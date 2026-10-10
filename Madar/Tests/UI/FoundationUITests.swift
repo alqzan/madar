@@ -2,6 +2,7 @@ import XCTest
 
 @MainActor final class FoundationUITests: XCTestCase {
     func test_M0S2_BackupPasswordConfirmationAndFixtureIsolation() throws {
+        continueAfterFailure = false
         // A second fresh fixture must not inherit the first fixture's configured Keychain key.
         for size in ["L", "AX3"] {
             let app = XCUIApplication()
@@ -9,24 +10,24 @@ import XCTest
             app.launchEnvironment["MADAR_UI_SIZE"] = size
             app.launch(); openBackupSettings(app)
             XCTAssertTrue(app.staticTexts["backup-key-setup"].waitForExistence(timeout: 10), app.debugDescription)
+            let passphrase = "test-only-passphrase"
             let password = app.secureTextFields["backup-password"]
             scrollTo(password, in: app)
-            password.tap(); password.typeText("test-only-passphrase")
+            password.tap(); password.typeText(passphrase)
             attachScreenshot(app, named: "M0-backup-before-confirmation-\(size)")
             // Exercise native Next while the keyboard changes the Form's visible area,
             // instead of tapping a row whose frame may be outside that area.
             password.typeText("\n")
             let confirmation = app.secureTextFields["backup-password-confirmation"]
-            let mismatch = "test-only-passphrase!"
+            let mismatch = passphrase + "!"
             confirmation.typeText(mismatch)
-            app.buttons["backup-keyboard-done"].tap()
             let export = app.buttons["backup-now"]
+            XCTAssertEqual(export.value as? String, "passphrase-count=\(passphrase.count);confirmation-count=\(mismatch.count);matches=false;busy=false")
             XCTAssertFalse(export.isEnabled, "A mismatched confirmation must not permit export.")
-
-            scrollTo(confirmation, in: app)
-            confirmation.tap()
-            confirmation.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: mismatch.count))
-            confirmation.typeText("test-only-passphrase")
+            // The insertion point is still at the end; remove only the extra mismatching
+            // character. Re-tapping a populated secure field can move the insertion point.
+            confirmation.typeText(XCUIKeyboardKey.delete.rawValue)
+            XCTAssertEqual(export.value as? String, "passphrase-count=\(passphrase.count);confirmation-count=\(passphrase.count);matches=true;busy=false")
             app.buttons["backup-keyboard-done"].tap()
             scrollTo(export, in: app)
             XCTAssertTrue(export.isEnabled, app.debugDescription); export.tap()
