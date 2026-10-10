@@ -32,3 +32,30 @@ No simulator was launched by this agent. No physical widget/notification action,
 Unresolved/quarantine files are retained for explicit app review; this tranche does not invent a resolver UI or silently discard them. An unreadable quarantined identity conservatively blocks receipt collection until resolved. Generation-scoped completion markers intentionally preserve identity provenance beyond receipt retention; they store no command payload. Future room actions must add their reviewed authorization and post-commit invalidations/scheduled-request handling before surfacing an entry point.
 
 For the root: merge the narrow `MadarApp` lifecycle hooks with M0-T05's backup-key initializer patch, regenerate the project with the existing fonts, run actual launch/foreground tests with isolated inbox stores, and include this diff in the Top M0-S1 section review. `CommandEnvelope.schemaVersion == 1` / inbox transportVersion 1 are independent from the data-store schema migration. Next session: Top (Sol xhigh) section review/gate evidence; production additions remain Standard high.
+
+## Root reconciliation and integration — 2026-10-10
+
+Accepted scope: independent Top review `docs/reviews/M0-command-inbox.md` now approves transport/data through 9db4191. Initial collision, cross-generation receipts and unknown-command findings were fixed separately; a fix-only follow-up also covers retained completion provenance after receipt/scope GC. No model field was added. Freshly authorized IDs still apply; stale deterministic IDs remain unresolved across replacement. Branch with host tests 76bab3c merged on main as 3e54a53. M0-S1 and whole M0 remain open for RA4/export/gate.
+
+Current main evidence:
+
+```text
+swift test --package-path Madar/Packages/MadarCore
+Test run with 21 tests ... passed.
+swift test --package-path Madar/Packages/MadarCommands
+Test run with 17 tests in 2 suites passed.
+swift test --package-path Madar/Packages/MadarInbox
+Test run with 6 tests ... passed.
+xcodebuild -project Madar/Madar.xcodeproj -scheme Madar -destination 'platform=iOS Simulator,id=412F4437-7BD7-44D1-AA3D-2B7158090E14' -only-testing:MadarTests test
+Executed 15 tests, with 0 failures (3.058 seconds).
+** TEST SUCCEEDED **
+python3 Madar/scripts/inbox-process-test.py
+producerStoreFiles=0, producerLinksSwiftData=false,
+rows=1, receipts=2, refreshes=3, unacknowledged=0, passed=true.
+```
+
+Raw commands (including signing/derived-data/result arguments) and output: `Madar/Artifacts/automation-main-integration.log`, `automation-final-{core,commands,inbox,process}.log`. Four real AppSession tests cover deferred two-source drain/snapshot refresh, same-ID replay, writer quiescence/resume and actual encrypted-backup replacement while retaining device receipts. The final main suite also includes the preserved-value/hidden-route regression.
+
+The coordinator installed the final main simulator app and launched its actual @main process with fresh fixture `automation-inbox-ce07176d-9126-4628-aad0-ac7acbefe685`. Before launch, two external synthetic JSONL producers left no store files. Cold launch produced one PrayerLog/two receipts/zero pending or processing deliveries; a same-ID re-delivery followed by process relaunch preserved those counts and the foundation snapshot. `automation-cold-launch.json` records tested revision 3e54a53 and `automation-cold-launch.log` records the app launches. Test driver retained at `/tmp/madar-inbox-cold-launch.py`; this is controlled simulator evidence, not a physical extension/notification delivery.
+
+Not tested: actual background-to-foreground delivery, physical iPhone surfaces, before-first-unlock protection, process kill inside fsync/CoreData save, VoiceOver, real-owner-data migration or whole milestone acceptance. UI backup password/export failure remains separately open; host-level backup restore success does not close it.
