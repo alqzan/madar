@@ -213,7 +213,11 @@ struct BackupSettingsView: View {
         if let fixture = ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"], UUID(uuidString: fixture) != nil {
             // Only an isolated UI fixture exposes non-secret diagnostics to XCTest.
             // Never expose the passphrase itself, even in a failing accessibility snapshot.
-            button.accessibilityValue("passphrase-count=\(model.exportPassphrase.count);confirmation-count=\(model.exportConfirmation.count);matches=\(model.exportPassphrase == model.exportConfirmation);busy=\(model.busy)")
+            let diagnostic = "passphrase-count=" + String(model.exportPassphrase.count)
+                + ";confirmation-count=" + String(model.exportConfirmation.count)
+                + ";matches=" + String(model.exportPassphrase == model.exportConfirmation)
+                + ";busy=" + String(model.busy)
+            button.accessibilityValue(Text(verbatim: diagnostic))
         } else { button }
         #else
         button
