@@ -1,6 +1,26 @@
 import XCTest
 
 @MainActor final class FoundationUITests: XCTestCase {
+    func test_M0S2_SecurePasswordTypingTransport() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment["MADAR_UI_STORE_ID"] = UUID().uuidString
+        app.launchEnvironment["MADAR_UI_SIZE"] = "L"
+        app.launch(); openBackupSettings(app)
+        let password = app.secureTextFields["backup-password"]
+        let export = app.buttons["backup-now"]
+        scrollTo(password, in: app)
+        password.tap()
+        for (index, character) in "test-only-passphrase".enumerated() {
+            password.typeText(String(character))
+            let expectedCount = index + 1
+            let diagnostic = export.value as? String
+            print("Secure UI input stage \(expectedCount): \(diagnostic ?? "no diagnostic")")
+            XCTAssertEqual(diagnostic, "passphrase-count=\(expectedCount);confirmation-count=0;matches=false;busy=false")
+        }
+        attachScreenshot(app, named: "M0-backup-character-transport-L")
+        app.terminate()
+    }
     func test_M0S2_BackupPasswordConfirmationAndFixtureIsolation() throws {
         continueAfterFailure = false
         // A second fresh fixture must not inherit the first fixture's configured Keychain key.
