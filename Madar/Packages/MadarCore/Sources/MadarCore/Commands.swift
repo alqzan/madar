@@ -72,6 +72,12 @@ public struct CommandTransactionRequest: Sendable {
     public let semantics: CommandSemantics
     public let payloadHash: String
     public let naturalKey: String?
+    /// App transaction namespace, never part of the producer's command identity.
+    public let generationID: UUID?
+    public init(envelope: CommandEnvelope, operation: CommandOperation, semantics: CommandSemantics, payloadHash: String, naturalKey: String?, generationID: UUID? = nil) {
+        self.envelope = envelope; self.operation = operation; self.semantics = semantics
+        self.payloadHash = payloadHash; self.naturalKey = naturalKey; self.generationID = generationID
+    }
     /// Expiry permits later garbage collection; it does not erase an on-disk replay identity.
     /// The inbox coordinator pins receipts until every delivery has been acknowledged.
     public func replayOutcome(receipts: [CoreCommandReceipt]) -> CommandOutcome? {
@@ -97,7 +103,7 @@ public protocol CommandStoreAdapter: Sendable {
 public struct CommandBus: Sendable {
     private let adapter: any CommandStoreAdapter
     public init(adapter: any CommandStoreAdapter) { self.adapter = adapter }
-    public func execute(_ envelope: CommandEnvelope, now: Date = Date()) async throws -> CommandOutcome {
+    public func execute(_ envelope: CommandEnvelope, now: Date = Date(), generationID: UUID? = nil) async throws -> CommandOutcome {
         guard envelope.schemaVersion == 1, envelope.issuedAt <= now.addingTimeInterval(300), case .object(let payload) = envelope.payload else { return .init(status: .rejected, reason: "invalidCommand") }
         let externalPrayerCommands = ["prayer.log", "prayer.makeUp", "prayer.answerHeart", "prayer.logQiyam"]
         let systemPrayerCommands = ["prayer.agePending", "prayer.initializeTracking"]
@@ -142,6 +148,6 @@ public struct CommandBus: Sendable {
             operation = .undo(token: id); semantics = .undo; naturalKey = nil
         default: return .init(status: .rejected, reason: "unavailableInM0")
         }
-        return try await adapter.transact(CommandTransactionRequest(envelope: envelope, operation: operation, semantics: semantics, payloadHash: try envelope.payload.sha256(), naturalKey: naturalKey), now: now)
+        return try await adapter.transact(CommandTransactionRequest(envelope: envelope, operation: operation, semantics: semantics, payloadHash: try envelope.payload.sha256(), naturalKey: naturalKey, generationID: generationID), now: now)
     }
 }

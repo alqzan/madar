@@ -183,4 +183,70 @@ import MadarInbox
         #expect(try FileManager.default.contentsOfDirectory(atPath: inbox.directory.appending(path: "quarantine").path).filter { $0.hasSuffix(".jsonl") }.count == 1)
     }
 
+    @Test func test_M0S1_newGenerationCannotReplayOldReceipt() async throws {
+        // Both a fully acknowledged save and an interrupted save-before-refresh retain
+        // Device.store identity across a synthetic domain replacement.
+        for interrupted in [false, true] {
+            let (container, adapter, inbox) = try fixture(), old = UUID(), replacement = UUID()
+            let first = prayer(generation: old)
+            _ = try inbox.enqueue(first)
+            var active = old, failRefresh = interrupted, refreshes = 0
+            let drainer = InboxDrainer(inbox: inbox, bus: CommandBus(adapter: adapter), generation: { .init(generationID: active, acceptsUnstampedDeliveries: false) }, hasReceipt: { try adapter.hasReceipt(commandID: $0) }, refresh: {
+                if failRefresh { throw InboxError.io(5) }
+                refreshes += 1
+            })
+            if interrupted { await #expect(throws: InboxError.self) { try await drainer.drain() } }
+            else { try await drainer.drain() }
+            #expect(try adapter.hasReceipt(commandID: first.command.commandID))
+            #expect(try inbox.wasCommitted(commandID: first.command.commandID, generationID: old) == !interrupted)
+            let context = ModelContext(container)
+            for row in try context.fetch(FetchDescriptor<PrayerLog>()) { context.delete(row) }
+            try context.save()
+            active = replacement; failRefresh = false
+            let stampedRetry = InboxRecord(expectedGenerationID: replacement, command: first.command)
+            _ = try inbox.enqueue(stampedRetry)
+            try await drainer.drain()
+            #expect(try ModelContext(container).fetchCount(FetchDescriptor<PrayerLog>()) == 0)
+            #expect(try ModelContext(container).fetchCount(FetchDescriptor<MadarData.CommandReceipt>()) == 1)
+            #expect(try inbox.processingFiles().isEmpty)
+            #expect(try inbox.unacknowledgedCommandIDs() == [first.command.commandID])
+            #expect(try FileManager.default.contentsOfDirectory(atPath: inbox.directory.appending(path: "unresolved").path).filter { $0.hasSuffix(".jsonl") }.count == (interrupted ? 2 : 1))
+            #expect(!((try inbox.wasCommitted(commandID: first.command.commandID, generationID: replacement))))
+            #expect(refreshes == (interrupted ? 0 : 1))
+        }
+    }
+
+    @Test func test_M0S1_inheritedReceiptWithoutGenerationRemainsUnresolved() async throws {
+        let (container, adapter, inbox) = try fixture(), generation = UUID(), first = prayer(generation: UUID())
+        let receipt = MadarData.CommandReceipt()
+        receipt.commandID = first.command.commandID; receipt.name = first.command.name
+        receipt.payloadHash = try first.command.payload.sha256(); receipt.status = "applied"
+        let context = ModelContext(container); context.insert(receipt); try context.save()
+        _ = try inbox.enqueue(.init(expectedGenerationID: generation, command: first.command))
+        let drainer = InboxDrainer(inbox: inbox, bus: CommandBus(adapter: adapter), generation: { .init(generationID: generation, acceptsUnstampedDeliveries: false) }, hasReceipt: { try adapter.hasReceipt(commandID: $0) }, refresh: { Issue.record("unknown receipt scope must not refresh") })
+        try await drainer.drain()
+        #expect(try ModelContext(container).fetchCount(FetchDescriptor<PrayerLog>()) == 0)
+        #expect(try ModelContext(container).fetchCount(FetchDescriptor<MadarData.CommandReceipt>()) == 1)
+        #expect(try inbox.unacknowledgedCommandIDs() == [first.command.commandID])
+        #expect(try inbox.processingFiles().isEmpty)
+        #expect(!((try inbox.wasCommitted(commandID: first.command.commandID, generationID: generation))))
+    }
+
+    @Test func test_M0S1_scopedReceiptReopensAfterSaveBeforeRefresh() async throws {
+        let (container, adapter, inbox) = try fixture(), generation = UUID(), first = prayer(generation: UUID())
+        _ = try inbox.enqueue(.init(expectedGenerationID: generation, command: first.command))
+        let interrupted = InboxDrainer(inbox: inbox, bus: CommandBus(adapter: adapter), generation: { .init(generationID: generation, acceptsUnstampedDeliveries: false) }, hasReceipt: { try adapter.hasReceipt(commandID: $0) }, refresh: { throw InboxError.io(5) })
+        await #expect(throws: InboxError.self) { try await interrupted.drain() }
+        let stamp = try #require(try ModelContext(container).fetch(FetchDescriptor<PrayerLog>()).first?.updatedAt)
+        #expect(!((try inbox.wasCommitted(commandID: first.command.commandID, generationID: generation))))
+        let reopened = try MadarContainerFactory.makeLocal(at: adapter.lockDirectory)
+        let restartedAdapter = DurableCommandAdapter(container: reopened, lockDirectory: adapter.lockDirectory, generationProvider: { generation })
+        let restarted = InboxDrainer(inbox: PendingInbox(directory: inbox.directory), bus: CommandBus(adapter: restartedAdapter), generation: { .init(generationID: generation, acceptsUnstampedDeliveries: false) }, hasReceipt: { try restartedAdapter.hasReceipt(commandID: $0) }, refresh: {})
+        try await restarted.drain()
+        #expect(try inbox.processingFiles().isEmpty)
+        #expect(try ModelContext(reopened).fetch(FetchDescriptor<PrayerLog>()).first?.updatedAt == stamp)
+        #expect(try ModelContext(reopened).fetchCount(FetchDescriptor<MadarData.CommandReceipt>()) == 1)
+        #expect(try inbox.wasCommitted(commandID: first.command.commandID, generationID: generation))
+    }
+
 }

@@ -57,9 +57,12 @@ import MadarInbox
             if try inbox.wasCommitted(commandID: record.command.commandID, generationID: active.generationID), !(try hasReceipt(record.command.commandID)) {
                 try inbox.retainForResolution(file, reason: "legacyIdentityAmbiguous"); continue
             }
-            let outcome = try await bus.execute(record.command, now: now)
+            let outcome = try await bus.execute(record.command, now: now, generationID: active.generationID)
             switch outcome.status {
-            case .needsApp, .needsUnlock: continue // recoverable; no deletion or false success
+            case .needsApp, .needsUnlock:
+                if outcome.reason == "receiptGenerationMismatch" { try inbox.retainForResolution(file, reason: "generationChanged") }
+                else if outcome.reason == "receiptGenerationUnknown" { try inbox.retainForResolution(file, reason: "legacyIdentityAmbiguous") }
+                continue // recoverable; no deletion or false success
             case .rejected: try inbox.quarantine(file, reason: "invalidCommand")
             case .applied, .duplicate:
                 try Task.checkCancellation()

@@ -66,7 +66,10 @@ final class AppSession {
         guard let group = groupDirectory ?? FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.alqzan.madar2") else { throw DataError.missingAppGroup }
         snapshotStore = SnapshotStore(directory: group.appending(path: "Snapshots", directoryHint: .isDirectory))
         pendingInbox = PendingInbox(directory: group.appending(path: "PendingInbox", directoryHint: .isDirectory))
-        commandAdapter = DurableCommandAdapter(containerProvider: { try managedStore?.containerForTransaction() ?? container }, lockDirectory: managedStore?.commandLockURL.deletingLastPathComponent() ?? group)
+        commandAdapter = DurableCommandAdapter(containerProvider: { try managedStore?.containerForTransaction() ?? container }, lockDirectory: managedStore?.commandLockURL.deletingLastPathComponent() ?? group, generationProvider: {
+            if let managedStore { return managedStore.binding.generationID }
+            return try PendingInbox(directory: group.appending(path: "PendingInbox")).currentGeneration()?.generationID
+        })
         bus = CommandBus(adapter: commandAdapter)
         schema = try SettingsSchema.bundled()
         store = SettingsStore(context: container.mainContext, schema: schema)
