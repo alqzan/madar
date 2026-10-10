@@ -242,7 +242,9 @@
     }
    ],
    "storage": "DeviceSetting (deviceOnly configuration, never synced)",
-   "preset": true
+   "preset": true,
+   "availability": "v2",
+   "reviewFix": "RA8"
   },
   {
    "key": "core.motion",
@@ -268,7 +270,9 @@
    ],
    "note": "تقليل الحركة في iOS يغلب",
    "storage": "DeviceSetting (deviceOnly configuration, never synced)",
-   "preset": true
+   "preset": true,
+   "availability": "v2",
+   "reviewFix": "RA8"
   },
   {
    "key": "core.roomIdentity",
@@ -289,7 +293,9 @@
     }
    ],
    "storage": "Setting (synced)",
-   "preset": true
+   "preset": true,
+   "availability": "v2",
+   "reviewFix": "RA8"
   },
   {
    "key": "core.homeCity",
@@ -440,10 +446,12 @@
    "section": "البيانات",
    "title": "زامن عبر iCloud",
    "type": "bool",
-   "default": true,
+   "default": false,
    "scope": "device",
    "storage": "DeviceSetting (deviceOnly configuration, never synced)",
-   "preset": false
+   "preset": false,
+   "availability": "deferred",
+   "reviewFix": "RA1"
   },
   {
    "key": "core.backup",
@@ -530,7 +538,9 @@
     }
    ],
    "storage": "Setting (synced)",
-   "preset": true
+   "preset": true,
+   "availability": "v2",
+   "reviewFix": "RA8"
   },
   {
    "key": "tabbar.labels",
@@ -560,7 +570,9 @@
     }
    },
    "storage": "Setting (synced)",
-   "preset": true
+   "preset": true,
+   "availability": "v2",
+   "reviewFix": "RA8"
   },
   {
    "key": "tabbar.openOn",
@@ -585,7 +597,9 @@
     }
    ],
    "storage": "Setting (synced)",
-   "preset": true
+   "preset": true,
+   "availability": "v2",
+   "reviewFix": "RA8"
   },
   {
    "key": "tabbar.minimizeOnScroll",
@@ -596,7 +610,9 @@
    "default": true,
    "scope": "sync",
    "storage": "Setting (synced)",
-   "preset": true
+   "preset": true,
+   "availability": "v2",
+   "reviewFix": "RA8"
   },
   {
    "key": "tabbar.searchTab",
@@ -718,7 +734,9 @@
      "habits",
      "mihbara"
     ]
-   }
+   },
+   "availability": "v2",
+   "reviewFix": "RA8"
   },
   {
    "key": "bahw.layout",
@@ -800,7 +818,9 @@
     }
    ],
    "storage": "Setting (synced)",
-   "preset": true
+   "preset": true,
+   "availability": "v2",
+   "reviewFix": "RA8"
   },
   {
    "key": "bahw.streakBreakAfter",
@@ -882,7 +902,9 @@
     }
    ],
    "storage": "Setting (synced)",
-   "preset": true
+   "preset": true,
+   "availability": "v2",
+   "reviewFix": "RA8"
   },
   {
    "key": "bahw.yearView",
@@ -907,7 +929,9 @@
     }
    ],
    "storage": "Setting (synced)",
-   "preset": true
+   "preset": true,
+   "availability": "v2",
+   "reviewFix": "RA8"
   },
   {
    "key": "bahw.yearWhich",
@@ -957,7 +981,9 @@
     }
    ],
    "storage": "Setting (synced)",
-   "preset": true
+   "preset": true,
+   "availability": "v2",
+   "reviewFix": "RA8"
   },
   {
    "key": "bahw.upcomingCount",
@@ -1004,7 +1030,9 @@
    ],
    "note": "توصية",
    "storage": "Setting (synced)",
-   "preset": true
+   "preset": true,
+   "availability": "v2",
+   "reviewFix": "RA8"
   },
   {
    "key": "bahw.widgetIdentity",
@@ -1026,7 +1054,9 @@
    ],
    "note": "لكل ودجة",
    "storage": "Setting (synced)",
-   "preset": true
+   "preset": true,
+   "availability": "v2",
+   "reviewFix": "RA8"
   },
   {
    "key": "bahw.iphoneWidgetFamily",
@@ -1051,7 +1081,9 @@
     }
    ],
    "storage": "Setting (synced)",
-   "preset": true
+   "preset": true,
+   "availability": "v2",
+   "reviewFix": "RA8"
   },
   {
    "key": "salah.layout",
@@ -1129,7 +1161,9 @@
     }
    ],
    "storage": "Setting (synced)",
-   "preset": true
+   "preset": true,
+   "availability": "v2",
+   "reviewFix": "RA8"
   },
   {
    "key": "salah.fridayTallArch",
@@ -1159,10 +1193,11 @@
    "section": "التسجيل",
    "title": "اسألني عن القلب",
    "type": "bool",
-   "default": true,
+   "default": false,
    "scope": "sync",
    "storage": "Setting (synced)",
-   "preset": false
+   "preset": false,
+   "reviewFix": "RP6"
   },
   {
    "key": "salah.trackingStart",
@@ -1380,11 +1415,12 @@
    "section": "التذكير",
    "title": "نشاط حيّ للصلاة القادمة (بعد انقضاء الحرمة)",
    "type": "bool",
-   "default": true,
+   "default": false,
    "scope": "sync",
    "note": "يبدأ من المقدّمة أو LiveActivityIntent أو مجدولًا عند نهاية الحرمة، ولا يبدأ عند الأذان. العدّ التنازلي نفسه ودجة بخط زمني مستقلة (تحقّق: البدء المجدول في iOS 26)",
    "storage": "Setting (synced)",
-   "preset": false
+   "preset": false,
+   "reviewFix": "RL5"
   },
   {
    "key": "quran.layout",
@@ -1447,7 +1483,9 @@
      "retention",
      "qiyam"
     ]
-   }
+   },
+   "availability": "v2",
+   "reviewFix": "RA8"
   },
   {
    "key": "quran.hifzLevel",
@@ -1617,10 +1655,12 @@
    "section": "الجلسة",
    "title": "المس الآية للتفسير",
    "type": "bool",
-   "default": true,
+   "default": false,
    "scope": "sync",
    "storage": "Setting (synced)",
-   "preset": true
+   "preset": true,
+   "reviewFix": "RQ8",
+   "availabilityGate": "M2 licence check"
   },
   {
    "key": "quran.weekLogView",
@@ -2198,7 +2238,9 @@
     "unique": true,
     "ascending": true,
     "exactItems": 7
-   }
+   },
+   "availability": "v2",
+   "reviewFix": "RA8"
   },
   {
    "key": "notes.showPhoto",
@@ -2274,10 +2316,11 @@
    "section": "الكتابة",
    "title": "الإملاء أولًا",
    "type": "bool",
-   "default": true,
+   "default": false,
    "scope": "sync",
    "storage": "Setting (synced)",
-   "preset": true
+   "preset": true,
+   "reviewFix": "RD5"
   },
   {
    "key": "notes.serverDictationConsent",
@@ -2484,7 +2527,9 @@
     }
    ],
    "storage": "Setting (synced)",
-   "preset": true
+   "preset": true,
+   "availability": "v2",
+   "reviewFix": "RA8"
   },
   {
    "key": "mihbara.sunnahPlace",
@@ -2513,7 +2558,9 @@
     }
    ],
    "storage": "Setting (synced)",
-   "preset": true
+   "preset": true,
+   "availability": "v2",
+   "reviewFix": "RA8"
   },
   {
    "key": "mihbara.rahlOpens",
@@ -2563,7 +2610,9 @@
     }
    ],
    "storage": "Setting (synced)",
-   "preset": true
+   "preset": true,
+   "availability": "v2",
+   "reviewFix": "RA8"
   },
   {
    "key": "mihbara.motivateStyle",
@@ -2588,7 +2637,9 @@
     }
    ],
    "storage": "Setting (synced)",
-   "preset": true
+   "preset": true,
+   "availability": "v2",
+   "reviewFix": "RA8"
   },
   {
    "key": "mihbara.notebookStyle",
@@ -2613,7 +2664,9 @@
     }
    ],
    "storage": "Setting (synced)",
-   "preset": true
+   "preset": true,
+   "availability": "v2",
+   "reviewFix": "RA8"
   },
   {
    "key": "mihbara.wirdCount",
@@ -2727,7 +2780,7 @@
     "font": "literata",
     "mode": "pages",
     "hyphenation": true,
-    "arabicHints": "hard"
+    "arabicHints": "none"
    },
    "scope": "sync",
    "storage": "Setting (synced)",
@@ -2741,8 +2794,12 @@
      "hyphenation": "Bool",
      "arabicHints": "String (values owned by §7.6)"
     },
-    "unknownKeys": "dropped on read, rejected on write"
-   }
+    "unknownKeys": "dropped on read, rejected on write",
+    "fieldAvailability": {
+     "arabicHints": "v2"
+    }
+   },
+   "reviewFix": "RMI1"
   },
   {
    "key": "mihbara.readingReminder",
@@ -2769,5 +2826,11 @@
    "storage": "Setting (synced)",
    "preset": false
   }
- ]
+ ],
+ "reviewAmendment": {
+  "file": "Madar - Handoff Review Fixes - V1.md",
+  "date": "2026-10-10",
+  "sourceVersion": 3,
+  "note": "Working copy; original handoff preserved in output/. Metadata does not itself prove UI gates."
+ }
 }
