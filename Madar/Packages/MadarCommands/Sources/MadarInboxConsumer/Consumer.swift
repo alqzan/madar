@@ -13,7 +13,7 @@ import MadarCommands
         let root = URL(fileURLWithPath: args[1], isDirectory: true)
         let container = try MadarContainerFactory.makeLocal(at: root.appending(path: "Store"))
         let inbox = PendingInbox(directory: root.appending(path: "PendingInbox"))
-        let adapter = DurableCommandAdapter(container: container, lockDirectory: root)
+        let adapter = DurableCommandAdapter(container: container, lockDirectory: root, generationProvider: { generationID })
         var refreshes = 0
         let drainer = InboxDrainer(inbox: inbox, bus: CommandBus(adapter: adapter), generation: { .init(generationID: generationID, acceptsUnstampedDeliveries: false) }, hasReceipt: { try adapter.hasReceipt(commandID: $0) }, refresh: {
             // A synthetic refresh checkpoint; production AppSession performs snapshots/history.
