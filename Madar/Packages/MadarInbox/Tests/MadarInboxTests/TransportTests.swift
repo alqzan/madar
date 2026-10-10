@@ -72,4 +72,32 @@ struct TransportTests {
         #expect(try inbox.claimBatch().isEmpty)
     }
 
+    @Test func test_M0S1_deliveryCollisionDoesNotBlockNeighbors() async throws {
+        let inbox = fixture(), generation = UUID(), first = record(generation: UUID())
+        _ = try inbox.enqueue(first)
+        let original = try #require(try inbox.claimBatch().first)
+        // Publication after claim accepts a second immutable delivery. Both must survive.
+        _ = try inbox.enqueue(first)
+        let neighbor = record(generation: generation)
+        _ = try inbox.enqueue(neighbor)
+        let retryBatch = try inbox.claimBatch()
+        #expect(retryBatch.count == 3)
+        #expect(try retryBatch.map { try inbox.read($0) }.filter { $0 == first }.count == 2)
+        for file in retryBatch where file.standardizedFileURL.resolvingSymlinksInPath().path != original.standardizedFileURL.resolvingSymlinksInPath().path { try inbox.acknowledge(file) }
+        let changed = InboxRecord(deliveryID: first.deliveryID, expectedGenerationID: first.expectedGenerationID,
+                                  command: neighbor.command)
+        // A producer can publish while the app is claiming other files.
+        async let publish: InboxTicket = Task.detached { try inbox.enqueue(changed) }.value
+        _ = try inbox.claimBatch()
+        _ = try await publish
+        let reopened = PendingInbox(directory: inbox.directory)
+        let recovered = try reopened.claimBatch()
+        #expect(recovered.count == 2)
+        #expect(Set(try recovered.map { try reopened.read($0).command.commandID }) == [first.command.commandID, neighbor.command.commandID])
+        #expect(try reopened.unacknowledgedCommandIDs() == [first.command.commandID, neighbor.command.commandID])
+        for file in recovered { try reopened.quarantine(file, reason: "invalidCommand") }
+        #expect(try reopened.claimBatch().isEmpty)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: inbox.directory.appending(path: "quarantine").path).filter { $0.hasSuffix(".jsonl") }.count == 2)
+    }
+
 }

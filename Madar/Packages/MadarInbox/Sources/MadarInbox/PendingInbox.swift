@@ -62,13 +62,15 @@ public struct PendingInbox: Sendable {
         try prepare()
         let resumed = try files(in: "processing")
         var claimed: [URL] = []
-        for file in try files(in: "pending") {
-            let destination = directory.appending(path: "processing/\(file.lastPathComponent)")
-            let result = renamex_np(file.path, destination.path, UInt32(RENAME_EXCL))
-            if result != 0 {
-                if errno == ENOENT { continue }
-                if errno == EEXIST { throw InboxError.duplicateDelivery }
-                throw InboxError.io(errno)
+        pendingFiles: for file in try files(in: "pending") {
+            // Delivery IDs identify envelopes, not physical file ownership. A producer may
+            // publish the same ID after the first file was claimed. Preserve both accepted
+            // records under distinct filenames; only the command transaction resolves replay.
+            var destination = directory.appending(path: "processing/\(file.lastPathComponent)")
+            while renamex_np(file.path, destination.path, UInt32(RENAME_EXCL)) != 0 {
+                if errno == ENOENT { continue pendingFiles }
+                guard errno == EEXIST else { throw InboxError.io(errno) }
+                destination = directory.appending(path: "processing/\(file.deletingPathExtension().lastPathComponent)~\(UUID()).jsonl")
             }
             try syncDirectory(file.deletingLastPathComponent()); try syncDirectory(destination.deletingLastPathComponent())
             claimed.append(destination)
@@ -85,7 +87,7 @@ public struct PendingInbox: Sendable {
         do { record = try JSONDecoder().decode(InboxRecord.self, from: data.dropLast()) }
         catch { throw InboxError.malformedRecord }
         guard record.transportVersion == 1 else { throw InboxError.unknownVersion }
-        guard record.deliveryID.uuidString == file.deletingPathExtension().lastPathComponent else { throw InboxError.malformedRecord }
+        guard record.deliveryID == deliveryID(for: file) else { throw InboxError.malformedRecord }
         return record
     }
     /// Save replay provenance after commit+refresh and before unlink. A later retry whose
@@ -145,24 +147,33 @@ public struct PendingInbox: Sendable {
         let url = directory.appending(path: folder, directoryHint: .isDirectory)
         guard FileManager.default.fileExists(atPath: url.path) else { return [] }
         return try FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: [.isRegularFileKey])
-            .filter { $0.pathExtension == "jsonl" && UUID(uuidString: $0.deletingPathExtension().lastPathComponent) != nil }
+            .filter { $0.pathExtension == "jsonl" && deliveryID(for: $0) != nil }
             .sorted { $0.lastPathComponent < $1.lastPathComponent }
+    }
+    private func deliveryID(for file: URL) -> UUID? {
+        let parts = file.deletingPathExtension().lastPathComponent.split(separator: "~", omittingEmptySubsequences: false)
+        guard parts.count == 1 || (parts.count == 2 && UUID(uuidString: String(parts[1])) != nil) else { return nil }
+        return UUID(uuidString: String(parts[0]))
     }
     private func validate(_ file: URL, folder: String) throws {
         let actualParent = file.deletingLastPathComponent().standardizedFileURL.resolvingSymlinksInPath().path
         let expectedParent = directory.appending(path: folder, directoryHint: .isDirectory).standardizedFileURL.resolvingSymlinksInPath().path
         guard actualParent == expectedParent,
-              file.pathExtension == "jsonl", UUID(uuidString: file.deletingPathExtension().lastPathComponent) != nil,
+              file.pathExtension == "jsonl", deliveryID(for: file) != nil,
               try file.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey]).isRegularFile == true,
               try file.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink != true else { throw InboxError.invalidLocation }
     }
     private func retain(_ file: URL, folder: String, reason: String) throws {
         try validate(file, folder: "processing")
-        let id = UUID(uuidString: file.deletingPathExtension().lastPathComponent)!
+        let id = deliveryID(for: file)!
         // Fixed machine reason only; never write a command payload or localized error description.
         guard ["malformedRecord", "unknownVersion", "invalidCommand", "generationChanged", "legacyIdentityAmbiguous"].contains(reason) else { throw InboxError.invalidLocation }
-        let destination = location(folder, id)
-        let diagnostic = directory.appending(path: "\(folder)/\(id.uuidString).diagnostic.json")
+        var destination = directory.appending(path: "\(folder)/\(file.lastPathComponent)")
+        // Retained copies can collide too, including across app restarts.
+        while FileManager.default.fileExists(atPath: destination.path) {
+            destination = directory.appending(path: "\(folder)/\(id.uuidString)~\(UUID()).jsonl")
+        }
+        let diagnostic = destination.deletingPathExtension().appendingPathExtension("diagnostic.json")
         try publish(encode(InboxDiagnostic(version: 1, deliveryID: id, reason: reason)), to: diagnostic, exclusive: false)
         guard renamex_np(file.path, destination.path, UInt32(RENAME_EXCL)) == 0 else { throw InboxError.io(errno) }
         try syncDirectory(file.deletingLastPathComponent()); try syncDirectory(destination.deletingLastPathComponent())

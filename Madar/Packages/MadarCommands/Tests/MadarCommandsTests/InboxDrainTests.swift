@@ -158,4 +158,29 @@ import MadarInbox
         #expect(try inbox.processingFiles().count == 1)
     }
 
+    @Test func test_M0S1_deliveryCollisionDoesNotBlockNeighbors() async throws {
+        let (container, adapter, inbox) = try fixture(), generation = UUID()
+        let first = prayer(generation: generation)
+        _ = try inbox.enqueue(first)
+        _ = try inbox.claimBatch()
+        _ = try inbox.enqueue(first)
+        let neighbor = prayer(generation: generation)
+        _ = try inbox.enqueue(neighbor)
+        let drainer = InboxDrainer(inbox: inbox, bus: CommandBus(adapter: adapter), generation: { .init(generationID: generation, acceptsUnstampedDeliveries: false) }, hasReceipt: { try adapter.hasReceipt(commandID: $0) }, refresh: {})
+        try await drainer.drain()
+        #expect(try inbox.processingFiles().isEmpty)
+        #expect(try ModelContext(container).fetchCount(FetchDescriptor<MadarData.CommandReceipt>()) == 2)
+        #expect(try ModelContext(container).fetchCount(FetchDescriptor<PrayerLog>()) == 1)
+        // Same transport ID with conflicting command identity must preserve the accepted
+        // original, reject only the payload mismatch, and let the valid command proceed.
+        _ = try inbox.enqueue(first)
+        _ = try inbox.claimBatch()
+        let changed = CommandEnvelope(commandID: first.command.commandID, name: "prayer.log", payload: .object(["dayKey": .string("2026-10-10"), "prayer": .string("fajr"), "status": .string("alone")]), source: .widget)
+        _ = try inbox.enqueue(.init(deliveryID: first.deliveryID, expectedGenerationID: generation, command: changed))
+        try await drainer.drain()
+        #expect(try inbox.processingFiles().isEmpty)
+        #expect(try ModelContext(container).fetch(FetchDescriptor<PrayerLog>()).first?.status == "jamaah")
+        #expect(try FileManager.default.contentsOfDirectory(atPath: inbox.directory.appending(path: "quarantine").path).filter { $0.hasSuffix(".jsonl") }.count == 1)
+    }
+
 }
