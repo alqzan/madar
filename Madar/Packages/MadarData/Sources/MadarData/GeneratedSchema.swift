@@ -1,12 +1,12 @@
 import Foundation
 import SwiftData
 public enum MadarSchema: VersionedSchema {
-    public static let versionIdentifier = Schema.Version(1, 0, 0)
+    public static let versionIdentifier = Schema.Version(2, 0, 0)
     public static var models: [any PersistentModel.Type] { syncedTypes + deviceTypes }
-    public static let version = 1
-    public static let syncedTypes: [any PersistentModel.Type] = [Setting.self, LayoutState.self, Preset.self, Trip.self, UpcomingDay.self, ImportBatch.self, ImportLink.self, PrayerLog.self, QadaItem.self, QiyamNight.self, HifzPlan.self, HifzSession.self, PageGrade.self, MistakeSpot.self, MistakeEvent.self, QuranDayState.self, QuranAllotment.self, RecoveryPlan.self, DayPage.self, Niyya.self, Entry.self, HiddenAutoLine.self, MarginNote.self, Letter.self, Project.self, Media.self, Account.self, Card.self, Statement.self, CashbackEntry.self, Transaction.self, Allocation.self, Reconciliation.self, BankMessage.self, Cycle.self, CyclePolicy.self, Envelope.self, EnvelopePlan.self, Obligation.self, InstallmentItem.self, Category.self, CategoryLimit.self, MerchantRule.self, ZakatProfile.self, Book.self, ReadingSession.self, Highlight.self, NotebookNote.self, HadithProgress.self, UserWord.self, Habit.self, HabitPolicy.self, HabitPause.self, HabitLog.self, WidgetConfig.self]
+    public static let version = 2
+    public static let syncedTypes: [any PersistentModel.Type] = [Setting.self, LayoutState.self, Preset.self, Trip.self, UpcomingDay.self, ImportBatch.self, ImportLink.self, PrayerLog.self, QadaItem.self, QiyamNight.self, HifzPlan.self, HifzSession.self, PageGrade.self, MistakeSpot.self, MistakeEvent.self, QuranDayState.self, QuranAllotment.self, RecoveryPlan.self, DayPage.self, Niyya.self, Entry.self, HiddenAutoLine.self, MarginNote.self, Letter.self, Project.self, Media.self, Account.self, Card.self, Statement.self, CashbackEntry.self, MoneyTransaction.self, Allocation.self, Reconciliation.self, BankMessage.self, Cycle.self, CyclePolicy.self, Envelope.self, EnvelopePlan.self, Obligation.self, InstallmentItem.self, Category.self, CategoryLimit.self, MerchantRule.self, ZakatProfile.self, Book.self, ReadingSession.self, Highlight.self, NotebookNote.self, HadithProgress.self, UserWord.self, Habit.self, HabitPolicy.self, HabitPause.self, HabitLog.self, WidgetConfig.self]
     public static let deviceTypes: [any PersistentModel.Type] = [DeviceSetting.self, NotificationLedger.self, CommandReceipt.self, PageSchedule.self, SessionDraft.self, ProcessingJob.self]
-    public static let syncedNames: [String] = ["Setting", "LayoutState", "Preset", "Trip", "UpcomingDay", "ImportBatch", "ImportLink", "PrayerLog", "QadaItem", "QiyamNight", "HifzPlan", "HifzSession", "PageGrade", "MistakeSpot", "MistakeEvent", "QuranDayState", "QuranAllotment", "RecoveryPlan", "DayPage", "Niyya", "Entry", "HiddenAutoLine", "MarginNote", "Letter", "Project", "Media", "Account", "Card", "Statement", "CashbackEntry", "Transaction", "Allocation", "Reconciliation", "BankMessage", "Cycle", "CyclePolicy", "Envelope", "EnvelopePlan", "Obligation", "InstallmentItem", "Category", "CategoryLimit", "MerchantRule", "ZakatProfile", "Book", "ReadingSession", "Highlight", "NotebookNote", "HadithProgress", "UserWord", "Habit", "HabitPolicy", "HabitPause", "HabitLog", "WidgetConfig"]
+    public static let syncedNames: [String] = ["Setting", "LayoutState", "Preset", "Trip", "UpcomingDay", "ImportBatch", "ImportLink", "PrayerLog", "QadaItem", "QiyamNight", "HifzPlan", "HifzSession", "PageGrade", "MistakeSpot", "MistakeEvent", "QuranDayState", "QuranAllotment", "RecoveryPlan", "DayPage", "Niyya", "Entry", "HiddenAutoLine", "MarginNote", "Letter", "Project", "Media", "Account", "Card", "Statement", "CashbackEntry", "MoneyTransaction", "Allocation", "Reconciliation", "BankMessage", "Cycle", "CyclePolicy", "Envelope", "EnvelopePlan", "Obligation", "InstallmentItem", "Category", "CategoryLimit", "MerchantRule", "ZakatProfile", "Book", "ReadingSession", "Highlight", "NotebookNote", "HadithProgress", "UserWord", "Habit", "HabitPolicy", "HabitPause", "HabitLog", "WidgetConfig"]
     public static var schema: Schema { Schema(versionedSchema: Self.self) }
 }
 @MainActor public enum RecordBridge {
@@ -42,7 +42,7 @@ public enum MadarSchema: VersionedSchema {
         rows += try context.fetch(FetchDescriptor<Card>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<Statement>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<CashbackEntry>()).map { try $0.record() }
-        rows += try context.fetch(FetchDescriptor<Transaction>()).map { try $0.record() }
+        rows += try context.fetch(FetchDescriptor<MoneyTransaction>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<Allocation>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<Reconciliation>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<BankMessage>()).map { try $0.record() }
@@ -73,6 +73,16 @@ public enum MadarSchema: VersionedSchema {
         if !syncedOnly { rows += try context.fetch(FetchDescriptor<PageSchedule>()).map { try $0.record() } }
         if !syncedOnly { rows += try context.fetch(FetchDescriptor<SessionDraft>()).map { try $0.record() } }
         if !syncedOnly { rows += try context.fetch(FetchDescriptor<ProcessingJob>()).map { try $0.record() } }
+        return rows
+    }
+    public static func deviceRecords(_ context: ModelContext) throws -> [DataRecord] {
+        var rows: [DataRecord] = []
+        rows += try context.fetch(FetchDescriptor<DeviceSetting>()).map { try $0.record() }
+        rows += try context.fetch(FetchDescriptor<NotificationLedger>()).map { try $0.record() }
+        rows += try context.fetch(FetchDescriptor<CommandReceipt>()).map { try $0.record() }
+        rows += try context.fetch(FetchDescriptor<PageSchedule>()).map { try $0.record() }
+        rows += try context.fetch(FetchDescriptor<SessionDraft>()).map { try $0.record() }
+        rows += try context.fetch(FetchDescriptor<ProcessingJob>()).map { try $0.record() }
         return rows
     }
     public static func instances(_ context: ModelContext) throws -> [any MadarRecordModel] {
@@ -107,7 +117,7 @@ public enum MadarSchema: VersionedSchema {
         result += try context.fetch(FetchDescriptor<Card>())
         result += try context.fetch(FetchDescriptor<Statement>())
         result += try context.fetch(FetchDescriptor<CashbackEntry>())
-        result += try context.fetch(FetchDescriptor<Transaction>())
+        result += try context.fetch(FetchDescriptor<MoneyTransaction>())
         result += try context.fetch(FetchDescriptor<Allocation>())
         result += try context.fetch(FetchDescriptor<Reconciliation>())
         result += try context.fetch(FetchDescriptor<BankMessage>())
@@ -196,8 +206,8 @@ public enum MadarSchema: VersionedSchema {
             let row = Statement(); context.insert(row); try row.apply(record)
         case "CashbackEntry":
             let row = CashbackEntry(); context.insert(row); try row.apply(record)
-        case "Transaction":
-            let row = Transaction(); context.insert(row); try row.apply(record)
+        case "MoneyTransaction":
+            let row = MoneyTransaction(); context.insert(row); try row.apply(record)
         case "Allocation":
             let row = Allocation(); context.insert(row); try row.apply(record)
         case "Reconciliation":
@@ -413,9 +423,9 @@ public enum MadarSchema: VersionedSchema {
             let row = rows.first { $0.id == record.id && $0.mergedInto?.uuidString == record.fields["mergedInto"]?.string } ?? CashbackEntry()
             if row.modelContext == nil { context.insert(row) }
             try row.apply(record)
-        case "Transaction":
-            let rows = try context.fetch(FetchDescriptor<Transaction>())
-            let row = rows.first { $0.id == record.id && $0.mergedInto?.uuidString == record.fields["mergedInto"]?.string } ?? Transaction()
+        case "MoneyTransaction":
+            let rows = try context.fetch(FetchDescriptor<MoneyTransaction>())
+            let row = rows.first { $0.id == record.id && $0.mergedInto?.uuidString == record.fields["mergedInto"]?.string } ?? MoneyTransaction()
             if row.modelContext == nil { context.insert(row) }
             try row.apply(record)
         case "Allocation":

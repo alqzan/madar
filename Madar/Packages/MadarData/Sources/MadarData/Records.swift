@@ -1,7 +1,7 @@
 import Foundation
 import CryptoKit
 
-public enum DataError: Error, Equatable { case unknownModel(String), invalidValue(String), newerStore, missingAppGroup, undoExpired, invalidBackup, authenticationFailed, unsupportedBackup }
+public enum DataError: Error, Equatable { case unknownModel(String), invalidValue(String), newerStore, legacyStoreRequiresAdoption, missingAppGroup, undoExpired, invalidBackup, authenticationFailed, unsupportedBackup }
 public enum JSONValue: Codable, Hashable, Sendable {
     case null, bool(Bool), number(Double), string(String), array([JSONValue]), object([String: JSONValue])
     public init(from decoder: any Decoder) throws {

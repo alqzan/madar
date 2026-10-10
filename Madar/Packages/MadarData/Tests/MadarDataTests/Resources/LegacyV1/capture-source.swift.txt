@@ -1,0 +1,39 @@
+import Foundation
+import SwiftData
+import Testing
+@testable import MadarData
+
+@Suite(.serialized) @MainActor struct LegacyFixtureCaptureTests {
+    @Test func captureOriginalV1Fixture() throws {
+        guard ProcessInfo.processInfo.environment["MADAR_CAPTURE_V1"] == "1" else { return }
+        let base = URL(fileURLWithPath:"/tmp/MadarRA4OriginalV1",isDirectory:true)
+        try FileManager.default.createDirectory(at:base,withIntermediateDirectories:true)
+        func create() throws {
+            let container = try MadarContainerFactory.makeLocal(at:base.appendingPathComponent("Flat")); let context = container.mainContext
+            context.autosaveEnabled = false; try fixture(context)
+            let money = try context.fetch(FetchDescriptor<Transaction>()).first!
+            money.amountMinor = 12345; money.currency = "KWD"; money.homeAmountMinor = 151234
+            money.dayKey = "2026-02-03"; money.tzID = "Asia/Kuwait"; money.dayPolicy = "legacy@0"
+            money.createdAt = Date(timeIntervalSince1970:100); money.updatedAt = Date(timeIntervalSince1970:200)
+            money.deletedAt = Date(timeIntervalSince1970:150); money.deletionBarrierAt = money.deletedAt
+            money.restoredAt = Date(timeIntervalSince1970:175)
+            money.fromAccountID = try context.fetch(FetchDescriptor<Account>()).first!.id
+            let alias = Transaction(); alias.id = UUID(uuidString:"00000000-0000-0000-0000-000000000031")!
+            alias.mergedInto = money.id; alias.deletedAt = money.deletedAt; alias.deletionBarrierAt = money.deletedAt
+            alias.amountMinor = 500; context.insert(alias)
+            let link = try context.fetch(FetchDescriptor<ImportLink>()).first!; link.targetModel = "Transaction"; link.targetID = money.id; link.sourceModel = "Transaction"
+            let allocation = try context.fetch(FetchDescriptor<Allocation>()).first!; allocation.transactionID = money.id
+            let entry = try context.fetch(FetchDescriptor<Entry>()).first { $0.mergedInto == nil }!; entry.pinnedEventKind = "Transaction"; entry.pinnedEventID = money.id
+            let device = DeviceSetting(); device.key = "sys.writerID"; device.valueJSON = try JSONEncoder().encode("fixed-v1-writer"); context.insert(device)
+            let scope = DeviceSetting(); scope.key = "sys.commandReceiptScope"; scope.valueJSON = try JSONEncoder().encode("00000000-0000-0000-0000-000000000077"); context.insert(scope)
+            let receipt = CommandReceipt(); receipt.commandID = UUID(uuidString:"00000000-0000-0000-0000-000000000088")!; receipt.payloadHash = "legacy-receipt-fingerprint"; context.insert(receipt)
+            context.insert(NotificationLedger()); context.insert(PageSchedule()); context.insert(SessionDraft()); context.insert(ProcessingJob())
+            try context.save()
+            let records = try RecordBridge.all(context,syncedOnly:false)
+            try JSONEncoder().encode(records).write(to:base.appendingPathComponent("records.json"))
+            try BackupCodec.export(records:records.filter { MadarSchema.syncedNames.contains($0.model) },passphrase:"legacy fixture password",now:Date(timeIntervalSince1970:123456)).write(to:base.appendingPathComponent("source-v1.madarbackup"))
+        }
+        try create()
+        print("Captured original V1 fixture at \(base.path)")
+    }
+}

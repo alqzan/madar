@@ -1700,7 +1700,7 @@ extension CashbackEntry: MadarRecordModel {
         transactionID = try record.decode("transactionID", as: UUID?.self)
     }
 }
-@Model public final class Transaction {
+@Model public final class MoneyTransaction {
     public var id: UUID = UUID()
     public var createdAt: Date = Date()
     public var updatedAt: Date = Date()
@@ -1739,9 +1739,9 @@ extension CashbackEntry: MadarRecordModel {
     public var reviewState: String = "ok"
     public init() {}
 }
-extension Transaction: MadarRecordModel {
+extension MoneyTransaction: MadarRecordModel {
     public func record() throws -> DataRecord {
-        try DataRecord(model: "Transaction", fields: [
+        try DataRecord(model: "MoneyTransaction", fields: [
             "id": JSONValue.encode(id),
             "createdAt": JSONValue.encode(createdAt),
             "updatedAt": JSONValue.encode(updatedAt),

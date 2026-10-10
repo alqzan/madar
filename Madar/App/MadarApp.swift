@@ -60,8 +60,12 @@ struct MadarApp: App {
             let lockURL = group.appending(path: "CommandBus.lock")
             let managed: ManagedDataStore
             if !FileManager.default.fileExists(atPath: root.appending(path: "ActiveGeneration.json").path), FileManager.default.fileExists(atPath: group.appending(path: "Madar.store").path) {
-                let legacy = try MadarContainerFactory.makeAppGroup(identifier: "group.com.alqzan.madar2")
-                managed = try ManagedDataStore.adopt(from: legacy, at: root, commandLockURL: lockURL)
+                let version = try MadarContainerFactory.storeVersionForAdoption(at:group)
+                if version == 1 { managed = try ManagedDataStore.adoptLegacy(from:group,at:root,commandLockURL:lockURL) }
+                else {
+                    let legacy = try MadarContainerFactory.makeLocal(at:group)
+                    managed = try ManagedDataStore.adopt(from:legacy,at:root,commandLockURL:lockURL)
+                }
             } else { managed = try ManagedDataStore(root: root, commandLockURL: lockURL) }
             let opened = try AppSession(container: managed.container, managedStore: managed, groupDirectory: group)
             let backup = AppBackupService(session: opened, store: managed, backupDirectory: group.appending(path: "Backups", directoryHint: .isDirectory), keyStore: KeychainBackupKeyStore(service: backupKeyService))
