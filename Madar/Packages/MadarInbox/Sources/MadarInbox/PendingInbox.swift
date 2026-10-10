@@ -104,6 +104,21 @@ public struct PendingInbox: Sendable {
         guard value.version == 1, value.generationID == generationID, value.commandID == commandID else { throw InboxError.malformedRecord }
         return true
     }
+    /// Receipt GC does not make an already completed command ID a fresh action.
+    /// Search every generation: a producer's new snapshot stamp cannot erase provenance
+    /// from the generation where this identity previously committed.
+    public func wasCommitted(commandID: UUID) throws -> Bool {
+        let folder = directory.appending(path: "completed", directoryHint: .isDirectory)
+        guard FileManager.default.fileExists(atPath: folder.path) else { return false }
+        let suffix = "-\(commandID.uuidString).json"
+        for marker in try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil) where marker.lastPathComponent.hasSuffix(suffix) {
+            let value = try JSONDecoder().decode(CompletedIdentity.self, from: Data(contentsOf: marker))
+            guard value.version == 1, value.commandID == commandID,
+                  marker.lastPathComponent == "\(value.generationID.uuidString)-\(commandID.uuidString).json" else { throw InboxError.malformedRecord }
+            return true
+        }
+        return false
+    }
     public func acknowledge(_ file: URL) throws {
         try validate(file, folder: "processing")
         try FileManager.default.removeItem(at: file)

@@ -56,7 +56,10 @@ import MadarInbox
                 if denial.status == .rejected { try inbox.quarantine(file, reason: "invalidCommand") }
                 continue // needsUnlock/needsApp preserve the accepted delivery
             }
-            if try inbox.wasCommitted(commandID: record.command.commandID, generationID: active.generationID), !(try hasReceipt(record.command.commandID)) {
+            // A collected receipt can leave completion provenance in any prior generation.
+            // Check only when no receipt survives: scoped receipt replay remains authoritative
+            // during recovery after save but before the refresh/completion-marker checkpoint.
+            if !(try hasReceipt(record.command.commandID)), try inbox.wasCommitted(commandID: record.command.commandID) {
                 try inbox.retainForResolution(file, reason: "legacyIdentityAmbiguous"); continue
             }
             let outcome = try await bus.execute(record.command, now: now, generationID: active.generationID)
