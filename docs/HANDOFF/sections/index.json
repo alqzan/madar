@@ -1,0 +1,127 @@
+[
+  {
+    "sectionID": "start",
+    "path": "sections/00-start.md",
+    "sha256": "206bc7b77094dc1a37ba5729022231581082991c3b09b3e6ece15423218becb3"
+  },
+  {
+    "sectionID": "brief",
+    "path": "sections/01-brief.md",
+    "sha256": "e6160e5b212744746a7efdf2c249d41783b9f8ece797aac11804a3959c15585d"
+  },
+  {
+    "sectionID": "vision",
+    "path": "sections/02-vision.md",
+    "sha256": "344fe84d8715ebab5a0eca06de0d0ae13354dc690443c9a6b772628698c435e2"
+  },
+  {
+    "sectionID": "audit",
+    "path": "sections/03-audit.md",
+    "sha256": "6f3dc6d61ac976c3c4a2f3140d01dcebacc816360ded40469963a157a4a510b9"
+  },
+  {
+    "sectionID": "arch",
+    "path": "sections/04-arch.md",
+    "sha256": "16a3893a3e766101357c2788a3e044077952170a081478bcc3fe6fa7248c48fc"
+  },
+  {
+    "sectionID": "ds",
+    "path": "sections/05-ds.md",
+    "sha256": "8ed10e01dc9a44b4c64227b179844f14f80295f504baaff561acefeccca98074"
+  },
+  {
+    "sectionID": "flex",
+    "path": "sections/06-flex.md",
+    "sha256": "5c309994cfa34530fe678aa8f911e6b3f4041233cbd29c10e8bc73e9169eb535"
+  },
+  {
+    "sectionID": "rooms",
+    "path": "sections/07-rooms.md",
+    "sha256": "637b5ec18a75319d14c37326e90d4466d42f1e77b53e6a15ef36ddded9af7084"
+  },
+  {
+    "sectionID": "r-bahw",
+    "path": "sections/08-r-bahw.md",
+    "sha256": "83503b33a60e0f623e98309d26e5d35b04d50d006e4e42ff2cc676ca820cfdc9"
+  },
+  {
+    "sectionID": "r-salah",
+    "path": "sections/09-r-salah.md",
+    "sha256": "3efb69eeab5e76f18b1ab8ca220c6494e32cd4d852ebbcbcf632d40dcf507d33"
+  },
+  {
+    "sectionID": "r-notes",
+    "path": "sections/10-r-notes.md",
+    "sha256": "d34d70959a5170d862d93f82e02b44e10fa35888093fd0a664e42f1f2a1b2fb1"
+  },
+  {
+    "sectionID": "r-quran",
+    "path": "sections/11-r-quran.md",
+    "sha256": "6c5d545f6e55cc58e3faddd4ef7387c12c0af557525f7684a42908304d2e4bce"
+  },
+  {
+    "sectionID": "r-mal",
+    "path": "sections/12-r-mal.md",
+    "sha256": "f0bbb1e32adc8c6377a1bb82c91cbd3d561f1687827743781f8324bc61198740"
+  },
+  {
+    "sectionID": "r-mih",
+    "path": "sections/13-r-mih.md",
+    "sha256": "0f2120ce4b0b3dd16125721e2dde1cd3889e3c659bf4c78c4bd3b23948c51728"
+  },
+  {
+    "sectionID": "shared",
+    "path": "sections/14-shared.md",
+    "sha256": "13e6cbbcbff3b1d9c0fc66916844a79b1cea36b74a29c7af3256cb447f77f179"
+  },
+  {
+    "sectionID": "outside",
+    "path": "sections/15-outside.md",
+    "sha256": "bfee395ed529a898ec0e245719f832e30206db9806f2fd6ad977b5511cf3dd42"
+  },
+  {
+    "sectionID": "tech",
+    "path": "sections/16-tech.md",
+    "sha256": "b96afae68f20dd97fe87a1062ab56d8efc9e6a16532558c3e19316c1e50c09fe"
+  },
+  {
+    "sectionID": "data",
+    "path": "sections/17-data.md",
+    "sha256": "12512e33bb2cdf35dcd64c12065f84c302a558cd65e3e669343e8bb5fab10355"
+  },
+  {
+    "sectionID": "plan",
+    "path": "sections/18-plan.md",
+    "sha256": "15359035d622c6b910bf490a6394420e84e2b1b71d9333e3bf4fd1450366d928"
+  },
+  {
+    "sectionID": "qa",
+    "path": "sections/19-qa.md",
+    "sha256": "24d652d22a42f383a825b3a2498670cdb381cda9810b36a3cca8b90f7a08b375"
+  },
+  {
+    "sectionID": "risks",
+    "path": "sections/20-risks.md",
+    "sha256": "459113bde5b86cb947be4b5099a0b3c3b5e9cba373c07bd05914f7d0cf40853b"
+  },
+  {
+    "sectionID": "open",
+    "path": "sections/21-open.md",
+    "sha256": "96f732fc099aa0b4b724b2034e3a6e174996bcc3b2aef073c437071f18876671"
+  },
+  {
+    "sectionID": "gallery",
+    "path": "sections/22-gallery.md",
+    "sha256": "1f96dc34f9e397602835d5ea8f83e1017b083aeb05c5c1e39357cb56dcad0680"
+  },
+  {
+    "sectionID": "glossary",
+    "path": "sections/23-glossary.md",
+    "sha256": "2fc96211dfe29ec98a27d8f0c5822f2dc9b39076ea10f4611801951174ece227"
+  },
+  {
+    "sectionID": "closure",
+    "path": "sections/24-closure.md",
+    "sha256": "48275ed868fd2fd2e8bd1cb5ba37da7de53c36854ffd02c9f05729ee11f3f458"
+  }
+]

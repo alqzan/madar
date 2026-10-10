@@ -1,0 +1,2773 @@
+{
+ "version": 3,
+ "date": "2026-10-09",
+ "note": "default = المتفق عليه. scope sync = يُزامَن (Setting)، device = لهذا الجهاز (DeviceSetting في تكوين deviceOnly). preset = يدخل في الأنماط المحفوظة (§٦). layout entries are {blocks, pinned, hidden, sizes}; pinned blocks cannot be hidden. availability v2 = hidden in v1. Money values are Int minor units (halalas).",
+ "constants": {
+  "sanctityMinutes": {
+   "default": 30,
+   "maghrib": 20
+  },
+  "money": {
+   "maxRepayCycles": 12,
+   "maxDailyShortfallFraction": "1/3",
+   "offsetCapPerCycleInDailyAllowances": 3,
+   "offsetCapStatus": "open (owner to confirm)"
+  },
+  "reading": {
+   "idleMinutes": 5,
+   "minSessionSeconds": 60,
+   "jumpPages": 20,
+   "finishPromptProgression": 0.98
+  },
+  "import": {
+   "maxPages": 1000,
+   "maxFileMB": 500,
+   "zipMaxEntries": 10000,
+   "zipMaxUncompressedMB": 1024,
+   "zipMaxRatio": 100,
+   "ocrBatchPages": 10
+  }
+ },
+ "valueRules": {
+  "write": "reject any value that fails its type/options/range/contract (UI never offers it)",
+  "read": "unknown or invalid stored value → schema default, logged once; never coerced into a plausible value",
+  "choice": "value must be an option whose availability is not v2",
+  "int": "Int within range",
+  "bool": "Bool",
+  "nullVsZero": "null = not set; 0 = a real zero"
+ },
+ "removedKeys": [
+  {
+   "key": "quran.plan",
+   "movedTo": "HifzPlan model (§11) — the only owner of direction/unit/amount/rhythm; hifz days = week minus quran.restDay",
+   "finding": "C04"
+  },
+  {
+   "key": "quran.missPolicy",
+   "movedTo": "HifzPlan.missPolicy",
+   "finding": "C04"
+  },
+  {
+   "key": "notes.showThatDay",
+   "movedTo": "LayoutState(notes).hidden contains \"thatDay\"",
+   "finding": "C04"
+  },
+  {
+   "key": "notes.showDays",
+   "movedTo": "LayoutState(notes).hidden contains \"days\"",
+   "finding": "C04"
+  },
+  {
+   "key": "mal.expenseInDiary",
+   "movedTo": "notes.autoLines.mal (same toggle shown in خصّص المال)",
+   "finding": "C04"
+  }
+ ],
+ "settings": [
+  {
+   "key": "core.dayStart",
+   "owner": "core",
+   "section": "اليوم والتقويم",
+   "title": "يبدأ يومك من",
+   "type": "choice",
+   "default": "fajr",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "fajr",
+     "label": "الفجر"
+    },
+    {
+     "value": "maghrib",
+     "label": "المغرب"
+    },
+    {
+     "value": "midnight",
+     "label": "منتصف الليل"
+    }
+   ],
+   "note": "يحكم كل الغرف (يوم المال أيضًا)؛ الاستثناء الوحيد: سجلّ الصلاة يُجمَّع بيوم الصلاة. dayKey المخزَّن لا يُعاد حسابه",
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "core.firstCalendar",
+   "owner": "core",
+   "section": "اليوم والتقويم",
+   "title": "التقويم الأول",
+   "type": "choice",
+   "default": "hijri",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "hijri",
+     "label": "الهجري"
+    },
+    {
+     "value": "gregorian",
+     "label": "الميلادي"
+    }
+   ],
+   "note": "يحكم كل التواريخ عدا تقويم المذكرات (notes.calendarFirst)",
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "core.hijriSource",
+   "owner": "core",
+   "section": "اليوم والتقويم",
+   "title": "حساب الهجري",
+   "type": "choice",
+   "default": "ummAlQura",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "ummAlQura",
+     "label": "أم القرى"
+    },
+    {
+     "value": "sighting",
+     "label": "الرؤية (أم القرى + تصحيح)"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "core.hijriOffset",
+   "owner": "core",
+   "section": "اليوم والتقويم",
+   "title": "تصحيح الهجري (أيام)",
+   "type": "int",
+   "default": 0,
+   "scope": "sync",
+   "range": [
+    -2,
+    2
+   ],
+   "note": "توصية (المصدر ±١). يعمل فقط حين hijriSource = sighting وتخفيه الواجهة غير ذلك",
+   "visibleWhen": {
+    "core.hijriSource": "sighting"
+   },
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "core.weekStart",
+   "owner": "core",
+   "section": "اليوم والتقويم",
+   "title": "أول الأسبوع",
+   "type": "choice",
+   "default": "saturday",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "saturday",
+     "label": "السبت"
+    },
+    {
+     "value": "sunday",
+     "label": "الأحد"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "core.theme",
+   "owner": "core",
+   "section": "المظهر",
+   "title": "الوضع",
+   "type": "choice",
+   "default": "auto",
+   "scope": "device",
+   "options": [
+    {
+     "value": "auto",
+     "label": "تلقائي"
+    },
+    {
+     "value": "light",
+     "label": "نهاري"
+    },
+    {
+     "value": "dark",
+     "label": "ليلي"
+    }
+   ],
+   "storage": "DeviceSetting (deviceOnly configuration, never synced)",
+   "preset": true
+  },
+  {
+   "key": "core.numerals",
+   "owner": "core",
+   "section": "المظهر",
+   "title": "الأرقام",
+   "type": "choice",
+   "default": "arabicIndic",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "arabicIndic",
+     "label": "١٢٣"
+    },
+    {
+     "value": "western",
+     "label": "123"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "core.fontScale",
+   "owner": "core",
+   "section": "المظهر",
+   "title": "حجم الخط",
+   "type": "choice",
+   "default": "system",
+   "scope": "device",
+   "options": [
+    {
+     "value": "system",
+     "label": "يتبع الجوال"
+    },
+    {
+     "value": "large",
+     "label": "أكبر"
+    },
+    {
+     "value": "xlarge",
+     "label": "أكبر جدًا"
+    }
+   ],
+   "storage": "DeviceSetting (deviceOnly configuration, never synced)",
+   "preset": true
+  },
+  {
+   "key": "core.motion",
+   "owner": "core",
+   "section": "المظهر",
+   "title": "الحركة",
+   "type": "choice",
+   "default": "full",
+   "scope": "device",
+   "options": [
+    {
+     "value": "full",
+     "label": "كاملة"
+    },
+    {
+     "value": "calm",
+     "label": "هادئة"
+    },
+    {
+     "value": "none",
+     "label": "بلا"
+    }
+   ],
+   "note": "تقليل الحركة في iOS يغلب",
+   "storage": "DeviceSetting (deviceOnly configuration, never synced)",
+   "preset": true
+  },
+  {
+   "key": "core.roomIdentity",
+   "owner": "core",
+   "section": "المظهر",
+   "title": "ألوان الغرف",
+   "type": "choice",
+   "default": "perRoom",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "perRoom",
+     "label": "بهوية كل غرفة"
+    },
+    {
+     "value": "calmPaper",
+     "label": "ورق هادئ موحّد"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "core.homeCity",
+   "owner": "core",
+   "section": "مدينتك والسفر",
+   "title": "مدينتك",
+   "type": "place",
+   "default": {
+    "name": "الرياض",
+    "country": "SA",
+    "lat": 24.7136,
+    "lon": 46.6753,
+    "tz": "Asia/Riyadh",
+    "currency": "SAR"
+   },
+   "scope": "sync",
+   "storage": "Setting (synced)",
+   "preset": false,
+   "contract": {
+    "fields": {
+     "name": "String 1…80",
+     "country": "ISO 3166-1 alpha-2",
+     "lat": "Double −90…90",
+     "lon": "Double −180…180",
+     "tz": "IANA id; TimeZone(identifier:) != nil",
+     "currency": "ISO 4217; in Locale.Currency.isoCurrencies"
+    },
+    "required": "all"
+   }
+  },
+  {
+   "key": "core.currency",
+   "owner": "core",
+   "section": "مدينتك والسفر",
+   "title": "عملة البيت",
+   "type": "string",
+   "default": "SAR",
+   "scope": "sync",
+   "note": "ISO 4217؛ المبالغ Int بالوحدة الصغرى لعملتها (الأُسّ من جدول ISO 4217). في v1 يُغيَّر قبل أول حركة مالية فقط",
+   "storage": "Setting (synced)",
+   "preset": false,
+   "contract": {
+    "format": "ISO 4217, 3 uppercase ASCII letters, in Locale.Currency.isoCurrencies"
+   }
+  },
+  {
+   "key": "core.travelMode",
+   "owner": "core",
+   "section": "مدينتك والسفر",
+   "title": "وضع السفر",
+   "type": "choice",
+   "default": "auto",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "auto",
+     "label": "تلقائي"
+    },
+    {
+     "value": "ask",
+     "label": "اسألني"
+    },
+    {
+     "value": "manual",
+     "label": "يدويًا"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "core.travelKm",
+   "owner": "core",
+   "section": "مدينتك والسفر",
+   "title": "يتفعّل بعد (كم)",
+   "type": "int",
+   "default": 300,
+   "scope": "sync",
+   "range": [
+    80,
+    1000
+   ],
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "core.faceIDLock",
+   "owner": "core",
+   "section": "الخصوصية",
+   "title": "القفل بالوجه",
+   "type": "choice",
+   "default": "notesOnly",
+   "scope": "device",
+   "options": [
+    {
+     "value": "app",
+     "label": "مدار كله"
+    },
+    {
+     "value": "notesOnly",
+     "label": "المذكرات"
+    },
+    {
+     "value": "none",
+     "label": "بلا"
+    }
+   ],
+   "storage": "DeviceSetting (deviceOnly configuration, never synced)",
+   "preset": false
+  },
+  {
+   "key": "core.hideMoneyOutside",
+   "owner": "core",
+   "section": "الخصوصية",
+   "title": "أخفِ المال خارج التطبيق",
+   "type": "bool",
+   "default": true,
+   "scope": "sync",
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "core.hideMoneyUntilTouch",
+   "owner": "core",
+   "section": "الخصوصية",
+   "title": "أخفِ أرقام المال حتى ألمسها",
+   "type": "bool",
+   "default": false,
+   "scope": "sync",
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "core.spotlightIndex",
+   "owner": "core",
+   "section": "البحث",
+   "title": "فهرسة Spotlight",
+   "type": "bool",
+   "default": false,
+   "scope": "device",
+   "note": "مطفأة افتراضيًا؛ عناوين وتواريخ فقط؛ يُحذف فهرس المذكرات حين تُقفل",
+   "storage": "DeviceSetting (deviceOnly configuration, never synced)",
+   "preset": false
+  },
+  {
+   "key": "core.iCloudSync",
+   "owner": "core",
+   "section": "البيانات",
+   "title": "زامن عبر iCloud",
+   "type": "bool",
+   "default": true,
+   "scope": "device",
+   "storage": "DeviceSetting (deviceOnly configuration, never synced)",
+   "preset": false
+  },
+  {
+   "key": "core.backup",
+   "owner": "core",
+   "section": "البيانات",
+   "title": "نسخة احتياطية",
+   "type": "choice",
+   "default": "weekly",
+   "scope": "device",
+   "options": [
+    {
+     "value": "weekly",
+     "label": "أسبوعيًا"
+    },
+    {
+     "value": "daily",
+     "label": "يوميًا"
+    },
+    {
+     "value": "manual",
+     "label": "يدويًا"
+    }
+   ],
+   "storage": "DeviceSetting (deviceOnly configuration, never synced)",
+   "preset": false
+  },
+  {
+   "key": "tabbar.items",
+   "owner": "tabbar",
+   "section": "الشريط السفلي",
+   "title": "أقسام الشريط (بعد البهو)",
+   "type": "list",
+   "default": [
+    "salah",
+    "notes",
+    "quran",
+    "mal"
+   ],
+   "scope": "sync",
+   "note": "٤ كحد أقصى من: salah, notes, quran, mal, mihbara, habits, year؛ ٣ كحد أقصى إذا فُعّل searchTab (للبقاء عند ٥ تبويبات)",
+   "maxItems": 4,
+   "maxItemsWhen": {
+    "tabbar.searchTab": true,
+    "max": 3
+   },
+   "storage": "Setting (synced)",
+   "preset": true,
+   "contract": {
+    "items": [
+     "salah",
+     "notes",
+     "quran",
+     "mal",
+     "mihbara",
+     "habits",
+     "year"
+    ],
+    "unique": true,
+    "minItems": 1,
+    "maxItems": 4,
+    "maxItemsWhenSearchTab": 3
+   }
+  },
+  {
+   "key": "tabbar.style",
+   "owner": "tabbar",
+   "section": "الشريط السفلي",
+   "title": "الشكل",
+   "type": "choice",
+   "default": "glass",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "glass",
+     "label": "زجاج iOS"
+    },
+    {
+     "value": "capsule",
+     "label": "كبسولة عائمة"
+    },
+    {
+     "value": "tabs",
+     "label": "ألسنة الدفتر"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "tabbar.labels",
+   "owner": "tabbar",
+   "section": "الشريط السفلي",
+   "title": "الأسماء",
+   "type": "choice",
+   "default": "all",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "all",
+     "label": "لكلها"
+    },
+    {
+     "value": "selected",
+     "label": "للمختار"
+    }
+   ],
+   "note": "«للمختار» لشكلَي capsule وtabs فقط (ب وج)؛ معطّل في glass (أ)",
+   "optionConstraints": {
+    "selected": {
+     "requiresStyle": [
+      "capsule",
+      "tabs"
+     ]
+    }
+   },
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "tabbar.openOn",
+   "owner": "tabbar",
+   "section": "الشريط السفلي",
+   "title": "يفتح مدار على",
+   "type": "choice",
+   "default": "bahw",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "bahw",
+     "label": "البهو"
+    },
+    {
+     "value": "last",
+     "label": "آخر قسم"
+    },
+    {
+     "value": "byTime",
+     "label": "حسب الوقت"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "tabbar.minimizeOnScroll",
+   "owner": "tabbar",
+   "section": "الشريط السفلي",
+   "title": "يصغر حين تمرّر",
+   "type": "bool",
+   "default": true,
+   "scope": "sync",
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "tabbar.searchTab",
+   "owner": "tabbar",
+   "section": "الشريط السفلي",
+   "title": "زر البحث في الشريط",
+   "type": "bool",
+   "default": false,
+   "scope": "sync",
+   "note": "توصية. إذا فُعّل فأقسام الشريط ≤ ٣ (تحقّق: قاعدة العدد على iOS)",
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "notif.dailyBudget",
+   "owner": "notif",
+   "section": "الإشعارات",
+   "title": "ميزانية اليوم",
+   "type": "int",
+   "default": 4,
+   "scope": "sync",
+   "range": [
+    1,
+    10
+   ],
+   "note": "لكل جهاز؛ سؤال الصلاة ومتابعة القلب والنشاط الحيّ خارجها؛ الملخّص و«افتح مدار» يُحسب كلٌّ منهما ١",
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "notif.digestOverflow",
+   "owner": "notif",
+   "section": "الإشعارات",
+   "title": "اجمع الزائد في ملخّص بعد العشاء",
+   "type": "bool",
+   "default": true,
+   "scope": "sync",
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "notif.quietAfterIsha",
+   "owner": "notif",
+   "section": "الإشعارات",
+   "title": "صمت بعد العشاء",
+   "type": "bool",
+   "default": false,
+   "scope": "sync",
+   "note": "مطفأ افتراضيًا",
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "notif.quietFrom",
+   "owner": "notif",
+   "section": "الإشعارات",
+   "title": "يبدأ الصمت من",
+   "type": "time",
+   "default": "21:30",
+   "scope": "sync",
+   "note": "توصية ٩:٣٠ م؛ يُضبط بالساعة ولا يتبع العشاء",
+   "storage": "Setting (synced)",
+   "preset": false,
+   "contract": {
+    "format": "HH:mm, 24-hour, ASCII digits, 00:00…23:59"
+   }
+  },
+  {
+   "key": "notif.staleNudge",
+   "owner": "notif",
+   "section": "الإشعارات",
+   "title": "«افتح مدار» إن غبت يومين",
+   "type": "bool",
+   "default": true,
+   "scope": "sync",
+   "note": "يُحسب من ميزانية يومه",
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "notif.thisDeviceReminders",
+   "owner": "notif",
+   "section": "الإشعارات",
+   "title": "تذكيرات هذا الجهاز",
+   "type": "bool",
+   "default": true,
+   "scope": "device",
+   "note": "تذكيرات الصلاة والقرآن والمذكرات تُجدول فقط على الأجهزة التي فُعّل فيها؛ الافتراضي: الآيفون نعم، الآيباد لا",
+   "defaultByIdiom": {
+    "phone": true,
+    "pad": false
+   },
+   "storage": "DeviceSetting (deviceOnly configuration, never synced)",
+   "preset": false
+  },
+  {
+   "key": "notif.roomPriority",
+   "owner": "notif",
+   "section": "الإشعارات",
+   "title": "أولوية الغرف",
+   "type": "list",
+   "default": [
+    "salah",
+    "quran",
+    "mal",
+    "notes",
+    "habits",
+    "mihbara"
+   ],
+   "scope": "sync",
+   "storage": "Setting (synced)",
+   "preset": false,
+   "contract": {
+    "permutationOf": [
+     "salah",
+     "quran",
+     "mal",
+     "notes",
+     "habits",
+     "mihbara"
+    ]
+   }
+  },
+  {
+   "key": "bahw.layout",
+   "owner": "bahw",
+   "section": "الودجات",
+   "title": "الودجات وترتيبها وأحجامها",
+   "type": "layout",
+   "default": {
+    "blocks": [
+     "habits",
+     "salah",
+     "quran",
+     "mal",
+     "year",
+     "upcoming",
+     "notes",
+     "mihbara"
+    ],
+    "pinned": [],
+    "hidden": [],
+    "sizes": {
+     "habits": "4x4",
+     "salah": "4x2",
+     "quran": "2x2",
+     "mal": "2x2",
+     "year": "4x2",
+     "upcoming": "4x2",
+     "notes": "2x2",
+     "mihbara": "2x2"
+    }
+   },
+   "scope": "sync",
+   "note": "LayoutState هو المخزن الوحيد؛ البهو بلا كتل ثابتة",
+   "storage": "Setting (synced)",
+   "preset": true,
+   "contract": {
+    "payload": "LayoutPayload v1 {v, blocks, pinned, hidden, sizes}",
+    "blockIds": [
+     "habits",
+     "salah",
+     "quran",
+     "mal",
+     "year",
+     "upcoming",
+     "notes",
+     "mihbara"
+    ],
+    "pinnedSubsetOfBlocks": true,
+    "hiddenDisjointFromPinned": true,
+    "sizes": [
+     "1x1",
+     "2x2",
+     "4x2",
+     "4x4"
+    ],
+    "unknownIds": "dropped on read"
+   }
+  },
+  {
+   "key": "bahw.habitsView",
+   "owner": "bahw",
+   "section": "العادات",
+   "title": "عرض العادات",
+   "type": "choice",
+   "default": "orbit",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "orbit",
+     "label": "المدار"
+    },
+    {
+     "value": "lamps",
+     "label": "القناديل"
+    },
+    {
+     "value": "weave",
+     "label": "النسيج"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "bahw.streakBreakAfter",
+   "owner": "bahw",
+   "section": "العادات",
+   "title": "السلسلة تنكسر بفوت",
+   "type": "choice",
+   "default": 2,
+   "scope": "sync",
+   "options": [
+    {
+     "value": 1,
+     "label": "مرة"
+    },
+    {
+     "value": 2,
+     "label": "مرتين"
+    },
+    {
+     "value": 3,
+     "label": "ثلاث"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "bahw.reminder",
+   "owner": "bahw",
+   "section": "العادات",
+   "title": "التذكير",
+   "type": "choice",
+   "default": "dot",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "dot",
+     "label": "نقطة في البهو"
+    },
+    {
+     "value": "push",
+     "label": "إشعار لطيف"
+    },
+    {
+     "value": "none",
+     "label": "بلا"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "bahw.travelFreezesHome",
+   "owner": "bahw",
+   "section": "العادات",
+   "title": "السفر يجمّد عادات البيت",
+   "type": "bool",
+   "default": true,
+   "scope": "sync",
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "bahw.widgetScope",
+   "owner": "bahw",
+   "section": "العادات",
+   "title": "ودجة العادات تعرض",
+   "type": "choice",
+   "default": "todayAndAfter",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "todayAndAfter",
+     "label": "اليوم وما بعده"
+    },
+    {
+     "value": "todayOnly",
+     "label": "اليوم فقط"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "bahw.yearView",
+   "owner": "bahw",
+   "section": "السنة",
+   "title": "عرض السنة",
+   "type": "choice",
+   "default": "strip",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "strip",
+     "label": "الشريط"
+    },
+    {
+     "value": "necklace",
+     "label": "العِقد"
+    },
+    {
+     "value": "crescents",
+     "label": "أهلّة الشهر الهجري"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "bahw.yearWhich",
+   "owner": "bahw",
+   "section": "السنة",
+   "title": "أي سنة",
+   "type": "choice",
+   "default": "both",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "both",
+     "label": "الاثنتان"
+    },
+    {
+     "value": "hijri",
+     "label": "الهجرية"
+    },
+    {
+     "value": "gregorian",
+     "label": "الميلادية"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "bahw.upcomingView",
+   "owner": "bahw",
+   "section": "الأيام القادمة",
+   "title": "عرض الأيام",
+   "type": "choice",
+   "default": "rings",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "rings",
+     "label": "حلقات"
+    },
+    {
+     "value": "beads",
+     "label": "سبحة"
+    },
+    {
+     "value": "axis",
+     "label": "محور"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "bahw.upcomingCount",
+   "owner": "bahw",
+   "section": "الأيام القادمة",
+   "title": "العدد",
+   "type": "choice",
+   "default": 4,
+   "scope": "sync",
+   "options": [
+    {
+     "value": 4,
+     "label": "٤"
+    },
+    {
+     "value": 7,
+     "label": "٧"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "bahw.smartPresence",
+   "owner": "bahw",
+   "section": "حضور مدار",
+   "title": "الاقتراح حسب الوقت",
+   "type": "choice",
+   "default": "calm",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "calm",
+     "label": "هادئ"
+    },
+    {
+     "value": "medium",
+     "label": "متوسط"
+    },
+    {
+     "value": "present",
+     "label": "حاضر"
+    }
+   ],
+   "note": "توصية",
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "bahw.widgetIdentity",
+   "owner": "bahw",
+   "section": "الودجات",
+   "title": "هوية ودجات الغرف",
+   "type": "choice",
+   "default": "room",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "room",
+     "label": "بهوية القسم"
+    },
+    {
+     "value": "calm",
+     "label": "ورق هادئ"
+    }
+   ],
+   "note": "لكل ودجة",
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "bahw.iphoneWidgetFamily",
+   "owner": "bahw",
+   "section": "الودجات",
+   "title": "عائلة ودجات الآيفون",
+   "type": "choice",
+   "default": "manuscript",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "manuscript",
+     "label": "مخطوط"
+    },
+    {
+     "value": "glass",
+     "label": "زجاج"
+    },
+    {
+     "value": "ink",
+     "label": "حبر"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "salah.layout",
+   "owner": "salah",
+   "section": "ترتيب الرئيسية",
+   "title": "الكتل",
+   "type": "layout",
+   "default": {
+    "blocks": [
+     "next",
+     "riwaq",
+     "pending",
+     "hali",
+     "qada",
+     "qiyam"
+    ],
+    "pinned": [
+     "next",
+     "riwaq"
+    ],
+    "hidden": [],
+    "sizes": {}
+   },
+   "scope": "sync",
+   "note": "pinned لا تُخفى",
+   "storage": "Setting (synced)",
+   "preset": true,
+   "contract": {
+    "payload": "LayoutPayload v1 {v, blocks, pinned, hidden, sizes}",
+    "blockIds": [
+     "next",
+     "riwaq",
+     "pending",
+     "hali",
+     "qada",
+     "qiyam"
+    ],
+    "pinnedSubsetOfBlocks": true,
+    "hiddenDisjointFromPinned": true,
+    "sizes": [],
+    "unknownIds": "dropped on read"
+   }
+  },
+  {
+   "key": "salah.pool",
+   "owner": "salah",
+   "section": "الرواق والميزان",
+   "title": "البركة تحت الأقواس",
+   "type": "bool",
+   "default": true,
+   "scope": "sync",
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "salah.balanceView",
+   "owner": "salah",
+   "section": "الرواق والميزان",
+   "title": "الميزان في «حالي»",
+   "type": "choice",
+   "default": "beads",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "beads",
+     "label": "السبحة"
+    },
+    {
+     "value": "scale",
+     "label": "الكفّتان"
+    },
+    {
+     "value": "miniRiwaq",
+     "label": "رواق مصغّر"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "salah.fridayTallArch",
+   "owner": "salah",
+   "section": "الرواق والميزان",
+   "title": "قوس الجمعة أطول",
+   "type": "bool",
+   "default": true,
+   "scope": "sync",
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "salah.showMosqueStreak",
+   "owner": "salah",
+   "section": "الرواق والميزان",
+   "title": "سلسلة المسجد",
+   "type": "bool",
+   "default": true,
+   "scope": "sync",
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "salah.askHeart",
+   "owner": "salah",
+   "section": "التسجيل",
+   "title": "اسألني عن القلب",
+   "type": "bool",
+   "default": true,
+   "scope": "sync",
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "salah.trackingStart",
+   "owner": "salah",
+   "section": "التسجيل",
+   "title": "بداية التتبّع",
+   "type": "object",
+   "default": {
+    "dayKey": null,
+    "edits": 0
+   },
+   "scope": "sync",
+   "note": "تاريخ أول تشغيل يُكتب عند أول تشغيل (dayKey)؛ يُعدّل مرة واحدة فقط (edits = 1) حتى ٣٠ يومًا قبل أول تشغيل. ما قبله لا يصير معلّقًا ولا فائتًا",
+   "storage": "Setting (synced)",
+   "preset": false,
+   "contract": {
+    "fields": {
+     "dayKey": "String? yyyy-MM-dd (nil until first run writes it)",
+     "edits": "Int 0…1 — a second user edit is rejected"
+    },
+    "rule": "an edit may move dayKey at most 30 days before the first-run date",
+    "note": "one key replaces the proposed hidden trackingStartEdited"
+   }
+  },
+  {
+   "key": "salah.pendingDays",
+   "owner": "salah",
+   "section": "التسجيل",
+   "title": "غير المسجّلة تُحسب فائتة بعد (أيام)",
+   "type": "int",
+   "default": 7,
+   "scope": "sync",
+   "range": [
+    3,
+    14
+   ],
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "salah.method",
+   "owner": "salah",
+   "section": "المواقيت",
+   "title": "طريقة الحساب",
+   "type": "choice",
+   "default": "ummAlQura",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "ummAlQura",
+     "label": "أم القرى"
+    },
+    {
+     "value": "mwl",
+     "label": "رابطة العالم الإسلامي"
+    },
+    {
+     "value": "egyptian",
+     "label": "الهيئة المصرية"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "salah.asr",
+   "owner": "salah",
+   "section": "المواقيت",
+   "title": "وقت العصر",
+   "type": "choice",
+   "default": "standard",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "standard",
+     "label": "الجمهور"
+    },
+    {
+     "value": "hanafi",
+     "label": "الحنفي"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "salah.highLatitudeRule",
+   "owner": "salah",
+   "section": "المواقيت",
+   "title": "قاعدة خطوط العرض العالية",
+   "type": "choice",
+   "default": "auto",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "auto",
+     "label": "تلقائي (منتصف الليل حتى ٤٨°، سُبع الليل فوقه)"
+    },
+    {
+     "value": "middleOfTheNight",
+     "label": "منتصف الليل"
+    },
+    {
+     "value": "seventhOfTheNight",
+     "label": "سُبع الليل"
+    },
+    {
+     "value": "twilightAngle",
+     "label": "زاوية الشفق"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "salah.offsets",
+   "owner": "salah",
+   "section": "المواقيت",
+   "title": "تعديل بالدقائق لكل صلاة",
+   "type": "map",
+   "default": {
+    "fajr": 0,
+    "dhuhr": 0,
+    "asr": 0,
+    "maghrib": 0,
+    "isha": 0
+   },
+   "scope": "sync",
+   "storage": "Setting (synced)",
+   "preset": false,
+   "contract": {
+    "keys": [
+     "fajr",
+     "dhuhr",
+     "asr",
+     "maghrib",
+     "isha"
+    ],
+    "exactKeys": true,
+    "value": "Int minutes",
+    "range": [
+     -60,
+     60
+    ],
+    "note": "range is an engineering bound, not a ruling"
+   }
+  },
+  {
+   "key": "salah.travelShortenCombine",
+   "owner": "salah",
+   "section": "المواقيت",
+   "title": "القصر والجمع في السفر",
+   "type": "bool",
+   "default": true,
+   "scope": "sync",
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "salah.askAfterAdhanMin",
+   "owner": "salah",
+   "section": "التذكير",
+   "title": "اسألني بعد الأذان بـ (دقيقة)",
+   "type": "int",
+   "default": 30,
+   "scope": "sync",
+   "range": [
+    30,
+    90
+   ],
+   "note": "لا يسبق نهاية الحرمة: يُجدول عند max(الإعداد، نهاية الحرمة) — الحرمة ٣٠ دقيقة والمغرب ٢٠ (constants.sanctityMinutes)",
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "salah.askReminder",
+   "owner": "salah",
+   "section": "التذكير",
+   "title": "اسألني عن الصلاة بعد الأذان",
+   "type": "bool",
+   "default": true,
+   "scope": "sync",
+   "note": "إطفاؤه يلغي أسئلة الصلاة المعلّقة؛ التسجيل من الودجة والتحكّم والتطبيق باقٍ",
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "salah.qadaReminder",
+   "owner": "salah",
+   "section": "التذكير",
+   "title": "تذكير القضاء",
+   "type": "choice",
+   "default": "afterFajr",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "afterFajr",
+     "label": "بعد الفجر"
+    },
+    {
+     "value": "afterIsha",
+     "label": "بعد العشاء"
+    },
+    {
+     "value": "off",
+     "label": "بلا"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "salah.liveActivity",
+   "owner": "salah",
+   "section": "التذكير",
+   "title": "نشاط حيّ للصلاة القادمة (بعد انقضاء الحرمة)",
+   "type": "bool",
+   "default": true,
+   "scope": "sync",
+   "note": "يبدأ من المقدّمة أو LiveActivityIntent أو مجدولًا عند نهاية الحرمة، ولا يبدأ عند الأذان. العدّ التنازلي نفسه ودجة بخط زمني مستقلة (تحقّق: البدء المجدول في iOS 26)",
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "quran.layout",
+   "owner": "quran",
+   "section": "ترتيب الرئيسية",
+   "title": "الكتل",
+   "type": "layout",
+   "default": {
+    "blocks": [
+     "sadr",
+     "path",
+     "log14",
+     "tools"
+    ],
+    "pinned": [
+     "sadr",
+     "path"
+    ],
+    "hidden": [],
+    "sizes": {}
+   },
+   "scope": "sync",
+   "storage": "Setting (synced)",
+   "preset": true,
+   "contract": {
+    "payload": "LayoutPayload v1 {v, blocks, pinned, hidden, sizes}",
+    "blockIds": [
+     "sadr",
+     "path",
+     "log14",
+     "tools"
+    ],
+    "pinnedSubsetOfBlocks": true,
+    "hiddenDisjointFromPinned": true,
+    "sizes": [],
+    "unknownIds": "dropped on read"
+   }
+  },
+  {
+   "key": "quran.toolsOrder",
+   "owner": "quran",
+   "section": "ترتيب الرئيسية",
+   "title": "ترتيب الأدوات",
+   "type": "list",
+   "default": [
+    "mushaf",
+    "fihris",
+    "free",
+    "retention",
+    "qiyam"
+   ],
+   "scope": "sync",
+   "storage": "Setting (synced)",
+   "preset": true,
+   "contract": {
+    "permutationOf": [
+     "mushaf",
+     "fihris",
+     "free",
+     "retention",
+     "qiyam"
+    ]
+   }
+  },
+  {
+   "key": "quran.hifzLevel",
+   "owner": "quran",
+   "section": "يومك",
+   "title": "درجة الحفظ المعتادة",
+   "type": "choice",
+   "default": "medium",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "simple",
+     "label": "بسيط"
+    },
+    {
+     "value": "medium",
+     "label": "متوسط"
+    },
+    {
+     "value": "deep",
+     "label": "عميق"
+    },
+    {
+     "value": "max",
+     "label": "مُحكَم"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "quran.reviewLevel",
+   "owner": "quran",
+   "section": "يومك",
+   "title": "درجة المراجعة المعتادة",
+   "type": "choice",
+   "default": "medium",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "simple",
+     "label": "بسيط"
+    },
+    {
+     "value": "medium",
+     "label": "متوسط"
+    },
+    {
+     "value": "deep",
+     "label": "عميق"
+    },
+    {
+     "value": "max",
+     "label": "مُحكَم"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "quran.balanceDecides",
+   "owner": "quran",
+   "section": "يومك",
+   "title": "الميزان يقرّر قبل أن تبدأ",
+   "type": "bool",
+   "default": true,
+   "scope": "sync",
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "quran.restDay",
+   "owner": "quran",
+   "section": "يومك",
+   "title": "يوم الراحة",
+   "type": "choice",
+   "default": "friday",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "friday",
+     "label": "الجمعة"
+    },
+    {
+     "value": "none",
+     "label": "بلا"
+    },
+    {
+     "value": "saturday",
+     "label": "السبت"
+    }
+   ],
+   "note": "خطة الحفظ نفسها (الاتجاه، الوحدة، المقدار، الإيقاع، «لو فاتك يوم») في نموذج HifzPlan وحده (§١١)، لا في الإعدادات؛ أيام الحفظ = الأسبوع عدا يوم الراحة (بلا = كل الأيام)",
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "quran.hifzMethod",
+   "owner": "quran",
+   "section": "الجلسة",
+   "title": "طريقة الحفظ",
+   "type": "choice",
+   "default": "coach",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "coach",
+     "label": "المدرّب"
+    },
+    {
+     "value": "completeAyah",
+     "label": "أكمل الآية"
+    },
+    {
+     "value": "gradual",
+     "label": "تدريجي"
+    },
+    {
+     "value": "next",
+     "label": "ما بعدها؟"
+    },
+    {
+     "value": "link",
+     "label": "وصل الصفحات"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "quran.reviewMethod",
+   "owner": "quran",
+   "section": "الجلسة",
+   "title": "طريقة المراجعة",
+   "type": "choice",
+   "default": "continuous",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "continuous",
+     "label": "سرد متصل"
+    },
+    {
+     "value": "voice",
+     "label": "بالصوت",
+     "availability": "v2"
+    }
+   ],
+   "note": "«بالصوت» v2: مخفي في الإصدار الأول",
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "quran.similarAlert",
+   "owner": "quran",
+   "section": "الجلسة",
+   "title": "تنبيه المتشابهات",
+   "type": "bool",
+   "default": true,
+   "scope": "sync",
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "quran.tapForTafsir",
+   "owner": "quran",
+   "section": "الجلسة",
+   "title": "المس الآية للتفسير",
+   "type": "bool",
+   "default": true,
+   "scope": "sync",
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "quran.weekLogView",
+   "owner": "quran",
+   "section": "الجلسة",
+   "title": "سجلّ الأسبوع",
+   "type": "choice",
+   "default": "rings",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "rings",
+     "label": "الحلقات"
+    },
+    {
+     "value": "summary",
+     "label": "الملخّص"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "quran.wirdReminder",
+   "owner": "quran",
+   "section": "التذكير",
+   "title": "تذكير الورد",
+   "type": "choice",
+   "default": "afterFajr",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "afterFajr",
+     "label": "بعد الفجر"
+    },
+    {
+     "value": "afterAsr",
+     "label": "بعد العصر"
+    },
+    {
+     "value": "afterIsha",
+     "label": "بعد العشاء"
+    },
+    {
+     "value": "off",
+     "label": "بلا"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "quran.lateReminder",
+   "owner": "quran",
+   "section": "التذكير",
+   "title": "المتأخر قبل أن يبعد",
+   "type": "bool",
+   "default": true,
+   "scope": "sync",
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "mal.layout",
+   "owner": "mal",
+   "section": "ترتيب الرئيسية",
+   "title": "الكتل",
+   "type": "layout",
+   "default": {
+    "blocks": [
+     "curve",
+     "now",
+     "envelopes",
+     "limits",
+     "obligations"
+    ],
+    "pinned": [
+     "now"
+    ],
+    "hidden": [],
+    "sizes": {}
+   },
+   "scope": "sync",
+   "storage": "Setting (synced)",
+   "preset": true,
+   "contract": {
+    "payload": "LayoutPayload v1 {v, blocks, pinned, hidden, sizes}",
+    "blockIds": [
+     "curve",
+     "now",
+     "envelopes",
+     "limits",
+     "obligations"
+    ],
+    "pinnedSubsetOfBlocks": true,
+    "hiddenDisjointFromPinned": true,
+    "sizes": [],
+    "unknownIds": "dropped on read"
+   }
+  },
+  {
+   "key": "mal.firstNumber",
+   "owner": "mal",
+   "section": "الأرقام",
+   "title": "الرقم الأول",
+   "type": "choice",
+   "default": "availableNow",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "availableNow",
+     "label": "لك الآن"
+    },
+    {
+     "value": "netBasis",
+     "label": "لك فعلًا"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "mal.curveRange",
+   "owner": "mal",
+   "section": "الأرقام",
+   "title": "مدى المنحنى",
+   "type": "choice",
+   "default": "cycle",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "cycle",
+     "label": "الدورة"
+    },
+    {
+     "value": "week",
+     "label": "٧ أيام"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "mal.dailyAllowance",
+   "owner": "mal",
+   "section": "يومك والراتب",
+   "title": "اليومية",
+   "type": "object",
+   "default": {
+    "mode": "fixed",
+    "amountMinor": null,
+    "percentBp": null
+   },
+   "scope": "sync",
+   "note": "تُضبط في أول تشغيل؛ النسبة ÷ طول الدورة الفعلي؛ amountMinor بالوحدة الصغرى (هللة)، percentBp بنقاط الأساس (١٪ = ١٠٠)",
+   "storage": "Setting (synced)",
+   "preset": false,
+   "contract": {
+    "fields": {
+     "mode": "fixed|percent",
+     "amountMinor": "Int? ≥ 0, minor units; required when mode = fixed",
+     "percentBp": "Int? 0…10000 basis points; required when mode = percent"
+    },
+    "note": "null before first-run setup = not set (never treated as 0)"
+   }
+  },
+  {
+   "key": "mal.salaryRemainder",
+   "owner": "mal",
+   "section": "يومك والراتب",
+   "title": "باقي الراتب يذهب إلى",
+   "type": "choice",
+   "default": "surplusThenReserve",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "surplusThenReserve",
+     "label": "الفوائض حتى ١٠٬٠٠٠ ثم الاحتياطي"
+    },
+    {
+     "value": "reserve",
+     "label": "الاحتياطي"
+    },
+    {
+     "value": "ask",
+     "label": "اسألني"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "mal.surplusCap",
+   "owner": "mal",
+   "section": "يومك والراتب",
+   "title": "سقف الفوائض",
+   "type": "money",
+   "default": 1000000,
+   "scope": "sync",
+   "note": "بالوحدة الصغرى (هللة) = ١٠٬٠٠٠ ر.س",
+   "storage": "Setting (synced)",
+   "preset": false,
+   "contract": {
+    "value": "Int minor units",
+    "range": [
+     0,
+     10000000000000
+    ]
+   }
+  },
+  {
+   "key": "mal.autoOffset",
+   "owner": "mal",
+   "section": "يومك والراتب",
+   "title": "المقاصة التلقائية",
+   "type": "bool",
+   "default": true,
+   "scope": "sync",
+   "note": "عجز ≤ ٣ يوميات، سقف لكل دورة",
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "mal.bigExpenseDays",
+   "owner": "mal",
+   "section": "يومك والراتب",
+   "title": "المصروف الكبير يسأل من (يوميات)",
+   "type": "int",
+   "default": 3,
+   "scope": "sync",
+   "range": [
+    2,
+    8
+   ],
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "mal.cashWithdrawalAsSpend",
+   "owner": "mal",
+   "section": "يومك والراتب",
+   "title": "السحب النقدي يُخصم من يومك",
+   "type": "bool",
+   "default": true,
+   "scope": "sync",
+   "note": "إن أُطفئ: السحب محايد ومصروف النقد اليدوي يُخصم",
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "mal.travelPausesDaily",
+   "owner": "mal",
+   "section": "يومك والراتب",
+   "title": "اليومية تتوقف في السفر",
+   "type": "bool",
+   "default": true,
+   "scope": "sync",
+   "note": "توصية",
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "mal.logView",
+   "owner": "mal",
+   "section": "السجلّ والتحليل",
+   "title": "شكل السجلّ",
+   "type": "choice",
+   "default": "arches",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "arches",
+     "label": "رواق الأقواس"
+    },
+    {
+     "value": "monthArches",
+     "label": "الشهر أقواسًا"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "mal.analysisDefault",
+   "owner": "mal",
+   "section": "السجلّ والتحليل",
+   "title": "التحليل يفتح على",
+   "type": "choice",
+   "default": "cycle",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "cycle",
+     "label": "الدورة"
+    },
+    {
+     "value": "week",
+     "label": "الأسبوع"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "mal.alert80",
+   "owner": "mal",
+   "section": "التنبيهات",
+   "title": "تنبيه ٨٠٪ من الحد",
+   "type": "bool",
+   "default": true,
+   "scope": "sync",
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "mal.cardDue",
+   "owner": "mal",
+   "section": "التنبيهات",
+   "title": "موعد سداد البطاقة",
+   "type": "choice",
+   "default": "3days",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "3days",
+     "label": "قبل ٣ أيام"
+    },
+    {
+     "value": "1day",
+     "label": "قبل يوم"
+    },
+    {
+     "value": "off",
+     "label": "بلا"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "mal.sinceLastVisit",
+   "owner": "mal",
+   "section": "التنبيهات",
+   "title": "«منذ آخر زيارة»",
+   "type": "bool",
+   "default": true,
+   "scope": "sync",
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "mal.utilizationWarn",
+   "owner": "mal",
+   "section": "التنبيهات",
+   "title": "تنبيه استخدام الحد فوق",
+   "type": "int",
+   "default": 30,
+   "scope": "sync",
+   "range": [
+    10,
+    90
+   ],
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "notes.homeShape",
+   "owner": "notes",
+   "section": "الرئيسية",
+   "title": "شكل الرئيسية",
+   "type": "choice",
+   "default": "window",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "window",
+     "label": "النافذة"
+    },
+    {
+     "value": "echoes",
+     "label": "الأصداء"
+    },
+    {
+     "value": "margin",
+     "label": "الهامش"
+    }
+   ],
+   "note": "مفتوح",
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "notes.layout",
+   "owner": "notes",
+   "section": "الرئيسية",
+   "title": "الكتل",
+   "type": "layout",
+   "default": {
+    "blocks": [
+     "memory",
+     "thatDay",
+     "sinceThatDay",
+     "days",
+     "todayBar"
+    ],
+    "pinned": [
+     "memory",
+     "todayBar"
+    ],
+    "hidden": [],
+    "sizes": {}
+   },
+   "scope": "sync",
+   "note": "الترتيب والأحجام لشكل «النافذة» وحده؛ أما hidden فيحكم كل الأشكال: إخفاء thatDay («ذاك اليوم») أو days («أيامك») هنا هو المصدر الوحيد (حُذف notes.showThatDay وnotes.showDays)",
+   "appliesTo": {
+    "notes.homeShape": "window"
+   },
+   "hiddenAppliesToAllShapes": true,
+   "storage": "Setting (synced)",
+   "preset": true,
+   "contract": {
+    "payload": "LayoutPayload v1 {v, blocks, pinned, hidden, sizes}",
+    "blockIds": [
+     "memory",
+     "thatDay",
+     "sinceThatDay",
+     "days",
+     "todayBar"
+    ],
+    "pinnedSubsetOfBlocks": true,
+    "hiddenDisjointFromPinned": true,
+    "sizes": [],
+    "unknownIds": "dropped on read"
+   }
+  },
+  {
+   "key": "notes.memorySize",
+   "owner": "notes",
+   "section": "الرئيسية",
+   "title": "حجم الذكرى",
+   "type": "choice",
+   "default": "large",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "large",
+     "label": "كبيرة"
+    },
+    {
+     "value": "medium",
+     "label": "متوسطة"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "notes.calendarFirst",
+   "owner": "notes",
+   "section": "أي ذكرى",
+   "title": "التقويم الأول في تقويم المذكرات",
+   "type": "choice",
+   "default": "gregorian",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "gregorian",
+     "label": "الميلادي"
+    },
+    {
+     "value": "hijri",
+     "label": "الهجري"
+    }
+   ],
+   "note": "استثناء معتمد من core.firstCalendar: سنة الجدار وورقة الشهر ميلادي أولًا",
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "notes.match",
+   "owner": "notes",
+   "section": "أي ذكرى",
+   "title": "المطابقة",
+   "type": "choice",
+   "default": "gregorian",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "gregorian",
+     "label": "بالميلادي"
+    },
+    {
+     "value": "hijri",
+     "label": "بالهجري"
+    },
+    {
+     "value": "auto",
+     "label": "تلقائي"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "notes.noMemory",
+   "owner": "notes",
+   "section": "أي ذكرى",
+   "title": "إذا لا ذكرى بنفس التاريخ",
+   "type": "choice",
+   "default": "nearestEcho",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "nearestEcho",
+     "label": "أقرب صدى"
+    },
+    {
+     "value": "todayPhoto",
+     "label": "صورة اليوم"
+    },
+    {
+     "value": "random",
+     "label": "بالصدفة"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "notes.yearsBack",
+   "owner": "notes",
+   "section": "أي ذكرى",
+   "title": "كم سنة ترجع",
+   "type": "choice",
+   "default": "all",
+   "scope": "sync",
+   "options": [
+    {
+     "value": 3,
+     "label": "٣"
+    },
+    {
+     "value": 5,
+     "label": "٥"
+    },
+    {
+     "value": "all",
+     "label": "كلها"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "notes.echoDistances",
+   "owner": "notes",
+   "section": "أي ذكرى",
+   "title": "مسافات الأصداء",
+   "type": "list",
+   "default": [
+    "1w",
+    "1m",
+    "3m",
+    "6m",
+    "1y",
+    "2y",
+    "3y"
+   ],
+   "scope": "sync",
+   "note": "سبع مسافات، والثامنة اليوم نفسه",
+   "storage": "Setting (synced)",
+   "preset": true,
+   "contract": {
+    "itemPattern": "^[1-9][0-9]?[wmy]$",
+    "unique": true,
+    "ascending": true,
+    "exactItems": 7
+   }
+  },
+  {
+   "key": "notes.showPhoto",
+   "owner": "notes",
+   "section": "ما تعرضه الذكرى",
+   "title": "الصورة",
+   "type": "bool",
+   "default": true,
+   "scope": "sync",
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "notes.showPlace",
+   "owner": "notes",
+   "section": "ما تعرضه الذكرى",
+   "title": "المكان",
+   "type": "bool",
+   "default": true,
+   "scope": "sync",
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "notes.showAutoSections",
+   "owner": "notes",
+   "section": "ما تعرضه الذكرى",
+   "title": "ما كتبه مدار وأقسامه",
+   "type": "bool",
+   "default": true,
+   "scope": "sync",
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "notes.sinceMetrics",
+   "owner": "notes",
+   "section": "ما تعرضه الذكرى",
+   "title": "مقاييس «منذ ذاك اليوم»",
+   "type": "list",
+   "default": [
+    "sadr",
+    "fajrJamaah",
+    "spend"
+   ],
+   "scope": "sync",
+   "storage": "Setting (synced)",
+   "preset": true,
+   "contract": {
+    "items": [
+     "sadr",
+     "fajrJamaah",
+     "spend"
+    ],
+    "unique": true,
+    "maxItems": 3
+   }
+  },
+  {
+   "key": "notes.includeDayOne",
+   "owner": "notes",
+   "section": "أي ذكرى",
+   "title": "صفحات داي ون في الذكريات",
+   "type": "bool",
+   "default": true,
+   "scope": "sync",
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "notes.dictationFirst",
+   "owner": "notes",
+   "section": "الكتابة",
+   "title": "الإملاء أولًا",
+   "type": "bool",
+   "default": true,
+   "scope": "sync",
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "notes.serverDictationConsent",
+   "owner": "notes",
+   "section": "الكتابة",
+   "title": "إرسال الصوت إلى Apple للتحويل",
+   "type": "bool",
+   "default": false,
+   "scope": "device",
+   "note": "يُسأل قبل أول استعمال فقط إن لم يتوفر التحويل على الجهاز",
+   "storage": "DeviceSetting (deviceOnly configuration, never synced)",
+   "preset": false
+  },
+  {
+   "key": "notes.secondInk",
+   "owner": "notes",
+   "section": "الكتابة",
+   "title": "لون الحبر الثاني",
+   "type": "choice",
+   "default": "blue",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "blue",
+     "label": "أزرق"
+    },
+    {
+     "value": "green",
+     "label": "أخضر"
+    },
+    {
+     "value": "brown",
+     "label": "بنّي"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "notes.suggestLine",
+   "owner": "notes",
+   "section": "الكتابة",
+   "title": "اقترح عليّ سطرًا",
+   "type": "bool",
+   "default": true,
+   "scope": "sync",
+   "note": "لا يُكتب إلا باختيارك",
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "notes.marginAlsoToday",
+   "owner": "notes",
+   "section": "الكتابة",
+   "title": "الهامش يُكتب في صفحة اليوم",
+   "type": "bool",
+   "default": true,
+   "scope": "sync",
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "notes.autoLines",
+   "owner": "notes",
+   "section": "اليوم يكتب نفسه",
+   "title": "سطور الأقسام",
+   "type": "map",
+   "default": {
+    "salah": true,
+    "quran": true,
+    "mal": true,
+    "mihbara": true
+   },
+   "scope": "sync",
+   "note": "المالك الوحيد لظهور سطور كل غرفة في المذكرات؛ «المصروف يدخل صفحة اليوم» في خصّص المال يعرض المفتاح نفسه notes.autoLines.mal (حُذف mal.expenseInDiary)",
+   "storage": "Setting (synced)",
+   "preset": true,
+   "contract": {
+    "keys": [
+     "salah",
+     "quran",
+     "mal",
+     "mihbara"
+    ],
+    "exactKeys": true,
+    "value": "Bool"
+   }
+  },
+  {
+   "key": "notes.onThisDay",
+   "owner": "notes",
+   "section": "التذكير",
+   "title": "«في مثل هذا اليوم»",
+   "type": "choice",
+   "default": "afterIsha",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "afterFajr",
+     "label": "بعد الفجر"
+    },
+    {
+     "value": "afterIsha",
+     "label": "بعد العشاء"
+    },
+    {
+     "value": "off",
+     "label": "بلا"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "notes.morningNiyya",
+   "owner": "notes",
+   "section": "التذكير",
+   "title": "نيّة الصباح",
+   "type": "bool",
+   "default": true,
+   "scope": "sync",
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "notes.dailyCap",
+   "owner": "notes",
+   "section": "التذكير",
+   "title": "سقف إشعارات المذكرات",
+   "type": "int",
+   "default": 2,
+   "scope": "sync",
+   "range": [
+    0,
+    2
+   ],
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "mihbara.layout",
+   "owner": "mihbara",
+   "section": "أجزاء الغرفة",
+   "title": "الأجزاء (إخفاء فقط)",
+   "type": "layout",
+   "default": {
+    "blocks": [
+     "shelf",
+     "oldCabinet",
+     "desk",
+     "notebook",
+     "motivate"
+    ],
+    "pinned": [
+     "shelf",
+     "desk"
+    ],
+    "hidden": [],
+    "sizes": {}
+   },
+   "scope": "sync",
+   "note": "المحبرة مشهد واحد: تُخفى أجزاؤها ولا يتغيّر مكانها",
+   "storage": "Setting (synced)",
+   "preset": true,
+   "contract": {
+    "payload": "LayoutPayload v1 {v, blocks, pinned, hidden, sizes}",
+    "blockIds": [
+     "shelf",
+     "oldCabinet",
+     "desk",
+     "notebook",
+     "motivate"
+    ],
+    "pinnedSubsetOfBlocks": true,
+    "hiddenDisjointFromPinned": true,
+    "sizes": [],
+    "unknownIds": "dropped on read"
+   }
+  },
+  {
+   "key": "mihbara.shape",
+   "owner": "mihbara",
+   "section": "مظهر المحبرة",
+   "title": "الشكل",
+   "type": "choice",
+   "default": "asil",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "asil",
+     "label": "الأصيل"
+    },
+    {
+     "value": "modern",
+     "label": "الحديث"
+    },
+    {
+     "value": "manuscript",
+     "label": "المخطوط"
+    },
+    {
+     "value": "focused",
+     "label": "المركّز"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "mihbara.sunnahPlace",
+   "owner": "mihbara",
+   "section": "مظهر المحبرة",
+   "title": "مكان السنّة",
+   "type": "choice",
+   "default": "rahl",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "rahl",
+     "label": "الرَّحل"
+    },
+    {
+     "value": "sideBySide",
+     "label": "جنبًا إلى جنب"
+    },
+    {
+     "value": "oneOpen",
+     "label": "واحد مفتوح"
+    },
+    {
+     "value": "stacked",
+     "label": "فوق بعض"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "mihbara.rahlOpens",
+   "owner": "mihbara",
+   "section": "مظهر المحبرة",
+   "title": "متى ينفتح الرَّحل",
+   "type": "choice",
+   "default": "afterFajr",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "afterFajr",
+     "label": "بعد الفجر"
+    },
+    {
+     "value": "untilDone",
+     "label": "حتى يتمّه"
+    },
+    {
+     "value": "manual",
+     "label": "يدويًا"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "mihbara.pageStyle",
+   "owner": "mihbara",
+   "section": "مظهر المحبرة",
+   "title": "الصفحات",
+   "type": "choice",
+   "default": "classic",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "classic",
+     "label": "كلاسيكية"
+    },
+    {
+     "value": "modern",
+     "label": "حديثة"
+    },
+    {
+     "value": "framed",
+     "label": "مؤطّرة"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "mihbara.motivateStyle",
+   "owner": "mihbara",
+   "section": "مظهر المحبرة",
+   "title": "حمّسني",
+   "type": "choice",
+   "default": "paper",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "paper",
+     "label": "الورقة"
+    },
+    {
+     "value": "lamp",
+     "label": "السراج"
+    },
+    {
+     "value": "road",
+     "label": "الطريق"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "mihbara.notebookStyle",
+   "owner": "mihbara",
+   "section": "مظهر المحبرة",
+   "title": "الدفتر",
+   "type": "choice",
+   "default": "yellowRuled",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "yellowRuled",
+     "label": "أصفر مسطّر"
+    },
+    {
+     "value": "white",
+     "label": "أبيض"
+    },
+    {
+     "value": "indexCard",
+     "label": "بطاقة فهرسة"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "mihbara.wirdCount",
+   "owner": "mihbara",
+   "section": "السنّة",
+   "title": "أحاديث الورد في اليوم",
+   "type": "int",
+   "default": 1,
+   "scope": "sync",
+   "range": [
+    1,
+    3
+   ],
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "mihbara.hadithCollection",
+   "owner": "mihbara",
+   "section": "السنّة",
+   "title": "المتن الحالي",
+   "type": "choice",
+   "default": "nawawi40",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "nawawi40",
+     "label": "الأربعون النووية"
+    },
+    {
+     "value": "umdah",
+     "label": "عمدة الأحكام"
+    },
+    {
+     "value": "riyad",
+     "label": "رياض الصالحين"
+    },
+    {
+     "value": "bulugh",
+     "label": "بلوغ المرام"
+    }
+   ],
+   "note": "المجموعات المتاحة فعلًا تتبع قرار المالك في المصدر والطبعة",
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
+   "key": "mihbara.hadithView",
+   "owner": "mihbara",
+   "section": "السنّة",
+   "title": "عرض الحديث",
+   "type": "choice",
+   "default": "layers",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "layers",
+     "label": "طبقات"
+    },
+    {
+     "value": "hashiya",
+     "label": "حاشية"
+    },
+    {
+     "value": "cards",
+     "label": "بطاقات"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "mihbara.readerAr",
+   "owner": "mihbara",
+   "section": "القارئ",
+   "title": "إعدادات القارئ العربي",
+   "type": "object",
+   "default": {
+    "theme": "auto",
+    "size": 4,
+    "font": "amiri",
+    "mode": "pages",
+    "tashkil": true,
+    "footnotes": "tap"
+   },
+   "scope": "sync",
+   "note": "تُحفظ لكل لغة",
+   "storage": "Setting (synced)",
+   "preset": true,
+   "contract": {
+    "fields": {
+     "theme": "auto|paper|warm|calm|night|black",
+     "size": "Int 1…7",
+     "font": "id from the Arabic reader font list (§7.6)",
+     "mode": "pages|scroll|focus",
+     "tashkil": "Bool",
+     "footnotes": "String (values owned by §7.6)"
+    },
+    "unknownKeys": "dropped on read, rejected on write"
+   }
+  },
+  {
+   "key": "mihbara.readerEn",
+   "owner": "mihbara",
+   "section": "القارئ",
+   "title": "إعدادات القارئ الإنجليزي",
+   "type": "object",
+   "default": {
+    "theme": "auto",
+    "size": 4,
+    "font": "literata",
+    "mode": "pages",
+    "hyphenation": true,
+    "arabicHints": "hard"
+   },
+   "scope": "sync",
+   "storage": "Setting (synced)",
+   "preset": true,
+   "contract": {
+    "fields": {
+     "theme": "auto|paper|warm|calm|night|black",
+     "size": "Int 1…7",
+     "font": "id from the English reader font list (§7.6)",
+     "mode": "pages|scroll|focus",
+     "hyphenation": "Bool",
+     "arabicHints": "String (values owned by §7.6)"
+    },
+    "unknownKeys": "dropped on read, rejected on write"
+   }
+  },
+  {
+   "key": "mihbara.readingReminder",
+   "owner": "mihbara",
+   "section": "التذكير",
+   "title": "تذكير القراءة",
+   "type": "choice",
+   "default": "off",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "off",
+     "label": "بلا"
+    },
+    {
+     "value": "afterAsr",
+     "label": "بعد العصر"
+    },
+    {
+     "value": "afterIsha",
+     "label": "بعد العشاء"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": false
+  }
+ ]
+}
