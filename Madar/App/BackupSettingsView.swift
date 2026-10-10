@@ -172,7 +172,7 @@ struct BackupSettingsView: View {
                 SecureField("أعِد كلمة المرور", text: $model.exportConfirmation).textContentType(.newPassword).focused($focusedPassword, equals: 2).submitLabel(.done).onSubmit { focusedPassword = nil }.accessibilityIdentifier("backup-password-confirmation")
                 Text("احفظ كلمة المرور في مكان آمن. فقدانها يجعل النسخة غير قابلة للقراءة.").font(MadarTypography.caption())
                 if model.status?.keyConfigured == false { Text("تُستخدم كلمة مرور أول نسخة للنسخ التلقائي أيضًا. يُحفظ مفتاح مشتق منها على هذا الجهاز، وتبقى كلمة المرور عندك.").font(MadarTypography.caption()).accessibilityIdentifier("backup-key-setup") }
-                Button("انسخ الآن", action: model.export).disabled(!model.canExport).accessibilityIdentifier("backup-now")
+                exportButton
                 if let file = model.exportedURL {
                     ShareLink(item: file) { Label("احفظ النسخة أو شاركها", systemImage: "square.and.arrow.up") }.accessibilityIdentifier("backup-export")
                 }
@@ -206,6 +206,18 @@ struct BackupSettingsView: View {
                 Text((model.restoreMode == .replace ? "سيتغيّر هذا على كل أجهزتك. تُحفظ نسخة أمان أولًا، وتُحذف السجلات غير الموجودة في النسخة حذفًا قابلًا للاسترجاع الصريح." : "تُدمج السجلات حسب هوياتها، ولا يعيد الدمج سجلًّا محذوفًا إلا باسترجاع صريح.") + (model.status?.keyConfigured == false ? " كلمة مرور النسخة المختارة ستحمي نسخة الأمان والنسخ التلقائي على هذا الجهاز." : ""))
             }
             .alert("لم يكتمل الإجراء", isPresented: Binding(get: { model.errorMessage != nil }, set: { if !$0 { model.errorMessage = nil } })) { Button("حسنًا") { model.errorMessage = nil } } message: { Text(model.errorMessage ?? "") }
+    }
+    @ViewBuilder private var exportButton: some View {
+        let button = Button("انسخ الآن", action: model.export).disabled(!model.canExport).accessibilityIdentifier("backup-now")
+        #if DEBUG
+        if let fixture = ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"], UUID(uuidString: fixture) != nil {
+            // Only an isolated UI fixture exposes non-secret diagnostics to XCTest.
+            // Never expose the passphrase itself, even in a failing accessibility snapshot.
+            button.accessibilityValue("passphrase-count=\(model.exportPassphrase.count);confirmation-count=\(model.exportConfirmation.count);matches=\(model.exportPassphrase == model.exportConfirmation);busy=\(model.busy)")
+        } else { button }
+        #else
+        button
+        #endif
     }
     @ViewBuilder private func previewRows(_ preview: BackupRestorePreview) -> some View {
         Text("معاينة \(preview.fileName)").font(MadarTypography.section())
