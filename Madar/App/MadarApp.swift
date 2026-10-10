@@ -47,10 +47,13 @@ struct MadarApp: App {
     @MainActor private func load() async {
         do {
             guard var group = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.alqzan.madar2") else { throw DataError.missingAppGroup }
+            var backupKeyService = "com.alqzan.madar2.backup"
             #if DEBUG
             if let fixture = ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"], !fixture.isEmpty, fixture.count <= 100,
                fixture.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-") }) {
                 group = group.appending(path: "UITestStores/\(fixture)", directoryHint: .isDirectory)
+                // The fixture's first export must never read or replace the real backup key.
+                backupKeyService += ".uitest.\(fixture)"
             }
             #endif
             let root = group.appending(path: "ManagedData", directoryHint: .isDirectory)
@@ -61,7 +64,7 @@ struct MadarApp: App {
                 managed = try ManagedDataStore.adopt(from: legacy, at: root, commandLockURL: lockURL)
             } else { managed = try ManagedDataStore(root: root, commandLockURL: lockURL) }
             let opened = try AppSession(container: managed.container, managedStore: managed, groupDirectory: group)
-            let backup = AppBackupService(session: opened, store: managed, backupDirectory: group.appending(path: "Backups", directoryHint: .isDirectory))
+            let backup = AppBackupService(session: opened, store: managed, backupDirectory: group.appending(path: "Backups", directoryHint: .isDirectory), keyStore: KeychainBackupKeyStore(service: backupKeyService))
             opened.backupService = backup
             opened.syncService = AppSyncService(session: opened, store: managed, backup: backup)
             opened.lockController = MadarLockController(scope: MadarLockScope(rawValue: opened.string("core.faceIDLock")) ?? .notesOnly, service: AppPrivacyService(session: opened))

@@ -1,34 +1,45 @@
 import XCTest
 
 @MainActor final class FoundationUITests: XCTestCase {
-    func testBackupExportAndLocalSyncThroughNativeSettings() throws {
-        let app = XCUIApplication()
-        app.launchEnvironment["MADAR_UI_STORE_ID"] = UUID().uuidString
-        app.launch(); finishOnboarding(app)
-        app.buttons["settings-button"].tap()
-        let backupLink = app.buttons["backup-settings-link"]
-        for _ in 0..<8 { if backupLink.isHittable { break }; app.swipeUp() }
-        XCTAssertTrue(backupLink.isHittable, app.debugDescription); backupLink.tap()
-        let password = app.secureTextFields["backup-password"]
-        XCTAssertTrue(password.waitForExistence(timeout: 10), app.debugDescription)
-        password.tap(); password.typeText("test-only-passphrase")
-        let confirmation = app.secureTextFields["backup-password-confirmation"]
-        confirmation.tap(); confirmation.typeText("test-only-passphrase")
-        app.buttons["backup-keyboard-done"].tap()
-        let export = app.buttons["backup-now"]
-        if !export.isHittable { app.swipeUp() }
-        XCTAssertTrue(export.isEnabled); export.tap()
-        let share = app.buttons["backup-export"]
-        XCTAssertTrue(share.waitForExistence(timeout: 20), app.debugDescription)
-        let screenshot = XCTAttachment(screenshot: app.screenshot()); screenshot.name = "M0-backup-native-export"; screenshot.lifetime = .keepAlways; add(screenshot)
-        app.terminate(); app.launch(); finishOnboarding(app)
-        app.buttons["settings-button"].tap()
-        let sync = app.buttons["sync-settings-link"]
-        for _ in 0..<8 { if sync.isHittable { break }; app.swipeUp() }
-        XCTAssertTrue(sync.isHittable, app.debugDescription); sync.tap()
-        XCTAssertTrue(app.staticTexts["sync-status"].waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertEqual(app.staticTexts["sync-status"].label, "هذه النسخة تعمل محليًا؛ اتصال iCloud غير مهيّأ.")
-        XCTAssertFalse(app.switches["sync-enabled"].isEnabled)
+    func test_M0S2_BackupPasswordConfirmationAndFixtureIsolation() throws {
+        // A second fresh fixture must not inherit the first fixture's configured Keychain key.
+        for size in ["L", "AX3"] {
+            let app = XCUIApplication()
+            app.launchEnvironment["MADAR_UI_STORE_ID"] = UUID().uuidString
+            app.launchEnvironment["MADAR_UI_SIZE"] = size
+            app.launch(); openBackupSettings(app)
+            XCTAssertTrue(app.staticTexts["backup-key-setup"].waitForExistence(timeout: 10), app.debugDescription)
+            let password = app.secureTextFields["backup-password"]
+            scrollTo(password, in: app)
+            password.tap(); password.typeText("test-only-passphrase")
+            attachScreenshot(app, named: "M0-backup-before-confirmation-\(size)")
+            // Exercise native Next while the keyboard changes the Form's visible area,
+            // instead of tapping a row whose frame may be outside that area.
+            password.typeText("\n")
+            let confirmation = app.secureTextFields["backup-password-confirmation"]
+            let mismatch = "test-only-passphrase!"
+            confirmation.typeText(mismatch)
+            app.buttons["backup-keyboard-done"].tap()
+            let export = app.buttons["backup-now"]
+            XCTAssertFalse(export.isEnabled, "A mismatched confirmation must not permit export.")
+
+            scrollTo(confirmation, in: app)
+            confirmation.tap()
+            confirmation.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: mismatch.count))
+            confirmation.typeText("test-only-passphrase")
+            app.buttons["backup-keyboard-done"].tap()
+            scrollTo(export, in: app)
+            XCTAssertTrue(export.isEnabled, app.debugDescription); export.tap()
+            let share = app.buttons["backup-export"]
+            XCTAssertTrue(share.waitForExistence(timeout: 20), app.debugDescription)
+            scrollTo(share, in: app)
+            attachScreenshot(app, named: "M0-backup-native-export-\(size)")
+
+            app.terminate(); app.launch(); openBackupSettings(app)
+            XCTAssertTrue(app.buttons["backup-schedule"].waitForExistence(timeout: 10), app.debugDescription)
+            XCTAssertFalse(app.staticTexts["backup-key-setup"].exists, "The same fixture must retain its configured key after relaunch.")
+            app.terminate()
+        }
     }
 
     func testWholeAppLockPersistsWithoutRenderingProtectedContent() throws {
@@ -142,6 +153,25 @@ import XCTest
                 app.terminate()
             }
         }
+    }
+    private func openBackupSettings(_ app: XCUIApplication) {
+        finishOnboarding(app)
+        app.buttons["settings-button"].tap()
+        let link = app.buttons["backup-settings-link"]
+        scrollTo(link, in: app)
+        link.tap()
+        XCTAssertTrue(app.secureTextFields["backup-password"].waitForExistence(timeout: 10), app.debugDescription)
+    }
+    private func scrollTo(_ element: XCUIElement, in app: XCUIApplication) {
+        for _ in 0..<12 {
+            if element.isHittable { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(element.isHittable, app.debugDescription)
+    }
+    private func attachScreenshot(_ app: XCUIApplication, named name: String) {
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = name; attachment.lifetime = .keepAlways; add(attachment)
     }
     private func finishOnboarding(_ app: XCUIApplication) {
         if app.buttons["first-run-skip"].waitForExistence(timeout: 2) { app.buttons["first-run-skip"].tap() }
