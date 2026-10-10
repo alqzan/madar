@@ -55,28 +55,44 @@ import MadarData
         context.rollback()
         #expect(try context.fetch(FetchDescriptor<PrayerLog>()).isEmpty && context.fetch(FetchDescriptor<QadaItem>()).isEmpty)
     }
-    @Test func pendingAgesAtPrayerDayFajrAndReplaysWithoutExtraRows() throws {
+    @Test func test_RP1_unloggedNeverBecomesQada() throws {
         let container = try container(); let context = container.mainContext
+        // §7.2's former seven-prayer-day deadline, overridden by RP1.
         let deadline = try #require(PrayerTimesEngine.calculate(day: GregorianDay("2026-10-14"), place: .riyadh)?.fajr)
-        #expect(try PrayerMutationHandler.stage(operation: .agePending, in: context, now: deadline.addingTimeInterval(-1), writer: "test-device", source: .system) == nil)
-        let inverse = try PrayerMutationHandler.stage(operation: .agePending, in: context, now: deadline, writer: "test-device", source: .system); try context.save()
-        #expect(inverse != nil)
-        let rows = try context.fetch(FetchDescriptor<PrayerLog>())
-        #expect(rows.count == 5 && rows.allSatisfy { $0.dayKey == "2026-10-07" && $0.status == "missed" && $0.source == "aging" })
-        #expect(try context.fetch(FetchDescriptor<QadaItem>()).count == 5)
-        #expect(try PrayerMutationHandler.stage(operation: .agePending, in: context, now: deadline, writer: "second-device", source: .system) == nil)
+        let returnAfterThreeWeeks = try #require(PrayerTimesEngine.calculate(day: GregorianDay("2026-10-28"), place: .riyadh)?.fajr)
+        for now in [deadline.addingTimeInterval(-1), deadline, deadline.addingTimeInterval(1), returnAfterThreeWeeks] {
+            for writer in ["test-device", "repeated-command"] {
+                let inverse = try PrayerMutationHandler.stage(operation: .agePending, in: context, now: now, writer: writer, source: .system)
+                try context.save()
+                #expect(inverse == nil)
+            }
+            for _ in 0..<2 {
+                let state = try PrayerRepository(context: context).snapshot(now: now)
+                #expect(state.pending.contains(try ref()))
+                #expect(state.statistics.denominator == 0 && state.statistics.percentage == nil)
+                #expect(state.statistics.owed == 0 && state.statistics.madeUp == 0 && state.qada.isEmpty)
+                #expect(!state.history.flatMap(\.cells).contains { [.missed, .qada].contains($0.status) })
+            }
+            #expect(try context.fetch(FetchDescriptor<PrayerLog>()).isEmpty)
+            #expect(try context.fetch(FetchDescriptor<QadaItem>()).isEmpty)
+        }
     }
-    @Test func movedTrackingHasEditDayGraceAndSecondEditFails() throws {
+    @Test func movedTrackingRemainsUnloggedAndSecondEditFails() throws {
         let container = try container(start: "2026-10-09T12:00:00+03:00"); let context = container.mainContext
         try apply(.editTrackingStart(GregorianDay("2026-10-07")), context, at: "2026-10-10T12:00:00+03:00")
         #expect(throws: PrayerDomainError.trackingAlreadyEdited) { try apply(.editTrackingStart(GregorianDay("2026-10-06")), context, at: "2026-10-10T12:01:00+03:00") }
         context.rollback()
-        let oldDeadline = try #require(PrayerTimesEngine.calculate(day: GregorianDay("2026-10-14"), place: .riyadh)?.fajr)
-        _ = try PrayerMutationHandler.stage(operation: .agePending, in: context, now: oldDeadline, writer: "test-device")
+        for day in ["2026-10-14", "2026-10-17"] {
+            let deadline = try #require(PrayerTimesEngine.calculate(day: GregorianDay(day), place: .riyadh)?.fajr)
+            #expect(try PrayerMutationHandler.stage(operation: .agePending, in: context, now: deadline, writer: "test-device") == nil)
+            try context.save()
+            let state = try PrayerRepository(context: context).snapshot(now: deadline)
+            #expect(state.tracking.day.description == "2026-10-07" && state.tracking.edits == 1)
+            #expect(state.pending.contains(try ref()))
+            #expect(state.statistics.denominator == 0 && state.qada.isEmpty)
+        }
         #expect(try context.fetch(FetchDescriptor<PrayerLog>()).isEmpty)
-        let deadline = try #require(PrayerTimesEngine.calculate(day: GregorianDay("2026-10-17"), place: .riyadh)?.fajr)
-        _ = try PrayerMutationHandler.stage(operation: .agePending, in: context, now: deadline, writer: "test-device"); try context.save()
-        #expect(try context.fetch(FetchDescriptor<PrayerLog>()).contains { $0.dayKey == "2026-10-07" })
+        #expect(try context.fetch(FetchDescriptor<QadaItem>()).isEmpty)
     }
     @Test func explicitUnrecordedPeriodCreatesNoDebtOrPercentageAndCanUndo() throws {
         let container = try container(); let context = container.mainContext
