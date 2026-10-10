@@ -34,11 +34,11 @@ struct CustomizeMadar: View {
                     } }
                     if dynamicType.isAccessibilitySize {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text(changesLabel).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                            Text(changesLabel).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("customization-changes")
                             Button("أعِد الافتراضي") { confirmReset = true }.frame(minHeight: 44).accessibilityIdentifier("reset-settings")
                         }
                     } else { HStack {
-                        Text(changesLabel).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                        Text(changesLabel).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("customization-changes")
                         Spacer()
                         Button("أعِد الافتراضي") { confirmReset = true }.frame(minHeight: 44).accessibilityIdentifier("reset-settings")
                     } }
@@ -81,7 +81,7 @@ struct CustomizeMadar: View {
     private let symbols = ["اليوم والتقويم": "calendar", "المظهر": "textformat", "مدينتك": "location"]
     private var changesLabel: String {
         let count = session.schema.settings.filter { AppSession.supportedKeys.contains($0.key) && session.values[$0.key] != $0.defaultValue }.count
-        return count == 0 ? "كما اتفقنا" : "\(session.digits(count)) تعديل عن المتفق عليه"
+        return CustomizationCopy.changes(count: count, formattedCount: session.digits(count))
     }
     private func valueLabel(_ key: String) -> String {
         session.schema.settings.first(where: { $0.key == key })?.options.first(where: { $0.value == session.values[key] })?.label ?? ""

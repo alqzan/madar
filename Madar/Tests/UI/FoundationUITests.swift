@@ -1,6 +1,45 @@
 import XCTest
 
 @MainActor final class FoundationUITests: XCTestCase {
+    func test_M0S2_RU3_CustomizationPluralsAtDefaultAndAX3() throws {
+        continueAfterFailure = false
+        for size in ["L", "AX3"] {
+            let app = XCUIApplication()
+            app.launchEnvironment["MADAR_UI_STORE_ID"] = UUID().uuidString
+            app.launchEnvironment["MADAR_UI_SIZE"] = size
+            app.launch(); finishOnboarding(app)
+            XCTAssertTrue(app.buttons["settings-button"].waitForExistence(timeout: 10))
+            app.buttons["settings-button"].tap()
+            let changes = app.staticTexts["customization-changes"]
+            XCTAssertTrue(changes.waitForExistence(timeout: 10))
+            XCTAssertEqual(changes.label, "كما اتفقنا")
+            attachScreenshot(app, named: "M0-RU3-zero-\(size)")
+            let edits = [
+                ("core.theme", "light", "تعديل واحد عن المتفق عليه"),
+                ("core.firstCalendar", "gregorian", "تعديلان عن المتفق عليه"),
+                ("core.numerals", "western", "\u{2068}3\u{2069} تعديلات عن المتفق عليه")
+            ]
+            for (key, value, expected) in edits {
+                let search = app.textFields["settings-search"]
+                scrollTo(search, in: app)
+                search.tap(); search.typeText(key + "\n")
+                let option = app.buttons["option-\(key)-\(value)"]
+                XCTAssertTrue(option.waitForExistence(timeout: 10))
+                scrollTo(option, in: app); option.tap()
+                expectation(for: NSPredicate(format: "selected == true"), evaluatedWith: option)
+                waitForExpectations(timeout: 10)
+                // The same disposable store verifies persistence; a fresh screen clears search.
+                app.terminate(); app.launch(); finishOnboarding(app)
+                XCTAssertTrue(app.buttons["settings-button"].waitForExistence(timeout: 10))
+                app.buttons["settings-button"].tap()
+                XCTAssertTrue(changes.waitForExistence(timeout: 10))
+                XCTAssertEqual(changes.label, expected)
+                attachScreenshot(app, named: "M0-RU3-\(key)-\(size)")
+            }
+            app.terminate()
+        }
+    }
+
     func test_M0S2_CutSettingsAndDeferredEntryPointsStayHidden() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
