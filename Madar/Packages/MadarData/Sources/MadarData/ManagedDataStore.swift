@@ -47,7 +47,8 @@ struct GenerationReady: Codable { let version: Int; let generationID: UUID; let 
         }
         let directory = root.appendingPathComponent("Generations/\(pointer.generationID.uuidString)",isDirectory:true)
         guard FileManager.default.fileExists(atPath:directory.appendingPathComponent("GenerationReady.json").path) else { throw BackupOperationError.invalidManagedStore }
-        binding = .init(generationID:pointer.generationID,syncedDirectory:directory,deviceStoreURL:root.appendingPathComponent("Device.store"),accountHash:pointer.accountHash,cloudEnabled:pointer.cloudKitContainerIdentifier != nil)
+        // The pointer's legacy cloud identifier is compatibility metadata, not a v1 capability.
+        binding = .init(generationID:pointer.generationID,syncedDirectory:directory,deviceStoreURL:root.appendingPathComponent("Device.store"),accountHash:pointer.accountHash,cloudEnabled:false)
         container = try MadarContainerFactory.make(at:directory,deviceStoreURL:binding.deviceStoreURL,cloudKitContainerIdentifier:pointer.cloudKitContainerIdentifier); container.mainContext.autosaveEnabled = false
         try recoverInterruptedOperation(pointer:pointer)
         try lease.endMaintenance()
@@ -113,7 +114,7 @@ struct GenerationReady: Codable { let version: Int; let generationID: UUID; let 
         let directory = generationDirectory(pointer.generationID)
         guard FileManager.default.fileExists(atPath:directory.appendingPathComponent("GenerationReady.json").path) else { throw BackupOperationError.invalidManagedStore }
         let replacement = try MadarContainerFactory.make(at:directory,deviceStoreURL:binding.deviceStoreURL,cloudKitContainerIdentifier:pointer.cloudKitContainerIdentifier); replacement.mainContext.autosaveEnabled = false
-        container = replacement; binding = .init(generationID:pointer.generationID,syncedDirectory:directory,deviceStoreURL:binding.deviceStoreURL,accountHash:pointer.accountHash,cloudEnabled:pointer.cloudKitContainerIdentifier != nil)
+        container = replacement; binding = .init(generationID:pointer.generationID,syncedDirectory:directory,deviceStoreURL:binding.deviceStoreURL,accountHash:pointer.accountHash,cloudEnabled:false)
     }
     public func containerForTransaction() throws -> ModelContainer { try refreshIfNeeded(); return container }
     func generationDirectory(_ id: UUID) -> URL { root.appendingPathComponent("Generations/\(id.uuidString)",isDirectory:true) }

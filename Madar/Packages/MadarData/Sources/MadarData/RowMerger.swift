@@ -178,7 +178,9 @@ private struct DictionarySpec: Decodable { let models: [ModelDefinition]; let re
     }
     private static func cascade(_ rows: inout [DataRecord]) throws {
         for parent in rows where parent.deletedAt != nil && parent.fields["mergedInto"] == .null {
-            let children: [(String,String)] = switch parent.model { case "Entry": [("MarginNote","targetEntryID")]; case "HifzSession": [("PageGrade","sessionID"),("MistakeEvent","sessionID")]; case "Book": [("ReadingSession","bookID"),("Highlight","bookID")]; default: [] }
+            // RD2: margins and reading history have independent lifetimes. Keep the origin UUID
+            // as provenance and the Book tombstone's title; never revive old child tombstones.
+            let children: [(String,String)] = switch parent.model { case "HifzSession": [("PageGrade","sessionID"),("MistakeEvent","sessionID")]; default: [] }
             if parent.model == "Entry" {
                 let mediaIDs = Set(([parent.fields["mediaID"] ?? .null] + (parent.fields["attachmentMediaIDs"]?.array ?? [])).compactMap(\.string))
                 for i in rows.indices where rows[i].model == "Media" && mediaIDs.contains(rows[i].id.uuidString) {
