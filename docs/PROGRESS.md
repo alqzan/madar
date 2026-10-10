@@ -6,6 +6,8 @@ M0 — reconciliation with review V1, before accepting the existing foundation. 
 
 Checked 9386ea7..b7bed94 — protocol/default metadata and RA1/RD2 reconciled. Top RA1/RD2 review approved; root MadarData passed 38 tests after integration. Simulator app compiled, lock persistence passed. Backup flow still failed matching/export after native Next; Top fix-only diagnostic rerun active. RA2/RA4/RA8 and physical M0 gate remain open; no whole milestone approved.
 
+Checked b7bed94..aac7014 (claude, 2026-10-10) — no blocking defect in main. Package tests pass (Core 20, Data 38, Snapshots 3, Sync 8); app build succeeds. Open: MadarPrayer tests do not compile and assert RP1-violating aging; inbox/receipt fixes (M0R-03..06) exist only on branch m0-s1-command-inbox 846e1bb, unreviewed and unmerged; backup UI test still failing.
+
 # Board
 
 | Section | Status | Task | Owner | Scope and acceptance |
@@ -15,7 +17,7 @@ Checked 9386ea7..b7bed94 — protocol/default metadata and RA1/RD2 reconciled. T
 | M0-S1 Command inbox and replay | building | M0-T02 in-progress (Standard high) | command_inbox | Worktree m0-command-inbox, branch m0-s1-command-inbox. Atomic JSONL inbox and app drain, value-only transport, durable duplicate receipts/replay before tombstone/expiry. Read design note, 16-tech, 17-data, 15-outside; RA2 and M0R-03/04/05/06. Independent producers never link SwiftData. Root coordinates simulator tests. |
 | M0-S1 Local factory and retention | building | M0-T03 done (Standard high; Top reviewed) | local_data | Agent 4297c8a reviewed approve scope-only, integrated 3718248. Root full MadarData rerun passed 38 tests in 3 suites (review-local-retention-integrated.log). No CloudKit factory choice; RD2 retains children and old tombstones. M3 arrow UI pending. |
 | M0-S1 Model rename compatibility | building | M0-T07 in-progress (Standard high) | local_data | Reuse isolated m0-local-data worktree, new branch m0-s1-money-models from current main. RA4 MoneyTransaction; freeze old schema and staged migration before changing names. Read 17-data and compatibility design note. Old store/archive fixtures preserve IDs/FKs/timestamps/deletions/media. Separate from approved RD2. |
-| M0-S2 Lean shell and times | building | M0-T04 needs-fix | unclaimed | Native glass only; hide cut settings, presets and cloud entry. Only built rooms visible. Defaults RD5/RQ8/RL5/RP6. Read 04-arch, 06-flex, 09-r-salah, 18-plan; RA3/8, RL8, RU1/3. Default/AX3 screenshots and meaningful UI checks. |
+| M0-S2 Lean shell and times | in-review | M0-T04 done on branch m0-s2-lean-shell (claude, standard), not merged | claude | Native glass only; hide cut settings, presets and cloud entry. Only built rooms visible. Defaults RD5/RQ8/RL5/RP6. Read 04-arch, 06-flex, 09-r-salah, 18-plan; RA3/8, RL8, RU1/3. Default/AX3 screenshots and meaningful UI checks. |
 | M0-S2 Existing UI defects | building | M0-T05 in-progress (Top) | ui_debug | Worktree m0-ui-debug, branch m0-s2-backup-focus. Backup confirmation lost keyboard focus after prior attempts; diagnose real screenshot/log before fix. Root owns simulator and validation. Lock persistence passed. Preserve fixture isolation. Window-level sheet privacy remains required before private content ships. |
 | M0-S3 Review and gate | building | M0-T06 todo (Top) | unclaimed | Fresh section reviews, J01–J18 room journey definitions before cited gates, M0 report. Build iPhone prayer times. Physical/signed checks marked not tested until runnable. |
 
@@ -29,6 +31,18 @@ Production tasks start after M0-T01. Separate agents own separate sections/files
 - Encrypted backup already exists; scalability RD4 and window-level privacy need review in the first relevant milestone. Retain code without implying all contracts passed.
 
 # Handovers
+
+## Handover — M0-T04 lean shell — 2026-10-10 — claude (Sonnet, standard)
+
+Done: quick check of Codex work (see Last checked). M0-T04 on branch `m0-s2-lean-shell` (not merged): glass-only native `TabView` (RL8); cut keys (`core.fontScale`, `core.motion`, `core.roomIdentity`, `tabbar.*`) removed from `AppSession.supportedKeys` and hard-coded to defaults in `TabShell.swift`; entry points to saved presets and sync settings removed from `CustomizeMadar.swift` (code kept for compatibility, `savePreset` unreachable). Stored values of cut keys are now ignored.
+Verified: `xcodebuild ... generic/platform=iOS Simulator build` → `** BUILD SUCCEEDED **`. UI tests testFirstRunAndSettingsRenderWithoutUnbuiltRooms, testThemePersistenceResetAndUndoThroughUI, testLightDarkAndAccessibilityScreenshots → `Executed 3 tests, with 0 failures`, `** TEST SUCCEEDED **`.
+Not verified: AX3 screenshot compared against canonical design by eye; physical iPhone; settings-schema `availability: v2` flags in the JSON were not changed here; `savePreset`/PresetsView files still exist.
+For the next agent:
+1. Section review of `m0-s2-lean-shell` (Standard), then merge. Possible merge conflict in `AppSession.swift` with the inbox branch.
+2. Top-tier review of `m0-s1-command-inbox` (846e1bb) before merging: concurrency and data path. It reports its tests pass but no simulator run.
+3. [fix-previous] `Packages/MadarPrayer/Tests/MadarPrayerTests/PrayerTests.swift` lines 22, 43, 84, 104: `#require(apply(...))` lacks `try`, so the package does not build its tests. Line ~58-66 asserts aging to missed, which RP1 forbids; remove `.agePending` (PrayerMutationHandler.swift) as part of M1 RP1 work. `PrayerRoom.swift:364` has "·" next to a digit (RU1).
+4. Backup UI test: stop after two more attempts, test the model logic and verify by hand on the phone.
+Next: Top (Sol xhigh or Opus, high) for item 2, then M0-T07 and M0-T06.
 
 ## Handover — review files received — 2026-10-10 — root
 

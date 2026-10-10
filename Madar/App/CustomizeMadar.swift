@@ -19,14 +19,12 @@ struct CustomizeMadar: View {
                         VStack(alignment: .leading, spacing: 16) {
                             previewLine("اليوم يبدأ", value: valueLabel("core.dayStart"))
                             previewLine("التقويم الأول", value: valueLabel("core.firstCalendar"))
-                            previewLine("الشريط", value: valueLabel("tabbar.style"))
                             Label(session.cityName, systemImage: "circle.hexagongrid").font(MadarTypography.caption())
                         }
                     } else { HStack {
                         VStack(alignment: .leading, spacing: 8) {
                             previewLine("اليوم يبدأ", value: valueLabel("core.dayStart"))
                             previewLine("التقويم الأول", value: valueLabel("core.firstCalendar"))
-                            previewLine("الشريط", value: valueLabel("tabbar.style"))
                         }
                         Spacer(minLength: 8)
                         VStack(spacing: 10) {
@@ -61,12 +59,8 @@ struct CustomizeMadar: View {
                     }
                 }
                 if query.isEmpty {
-                    NavigationLink("الأنماط المحفوظة") { PresetsView(session: session) }.frame(minHeight: 44).font(MadarTypography.section())
                     if let backup = session.backupService {
                         NavigationLink("النسخ والاستعادة") { BackupSettingsView(service: backup) }.frame(minHeight: 44).font(MadarTypography.section()).accessibilityIdentifier("backup-settings-link")
-                    }
-                    if let sync = session.syncService {
-                        NavigationLink("المزامنة") { SyncSettingsView(service: sync) }.frame(minHeight: 44).font(MadarTypography.section()).accessibilityIdentifier("sync-settings-link")
                     }
                 }
             }
@@ -83,8 +77,8 @@ struct CustomizeMadar: View {
             return query.isEmpty || normalized(definition.title + " " + sectionFor(definition.key) + " " + definition.key).contains(normalized(query))
         }
     }
-    private var sections: [String] { ["الشريط السفلي", "اليوم والتقويم", "المظهر", "مدينتك", "الخصوصية"].filter { section in filtered.contains { sectionFor($0.key) == section } } }
-    private let symbols = ["الشريط السفلي": "rectangle.bottomthird.inset.filled", "اليوم والتقويم": "calendar", "المظهر": "textformat", "مدينتك": "location"]
+    private var sections: [String] { ["اليوم والتقويم", "المظهر", "مدينتك", "الخصوصية"].filter { section in filtered.contains { sectionFor($0.key) == section } } }
+    private let symbols = ["اليوم والتقويم": "calendar", "المظهر": "textformat", "مدينتك": "location"]
     private var changesLabel: String {
         let count = session.schema.settings.filter { AppSession.supportedKeys.contains($0.key) && session.values[$0.key] != $0.defaultValue }.count
         return count == 0 ? "كما اتفقنا" : "\(session.digits(count)) تعديل عن المتفق عليه"
@@ -105,7 +99,6 @@ struct CustomizeMadar: View {
 }
 
 func sectionFor(_ key: String) -> String {
-    if key.hasPrefix("tabbar.") { return "الشريط السفلي" }
     if ["core.dayStart", "core.firstCalendar", "core.hijriSource", "core.hijriOffset", "core.weekStart"].contains(key) { return "اليوم والتقويم" }
     if key == "core.homeCity" { return "مدينتك" }
     if key == "core.faceIDLock" { return "الخصوصية" }
@@ -174,24 +167,18 @@ struct SettingControl: View {
     private var integerRange: ClosedRange<Int> { Int(definition.range?.first ?? 0)...Int(definition.range?.last ?? 0) }
     @ViewBuilder private var choices: some View {
         ForEach(definition.options, id: \.value) { option in
-            if !(definition.key == "tabbar.labels" && session.string("tabbar.style") == "glass" && option.value == .string("selected")) {
-                Button {
-                    if definition.key == "tabbar.style" && option.value == .string("glass") {
-                        session.setMany(["tabbar.style": .string("glass"), "tabbar.labels": .string("all")])
-                    } else { session.set(option.value, key: definition.key) }
-                } label: {
-                    VStack(spacing: 3) {
-                        Text(option.label).font(MadarTypography.body()).fixedSize(horizontal: false, vertical: true)
-                        if option.value == definition.defaultValue { Text("افتراضي").font(MadarTypography.fine()) }
-                    }.frame(maxWidth: .infinity, minHeight: 44).padding(.horizontal, 8).padding(.vertical, 8)
-                        .foregroundStyle(session.values[definition.key] == option.value ? theme.ink : theme.secondaryInk)
-                        .background(session.values[definition.key] == option.value ? theme.surface : theme.background, in: .rect(cornerRadius: 12))
-                        .overlay { RoundedRectangle(cornerRadius: 12).stroke(session.values[definition.key] == option.value ? theme.accent : theme.line, lineWidth: 1) }
-                }.buttonStyle(.plain).accessibilityLabel(option.label)
-                    .accessibilityValue(session.values[definition.key] == option.value ? "مختار" : "")
-                    .accessibilityAddTraits(session.values[definition.key] == option.value ? .isSelected : [])
-                    .accessibilityIdentifier("option-\(definition.key)-\(option.identifier)")
-            }
+            Button { session.set(option.value, key: definition.key) } label: {
+                VStack(spacing: 3) {
+                    Text(option.label).font(MadarTypography.body()).fixedSize(horizontal: false, vertical: true)
+                    if option.value == definition.defaultValue { Text("افتراضي").font(MadarTypography.fine()) }
+                }.frame(maxWidth: .infinity, minHeight: 44).padding(.horizontal, 8).padding(.vertical, 8)
+                    .foregroundStyle(session.values[definition.key] == option.value ? theme.ink : theme.secondaryInk)
+                    .background(session.values[definition.key] == option.value ? theme.surface : theme.background, in: .rect(cornerRadius: 12))
+                    .overlay { RoundedRectangle(cornerRadius: 12).stroke(session.values[definition.key] == option.value ? theme.accent : theme.line, lineWidth: 1) }
+            }.buttonStyle(.plain).accessibilityLabel(option.label)
+                .accessibilityValue(session.values[definition.key] == option.value ? "مختار" : "")
+                .accessibilityAddTraits(session.values[definition.key] == option.value ? .isSelected : [])
+                .accessibilityIdentifier("option-\(definition.key)-\(option.identifier)")
         }
     }
 }
