@@ -11,17 +11,18 @@ import XCTest
             app.launch(); openBackupSettings(app)
             XCTAssertTrue(app.staticTexts["backup-key-setup"].waitForExistence(timeout: 10), app.debugDescription)
             let passphrase = "test-only-passphrase"
+            let export = app.buttons["backup-now"]
             let password = app.secureTextFields["backup-password"]
             scrollTo(password, in: app)
             password.tap(); password.typeText(passphrase)
             attachScreenshot(app, named: "M0-backup-before-confirmation-\(size)")
+            XCTAssertEqual(export.value as? String, "passphrase-count=\(passphrase.count);confirmation-count=0;matches=false;busy=false", "Validate first-field input before submitting or changing focus.")
             // Exercise native Next while the keyboard changes the Form's visible area,
             // instead of tapping a row whose frame may be outside that area.
             password.typeText("\n")
             let confirmation = app.secureTextFields["backup-password-confirmation"]
             let mismatch = passphrase + "!"
             confirmation.typeText(mismatch)
-            let export = app.buttons["backup-now"]
             XCTAssertEqual(export.value as? String, "passphrase-count=\(passphrase.count);confirmation-count=\(mismatch.count);matches=false;busy=false")
             XCTAssertFalse(export.isEnabled, "A mismatched confirmation must not permit export.")
             // The insertion point is still at the end; remove only the extra mismatching
