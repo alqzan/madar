@@ -101,14 +101,16 @@ public protocol CommandStoreAdapter: Sendable {
     func transact(_ request: CommandTransactionRequest, now: Date) async throws -> CommandOutcome
 }
 public struct CommandBus: Sendable {
+    // Names implemented by this milestone. Unknown and later-room names are invalid
+    // before authorization, so they cannot become indefinitely recoverable needsApp work.
+    public static let appOnlyCommandNames: Set<String> = ["settings.set", "settings.applyPreset", "preset.save", "core.completeOnboarding", "system.undo"]
+    public static let supportedCommandNames = appOnlyCommandNames.union(["prayer.log"])
     private let adapter: any CommandStoreAdapter
     public init(adapter: any CommandStoreAdapter) { self.adapter = adapter }
     public func execute(_ envelope: CommandEnvelope, now: Date = Date(), generationID: UUID? = nil) async throws -> CommandOutcome {
         guard envelope.schemaVersion == 1, envelope.issuedAt <= now.addingTimeInterval(300), case .object(let payload) = envelope.payload else { return .init(status: .rejected, reason: "invalidCommand") }
-        let externalPrayerCommands = ["prayer.log", "prayer.makeUp", "prayer.answerHeart", "prayer.logQiyam"]
-        let systemPrayerCommands = ["prayer.agePending", "prayer.initializeTracking"]
-        if !externalPrayerCommands.contains(envelope.name), envelope.source != .app,
-           !(envelope.source == .system && systemPrayerCommands.contains(envelope.name)) {
+        guard Self.supportedCommandNames.contains(envelope.name) else { return .init(status: .rejected, reason: "unavailableInM0") }
+        if Self.appOnlyCommandNames.contains(envelope.name), envelope.source != .app {
             return .init(status: .needsApp, reason: "appOnlyFoundationCommand")
         }
         let operation: CommandOperation; let semantics: CommandSemantics; let naturalKey: String?
