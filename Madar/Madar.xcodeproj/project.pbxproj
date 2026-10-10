@@ -19,12 +19,13 @@
 		251712D13E1CB75A086AB762 /* MadarApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52096FB2E7F5C96D70BD4B80 /* MadarApp.swift */; };
 		2708B599D4DE94431189E7AA /* BackupSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30548ADF1D2BBABB66489408 /* BackupSettingsView.swift */; };
 		2C8A090F231850A34A5F984E /* MadarCommands in Frameworks */ = {isa = PBXBuildFile; productRef = BB0D9BFDBBAFC58EE2999DE7 /* MadarCommands */; };
-		330FEECE1D89F18B01B139E5 /* MadarSync in Frameworks */ = {isa = PBXBuildFile; productRef = F56ABA17B98BBC295DED888C /* MadarSync */; };
+		330FEECE1D89F18B01B139E5 /* MadarInbox in Frameworks */ = {isa = PBXBuildFile; productRef = CD612AE668CD8323078B4B8B /* MadarInbox */; };
 		34C08CE848450C430D0DB1E4 /* MadarWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BF0DFC3D1738347A82224A8 /* MadarWidgets.swift */; };
 		3D1F6A8075563D6E074473E2 /* PresetsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D3EC96D647534DFB18C29D1 /* PresetsView.swift */; };
 		41A7643B253AFF8A7C6F7417 /* MadarWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = E9A234078D9BE6530E46FC1E /* MadarWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		48F35CA79681B1883AA6DE30 /* MadarSnapshots in Frameworks */ = {isa = PBXBuildFile; productRef = D9E009A01CE49E91ECD42040 /* MadarSnapshots */; };
 		515BF7C677ACA9EA442A84EC /* MadarCore in Frameworks */ = {isa = PBXBuildFile; productRef = D04FCD79967981AED2E8C7FE /* MadarCore */; };
+		59CFCB83C498D00A1C66BA5F /* MadarSync in Frameworks */ = {isa = PBXBuildFile; productRef = F56ABA17B98BBC295DED888C /* MadarSync */; };
 		61008D4E1402C2503A5A3F54 /* MadarSnapshots in Frameworks */ = {isa = PBXBuildFile; productRef = 84C88E462FB52C233E333734 /* MadarSnapshots */; };
 		63381DAA1409F348D6E16B85 /* Amiri-OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = 56174C04CFE7BB474B46291C /* Amiri-OFL.txt */; };
 		6719E30E96A27275B6352121 /* MadarSnapshots in Frameworks */ = {isa = PBXBuildFile; productRef = 8536634CB7C0A26F02B922D9 /* MadarSnapshots */; };
@@ -138,6 +139,7 @@
 		D3146E3E67CC7456B5F8DDAD /* Madar.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Madar.entitlements; sourceTree = "<group>"; };
 		D80269312D7B18D5290E8E80 /* thmanyahserifdisplay-Black.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "thmanyahserifdisplay-Black.otf"; sourceTree = "<group>"; };
 		E9A234078D9BE6530E46FC1E /* MadarWidgets.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = MadarWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		EAFD1540BCC9EC975C48ABFA /* MadarInbox */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MadarInbox; path = Packages/MadarInbox; sourceTree = SOURCE_ROOT; };
 		F5C14B0401F68E78003D252D /* thmanyahsans-Light.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "thmanyahsans-Light.otf"; sourceTree = "<group>"; };
 		F7C4E870846C8F0F11086BEB /* FoundationHome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoundationHome.swift; sourceTree = "<group>"; };
 		FCA6249CAB9BF7BB68654926 /* MadarUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MadarUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -154,7 +156,8 @@
 				188EE40FE4D74FF7D7738992 /* MadarDesign in Frameworks */,
 				48F35CA79681B1883AA6DE30 /* MadarSnapshots in Frameworks */,
 				F84D525E813550D298F3BA1F /* MadarCommands in Frameworks */,
-				330FEECE1D89F18B01B139E5 /* MadarSync in Frameworks */,
+				330FEECE1D89F18B01B139E5 /* MadarInbox in Frameworks */,
+				59CFCB83C498D00A1C66BA5F /* MadarSync in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -233,6 +236,7 @@
 				D0D30BE8BAADE93B06014EE0 /* MadarCore */,
 				24560E5969E823668449B1D8 /* MadarData */,
 				647A7301BEAB86DFF20A2A07 /* MadarDesign */,
+				EAFD1540BCC9EC975C48ABFA /* MadarInbox */,
 				AA5DF286ED4CF242BEF2D537 /* MadarSnapshots */,
 				863A4A54342817F175DA4371 /* MadarSync */,
 			);
@@ -338,6 +342,7 @@
 				D7349BC32E9D9D10CE3C790A /* MadarDesign */,
 				D9E009A01CE49E91ECD42040 /* MadarSnapshots */,
 				33781F34CD5C1A71FC795FC2 /* MadarCommands */,
+				CD612AE668CD8323078B4B8B /* MadarInbox */,
 				F56ABA17B98BBC295DED888C /* MadarSync */,
 			);
 			productName = Madar;
@@ -446,6 +451,7 @@
 				70BB261FC2095D04C91097F9 /* XCLocalSwiftPackageReference "Packages/MadarCore" */,
 				DD0C2693CA0DD2A83DF23DF2 /* XCLocalSwiftPackageReference "Packages/MadarData" */,
 				497B4A463A6ACD30713D8183 /* XCLocalSwiftPackageReference "Packages/MadarDesign" */,
+				FEE24431784F9102823C56FC /* XCLocalSwiftPackageReference "Packages/MadarInbox" */,
 				4804E91219655B2AD56FF8DD /* XCLocalSwiftPackageReference "Packages/MadarSnapshots" */,
 				61F2A03C6F7D3476EB702DB5 /* XCLocalSwiftPackageReference "Packages/MadarSync" */,
 			);
@@ -908,6 +914,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/MadarData;
 		};
+		FEE24431784F9102823C56FC /* XCLocalSwiftPackageReference "Packages/MadarInbox" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/MadarInbox;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -938,6 +948,10 @@
 		C0F01EF9460620030E8156F6 /* MadarCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = MadarCore;
+		};
+		CD612AE668CD8323078B4B8B /* MadarInbox */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MadarInbox;
 		};
 		D04FCD79967981AED2E8C7FE /* MadarCore */ = {
 			isa = XCSwiftPackageProductDependency;

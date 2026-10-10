@@ -6,6 +6,8 @@ import MadarCore
 import MadarSnapshots
 import WidgetKit
 import MadarCommands
+import MadarInbox
+import UIKit
 
 typealias JSONValue = MadarData.JSONValue
 struct AppUndoToken { let id: UUID; let expiresAt: Date }
@@ -31,6 +33,29 @@ final class AppSession {
     var selectedTab = "foundation"
     var settingsQuery = ""
     private let bus: CommandBus
+    private let commandAdapter: DurableCommandAdapter
+    let pendingInbox: PendingInbox
+    @ObservationIgnored private lazy var inboxDrainer = InboxDrainer(inbox: pendingInbox, bus: bus, generation: { [weak self] in
+        guard let self else { throw DataError.invalidValue("session unavailable") }
+        return try self.inboxGeneration()
+    }, hasReceipt: { [weak self] id in
+        guard let self else { throw DataError.invalidValue("session unavailable") }
+        return try self.commandAdapter.hasReceipt(commandID: id)
+    }, refresh: { [weak self] in
+        guard let self else { throw DataError.invalidValue("session unavailable") }
+        try self.reload(); try self.publishSnapshot()
+        try (self.syncService as? AppSyncService)?.processLocalHistory()
+        WidgetCenter.shared.reloadAllTimelines()
+    }, shouldPause: { [weak self] in
+        self?.maintenanceInProgress != false || !UIApplication.shared.isProtectedDataAvailable
+    }, authorization: { [weak self] command in
+        guard let self, self.lockController != nil else { return .init(status: .needsApp) }
+        guard UIApplication.shared.isProtectedDataAvailable else { return .init(status: .needsUnlock) }
+        // §16 authorize: prayer.log is blindWrite even with whole-app Face ID protection.
+        // App-only settings never enter via transport, even if it claims source: app.
+        if command.name == "prayer.log" { return nil }
+        return self.lockController?.canPresent(.app) == true ? nil : .init(status: .needsUnlock)
+    })
     private var expiryTask: Task<Void, Never>?
 
     static let supportedKeys = ["core.dayStart", "core.firstCalendar", "core.hijriSource", "core.hijriOffset", "core.weekStart", "core.theme", "core.numerals", "core.fontScale", "core.motion", "core.roomIdentity", "core.homeCity", "core.faceIDLock", "tabbar.style", "tabbar.labels", "tabbar.minimizeOnScroll"]
@@ -40,7 +65,9 @@ final class AppSession {
         self.managedStore = managedStore
         guard let group = groupDirectory ?? FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.alqzan.madar2") else { throw DataError.missingAppGroup }
         snapshotStore = SnapshotStore(directory: group.appending(path: "Snapshots", directoryHint: .isDirectory))
-        bus = CommandBus(adapter: DurableCommandAdapter(containerProvider: { try managedStore?.containerForTransaction() ?? container }, lockDirectory: managedStore?.commandLockURL.deletingLastPathComponent() ?? group))
+        pendingInbox = PendingInbox(directory: group.appending(path: "PendingInbox", directoryHint: .isDirectory))
+        commandAdapter = DurableCommandAdapter(containerProvider: { try managedStore?.containerForTransaction() ?? container }, lockDirectory: managedStore?.commandLockURL.deletingLastPathComponent() ?? group)
+        bus = CommandBus(adapter: commandAdapter)
         schema = try SettingsSchema.bundled()
         store = SettingsStore(context: container.mainContext, schema: schema)
         try reload()
@@ -167,7 +194,38 @@ final class AppSession {
         maintenanceInProgress = true
         while pendingWrites > 0 { await Task.yield() }
     }
-    func resumeWriters() { maintenanceInProgress = false }
+    func resumeWriters() {
+        maintenanceInProgress = false
+        Task {
+            do { try await drainInbox() }
+            catch { errorMessage = "لم يكتمل تحديث البيانات. \(error.localizedDescription)" }
+        }
+    }
+    /// Count the drain as an app writer so export/restore can quiesce it cooperatively.
+    func drainInbox() async throws {
+        guard !maintenanceInProgress, !inboxDrainer.isDraining else { return }
+        pendingWrites += 1; defer { pendingWrites -= 1 }
+        try await inboxDrainer.drain()
+        // A malformed/quarantined record may have an unreadable identity: keep all receipts.
+        let pinned: Set<UUID>
+        do { pinned = try pendingInbox.unacknowledgedCommandIDs() }
+        catch InboxError.malformedRecord { return }
+        try commandAdapter.purgeExpiredReceipts(pinnedIDs: pinned)
+    }
+    private func inboxGeneration() throws -> InboxGeneration {
+        let previous = try pendingInbox.currentGeneration()
+        guard let managedStore else {
+            return previous ?? .init(generationID: UUID(), acceptsUnstampedDeliveries: true)
+        }
+        try managedStore.refreshIfNeeded()
+        // The active pointer retains restore provenance; unstamped legacy files must stay
+        // unresolved after replacement, including a crash before snapshot publication.
+        struct PointerProvenance: Decodable { let previousGenerationID: UUID? }
+        let pointer = try JSONDecoder().decode(PointerProvenance.self, from: Data(contentsOf: managedStore.root.appending(path: "ActiveGeneration.json")))
+        let changed = previous.map { $0.generationID != managedStore.binding.generationID } ?? false
+        let permitsLegacy = pointer.previousGenerationID == nil && !changed && previous?.acceptsUnstampedDeliveries != false
+        return .init(generationID: managedStore.binding.generationID, acceptsUnstampedDeliveries: permitsLegacy)
+    }
     func applySettingsAndWait(_ changes: [String: JSONValue]) async throws {
         guard beginWrite() else { throw BackupOperationError.busy }
         defer { pendingWrites -= 1 }
@@ -202,6 +260,7 @@ final class AppSession {
         return place
     }
     func publishSnapshot() throws {
+        try pendingInbox.publishGeneration(inboxGeneration())
         let instant = Date(), place = activePlace, day = GregorianDay.containing(instant, in: place.timeZone)
         let prayers = [day.adding(days: -1), day].compactMap { PrayerTimesEngine.calculate(day: $0, place: place) }
         guard let key = try? MadarDay.resolve(instant: instant, place: place, boundary: DayBoundary(rawValue: string("core.dayStart")) ?? .fajr, prayerDays: prayers, hijriSource: HijriSource(rawValue: string("core.hijriSource")) ?? .ummAlQura, sightingOffset: Int(number("core.hijriOffset"))) else {

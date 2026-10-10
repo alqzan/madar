@@ -72,16 +72,25 @@ public struct CommandTransactionRequest: Sendable {
     public let semantics: CommandSemantics
     public let payloadHash: String
     public let naturalKey: String?
+    /// Expiry permits later garbage collection; it does not erase an on-disk replay identity.
+    /// The inbox coordinator pins receipts until every delivery has been acknowledged.
+    public func replayOutcome(receipts: [CoreCommandReceipt]) -> CommandOutcome? {
+        guard let receipt = receipts.first(where: { $0.commandID == envelope.commandID }) else { return nil }
+        guard receipt.name == envelope.name, receipt.payloadHash == payloadHash else {
+            return .init(status: .rejected, reason: "commandIdentityMismatch")
+        }
+        return receipt.outcome
+    }
     public func decision(receipts: [CoreCommandReceipt], existingNaturalPayloadHash: String?, now: Date) -> CommandDecision {
+        if let outcome = replayOutcome(receipts: receipts) { return .replay(outcome) }
         let live = receipts.filter { $0.expiresAt > now }
-        if let receipt = live.first(where: { $0.commandID == envelope.commandID }) { return .replay(receipt.outcome) }
         if semantics == .upsert, naturalKey != nil, existingNaturalPayloadHash == payloadHash { return .duplicate }
         if semantics == .append, live.contains(where: { $0.name == envelope.name && $0.payloadHash == payloadHash && now >= $0.appliedAt && now.timeIntervalSince($0.appliedAt) <= 10 }) { return .duplicate }
         return .apply
     }
 }
 /// Adapter MUST decide, mutate, store inverse + receipt, and commit in ONE serialized store
-/// transaction, including across app/Intent contexts. In-memory bus state is never authoritative.
+/// transaction in the app process. Extensions enqueue value envelopes only. In-memory bus state is never authoritative.
 public protocol CommandStoreAdapter: Sendable {
     func transact(_ request: CommandTransactionRequest, now: Date) async throws -> CommandOutcome
 }

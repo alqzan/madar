@@ -1,0 +1,65 @@
+[118 / 221]
+[124 / 221]
+[135 / 221]
+[136 / 221]
+[139 / 221]
+[141 / 221]
+[152 / 221]
+[155 / 221] Adhan
+[157 / 221] Adhan
+[169 / 221] MadarData
+[170 / 221] MadarData
+[172 / 222]
+[174 / 222] MadarCore
+[179 / 230] MadarCore
+[179 / 230] MadarData
+[188 / 230] MadarCore-product
+[188 / 230] MadarCore
+[189 / 230] MadarCore
+[190 / 230] MadarData
+[197 / 231] MadarCommands
+[210 / 234] MadarCommandProbe-product
+[213 / 236] MadarCommandProbe-product
+[215 / 236] MadarData
+[217 / 236]
+[224 / 237] MadarCommandProbe-product
+[227 / 242]
+[231 / 242] MadarCommandsTests-product
+[236 / 242] MadarCommandsTests-product
+[238 / 242] MadarCommandsTests-product
+Build complete! (13.75 sec)
+Test Suite 'All tests' started at 1448-04-29 17:06:51.423.
+Test Suite 'All tests' passed at 1448-04-29 17:06:51.425.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.002) seconds
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite ReplayTests started.
+◇ Test test_M0R04_distinctDuplicateReceiptNeverOverwritesLaterEdit() started.
+✘ Test test_M0R04_distinctDuplicateReceiptNeverOverwritesLaterEdit() recorded an issue at ReplayTests.swift:24:9: Expectation failed: try ModelContext(container).fetchCount(FetchDescriptor<MadarData.CommandReceipt>()) == 2
+↳ try ModelContext(container).fetchCount(FetchDescriptor<MadarData.CommandReceipt>()) == 2 → <not evaluated>
+✘ Test test_M0R04_distinctDuplicateReceiptNeverOverwritesLaterEdit() recorded an issue at ReplayTests.swift:27:9: Expectation failed: try await bus.execute(b, now: now.addingTimeInterval(3)).status == .duplicate
+↳ try await bus.execute(b, now: now.addingTimeInterval(3)).status == .duplicate → <not evaluated>
+✘ Test test_M0R04_distinctDuplicateReceiptNeverOverwritesLaterEdit() recorded an issue at ReplayTests.swift:28:9: Expectation failed: try ModelContext(container).fetch(FetchDescriptor<PrayerLog>()).first?.status == "alone"
+↳ try ModelContext(container).fetch(FetchDescriptor<PrayerLog>()).first?.status == "alone" → <not evaluated>
+✘ Test test_M0R04_distinctDuplicateReceiptNeverOverwritesLaterEdit() failed after 0.069 seconds with 3 issues.
+◇ Test test_M0R05_replayBeforeTombstoneAndIdentityMismatch() started.
+✘ Test test_M0R05_replayBeforeTombstoneAndIdentityMismatch() recorded an issue at ReplayTests.swift:36:9: Expectation failed: try await bus.execute(a, now: now.addingTimeInterval(2)) == applied
+↳ try await bus.execute(a, now: now.addingTimeInterval(2)) == applied → <not evaluated>
+✘ Test test_M0R05_replayBeforeTombstoneAndIdentityMismatch() recorded an issue at ReplayTests.swift:39:9: Expectation failed: mismatch.status == .rejected && mismatch.reason == "commandIdentityMismatch"
+↳ mismatch.status == .rejected && mismatch.reason == "commandIdentityMismatch" → false
+↳   mismatch.status == .rejected → true
+↳   mismatch.reason == "commandIdentityMismatch" → false
+✘ Test test_M0R05_replayBeforeTombstoneAndIdentityMismatch() recorded an issue at ReplayTests.swift:41:9: Expectation failed: try await bus.execute(changedName, now: now).reason == "commandIdentityMismatch"
+↳ try await bus.execute(changedName, now: now).reason == "commandIdentityMismatch" → <not evaluated>
+✘ Test test_M0R05_replayBeforeTombstoneAndIdentityMismatch() failed after 0.043 seconds with 3 issues.
+◇ Test test_M0R06_onDiskExpiredReceiptReplaysAfterReopen() started.
+✘ Test test_M0R06_onDiskExpiredReceiptReplaysAfterReopen() recorded an issue at ReplayTests.swift:51:9: Expectation failed: try await second.execute(b, now: now.addingTimeInterval(8 * 86400)).status == .duplicate
+↳ try await second.execute(b, now: now.addingTimeInterval(8 * 86400)).status == .duplicate → <not evaluated>
+✘ Test test_M0R06_onDiskExpiredReceiptReplaysAfterReopen() recorded an issue at ReplayTests.swift:52:9: Expectation failed: try ModelContext(container).fetch(FetchDescriptor<PrayerLog>()).first?.status == "alone"
+↳ try ModelContext(container).fetch(FetchDescriptor<PrayerLog>()).first?.status == "alone" → <not evaluated>
+✘ Test test_M0R06_onDiskExpiredReceiptReplaysAfterReopen() failed after 0.046 seconds with 2 issues.
+✘ Suite ReplayTests failed after 0.160 seconds with 8 issues.
+✘ Test run with 3 tests in 1 suite failed after 0.160 seconds with 8 issues.
+Note: Some test targets reported failures:
+  - MadarCommandsTests (Swift Testing)

@@ -25,7 +25,7 @@ private struct ReceiptWire: Codable {
     var outcome: CommandOutcome
 }
 
-/// File lock covers separate app/Intent processes; each transaction uses a fresh context.
+/// App-only adapter. The lease excludes app maintenance; each transaction uses a fresh context.
 /// No actor suspension occurs between lock, dedupe, mutations and durable receipt save.
 @MainActor public final class DurableCommandAdapter: CommandStoreAdapter {
     private let containerProvider: @MainActor () throws -> ModelContainer
@@ -70,9 +70,11 @@ private struct ReceiptWire: Codable {
                                        undoExpiresAt: row.undoExpiresAt ?? row.createdAt,
                                        undoJSON: row.undoJSON,
                                        outcome: .init(status: CommandStatus(rawValue: row.status) ?? .rejected,
-                                                      undoToken: row.undoJSON == nil ? nil : id))
+                                                      undoToken: row.status == "applied" && ["prayer.log", "settings.set", "settings.applyPreset"].contains(row.name) ? id : nil))
                 return try JSONDecoder().decode(CoreCommandReceipt.self, from: JSONEncoder().encode(wire))
             }
+            // Receipt identity is authoritative even after undo/deletion or retention expiry.
+            if let replay = request.replayOutcome(receipts: receipts) { return replay }
             var existingHash: String?
             if case .replaceSettings(let settings) = request.operation {
                 var existing: [String: MadarCore.JSONValue] = [:]
@@ -90,7 +92,11 @@ private struct ReceiptWire: Codable {
             }
             switch request.decision(receipts: receipts, existingNaturalPayloadHash: existingHash, now: now) {
             case .replay(let outcome): return outcome
-            case .duplicate: return .init(status: .duplicate)
+            case .duplicate:
+                let outcome = CommandOutcome(status: .duplicate)
+                let writer = try store.writerIDForWrite(now: now)
+                try saveReceipt(request, outcome: outcome, inverseJSON: nil, writer: writer, at: now, context: context)
+                return outcome
             case .apply: break
             }
             let writer = try store.writerIDForWrite(now: now)
@@ -200,23 +206,42 @@ private struct ReceiptWire: Codable {
                 if existing == nil { context.insert(row) }
             }
             let outcome = CommandOutcome(status: .applied, undoToken: inverse == nil ? nil : request.envelope.commandID)
-            let receipt = MadarData.CommandReceipt()
-            let appliedAt = transactionClock(arrivalDate)
-            receipt.writerID = writer
-            receipt.commandID = request.envelope.commandID; receipt.name = request.envelope.name
-            receipt.payloadHash = request.payloadHash; receipt.source = request.envelope.source.rawValue
-            receipt.issuedAt = request.envelope.issuedAt; receipt.createdAt = appliedAt; receipt.updatedAt = appliedAt
-            receipt.status = outcome.status.rawValue
-            receipt.expiresAt = appliedAt.addingTimeInterval(7 * 86400)
-            receipt.undoExpiresAt = appliedAt.addingTimeInterval(request.semantics == .preset ? 60 : 600)
-            receipt.undoJSON = try inverse.map { try JSONEncoder().encode($0) }
-            context.insert(receipt)
-            try context.save()
+            try saveReceipt(request, outcome: outcome, inverseJSON: try inverse.map { try JSONEncoder().encode($0) }, writer: writer, at: transactionClock(arrivalDate), context: context)
             return outcome
         } catch {
             context.rollback()
             throw error
         }
+    }
+    private func saveReceipt(_ request: CommandTransactionRequest, outcome: CommandOutcome, inverseJSON: Data?, writer: String, at appliedAt: Date, context: ModelContext) throws {
+        let receipt = MadarData.CommandReceipt()
+        receipt.writerID = writer
+        receipt.commandID = request.envelope.commandID; receipt.name = request.envelope.name
+        receipt.payloadHash = request.payloadHash; receipt.source = request.envelope.source.rawValue
+        receipt.issuedAt = request.envelope.issuedAt; receipt.createdAt = appliedAt; receipt.updatedAt = appliedAt
+        receipt.status = outcome.status.rawValue
+        receipt.expiresAt = appliedAt.addingTimeInterval(7 * 86400)
+        receipt.undoExpiresAt = appliedAt.addingTimeInterval(request.semantics == .preset ? 60 : 600)
+        receipt.undoJSON = inverseJSON
+        context.insert(receipt)
+        try context.save()
+    }
+    public func hasReceipt(commandID: UUID) throws -> Bool {
+        let lease = StoreLease(lockURL: lockDirectory.appending(path: "CommandBus.lock"))
+        try lease.acquire(); defer { lease.release() }
+        return try ModelContext(containerProvider()).fetch(FetchDescriptor<MadarData.CommandReceipt>()).contains { $0.commandID == commandID && $0.deletedAt == nil && $0.mergedInto == nil }
+    }
+    /// Called only after the inbox acknowledges its durable files. Malformed/unresolved files
+    /// conservatively block collection; inverse expiry remains independent of replay identity.
+    public func purgeExpiredReceipts(pinnedIDs: Set<UUID>, now: Date = Date()) throws {
+        let lease = StoreLease(lockURL: lockDirectory.appending(path: "CommandBus.lock"))
+        try lease.acquire(); defer { lease.release() }
+        let context = ModelContext(try containerProvider()); context.autosaveEnabled = false
+        for row in try context.fetch(FetchDescriptor<MadarData.CommandReceipt>()) {
+            guard let id = row.commandID, row.expiresAt <= now, !pinnedIDs.contains(id) else { continue }
+            context.delete(row)
+        }
+        try context.save()
     }
     private func convert(_ values: [String: MadarCore.JSONValue]) throws -> [String: MadarData.JSONValue] {
         try values.mapValues { try JSONDecoder().decode(MadarData.JSONValue.self, from: $0.canonicalData()) }

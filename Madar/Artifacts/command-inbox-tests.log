@@ -1,0 +1,65 @@
+103 |             entered = true
+104 |             while !allowRefresh { await Task.yield() }
+    |                    `- note: capturing use
+105 |         })
+106 |         let operation = Task { try await drainer.drain() }
+107 |         while !entered { await Task.yield() }
+108 |         operation.cancel(); allowRefresh = true
+    |                                          `- warning: 'allowRefresh' mutated after capture by sendable closure
+109 |         do { try await operation.value; Issue.record("cancelled drain unexpectedly acknowledged") }
+110 |         catch is CancellationError { }
+
+/Users/abdulrahman/.codex/worktrees/m0-command-inbox/بناء مدار 2.0/Madar/Packages/MadarCommands/Tests/MadarCommandsTests/InboxDrainTests.swift:155:16: warning: 'locked' mutated after capture by sendable closure
+141 |         let spoofed = CommandEnvelope(name: "settings.set", payload: .object(["settings": .object(["core.faceIDLock": .string("none")])]), source: .app)
+142 |         _ = try inbox.enqueue(.init(expectedGenerationID: generation, command: spoofed))
+143 |         var locked = true
+    |             `- note: variable defined here
+144 |         let drainer = InboxDrainer(inbox: inbox, bus: bus, generation: { .init(generationID: generation, acceptsUnstampedDeliveries: false) }, hasReceipt: { try adapter.hasReceipt(commandID: $0) }, refresh: {}, authorization: { command in
+    |                                                                                                                                                                                                                                   `- note: variable captured by sendable closure
+145 |             command.name == "prayer.log" ? nil : .init(status: locked ? .needsUnlock : .needsApp)
+    |                                                                `- note: capturing use
+146 |         })
+147 |         try await drainer.drain()
+    :
+153 |         #expect(!((try adapter.hasReceipt(commandID: spoofed.commandID))))
+154 |         _ = try inbox.enqueue(prayer(generation: generation))
+155 |         locked = true
+    |                `- warning: 'locked' mutated after capture by sendable closure
+156 |         try await drainer.drain()
+157 |         #expect(try ModelContext(container).fetchCount(FetchDescriptor<PrayerLog>()) == 1)
+[32 / 36] MadarCommandsTests-product
+[34 / 36] MadarCommandsTests-product
+Build complete! (1.76 sec)
+Test Suite 'All tests' started at 1448-04-29 17:22:27.123.
+Test Suite 'All tests' passed at 1448-04-29 17:22:27.124.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.002) seconds
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite InboxDrainTests started.
+◇ Suite ReplayTests started.
+◇ Test test_M0R03_refreshFailureLeavesCommittedDeliveryAndRetryDoesNotMutate() started.
+◇ Test test_M0R04_distinctDuplicateReceiptNeverOverwritesLaterEdit() started.
+✔ Test test_M0R03_refreshFailureLeavesCommittedDeliveryAndRetryDoesNotMutate() passed after 0.114 seconds.
+◇ Test test_M0R03_malformedAndOldGenerationDoNotBlockNewCommands() started.
+✔ Test test_M0R03_malformedAndOldGenerationDoNotBlockNewCommands() passed after 0.045 seconds.
+◇ Test test_M0R06_pendingPinsExpiredReceiptAndAcknowledgedRetryIsUnresolvedAfterGC() started.
+✔ Test test_M0R04_distinctDuplicateReceiptNeverOverwritesLaterEdit() passed after 0.163 seconds.
+◇ Test test_M0R05_replayBeforeTombstoneAndIdentityMismatch() started.
+✔ Test test_M0R06_pendingPinsExpiredReceiptAndAcknowledgedRetryIsUnresolvedAfterGC() passed after 0.079 seconds.
+◇ Test test_M0R03_duplicateForegroundDrainsRunOneRefresh() started.
+✔ Test test_M0R03_duplicateForegroundDrainsRunOneRefresh() passed after 0.041 seconds.
+◇ Test test_M0R03_maintenanceAndProtectionFailureLeaveDeliveryRecoverable() started.
+✔ Test test_M0R05_replayBeforeTombstoneAndIdentityMismatch() passed after 0.120 seconds.
+◇ Test test_M0R06_onDiskExpiredReceiptReplaysAfterReopen() started.
+✔ Test test_M0R03_maintenanceAndProtectionFailureLeaveDeliveryRecoverable() passed after 0.073 seconds.
+◇ Test test_M0R03_cancellationAfterSaveResumesBeforeAcknowledgement() started.
+✔ Test test_M0R06_onDiskExpiredReceiptReplaysAfterReopen() passed after 0.117 seconds.
+✔ Suite ReplayTests passed after 0.400 seconds.
+✔ Test test_M0R03_cancellationAfterSaveResumesBeforeAcknowledgement() passed after 0.052 seconds.
+◇ Test test_M0R03_restoreGenerationRejectsOldDeviceReceiptAndUnstampedDelivery() started.
+✔ Test test_M0R03_restoreGenerationRejectsOldDeviceReceiptAndUnstampedDelivery() passed after 0.040 seconds.
+◇ Test test_M0R03_spoofedAppSourceCannotDisableLockFromInbox() started.
+✔ Test test_M0R03_spoofedAppSourceCannotDisableLockFromInbox() passed after 0.042 seconds.
+✔ Suite InboxDrainTests passed after 0.490 seconds.
+✔ Test run with 11 tests in 2 suites passed after 0.491 seconds.
