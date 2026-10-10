@@ -1,0 +1,88 @@
+{
+  "gate": "Local development only until original shipped licence is obtained; not for public repository or font hosting",
+  "officialLicenseURL": "https://font.thmanyah.com/licenses",
+  "retrieved": "2026-10-10",
+  "licenseFromExactDownloadPackage": null,
+  "fonts": [
+    {
+      "file": "thmanyahsans-Light.otf",
+      "sha256": "c4286938c04ea60eb1953919cddce7b268270a825a04823a0642a044ebc7fd34",
+      "source": "/Users/abdulrahman/Library/Fonts/thmanyahsans-Light.otf",
+      "modified": false
+    },
+    {
+      "file": "thmanyahsans-Regular.otf",
+      "sha256": "f45a420632384b42a37ec9b24298ddc6502faa52d55d973144779262ebc023dc",
+      "source": "/Users/abdulrahman/Library/Fonts/thmanyahsans-Regular.otf",
+      "modified": false
+    },
+    {
+      "file": "thmanyahsans-Medium.otf",
+      "sha256": "f2762ffbe17351193e3d630dd10f0c3a965e6c873998dfdeda2bd0dcad7985c6",
+      "source": "/Users/abdulrahman/Library/Fonts/thmanyahsans-Medium.otf",
+      "modified": false
+    },
+    {
+      "file": "thmanyahsans-Bold.otf",
+      "sha256": "72cc27021cc1a503e5c03b072df8b16d55c78983e5fd73a4cdf92b5a600af2f7",
+      "source": "/Users/abdulrahman/Library/Fonts/thmanyahsans-Bold.otf",
+      "modified": false
+    },
+    {
+      "file": "thmanyahserifdisplay-Bold.otf",
+      "sha256": "ac2f056441891276792ab6d828d8ad9169ef44ecea60d6ccf126b25361f0ee9d",
+      "source": "/Users/abdulrahman/Library/Fonts/thmanyahserifdisplay-Bold.otf",
+      "modified": false
+    },
+    {
+      "file": "thmanyahserifdisplay-Black.otf",
+      "sha256": "696b78342a499a82421ae25c1db86b73730108ea38d8be216669c243dfea1557",
+      "source": "/Users/abdulrahman/Library/Fonts/thmanyahserifdisplay-Black.otf",
+      "modified": false
+    },
+    {
+      "file": "thmanyahseriftext-Regular.otf",
+      "sha256": "db7294cfea2b2a537c028305dc142fb3b743da1c4738f0fac3a7dd31c0c47b5f",
+      "source": "/Users/abdulrahman/Library/Fonts/thmanyahseriftext-Regular.otf",
+      "modified": false
+    },
+    {
+      "file": "thmanyahseriftext-Bold.otf",
+      "sha256": "001cc1586b6920139780b8ea05f3df399a4c11dc5a86d96102ff356c727a0a35",
+      "source": "/Users/abdulrahman/Library/Fonts/thmanyahseriftext-Bold.otf",
+      "modified": false
+    },
+    {
+      "file": "Amiri-Regular.ttf",
+      "family": "Amiri",
+      "version": "1.003",
+      "source": "https://github.com/aliftype/amiri/releases/download/1.003/Amiri-1.003.zip",
+      "sha256": "cd2550c0f4c05eb341bf97958211aaa39382bca96577ba3a67d4a3b4912c43c0",
+      "modified": false,
+      "license": "OFL-1.1",
+      "licenseFile": "Amiri-OFL.txt",
+      "licenseSha256": "72de68e5954f4fdd24702292ef5a32f003ca960ec9330dc86e5eefb5dffb9b22",
+      "licenseURL": "https://github.com/aliftype/amiri/blob/1.003/OFL.txt",
+      "retrieved": "2026-10-10",
+      "appBundle": true
+    },
+    {
+      "file": "Amiri-Bold.ttf",
+      "family": "Amiri",
+      "version": "1.003",
+      "source": "https://github.com/aliftype/amiri/releases/download/1.003/Amiri-1.003.zip",
+      "sha256": "8cfed49b66de57e360ac61631d882dddfa23095d3ddb39fc2133eaf93892e79a",
+      "modified": false,
+      "license": "OFL-1.1",
+      "licenseFile": "Amiri-OFL.txt",
+      "licenseSha256": "72de68e5954f4fdd24702292ef5a32f003ca960ec9330dc86e5eefb5dffb9b22",
+      "licenseURL": "https://github.com/aliftype/amiri/blob/1.003/OFL.txt",
+      "retrieved": "2026-10-10",
+      "appBundle": true
+    }
+  ],
+  "officialLicenseFile": "thmanyah-license-2026-10-10.html",
+  "officialLicenseSha256": "084945240b72fadd4f0a9f2e53ec50179529c36aecead111648288c7f75fd462",
+  "amiriSourceRelease": "https://github.com/aliftype/amiri/releases/tag/1.003",
+  "amiriArchiveSha256": "81af0aff7d2086d8af24cea7202f7546130997982534691373485cd96744d05e"
+}

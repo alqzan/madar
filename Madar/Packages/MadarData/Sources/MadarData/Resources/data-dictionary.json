@@ -1,0 +1,5419 @@
+{
+  "version": 3,
+  "date": "2026-10-10",
+  "generatedBy": "Agent A gen_dd.py (single source with parts/p12.html §11 listing and natural-key table)",
+  "conventions": {
+    "seedNamespace": "2103b223-aa33-4c73-bab6-b2adaed8603e",
+    "foreignKeys": "optional UUIDs (UUID?), never @Relationship; resolve through mergedInto aliases",
+    "enums": "String raw values",
+    "money": "Int in the minor unit of its currency; exponent from bundled currency-minor-units.json (ISO 4217: SAR/USD 2, JPY 0, KWD/BHD/OMR 3)",
+    "rates": "Decimal as canonical String (ASCII, \".\" separator) (FX); percentages as Int basis points (suffix Bp)",
+    "duration": "Int seconds (suffix S) unless the field or its unit field names another unit (Min, Days, Km, HabitPolicy.unit)",
+    "dayKey": "yyyy-MM-dd ASCII Gregorian; never recomputed implicitly",
+    "deletePolicy": "soft = tombstone this row; softCascade = also tombstone listed children; softRestrict = UI archives instead while live children exist; sticky deletion dominates ordinary LWW; restore requires restoredAt > maximum deletion barrier, keeps barrier"
+  },
+  "commonFields": [
+    {
+      "name": "id",
+      "type": "UUID",
+      "optional": false,
+      "default": "UUID()",
+      "note": "seeded/singleton rows use UUIDv5(seedNS, \"<Model>:<slug>\")"
+    },
+    {
+      "name": "createdAt",
+      "type": "Date",
+      "optional": false,
+      "default": "Date()"
+    },
+    {
+      "name": "updatedAt",
+      "type": "Date",
+      "optional": false,
+      "default": "Date()",
+      "note": "every write: max(now, previous updatedAt + 1 ms)"
+    },
+    {
+      "name": "deletedAt",
+      "type": "Date?",
+      "optional": true,
+      "note": "tombstone; never hard-deleted"
+    },
+    {
+      "name": "writerID",
+      "type": "String",
+      "optional": false,
+      "default": "",
+      "note": "install id of the device that wrote the row last (DeviceSetting sys.writerID)"
+    },
+    {
+      "name": "mergedInto",
+      "type": "UUID?",
+      "optional": true,
+      "note": "alias: set on a merge loser = winner id; such rows are never winners and never shown"
+    },
+    {
+      "name": "deletionBarrierAt",
+      "type": "Date?",
+      "optional": true,
+      "note": "Maximum observed explicit deletion timestamp; retained after restore."
+    },
+    {
+      "name": "restoredAt",
+      "type": "Date?",
+      "optional": true,
+      "note": "Explicit restore timestamp only. Live only when newer than deletionBarrierAt; stale ordinary edits never revive."
+    }
+  ],
+  "modelCount": {
+    "synced": 55,
+    "deviceOnly": 6,
+    "total": 61
+  },
+  "reconcileOrder": [
+    "Setting",
+    "LayoutState",
+    "Preset",
+    "ImportBatch",
+    "ImportLink",
+    "Trip",
+    "UpcomingDay",
+    "Media",
+    "HifzPlan",
+    "HifzSession",
+    "PageGrade",
+    "MistakeEvent",
+    "MistakeSpot",
+    "QuranDayState",
+    "QuranAllotment",
+    "RecoveryPlan",
+    "PrayerLog",
+    "QadaItem",
+    "QiyamNight",
+    "DayPage",
+    "Project",
+    "Entry",
+    "MarginNote",
+    "HiddenAutoLine",
+    "Niyya",
+    "Letter",
+    "Account",
+    "Card",
+    "Category",
+    "CategoryLimit",
+    "MerchantRule",
+    "Envelope",
+    "EnvelopePlan",
+    "Cycle",
+    "CyclePolicy",
+    "BankMessage",
+    "Statement",
+    "Obligation",
+    "InstallmentItem",
+    "Transaction",
+    "Allocation",
+    "CashbackEntry",
+    "Reconciliation",
+    "ZakatProfile",
+    "Book",
+    "ReadingSession",
+    "Highlight",
+    "NotebookNote",
+    "HadithProgress",
+    "UserWord",
+    "Habit",
+    "HabitPolicy",
+    "HabitPause",
+    "HabitLog",
+    "WidgetConfig"
+  ],
+  "models": [
+    {
+      "name": "Setting",
+      "room": "core",
+      "config": "synced",
+      "naturalKey": [
+        "key"
+      ],
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": "A row exists only after the user changes the key; no row = schema default. One row per key.",
+      "amendedBy": null,
+      "relationships": [],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "key",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "note": "settings-schema.json key whose scope = sync"
+        },
+        {
+          "name": "valueJSON",
+          "type": "Data",
+          "optional": false,
+          "default": "Data()",
+          "note": "JSON of the typed value; Codable contract per schema entry (type/contract)"
+        }
+      ]
+    },
+    {
+      "name": "LayoutState",
+      "room": "core",
+      "config": "synced",
+      "naturalKey": [
+        "room"
+      ],
+      "deletePolicy": "soft",
+      "invariants": [
+        "pinned ⊆ blocks",
+        "hidden ∩ pinned = ∅",
+        "unknown block ids dropped on read"
+      ],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": null,
+      "amendedBy": null,
+      "relationships": [],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "room",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "enum": [
+            "bahw",
+            "salah",
+            "quran",
+            "mal",
+            "notes",
+            "mihbara"
+          ]
+        },
+        {
+          "name": "blocksJSON",
+          "type": "Data",
+          "optional": false,
+          "default": "Data()",
+          "note": "LayoutPayload v1 {v, blocks:[String], pinned:[String], hidden:[String], sizes:{String:String}} — the ONLY layout store"
+        }
+      ]
+    },
+    {
+      "name": "Preset",
+      "room": "core",
+      "config": "synced",
+      "naturalKey": "id",
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": "«المتفق عليه» = UUIDv5(seedNS, \"Preset:default\")",
+      "note": null,
+      "amendedBy": null,
+      "relationships": [],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "name",
+          "type": "String",
+          "optional": false,
+          "default": ""
+        },
+        {
+          "name": "payloadJSON",
+          "type": "Data",
+          "optional": false,
+          "default": "Data()",
+          "note": "PresetPayload v1 {v, settings:{key:value} (preset:true keys only), layouts:{room:LayoutPayload}}"
+        },
+        {
+          "name": "locked",
+          "type": "Bool",
+          "optional": false,
+          "default": false,
+          "note": "true only for the seeded «المتفق عليه»"
+        }
+      ]
+    },
+    {
+      "name": "Trip",
+      "room": "core",
+      "config": "synced",
+      "naturalKey": "id",
+      "deletePolicy": "soft",
+      "invariants": [
+        "at most ONE open trip: deletedAt == nil && dismissed == false && end == nil (repair: keep latest start, close others with end = winner.start)"
+      ],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": null,
+      "amendedBy": "D A15",
+      "relationships": [],
+      "eventProvenance": true,
+      "fields": [
+        {
+          "name": "city",
+          "type": "String",
+          "optional": false,
+          "default": ""
+        },
+        {
+          "name": "country",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "unit": "ISO 3166-1 alpha-2"
+        },
+        {
+          "name": "currency",
+          "type": "String?",
+          "optional": true,
+          "unit": "ISO 4217"
+        },
+        {
+          "name": "lat",
+          "type": "Double",
+          "optional": false,
+          "default": 0.0,
+          "unit": "degrees",
+          "range": [
+            -90,
+            90
+          ]
+        },
+        {
+          "name": "lon",
+          "type": "Double",
+          "optional": false,
+          "default": 0.0,
+          "unit": "degrees",
+          "range": [
+            -180,
+            180
+          ]
+        },
+        {
+          "name": "tzID",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "unit": "IANA time-zone id"
+        },
+        {
+          "name": "fxRateToHome",
+          "type": "String?",
+          "optional": true,
+          "unit": "Decimal as canonical String (ASCII, \".\" separator): home units per 1 unit of `currency`",
+          "note": "manual in v1; changing it never rewrites past transactions"
+        },
+        {
+          "name": "fxSetAt",
+          "type": "Date?",
+          "optional": true
+        },
+        {
+          "name": "mode",
+          "type": "String",
+          "optional": false,
+          "default": "auto",
+          "enum": [
+            "auto",
+            "manual"
+          ]
+        },
+        {
+          "name": "dismissed",
+          "type": "Bool",
+          "optional": false,
+          "default": false
+        },
+        {
+          "name": "start",
+          "type": "Date?",
+          "optional": true
+        },
+        {
+          "name": "end",
+          "type": "Date?",
+          "optional": true
+        },
+        {
+          "name": "homeKm",
+          "type": "Double?",
+          "optional": true,
+          "unit": "km"
+        }
+      ]
+    },
+    {
+      "name": "UpcomingDay",
+      "room": "core",
+      "config": "synced",
+      "naturalKey": "id",
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": "stores the RULE; next occurrence derived (p5); Hijri day 30 in a 29-day month → 29; Feb 29 → Feb 28",
+      "amendedBy": "C 6",
+      "relationships": [],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "title",
+          "type": "String",
+          "optional": false,
+          "default": ""
+        },
+        {
+          "name": "calendar",
+          "type": "String",
+          "optional": false,
+          "default": "hijri",
+          "enum": [
+            "hijri",
+            "greg"
+          ]
+        },
+        {
+          "name": "year",
+          "type": "Int?",
+          "optional": true
+        },
+        {
+          "name": "month",
+          "type": "Int",
+          "optional": false,
+          "default": 1,
+          "range": [
+            1,
+            12
+          ]
+        },
+        {
+          "name": "day",
+          "type": "Int",
+          "optional": false,
+          "default": 1,
+          "range": [
+            1,
+            31
+          ]
+        },
+        {
+          "name": "repeats",
+          "type": "String",
+          "optional": false,
+          "default": "none",
+          "enum": [
+            "none",
+            "yearly",
+            "monthly"
+          ]
+        },
+        {
+          "name": "countFromDayKey",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "unit": "yyyy-MM-dd"
+        }
+      ]
+    },
+    {
+      "name": "ImportBatch",
+      "room": "core",
+      "config": "synced",
+      "naturalKey": "id",
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": "one provenance record per imported file (Day One, bank bulk paste, Goodreads, migration)",
+      "amendedBy": "D A6",
+      "relationships": [],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "kind",
+          "type": "String",
+          "optional": false,
+          "default": "dayOne",
+          "enum": [
+            "dayOne",
+            "bankBulk",
+            "goodreads",
+            "migration"
+          ]
+        },
+        {
+          "name": "fileName",
+          "type": "String",
+          "optional": false,
+          "default": ""
+        },
+        {
+          "name": "fileHash",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "unit": "SHA-256 hex"
+        },
+        {
+          "name": "startedAt",
+          "type": "Date",
+          "optional": false,
+          "default": "Date()"
+        },
+        {
+          "name": "finishedAt",
+          "type": "Date?",
+          "optional": true
+        },
+        {
+          "name": "status",
+          "type": "String",
+          "optional": false,
+          "default": "running",
+          "enum": [
+            "running",
+            "done",
+            "partial",
+            "failed",
+            "cancelled"
+          ]
+        },
+        {
+          "name": "summaryJSON",
+          "type": "Data",
+          "optional": false,
+          "default": "Data()"
+        },
+        {
+          "name": "optionsJSON",
+          "type": "Data",
+          "optional": false,
+          "default": "Data()"
+        }
+      ]
+    },
+    {
+      "name": "ImportLink",
+      "room": "core",
+      "config": "synced",
+      "naturalKey": [
+        "source",
+        "sourceModel",
+        "sourceID"
+      ],
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "row LWW; when two links merge, their targets are merged too (loser target → winner target)",
+      "seed": null,
+      "note": "migration (myDream) key for every model; Day One/Goodreads use native source fields",
+      "amendedBy": null,
+      "relationships": [
+        {
+          "field": "targetID",
+          "to": "(targetModel)",
+          "kind": "one"
+        },
+        {
+          "field": "importBatchID",
+          "to": "ImportBatch",
+          "kind": "one"
+        }
+      ],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "source",
+          "type": "String",
+          "optional": false,
+          "default": "myDream",
+          "enum": [
+            "myDream"
+          ]
+        },
+        {
+          "name": "sourceModel",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "note": "legacy entity/table name"
+        },
+        {
+          "name": "sourceID",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "note": "stable id from the legacy file (or SHA-256 of the canonical record)"
+        },
+        {
+          "name": "targetModel",
+          "type": "String",
+          "optional": false,
+          "default": ""
+        },
+        {
+          "name": "targetID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "(targetModel)"
+        },
+        {
+          "name": "importBatchID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "ImportBatch"
+        },
+        {
+          "name": "unmappedJSON",
+          "type": "Data?",
+          "optional": true,
+          "note": "legacy fields with no home in Madar (archived, never shown)"
+        },
+        {
+          "name": "importedAt",
+          "type": "Date",
+          "optional": false,
+          "default": "Date()"
+        }
+      ]
+    },
+    {
+      "name": "PrayerLog",
+      "room": "prayer",
+      "config": "synced",
+      "naturalKey": [
+        "dayKey",
+        "prayer"
+      ],
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": "pending/future are DERIVED: no row + prayer time reached (within pendingDays) = pending; not yet reached = future",
+      "amendedBy": "C 7",
+      "relationships": [
+        {
+          "field": "tripID",
+          "to": "Trip",
+          "kind": "one"
+        }
+      ],
+      "eventProvenance": true,
+      "fields": [
+        {
+          "name": "dayKey",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "unit": "yyyy-MM-dd (ASCII, Gregorian)",
+          "note": "stored once; see §11 Day keys. prayerDay: civil date of the prayer time at the place (not core.dayStart)"
+        },
+        {
+          "name": "prayer",
+          "type": "String",
+          "optional": false,
+          "default": "fajr",
+          "enum": [
+            "fajr",
+            "dhuhr",
+            "asr",
+            "maghrib",
+            "isha"
+          ]
+        },
+        {
+          "name": "status",
+          "type": "String",
+          "optional": false,
+          "default": "jamaah",
+          "enum": [
+            "jamaah",
+            "alone",
+            "qada",
+            "missed",
+            "unrecordedHistory"
+          ]
+        },
+        {
+          "name": "heart",
+          "type": "String?",
+          "optional": true,
+          "enum": [
+            "distracted",
+            "present",
+            "khashi"
+          ]
+        },
+        {
+          "name": "eventAt",
+          "type": "Date",
+          "optional": false,
+          "default": "Date()",
+          "note": "event instant (dayKey provenance): the prayer's own adhan time at the place"
+        },
+        {
+          "name": "tzID",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "unit": "IANA time-zone id",
+          "note": "zone used to compute dayKey (active place at the event instant)"
+        },
+        {
+          "name": "dayPolicy",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "note": "\"<rule>@<version>\" used to compute dayKey, e.g. \"fajr@1\", \"prayerDay@1\", \"legacy@0\""
+        },
+        {
+          "name": "loggedAt",
+          "type": "Date?",
+          "optional": true
+        },
+        {
+          "name": "source",
+          "type": "String",
+          "optional": false,
+          "default": "app",
+          "enum": [
+            "app",
+            "notification",
+            "widget",
+            "siri",
+            "control",
+            "import",
+            "aging"
+          ]
+        },
+        {
+          "name": "tripID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Trip"
+        },
+        {
+          "name": "pairID",
+          "type": "UUID?",
+          "optional": true
+        },
+        {
+          "name": "shortened",
+          "type": "Bool?",
+          "optional": true
+        }
+      ]
+    },
+    {
+      "name": "QadaItem",
+      "room": "prayer",
+      "config": "synced",
+      "naturalKey": [
+        "prayer",
+        "originalDayKey"
+      ],
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": "MakeUpPrayer sets madeUpAt AND the original PrayerLog.status = qada in one transaction (undo reverts both); the strict streak is NOT repaired; no QadaItem for a prayer whose time has not come or before salah.trackingStart unless added explicitly as an old missed prayer",
+      "amendedBy": "C 8",
+      "relationships": [],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "prayer",
+          "type": "String",
+          "optional": false,
+          "default": "fajr",
+          "enum": [
+            "fajr",
+            "dhuhr",
+            "asr",
+            "maghrib",
+            "isha"
+          ]
+        },
+        {
+          "name": "originalDayKey",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "unit": "yyyy-MM-dd"
+        },
+        {
+          "name": "madeUpAt",
+          "type": "Date?",
+          "optional": true
+        }
+      ]
+    },
+    {
+      "name": "QiyamNight",
+      "room": "prayer",
+      "config": "synced",
+      "naturalKey": [
+        "nightKey"
+      ],
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": null,
+      "amendedBy": "C 9",
+      "relationships": [
+        {
+          "field": "quranSessionID",
+          "to": "HifzSession",
+          "kind": "one"
+        }
+      ],
+      "eventProvenance": true,
+      "fields": [
+        {
+          "name": "nightKey",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "unit": "yyyy-MM-dd",
+          "note": "prayer-day key D of the Isha that starts the night (Isha D → Fajr D+1)"
+        },
+        {
+          "name": "rakaat",
+          "type": "Int",
+          "optional": false,
+          "default": 0,
+          "range": [
+            0,
+            99
+          ]
+        },
+        {
+          "name": "witr",
+          "type": "Bool",
+          "optional": false,
+          "default": false
+        },
+        {
+          "name": "quranSessionID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "HifzSession",
+          "note": "pages are owned by HifzSession(kind = qiyam)"
+        },
+        {
+          "name": "tzID",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "unit": "IANA"
+        },
+        {
+          "name": "dayPolicy",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "note": "\"night@1\""
+        }
+      ]
+    },
+    {
+      "name": "HifzPlan",
+      "room": "quran",
+      "config": "synced",
+      "naturalKey": [
+        "version"
+      ],
+      "deletePolicy": "soft",
+      "invariants": [
+        "active plan = live row with greatest version and supersededAt == nil (exactly one after merge)",
+        "hifz days = the 7 weekdays minus quran.restDay (none = all 7); the plan stores no days",
+        "frontierAyah is a cache recomputed from coverage after every session change and after merge"
+      ],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": "The ONLY owner of plan and missPolicy (settings quran.plan / quran.missPolicy removed). Rest day stays in quran.restDay.",
+      "amendedBy": "C 11",
+      "relationships": [],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "version",
+          "type": "Int",
+          "optional": false,
+          "default": 1,
+          "note": "1,2,3… — a plan change inserts a new version; never edit an old one"
+        },
+        {
+          "name": "direction",
+          "type": "String",
+          "optional": false,
+          "default": "forward",
+          "enum": [
+            "forward",
+            "reverse"
+          ]
+        },
+        {
+          "name": "startAyah",
+          "type": "Int",
+          "optional": false,
+          "default": 1,
+          "unit": "ayahId 1…6236",
+          "note": "first ayah of new hifz under this plan (migration: per the §7.4 legacy table)"
+        },
+        {
+          "name": "unit",
+          "type": "String",
+          "optional": false,
+          "default": "page",
+          "enum": [
+            "ayah",
+            "quarter",
+            "half",
+            "page"
+          ]
+        },
+        {
+          "name": "amount",
+          "type": "Double",
+          "optional": false,
+          "default": 1.0,
+          "note": "count of `unit` per study day, > 0 (may be fractional; wizard bounds owned by §7.4)"
+        },
+        {
+          "name": "rhythm",
+          "type": "String",
+          "optional": false,
+          "default": "balanced",
+          "enum": [
+            "light",
+            "balanced",
+            "intense"
+          ]
+        },
+        {
+          "name": "missPolicy",
+          "type": "String",
+          "optional": false,
+          "default": "ask",
+          "enum": [
+            "ask",
+            "spread",
+            "double",
+            "skip"
+          ]
+        },
+        {
+          "name": "frontierAyah",
+          "type": "Int?",
+          "optional": true,
+          "derivedCache": true
+        },
+        {
+          "name": "activeFrom",
+          "type": "Date",
+          "optional": false,
+          "default": "Date()"
+        },
+        {
+          "name": "supersededAt",
+          "type": "Date?",
+          "optional": true
+        }
+      ]
+    },
+    {
+      "name": "HifzSession",
+      "room": "quran",
+      "config": "synced",
+      "naturalKey": "id",
+      "deletePolicy": "softCascade: PageGrade, MistakeEvent",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": null,
+      "amendedBy": "C 12",
+      "relationships": [
+        {
+          "field": "planID",
+          "to": "HifzPlan",
+          "kind": "one"
+        }
+      ],
+      "eventProvenance": true,
+      "naturalKeyRule": "(commitID) when non-nil; otherwise id",
+      "fields": [
+        {
+          "name": "planID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "HifzPlan",
+          "note": "plan in force when the session was saved; history survives plan changes"
+        },
+        {
+          "name": "dayKey",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "unit": "yyyy-MM-dd (ASCII, Gregorian)",
+          "note": "stored once; see §11 Day keys."
+        },
+        {
+          "name": "endedAt",
+          "type": "Date",
+          "optional": false,
+          "default": "Date()",
+          "note": "event instant (dayKey provenance): session end; used for ordering and folding (§7.4)"
+        },
+        {
+          "name": "tzID",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "unit": "IANA time-zone id",
+          "note": "zone used to compute dayKey (active place at the event instant)"
+        },
+        {
+          "name": "dayPolicy",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "note": "\"<rule>@<version>\" used to compute dayKey, e.g. \"fajr@1\", \"prayerDay@1\", \"legacy@0\""
+        },
+        {
+          "name": "kind",
+          "type": "String",
+          "optional": false,
+          "default": "hifz",
+          "enum": [
+            "hifz",
+            "review",
+            "free",
+            "qiyam",
+            "drill"
+          ]
+        },
+        {
+          "name": "fromAyah",
+          "type": "Int",
+          "optional": false,
+          "default": 1,
+          "unit": "ayahId 1…6236"
+        },
+        {
+          "name": "toAyah",
+          "type": "Int",
+          "optional": false,
+          "default": 1,
+          "unit": "ayahId 1…6236",
+          "note": "fromAyah ≤ toAyah"
+        },
+        {
+          "name": "pages",
+          "type": "[Int]",
+          "optional": false,
+          "default": [],
+          "unit": "page 1…604",
+          "note": "derived from the range at save"
+        },
+        {
+          "name": "mistakes",
+          "type": "Int",
+          "optional": false,
+          "default": 0,
+          "range": [
+            0,
+            999
+          ]
+        },
+        {
+          "name": "method",
+          "type": "String",
+          "optional": false,
+          "default": "coach",
+          "enum": [
+            "coach",
+            "completeAyah",
+            "gradual",
+            "next",
+            "link",
+            "continuous"
+          ]
+        },
+        {
+          "name": "source",
+          "type": "String",
+          "optional": false,
+          "default": "app",
+          "enum": [
+            "app",
+            "import"
+          ]
+        },
+        {
+          "name": "commitID",
+          "type": "UUID?",
+          "optional": true
+        },
+        {
+          "name": "nightKey",
+          "type": "String?",
+          "optional": true
+        }
+      ]
+    },
+    {
+      "name": "PageGrade",
+      "room": "quran",
+      "config": "synced",
+      "naturalKey": [
+        "sessionID",
+        "page"
+      ],
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": "rows with nil or deleted session are ignored by every computation",
+      "amendedBy": "C 13",
+      "relationships": [
+        {
+          "field": "sessionID",
+          "to": "HifzSession",
+          "kind": "one"
+        }
+      ],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "sessionID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "HifzSession"
+        },
+        {
+          "name": "page",
+          "type": "Int",
+          "optional": false,
+          "default": 1,
+          "range": [
+            1,
+            604
+          ]
+        },
+        {
+          "name": "grade",
+          "type": "String",
+          "optional": false,
+          "default": "good",
+          "enum": [
+            "mastered",
+            "good",
+            "needs"
+          ]
+        },
+        {
+          "name": "role",
+          "type": "String",
+          "optional": false,
+          "default": "regular",
+          "enum": [
+            "regular",
+            "test"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "MistakeSpot",
+      "room": "quran",
+      "config": "synced",
+      "naturalKey": [
+        "ayahId",
+        "wordIndex"
+      ],
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": "summary (count, streak, closed) is DERIVED from MistakeEvent + legacy base",
+      "amendedBy": "C 15",
+      "relationships": [],
+      "eventProvenance": false,
+      "naturalKeyRule": "(ayahId, wordIndex) — nil is its own value",
+      "fields": [
+        {
+          "name": "ayahId",
+          "type": "Int",
+          "optional": false,
+          "default": 1,
+          "range": [
+            1,
+            6236
+          ]
+        },
+        {
+          "name": "wordIndex",
+          "type": "Int?",
+          "optional": true
+        },
+        {
+          "name": "legacyHits",
+          "type": "Int",
+          "optional": false,
+          "default": 0
+        },
+        {
+          "name": "legacyLastDrillAt",
+          "type": "Date?",
+          "optional": true
+        },
+        {
+          "name": "legacyStreak",
+          "type": "Int",
+          "optional": false,
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "MistakeEvent",
+      "room": "quran",
+      "config": "synced",
+      "naturalKey": "id",
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": "tombstoned/restored with its session",
+      "amendedBy": "C 16",
+      "relationships": [
+        {
+          "field": "sessionID",
+          "to": "HifzSession",
+          "kind": "one"
+        }
+      ],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "ayahId",
+          "type": "Int",
+          "optional": false,
+          "default": 1,
+          "range": [
+            1,
+            6236
+          ]
+        },
+        {
+          "name": "wordIndex",
+          "type": "Int?",
+          "optional": true
+        },
+        {
+          "name": "sessionID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "HifzSession"
+        },
+        {
+          "name": "at",
+          "type": "Date",
+          "optional": false,
+          "default": "Date()"
+        },
+        {
+          "name": "kind",
+          "type": "String",
+          "optional": false,
+          "default": "mistake",
+          "enum": [
+            "mistake",
+            "drillPass",
+            "drillFail"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "QuranDayState",
+      "room": "quran",
+      "config": "synced",
+      "naturalKey": [
+        "dayKey"
+      ],
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": null,
+      "amendedBy": "C 18",
+      "relationships": [],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "dayKey",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "unit": "yyyy-MM-dd (ASCII, Gregorian)",
+          "note": "stored once; see §11 Day keys."
+        },
+        {
+          "name": "hifzLevel",
+          "type": "String?",
+          "optional": true,
+          "enum": [
+            "simple",
+            "medium",
+            "deep",
+            "max"
+          ]
+        },
+        {
+          "name": "reviewLevel",
+          "type": "String?",
+          "optional": true,
+          "enum": [
+            "simple",
+            "medium",
+            "deep",
+            "max"
+          ]
+        },
+        {
+          "name": "forceNewHifz",
+          "type": "Bool",
+          "optional": false,
+          "default": false
+        },
+        {
+          "name": "testPages",
+          "type": "[Int]",
+          "optional": false,
+          "default": [],
+          "unit": "page 1…604",
+          "note": "chosen once per day"
+        }
+      ]
+    },
+    {
+      "name": "QuranAllotment",
+      "room": "quran",
+      "config": "synced",
+      "naturalKey": [
+        "origin",
+        "originDayKey",
+        "dayKey",
+        "kind"
+      ],
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": "a day target, not a debt (not carried over)",
+      "amendedBy": "C 19",
+      "relationships": [],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "dayKey",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "unit": "yyyy-MM-dd (ASCII, Gregorian)",
+          "note": "stored once; see §11 Day keys."
+        },
+        {
+          "name": "kind",
+          "type": "String",
+          "optional": false,
+          "default": "hifzExtra",
+          "enum": [
+            "hifzExtra",
+            "reviewExtra"
+          ]
+        },
+        {
+          "name": "amount",
+          "type": "Double",
+          "optional": false,
+          "default": 0.0
+        },
+        {
+          "name": "pages",
+          "type": "[Int]",
+          "optional": false,
+          "default": []
+        },
+        {
+          "name": "origin",
+          "type": "String",
+          "optional": false,
+          "default": "missPolicy",
+          "enum": [
+            "missPolicy",
+            "raise"
+          ]
+        },
+        {
+          "name": "originDayKey",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "unit": "yyyy-MM-dd"
+        }
+      ]
+    },
+    {
+      "name": "RecoveryPlan",
+      "room": "quran",
+      "config": "synced",
+      "naturalKey": "id",
+      "deletePolicy": "soft",
+      "invariants": [
+        "at most one active (cancelledAt == nil and not complete); repair keeps the latest startDayKey and cancels the others"
+      ],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": null,
+      "amendedBy": "C 20",
+      "relationships": [],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "startDayKey",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "unit": "yyyy-MM-dd"
+        },
+        {
+          "name": "days",
+          "type": "Int",
+          "optional": false,
+          "default": 7
+        },
+        {
+          "name": "pages",
+          "type": "[Int]",
+          "optional": false,
+          "default": []
+        },
+        {
+          "name": "cancelledAt",
+          "type": "Date?",
+          "optional": true
+        }
+      ]
+    },
+    {
+      "name": "DayPage",
+      "room": "diary",
+      "config": "synced",
+      "naturalKey": [
+        "dayKey"
+      ],
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": null,
+      "amendedBy": null,
+      "relationships": [
+        {
+          "field": "photoMediaID",
+          "to": "Media",
+          "kind": "one"
+        }
+      ],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "dayKey",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "unit": "yyyy-MM-dd (ASCII, Gregorian)",
+          "note": "stored once; see §11 Day keys. day container: no provenance"
+        },
+        {
+          "name": "questionAnswer",
+          "type": "String?",
+          "optional": true
+        },
+        {
+          "name": "photoMediaID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Media"
+        },
+        {
+          "name": "origin",
+          "type": "String",
+          "optional": false,
+          "default": "native",
+          "enum": [
+            "native",
+            "dayOne"
+          ]
+        },
+        {
+          "name": "hiddenFromMemories",
+          "type": "Bool",
+          "optional": false,
+          "default": false
+        }
+      ]
+    },
+    {
+      "name": "Niyya",
+      "room": "diary",
+      "config": "synced",
+      "naturalKey": [
+        "dayKey",
+        "order"
+      ],
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": null,
+      "amendedBy": null,
+      "relationships": [],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "dayKey",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "unit": "yyyy-MM-dd (ASCII, Gregorian)",
+          "note": "stored once; see §11 Day keys."
+        },
+        {
+          "name": "order",
+          "type": "Int",
+          "optional": false,
+          "default": 0,
+          "range": [
+            0,
+            9
+          ]
+        },
+        {
+          "name": "text",
+          "type": "String",
+          "optional": false,
+          "default": ""
+        },
+        {
+          "name": "result",
+          "type": "String?",
+          "optional": true,
+          "enum": [
+            "done",
+            "partial",
+            "notEasy"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Entry",
+      "room": "diary",
+      "config": "synced",
+      "naturalKey": "id",
+      "deletePolicy": "softCascade: MarginNote(targetEntryID), Media referenced only by this entry",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": null,
+      "amendedBy": "D A1, A2",
+      "relationships": [
+        {
+          "field": "mediaID",
+          "to": "Media",
+          "kind": "one"
+        },
+        {
+          "field": "attachmentMediaIDs",
+          "to": "Media",
+          "kind": "many"
+        },
+        {
+          "field": "projectID",
+          "to": "Project",
+          "kind": "one"
+        },
+        {
+          "field": "importBatchID",
+          "to": "ImportBatch",
+          "kind": "one"
+        },
+        {
+          "field": "pinnedEventID",
+          "to": "(pinnedEventKind)",
+          "kind": "one"
+        }
+      ],
+      "eventProvenance": true,
+      "naturalKeyRule": "(source, sourceID, sourceBranch) when sourceID != nil; (pinnedEventKind, pinnedEventID) when pinned; otherwise id",
+      "fields": [
+        {
+          "name": "dayKey",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "unit": "yyyy-MM-dd (ASCII, Gregorian)",
+          "note": "stored once; see §11 Day keys."
+        },
+        {
+          "name": "eventAt",
+          "type": "Date",
+          "optional": false,
+          "default": "Date()",
+          "note": "event instant (dayKey provenance): the time the entry is ABOUT (user-editable); createdAt = when it was written"
+        },
+        {
+          "name": "tzID",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "unit": "IANA time-zone id",
+          "note": "zone used to compute dayKey (active place at the event instant)"
+        },
+        {
+          "name": "dayPolicy",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "note": "\"<rule>@<version>\" used to compute dayKey, e.g. \"fajr@1\", \"prayerDay@1\", \"legacy@0\""
+        },
+        {
+          "name": "text",
+          "type": "String",
+          "optional": false,
+          "default": ""
+        },
+        {
+          "name": "textFormat",
+          "type": "String",
+          "optional": false,
+          "default": "plain",
+          "enum": [
+            "plain",
+            "markdown"
+          ]
+        },
+        {
+          "name": "ink",
+          "type": "String",
+          "optional": false,
+          "default": "normal",
+          "enum": [
+            "normal",
+            "late",
+            "ghad"
+          ]
+        },
+        {
+          "name": "mediaID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Media"
+        },
+        {
+          "name": "attachmentMediaIDs",
+          "type": "[UUID]",
+          "optional": false,
+          "default": [],
+          "fk": "Media"
+        },
+        {
+          "name": "projectID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Project"
+        },
+        {
+          "name": "place",
+          "type": "String?",
+          "optional": true
+        },
+        {
+          "name": "lat",
+          "type": "Double?",
+          "optional": true,
+          "range": [
+            -90,
+            90
+          ]
+        },
+        {
+          "name": "lon",
+          "type": "Double?",
+          "optional": true,
+          "range": [
+            -180,
+            180
+          ]
+        },
+        {
+          "name": "source",
+          "type": "String",
+          "optional": false,
+          "default": "native",
+          "enum": [
+            "native",
+            "dayOne",
+            "migration",
+            "autoPinned"
+          ]
+        },
+        {
+          "name": "sourceID",
+          "type": "String?",
+          "optional": true
+        },
+        {
+          "name": "sourceJournal",
+          "type": "String?",
+          "optional": true
+        },
+        {
+          "name": "sourceTimeZone",
+          "type": "String?",
+          "optional": true,
+          "unit": "IANA"
+        },
+        {
+          "name": "sourceModifiedAt",
+          "type": "Date?",
+          "optional": true
+        },
+        {
+          "name": "sourceHash",
+          "type": "String?",
+          "optional": true,
+          "unit": "SHA-256 of the normalized source entry"
+        },
+        {
+          "name": "importBatchID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "ImportBatch"
+        },
+        {
+          "name": "pinnedEventKind",
+          "type": "String?",
+          "optional": true
+        },
+        {
+          "name": "pinnedEventID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "(pinnedEventKind)"
+        },
+        {
+          "name": "sourceBranch",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "note": "Empty for primary import identity; keep-both uses SHA256 of canonical incoming source entry, never random. Original sourceID, dates and attachment references retained."
+        }
+      ]
+    },
+    {
+      "name": "HiddenAutoLine",
+      "room": "diary",
+      "config": "synced",
+      "naturalKey": [
+        "eventKind",
+        "eventID"
+      ],
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": "a display preference, never deletes the event",
+      "amendedBy": "D A4",
+      "relationships": [
+        {
+          "field": "eventID",
+          "to": "(eventKind)",
+          "kind": "one"
+        }
+      ],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "eventKind",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "note": "source model name, e.g. \"PrayerLog\""
+        },
+        {
+          "name": "eventID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "(eventKind)"
+        },
+        {
+          "name": "dayKey",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "unit": "yyyy-MM-dd (ASCII, Gregorian)",
+          "note": "stored once; see §11 Day keys. copy of the source event dayKey"
+        }
+      ]
+    },
+    {
+      "name": "MarginNote",
+      "room": "diary",
+      "config": "synced",
+      "naturalKey": "id",
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": null,
+      "amendedBy": null,
+      "relationships": [
+        {
+          "field": "targetEntryID",
+          "to": "Entry",
+          "kind": "one"
+        }
+      ],
+      "eventProvenance": true,
+      "fields": [
+        {
+          "name": "targetDayKey",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "unit": "yyyy-MM-dd"
+        },
+        {
+          "name": "targetEntryID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Entry"
+        },
+        {
+          "name": "text",
+          "type": "String",
+          "optional": false,
+          "default": ""
+        },
+        {
+          "name": "writtenAt",
+          "type": "Date",
+          "optional": false,
+          "default": "Date()"
+        },
+        {
+          "name": "writtenDayKey",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "unit": "yyyy-MM-dd",
+          "note": "day it was written (shown on that day too)"
+        },
+        {
+          "name": "tzID",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "unit": "IANA"
+        },
+        {
+          "name": "dayPolicy",
+          "type": "String",
+          "optional": false,
+          "default": ""
+        }
+      ]
+    },
+    {
+      "name": "Letter",
+      "room": "diary",
+      "config": "synced",
+      "naturalKey": "id",
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": "sealed text is excluded from search/Spotlight/widgets/notifications",
+      "amendedBy": "D A5",
+      "relationships": [],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "text",
+          "type": "String",
+          "optional": false,
+          "default": ""
+        },
+        {
+          "name": "openAt",
+          "type": "Date?",
+          "optional": true
+        },
+        {
+          "name": "triggerKind",
+          "type": "String",
+          "optional": false,
+          "default": "date",
+          "enum": [
+            "date",
+            "hijriDate",
+            "tripStart",
+            "tripEnd",
+            "khatma",
+            "bookFinished",
+            "projectFinished",
+            "ramadanStart"
+          ]
+        },
+        {
+          "name": "triggerTargetID",
+          "type": "UUID?",
+          "optional": true
+        },
+        {
+          "name": "triggerValue",
+          "type": "String?",
+          "optional": true
+        },
+        {
+          "name": "state",
+          "type": "String",
+          "optional": false,
+          "default": "sealed",
+          "enum": [
+            "sealed",
+            "eligible",
+            "opened",
+            "orphaned"
+          ]
+        },
+        {
+          "name": "eligibleAt",
+          "type": "Date?",
+          "optional": true
+        },
+        {
+          "name": "openedAt",
+          "type": "Date?",
+          "optional": true
+        }
+      ]
+    },
+    {
+      "name": "Project",
+      "room": "diary",
+      "config": "synced",
+      "naturalKey": "id",
+      "deletePolicy": "soft (entries keep projectID; UI shows the project as deleted)",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": null,
+      "amendedBy": null,
+      "relationships": [],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "name",
+          "type": "String",
+          "optional": false,
+          "default": ""
+        },
+        {
+          "name": "intention",
+          "type": "String",
+          "optional": false,
+          "default": ""
+        },
+        {
+          "name": "keyword",
+          "type": "String?",
+          "optional": true
+        },
+        {
+          "name": "finishedAt",
+          "type": "Date?",
+          "optional": true
+        },
+        {
+          "name": "reflection",
+          "type": "String?",
+          "optional": true
+        }
+      ]
+    },
+    {
+      "name": "Media",
+      "room": "diary",
+      "config": "synced",
+      "naturalKey": "id",
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": "common fields only once (createdAt/deletedAt are NOT redeclared)",
+      "amendedBy": "D A3 (adjusted)",
+      "relationships": [
+        {
+          "field": "importBatchID",
+          "to": "ImportBatch",
+          "kind": "one"
+        }
+      ],
+      "eventProvenance": false,
+      "naturalKeyRule": "(sourceID) when non-nil; otherwise id",
+      "fields": [
+        {
+          "name": "kind",
+          "type": "String",
+          "optional": false,
+          "default": "photo",
+          "enum": [
+            "photo",
+            "audio",
+            "video",
+            "doc"
+          ]
+        },
+        {
+          "name": "contentType",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "unit": "UTType identifier (serves as the MIME/type field)"
+        },
+        {
+          "name": "data",
+          "type": "Data?",
+          "optional": true,
+          "note": "@Attribute(.externalStorage) — syncs as CKAsset; set to nil when tombstoned (row kept)"
+        },
+        {
+          "name": "sizeBytes",
+          "type": "Int",
+          "optional": false,
+          "default": 0
+        },
+        {
+          "name": "sha256",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "unit": "lowercase hex",
+          "note": "the checksum field (backup manifest + import dedupe)"
+        },
+        {
+          "name": "durationS",
+          "type": "Int?",
+          "optional": true,
+          "unit": "seconds"
+        },
+        {
+          "name": "sourceID",
+          "type": "String?",
+          "optional": true
+        },
+        {
+          "name": "state",
+          "type": "String",
+          "optional": false,
+          "default": "ok",
+          "enum": [
+            "ok",
+            "missing"
+          ]
+        },
+        {
+          "name": "importBatchID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "ImportBatch"
+        }
+      ]
+    },
+    {
+      "name": "Account",
+      "room": "money",
+      "config": "synced",
+      "naturalKey": "id",
+      "deletePolicy": "softRestrict: archive while live Transactions reference it",
+      "invariants": [],
+      "merge": "row LWW, except (balanceMinor, balanceAt) taken together from the row with the latest balanceAt",
+      "seed": null,
+      "note": null,
+      "amendedBy": "D A9",
+      "relationships": [
+        {
+          "field": "parentID",
+          "to": "Account",
+          "kind": "one"
+        }
+      ],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "name",
+          "type": "String",
+          "optional": false,
+          "default": ""
+        },
+        {
+          "name": "bank",
+          "type": "String",
+          "optional": false,
+          "default": ""
+        },
+        {
+          "name": "kind",
+          "type": "String",
+          "optional": false,
+          "default": "current",
+          "enum": [
+            "current",
+            "savings",
+            "cash"
+          ]
+        },
+        {
+          "name": "ownerName",
+          "type": "String?",
+          "optional": true
+        },
+        {
+          "name": "ownership",
+          "type": "String",
+          "optional": false,
+          "default": "mine",
+          "enum": [
+            "mine",
+            "notMine"
+          ]
+        },
+        {
+          "name": "zakatInclude",
+          "type": "Bool",
+          "optional": false,
+          "default": true
+        },
+        {
+          "name": "currency",
+          "type": "String",
+          "optional": false,
+          "default": "SAR",
+          "unit": "ISO 4217"
+        },
+        {
+          "name": "balanceMinor",
+          "type": "Int",
+          "optional": false,
+          "default": 0,
+          "unit": "minor units of `currency` (exponent from currency-minor-units.json)",
+          "note": "observed bank balance"
+        },
+        {
+          "name": "balanceAt",
+          "type": "Date?",
+          "optional": true
+        },
+        {
+          "name": "parentID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Account"
+        },
+        {
+          "name": "senderIDs",
+          "type": "[String]",
+          "optional": false,
+          "default": []
+        }
+      ]
+    },
+    {
+      "name": "Card",
+      "room": "money",
+      "config": "synced",
+      "naturalKey": "id",
+      "deletePolicy": "softRestrict",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": "identity = (bank, last4) + aliases",
+      "amendedBy": "D A10",
+      "relationships": [
+        {
+          "field": "accountID",
+          "to": "Account",
+          "kind": "one"
+        }
+      ],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "name",
+          "type": "String",
+          "optional": false,
+          "default": ""
+        },
+        {
+          "name": "bank",
+          "type": "String",
+          "optional": false,
+          "default": ""
+        },
+        {
+          "name": "last4",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "note": "exactly 4 ASCII digits"
+        },
+        {
+          "name": "aliases",
+          "type": "[String]",
+          "optional": false,
+          "default": []
+        },
+        {
+          "name": "holderName",
+          "type": "String?",
+          "optional": true
+        },
+        {
+          "name": "network",
+          "type": "String",
+          "optional": false,
+          "default": ""
+        },
+        {
+          "name": "limitMinor",
+          "type": "Int?",
+          "optional": true,
+          "unit": "minor units of `currency` (exponent from currency-minor-units.json)",
+          "note": "nil = unknown; 0 = zero limit"
+        },
+        {
+          "name": "cashbackBp",
+          "type": "Int?",
+          "optional": true,
+          "unit": "basis points (1% = 100)",
+          "range": [
+            0,
+            10000
+          ]
+        },
+        {
+          "name": "aprBp",
+          "type": "Int?",
+          "optional": true,
+          "unit": "basis points",
+          "range": [
+            0,
+            100000
+          ]
+        },
+        {
+          "name": "accountID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Account"
+        },
+        {
+          "name": "fieldSourcesJSON",
+          "type": "Data",
+          "optional": false,
+          "default": "Data()"
+        }
+      ]
+    },
+    {
+      "name": "Statement",
+      "room": "money",
+      "config": "synced",
+      "naturalKey": [
+        "cardID",
+        "closeDay(closeDate)"
+      ],
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": "a second statement within 5 days of an estimated close → possible-duplicate review, not a second row",
+      "amendedBy": "D A11",
+      "relationships": [
+        {
+          "field": "cardID",
+          "to": "Card",
+          "kind": "one"
+        },
+        {
+          "field": "messageID",
+          "to": "BankMessage",
+          "kind": "one"
+        }
+      ],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "cardID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Card"
+        },
+        {
+          "name": "closeDate",
+          "type": "Date",
+          "optional": false,
+          "default": "Date()",
+          "note": "natural key uses its yyyy-MM-dd in the home zone"
+        },
+        {
+          "name": "closeDateSource",
+          "type": "String",
+          "optional": false,
+          "default": "estimated",
+          "enum": [
+            "estimated",
+            "message",
+            "entered"
+          ]
+        },
+        {
+          "name": "periodStart",
+          "type": "Date?",
+          "optional": true
+        },
+        {
+          "name": "dueDate",
+          "type": "Date?",
+          "optional": true
+        },
+        {
+          "name": "statementMinor",
+          "type": "Int",
+          "optional": false,
+          "default": 0,
+          "unit": "minor units of `currency` (exponent from currency-minor-units.json)"
+        },
+        {
+          "name": "minimumDueMinor",
+          "type": "Int",
+          "optional": false,
+          "default": 0,
+          "unit": "minor units of `currency` (exponent from currency-minor-units.json)"
+        },
+        {
+          "name": "messageID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "BankMessage"
+        }
+      ]
+    },
+    {
+      "name": "CashbackEntry",
+      "room": "money",
+      "config": "synced",
+      "naturalKey": "id",
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": null,
+      "amendedBy": null,
+      "relationships": [
+        {
+          "field": "cardID",
+          "to": "Card",
+          "kind": "one"
+        },
+        {
+          "field": "transactionID",
+          "to": "Transaction",
+          "kind": "one"
+        }
+      ],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "cardID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Card"
+        },
+        {
+          "name": "eventAt",
+          "type": "Date",
+          "optional": false,
+          "default": "Date()"
+        },
+        {
+          "name": "amountMinor",
+          "type": "Int",
+          "optional": false,
+          "default": 0,
+          "unit": "minor units of `currency` (exponent from currency-minor-units.json)",
+          "range": [
+            0,
+            null
+          ]
+        },
+        {
+          "name": "kind",
+          "type": "String",
+          "optional": false,
+          "default": "earned",
+          "enum": [
+            "earned",
+            "redeemed"
+          ]
+        },
+        {
+          "name": "transactionID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Transaction"
+        }
+      ]
+    },
+    {
+      "name": "Transaction",
+      "room": "money",
+      "config": "synced",
+      "naturalKey": "id",
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "id-only; never merged by content (duplicates prevented by BankMessage (fingerprint, occurrence) and ImportLink)",
+      "seed": null,
+      "note": "two legs in one row; envelope/daily effects live in Allocation",
+      "amendedBy": "D A7",
+      "relationships": [
+        {
+          "field": "categoryID",
+          "to": "Category",
+          "kind": "one"
+        },
+        {
+          "field": "fromAccountID",
+          "to": "Account",
+          "kind": "one"
+        },
+        {
+          "field": "toAccountID",
+          "to": "Account",
+          "kind": "one"
+        },
+        {
+          "field": "cardID",
+          "to": "Card",
+          "kind": "one"
+        },
+        {
+          "field": "relatedTransactionID",
+          "to": "Transaction",
+          "kind": "one"
+        },
+        {
+          "field": "obligationID",
+          "to": "Obligation",
+          "kind": "one"
+        },
+        {
+          "field": "installmentID",
+          "to": "InstallmentItem",
+          "kind": "one"
+        },
+        {
+          "field": "cycleID",
+          "to": "Cycle",
+          "kind": "one"
+        },
+        {
+          "field": "messageID",
+          "to": "BankMessage",
+          "kind": "one"
+        },
+        {
+          "field": "tripID",
+          "to": "Trip",
+          "kind": "one"
+        }
+      ],
+      "eventProvenance": true,
+      "fields": [
+        {
+          "name": "dayKey",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "unit": "yyyy-MM-dd (ASCII, Gregorian)",
+          "note": "stored once; see §11 Day keys."
+        },
+        {
+          "name": "eventAt",
+          "type": "Date",
+          "optional": false,
+          "default": "Date()",
+          "note": "event instant (dayKey provenance): time of the purchase/movement (bank message time for parsed rows)"
+        },
+        {
+          "name": "tzID",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "unit": "IANA time-zone id",
+          "note": "zone used to compute dayKey (active place at the event instant)"
+        },
+        {
+          "name": "dayPolicy",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "note": "\"<rule>@<version>\" used to compute dayKey, e.g. \"fajr@1\", \"prayerDay@1\", \"legacy@0\""
+        },
+        {
+          "name": "kind",
+          "type": "String",
+          "optional": false,
+          "default": "expense",
+          "enum": [
+            "expense",
+            "income",
+            "salary",
+            "cardPayment",
+            "transfer",
+            "refund",
+            "cashback",
+            "withdrawal",
+            "repayment",
+            "adjustment"
+          ]
+        },
+        {
+          "name": "amountMinor",
+          "type": "Int",
+          "optional": false,
+          "default": 0,
+          "unit": "minor units of `currency` (its own exponent)",
+          "range": [
+            0,
+            null
+          ]
+        },
+        {
+          "name": "currency",
+          "type": "String",
+          "optional": false,
+          "default": "SAR",
+          "unit": "ISO 4217"
+        },
+        {
+          "name": "homeAmountMinor",
+          "type": "Int",
+          "optional": false,
+          "default": 0,
+          "unit": "minor units of homeCurrency",
+          "note": "frozen at write"
+        },
+        {
+          "name": "homeCurrency",
+          "type": "String",
+          "optional": false,
+          "default": "SAR",
+          "unit": "ISO 4217"
+        },
+        {
+          "name": "rateAtTime",
+          "type": "String?",
+          "optional": true,
+          "unit": "Decimal as canonical String (ASCII, \".\" separator): home units per 1 unit of `currency`"
+        },
+        {
+          "name": "rateSource",
+          "type": "String?",
+          "optional": true,
+          "enum": [
+            "message",
+            "trip",
+            "manual"
+          ]
+        },
+        {
+          "name": "merchant",
+          "type": "String?",
+          "optional": true
+        },
+        {
+          "name": "counterparty",
+          "type": "String?",
+          "optional": true
+        },
+        {
+          "name": "categoryID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Category"
+        },
+        {
+          "name": "method",
+          "type": "String",
+          "optional": false,
+          "default": "cash",
+          "enum": [
+            "cash",
+            "card",
+            "bnpl",
+            "transfer"
+          ]
+        },
+        {
+          "name": "fromAccountID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Account"
+        },
+        {
+          "name": "toAccountID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Account"
+        },
+        {
+          "name": "cardID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Card"
+        },
+        {
+          "name": "relatedTransactionID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Transaction"
+        },
+        {
+          "name": "obligationID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Obligation"
+        },
+        {
+          "name": "installmentID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "InstallmentItem"
+        },
+        {
+          "name": "cycleID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Cycle"
+        },
+        {
+          "name": "ignoredFromBudget",
+          "type": "Bool",
+          "optional": false,
+          "default": false
+        },
+        {
+          "name": "source",
+          "type": "String",
+          "optional": false,
+          "default": "bank",
+          "enum": [
+            "bank",
+            "manual"
+          ]
+        },
+        {
+          "name": "messageID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "BankMessage"
+        },
+        {
+          "name": "tripID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Trip"
+        },
+        {
+          "name": "showInDiary",
+          "type": "Bool",
+          "optional": false,
+          "default": true
+        },
+        {
+          "name": "reviewState",
+          "type": "String",
+          "optional": false,
+          "default": "ok",
+          "enum": [
+            "ok",
+            "needsLook",
+            "possibleDuplicate"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Allocation",
+      "room": "money",
+      "config": "synced",
+      "naturalKey": "id",
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": "Envelope.balanceMinor = Σ allocations (derived cache)",
+      "amendedBy": "D A8",
+      "relationships": [
+        {
+          "field": "transactionID",
+          "to": "Transaction",
+          "kind": "one"
+        },
+        {
+          "field": "targetID",
+          "to": "Envelope",
+          "kind": "one"
+        },
+        {
+          "field": "cycleID",
+          "to": "Cycle",
+          "kind": "one"
+        }
+      ],
+      "eventProvenance": false,
+      "naturalKeyRule": "(idempotencyKey) when non-empty; otherwise id",
+      "fields": [
+        {
+          "name": "transactionID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Transaction"
+        },
+        {
+          "name": "groupID",
+          "type": "UUID?",
+          "optional": true
+        },
+        {
+          "name": "target",
+          "type": "String",
+          "optional": false,
+          "default": "daily",
+          "enum": [
+            "daily",
+            "envelope",
+            "reserve",
+            "surplus",
+            "goal"
+          ]
+        },
+        {
+          "name": "targetID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Envelope"
+        },
+        {
+          "name": "amountMinor",
+          "type": "Int",
+          "optional": false,
+          "default": 0,
+          "unit": "minor units of the home currency (signed)"
+        },
+        {
+          "name": "kind",
+          "type": "String",
+          "optional": false,
+          "default": "spend",
+          "enum": [
+            "spend",
+            "fund",
+            "refund",
+            "offset",
+            "repay",
+            "adjust"
+          ]
+        },
+        {
+          "name": "cycleID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Cycle"
+        },
+        {
+          "name": "idempotencyKey",
+          "type": "String",
+          "optional": false,
+          "default": ""
+        }
+      ]
+    },
+    {
+      "name": "Reconciliation",
+      "room": "money",
+      "config": "synced",
+      "naturalKey": "id",
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": "balance reconciliation record (money); unrelated to the row merge in §11; undo restores both",
+      "amendedBy": "D A12",
+      "relationships": [
+        {
+          "field": "accountID",
+          "to": "Account",
+          "kind": "one"
+        },
+        {
+          "field": "cardID",
+          "to": "Card",
+          "kind": "one"
+        },
+        {
+          "field": "adjustmentTransactionID",
+          "to": "Transaction",
+          "kind": "one"
+        }
+      ],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "accountID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Account"
+        },
+        {
+          "name": "cardID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Card"
+        },
+        {
+          "name": "at",
+          "type": "Date",
+          "optional": false,
+          "default": "Date()"
+        },
+        {
+          "name": "expectedMinor",
+          "type": "Int",
+          "optional": false,
+          "default": 0,
+          "unit": "minor units of `currency` (exponent from currency-minor-units.json)"
+        },
+        {
+          "name": "observedMinor",
+          "type": "Int",
+          "optional": false,
+          "default": 0,
+          "unit": "minor units of `currency` (exponent from currency-minor-units.json)"
+        },
+        {
+          "name": "deltaMinor",
+          "type": "Int",
+          "optional": false,
+          "default": 0,
+          "unit": "minor units of `currency` (exponent from currency-minor-units.json) (signed)"
+        },
+        {
+          "name": "resolution",
+          "type": "String",
+          "optional": false,
+          "default": "adjust",
+          "enum": [
+            "adjust",
+            "unrecordedSpend",
+            "leave"
+          ]
+        },
+        {
+          "name": "adjustmentTransactionID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Transaction"
+        },
+        {
+          "name": "beforeJSON",
+          "type": "Data",
+          "optional": false,
+          "default": "Data()"
+        },
+        {
+          "name": "note",
+          "type": "String?",
+          "optional": true
+        }
+      ]
+    },
+    {
+      "name": "BankMessage",
+      "room": "money",
+      "config": "synced",
+      "naturalKey": [
+        "fingerprint",
+        "occurrence"
+      ],
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": null,
+      "amendedBy": "D A19",
+      "relationships": [
+        {
+          "field": "importBatchID",
+          "to": "ImportBatch",
+          "kind": "one"
+        }
+      ],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "sender",
+          "type": "String",
+          "optional": false,
+          "default": ""
+        },
+        {
+          "name": "text",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "note": "≤ 2 000 chars"
+        },
+        {
+          "name": "normalizedText",
+          "type": "String",
+          "optional": false,
+          "default": ""
+        },
+        {
+          "name": "receivedAt",
+          "type": "Date",
+          "optional": false,
+          "default": "Date()"
+        },
+        {
+          "name": "receivedAtSource",
+          "type": "String",
+          "optional": false,
+          "default": "device",
+          "enum": [
+            "device",
+            "parsedFromText",
+            "batch"
+          ]
+        },
+        {
+          "name": "fingerprint",
+          "type": "String",
+          "optional": false,
+          "default": ""
+        },
+        {
+          "name": "occurrence",
+          "type": "Int",
+          "optional": false,
+          "default": 1,
+          "note": "identical same-minute messages get 1, 2, …"
+        },
+        {
+          "name": "channel",
+          "type": "String",
+          "optional": false,
+          "default": "shortcut",
+          "enum": [
+            "shortcut",
+            "bulk",
+            "migration",
+            "manual"
+          ]
+        },
+        {
+          "name": "importBatchID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "ImportBatch"
+        },
+        {
+          "name": "kind",
+          "type": "String",
+          "optional": false,
+          "default": ""
+        },
+        {
+          "name": "parsedJSON",
+          "type": "Data?",
+          "optional": true
+        },
+        {
+          "name": "parseVersion",
+          "type": "Int",
+          "optional": false,
+          "default": 1
+        },
+        {
+          "name": "status",
+          "type": "String",
+          "optional": false,
+          "default": "ok",
+          "enum": [
+            "ok",
+            "needsLook",
+            "ignored",
+            "possibleDuplicate"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Cycle",
+      "room": "money",
+      "config": "synced",
+      "naturalKey": [
+        "startDay(start)"
+      ],
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": "mode/percentBp/dailyAllowanceMinor = cache of the current CyclePolicy; the closed report is immutable (later corrections = Allocation(kind: adjust) in the open cycle)",
+      "amendedBy": "D A16",
+      "relationships": [
+        {
+          "field": "salaryTransactionID",
+          "to": "Transaction",
+          "kind": "one"
+        }
+      ],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "start",
+          "type": "Date",
+          "optional": false,
+          "default": "Date()"
+        },
+        {
+          "name": "end",
+          "type": "Date?",
+          "optional": true
+        },
+        {
+          "name": "expectedEnd",
+          "type": "Date?",
+          "optional": true
+        },
+        {
+          "name": "closedAt",
+          "type": "Date?",
+          "optional": true
+        },
+        {
+          "name": "salaryTransactionID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Transaction"
+        },
+        {
+          "name": "incomeMinor",
+          "type": "Int",
+          "optional": false,
+          "default": 0,
+          "unit": "minor units of `currency` (exponent from currency-minor-units.json)"
+        },
+        {
+          "name": "mode",
+          "type": "String",
+          "optional": false,
+          "default": "fixed",
+          "enum": [
+            "fixed",
+            "percent"
+          ],
+          "derivedCache": true
+        },
+        {
+          "name": "percentBp",
+          "type": "Int?",
+          "optional": true,
+          "unit": "basis points",
+          "range": [
+            0,
+            10000
+          ],
+          "derivedCache": true
+        },
+        {
+          "name": "dailyAllowanceMinor",
+          "type": "Int",
+          "optional": false,
+          "default": 0,
+          "unit": "minor units of `currency` (exponent from currency-minor-units.json)",
+          "derivedCache": true
+        },
+        {
+          "name": "carryAdjustMinor",
+          "type": "Int",
+          "optional": false,
+          "default": 0,
+          "unit": "minor units of `currency` (exponent from currency-minor-units.json) (signed)"
+        },
+        {
+          "name": "closedReportJSON",
+          "type": "Data?",
+          "optional": true
+        },
+        {
+          "name": "reportVersion",
+          "type": "Int",
+          "optional": false,
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "CyclePolicy",
+      "room": "money",
+      "config": "synced",
+      "naturalKey": [
+        "cycleID",
+        "effectiveFromDayKey"
+      ],
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": null,
+      "amendedBy": "D A17 (adjusted: percent → percentBp)",
+      "relationships": [
+        {
+          "field": "cycleID",
+          "to": "Cycle",
+          "kind": "one"
+        }
+      ],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "cycleID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Cycle"
+        },
+        {
+          "name": "effectiveFromDayKey",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "unit": "yyyy-MM-dd",
+          "note": "edits start the next Madar day"
+        },
+        {
+          "name": "mode",
+          "type": "String",
+          "optional": false,
+          "default": "fixed",
+          "enum": [
+            "fixed",
+            "percent"
+          ]
+        },
+        {
+          "name": "allowanceMinor",
+          "type": "Int",
+          "optional": false,
+          "default": 0,
+          "unit": "minor units of `currency` (exponent from currency-minor-units.json)"
+        },
+        {
+          "name": "percentBp",
+          "type": "Int?",
+          "optional": true,
+          "unit": "basis points",
+          "range": [
+            0,
+            10000
+          ]
+        },
+        {
+          "name": "dailyRateMinor",
+          "type": "Int",
+          "optional": false,
+          "default": 0,
+          "unit": "minor units of `currency` (exponent from currency-minor-units.json)"
+        },
+        {
+          "name": "lastDayRemainderMinor",
+          "type": "Int",
+          "optional": false,
+          "default": 0,
+          "unit": "minor units of `currency` (exponent from currency-minor-units.json)"
+        }
+      ]
+    },
+    {
+      "name": "Envelope",
+      "room": "money",
+      "config": "synced",
+      "naturalKey": "id; role ∈ {reserve, surplus} is a singleton key (role)",
+      "deletePolicy": "softRestrict",
+      "invariants": [
+        "exactly one live Envelope with role = reserve and one with role = surplus",
+        "balanceMinor recomputed from Allocation, never merged"
+      ],
+      "merge": "row LWW (§11 merge)",
+      "seed": "reserve = UUIDv5(seedNS, \"Envelope:reserve\"); surplus = UUIDv5(seedNS, \"Envelope:surplus\")",
+      "note": null,
+      "amendedBy": null,
+      "relationships": [],
+      "eventProvenance": false,
+      "naturalKeyRule": "(role) for reserve and surplus only",
+      "fields": [
+        {
+          "name": "name",
+          "type": "String",
+          "optional": false,
+          "default": ""
+        },
+        {
+          "name": "role",
+          "type": "String",
+          "optional": false,
+          "default": "general",
+          "enum": [
+            "general",
+            "surplus",
+            "reserve",
+            "goal",
+            "trip"
+          ]
+        },
+        {
+          "name": "balanceMinor",
+          "type": "Int",
+          "optional": false,
+          "default": 0,
+          "unit": "minor units of the home currency (signed)",
+          "derivedCache": true
+        },
+        {
+          "name": "targetMinor",
+          "type": "Int?",
+          "optional": true,
+          "unit": "minor units of `currency` (exponent from currency-minor-units.json)"
+        },
+        {
+          "name": "due",
+          "type": "Date?",
+          "optional": true
+        }
+      ]
+    },
+    {
+      "name": "EnvelopePlan",
+      "room": "money",
+      "config": "synced",
+      "naturalKey": "id",
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": null,
+      "amendedBy": null,
+      "relationships": [
+        {
+          "field": "envelopeID",
+          "to": "Envelope",
+          "kind": "one"
+        }
+      ],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "envelopeID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Envelope"
+        },
+        {
+          "name": "kind",
+          "type": "String",
+          "optional": false,
+          "default": "fund",
+          "enum": [
+            "fund",
+            "repay"
+          ]
+        },
+        {
+          "name": "source",
+          "type": "String",
+          "optional": false,
+          "default": "salary",
+          "enum": [
+            "salary",
+            "surplus",
+            "reserve"
+          ]
+        },
+        {
+          "name": "perPaycheckMinor",
+          "type": "Int",
+          "optional": false,
+          "default": 0,
+          "unit": "minor units of `currency` (exponent from currency-minor-units.json)"
+        },
+        {
+          "name": "untilDate",
+          "type": "Date?",
+          "optional": true
+        }
+      ]
+    },
+    {
+      "name": "Obligation",
+      "room": "money",
+      "config": "synced",
+      "naturalKey": "id",
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": null,
+      "amendedBy": "D A13",
+      "relationships": [
+        {
+          "field": "purchaseTransactionID",
+          "to": "Transaction",
+          "kind": "one"
+        },
+        {
+          "field": "sourceMessageID",
+          "to": "BankMessage",
+          "kind": "one"
+        }
+      ],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "kind",
+          "type": "String",
+          "optional": false,
+          "default": "bill",
+          "enum": [
+            "loan",
+            "bill",
+            "installment"
+          ]
+        },
+        {
+          "name": "name",
+          "type": "String",
+          "optional": false,
+          "default": ""
+        },
+        {
+          "name": "provider",
+          "type": "String?",
+          "optional": true
+        },
+        {
+          "name": "amountMinor",
+          "type": "Int",
+          "optional": false,
+          "default": 0,
+          "unit": "minor units of `currency` (exponent from currency-minor-units.json)"
+        },
+        {
+          "name": "totalMinor",
+          "type": "Int",
+          "optional": false,
+          "default": 0,
+          "unit": "minor units of `currency` (exponent from currency-minor-units.json)"
+        },
+        {
+          "name": "currency",
+          "type": "String",
+          "optional": false,
+          "default": "SAR",
+          "unit": "ISO 4217"
+        },
+        {
+          "name": "dueDay",
+          "type": "Int?",
+          "optional": true,
+          "range": [
+            1,
+            31
+          ]
+        },
+        {
+          "name": "remainingCount",
+          "type": "Int?",
+          "optional": true,
+          "range": [
+            0,
+            600
+          ]
+        },
+        {
+          "name": "purchaseTransactionID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Transaction"
+        },
+        {
+          "name": "sourceMessageID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "BankMessage"
+        }
+      ]
+    },
+    {
+      "name": "InstallmentItem",
+      "room": "money",
+      "config": "synced",
+      "naturalKey": [
+        "obligationID",
+        "seq"
+      ],
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": null,
+      "amendedBy": "D A14",
+      "relationships": [
+        {
+          "field": "obligationID",
+          "to": "Obligation",
+          "kind": "one"
+        },
+        {
+          "field": "paidTransactionID",
+          "to": "Transaction",
+          "kind": "one"
+        }
+      ],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "obligationID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Obligation"
+        },
+        {
+          "name": "seq",
+          "type": "Int",
+          "optional": false,
+          "default": 1,
+          "range": [
+            1,
+            600
+          ]
+        },
+        {
+          "name": "dueDate",
+          "type": "Date",
+          "optional": false,
+          "default": "Date()"
+        },
+        {
+          "name": "amountMinor",
+          "type": "Int",
+          "optional": false,
+          "default": 0,
+          "unit": "minor units of `currency` (exponent from currency-minor-units.json)"
+        },
+        {
+          "name": "paidMinor",
+          "type": "Int",
+          "optional": false,
+          "default": 0,
+          "unit": "minor units of `currency` (exponent from currency-minor-units.json)"
+        },
+        {
+          "name": "paidTransactionID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Transaction"
+        },
+        {
+          "name": "paidAt",
+          "type": "Date?",
+          "optional": true
+        }
+      ]
+    },
+    {
+      "name": "Category",
+      "room": "money",
+      "config": "synced",
+      "naturalKey": "id",
+      "deletePolicy": "softRestrict",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": "default categories = UUIDv5(seedNS, \"Category:<slug>\")",
+      "note": null,
+      "amendedBy": null,
+      "relationships": [],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "name",
+          "type": "String",
+          "optional": false,
+          "default": ""
+        },
+        {
+          "name": "icon",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "unit": "SF Symbol name"
+        },
+        {
+          "name": "color",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "unit": "design-token id"
+        },
+        {
+          "name": "order",
+          "type": "Int",
+          "optional": false,
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "CategoryLimit",
+      "room": "money",
+      "config": "synced",
+      "naturalKey": [
+        "categoryID"
+      ],
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": null,
+      "amendedBy": "D A18 (adjusted: percent → percentBp)",
+      "relationships": [
+        {
+          "field": "categoryID",
+          "to": "Category",
+          "kind": "one"
+        },
+        {
+          "field": "alert80CycleID",
+          "to": "Cycle",
+          "kind": "one"
+        }
+      ],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "categoryID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Category"
+        },
+        {
+          "name": "mode",
+          "type": "String",
+          "optional": false,
+          "default": "fixed",
+          "enum": [
+            "none",
+            "fixed",
+            "percent"
+          ]
+        },
+        {
+          "name": "limitMinor",
+          "type": "Int",
+          "optional": false,
+          "default": 0,
+          "unit": "minor units of `currency` (exponent from currency-minor-units.json)"
+        },
+        {
+          "name": "percentBp",
+          "type": "Int?",
+          "optional": true,
+          "unit": "basis points",
+          "range": [
+            0,
+            10000
+          ]
+        },
+        {
+          "name": "base",
+          "type": "String",
+          "optional": false,
+          "default": "income",
+          "enum": [
+            "income",
+            "allowance"
+          ]
+        },
+        {
+          "name": "alert80CycleID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Cycle"
+        }
+      ]
+    },
+    {
+      "name": "MerchantRule",
+      "room": "money",
+      "config": "synced",
+      "naturalKey": "id",
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": null,
+      "amendedBy": null,
+      "relationships": [
+        {
+          "field": "categoryID",
+          "to": "Category",
+          "kind": "one"
+        }
+      ],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "pattern",
+          "type": "String",
+          "optional": false,
+          "default": ""
+        },
+        {
+          "name": "categoryID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Category"
+        },
+        {
+          "name": "ignore",
+          "type": "Bool",
+          "optional": false,
+          "default": false
+        }
+      ]
+    },
+    {
+      "name": "ZakatProfile",
+      "room": "money",
+      "config": "synced",
+      "naturalKey": "singleton",
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": "UUIDv5(seedNS, \"ZakatProfile:singleton\")",
+      "note": null,
+      "amendedBy": "D A20",
+      "relationships": [],
+      "eventProvenance": false,
+      "naturalKeyRule": "singleton (fixed id)",
+      "fields": [
+        {
+          "name": "hawlStartHijri",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "unit": "h:yyyy-MM-dd"
+        },
+        {
+          "name": "goldPricePerGramMinor",
+          "type": "Int?",
+          "optional": true,
+          "unit": "minor units per gram"
+        },
+        {
+          "name": "goldPriceSetAt",
+          "type": "Date?",
+          "optional": true
+        },
+        {
+          "name": "nisabMg",
+          "type": "Int",
+          "optional": false,
+          "default": 85000,
+          "unit": "milligrams of gold"
+        },
+        {
+          "name": "debtsPolicy",
+          "type": "String",
+          "optional": false,
+          "default": "unset",
+          "enum": [
+            "unset",
+            "none",
+            "dueNow",
+            "allOwed"
+          ]
+        },
+        {
+          "name": "otherAssetsMinor",
+          "type": "Int",
+          "optional": false,
+          "default": 0,
+          "unit": "minor units of `currency` (exponent from currency-minor-units.json)"
+        },
+        {
+          "name": "lastPaidAt",
+          "type": "Date?",
+          "optional": true
+        }
+      ]
+    },
+    {
+      "name": "Book",
+      "room": "mihbara",
+      "config": "synced",
+      "naturalKey": "id",
+      "deletePolicy": "softCascade: ReadingSession, Highlight",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": null,
+      "amendedBy": "D A23",
+      "relationships": [
+        {
+          "field": "mediaID",
+          "to": "Media",
+          "kind": "one"
+        },
+        {
+          "field": "importBatchID",
+          "to": "ImportBatch",
+          "kind": "one"
+        }
+      ],
+      "eventProvenance": false,
+      "naturalKeyRule": "(sourceGoodreadsID) when non-nil; otherwise id",
+      "fields": [
+        {
+          "name": "title",
+          "type": "String",
+          "optional": false,
+          "default": ""
+        },
+        {
+          "name": "author",
+          "type": "String",
+          "optional": false,
+          "default": ""
+        },
+        {
+          "name": "editor",
+          "type": "String?",
+          "optional": true
+        },
+        {
+          "name": "edition",
+          "type": "String?",
+          "optional": true
+        },
+        {
+          "name": "kind",
+          "type": "String",
+          "optional": false,
+          "default": "paper",
+          "enum": [
+            "paper",
+            "ebook",
+            "turath",
+            "file"
+          ]
+        },
+        {
+          "name": "format",
+          "type": "String?",
+          "optional": true,
+          "enum": [
+            "epub",
+            "pdf",
+            "pdfScanned",
+            "txt",
+            "html"
+          ]
+        },
+        {
+          "name": "shelf",
+          "type": "String",
+          "optional": false,
+          "default": "want",
+          "enum": [
+            "reading",
+            "want",
+            "finished",
+            "old"
+          ]
+        },
+        {
+          "name": "pages",
+          "type": "Int?",
+          "optional": true,
+          "range": [
+            1,
+            100000
+          ]
+        },
+        {
+          "name": "locatorJSON",
+          "type": "Data?",
+          "optional": true,
+          "note": "current position — source of truth"
+        },
+        {
+          "name": "currentPage",
+          "type": "Int?",
+          "optional": true,
+          "derivedCache": true
+        },
+        {
+          "name": "tocJSON",
+          "type": "Data?",
+          "optional": true
+        },
+        {
+          "name": "language",
+          "type": "String",
+          "optional": false,
+          "default": "ar",
+          "unit": "BCP-47"
+        },
+        {
+          "name": "mediaID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Media"
+        },
+        {
+          "name": "fileHash",
+          "type": "String?",
+          "optional": true,
+          "unit": "SHA-256 hex"
+        },
+        {
+          "name": "isbn13",
+          "type": "String?",
+          "optional": true
+        },
+        {
+          "name": "sourceGoodreadsID",
+          "type": "String?",
+          "optional": true
+        },
+        {
+          "name": "importBatchID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "ImportBatch"
+        },
+        {
+          "name": "turathID",
+          "type": "Int?",
+          "optional": true
+        },
+        {
+          "name": "finishedAt",
+          "type": "Date?",
+          "optional": true
+        },
+        {
+          "name": "rating",
+          "type": "Int?",
+          "optional": true,
+          "range": [
+            1,
+            5
+          ]
+        },
+        {
+          "name": "review",
+          "type": "String?",
+          "optional": true
+        },
+        {
+          "name": "readCount",
+          "type": "Int",
+          "optional": false,
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "ReadingSession",
+      "room": "mihbara",
+      "config": "synced",
+      "naturalKey": "id",
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": "progress counts forward only",
+      "amendedBy": "D A24",
+      "relationships": [
+        {
+          "field": "bookID",
+          "to": "Book",
+          "kind": "one"
+        }
+      ],
+      "eventProvenance": true,
+      "fields": [
+        {
+          "name": "bookID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Book"
+        },
+        {
+          "name": "start",
+          "type": "Date",
+          "optional": false,
+          "default": "Date()"
+        },
+        {
+          "name": "end",
+          "type": "Date?",
+          "optional": true
+        },
+        {
+          "name": "activeSeconds",
+          "type": "Int",
+          "optional": false,
+          "default": 0,
+          "unit": "seconds"
+        },
+        {
+          "name": "fromPage",
+          "type": "Int",
+          "optional": false,
+          "default": 0
+        },
+        {
+          "name": "toPage",
+          "type": "Int",
+          "optional": false,
+          "default": 0,
+          "note": "fromPage ≤ toPage"
+        },
+        {
+          "name": "startLocatorJSON",
+          "type": "Data?",
+          "optional": true
+        },
+        {
+          "name": "endLocatorJSON",
+          "type": "Data?",
+          "optional": true
+        },
+        {
+          "name": "startProgression",
+          "type": "Double",
+          "optional": false,
+          "default": 0.0,
+          "range": [
+            0,
+            1
+          ]
+        },
+        {
+          "name": "endProgression",
+          "type": "Double",
+          "optional": false,
+          "default": 0.0,
+          "range": [
+            0,
+            1
+          ]
+        },
+        {
+          "name": "pagesCounted",
+          "type": "Int",
+          "optional": false,
+          "default": 0
+        },
+        {
+          "name": "source",
+          "type": "String",
+          "optional": false,
+          "default": "reader",
+          "enum": [
+            "reader",
+            "timer",
+            "manual"
+          ]
+        },
+        {
+          "name": "dayKey",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "unit": "yyyy-MM-dd (ASCII, Gregorian)",
+          "note": "stored once; see §11 Day keys."
+        },
+        {
+          "name": "tzID",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "unit": "IANA"
+        },
+        {
+          "name": "dayPolicy",
+          "type": "String",
+          "optional": false,
+          "default": ""
+        }
+      ]
+    },
+    {
+      "name": "Highlight",
+      "room": "mihbara",
+      "config": "synced",
+      "naturalKey": "id",
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": null,
+      "amendedBy": "D A25",
+      "relationships": [
+        {
+          "field": "bookID",
+          "to": "Book",
+          "kind": "one"
+        }
+      ],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "bookID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Book"
+        },
+        {
+          "name": "locatorJSON",
+          "type": "Data",
+          "optional": false,
+          "default": "Data()",
+          "note": "reflow-safe anchor (R02)"
+        },
+        {
+          "name": "pageLabel",
+          "type": "String?",
+          "optional": true
+        },
+        {
+          "name": "color",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "unit": "design-token id"
+        },
+        {
+          "name": "note",
+          "type": "String?",
+          "optional": true
+        }
+      ]
+    },
+    {
+      "name": "NotebookNote",
+      "room": "mihbara",
+      "config": "synced",
+      "naturalKey": "id",
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": "fromDiary stores targetID = Entry id and no copied text; it inherits the diary lock",
+      "amendedBy": "D A26",
+      "relationships": [
+        {
+          "field": "targetID",
+          "to": "(by link: Book | HadithProgress | Entry)",
+          "kind": "one"
+        }
+      ],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "text",
+          "type": "String",
+          "optional": false,
+          "default": ""
+        },
+        {
+          "name": "link",
+          "type": "String",
+          "optional": false,
+          "default": "general",
+          "enum": [
+            "page",
+            "bookStart",
+            "bookEnd",
+            "hadith",
+            "idea",
+            "general",
+            "fromDiary"
+          ]
+        },
+        {
+          "name": "targetID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "(by link: Book | HadithProgress | Entry)"
+        },
+        {
+          "name": "page",
+          "type": "Int?",
+          "optional": true
+        },
+        {
+          "name": "locatorJSON",
+          "type": "Data?",
+          "optional": true
+        },
+        {
+          "name": "isPrivate",
+          "type": "Bool",
+          "optional": false,
+          "default": false
+        }
+      ]
+    },
+    {
+      "name": "HadithProgress",
+      "room": "mihbara",
+      "config": "synced",
+      "naturalKey": [
+        "collectionID",
+        "number"
+      ],
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "row LWW, except understood = OR, layersOpened = union, understoodDayKey = earliest, readAt = earliest",
+      "seed": null,
+      "note": null,
+      "amendedBy": "D A27",
+      "relationships": [],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "collectionID",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "note": "stable slug"
+        },
+        {
+          "name": "number",
+          "type": "Int",
+          "optional": false,
+          "default": 0,
+          "range": [
+            0,
+            100000
+          ],
+          "note": "number in the edition's numbering"
+        },
+        {
+          "name": "editionID",
+          "type": "String",
+          "optional": false,
+          "default": ""
+        },
+        {
+          "name": "readAt",
+          "type": "Date?",
+          "optional": true
+        },
+        {
+          "name": "understood",
+          "type": "Bool",
+          "optional": false,
+          "default": false
+        },
+        {
+          "name": "understoodDayKey",
+          "type": "String?",
+          "optional": true,
+          "unit": "yyyy-MM-dd",
+          "note": "day the hadith was marked understood (diary line / habit)"
+        },
+        {
+          "name": "returnTo",
+          "type": "Bool",
+          "optional": false,
+          "default": false
+        },
+        {
+          "name": "layersOpened",
+          "type": "[String]",
+          "optional": false,
+          "default": []
+        }
+      ]
+    },
+    {
+      "name": "UserWord",
+      "room": "mihbara",
+      "config": "synced",
+      "naturalKey": [
+        "language",
+        "normalized(word)"
+      ],
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": "«كلماتي» survives sync and book deletion",
+      "amendedBy": "D A28",
+      "relationships": [
+        {
+          "field": "bookID",
+          "to": "Book",
+          "kind": "one"
+        }
+      ],
+      "eventProvenance": false,
+      "naturalKeyRule": "(language, normalized(word)) — Arabic normalization of §6 search",
+      "fields": [
+        {
+          "name": "word",
+          "type": "String",
+          "optional": false,
+          "default": ""
+        },
+        {
+          "name": "language",
+          "type": "String",
+          "optional": false,
+          "default": "ar",
+          "enum": [
+            "ar",
+            "en"
+          ]
+        },
+        {
+          "name": "meaning",
+          "type": "String?",
+          "optional": true
+        },
+        {
+          "name": "meaningSource",
+          "type": "String",
+          "optional": false,
+          "default": "none",
+          "enum": [
+            "none",
+            "user",
+            "translation"
+          ]
+        },
+        {
+          "name": "bookID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Book"
+        },
+        {
+          "name": "bookTitle",
+          "type": "String",
+          "optional": false,
+          "default": ""
+        },
+        {
+          "name": "locatorJSON",
+          "type": "Data?",
+          "optional": true
+        },
+        {
+          "name": "context",
+          "type": "String",
+          "optional": false,
+          "default": ""
+        },
+        {
+          "name": "savedAt",
+          "type": "Date",
+          "optional": false,
+          "default": "Date()"
+        }
+      ]
+    },
+    {
+      "name": "Habit",
+      "room": "habits",
+      "config": "synced",
+      "naturalKey": "id",
+      "deletePolicy": "soft (archivedAt preferred); policies, pauses and logs kept",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": "identity only; rules live in HabitPolicy",
+      "amendedBy": "C 1",
+      "relationships": [],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "name",
+          "type": "String",
+          "optional": false,
+          "default": ""
+        },
+        {
+          "name": "icon",
+          "type": "String",
+          "optional": false,
+          "default": ""
+        },
+        {
+          "name": "color",
+          "type": "String",
+          "optional": false,
+          "default": ""
+        },
+        {
+          "name": "kind",
+          "type": "String",
+          "optional": false,
+          "default": "custom",
+          "enum": [
+            "custom",
+            "linked"
+          ]
+        },
+        {
+          "name": "linkedSource",
+          "type": "String?",
+          "optional": true,
+          "enum": [
+            "jamaah",
+            "review",
+            "reading",
+            "hadith",
+            "diaryLine",
+            "withinDay",
+            "walking"
+          ]
+        },
+        {
+          "name": "reminder",
+          "type": "String",
+          "optional": false,
+          "default": "dot",
+          "enum": [
+            "dot",
+            "push",
+            "none"
+          ],
+          "note": "per-habit value wins; bahw.reminder is only the default for new habits"
+        },
+        {
+          "name": "homeOnly",
+          "type": "Bool",
+          "optional": false,
+          "default": false
+        },
+        {
+          "name": "startDate",
+          "type": "Date",
+          "optional": false,
+          "default": "Date()"
+        },
+        {
+          "name": "order",
+          "type": "Int",
+          "optional": false,
+          "default": 0
+        },
+        {
+          "name": "archivedAt",
+          "type": "Date?",
+          "optional": true
+        }
+      ]
+    },
+    {
+      "name": "HabitPolicy",
+      "room": "habits",
+      "config": "synced",
+      "naturalKey": [
+        "habitID",
+        "effectiveFrom"
+      ],
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": "editing today never reinterprets past periods",
+      "amendedBy": "C 2 (adjusted: target/minimum Int)",
+      "relationships": [
+        {
+          "field": "habitID",
+          "to": "Habit",
+          "kind": "one"
+        }
+      ],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "habitID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Habit"
+        },
+        {
+          "name": "effectiveFrom",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "unit": "yyyy-MM-dd (MadarDayKey)"
+        },
+        {
+          "name": "frequency",
+          "type": "String",
+          "optional": false,
+          "default": "daily",
+          "enum": [
+            "daily",
+            "weekly",
+            "monthly",
+            "yearly"
+          ]
+        },
+        {
+          "name": "weekdays",
+          "type": "[String]?",
+          "optional": true,
+          "enum": [
+            "sat",
+            "sun",
+            "mon",
+            "tue",
+            "wed",
+            "thu",
+            "fri"
+          ]
+        },
+        {
+          "name": "monthDays",
+          "type": "[Int]?",
+          "optional": true,
+          "range": [
+            1,
+            30
+          ]
+        },
+        {
+          "name": "monthCalendar",
+          "type": "String?",
+          "optional": true,
+          "enum": [
+            "hijri",
+            "gregorian"
+          ]
+        },
+        {
+          "name": "yearMonth",
+          "type": "Int?",
+          "optional": true,
+          "range": [
+            1,
+            12
+          ]
+        },
+        {
+          "name": "yearDay",
+          "type": "Int?",
+          "optional": true,
+          "range": [
+            1,
+            31
+          ]
+        },
+        {
+          "name": "measure",
+          "type": "String",
+          "optional": false,
+          "default": "once",
+          "enum": [
+            "once",
+            "count",
+            "duration",
+            "health"
+          ]
+        },
+        {
+          "name": "unit",
+          "type": "String?",
+          "optional": true
+        },
+        {
+          "name": "target",
+          "type": "Int?",
+          "optional": true,
+          "unit": "in `unit`",
+          "note": "> 0 unless measure = once"
+        },
+        {
+          "name": "minimum",
+          "type": "Int?",
+          "optional": true,
+          "unit": "in `unit`",
+          "note": "0 < minimum ≤ target"
+        },
+        {
+          "name": "restWeekdays",
+          "type": "[String]?",
+          "optional": true,
+          "enum": [
+            "sat",
+            "sun",
+            "mon",
+            "tue",
+            "wed",
+            "thu",
+            "fri"
+          ]
+        },
+        {
+          "name": "windowAnchor",
+          "type": "String?",
+          "optional": true,
+          "enum": [
+            "fajr",
+            "dhuhr",
+            "asr",
+            "maghrib",
+            "isha"
+          ]
+        },
+        {
+          "name": "windowStartMin",
+          "type": "Int?",
+          "optional": true,
+          "unit": "minutes from local midnight, or offset from anchor"
+        },
+        {
+          "name": "windowEndMin",
+          "type": "Int?",
+          "optional": true,
+          "unit": "minutes",
+          "note": "start ≠ end; window ≤ 24 h"
+        }
+      ]
+    },
+    {
+      "name": "HabitPause",
+      "room": "habits",
+      "config": "synced",
+      "naturalKey": "id",
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": "unfreeze sets toDayKey, never deletes; homeOnly-during-trip pauses are derived from Trip",
+      "amendedBy": "C 3",
+      "relationships": [
+        {
+          "field": "habitID",
+          "to": "Habit",
+          "kind": "one"
+        },
+        {
+          "field": "tripID",
+          "to": "Trip",
+          "kind": "one"
+        }
+      ],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "habitID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Habit"
+        },
+        {
+          "name": "fromDayKey",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "unit": "yyyy-MM-dd"
+        },
+        {
+          "name": "toDayKey",
+          "type": "String?",
+          "optional": true
+        },
+        {
+          "name": "reason",
+          "type": "String",
+          "optional": false,
+          "default": "freeze",
+          "enum": [
+            "freeze",
+            "trip",
+            "vacation"
+          ]
+        },
+        {
+          "name": "tripID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Trip"
+        }
+      ]
+    },
+    {
+      "name": "HabitLog",
+      "room": "habits",
+      "config": "synced",
+      "naturalKey": [
+        "habitID",
+        "periodKey"
+      ],
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "row LWW, except value = max of live duplicates (a completion is never lost)",
+      "seed": null,
+      "note": "Linked habits backed by a Madar room write NO HabitLog (value derived from the owner room), except walking: one log per closed Madar day with the HealthKit total (updatable for 7 days, then fixed). After a core.weekStart change the current week keeps its key; the next week absorbs the gap (one transitional week of 7–13 days).",
+      "amendedBy": "C 4",
+      "relationships": [
+        {
+          "field": "habitID",
+          "to": "Habit",
+          "kind": "one"
+        }
+      ],
+      "eventProvenance": true,
+      "fields": [
+        {
+          "name": "habitID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Habit"
+        },
+        {
+          "name": "periodKey",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "note": "day \"yyyy-MM-dd\"; week = dayKey of the week START per core.weekStart; month \"g:yyyy-MM\" / \"h:yyyy-MM\"; year \"g:yyyy\" / \"h:yyyy\""
+        },
+        {
+          "name": "value",
+          "type": "Int",
+          "optional": false,
+          "default": 0,
+          "unit": "HabitPolicy.unit in force (once: 1)"
+        },
+        {
+          "name": "eventAt",
+          "type": "Date",
+          "optional": false,
+          "default": "Date()",
+          "note": "event instant (dayKey provenance): time of the (last) log"
+        },
+        {
+          "name": "tzID",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "unit": "IANA time-zone id",
+          "note": "zone used to compute dayKey (active place at the event instant)"
+        },
+        {
+          "name": "dayPolicy",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "note": "\"<rule>@<version>\" used to compute dayKey, e.g. \"fajr@1\", \"prayerDay@1\", \"legacy@0\""
+        }
+      ]
+    },
+    {
+      "name": "WidgetConfig",
+      "room": "habits",
+      "config": "synced",
+      "naturalKey": "id",
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "row LWW (§11 merge)",
+      "seed": null,
+      "note": null,
+      "amendedBy": "B2 7",
+      "relationships": [],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "name",
+          "type": "String",
+          "optional": false,
+          "default": ""
+        },
+        {
+          "name": "familyID",
+          "type": "String?",
+          "optional": true,
+          "enum": [
+            "small",
+            "medium",
+            "large",
+            "extraLargePortrait",
+            "accessoryCircular",
+            "accessoryRectangular",
+            "accessoryInline"
+          ]
+        },
+        {
+          "name": "items",
+          "type": "[String]",
+          "optional": false,
+          "default": []
+        },
+        {
+          "name": "styleJSON",
+          "type": "Data",
+          "optional": false,
+          "default": "Data()"
+        }
+      ]
+    },
+    {
+      "name": "DeviceSetting",
+      "room": "core",
+      "config": "deviceOnly",
+      "naturalKey": [
+        "key"
+      ],
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "n/a (device-only)",
+      "seed": null,
+      "note": "same SettingsStore facade as Setting",
+      "amendedBy": null,
+      "relationships": [],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "key",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "note": "schema key with scope = device, or internal \"sys.*\" key (writerID, historyToken, iCloudTokenHash, lastBackupAt, lastBackupResult, storeSchemaVersion)"
+        },
+        {
+          "name": "valueJSON",
+          "type": "Data",
+          "optional": false,
+          "default": "Data()"
+        }
+      ]
+    },
+    {
+      "name": "NotificationLedger",
+      "room": "system",
+      "config": "deviceOnly",
+      "naturalKey": [
+        "requestID"
+      ],
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "n/a (device-only)",
+      "seed": null,
+      "note": null,
+      "amendedBy": "B2 8",
+      "relationships": [],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "dayKey",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "unit": "yyyy-MM-dd (ASCII, Gregorian)",
+          "note": "stored once; see §11 Day keys."
+        },
+        {
+          "name": "requestID",
+          "type": "String",
+          "optional": false,
+          "default": ""
+        },
+        {
+          "name": "room",
+          "type": "String",
+          "optional": false,
+          "default": ""
+        },
+        {
+          "name": "kind",
+          "type": "String",
+          "optional": false,
+          "default": ""
+        },
+        {
+          "name": "requestClass",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "enum": [
+            "prayer",
+            "room",
+            "digest",
+            "nudge"
+          ]
+        },
+        {
+          "name": "scheduledFor",
+          "type": "Date",
+          "optional": false,
+          "default": "Date()"
+        },
+        {
+          "name": "state",
+          "type": "String",
+          "optional": false,
+          "default": "submitted",
+          "enum": [
+            "submitted",
+            "cancelled",
+            "dropped",
+            "digested",
+            "observed"
+          ]
+        },
+        {
+          "name": "reason",
+          "type": "String?",
+          "optional": true,
+          "enum": [
+            "budget",
+            "quiet",
+            "cap",
+            "off"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "CommandReceipt",
+      "room": "system",
+      "config": "deviceOnly",
+      "naturalKey": [
+        "commandID"
+      ],
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "n/a (device-only)",
+      "seed": null,
+      "note": "I02 idempotency + undo",
+      "amendedBy": null,
+      "relationships": [],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "commandID",
+          "type": "UUID?",
+          "optional": true
+        },
+        {
+          "name": "name",
+          "type": "String",
+          "optional": false,
+          "default": ""
+        },
+        {
+          "name": "payloadHash",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "unit": "SHA-256 hex of canonical payload JSON"
+        },
+        {
+          "name": "source",
+          "type": "String",
+          "optional": false,
+          "default": "app",
+          "enum": [
+            "app",
+            "widget",
+            "control",
+            "siri",
+            "shortcut",
+            "notification",
+            "spotlight",
+            "system"
+          ]
+        },
+        {
+          "name": "issuedAt",
+          "type": "Date",
+          "optional": false,
+          "default": "Date()"
+        },
+        {
+          "name": "status",
+          "type": "String",
+          "optional": false,
+          "default": "applied",
+          "enum": [
+            "applied",
+            "duplicate",
+            "rejected",
+            "needsUnlock",
+            "needsApp",
+            "undone"
+          ]
+        },
+        {
+          "name": "undoJSON",
+          "type": "Data?",
+          "optional": true,
+          "note": "inverse operation for the undo token"
+        },
+        {
+          "name": "expiresAt",
+          "type": "Date",
+          "optional": false,
+          "default": "Date()",
+          "note": "issuedAt + 7 days; purged after"
+        },
+        {
+          "name": "undoExpiresAt",
+          "type": "Date?",
+          "optional": true,
+          "note": "Preset appliedAt + 60 seconds; separate from expiresAt (7-day command retention)."
+        }
+      ]
+    },
+    {
+      "name": "PageSchedule",
+      "room": "quran",
+      "config": "deviceOnly",
+      "naturalKey": [
+        "page"
+      ],
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "n/a (device-only)",
+      "seed": null,
+      "note": "CACHE ONLY: every field rebuilt from non-deleted HifzSession + PageGrade + current HifzPlan.rhythm (§7.4); a scheduleVersion change rebuilds all",
+      "amendedBy": "C 14",
+      "relationships": [],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "page",
+          "type": "Int",
+          "optional": false,
+          "default": 1,
+          "range": [
+            1,
+            604
+          ]
+        },
+        {
+          "name": "memorizedAt",
+          "type": "Date?",
+          "optional": true
+        },
+        {
+          "name": "stage",
+          "type": "Int",
+          "optional": false,
+          "default": 0,
+          "range": [
+            0,
+            12
+          ]
+        },
+        {
+          "name": "ease",
+          "type": "Double",
+          "optional": false,
+          "default": 1.0,
+          "unit": "factor",
+          "range": [
+            0.6,
+            1.4
+          ]
+        },
+        {
+          "name": "nextDue",
+          "type": "String?",
+          "optional": true,
+          "unit": "yyyy-MM-dd (a Madar day, not an instant)"
+        },
+        {
+          "name": "lastReviewedAt",
+          "type": "Date?",
+          "optional": true
+        },
+        {
+          "name": "lastGrade",
+          "type": "String?",
+          "optional": true,
+          "enum": [
+            "mastered",
+            "good",
+            "needs"
+          ]
+        },
+        {
+          "name": "scheduleVersion",
+          "type": "Int",
+          "optional": false,
+          "default": 0
+        }
+      ]
+    },
+    {
+      "name": "SessionDraft",
+      "room": "quran",
+      "config": "deviceOnly",
+      "naturalKey": "id",
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "n/a (device-only)",
+      "seed": null,
+      "note": "id = draftID = HifzSession.commitID",
+      "amendedBy": "C 17",
+      "relationships": [],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "kind",
+          "type": "String",
+          "optional": false,
+          "default": "hifz",
+          "enum": [
+            "hifz",
+            "review",
+            "free",
+            "qiyam",
+            "drill"
+          ]
+        },
+        {
+          "name": "dayKey",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "unit": "yyyy-MM-dd (ASCII, Gregorian)",
+          "note": "stored once; see §11 Day keys."
+        },
+        {
+          "name": "startedAt",
+          "type": "Date",
+          "optional": false,
+          "default": "Date()"
+        },
+        {
+          "name": "portionJSON",
+          "type": "Data",
+          "optional": false,
+          "default": "Data()"
+        },
+        {
+          "name": "cursorJSON",
+          "type": "Data",
+          "optional": false,
+          "default": "Data()"
+        },
+        {
+          "name": "provisionalJSON",
+          "type": "Data",
+          "optional": false,
+          "default": "Data()"
+        }
+      ]
+    },
+    {
+      "name": "ProcessingJob",
+      "room": "mihbara",
+      "config": "deviceOnly",
+      "naturalKey": "id",
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "n/a (device-only)",
+      "seed": null,
+      "note": "resumable OCR",
+      "amendedBy": "D A29",
+      "relationships": [
+        {
+          "field": "bookID",
+          "to": "Book",
+          "kind": "one"
+        }
+      ],
+      "eventProvenance": false,
+      "fields": [
+        {
+          "name": "bookID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Book"
+        },
+        {
+          "name": "kind",
+          "type": "String",
+          "optional": false,
+          "default": "ocr",
+          "enum": [
+            "ocr",
+            "convert"
+          ]
+        },
+        {
+          "name": "state",
+          "type": "String",
+          "optional": false,
+          "default": "queued",
+          "enum": [
+            "queued",
+            "running",
+            "paused",
+            "done",
+            "failed",
+            "cancelled"
+          ]
+        },
+        {
+          "name": "totalPages",
+          "type": "Int",
+          "optional": false,
+          "default": 0
+        },
+        {
+          "name": "donePages",
+          "type": "Int",
+          "optional": false,
+          "default": 0
+        },
+        {
+          "name": "checkpoint",
+          "type": "Int",
+          "optional": false,
+          "default": 0
+        },
+        {
+          "name": "engine",
+          "type": "String",
+          "optional": false,
+          "default": ""
+        },
+        {
+          "name": "error",
+          "type": "String?",
+          "optional": true
+        }
+      ]
+    }
+  ],
+  "snapshotEnvelope": {
+    "fields": {
+      "name": "String",
+      "schemaVersion": "Int",
+      "generatedAt": "Date (ISO 8601)",
+      "validUntil": "Date — after it, the widget shows its placeholder for time-sensitive parts",
+      "dayKey": "String",
+      "tzID": "String",
+      "privacy": "{moneyHidden: Bool, notesLocked: Bool} — hidden values are OMITTED from the file, not masked",
+      "payload": "object (per snapshot)"
+    },
+    "file": "AppGroup/Snapshots/<name>.json, written with Data.write(options: .atomic) (temp file + rename)",
+    "readRule": "decode fully or not at all; unknown schemaVersion or decode failure → placeholder «افتح مدار», never a crash and never partial data"
+  },
+  "snapshots": {
+    "PrayerTodaySnapshot": {
+      "owner": "prayer",
+      "schemaVersion": 1,
+      "payload": {
+        "place": "{city: String, tzID: String, isTravel: Bool, locationAccuracy: precise|approximate|manual|stale, locatedAt: Date?}",
+        "days": "[7] {dayKey, times: {fajr, sunrise, dhuhr, asr, maghrib, isha: Date}? — nil when the sun does not rise/set (PrayerTimesEngine returns nil)}",
+        "prayers": "[5] today {prayer, adhanAt: Date?, endsAt: Date?, status: jamaah|alone|qada|missed|pending|future|unrecordedHistory, shortened: Bool, pairID: UUID?}",
+        "next": "{prayer, adhanAt: Date}?",
+        "isFriday": "Bool",
+        "sanctityUntil": "Date?",
+        "monthInTimeBp": "Int? (P03 ratio, basis points)",
+        "prayerStreak": "Int",
+        "mosqueStreak": "Int",
+        "last25": "[String] statuses, newest first",
+        "qiyamTonight": "{rakaat: Int, witr: Bool}?"
+      },
+      "note": "widgets never request location; they read this snapshot (C 22)"
+    },
+    "QuranHomeSnapshot": {
+      "owner": "quran",
+      "schemaVersion": 1,
+      "payload": {
+        "memorizedPages": "Int 0…604 (complete pages of coverage)",
+        "juzProgressBp": "[30] Int",
+        "isRestDay": "Bool",
+        "today": "{bridge: {fromAyah, toAyah}?, wird: {fromAyah, toAyah, done: Bool}?, reviewPagesDue: Int, reviewPagesDone: Int, drillsDue: Int}",
+        "streak": "Int",
+        "last7": "[7] {dayKey, hifzDone: Bool, reviewPages: Int}",
+        "forecastKhatmHijri": "String? (h:yyyy-MM-dd)"
+      }
+    },
+    "MoneyNowSnapshot": {
+      "owner": "money",
+      "schemaVersion": 1,
+      "payload": {
+        "currency": "String ISO 4217",
+        "availableNowMinor": "Int? (nil when privacy.moneyHidden)",
+        "netBasisMinor": "Int?",
+        "reservedMinor": "Int?",
+        "dailyAllowanceMinor": "Int?",
+        "cycle": "{start: Date, end: Date?, dayIndex: Int, length: Int}",
+        "curveMinor": "[Int]? cumulative per cycle day",
+        "envelopes": "[{id, name, role, balanceMinor?, targetMinor?}] (≤ 6)",
+        "limits": "[{categoryID, name, spentMinor?, limitMinor?}] (≤ 4)",
+        "reserveDays": "Int?"
+      }
+    },
+    "HabitsTodaySnapshot": {
+      "owner": "habits",
+      "schemaVersion": 1,
+      "payload": {
+        "done": "Int",
+        "due": "Int",
+        "next": "{habitID, name, icon}?",
+        "items": "[{habitID, name, icon, color, done: Bool, value: Int, target: Int?, unit: String?, missWarning: Bool}] (≤ 6)",
+        "counts": "{week: Int, month: Int, year: Int}"
+      }
+    },
+    "DiaryTodaySnapshot": {
+      "owner": "diary",
+      "schemaVersion": 1,
+      "payload": {
+        "lineCount": "Int",
+        "lastLine": "String? ≤ 80 chars (nil when privacy.notesLocked)",
+        "niyya": "String? (nil when locked)",
+        "photoThumbPath": "String? App Group relative, ≤ 1 MB (nil when locked)",
+        "memory": "{dayKey, yearsAgo: Int, thumbPath: String?}? (nil when locked)"
+      }
+    },
+    "MihbaraSnapshot": {
+      "owner": "mihbara",
+      "schemaVersion": 1,
+      "payload": {
+        "currentBook": "{id, title, author, currentPage: Int?, pages: Int?, pagesToChapterEnd: Int?}?",
+        "hadithToday": "{collectionID, number, title}?",
+        "shelfCount": "Int",
+        "lastNotebookLine": "String? ≤ 80 chars (never from isPrivate or fromDiary notes)"
+      }
+    },
+    "YearSnapshot": {
+      "owner": "core",
+      "schemaVersion": 1,
+      "payload": {
+        "hijriProgressBp": "Int",
+        "gregorianProgressBp": "Int",
+        "ramadanInDays": "Int?",
+        "landmarks": "[{name, hijriKey: String, gregorianKey: String, daysLeft: Int}] (≤ 5)"
+      }
+    },
+    "UpcomingSnapshot": {
+      "owner": "core",
+      "schemaVersion": 1,
+      "payload": {
+        "items": "[{id: UUID?, title, dateKey: String, daysLeft: Int, source: manual|salary|juz|season|trip}] (≤ 7)"
+      }
+    }
+  },
+  "command": {
+    "envelope": {
+      "commandID": "UUID — idempotency key",
+      "name": "String, e.g. \"prayer.log\"",
+      "payload": "JSON object, strict Codable per command (unknown keys rejected)",
+      "source": "app|widget|control|siri|shortcut|notification|spotlight|system",
+      "issuedAt": "Date (ISO 8601)",
+      "schemaVersion": "Int (1)"
+    },
+    "result": {
+      "status": "applied|duplicate|rejected|needsUnlock|needsApp",
+      "reason": "String? (rejected)",
+      "undoToken": "UUID? (= commandID of the receipt)",
+      "affected": "[{room, dayKey}] — drives snapshot regeneration"
+    },
+    "commandIDRule": {
+      "notification": "UUIDv5(seedNS, requestID + \".\" + actionIdentifier) — repeated delivery = same command",
+      "widget/control/siri/shortcut/spotlight/app": "fresh UUID per perform() unless the payload carries one",
+      "system": "UUIDv5(seedNS, name + \".\" + canonical payload) — e.g. AgePendingPrayers(asOf)",
+      "url": "URLs never issue commands: they navigate (read) or prefill a sheet; the user confirms and the app issues the command (source app)"
+    },
+    "dedupe": [
+      "same commandID → return the stored receipt, no write",
+      "upsert commands are idempotent on the natural key (equal values → no write, updatedAt untouched)",
+      "append commands: same name + payloadHash from any source within 10 s → duplicate"
+    ],
+    "auth": {
+      "blindWrite": "writes without revealing room content; allowed in background; result text is generic (\"سُجّلت\")",
+      "read": "reveals content; if the room is locked (core.faceIDLock) → needsApp: open the app behind the lock gate",
+      "deviceUnlock": "diary and money commands use IntentAuthenticationPolicy.requiresAuthentication / UNNotificationActionOptions.authenticationRequired"
+    },
+    "lockedStore": "if an intent cannot open the store (device locked / data protection), it appends the Command envelope to AppGroup/PendingInbox.jsonl and returns; the app drains it through the CommandBus on next foreground (same commandID → idempotent). Before first unlock after reboot even this may fail — recovery is bulk paste. Verified on device in M5.",
+    "registryV1": {
+      "prayer.log": {
+        "intent": "LogPrayerIntent",
+        "payload": "{dayKey, prayer, status, heart?, shortened?}",
+        "kind": "upsert (dayKey, prayer)",
+        "auth": "blindWrite",
+        "after": "cancel pending salah.<dayKey>.<prayer>"
+      },
+      "prayer.logPair": {
+        "intent": "LogPrayerPair",
+        "payload": "{dayKey, pair: dhuhrAsr|maghribIsha, status, shortened, mode}",
+        "kind": "upsert both (dayKey, prayer) + shared pairID",
+        "auth": "blindWrite"
+      },
+      "prayer.setHeart": {
+        "payload": "{dayKey, prayer, heart|null}",
+        "kind": "upsert",
+        "auth": "blindWrite"
+      },
+      "prayer.makeUp": {
+        "intent": "MakeUpPrayer",
+        "payload": "{prayer, dayKey, at}",
+        "kind": "upsert QadaItem (prayer, dayKey).madeUpAt + PrayerLog.status = qada, one transaction",
+        "auth": "blindWrite"
+      },
+      "prayer.agePending": {
+        "intent": "AgePendingPrayers",
+        "payload": "{asOf: dayKey}",
+        "kind": "system; idempotent via PrayerLog/QadaItem natural keys",
+        "auth": "system"
+      },
+      "qiyam.completeWird": {
+        "intent": "CompleteQiyamWird",
+        "payload": "{nightKey, rakaat, pages, grades}",
+        "kind": "upsert QiyamNight (nightKey) + HifzSession(kind = qiyam) via commitID = commandID",
+        "auth": "blindWrite"
+      },
+      "quran.commitSession": {
+        "intent": "CommitQuranSession",
+        "payload": "{draftID}",
+        "kind": "upsert HifzSession (commitID = draftID)",
+        "auth": "app"
+      },
+      "quran.resolveMissedDay": {
+        "intent": "ResolveMissedDay",
+        "payload": "{dayKey, choice: spread|double|skip|postpone}",
+        "kind": "upsert QuranAllotment rows (natural key)",
+        "auth": "app"
+      },
+      "quran.raisePages": {
+        "intent": "RaisePages",
+        "payload": "{dayKey, pages: [Int]}",
+        "kind": "upsert QuranAllotment(kind = reviewExtra, origin = raise)",
+        "auth": "app"
+      },
+      "habit.complete": {
+        "intent": "CompleteHabitIntent",
+        "payload": "{habitID, periodKey?, delta: Int = 1}",
+        "kind": "upsert (habitID, periodKey); delta adds for measure = count",
+        "auth": "blindWrite"
+      },
+      "diary.appendLine": {
+        "intent": "AddDiaryLineIntent",
+        "payload": "{text ≤ 2000, day: today|yesterday}",
+        "kind": "append",
+        "auth": "blindWrite + deviceUnlock"
+      },
+      "money.logExpense": {
+        "intent": "LogExpenseIntent",
+        "payload": "{amountMinor > 0, currency, merchant?, method?, categoryID?}",
+        "kind": "append",
+        "auth": "blindWrite + deviceUnlock"
+      },
+      "money.ingestBankMessage": {
+        "intent": "IngestBankMessageIntent",
+        "payload": "{sender, text, receivedAt}",
+        "kind": "upsert (fingerprint, occurrence)",
+        "auth": "blindWrite + deviceUnlock; PendingInbox when the store is locked"
+      },
+      "capture.text": {
+        "intent": "CaptureIntent",
+        "payload": "{text}",
+        "kind": "parses, then issues ONE of the commands above with the same commandID",
+        "auth": "per resolved command"
+      },
+      "travel.toggle": {
+        "intent": "ToggleTravelIntent",
+        "payload": "{on: Bool}",
+        "kind": "upsert the single open Trip",
+        "auth": "blindWrite"
+      },
+      "quran.startSession": {
+        "intent": "StartQuranSessionIntent",
+        "payload": "{step: bridge|wird|review|drill}",
+        "kind": "navigation",
+        "auth": "read → needsApp"
+      },
+      "open.route": {
+        "intent": "OpenRoomIntent",
+        "payload": "{route}",
+        "kind": "navigation through RouteRegistry (p3)",
+        "auth": "read"
+      },
+      "system.undo": {
+        "payload": "{undoToken}",
+        "kind": "applies CommandReceipt.undoJSON within 10 min",
+        "auth": "same as the original command"
+      }
+    },
+    "undoPolicy": {
+      "presetSeconds": 60,
+      "receiptRetentionDays": 7,
+      "execution": "Immediately on press, within undo window"
+    }
+  }
+}

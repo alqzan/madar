@@ -1,0 +1,102 @@
+{
+  "fixtures" : [
+    {
+      "actual" : [
+        "04:30",
+        "11:41",
+        "15:03",
+        "17:34",
+        "19:04"
+      ],
+      "city" : "Riyadh",
+      "date" : "2026-10-07",
+      "deltaMinutes" : [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "expected" : [
+        "04:30",
+        "11:41",
+        "15:03",
+        "17:34",
+        "19:04"
+      ],
+      "lat" : 24.7136,
+      "lon" : 46.6753,
+      "madhab" : "shafi",
+      "method" : "ummAlQura",
+      "timezone" : "Asia\/Riyadh"
+    },
+    {
+      "actual" : [
+        "04:31",
+        "11:41",
+        "15:02",
+        "17:32",
+        "19:02"
+      ],
+      "city" : "Riyadh",
+      "date" : "2026-10-09",
+      "deltaMinutes" : [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "expected" : [
+        "04:31",
+        "11:41",
+        "15:02",
+        "17:32",
+        "19:02"
+      ],
+      "lat" : 24.7136,
+      "lon" : 46.6753,
+      "madhab" : "shafi",
+      "method" : "ummAlQura",
+      "timezone" : "Asia\/Riyadh"
+    },
+    {
+      "actual" : [
+        "05:00",
+        "12:11",
+        "15:33",
+        "18:06",
+        "19:36"
+      ],
+      "city" : "Jeddah (audit assumption)",
+      "date" : "2026-10-07",
+      "deltaMinutes" : [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "expected" : [
+        "05:00",
+        "12:11",
+        "15:33",
+        "18:06",
+        "19:36"
+      ],
+      "lat" : 21.485800000000001,
+      "lon" : 39.192500000000003,
+      "madhab" : "shafi",
+      "method" : "ummAlQura",
+      "timezone" : "Asia\/Riyadh"
+    }
+  ],
+  "hijri2026_10_09" : {
+    "day" : 28,
+    "month" : 4,
+    "year" : 1448
+  },
+  "library" : "adhan-swift 1.5.0",
+  "libraryCommit" : "a6fa2deee80c5abb0b9ad04466f8ab12b53144e7",
+  "note" : "Probe of specification examples, not an independent religious timetable certification. Jeddah coordinates are assumed because handoff omits them."
+}

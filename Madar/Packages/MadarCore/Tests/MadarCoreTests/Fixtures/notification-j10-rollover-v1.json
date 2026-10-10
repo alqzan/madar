@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "source": "J10 daily budget B=4 applies to final absolute delivery time; expectations hand-authored for midnight day boundary",
+  "start": "2026-10-09",
+  "boundary": "midnight",
+  "isha": "23:30",
+  "digest": "00:30",
+  "dayOneCandidates": ["day1.0", "day1.1", "day1.2", "day1.3", "day1.4", "day1.5"],
+  "dayTwoCandidates": ["day2.0", "day2.1", "day2.2", "day2.3"],
+  "expectedScheduled": ["day1.0", "day1.1", "day1.2", "day2.0", "day2.1", "day2.2", "day2.3"],
+  "expectedDropped": ["digest.2026-10-09", "day1.3", "day1.4", "day1.5"]
+}

@@ -1,0 +1,59 @@
+Building for debugging...
+[2 / 6] MadarData
+[3 / 7] MadarData
+[7 / 12] MadarData
+[10 / 14] MadarDataTests-product
+[12 / 16] MadarDataTests-product
+[18 / 20] MadarDataTests-product
+Build complete! (4.00 sec)
+Test Suite 'All tests' started at 1448-04-29 09:01:45.537.
+Test Suite 'All tests' passed at 1448-04-29 09:01:45.537.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite DataTests started.
+◇ Test schemaAndDefaultContainer() started.
+✔ Test schemaAndDefaultContainer() passed after 0.061 seconds.
+◇ Test diskPersistenceAndNewerVersionGuard() started.
+✔ Test diskPersistenceAndNewerVersionGuard() passed after 0.053 seconds.
+◇ Test stickyDeletionAndExplicitRestore() started.
+✔ Test stickyDeletionAndExplicitRestore() passed after 0.035 seconds.
+◇ Test deterministicWinnerAndAliasForeignKey() started.
+✔ Test deterministicWinnerAndAliasForeignKey() passed after 0.030 seconds.
+◇ Test ownershipCascadeKeepsSharedMedia() started.
+✔ Test ownershipCascadeKeepsSharedMedia() passed after 0.026 seconds.
+◇ Test fieldExceptionsAndMoneyIdentity() started.
+✔ Test fieldExceptionsAndMoneyIdentity() passed after 0.027 seconds.
+◇ Test dayOneBranchStableAndKeepBoth() started.
+✔ Test dayOneBranchStableAndKeepBoth() passed after 0.028 seconds.
+◇ Test settingsDefaultsPersistenceAndInvalidRejection() started.
+✔ Test settingsDefaultsPersistenceAndInvalidRejection() passed after 0.026 seconds.
+◇ Test presetImmediateUndoAndExactDeadlineAndReceiptLifetime() started.
+✔ Test presetImmediateUndoAndExactDeadlineAndReceiptLifetime() passed after 0.026 seconds.
+◇ Test presetInvalidIsAtomicAndDeviceSettingSeparate() started.
+✔ Test presetInvalidIsAtomicAndDeviceSettingSeparate() passed after 0.026 seconds.
+◇ Test batchDependentSettingsAndUndoAreAtomic() started.
+✔ Test batchDependentSettingsAndUndoAreAtomic() passed after 0.026 seconds.
+◇ Test backupAllModelsMediaAndRepeatedMerge() started.
+✔ Test backupAllModelsMediaAndRepeatedMerge() passed after 0.246 seconds.
+◇ Test backupCorruptionRejectedWithoutDestinationWrites() started.
+✔ Test backupCorruptionRejectedWithoutDestinationWrites() passed after 0.341 seconds.
+◇ Test identicalUUIDSeedsReconcileWithoutSelfAliasWinner() started.
+✔ Test identicalUUIDSeedsReconcileWithoutSelfAliasWinner() passed after 0.028 seconds.
+◇ Test sameUUIDLaterStaleEditKeepsDeletion() started.
+✔ Test sameUUIDLaterStaleEditKeepsDeletion() passed after 0.028 seconds.
+◇ Test importLinkTargetMergePreservesDeletionAndRemapsChildren() started.
+✔ Test importLinkTargetMergePreservesDeletionAndRemapsChildren() passed after 0.029 seconds.
+◇ Test singletonBarrierNormalizesAndRestoreCannotBeOrdinaryWrite() started.
+✔ Test singletonBarrierNormalizesAndRestoreCannotBeOrdinaryWrite() passed after 0.028 seconds.
+◇ Test computedNaturalKeysDoNotCollapseDifferentDatesOrWords() started.
+✔ Test computedNaturalKeysDoNotCollapseDifferentDatesOrWords() passed after 0.026 seconds.
+◇ Test rejectedBackupLeavesDiskStoreByteIdentical() started.
+✔ Test rejectedBackupLeavesDiskStoreByteIdentical() passed after 0.280 seconds.
+◇ Test multichunkReorderAndMissingMediaExportAreRejected() started.
+✔ Test multichunkReorderAndMissingMediaExportAreRejected() passed after 0.309 seconds.
+◇ Test monotonicClockAndSeedIdentity() started.
+✔ Test monotonicClockAndSeedIdentity() passed after 0.001 seconds.
+✔ Suite DataTests passed after 1.690 seconds.
+✔ Test run with 21 tests in 1 suite passed after 1.690 seconds.

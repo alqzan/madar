@@ -1,0 +1,9 @@
+.build/
+.swiftpm/
+DerivedData/
+Artifacts/
+*.xcuserstate
+xcuserdata/
+.DS_Store
+App/Resources/Fonts/*.otf
+App/Resources/Fonts/*.ttf

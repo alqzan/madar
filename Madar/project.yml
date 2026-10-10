@@ -1,0 +1,125 @@
+name: Madar
+options:
+  bundleIdPrefix: com.alqzan.madar2
+  deploymentTarget:
+    iOS: '26.0'
+  developmentLanguage: ar
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: '6.2'
+    TARGETED_DEVICE_FAMILY: '1,2'
+    DEVELOPMENT_TEAM: ''
+    CODE_SIGN_STYLE: Automatic
+    MARKETING_VERSION: '0.1.0'
+    CURRENT_PROJECT_VERSION: '1'
+    GENERATE_INFOPLIST_FILE: true
+packages:
+  MadarCore:
+    path: Packages/MadarCore
+  MadarData:
+    path: Packages/MadarData
+  MadarDesign:
+    path: Packages/MadarDesign
+  MadarSnapshots:
+    path: Packages/MadarSnapshots
+  MadarCommands:
+    path: Packages/MadarCommands
+  MadarSync:
+    path: Packages/MadarSync
+targets:
+  Madar:
+    type: application
+    platform: iOS
+    sources:
+      - path: App
+        excludes:
+          - QuranRoom.swift
+      - Intents
+    dependencies:
+      - package: MadarCore
+      - package: MadarData
+      - package: MadarDesign
+      - package: MadarSnapshots
+      - package: MadarCommands
+      - package: MadarSync
+      - target: MadarWidgets
+        embed: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.alqzan.madar2
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        INFOPLIST_KEY_CFBundleDisplayName: مدار
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.lifestyle
+        GENERATE_INFOPLIST_FILE: true
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: true
+        INFOPLIST_KEY_UILaunchScreen_Generation: true
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDevelopmentRegion: ar
+        CFBundleURLTypes:
+          - CFBundleURLName: com.alqzan.madar2
+            CFBundleURLSchemes: [madar]
+        ITSAppUsesNonExemptEncryption: false
+        NSFaceIDUsageDescription: افتح بيانات مدار المحمية بمصادقة الجهاز.
+        UIAppFonts:
+          - thmanyahsans-Light.otf
+          - thmanyahsans-Regular.otf
+          - thmanyahsans-Medium.otf
+          - thmanyahsans-Bold.otf
+          - thmanyahserifdisplay-Bold.otf
+          - thmanyahserifdisplay-Black.otf
+          - thmanyahseriftext-Regular.otf
+          - thmanyahseriftext-Bold.otf
+          - Amiri-Regular.ttf
+          - Amiri-Bold.ttf
+    entitlements:
+      path: App/Madar.entitlements
+      properties:
+        com.apple.security.application-groups: [group.com.alqzan.madar2]
+  MadarWidgets:
+    type: app-extension
+    platform: iOS
+    sources: [Widgets]
+    dependencies:
+      - package: MadarSnapshots
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.alqzan.madar2.widgets
+        GENERATE_INFOPLIST_FILE: true
+        APPLICATION_EXTENSION_API_ONLY: true
+        SKIP_INSTALL: true
+    info:
+      path: Widgets/Info.plist
+      properties:
+        CFBundleDisplayName: مدار
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    entitlements:
+      path: Widgets/MadarWidgets.entitlements
+      properties:
+        com.apple.security.application-groups: [group.com.alqzan.madar2]
+  MadarTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [Tests/Integration]
+    dependencies:
+      - target: Madar
+      - package: MadarData
+      - package: MadarCore
+      - package: MadarSnapshots
+      - package: MadarCommands
+  MadarUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [Tests/UI]
+    dependencies:
+      - target: Madar
+schemes:
+  Madar:
+    build:
+      targets:
+        Madar: all
+    test:
+      targets: [MadarTests, MadarUITests]

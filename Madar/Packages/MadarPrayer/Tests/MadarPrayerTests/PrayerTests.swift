@@ -1,0 +1,147 @@
+import Foundation
+import SwiftData
+import Testing
+import MadarCore
+import MadarData
+@testable import MadarPrayer
+
+@Suite(.serialized) @MainActor struct PrayerTests {
+    private func time(_ text: String) -> Date { ISO8601DateFormatter().date(from: text)! }
+    private func ref(_ day: String = "2026-10-07", _ prayer: Prayer = .fajr) throws -> PrayerReference { try .init(day: GregorianDay(day), prayer: prayer) }
+    private func container(start: String = "2026-10-07T09:00:00+03:00") throws -> ModelContainer {
+        let container = try MadarContainerFactory.makeInMemory()
+        _ = try PrayerMutationHandler.stage(operation: .initializeTracking, in: container.mainContext, now: time(start), writer: "test-device")
+        try container.mainContext.save(); return container
+    }
+    @discardableResult private func apply(_ command: PrayerMutation, _ context: ModelContext, at: String = "2026-10-07T12:00:00+03:00") throws -> Data? {
+        let inverse = try PrayerMutationHandler.stage(operation: command, in: context, now: time(at), writer: "test-device"); try context.save(); return inverse
+    }
+    @Test func makeUpUsesOneNaturalPairOfRowsAndUndoRestoresBoth() throws {
+        let container = try container(); let context = container.mainContext; let reference = try ref()
+        try apply(.record(reference, status: .missed, heart: nil, shortened: nil), context)
+        let inverse = try #require(apply(.makeUp(reference), context, at: "2026-10-07T12:01:00+03:00"))
+        #expect(try context.fetch(FetchDescriptor<PrayerLog>()).filter { $0.deletedAt == nil }.map(\.status) == ["qada"])
+        #expect(try context.fetch(FetchDescriptor<QadaItem>()).filter { $0.deletedAt == nil }.first?.madeUpAt == time("2026-10-07T12:01:00+03:00"))
+        #expect(try apply(.makeUp(reference), context, at: "2026-10-07T12:02:00+03:00") == nil)
+        try PrayerMutationHandler.undo(inverse, in: context, now: time("2026-10-07T12:03:00+03:00"), writer: "test-device"); try context.save()
+        #expect(try context.fetch(FetchDescriptor<PrayerLog>()).first?.status == "missed")
+        #expect(try context.fetch(FetchDescriptor<QadaItem>()).first?.madeUpAt == nil)
+        #expect(try context.fetch(FetchDescriptor<PrayerLog>()).count == 1 && context.fetch(FetchDescriptor<QadaItem>()).count == 1)
+    }
+    @Test func qadaFromArcIsAtomicAndCorrectionTombstonesDebt() throws {
+        let container = try container(); let context = container.mainContext; let reference = try ref()
+        try apply(.record(reference, status: .qada, heart: .present, shortened: nil), context)
+        #expect(try context.fetch(FetchDescriptor<PrayerLog>()).first?.heart == "present")
+        #expect(try context.fetch(FetchDescriptor<QadaItem>()).first?.madeUpAt != nil)
+        try apply(.record(reference, status: .jamaah, heart: nil, shortened: false), context, at: "2026-10-07T12:04:00+03:00")
+        let qada = try #require(context.fetch(FetchDescriptor<QadaItem>()).first)
+        #expect(qada.deletedAt != nil && qada.deletionBarrierAt != nil)
+        #expect(try PrayerRepository(context: context).snapshot(now: time("2026-10-07T12:05:00+03:00")).statistics.owed == 0)
+    }
+    @Test func inverseRejectsStaleChangeWithoutOverwritingLaterHeart() throws {
+        let container = try container(); let context = container.mainContext; let reference = try ref()
+        let inverse = try #require(apply(.record(reference, status: .jamaah, heart: nil, shortened: nil), context))
+        try apply(.answerHeart(reference, .khashi), context, at: "2026-10-07T12:01:00+03:00")
+        #expect(throws: PrayerDomainError.staleUndo) { try PrayerMutationHandler.undo(inverse, in: context, now: time("2026-10-07T12:02:00+03:00"), writer: "test-device") }
+        #expect(try context.fetch(FetchDescriptor<PrayerLog>()).first?.heart == "khashi")
+    }
+    @Test func futureQadaAndInvalidShorteningAreRejected() throws {
+        let container = try container(); let context = container.mainContext
+        #expect(throws: PrayerDomainError.futurePrayer) { try apply(.makeUp(ref("2026-10-07", .isha)), context) }
+        context.rollback()
+        #expect(throws: PrayerDomainError.beforeTrackingStart) { try apply(.makeUp(ref("2026-10-06")), context) }
+        context.rollback()
+        #expect(throws: PrayerDomainError.invalidShortening) { try apply(.record(ref(), status: .jamaah, heart: nil, shortened: true), context) }
+        context.rollback()
+        #expect(try context.fetch(FetchDescriptor<PrayerLog>()).isEmpty && context.fetch(FetchDescriptor<QadaItem>()).isEmpty)
+    }
+    @Test func pendingAgesAtPrayerDayFajrAndReplaysWithoutExtraRows() throws {
+        let container = try container(); let context = container.mainContext
+        let deadline = try #require(PrayerTimesEngine.calculate(day: GregorianDay("2026-10-14"), place: .riyadh)?.fajr)
+        #expect(try PrayerMutationHandler.stage(operation: .agePending, in: context, now: deadline.addingTimeInterval(-1), writer: "test-device", source: .system) == nil)
+        let inverse = try PrayerMutationHandler.stage(operation: .agePending, in: context, now: deadline, writer: "test-device", source: .system); try context.save()
+        #expect(inverse != nil)
+        let rows = try context.fetch(FetchDescriptor<PrayerLog>())
+        #expect(rows.count == 5 && rows.allSatisfy { $0.dayKey == "2026-10-07" && $0.status == "missed" && $0.source == "aging" })
+        #expect(try context.fetch(FetchDescriptor<QadaItem>()).count == 5)
+        #expect(try PrayerMutationHandler.stage(operation: .agePending, in: context, now: deadline, writer: "second-device", source: .system) == nil)
+    }
+    @Test func movedTrackingHasEditDayGraceAndSecondEditFails() throws {
+        let container = try container(start: "2026-10-09T12:00:00+03:00"); let context = container.mainContext
+        try apply(.editTrackingStart(GregorianDay("2026-10-07")), context, at: "2026-10-10T12:00:00+03:00")
+        #expect(throws: PrayerDomainError.trackingAlreadyEdited) { try apply(.editTrackingStart(GregorianDay("2026-10-06")), context, at: "2026-10-10T12:01:00+03:00") }
+        context.rollback()
+        let oldDeadline = try #require(PrayerTimesEngine.calculate(day: GregorianDay("2026-10-14"), place: .riyadh)?.fajr)
+        _ = try PrayerMutationHandler.stage(operation: .agePending, in: context, now: oldDeadline, writer: "test-device")
+        #expect(try context.fetch(FetchDescriptor<PrayerLog>()).isEmpty)
+        let deadline = try #require(PrayerTimesEngine.calculate(day: GregorianDay("2026-10-17"), place: .riyadh)?.fajr)
+        _ = try PrayerMutationHandler.stage(operation: .agePending, in: context, now: deadline, writer: "test-device"); try context.save()
+        #expect(try context.fetch(FetchDescriptor<PrayerLog>()).contains { $0.dayKey == "2026-10-07" })
+    }
+    @Test func explicitUnrecordedPeriodCreatesNoDebtOrPercentageAndCanUndo() throws {
+        let container = try container(); let context = container.mainContext
+        let references = try [ref(), ref("2026-10-07", .dhuhr)]
+        let inverse = try #require(apply(.markUnrecorded(references), context))
+        let state = try PrayerRepository(context: context).snapshot(now: time("2026-10-07T12:05:00+03:00"))
+        #expect(state.statistics.denominator == 0 && state.statistics.percentage == nil && state.qada.isEmpty)
+        try PrayerMutationHandler.undo(inverse, in: context, now: time("2026-10-07T12:06:00+03:00"), writer: "test-device"); try context.save()
+        #expect(try PrayerRepository(context: context).snapshot(now: time("2026-10-07T12:07:00+03:00")).pending.count == 2)
+    }
+    @Test func qiyamMidnightBelongsToOneNightAndNeverWritesQuranPages() throws {
+        let container = try container(); let context = container.mainContext
+        let repository = try PrayerRepository(context: context)
+        #expect(repository.defaultNight(at: time("2026-10-07T23:30:00+03:00")).description == "2026-10-07")
+        #expect(repository.defaultNight(at: time("2026-10-08T02:10:00+03:00")).description == "2026-10-07")
+        #expect(repository.defaultNight(at: time("2026-10-08T08:00:00+03:00")).description == "2026-10-07")
+        try apply(.logQiyam(night: GregorianDay("2026-10-07"), rakaat: 8, witr: true), context, at: "2026-10-07T23:30:00+03:00")
+        #expect(try apply(.logQiyam(night: GregorianDay("2026-10-07"), rakaat: 8, witr: true), context, at: "2026-10-08T02:10:00+03:00") == nil)
+        #expect(try context.fetch(FetchDescriptor<QiyamNight>()).count == 1 && context.fetch(FetchDescriptor<HifzSession>()).isEmpty)
+        #expect(throws: PrayerDomainError.invalidNight) { try apply(.logQiyam(night: GregorianDay("2026-10-08"), rakaat: 2, witr: false), context, at: "2026-10-08T12:00:00+03:00") }
+    }
+    @Test func taqdimPairHasExactlyTwoRowsAndUndoRemovesBoth() throws {
+        let container = try container(); let context = container.mainContext
+        try apply(.startTrip(city: "الرياض", country: "SA", place: .riyadh, homeKm: 350), context, at: "2026-10-07T10:00:00+03:00")
+        let inverse = try #require(apply(.logPair(day: GregorianDay("2026-10-07"), pair: .dhuhrAsr, status: .jamaah, shortened: true, mode: .taqdim), context))
+        let logs = try context.fetch(FetchDescriptor<PrayerLog>())
+        #expect(logs.count == 2 && Set(logs.compactMap(\.pairID)).count == 1 && logs.allSatisfy { $0.shortened == true && $0.tripID != nil })
+        try PrayerMutationHandler.undo(inverse, in: context, now: time("2026-10-07T12:01:00+03:00"), writer: "test-device"); try context.save()
+        #expect(try context.fetch(FetchDescriptor<PrayerLog>()).filter { $0.deletedAt == nil }.isEmpty)
+    }
+    @Test func editingOnePairedPrayerUnlinksBothAndEndTripPreservesOldClock() throws {
+        let container = try container(); let context = container.mainContext
+        let jeddah = try ActivePlace(latitude: 21.4858, longitude: 39.1925, timeZoneID: "Asia/Riyadh")
+        try apply(.startTrip(city: "جدة", country: "SA", place: jeddah, homeKm: 900), context, at: "2026-10-07T10:00:00+03:00")
+        try apply(.logPair(day: GregorianDay("2026-10-07"), pair: .dhuhrAsr, status: .jamaah, shortened: true, mode: .taqdim), context, at: "2026-10-07T12:30:00+03:00")
+        let trip = try #require(context.fetch(FetchDescriptor<Trip>()).first)
+        try apply(.endTrip(trip.id), context, at: "2026-10-07T13:00:00+03:00")
+        let occurrence = try #require(PrayerRepository(context: context).occurrence(ref("2026-10-07", .asr)))
+        #expect(occurrence.time == time("2026-10-07T15:03:00+03:00"))
+        try apply(.record(ref("2026-10-07", .asr), status: .alone, heart: .present, shortened: false), context, at: "2026-10-07T16:00:00+03:00")
+        let logs = try context.fetch(FetchDescriptor<PrayerLog>())
+        #expect(logs.allSatisfy { $0.pairID == nil })
+        let dhuhr = try #require(logs.first { $0.prayer == "dhuhr" })
+        #expect(dhuhr.status == "jamaah" && dhuhr.eventAt == time("2026-10-07T12:11:00+03:00"))
+    }
+    @Test func monthRatioGolden26Of30AndStrictStreakNotRepairedByQada() throws {
+        // Hand-authored §7.2 example: 26 on time, 2 qada, 2 missed. No code-generated expectations.
+        let container = try container(start: "2026-10-01T12:00:00+03:00"); let context = container.mainContext
+        var index = 0
+        for day in 1...6 { for prayer in Prayer.allCases {
+            let row = PrayerLog(); row.dayKey = String(format: "2026-10-%02d", day); row.prayer = prayer.rawValue; row.status = index < 26 ? "jamaah" : (index < 28 ? "qada" : "missed"); row.eventAt = time("2026-10-01T05:00:00+03:00"); row.tzID = "Asia/Riyadh"; context.insert(row)
+            if index >= 26 { let qada = QadaItem(); qada.originalDayKey = row.dayKey; qada.prayer = row.prayer; qada.madeUpAt = index < 28 ? time("2026-10-06T20:00:00+03:00") : nil; context.insert(qada) }
+            index += 1
+        } }; try context.save()
+        let state = try PrayerRepository(context: context).snapshot(now: time("2026-10-07T20:00:00+03:00"))
+        #expect(state.statistics.onTime == 26 && state.statistics.denominator == 30 && state.statistics.percentage == 87)
+        #expect(state.statistics.madeUp == 2 && state.statistics.owed == 2 && state.statistics.prayerStreak == 0)
+    }
+    @Test func polarManualLogHasNoFabricatedAdhanOrDerivedPending() throws {
+        let container = try container(start: "2026-06-21T12:00:00+02:00"); let context = container.mainContext
+        let settings = try SettingsStore(context: context)
+        try settings.prepare(.object(["name": .string("Tromso"), "country": .string("NO"), "lat": .number(69.6492), "lon": .number(18.9553), "tz": .string("Europe/Oslo"), "currency": .string("NOK")]), for: "core.homeCity", now: time("2026-06-21T12:00:00+02:00"))
+        try context.save()
+        try apply(.record(ref("2026-06-21"), status: .alone, heart: nil, shortened: nil), context, at: "2026-06-21T14:00:00+02:00")
+        let state = try PrayerRepository(context: context).snapshot(now: time("2026-06-21T14:00:00+02:00"))
+        #expect(!state.hasTimes && state.next == nil && state.pending.isEmpty && state.today.cells.allSatisfy { $0.time == nil })
+    }
+}

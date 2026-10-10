@@ -1,0 +1,3492 @@
+{
+  "version": 1,
+  "legacyCommit": "aba0c1b18a3bf3fc070395a40595e939c3b73aa3",
+  "source": "src/lib/types.ts",
+  "sourceSHA256": "4eee0ee64c6014f949b24c096d9c80497fce12620f59dd614e912644e2161ed7",
+  "boundary": "Static source inventory only. Not a completed importer or an assertion that user data has migrated.",
+  "gate": "Every raw archive entry retained; each room replaces pending maps with verified conversions before its import.",
+  "checksRequired": [
+    "source and target row counts by model",
+    "money sums per currency minor unit",
+    "exact original dates and zones",
+    "media bytes count and hashes",
+    "repeat batch no row growth",
+    "unknown field raw archive retained"
+  ],
+  "interfaces": [
+    {
+      "interface": "FinanceCategoryDef",
+      "fields": [
+        {
+          "field": "id",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "label",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "icon",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "color",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "parentId",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "allowSubs",
+          "optional": true,
+          "type": "boolean",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "updatedAt",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        }
+      ]
+    },
+    {
+      "interface": "ReserveSplit",
+      "fields": [
+        {
+          "field": "fundId",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "pct",
+          "optional": false,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        }
+      ]
+    },
+    {
+      "interface": "InboxExpenseRoute",
+      "fields": [
+        {
+          "field": "reserveSplits",
+          "optional": true,
+          "type": "ReserveSplit[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "offBudget",
+          "optional": true,
+          "type": "boolean",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        }
+      ]
+    },
+    {
+      "interface": "ObligationHint",
+      "fields": [
+        {
+          "field": "amount",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "merchant",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "dueDate",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "perPeriod",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "periodsLeft",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        }
+      ]
+    },
+    {
+      "interface": "FinanceSettingsProfile",
+      "fields": [
+        {
+          "field": "format",
+          "optional": false,
+          "type": "\"madar-bank-settings\"",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "version",
+          "optional": false,
+          "type": "1",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "ownerAccounts",
+          "optional": false,
+          "type": "string[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "ownerWallets",
+          "optional": false,
+          "type": "string[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "ownerAliases",
+          "optional": false,
+          "type": "string[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "salaryPayers",
+          "optional": false,
+          "type": "string[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "payerAliases",
+          "optional": false,
+          "type": "Record<string, string>",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "salaryPattern",
+          "optional": true,
+          "type": "{ accountId?: string; payer?: string; day?: number; amounts?: number[] }",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "merchantRules",
+          "optional": false,
+          "type": "Record<string, string>",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "cashbackEnabled",
+          "optional": false,
+          "type": "boolean",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "cashbackEnvelopeId",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        }
+      ]
+    },
+    {
+      "interface": "Transaction",
+      "fields": [
+        {
+          "field": "id",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "date",
+          "optional": false,
+          "type": "string",
+          "disposition": "mappedAndRawPreserved",
+          "target": "Transaction.dayKey",
+          "validation": "copy civil key legacy@0; preserve timestamp separately"
+        },
+        {
+          "field": "amount",
+          "optional": false,
+          "type": "number",
+          "disposition": "mappedAndRawPreserved",
+          "target": "Transaction.amountMinor",
+          "validation": "Decimal conversion using currency exponent; no binary floating rounding"
+        },
+        {
+          "field": "category",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "note",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "linkedJournalId",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "reserveSplits",
+          "optional": true,
+          "type": "ReserveSplit[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "updatedAt",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "offBudget",
+          "optional": true,
+          "type": "boolean",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "kind",
+          "optional": true,
+          "type": "TxnKind",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "direction",
+          "optional": true,
+          "type": "TxnDirection",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "fee",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "time",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "bank",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "account",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "cardLast4",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "accountId",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "balanceAfter",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "balanceKind",
+          "optional": true,
+          "type": "BalanceKind",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "counterparty",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "debtRemaining",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "template",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "confidence",
+          "optional": true,
+          "type": "\"template\" | \"inferred\" | \"generic\"",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "eventId",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "sourceKey",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "sourceInboxId",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "sourceReceivedAt",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "suspectedDuplicate",
+          "optional": true,
+          "type": "boolean",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "reviewReason",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "linkedTransactionId",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "refundDestination",
+          "optional": true,
+          "type": "RefundDestination",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "originalAmount",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "obligationHint",
+          "optional": true,
+          "type": "ObligationHint",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "rawText",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        }
+      ]
+    },
+    {
+      "interface": "Account",
+      "fields": [
+        {
+          "field": "id",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "bank",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "last4",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "kind",
+          "optional": false,
+          "type": "\"account\" | \"card\" | \"wallet\"",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "fundingKind",
+          "optional": false,
+          "type": "\"debit\" | \"credit\" | \"unknown\"",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "network",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "label",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "isOwn",
+          "optional": false,
+          "type": "boolean",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "firstSeen",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "lastSeen",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "archivedAt",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "updatedAt",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        }
+      ]
+    },
+    {
+      "interface": "Obligation",
+      "fields": [
+        {
+          "field": "id",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "kind",
+          "optional": false,
+          "type": "\"card\" | \"loan\" | \"bnpl\"",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "source",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "ref",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "label",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "outstanding",
+          "optional": false,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "minimum",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "dueDate",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "perPeriod",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "periodsLeft",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "observedAt",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "settledAt",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "updatedAt",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        }
+      ]
+    },
+    {
+      "interface": "ObservedBalance",
+      "fields": [
+        {
+          "field": "id",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "bank",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "account",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "cardLast4",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "balance",
+          "optional": false,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "balanceKind",
+          "optional": false,
+          "type": "BalanceKind",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "assetKind",
+          "optional": true,
+          "type": "\"bank_cash\" | \"credit_available\" | \"cashback_wallet\" | \"unknown\"",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "observedAt",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "updatedAt",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        }
+      ]
+    },
+    {
+      "interface": "SettlementResolution",
+      "fields": [
+        {
+          "field": "id",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "cardId",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "kind",
+          "optional": false,
+          "type": "SettlementResolutionKind",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "amount",
+          "optional": false,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "date",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "note",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "settlementIds",
+          "optional": true,
+          "type": "string[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "appliedToEventIds",
+          "optional": true,
+          "type": "string[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "allocatedAmount",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "updatedAt",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        }
+      ]
+    },
+    {
+      "interface": "CardSettlement",
+      "fields": [
+        {
+          "field": "id",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "cardId",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "amount",
+          "optional": false,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "date",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "eventId",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "sourceInboxId",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "sourceReceivedAt",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "rawText",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "updatedAt",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        }
+      ]
+    },
+    {
+      "interface": "InboxEventRecord",
+      "fields": [
+        {
+          "field": "id",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "eventId",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "rawText",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "kind",
+          "optional": false,
+          "type": "TxnKind",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "direction",
+          "optional": false,
+          "type": "TxnDirection",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "amount",
+          "optional": false,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "expenseAmount",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "fee",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "category",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "note",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "date",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "time",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "bank",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "account",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "cardLast4",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "accountId",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "balanceAfter",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "balanceKind",
+          "optional": true,
+          "type": "BalanceKind",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "counterparty",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "debtRemaining",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "template",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "confidence",
+          "optional": true,
+          "type": "\"template\" | \"inferred\" | \"generic\"",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "sourceKey",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "sourceInboxId",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "sourceReceivedAt",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "updatedAt",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "obligationHint",
+          "optional": true,
+          "type": "ObligationHint",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "refundDestination",
+          "optional": true,
+          "type": "RefundDestination",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "reviewReason",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        }
+      ]
+    },
+    {
+      "interface": "InboxDecision",
+      "fields": [
+        {
+          "field": "id",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "eventId",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "decision",
+          "optional": false,
+          "type": "InboxDecisionKind",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "reason",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "updatedAt",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        }
+      ]
+    },
+    {
+      "interface": "Trip",
+      "fields": [
+        {
+          "field": "id",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "startedAt",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "endedAt",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        }
+      ]
+    },
+    {
+      "interface": "ReserveDeposit",
+      "fields": [
+        {
+          "field": "id",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "date",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "amount",
+          "optional": false,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "note",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        }
+      ]
+    },
+    {
+      "interface": "FundFunding",
+      "fields": [
+        {
+          "field": "perCycle",
+          "optional": false,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "source",
+          "optional": false,
+          "type": "\"salary\" | \"surplus\"",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "stop",
+          "optional": true,
+          "type": "\"zero\" | \"target\"",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        }
+      ]
+    },
+    {
+      "interface": "ReserveFund",
+      "fields": [
+        {
+          "field": "id",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "name",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "role",
+          "optional": true,
+          "type": "\"general\" | \"surplus\" | \"custom\"",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "icon",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "color",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "target",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "deposits",
+          "optional": false,
+          "type": "ReserveDeposit[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "funding",
+          "optional": true,
+          "type": "FundFunding",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "trips",
+          "optional": true,
+          "type": "Trip[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "createdAt",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "updatedAt",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        }
+      ]
+    },
+    {
+      "interface": "Book",
+      "fields": [
+        {
+          "field": "id",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "title",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "author",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "totalPages",
+          "optional": false,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "currentPage",
+          "optional": false,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "status",
+          "optional": false,
+          "type": "\"أقرأ\" | \"أنهيت\" | \"أريد_قراءة\"",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "startDate",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "finishDate",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "coverColor",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "rating",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "notes",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "updatedAt",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        }
+      ]
+    },
+    {
+      "interface": "KnowledgeSource",
+      "fields": [
+        {
+          "field": "id",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "kind",
+          "optional": false,
+          "type": "SourceKind",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "name",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "author",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "bookId",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "createdAt",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "updatedAt",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        }
+      ]
+    },
+    {
+      "interface": "Benefit",
+      "fields": [
+        {
+          "field": "id",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "sourceId",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "text",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "question",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "applied",
+          "optional": true,
+          "type": "boolean",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "createdAt",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "updatedAt",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        }
+      ]
+    },
+    {
+      "interface": "ReadingLog",
+      "fields": [
+        {
+          "field": "id",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "bookId",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "date",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "pagesRead",
+          "optional": false,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "minutesRead",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "updatedAt",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        }
+      ]
+    },
+    {
+      "interface": "JournalAttachment",
+      "fields": [
+        {
+          "field": "kind",
+          "optional": false,
+          "type": "\"pdf\" | \"file\"",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "filename",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "hash",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "previewHash",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "contentType",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "size",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "status",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "sourceMediaID",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "localData",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        }
+      ]
+    },
+    {
+      "interface": "JournalPhotoEdit",
+      "fields": [
+        {
+          "field": "rotation",
+          "optional": true,
+          "type": "0 | 90 | 180 | 270",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "scale",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "offsetX",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "offsetY",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "flipX",
+          "optional": true,
+          "type": "boolean",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "flipY",
+          "optional": true,
+          "type": "boolean",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        }
+      ]
+    },
+    {
+      "interface": "JournalEntry",
+      "fields": [
+        {
+          "field": "id",
+          "optional": false,
+          "type": "string",
+          "disposition": "mappedAndRawPreserved",
+          "target": "ImportLink.sourceID",
+          "validation": "deterministic UUIDv5; keep original ID"
+        },
+        {
+          "field": "date",
+          "optional": false,
+          "type": "string",
+          "disposition": "mappedAndRawPreserved",
+          "target": "Entry.dayKey",
+          "validation": "copy verbatim; dayPolicy legacy@0"
+        },
+        {
+          "field": "title",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "time",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "question",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "content",
+          "optional": false,
+          "type": "string",
+          "disposition": "mappedAndRawPreserved",
+          "target": "Entry.text",
+          "validation": "preserve text exactly; textFormat from source"
+        },
+        {
+          "field": "tags",
+          "optional": true,
+          "type": "string[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "photo",
+          "optional": true,
+          "type": "string",
+          "disposition": "mappedAndRawPreserved",
+          "target": "Media",
+          "validation": "decode legacy bytes once; SHA256; dedupe with photos"
+        },
+        {
+          "field": "photos",
+          "optional": true,
+          "type": "string[]",
+          "disposition": "mappedAndRawPreserved",
+          "target": "Media",
+          "validation": "decode originals; SHA256; never replace with preview"
+        },
+        {
+          "field": "audio",
+          "optional": true,
+          "type": "string",
+          "disposition": "mappedAndRawPreserved",
+          "target": "Media",
+          "validation": "decode bytes once; retain MIME"
+        },
+        {
+          "field": "audios",
+          "optional": true,
+          "type": "string[]",
+          "disposition": "mappedAndRawPreserved",
+          "target": "Media",
+          "validation": "preserve every file; dedupe legacy first audio"
+        },
+        {
+          "field": "videoRefs",
+          "optional": true,
+          "type": "{ type?: string; duration?: number; posterHash?: string; sourceMediaID?: string }[]",
+          "disposition": "mappedAndRawPreserved",
+          "target": "Media",
+          "validation": "metadata-only when source has no file; never fabricate video"
+        },
+        {
+          "field": "attachmentRefs",
+          "optional": true,
+          "type": "JournalAttachment[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "audioMetadataRefs",
+          "optional": true,
+          "type": "{ type?: string; duration?: number; filename?: string; status: string; sourceMediaID?: string }[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "linkedBookId",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "linkedTransactionIds",
+          "optional": true,
+          "type": "string[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "source",
+          "optional": true,
+          "type": "\"dayOne\" | \"manual\"",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "dayOneUUID",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "starred",
+          "optional": true,
+          "type": "boolean",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "location",
+          "optional": true,
+          "type": "{ lat: number; lng: number; place?: string }",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "capturedAt",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "timeZone",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "modifiedAt",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "photoRefs",
+          "optional": true,
+          "type": "string[]",
+          "disposition": "mappedAndRawPreserved",
+          "target": "Media",
+          "validation": "content hash reference; missing remains explicit"
+        },
+        {
+          "field": "audioRefs",
+          "optional": true,
+          "type": "string[]",
+          "disposition": "mappedAndRawPreserved",
+          "target": "Media",
+          "validation": "content hash reference; missing remains explicit"
+        },
+        {
+          "field": "photoEdits",
+          "optional": true,
+          "type": "Record<string, JournalPhotoEdit>",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "updatedAt",
+          "optional": true,
+          "type": "number",
+          "disposition": "mappedAndRawPreserved",
+          "target": "Entry.updatedAt",
+          "validation": "milliseconds to absolute Date; preserve missing"
+        },
+        {
+          "field": "mood",
+          "optional": true,
+          "type": "1 | 2 | 3 | 4 | 5",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "mergedFrom",
+          "optional": true,
+          "type": "MergedSource[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "quickLines",
+          "optional": true,
+          "type": "JournalQuickLine[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        }
+      ]
+    },
+    {
+      "interface": "JournalQuickLine",
+      "fields": [
+        {
+          "field": "id",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "text",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        }
+      ]
+    },
+    {
+      "interface": "MergedSource",
+      "fields": [
+        {
+          "field": "id",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "time",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "title",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "chars",
+          "optional": false,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "photos",
+          "optional": false,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "audios",
+          "optional": false,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "dayOneUUID",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "mergedAt",
+          "optional": false,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        }
+      ]
+    },
+    {
+      "interface": "Habit",
+      "fields": [
+        {
+          "field": "id",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "name",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "icon",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "color",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "logs",
+          "optional": false,
+          "type": "string[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "updatedAt",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        }
+      ]
+    },
+    {
+      "interface": "QiyamNight",
+      "fields": [
+        {
+          "field": "rakaat",
+          "optional": false,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "witr",
+          "optional": false,
+          "type": "boolean",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        }
+      ]
+    },
+    {
+      "interface": "PrayerLog",
+      "fields": [
+        {
+          "field": "date",
+          "optional": false,
+          "type": "string",
+          "disposition": "mappedAndRawPreserved",
+          "target": "PrayerLog.dayKey",
+          "validation": "preserve prayer civil date; prayerDay@1"
+        },
+        {
+          "field": "prayers",
+          "optional": false,
+          "type": "Partial<Record<PrayerName, PrayerStatus>>",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "khushu",
+          "optional": true,
+          "type": "Partial<Record<PrayerName, KhushuLevel>>",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "khushuUpdatedAt",
+          "optional": true,
+          "type": "Partial<Record<PrayerName, number>>",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "prayerUpdatedAt",
+          "optional": true,
+          "type": "Partial<Record<PrayerName, number>>",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "sunan",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "sunanUpdatedAt",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "qiyam",
+          "optional": true,
+          "type": "QiyamNight",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "qiyamUpdatedAt",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        }
+      ]
+    },
+    {
+      "interface": "Budget",
+      "fields": [
+        {
+          "field": "category",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "limit",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "pct",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "updatedAt",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        }
+      ]
+    },
+    {
+      "interface": "DailyBudget",
+      "fields": [
+        {
+          "field": "amount",
+          "optional": false,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "startDate",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "monthlyIncome",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "incomePct",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "carryAdjust",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "fundingPerDay",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        }
+      ]
+    },
+    {
+      "interface": "CountdownEvent",
+      "fields": [
+        {
+          "field": "id",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "title",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "date",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "emoji",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "countUpAfter",
+          "optional": true,
+          "type": "boolean",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "updatedAt",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        }
+      ]
+    },
+    {
+      "interface": "FutureLetter",
+      "fields": [
+        {
+          "field": "id",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "writtenDate",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "deliveryDate",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "title",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "content",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "opened",
+          "optional": true,
+          "type": "boolean",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "openedDate",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "updatedAt",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        }
+      ]
+    },
+    {
+      "interface": "QuranReflection",
+      "fields": [
+        {
+          "field": "id",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "date",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "surah",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "fromAyah",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "toAyah",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "reference",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "text",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "tags",
+          "optional": true,
+          "type": "string[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "createdAt",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "updatedAt",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        }
+      ]
+    },
+    {
+      "interface": "HifzPlan",
+      "fields": [
+        {
+          "field": "startId",
+          "optional": false,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "unit",
+          "optional": false,
+          "type": "HifzUnit",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "amount",
+          "optional": false,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "createdAt",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "intensity",
+          "optional": true,
+          "type": "HifzIntensity",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        }
+      ]
+    },
+    {
+      "interface": "HifzSession",
+      "fields": [
+        {
+          "field": "id",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "date",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "fromId",
+          "optional": false,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "toId",
+          "optional": false,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "rating",
+          "optional": true,
+          "type": "HifzRating",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "at",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "updatedAt",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        }
+      ]
+    },
+    {
+      "interface": "HifzReviewLog",
+      "fields": [
+        {
+          "field": "id",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "date",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "fromId",
+          "optional": false,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "toId",
+          "optional": false,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "rating",
+          "optional": true,
+          "type": "HifzRating",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "at",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "updatedAt",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        }
+      ]
+    },
+    {
+      "interface": "HifzMistake",
+      "fields": [
+        {
+          "field": "id",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "ayahId",
+          "optional": false,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "wordIndex",
+          "optional": false,
+          "type": "number | null",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "word",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "hits",
+          "optional": false,
+          "type": "string[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "resolved",
+          "optional": false,
+          "type": "boolean",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "updatedAt",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "okStreak",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "lastDrill",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        }
+      ]
+    },
+    {
+      "interface": "HifzState",
+      "fields": [
+        {
+          "field": "plan",
+          "optional": false,
+          "type": "HifzPlan | null",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "frontierId",
+          "optional": false,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "sessions",
+          "optional": false,
+          "type": "HifzSession[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "reviews",
+          "optional": false,
+          "type": "HifzReviewLog[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "mistakes",
+          "optional": true,
+          "type": "HifzMistake[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "lastTestDate",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "planId",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "planUpdatedAt",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "frontierUpdatedAt",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "deletedRecords",
+          "optional": true,
+          "type": "Record<string, number>",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        }
+      ]
+    },
+    {
+      "interface": "KhatmaState",
+      "fields": [
+        {
+          "field": "juz",
+          "optional": false,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "page",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "startDate",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "completed",
+          "optional": false,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "lastReadDate",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "pageLog",
+          "optional": true,
+          "type": "{ date: string; page: number }[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "dailyPageGoal",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        }
+      ]
+    },
+    {
+      "interface": "Reconcile",
+      "fields": [
+        {
+          "field": "id",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "date",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "expected",
+          "optional": false,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "actual",
+          "optional": false,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "delta",
+          "optional": false,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "unsettledRecordedCharges",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "excessSettlements",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "excessByCard",
+          "optional": true,
+          "type": "Record<string, number>",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "blockedByExcess",
+          "optional": true,
+          "type": "boolean",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "updatedAt",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        }
+      ]
+    },
+    {
+      "interface": "AppData",
+      "fields": [
+        {
+          "field": "transactions",
+          "optional": false,
+          "type": "Transaction[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "books",
+          "optional": false,
+          "type": "Book[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "readingLogs",
+          "optional": false,
+          "type": "ReadingLog[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "knowledgeSources",
+          "optional": true,
+          "type": "KnowledgeSource[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "benefits",
+          "optional": true,
+          "type": "Benefit[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "journalEntries",
+          "optional": false,
+          "type": "JournalEntry[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "habits",
+          "optional": false,
+          "type": "Habit[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "budgets",
+          "optional": false,
+          "type": "Budget[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "categories",
+          "optional": false,
+          "type": "FinanceCategoryDef[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "reserves",
+          "optional": false,
+          "type": "ReserveFund[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "prayerLogs",
+          "optional": false,
+          "type": "PrayerLog[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "qadaBacklog",
+          "optional": true,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "quranReflections",
+          "optional": false,
+          "type": "QuranReflection[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "quranHifz",
+          "optional": false,
+          "type": "HifzState",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "quranWird",
+          "optional": false,
+          "type": "string[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "quranKhatma",
+          "optional": false,
+          "type": "KhatmaState",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "dailyBudget",
+          "optional": false,
+          "type": "DailyBudget | null",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "monthlyIncome",
+          "optional": false,
+          "type": "number | null",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "futureLetters",
+          "optional": false,
+          "type": "FutureLetter[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "countdownEvents",
+          "optional": true,
+          "type": "CountdownEvent[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "salaryDay",
+          "optional": false,
+          "type": "number",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "budgetWindow",
+          "optional": true,
+          "type": "BudgetWindowMode",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "lastSalaryConfirm",
+          "optional": false,
+          "type": "string | null",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "autoOffset",
+          "optional": true,
+          "type": "boolean",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "reconciles",
+          "optional": true,
+          "type": "Reconcile[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "readingGoal",
+          "optional": false,
+          "type": "number | null",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "frozenHabits",
+          "optional": true,
+          "type": "string[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "merchantRules",
+          "optional": false,
+          "type": "Record<string, string>",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "obligations",
+          "optional": true,
+          "type": "Obligation[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "observedBalances",
+          "optional": true,
+          "type": "ObservedBalance[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "accounts",
+          "optional": true,
+          "type": "Account[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "ownerAliases",
+          "optional": true,
+          "type": "string[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "ownerWallets",
+          "optional": true,
+          "type": "string[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "ownerAccounts",
+          "optional": true,
+          "type": "string[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "salaryPayers",
+          "optional": true,
+          "type": "string[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "payerAliases",
+          "optional": true,
+          "type": "Record<string, string>",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "settlementResolutions",
+          "optional": true,
+          "type": "SettlementResolution[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "settlements",
+          "optional": true,
+          "type": "CardSettlement[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "inboxDecisions",
+          "optional": true,
+          "type": "InboxDecision[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "inboxEvents",
+          "optional": true,
+          "type": "InboxEventRecord[]",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "cashbackEnabled",
+          "optional": true,
+          "type": "boolean",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "cashbackEnvelopeId",
+          "optional": true,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        },
+        {
+          "field": "deleted",
+          "optional": true,
+          "type": "Record<string, number>",
+          "disposition": "mappedAndRawPreserved",
+          "target": "deletionBarrierAt",
+          "validation": "preserve every source tombstone keyed via ImportLink"
+        },
+        {
+          "field": "deletedMedia",
+          "optional": true,
+          "type": "Record<string, number>",
+          "disposition": "mappedAndRawPreserved",
+          "target": "Media.deletionBarrierAt",
+          "validation": "retain removal barriers by content hash"
+        },
+        {
+          "field": "fieldUpdatedAt",
+          "optional": true,
+          "type": "Record<string, number>",
+          "disposition": "mappedAndRawPreserved",
+          "target": "Setting.updatedAt",
+          "validation": "preserve explicit clears; default is not a stored edit"
+        },
+        {
+          "field": "lastUpdated",
+          "optional": false,
+          "type": "string",
+          "disposition": "preserveRawUntilRoomMigration",
+          "target": "Media(kind=doc): original export archive",
+          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+        }
+      ]
+    }
+  ]
+}

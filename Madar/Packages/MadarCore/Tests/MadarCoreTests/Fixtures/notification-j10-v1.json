@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "source": "MADAR_HANDOFF.html section 8.8 algorithm, J10; hand-authored expectations, not recorded engine output",
+  "scenarios": [
+    {"day":"2026-10-07","isha":"19:04","quiet":null,"device":true,"disabled":[],"room":"quran","expected":["q0","q1","q2","digest.2026-10-07"],"digestClock":"20:04"},
+    {"day":"2026-10-08","isha":"22:00","quiet":1290,"device":true,"disabled":[],"room":"quran","expected":["q0","q1","q2","digest.2026-10-08"],"digestClock":"21:15"},
+    {"day":"2026-10-09","isha":"19:02","quiet":1290,"device":true,"disabled":[],"room":"quran","expected":["q0","q1","q2","digest.2026-10-09"],"digestClock":"20:02"},
+    {"day":"2026-10-10","isha":"19:36","quiet":null,"device":true,"disabled":[],"room":"quran","expected":["q0","q1","q2","digest.2026-10-10"],"digestClock":"20:36","travel":true},
+    {"day":"2026-10-11","isha":"19:02","quiet":null,"device":false,"disabled":[],"room":"quran","expected":[],"digestClock":null},
+    {"day":"2026-10-12","isha":"19:02","quiet":null,"device":true,"disabled":["q0"],"room":"quran","expected":["q1","q2","q3","digest.2026-10-12"],"digestClock":"20:02"},
+    {"day":"2026-10-13","isha":"19:02","quiet":null,"device":true,"disabled":[],"room":"notes","expected":["q0","q1"],"digestClock":null}
+  ]
+}

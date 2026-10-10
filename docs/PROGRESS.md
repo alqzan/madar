@@ -4,7 +4,7 @@ M0 — reconciliation with review V1, before accepting the existing foundation. 
 
 # Last checked
 
-No commits existed when this protocol was received. Checked the three attached files and working-tree contracts on 2026-10-10. AGENTS.md and CLAUDE.md are identical. The owner explicitly adopted RD2 margin retention. Previous test logs are evidence for their recorded revisions only; latest UI fixes have not yet passed a rerun. Current build/test check is pending.
+Protocol installed in 9386ea7. No commits existed before receiving it. Checked the attachments and working-tree contracts on 2026-10-10; owner adopted RD2. Current MadarData baseline: 34 tests passed. Current simulator app compiled; whole-app lock test passed. Backup UI test failed to focus the confirmation field. Reconciliation and this UI defect remain open; no M0 gate passed.
 
 # Board
 
@@ -37,6 +37,8 @@ Verified: file reads, exact AGENTS/CLAUDE match, current git status (no commits)
 
 Not verified: full new contract compliance, physical iPhone run, notifications/widgets/Live Activities, actual cloud sync, Quran licenses, real user migration. Prior agents ended with tool-reported usage errors; no reset was consumed.
 
-Current check: MadarData baseline passed 34 tests (Artifacts/review-data-baseline.log). UI rerun could not start: unfinished M2 QuranRoom.swift references missing QuranSettingsUIService. Preserved that scaffold and excluded it from the M0 app target (project.yml); no placeholder service or visible room was added. Rebuild/rerun is pending.
+Current check: MadarData baseline passed 34 tests (Artifacts/review-data-baseline.log). First UI rerun could not start: unfinished M2 QuranRoom.swift references missing QuranSettingsUIService. Preserved that scaffold and excluded it from the M0 app target (project.yml); no placeholder service or visible room was added. Second run compiled and passed whole-app lock persistence; backup test failed at confirmation keyboard focus (Artifacts/review-ui-fixed.log). This is a Top debugging card after earlier UI fix attempts; no rollback to a nonexistent old green commit.
+
+Baseline snapshot: preserve the inherited app source as a separate local commit to permit isolated branch/worktree review. This is a record of existing implementation, not acceptance of old contracts. Build products, font binaries, output/ and tmp/ stay excluded. Earlier builders' actual model tiers are not inferred from inherited files.
 
 Next: Top architecture note, current build/UI check, then scoped data/inbox fixes. Recommended tiers: Sol xhigh for architecture/reviews; Sol high for production paths. Human instructions remain above attached documents.

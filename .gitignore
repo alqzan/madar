@@ -1,0 +1,4 @@
+# Preserve local audit inputs and scratch data without staging them.
+output/
+tmp/
+.DS_Store
