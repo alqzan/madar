@@ -57,13 +57,37 @@ import Testing
         #expect(try RecordFingerprint.hash(RecordBridge.all(reopened.container.mainContext,syncedOnly:false)) == RecordFingerprint.hash(expectedRows()))
     }
     private func fileHashes(_ directory: URL) throws -> [String:String] {
-        let directory = directory.resolvingSymlinksInPath()
-        let files = try #require(FileManager.default.enumerator(at:directory,includingPropertiesForKeys:[.isRegularFileKey]))
+        let files = try #require(FileManager.default.enumerator(atPath:directory.path))
         var result: [String:String] = [:]
-        for case let url as URL in files where try url.resourceValues(forKeys:[.isRegularFileKey]).isRegularFile == true {
-            result[url.pathComponents.dropFirst(directory.pathComponents.count).joined(separator:"/")] = BackupCodec.hash(try Data(contentsOf:url))
+        for case let relativePath as String in files {
+            let url = directory.appendingPathComponent(relativePath)
+            if try url.resourceValues(forKeys:[.isRegularFileKey]).isRegularFile == true {
+                result[relativePath] = BackupCodec.hash(try Data(contentsOf:url))
+            }
         }
         return result
+    }
+    @Test func test_M0S1_RA4_fileHashesKeepSourcePathsRelativeAndOnlyExcludeRootLock() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("MadarFileHashesTest-\(UUID())")
+        defer { try? FileManager.default.removeItem(at:root) }
+        let sourcePaths = ["Device.store", "Device.store-wal", "Device.store-shm", "DeviceSchemaVersion.json",
+                           "ActiveGeneration.json", "Generations/old/Madar.store", "Generations/old/GenerationReady.json",
+                           "Generations/old/SchemaVersion.json", "Media/photo.bin", "Media/CommandBus.lock"]
+        let expectedHash = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824" // SHA-256 of "hello".
+        for path in sourcePaths {
+            let file = root.appendingPathComponent(path)
+            try FileManager.default.createDirectory(at:file.deletingLastPathComponent(),withIntermediateDirectories:true)
+            try Data("hello".utf8).write(to:file)
+        }
+        let before = try fileHashes(root)
+        #expect(before == Dictionary(uniqueKeysWithValues:sourcePaths.map { ($0,expectedHash) }))
+        try Data().write(to:root.appendingPathComponent("CommandBus.lock"))
+        let after = try fileHashes(root)
+        #expect(after["CommandBus.lock"] == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
+        #expect(after.filter { $0.key != "CommandBus.lock" } == before)
+        #expect(after["Media/CommandBus.lock"] == expectedHash)
+        try Data("changed".utf8).write(to:root.appendingPathComponent("DeviceSchemaVersion.json"))
+        #expect(try fileHashes(root).filter { $0.key != "CommandBus.lock" } != before)
     }
     private func oldManagedFixture(_ base: URL) throws -> (URL,UUID,URL) {
         let root = base.appendingPathComponent("ManagedV1")
@@ -113,9 +137,11 @@ import Testing
         let (root,_,generation) = try oldManagedFixture(base)
         try DurableFiles.encode(999,to:root.appendingPathComponent("DeviceSchemaVersion.json"))
         let hashes = try fileHashes(root)
+        #expect(hashes["CommandBus.lock"] == nil)
         #expect(throws:DataError.newerStore) { try ManagedDataStore(root:root) }
-        let after = try fileHashes(root).filter { $0.key != "CommandBus.lock" }
-        #expect(after == hashes)
+        let after = try fileHashes(root)
+        #expect(after["CommandBus.lock"] == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
+        #expect(after.filter { $0.key != "CommandBus.lock" } == hashes)
         #expect(try MadarContainerFactory.storeVersion(at:generation) == 1)
         try DurableFiles.encode(1,to:root.appendingPathComponent("DeviceSchemaVersion.json"))
         let repaired = try ManagedDataStore(root:root)
