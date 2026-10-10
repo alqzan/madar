@@ -48,8 +48,10 @@ import MadarInbox
             }
             // The embedded source is a value, never proof of a user-authorized app call.
             // Foundation app-only writes use the direct UI bus; transport cannot disable locks.
-            let appOnly = ["settings.set", "settings.applyPreset", "preset.save", "core.completeOnboarding", "system.undo"]
-            if appOnly.contains(record.command.name) { continue } // needsApp; retain for explicit app resolution
+            guard CommandBus.supportedCommandNames.contains(record.command.name) else {
+                try inbox.quarantine(file, reason: "invalidCommand"); continue
+            }
+            if CommandBus.appOnlyCommandNames.contains(record.command.name) { continue } // needsApp; retain for explicit app resolution
             if let denial = authorization(record.command) {
                 if denial.status == .rejected { try inbox.quarantine(file, reason: "invalidCommand") }
                 continue // needsUnlock/needsApp preserve the accepted delivery
