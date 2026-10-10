@@ -4,6 +4,8 @@ M0 — reconciliation with review V1, before accepting the existing foundation. 
 
 # Last checked
 
+Checked aac7014..0a31987 — automation 2026-10-10: app BUILD SUCCEEDED; Core 20, Data 38, Snapshots 3, Sync 8 passed. MadarPrayer compile failure confirmed; isolated Standard-high fix m0-fix-previous-prayer underway. Fresh Top inbox review and Standard-high shell review underway; root owns simulator.
+
 Checked 9386ea7..b7bed94 — protocol/default metadata and RA1/RD2 reconciled. Top RA1/RD2 review approved; root MadarData passed 38 tests after integration. Simulator app compiled, lock persistence passed. Backup flow still failed matching/export after native Next; Top fix-only diagnostic rerun active. RA2/RA4/RA8 and physical M0 gate remain open; no whole milestone approved.
 
 Checked b7bed94..aac7014 (claude, 2026-10-10) — no blocking defect in main. Package tests pass (Core 20, Data 38, Snapshots 3, Sync 8); app build succeeds. Open: MadarPrayer tests do not compile and assert RP1-violating aging; inbox/receipt fixes (M0R-03..06) exist only on branch m0-s1-command-inbox 846e1bb, unreviewed and unmerged; backup UI test still failing.
