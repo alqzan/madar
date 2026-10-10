@@ -282,4 +282,47 @@ import MadarInbox
         #expect(!((try adapter.hasReceipt(commandID: appOnly.commandID))))
     }
 
+    @Test func test_M0S1_newGenerationCannotReplayCollectedReceipt() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "MadarCollectedReceipt-\(UUID())")
+        let managed = try ManagedDataStore(root: root)
+        let inbox = PendingInbox(directory: root.appending(path: "PendingInbox"))
+        let adapter = DurableCommandAdapter(containerProvider: { try managed.containerForTransaction() }, lockDirectory: root, transactionClock: { $0 }, generationProvider: { managed.binding.generationID })
+        let oldGeneration = managed.binding.generationID, deviceStore = managed.binding.deviceStoreURL, now = Date()
+        let first = prayer(generation: oldGeneration, now: now)
+        var refreshes = 0
+        let drainer = InboxDrainer(inbox: inbox, bus: CommandBus(adapter: adapter), generation: { .init(generationID: managed.binding.generationID, acceptsUnstampedDeliveries: false) }, hasReceipt: { try adapter.hasReceipt(commandID: $0) }, refresh: { refreshes += 1 })
+        _ = try inbox.enqueue(first)
+        try await drainer.drain(now: now)
+        #expect(try inbox.wasCommitted(commandID: first.command.commandID, generationID: oldGeneration))
+        try adapter.purgeExpiredReceipts(pinnedIDs: inbox.unacknowledgedCommandIDs(), now: now.addingTimeInterval(8 * 86400))
+        #expect(!((try adapter.hasReceipt(commandID: first.command.commandID))))
+        #expect(try ModelContext(managed.container).fetch(FetchDescriptor<DeviceSetting>()).filter { $0.key.hasPrefix("sys.commandReceiptScope:") }.isEmpty)
+        // Exercise the production staging/pointer switch with a fixed Device.store, rather
+        // than deleting the fact by hand or changing only the drainer's generation closure.
+        let coordinator = BackupCoordinator(store: managed, backupDirectory: root.appending(path: "Backups"), keyStore: MemoryBackupKeyStore())
+        try await coordinator.configurePassphrase("correct long fixture password")
+        _ = try await coordinator.rotateLocalStore(accountHash: nil, preservingCurrentRows: false)
+        let replacement = managed.binding.generationID
+        #expect(replacement != oldGeneration)
+        #expect(managed.binding.deviceStoreURL == deviceStore)
+        #expect(try ModelContext(managed.container).fetchCount(FetchDescriptor<PrayerLog>()) == 0)
+        _ = try inbox.enqueue(.init(expectedGenerationID: replacement, command: first.command))
+        try await drainer.drain(now: now.addingTimeInterval(9 * 86400))
+        #expect(try ModelContext(managed.container).fetchCount(FetchDescriptor<PrayerLog>()) == 0)
+        #expect(try ModelContext(managed.container).fetchCount(FetchDescriptor<MadarData.CommandReceipt>()) == 0)
+        #expect(try inbox.processingFiles().isEmpty)
+        #expect(try inbox.unacknowledgedCommandIDs() == [first.command.commandID])
+        #expect(try FileManager.default.contentsOfDirectory(atPath: inbox.directory.appending(path: "unresolved").path).filter { $0.hasSuffix(".jsonl") }.count == 1)
+        #expect(!((try inbox.wasCommitted(commandID: first.command.commandID, generationID: replacement))))
+        #expect(refreshes == 1)
+        let fresh = prayer(generation: replacement, now: now.addingTimeInterval(9 * 86400))
+        _ = try inbox.enqueue(fresh)
+        try await drainer.drain(now: now.addingTimeInterval(9 * 86400))
+        #expect(try ModelContext(managed.container).fetchCount(FetchDescriptor<PrayerLog>()) == 1)
+        #expect(try adapter.hasReceipt(commandID: fresh.command.commandID))
+        #expect(!((try adapter.hasReceipt(commandID: first.command.commandID))))
+        #expect(try inbox.unacknowledgedCommandIDs() == [first.command.commandID])
+        #expect(refreshes == 2)
+    }
+
 }
