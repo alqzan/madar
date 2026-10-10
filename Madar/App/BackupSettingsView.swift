@@ -171,7 +171,7 @@ struct BackupSettingsView: View {
                 SecureField("كلمة مرور — عشرة أحرف على الأقل", text: $model.exportPassphrase).textContentType(.newPassword).focused($focusedPassword, equals: 1).submitLabel(.next).onSubmit { focusedPassword = 2 }.accessibilityIdentifier("backup-password")
                 SecureField("أعِد كلمة المرور", text: $model.exportConfirmation).textContentType(.newPassword).focused($focusedPassword, equals: 2).submitLabel(.done).onSubmit { focusedPassword = nil }.accessibilityIdentifier("backup-password-confirmation")
                 Text("احفظ كلمة المرور في مكان آمن. فقدانها يجعل النسخة غير قابلة للقراءة.").font(MadarTypography.caption())
-                if model.status?.keyConfigured == false { Text("تُستخدم كلمة مرور أول نسخة للنسخ التلقائي أيضًا. يُحفظ مفتاح مشتق منها على هذا الجهاز، وتبقى كلمة المرور عندك.").font(MadarTypography.caption()) }
+                if model.status?.keyConfigured == false { Text("تُستخدم كلمة مرور أول نسخة للنسخ التلقائي أيضًا. يُحفظ مفتاح مشتق منها على هذا الجهاز، وتبقى كلمة المرور عندك.").font(MadarTypography.caption()).accessibilityIdentifier("backup-key-setup") }
                 Button("انسخ الآن", action: model.export).disabled(!model.canExport).accessibilityIdentifier("backup-now")
                 if let file = model.exportedURL {
                     ShareLink(item: file) { Label("احفظ النسخة أو شاركها", systemImage: "square.and.arrow.up") }.accessibilityIdentifier("backup-export")
