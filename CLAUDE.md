@@ -153,6 +153,8 @@ The order is M0 Foundation, M1 Prayer, M2 Quran, M3 Diary, M4 Lobby + Habits + W
 
 ### 2. Start of every session: check, fix, then continue
 
+**Trigger.** If the owner starts a session with only «اكمل» / "continue" (or any short go-ahead), that is the whole instruction: run this section from step 1, then do the next task on the board. Do not ask what to do. The owner should never have to explain where work stopped. `docs/PROGRESS.md` on `main` is that explanation.
+
 1. Read this file, then `docs/PROGRESS.md`: the current milestone, the board, the **Last checked** commit, and the latest handover.
 2. Run `git status` and `git log --oneline -20`.
 3. **Quick check of the previous session.** Keep it short. It's a sanity check, not a full review.
@@ -289,6 +291,12 @@ Give each subagent a one-paragraph brief and ask for a short result. Never ask a
 - **Damage you find from an earlier session** (one the quick check missed): fix it in a `[fix-previous]` commit with a test, and mention it in the handover. Never patch it silently inside an unrelated task.
 
 ### 7. End of every session: handover
+
+**The handover must reach `main`.** The next agent starts from `main`, so a handover that exists only on a work branch is invisible to it. Before you stop, whatever branch you worked on:
+1. Commit your `docs/PROGRESS.md` update (board, Last checked, handover) to `main` as a docs-only commit: `git checkout main`, `git checkout <branch> -- docs/PROGRESS.md`, commit. Never put code on `main` this way.
+2. Name every unmerged branch and worktree in the handover, with its latest commit and what is needed to merge it.
+3. Leave the shared checkout on `main`, clean (`git status`), so it builds.
+4. Anything you could not finish goes in the handover as the first line of **For the next agent**, not only in chat.
 
 **Commit message format:** `[M1-T03] <what> (codex|claude, tier: standard)`
 
