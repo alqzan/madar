@@ -1,6 +1,45 @@
 import XCTest
 
 @MainActor final class FoundationUITests: XCTestCase {
+    func test_M0S2_CutSettingsAndDeferredEntryPointsStayHidden() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment["MADAR_UI_STORE_ID"] = UUID().uuidString
+        let hiddenQueries = ["core.fontScale", "core.motion", "core.roomIdentity", "tabbar.style", "tabbar.labels", "tabbar.openOn", "tabbar.minimizeOnScroll", "الأنماط", "المزامنة"]
+        // Relaunch keeps the same disposable store but gives every query a clean search field.
+        for query in hiddenQueries + ["core.theme"] {
+            app.launch(); finishOnboarding(app)
+            XCTAssertTrue(app.buttons["settings-button"].waitForExistence(timeout: 10))
+            app.buttons["settings-button"].tap()
+            let search = app.textFields["settings-search"]
+            XCTAssertTrue(search.waitForExistence(timeout: 10))
+            XCTAssertFalse(app.buttons["sync-settings-link"].exists)
+            XCTAssertFalse(app.buttons["الأنماط المحفوظة"].exists)
+            XCTAssertFalse(app.staticTexts["الشريط السفلي"].exists)
+            search.tap(); search.typeText(query + "\n")
+            XCTAssertEqual(search.value as? String, query)
+            if query == "core.theme" {
+                XCTAssertTrue(app.buttons["option-core.theme-auto"].waitForExistence(timeout: 10), "A shipped setting must remain searchable.")
+            } else {
+                let options = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "option-"))
+                let controls = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "setting-"))
+                XCTAssertEqual(options.count, 0, query)
+                XCTAssertEqual(controls.count, 0, query)
+                XCTAssertFalse(app.buttons["sync-settings-link"].exists, query)
+                XCTAssertFalse(app.buttons["الأنماط المحفوظة"].exists, query)
+            }
+            app.terminate()
+        }
+        app.launch(); finishOnboarding(app)
+        XCTAssertTrue(app.buttons["settings-button"].waitForExistence(timeout: 10))
+        app.buttons["settings-button"].tap()
+        XCTAssertTrue(app.textFields["settings-search"].waitForExistence(timeout: 10))
+        attachScreenshot(app, named: "M0-native-bar-before-scroll")
+        app.swipeUp(); app.swipeUp()
+        // Native minimization has no stable public XCTest state; review these two images.
+        attachScreenshot(app, named: "M0-native-bar-after-scroll")
+        app.terminate()
+    }
     func test_M0S2_SecurePasswordTypingTransport() throws {
         continueAfterFailure = false
         let app = XCUIApplication()

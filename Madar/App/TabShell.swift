@@ -9,51 +9,22 @@ struct FoundationTab: Identifiable, Hashable {
 }
 
 /// Only built destinations enter this shell. Future rooms supply destinations at their milestone.
+/// RL8: the one tab bar is the native glass `TabView`; no alternate style is built.
 struct TabShell<Content: View>: View {
     @Binding var selection: String
     let tabs: [FoundationTab]
-    let style: String
-    let labels: String
-    let minimize: Bool
     @ViewBuilder let content: (String) -> Content
     @Environment(\.roomTheme) private var theme
-    @Environment(\.dynamicTypeSize) private var dynamicType
     var body: some View {
-        if style == "glass" {
-            TabView(selection: $selection) {
-                ForEach(tabs) { tab in
-                    Tab(tab.title, systemImage: tab.symbol, value: tab.id) {
-                        content(tab.id).accessibilityIdentifier(tab.id == "customize" ? "settings-tab" : "foundation-tab")
-                    }
+        TabView(selection: $selection) {
+            ForEach(tabs) { tab in
+                Tab(tab.title, systemImage: tab.symbol, value: tab.id) {
+                    content(tab.id).accessibilityIdentifier(tab.id == "customize" ? "settings-tab" : "foundation-tab")
                 }
-            }
-            .tabBarMinimizeBehavior(minimize ? .onScrollDown : .never)
-            .tint(theme.accent)
-        } else {
-            content(selection).safeAreaInset(edge: .bottom, spacing: 8) {
-                HStack(spacing: style == "capsule" ? 4 : 8) {
-                    ForEach(tabs) { tab in
-                        Button { selection = tab.id } label: {
-                            VStack(spacing: 4) {
-                                Image(systemName: tab.symbol).font(.title3)
-                                if labels == "all" || tab.id == selection || dynamicType.isAccessibilitySize {
-                                    Text(tab.title).font(MadarTypography.fine()).fixedSize(horizontal: false, vertical: true)
-                                }
-                            }.frame(maxWidth: .infinity, minHeight: 48)
-                                .padding(.horizontal, 8).padding(.vertical, 6)
-                                .foregroundStyle(tab.id == selection ? theme.onAccent : theme.ink)
-                                .background(tab.id == selection ? theme.accentFill : theme.surface, in: .rect(cornerRadius: style == "capsule" ? 32 : 16))
-                        }
-                        .buttonStyle(.plain).accessibilityLabel(tab.title)
-                        .accessibilityAddTraits(tab.id == selection ? .isSelected : [])
-                        .accessibilityIdentifier(tab.id == "customize" ? "settings-tab" : "foundation-tab")
-                    }
-                }
-                .padding(style == "capsule" ? 8 : 0)
-                .background(style == "capsule" ? theme.surface : .clear, in: .capsule)
-                .padding(.horizontal, style == "capsule" ? 24 : 16).padding(.bottom, 8)
             }
         }
+        .tabBarMinimizeBehavior(.onScrollDown)
+        .tint(theme.accent)
     }
 }
 
@@ -65,8 +36,8 @@ struct MadarRootView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var body: some View {
         let dark = forcedColorScheme == .dark || (forcedColorScheme == nil && colorScheme == .dark)
-        let theme = RoomTheme(dark: dark, calmPaper: session.string("core.roomIdentity") == "calmPaper")
-        TabShell(selection: $session.selectedTab, tabs: [.init(id: "foundation", title: "مدار", symbol: "circle.hexagongrid"), .init(id: "customize", title: "خصّص", symbol: "slider.horizontal.3")], style: session.string("tabbar.style"), labels: session.string("tabbar.labels"), minimize: session.bool("tabbar.minimizeOnScroll")) { tab in
+        let theme = RoomTheme(dark: dark, calmPaper: false)
+        TabShell(selection: $session.selectedTab, tabs: [.init(id: "foundation", title: "مدار", symbol: "circle.hexagongrid"), .init(id: "customize", title: "خصّص", symbol: "slider.horizontal.3")]) { tab in
             NavigationStack {
                 if tab == "customize" { CustomizeMadar(session: session) }
                 else { FoundationHome(session: session) }
@@ -77,8 +48,6 @@ struct MadarRootView: View {
         .dynamicTypeSize(effectiveType)
         .preferredColorScheme(forcedColorScheme)
         .animation(themeAnimation, value: session.string("core.theme"))
-        .animation(themeAnimation, value: session.string("core.roomIdentity"))
-        .animation(themeAnimation, value: session.string("tabbar.style"))
         .task {
             do {
                 try (session.syncService as? AppSyncService)?.processLocalHistory()
@@ -108,8 +77,8 @@ struct MadarRootView: View {
         }
     }
     private var themeAnimation: Animation? {
-        guard session.string("core.motion") != "none" else { return nil }
-        if reduceMotion || session.string("core.motion") == "calm" { return .easeInOut(duration: 0.2) }
+        // RA8: motion is fixed at its agreed default (full); Reduce Motion is still honoured.
+        if reduceMotion { return .easeInOut(duration: 0.2) }
         let metrics = MadarMetric.values
         return .timingCurve(metrics["motion.themeSwitch.curve.0"]!, metrics["motion.themeSwitch.curve.1"]!, metrics["motion.themeSwitch.curve.2"]!, metrics["motion.themeSwitch.curve.3"]!, duration: metrics["motion.themeSwitch.duration"]!)
     }
@@ -125,7 +94,7 @@ struct MadarRootView: View {
             return size == "AX5" ? .accessibility5 : size == "AX3" ? .accessibility3 : .large
         }
         #endif
-        let minimum: DynamicTypeSize = switch session.string("core.fontScale") { case "large": .xLarge; case "xlarge": .xxxLarge; default: .large }
-        return max(dynamicType, minimum)
+        // RA8: core.fontScale is cut; the system's Dynamic Type setting is followed as is.
+        return dynamicType
     }
 }

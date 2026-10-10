@@ -33,7 +33,7 @@ final class AppSession {
     private let bus: CommandBus
     private var expiryTask: Task<Void, Never>?
 
-    static let supportedKeys = ["core.dayStart", "core.firstCalendar", "core.hijriSource", "core.hijriOffset", "core.weekStart", "core.theme", "core.numerals", "core.fontScale", "core.motion", "core.roomIdentity", "core.homeCity", "core.faceIDLock", "tabbar.style", "tabbar.labels", "tabbar.minimizeOnScroll"]
+    static let supportedKeys = ["core.dayStart", "core.firstCalendar", "core.hijriSource", "core.hijriOffset", "core.weekStart", "core.theme", "core.numerals", "core.homeCity", "core.faceIDLock"]
 
     init(container: ModelContainer, managedStore: ManagedDataStore? = nil, groupDirectory: URL? = nil) throws {
         self.container = container
