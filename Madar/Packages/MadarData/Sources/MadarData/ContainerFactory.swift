@@ -8,16 +8,11 @@ public enum MadarContainerFactory {
             ModelConfiguration("deviceOnly", schema: Schema(MadarSchema.deviceTypes), isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         ])
     }
-    public static func makeLocal(at directory: URL) throws -> ModelContainer { try build(at: directory, cloudKitIdentifier: nil) }
+    public static func makeLocal(at directory: URL) throws -> ModelContainer { try build(at: directory) }
     @MainActor public static func makeAppGroup(identifier: String, cloudKitContainerIdentifier: String? = nil) throws -> ModelContainer {
         guard let directory = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: identifier) else { throw DataError.missingAppGroup }
-        try preflightVersion(at: directory)
-        // Read the device store alone before opening CloudKit. Missing preference = schema default true.
-        let device = try ModelContainer(for: Schema(MadarSchema.deviceTypes), configurations: ModelConfiguration("deviceOnly", schema: Schema(MadarSchema.deviceTypes), url: directory.appendingPathComponent("Device.store"), cloudKitDatabase: .none))
-        let rows = try device.mainContext.fetch(FetchDescriptor<DeviceSetting>())
-        let preference = rows.filter { $0.key == "core.iCloudSync" && $0.deletedAt == nil && $0.mergedInto == nil }.max { $0.updatedAt < $1.updatedAt }
-        let enabled = preference.flatMap { try? JSONDecoder().decode(Bool.self, from: $0.valueJSON) } ?? true
-        return try build(at: directory, cloudKitIdentifier: enabled ? cloudKitContainerIdentifier : nil)
+        // RA1: retain the legacy signature and stored preference, but v1 always opens local files.
+        return try build(at: directory)
     }
     private static func preflightVersion(at directory: URL) throws {
         let stamp = directory.appendingPathComponent("SchemaVersion.json")
@@ -37,7 +32,7 @@ public enum MadarContainerFactory {
             guard version >= 1 else { throw DataError.invalidValue("device store version") }
         }
         let container = try ModelContainer(for:MadarSchema.schema,migrationPlan:MadarMigrationPlan.self,configurations:[
-            ModelConfiguration("synced",schema:Schema(MadarSchema.syncedTypes),url:syncedDirectory.appendingPathComponent("Madar.store"),cloudKitDatabase:cloudKitContainerIdentifier.map { .private($0) } ?? .none),
+            ModelConfiguration("synced",schema:Schema(MadarSchema.syncedTypes),url:syncedDirectory.appendingPathComponent("Madar.store"),cloudKitDatabase:.none),
             ModelConfiguration("deviceOnly",schema:Schema(MadarSchema.deviceTypes),url:deviceStoreURL,cloudKitDatabase:.none)
         ])
         try DurableFiles.encode(MadarSchema.version,to:syncedDirectory.appendingPathComponent("SchemaVersion.json"))
@@ -48,12 +43,12 @@ public enum MadarContainerFactory {
         try FileManager.default.createDirectory(at:directory,withIntermediateDirectories:true)
         return try ModelContainer(for:Schema(MadarSchema.syncedTypes),configurations:ModelConfiguration("synced",schema:Schema(MadarSchema.syncedTypes),url:directory.appendingPathComponent("Madar.store"),cloudKitDatabase:.none))
     }
-    private static func build(at directory: URL, cloudKitIdentifier: String?) throws -> ModelContainer {
+    private static func build(at directory: URL) throws -> ModelContainer {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let stamp = directory.appendingPathComponent("SchemaVersion.json")
         try preflightVersion(at: directory)
         let container = try ModelContainer(for: MadarSchema.schema, migrationPlan: MadarMigrationPlan.self, configurations: [
-            ModelConfiguration("synced", schema: Schema(MadarSchema.syncedTypes), url: directory.appendingPathComponent("Madar.store"), cloudKitDatabase: cloudKitIdentifier.map { .private($0) } ?? .none),
+            ModelConfiguration("synced", schema: Schema(MadarSchema.syncedTypes), url: directory.appendingPathComponent("Madar.store"), cloudKitDatabase: .none),
             ModelConfiguration("deviceOnly", schema: Schema(MadarSchema.deviceTypes), url: directory.appendingPathComponent("Device.store"), cloudKitDatabase: .none)
         ])
         try JSONEncoder().encode(MadarSchema.version).write(to: stamp, options: .atomic)

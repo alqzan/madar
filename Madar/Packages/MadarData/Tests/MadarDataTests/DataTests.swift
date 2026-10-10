@@ -39,12 +39,49 @@ import Testing
         #expect(a.mergedInto == b.id); #expect(grade.sessionID == b.id)
         let late = PageGrade(); late.sessionID = a.id; late.page = 2; context.insert(late); try context.save(); try RowMerger(context:context).run(); #expect(late.sessionID == b.id)
     }
-    @Test func ownershipCascadeKeepsSharedMedia() throws {
+    @Test func test_M0S1_RD2_entryDeletionRetainsMarginsAndSharedMedia() throws {
         let c = try MadarContainerFactory.makeInMemory(); let context = c.mainContext
         let media = Media(); let entry = Entry(); let other = Entry(); entry.mediaID = media.id; other.mediaID = media.id
-        let note = MarginNote(); note.targetEntryID = entry.id; entry.deletedAt = Date()
+        let note = MarginNote(); note.targetEntryID = entry.id; note.targetDayKey = "2020-01-01"; note.writtenDayKey = "2026-10-10"; note.text = "هامش محفوظ"; entry.deletedAt = Date()
+        let before = try note.record()
         for row in [media as any PersistentModel,entry,other,note] { context.insert(row) }; try context.save(); try RowMerger(context:context).run()
-        #expect(note.deletedAt != nil); #expect(media.deletedAt == nil)
+        #expect(try note.record() == before); #expect(media.deletedAt == nil)
+        #expect(try RowMerger(context:context).run() == 0)
+    }
+    @Test func test_M0S1_RD2_bookDeletionRetainsHistoryTitleAndFile() throws {
+        let c = try MadarContainerFactory.makeInMemory(); let context = c.mainContext
+        let media = Media(); media.data = Data([1,2,3])
+        let book = Book(); book.title = "كتاب محفوظ"; book.mediaID = media.id; book.deletedAt = Date(timeIntervalSince1970:100)
+        let session = ReadingSession(); session.bookID = book.id; session.dayKey = "2026-10-09"; session.activeSeconds = 60; session.pagesCounted = 2
+        let highlight = Highlight(); highlight.bookID = book.id
+        let sessionBefore = try session.record(), highlightBefore = try highlight.record(), mediaBefore = try media.record()
+        for row in [media as any PersistentModel,book,session,highlight] { context.insert(row) }; try context.save()
+        let merger = RowMerger(context:context); try merger.run()
+        #expect(book.title == "كتاب محفوظ"); #expect(book.deletedAt != nil)
+        #expect(try session.record() == sessionBefore); #expect(try highlight.record() == highlightBefore); #expect(try media.record() == mediaBefore)
+        #expect(try merger.run() == 0)
+    }
+    @Test func test_M0S1_RD2_oldCascadeChildrenRequireExplicitRestore() throws {
+        let c = try MadarContainerFactory.makeInMemory(); let context = c.mainContext
+        let deletion = Date(timeIntervalSince1970:100)
+        let entry = Entry(); entry.deletedAt = deletion
+        let book = Book(); book.deletedAt = deletion; book.title = "عنوان محذوف"
+        let note = MarginNote(); note.targetEntryID = entry.id; note.deletedAt = deletion; note.deletionBarrierAt = deletion
+        let session = ReadingSession(); session.bookID = book.id; session.deletedAt = deletion; session.deletionBarrierAt = deletion
+        let highlight = Highlight(); highlight.bookID = book.id; highlight.deletedAt = deletion; highlight.deletionBarrierAt = deletion
+        for row in [entry as any PersistentModel,book,note,session,highlight] { context.insert(row) }; try context.save()
+        let merger = RowMerger(context:context); try merger.run()
+        try merger.restore(model:"Entry",id:entry.id,now:deletion.addingTimeInterval(10))
+        try merger.restore(model:"Book",id:book.id,now:deletion.addingTimeInterval(10))
+        // A later ordinary write/import cannot revive old cascade tombstones.
+        note.deletedAt = nil; session.deletedAt = nil; highlight.deletedAt = nil
+        note.updatedAt = deletion.addingTimeInterval(100); session.updatedAt = note.updatedAt; highlight.updatedAt = note.updatedAt
+        try context.save(); try merger.run()
+        #expect(note.deletedAt == deletion); #expect(session.deletedAt == deletion); #expect(highlight.deletedAt == deletion)
+        #expect(note.restoredAt == nil && session.restoredAt == nil && highlight.restoredAt == nil)
+        #expect(try merger.run() == 0)
+        try merger.restore(model:"MarginNote",id:note.id,now:deletion.addingTimeInterval(200))
+        #expect(note.deletedAt == nil); #expect(session.deletedAt == deletion && highlight.deletedAt == deletion)
     }
     @Test func fieldExceptionsAndMoneyIdentity() throws {
         let c = try MadarContainerFactory.makeInMemory(); let context = c.mainContext
@@ -128,7 +165,7 @@ import Testing
         let la = ImportLink(); let lb = ImportLink(); la.sourceID = "legacy-1"; lb.sourceID = la.sourceID; la.targetModel = "Entry"; lb.targetModel = "Entry"; la.targetID = a.id; lb.targetID = b.id; lb.updatedAt = la.updatedAt.addingTimeInterval(1)
         let note = MarginNote(); note.targetEntryID = a.id
         context.insert(a); context.insert(b); context.insert(la); context.insert(lb); context.insert(note); try context.save(); try RowMerger(context:context).run()
-        #expect(a.mergedInto == b.id); #expect(b.deletedAt != nil); #expect(note.targetEntryID == b.id); #expect(note.deletedAt != nil); #expect(try RowMerger(context:context).run() == 0)
+        #expect(a.mergedInto == b.id); #expect(b.deletedAt != nil); #expect(note.targetEntryID == b.id); #expect(note.deletedAt == nil); #expect(try RowMerger(context:context).run() == 0)
     }
     @Test func singletonBarrierNormalizesAndRestoreCannotBeOrdinaryWrite() throws {
         let c = try MadarContainerFactory.makeInMemory(); let context = c.mainContext
