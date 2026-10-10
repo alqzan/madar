@@ -189,6 +189,20 @@ func J10_capAndNudge() throws {
     let again = NotificationArbiter.plan(candidates: [], prayerDays: [], now: now, timeZone: zone)
     #expect(next == again)
 }
+@Test("RU1 dual dates separate numeric parts with an Arabic comma")
+func test_RU1_dualDatesSeparateDigitsWithArabicComma() throws {
+    let dual = DualDate(instant: try instant(hour: 12), timeZone: zone)
+    // Hand-written Hijri reference from the handoff, with RU1's punctuation.
+    let fixtures: [(FirstCalendar, NumeralStyle, String)] = [
+        (.hijri, .hindi, "٢٨ ربيع الآخر ١٤٤٨، ٢٠٢٦-١٠-٠٩"),
+        (.gregorian, .hindi, "٢٠٢٦-١٠-٠٩، ٢٨ ربيع الآخر ١٤٤٨"),
+        (.hijri, .western, "28 ربيع الآخر 1448، 2026-10-09"),
+        (.gregorian, .western, "2026-10-09، 28 ربيع الآخر 1448")
+    ]
+    for (calendar, numerals, expected) in fixtures {
+        #expect(dual.text(firstCalendar: calendar, numerals: numerals) == expected)
+    }
+}
 @Test("J01 dual calendar order and diary night presentation leave stored key alone")
 func dualDateAndTravel() throws {
     let date = try instant(hour: 12)

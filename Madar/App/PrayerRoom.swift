@@ -181,7 +181,7 @@ struct PrayerRoom: View {
         VStack(alignment: .leading, spacing: 5) {
             Text("الصلاة").font(MadarTypography.title())
             Text(state.dateTitle).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-            Text(state.secondaryDateTitle + " · " + state.placeTitle).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+            Text(state.secondaryDateTitle + "، " + state.placeTitle).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
         }
     }
     @ViewBuilder private func block(_ key: String, state: PrayerRoomState) -> some View {
@@ -189,7 +189,7 @@ struct PrayerRoom: View {
         case "next": nextCard(state)
         case "riwaq": riwaq(state)
         case "pending": pendingCard(state)
-        case "hali": if let summary = state.summary { Button { sheet = .hali } label: { MadarCard { VStack(alignment: .leading, spacing: 12) { Text("حالي").font(MadarTypography.cardTitle()); PrayerBalance(summary: summary, style: state.balanceView, locale: state.numeralLocale); Text(summary.percentageLabel.map { $0 + " · " + summary.monthTitle } ?? "لم تُحسب النسبة بعد"); Text(summary.prayerStreakLabel).foregroundStyle(theme.secondaryInk); if let mosque = summary.mosqueStreakLabel { Text(mosque).foregroundStyle(theme.secondaryInk) } } } }.buttonStyle(.plain).accessibilityIdentifier("prayer-hali") }
+        case "hali": if let summary = state.summary { Button { sheet = .hali } label: { MadarCard { VStack(alignment: .leading, spacing: 12) { Text("حالي").font(MadarTypography.cardTitle()); PrayerBalance(summary: summary, style: state.balanceView, locale: state.numeralLocale); Text(summary.percentageLabel.map { $0 + "، " + summary.monthTitle } ?? "لم تُحسب النسبة بعد"); Text(summary.prayerStreakLabel).foregroundStyle(theme.secondaryInk); if let mosque = summary.mosqueStreakLabel { Text(mosque).foregroundStyle(theme.secondaryInk) } } } }.buttonStyle(.plain).accessibilityIdentifier("prayer-hali") }
         case "qada": qadaCard(state)
         case "qiyam": if !state.nights.isEmpty { Button { sheet = .qiyam } label: { MadarCard { VStack(alignment: .leading, spacing: 10) { Label("قيام الليل", systemImage: "moon.stars").font(MadarTypography.cardTitle()); Text(state.nights[0].rakaat == 0 ? "سجّل ما قمتَه" : "\(number(state.nights[0].rakaat, state)) ركعات"); Text("ليس سلسلة تنكسر، أثرٌ يُرى").foregroundStyle(theme.secondaryInk) } } }.buttonStyle(.plain).accessibilityIdentifier("prayer-qiyam") }
         default: EmptyView()
@@ -211,7 +211,7 @@ struct PrayerRoom: View {
         MadarCard {
             VStack(spacing: 12) {
                 if typeSize.isAccessibilitySize {
-                    ForEach(state.entries) { entry in Button { sheet = .log(entry) } label: { HStack { PrayerStar().fill(statusColor(entry.status)).frame(width: 20, height: 20); VStack(alignment: .leading) { Text(entry.title); Text([entry.timeLabel, entry.status.title].compactMap { $0 }.joined(separator: " · ")).font(MadarTypography.caption()) }; Spacer(); Image(systemName: "chevron.forward") }.frame(minHeight: 60) }.buttonStyle(.plain).accessibilityIdentifier("prayer-arch-" + entry.selection.prayer.rawValue) }
+                    ForEach(state.entries) { entry in Button { sheet = .log(entry) } label: { HStack { PrayerStar().fill(statusColor(entry.status)).frame(width: 20, height: 20); VStack(alignment: .leading) { Text(entry.title); Text([entry.timeLabel, entry.status.title].compactMap { $0 }.joined(separator: "، ")).font(MadarTypography.caption()) }; Spacer(); Image(systemName: "chevron.forward") }.frame(minHeight: 60) }.buttonStyle(.plain).accessibilityIdentifier("prayer-arch-" + entry.selection.prayer.rawValue) }
                 } else {
                     HStack(alignment: .bottom, spacing: 8) {
                         ForEach(state.entries) { entry in
@@ -321,7 +321,7 @@ private struct PrayerPendingSheet: View {
     @State private var selected = Set<PrayerUISelection>()
     @State private var confirm = false
     var body: some View {
-        List { Section { Text("سجّل ما تتذكّره. اختيار «لم أسجّل هذه الفترة» يترك الفروض المحدّدة خارج القضاء والنسبة والسلسلة.") }; ForEach(model.state?.pending ?? []) { entry in HStack { Toggle(isOn: Binding(get: { selected.contains(entry.selection) }, set: { if $0 { selected.insert(entry.selection) } else { selected.remove(entry.selection) } })) { Text(entry.selection.dayKey + " · " + entry.title) }; Button("سجّل") { select(entry) }.accessibilityIdentifier("prayer-pending-log-" + entry.id) } }; Button("لم أسجّل هذه الفترة") { confirm = true }.disabled(selected.isEmpty).accessibilityIdentifier("prayer-unrecorded") }
+        List { Section { Text("سجّل ما تتذكّره. اختيار «لم أسجّل هذه الفترة» يترك الفروض المحدّدة خارج القضاء والنسبة والسلسلة.") }; ForEach(model.state?.pending ?? []) { entry in HStack { Toggle(isOn: Binding(get: { selected.contains(entry.selection) }, set: { if $0 { selected.insert(entry.selection) } else { selected.remove(entry.selection) } })) { Text(entry.selection.dayKey + "، " + entry.title) }; Button("سجّل") { select(entry) }.accessibilityIdentifier("prayer-pending-log-" + entry.id) } }; Button("لم أسجّل هذه الفترة") { confirm = true }.disabled(selected.isEmpty).accessibilityIdentifier("prayer-unrecorded") }
             .navigationTitle("صلوات معلّقة").font(MadarTypography.body()).disabled(model.busy)
             .confirmationDialog("اترك الفروض المحدّدة بلا سجل؟", isPresented: $confirm, titleVisibility: .visible) { Button("لم أسجّل هذه الفترة") { Task { if await model.perform(.markUnrecorded(Array(selected))) { selected.removeAll() } } } } message: { Text("لا تُعدّ فائتة، ويمكنك التراجع بعد الحفظ.") }
     }
@@ -332,7 +332,7 @@ private struct PrayerQadaSheet: View {
     @State private var day: Date = .now
     @State private var prayer: PrayerUICode = .fajr
     var body: some View {
-        Form { PrayerQadaCitation(); if model.state?.qada.isEmpty == true { Text("لا فوائت مسجّلة عليك.") }; ForEach(model.state?.qada ?? []) { item in VStack(alignment: .leading, spacing: 10) { Text(item.title + " · " + item.dateLabel); Button("قضيتُها") { Task { _ = await model.perform(.makeUp(item.selection)) } }.accessibilityIdentifier("prayer-qada-makeup-" + item.id) } }; Button("أضِف فائتة قديمة") { if let state = model.state { day = state.oldMissedDefault }; addingOld = true }.accessibilityIdentifier("prayer-add-old-missed"); if addingOld, let state = model.state { Section("فائتة أضيفها صراحة") { DatePicker("اليوم", selection: $day, in: state.oldMissedEarliest...state.oldMissedLatest, displayedComponents: .date).environment(\.timeZone, TimeZone(identifier: state.timeZoneID) ?? .gmt); Picker("الصلاة", selection: $prayer) { ForEach(PrayerUICode.allCases) { Text($0.title).tag($0) } }; Button("أضِف الفائتة") { Task { if await model.perform(.addOldMissed(day: day, prayer: prayer)) { addingOld = false } } }.accessibilityIdentifier("prayer-add-old-confirm") } } }.navigationTitle("القضاء").font(MadarTypography.body()).disabled(model.busy)
+        Form { PrayerQadaCitation(); if model.state?.qada.isEmpty == true { Text("لا فوائت مسجّلة عليك.") }; ForEach(model.state?.qada ?? []) { item in VStack(alignment: .leading, spacing: 10) { Text(item.title + "، " + item.dateLabel); Button("قضيتُها") { Task { _ = await model.perform(.makeUp(item.selection)) } }.accessibilityIdentifier("prayer-qada-makeup-" + item.id) } }; Button("أضِف فائتة قديمة") { if let state = model.state { day = state.oldMissedDefault }; addingOld = true }.accessibilityIdentifier("prayer-add-old-missed"); if addingOld, let state = model.state { Section("فائتة أضيفها صراحة") { DatePicker("اليوم", selection: $day, in: state.oldMissedEarliest...state.oldMissedLatest, displayedComponents: .date).environment(\.timeZone, TimeZone(identifier: state.timeZoneID) ?? .gmt); Picker("الصلاة", selection: $prayer) { ForEach(PrayerUICode.allCases) { Text($0.title).tag($0) } }; Button("أضِف الفائتة") { Task { if await model.perform(.addOldMissed(day: day, prayer: prayer)) { addingOld = false } } }.accessibilityIdentifier("prayer-add-old-confirm") } } }.navigationTitle("القضاء").font(MadarTypography.body()).disabled(model.busy)
     }
 }
 private struct PrayerQiyamSheet: View {
@@ -343,7 +343,7 @@ private struct PrayerQiyamSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.roomTheme) private var theme
     var body: some View {
-        Form { Section { Picker("الليلة", selection: $nightKey) { ForEach(model.state?.nights ?? []) { Text($0.title).tag($0.nightKey) } }.accessibilityIdentifier("prayer-qiyam-night"); Stepper("الركعات: \(rakaat)", value: $rakaat, in: 0...100, step: 2).accessibilityIdentifier("prayer-qiyam-rakaat"); Toggle("أوترتُ", isOn: $witr).accessibilityIdentifier("prayer-qiyam-witr"); Button("احفظ قيام الليلة") { Task { if await model.perform(.saveQiyam(nightKey: nightKey, rakaat: rakaat, witr: witr)) { dismiss() } } }.disabled(nightKey.isEmpty).accessibilityIdentifier("prayer-qiyam-save") }; Section("آخر ثلاثين ليلة") { ScrollView(.horizontal) { HStack(spacing: 5) { ForEach(model.state?.nightFootprint ?? []) { night in RoundedRectangle(cornerRadius: 4).fill(night.rakaat > 0 || night.witr ? theme.accent : theme.line).frame(width: 10, height: 24).accessibilityLabel(night.title + (night.rakaat > 0 || night.witr ? " · قيام مسجّل" : " · بلا تسجيل")) } } }; Text("ليس سلسلة تنكسر، أثرٌ يُرى."); Text("التسجيل هنا للركعات والوتر؛ لا يكتب أوجهًا أو مراجعة قرآن.").font(MadarTypography.caption()) } }.navigationTitle("قيام الليل").font(MadarTypography.body()).disabled(model.busy).onAppear { if let first = model.state?.nights.first { nightKey = first.nightKey; rakaat = first.rakaat; witr = first.witr } }.onChange(of: nightKey) { _, key in if let night = model.state?.nights.first(where: { $0.nightKey == key }) { rakaat = night.rakaat; witr = night.witr } }
+        Form { Section { Picker("الليلة", selection: $nightKey) { ForEach(model.state?.nights ?? []) { Text($0.title).tag($0.nightKey) } }.accessibilityIdentifier("prayer-qiyam-night"); Stepper("الركعات: \(rakaat)", value: $rakaat, in: 0...100, step: 2).accessibilityIdentifier("prayer-qiyam-rakaat"); Toggle("أوترتُ", isOn: $witr).accessibilityIdentifier("prayer-qiyam-witr"); Button("احفظ قيام الليلة") { Task { if await model.perform(.saveQiyam(nightKey: nightKey, rakaat: rakaat, witr: witr)) { dismiss() } } }.disabled(nightKey.isEmpty).accessibilityIdentifier("prayer-qiyam-save") }; Section("آخر ثلاثين ليلة") { ScrollView(.horizontal) { HStack(spacing: 5) { ForEach(model.state?.nightFootprint ?? []) { night in RoundedRectangle(cornerRadius: 4).fill(night.rakaat > 0 || night.witr ? theme.accent : theme.line).frame(width: 10, height: 24).accessibilityLabel(night.title + (night.rakaat > 0 || night.witr ? "، قيام مسجّل" : "، بلا تسجيل")) } } }; Text("ليس سلسلة تنكسر، أثرٌ يُرى."); Text("التسجيل هنا للركعات والوتر؛ لا يكتب أوجهًا أو مراجعة قرآن.").font(MadarTypography.caption()) } }.navigationTitle("قيام الليل").font(MadarTypography.body()).disabled(model.busy).onAppear { if let first = model.state?.nights.first { nightKey = first.nightKey; rakaat = first.rakaat; witr = first.witr } }.onChange(of: nightKey) { _, key in if let night = model.state?.nights.first(where: { $0.nightKey == key }) { rakaat = night.rakaat; witr = night.witr } }
     }
 }
 private struct PrayerPairSheet: View {
@@ -361,7 +361,7 @@ private struct PrayerPairSheet: View {
 private struct PrayerQadaCitation: View {
     @State private var index = 0
     private let citations = [
-        ("مَنْ نَسِيَ صَلَاةً فَلْيُصَلِّ إِذَا ذَكَرَهَا، لَا كَفَّارَةَ لَهَا إِلَّا ذَلِكَ", "البخاري ٥٩٧ · مسلم ٦٨٤"),
+        ("مَنْ نَسِيَ صَلَاةً فَلْيُصَلِّ إِذَا ذَكَرَهَا، لَا كَفَّارَةَ لَهَا إِلَّا ذَلِكَ", "البخاري ٥٩٧، مسلم ٦٨٤"),
         ("مَنْ نَسِيَ صَلَاةً أَوْ نَامَ عَنْهَا فَكَفَّارَتُهَا أَنْ يُصَلِّيَهَا إِذَا ذَكَرَهَا", "مسلم ٦٨٤"),
         ("﴿حَافِظُوا عَلَى الصَّلَوَاتِ وَالصَّلَاةِ الْوُسْطَىٰ وَقُومُوا لِلَّهِ قَانِتِينَ﴾", "البقرة ٢٣٨")
     ]
