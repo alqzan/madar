@@ -1,6 +1,28 @@
 import XCTest
 
 @MainActor final class FoundationUITests: XCTestCase {
+    func test_M0S2_SecureInputCharacterClasses() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment["MADAR_UI_STORE_ID"] = UUID().uuidString
+        app.launchEnvironment["MADAR_UI_SIZE"] = "L"
+        app.launch(); openBackupSettings(app)
+        let password = app.secureTextFields["backup-password"]
+        let export = app.buttons["backup-now"]
+        scrollTo(password, in: app)
+        password.tap()
+        var observations: [String] = []
+        let samples = [("Latin 1", "t"), ("punctuation 1", "-"), ("Latin 2", "e"), ("punctuation 2", "!"), ("Arabic", "س")]
+        for (label, character) in samples {
+            password.typeText(character)
+            let diagnostic = export.value as? String ?? "no diagnostic"
+            print("Secure UI input class \(label): \(diagnostic)")
+            observations.append(diagnostic)
+        }
+        let expected = (1...samples.count).map { "passphrase-count=\($0);confirmation-count=0;matches=false;busy=false" }
+        XCTAssertEqual(observations, expected, "Every supported character must be retained by actual UI input.")
+        app.terminate()
+    }
     func test_M0S2_SecurePasswordTypingTransport() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
