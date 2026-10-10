@@ -19,7 +19,7 @@ import MadarData
     @Test func makeUpUsesOneNaturalPairOfRowsAndUndoRestoresBoth() throws {
         let container = try container(); let context = container.mainContext; let reference = try ref()
         try apply(.record(reference, status: .missed, heart: nil, shortened: nil), context)
-        let inverse = try #require(apply(.makeUp(reference), context, at: "2026-10-07T12:01:00+03:00"))
+        let inverse = try #require(try apply(.makeUp(reference), context, at: "2026-10-07T12:01:00+03:00"))
         #expect(try context.fetch(FetchDescriptor<PrayerLog>()).filter { $0.deletedAt == nil }.map(\.status) == ["qada"])
         #expect(try context.fetch(FetchDescriptor<QadaItem>()).filter { $0.deletedAt == nil }.first?.madeUpAt == time("2026-10-07T12:01:00+03:00"))
         #expect(try apply(.makeUp(reference), context, at: "2026-10-07T12:02:00+03:00") == nil)
@@ -40,7 +40,7 @@ import MadarData
     }
     @Test func inverseRejectsStaleChangeWithoutOverwritingLaterHeart() throws {
         let container = try container(); let context = container.mainContext; let reference = try ref()
-        let inverse = try #require(apply(.record(reference, status: .jamaah, heart: nil, shortened: nil), context))
+        let inverse = try #require(try apply(.record(reference, status: .jamaah, heart: nil, shortened: nil), context))
         try apply(.answerHeart(reference, .khashi), context, at: "2026-10-07T12:01:00+03:00")
         #expect(throws: PrayerDomainError.staleUndo) { try PrayerMutationHandler.undo(inverse, in: context, now: time("2026-10-07T12:02:00+03:00"), writer: "test-device") }
         #expect(try context.fetch(FetchDescriptor<PrayerLog>()).first?.heart == "khashi")
@@ -81,7 +81,7 @@ import MadarData
     @Test func explicitUnrecordedPeriodCreatesNoDebtOrPercentageAndCanUndo() throws {
         let container = try container(); let context = container.mainContext
         let references = try [ref(), ref("2026-10-07", .dhuhr)]
-        let inverse = try #require(apply(.markUnrecorded(references), context))
+        let inverse = try #require(try apply(.markUnrecorded(references), context))
         let state = try PrayerRepository(context: context).snapshot(now: time("2026-10-07T12:05:00+03:00"))
         #expect(state.statistics.denominator == 0 && state.statistics.percentage == nil && state.qada.isEmpty)
         try PrayerMutationHandler.undo(inverse, in: context, now: time("2026-10-07T12:06:00+03:00"), writer: "test-device"); try context.save()
@@ -101,7 +101,7 @@ import MadarData
     @Test func taqdimPairHasExactlyTwoRowsAndUndoRemovesBoth() throws {
         let container = try container(); let context = container.mainContext
         try apply(.startTrip(city: "الرياض", country: "SA", place: .riyadh, homeKm: 350), context, at: "2026-10-07T10:00:00+03:00")
-        let inverse = try #require(apply(.logPair(day: GregorianDay("2026-10-07"), pair: .dhuhrAsr, status: .jamaah, shortened: true, mode: .taqdim), context))
+        let inverse = try #require(try apply(.logPair(day: GregorianDay("2026-10-07"), pair: .dhuhrAsr, status: .jamaah, shortened: true, mode: .taqdim), context))
         let logs = try context.fetch(FetchDescriptor<PrayerLog>())
         #expect(logs.count == 2 && Set(logs.compactMap(\.pairID)).count == 1 && logs.allSatisfy { $0.shortened == true && $0.tripID != nil })
         try PrayerMutationHandler.undo(inverse, in: context, now: time("2026-10-07T12:01:00+03:00"), writer: "test-device"); try context.save()
