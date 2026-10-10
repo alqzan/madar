@@ -213,10 +213,12 @@ import Darwin
         var warnings: [String] = []
         do {
             let context = ModelContext(store.container); context.autosaveEnabled = false
-            // These device-local rows refer to the previous facts and are never imported from archives.
-            for row in try context.fetch(FetchDescriptor<PageSchedule>()) { context.delete(row) }
-            for row in try context.fetch(FetchDescriptor<SessionDraft>()) { context.delete(row) }
-            for row in try context.fetch(FetchDescriptor<ProcessingJob>()) { context.delete(row) }
+            // Restore changes facts. A model-name conversion preserves every fact and local row.
+            if store.journal()?.preserveDeviceRows != true {
+                for row in try context.fetch(FetchDescriptor<PageSchedule>()) { context.delete(row) }
+                for row in try context.fetch(FetchDescriptor<SessionDraft>()) { context.delete(row) }
+                for row in try context.fetch(FetchDescriptor<ProcessingJob>()) { context.delete(row) }
+            }
             if context.hasChanges { try context.save() }
         } catch { warnings.append("تعذّر إبطال الجدولة والمسودات والمهام؛ ستُعاد المحاولة عند الفتح.") }
         do { try await lifecycle.rebuildSnapshots(store.container) } catch { warnings.append("تعذّر تحديث اللقطات؛ ستُعاد المحاولة عند الفتح.") }

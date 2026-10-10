@@ -76,7 +76,7 @@ public enum BackupCodec {
         let headerBytes = try take(headerLength); let header = try JSONDecoder().decode(BackupHeader.self,from:headerBytes)
         guard header.magic == "MADARBK", header.formatVersion == 1, header.cipher == "AES-256-GCM", header.kdf.alg == "PBKDF2-HMAC-SHA256", header.kdf.iterations == 600000, header.kdf.salt.count == 16, header.noncePrefix.count == 4, header.chunkSize == chunkSize, (1...512).contains(header.chunkCount) else { throw DataError.unsupportedBackup }
         guard header.storeSchemaVersion <= MadarSchema.version else { throw DataError.newerStore }
-        guard header.storeSchemaVersion == MadarSchema.version else { throw DataError.unsupportedBackup }
+        let sourceModels = try SchemaCompatibility.modelNames(version:header.storeSchemaVersion)
         let key: SymmetricKey
         if let passphrase { key = try derive(passphrase:passphrase,salt:header.kdf.salt,iterations:header.kdf.iterations) }
         else if let credential, credential.salt == header.kdf.salt, credential.keyData.count == 32 { key = SymmetricKey(data:credential.keyData) }
@@ -95,10 +95,10 @@ public enum BackupCodec {
         let files = try decodeArchive(archive)
         guard let bytes = files["manifest.json"] else { throw DataError.invalidBackup }
         let manifest = try JSONDecoder().decode(BackupManifest.self,from:bytes)
-        guard manifest.formatVersion == 1, manifest.storeSchemaVersion == header.storeSchemaVersion, Set(manifest.counts.keys) == Set(MadarSchema.syncedNames), Set(manifest.files.map(\.path)).count == manifest.files.count, Set(files.keys) == Set(manifest.files.map(\.path)+["manifest.json"]) else { throw DataError.invalidBackup }
+        guard manifest.formatVersion == 1, manifest.storeSchemaVersion == header.storeSchemaVersion, Set(manifest.counts.keys) == Set(sourceModels), Set(manifest.files.map(\.path)).count == manifest.files.count, Set(files.keys) == Set(manifest.files.map(\.path)+["manifest.json"]) else { throw DataError.invalidBackup }
         for file in manifest.files { guard let data = files[file.path], data.count == file.bytes, hash(data) == file.sha256 else { throw DataError.invalidBackup } }
         var records: [DataRecord] = []
-        for model in MadarSchema.syncedNames {
+        for model in sourceModels {
             guard let data = files["data/\(model).jsonl"] else { throw DataError.invalidBackup }
             let lines = data.split(separator:0x0a,omittingEmptySubsequences:true)
             guard manifest.counts[model] == lines.count else { throw DataError.invalidBackup }
@@ -109,8 +109,9 @@ public enum BackupCodec {
                 records.append(row)
             }
         }
-        let allowedPaths = Set(MadarSchema.syncedNames.map { "data/\($0).jsonl" } + records.filter { $0.model == "Media" && $0.fields["data"] != .null }.map { "media/\($0.id.uuidString)" })
+        let allowedPaths = Set(sourceModels.map { "data/\($0).jsonl" } + records.filter { $0.model == "Media" && $0.fields["data"] != .null }.map { "media/\($0.id.uuidString)" })
         guard Set(manifest.files.map(\.path)) == allowedPaths else { throw DataError.invalidBackup }
+        records = try SchemaCompatibility.currentRecords(records,from:header.storeSchemaVersion)
         // Decode every stored property through generated typed models in an isolated validation container.
         try RecordValidator.validate(records)
         try cancellation.check()

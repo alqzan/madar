@@ -24,7 +24,7 @@ for m in p['models']:
  code += [f'        {f["name"]} = try record.decode("{f["name"]}", as: {f["type"]}.self)' for f in fs]
  code += ['    }','}']
 (base/'Sources/MadarData/GeneratedModels.swift').write_text('\n'.join(code)+'\n')
-code=['import Foundation','import SwiftData','public enum MadarSchema: VersionedSchema {', '    public static let versionIdentifier = Schema.Version(1, 0, 0)', '    public static var models: [any PersistentModel.Type] { syncedTypes + deviceTypes }','    public static let version = 1','    public static let syncedTypes: [any PersistentModel.Type] = ['+', '.join(m['name']+'.self' for m in p['models'] if m['config']=='synced')+']','    public static let deviceTypes: [any PersistentModel.Type] = ['+', '.join(m['name']+'.self' for m in p['models'] if m['config']=='deviceOnly')+']','    public static let syncedNames: [String] = '+json.dumps([m['name'] for m in p['models'] if m['config']=='synced']),'    public static var schema: Schema { Schema(versionedSchema: Self.self) }','}','@MainActor public enum RecordBridge {','    public static func all(_ context: ModelContext, syncedOnly: Bool = true) throws -> [DataRecord] {','        var rows: [DataRecord] = []']
+code=['import Foundation','import SwiftData','public enum MadarSchema: VersionedSchema {', '    public static let versionIdentifier = Schema.Version(2, 0, 0)', '    public static var models: [any PersistentModel.Type] { syncedTypes + deviceTypes }','    public static let version = 2','    public static let syncedTypes: [any PersistentModel.Type] = ['+', '.join(m['name']+'.self' for m in p['models'] if m['config']=='synced')+']','    public static let deviceTypes: [any PersistentModel.Type] = ['+', '.join(m['name']+'.self' for m in p['models'] if m['config']=='deviceOnly')+']','    public static let syncedNames: [String] = '+json.dumps([m['name'] for m in p['models'] if m['config']=='synced']),'    public static var schema: Schema { Schema(versionedSchema: Self.self) }','}','@MainActor public enum RecordBridge {','    public static func all(_ context: ModelContext, syncedOnly: Bool = true) throws -> [DataRecord] {','        var rows: [DataRecord] = []']
 for m in p['models']:
  line=f'rows += try context.fetch(FetchDescriptor<{m["name"]}>()).map {{ try $0.record() }}'
  code += [('        '+line) if m['config']=='synced' else '        if !syncedOnly { '+line+' }']
@@ -48,4 +48,9 @@ for model in p['models']:
     insert_lines += ['        case "' + model['name'] + '":', '            let row = ' + model['name'] + '(); context.insert(row); try row.apply(record)']
 insert_lines += ['        default: throw DataError.unknownModel(record.model)', '        }', '    }']
 text = text.replace('    public static func upsert(', '\n'.join(insert_lines) + '\n    public static func upsert(')
+device_lines = ['    public static func deviceRecords(_ context: ModelContext) throws -> [DataRecord] {', '        var rows: [DataRecord] = []']
+for model in p['models']:
+    if model['config'] == 'deviceOnly': device_lines.append('        rows += try context.fetch(FetchDescriptor<' + model['name'] + '>()).map { try $0.record() }')
+device_lines += ['        return rows', '    }']
+text = text.replace('    public static func instances(', '\n'.join(device_lines) + '\n    public static func instances(')
 (base/'Sources/MadarData/GeneratedSchema.swift').write_text(text)

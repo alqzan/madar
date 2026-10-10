@@ -87,7 +87,7 @@ import Testing
         let c = try MadarContainerFactory.makeInMemory(); let context = c.mainContext
         let h = UUID(); let a = HabitLog(); a.habitID = h; a.periodKey = "2026-10-10"; a.value = 7
         let b = HabitLog(); b.habitID = h; b.periodKey = a.periodKey; b.value = 2; b.updatedAt = a.updatedAt.addingTimeInterval(10)
-        let t1 = Transaction(); let t2 = Transaction(); context.insert(a); context.insert(b); context.insert(t1); context.insert(t2); try context.save(); try RowMerger(context:context).run()
+        let t1 = MoneyTransaction(); let t2 = MoneyTransaction(); context.insert(a); context.insert(b); context.insert(t1); context.insert(t2); try context.save(); try RowMerger(context:context).run()
         #expect(b.value == 7); #expect(t1.mergedInto == nil && t2.mergedInto == nil)
     }
     @Test func dayOneBranchStableAndKeepBoth() throws {
@@ -191,7 +191,7 @@ import Testing
         var newer = backup
         let length = Int(newer.prefix(4).reduce(UInt64(0)) { ($0 << 8) | UInt64($1) })
         var header = String(data:newer.subdata(in:4..<4+length),encoding:.utf8)!
-        header = header.replacingOccurrences(of:"\"storeSchemaVersion\":1",with:"\"storeSchemaVersion\":9")
+        header = header.replacingOccurrences(of:"\"storeSchemaVersion\":2",with:"\"storeSchemaVersion\":9")
         newer.replaceSubrange(4..<4+length,with:Data(header.utf8))
         #expect(throws:DataError.newerStore) { try BackupCodec.validate(newer,passphrase:"correct long password") }
         #expect(try diskBytes() == before)
