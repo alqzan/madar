@@ -22,6 +22,14 @@ struct MadarApp: App {
             .environment(\.layoutDirection, .rightToLeft)
             .environment(\.locale, Locale(identifier: "ar_SA"))
             .task { if session == nil && startupError == nil && ProcessInfo.processInfo.environment["MADAR_UI_GALLERY"] != "1" { await load() } }
+            .onChange(of: scenePhase) { _, phase in
+                guard phase == .active, let session else { return }
+                Task {
+                    do { try await session.drainInbox() }
+                    catch BackupOperationError.busy { }
+                    catch { session.errorMessage = "لم يكتمل تحديث البيانات. \(error.localizedDescription)" }
+                }
+            }
             .onOpenURL { url in
                 if let session { session.open(url) }
                 else { pendingURL = url }
@@ -73,6 +81,9 @@ struct MadarApp: App {
                 guard warnings.isEmpty else { throw DataError.invalidValue(warnings.joined(separator: "\n")) }
             }
             session = opened; startupError = nil
+            do { try await opened.drainInbox() }
+            catch BackupOperationError.busy { }
+            catch { opened.errorMessage = "لم يكتمل تحديث البيانات. \(error.localizedDescription)" }
             if let pendingURL { opened.open(pendingURL); self.pendingURL = nil }
         } catch { startupError = error.localizedDescription }
     }

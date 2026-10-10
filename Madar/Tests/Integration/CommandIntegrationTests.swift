@@ -26,7 +26,7 @@ import MadarData
         _ = try await bus.execute(notification, now: now)
         let context = ModelContext(container)
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<PrayerLog>()), 1)
-        XCTAssertEqual(try context.fetchCount(FetchDescriptor<MadarData.CommandReceipt>()), 1)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<MadarData.CommandReceipt>()), 2)
         let reopened = try MadarContainerFactory.makeLocal(at: directory)
         let persisted = try ModelContext(reopened).fetch(FetchDescriptor<PrayerLog>())
         XCTAssertEqual(persisted.count, 1)

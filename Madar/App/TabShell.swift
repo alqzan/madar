@@ -50,6 +50,7 @@ struct MadarRootView: View {
         .animation(themeAnimation, value: session.string("core.theme"))
         .task {
             do {
+                try await session.drainInbox()
                 try (session.syncService as? AppSyncService)?.processLocalHistory()
                 try await (session.backupService as? AppBackupService)?.runScheduledBackup()
             } catch BackupOperationError.busy { }
@@ -68,6 +69,7 @@ struct MadarRootView: View {
                 catch { session.errorMessage = "تعذّر تحديث الواجهة. \(error.localizedDescription)" }
                 Task {
                     do {
+                        try await session.drainInbox()
                         try (session.syncService as? AppSyncService)?.processLocalHistory()
                         try await (session.backupService as? AppBackupService)?.runScheduledBackup()
                     } catch BackupOperationError.busy { }

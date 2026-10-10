@@ -12,6 +12,10 @@ private struct SettingsInverse: Codable {
     var prayerBefore: DataRecord? = nil
     var prayerAfter: DataRecord? = nil
 }
+private struct ReceiptNamespace: Codable {
+    let version: Int
+    let generationID: UUID
+}
 private struct ReceiptWire: Codable {
     var commandID: UUID
     var name: String
@@ -25,21 +29,22 @@ private struct ReceiptWire: Codable {
     var outcome: CommandOutcome
 }
 
-/// File lock covers separate app/Intent processes; each transaction uses a fresh context.
+/// App-only adapter. The lease excludes app maintenance; each transaction uses a fresh context.
 /// No actor suspension occurs between lock, dedupe, mutations and durable receipt save.
 @MainActor public final class DurableCommandAdapter: CommandStoreAdapter {
     private let containerProvider: @MainActor () throws -> ModelContainer
     let lockDirectory: URL
     private let transactionClock: @Sendable (Date) -> Date
+    private let generationProvider: @MainActor () throws -> UUID?
     /// Production refreshes time after waiting for the lock and before writing the receipt.
     /// Tests using a virtual timeline may inject `{ $0 }`.
-    public init(container: ModelContainer, lockDirectory: URL, transactionClock: @escaping @Sendable (Date) -> Date = { _ in Date() }) {
-        self.containerProvider = { container }; self.lockDirectory = lockDirectory; self.transactionClock = transactionClock
+    public init(container: ModelContainer, lockDirectory: URL, transactionClock: @escaping @Sendable (Date) -> Date = { _ in Date() }, generationProvider: @escaping @MainActor () throws -> UUID? = { nil }) {
+        self.containerProvider = { container }; self.lockDirectory = lockDirectory; self.transactionClock = transactionClock; self.generationProvider = generationProvider
     }
     /// Resolve the active generation only after acquiring the shared transaction lease.
     /// Long maintenance fails immediately; ordinary command contention waits cooperatively.
-    public init(containerProvider: @escaping @MainActor () throws -> ModelContainer, lockDirectory: URL, transactionClock: @escaping @Sendable (Date) -> Date = { _ in Date() }) {
-        self.containerProvider = containerProvider; self.lockDirectory = lockDirectory; self.transactionClock = transactionClock
+    public init(containerProvider: @escaping @MainActor () throws -> ModelContainer, lockDirectory: URL, transactionClock: @escaping @Sendable (Date) -> Date = { _ in Date() }, generationProvider: @escaping @MainActor () throws -> UUID? = { nil }) {
+        self.containerProvider = containerProvider; self.lockDirectory = lockDirectory; self.transactionClock = transactionClock; self.generationProvider = generationProvider
     }
     public func transact(_ request: CommandTransactionRequest, now arrivalDate: Date) async throws -> CommandOutcome {
         try FileManager.default.createDirectory(at: lockDirectory, withIntermediateDirectories: true)
@@ -61,7 +66,27 @@ private struct ReceiptWire: Codable {
         let context = ModelContext(container); context.autosaveEnabled = false
         do {
             let store = SettingsStore(context: context, schema: try SettingsSchema.bundled())
-            let receiptRows = try context.fetch(FetchDescriptor<MadarData.CommandReceipt>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
+            let activeGeneration = try generationProvider()
+            if let expected = request.generationID, let activeGeneration, expected != activeGeneration {
+                return .init(status: .needsApp, reason: "receiptGenerationMismatch")
+            }
+            // Fixed-container callers have no replacement pointer. Their local namespace is
+            // stable across reopen; managed production callers always supply the real pointer.
+            let generationID = activeGeneration ?? request.generationID ?? StableIdentity.uuid(for: "CommandGeneration:\(lockDirectory.standardizedFileURL.resolvingSymlinksInPath().path)")
+            let namespaces = try context.fetch(FetchDescriptor<DeviceSetting>()).filter { $0.key.hasPrefix("sys.commandReceiptScope:") && $0.deletedAt == nil && $0.mergedInto == nil }
+            func namespace(_ row: MadarData.CommandReceipt) -> ReceiptNamespace? {
+                let matches = namespaces.filter { $0.key == "sys.commandReceiptScope:\(row.id.uuidString)" }
+                guard matches.count == 1, let value = try? JSONDecoder().decode(ReceiptNamespace.self, from: matches[0].valueJSON), value.version == 1 else { return nil }
+                return value
+            }
+            let allReceiptRows = try context.fetch(FetchDescriptor<MadarData.CommandReceipt>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
+            // Existing identities from another or unknown generation are unresolved, even
+            // when the newly delivered envelope bears today's snapshot stamp.
+            for row in allReceiptRows where row.commandID == request.envelope.commandID {
+                guard let scope = namespace(row) else { return .init(status: .needsApp, reason: "receiptGenerationUnknown") }
+                guard scope.generationID == generationID else { return .init(status: .needsApp, reason: "receiptGenerationMismatch") }
+            }
+            let receiptRows = allReceiptRows.filter { namespace($0)?.generationID == generationID }
             let receipts = try receiptRows.compactMap { row -> CoreCommandReceipt? in
                 guard let id = row.commandID else { return nil }
                 let wire = ReceiptWire(commandID: id, name: row.name, payloadHash: row.payloadHash,
@@ -70,9 +95,11 @@ private struct ReceiptWire: Codable {
                                        undoExpiresAt: row.undoExpiresAt ?? row.createdAt,
                                        undoJSON: row.undoJSON,
                                        outcome: .init(status: CommandStatus(rawValue: row.status) ?? .rejected,
-                                                      undoToken: row.undoJSON == nil ? nil : id))
+                                                      undoToken: row.status == "applied" && ["prayer.log", "settings.set", "settings.applyPreset"].contains(row.name) ? id : nil))
                 return try JSONDecoder().decode(CoreCommandReceipt.self, from: JSONEncoder().encode(wire))
             }
+            // Receipt identity is authoritative even after undo/deletion or retention expiry.
+            if let replay = request.replayOutcome(receipts: receipts) { return replay }
             var existingHash: String?
             if case .replaceSettings(let settings) = request.operation {
                 var existing: [String: MadarCore.JSONValue] = [:]
@@ -90,7 +117,11 @@ private struct ReceiptWire: Codable {
             }
             switch request.decision(receipts: receipts, existingNaturalPayloadHash: existingHash, now: now) {
             case .replay(let outcome): return outcome
-            case .duplicate: return .init(status: .duplicate)
+            case .duplicate:
+                let outcome = CommandOutcome(status: .duplicate)
+                let writer = try store.writerIDForWrite(now: now)
+                try saveReceipt(request, outcome: outcome, inverseJSON: nil, writer: writer, generationID: generationID, at: now, context: context)
+                return outcome
             case .apply: break
             }
             let writer = try store.writerIDForWrite(now: now)
@@ -200,23 +231,51 @@ private struct ReceiptWire: Codable {
                 if existing == nil { context.insert(row) }
             }
             let outcome = CommandOutcome(status: .applied, undoToken: inverse == nil ? nil : request.envelope.commandID)
-            let receipt = MadarData.CommandReceipt()
-            let appliedAt = transactionClock(arrivalDate)
-            receipt.writerID = writer
-            receipt.commandID = request.envelope.commandID; receipt.name = request.envelope.name
-            receipt.payloadHash = request.payloadHash; receipt.source = request.envelope.source.rawValue
-            receipt.issuedAt = request.envelope.issuedAt; receipt.createdAt = appliedAt; receipt.updatedAt = appliedAt
-            receipt.status = outcome.status.rawValue
-            receipt.expiresAt = appliedAt.addingTimeInterval(7 * 86400)
-            receipt.undoExpiresAt = appliedAt.addingTimeInterval(request.semantics == .preset ? 60 : 600)
-            receipt.undoJSON = try inverse.map { try JSONEncoder().encode($0) }
-            context.insert(receipt)
-            try context.save()
+            try saveReceipt(request, outcome: outcome, inverseJSON: try inverse.map { try JSONEncoder().encode($0) }, writer: writer, generationID: generationID, at: transactionClock(arrivalDate), context: context)
             return outcome
         } catch {
             context.rollback()
             throw error
         }
+    }
+    private func saveReceipt(_ request: CommandTransactionRequest, outcome: CommandOutcome, inverseJSON: Data?, writer: String, generationID: UUID, at appliedAt: Date, context: ModelContext) throws {
+        let receipt = MadarData.CommandReceipt()
+        receipt.writerID = writer
+        receipt.commandID = request.envelope.commandID; receipt.name = request.envelope.name
+        receipt.payloadHash = request.payloadHash; receipt.source = request.envelope.source.rawValue
+        receipt.issuedAt = request.envelope.issuedAt; receipt.createdAt = appliedAt; receipt.updatedAt = appliedAt
+        receipt.status = outcome.status.rawValue
+        receipt.expiresAt = appliedAt.addingTimeInterval(7 * 86400)
+        receipt.undoExpiresAt = appliedAt.addingTimeInterval(request.semantics == .preset ? 60 : 600)
+        receipt.undoJSON = inverseJSON
+        context.insert(receipt)
+        // Namespace and effect commit together. A filesystem completion marker is later
+        // refresh provenance and must never be the source of receipt generation identity.
+        let scope = DeviceSetting()
+        scope.key = "sys.commandReceiptScope:\(receipt.id.uuidString)"
+        scope.id = StableIdentity.uuid(for: "DeviceSetting:\(scope.key)")
+        scope.valueJSON = try JSONEncoder().encode(ReceiptNamespace(version: 1, generationID: generationID))
+        scope.writerID = writer; scope.createdAt = appliedAt; scope.updatedAt = appliedAt
+        context.insert(scope)
+        try context.save()
+    }
+    public func hasReceipt(commandID: UUID) throws -> Bool {
+        let lease = StoreLease(lockURL: lockDirectory.appending(path: "CommandBus.lock"))
+        try lease.acquire(); defer { lease.release() }
+        return try ModelContext(containerProvider()).fetch(FetchDescriptor<MadarData.CommandReceipt>()).contains { $0.commandID == commandID && $0.deletedAt == nil && $0.mergedInto == nil }
+    }
+    /// Called only after the inbox acknowledges its durable files. Malformed/unresolved files
+    /// conservatively block collection; inverse expiry remains independent of replay identity.
+    public func purgeExpiredReceipts(pinnedIDs: Set<UUID>, now: Date = Date()) throws {
+        let lease = StoreLease(lockURL: lockDirectory.appending(path: "CommandBus.lock"))
+        try lease.acquire(); defer { lease.release() }
+        let context = ModelContext(try containerProvider()); context.autosaveEnabled = false
+        for row in try context.fetch(FetchDescriptor<MadarData.CommandReceipt>()) {
+            guard let id = row.commandID, row.expiresAt <= now, !pinnedIDs.contains(id) else { continue }
+            for scope in try context.fetch(FetchDescriptor<DeviceSetting>()) where scope.key == "sys.commandReceiptScope:\(row.id.uuidString)" { context.delete(scope) }
+            context.delete(row)
+        }
+        try context.save()
     }
     private func convert(_ values: [String: MadarCore.JSONValue]) throws -> [String: MadarData.JSONValue] {
         try values.mapValues { try JSONDecoder().decode(MadarData.JSONValue.self, from: $0.canonicalData()) }

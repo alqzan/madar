@@ -25,6 +25,8 @@ packages:
     path: Packages/MadarSnapshots
   MadarCommands:
     path: Packages/MadarCommands
+  MadarInbox:
+    path: Packages/MadarInbox
   MadarSync:
     path: Packages/MadarSync
 targets:
@@ -42,6 +44,7 @@ targets:
       - package: MadarDesign
       - package: MadarSnapshots
       - package: MadarCommands
+      - package: MadarInbox
       - package: MadarSync
       - target: MadarWidgets
         embed: true
@@ -110,6 +113,7 @@ targets:
       - package: MadarCore
       - package: MadarSnapshots
       - package: MadarCommands
+      - package: MadarInbox
   MadarUITests:
     type: bundle.ui-testing
     platform: iOS

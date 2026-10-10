@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# HISTORICAL SQLite-writer probe. Excluded from RA2/M0 acceptance.
+# Use inbox-process-test.py for the current producer/app-consumer contract.
 import json
 import subprocess
 import tempfile
@@ -30,7 +32,7 @@ with tempfile.TemporaryDirectory(prefix='Madar2SyntheticConcurrency-') as folder
     statuses = sorted(stdout.strip() for stdout, _ in outputs)
     counts = json.loads(subprocess.check_output([probe, 'inspect', store], text=True))
     assert statuses == ['applied', 'duplicate'], (statuses, outputs)
-    assert counts == {'rows': 1, 'receipts': 1}, counts
+    assert counts == {'rows': 1, 'receipts': 2}, counts
     report = {'fixtureVersion': 1, 'platform': 'macOS native processes', 'sources': ['notification', 'widget'],
               'statuses': statuses, 'counts': counts, 'passed': True,
               'boundary': 'Real independent processes share temporary stores and the app command adapter. This is not physical-device Intent or notification delivery.'}
