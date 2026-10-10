@@ -1,5 +1,27 @@
 # M0-T07 — WIP compatibility handover
 
+## Top helper repair — 2026-10-10 19:25 UTC
+
+For the next agent: the narrow helper defect below is repaired; independent fresh Top review and root-baseline integration checks remain required before accepting RA4. Root owns shared `main`, its handover, app build and simulator; this worktree remains on `m0-s1-money-models` and is unmerged.
+
+Reverted the failed symlink/pathComponents helper approach and split the repair from all production migration work. `FileManager.enumerator(atPath:)` supplies relative String keys directly. Every previous source-byte assertion remains; invalid-device rejection now also requires the sole permitted new artifact to be an empty root `CommandBus.lock`. A nested file with that name stays in the comparison. No production source, legacy fixture, schema or expected records changed.
+
+Added `test_M0S1_RA4_fileHashesKeepSourcePathsRelativeAndOnlyExcludeRootLock`, with literal SQLite/sidecar, pointer, stamp, generation metadata and media paths and hard-coded SHA-256 vectors for `hello` and empty bytes. The regression failed against the old helper (four key/exclusion issues), then passed after the repair. It also confirms a metadata-byte change remains detectable after the root-lock exclusion.
+
+Verified (all green commands exit 0):
+```
+swift test --package-path Madar/Packages/MadarData --filter SchemaCompatibilityTests > /tmp/madar-ra4-helper-focused-20261010-a9d8.log 2>&1
+✔ Suite SchemaCompatibilityTests passed after 2.141 seconds.
+✔ Test run with 7 tests in 1 suite passed after 2.141 seconds.
+
+swift test --package-path Madar/Packages/MadarData > /tmp/madar-ra4-helper-full-20261010-a9d8.log 2>&1
+✔ Suite ManagedBackupTests passed after 8.641 seconds.
+✔ Test run with 45 tests in 4 suites passed after 8.642 seconds.
+```
+`git diff --check` passed. Regression red log: `/tmp/madar-ra4-helper-red-20261010-a9d8.log` (exit 1, expected before repair). Not tested: root-baseline command replay integration, app build, simulator, signed/iPhone run or owner data. Next session: independent reviewer, Top GPT-6.1 Sol xhigh.
+
+## Original Standard WIP record
+
 Recorded 2026-10-10, codex GPT-6.1 Sol Standard high. Do not merge this WIP before the smaller Top repair and independent Top review.
 
 For the next agent: repair only the test helper `SchemaCompatibilityTests.fileHashes` (around line 55). Its derived dictionary keys still include `ManagedV1/`, so excluding exactly `CommandBus.lock` fails even though source stores/pointer/stamps are byte-identical. Two Standard repair attempts (symlink resolution, then pathComponents) were unsuccessful; no further helper attempt was made. Suggested separate Top card: use FileManager.enumerator(atPath:) relative String paths. Tests show the sole remaining failure is the lock-file exclusion expectation at line 118.
