@@ -128,7 +128,7 @@ public struct DualDate: Equatable, Sendable {
         let months = ["محرم", "صفر", "ربيع الأول", "ربيع الآخر", "جمادى الأولى", "جمادى الآخرة", "رجب", "شعبان", "رمضان", "شوال", "ذو القعدة", "ذو الحجة"]
         let h = "\(f.string(hijri.day)) \(months[hijri.month - 1]) \(f.string(hijri.year))"
         let g = f.localized(gregorian.description)
-        return firstCalendar == .hijri ? h + " · " + g : g + " · " + h
+        return firstCalendar == .hijri ? h + "، " + g : g + "، " + h
     }
     /// Diary-only night display; does not mutate the persisted Madar day key.
     public static func diaryNightHijri(instant: Date, prayers: PrayerDay, source: HijriSource = .ummAlQura, sightingOffset: Int = 0) -> HijriDate {
