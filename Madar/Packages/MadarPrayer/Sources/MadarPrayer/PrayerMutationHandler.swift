@@ -115,19 +115,9 @@ private struct PrayerInverse: Codable {
             if let row = repository.log(ref) { try unlinkPair(row); try remove(row) }
             if let row = repository.qada(ref) { try remove(row) }
         case .agePending:
-            let pendingDays = Int(try repository.settings.value(for: "salah.pendingDays").number ?? 7)
-            var day = track.day
-            while day <= current {
-                let anchor = day < track.firstRun ? max(day, track.editAnchor ?? day) : day
-                let deadlineDay = anchor.adding(days: pendingDays)
-                if let deadline = repository.occurrence(.init(day: deadlineDay, prayer: .fajr)), now >= deadline.time {
-                    for prayer in Prayer.allCases {
-                        let ref = PrayerReference(day: day, prayer: prayer)
-                        if logIndex[ref] == nil, repository.occurrence(ref) != nil { try setLog(ref, status: .missed, recordSource: "aging") }
-                    }
-                }
-                day = day.adding(days: 1)
-            }
+            // RP1: legacy commands remain decodable, but time passing never records
+            // a religious status or debt on the user's behalf.
+            return nil
         case .logPair(let day, let pair, let status, let shortened, let mode):
             guard [.jamaah, .alone].contains(status), try repository.settings.value(for: "salah.travelShortenCombine") == .bool(true), let trip = repository.activeTrip(at: now) else { throw PrayerDomainError.noActiveTrip }
             let first = PrayerReference(day: day, prayer: pair.prayers[0]), second = PrayerReference(day: day, prayer: pair.prayers[1])
