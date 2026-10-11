@@ -4,17 +4,21 @@ import Darwin
 
 @MainActor public final class BackupCoordinator {
     public let store: ManagedDataStore; public let backupDirectory: URL
+    private let deriveCredential: @Sendable (String) async throws -> BackupCredential
     private let keyStore: any BackupKeyStore; private let lifecycle: BackupLifecycle; private let localOnly: Bool
     private var catalogURL: URL { backupDirectory.appendingPathComponent("BackupCatalog.json") }
     private var statusURL: URL { backupDirectory.appendingPathComponent("BackupStatus.json") }
     enum Checkpoint: String { case afterJournal, afterStagingSave, afterReady, afterPointer, afterHooks }
     var interruption: Checkpoint?
-    public init(store: ManagedDataStore, backupDirectory: URL, keyStore: any BackupKeyStore, lifecycle: BackupLifecycle = BackupLifecycle(), localOnly: Bool = true) {
-        self.store = store; self.backupDirectory = backupDirectory; self.keyStore = keyStore; self.lifecycle = lifecycle; self.localOnly = localOnly
+    public init(store: ManagedDataStore, backupDirectory: URL, keyStore: any BackupKeyStore, lifecycle: BackupLifecycle = BackupLifecycle(), localOnly: Bool = true,
+                deriveCredential: @escaping @Sendable (String) async throws -> BackupCredential = { passphrase in
+                    try await Task.detached(priority: .userInitiated) { try BackupCredential.derive(passphrase: passphrase) }.value
+                }) {
+        self.store = store; self.backupDirectory = backupDirectory; self.keyStore = keyStore; self.lifecycle = lifecycle; self.localOnly = localOnly; self.deriveCredential = deriveCredential
     }
-    public func hasConfiguredKey() throws -> Bool { try keyStore.load() != nil }
+    public func hasConfiguredKey() throws -> Bool { try keyStore.exists() }
     public func configurePassphrase(_ passphrase: String, validation: @MainActor () throws -> Void = {}) async throws {
-        let credential = try await Task.detached(priority:.userInitiated) { try BackupCredential.derive(passphrase:passphrase) }.value
+        let credential = try await deriveCredential(passphrase)
         try Task.checkCancellation(); try validation()
         try keyStore.save(credential)
     }
@@ -91,22 +95,24 @@ import Darwin
         if store.isCloudBacked { warnings.append("الاستعادة إلى مخزن مرتبط بالسحاب غير متاحة حتى تُثبت المصالحة وانتشار الحذف.") }
         return .init(id:UUID(),fileURL:file,fileName:file.lastPathComponent,createdAt:value.0.manifest.createdAt,counts:Self.counts(value.0.records),currentCounts:Self.counts(records),additions:value.0.records.filter { !existingKeys.contains(RecordFingerprint.key($0)) }.count,updates:updates,deletions:records.filter { $0.isLive && !backupKeys.contains(RecordFingerprint.key($0)) }.count,earliestDate:dates.min(),latestDate:dates.max(),skippedCount:0,warnings:warnings,validated:value.0,fileHash:value.1,generationID:store.binding.generationID,currentFingerprint:try RecordFingerprint.hash(records))
     }
-    public func restore(preview: RestorePreview, mode: RestoreMode, passphrase: String? = nil, progress: @escaping @Sendable (BackupProgress) -> Void = { _ in }, cancellation: BackupCancellation = BackupCancellation(), now: Date = Date()) async throws -> RestoreResult {
+    public func restore(preview: RestorePreview, mode: RestoreMode, passphrase: String? = nil, progress: @escaping @Sendable (BackupProgress) -> Void = { _ in }, cancellation: BackupCancellation = BackupCancellation(), now: Date = Date(), authorization: @MainActor () async throws -> Void = {}, validation: @MainActor () throws -> Void = {}) async throws -> RestoreResult {
         guard !store.isCloudBacked else { throw BackupOperationError.cloudRestoreUnsupported }
         let lease = try await beginOperation()
         var preserveRecovery = false; var stagedGeneration: UUID?
         defer { finishOperation(lease:lease,preserveRecovery:preserveRecovery) }
         do {
             guard !store.isCloudBacked else { throw BackupOperationError.cloudRestoreUnsupported }
-            try cancellation.check()
+            try await authorization(); try validation(); try cancellation.check()
             let fileHash = try await background(cancellation) { BackupCodec.hash(try Self.readBounded(preview.fileURL)) }
+            try validation(); try cancellation.check()
             guard fileHash == preview.fileHash, preview.generationID == store.binding.generationID else { throw BackupOperationError.stalePreview }
             let current = try currentRecords(); guard try RecordFingerprint.hash(current) == preview.currentFingerprint else { throw BackupOperationError.stalePreview }
             if let passphrase { let verified = try await background(cancellation) { try BackupCodec.validateContents(Self.readBounded(preview.fileURL),passphrase:passphrase,cancellation:cancellation,progress:progress) }; guard try RecordFingerprint.hash(verified.records) == RecordFingerprint.hash(preview.validated.records) else { throw BackupOperationError.stalePreview } }
+            try validation(); try cancellation.check()
             guard try hasConfiguredKey() else { throw BackupOperationError.backupNotConfigured }
             progress(.init(phase:.automaticBackup,completedUnits:0,totalUnits:1))
             let safety = try await exportUnderLease(kind:.automatic,passphrase:nil,progress:progress,cancellation:cancellation,now:now)
-            progress(.init(phase:.automaticBackup,completedUnits:1,totalUnits:1)); try cancellation.check()
+            progress(.init(phase:.automaticBackup,completedUnits:1,totalUnits:1)); try validation(); try cancellation.check()
             let writerContext = ModelContext(store.container); writerContext.autosaveEnabled = false
             let writer = try SettingsStore(context:writerContext).writerIDForWrite(now:now); try writerContext.save()
             let planned = try Self.plan(existing:current,incoming:preview.validated.records,mode:mode,now:now,writerID:writer)
@@ -114,10 +120,10 @@ import Darwin
             var journal = RestoreJournal(operationID:UUID(),oldGenerationID:store.binding.generationID,newGenerationID:id,phase:.preparing,hooksPending:true)
             try DurableFiles.encode(journal,to:store.journalURL); try checkpoint(.afterJournal)
             try await stage(records:planned,id:id,cancellation:cancellation,progress:progress,now:now)
-            try checkpoint(.afterStagingSave); try cancellation.check()
+            try checkpoint(.afterStagingSave); try validation(); try cancellation.check()
             journal.phase = .ready; try DurableFiles.encode(journal,to:store.journalURL); try checkpoint(.afterReady)
             // Cancellation is accepted until the commit point. After promotion the result is committed.
-            try cancellation.check(); progress(.init(phase:.promoting,completedUnits:0,totalUnits:1))
+            try validation(); try cancellation.check(); progress(.init(phase:.promoting,completedUnits:0,totalUnits:1))
             try store.promote(id); try checkpoint(.afterPointer)
             journal.phase = .promoted; try DurableFiles.encode(journal,to:store.journalURL)
             lifecycle.bindContainer(store.container)

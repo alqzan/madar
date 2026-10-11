@@ -42,13 +42,15 @@ import MadarData
         private let storage = MemoryBackupKeyStore()
         private var readCount = 0
         private var writeCount = 0
-        var onRead: (@Sendable () -> Void)?
+        var onExists: (@Sendable () -> Void)?
         var reads: Int { mutex.lock(); defer { mutex.unlock() }; return readCount }
         var writes: Int { mutex.lock(); defer { mutex.unlock() }; return writeCount }
+        func exists() throws -> Bool { onExists?(); return try storage.exists() }
         func load() throws -> BackupCredential? {
-            mutex.lock(); readCount += 1; let hook = onRead; mutex.unlock()
-            hook?(); return try storage.load()
+            mutex.lock(); readCount += 1; mutex.unlock()
+            return try storage.load()
         }
+        func seed(_ credential: BackupCredential) throws { try storage.save(credential) }
         func save(_ credential: BackupCredential) throws { mutex.lock(); writeCount += 1; mutex.unlock(); try storage.save(credential) }
         func remove() throws { try storage.remove() }
     }
@@ -64,7 +66,10 @@ import MadarData
         let presented: PresentationProbe
     }
     private final class PresentationProbe { var files: [URL] = [] }
-    private func fixture(scope: MadarLockScope = .notesOnly, privateRow: Bool = false, tombstone: Bool = false) throws -> Fixture {
+    private func fixture(scope: MadarLockScope = .notesOnly, privateRow: Bool = false, tombstone: Bool = false,
+                         deriveCredential: @escaping @Sendable (String) async throws -> BackupCredential = { passphrase in
+                             try await Task.detached { try BackupCredential.derive(passphrase: passphrase) }.value
+                         }) throws -> Fixture {
         // Keep synthetic SQLite files until process exit while SwiftData holds them.
         let root = FileManager.default.temporaryDirectory.appending(path: "MadarExportPrivacy-\(UUID())")
         let store = try ManagedDataStore(root: root.appending(path: "Data"), commandLockURL: root.appending(path: "CommandBus.lock"))
@@ -77,7 +82,7 @@ import MadarData
         let auth = Auth(), privacy = Privacy(), keys = Keys(), presented = PresentationProbe()
         let lock = MadarLockController(scope: scope, service: privacy, authenticator: { auth }); session.lockController = lock
         let backup = AppBackupService(session: session, store: store, backupDirectory: root.appending(path: "Backups"), keyStore: keys,
-            sharePresentation: { file, ticket in try lock.validate(ticket); presented.files.append(file) })
+            sharePresentation: { file, ticket in try lock.validate(ticket); presented.files.append(file) }, deriveCredential: deriveCredential)
         return Fixture(root: root, store: store, session: session, auth: auth, privacy: privacy, lock: lock, keys: keys, backup: backup, presented: presented)
     }
     private enum ProbeError: Error { case timeout }
@@ -150,14 +155,88 @@ import MadarData
 
     func test_M0P1b_staleKeyDerivationCannotSaveKeyOrCreateFile() async throws {
         let fixture = try fixture()
-        // This hook is exercised only by the main-actor hasConfiguredKey query;
-        // it revokes immediately after that authorized read, before key derivation.
+        // This hook is exercised only by the main-actor hasConfiguredKey metadata query;
+        // it revokes immediately after that authorized presence check, before key derivation.
         let controller = fixture.lock
-        fixture.keys.onRead = { MainActor.assumeIsolated { controller.sceneChanged(.background) } }
+        fixture.keys.onExists = { MainActor.assumeIsolated { controller.sceneChanged(.background) } }
         do { _ = try await fixture.backup.export(passphrase: "test-only-passphrase", progress: { _ in }); XCTFail("Stale key setup succeeded") } catch { }
-        XCTAssertEqual(fixture.keys.reads, 1); XCTAssertEqual(fixture.keys.writes, 0)
+        XCTAssertEqual(fixture.keys.reads, 0); XCTAssertEqual(fixture.keys.writes, 0)
         XCTAssertTrue(try fixture.backup.coordinator.catalog().isEmpty)
         XCTAssertFalse(fixture.session.maintenanceInProgress)
+    }
+
+    @MainActor private final class DerivationProbe {
+        var continuation: CheckedContinuation<BackupCredential, Error>?
+        func derive(_ passphrase: String) async throws -> BackupCredential {
+            try await withCheckedThrowingContinuation { continuation = $0 }
+        }
+    }
+    private func importedPreview(_ fixture: Fixture) async throws -> BackupRestorePreview {
+        let source = try self.fixture()
+        let receipt = try await source.backup.coordinator.export(passphrase: "test-only-passphrase")
+        return try await fixture.backup.previewRestore(file: receipt.fileURL, passphrase: "test-only-passphrase", progress: { _ in })
+    }
+    func test_M0P1b_01_restoreFirstKeyRefusalCreatesNoSafetyOrPromotion() async throws {
+        for scope: MadarLockScope in [.notesOnly, .none] {
+            let fixture = try fixture(scope: scope, privateRow: scope == .none)
+            let preview = try await importedPreview(fixture), generation = fixture.store.binding.generationID
+            fixture.auth.allowed = false
+            do { _ = try await fixture.backup.restore(previewID: preview.id, mode: .replace, progress: { _ in }); XCTFail("Refused safety-key setup succeeded") } catch { }
+            XCTAssertEqual(fixture.auth.calls, 1)
+            XCTAssertEqual(fixture.store.binding.generationID, generation)
+            try assertNoOutput(fixture)
+        }
+    }
+    func test_M0P1b_01_authorizedFirstKeyRestoreCreatesSafetyAndPromotes() async throws {
+        let fixture = try fixture(scope: .none, privateRow: true)
+        let preview = try await importedPreview(fixture), generation = fixture.store.binding.generationID
+        _ = try await fixture.backup.restore(previewID: preview.id, mode: .replace, progress: { _ in })
+        XCTAssertEqual(fixture.auth.calls, 1)
+        XCTAssertEqual(fixture.keys.reads, 1); XCTAssertEqual(fixture.keys.writes, 2)
+        XCTAssertNotEqual(fixture.store.binding.generationID, generation)
+        XCTAssertEqual(try fixture.backup.coordinator.catalog().filter { $0.kind == .automatic }.count, 1)
+        XCTAssertFalse(fixture.session.maintenanceInProgress)
+    }
+    func test_M0P1b_01_restoreDelayedKeyDerivationRevocationCannotSaveSafetyOrPromote() async throws {
+        let credential = try await Task.detached { try BackupCredential.derive(passphrase: "test-only-passphrase") }.value
+        for event in 0...3 {
+            let derivation = DerivationProbe()
+            let fixture = try fixture(deriveCredential: { try await derivation.derive($0) })
+            let preview = try await importedPreview(fixture), generation = fixture.store.binding.generationID
+            let request = Task { try await fixture.backup.restore(previewID: preview.id, mode: .replace, progress: { _ in }) }
+            try await waitUntil { derivation.continuation != nil }
+            XCTAssertTrue(fixture.session.maintenanceInProgress)
+            switch event {
+            case 0: fixture.lock.sceneChanged(.background)
+            case 1: fixture.lock.lock()
+            case 2: try await fixture.lock.changeScope(.none)
+            default: fixture.lock.disconnect()
+            }
+            derivation.continuation?.resume(returning: credential); derivation.continuation = nil
+            do { _ = try await request.value; XCTFail("Revoked derivation configured safety key") } catch { }
+            XCTAssertEqual(fixture.keys.reads, 0); XCTAssertEqual(fixture.keys.writes, 0)
+            XCTAssertTrue(try fixture.backup.coordinator.catalog().isEmpty)
+            XCTAssertEqual(fixture.store.binding.generationID, generation)
+            XCTAssertFalse(fixture.session.maintenanceInProgress)
+        }
+    }
+    func test_M0P1b_02_settingsConfiguredStatusDoesNotLoadOrSaveCredential() async throws {
+        let fixture = try fixture()
+        let model = BackupSettingsModel(service: fixture.backup)
+        await model.refresh()
+        XCTAssertEqual(model.status?.keyConfigured, false)
+        let credential = try await Task.detached { try BackupCredential.derive(passphrase: "test-only-passphrase") }.value
+        try fixture.keys.seed(credential)
+        await model.refresh()
+        XCTAssertEqual(model.status?.keyConfigured, true)
+        XCTAssertEqual(fixture.keys.reads, 0); XCTAssertEqual(fixture.keys.writes, 0)
+        XCTAssertEqual(fixture.auth.calls, 0)
+        // Unattended automatic backup still loads the configured credential.
+        try await fixture.backup.runScheduledBackup()
+        XCTAssertEqual(fixture.keys.reads, 1); XCTAssertEqual(fixture.keys.writes, 1)
+        XCTAssertEqual(fixture.auth.calls, 0)
+        XCTAssertEqual(try fixture.backup.coordinator.catalog().filter { $0.kind == .automatic }.count, 1)
+        model.close()
     }
 
     func test_M0P1b_cachedShareReauthorizesOriginalPrivatePayloadAndRetainsFile() async throws {

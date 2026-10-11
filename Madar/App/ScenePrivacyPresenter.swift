@@ -10,12 +10,21 @@ import UIKit
     private var hiddenAccessibility: [(UIWindow, Bool)] = []
     private var notifications: [NSObjectProtocol] = []
     private var stateID: UUID?
+    private var revocationID: UUID?
+    private var activityAuthorization: PrivacyAuthorization?
+    private var retiringActivityID: UUID?
     private var activity: UIActivityViewController?
     private var activityID: UUID?
+    private let presentActivity: @MainActor (UIViewController, UIActivityViewController) -> Void
+    private let retireActivity: @MainActor (UIActivityViewController, @escaping @MainActor @Sendable () -> Void) -> Void
+    var hasActivityRequest: Bool { activityID != nil || activityAuthorization != nil }
     private let activationState: @MainActor (UIWindowScene) -> UIScene.ActivationState
     init(controller: MadarLockController,
-         activationState: @escaping @MainActor (UIWindowScene) -> UIScene.ActivationState = { $0.activationState }) {
+         activationState: @escaping @MainActor (UIWindowScene) -> UIScene.ActivationState = { $0.activationState },
+         presentActivity: @escaping @MainActor (UIViewController, UIActivityViewController) -> Void = { host, activity in host.present(activity, animated: true) },
+         retireActivity: @escaping @MainActor (UIActivityViewController, @escaping @MainActor @Sendable () -> Void) -> Void = { activity, completion in activity.dismiss(animated: false, completion: completion) }) {
         self.controller = controller; self.activationState = activationState
+        self.presentActivity = presentActivity; self.retireActivity = retireActivity
     }
     func attach(to window: UIWindow) {
         guard let owningScene = window.windowScene else { return }
@@ -26,6 +35,11 @@ import UIKit
         cover.rootViewController = UIHostingController(rootView: ScenePrivacyCover(controller: controller))
         cover.accessibilityIdentifier = "scene-privacy-cover"
         coverWindow = cover
+        revocationID = controller.observeRevocation { [weak self] _ in
+            // Owning-controller lock/scope changes reach this before state observers
+            // can uncover the app, including a private file under scope none.
+            self?.coverNow(); self?.dismissActivity()
+        }
         stateID = controller.observeState { [weak self] in self?.synchronize() }
         observe(UIWindowScene.willDeactivateNotification, phase: .inactive)
         observe(UIScene.didEnterBackgroundNotification, phase: .background)
@@ -91,7 +105,10 @@ import UIKit
         coverWindow.isHidden = false
     }
     private func synchronize() {
-        if controller.covered || !controller.canPresent(.app) { coverNow() }
+        if let ticket = activityAuthorization, (try? controller.validate(ticket)) == nil {
+            coverNow(); dismissActivity()
+        }
+        if retiringActivityID != nil || controller.covered || !controller.canPresent(.app) { coverNow() }
         else {
             coverWindow?.isHidden = true
             for (window, previous) in hiddenAccessibility { window.accessibilityElementsHidden = previous }
@@ -102,23 +119,36 @@ import UIKit
         try controller.validate(authorization)
         guard scene != nil, coverWindow?.isHidden == true, let hostWindow,
               hostWindow.windowScene === scene, var top = hostWindow.rootViewController,
-              activity == nil else { throw PrivacyAuthorizationError.stale }
+              activity == nil, retiringActivityID == nil else { throw PrivacyAuthorizationError.stale }
         while let presented = top.presentedViewController { top = presented }
         guard top.viewIfLoaded?.window === hostWindow else { throw PrivacyAuthorizationError.stale }
         let id = UUID(); let share = UIActivityViewController(activityItems: [file], applicationActivities: nil)
         share.popoverPresentationController?.sourceView = top.view
         share.popoverPresentationController?.sourceRect = CGRect(x: top.view.bounds.midX, y: top.view.bounds.midY, width: 1, height: 1)
         share.completionWithItemsHandler = { [weak self] _, _, _, _ in
-            Task { @MainActor in if self?.activityID == id { self?.activity = nil; self?.activityID = nil } }
+            Task { @MainActor in if self?.activityID == id { self?.activity = nil; self?.activityID = nil; self?.activityAuthorization = nil } }
         }
-        activity = share; activityID = id
-        top.present(share, animated: true)
+        activity = share; activityID = id; activityAuthorization = authorization
+        presentActivity(top, share)
     }
-    private func dismissActivity() { activity?.dismiss(animated: false); activity = nil; activityID = nil }
+    private func dismissActivity() {
+        let retired = activity, id = activityID
+        activity = nil; activityID = nil; activityAuthorization = nil
+        guard let retired, let id else { return }
+        // UIKit dismissal may finish on a later turn even without animation.
+        // Keep the cover until the native adapter confirms removal.
+        retiringActivityID = id
+        retired.viewIfLoaded?.accessibilityElementsHidden = true
+        retireActivity(retired) { [weak self] in
+            guard let self, retiringActivityID == id else { return }
+            retiringActivityID = nil; synchronize()
+        }
+    }
     func detach(invalidate: Bool = true) {
         if invalidate { coverNow(); controller.disconnect() }
         dismissActivity()
         if let stateID { controller.removeObserver(stateID) }; stateID = nil
+        if let revocationID { controller.removeObserver(revocationID) }; revocationID = nil
         for token in notifications { NotificationCenter.default.removeObserver(token) }; notifications.removeAll()
         for (window, previous) in hiddenAccessibility { window.accessibilityElementsHidden = previous }; hiddenAccessibility.removeAll()
         coverWindow?.isHidden = true; coverWindow?.rootViewController = nil; coverWindow = nil; scene = nil; hostWindow = nil

@@ -16,11 +16,12 @@ public struct BackupCredential: Codable, Sendable, Equatable {
         let prefix = BackupCodec.integer(nextNonceCounter,bytes:4); nextNonceCounter += 1; return prefix
     }
 }
-public protocol BackupKeyStore: Sendable { func load() throws -> BackupCredential?; func save(_ credential: BackupCredential) throws; func remove() throws }
+public protocol BackupKeyStore: Sendable { func exists() throws -> Bool; func load() throws -> BackupCredential?; func save(_ credential: BackupCredential) throws; func remove() throws }
 /// Explicit local test dependency. Does not access the system Keychain.
 public final class MemoryBackupKeyStore: BackupKeyStore, @unchecked Sendable {
     private let lock = NSLock(); private var credential: BackupCredential?
     public init() {}
+    public func exists() throws -> Bool { lock.lock(); defer { lock.unlock() }; return credential != nil }
     public func load() throws -> BackupCredential? { lock.lock(); defer { lock.unlock() }; return credential }
     public func save(_ credential: BackupCredential) throws { lock.lock(); defer { lock.unlock() }; self.credential = credential }
     public func remove() throws { lock.lock(); defer { lock.unlock() }; credential = nil }
@@ -29,6 +30,17 @@ public final class KeychainBackupKeyStore: BackupKeyStore, Sendable {
     private let service: String; private let account: String
     public init(service: String = "app.madar.backup",account: String = "derived-backup-key-v1") { self.service = service; self.account = account }
     private var query: [String:Any] { [kSecClass as String:kSecClassGenericPassword,kSecAttrService as String:service,kSecAttrAccount as String:account,kSecAttrSynchronizable as String:false] }
+    /// Presence only: never asks Keychain to return credential bytes.
+    public func exists() throws -> Bool {
+        var attributes = query
+        attributes[kSecReturnAttributes as String] = true
+        attributes[kSecReturnData as String] = false
+        attributes[kSecMatchLimit as String] = kSecMatchLimitOne
+        let status = SecItemCopyMatching(attributes as CFDictionary, nil)
+        if status == errSecItemNotFound { return false }
+        guard status == errSecSuccess else { throw DataError.invalidValue("backup key unavailable (\(status))") }
+        return true
+    }
     public func load() throws -> BackupCredential? {
         var attributes = query; attributes[kSecReturnData as String] = true; attributes[kSecMatchLimit as String] = kSecMatchLimitOne
         var result: CFTypeRef?; let status = SecItemCopyMatching(attributes as CFDictionary,&result)

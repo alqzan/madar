@@ -4,6 +4,45 @@ import Testing
 @testable import MadarData
 
 @Suite(.serialized) @MainActor struct ManagedBackupTests {
+    private final class PresenceKeys: BackupKeyStore, @unchecked Sendable {
+        private let mutex = NSLock()
+        private var credential: BackupCredential?
+        private var loads = 0
+        private var saves = 0
+        var accesses: (Int, Int) { mutex.lock(); defer { mutex.unlock() }; return (loads, saves) }
+        func exists() throws -> Bool { mutex.lock(); defer { mutex.unlock() }; return credential != nil }
+        func load() throws -> BackupCredential? { mutex.lock(); defer { mutex.unlock() }; loads += 1; return credential }
+        func save(_ value: BackupCredential) throws { mutex.lock(); defer { mutex.unlock() }; saves += 1; credential = value }
+        func remove() throws { mutex.lock(); defer { mutex.unlock() }; credential = nil }
+    }
+    @Test func test_M0P1b_02_configuredPresenceNeverLoadsSecretAndAutomaticBackupStillDoes() async throws {
+        let base = try scratch(); defer { try? FileManager.default.removeItem(at: base) }
+        let store = try ManagedDataStore(root: base.appendingPathComponent("Managed"), commandLockURL: base.appendingPathComponent("CommandBus.lock"))
+        let keys = PresenceKeys(), coordinator = BackupCoordinator(store: store, backupDirectory: base.appendingPathComponent("Backups"), keyStore: keys)
+        #expect(try !coordinator.hasConfiguredKey()); #expect(keys.accesses.0 == 0); #expect(keys.accesses.1 == 0)
+        try await coordinator.configurePassphrase("correct long password")
+        let writes = keys.accesses.1
+        #expect(try coordinator.hasConfiguredKey()); #expect(keys.accesses.0 == 0); #expect(keys.accesses.1 == writes)
+        #expect(try await coordinator.performScheduledBackupIfDue(schedule: .weekly) != nil)
+        #expect(keys.accesses.0 == 1); #expect(keys.accesses.1 == writes + 1)
+    }
+    @Test func test_M0P1b_01_restoreAuthorizationRefusesBeforeKeyReadSafetyAndPromotion() async throws {
+        let base = try scratch(); defer { try? FileManager.default.removeItem(at: base) }
+        let store = try ManagedDataStore(root: base.appendingPathComponent("Managed"), commandLockURL: base.appendingPathComponent("CommandBus.lock"))
+        let keys = PresenceKeys(), coordinator = BackupCoordinator(store: store, backupDirectory: base.appendingPathComponent("Backups"), keyStore: keys)
+        let file = try backupFile([], base: base), generation = store.binding.generationID
+        let preview = try await coordinator.preview(file: file, passphrase: "correct long password")
+        enum Refusal: Error { case denied }
+        var barrierHeld = false
+        await #expect(throws: Refusal.denied) {
+            try await coordinator.restore(preview: preview, mode: .replace, authorization: {
+                barrierHeld = store.isBusy; throw Refusal.denied
+            })
+        }
+        #expect(barrierHeld); #expect(!store.isBusy)
+        #expect(keys.accesses.0 == 0); #expect(keys.accesses.1 == 0)
+        #expect(try coordinator.catalog().isEmpty); #expect(store.binding.generationID == generation)
+    }
     private func scratch() throws -> URL { let url = FileManager.default.temporaryDirectory.appendingPathComponent("MadarManagedTests-\(UUID())"); try FileManager.default.createDirectory(at:url,withIntermediateDirectories:true); return url }
     private func backupFile(_ records: [DataRecord],base:URL) throws -> URL { let url = base.appendingPathComponent("Source.madarbackup"); try BackupCodec.export(records:records,passphrase:"correct long password").write(to:url); return url }
     private func makeCoordinator(base:URL,seed:Bool=false,lifecycle:BackupLifecycle=BackupLifecycle()) async throws -> (ManagedDataStore,BackupCoordinator,MemoryBackupKeyStore) {
