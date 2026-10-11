@@ -74,11 +74,10 @@ import MadarData
 
     func testPlainExportUIAdapterNeedsNoPasswordAndResumesSession() async throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "MadarPlainService-\(UUID())")
-        defer { try? FileManager.default.removeItem(at: root) }
         let managed = try ManagedDataStore(root: root.appending(path: "Data"), commandLockURL: root.appending(path: "CommandBus.lock"))
         let session = try AppSession(container: managed.container, managedStore: managed, groupDirectory: root)
         let backup = AppBackupService(session: session, store: managed, backupDirectory: root.appending(path: "Backups"), keyStore: MemoryBackupKeyStore())
-        try await session.applySettingsAndWait(["core.firstCalendar": .string("gregorian"), "core.faceIDLock": .bool(true)])
+        try await session.applySettingsAndWait(["core.firstCalendar": .string("gregorian"), "core.faceIDLock": .string("app")])
         let file = try await backup.exportPlain(progress: { _ in })
         let validated = try PortableExportCodec.validate(Data(contentsOf: file))
         XCTAssertEqual(file.pathExtension, "zip")
