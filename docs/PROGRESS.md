@@ -40,7 +40,7 @@ Production tasks start after M0-T01. Separate agents own separate sections/files
 - Reassess sync after M5. Developer membership, TestFlight and additional platforms await owner setup.
 - Encrypted backup already exists; scalability RD4 and window-level privacy need review in the first relevant milestone. Retain code without implying all contracts passed.
 
-Owner instruction (2026-10-11): AGENTS/CLAUDE §5a now require a concrete session acceptance target, reuse of current green evidence, diagnosis before retries, and a ~95% handover reserve. The active next task remains the fresh Top P1b review below; this documentation change does not close any product gate.
+Owner instruction (2026-10-11): AGENTS/CLAUDE §5a now require a concrete session acceptance target, reuse of current green evidence, diagnosis before retries, minimal checks proportional to the change, and delivery with3–5%five-hour usage remaining (95–97%used); continue useful authorized tasks while more than5% remains. The active next task remains the fresh Top P1b review below; this documentation change does not close any product gate.
 
 # Handovers
 
