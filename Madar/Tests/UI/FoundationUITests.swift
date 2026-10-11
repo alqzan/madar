@@ -9,11 +9,18 @@ import XCTest
             app.launchEnvironment["MADAR_UI_SIZE"] = size
             app.launchEnvironment["MADAR_UI_THEME"] = theme
             app.launch(); finishOnboarding(app)
+            let content = app.scrollViews.firstMatch
+            XCTAssertTrue(content.waitForExistence(timeout: 10), app.debugDescription)
             let names = [("fajr", "الفجر"), ("dhuhr", "الظهر"), ("asr", "العصر"), ("maghrib", "المغرب"), ("isha", "العشاء")]
             for (index, pair) in names.enumerated() {
                 let row = app.descendants(matching: .any).matching(identifier: "foundation-prayer-time-\(pair.0)").firstMatch
-                XCTAssertTrue(row.waitForExistence(timeout: 10), app.debugDescription)
-                scrollTo(row, in: app)
+                // Offscreen SwiftUI rows may not exist in the accessibility tree yet.
+                for _ in 0..<12 {
+                    if row.exists && row.isHittable { break }
+                    content.swipeUp()
+                }
+                XCTAssertTrue(row.exists, app.debugDescription)
+                XCTAssertTrue(row.isHittable, app.debugDescription)
                 XCTAssertTrue(row.label.hasPrefix("\(pair.1)، "), row.label)
                 XCTAssertTrue(NSPredicate(format: "SELF MATCHES %@", "[^،]+، [٠-٩]{2}:[٠-٩]{2}").evaluate(with: row.label), row.label)
                 if index == 0 || index == names.count - 1 { attachScreenshot(app, named: "M0-today-times-\(pair.0)-\(theme)-\(size)") }
