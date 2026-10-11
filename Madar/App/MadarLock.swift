@@ -54,7 +54,7 @@ struct PrivacyAuthorization {
     private var disconnected = false
     private var scopeTransitionPending = false
     private var redactionTask: Task<Void, Error>?
-    private var activeWaiters: [CheckedContinuation<Void, Never>] = []
+    private var activeWaiters: [UUID: CheckedContinuation<Void, Never>] = [:]
     private var stateObservers: [UUID: @MainActor () -> Void] = [:]
     private var revokeObservers: [UUID: @MainActor (Bool) -> Void] = [:]
     init(scope: MadarLockScope, service: any MadarLockService, clock: @escaping @MainActor () -> Date = Date.init,
@@ -85,7 +85,12 @@ struct PrivacyAuthorization {
     }
     private func invalidateAuth() {
         currentAuth?.1.invalidate(); currentAuth = nil; authenticating = false
-        let waiters = activeWaiters; activeWaiters.removeAll(); for waiter in waiters { waiter.resume() }
+        let waiters = activeWaiters; activeWaiters.removeAll(); for waiter in waiters.values { waiter.resume() }
+    }
+    private func cancelAuthorization(_ id: UUID) {
+        guard currentAuth?.0 == id else { return }
+        generation += 1; covered = true; invalidateAuth()
+        revoke(cancelRequests: true); recoverActive()
     }
     private func enqueueRedaction() {
         let previous = redactionTask
@@ -125,10 +130,20 @@ struct PrivacyAuthorization {
         let needed = Set(features.compactMap { requiredFeature(for: $0) })
         let device = authenticator(); currentAuth = (id, device)
         defer { if currentAuth?.0 == id { currentAuth = nil; authenticating = false; notify(); if covered && phase == .active { recoverActive() } } }
+        return try await withTaskCancellationHandler {
+            try await performAuthorization(features, id: id, stamp: stamp, needed: needed, device: device)
+        } onCancel: {
+            Task { @MainActor [weak self] in self?.cancelAuthorization(id) }
+        }
+    }
+    private func performAuthorization(_ features: Set<MadarProtectedFeature>, id: UUID, stamp: Int,
+                                      needed: Set<MadarProtectedFeature>, device: any MadarDeviceAuthenticator) async throws -> PrivacyAuthorization {
         func current() throws {
-            guard !Task.isCancelled, currentAuth?.0 == id, generation == stamp, !disconnected else { throw PrivacyAuthorizationError.stale }
+            try Task.checkCancellation()
+            guard currentAuth?.0 == id, generation == stamp, !disconnected else { throw PrivacyAuthorizationError.stale }
         }
         do {
+            try current()
             if !needed.isSubset(of: unlocked) {
                 authenticating = true; statusMessage = nil; notify()
                 guard try await device.verify() else { throw PrivacyAuthorizationError.refused }
@@ -136,7 +151,7 @@ struct PrivacyAuthorization {
             }
             // LA may temporarily deactivate its owning scene. Keep this request through that
             // transition, but background/scope/disconnect invalidates it and wakes the waiter.
-            while phase != .active { await withCheckedContinuation { activeWaiters.append($0) }; try current() }
+            while phase != .active { await withCheckedContinuation { activeWaiters[id] = $0 }; try current() }
             if redactionFailed { enqueueRedaction() }
             try await redactionTask?.value; try current()
             guard phase == .active else { throw PrivacyAuthorizationError.stale }
@@ -205,7 +220,7 @@ struct PrivacyAuthorization {
         case .active:
             let expired = backgroundAt.map { (now ?? clock()).timeIntervalSince($0) >= 60 } ?? false
             backgroundAt = nil
-            let waiters = activeWaiters; activeWaiters.removeAll(); for waiter in waiters { waiter.resume() }
+            let waiters = activeWaiters; activeWaiters.removeAll(); for waiter in waiters.values { waiter.resume() }
             if expired { lock() } else { recoverActive() }
         @unknown default: lock()
         }

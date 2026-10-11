@@ -45,6 +45,39 @@ import UIKit
         }
     }
 
+    func test_M0P1a_cancelledVerifierReleasesRequestWithoutWaitingForLateResult() async throws {
+        let first = Authenticator(), second = Authenticator(), service = Service(); first.delayed = true
+        var next = first
+        let lock = MadarLockController(scope: .app, service: service, authenticator: { next })
+        let old = Task { try await lock.authorize([.app]) }
+        try await waitUntil { first.continuation != nil }
+        old.cancel()
+        try await waitUntil { first.invalidations == 1 && !lock.authenticating }
+        next = second
+        let ticket = try await lock.authorize([.app])
+        first.continuation?.resume(returning: true); first.continuation = nil
+        do { _ = try await old.value; XCTFail("Cancelled request succeeded") } catch { }
+        XCTAssertEqual(service.bindings, [.app]); XCTAssertNoThrow(try lock.validate(ticket))
+        XCTAssertFalse(lock.covered)
+    }
+
+    func test_M0P1a_cancelledInactiveWaiterIsWokenAndNewRequestCanAuthorize() async throws {
+        let auth = Authenticator(); auth.delayed = true
+        let lock = MadarLockController(scope: .app, service: Service(), authenticator: { auth })
+        let old = Task { try await lock.authorize([.app]) }
+        try await waitUntil { auth.continuation != nil }
+        lock.sceneChanged(.inactive)
+        auth.continuation?.resume(returning: true); auth.continuation = nil
+        await settle(); XCTAssertTrue(lock.authenticating)
+        old.cancel()
+        try await waitUntil { auth.invalidations == 1 && !lock.authenticating }
+        // The old task finishes while the scene is still inactive, without an active notification.
+        do { _ = try await old.value; XCTFail("Cancelled inactive waiter succeeded") } catch { }
+        auth.delayed = false; lock.sceneChanged(.active)
+        let ticket = try await lock.authorize([.app])
+        XCTAssertNoThrow(try lock.validate(ticket)); XCTAssertEqual(auth.calls, 2)
+    }
+
     func test_M0P1a_scopeChangeImmediatelyRevokesOtherScene() async throws {
         guard let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first else {
             throw XCTSkip("Requires an app-host UIWindowScene")
