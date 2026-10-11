@@ -7,8 +7,16 @@ import UIKit
     private final class Service: MadarLockService {
         var bindings: [MadarProtectedFeature] = []
         var purges = 0
+        var delayNextBinding = false
+        var bindingContinuation: CheckedContinuation<Void, Never>?
         func redactProtectedData() async throws { purges += 1; bindings.removeAll() }
-        func authorizeAccess(to feature: MadarProtectedFeature) async throws { bindings.append(feature) }
+        func authorizeAccess(to feature: MadarProtectedFeature) async throws {
+            if delayNextBinding {
+                delayNextBinding = false
+                await withCheckedContinuation { bindingContinuation = $0 }
+            }
+            bindings.append(feature)
+        }
         func privacyScopeDidChange(to scope: MadarLockScope) async throws { }
     }
     private final class Authenticator: MadarDeviceAuthenticator {
@@ -24,6 +32,38 @@ import UIKit
         func invalidate() { invalidations += 1 }
     }
     private func settle() async { for _ in 0..<30 { await Task.yield() } }
+
+    func test_M0P1a_staleVerifierCannotPurgeNewAuthorization() async throws {
+        let first = Authenticator(), second = Authenticator(), service = Service(); first.delayed = true
+        var next = first
+        let lock = MadarLockController(scope: .app, service: service, authenticator: { next })
+        let old = Task { try await lock.authorize([.app]) }
+        await settle(); XCTAssertNotNil(first.continuation)
+        lock.sceneChanged(.background); lock.sceneChanged(.active)
+        next = second
+        let ticket = try await lock.authorize([.app])
+        let purges = service.purges
+        first.continuation?.resume(returning: true); first.continuation = nil
+        do { _ = try await old.value; XCTFail("Stale verifier succeeded") } catch { }
+        await settle()
+        XCTAssertEqual(service.purges, purges); XCTAssertEqual(service.bindings, [.app])
+        XCTAssertFalse(lock.covered); XCTAssertNoThrow(try lock.validate(ticket))
+    }
+
+    func test_M0P1a_staleBindingCleanupPrecedesNewAuthorization() async throws {
+        let service = Service(); service.delayNextBinding = true
+        let lock = MadarLockController(scope: .app, service: service, authenticator: { Authenticator() })
+        let old = Task { try await lock.authorize([.app]) }
+        await settle(); XCTAssertNotNil(service.bindingContinuation)
+        lock.sceneChanged(.background); lock.sceneChanged(.active)
+        let fresh = Task { try await lock.authorize([.app]) }
+        await settle(); XCTAssertTrue(lock.covered); XCTAssertTrue(service.bindings.isEmpty)
+        service.bindingContinuation?.resume(); service.bindingContinuation = nil
+        do { _ = try await old.value; XCTFail("Stale binding succeeded") } catch { }
+        let ticket = try await fresh.value
+        XCTAssertEqual(service.bindings, [.app]); XCTAssertFalse(lock.covered)
+        XCTAssertNoThrow(try lock.validate(ticket)); XCTAssertGreaterThan(service.purges, 0)
+    }
 
     func testPrivateNoteAlwaysRequiresDeviceAuthenticationAndTicketHasSceneOwner() async throws {
         let auth = Authenticator(), service = Service()

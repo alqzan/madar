@@ -90,6 +90,33 @@ struct PrivacyAuthorization {
         let previous = redactionTask
         redactionTask = Task { [service] in _ = try? await previous?.value; try await service.redactProtectedData() }
     }
+    /// All service mutations share the same queue. A stale binding is purged
+    /// under the cover before any newer binding can start.
+    private func bind(_ features: Set<MadarProtectedFeature>, valid: @escaping @MainActor () -> Bool) async throws {
+        let previous = redactionTask
+        let operation = Task { [self] in
+            try await previous?.value
+            guard valid() else { throw PrivacyAuthorizationError.stale }
+            var started = false
+            do {
+                for feature in features {
+                    guard valid() else { throw PrivacyAuthorizationError.stale }
+                    started = true
+                    try await service.authorizeAccess(to: feature)
+                    guard valid() else { throw PrivacyAuthorizationError.stale }
+                }
+            } catch {
+                if started {
+                    covered = true; revoke(cancelRequests: false)
+                    do { try await service.redactProtectedData() }
+                    catch { redactionFailed = true; notify(); throw error }
+                }
+                throw error
+            }
+        }
+        redactionTask = operation
+        try await operation.value
+    }
     func authorize(_ features: Set<MadarProtectedFeature>) async throws -> PrivacyAuthorization {
         guard phase == .active, !disconnected else { throw PrivacyAuthorizationError.stale }
         guard currentAuth == nil else { throw PrivacyAuthorizationError.busy }
@@ -113,19 +140,17 @@ struct PrivacyAuthorization {
             try await redactionTask?.value; try current()
             guard phase == .active else { throw PrivacyAuthorizationError.stale }
             let activeEpoch = epoch
-            for feature in features {
-                try await service.authorizeAccess(to: feature); try current()
-                guard phase == .active, epoch == activeEpoch else { throw PrivacyAuthorizationError.stale }
+            try await bind(features) { [self] in
+                currentAuth?.0 == id && generation == stamp && !disconnected && phase == .active && epoch == activeEpoch
             }
+            try current()
             unlocked.formUnion(needed); authorizedFeatures.formUnion(features); redactionFailed = false; covered = false; notify()
             return .init(owner: identity, generation: generation, epoch: epoch, features: features)
         } catch {
             if currentAuth?.0 == id {
                 statusMessage = "لم يُفتح القفل. يمكنك المحاولة مرة أخرى."
                 if !(error is PrivacyAuthorizationError) && !(error is CancellationError) { redactionFailed = true; covered = true; notify() }
-                // A service can finish rebinding after revocation; serialize another purge.
-                enqueueRedaction()
-            } else { enqueueRedaction() }
+            }
             throw error
         }
     }
@@ -177,10 +202,10 @@ struct PrivacyAuthorization {
                 guard generation == stamp, epoch == activeEpoch, phase == .active, !disconnected else { return }
                 // The auth request owns its binding and exposure commit.
                 guard currentAuth == nil else { return }
-                for feature in authorizedFeatures {
-                    try await service.authorizeAccess(to: feature)
-                    guard generation == stamp, epoch == activeEpoch, phase == .active, !disconnected else { enqueueRedaction(); return }
+                try await bind(authorizedFeatures) { [self] in
+                    generation == stamp && epoch == activeEpoch && phase == .active && !disconnected && currentAuth == nil
                 }
+                guard generation == stamp, epoch == activeEpoch, phase == .active, !disconnected else { return }
                 redactionFailed = false; covered = false; notify()
             } catch {
                 guard generation == stamp, epoch == activeEpoch else { return }
