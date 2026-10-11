@@ -182,27 +182,35 @@ import XCTest
             app.launchEnvironment["MADAR_UI_STORE_ID"] = UUID().uuidString
             app.launchEnvironment["MADAR_UI_SIZE"] = size
             app.launch(); openBackupSettings(app)
-            XCTAssertTrue(app.staticTexts["backup-key-setup"].waitForExistence(timeout: 10), app.debugDescription)
+            let keySetup = app.staticTexts["backup-key-setup"]
+            scrollBackupForm(to: keySetup, in: app)
+            XCTAssertTrue(keySetup.exists, "A fresh fixture must not inherit a configured backup key.")
             let passphrase = "test-only-passphrase"
             let export = app.buttons["backup-now"]
             let password = app.secureTextFields["backup-password"]
-            scrollTo(password, in: app)
-            password.tap(); password.typeText(passphrase)
+            scrollBackupForm(to: password, in: app, towardsTop: true)
+            password.tap()
+            try selectEnglishKeyboard(app)
+            let keyboardDone = app.buttons["backup-keyboard-done"]
+            XCTAssertTrue(keyboardDone.waitForExistence(timeout: 10), app.debugDescription)
+            password.typeText(passphrase)
             attachScreenshot(app, named: "M0-backup-before-confirmation-\(size)")
-            XCTAssertEqual(export.value as? String, "passphrase-count=\(passphrase.count);confirmation-count=0;matches=false;busy=false", "Validate first-field input before submitting or changing focus.")
+            XCTAssertEqual(keyboardDone.value as? String, "passphrase-count=\(passphrase.count);confirmation-count=0;matches=false;busy=false;can-export=false", "Validate first-field input before submitting or changing focus.")
             // Exercise native Next while the keyboard changes the Form's visible area,
             // instead of tapping a row whose frame may be outside that area.
             password.typeText("\n")
             let confirmation = app.secureTextFields["backup-password-confirmation"]
             let mismatch = passphrase + "!"
+            try selectEnglishKeyboard(app)
             confirmation.typeText(mismatch)
-            XCTAssertEqual(export.value as? String, "passphrase-count=\(passphrase.count);confirmation-count=\(mismatch.count);matches=false;busy=false")
-            XCTAssertFalse(export.isEnabled, "A mismatched confirmation must not permit export.")
+            // The toolbar mirrors the predicate driving the virtualized export
+            // button's disabled state. Do not change focus just to query that row.
+            XCTAssertEqual(keyboardDone.value as? String, "passphrase-count=\(passphrase.count);confirmation-count=\(mismatch.count);matches=false;busy=false;can-export=false", "A mismatched confirmation must not permit export.")
             // The insertion point is still at the end; remove only the extra mismatching
             // character. Re-tapping a populated secure field can move the insertion point.
             confirmation.typeText(XCUIKeyboardKey.delete.rawValue)
-            XCTAssertEqual(export.value as? String, "passphrase-count=\(passphrase.count);confirmation-count=\(passphrase.count);matches=true;busy=false")
-            app.buttons["backup-keyboard-done"].tap()
+            XCTAssertEqual(keyboardDone.value as? String, "passphrase-count=\(passphrase.count);confirmation-count=\(passphrase.count);matches=true;busy=false;can-export=true")
+            keyboardDone.tap()
             scrollTo(export, in: app)
             XCTAssertTrue(export.isEnabled, app.debugDescription); export.tap()
             let share = app.buttons["backup-export"]
@@ -211,8 +219,10 @@ import XCTest
             attachScreenshot(app, named: "M0-backup-native-export-\(size)")
 
             app.terminate(); app.launch(); openBackupSettings(app)
-            XCTAssertTrue(app.buttons["backup-schedule"].waitForExistence(timeout: 10), app.debugDescription)
-            XCTAssertFalse(app.staticTexts["backup-key-setup"].exists, "The same fixture must retain its configured key after relaunch.")
+            // The setup notice is below the fields. Materialize its section before
+            // asserting absence, so an offscreen cell cannot masquerade as persistence.
+            scrollBackupForm(to: app.buttons["backup-now"], in: app)
+            XCTAssertFalse(keySetup.exists, "The same fixture must retain its configured key after relaunch.")
             app.terminate()
         }
     }
@@ -335,13 +345,65 @@ import XCTest
             }
         }
     }
+    private func selectEnglishKeyboard(_ app: XCUIApplication) throws {
+        // XCTest secure typing uses the current keyboard's characters. Observe the
+        // real layout before sending this test's Latin fixture passphrase.
+        let knownKeys = app.keyboards.keys.matching(NSPredicate(format: "label IN %@", ["ت", "t"] as NSArray))
+        let currentKey = try XCTUnwrap(waitForHittableElement(knownKeys, in: app), "A real Arabic or English software keyboard must be visible.")
+        if currentKey.label == "t" { return }
+        let switchButtons = app.buttons.matching(NSPredicate(format: "label IN %@", ["لوحة المفاتيح التالية", "Next keyboard"] as NSArray))
+        let nextKeyboard = try XCTUnwrap(waitForHittableElement(switchButtons, in: app), "The observed native next-keyboard control must be hittable.")
+        let nextLayout = nextKeyboard.value as? String ?? ""
+        print("M0 native next keyboard: \(nextLayout)")
+        // The captured Arabic keyboard announces English (UK). Make one switch;
+        // never cycle through unknown layouts or assume a keyboard from locale.
+        let englishSwitch = try XCTUnwrap(nextLayout.hasPrefix("English") ? nextKeyboard : nil, "The next keyboard must announce English before selecting it.")
+        englishSwitch.tap()
+        let englishKeys = app.keyboards.keys.matching(NSPredicate(format: "label == %@", "t"))
+        _ = try XCTUnwrap(waitForHittableElement(englishKeys, in: app), "The selected English keyboard must expose a hittable t key.")
+    }
+    private func waitForHittableElement(_ query: XCUIElementQuery, in app: XCUIApplication) -> XCUIElement? {
+        let ready = NSPredicate { _, _ in
+            MainActor.assumeIsolated {
+                query.allElementsBoundByIndex.contains { self.elementIsOnscreenAndHittable($0, in: app) }
+            }
+        }
+        let readiness = XCTNSPredicateExpectation(predicate: ready, object: nil)
+        guard XCTWaiter.wait(for: [readiness], timeout: 10) == .completed else { return nil }
+        return query.allElementsBoundByIndex.first { elementIsOnscreenAndHittable($0, in: app) }
+    }
+    private func elementIsOnscreenAndHittable(_ element: XCUIElement, in app: XCUIApplication) -> Bool {
+        guard element.exists, element.isHittable else { return false }
+        let frame = element.frame
+        return frame.width > 0 && frame.height > 0 && app.frame.contains(CGPoint(x: frame.midX, y: frame.midY))
+    }
     private func openBackupSettings(_ app: XCUIApplication) {
         finishOnboarding(app)
         app.buttons["settings-button"].tap()
         let link = app.buttons["backup-settings-link"]
         scrollTo(link, in: app)
         link.tap()
-        XCTAssertTrue(app.secureTextFields["backup-password"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.navigationBars["النسخ والاستعادة"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.buttons["backup-schedule"].waitForExistence(timeout: 10), app.debugDescription)
+        // AX3's plain-export section pushes password cells out of the Form's
+        // accessibility tree. Scroll the actual Form before requiring the field.
+        scrollBackupForm(to: app.secureTextFields["backup-password"], in: app)
+    }
+    private func scrollBackupForm(to element: XCUIElement, in app: XCUIApplication, towardsTop: Bool = false) {
+        let form = app.collectionViews.firstMatch
+        XCTAssertTrue(form.waitForExistence(timeout: 10), app.debugDescription)
+        for _ in 0..<12 {
+            if elementIsOnscreenAndHittable(element, in: app) { return }
+            if element.exists {
+                // A materialized offscreen row gives the direction; otherwise the
+                // caller supplies the known section order for virtualized cells.
+                if element.frame.midY < form.frame.midY { form.swipeDown() }
+                else { form.swipeUp() }
+            } else if towardsTop { form.swipeDown() }
+            else { form.swipeUp() }
+        }
+        XCTAssertTrue(element.exists, app.debugDescription)
+        XCTAssertTrue(elementIsOnscreenAndHittable(element, in: app), app.debugDescription)
     }
     private func openPlainExportSettings(_ app: XCUIApplication) {
         finishOnboarding(app)

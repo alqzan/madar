@@ -209,7 +209,7 @@ struct BackupSettingsView: View {
             }
             if let result = model.resultMessage { Section { Text(result).accessibilityIdentifier("backup-result") } }
         }.navigationTitle("النسخ والاستعادة")
-            .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تم") { focusedPassword = nil }.accessibilityIdentifier("backup-keyboard-done") } }
+            .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); keyboardDoneButton } }
             .task { await model.refresh() }
             .onDisappear { model.close() }
             .fileImporter(isPresented: $importing, allowedContentTypes: [UTType(filenameExtension: "madarbackup") ?? .data], allowsMultipleSelection: false) { result in
@@ -225,19 +225,35 @@ struct BackupSettingsView: View {
     @ViewBuilder private var exportButton: some View {
         let button = Button("انسخ الآن", action: model.export).disabled(!model.canExport).accessibilityIdentifier("backup-now")
         #if DEBUG
-        if let fixture = ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"], UUID(uuidString: fixture) != nil {
-            // Only an isolated UI fixture exposes non-secret diagnostics to XCTest.
-            // Never expose the passphrase itself, even in a failing accessibility snapshot.
-            let diagnostic = "passphrase-count=" + String(model.exportPassphrase.count)
-                + ";confirmation-count=" + String(model.exportConfirmation.count)
-                + ";matches=" + String(model.exportPassphrase == model.exportConfirmation)
-                + ";busy=" + String(model.busy)
+        if let diagnostic = fixtureInputDiagnostic {
             button.accessibilityValue(Text(verbatim: diagnostic))
         } else { button }
         #else
         button
         #endif
     }
+    @ViewBuilder private var keyboardDoneButton: some View {
+        let button = Button("تم") { focusedPassword = nil }.accessibilityIdentifier("backup-keyboard-done")
+        #if DEBUG
+        if let diagnostic = fixtureInputDiagnostic {
+            // AX3 virtualizes the export row while a secure field is focused.
+            // Read the same non-secret state on the visible keyboard accessory.
+            button.accessibilityValue(Text(verbatim: diagnostic + ";can-export=" + String(model.canExport)))
+        } else { button }
+        #else
+        button
+        #endif
+    }
+    #if DEBUG
+    private var fixtureInputDiagnostic: String? {
+        guard let fixture = ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"], UUID(uuidString: fixture) != nil else { return nil }
+        // Only an isolated UI fixture exposes counts and state, never passwords.
+        return "passphrase-count=" + String(model.exportPassphrase.count)
+            + ";confirmation-count=" + String(model.exportConfirmation.count)
+            + ";matches=" + String(model.exportPassphrase == model.exportConfirmation)
+            + ";busy=" + String(model.busy)
+    }
+    #endif
     @ViewBuilder private func previewRows(_ preview: BackupRestorePreview) -> some View {
         Text("معاينة \(preview.fileName)").font(MadarTypography.section())
         Text(preview.createdAt, format: .dateTime.year().month().day()).font(MadarTypography.caption())
