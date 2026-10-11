@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 import SwiftData
 import Testing
 @testable import MadarData
@@ -221,6 +222,45 @@ import Testing
         let adopted = try ManagedDataStore.adoptLegacy(from: flat, at: base.appendingPathComponent("Adopted"))
         #expect(try RecordFingerprint.hash(RecordBridge.all(adopted.container.mainContext, syncedOnly: false)) == RecordFingerprint.hash(expectedRows()))
         #expect(try fileHashes(flat) == before)
+    }
+
+    @Test func test_M0S1_M0R4_03_legacyMoneyPreviewUsesConvertedCountsPreservingManifest() async throws {
+        let base = try fixtureDirectory(); defer { try? FileManager.default.removeItem(at: base) }
+        let oldRows = try JSONDecoder().decode([DataRecord].self, from: Data(contentsOf: resources.appendingPathComponent("records.json"))).filter { $0.model == "Transaction" }
+        #expect(oldRows.count == 2)
+        var files: [String: Data] = [:]
+        for model in MadarSchemaV1.syncedNames {
+            var data = Data()
+            for row in oldRows where row.model == model { data += try JSONValue.object(row.fields).canonicalData() + Data([0x0a]) }
+            files["data/\(model).jsonl"] = data
+        }
+        let manifest = BackupManifest(formatVersion: 1, storeSchemaVersion: 1, createdAt: Date(timeIntervalSince1970: 2_000_000_000), counts: Dictionary(uniqueKeysWithValues: MadarSchemaV1.syncedNames.map { ($0, $0 == "Transaction" ? 2 : 0) }), files: files.map { .init(path: $0.key, bytes: $0.value.count, sha256: BackupCodec.hash($0.value)) })
+        files["manifest.json"] = try JSONEncoder().encode(manifest)
+        let archive = try BackupCodec.encodeArchive(files); #expect(archive.count < 1024 * 1024)
+        let credential = try BackupCredential.derive(passphrase: "legacy fixture password")
+        let prefix = Data([1, 2, 3, 4])
+        let header = BackupHeader(magic: "MADARBK", formatVersion: 1, appVersion: "review-regression", storeSchemaVersion: 1, createdAt: manifest.createdAt, kdf: .init(alg: "PBKDF2-HMAC-SHA256", iterations: 600000, salt: credential.salt), cipher: "AES-256-GCM", chunkSize: 1024 * 1024, chunkCount: 1, noncePrefix: prefix)
+        let headerBytes = try JSONEncoder().encode(header)
+        let index = BackupCodec.integer(0, bytes: 8)
+        let sealed = try AES.GCM.seal(archive, using: SymmetricKey(data: credential.keyData), nonce: AES.GCM.Nonce(data: prefix + index), authenticating: headerBytes + index + Data([1]))
+        let body = sealed.ciphertext + sealed.tag
+        let bytes = BackupCodec.integer(UInt64(headerBytes.count), bytes: 4) + headerBytes + BackupCodec.integer(UInt64(body.count), bytes: 4) + body
+        let legacyURL = base.appendingPathComponent("TransactionOnly.madarbackup"); try bytes.write(to: legacyURL)
+        let store = try ManagedDataStore(root: base.appendingPathComponent("Managed"))
+        let coordinator = BackupCoordinator(store: store, backupDirectory: base.appendingPathComponent("Backups"), keyStore: MemoryBackupKeyStore())
+        let preview = try await coordinator.preview(file: legacyURL, passphrase: "legacy fixture password")
+        #expect(preview.counts["MoneyTransaction"] == 2); #expect(preview.counts["Transaction"] == nil)
+        #expect(preview.additions == 2); #expect(preview.counts.values.reduce(0, +) == 2)
+        #expect(preview.validated.manifest.counts["Transaction"] == 2)
+        #expect(preview.validated.manifest.counts["MoneyTransaction"] == nil)
+        #expect(preview.validated.manifest.files.contains { $0.path == "data/Transaction.jsonl" })
+        #expect(try Data(contentsOf: legacyURL) == bytes)
+        let currentRows = try SchemaCompatibility.currentRecords(oldRows, from: 1)
+        let currentURL = base.appendingPathComponent("Current.madarbackup")
+        try BackupCodec.export(records: currentRows, passphrase: "legacy fixture password").write(to: currentURL)
+        let current = try await coordinator.preview(file: currentURL, passphrase: "legacy fixture password")
+        #expect(current.counts == current.validated.manifest.counts)
+        #expect(current.counts["MoneyTransaction"] == 2)
     }
 
 }
