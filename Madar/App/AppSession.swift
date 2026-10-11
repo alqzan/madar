@@ -22,7 +22,6 @@ final class AppSession {
     var backupService: (any BackupUIService)?
     var syncService: (any SyncUIService)?
     var lockController: MadarLockController?
-    weak var privacyPresenter: ScenePrivacyPresenter?
     private(set) var protectedDataAuthorized = false
     let schema: SettingsSchema
     var store: SettingsStore
