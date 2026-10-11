@@ -1,6 +1,14 @@
 import Foundation
 
 enum SchemaCompatibility {
+    static func validateDeviceVersion(at directory: URL) throws {
+        let stamp = directory.appendingPathComponent("DeviceSchemaVersion.json")
+        guard FileManager.default.fileExists(atPath: stamp.path) else { return }
+        let version = try JSONDecoder().decode(Int.self, from: Data(contentsOf: stamp))
+        guard (1...MadarSchema.version).contains(version) else {
+            throw version > MadarSchema.version ? DataError.newerStore : DataError.invalidValue("device store version")
+        }
+    }
     static func modelNames(version: Int) throws -> [String] {
         switch version {
         case 1: MadarSchemaV1.syncedNames

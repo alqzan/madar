@@ -68,8 +68,11 @@ struct GenerationReady: Codable { let version: Int; let generationID: UUID; let 
     }
     /// Converts an explicitly chosen legacy flat store from a read-only clone; never opens its source.
     public static func adoptLegacy(from directory: URL, at root: URL, commandLockURL: URL? = nil) throws -> ManagedDataStore {
-        try adoptRecords(at:root,commandLockURL:commandLockURL,interruption:nil) {
-            guard try MadarContainerFactory.storeVersion(at:directory) == 1 else { throw DataError.invalidValue("legacy adoption source") }
+        // Fail closed before adoption writes a target, journal or replacement schema stamp.
+        guard try MadarContainerFactory.storeVersion(at:directory) == 1 else { throw DataError.invalidValue("legacy adoption source") }
+        try SchemaCompatibility.validateDeviceVersion(at: directory)
+        return try adoptRecords(at:root,commandLockURL:commandLockURL,interruption:nil) {
+            try SchemaCompatibility.validateDeviceVersion(at: directory)
             let copy = FileManager.default.temporaryDirectory.appendingPathComponent("MadarLegacyAdoption-\(UUID())")
             defer { try? FileManager.default.removeItem(at:copy) }
             let original = try LegacyV1Reader.read(syncedDirectory:directory,deviceStoreURL:directory.appendingPathComponent("Device.store"),copiedTo:copy)

@@ -199,4 +199,28 @@ import Testing
         #expect(try fileHashes(root).filter { $0.key != "CommandBus.lock" } == before)
     }
 
+    @Test func test_M0S1_M0R4_02_flatAdoptionPreflightsDeviceStampWithoutTargetWrites() throws {
+        for stamp in ["999", "0", "-1", "\"malformed\"", "{"] {
+            let base = try fixtureDirectory(); defer { try? FileManager.default.removeItem(at: base) }
+            let flat = base.appendingPathComponent("Flat"); let target = base.appendingPathComponent("Adopted")
+            try Data(stamp.utf8).write(to: flat.appendingPathComponent("DeviceSchemaVersion.json"))
+            let before = try fileHashes(flat)
+            if stamp == "999" {
+                #expect(throws: DataError.newerStore) { try ManagedDataStore.adoptLegacy(from: flat, at: target) }
+            } else {
+                #expect(throws: (any Error).self) { try ManagedDataStore.adoptLegacy(from: flat, at: target) }
+            }
+            #expect(try fileHashes(flat) == before)
+            #expect(!FileManager.default.fileExists(atPath: target.path))
+            #expect(!FileManager.default.fileExists(atPath: base.appendingPathComponent("Adopted-AdoptionJournal.json").path))
+        }
+        let base = try fixtureDirectory(); defer { try? FileManager.default.removeItem(at: base) }
+        let flat = base.appendingPathComponent("Flat"); let stamp = flat.appendingPathComponent("DeviceSchemaVersion.json")
+        if FileManager.default.fileExists(atPath: stamp.path) { try FileManager.default.removeItem(at: stamp) }
+        let before = try fileHashes(flat)
+        let adopted = try ManagedDataStore.adoptLegacy(from: flat, at: base.appendingPathComponent("Adopted"))
+        #expect(try RecordFingerprint.hash(RecordBridge.all(adopted.container.mainContext, syncedOnly: false)) == RecordFingerprint.hash(expectedRows()))
+        #expect(try fileHashes(flat) == before)
+    }
+
 }

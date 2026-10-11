@@ -20,11 +20,7 @@ import SwiftData
         }
         guard version == 1 else { throw DataError.legacyStoreRequiresAdoption }
         guard FileManager.default.fileExists(atPath:originalDirectory.appendingPathComponent("GenerationReady.json").path) else { throw BackupOperationError.invalidManagedStore }
-        let deviceStamp = root.appendingPathComponent("DeviceSchemaVersion.json")
-        if FileManager.default.fileExists(atPath:deviceStamp.path) {
-            let deviceVersion = try JSONDecoder().decode(Int.self,from:Data(contentsOf:deviceStamp))
-            guard (1...MadarSchema.version).contains(deviceVersion) else { throw deviceVersion > MadarSchema.version ? DataError.newerStore : DataError.invalidValue("device store version") }
-        }
+        try SchemaCompatibility.validateDeviceVersion(at: root)
         var journal: Journal
         if FileManager.default.fileExists(atPath:journalURL.path) {
             journal = try JSONDecoder().decode(Journal.self,from:Data(contentsOf:journalURL))
