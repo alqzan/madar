@@ -30,3 +30,13 @@ Reviewer: git diff --check 451289e..3dc85ae
 ```
 
 Not verified here: simulator flows, actual default/AX3/AX5/dark image comparison, VoiceOver interaction, location/settings runtime changes, or physical iPhone. The root agent owns the simulator and must record those results before merging. RA3 owner-iPhone acceptance and the M0 gate are still open; this approval does not close either.
+
+## Independent fix review — f22e7ee
+
+Verdict: **approve** for the one-line fix `40f4216..f22e7ee`; no remaining source finding in this fix. Reviewed independently on Standard high, 2026-10-11. This is a fix-only pass, not a repeated review of the original section.
+
+Root's actual failed UI hierarchy in `Madar/Artifacts/run3-today-times-retry.log:476–490` shows the card title, city and all five semantic prayer rows carrying the parent identifier `foundation-prayer-times`, including the Fajr row labelled `الفجر، ٠٤:٣١`. The parent identifier overrides the intended child identifiers in the rendered accessibility tree, so the previous source-only approval did not establish those identifiers at runtime.
+
+The fix removes only the parent `.accessibilityIdentifier` at `Madar/App/FoundationHome.swift:63`. It preserves each unique `foundation-prayer-time-<prayer>` identifier and combined Arabic label at lines 58–60, and changes no layout, calculation, interaction, accessibility grouping or data. Removing the unused parent identifier directly addresses the evidenced collision; retaining it would keep all child lookups ambiguous. `git diff --check 40f4216..f22e7ee` passed with exit 0 and no output.
+
+Root's exact four-variant UI rerun on `f22e7ee` is still running. Runtime identifier confirmation and actual default/AX3/AX5/dark image review remain required before merge; this fix approval claims neither.
