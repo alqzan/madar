@@ -32,3 +32,11 @@ For root validation:
 Fresh independent Standard section review and root runtime/visual checks are required before merge. RA7's official independent timetable fixtures remain M1 work. Owner-iPhone shell/today-times acceptance remains untested. Root owns PROGRESS/main handover; this branch contains only the task and this report.
 
 Root validation follow-up: root reports 20 host tests passed with zero failures. The first UI run failed while waiting for the first offscreen row before scrolling; its initial accessibility hierarchy contained the header and introduction only. A separate test-only repair now waits for the existing ScrollView and swipes that container up, at most 12 times per row, until the row exists and is hittable before checking its label. `git diff --check` passed with no output. The repaired UI runtime and screenshot checks remain pending root's retry; no production code changed in this repair.
+
+## Root runtime and integration acceptance
+
+Fresh Standard source review d143633 approved; two Standard UI setup runs exposed a real parent accessibility identifier propagation. Preserved candidate40f4216; normal revert1308a5b restored old product code; narrow Top fixf22e7ee removes only the parent identifier. Independent Standard fix-only review3f62f80 approved.
+
+Root signed iPhone17Pro/iOS26.5 simulator run on f22e7ee: `run3-today-times-top.log/xcresult` → `Executed 1 test, with 0 failures ... 44.456 seconds`, `** TEST SUCCEEDED **`. All five prayer labels/clocks found in L/light, AX3/light, AX5/light and L/dark. Root inspected all eight retained first/last-row images: default rows remain side by side, accessibility rows stack without clipped new text and scroll to the final Isha row. Native Arabic RTL/Arabic-Indic clocks remain readable. This is visual inspection and semantic-label evidence, not an actual spoken VoiceOver run.
+
+Integrated b6556bb preserves current J01 fixtures, RU1 guard and privacy/keyboard reports. Root `run4-times-integrated.log/xcresult` → `Executed 20 tests, with 0 failures ... 3.798 seconds`, `** TEST SUCCEEDED **`; contract88/RU1 guards and `git diff --check` pass. No physical iPhone, official astronomical calibration or whole M0 gate is claimed. T10 is accepted within its read-only foundation scope.

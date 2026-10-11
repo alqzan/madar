@@ -4,7 +4,7 @@ M0 — reconciliation with review V1, before accepting the existing foundation. 
 
 # Last checked
 
-Checked a4b3a4a..cf60172 — T00 Standard review approve/lint88; RA4 Top fix review approved and current receipt+pending transport host regression passed, integrated Data49/Commands17/host17. Plain export Top review approved; integrated Data57/host18, signed simulator test succeeded; root native sharing L/light, AX3/light, L/dark passed and actual images inspected. Raw run3 logs in Madar/Artifacts and candidate worktrees. RU1 follow-up fe0214e replaced3 backup/preview numeric middle dots; source guard passed. Prior all7package baseline green. T05 keyboard, window/privacy/export lock, visible today clocks and complete physical/software M0 gate remain open.
+Checked a4b3a4a..cf60172 — T00 Standard review approve/lint88; RA4 Top fix review approved and current receipt+pending transport host regression passed, integrated Data49/Commands17/host17. Plain export Top review approved; integrated Data57/host18, signed simulator test succeeded; root native sharing L/light, AX3/light, L/dark passed and actual images inspected. Raw run3 logs in Madar/Artifacts and candidate worktrees. RU1 follow-up fe0214e replaced3 backup/preview numeric middle dots; source guard passed. Prior all7package baseline green. T05 keyboard, window/privacy/export lock and complete physical/software M0 gate remain open. Checked cf60172..b6556bb — main baseline18 and integrated today-clock host20 tests passed; independent Standard source/fix reviews and root four-variant visual UI checks passed. T10 accepted scope-only.
 
 # Board
 
@@ -19,7 +19,7 @@ Checked a4b3a4a..cf60172 — T00 Standard review approve/lint88; RA4 Top fix rev
 | M0-S2 Lean shell and times | approved | M0-T04 done; merged 596dc05 (Standard high reviewed) | claude + codex reviewer | Native glass only; hide cut settings, presets and cloud entry. Only built rooms visible. Defaults RD5/RQ8/RL5/RP6. Read 04-arch, 06-flex, 09-r-salah, 18-plan; RA3/8, RL8, RU1/3. Default/AX3/dark screenshot comparison and native minimize verified; 3 UI tests + availability UI/legacy-route integration tests passed. Scope-only approval; M0-T05 remains open. |
 | M0-S2 Existing UI defects | building | M0-T05 in-progress (Top) | ui_debug | Worktree m0-ui-debug, branch m0-s2-backup-focus. Backup confirmation lost keyboard focus after prior attempts; diagnose real screenshot/log before fix. Root owns simulator and validation. Lock persistence passed. Preserve fixture isolation. Window-level sheet privacy remains required before private content ships. |
 | M0-S2 Presentation privacy | building | M0-T09 needs-fix (Top compiler split next; design219afd9) | codex plain_export | Scene-scoped synchronous window cover above app-owned sheets; explicit full-data export and cached share pass existing lock before file/key/read or presentation. Preserve60s lease, fail-closed redaction, privateNote rule and blind inbox writes. Read docs/design/M0-presentation-privacy.md,14-shared153–189 and schema core.faceIDLock. Host controlled auth/clock, two-scene/native-modal coverage, root real inactive/switcher/defaultAX3dark flows; freshTopreview beforemerge. No defaults/model/retention change. |
-| M0-S2 Today prayer times | building | M0-T10 needs-fix (Top identifier split; Standard source reviewed) | codex protocol_review | RA3 minimal read-only today prayer clocks in existing foundation; existing engine/settings/location/time zone/numerals, update on day/place changes, unavailable fallback. No prayer-room route/logging/notifications. Read RA3 and current FoundationHome/shared typography; host display/zone tests, root defaultAX3dark actual UI, freshStandardreview beforemerge. |
+| M0-S2 Today prayer times | approved | M0-T10 done (Standard high; Top identifier repair; Standard reviewed) | codex protocol_review | Integratedb6556bb; source/fix reviews approve, root host20 and L/AX3/AX5/dark UI pass with all eight images inspected. RA3 minimal read-only today prayer clocks in existing foundation; existing engine/settings/location/time zone/numerals, update on day/place changes, unavailable fallback. No prayer-room route/logging/notifications. Read RA3 and current FoundationHome/shared typography; host display/zone tests, root defaultAX3dark actual UI, freshStandardreview beforemerge. |
 | M0-S3 Review and gate | building | M0-T06 todo (Top) | unclaimed | Fresh section reviews, J01–J18 room journey definitions before cited gates, M0 report. Build iPhone prayer times. Physical/signed checks marked not tested until runnable. |
 
 Production tasks start after M0-T01. Separate agents own separate sections/files. No agent may switch this shared checkout's branch while another runs. Use separate managed worktrees for parallel production after a curated baseline exists. Read-only/design jobs may share the checkout. Do not broadly stage `output/`, `tmp/`, generated build products or user data.
@@ -34,6 +34,16 @@ Production tasks start after M0-T01. Separate agents own separate sections/files
 - Encrypted backup already exists; scalability RD4 and window-level privacy need review in the first relevant milestone. Retain code without implying all contracts passed.
 
 # Handovers
+
+## Handover — M0-T10 accepted; privacy/keyboard continuation — 2026-10-11 — codex (Sol)
+
+Done: T10 today read-only prayer clocks integratedb6556bb, Standard source/fix reviews approved after narrow Top parent-ID repairf22e7ee. Current J01 fixtures and accepted RA4/plain export/RU1 work preserved.
+Verified: root mainbaseline18tests0failures / ** TEST SUCCEEDED ** (run4-main-baseline); integrated host20tests0failures3.798s / ** TEST SUCCEEDED ** (run4-times-integrated); candidate clock UI L/light,AX3/light,AX5/light,L/dark1test0failures44.456s / ** TEST SUCCEEDED ** (m0-foundation-times run3-today-times-top). All8first/lastrow images actually inspected. Contract88/RU1guards/diffcheck pass.
+Not verified: wholeM0/physicaliPhone, modal/switcherprivacy/exportauth, completeencryptedbackupL/AX3flow, destinationFileswrite, generalAX5/VoiceOver/lint.
+For the next agent: continue active Top compiler split T09 from e9bbfb7 in m0-presentation-privacy; do notmerge reverted8e643a1 tip or claim P1bexportgateexists. CuratedTop T05testhelper from9c0f47a on currentbaseline must repair AX3materialization before exactrootUIcheck; do notimportdiagnosticancestors. Freshfivehourwindow at6%used, weekly17%; noresetcreditused. Currentroot owns simulator412F4437-7BD7-44D1-AA3D-2B7158090E14. Update this checkpoint after active outcomes.
+Branches/worktrees: times-id-fix3f62f80 integrated; oldclockbranch1308a5b revertedgreen and candidate40f4216 preserved. Privacyreverted8e643a1/preservede9bbfb7 in m0-presentation-privacy; backup9c0f47a in m0-ui-debug preserved. EarlierRA4/plainworktrees alreadyintegrated, no needmergeolderancestors.
+Next: T09P1a compile/host/freshTopreview, P1bexport/native-shareauth; T05rootL/AX3journey; boundedM0softwarechecks thenTopgate with explicitphysicalnot-tested.
+Next session: Standard Solhigh production; independentTop Solxhigh concurrency/privacy/gate.
 
 ## Handover — M0-T07/T08 integrated; T05/T09/T10 continuation — 2026-10-11 — codex (Sol)
 
@@ -76,17 +86,3 @@ For the next agent:
 3. [fix-previous] `Packages/MadarPrayer/Tests/MadarPrayerTests/PrayerTests.swift` lines 22, 43, 84, 104: `#require(apply(...))` lacks `try`, so the package does not build its tests. Line ~58-66 asserts aging to missed, which RP1 forbids; remove `.agePending` (PrayerMutationHandler.swift) as part of M1 RP1 work. `PrayerRoom.swift:364` has "·" next to a digit (RU1).
 4. Backup UI test: stop after two more attempts, test the model logic and verify by hand on the phone.
 Next: Top (Sol xhigh or Opus, high) for item 2, then M0-T07 and M0-T06.
-
-## Handover — review files received — 2026-10-10 — root
-
-Done: read all attachments; copied protocol and handoff; extracted 25 sections; RD2 conflict resolved by owner. Earlier automatic prayer aging, multi-process SQLite proof and visible disabled cloud setting now conflict with V1.
-
-Verified: file reads, exact AGENTS/CLAUDE match, current git status (no commits). Earlier logs: services integration v3 passed 10 tests; first services UI run failed 2 tests; fixes exist but rerun pending. These are not current milestone acceptance.
-
-Not verified: full new contract compliance, physical iPhone run, notifications/widgets/Live Activities, actual cloud sync, Quran licenses, real user migration. Prior agents ended with tool-reported usage errors; no reset was consumed.
-
-Current check: updated defaults passed 34 tests, then integrated RA1/RD2 passed 38 tests (Artifacts/review-local-retention-integrated.log). Unfinished M2 QuranRoom.swift is preserved and excluded from M0 target. Lock persistence passed in actual simulator checks. Backup UI still fails matching/export at the first assertion (backup-fixture-check.log); named native-export attachments from that failed flow are failure-state images. Top reviewer requested changes, not acceptance. Fresh diagnostic fix is being tested with failure collection disabled to avoid the previous 600-second diagnostic stall. Production password rules are not weakened.
-
-Baseline snapshot: preserve the inherited app source as a separate local commit to permit isolated branch/worktree review. This is a record of existing implementation, not acceptance of old contracts. Build products, font binaries, output/ and tmp/ stay excluded. Earlier builders' actual model tiers are not inferred from inherited files.
-
-Next: Top architecture note, current build/UI check, then scoped data/inbox fixes. Recommended tiers: Sol xhigh for architecture/reviews; Sol high for production paths. Human instructions remain above attached documents.
