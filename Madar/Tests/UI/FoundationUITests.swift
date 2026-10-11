@@ -1,6 +1,28 @@
 import XCTest
 
 @MainActor final class FoundationUITests: XCTestCase {
+    func test_M0S2_CaptureFocusedSecureKeyboard() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment["MADAR_UI_STORE_ID"] = UUID().uuidString
+        app.launchEnvironment["MADAR_UI_SIZE"] = "L"
+        app.launch(); openBackupSettings(app)
+        defer { app.terminate() }
+        let password = app.secureTextFields["backup-password"]
+        scrollTo(password, in: app)
+        password.tap()
+
+        // Capture the untouched, isolated fixture before sending any input.
+        attachScreenshot(app, named: "M0-backup-focused-empty-keyboard-L")
+        print("M0 focused secure field hierarchy:\n\(app.debugDescription)")
+        let keyboards = app.keyboards.allElementsBoundByIndex
+        print("M0 focused secure field keyboard count: \(keyboards.count)")
+        for (index, keyboard) in keyboards.enumerated() {
+            let labels = keyboard.keys.allElementsBoundByIndex.map { $0.label }
+            print("M0 focused secure field keyboard \(index) native key labels: \(labels)")
+            print("M0 focused secure field keyboard \(index) hierarchy:\n\(keyboard.debugDescription)")
+        }
+    }
     func test_M0S2_SecureInputCharacterClasses() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
