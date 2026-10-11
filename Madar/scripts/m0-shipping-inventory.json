@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "basis": "M0 RA3 / current root 587c57a; source-backed inventory, not a static call-graph proof",
+  "entrypoints": [
+    {"path":"Madar/App/MadarApp.swift","anchor":"MadarRootView(session: session)","availability":"v1 M0","flow":"App -> lock gate -> root; startup retry and incoming settings URL; DEBUG gallery separately gated"},
+    {"path":"Madar/App/TabShell.swift","anchor":"tabs: [.init(id: \"foundation\"","availability":"v1 M0","flow":"Only foundation and customize tabs; onboarding cover, settings route, undo and error alert"},
+    {"path":"Madar/App/FoundationHome.swift","anchor":"FoundationPrayerTimesCard","availability":"v1 M0","flow":"Read-only clocks and customize buttons; no prayer logging route"},
+    {"path":"Madar/App/CustomizeMadar.swift","anchor":"guard AppSession.supportedKeys.contains(definition.key)","availability":"v1 M0","flow":"Search and nine supported setting keys; choice/int/place controls; reset confirmation; backup link only when service exists"},
+    {"path":"Madar/App/CityEditor.swift","anchor":"struct CityEditor","availability":"v1 M0","flow":"Onboarding/settings -> city presets and save; location fields validated by ActivePlace"},
+    {"path":"Madar/App/FirstRunView.swift","anchor":"struct FirstRunView","availability":"v1 M0","flow":"Two-step introduction and city; continue/skip, no future-room entry"},
+    {"path":"Madar/App/BackupSettingsView.swift","anchor":"plain-export-now","availability":"v1 M0 plain export; retained encrypted backup","flow":"Prepare plain export -> share; retained password backup/inspect/restore/cancel, native importer/share; auth/privacy tracked separately T09"},
+    {"path":"Madar/App/MadarLock.swift","anchor":"struct MadarLockGate","availability":"v1 M0 privacy","flow":"Protected root lock screen and authentication; presented native UI privacy remains separately verified"},
+    {"path":"Madar/Intents/OpenMadarIntent.swift","anchor":"static let openAppWhenRun = true","availability":"v1 M0 navigation only","flow":"Open app, no room or write parameter"},
+    {"path":"Madar/Widgets/MadarWidgets.swift","anchor":"struct FoundationWidget","availability":"v1 M0 foundation extension","flow":"App-opening placeholder only; snapshot read, no unbuilt-room actions"}
+  ],
+  "compiledWithoutReleaseEntry": [
+    {"symbol":"PrayerRoom / PrayerSettingsView","reason":"Compiled app scaffolding has no M0 tab/route: only foundation and customize, FeatureAvailability.m0 allows core. Do not require M1 room acceptance."},
+    {"symbol":"SyncSettingsView / AppSyncService","reason":"No CustomizeMadar sync link; local-only v1. Preserve implementation without claiming feature acceptance."},
+    {"symbol":"PresetsView / savePreset / CustomizeRoom","reason":"No root release entry; supportedKeys filter used by current settings. Generic future template is compiled but not an M0 screen."},
+    {"symbol":"MadarComponentGallery","reason":"Only MADAR_UI_GALLERY inside #if DEBUG; test surface, not a release feature."},
+    {"symbol":"EditModeContainer","reason":"Shared component/gallery only; full room editing deferred by RA3."}
+  ],
+  "dynamicProofsToInspect": [
+    "SettingControl definition.key/option.value comes from filtered schema, not arbitrary caller strings; UI conditional branches and defaults still require host/UI evidence.",
+    "Theme foreground/background/font inheritance, opacity, native system colours and dynamic strings require source/visual tracing per emitted location.",
+    "Native file names, error.localizedDescription, date formatter, imported warnings/counts and generic package formatting are not proven by source regex.",
+    "Control lines in compiled unentered views remain in emitted inventory; do not silently treat them as reachable or tested."
+  ],
+  "currentCountPhraseInventory": [
+    {"path":"Madar/App/CustomizationCopy.swift","line":6,"status":"catalog-backed","catalog":"Customization/customization.changes; six Arabic plural categories; hosted explicit expectations already exist"},
+    {"path":"Madar/App/BackupSettingsView.swift","line":124,"status":"finding RU3","reason":"Restore success builds arbitrary restored/skipped counts with invariant سجلًّا; e.g. 3 needs سجلات"},
+    {"path":"Madar/App/BackupSettingsView.swift","line":251,"status":"finding RU3","reason":"Skipped preview builds arbitrary count with invariant سجلًّا; no catalog plural"},
+    {"path":"Madar/App/BackupSettingsView.swift","line":175,"status":"manual linguistic trace","reason":"Saved automatic/manual count summaries have no catalog variation; inspect 0/1/2/3/11/100 expectations"},
+    {"path":"Madar/App/BackupSettingsView.swift","line":245,"status":"label-plus-count","reason":"Current/saved counts and line247 additions/updates/deletions use stable labels; numeral style and bidi still require runtime evidence"},
+    {"path":"Madar/App/BackupSettingsView.swift","line":260,"status":"finding numerals","reason":"digits and arabicNumber (line263) use ar_SA directly; do not read core.numerals. Selected western style cannot change this formatting path."},
+    {"path":"Madar/App/PresetsView.swift","line":79,"status":"compiled without entry","reason":"Preset changed-settings/ignored/layout counts are emitted dynamically but RA3 has no release preset entry; do not expand current room review"}
+  ]
+}
