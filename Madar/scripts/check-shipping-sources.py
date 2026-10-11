@@ -49,11 +49,15 @@ def check_target_dependencies(declaration, manifest, product, included_products)
     enumerated by PBX are supported; the explicitly excluded pinned Adhan product
     is the only external dependency. Any new form needs deliberate scope support.
     """
-    match = re.search(r'\bdependencies:\s*', declaration)
+    match = re.search(r'\bdependencies\s*:\s*', declaration)
     if not match: return
     tail = declaration[match.end():]
     array = re.match(r'\[([^\]]*)\]', tail)
     if not array: raise ValueError(f'computed target dependencies require scope support: {product}')
+    # A supported literal prefix is insufficient: the entire dependency argument
+    # must end here, before the target closes or another labelled argument begins.
+    if not re.match(r'\s*(?:\)|,\s*(?:\)|[A-Za-z_]\w*\s*:))', tail[array.end():]):
+        raise ValueError(f'computed target dependencies require scope support: {product}')
     same_package_targets = set(re.findall(r'(?<!\w)\.(?:target|executableTarget)\(name:\s*"([^"]+)"', manifest))
     remaining = array[1].strip()
     while remaining:

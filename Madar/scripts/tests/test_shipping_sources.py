@@ -127,11 +127,60 @@ targets: [.target(name: "Main", dependencies: ["Helper"]), .target(name: "Helper
 
     def test_M0L01_unsupported_dependency_forms_fail_closed(self):
         for declaration in ['(name: "Main", dependencies: dependencyList)',
+                            '(name: "Main", dependencies : ["Main"] + extraDependencies)',
                             '(name: "Main", dependencies: [.target(name: "Helper")])',
                             '(name: "Main", dependencies: [.product(name: "Mystery", package: "unknown")])',
                             '(name: "Main", dependencies: ["NotEnumerated"])']:
             with self.subTest(declaration=declaration), self.assertRaises(ValueError):
                 checks.check_target_dependencies(declaration, declaration, 'Main', {'Main'})
+
+    def test_M0L01_computed_suffix_cannot_omit_violating_target(self):
+        expressions = [
+            '["MadarCore"] + extraDependencies',
+            '["MadarCore"] + (includeHelper ? ["Helper"] : [])',
+            '["MadarCore"].isEmpty ? extraDependencies : ["MadarCore"]',
+            '["MadarCore"].map { $0 } + extraDependencies',
+            '["MadarCore"] /* boundary */ + extraDependencies',
+            '["MadarCore"]\n + extraDependencies',
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for package, target in [('Main', 'Main'), ('Main', 'Helper'), ('MadarCore', 'MadarCore')]:
+                source = root/'Packages'/package/'Sources'/target
+                source.mkdir(parents=True)
+                (source/'File.swift').write_text('Text("bad").foregroundStyle(.red)' if target == 'Helper' else '')
+            helper = root/'Packages/Main/Sources/Helper/File.swift'
+            # This independently detectable violation cannot be hidden by accepting
+            # an enumerated literal prefix of a computed dependency expression.
+            self.assertTrue(any('colour value' in x for x in checks.scan_source(helper.read_text(), 'Helper/File.swift', {})[0]))
+            (root/'Packages/MadarCore/Package.swift').write_text('''import PackageDescription
+let package = Package(name: "MadarCore", products: [.library(name: "MadarCore", targets: ["MadarCore"])],
+targets: [.target(name: "MadarCore")])''')
+            project = {'rootObject':'project','objects': {
+                'project':{'isa':'PBXProject','mainGroup':'group','packageReferences':['main','core']},
+                'group':{'isa':'PBXGroup','children':[]},
+                'main':{'isa':'XCLocalSwiftPackageReference','relativePath':'Packages/Main'},
+                'core':{'isa':'XCLocalSwiftPackageReference','relativePath':'Packages/MadarCore'},
+                'mainProduct':{'isa':'XCSwiftPackageProductDependency','productName':'Main'},
+                'coreProduct':{'isa':'XCSwiftPackageProductDependency','productName':'MadarCore'},
+                'app':{'isa':'PBXNativeTarget','name':'Madar','productType':'com.apple.product-type.application','buildPhases':[], 'packageProductDependencies':['mainProduct','coreProduct']},
+                'widget':{'isa':'PBXNativeTarget','name':'MadarWidgets','productType':'com.apple.product-type.app-extension','buildPhases':[]}}}
+            for expression in expressions:
+                with self.subTest(expression=expression):
+                    (root/'Packages/Main/Package.swift').write_text('''import PackageDescription
+let extraDependencies = ["Helper"]
+let includeHelper = true
+let package = Package(name: "Main", products: [.library(name: "Main", targets: ["Main"])],
+targets: [.target(name: "Main", dependencies: ''' + expression + '''), .target(name: "Helper")])''')
+                    with self.assertRaisesRegex(ValueError, 'computed target dependencies'):
+                        checks.build_files(project, root)
+
+    def test_M0L01_literal_dependency_argument_boundaries_remain_supported(self):
+        for declaration in ['(name: "Main", dependencies: ["MadarCore"])',
+                            '(name: "Main", dependencies: ["MadarCore"], resources: [.process("Resources")])',
+                            '(name: "Main", dependencies: ["MadarCore"],)']:
+            with self.subTest(declaration=declaration):
+                checks.check_target_dependencies(declaration, declaration, 'Main', {'Main', 'MadarCore'})
 
 
 if __name__ == '__main__': unittest.main()
