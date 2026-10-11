@@ -278,6 +278,15 @@ Give each subagent a one-paragraph brief and ask for a short result. Never ask a
 - One review pass per change. A re-review covers only the fix diff.
 - If the same mistake appears twice, add a test or a lint check instead of reviewing for it again.
 
+### 5a. Session progress and usage — owner instruction, 11 October 2026
+
+- At the start, select one coherent task from the board and state its concrete acceptance result: a working screen/flow, a finished engine, a proven defect repair, or the decision required by a review card. Finish it before opening another independent task. Aim for at least one completed, verifiable task per session; this is a target, never permission to skip acceptance or fabricate completion.
+- The initial sanity check stays bounded to the latest handover and risky changes. Do not turn it into another full review. If a required check has current passing evidence for the same code/configuration, reuse that evidence and cite its commit/output. Re-run only when a relevant change, failed result or explicit acceptance requirement justifies it; record the reason before an expensive repeat.
+- Diagnose the first failed output before retrying. Respect the existing two-repair-attempt limit; do not cycle through equivalent simulator setup, broad audits or reviews. After the limit, preserve the evidence, split/escalate the problem and continue another independent authorized task if available. An unavailable manual UI does not block work that can proceed independently.
+- Report progress as what now works and what remains, not counts of searches, builds or reviews. If the session produces no completed task, record the concrete blocker, what was tried, and the smallest next step in the handover. Test counts alone do not count as delivered functionality.
+- Check usage at session start, task boundaries and before expensive work. Near 90% avoid opening work unlikely to finish within the remaining budget; near 95% reserve the remaining margin for the required main handover, clean checkout and automation memory. These are budget safeguards, not a target to burn tokens. If usage is unavailable, say so and choose a conservative clean stopping point.
+- Keep quality, mandatory reviews and milestone gates intact. Use the required model tier; avoid unnecessary delegation and duplicate review. A completion/session estimate is provisional and must be revised using actually completed tasks, not presented as a deadline or quota.
+
 ### 6. When something goes wrong
 
 - **Critical and High findings block the merge.** Fix them on the same branch and add a regression test named after the finding (`test_M1S2_<finding>`).
