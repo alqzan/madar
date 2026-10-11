@@ -328,6 +328,75 @@ import UIKit
         XCTAssertFalse(lock.canPresent(.app))
     }
 
+    /// Real UIWindowScene/controller objects with a controlled native adapter.
+    /// This proves revocation ordering, not an OS activity/switcher capture.
+    @MainActor private final class ActivityProbe {
+        var presentations = 0
+        var retirements = 0
+        var completion: (@MainActor @Sendable () -> Void)?
+        func present(_ host: UIViewController, _ activity: UIActivityViewController) { presentations += 1 }
+        func retire(_ activity: UIActivityViewController, _ completion: @escaping @MainActor @Sendable () -> Void) {
+            retirements += 1; self.completion = completion
+        }
+        func finishRetirement() { let callback = completion; completion = nil; callback?() }
+    }
+    private func activeShareRevocation(scope: MadarLockScope, scopeChange: Bool) async throws {
+        guard let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first else {
+            throw XCTSkip("Requires an app-host UIWindowScene")
+        }
+        let oldKey = scene.windows.first(where: \.isKeyWindow)
+        let window = UIWindow(windowScene: scene), root = UIViewController()
+        window.rootViewController = root; window.makeKeyAndVisible(); root.loadViewIfNeeded()
+        let service = Service(), auth = Authenticator(), probe = ActivityProbe()
+        service.persistedScope = scope
+        let lock = MadarLockController(scope: scope, service: service, authenticator: { auth })
+        let presenter = ScenePrivacyPresenter(controller: lock, activationState: { _ in .foregroundActive },
+            presentActivity: { probe.present($0, $1) }, retireActivity: { probe.retire($0, $1) })
+        presenter.attach(to: window)
+        let file = FileManager.default.temporaryDirectory.appending(path: "MadarPrivateShare-\(UUID()).zip")
+        try Data("synthetic private export".utf8).write(to: file)
+        defer {
+            presenter.detach(); probe.finishRetirement(); window.isHidden = true; oldKey?.makeKeyAndVisible()
+            try? FileManager.default.removeItem(at: file)
+        }
+        let ticket = try await lock.authorize([.export, .privateNote])
+        try presenter.present(file: file, authorization: ticket)
+        XCTAssertTrue(presenter.hasActivityRequest); XCTAssertEqual(probe.presentations, 1)
+        if scopeChange {
+            service.delayScope = true
+            let change = Task { try await lock.changeScope(scope == .none ? .notesOnly : .none) }
+            try await waitUntil { service.scopeContinuation != nil }
+            // Owning-controller revocation occurs before persistence suspends.
+            XCTAssertFalse(presenter.hasActivityRequest); XCTAssertEqual(probe.retirements, 1)
+            XCTAssertEqual(presenter.coverWindow?.isHidden, false)
+            service.scopeContinuation?.resume(); service.scopeContinuation = nil
+            try await change.value
+        } else {
+            lock.lock()
+            // No Task/settle is needed to retire the active presentation request.
+            XCTAssertFalse(presenter.hasActivityRequest); XCTAssertEqual(probe.retirements, 1)
+            XCTAssertEqual(presenter.coverWindow?.isHidden, false)
+        }
+        XCTAssertThrowsError(try lock.validate(ticket))
+        _ = try await lock.authorize([.app])
+        XCTAssertEqual(probe.presentations, 1); XCTAssertFalse(presenter.hasActivityRequest)
+        XCTAssertEqual(presenter.coverWindow?.isHidden, false, "Cover must outlive native dismissal")
+        probe.finishRetirement()
+        XCTAssertEqual(presenter.coverWindow?.isHidden, true)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: file.path))
+        XCTAssertEqual(probe.presentations, 1, "Generic authorization cannot reopen sharing")
+        // An explicit share tap with fresh payload authorization remains usable.
+        let fresh = try await lock.authorize([.export, .privateNote])
+        try presenter.present(file: file, authorization: fresh)
+        XCTAssertEqual(probe.presentations, 2)
+    }
+    func test_M0P1b_03_activeLockRetiresPrivateShareIncludingScopeNone() async throws {
+        for scope: MadarLockScope in [.none, .notesOnly, .app] { try await activeShareRevocation(scope: scope, scopeChange: false) }
+    }
+    func test_M0P1b_03_localScopeChangeRetiresPrivateShareBeforeGenericAuthorization() async throws {
+        for scope: MadarLockScope in [.none, .notesOnly, .app] { try await activeShareRevocation(scope: scope, scopeChange: true) }
+    }
+
     func testNativeInactiveCoverIsSynchronousNonKeyAndAbovePresentedController() async throws {
         guard let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first else {
             throw XCTSkip("Requires an app-host UIWindowScene")

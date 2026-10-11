@@ -11,6 +11,8 @@ import WidgetKit
     private var previewPasswords: [UUID: String] = [:]
     private var cancellation = BackupCancellation()
     private var exportCancellation: BackupCancellation?
+    private var restoreID: UUID?
+    private var restoreTicket: PrivacyAuthorization?
     private var exportID: UUID?
     private var exportTicket: PrivacyAuthorization?
     private var artifactTickets: [URL: PrivacyAuthorization] = [:]
@@ -20,7 +22,10 @@ import WidgetKit
     private var revocationObservers: [UUID: @MainActor (Bool) -> Void] = [:]
     private let presentShare: @MainActor (URL, PrivacyAuthorization) throws -> Void
     init(session: AppSession, store: ManagedDataStore, backupDirectory: URL, keyStore: any BackupKeyStore = KeychainBackupKeyStore(service: "com.alqzan.madar2.backup"),
-         sharePresentation: (@MainActor (URL, PrivacyAuthorization) throws -> Void)? = nil) {
+         sharePresentation: (@MainActor (URL, PrivacyAuthorization) throws -> Void)? = nil,
+         deriveCredential: @escaping @Sendable (String) async throws -> BackupCredential = { passphrase in
+             try await Task.detached(priority: .userInitiated) { try BackupCredential.derive(passphrase: passphrase) }.value
+         }) {
         self.session = session
         presentShare = sharePresentation ?? { [weak session] file, ticket in
             guard let presenter = session?.privacyPresenter else { throw PrivacyAuthorizationError.stale }
@@ -43,7 +48,7 @@ import WidgetKit
             resume: { [weak session] in session?.resumeWriters() }
         )
         coordinator = BackupCoordinator(store: store, backupDirectory: backupDirectory,
-            keyStore: keyStore, lifecycle: lifecycle)
+            keyStore: keyStore, lifecycle: lifecycle, deriveCredential: deriveCredential)
     }
     func status() async throws -> BackupUIStatus {
         guard let session else { throw DataError.invalidValue("session unavailable") }
@@ -118,6 +123,9 @@ import WidgetKit
             lockObserver = controller.observeRevocation { [weak self] cancelRequests in
                 guard let self else { return }
                 let cancelExport = cancelRequests || exportTicket != nil
+                if cancelRequests || restoreTicket != nil {
+                    cancellation.cancel(); restoreID = nil; restoreTicket = nil
+                }
                 artifactTickets.removeAll()
                 if cancelExport { exportCancellation?.cancel(); exportID = nil; exportTicket = nil }
                 for observer in Array(revocationObservers.values) { observer(cancelExport) }
@@ -159,20 +167,37 @@ import WidgetKit
     }
     func restore(previewID: UUID, mode: BackupUIRestoreMode, progress: @escaping @MainActor @Sendable (BackupUIProgress) -> Void) async throws -> BackupRestoreResult {
         guard let preview = previews[previewID] else { throw BackupOperationError.stalePreview }
-        cancellation = BackupCancellation()
-        if try !coordinator.hasConfiguredKey() {
-            guard let password = previewPasswords[previewID] else { throw BackupOperationError.backupNotConfigured }
-            try await coordinator.configurePassphrase(password)
+        guard restoreID == nil else { throw BackupOperationError.busy }
+        let controller = try privacyController(), id = UUID(), token = BackupCancellation()
+        cancellation = token; restoreID = id
+        defer { if restoreID == id { restoreID = nil; restoreTicket = nil } }
+        let validation: @MainActor () throws -> Void = { [self] in
+            guard restoreID == id, let ticket = restoreTicket else { throw PrivacyAuthorizationError.stale }
+            try validate(ticket, controller: controller); try token.check()
         }
-        previewPasswords.removeValue(forKey: previewID)
+        // First-key setup and safety capture share the restore writer barrier.
+        // Only presence metadata is inspected before scene authorization.
+        let authorization: @MainActor () async throws -> Void = { [self] in
+            var features: Set<MadarProtectedFeature> = [.export]
+            if try containsPrivateExportRows() { features.insert(.privateNote) }
+            let ticket = try await controller.authorize(features)
+            guard restoreID == id else { throw PrivacyAuthorizationError.stale }
+            restoreTicket = ticket; try validation()
+            if try !coordinator.hasConfiguredKey() {
+                guard let password = previewPasswords[previewID] else { throw BackupOperationError.backupNotConfigured }
+                try await coordinator.configurePassphrase(password, validation: validation)
+                try validation()
+            }
+        }
         let result = try await coordinator.restore(preview: preview, mode: mode == .merge ? .merge : .replace,
-            progress: reporter(progress), cancellation: cancellation)
+            progress: reporter(progress), cancellation: token, authorization: authorization, validation: validation)
+        previewPasswords.removeValue(forKey: previewID)
         previews.removeValue(forKey: previewID)
         try? FileManager.default.removeItem(at: preview.fileURL)
         return BackupRestoreResult(restoredCount: result.restoredCount, skippedCount: result.skippedCount, warnings: result.warnings)
     }
     func cancel() async {
-        exportCancellation?.cancel(); cancellation.cancel(); clearPreviews()
+        exportCancellation?.cancel(); cancellation.cancel(); restoreID = nil; restoreTicket = nil; clearPreviews()
     }
     private func clearPreviews() {
         previewPasswords.removeAll()
