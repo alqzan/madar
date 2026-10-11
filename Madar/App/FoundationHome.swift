@@ -2,18 +2,87 @@ import SwiftUI
 import MadarCore
 import MadarDesign
 
+struct FoundationPrayerTimeRow: Identifiable, Equatable {
+    let prayer: Prayer
+    let title: String
+    let clock: String
+    var id: Prayer { prayer }
+    var accessibilityLabel: String { "\(title)، \(clock)" }
+}
+
+/// A read-only presentation of the active place's civil day; stored room day keys are untouched.
+struct FoundationPrayerTimesPresentation {
+    let day: GregorianDay
+    let prayerDay: PrayerDay?
+    let rows: [FoundationPrayerTimeRow]
+
+    init(instant: Date, place: ActivePlace, options: PrayerCalculationOptions = .init(), numerals: NumeralStyle = .hindi) {
+        day = GregorianDay.containing(instant, in: place.timeZone)
+        let calculated = PrayerTimesEngine.calculate(day: day, place: place, options: options)
+        prayerDay = calculated
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = place.timeZone
+        let formatter = MadarNumberFormatter(style: numerals)
+        rows = calculated.map { times in
+            Prayer.allCases.map { prayer in
+                let title = switch prayer { case .fajr: "الفجر"; case .dhuhr: "الظهر"; case .asr: "العصر"; case .maghrib: "المغرب"; case .isha: "العشاء" }
+                let components = calendar.dateComponents([.hour, .minute], from: times.time(for: prayer))
+                let clock = String(format: "%02d:%02d", locale: Locale(identifier: "en_US_POSIX"), components.hour ?? 0, components.minute ?? 0)
+                return FoundationPrayerTimeRow(prayer: prayer, title: title, clock: formatter.localized(clock))
+            }
+        } ?? []
+    }
+}
+
+private struct FoundationPrayerTimesCard: View {
+    let rows: [FoundationPrayerTimeRow]
+    let cityName: String
+    @Environment(\.roomTheme) private var theme
+    @Environment(\.dynamicTypeSize) private var dynamicType
+    var body: some View {
+        MadarCard {
+            VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("مواقيت اليوم").font(MadarTypography.cardTitle()).accessibilityAddTraits(.isHeader)
+                    Text(cityName).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                }
+                ForEach(rows) { row in
+                    Group {
+                        if dynamicType.isAccessibilitySize {
+                            VStack(alignment: .leading, spacing: 4) { Text(row.title); clock(row) }
+                        } else {
+                            HStack { Text(row.title); Spacer(); clock(row) }
+                        }
+                    }
+                    .font(MadarTypography.body()).frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(row.accessibilityLabel)
+                    .accessibilityIdentifier("foundation-prayer-time-\(row.prayer.rawValue)")
+                }
+            }
+        }
+    }
+    private func clock(_ row: FoundationPrayerTimeRow) -> some View {
+        Text("\u{2068}\(row.clock)\u{2069}").monospacedDigit().fixedSize(horizontal: false, vertical: true)
+    }
+}
+
 struct FoundationHome: View {
     @Bindable var session: AppSession
     @Environment(\.roomTheme) private var theme
     var body: some View {
         TimelineView(.periodic(from: .now, by: 60)) { timeline in
+            let place = session.activePlace
+            let options = prayerOptions
+            let today = FoundationPrayerTimesPresentation(instant: timeline.date, place: place, options: options, numerals: session.string("core.numerals") == "western" ? .western : .hindi)
+            let prayerDays = [PrayerTimesEngine.calculate(day: today.day.adding(days: -1), place: place, options: options), today.prayerDay].compactMap { $0 }
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     HStack(alignment: .top) {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text(dateLine(timeline.date, primary: true)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                            Text(dateLine(timeline.date, primary: true, place: place, day: today.day, prayerDays: prayerDays)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                             Text("يومك بين الصلوات").font(MadarTypography.title())
-                            Text(dateLine(timeline.date, primary: false)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                            Text(dateLine(timeline.date, primary: false, place: place, day: today.day, prayerDays: prayerDays)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                         }
                         Spacer()
                         Button { session.selectedTab = "customize" } label: {
@@ -29,12 +98,14 @@ struct FoundationHome: View {
                             Button("خصّص مدار") { session.selectedTab = "customize" }.buttonStyle(MadarPrimaryButton())
                         }
                     }
-                    if PrayerTimesEngine.calculate(day: GregorianDay.containing(timeline.date, in: session.activePlace.timeZone), place: session.activePlace) == nil {
+                    if today.rows.isEmpty {
                         MadarCard {
                             Label("تعذّر حساب المواقيت لهذا الموقع اليوم. بداية اليوم من الفجر أو المغرب تحتاج مواقيت متاحة؛ يمكنك اختيار منتصف الليل من خصّص مدار.", systemImage: "info.circle")
                                 .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                                 .accessibilityIdentifier("prayer-boundary-unavailable")
                         }
+                    } else {
+                        FoundationPrayerTimesCard(rows: today.rows, cityName: session.cityName)
                     }
                     MadarCard {
                         VStack(alignment: .leading, spacing: 12) {
@@ -55,12 +126,22 @@ struct FoundationHome: View {
     private var boundaryLabel: String {
         switch session.string("core.dayStart") { case "maghrib": "المغرب"; case "midnight": "منتصف الليل"; default: "الفجر" }
     }
-    private func dateLine(_ instant: Date, primary: Bool) -> String {
+    private var prayerOptions: PrayerCalculationOptions {
+        var offsets: [Prayer: Int] = [:]
+        if case .object(let values) = session.values["salah.offsets"] {
+            for prayer in Prayer.allCases {
+                if case .number(let minutes) = values[prayer.rawValue] { offsets[prayer] = Int(minutes) }
+            }
+        }
+        return PrayerCalculationOptions(method: PrayerCalculationMethod(rawValue: session.string("salah.method")) ?? .ummAlQura,
+            hanafiAsr: session.string("salah.asr") == "hanafi",
+            highLatitudeRule: PrayerHighLatitudeRule(rawValue: session.string("salah.highLatitudeRule")) ?? .auto,
+            offsets: offsets, hijriSource: HijriSource(rawValue: session.string("core.hijriSource")) ?? .ummAlQura,
+            sightingOffset: Int(session.number("core.hijriOffset")))
+    }
+    private func dateLine(_ instant: Date, primary: Bool, place: ActivePlace, day: GregorianDay, prayerDays: [PrayerDay]) -> String {
         let useHijri = (session.string("core.firstCalendar") == "hijri") == primary
-        let place = session.activePlace
-        let day = GregorianDay.containing(instant, in: place.timeZone)
-        let prayers = [day.adding(days: -1), day].compactMap { PrayerTimesEngine.calculate(day: $0, place: place) }
-        let key = try? MadarDay.resolve(instant: instant, place: place, boundary: DayBoundary(rawValue: session.string("core.dayStart")) ?? .fajr, prayerDays: prayers, hijriSource: HijriSource(rawValue: session.string("core.hijriSource")) ?? .ummAlQura, sightingOffset: Int(session.number("core.hijriOffset")))
+        let key = try? MadarDay.resolve(instant: instant, place: place, boundary: DayBoundary(rawValue: session.string("core.dayStart")) ?? .fajr, prayerDays: prayerDays, hijriSource: HijriSource(rawValue: session.string("core.hijriSource")) ?? .ummAlQura, sightingOffset: Int(session.number("core.hijriOffset")))
         let date = (key?.date ?? day).date(in: place.timeZone).addingTimeInterval(12 * 3600)
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: session.string("core.numerals") == "western" ? "ar_SA@numbers=latn" : "ar_SA@numbers=arab")

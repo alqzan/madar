@@ -1,9 +1,40 @@
 import XCTest
 import SwiftData
 import MadarData
+import MadarCore
 @testable import Madar
 
 @MainActor final class AppServiceIntegrationTests: XCTestCase {
+    func test_M0T10_FoundationPrayerClocksUseGoldenDayNumeralsAndZone() throws {
+        // Expected clocks are copied from the approved Riyadh 2026-10-09 handoff row.
+        // This UTC instant is still October 8 in UTC, but October 9 in the active place.
+        let instant = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-10-08T22:30:00Z"))
+        let arabic = FoundationPrayerTimesPresentation(instant: instant, place: .riyadh)
+        XCTAssertEqual(arabic.day.description, "2026-10-09")
+        XCTAssertEqual(arabic.rows.map(\.prayer), [.fajr, .dhuhr, .asr, .maghrib, .isha])
+        XCTAssertEqual(arabic.rows.map(\.title), ["الفجر", "الظهر", "العصر", "المغرب", "العشاء"])
+        XCTAssertEqual(arabic.rows.map(\.clock), ["٠٤:٣١", "١١:٤١", "١٥:٠٢", "١٧:٣٢", "١٩:٠٢"])
+        XCTAssertEqual(arabic.rows.first?.accessibilityLabel, "الفجر، ٠٤:٣١")
+        let western = FoundationPrayerTimesPresentation(instant: instant, place: .riyadh, numerals: .western)
+        XCTAssertEqual(western.rows.map(\.clock), ["04:31", "11:41", "15:02", "17:32", "19:02"])
+        let sameDay = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-10-09T10:00:00Z"))
+        let utcPlace = try ActivePlace(latitude: 24.7136, longitude: 46.6753, timeZoneID: "UTC")
+        let utc = FoundationPrayerTimesPresentation(instant: sameDay, place: utcPlace, numerals: .western)
+        // Same coordinates/date, clocks expressed three hours earlier than Asia/Riyadh.
+        XCTAssertEqual(utc.rows.map(\.clock), ["01:31", "08:41", "12:02", "14:32", "16:02"])
+        let adjusted = FoundationPrayerTimesPresentation(instant: instant, place: .riyadh, options: .init(offsets: [.fajr: 5]), numerals: .western)
+        XCTAssertEqual(adjusted.rows.first?.clock, "04:36")
+    }
+
+    func test_M0T10_UnavailablePrayerClocksNeverFabricateRows() throws {
+        let instant = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-06-21T12:00:00Z"))
+        let polar = try ActivePlace(latitude: 89, longitude: 0, timeZoneID: "UTC")
+        let unavailable = FoundationPrayerTimesPresentation(instant: instant, place: polar)
+        XCTAssertNil(unavailable.prayerDay)
+        XCTAssertTrue(unavailable.rows.isEmpty)
+        XCTAssertEqual(unavailable.day.description, "2026-06-21")
+    }
+
     func test_M0S2_LegacyCutSettingsRemainStoredWithoutAvailableRoutes() throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "MadarCutSettings-\(UUID())")
         let managed = try ManagedDataStore(root: root.appending(path: "Data"), commandLockURL: root.appending(path: "CommandBus.lock"))
