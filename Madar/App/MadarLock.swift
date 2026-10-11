@@ -90,7 +90,7 @@ struct PrivacyAuthorization {
     private func cancelAuthorization(_ id: UUID) {
         guard currentAuth?.0 == id else { return }
         generation += 1; covered = true; invalidateAuth()
-        revoke(cancelRequests: true); recoverActive()
+        revoke(cancelRequests: true); enqueueRedaction(); recoverActive()
     }
     private func enqueueRedaction() {
         let previous = redactionTask
@@ -129,7 +129,12 @@ struct PrivacyAuthorization {
         let id = UUID(), stamp = generation
         let needed = Set(features.compactMap { requiredFeature(for: $0) })
         let device = authenticator(); currentAuth = (id, device)
-        defer { if currentAuth?.0 == id { currentAuth = nil; authenticating = false; notify(); if covered && phase == .active { recoverActive() } } }
+        defer {
+            // Cancellation can win immediately after a completed service binding,
+            // before its asynchronously dispatched handler reaches the actor.
+            if Task.isCancelled { cancelAuthorization(id) }
+            if currentAuth?.0 == id { currentAuth = nil; authenticating = false; notify(); if covered && phase == .active { recoverActive() } }
+        }
         return try await withTaskCancellationHandler {
             try await performAuthorization(features, id: id, stamp: stamp, needed: needed, device: device)
         } onCancel: {

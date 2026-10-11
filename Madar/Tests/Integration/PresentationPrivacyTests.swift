@@ -11,6 +11,7 @@ import UIKit
         var bindingContinuation: CheckedContinuation<Void, Never>?
         var delayScope = false
         var scopeContinuation: CheckedContinuation<Void, Error>?
+        var bindingHook: (@MainActor () -> Void)?
         func redactProtectedData() async throws { purges += 1; bindings.removeAll() }
         func authorizeAccess(to feature: MadarProtectedFeature) async throws {
             if delayNextBinding {
@@ -18,6 +19,7 @@ import UIKit
                 await withCheckedContinuation { bindingContinuation = $0 }
             }
             bindings.append(feature)
+            bindingHook?()
         }
         func privacyScopeDidChange(to scope: MadarLockScope) async throws {
             if delayScope { try await withCheckedThrowingContinuation { scopeContinuation = $0 } }
@@ -127,6 +129,20 @@ import UIKit
         auth.delayed = false; lock.sceneChanged(.active)
         let ticket = try await lock.authorize([.app])
         XCTAssertNoThrow(try lock.validate(ticket)); XCTAssertEqual(auth.calls, 2)
+    }
+
+    func test_M0P1a_cancellationAtBindingCompletionPurgesBeforeNewBinding() async throws {
+        let service = Service()
+        let lock = MadarLockController(scope: .app, service: service, authenticator: { Authenticator() })
+        var request: Task<PrivacyAuthorization, Error>?
+        service.bindingHook = { request?.cancel() }
+        request = Task { try await lock.authorize([.app]) }
+        do { _ = try await request?.value; XCTFail("Cancellation at binding completion succeeded") } catch { }
+        service.bindingHook = nil
+        try await waitUntil { service.purges > 0 && service.bindings.isEmpty && !lock.authenticating }
+        XCTAssertFalse(lock.canPresent(.app))
+        let fresh = try await lock.authorize([.app])
+        XCTAssertEqual(service.bindings, [.app]); XCTAssertNoThrow(try lock.validate(fresh))
     }
 
     func test_M0P1a_scopeChangeImmediatelyRevokesOtherScene() async throws {
