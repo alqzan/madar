@@ -252,7 +252,9 @@ import XCTest
         screenshot.name = "M0-deep-link-cold-settings"; screenshot.lifetime = .keepAlways; add(screenshot)
     }
     func testFirstRunAndSettingsRenderWithoutUnbuiltRooms() throws {
+        continueAfterFailure = false
         let app = XCUIApplication()
+        app.launchEnvironment["MADAR_UI_STORE_ID"] = UUID().uuidString
         app.launch()
         finishOnboarding(app)
         let settings = app.buttons["settings-button"]
@@ -265,9 +267,11 @@ import XCTest
         let settingsShot = XCTAttachment(screenshot: app.screenshot()); settingsShot.name = "M0-customize-RTL"; settingsShot.lifetime = .keepAlways; add(settingsShot)
     }
     func testLightDarkAndAccessibilityScreenshots() throws {
+        continueAfterFailure = false
         for theme in ["light", "dark"] {
             for size in ["L", "AX3", "AX5"] {
                 let app = XCUIApplication()
+                app.launchEnvironment["MADAR_UI_STORE_ID"] = UUID().uuidString
                 app.launchEnvironment["MADAR_UI_THEME"] = theme
                 app.launchEnvironment["MADAR_UI_SIZE"] = size
                 app.launch()
@@ -282,7 +286,9 @@ import XCTest
         }
     }
     func testThemePersistenceResetAndUndoThroughUI() throws {
+        continueAfterFailure = false
         let app = XCUIApplication()
+        app.launchEnvironment["MADAR_UI_STORE_ID"] = UUID().uuidString
         app.launch(); finishOnboarding(app)
         XCTAssertTrue(app.buttons["settings-button"].waitForExistence(timeout: 10))
         app.buttons["settings-button"].tap()
