@@ -1,6 +1,51 @@
 import XCTest
 
 @MainActor final class FoundationUITests: XCTestCase {
+    func test_M0T08_PlainExportNativeShareAtDefaultAX3AndDark() throws {
+        continueAfterFailure = false
+        for (size, theme) in [("L", "light"), ("AX3", "light"), ("L", "dark")] {
+            let app = XCUIApplication()
+            app.launchEnvironment["MADAR_UI_STORE_ID"] = UUID().uuidString
+            app.launchEnvironment["MADAR_UI_SIZE"] = size
+            app.launchEnvironment["MADAR_UI_THEME"] = theme
+            app.launch(); openBackupSettings(app)
+            let export = app.buttons["plain-export-now"]
+            XCTAssertTrue(export.waitForExistence(timeout: 10), app.debugDescription)
+            scrollTo(export, in: app)
+            attachScreenshot(app, named: "M0-plain-export-before-\(theme)-\(size)")
+            XCTAssertTrue(export.isEnabled)
+            export.tap()
+            let share = app.buttons["plain-export-share"]
+            XCTAssertTrue(share.waitForExistence(timeout: 20), app.debugDescription)
+            scrollTo(share, in: app)
+            attachScreenshot(app, named: "M0-plain-export-ready-\(theme)-\(size)")
+            share.tap()
+            print("M0 plain export native share \(theme)/\(size):\n\(app.debugDescription)")
+            // BackupCoordinator names the portable archive Madar-<timestamp>-plain.zip.
+            // Native sharing may omit the extension from the displayed item title.
+            let file = app.descendants(matching: .any).matching(NSPredicate(
+                format: "label BEGINSWITH %@ AND label CONTAINS %@", "Madar-", "-plain"
+            )).firstMatch
+            XCTAssertTrue(file.waitForExistence(timeout: 10), app.debugDescription)
+            let saveToFiles = app.descendants(matching: .any).matching(NSPredicate(
+                format: "label CONTAINS[c] %@ OR label CONTAINS %@", "Save to Files", "الملفات"
+            )).firstMatch
+            XCTAssertTrue(saveToFiles.waitForExistence(timeout: 10), app.debugDescription)
+            attachScreenshot(app, named: "M0-plain-export-native-share-\(theme)-\(size)")
+            let dismiss = app.buttons.matching(NSPredicate(
+                format: "label IN %@", ["Close", "Cancel", "إغلاق", "إلغاء"]
+            )).firstMatch
+            if dismiss.exists && dismiss.isHittable { dismiss.tap() }
+            else { app.swipeDown() }
+            expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: file)
+            waitForExpectations(timeout: 10)
+            scrollTo(share, in: app)
+            attachScreenshot(app, named: "M0-plain-export-dismissed-\(theme)-\(size)")
+            // Sharing/dismissal does not establish a successful write to a Files destination.
+            app.terminate()
+        }
+    }
+
     func test_M0S2_RU3_CustomizationPluralsAtDefaultAndAX3() throws {
         continueAfterFailure = false
         for size in ["L", "AX3"] {
