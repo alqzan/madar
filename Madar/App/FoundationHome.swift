@@ -60,7 +60,7 @@ private struct FoundationPrayerTimesCard: View {
                     .accessibilityIdentifier("foundation-prayer-time-\(row.prayer.rawValue)")
                 }
             }
-        }.accessibilityIdentifier("foundation-prayer-times")
+        }
     }
     private func clock(_ row: FoundationPrayerTimeRow) -> some View {
         Text("\u{2068}\(row.clock)\u{2069}").monospacedDigit().fixedSize(horizontal: false, vertical: true)
