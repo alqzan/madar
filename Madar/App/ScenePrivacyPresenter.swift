@@ -33,9 +33,13 @@ import UIKit
             MainActor.assumeIsolated { self?.transition(.background) }
         })
         notifications.append(NotificationCenter.default.addObserver(forName: .madarPrivacyScopeChanged, object: nil, queue: .main) { [weak self] note in
+            // Notification's object/userInfo are not Sendable. Snapshot only values
+            // before the synchronous main-actor boundary; never transfer the note.
+            let sourceID = (note.object as? MadarLockController).map(ObjectIdentifier.init)
+            guard let raw = note.userInfo?["scope"] as? String,
+                  let scope = MadarLockScope(rawValue: raw) else { return }
             MainActor.assumeIsolated {
-                guard let self, (note.object as? MadarLockController) !== self.controller,
-                      let raw = note.userInfo?["scope"] as? String, let scope = MadarLockScope(rawValue: raw) else { return }
+                guard let self, sourceID != ObjectIdentifier(self.controller) else { return }
                 self.coverNow(); self.controller.receiveScope(scope)
             }
         })
