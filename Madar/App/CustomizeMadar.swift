@@ -60,7 +60,9 @@ struct CustomizeMadar: View {
                 }
                 if query.isEmpty {
                     if let backup = session.backupService {
-                        NavigationLink("النسخ والاستعادة") { BackupSettingsView(service: backup) }.frame(minHeight: 44).font(MadarTypography.section()).accessibilityIdentifier("backup-settings-link")
+                        NavigationLink("النسخ والاستعادة") {
+                            BackupSettingsView(service: backup, numerals: session.string("core.numerals") == "western" ? .western : .hindi)
+                        }.frame(minHeight: 44).font(MadarTypography.section()).accessibilityIdentifier("backup-settings-link")
                     }
                 }
             }

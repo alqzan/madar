@@ -5,19 +5,42 @@ import MadarCore
 final class CustomizationCopyTests: XCTestCase {
     func test_fixPrevious_M0T13_RU3_BackupRecordPluralCategories() {
         // Golden Arabic grammar follows RU3, not production/catalog output.
-        let fixtures: [(Int, String, String)] = [
-            (0, "لم تُستعد أي سجلات.", "لم تُترك أي سجلات دون تطبيق."),
-            (1, "استُعيد سجل واحد.", "لم يُطبّق سجل واحد."),
-            (2, "استُعيد سجلان.", "لم يُطبّق سجلان."),
-            (3, "استُعيدت \u{2068}٣\u{2069} سجلات.", "لم تُطبّق \u{2068}٣\u{2069} سجلات."),
-            (11, "استُعيد \u{2068}١١\u{2069} سجلًّا.", "لم يُطبّق \u{2068}١١\u{2069} سجلًّا."),
-            (100, "استُعيد \u{2068}١٠٠\u{2069} سجل.", "لم يُطبّق \u{2068}١٠٠\u{2069} سجل.")
+        let fixtures: [(Int, String, String, String, String)] = [
+            (0, "لم تُستعد أي سجلات.", "لم تُترك أي سجلات دون تطبيق.", "لم تُستعد أي سجلات.", "لم تُترك أي سجلات دون تطبيق."),
+            (1, "استُعيد سجل واحد.", "لم يُطبّق سجل واحد.", "استُعيد سجل واحد.", "لم يُطبّق سجل واحد."),
+            (2, "استُعيد سجلان.", "لم يُطبّق سجلان.", "استُعيد سجلان.", "لم يُطبّق سجلان."),
+            (3, "استُعيدت \u{2068}٣\u{2069} سجلات.", "لم تُطبّق \u{2068}٣\u{2069} سجلات.", "استُعيدت \u{2068}3\u{2069} سجلات.", "لم تُطبّق \u{2068}3\u{2069} سجلات."),
+            (11, "استُعيد \u{2068}١١\u{2069} سجلًّا.", "لم يُطبّق \u{2068}١١\u{2069} سجلًّا.", "استُعيد \u{2068}11\u{2069} سجلًّا.", "لم يُطبّق \u{2068}11\u{2069} سجلًّا."),
+            (100, "استُعيد \u{2068}١٠٠\u{2069} سجل.", "لم يُطبّق \u{2068}١٠٠\u{2069} سجل.", "استُعيد \u{2068}100\u{2069} سجل.", "لم يُطبّق \u{2068}100\u{2069} سجل.")
         ]
-        for (count, restored, skipped) in fixtures {
-            let digits = MadarNumberFormatter(style: .hindi).string(count)
-            XCTAssertEqual(BackupCopy.restored(count: count, formattedCount: digits), restored)
-            XCTAssertEqual(BackupCopy.skipped(count: count, formattedCount: digits), skipped)
+        for (count, hindiRestored, hindiSkipped, westernRestored, westernSkipped) in fixtures {
+            for (style, restored, skipped) in [(NumeralStyle.hindi, hindiRestored, hindiSkipped), (.western, westernRestored, westernSkipped)] {
+                let digits = MadarNumberFormatter(style: style).string(count)
+                let actualRestored = BackupCopy.restored(count: count, formattedCount: digits)
+                let actualSkipped = BackupCopy.skipped(count: count, formattedCount: digits)
+                XCTAssertEqual(actualRestored, restored)
+                XCTAssertEqual(actualSkipped, skipped)
+                XCTAssertFalse(actualRestored.contains("·"))
+                XCTAssertFalse(actualSkipped.contains("·"))
+            }
         }
+    }
+
+    func test_fixPrevious_M0T13_BackupNumeralRedrawPreservesRestoreFactsAndWarnings() {
+        let result = BackupRestoreResult(restoredCount: 3, skippedCount: 11, warnings: ["تنبيه 123"])
+        let expected: [(NumeralStyle, String)] = [
+            (.hindi, "اكتملت الاستعادة. استُعيدت ٣ سجلات. لم يُطبّق ١١ سجلًّا.\nتنبيه 123"),
+            (.western, "اكتملت الاستعادة. استُعيدت 3 سجلات. لم يُطبّق 11 سجلًّا.\nتنبيه 123")
+        ]
+        for (style, text) in expected {
+            // Compare full readable copy while catalog interpolation retains bidi isolates.
+            let actual = BackupCopy.restoreSummary(result, numerals: style)
+                .filter { $0 != "\u{2068}" && $0 != "\u{2069}" }
+            XCTAssertEqual(actual, text)
+        }
+        XCTAssertEqual(result.restoredCount, 3)
+        XCTAssertEqual(result.skippedCount, 11)
+        XCTAssertEqual(result.warnings, ["تنبيه 123"], "Appearance must not relocalize warning payloads.")
     }
 
     func test_M0S2_RU3_ArabicPluralCategoriesHonorNumerals() {
