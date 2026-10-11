@@ -3,8 +3,8 @@ import SwiftData
 
 /// Forward conversion under the app's existing store lease. Old generations remain rollback sources.
 @MainActor enum LegacyGenerationMigration {
-    enum Checkpoint: String { case afterCopy, afterStaging, afterPointer }
-    private struct Journal: Codable { let oldID: UUID; let newID: UUID }
+    enum Checkpoint: String { case afterCopy, afterStaging, afterHooksJournal, afterPointer }
+    private struct Journal: Codable { let oldID: UUID; let newID: UUID; var preserveDeviceRows: Bool? = nil }
     static func migrate(pointer: ManagedPointer, root: URL, interruption: Checkpoint?) throws -> ManagedPointer {
         let journalURL = root.appendingPathComponent("SchemaMigration.json")
         let originalDirectory = root.appendingPathComponent("Generations/\(pointer.generationID.uuidString)")
@@ -25,14 +25,32 @@ import SwiftData
             let deviceVersion = try JSONDecoder().decode(Int.self,from:Data(contentsOf:deviceStamp))
             guard (1...MadarSchema.version).contains(deviceVersion) else { throw deviceVersion > MadarSchema.version ? DataError.newerStore : DataError.invalidValue("device store version") }
         }
-        let journal: Journal
+        var journal: Journal
         if FileManager.default.fileExists(atPath:journalURL.path) {
             journal = try JSONDecoder().decode(Journal.self,from:Data(contentsOf:journalURL))
             guard journal.oldID == pointer.generationID else { throw BackupOperationError.invalidManagedStore }
         } else {
             journal = .init(oldID:pointer.generationID,newID:UUID())
-            try DurableFiles.encode(journal,to:journalURL)
         }
+        // The active pointer decides whether an older restore committed. Persist this obligation
+        // before replacing its hooks journal, so retries before/after migration promotion keep it.
+        let restoreURL = root.appendingPathComponent("RestoreJournal.json")
+        var preserveDeviceRows = true
+        if FileManager.default.fileExists(atPath:restoreURL.path) {
+            let restore = try JSONDecoder().decode(RestoreJournal.self,from:Data(contentsOf:restoreURL))
+            guard restore.oldGenerationID != restore.newGenerationID else { throw BackupOperationError.invalidManagedStore }
+            if pointer.generationID == restore.newGenerationID {
+                preserveDeviceRows = restore.preserveDeviceRows == true
+            } else if pointer.generationID == restore.oldGenerationID {
+                guard restore.phase != .promoted else { throw BackupOperationError.invalidManagedStore }
+                if restore.newGenerationID != journal.newID {
+                    let abandoned = root.appendingPathComponent("Generations/\(restore.newGenerationID.uuidString)")
+                    if FileManager.default.fileExists(atPath:abandoned.path) { try FileManager.default.removeItem(at:abandoned) }
+                }
+            } else { throw BackupOperationError.invalidManagedStore }
+        }
+        journal.preserveDeviceRows = journal.preserveDeviceRows ?? preserveDeviceRows
+        try DurableFiles.encode(journal,to:journalURL)
         let safety = root.appendingPathComponent("MigrationSafety/\(journal.oldID.uuidString)")
         try FileManager.default.createDirectory(at:safety,withIntermediateDirectories:true,attributes:[.posixPermissions:0o700])
         let sourceCopy = safety.appendingPathComponent("SourceV1")
@@ -79,8 +97,9 @@ import SwiftData
         }
         try validateDevice()
         let replacement = ManagedPointer(version:pointer.version,generationID:journal.newID,previousGenerationID:pointer.generationID,accountHash:pointer.accountHash,cloudKitContainerIdentifier:pointer.cloudKitContainerIdentifier)
-        let hooks = RestoreJournal(operationID:UUID(),oldGenerationID:journal.oldID,newGenerationID:journal.newID,phase:.ready,hooksPending:true,preserveDeviceRows:true)
+        let hooks = RestoreJournal(operationID:UUID(),oldGenerationID:journal.oldID,newGenerationID:journal.newID,phase:.ready,hooksPending:true,preserveDeviceRows:journal.preserveDeviceRows)
         try DurableFiles.encode(hooks,to:root.appendingPathComponent("RestoreJournal.json"))
+        if interruption == .afterHooksJournal { throw BackupOperationError.simulatedInterruption("migration afterHooksJournal") }
         try DurableFiles.encode(replacement,to:root.appendingPathComponent("ActiveGeneration.json"))
         if interruption == .afterPointer { throw BackupOperationError.simulatedInterruption("migration afterPointer") }
         try FileManager.default.removeItem(at:journalURL)

@@ -155,4 +155,48 @@ import Testing
         #expect(try fileHashes(flat) == before)
     }
 
+    @Test func test_M0S1_M0R4_01_committedRestoreCleanupSurvivesMigrationAndReopen() async throws {
+        for phase in [RestoreJournal.Phase.ready, .promoted] {
+            for checkpoint in [LegacyGenerationMigration.Checkpoint.afterCopy, .afterStaging, .afterHooksJournal, .afterPointer] {
+                let base = try fixtureDirectory(); defer { try? FileManager.default.removeItem(at: base) }
+                let (root, id, generation) = try oldManagedFixture(base)
+                let sourceHashes = try fileHashes(generation)
+                try DurableFiles.encode(RestoreJournal(operationID: UUID(), oldGenerationID: UUID(), newGenerationID: id, phase: phase, hooksPending: true), to: root.appendingPathComponent("RestoreJournal.json"))
+                #expect(throws: BackupOperationError.simulatedInterruption("migration \(checkpoint.rawValue)")) {
+                    try ManagedDataStore(root: root, migrationInterruption: checkpoint)
+                }
+                let store = try ManagedDataStore(root: root)
+                let coordinator = BackupCoordinator(store: store, backupDirectory: base.appendingPathComponent("Backups"), keyStore: MemoryBackupKeyStore())
+                #expect(try await coordinator.recoverPendingLifecycle().isEmpty)
+                let context = store.container.mainContext
+                #expect(try context.fetchCount(FetchDescriptor<PageSchedule>()) == 0)
+                #expect(try context.fetchCount(FetchDescriptor<SessionDraft>()) == 0)
+                #expect(try context.fetchCount(FetchDescriptor<ProcessingJob>()) == 0)
+                #expect(try context.fetchCount(FetchDescriptor<CommandReceipt>()) == 1)
+                #expect(try fileHashes(generation) == sourceHashes)
+                #expect(!store.recoveryRequiresRefresh)
+            }
+        }
+    }
+    @Test func test_M0S1_M0R4_01_uncommittedRestorePreservesDeviceRowsAndRejectsMismatch() async throws {
+        for phase in [RestoreJournal.Phase.preparing, .ready] {
+            let base = try fixtureDirectory(); defer { try? FileManager.default.removeItem(at: base) }
+            let (root, id, _) = try oldManagedFixture(base)
+            let abandoned = UUID(); let staging = root.appendingPathComponent("Generations/\(abandoned.uuidString)")
+            try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
+            try DurableFiles.encode(RestoreJournal(operationID: UUID(), oldGenerationID: id, newGenerationID: abandoned, phase: phase, hooksPending: true), to: root.appendingPathComponent("RestoreJournal.json"))
+            let store = try ManagedDataStore(root: root)
+            let coordinator = BackupCoordinator(store: store, backupDirectory: base.appendingPathComponent("Backups"), keyStore: MemoryBackupKeyStore())
+            #expect(try await coordinator.recoverPendingLifecycle().isEmpty)
+            #expect(try RecordFingerprint.hash(RecordBridge.all(store.container.mainContext, syncedOnly: false)) == RecordFingerprint.hash(expectedRows()))
+            #expect(!FileManager.default.fileExists(atPath: staging.path))
+        }
+        let base = try fixtureDirectory(); defer { try? FileManager.default.removeItem(at: base) }
+        let (root, _, _) = try oldManagedFixture(base)
+        try DurableFiles.encode(RestoreJournal(operationID: UUID(), oldGenerationID: UUID(), newGenerationID: UUID(), phase: .ready, hooksPending: true), to: root.appendingPathComponent("RestoreJournal.json"))
+        let before = try fileHashes(root)
+        #expect(throws: BackupOperationError.invalidManagedStore) { try ManagedDataStore(root: root) }
+        #expect(try fileHashes(root).filter { $0.key != "CommandBus.lock" } == before)
+    }
+
 }
