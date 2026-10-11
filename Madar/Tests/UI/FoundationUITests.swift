@@ -191,9 +191,11 @@ import XCTest
             scrollBackupForm(to: password, in: app, towardsTop: true)
             password.tap()
             try selectEnglishKeyboard(app)
+            let keyboardDone = app.buttons["backup-keyboard-done"]
+            XCTAssertTrue(keyboardDone.waitForExistence(timeout: 10), app.debugDescription)
             password.typeText(passphrase)
             attachScreenshot(app, named: "M0-backup-before-confirmation-\(size)")
-            XCTAssertEqual(export.value as? String, "passphrase-count=\(passphrase.count);confirmation-count=0;matches=false;busy=false", "Validate first-field input before submitting or changing focus.")
+            XCTAssertEqual(keyboardDone.value as? String, "passphrase-count=\(passphrase.count);confirmation-count=0;matches=false;busy=false;can-export=false", "Validate first-field input before submitting or changing focus.")
             // Exercise native Next while the keyboard changes the Form's visible area,
             // instead of tapping a row whose frame may be outside that area.
             password.typeText("\n")
@@ -201,13 +203,14 @@ import XCTest
             let mismatch = passphrase + "!"
             try selectEnglishKeyboard(app)
             confirmation.typeText(mismatch)
-            XCTAssertEqual(export.value as? String, "passphrase-count=\(passphrase.count);confirmation-count=\(mismatch.count);matches=false;busy=false")
-            XCTAssertFalse(export.isEnabled, "A mismatched confirmation must not permit export.")
+            // The toolbar mirrors the predicate driving the virtualized export
+            // button's disabled state. Do not change focus just to query that row.
+            XCTAssertEqual(keyboardDone.value as? String, "passphrase-count=\(passphrase.count);confirmation-count=\(mismatch.count);matches=false;busy=false;can-export=false", "A mismatched confirmation must not permit export.")
             // The insertion point is still at the end; remove only the extra mismatching
             // character. Re-tapping a populated secure field can move the insertion point.
             confirmation.typeText(XCUIKeyboardKey.delete.rawValue)
-            XCTAssertEqual(export.value as? String, "passphrase-count=\(passphrase.count);confirmation-count=\(passphrase.count);matches=true;busy=false")
-            app.buttons["backup-keyboard-done"].tap()
+            XCTAssertEqual(keyboardDone.value as? String, "passphrase-count=\(passphrase.count);confirmation-count=\(passphrase.count);matches=true;busy=false;can-export=true")
+            keyboardDone.tap()
             scrollTo(export, in: app)
             XCTAssertTrue(export.isEnabled, app.debugDescription); export.tap()
             let share = app.buttons["backup-export"]
