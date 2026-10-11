@@ -1,6 +1,6 @@
 {
- "version": 2,
- "date": "2026-10-09",
+ "version": 3,
+ "date": "2026-10-10",
  "generatedBy": "Agent A gen_dd.py (single source with parts/p12.html §11 listing and natural-key table)",
  "conventions": {
   "seedNamespace": "2103b223-aa33-4c73-bab6-b2adaed8603e",
@@ -10,7 +10,7 @@
   "rates": "Decimal as canonical String (ASCII, \".\" separator) (FX); percentages as Int basis points (suffix Bp)",
   "duration": "Int seconds (suffix S) unless the field or its unit field names another unit (Min, Days, Km, HabitPolicy.unit)",
   "dayKey": "yyyy-MM-dd ASCII Gregorian; never recomputed implicitly",
-  "deletePolicy": "soft = tombstone this row; softCascade = also tombstone listed children; softRestrict = UI archives instead while live children exist"
+  "deletePolicy": "soft = tombstone this row; softCascade = also tombstone listed children; softRestrict = UI archives instead while live children exist; sticky deletion dominates ordinary LWW; restore requires restoredAt > maximum deletion barrier, keeps barrier"
  },
  "commonFields": [
   {
@@ -51,6 +51,18 @@
    "type": "UUID?",
    "optional": true,
    "note": "alias: set on a merge loser = winner id; such rows are never winners and never shown"
+  },
+  {
+   "name": "deletionBarrierAt",
+   "type": "Date?",
+   "optional": true,
+   "note": "Maximum observed explicit deletion timestamp; retained after restore."
+  },
+  {
+   "name": "restoredAt",
+   "type": "Date?",
+   "optional": true,
+   "note": "Explicit restore timestamp only. Live only when newer than deletionBarrierAt; stale ordinary edits never revive."
   }
  ],
  "modelCount": {
@@ -1556,7 +1568,7 @@
     }
    ],
    "eventProvenance": true,
-   "naturalKeyRule": "(source, sourceID) when sourceID ≠ nil; (pinnedEventKind, pinnedEventID) when pinned; otherwise id",
+   "naturalKeyRule": "(source, sourceID, sourceBranch) when sourceID != nil; (pinnedEventKind, pinnedEventID) when pinned; otherwise id",
    "fields": [
     {
      "name": "dayKey",
@@ -1712,6 +1724,13 @@
      "type": "UUID?",
      "optional": true,
      "fk": "(pinnedEventKind)"
+    },
+    {
+     "name": "sourceBranch",
+     "type": "String",
+     "optional": false,
+     "default": "",
+     "note": "Empty for primary import identity; keep-both uses SHA256 of canonical incoming source entry, never random. Original sourceID, dates and attachment references retained."
     }
    ]
   },
@@ -4889,7 +4908,8 @@
       "duplicate",
       "rejected",
       "needsUnlock",
-      "needsApp"
+      "needsApp",
+      "undone"
      ]
     },
     {
@@ -4904,6 +4924,12 @@
      "optional": false,
      "default": "Date()",
      "note": "issuedAt + 7 days; purged after"
+    },
+    {
+     "name": "undoExpiresAt",
+     "type": "Date?",
+     "optional": true,
+     "note": "Preset appliedAt + 60 seconds; separate from expiresAt (7-day command retention)."
     }
    ]
   },
@@ -5383,6 +5409,11 @@
     "kind": "applies CommandReceipt.undoJSON within 10 min",
     "auth": "same as the original command"
    }
+  },
+  "undoPolicy": {
+   "presetSeconds": 60,
+   "receiptRetentionDays": 7,
+   "execution": "Immediately on press, within undo window"
   }
  }
 }
