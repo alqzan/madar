@@ -1,6 +1,65 @@
 import XCTest
 
 @MainActor final class FoundationUITests: XCTestCase {
+    func test_M0T12_FocusBoundsAndSearchAtDefaultAX3AX5AndDark() throws {
+        continueAfterFailure = false
+        var previewHeights: [String: CGFloat] = [:]
+        for (size, theme) in [("L", "light"), ("AX3", "light"), ("AX5", "light"), ("L", "dark")] {
+            let app = XCUIApplication()
+            app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": size, "MADAR_UI_THEME": theme]
+            app.launch(); finishOnboarding(app)
+            let row = app.descendants(matching: .any).matching(identifier: "foundation-prayer-time-fajr").firstMatch
+            try exposeForAudit(row, in: app)
+            XCTAssertGreaterThanOrEqual(row.frame.height, 44, "Prayer focus region must reserve 44pt in layout.")
+            XCTAssertGreaterThanOrEqual(row.frame.width, 44)
+            XCTAssertFalse(app.buttons["foundation-prayer-time-fajr"].exists, "The clock remains read-only.")
+            attachScreenshot(app, named: "M0-focus-prayer-\(theme)-\(size)")
+
+            try exposeForAudit(app.buttons["settings-button"], in: app)
+            app.buttons["settings-button"].tap()
+            let reset = app.buttons["reset-settings"]
+            try exposeForAudit(reset, in: app)
+            XCTAssertGreaterThanOrEqual(reset.frame.height, 44, "Measure the native button node, not its wrapper.")
+            XCTAssertGreaterThanOrEqual(reset.frame.width, 44)
+            let title = app.staticTexts["customization-live-preview-title"]
+            try exposeForAudit(title, in: app)
+            if theme == "light" { previewHeights[size] = title.frame.height }
+            XCTAssertFalse(app.images.matching(identifier: "circle.hexagongrid").firstMatch.exists, "The preview symbol adds no spoken content.")
+            let search = app.textFields["settings-search"]
+            try exposeForAudit(search, in: app)
+            XCTAssertEqual(search.placeholderValue, "ابحث")
+            XCTAssertEqual(search.label, "ابحث في إعدادات مدار")
+            attachScreenshot(app, named: "M0-focus-search-\(theme)-\(size)")
+            app.terminate()
+        }
+        let normal = try XCTUnwrap(previewHeights["L"])
+        let ax3 = try XCTUnwrap(previewHeights["AX3"])
+        let ax5 = try XCTUnwrap(previewHeights["AX5"])
+        XCTAssertGreaterThan(ax3, normal, "The preview heading must grow at AX3.")
+        XCTAssertGreaterThan(ax5, ax3, "The preview heading must keep growing through AX5.")
+    }
+
+    func test_M0T12_FoundationAndSettingsAccessibilityAudit() throws {
+        continueAfterFailure = true
+        for theme in ["light", "dark"] {
+            let app = XCUIApplication()
+            // No MADAR_UI_SIZE: the native audit must be able to vary the system size.
+            app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_THEME": theme]
+            app.launch(); finishOnboarding(app)
+            try exposeForAudit(app.staticTexts["foundation-first-calendar"], in: app)
+            XCTAssertTrue(auditViewport(in: app).contains(app.staticTexts["foundation-day-start"].frame))
+            attachScreenshot(app, named: "M0-audit-home-footer-\(theme)-system")
+            try auditWithoutSuppression(app, scope: "home footer \(theme)")
+
+            try exposeForAudit(app.buttons["settings-button"], in: app)
+            app.buttons["settings-button"].tap()
+            try exposeForAudit(app.textFields["settings-search"], in: app)
+            attachScreenshot(app, named: "M0-audit-settings-\(theme)-system")
+            try auditWithoutSuppression(app, scope: "settings \(theme)")
+            app.terminate()
+        }
+    }
+
     func test_M0T10_TodayPrayerTimesAtDefaultAX3AX5AndDark() throws {
         continueAfterFailure = false
         for (size, theme) in [("L", "light"), ("AX3", "light"), ("AX5", "light"), ("L", "dark")] {
@@ -430,6 +489,35 @@ import XCTest
             app.swipeUp()
         }
         XCTAssertTrue(element.isHittable, app.debugDescription)
+    }
+    private func auditViewport(in app: XCUIApplication) -> CGRect {
+        let scroll = app.scrollViews.firstMatch.frame
+        let status = app.statusBars.firstMatch
+        let tabs = app.tabBars.firstMatch
+        let top = status.exists ? max(scroll.minY, status.frame.maxY) : scroll.minY
+        let bottom = tabs.exists ? min(scroll.maxY, tabs.frame.minY) : scroll.maxY
+        return CGRect(x: scroll.minX, y: top + 8, width: scroll.width, height: max(0, bottom - top - 16))
+    }
+    private func exposeForAudit(_ element: XCUIElement, in app: XCUIApplication) throws {
+        let scroll = app.scrollViews.firstMatch
+        XCTAssertTrue(scroll.waitForExistence(timeout: 10), app.debugDescription)
+        for _ in 0..<16 {
+            let viewport = auditViewport(in: app)
+            if element.exists && element.isHittable && viewport.contains(element.frame) { return }
+            if element.exists && element.frame.minY < viewport.minY { scroll.swipeDown() }
+            else { scroll.swipeUp() }
+        }
+        XCTFail("Could not fully expose \(element.identifier) above native bars; viewport=\(auditViewport(in: app)), element=\(element)")
+        throw NSError(domain: "MadarAuditFixture", code: 1)
+    }
+    private func auditWithoutSuppression(_ app: XCUIApplication, scope: String) throws {
+        print("M0 native accessibility scope=\(scope), viewport=\(auditViewport(in: app))")
+        try app.performAccessibilityAudit { issue in
+            let frame = issue.element?.frame
+            let fullyVisible = frame.map { self.auditViewport(in: app).contains($0) }
+            print("M0 audit issue: \(issue.compactDescription); detail=\(issue.detailedDescription); frame=\(String(describing: frame)); fullyVisible=\(String(describing: fullyVisible)); element=\(String(describing: issue.element))")
+            return false // Clipped/occluded/nil-element issues remain failures, never ignored.
+        }
     }
     private func attachScreenshot(_ app: XCUIApplication, named name: String) {
         let attachment = XCTAttachment(screenshot: app.screenshot())

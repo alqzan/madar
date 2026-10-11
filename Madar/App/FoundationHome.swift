@@ -54,7 +54,8 @@ private struct FoundationPrayerTimesCard: View {
                             HStack { Text(row.title); Spacer(); clock(row) }
                         }
                     }
-                    .font(MadarTypography.body()).frame(maxWidth: .infinity, alignment: .leading)
+                    .font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .contentShape(.rect)
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel(row.accessibilityLabel)
                     .accessibilityIdentifier("foundation-prayer-time-\(row.prayer.rawValue)")
@@ -111,15 +112,16 @@ struct FoundationHome: View {
                         VStack(alignment: .leading, spacing: 12) {
                             Label(session.cityName, systemImage: "location").font(MadarTypography.section())
                             Text("اليوم يبدأ من \(boundaryLabel)").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
+                                .accessibilityIdentifier("foundation-day-start")
                             HStack {
-                                Text("التقويم الأول").foregroundStyle(theme.secondaryInk)
+                                Text("التقويم الأول").foregroundStyle(theme.secondaryInk).accessibilityIdentifier("foundation-first-calendar")
                                 Spacer()
                                 Text(session.string("core.firstCalendar") == "hijri" ? "الهجري" : "الميلادي")
                             }
                         }
                     }
                 }.padding(16).frame(maxWidth: 620).frame(maxWidth: .infinity)
-            }.background(theme.background).foregroundStyle(theme.ink)
+            }.scrollEdgeEffectHidden().background(theme.background).foregroundStyle(theme.ink)
         }
         .toolbarVisibility(.hidden, for: .navigationBar)
     }

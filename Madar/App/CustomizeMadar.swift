@@ -13,7 +13,8 @@ struct CustomizeMadar: View {
         CustomizationTemplate(title: "خصّص مدار", subtitle: "كل تعديل يُحفظ وحده") {
             MadarCard {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("نموذج حيّ").font(MadarTypography.fine()).foregroundStyle(theme.accent)
+                    Text("نموذج حيّ").font(MadarTypography.caption()).foregroundStyle(theme.accent)
+                        .accessibilityAddTraits(.isHeader).accessibilityIdentifier("customization-live-preview-title")
                     Text("مدار كما سيظهر").font(MadarTypography.cardTitle())
                     if dynamicType.isAccessibilitySize {
                         VStack(alignment: .leading, spacing: 16) {
@@ -28,27 +29,28 @@ struct CustomizeMadar: View {
                         }
                         Spacer(minLength: 8)
                         VStack(spacing: 10) {
-                            Image(systemName: "circle.hexagongrid").font(.system(size: 38)).foregroundStyle(theme.accent)
+                            Image(systemName: "circle.hexagongrid").font(.system(size: 38)).foregroundStyle(theme.accent).accessibilityHidden(true)
                             Text(session.cityName).font(MadarTypography.caption())
                         }.padding(16).background(theme.background, in: .rect(cornerRadius: 24))
                     } }
                     if dynamicType.isAccessibilitySize {
                         VStack(alignment: .leading, spacing: 8) {
                             Text(changesLabel).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("customization-changes")
-                            Button("أعِد الافتراضي") { confirmReset = true }.frame(minHeight: 44).accessibilityIdentifier("reset-settings")
+                            Button { confirmReset = true } label: { Text("أعِد الافتراضي").frame(minWidth: 44, minHeight: 44).contentShape(.rect) }.accessibilityIdentifier("reset-settings")
                         }
                     } else { HStack {
                         Text(changesLabel).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("customization-changes")
                         Spacer()
-                        Button("أعِد الافتراضي") { confirmReset = true }.frame(minHeight: 44).accessibilityIdentifier("reset-settings")
+                        Button { confirmReset = true } label: { Text("أعِد الافتراضي").frame(minWidth: 44, minHeight: 44).contentShape(.rect) }.accessibilityIdentifier("reset-settings")
                     } }
                 }
             }
         } content: {
             VStack(spacing: 16) {
                 HStack {
-                    Image(systemName: "magnifyingglass").foregroundStyle(theme.secondaryInk)
-                    TextField("ابحث في إعدادات مدار…", text: $session.settingsQuery).accessibilityIdentifier("settings-search")
+                    Image(systemName: "magnifyingglass").foregroundStyle(theme.secondaryInk).accessibilityHidden(true)
+                    TextField("ابحث في إعدادات مدار", text: $session.settingsQuery, prompt: Text("ابحث").foregroundStyle(theme.secondaryInk))
+                        .font(MadarTypography.body()).accessibilityLabel("ابحث في إعدادات مدار").accessibilityIdentifier("settings-search")
                         .submitLabel(.search)
                 }.padding(16).background(theme.surface, in: .capsule)
                 if filtered.isEmpty {
