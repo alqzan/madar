@@ -55,6 +55,10 @@ struct BackupRestoreResult: Sendable { let restoredCount: Int; let skippedCount:
     func setSchedule(_ schedule: BackupUISchedule) async throws
     func exportPlain(progress: @escaping @MainActor @Sendable (BackupUIProgress) -> Void) async throws -> URL
     func export(passphrase: String, progress: @escaping @MainActor @Sendable (BackupUIProgress) -> Void) async throws -> URL
+    func validateExport(file: URL) throws
+    func share(file: URL) async throws
+    func observeExportRevocation(_ observer: @escaping @MainActor (Bool) -> Void) -> UUID
+    func removeExportObserver(_ id: UUID)
     func previewRestore(file: URL, passphrase: String, progress: @escaping @MainActor @Sendable (BackupUIProgress) -> Void) async throws -> BackupRestorePreview
     func restore(previewID: UUID, mode: BackupUIRestoreMode, progress: @escaping @MainActor @Sendable (BackupUIProgress) -> Void) async throws -> BackupRestoreResult
     /// Stops cooperatively, removes staging and partial outputs, retains prior successful backups.
@@ -79,37 +83,66 @@ struct BackupRestoreResult: Sendable { let restoredCount: Int; let skippedCount:
     var restoreMode: BackupUIRestoreMode = .merge
     private var operation: Task<Void, Never>?
     private var operationID: UUID?
-    init(service: any BackupUIService) { self.service = service }
+    private var protectedOperation = false
+    private var revocationObserver: UUID?
+    init(service: any BackupUIService) { self.service = service; observePrivacy() }
+    private func observePrivacy() {
+        guard revocationObserver == nil else { return }
+        revocationObserver = service.observeExportRevocation { [weak self] cancel in
+            guard let self else { return }
+            exportedURL = nil; plainExportedURL = nil; exportPassphrase = ""; exportConfirmation = ""; resultMessage = nil
+            if cancel && protectedOperation {
+                operation?.cancel(); operationID = nil; busy = false; progress = nil; operation = nil; protectedOperation = false
+            }
+        }
+    }
     var canExport: Bool { !busy && exportPassphrase.count >= 10 && exportPassphrase == exportConfirmation }
     var canInspect: Bool { !busy && selectedFile != nil && !restorePassphrase.isEmpty }
     func refresh() async {
+        observePrivacy()
         do { status = try await service.status() }
         catch { errorMessage = "تعذّر قراءة حالة النسخ. \(error.localizedDescription)" }
     }
     func setSchedule(_ schedule: BackupUISchedule) {
-        run(initial: "يحفظ موعد النسخ…") { [self] _ in try await service.setSchedule(schedule); status = try await service.status() }
+        run(initial: "يحفظ موعد النسخ…") { [self] _, _ in try await service.setSchedule(schedule); status = try await service.status() }
     }
     func export() {
         guard canExport else { return }
         let passphrase = exportPassphrase
-        run(initial: "يجهّز النسخة المشفّرة…") { [self] report in
+        run(initial: "يجهّز النسخة المشفّرة…", protected: true) { [self] report, id in
             let file = try await service.export(passphrase: passphrase, progress: report)
+            try checkRequest(id); try service.validateExport(file: file)
+            let current = try? await service.status()
+            try checkRequest(id); try service.validateExport(file: file)
             exportedURL = file; exportPassphrase = ""; exportConfirmation = ""
-            if let current = try? await service.status() { status = current }; resultMessage = "حُفظت النسخة المشفّرة."
+            if let current { status = current }; resultMessage = "حُفظت النسخة المشفّرة."
         }
     }
     func exportPlain() {
         guard !busy else { return }
-        run(initial: "يجهّز ملف التصدير…") { [self] report in
-            plainExportedURL = try await service.exportPlain(progress: report)
+        run(initial: "يجهّز ملف التصدير…", protected: true) { [self] report, id in
+            let file = try await service.exportPlain(progress: report)
+            try checkRequest(id); try service.validateExport(file: file)
+            plainExportedURL = file
             resultMessage = "التصدير جاهز للحفظ أو المشاركة. الملف غير مشفّر."
         }
+    }
+    func sharePlain() { if let file = plainExportedURL { share(file) } }
+    func shareEncrypted() { if let file = exportedURL { share(file) } }
+    private func share(_ file: URL) {
+        run(initial: "يفتح المشاركة…", protected: true) { [self] _, id in
+            try await service.share(file: file); try checkRequest(id)
+        }
+    }
+    private func checkRequest(_ id: UUID) throws {
+        try Task.checkCancellation()
+        guard operationID == id else { throw PrivacyAuthorizationError.stale }
     }
     func inspect() {
         guard canInspect, let file = selectedFile else { return }
         let passphrase = restorePassphrase
         preview = nil
-        run(initial: "يفحص النسخة دون تغيير بياناتك…") { [self] report in
+        run(initial: "يفحص النسخة دون تغيير بياناتك…") { [self] report, _ in
             let access = file.startAccessingSecurityScopedResource()
             defer { if access { file.stopAccessingSecurityScopedResource() } }
             let validated = try await service.previewRestore(file: file, passphrase: passphrase, progress: report)
@@ -119,7 +152,7 @@ struct BackupRestoreResult: Sendable { let restoredCount: Int; let skippedCount:
     func restore() {
         guard !busy, let preview else { return }
         let mode = restoreMode
-        run(initial: "يستعيد النسخة…") { [self] report in
+        run(initial: "يستعيد النسخة…") { [self] report, _ in
             let result = try await service.restore(previewID: preview.id, mode: mode, progress: report)
             self.preview = nil; restorePassphrase = ""; selectedFile = nil
             if let current = try? await service.status() { status = current }
@@ -128,28 +161,31 @@ struct BackupRestoreResult: Sendable { let restoredCount: Int; let skippedCount:
     }
     func dismissPreview() { preview = nil }
     func close() {
+        let wasProtected = protectedOperation
         operation?.cancel(); exportPassphrase = ""; exportConfirmation = ""; restorePassphrase = ""; preview = nil
-        Task { [service] in await service.cancel() }
+        exportedURL = nil; plainExportedURL = nil; operationID = nil; busy = false; progress = nil; protectedOperation = false
+        if let revocationObserver { service.removeExportObserver(revocationObserver) }; revocationObserver = nil
+        if !wasProtected { Task { [service] in await service.cancel() } }
     }
     func cancel() {
         guard busy else { return }
         operation?.cancel()
-        Task { [self] in await service.cancel() }
+        if !protectedOperation { Task { [service] in await service.cancel() } }
     }
-    private func run(initial: String, action: @escaping @MainActor (@escaping @MainActor @Sendable (BackupUIProgress) -> Void) async throws -> Void) {
+    private func run(initial: String, protected: Bool = false, action: @escaping @MainActor (@escaping @MainActor @Sendable (BackupUIProgress) -> Void, UUID) async throws -> Void) {
         guard !busy else { return }
-        let id = UUID(); operationID = id; busy = true; resultMessage = nil; restoreResult = nil
+        let id = UUID(); operationID = id; busy = true; protectedOperation = protected; resultMessage = nil; restoreResult = nil
         progress = BackupUIProgress(message: initial)
         operation = Task { [weak self] in
             guard let self else { return }
-            defer { if operationID == id { busy = false; progress = nil; operation = nil } }
+            defer { if operationID == id { busy = false; progress = nil; operation = nil; protectedOperation = false } }
             do {
-                try await action { [weak self] update in
+                try await action({ [weak self] update in
                     guard let self, operationID == id else { return }
                     progress = update
-                }
-            } catch is CancellationError { resultMessage = "أُلغي الإجراء. النسخ السابقة محفوظة." }
-            catch { errorMessage = "لم يكتمل الإجراء. \(error.localizedDescription)" }
+                }, id)
+            } catch is CancellationError { if operationID == id { resultMessage = "أُلغي الإجراء. النسخ السابقة محفوظة." } }
+            catch { if operationID == id { errorMessage = "لم يكتمل الإجراء. \(error.localizedDescription)" } }
         }
     }
 }
@@ -184,8 +220,8 @@ struct BackupSettingsView: View {
             } header: { Text("النسخ الاحتياطية") } footer: { Text("النسخ المجدولة تُنفّذ حين يسمح النظام، ويمكنك النسخ يدويًا في أي وقت.") }
             Section {
                 Button("جهّز ملف التصدير", action: model.exportPlain).disabled(model.busy).accessibilityIdentifier("plain-export-now")
-                if let file = model.plainExportedURL {
-                    ShareLink(item: file) { Label("احفظ التصدير أو شاركه", systemImage: "square.and.arrow.up") }.accessibilityIdentifier("plain-export-share")
+                if model.plainExportedURL != nil {
+                    Button(action: model.sharePlain) { Label("احفظ التصدير أو شاركه", systemImage: "square.and.arrow.up") }.disabled(model.busy).accessibilityIdentifier("plain-export-share")
                 }
             } header: { Text("تصدير بياناتك") } footer: { Text("ملف ZIP غير مشفّر يحتوي سجلاتك بصيغة JSONL وصورها وصوتها، ويمكن فتحه خارج مدار. شاركه مع من تثق به. إعدادات هذا الجهاز وقفل التطبيق لا تدخل فيه.") }
             Section {
@@ -194,8 +230,8 @@ struct BackupSettingsView: View {
                 Text("احفظ كلمة المرور في مكان آمن. فقدانها يجعل النسخة غير قابلة للقراءة.").font(MadarTypography.caption())
                 if model.status?.keyConfigured == false { Text("تُستخدم كلمة مرور أول نسخة للنسخ التلقائي أيضًا. يُحفظ مفتاح مشتق منها على هذا الجهاز، وتبقى كلمة المرور عندك.").font(MadarTypography.caption()).accessibilityIdentifier("backup-key-setup") }
                 exportButton
-                if let file = model.exportedURL {
-                    ShareLink(item: file) { Label("احفظ النسخة أو شاركها", systemImage: "square.and.arrow.up") }.accessibilityIdentifier("backup-export")
+                if model.exportedURL != nil {
+                    Button(action: model.shareEncrypted) { Label("احفظ النسخة أو شاركها", systemImage: "square.and.arrow.up") }.disabled(model.busy).accessibilityIdentifier("backup-export")
                 }
             } header: { Text("نسخة مشفّرة") } footer: { Text("تشمل بياناتك وصورها وصوتها؛ إعدادات هذا الجهاز لا تدخل في النسخة.") }
             Section {
