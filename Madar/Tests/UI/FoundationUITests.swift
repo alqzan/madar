@@ -39,18 +39,7 @@ import XCTest
         // keyboard must actually be onscreen. During presentation, AX may expose
         // duplicate keys, so wait for a hittable candidate rather than the first one.
         let arabicKeys = app.keyboards.keys.matching(NSPredicate(format: "label == %@", "ت"))
-        let ready = NSPredicate { _, _ in
-            MainActor.assumeIsolated {
-                arabicKeys.allElementsBoundByIndex.contains {
-                    $0.exists && $0.isHittable && app.frame.contains($0.frame)
-                }
-            }
-        }
-        let readiness = XCTNSPredicateExpectation(predicate: ready, object: nil)
-        guard XCTWaiter.wait(for: [readiness], timeout: 10) == .completed,
-              let nativeKey = arabicKeys.allElementsBoundByIndex.first(where: {
-                  $0.exists && $0.isHittable && app.frame.contains($0.frame)
-              }) else {
+        guard let nativeKey = waitForHittableElement(arabicKeys, in: app) else {
             attachScreenshot(app, named: "M0-backup-native-key-unready-L")
             print("M0 native Arabic key unavailable:\n\(app.debugDescription)")
             XCTFail("Show the Arabic software keyboard and disable simulated hardware keyboard before this probe.")
@@ -70,6 +59,8 @@ import XCTest
         attachScreenshot(app, named: "M0-backup-Arabic-typing-transport-L")
         XCTAssertEqual(afterArabicTransport, "passphrase-count=2;confirmation-count=0;matches=false;busy=false")
 
+        try selectEnglishKeyboard(app)
+        attachScreenshot(app, named: "M0-backup-English-keyboard-ready-L")
         password.typeText("t")
         let afterLatinTransport = export.value as? String
         print("M0 secure input after Latin typeText: \(afterLatinTransport ?? "no diagnostic")")
@@ -108,6 +99,7 @@ import XCTest
         let export = app.buttons["backup-now"]
         scrollTo(password, in: app)
         password.tap()
+        try selectEnglishKeyboard(app)
         for (index, character) in "test-only-passphrase".enumerated() {
             password.typeText(String(character))
             let expectedCount = index + 1
@@ -131,7 +123,9 @@ import XCTest
             let export = app.buttons["backup-now"]
             let password = app.secureTextFields["backup-password"]
             scrollTo(password, in: app)
-            password.tap(); password.typeText(passphrase)
+            password.tap()
+            try selectEnglishKeyboard(app)
+            password.typeText(passphrase)
             attachScreenshot(app, named: "M0-backup-before-confirmation-\(size)")
             XCTAssertEqual(export.value as? String, "passphrase-count=\(passphrase.count);confirmation-count=0;matches=false;busy=false", "Validate first-field input before submitting or changing focus.")
             // Exercise native Next while the keyboard changes the Form's visible area,
@@ -139,6 +133,7 @@ import XCTest
             password.typeText("\n")
             let confirmation = app.secureTextFields["backup-password-confirmation"]
             let mismatch = passphrase + "!"
+            try selectEnglishKeyboard(app)
             confirmation.typeText(mismatch)
             XCTAssertEqual(export.value as? String, "passphrase-count=\(passphrase.count);confirmation-count=\(mismatch.count);matches=false;busy=false")
             XCTAssertFalse(export.isEnabled, "A mismatched confirmation must not permit export.")
@@ -272,6 +267,39 @@ import XCTest
                 app.terminate()
             }
         }
+    }
+    private func selectEnglishKeyboard(_ app: XCUIApplication) throws {
+        // XCTest secure typing uses the current keyboard's characters. Observe
+        // the real layout before sending the Latin-only fixture passphrase.
+        let knownKeys = app.keyboards.keys.matching(NSPredicate(format: "label IN %@", ["ت", "t"] as NSArray))
+        let currentKey = try XCTUnwrap(waitForHittableElement(knownKeys, in: app), "A real Arabic or English software keyboard must be visible.")
+        if currentKey.label == "t" { return }
+
+        let switchButtons = app.buttons.matching(NSPredicate(format: "label IN %@", ["لوحة المفاتيح التالية", "Next keyboard"] as NSArray))
+        let nextKeyboard = try XCTUnwrap(waitForHittableElement(switchButtons, in: app), "The observed native next-keyboard control must be hittable.")
+        let nextLayout = nextKeyboard.value as? String ?? ""
+        print("M0 native next keyboard: \(nextLayout)")
+        // The captured Arabic keyboard announces English (UK) as its next layout.
+        // One deliberate switch is allowed; never cycle through unknown layouts.
+        let englishSwitch = try XCTUnwrap(nextLayout.hasPrefix("English") ? nextKeyboard : nil, "The next keyboard must announce English before selecting it.")
+        englishSwitch.tap()
+        let englishKeys = app.keyboards.keys.matching(NSPredicate(format: "label == %@", "t"))
+        _ = try XCTUnwrap(waitForHittableElement(englishKeys, in: app), "The selected English keyboard must expose a hittable t key.")
+    }
+    private func waitForHittableElement(_ query: XCUIElementQuery, in app: XCUIApplication) -> XCUIElement? {
+        let ready = NSPredicate { _, _ in
+            MainActor.assumeIsolated {
+                query.allElementsBoundByIndex.contains { self.elementIsOnscreenAndHittable($0, in: app) }
+            }
+        }
+        let readiness = XCTNSPredicateExpectation(predicate: ready, object: nil)
+        guard XCTWaiter.wait(for: [readiness], timeout: 10) == .completed else { return nil }
+        return query.allElementsBoundByIndex.first { elementIsOnscreenAndHittable($0, in: app) }
+    }
+    private func elementIsOnscreenAndHittable(_ element: XCUIElement, in app: XCUIApplication) -> Bool {
+        guard element.exists, element.isHittable else { return false }
+        let frame = element.frame
+        return frame.width > 0 && frame.height > 0 && app.frame.contains(CGPoint(x: frame.midX, y: frame.midY))
     }
     private func openBackupSettings(_ app: XCUIApplication) {
         finishOnboarding(app)
