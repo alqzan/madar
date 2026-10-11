@@ -174,6 +174,7 @@ import MadarSnapshots
         try await session.drainInbox()
         let originalGeneration = fixture.managed.binding.generationID
         let deviceStoreURL = fixture.managed.binding.deviceStoreURL
+        ExportPrivacyTestHarness.install(on: session)
         let archive = try await backup.export(passphrase: "test-only-passphrase", progress: { _ in })
         let correction = try record(prayerCommand(source: .widget, status: "alone"), fixture: fixture)
         try session.pendingInbox.enqueue(correction)

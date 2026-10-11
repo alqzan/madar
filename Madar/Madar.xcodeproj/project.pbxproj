@@ -11,6 +11,7 @@
 		14B1C4AEEC8258B6AECE7BBE /* thmanyahserifdisplay-Bold.otf in Resources */ = {isa = PBXBuildFile; fileRef = C6661268F5C60E85AA211014 /* thmanyahserifdisplay-Bold.otf */; };
 		1568A1568FDC897B19DC9694 /* MadarData in Frameworks */ = {isa = PBXBuildFile; productRef = 9596E50BAF7470B464E4BDF0 /* MadarData */; };
 		1696EFC63E82D4D32AD91261 /* CommandIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E84CCAE8F551CE20CBE2B23 /* CommandIntegrationTests.swift */; };
+		16A45A0199AD6A2B5E9EC744 /* ExportPrivacyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C903CE9D436A9E7A19EEE2C /* ExportPrivacyTests.swift */; };
 		188EE40FE4D74FF7D7738992 /* MadarDesign in Frameworks */ = {isa = PBXBuildFile; productRef = D7349BC32E9D9D10CE3C790A /* MadarDesign */; };
 		19324DE7D0A3DB449A018ACD /* Amiri-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 95E7A16CBC55D306C7FDC034 /* Amiri-Bold.ttf */; };
 		1EAF9A64BCA74E3F56989549 /* thmanyahserifdisplay-Black.otf in Resources */ = {isa = PBXBuildFile; fileRef = D80269312D7B18D5290E8E80 /* thmanyahserifdisplay-Black.otf */; };
@@ -106,6 +107,7 @@
 		0AAF9DA5CBAEE9C391B62E8A /* SyncSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncSettingsView.swift; sourceTree = "<group>"; };
 		0E84CCAE8F551CE20CBE2B23 /* CommandIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandIntegrationTests.swift; sourceTree = "<group>"; };
 		1A25447FB94716ACAAEB7433 /* thmanyahsans-Regular.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "thmanyahsans-Regular.otf"; sourceTree = "<group>"; };
+		1C903CE9D436A9E7A19EEE2C /* ExportPrivacyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportPrivacyTests.swift; sourceTree = "<group>"; };
 		1D4DECF86A1E7DCEBC1D6ADF /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		1D5244CCC79BF2B66C486F51 /* AppSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSession.swift; sourceTree = "<group>"; };
 		1F9E40A347AD27478E3FA224 /* thmanyahseriftext-Regular.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "thmanyahseriftext-Regular.otf"; sourceTree = "<group>"; };
@@ -292,6 +294,7 @@
 				C105008888548BF995BA7B6D /* AppServiceIntegrationTests.swift */,
 				0E84CCAE8F551CE20CBE2B23 /* CommandIntegrationTests.swift */,
 				C63BADA5C6BD423F06356E09 /* CustomizationCopyTests.swift */,
+				1C903CE9D436A9E7A19EEE2C /* ExportPrivacyTests.swift */,
 				51D072137ACF840D7A277E1C /* PresentationPrivacyTests.swift */,
 			);
 			path = Integration;
@@ -521,6 +524,7 @@
 				6E9C8889C99E331FEFFD9F6A /* AppServiceIntegrationTests.swift in Sources */,
 				1696EFC63E82D4D32AD91261 /* CommandIntegrationTests.swift in Sources */,
 				EEFB1D6DFBF9E0E4FA1C18B1 /* CustomizationCopyTests.swift in Sources */,
+				16A45A0199AD6A2B5E9EC744 /* ExportPrivacyTests.swift in Sources */,
 				78E8D48DC47F5DEA058B6138 /* PresentationPrivacyTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
