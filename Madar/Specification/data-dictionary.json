@@ -110,7 +110,7 @@
     "Statement",
     "Obligation",
     "InstallmentItem",
-    "Transaction",
+    "MoneyTransaction",
     "Allocation",
     "CashbackEntry",
     "Reconciliation",
@@ -2353,7 +2353,7 @@
         },
         {
           "field": "transactionID",
-          "to": "Transaction",
+          "to": "MoneyTransaction",
           "kind": "one"
         }
       ],
@@ -2396,12 +2396,12 @@
           "name": "transactionID",
           "type": "UUID?",
           "optional": true,
-          "fk": "Transaction"
+          "fk": "MoneyTransaction"
         }
       ]
     },
     {
-      "name": "Transaction",
+      "name": "MoneyTransaction",
       "room": "money",
       "config": "synced",
       "naturalKey": "id",
@@ -2434,7 +2434,7 @@
         },
         {
           "field": "relatedTransactionID",
-          "to": "Transaction",
+          "to": "MoneyTransaction",
           "kind": "one"
         },
         {
@@ -2612,7 +2612,7 @@
           "name": "relatedTransactionID",
           "type": "UUID?",
           "optional": true,
-          "fk": "Transaction"
+          "fk": "MoneyTransaction"
         },
         {
           "name": "obligationID",
@@ -2693,7 +2693,7 @@
       "relationships": [
         {
           "field": "transactionID",
-          "to": "Transaction",
+          "to": "MoneyTransaction",
           "kind": "one"
         },
         {
@@ -2714,7 +2714,7 @@
           "name": "transactionID",
           "type": "UUID?",
           "optional": true,
-          "fk": "Transaction"
+          "fk": "MoneyTransaction"
         },
         {
           "name": "groupID",
@@ -2799,7 +2799,7 @@
         },
         {
           "field": "adjustmentTransactionID",
-          "to": "Transaction",
+          "to": "MoneyTransaction",
           "kind": "one"
         }
       ],
@@ -2859,7 +2859,7 @@
           "name": "adjustmentTransactionID",
           "type": "UUID?",
           "optional": true,
-          "fk": "Transaction"
+          "fk": "MoneyTransaction"
         },
         {
           "name": "beforeJSON",
@@ -3011,7 +3011,7 @@
       "relationships": [
         {
           "field": "salaryTransactionID",
-          "to": "Transaction",
+          "to": "MoneyTransaction",
           "kind": "one"
         }
       ],
@@ -3042,7 +3042,7 @@
           "name": "salaryTransactionID",
           "type": "UUID?",
           "optional": true,
-          "fk": "Transaction"
+          "fk": "MoneyTransaction"
         },
         {
           "name": "incomeMinor",
@@ -3314,7 +3314,7 @@
       "relationships": [
         {
           "field": "purchaseTransactionID",
-          "to": "Transaction",
+          "to": "MoneyTransaction",
           "kind": "one"
         },
         {
@@ -3390,7 +3390,7 @@
           "name": "purchaseTransactionID",
           "type": "UUID?",
           "optional": true,
-          "fk": "Transaction"
+          "fk": "MoneyTransaction"
         },
         {
           "name": "sourceMessageID",
@@ -3422,7 +3422,7 @@
         },
         {
           "field": "paidTransactionID",
-          "to": "Transaction",
+          "to": "MoneyTransaction",
           "kind": "one"
         }
       ],
@@ -3468,7 +3468,7 @@
           "name": "paidTransactionID",
           "type": "UUID?",
           "optional": true,
-          "fk": "Transaction"
+          "fk": "MoneyTransaction"
         },
         {
           "name": "paidAt",

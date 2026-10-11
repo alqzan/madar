@@ -34,7 +34,7 @@ import CryptoKit
     let rowCard = Card(); rowCard.id = StableIdentity.uuid(for:"fixture:Card"); context.insert(rowCard)
     let rowStatement = Statement(); rowStatement.id = StableIdentity.uuid(for:"fixture:Statement"); context.insert(rowStatement)
     let rowCashbackEntry = CashbackEntry(); rowCashbackEntry.id = StableIdentity.uuid(for:"fixture:CashbackEntry"); context.insert(rowCashbackEntry)
-    let rowTransaction = Transaction(); rowTransaction.id = StableIdentity.uuid(for:"fixture:Transaction"); context.insert(rowTransaction)
+    let rowTransaction = MoneyTransaction(); rowTransaction.id = StableIdentity.uuid(for:"fixture:MoneyTransaction"); context.insert(rowTransaction)
     let rowAllocation = Allocation(); rowAllocation.id = StableIdentity.uuid(for:"fixture:Allocation"); context.insert(rowAllocation)
     let rowReconciliation = Reconciliation(); rowReconciliation.id = StableIdentity.uuid(for:"fixture:Reconciliation"); context.insert(rowReconciliation)
     let rowBankMessage = BankMessage(); rowBankMessage.id = StableIdentity.uuid(for:"fixture:BankMessage"); context.insert(rowBankMessage)

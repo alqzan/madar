@@ -47,7 +47,7 @@ import Darwin
         let dates = value.0.records.filter(\.isLive).compactMap { row in ["eventAt","endedAt","writtenAt","at","start","createdAt"].compactMap { row.date($0) }.first }
         var warnings = ["تتضمن الأعداد سجلات الحذف والأسماء البديلة.","عند الاستبدال: سيتغيّر هذا على كل أجهزتك بعد تفعيل المزامنة؛ السجلات الحالية الغائبة تصبح محذوفة."]
         if store.isCloudBacked { warnings.append("الاستعادة إلى مخزن مرتبط بالسحاب غير متاحة حتى تُثبت المصالحة وانتشار الحذف.") }
-        return .init(id:UUID(),fileURL:file,fileName:file.lastPathComponent,createdAt:value.0.manifest.createdAt,counts:value.0.manifest.counts,currentCounts:Self.counts(records),additions:value.0.records.filter { !existingKeys.contains(RecordFingerprint.key($0)) }.count,updates:updates,deletions:records.filter { $0.isLive && !backupKeys.contains(RecordFingerprint.key($0)) }.count,earliestDate:dates.min(),latestDate:dates.max(),skippedCount:0,warnings:warnings,validated:value.0,fileHash:value.1,generationID:store.binding.generationID,currentFingerprint:try RecordFingerprint.hash(records))
+        return .init(id:UUID(),fileURL:file,fileName:file.lastPathComponent,createdAt:value.0.manifest.createdAt,counts:Self.counts(value.0.records),currentCounts:Self.counts(records),additions:value.0.records.filter { !existingKeys.contains(RecordFingerprint.key($0)) }.count,updates:updates,deletions:records.filter { $0.isLive && !backupKeys.contains(RecordFingerprint.key($0)) }.count,earliestDate:dates.min(),latestDate:dates.max(),skippedCount:0,warnings:warnings,validated:value.0,fileHash:value.1,generationID:store.binding.generationID,currentFingerprint:try RecordFingerprint.hash(records))
     }
     public func restore(preview: RestorePreview, mode: RestoreMode, passphrase: String? = nil, progress: @escaping @Sendable (BackupProgress) -> Void = { _ in }, cancellation: BackupCancellation = BackupCancellation(), now: Date = Date()) async throws -> RestoreResult {
         guard !store.isCloudBacked else { throw BackupOperationError.cloudRestoreUnsupported }
@@ -213,10 +213,12 @@ import Darwin
         var warnings: [String] = []
         do {
             let context = ModelContext(store.container); context.autosaveEnabled = false
-            // These device-local rows refer to the previous facts and are never imported from archives.
-            for row in try context.fetch(FetchDescriptor<PageSchedule>()) { context.delete(row) }
-            for row in try context.fetch(FetchDescriptor<SessionDraft>()) { context.delete(row) }
-            for row in try context.fetch(FetchDescriptor<ProcessingJob>()) { context.delete(row) }
+            // Restore changes facts. A model-name conversion preserves every fact and local row.
+            if store.journal()?.preserveDeviceRows != true {
+                for row in try context.fetch(FetchDescriptor<PageSchedule>()) { context.delete(row) }
+                for row in try context.fetch(FetchDescriptor<SessionDraft>()) { context.delete(row) }
+                for row in try context.fetch(FetchDescriptor<ProcessingJob>()) { context.delete(row) }
+            }
             if context.hasChanges { try context.save() }
         } catch { warnings.append("تعذّر إبطال الجدولة والمسودات والمهام؛ ستُعاد المحاولة عند الفتح.") }
         do { try await lifecycle.rebuildSnapshots(store.container) } catch { warnings.append("تعذّر تحديث اللقطات؛ ستُعاد المحاولة عند الفتح.") }

@@ -2,7 +2,7 @@ import XCTest
 import SwiftData
 import UIKit
 import MadarCore
-import MadarData
+@testable import MadarData
 import MadarInbox
 import MadarSnapshots
 @testable import Madar
@@ -219,4 +219,73 @@ import MadarSnapshots
         XCTAssertFalse(try session.pendingInbox.wasCommitted(commandID: stale.command.commandID, generationID: active.generationID))
         await backup.cancel()
     }
+    func test_M0S1_RA4_CurrentReceiptScopeAndPendingTransportSurviveMigration() async throws {
+        // Synthetic host data is retained until process exit; never remove open SQLite files.
+        let root = FileManager.default.temporaryDirectory.appending(path: "MadarV1Inbox-\(UUID())")
+        let dataRoot = root.appending(path: "Data"), oldID = UUID(), receiptID = UUID()
+        let generation = dataRoot.appending(path: "Generations/\(oldID.uuidString)")
+        let command = prayerCommand(source: .notification)
+        struct Scope: Codable { let version: Int; let generationID: UUID }
+        func seedV1() throws -> [DataRecord] {
+            try FileManager.default.createDirectory(at: generation, withIntermediateDirectories: true)
+            let container = try ModelContainer(for: MadarSchemaV1.schema, configurations: [
+                ModelConfiguration("synced", schema: Schema(MadarSchemaV1.syncedTypes), url: generation.appending(path: "Madar.store"), cloudKitDatabase: .none),
+                ModelConfiguration("deviceOnly", schema: Schema(MadarSchemaV1.deviceTypes), url: dataRoot.appending(path: "Device.store"), cloudKitDatabase: .none)
+            ])
+            let context = container.mainContext; context.autosaveEnabled = false
+            let prayer = MadarSchemaV1.PrayerLog(); prayer.dayKey = "2026-10-10"; prayer.prayer = "fajr"; prayer.source = "notification"
+            let money = MadarSchemaV1.Transaction(); money.amountMinor = 12345; money.dayKey = "2026-10-10"
+            let receipt = MadarSchemaV1.CommandReceipt(); receipt.id = receiptID; receipt.commandID = command.commandID
+            receipt.name = command.name; receipt.payloadHash = try command.payload.sha256(); receipt.source = "notification"
+            receipt.issuedAt = command.issuedAt; receipt.expiresAt = Date().addingTimeInterval(-86400)
+            let scope = MadarSchemaV1.DeviceSetting(); scope.key = "sys.commandReceiptScope:\(receiptID.uuidString)"
+            scope.valueJSON = try JSONEncoder().encode(Scope(version: 1, generationID: oldID))
+            context.insert(prayer); context.insert(money); context.insert(receipt); context.insert(scope); try context.save()
+            let all = try LegacyRecordBridge.all(context, syncedOnly: false)
+            try DurableFiles.encode(1, to: generation.appending(path: "SchemaVersion.json"))
+            try DurableFiles.encode(1, to: dataRoot.appending(path: "DeviceSchemaVersion.json"))
+            try DurableFiles.encode(GenerationReady(version: 1, generationID: oldID, recordsHash: try RecordFingerprint.hash(all.filter { MadarSchemaV1.syncedNames.contains($0.model) }), createdAt: Date()), to: generation.appending(path: "GenerationReady.json"))
+            try DurableFiles.encode(ManagedPointer(version: 1, generationID: oldID, previousGenerationID: nil, accountHash: nil, cloudKitContainerIdentifier: nil), to: dataRoot.appending(path: "ActiveGeneration.json"))
+            return all.map { var row = $0; if row.model == "Transaction" { row.model = "MoneyTransaction" }; return row }
+        }
+        let expected = try seedV1()
+        let inbox = PendingInbox(directory: root.appending(path: "PendingInbox"))
+        try inbox.publishGeneration(.init(generationID: oldID, acceptsUnstampedDeliveries: false))
+        let oldDelivery = InboxRecord(expectedGenerationID: oldID, command: command); try inbox.enqueue(oldDelivery)
+        let managed = try ManagedDataStore(root: dataRoot, commandLockURL: root.appending(path: "CommandBus.lock"))
+        XCTAssertNotEqual(managed.binding.generationID, oldID)
+        let session = try AppSession(container: managed.container, managedStore: managed, groupDirectory: root)
+        let lock = MadarLockController(scope: .app, service: AppPrivacyService(session: session)); session.lockController = lock
+        let fixture = Fixture(root: root, managed: managed, session: session, lock: lock)
+        XCTAssertTrue(UIApplication.shared.isProtectedDataAvailable)
+        let backup = AppBackupService(session: session, store: managed, backupDirectory: root.appending(path: "Backups"), keyStore: MemoryBackupKeyStore())
+        let recoveryWarnings = try await backup.coordinator.recoverPendingLifecycle()
+        XCTAssertTrue(recoveryWarnings.isEmpty, recoveryWarnings.description)
+        let replay = try record(command, fixture: fixture); try inbox.enqueue(replay)
+        try await session.drainInbox()
+        XCTAssertEqual(Set(try deliveries("unresolved", fixture: fixture).map(\.lastPathComponent)), ["\(oldDelivery.deliveryID).jsonl", "\(replay.deliveryID).jsonl"])
+        XCTAssertTrue(try deliveries("pending", fixture: fixture).isEmpty)
+        XCTAssertTrue(try deliveries("processing", fixture: fixture).isEmpty)
+        XCTAssertFalse(try inbox.wasCommitted(commandID: command.commandID, generationID: managed.binding.generationID))
+        let rows = try RecordBridge.all(session.container.mainContext, syncedOnly: false)
+        for original in expected { XCTAssertEqual(rows.first { $0.model == original.model && $0.id == original.id }, original) }
+        XCTAssertEqual(try receipts(fixture).count, 1); XCTAssertEqual(try prayers(fixture).count, 1)
+        let fresh = try record(prayerCommand(source: .widget, prayer: .dhuhr), fixture: fixture)
+        try inbox.enqueue(fresh); try await session.drainInbox(); try assertAcknowledged(fresh, fixture: fixture)
+        let freshReceipt = try XCTUnwrap(try receipts(fixture).first { $0.commandID == fresh.command.commandID }).record()
+        XCTAssertEqual(freshReceipt.fields["status"], .string("applied"))
+        try inbox.enqueue(try record(fresh.command, fixture: fixture)); try await session.drainInbox()
+        XCTAssertEqual(try receipts(fixture).count, 2); XCTAssertEqual(try prayers(fixture).count, 2)
+        XCTAssertEqual(try XCTUnwrap(try receipts(fixture).first { $0.commandID == fresh.command.commandID }).record(), freshReceipt)
+        let fingerprint = try RecordFingerprint.hash(RecordBridge.all(ModelContext(session.container), syncedOnly: false))
+        let reopened = try ManagedDataStore(root: dataRoot, commandLockURL: root.appending(path: "CommandBus.lock"))
+        XCTAssertEqual(reopened.binding.generationID, managed.binding.generationID)
+        let resumed = try AppSession(container: reopened.container, managedStore: reopened, groupDirectory: root)
+        let resumedLock = MadarLockController(scope: .app, service: AppPrivacyService(session: resumed)); resumed.lockController = resumedLock
+        try await resumed.drainInbox()
+        XCTAssertEqual(try RecordFingerprint.hash(RecordBridge.all(ModelContext(resumed.container), syncedOnly: false)), fingerprint)
+        XCTAssertEqual(try deliveries("unresolved", fixture: fixture).count, 2)
+        XCTAssertNil(resumed.errorMessage)
+    }
+
 }

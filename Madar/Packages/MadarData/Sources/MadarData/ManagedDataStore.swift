@@ -8,6 +8,7 @@ struct ManagedPointer: Codable {
 struct RestoreJournal: Codable {
     enum Phase: String, Codable { case preparing, ready, promoted }
     let operationID: UUID; let oldGenerationID: UUID; let newGenerationID: UUID; var phase: Phase; var hooksPending: Bool
+    var preserveDeviceRows: Bool? = nil
 }
 struct GenerationReady: Codable { let version: Int; let generationID: UUID; let recordsHash: String; let createdAt: Date }
 
@@ -20,12 +21,15 @@ struct GenerationReady: Codable { let version: Int; let generationID: UUID; let 
     public var recoveryRequiresRefresh: Bool { journal()?.hooksPending ?? false }
     var pointerURL: URL { root.appendingPathComponent("ActiveGeneration.json") }
     var journalURL: URL { root.appendingPathComponent("RestoreJournal.json") }
-    public init(root: URL, commandLockURL: URL? = nil, cloudKitContainerIdentifier: String? = nil, accountHash: String? = nil) throws {
+    public convenience init(root: URL, commandLockURL: URL? = nil, cloudKitContainerIdentifier: String? = nil, accountHash: String? = nil) throws {
+        try self.init(root:root,commandLockURL:commandLockURL,cloudKitContainerIdentifier:cloudKitContainerIdentifier,accountHash:accountHash,migrationInterruption:nil)
+    }
+    init(root: URL, commandLockURL: URL? = nil, cloudKitContainerIdentifier: String? = nil, accountHash: String? = nil, migrationInterruption: LegacyGenerationMigration.Checkpoint?) throws {
         self.root = root; self.commandLockURL = commandLockURL ?? root.appendingPathComponent("CommandBus.lock")
         try FileManager.default.createDirectory(at:root,withIntermediateDirectories:true,attributes:[.posixPermissions:0o700])
         let lease = StoreLease(lockURL:self.commandLockURL); try lease.acquire(failIfMaintenance:false); defer { lease.release() }
         let pointerURL = root.appendingPathComponent("ActiveGeneration.json")
-        let pointer: ManagedPointer
+        var pointer: ManagedPointer
         if FileManager.default.fileExists(atPath:pointerURL.path) { pointer = try JSONDecoder().decode(ManagedPointer.self,from:Data(contentsOf:pointerURL)); guard pointer.version == 1 else { throw BackupOperationError.invalidManagedStore } }
         else {
             let bootstrapURL = root.appendingPathComponent("InitializationJournal.json")
@@ -45,6 +49,7 @@ struct GenerationReady: Codable { let version: Int; let generationID: UUID; let 
             try DurableFiles.encode(GenerationReady(version:1,generationID:id,recordsHash:try RecordFingerprint.hash([]),createdAt:Date()),to:directory.appendingPathComponent("GenerationReady.json"))
             try DurableFiles.encode(pointer,to:pointerURL); try FileManager.default.removeItem(at:bootstrapURL)
         }
+        pointer = try LegacyGenerationMigration.migrate(pointer:pointer,root:root,interruption:migrationInterruption)
         let directory = root.appendingPathComponent("Generations/\(pointer.generationID.uuidString)",isDirectory:true)
         guard FileManager.default.fileExists(atPath:directory.appendingPathComponent("GenerationReady.json").path) else { throw BackupOperationError.invalidManagedStore }
         // The pointer's legacy cloud identifier is compatibility metadata, not a v1 capability.
@@ -59,6 +64,22 @@ struct GenerationReady: Codable { let version: Int; let generationID: UUID; let 
     enum AdoptionCheckpoint: String { case afterCopy, afterPromotion }
     private struct AdoptionJournal: Codable { let stagingName: String; let targetName: String }
     static func adoptForTesting(from source: ModelContainer, at root: URL, commandLockURL: URL? = nil, interruption: AdoptionCheckpoint?) throws -> ManagedDataStore {
+        try adoptRecords(at:root,commandLockURL:commandLockURL,interruption:interruption) { try RecordBridge.all(source.mainContext,syncedOnly:false) }
+    }
+    /// Converts an explicitly chosen legacy flat store from a read-only clone; never opens its source.
+    public static func adoptLegacy(from directory: URL, at root: URL, commandLockURL: URL? = nil) throws -> ManagedDataStore {
+        // Fail closed before adoption writes a target, journal or replacement schema stamp.
+        guard try MadarContainerFactory.storeVersion(at:directory) == 1 else { throw DataError.invalidValue("legacy adoption source") }
+        try SchemaCompatibility.validateDeviceVersion(at: directory)
+        return try adoptRecords(at:root,commandLockURL:commandLockURL,interruption:nil) {
+            try SchemaCompatibility.validateDeviceVersion(at: directory)
+            let copy = FileManager.default.temporaryDirectory.appendingPathComponent("MadarLegacyAdoption-\(UUID())")
+            defer { try? FileManager.default.removeItem(at:copy) }
+            let original = try LegacyV1Reader.read(syncedDirectory:directory,deviceStoreURL:directory.appendingPathComponent("Device.store"),copiedTo:copy)
+            return try SchemaCompatibility.currentRecords(original,from:1)
+        }
+    }
+    private static func adoptRecords(at root: URL, commandLockURL: URL?, interruption: AdoptionCheckpoint?, records readRecords: () throws -> [DataRecord]) throws -> ManagedDataStore {
         let lockURL = commandLockURL ?? root.appendingPathComponent("CommandBus.lock")
         // Place the shared default lock beside the target so acquiring it never creates the target directory prematurely.
         let effectiveLockURL = commandLockURL == nil ? root.deletingLastPathComponent().appendingPathComponent("\(root.lastPathComponent)-Adoption.lock") : lockURL
@@ -86,7 +107,7 @@ struct GenerationReady: Codable { let version: Int; let generationID: UUID; let 
         try DurableFiles.encode(AdoptionJournal(stagingName:staging.lastPathComponent,targetName:root.lastPathComponent),to:journalURL)
         do {
             // Source is scanned while the same cross-process write lease is held. It is never saved or mutated.
-            let records = try RecordBridge.all(source.mainContext,syncedOnly:false)
+            let records = try readRecords()
             func prepare() throws {
                 let temporary = try ManagedDataStore(root:staging,commandLockURL:staging.appendingPathComponent("AdoptionPreparation.lock"))
                 for row in records { try RecordBridge.insert(row,in:temporary.container.mainContext) }
