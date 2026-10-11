@@ -13,8 +13,9 @@ import Darwin
         self.store = store; self.backupDirectory = backupDirectory; self.keyStore = keyStore; self.lifecycle = lifecycle; self.localOnly = localOnly
     }
     public func hasConfiguredKey() throws -> Bool { try keyStore.load() != nil }
-    public func configurePassphrase(_ passphrase: String) async throws {
+    public func configurePassphrase(_ passphrase: String, validation: @MainActor () throws -> Void = {}) async throws {
         let credential = try await Task.detached(priority:.userInitiated) { try BackupCredential.derive(passphrase:passphrase) }.value
+        try Task.checkCancellation(); try validation()
         try keyStore.save(credential)
     }
     public func catalog() throws -> [BackupReceipt] {
@@ -25,17 +26,18 @@ import Darwin
         guard FileManager.default.fileExists(atPath:statusURL.path) else { return .init(lastSuccessAt:nil,lastResult:"never",localOnly:localOnly) }
         return try JSONDecoder().decode(BackupStatus.self,from:Data(contentsOf:statusURL))
     }
-    public func export(kind: BackupKind = .manual, passphrase: String? = nil, progress: @escaping @Sendable (BackupProgress) -> Void = { _ in }, cancellation: BackupCancellation = BackupCancellation(), now: Date = Date()) async throws -> BackupReceipt {
+    public func export(kind: BackupKind = .manual, passphrase: String? = nil, progress: @escaping @Sendable (BackupProgress) -> Void = { _ in }, cancellation: BackupCancellation = BackupCancellation(), now: Date = Date(), authorization: @MainActor () async throws -> Void = {}) async throws -> BackupReceipt {
         let lease = try await beginOperation()
         defer { finishOperation(lease:lease) }
-        do { return try await exportUnderLease(kind:kind,passphrase:passphrase,progress:progress,cancellation:cancellation,now:now) }
+        do { try await authorization(); try cancellation.check(); return try await exportUnderLease(kind:kind,passphrase:passphrase,progress:progress,cancellation:cancellation,now:now) }
         catch { try? recordFailure(error); throw error }
     }
     /// Captures logical rows under the same app writer barrier as encrypted backups.
     /// The share URL points to a dedicated ZIP, never to a live managed generation.
-    public func exportPlain(progress: @escaping @Sendable (BackupProgress) -> Void = { _ in }, cancellation: BackupCancellation = BackupCancellation(), now: Date = Date()) async throws -> URL {
+    public func exportPlain(progress: @escaping @Sendable (BackupProgress) -> Void = { _ in }, cancellation: BackupCancellation = BackupCancellation(), now: Date = Date(), authorization: @MainActor () async throws -> Void = {}) async throws -> URL {
         let lease = try await beginOperation()
         defer { finishOperation(lease: lease) }
+        try await authorization()
         try cancellation.check()
         let rows = try currentRecords()
         try RecordValidator.validate(rows); try BackupCodec.validateTypedRows(rows)
