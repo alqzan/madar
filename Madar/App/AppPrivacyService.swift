@@ -31,4 +31,12 @@ import MadarData
         guard let session else { throw DataError.invalidValue("session unavailable") }
         try await session.applySettingsAndWait(["core.faceIDLock": .string(scope.rawValue)])
     }
+    func persistedPrivacyScope() throws -> MadarLockScope {
+        guard let session else { throw DataError.invalidValue("session unavailable") }
+        try session.reload() // Settings only; no protected room text is fetched.
+        guard let scope = MadarLockScope(rawValue: session.string("core.faceIDLock")) else {
+            throw DataError.invalidValue("privacy scope")
+        }
+        return scope
+    }
 }
