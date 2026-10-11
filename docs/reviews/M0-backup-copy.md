@@ -1,0 +1,13 @@
+# M0-T13 backup copy review
+
+Verdict: **approve** — bounded source scope; no findings.
+
+Fresh independent Codex Sol Standard high review, 2026-10-11. Reviewed `b7e5f7c..37fd98e` commit by commit against T13, RU1/RU3 and the existing CustomizationCopy/catalog pattern. Reviewer did not author T13. Runtime/visual acceptance remains root-owned; this does not approve the M0 gate.
+
+- `Customization.xcstrings:4–131`, `CustomizationCopy.swift:12–29` and `CustomizationCopyTests.swift:6–43`: both record phrases provide zero/one/two/few/many/other, with independent explicit 0/1/2/3/11/100 expectations in Arabic-Indic and western styles. Singular/dual forms and three-record `سجلات`, 11-record `سجلًّا`, 100-record `سجل` are appropriate. Integer argument1 selects Arabic grammar and string argument2 supplies selected digits; individual fixtures assert FSI/PDI and absence of numeric middle dots. Summary fixtures preserve received warnings verbatim.
+- `BackupSettingsView.swift:73,119–126,141,282–285`: completed counts/warnings remain transient raw facts, cleared at the same new-operation boundary as prior result text and formatted at render time. `CustomizeMadar.swift:64` injects current `core.numerals`; view state identity is retained independently of this presentation value. No persisted field, payload or data mutation was introduced by numeral redraw. Saved and preview numeric helpers share the selected formatter.
+- Password validation, export/inspect/close/cancel methods and DEBUG diagnostic block are byte-identical to baseline. Backend service, schema and dictionary are unchanged; service status/date/warning behavior was not altered. No new backup feature or later-room entry appears. New UI test uses two synthetic stores and existing real-setting/backup helpers; it covers zero saved counts in both styles, not restore preview/result runtime flows.
+
+Actual review checks: catalog structure and unchanged-operation/backend/schema comparisons → `PASS`; `check-review-contracts.py --require-ra4` → `PASS: 88 amended contract checks`; `check-number-separators.py` → `PASS: RU1 app numeric separator source check`; `git diff --check b7e5f7c..37fd98e` → no output. Inspected author's `t13-numerals-build-for-testing-retry.log` ending `** TEST BUILD SUCCEEDED **`; reviewer did not rerun the build.
+
+Not executed by reviewer: hosted grammar tests, simulator, VoiceOver or physical iPhone. Root must execute the two new hosted copy tests and bounded selected-numeral UI test before runtime acceptance; actual restore preview/result rendering and remaining broader backup/privacy checks must stay accurately marked if untested. These verification limits are not source findings.
