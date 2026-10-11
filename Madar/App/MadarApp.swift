@@ -6,11 +6,14 @@ import MadarDesign
 
 @main
 struct MadarApp: App {
+    var body: some Scene { WindowGroup { MadarSceneContent() } }
+}
+
+private struct MadarSceneContent: View {
     @State private var session: AppSession?
     @State private var startupError: String?
     @State private var pendingURL: URL?
-    var body: some Scene {
-        WindowGroup {
+    var body: some View {
             Group {
                 #if DEBUG
                 if ProcessInfo.processInfo.environment["MADAR_UI_GALLERY"] == "1" { MadarComponentGallery() }
@@ -23,7 +26,9 @@ struct MadarApp: App {
             .environment(\.locale, Locale(identifier: "ar_SA"))
             .task { if session == nil && startupError == nil && ProcessInfo.processInfo.environment["MADAR_UI_GALLERY"] != "1" { await load() } }
             .onChange(of: scenePhase) { _, phase in
-                guard phase == .active, let session else { return }
+                guard let session else { return }
+                session.privacyPresenter?.transition(phase)
+                guard phase == .active else { return }
                 Task {
                     do { try await session.drainInbox() }
                     catch BackupOperationError.busy { }
@@ -34,14 +39,13 @@ struct MadarApp: App {
                 if let session { session.open(url) }
                 else { pendingURL = url }
             }
-        }
     }
     private var mainContent: some View {
         Group {
                 if let session, let lock = session.lockController {
                     MadarLockGate(controller: lock, feature: .app) {
                         MadarRootView(session: session).modelContainer(session.container)
-                    }.onChange(of: scenePhase) { _, phase in lock.sceneChanged(phase) }
+                    }.background(ScenePrivacyBridge(session: session).frame(width: 0, height: 0))
                 }
                 else if let startupError {
                     ContentUnavailableView {
