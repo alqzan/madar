@@ -43,6 +43,17 @@ import UIKit
                 self.coverNow(); self.controller.receiveScope(scope)
             }
         })
+        for name in [Notification.Name.madarPrivacyScopeWillChange, .madarPrivacyScopeChangeFailed] {
+            notifications.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] note in
+                let sourceID = (note.object as? MadarLockController).map(ObjectIdentifier.init)
+                MainActor.assumeIsolated {
+                    guard let self, sourceID != ObjectIdentifier(self.controller) else { return }
+                    self.coverNow(); self.dismissActivity()
+                    if name == .madarPrivacyScopeWillChange { self.controller.receiveScopeRevocation() }
+                    else { self.controller.receiveScopeFailure() }
+                }
+            })
+        }
         transition(owningScene.activationState == .foregroundActive ? .active : .inactive)
         synchronize()
     }

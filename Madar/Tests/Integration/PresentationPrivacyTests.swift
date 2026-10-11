@@ -9,6 +9,8 @@ import UIKit
         var purges = 0
         var delayNextBinding = false
         var bindingContinuation: CheckedContinuation<Void, Never>?
+        var delayScope = false
+        var scopeContinuation: CheckedContinuation<Void, Error>?
         func redactProtectedData() async throws { purges += 1; bindings.removeAll() }
         func authorizeAccess(to feature: MadarProtectedFeature) async throws {
             if delayNextBinding {
@@ -17,7 +19,9 @@ import UIKit
             }
             bindings.append(feature)
         }
-        func privacyScopeDidChange(to scope: MadarLockScope) async throws { }
+        func privacyScopeDidChange(to scope: MadarLockScope) async throws {
+            if delayScope { try await withCheckedThrowingContinuation { scopeContinuation = $0 } }
+        }
     }
     private final class Authenticator: MadarDeviceAuthenticator {
         var calls = 0
@@ -32,6 +36,46 @@ import UIKit
         func invalidate() { invalidations += 1 }
     }
     private func settle() async { for _ in 0..<30 { await Task.yield() } }
+    private enum HarnessError: Error { case timeout, persistenceFailed }
+    private func waitUntil(_ predicate: @MainActor () -> Bool) async throws {
+        let deadline = ContinuousClock.now.advanced(by: .seconds(3))
+        while !predicate() {
+            guard ContinuousClock.now < deadline else { throw HarnessError.timeout }
+            await Task.yield()
+        }
+    }
+
+    func test_M0P1a_scopeChangeImmediatelyRevokesOtherScene() async throws {
+        guard let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first else {
+            throw XCTSkip("Requires an app-host UIWindowScene")
+        }
+        let firstService = Service(); firstService.delayScope = true
+        let first = MadarLockController(scope: .app, service: firstService, authenticator: { Authenticator() })
+        let second = MadarLockController(scope: .app, service: Service(), authenticator: { Authenticator() })
+        let firstWindow = UIWindow(windowScene: scene), secondWindow = UIWindow(windowScene: scene)
+        firstWindow.rootViewController = UIViewController(); secondWindow.rootViewController = UIViewController()
+        let firstPresenter = ScenePrivacyPresenter(controller: first), secondPresenter = ScenePrivacyPresenter(controller: second)
+        firstPresenter.attach(to: firstWindow); secondPresenter.attach(to: secondWindow)
+        firstPresenter.transition(.active); secondPresenter.transition(.active)
+        defer { firstPresenter.detach(); secondPresenter.detach() }
+        _ = try await first.authorize([.app])
+        let ticket = try await second.authorize([.app])
+        // Observer runs synchronously in the sender's pre-await notification prefix.
+        var revokedBeforePersistence = false
+        let observer = second.observeRevocation { _ in
+            revokedBeforePersistence = second.covered && firstService.scopeContinuation == nil
+        }
+        defer { second.removeObserver(observer) }
+        let request = Task { try await first.changeScope(.notesOnly) }
+        try await waitUntil { firstService.scopeContinuation != nil }
+        XCTAssertTrue(revokedBeforePersistence); XCTAssertTrue(second.covered)
+        XCTAssertFalse(try XCTUnwrap(secondPresenter.coverWindow).isHidden)
+        XCTAssertThrowsError(try second.validate(ticket)); XCTAssertEqual(second.scope, .app)
+        firstService.scopeContinuation?.resume(throwing: HarnessError.persistenceFailed); firstService.scopeContinuation = nil
+        do { try await request.value; XCTFail("Persistence unexpectedly succeeded") } catch { }
+        await settle(); XCTAssertTrue(second.covered); XCTAssertTrue(second.redactionFailed)
+        XCTAssertEqual(second.scope, .app); XCTAssertThrowsError(try second.validate(ticket))
+    }
 
     func test_M0P1a_staleVerifierCannotPurgeNewAuthorization() async throws {
         let first = Authenticator(), second = Authenticator(), service = Service(); first.delayed = true
