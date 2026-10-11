@@ -3,6 +3,23 @@ import MadarCore
 @testable import Madar
 
 final class CustomizationCopyTests: XCTestCase {
+    func test_fixPrevious_M0T13_RU3_BackupRecordPluralCategories() {
+        // Golden Arabic grammar follows RU3, not production/catalog output.
+        let fixtures: [(Int, String, String)] = [
+            (0, "لم تُستعد أي سجلات.", "لم تُترك أي سجلات دون تطبيق."),
+            (1, "استُعيد سجل واحد.", "لم يُطبّق سجل واحد."),
+            (2, "استُعيد سجلان.", "لم يُطبّق سجلان."),
+            (3, "استُعيدت \u{2068}٣\u{2069} سجلات.", "لم تُطبّق \u{2068}٣\u{2069} سجلات."),
+            (11, "استُعيد \u{2068}١١\u{2069} سجلًّا.", "لم يُطبّق \u{2068}١١\u{2069} سجلًّا."),
+            (100, "استُعيد \u{2068}١٠٠\u{2069} سجل.", "لم يُطبّق \u{2068}١٠٠\u{2069} سجل.")
+        ]
+        for (count, restored, skipped) in fixtures {
+            let digits = MadarNumberFormatter(style: .hindi).string(count)
+            XCTAssertEqual(BackupCopy.restored(count: count, formattedCount: digits), restored)
+            XCTAssertEqual(BackupCopy.skipped(count: count, formattedCount: digits), skipped)
+        }
+    }
+
     func test_M0S2_RU3_ArabicPluralCategoriesHonorNumerals() {
         // Explicit linguistic expectations, independent of the catalog or production output.
         // Read the shipped app bundle so a missing resource fails this hosted regression.
