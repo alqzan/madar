@@ -52,6 +52,7 @@ struct BackupRestoreResult: Sendable { let restoredCount: Int; let skippedCount:
 @MainActor protocol BackupUIService: AnyObject {
     func status() async throws -> BackupUIStatus
     func setSchedule(_ schedule: BackupUISchedule) async throws
+    func exportPlain(progress: @escaping @MainActor @Sendable (BackupUIProgress) -> Void) async throws -> URL
     func export(passphrase: String, progress: @escaping @MainActor @Sendable (BackupUIProgress) -> Void) async throws -> URL
     func previewRestore(file: URL, passphrase: String, progress: @escaping @MainActor @Sendable (BackupUIProgress) -> Void) async throws -> BackupRestorePreview
     func restore(previewID: UUID, mode: BackupUIRestoreMode, progress: @escaping @MainActor @Sendable (BackupUIProgress) -> Void) async throws -> BackupRestoreResult
@@ -64,6 +65,7 @@ struct BackupRestoreResult: Sendable { let restoredCount: Int; let skippedCount:
     private(set) var status: BackupUIStatus?
     private(set) var progress: BackupUIProgress?
     private(set) var exportedURL: URL?
+    private(set) var plainExportedURL: URL?
     private(set) var preview: BackupRestorePreview?
     private(set) var busy = false
     private(set) var resultMessage: String?
@@ -92,6 +94,13 @@ struct BackupRestoreResult: Sendable { let restoredCount: Int; let skippedCount:
             let file = try await service.export(passphrase: passphrase, progress: report)
             exportedURL = file; exportPassphrase = ""; exportConfirmation = ""
             if let current = try? await service.status() { status = current }; resultMessage = "حُفظت النسخة المشفّرة."
+        }
+    }
+    func exportPlain() {
+        guard !busy else { return }
+        run(initial: "يجهّز ملف التصدير…") { [self] report in
+            plainExportedURL = try await service.exportPlain(progress: report)
+            resultMessage = "التصدير جاهز للحفظ أو المشاركة. الملف غير مشفّر."
         }
     }
     func inspect() {
@@ -167,6 +176,12 @@ struct BackupSettingsView: View {
                     Text("نحتفظ بآخر أربع نسخ تلقائية وكل النسخ اليدوية.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                 } else { ProgressView("يقرأ حالة النسخ…") }
             } header: { Text("النسخ الاحتياطية") } footer: { Text("النسخ المجدولة تُنفّذ حين يسمح النظام، ويمكنك النسخ يدويًا في أي وقت.") }
+            Section {
+                Button("جهّز ملف التصدير", action: model.exportPlain).disabled(model.busy).accessibilityIdentifier("plain-export-now")
+                if let file = model.plainExportedURL {
+                    ShareLink(item: file) { Label("احفظ التصدير أو شاركه", systemImage: "square.and.arrow.up") }.accessibilityIdentifier("plain-export-share")
+                }
+            } header: { Text("تصدير بياناتك") } footer: { Text("ملف ZIP غير مشفّر يحتوي سجلاتك بصيغة JSONL وصورها وصوتها، ويمكن فتحه خارج مدار. شاركه مع من تثق به. إعدادات هذا الجهاز وقفل التطبيق لا تدخل فيه.") }
             Section {
                 SecureField("كلمة مرور — عشرة أحرف على الأقل", text: $model.exportPassphrase).textContentType(.newPassword).focused($focusedPassword, equals: 1).submitLabel(.next).onSubmit { focusedPassword = 2 }.accessibilityIdentifier("backup-password")
                 SecureField("أعِد كلمة المرور", text: $model.exportConfirmation).textContentType(.newPassword).focused($focusedPassword, equals: 2).submitLabel(.done).onSubmit { focusedPassword = nil }.accessibilityIdentifier("backup-password-confirmation")

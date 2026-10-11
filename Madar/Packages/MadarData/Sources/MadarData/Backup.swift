@@ -45,6 +45,10 @@ public enum BackupCodec {
     }
     /// Plaintext preparation used by the asynchronous file coordinator and authenticated malformed-archive tests.
     static func archive(records: [DataRecord], now: Date = Date()) throws -> Data {
+        try encodeArchive(contentFiles(records: records, now: now))
+    }
+    /// Shared logical representation; never contains the device store or SQLite files.
+    static func contentFiles(records: [DataRecord], now: Date = Date()) throws -> [String: Data] {
         guard records.allSatisfy({ MadarSchema.syncedNames.contains($0.model) }) else { throw DataError.invalidBackup }
         var files: [String:Data] = [:]; var persisted = records
         for i in persisted.indices where persisted[i].model == "Media" {
@@ -60,7 +64,7 @@ public enum BackupCodec {
         }
         let manifest = BackupManifest(formatVersion:1,storeSchemaVersion:MadarSchema.version,createdAt:now,counts:Dictionary(uniqueKeysWithValues:MadarSchema.syncedNames.map { model in (model,records.filter { $0.model == model }.count) }),files:files.sorted { $0.key < $1.key }.map { .init(path:$0.key,bytes:$0.value.count,sha256:hash($0.value)) })
         files["manifest.json"] = try JSONEncoder().encode(manifest)
-        return try encodeArchive(files)
+        return files
     }
     @MainActor public static func validate(_ backup: Data, passphrase: String) throws -> ValidatedBackup {
         let result = try validateContents(backup,passphrase:passphrase)
@@ -95,7 +99,11 @@ public enum BackupCodec {
         let files = try decodeArchive(archive)
         guard let bytes = files["manifest.json"] else { throw DataError.invalidBackup }
         let manifest = try JSONDecoder().decode(BackupManifest.self,from:bytes)
-        guard manifest.formatVersion == 1, manifest.storeSchemaVersion == header.storeSchemaVersion, Set(manifest.counts.keys) == Set(sourceModels), Set(manifest.files.map(\.path)).count == manifest.files.count, Set(files.keys) == Set(manifest.files.map(\.path)+["manifest.json"]) else { throw DataError.invalidBackup }
+        guard manifest.storeSchemaVersion == header.storeSchemaVersion else { throw DataError.invalidBackup }
+        return try validateFiles(files, manifest: manifest, sourceModels: sourceModels, cancellation: cancellation, progress: progress)
+    }
+    static func validateFiles(_ files: [String: Data], manifest: BackupManifest, sourceModels: [String], cancellation: BackupCancellation = BackupCancellation(), progress: @Sendable (BackupProgress) -> Void = { _ in }) throws -> ValidatedBackup {
+        guard manifest.formatVersion == 1, Set(manifest.counts.keys) == Set(sourceModels), Set(manifest.files.map(\.path)).count == manifest.files.count, Set(files.keys) == Set(manifest.files.map(\.path)+["manifest.json"]) else { throw DataError.invalidBackup }
         for file in manifest.files { guard let data = files[file.path], data.count == file.bytes, hash(data) == file.sha256 else { throw DataError.invalidBackup } }
         var records: [DataRecord] = []
         for model in sourceModels {
@@ -111,7 +119,7 @@ public enum BackupCodec {
         }
         let allowedPaths = Set(sourceModels.map { "data/\($0).jsonl" } + records.filter { $0.model == "Media" && $0.fields["data"] != .null }.map { "media/\($0.id.uuidString)" })
         guard Set(manifest.files.map(\.path)) == allowedPaths else { throw DataError.invalidBackup }
-        records = try SchemaCompatibility.currentRecords(records,from:header.storeSchemaVersion)
+        records = try SchemaCompatibility.currentRecords(records,from:manifest.storeSchemaVersion)
         // Decode every stored property through generated typed models in an isolated validation container.
         try RecordValidator.validate(records)
         try cancellation.check()

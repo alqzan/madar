@@ -50,6 +50,10 @@ import WidgetKit
             progress: reporter(progress), cancellation: cancellation)
         return receipt.fileURL
     }
+    func exportPlain(progress: @escaping @MainActor @Sendable (BackupUIProgress) -> Void) async throws -> URL {
+        cancellation = BackupCancellation()
+        return try await coordinator.exportPlain(progress: reporter(progress), cancellation: cancellation)
+    }
     func previewRestore(file: URL, passphrase: String, progress: @escaping @MainActor @Sendable (BackupUIProgress) -> Void) async throws -> BackupRestorePreview {
         clearPreviews()
         cancellation = BackupCancellation()
