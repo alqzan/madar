@@ -10,7 +10,7 @@ Checked b6556bb..5832a8e — OK for accepted T05/T13 scope: current main22hostte
 
 Checked 5832a8e..3b273b5 — OK for T11 tooling: 12 negative/positive fixtures pass; integrated static checker exits 0 (60 Swift files, one catalog, 38 M0 contrast pairs). Strict completeness exits 2 because 420 manual trace lines remain. Production unchanged by this range; accepted app22/package125 evidence above remains current. This is not M0 approval.
 
-Checked 27a0967..f57d750 — T06 evidence is documentation-only; no product checks were rerun. Main production code is unchanged; M0 remains not approved.
+Checked 27a0967..7aec2bb — T06 report and source inventories are documentation-only; no product code changed or checks rerun. M0 remains not approved.
 
 # Board
 
