@@ -30,6 +30,17 @@ git diff --check
 exit 0, no output
 ```
 
+Root-hosted focused acceptance (`ExportPrivacyTests` plus the two new native-adapter retirement regressions) ran on iPhone 17 Pro / iOS 26.5:
+
+```text
+Executed 15 tests, with 0 failures (0 unexpected) in 5.242 seconds.
+** TEST EXECUTE SUCCEEDED **
+```
+
+Raw output: `Madar/Artifacts/madar-p1b-root-host.log`.
+
+The existing visible native-share UI journey was also attempted at L/light, AX3/light and L/dark. First run reused the author's unsigned generic build-for-testing, so the app-group entitlement was absent and startup showed `DataError` / retry. After diagnosing this environment mismatch, the targeted test was rebuilt with simulator signing (`CODE_SIGN_IDENTITY=- CODE_SIGNING_ALLOWED=YES`). It opened settings and completed export, but the default `notesOnly` scope required OS authentication; the UI test did not establish successful authentication and remained under `scene-privacy-cover` before it could inspect the native share item. The run failed at `FoundationUITests.swift:75` waiting for the share item. This does not establish an application defect or a successful authorized share; that flow remains **not verified**. Raw output: `Madar/Artifacts/madar-p1b-root-signed-ui.log`, result bundle `/tmp/madar-p1b-root-signed-ui.xcresult`. No repeated UI run was made.
+
 Generic simulator compilation:
 
 ```sh
@@ -46,7 +57,7 @@ Logs: `Madar/Artifacts/madar-p1b-fixes-build.log`, `madar-p1b-fixes-build-retry.
 
 ## For root / next reviewer
 
-App-host regressions are compiled, **not executed by this author**. Run the affected `ExportPrivacyTests` plus the two new `PresentationPrivacyTests` below and existing app backup/restore integration coverage using root's simulator:
+App-host regression run completed by root using the existing build-for-testing output. It ran the complete `ExportPrivacyTests` class plus the two new `PresentationPrivacyTests` listed below:
 
 - `test_M0P1b_01_restoreFirstKeyRefusalCreatesNoSafetyOrPromotion`
 - `test_M0P1b_01_authorizedFirstKeyRestoreCreatesSafetyAndPromotes`
@@ -55,4 +66,4 @@ App-host regressions are compiled, **not executed by this author**. Run the affe
 - `test_M0P1b_03_activeLockRetiresPrivateShareIncludingScopeNone`
 - `test_M0P1b_03_localScopeChangeRetiresPrivateShareBeforeGenericAuthorization`
 
-The last two tests use a real app-host UIWindowScene and native controller objects with a controlled adapter. They prove retirement order and cover lifetime while adapter completion is delayed; they do not prove UIKit/OS dismissal, system authentication, true two-scene operation, switcher frames or Files destination writes. Those native flows, default/AX3/dark matrix, spoken VoiceOver and physical protected-data behavior remain root/owner acceptance. No simulator operation was performed by this author. Fresh Top re-review of this fix diff is required before merge; T09 and M0 remain unapproved.
+The last two tests use a real app-host UIWindowScene and native controller objects with a controlled adapter. They prove retirement order and cover lifetime while adapter completion is delayed; they do not prove UIKit/OS dismissal, system authentication, true two-scene operation, switcher frames or Files destination writes. A fresh Top fix-only review approved `33ab2ec` in commit `8876626`; original findings remain preserved above in `docs/reviews/M0-presentation-privacy.md`. Native authenticated share, inactive/switcher, true two-scene operation, default/AX3/dark privacy matrix, spoken VoiceOver, physical protected-data behavior and Files destination writes remain root/owner acceptance. M0 remains unapproved.
