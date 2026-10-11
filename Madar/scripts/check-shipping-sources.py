@@ -42,6 +42,42 @@ def uncomment(text):
     return ''.join(out)
 
 
+def check_target_dependencies(declaration, manifest, product, included_products):
+    """Current literal dependency forms only; extra same-package targets fail closed.
+
+    We do not implement a SwiftPM graph evaluator. Root product dependencies already
+    enumerated by PBX are supported; the explicitly excluded pinned Adhan product
+    is the only external dependency. Any new form needs deliberate scope support.
+    """
+    match = re.search(r'\bdependencies:\s*', declaration)
+    if not match: return
+    tail = declaration[match.end():]
+    array = re.match(r'\[([^\]]*)\]', tail)
+    if not array: raise ValueError(f'computed target dependencies require scope support: {product}')
+    same_package_targets = set(re.findall(r'(?<!\w)\.(?:target|executableTarget)\(name:\s*"([^"]+)"', manifest))
+    remaining = array[1].strip()
+    while remaining:
+        literal = re.match(r'"([^"\\]+)"', remaining)
+        external = re.match(r'\.product\(name:\s*"([^"\\]+)",\s*package:\s*"([^"\\]+)"\)', remaining)
+        if literal:
+            name = literal[1]; consumed = literal.end()
+            if name in same_package_targets:
+                raise ValueError(f'additional local target dependency {product} -> {name} requires graph support')
+            if name not in included_products:
+                raise ValueError(f'unenumerated package dependency {product} -> {name}')
+        elif external:
+            name, package = external.groups(); consumed = external.end()
+            if (name, package) != ('Adhan', 'adhan-swift') or not re.search(
+                    r'\.package\(url:\s*"https://github\.com/batoulapps/adhan-swift\.git",\s*revision:\s*"[0-9a-f]{40}"\)', manifest):
+                raise ValueError(f'unsupported external product dependency {product} -> {name}/{package}')
+        else:
+            raise ValueError(f'unsupported target dependency expression: {product}: {remaining}')
+        remaining = remaining[consumed:].strip()
+        if remaining:
+            if not remaining.startswith(','): raise ValueError(f'unparsed target dependency tail: {product}')
+            remaining = remaining[1:].strip()
+
+
 def build_files(project, root):
     """Resolve explicit PBX groups, application plus embedded extension phases."""
     objects = project['objects']; paths = {}
@@ -90,7 +126,7 @@ def build_files(project, root):
             packages.add((candidates[0]['relativePath'], dep['productName']))
     for relative, product in packages:
         package = root / relative
-        manifest = (package / 'Package.swift').read_text()
+        manifest = uncomment((package / 'Package.swift').read_text())
         library = re.search(r'\.library\(name:\s*"' + re.escape(product) + r'",\s*targets:\s*\["([^"\]]+)"\]\)', manifest)
         if not library: raise ValueError(f'unknown product layout {product}')
         target = library.group(1)
@@ -104,6 +140,7 @@ def build_files(project, root):
             end += 1
         if depth or re.search(r'\b(?:path|exclude|sources)\s*:', manifest[start:end]):
             raise ValueError(f'custom package layout needs support: {product}')
+        check_target_dependencies(manifest[start:end], manifest, product, {name for _, name in packages})
         directory = package / 'Sources' / target
         if not directory.is_dir(): raise ValueError(f'missing product source {directory}')
         sources.update(directory.rglob('*.swift'))

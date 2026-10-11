@@ -103,5 +103,35 @@ Text("\\(digits(count)) سجلًّا")
             project['objects']['included']['sourceTree'] = 'UNRESOLVED'
             with self.assertRaisesRegex(ValueError, 'unsupported sourceTree'): checks.build_files(project, root)
 
+    def test_M0L01_main_to_helper_is_rejected_not_silently_omitted(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); package = root/'Packages/Main'
+            for target in ['Main','Helper']: (package/'Sources'/target).mkdir(parents=True)
+            (package/'Sources/Main/Main.swift').write_text('import Helper')
+            helper = package/'Sources/Helper/File.swift'
+            helper.write_text('Text("bad").foregroundStyle(.red)')
+            (package/'Package.swift').write_text('''import PackageDescription
+let package = Package(name: "Main", products: [.library(name: "Main", targets: ["Main"])],
+targets: [.target(name: "Main", dependencies: ["Helper"]), .target(name: "Helper")])''')
+            project = {'rootObject':'project','objects': {
+                'project':{'isa':'PBXProject','mainGroup':'group','packageReferences':['package']},
+                'group':{'isa':'PBXGroup','children':[]},
+                'package':{'isa':'XCLocalSwiftPackageReference','relativePath':'Packages/Main'},
+                'product':{'isa':'XCSwiftPackageProductDependency','productName':'Main'},
+                'app':{'isa':'PBXNativeTarget','name':'Madar','productType':'com.apple.product-type.application','buildPhases':[], 'packageProductDependencies':['product']},
+                'widget':{'isa':'PBXNativeTarget','name':'MadarWidgets','productType':'com.apple.product-type.app-extension','buildPhases':[]}}}
+            # Independent known violation in Helper must never disappear behind a green scope.
+            self.assertTrue(any('colour value' in x for x in checks.scan_source(helper.read_text(), 'Helper/File.swift', {})[0]))
+            with self.assertRaisesRegex(ValueError, 'Main -> Helper'):
+                checks.build_files(project, root)
+
+    def test_M0L01_unsupported_dependency_forms_fail_closed(self):
+        for declaration in ['(name: "Main", dependencies: dependencyList)',
+                            '(name: "Main", dependencies: [.target(name: "Helper")])',
+                            '(name: "Main", dependencies: [.product(name: "Mystery", package: "unknown")])',
+                            '(name: "Main", dependencies: ["NotEnumerated"])']:
+            with self.subTest(declaration=declaration), self.assertRaises(ValueError):
+                checks.check_target_dependencies(declaration, declaration, 'Main', {'Main'})
+
 
 if __name__ == '__main__': unittest.main()
