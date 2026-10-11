@@ -69,6 +69,7 @@ struct BackupRestoreResult: Sendable { let restoredCount: Int; let skippedCount:
     private(set) var preview: BackupRestorePreview?
     private(set) var busy = false
     private(set) var resultMessage: String?
+    private(set) var restoreResult: BackupRestoreResult?
     var errorMessage: String?
     var exportPassphrase = ""
     var exportConfirmation = ""
@@ -121,8 +122,7 @@ struct BackupRestoreResult: Sendable { let restoredCount: Int; let skippedCount:
             let result = try await service.restore(previewID: preview.id, mode: mode, progress: report)
             self.preview = nil; restorePassphrase = ""; selectedFile = nil
             if let current = try? await service.status() { status = current }
-            resultMessage = "اكتملت الاستعادة: \(arabicNumber(result.restoredCount)) سجلًّا. \(arabicNumber(result.skippedCount)) سجلًّا لم يُطبّق."
-            if !result.warnings.isEmpty { resultMessage = (resultMessage ?? "") + "\n" + result.warnings.joined(separator: "\n") }
+            restoreResult = result
         }
     }
     func dismissPreview() { preview = nil }
@@ -137,7 +137,7 @@ struct BackupRestoreResult: Sendable { let restoredCount: Int; let skippedCount:
     }
     private func run(initial: String, action: @escaping @MainActor (@escaping @MainActor @Sendable (BackupUIProgress) -> Void) async throws -> Void) {
         guard !busy else { return }
-        let id = UUID(); operationID = id; busy = true; resultMessage = nil
+        let id = UUID(); operationID = id; busy = true; resultMessage = nil; restoreResult = nil
         progress = BackupUIProgress(message: initial)
         operation = Task { [weak self] in
             guard let self else { return }
@@ -207,7 +207,7 @@ struct BackupSettingsView: View {
                     Button("إلغاء الإجراء", role: .cancel, action: model.cancel).accessibilityIdentifier("backup-cancel")
                 }.accessibilityIdentifier("backup-progress")
             }
-            if let result = model.resultMessage { Section { Text(result).accessibilityIdentifier("backup-result") } }
+            if let result = resultCopy { Section { Text(result).accessibilityIdentifier("backup-result") } }
         }.navigationTitle("النسخ والاستعادة")
             .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); keyboardDoneButton } }
             .task { await model.refresh() }
@@ -264,7 +264,7 @@ struct BackupSettingsView: View {
         if let first = preview.earliestDate, let last = preview.latestDate {
             Text("الفترة: \(first.formatted(.dateTime.day().month().year())) — \(last.formatted(.dateTime.day().month().year()))")
         }
-        if preview.skippedCount > 0 { Text("لم يُطبّق \(digits(preview.skippedCount)) سجلًّا.") }
+        if preview.skippedCount > 0 { Text(BackupCopy.skipped(count: preview.skippedCount, formattedCount: digits(preview.skippedCount))) }
         ForEach(preview.warnings, id: \.self) { Text($0).foregroundStyle(theme.secondaryInk) }
         Picker("طريقة الاستعادة", selection: $model.restoreMode) {
             Text("دمج").tag(BackupUIRestoreMode.merge)
@@ -274,6 +274,10 @@ struct BackupSettingsView: View {
         Button("استعد النسخة") { confirmingRestore = true }.disabled(model.busy).accessibilityIdentifier("restore-confirm")
     }
     private func digits(_ number: Int) -> String { number.formatted(.number.locale(Locale(identifier: "ar_SA"))) }
+    private var resultCopy: String? {
+        guard let result = model.restoreResult else { return model.resultMessage }
+        return BackupCopy.restoreSummary(result, formattedRestored: digits(result.restoredCount), formattedSkipped: digits(result.skippedCount))
+    }
 }
 
 private func arabicNumber(_ number: Int) -> String { number.formatted(.number.locale(Locale(identifier: "ar_SA"))) }
