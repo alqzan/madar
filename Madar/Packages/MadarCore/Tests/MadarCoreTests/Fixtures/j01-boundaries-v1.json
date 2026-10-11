@@ -1,0 +1,166 @@
+{
+  "fixtureVersion": 1,
+  "source": "09-r-salah.md reference table: Riyadh2026-10-09 04:31/17:32; London2026-03-28 04:09/18:27 GMT and2026-03-29 05:07/19:29 BST. Synthetic exact minute boundaries test day attribution independently of engine subminute rounding; not official astronomical calibration.",
+  "cases": [
+    {
+      "id": "riyadh-fajr-before",
+      "instant": "2026-10-09T01:30:59Z",
+      "zone": "Asia/Riyadh",
+      "civilDay": "2026-10-09",
+      "boundary": "fajr",
+      "fajr": "2026-10-09T01:31:00Z",
+      "maghrib": "2026-10-09T14:32:00Z",
+      "expectedKey": "2026-10-08"
+    },
+    {
+      "id": "riyadh-fajr-at",
+      "instant": "2026-10-09T01:31:00Z",
+      "zone": "Asia/Riyadh",
+      "civilDay": "2026-10-09",
+      "boundary": "fajr",
+      "fajr": "2026-10-09T01:31:00Z",
+      "maghrib": "2026-10-09T14:32:00Z",
+      "expectedKey": "2026-10-09"
+    },
+    {
+      "id": "riyadh-fajr-after",
+      "instant": "2026-10-09T01:31:01Z",
+      "zone": "Asia/Riyadh",
+      "civilDay": "2026-10-09",
+      "boundary": "fajr",
+      "fajr": "2026-10-09T01:31:00Z",
+      "maghrib": "2026-10-09T14:32:00Z",
+      "expectedKey": "2026-10-09"
+    },
+    {
+      "id": "riyadh-maghrib-before",
+      "instant": "2026-10-09T14:31:59Z",
+      "zone": "Asia/Riyadh",
+      "civilDay": "2026-10-09",
+      "boundary": "maghrib",
+      "fajr": "2026-10-09T01:31:00Z",
+      "maghrib": "2026-10-09T14:32:00Z",
+      "expectedKey": "2026-10-08"
+    },
+    {
+      "id": "riyadh-maghrib-at",
+      "instant": "2026-10-09T14:32:00Z",
+      "zone": "Asia/Riyadh",
+      "civilDay": "2026-10-09",
+      "boundary": "maghrib",
+      "fajr": "2026-10-09T01:31:00Z",
+      "maghrib": "2026-10-09T14:32:00Z",
+      "expectedKey": "2026-10-09"
+    },
+    {
+      "id": "riyadh-maghrib-after",
+      "instant": "2026-10-09T14:32:01Z",
+      "zone": "Asia/Riyadh",
+      "civilDay": "2026-10-09",
+      "boundary": "maghrib",
+      "fajr": "2026-10-09T01:31:00Z",
+      "maghrib": "2026-10-09T14:32:00Z",
+      "expectedKey": "2026-10-09"
+    },
+    {
+      "id": "riyadh-midnight-before",
+      "instant": "2026-10-08T20:59:59Z",
+      "zone": "Asia/Riyadh",
+      "civilDay": "2026-10-08",
+      "boundary": "midnight",
+      "expectedKey": "2026-10-08"
+    },
+    {
+      "id": "riyadh-midnight-at",
+      "instant": "2026-10-08T21:00:00Z",
+      "zone": "Asia/Riyadh",
+      "civilDay": "2026-10-09",
+      "boundary": "midnight",
+      "expectedKey": "2026-10-09"
+    },
+    {
+      "id": "riyadh-midnight-after",
+      "instant": "2026-10-08T21:00:01Z",
+      "zone": "Asia/Riyadh",
+      "civilDay": "2026-10-09",
+      "boundary": "midnight",
+      "expectedKey": "2026-10-09"
+    },
+    {
+      "id": "london-2026-03-28-before",
+      "instant": "2026-03-28T04:08:59Z",
+      "zone": "Europe/London",
+      "civilDay": "2026-03-28",
+      "boundary": "fajr",
+      "fajr": "2026-03-28T04:09:00Z",
+      "maghrib": "2026-03-28T18:27:00Z",
+      "expectedKey": "2026-03-27"
+    },
+    {
+      "id": "london-2026-03-28-at",
+      "instant": "2026-03-28T04:09:00Z",
+      "zone": "Europe/London",
+      "civilDay": "2026-03-28",
+      "boundary": "fajr",
+      "fajr": "2026-03-28T04:09:00Z",
+      "maghrib": "2026-03-28T18:27:00Z",
+      "expectedKey": "2026-03-28"
+    },
+    {
+      "id": "london-2026-03-28-after",
+      "instant": "2026-03-28T04:09:01Z",
+      "zone": "Europe/London",
+      "civilDay": "2026-03-28",
+      "boundary": "fajr",
+      "fajr": "2026-03-28T04:09:00Z",
+      "maghrib": "2026-03-28T18:27:00Z",
+      "expectedKey": "2026-03-28"
+    },
+    {
+      "id": "london-2026-03-29-before",
+      "instant": "2026-03-29T04:06:59Z",
+      "zone": "Europe/London",
+      "civilDay": "2026-03-29",
+      "boundary": "fajr",
+      "fajr": "2026-03-29T04:07:00Z",
+      "maghrib": "2026-03-29T18:29:00Z",
+      "expectedKey": "2026-03-28"
+    },
+    {
+      "id": "london-2026-03-29-at",
+      "instant": "2026-03-29T04:07:00Z",
+      "zone": "Europe/London",
+      "civilDay": "2026-03-29",
+      "boundary": "fajr",
+      "fajr": "2026-03-29T04:07:00Z",
+      "maghrib": "2026-03-29T18:29:00Z",
+      "expectedKey": "2026-03-29"
+    },
+    {
+      "id": "london-2026-03-29-after",
+      "instant": "2026-03-29T04:07:01Z",
+      "zone": "Europe/London",
+      "civilDay": "2026-03-29",
+      "boundary": "fajr",
+      "fajr": "2026-03-29T04:07:00Z",
+      "maghrib": "2026-03-29T18:29:00Z",
+      "expectedKey": "2026-03-29"
+    },
+    {
+      "id": "london-dst-midnight-before",
+      "instant": "2026-03-29T22:59:59Z",
+      "zone": "Europe/London",
+      "civilDay": "2026-03-29",
+      "boundary": "midnight",
+      "expectedKey": "2026-03-29"
+    },
+    {
+      "id": "london-dst-midnight-at",
+      "instant": "2026-03-29T23:00:00Z",
+      "zone": "Europe/London",
+      "civilDay": "2026-03-30",
+      "boundary": "midnight",
+      "expectedKey": "2026-03-30"
+    }
+  ]
+}
