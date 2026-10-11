@@ -4,7 +4,7 @@ M0 — reconciliation with review V1, before accepting the existing foundation. 
 
 # Last checked
 
-Checked 3e54a53..a4b3a4a — 2026-10-11 baseline app build/host tests and all 7 packages passed (raw run2 logs); earlier check: aac7014..3e54a53 — 2026-10-10 automation: 3 inherited prayer/number defects fixed (7291d02, df44c20, cbaa7e2). Scoped M0-T04 review approved/merged 596dc05; Top M0-T02 transport/data fixes approved/merged 3e54a53. Current main: Core 21, Commands 17, Inbox 6, Prayer 12 passed; simulator app build + 15 host integration tests passed. Shell UI 4 + legacy-route integration passed with default/AX3/dark comparison and native minimize. Actual cold launch/relaunch drained two synthetic sources to one fact/two receipts/no pending files. Data 38/Snapshots 3/Sync 8 baseline passed; those files are unchanged. RA4, backup UI, complete lint and physical M0 gate remain open.
+Checked a4b3a4a..cf60172 — T00 Standard review approve/lint88; RA4 Top fix review approved and current receipt+pending transport host regression passed, integrated Data49/Commands17/host17. Plain export Top review approved; integrated Data57/host18, signed simulator test succeeded; root native sharing L/light, AX3/light, L/dark passed and actual images inspected. Raw run3 logs in Madar/Artifacts and candidate worktrees. RU1 follow-up fe0214e replaced3 backup/preview numeric middle dots; source guard passed. Prior all7package baseline green. T05 keyboard, window/privacy/export lock, visible today clocks and complete physical/software M0 gate remain open.
 
 # Board
 
@@ -34,6 +34,16 @@ Production tasks start after M0-T01. Separate agents own separate sections/files
 - Encrypted backup already exists; scalability RD4 and window-level privacy need review in the first relevant milestone. Retain code without implying all contracts passed.
 
 # Handovers
+
+## Handover — M0-T07/T08 integrated; T05/T09/T10 continuation — 2026-10-11 — codex (Sol)
+
+Done: RA4 preserved-V1 migration defects fixed68af424/dfe3923/c0502c1; independent Top fix-only review c45a953 approve; current receipt namespace/pending transport regression2fc39ab passes. Integratedcb57e68/fc39d80. Plain export integrated12b49c2/cf60172 after independent Top3492af4, host/UI checks; Top test-only setup69b0698 fixedAX3 virtualized Form. RU1backup/restore counts correctedfe0214e with sourceguard. Top architecture219afd9 identifies presented-window coverage and default export-lock bypass; T09claimed0e3bb87, T10todayclocks451289e.
+Verified: current integrated Data57/5suites passed12.652s; signed simulator app+host18tests0failures / ** TEST SUCCEEDED ** (run3-export-integrated*). Native share at L/light, AX3/light, L/dark:1test0failures92.682s / ** TEST SUCCEEDED **; actual ready/share images inspected (m0-plain-export/Artifacts/run3-plain-ui-top*). Lint88 and RU1sourceguard pass. Real blank secure field focused but softwarekeyboard hidden/offscreen; native-key discriminator initially stoppedbeforetyping. DeviceHub Xcode27 path differs from oldSimulator; rootopened actual iPhone17Pro26.5 and Keyboardmenu. No productionkeyboard defect proven.
+Not verified: physicaliPhone/protecteddata/wholeM0gate, keyboard exportconfirmation, window-level modalprivacy, default lock refusal/authorization, Filesdestination write, fullAX5/VoiceOver/general lint.
+For the next agent: finish active T09/T10 candidate selfchecks and scoped independentreviews beforemerge, then root actualUI/hostintegration. Keyboard test-only branch7def1da needs bounded onscreen+hittable duplicated-key readinessrepair; inspect actualimages/logs beforeproductchanges. Owner reset outsideagent resulted freshusage; agent consumed noresetcredit. Sharedmainclean with claims; no ownerstore/migration/deploy.
+Branches/worktrees: m0-s2-presentation-privacy base0e3bb87 managedm0-presentation-privacy activeStandardhigh production; m0-s2-foundation-times base451289e managedm0-foundation-times activeStandardhigh production. m0-s2-backup-focus7def1da managedm0-ui-debug testonlydiagnosis; do notmerge earlierunverified diagnosticancestors. m0-s1-plain-export69b0698 managedm0-plain-export alreadyintegrated, m0-s1-money-integration2fc39ab managedm0-arabic-plurals alreadyintegrated. Originalm0-s1-money-modelsdad332e managedm0-local-data preserved, no needmergeoldancestors. m0-command-inbox76bab3c integrated.
+Next: T09privacy/exportgate andT10clocks, Topreview then scopedM0report; do notdeclareM0approvalfromsoftwaretests.
+Next session: Standard Solhigh production; independentTop Solxhigh privacy/concurrency/datareview andM0gate.
 
 ## Handover — M0-T00 and RA4/export candidates — 2026-10-11 — codex (Sol)
 
