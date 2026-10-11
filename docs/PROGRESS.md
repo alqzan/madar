@@ -33,6 +33,16 @@ Production tasks start after M0-T01. Separate agents own separate sections/files
 
 # Handovers
 
+## Handover — M0-T00 and RA4/export candidates — 2026-10-11 — codex (Sol)
+
+Done: baseline checked; inherited RU3 completion verified by hosted regression; T00 contracts/journeys completed and independently Standard-high reviewed approve, merged c94488b. RA4 candidate ported previously to current baseline b3a809d, independently Top reviewed42cd6e6 changes requested. T08 implementation committed2b8c326 (Standard high), independent Top review/build pending.
+Verified: baseline app build → ** BUILD SUCCEEDED **; hosted → Executed16 tests,0failures / ** TEST SUCCEEDED **; Core21/Data38/Commands17/Inbox6/Prayer12/Snapshots3/Sync8 passed (Madar/Artifacts/run2-*). Contract lint86 passed;25 extracts SHA unchanged. RA4 candidate build ** BUILD SUCCEEDED ** / Data45 passed, but independent probes reproduced2 High defects; this is not acceptance. Plain candidate Data53/5suites passed including8 new tests; no owner data opened.
+Not verified: physical iPhone, wholeM0 gate, backup keyboard UI, complete UI lint/VoiceOver/AX5, real extension/protected-data flows. No new M1 entry.
+For the next agent: complete RA4 findings M0R4-01(pending restore cleanup),02(flat future device stamp),03(legacy preview counts), fix-only Top re-review then current-baseline host migration/inbox checks before merge. T08 needs Top review and root app/host/default+AX3+dark/share flow before merge. Current active agent outcomes must update this checkpoint. Weekly limit96% may precede5hour23%; no reset used.
+Branches/worktrees: m0-s1-money-integration42cd6e6 in m0-arabic-plurals worktree (active Standard-highfix); m0-s1-plain-export2b8c326 in managedm0-plain-export (activeTopreview); original m0-s1-money-modelsdad332e in m0-local-data preserved, do notmerge diagnostic ancestors. m0-s2-backup-focuse1ae006 in m0-ui-debug remainsunmerged. m0-command-inbox76bab3c already integrated. m0-s0-protocol-completec94488b merged. Shared mainc94488b clean.
+Next: resolve reviewed migration defects, export integration, then bounded section/gate report; M0 acceptance remainsopen.
+Next session: Standard Sol high forproduction, independentTop Sol xhigh fordata/transport fixes andgate.
+
 ## Handover — M0-T02/T04 and previous fixes — 2026-10-10 — codex (Sol)
 
 Done: resumed the board; baseline check; separate [fix-previous] commits repair Prayer tests, make legacy aging a no-op under RP1, and replace numeric middle dots under RU1. Standard-high execution and independent Sol xhigh review closed all three inbox findings (including receipt-GC/pointer replacement). Independent Standard-high shell review approved M0-T04; both scoped tasks merged. Root did not begin the next section or claim all M0 approved.
