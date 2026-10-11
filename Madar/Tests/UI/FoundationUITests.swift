@@ -36,8 +36,9 @@ import XCTest
             app.launch(); finishOnboarding(app)
             let row = app.descendants(matching: .any).matching(identifier: "foundation-prayer-time-fajr").firstMatch
             try exposeForAudit(row, in: app)
-            XCTAssertGreaterThanOrEqual(row.frame.height, 44, "Prayer focus region must reserve 44pt in layout.")
-            XCTAssertGreaterThanOrEqual(row.frame.width, 44)
+            // CGRect may report 44pt as 43.99999999999994; tolerance is far below one display pixel.
+            XCTAssertGreaterThanOrEqual(row.frame.height + 1e-9, 44, "Prayer focus region must reserve 44pt in layout.")
+            XCTAssertGreaterThanOrEqual(row.frame.width + 1e-9, 44)
             XCTAssertFalse(app.buttons["foundation-prayer-time-fajr"].exists, "The clock remains read-only.")
             attachScreenshot(app, named: "M0-focus-prayer-\(theme)-\(size)")
 
@@ -45,8 +46,8 @@ import XCTest
             app.buttons["settings-button"].tap()
             let reset = app.buttons["reset-settings"]
             try exposeForAudit(reset, in: app)
-            XCTAssertGreaterThanOrEqual(reset.frame.height, 44, "Measure the native button node, not its wrapper.")
-            XCTAssertGreaterThanOrEqual(reset.frame.width, 44)
+            XCTAssertGreaterThanOrEqual(reset.frame.height + 1e-9, 44, "Measure the native button node, not its wrapper.")
+            XCTAssertGreaterThanOrEqual(reset.frame.width + 1e-9, 44)
             let title = app.staticTexts["customization-live-preview-title"]
             try exposeForAudit(title, in: app)
             if theme == "light" { previewHeights[size] = title.frame.height }
