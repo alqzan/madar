@@ -8,7 +8,7 @@ import XCTest
             app.launchEnvironment["MADAR_UI_STORE_ID"] = UUID().uuidString
             app.launchEnvironment["MADAR_UI_SIZE"] = size
             app.launchEnvironment["MADAR_UI_THEME"] = theme
-            app.launch(); openBackupSettings(app, requirePassword: false)
+            app.launch(); openPlainExportSettings(app)
             let export = app.buttons["plain-export-now"]
             XCTAssertTrue(export.waitForExistence(timeout: 10), app.debugDescription)
             scrollTo(export, in: app)
@@ -21,7 +21,7 @@ import XCTest
             attachScreenshot(app, named: "M0-plain-export-ready-\(theme)-\(size)")
             share.tap()
             print("M0 plain export native share \(theme)/\(size):\n\(app.debugDescription)")
-            // BackupCoordinator names the portable archive Madar-<timestamp>-plain.zip.
+            // BackupCoordinator names the portable archive Madar-<date>-plain.zip.
             // Native sharing may omit the extension from the displayed item title.
             let file = app.descendants(matching: .any).matching(NSPredicate(
                 format: "label BEGINSWITH %@ AND label CONTAINS %@", "Madar-", "-plain"
@@ -299,17 +299,32 @@ import XCTest
             }
         }
     }
-    private func openBackupSettings(_ app: XCUIApplication, requirePassword: Bool = true) {
+    private func openBackupSettings(_ app: XCUIApplication) {
         finishOnboarding(app)
         app.buttons["settings-button"].tap()
         let link = app.buttons["backup-settings-link"]
         scrollTo(link, in: app)
         link.tap()
-        if requirePassword {
-            XCTAssertTrue(app.secureTextFields["backup-password"].waitForExistence(timeout: 10), app.debugDescription)
-        } else {
-            XCTAssertTrue(app.buttons["plain-export-now"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.secureTextFields["backup-password"].waitForExistence(timeout: 10), app.debugDescription)
+    }
+    private func openPlainExportSettings(_ app: XCUIApplication) {
+        finishOnboarding(app)
+        app.buttons["settings-button"].tap()
+        let link = app.buttons["backup-settings-link"]
+        scrollTo(link, in: app)
+        link.tap()
+        XCTAssertTrue(app.navigationBars["النسخ والاستعادة"].waitForExistence(timeout: 10), app.debugDescription)
+        // Form is a CollectionView in the captured AX3 hierarchy. Its offscreen cells
+        // are virtualized, so scroll before requiring the export button to exist.
+        let form = app.collectionViews.firstMatch
+        XCTAssertTrue(form.waitForExistence(timeout: 10), app.debugDescription)
+        let export = app.buttons["plain-export-now"]
+        for _ in 0..<12 {
+            if export.exists && export.isHittable { return }
+            form.swipeUp()
         }
+        XCTAssertTrue(export.exists, app.debugDescription)
+        XCTAssertTrue(export.isHittable, app.debugDescription)
     }
     private func scrollTo(_ element: XCUIElement, in app: XCUIApplication) {
         for _ in 0..<12 {
