@@ -34,17 +34,29 @@ import XCTest
         let export = app.buttons["backup-now"]
         scrollTo(password, in: app)
         password.tap()
-        attachScreenshot(app, named: "M0-backup-native-key-empty-L")
 
         // The root's focus-only capture observed this Arabic key. The software
-        // keyboard must actually be onscreen; an offscreen AX preview is insufficient.
-        let nativeKey = app.keyboards.keys["ت"]
-        guard nativeKey.waitForExistence(timeout: 3), nativeKey.isHittable,
-              app.frame.contains(nativeKey.frame) else {
+        // keyboard must actually be onscreen. During presentation, AX may expose
+        // duplicate keys, so wait for a hittable candidate rather than the first one.
+        let arabicKeys = app.keyboards.keys.matching(NSPredicate(format: "label == %@", "ت"))
+        let ready = NSPredicate { _, _ in
+            MainActor.assumeIsolated {
+                arabicKeys.allElementsBoundByIndex.contains {
+                    $0.exists && $0.isHittable && app.frame.contains($0.frame)
+                }
+            }
+        }
+        let readiness = XCTNSPredicateExpectation(predicate: ready, object: nil)
+        guard XCTWaiter.wait(for: [readiness], timeout: 10) == .completed,
+              let nativeKey = arabicKeys.allElementsBoundByIndex.first(where: {
+                  $0.exists && $0.isHittable && app.frame.contains($0.frame)
+              }) else {
+            attachScreenshot(app, named: "M0-backup-native-key-unready-L")
             print("M0 native Arabic key unavailable:\n\(app.debugDescription)")
             XCTFail("Show the Arabic software keyboard and disable simulated hardware keyboard before this probe.")
             return
         }
+        attachScreenshot(app, named: "M0-backup-native-key-empty-L")
 
         nativeKey.tap()
         let afterNativeTap = export.value as? String
