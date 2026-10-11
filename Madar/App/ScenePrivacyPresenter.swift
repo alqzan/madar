@@ -129,7 +129,7 @@ private struct ScenePrivacyCover: View {
     @Bindable var controller: MadarLockController
     var body: some View {
         VStack(spacing: 20) {
-            Image(systemName: "lock.closed").font(.largeTitle).accessibilityHidden(true)
+            Image(systemName: "lock").font(.largeTitle).accessibilityHidden(true)
             Text("محتوى مدار محمي")
             if !controller.authenticating { Button("افتح القفل") { controller.authenticate(for: .app) }.accessibilityIdentifier("scene-lock-authenticate") }
         }.frame(maxWidth: .infinity, maxHeight: .infinity).background(.background)
