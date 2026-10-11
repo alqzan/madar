@@ -44,3 +44,16 @@ Not run: Xcode/app/package builds (production unchanged), simulator/UI/VoiceOver
 Independent Top review `946c87d` identified that an extra same-package Main → Helper dependency could disappear from enumeration. A separate tooling-only fix now validates each root target's dependency declaration before accepting its source/resource scope: current literal dependencies whose package products are already enumerated by PBX are supported, and the expressly excluded pinned Adhan product is recognized. Additional same-package targets, computed dependency lists, unknown package products and other product/target/conditional expression forms fail closed with a scope-support error. This intentionally bounds the parser to supported manifests rather than claiming a complete SwiftPM graph evaluator.
 
 New negative fixtures reproduce Main → Helper, place a known red-colour violation in Helper/File.swift and require `build_files` to reject the incomplete scope. Unsupported/computed dependency forms are also rejected. Actual `python3 -m unittest discover -s Madar/scripts/tests -v` → `Ran 10 tests ... OK`. Re-running the complete checker on this preserved T11 baseline still produces exactly the two known backup RU3 findings, with 60 sources/one catalog/38 pairs/418 manual lines; T13 is a separate branch and was not folded into this finding fix. No production file changed. `git diff --check` passes. Next is fresh fix-only review of this dependency guard; root integrates and rechecks against accepted T13 later.
+
+## Final integrated root check — 2026-10-11
+
+Top dependency-boundary repair54579a3/3ade5a5 independently approveda399b1f; merged main3b273b5. T13 production fixes are now present. Actual current-main output:
+
+```text
+Ran 12 tests in 0.008s
+OK
+STATIC PASS: 60 shipping Swift files, 1 catalogs, 38 independently measured M0 token pairs
+MANUAL TRACE REQUIRED: 420 source lines; no complete string/key/colour/action or M0 acceptance claim
+```
+
+Normal checker exit0; strict --require-complete exit2, expected while manual coverage remains. The two historical backup RU3 findings above are closed by T13, not open current-main defects. Full trace size420 is an inventory, not a defect count. JSONs can be regenerated; current raw outputs /tmp/madar-final-shipping.json and /tmp/madar-final-shipping-complete.json. No production changes or repeated app/package run were needed for this tooling-only merge.
