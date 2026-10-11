@@ -83,6 +83,7 @@ public struct CustomizationTemplate<Preview: View, Content: View>: View {
             }
             .padding(16).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }
+        .scrollEdgeEffectHidden()
         .background(theme.background).foregroundStyle(theme.ink)
     }
 }
