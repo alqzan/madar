@@ -31,6 +31,46 @@ import Darwin
         do { return try await exportUnderLease(kind:kind,passphrase:passphrase,progress:progress,cancellation:cancellation,now:now) }
         catch { try? recordFailure(error); throw error }
     }
+    /// Captures logical rows under the same app writer barrier as encrypted backups.
+    /// The share URL points to a dedicated ZIP, never to a live managed generation.
+    public func exportPlain(progress: @escaping @Sendable (BackupProgress) -> Void = { _ in }, cancellation: BackupCancellation = BackupCancellation(), now: Date = Date()) async throws -> URL {
+        let lease = try await beginOperation()
+        defer { finishOperation(lease: lease) }
+        try cancellation.check()
+        let rows = try currentRecords()
+        try RecordValidator.validate(rows); try BackupCodec.validateTypedRows(rows)
+        let directory = backupDirectory.appendingPathComponent("PlainExports").appendingPathComponent(UUID().uuidString)
+        return try await background(cancellation) {
+            let bytes = try PortableExportCodec.export(records: rows, now: now, cancellation: cancellation)
+            _ = try PortableExportCodec.validateContents(bytes, cancellation: cancellation)
+            let formatter = ISO8601DateFormatter(); formatter.formatOptions = [.withFullDate]
+            let destination = directory.appendingPathComponent("Madar-\(formatter.string(from: now))-plain.zip")
+            let partial = directory.appendingPathComponent("Export.partial")
+            var completed = false
+            defer { if !completed { try? FileManager.default.removeItem(at: directory) } }
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+            var attributes: [FileAttributeKey: Any] = [.posixPermissions: 0o600]
+            #if os(iOS)
+            attributes[.protectionKey] = FileProtectionType.complete
+            #endif
+            guard FileManager.default.createFile(atPath: partial.path, contents: nil, attributes: attributes) else { throw DataError.invalidBackup }
+            let handle = try FileHandle(forWritingTo: partial)
+            do {
+                var offset = 0
+                while offset < bytes.count {
+                    try cancellation.check()
+                    let end = min(offset + 64 * 1024, bytes.count)
+                    try handle.write(contentsOf: bytes.subdata(in: offset..<end)); offset = end
+                    progress(.init(phase: .writing, completedUnits: Int64(offset), totalUnits: Int64(bytes.count)))
+                }
+                try handle.synchronize(); try handle.close(); try cancellation.check()
+                guard rename(partial.path, destination.path) == 0 else { throw DataError.invalidBackup }
+            } catch { try? handle.close(); throw error }
+            completed = true
+            progress(.init(phase: .completed, completedUnits: 1, totalUnits: 1))
+            return destination
+        }
+    }
     public func preview(file: URL, passphrase: String, progress: @escaping @Sendable (BackupProgress) -> Void = { _ in }, cancellation: BackupCancellation = BackupCancellation()) async throws -> RestorePreview {
         let value = try await background(cancellation) {
             try cancellation.check(); let data = try Self.readBounded(file)
