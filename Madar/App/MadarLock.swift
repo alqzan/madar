@@ -46,6 +46,7 @@ struct PrivacyAuthorization {
     private let service: any MadarLockService
     private let clock: @MainActor () -> Date
     private let authenticator: @MainActor () -> any MadarDeviceAuthenticator
+    private let authorizationCommitBoundary: @MainActor () -> Void
     private var currentAuth: (UUID, any MadarDeviceAuthenticator)?
     private var backgroundAt: Date?
     private var authorizedFeatures: Set<MadarProtectedFeature> = []
@@ -63,8 +64,10 @@ struct PrivacyAuthorization {
     private var stateObservers: [UUID: @MainActor () -> Void] = [:]
     private var revokeObservers: [UUID: @MainActor (Bool) -> Void] = [:]
     init(scope: MadarLockScope, service: any MadarLockService, clock: @escaping @MainActor () -> Date = Date.init,
-         authenticator: @escaping @MainActor () -> any MadarDeviceAuthenticator = { SystemDeviceAuthenticator() }) {
+         authenticator: @escaping @MainActor () -> any MadarDeviceAuthenticator = { SystemDeviceAuthenticator() },
+         authorizationCommitBoundary: @escaping @MainActor () -> Void = {}) {
         self.scope = scope; self.service = service; self.clock = clock; self.authenticator = authenticator
+        self.authorizationCommitBoundary = authorizationCommitBoundary
     }
     private func requiredFeature(for feature: MadarProtectedFeature) -> MadarProtectedFeature? {
         if feature == .privateNote { return .privateNote }
@@ -172,7 +175,14 @@ struct PrivacyAuthorization {
             try await bind(features) { [self] in
                 currentAuth?.0 == id && generation == stamp && !disconnected && phase == .active && epoch == activeEpoch
             }
+            // Controlled host seam for the child-completion/caller-resumption
+            // boundary. Production has no override and never skips the checks.
+            authorizationCommitBoundary()
             try current()
+            guard phase == .active, epoch == activeEpoch else {
+                covered = true; revoke(cancelRequests: false); enqueueRedaction()
+                throw PrivacyAuthorizationError.stale
+            }
             unlocked.formUnion(needed); authorizedFeatures.formUnion(features); redactionFailed = false; scopePresentationRevoked = false; covered = false; notify()
             return .init(owner: identity, generation: generation, epoch: epoch, features: features)
         } catch {

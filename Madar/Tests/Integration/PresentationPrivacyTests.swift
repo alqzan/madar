@@ -52,6 +52,22 @@ import UIKit
         }
     }
 
+    func test_M0P1a_inactiveAtAuthorizationCommitRejectsAndCleansBinding() async throws {
+        let service = Service()
+        var observed: MadarLockController?
+        var interrupt = true
+        let lock = MadarLockController(scope: .app, service: service, authenticator: { Authenticator() }, authorizationCommitBoundary: {
+            if interrupt { interrupt = false; observed?.sceneChanged(.inactive) }
+        })
+        observed = lock
+        do { _ = try await lock.authorize([.app]); XCTFail("Inactive completion committed authorization") } catch { }
+        XCTAssertTrue(lock.covered); XCTAssertTrue(lock.unlocked.isEmpty); XCTAssertFalse(lock.canPresent(.app))
+        try await waitUntil { service.bindings.isEmpty && service.purges > 0 }
+        lock.sceneChanged(.active)
+        let fresh = try await lock.authorize([.app])
+        XCTAssertEqual(service.bindings, [.app]); XCTAssertNoThrow(try lock.validate(fresh))
+    }
+
     private func scopeLifecycleProbe(disconnect: Bool, outcome: Int, cancel: Bool = false) async throws {
         guard let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first else {
             throw XCTSkip("Requires an app-host UIWindowScene")
