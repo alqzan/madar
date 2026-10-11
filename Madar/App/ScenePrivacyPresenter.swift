@@ -12,7 +12,11 @@ import UIKit
     private var stateID: UUID?
     private var activity: UIActivityViewController?
     private var activityID: UUID?
-    init(controller: MadarLockController) { self.controller = controller }
+    private let activationState: @MainActor (UIWindowScene) -> UIScene.ActivationState
+    init(controller: MadarLockController,
+         activationState: @escaping @MainActor (UIWindowScene) -> UIScene.ActivationState = { $0.activationState }) {
+        self.controller = controller; self.activationState = activationState
+    }
     func attach(to window: UIWindow) {
         guard let owningScene = window.windowScene else { return }
         guard scene !== owningScene else { hostWindow = window; return }
@@ -43,7 +47,24 @@ import UIKit
                 self.coverNow(); self.controller.receiveScope(scope)
             }
         })
-        transition(owningScene.activationState == .foregroundActive ? .active : .inactive)
+        for name in [Notification.Name.madarPrivacyScopeWillChange, .madarPrivacyScopeChangeFailed] {
+            notifications.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] note in
+                let sourceID = (note.object as? MadarLockController).map(ObjectIdentifier.init)
+                MainActor.assumeIsolated {
+                    guard let self, sourceID != ObjectIdentifier(self.controller) else { return }
+                    self.coverNow(); self.dismissActivity()
+                    if name == .madarPrivacyScopeWillChange { self.controller.receiveScopeRevocation() }
+                    else { self.controller.receiveScopeFailure() }
+                }
+            })
+        }
+        switch activationState(owningScene) {
+        case .foregroundActive: transition(.active)
+        case .foregroundInactive: transition(.inactive)
+        case .background: transition(.background)
+        case .unattached: transition(.background); controller.lock()
+        @unknown default: transition(.background); controller.lock()
+        }
         synchronize()
     }
     private func observe(_ name: Notification.Name, phase: ScenePhase) {

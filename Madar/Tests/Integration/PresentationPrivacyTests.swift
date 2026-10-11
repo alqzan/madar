@@ -7,9 +7,23 @@ import UIKit
     private final class Service: MadarLockService {
         var bindings: [MadarProtectedFeature] = []
         var purges = 0
+        var delayNextBinding = false
+        var bindingContinuation: CheckedContinuation<Void, Never>?
+        var delayScope = false
+        var scopeContinuation: CheckedContinuation<Void, Error>?
+        var bindingHook: (@MainActor () -> Void)?
         func redactProtectedData() async throws { purges += 1; bindings.removeAll() }
-        func authorizeAccess(to feature: MadarProtectedFeature) async throws { bindings.append(feature) }
-        func privacyScopeDidChange(to scope: MadarLockScope) async throws { }
+        func authorizeAccess(to feature: MadarProtectedFeature) async throws {
+            if delayNextBinding {
+                delayNextBinding = false
+                await withCheckedContinuation { bindingContinuation = $0 }
+            }
+            bindings.append(feature)
+            bindingHook?()
+        }
+        func privacyScopeDidChange(to scope: MadarLockScope) async throws {
+            if delayScope { try await withCheckedThrowingContinuation { scopeContinuation = $0 } }
+        }
     }
     private final class Authenticator: MadarDeviceAuthenticator {
         var calls = 0
@@ -24,6 +38,176 @@ import UIKit
         func invalidate() { invalidations += 1 }
     }
     private func settle() async { for _ in 0..<30 { await Task.yield() } }
+    private enum HarnessError: Error { case timeout, persistenceFailed }
+    private func waitUntil(_ predicate: @MainActor () -> Bool) async throws {
+        let deadline = ContinuousClock.now.advanced(by: .seconds(3))
+        while !predicate() {
+            guard ContinuousClock.now < deadline else { throw HarnessError.timeout }
+            await Task.yield()
+        }
+    }
+
+    func test_M0P1a_lateBackgroundAttachmentStartsStableLeaseAtObservedBoundary() async throws {
+        guard let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first else {
+            throw XCTSkip("Requires an app-host UIWindowScene")
+        }
+        for elapsed: TimeInterval in [59, 60] {
+            var now = Date(timeIntervalSince1970: 2_000)
+            let auth = Authenticator()
+            let lock = MadarLockController(scope: .app, service: Service(), clock: { now }, authenticator: { auth })
+            _ = try await lock.authorize([.app])
+            let window = UIWindow(windowScene: scene); window.rootViewController = UIViewController()
+            let presenter = ScenePrivacyPresenter(controller: lock, activationState: { owning in
+                XCTAssertTrue(owning === scene); return .background
+            })
+            presenter.attach(to: window)
+            defer { presenter.detach() }
+            XCTAssertTrue(lock.covered)
+            now = now.addingTimeInterval(50); presenter.transition(.background)
+            now = Date(timeIntervalSince1970: 2_000 + elapsed); presenter.transition(.active)
+            try await waitUntil { !lock.covered }
+            XCTAssertEqual(lock.canPresent(.app), elapsed < 60)
+            XCTAssertEqual(auth.calls, 1)
+        }
+    }
+
+    func test_M0P1a_lateBackgroundAttachmentInvalidatesPendingAuthAndUnattachedClearsLease() async throws {
+        guard let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first else {
+            throw XCTSkip("Requires an app-host UIWindowScene")
+        }
+        let auth = Authenticator(); auth.delayed = true
+        let service = Service()
+        let lock = MadarLockController(scope: .app, service: service, authenticator: { auth })
+        let old = Task { try await lock.authorize([.app]) }
+        try await waitUntil { auth.continuation != nil }
+        let window = UIWindow(windowScene: scene); window.rootViewController = UIViewController()
+        let presenter = ScenePrivacyPresenter(controller: lock, activationState: { _ in .background })
+        presenter.attach(to: window)
+        defer { presenter.detach() }
+        XCTAssertEqual(auth.invalidations, 1); XCTAssertTrue(lock.covered)
+        auth.continuation?.resume(returning: true); auth.continuation = nil
+        do { _ = try await old.value; XCTFail("Background attachment accepted late auth") } catch { }
+        XCTAssertTrue(service.bindings.isEmpty)
+        let other = MadarLockController(scope: .app, service: Service(), authenticator: { Authenticator() })
+        _ = try await other.authorize([.app])
+        let unattached = ScenePrivacyPresenter(controller: other, activationState: { _ in .unattached })
+        unattached.attach(to: window)
+        defer { unattached.detach() }
+        XCTAssertTrue(other.covered); XCTAssertTrue(other.unlocked.isEmpty)
+        unattached.transition(.active); try await waitUntil { !other.covered }
+        XCTAssertFalse(other.canPresent(.app))
+    }
+
+    func test_M0P1a_cancelledVerifierReleasesRequestWithoutWaitingForLateResult() async throws {
+        let first = Authenticator(), second = Authenticator(), service = Service(); first.delayed = true
+        var next = first
+        let lock = MadarLockController(scope: .app, service: service, authenticator: { next })
+        let old = Task { try await lock.authorize([.app]) }
+        try await waitUntil { first.continuation != nil }
+        old.cancel()
+        try await waitUntil { first.invalidations == 1 && !lock.authenticating }
+        next = second
+        let ticket = try await lock.authorize([.app])
+        first.continuation?.resume(returning: true); first.continuation = nil
+        do { _ = try await old.value; XCTFail("Cancelled request succeeded") } catch { }
+        XCTAssertEqual(service.bindings, [.app]); XCTAssertNoThrow(try lock.validate(ticket))
+        XCTAssertFalse(lock.covered)
+    }
+
+    func test_M0P1a_cancelledInactiveWaiterIsWokenAndNewRequestCanAuthorize() async throws {
+        let auth = Authenticator(); auth.delayed = true
+        let lock = MadarLockController(scope: .app, service: Service(), authenticator: { auth })
+        let old = Task { try await lock.authorize([.app]) }
+        try await waitUntil { auth.continuation != nil }
+        lock.sceneChanged(.inactive)
+        auth.continuation?.resume(returning: true); auth.continuation = nil
+        await settle(); XCTAssertTrue(lock.authenticating)
+        old.cancel()
+        try await waitUntil { auth.invalidations == 1 && !lock.authenticating }
+        // The old task finishes while the scene is still inactive, without an active notification.
+        do { _ = try await old.value; XCTFail("Cancelled inactive waiter succeeded") } catch { }
+        auth.delayed = false; lock.sceneChanged(.active)
+        let ticket = try await lock.authorize([.app])
+        XCTAssertNoThrow(try lock.validate(ticket)); XCTAssertEqual(auth.calls, 2)
+    }
+
+    func test_M0P1a_cancellationAtBindingCompletionPurgesBeforeNewBinding() async throws {
+        let service = Service()
+        let lock = MadarLockController(scope: .app, service: service, authenticator: { Authenticator() })
+        var request: Task<PrivacyAuthorization, Error>?
+        service.bindingHook = { request?.cancel() }
+        request = Task { try await lock.authorize([.app]) }
+        do { _ = try await request?.value; XCTFail("Cancellation at binding completion succeeded") } catch { }
+        service.bindingHook = nil
+        try await waitUntil { service.purges > 0 && service.bindings.isEmpty && !lock.authenticating }
+        XCTAssertFalse(lock.canPresent(.app))
+        let fresh = try await lock.authorize([.app])
+        XCTAssertEqual(service.bindings, [.app]); XCTAssertNoThrow(try lock.validate(fresh))
+    }
+
+    func test_M0P1a_scopeChangeImmediatelyRevokesOtherScene() async throws {
+        guard let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first else {
+            throw XCTSkip("Requires an app-host UIWindowScene")
+        }
+        let firstService = Service(); firstService.delayScope = true
+        let first = MadarLockController(scope: .app, service: firstService, authenticator: { Authenticator() })
+        let second = MadarLockController(scope: .app, service: Service(), authenticator: { Authenticator() })
+        let firstWindow = UIWindow(windowScene: scene), secondWindow = UIWindow(windowScene: scene)
+        firstWindow.rootViewController = UIViewController(); secondWindow.rootViewController = UIViewController()
+        let firstPresenter = ScenePrivacyPresenter(controller: first), secondPresenter = ScenePrivacyPresenter(controller: second)
+        firstPresenter.attach(to: firstWindow); secondPresenter.attach(to: secondWindow)
+        firstPresenter.transition(.active); secondPresenter.transition(.active)
+        defer { firstPresenter.detach(); secondPresenter.detach() }
+        _ = try await first.authorize([.app])
+        let ticket = try await second.authorize([.app])
+        // Observer runs synchronously in the sender's pre-await notification prefix.
+        var revokedBeforePersistence = false
+        let observer = second.observeRevocation { _ in
+            revokedBeforePersistence = second.covered && firstService.scopeContinuation == nil
+        }
+        defer { second.removeObserver(observer) }
+        let request = Task { try await first.changeScope(.notesOnly) }
+        try await waitUntil { firstService.scopeContinuation != nil }
+        XCTAssertTrue(revokedBeforePersistence); XCTAssertTrue(second.covered)
+        XCTAssertFalse(try XCTUnwrap(secondPresenter.coverWindow).isHidden)
+        XCTAssertThrowsError(try second.validate(ticket)); XCTAssertEqual(second.scope, .app)
+        firstService.scopeContinuation?.resume(throwing: HarnessError.persistenceFailed); firstService.scopeContinuation = nil
+        do { try await request.value; XCTFail("Persistence unexpectedly succeeded") } catch { }
+        await settle(); XCTAssertTrue(second.covered); XCTAssertTrue(second.redactionFailed)
+        XCTAssertEqual(second.scope, .app); XCTAssertThrowsError(try second.validate(ticket))
+    }
+
+    func test_M0P1a_staleVerifierCannotPurgeNewAuthorization() async throws {
+        let first = Authenticator(), second = Authenticator(), service = Service(); first.delayed = true
+        var next = first
+        let lock = MadarLockController(scope: .app, service: service, authenticator: { next })
+        let old = Task { try await lock.authorize([.app]) }
+        await settle(); XCTAssertNotNil(first.continuation)
+        lock.sceneChanged(.background); lock.sceneChanged(.active)
+        next = second
+        let ticket = try await lock.authorize([.app])
+        let purges = service.purges
+        first.continuation?.resume(returning: true); first.continuation = nil
+        do { _ = try await old.value; XCTFail("Stale verifier succeeded") } catch { }
+        await settle()
+        XCTAssertEqual(service.purges, purges); XCTAssertEqual(service.bindings, [.app])
+        XCTAssertFalse(lock.covered); XCTAssertNoThrow(try lock.validate(ticket))
+    }
+
+    func test_M0P1a_staleBindingCleanupPrecedesNewAuthorization() async throws {
+        let service = Service(); service.delayNextBinding = true
+        let lock = MadarLockController(scope: .app, service: service, authenticator: { Authenticator() })
+        let old = Task { try await lock.authorize([.app]) }
+        await settle(); XCTAssertNotNil(service.bindingContinuation)
+        lock.sceneChanged(.background); lock.sceneChanged(.active)
+        let fresh = Task { try await lock.authorize([.app]) }
+        await settle(); XCTAssertTrue(lock.covered); XCTAssertTrue(service.bindings.isEmpty)
+        service.bindingContinuation?.resume(); service.bindingContinuation = nil
+        do { _ = try await old.value; XCTFail("Stale binding succeeded") } catch { }
+        let ticket = try await fresh.value
+        XCTAssertEqual(service.bindings, [.app]); XCTAssertFalse(lock.covered)
+        XCTAssertNoThrow(try lock.validate(ticket)); XCTAssertGreaterThan(service.purges, 0)
+    }
 
     func testPrivateNoteAlwaysRequiresDeviceAuthenticationAndTicketHasSceneOwner() async throws {
         let auth = Authenticator(), service = Service()

@@ -52,8 +52,9 @@ struct PrivacyAuthorization {
     private var epoch = 0
     private var phase: ScenePhase = .active
     private var disconnected = false
+    private var scopeTransitionPending = false
     private var redactionTask: Task<Void, Error>?
-    private var activeWaiters: [CheckedContinuation<Void, Never>] = []
+    private var activeWaiters: [UUID: CheckedContinuation<Void, Never>] = [:]
     private var stateObservers: [UUID: @MainActor () -> Void] = [:]
     private var revokeObservers: [UUID: @MainActor (Bool) -> Void] = [:]
     init(scope: MadarLockScope, service: any MadarLockService, clock: @escaping @MainActor () -> Date = Date.init,
@@ -68,7 +69,7 @@ struct PrivacyAuthorization {
     }
     func requiresProtection(_ feature: MadarProtectedFeature) -> Bool { requiredFeature(for: feature) != nil }
     func canPresent(_ feature: MadarProtectedFeature) -> Bool {
-        guard phase == .active, !disconnected, !covered, !redactionFailed else { return false }
+        guard phase == .active, !disconnected, !covered, !redactionFailed, !scopeTransitionPending else { return false }
         return requiredFeature(for: feature).map { unlocked.contains($0) } ?? true
     }
     func validate(_ ticket: PrivacyAuthorization) throws {
@@ -84,23 +85,70 @@ struct PrivacyAuthorization {
     }
     private func invalidateAuth() {
         currentAuth?.1.invalidate(); currentAuth = nil; authenticating = false
-        let waiters = activeWaiters; activeWaiters.removeAll(); for waiter in waiters { waiter.resume() }
+        let waiters = activeWaiters; activeWaiters.removeAll(); for waiter in waiters.values { waiter.resume() }
+    }
+    private func cancelAuthorization(_ id: UUID) {
+        guard currentAuth?.0 == id else { return }
+        generation += 1; covered = true; invalidateAuth()
+        revoke(cancelRequests: true); enqueueRedaction(); recoverActive()
     }
     private func enqueueRedaction() {
         let previous = redactionTask
         redactionTask = Task { [service] in _ = try? await previous?.value; try await service.redactProtectedData() }
     }
+    /// All service mutations share the same queue. A stale binding is purged
+    /// under the cover before any newer binding can start.
+    private func bind(_ features: Set<MadarProtectedFeature>, valid: @escaping @MainActor () -> Bool) async throws {
+        let previous = redactionTask
+        let operation = Task { [self] in
+            try await previous?.value
+            guard valid() else { throw PrivacyAuthorizationError.stale }
+            var started = false
+            do {
+                for feature in features {
+                    guard valid() else { throw PrivacyAuthorizationError.stale }
+                    started = true
+                    try await service.authorizeAccess(to: feature)
+                    guard valid() else { throw PrivacyAuthorizationError.stale }
+                }
+            } catch {
+                if started {
+                    covered = true; revoke(cancelRequests: false)
+                    do { try await service.redactProtectedData() }
+                    catch { redactionFailed = true; notify(); throw error }
+                }
+                throw error
+            }
+        }
+        redactionTask = operation
+        try await operation.value
+    }
     func authorize(_ features: Set<MadarProtectedFeature>) async throws -> PrivacyAuthorization {
-        guard phase == .active, !disconnected else { throw PrivacyAuthorizationError.stale }
+        guard phase == .active, !disconnected, !scopeTransitionPending else { throw PrivacyAuthorizationError.stale }
         guard currentAuth == nil else { throw PrivacyAuthorizationError.busy }
         let id = UUID(), stamp = generation
         let needed = Set(features.compactMap { requiredFeature(for: $0) })
         let device = authenticator(); currentAuth = (id, device)
-        defer { if currentAuth?.0 == id { currentAuth = nil; authenticating = false; notify(); if covered && phase == .active { recoverActive() } } }
+        defer {
+            // Cancellation can win immediately after a completed service binding,
+            // before its asynchronously dispatched handler reaches the actor.
+            if Task.isCancelled { cancelAuthorization(id) }
+            if currentAuth?.0 == id { currentAuth = nil; authenticating = false; notify(); if covered && phase == .active { recoverActive() } }
+        }
+        return try await withTaskCancellationHandler {
+            try await performAuthorization(features, id: id, stamp: stamp, needed: needed, device: device)
+        } onCancel: {
+            Task { @MainActor [weak self] in self?.cancelAuthorization(id) }
+        }
+    }
+    private func performAuthorization(_ features: Set<MadarProtectedFeature>, id: UUID, stamp: Int,
+                                      needed: Set<MadarProtectedFeature>, device: any MadarDeviceAuthenticator) async throws -> PrivacyAuthorization {
         func current() throws {
-            guard !Task.isCancelled, currentAuth?.0 == id, generation == stamp, !disconnected else { throw PrivacyAuthorizationError.stale }
+            try Task.checkCancellation()
+            guard currentAuth?.0 == id, generation == stamp, !disconnected else { throw PrivacyAuthorizationError.stale }
         }
         do {
+            try current()
             if !needed.isSubset(of: unlocked) {
                 authenticating = true; statusMessage = nil; notify()
                 guard try await device.verify() else { throw PrivacyAuthorizationError.refused }
@@ -108,24 +156,22 @@ struct PrivacyAuthorization {
             }
             // LA may temporarily deactivate its owning scene. Keep this request through that
             // transition, but background/scope/disconnect invalidates it and wakes the waiter.
-            while phase != .active { await withCheckedContinuation { activeWaiters.append($0) }; try current() }
+            while phase != .active { await withCheckedContinuation { activeWaiters[id] = $0 }; try current() }
             if redactionFailed { enqueueRedaction() }
             try await redactionTask?.value; try current()
             guard phase == .active else { throw PrivacyAuthorizationError.stale }
             let activeEpoch = epoch
-            for feature in features {
-                try await service.authorizeAccess(to: feature); try current()
-                guard phase == .active, epoch == activeEpoch else { throw PrivacyAuthorizationError.stale }
+            try await bind(features) { [self] in
+                currentAuth?.0 == id && generation == stamp && !disconnected && phase == .active && epoch == activeEpoch
             }
+            try current()
             unlocked.formUnion(needed); authorizedFeatures.formUnion(features); redactionFailed = false; covered = false; notify()
             return .init(owner: identity, generation: generation, epoch: epoch, features: features)
         } catch {
             if currentAuth?.0 == id {
                 statusMessage = "لم يُفتح القفل. يمكنك المحاولة مرة أخرى."
                 if !(error is PrivacyAuthorizationError) && !(error is CancellationError) { redactionFailed = true; covered = true; notify() }
-                // A service can finish rebinding after revocation; serialize another purge.
-                enqueueRedaction()
-            } else { enqueueRedaction() }
+            }
             throw error
         }
     }
@@ -138,18 +184,34 @@ struct PrivacyAuthorization {
         revoke(cancelRequests: true); enqueueRedaction(); recoverActive()
     }
     func changeScope(_ newScope: MadarLockScope) async throws {
+        scopeTransitionPending = true
         generation += 1; invalidateAuth(); unlocked.removeAll(); authorizedFeatures.removeAll(); covered = true
-        let stamp = generation; revoke(cancelRequests: true); enqueueRedaction()
+        let stamp = generation; revoke(cancelRequests: true)
+        // Every scene revokes before the first suspension, independently of persistence.
+        NotificationCenter.default.post(name: .madarPrivacyScopeWillChange, object: self)
+        enqueueRedaction()
         do {
             try await redactionTask?.value
             guard generation == stamp, !disconnected else { throw PrivacyAuthorizationError.stale }
             try await service.privacyScopeDidChange(to: newScope)
             guard generation == stamp, !disconnected else { throw PrivacyAuthorizationError.stale }
-            scope = newScope; redactionFailed = false; recoverActive()
+            scope = newScope; scopeTransitionPending = false; redactionFailed = false; recoverActive()
             NotificationCenter.default.post(name: .madarPrivacyScopeChanged, object: self, userInfo: ["scope": newScope.rawValue])
-        } catch { redactionFailed = true; notify(); throw error }
+        } catch {
+            if generation == stamp {
+                scopeTransitionPending = false; redactionFailed = true; covered = true; notify()
+                NotificationCenter.default.post(name: .madarPrivacyScopeChangeFailed, object: self)
+            }
+            throw error
+        }
     }
-    func receiveScope(_ newScope: MadarLockScope) { scope = newScope; lock() }
+    func receiveScopeRevocation() {
+        scopeTransitionPending = true
+        generation += 1; invalidateAuth(); unlocked.removeAll(); authorizedFeatures.removeAll(); covered = true
+        revoke(cancelRequests: true); enqueueRedaction()
+    }
+    func receiveScopeFailure() { scopeTransitionPending = false; redactionFailed = true; covered = true; notify() }
+    func receiveScope(_ newScope: MadarLockScope) { scopeTransitionPending = false; scope = newScope; lock() }
     func disconnect() { disconnected = true; epoch += 1; phase = .background; lock() }
     func sceneChanged(_ next: ScenePhase, now: Date? = nil) {
         guard !disconnected, next != phase else { return }
@@ -163,24 +225,24 @@ struct PrivacyAuthorization {
         case .active:
             let expired = backgroundAt.map { (now ?? clock()).timeIntervalSince($0) >= 60 } ?? false
             backgroundAt = nil
-            let waiters = activeWaiters; activeWaiters.removeAll(); for waiter in waiters { waiter.resume() }
+            let waiters = activeWaiters; activeWaiters.removeAll(); for waiter in waiters.values { waiter.resume() }
             if expired { lock() } else { recoverActive() }
         @unknown default: lock()
         }
     }
     private func recoverActive() {
-        guard phase == .active, !disconnected else { return }
+        guard phase == .active, !disconnected, !scopeTransitionPending else { return }
         let stamp = generation, activeEpoch = epoch
         Task { [self] in
             do {
                 try await redactionTask?.value
-                guard generation == stamp, epoch == activeEpoch, phase == .active, !disconnected else { return }
+                guard generation == stamp, epoch == activeEpoch, phase == .active, !disconnected, !scopeTransitionPending else { return }
                 // The auth request owns its binding and exposure commit.
                 guard currentAuth == nil else { return }
-                for feature in authorizedFeatures {
-                    try await service.authorizeAccess(to: feature)
-                    guard generation == stamp, epoch == activeEpoch, phase == .active, !disconnected else { enqueueRedaction(); return }
+                try await bind(authorizedFeatures) { [self] in
+                    generation == stamp && epoch == activeEpoch && phase == .active && !disconnected && currentAuth == nil
                 }
+                guard generation == stamp, epoch == activeEpoch, phase == .active, !disconnected else { return }
                 redactionFailed = false; covered = false; notify()
             } catch {
                 guard generation == stamp, epoch == activeEpoch else { return }
@@ -189,7 +251,11 @@ struct PrivacyAuthorization {
         }
     }
 }
-extension Notification.Name { static let madarPrivacyScopeChanged = Notification.Name("MadarPrivacyScopeChanged") }
+extension Notification.Name {
+    static let madarPrivacyScopeWillChange = Notification.Name("MadarPrivacyScopeWillChange")
+    static let madarPrivacyScopeChanged = Notification.Name("MadarPrivacyScopeChanged")
+    static let madarPrivacyScopeChangeFailed = Notification.Name("MadarPrivacyScopeChangeFailed")
+}
 
 /// Caller must not fetch protected rows before canPresent succeeds. This closure is evaluated only after the guard.
 struct MadarLockGate<Content: View>: View {
