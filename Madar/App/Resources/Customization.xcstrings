@@ -1,6 +1,134 @@
 {
   "sourceLanguage" : "ar",
   "strings" : {
+    "backup.restored" : {
+      "comment" : "Backup records: argument 1 chooses the Arabic plural; argument 2 supplies core.numerals display digits.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%#@count@"
+          },
+          "substitutions" : {
+            "count" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "zero" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "لم تُستعد أي سجلات."
+                    }
+                  },
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "استُعيد سجل واحد."
+                    }
+                  },
+                  "two" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "استُعيد سجلان."
+                    }
+                  },
+                  "few" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "استُعيدت %2$@ سجلات."
+                    }
+                  },
+                  "many" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "استُعيد %2$@ سجلًّا."
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "استُعيد %2$@ سجل."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "backup.skipped" : {
+      "comment" : "Backup records: argument 1 chooses the Arabic plural; argument 2 supplies core.numerals display digits.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%#@count@"
+          },
+          "substitutions" : {
+            "count" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "zero" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "لم تُترك أي سجلات دون تطبيق."
+                    }
+                  },
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "لم يُطبّق سجل واحد."
+                    }
+                  },
+                  "two" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "لم يُطبّق سجلان."
+                    }
+                  },
+                  "few" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "لم تُطبّق %2$@ سجلات."
+                    }
+                  },
+                  "many" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "لم يُطبّق %2$@ سجلًّا."
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "لم يُطبّق %2$@ سجل."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "backup.restoreSummary" : {
+      "comment" : "Restore completion; two complete localized count sentences follow the heading.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اكتملت الاستعادة. %1$@ %2$@"
+          }
+        }
+      }
+    },
     "customization.changes" : {
       "comment" : "Customization preview: settings changed from the agreed defaults. Argument 1 selects the Arabic plural; argument 2 contains digits formatted according to core.numerals.",
       "extractionState" : "manual",

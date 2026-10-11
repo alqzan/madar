@@ -3,6 +3,7 @@ import Observation
 import SwiftUI
 import UniformTypeIdentifiers
 import MadarDesign
+import MadarCore
 
 // UI contracts intentionally expose verified backend facts, never simulated success.
 enum BackupUISchedule: String, CaseIterable, Identifiable, Sendable {
@@ -69,6 +70,7 @@ struct BackupRestoreResult: Sendable { let restoredCount: Int; let skippedCount:
     private(set) var preview: BackupRestorePreview?
     private(set) var busy = false
     private(set) var resultMessage: String?
+    private(set) var restoreResult: BackupRestoreResult?
     var errorMessage: String?
     var exportPassphrase = ""
     var exportConfirmation = ""
@@ -121,8 +123,7 @@ struct BackupRestoreResult: Sendable { let restoredCount: Int; let skippedCount:
             let result = try await service.restore(previewID: preview.id, mode: mode, progress: report)
             self.preview = nil; restorePassphrase = ""; selectedFile = nil
             if let current = try? await service.status() { status = current }
-            resultMessage = "اكتملت الاستعادة: \(arabicNumber(result.restoredCount)) سجلًّا. \(arabicNumber(result.skippedCount)) سجلًّا لم يُطبّق."
-            if !result.warnings.isEmpty { resultMessage = (resultMessage ?? "") + "\n" + result.warnings.joined(separator: "\n") }
+            restoreResult = result
         }
     }
     func dismissPreview() { preview = nil }
@@ -137,7 +138,7 @@ struct BackupRestoreResult: Sendable { let restoredCount: Int; let skippedCount:
     }
     private func run(initial: String, action: @escaping @MainActor (@escaping @MainActor @Sendable (BackupUIProgress) -> Void) async throws -> Void) {
         guard !busy else { return }
-        let id = UUID(); operationID = id; busy = true; resultMessage = nil
+        let id = UUID(); operationID = id; busy = true; resultMessage = nil; restoreResult = nil
         progress = BackupUIProgress(message: initial)
         operation = Task { [weak self] in
             guard let self else { return }
@@ -154,12 +155,16 @@ struct BackupRestoreResult: Sendable { let restoredCount: Int; let skippedCount:
 }
 
 struct BackupSettingsView: View {
+    let numerals: NumeralStyle
     @State private var model: BackupSettingsModel
     @State private var importing = false
     @State private var confirmingRestore = false
     @FocusState private var focusedPassword: Int?
     @Environment(\.roomTheme) private var theme
-    init(service: any BackupUIService) { _model = State(initialValue: BackupSettingsModel(service: service)) }
+    init(service: any BackupUIService, numerals: NumeralStyle = .hindi) {
+        self.numerals = numerals
+        _model = State(initialValue: BackupSettingsModel(service: service))
+    }
     var body: some View {
         @Bindable var model = model
         Form {
@@ -172,7 +177,8 @@ struct BackupSettingsView: View {
                     else { Text("لم تُحفظ نسخة ناجحة بعد.") }
                     if let result = status.lastResult { Text(result).foregroundStyle(theme.secondaryInk) }
                     if status.localOnly { Label("النسخة على الجهاز فقط", systemImage: "internaldrive") }
-                    Text("النسخ المحفوظة: \(arabicNumber(status.automaticCount)) تلقائية، \(arabicNumber(status.manualCount)) يدوية.")
+                    Text("النسخ المحفوظة: \(digits(status.automaticCount)) تلقائية، \(digits(status.manualCount)) يدوية.")
+                        .accessibilityIdentifier("backup-saved-counts")
                     Text("نحتفظ بآخر أربع نسخ تلقائية وكل النسخ اليدوية.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                 } else { ProgressView("يقرأ حالة النسخ…") }
             } header: { Text("النسخ الاحتياطية") } footer: { Text("النسخ المجدولة تُنفّذ حين يسمح النظام، ويمكنك النسخ يدويًا في أي وقت.") }
@@ -207,7 +213,7 @@ struct BackupSettingsView: View {
                     Button("إلغاء الإجراء", role: .cancel, action: model.cancel).accessibilityIdentifier("backup-cancel")
                 }.accessibilityIdentifier("backup-progress")
             }
-            if let result = model.resultMessage { Section { Text(result).accessibilityIdentifier("backup-result") } }
+            if let result = resultCopy { Section { Text(result).accessibilityIdentifier("backup-result") } }
         }.navigationTitle("النسخ والاستعادة")
             .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); keyboardDoneButton } }
             .task { await model.refresh() }
@@ -264,7 +270,7 @@ struct BackupSettingsView: View {
         if let first = preview.earliestDate, let last = preview.latestDate {
             Text("الفترة: \(first.formatted(.dateTime.day().month().year())) — \(last.formatted(.dateTime.day().month().year()))")
         }
-        if preview.skippedCount > 0 { Text("لم يُطبّق \(digits(preview.skippedCount)) سجلًّا.") }
+        if preview.skippedCount > 0 { Text(BackupCopy.skipped(count: preview.skippedCount, formattedCount: digits(preview.skippedCount))) }
         ForEach(preview.warnings, id: \.self) { Text($0).foregroundStyle(theme.secondaryInk) }
         Picker("طريقة الاستعادة", selection: $model.restoreMode) {
             Text("دمج").tag(BackupUIRestoreMode.merge)
@@ -273,7 +279,9 @@ struct BackupSettingsView: View {
         Text(model.restoreMode == .replace ? "سيتغيّر هذا على كل أجهزتك." : "تبقى السجلات الحالية، وتُصالح معها النسخة.").font(MadarTypography.caption())
         Button("استعد النسخة") { confirmingRestore = true }.disabled(model.busy).accessibilityIdentifier("restore-confirm")
     }
-    private func digits(_ number: Int) -> String { number.formatted(.number.locale(Locale(identifier: "ar_SA"))) }
+    private func digits(_ number: Int) -> String { MadarNumberFormatter(style: numerals).string(number) }
+    private var resultCopy: String? {
+        guard let result = model.restoreResult else { return model.resultMessage }
+        return BackupCopy.restoreSummary(result, numerals: numerals)
+    }
 }
-
-private func arabicNumber(_ number: Int) -> String { number.formatted(.number.locale(Locale(identifier: "ar_SA"))) }
