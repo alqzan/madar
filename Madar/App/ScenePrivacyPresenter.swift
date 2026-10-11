@@ -12,7 +12,11 @@ import UIKit
     private var stateID: UUID?
     private var activity: UIActivityViewController?
     private var activityID: UUID?
-    init(controller: MadarLockController) { self.controller = controller }
+    private let activationState: @MainActor (UIWindowScene) -> UIScene.ActivationState
+    init(controller: MadarLockController,
+         activationState: @escaping @MainActor (UIWindowScene) -> UIScene.ActivationState = { $0.activationState }) {
+        self.controller = controller; self.activationState = activationState
+    }
     func attach(to window: UIWindow) {
         guard let owningScene = window.windowScene else { return }
         guard scene !== owningScene else { hostWindow = window; return }
@@ -54,7 +58,13 @@ import UIKit
                 }
             })
         }
-        transition(owningScene.activationState == .foregroundActive ? .active : .inactive)
+        switch activationState(owningScene) {
+        case .foregroundActive: transition(.active)
+        case .foregroundInactive: transition(.inactive)
+        case .background: transition(.background)
+        case .unattached: transition(.background); controller.lock()
+        @unknown default: transition(.background); controller.lock()
+        }
         synchronize()
     }
     private func observe(_ name: Notification.Name, phase: ScenePhase) {

@@ -45,6 +45,57 @@ import UIKit
         }
     }
 
+    func test_M0P1a_lateBackgroundAttachmentStartsStableLeaseAtObservedBoundary() async throws {
+        guard let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first else {
+            throw XCTSkip("Requires an app-host UIWindowScene")
+        }
+        for elapsed: TimeInterval in [59, 60] {
+            var now = Date(timeIntervalSince1970: 2_000)
+            let auth = Authenticator()
+            let lock = MadarLockController(scope: .app, service: Service(), clock: { now }, authenticator: { auth })
+            _ = try await lock.authorize([.app])
+            let window = UIWindow(windowScene: scene); window.rootViewController = UIViewController()
+            let presenter = ScenePrivacyPresenter(controller: lock, activationState: { owning in
+                XCTAssertTrue(owning === scene); return .background
+            })
+            presenter.attach(to: window)
+            defer { presenter.detach() }
+            XCTAssertTrue(lock.covered)
+            now = now.addingTimeInterval(50); presenter.transition(.background)
+            now = Date(timeIntervalSince1970: 2_000 + elapsed); presenter.transition(.active)
+            try await waitUntil { !lock.covered }
+            XCTAssertEqual(lock.canPresent(.app), elapsed < 60)
+            XCTAssertEqual(auth.calls, 1)
+        }
+    }
+
+    func test_M0P1a_lateBackgroundAttachmentInvalidatesPendingAuthAndUnattachedClearsLease() async throws {
+        guard let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first else {
+            throw XCTSkip("Requires an app-host UIWindowScene")
+        }
+        let auth = Authenticator(); auth.delayed = true
+        let service = Service()
+        let lock = MadarLockController(scope: .app, service: service, authenticator: { auth })
+        let old = Task { try await lock.authorize([.app]) }
+        try await waitUntil { auth.continuation != nil }
+        let window = UIWindow(windowScene: scene); window.rootViewController = UIViewController()
+        let presenter = ScenePrivacyPresenter(controller: lock, activationState: { _ in .background })
+        presenter.attach(to: window)
+        defer { presenter.detach() }
+        XCTAssertEqual(auth.invalidations, 1); XCTAssertTrue(lock.covered)
+        auth.continuation?.resume(returning: true); auth.continuation = nil
+        do { _ = try await old.value; XCTFail("Background attachment accepted late auth") } catch { }
+        XCTAssertTrue(service.bindings.isEmpty)
+        let other = MadarLockController(scope: .app, service: Service(), authenticator: { Authenticator() })
+        _ = try await other.authorize([.app])
+        let unattached = ScenePrivacyPresenter(controller: other, activationState: { _ in .unattached })
+        unattached.attach(to: window)
+        defer { unattached.detach() }
+        XCTAssertTrue(other.covered); XCTAssertTrue(other.unlocked.isEmpty)
+        unattached.transition(.active); try await waitUntil { !other.covered }
+        XCTAssertFalse(other.canPresent(.app))
+    }
+
     func test_M0P1a_cancelledVerifierReleasesRequestWithoutWaitingForLateResult() async throws {
         let first = Authenticator(), second = Authenticator(), service = Service(); first.delayed = true
         var next = first
