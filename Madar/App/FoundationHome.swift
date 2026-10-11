@@ -54,7 +54,8 @@ private struct FoundationPrayerTimesCard: View {
                             HStack { Text(row.title); Spacer(); clock(row) }
                         }
                     }
-                    .font(MadarTypography.body()).frame(maxWidth: .infinity, alignment: .leading)
+                    .font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .contentShape(.rect)
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel(row.accessibilityLabel)
                     .accessibilityIdentifier("foundation-prayer-time-\(row.prayer.rawValue)")
@@ -119,7 +120,7 @@ struct FoundationHome: View {
                         }
                     }
                 }.padding(16).frame(maxWidth: 620).frame(maxWidth: .infinity)
-            }.background(theme.background).foregroundStyle(theme.ink)
+            }.scrollEdgeEffectHidden().background(theme.background).foregroundStyle(theme.ink)
         }
         .toolbarVisibility(.hidden, for: .navigationBar)
     }

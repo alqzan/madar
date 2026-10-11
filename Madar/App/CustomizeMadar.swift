@@ -28,19 +28,19 @@ struct CustomizeMadar: View {
                         }
                         Spacer(minLength: 8)
                         VStack(spacing: 10) {
-                            Image(systemName: "circle.hexagongrid").font(.system(size: 38)).foregroundStyle(theme.accent)
+                            Image(systemName: "circle.hexagongrid").font(.system(size: 38)).foregroundStyle(theme.accent).accessibilityHidden(true)
                             Text(session.cityName).font(MadarTypography.caption())
                         }.padding(16).background(theme.background, in: .rect(cornerRadius: 24))
                     } }
                     if dynamicType.isAccessibilitySize {
                         VStack(alignment: .leading, spacing: 8) {
                             Text(changesLabel).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("customization-changes")
-                            Button("أعِد الافتراضي") { confirmReset = true }.frame(minHeight: 44).accessibilityIdentifier("reset-settings")
+                            Button { confirmReset = true } label: { Text("أعِد الافتراضي").frame(minHeight: 44).contentShape(.rect) }.accessibilityIdentifier("reset-settings")
                         }
                     } else { HStack {
                         Text(changesLabel).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("customization-changes")
                         Spacer()
-                        Button("أعِد الافتراضي") { confirmReset = true }.frame(minHeight: 44).accessibilityIdentifier("reset-settings")
+                        Button { confirmReset = true } label: { Text("أعِد الافتراضي").frame(minHeight: 44).contentShape(.rect) }.accessibilityIdentifier("reset-settings")
                     } }
                 }
             }

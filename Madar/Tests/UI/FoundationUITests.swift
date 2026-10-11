@@ -1,6 +1,32 @@
 import XCTest
 
 @MainActor final class FoundationUITests: XCTestCase {
+    func test_M0T12_FoundationAndSettingsAccessibilityAudit() throws {
+        continueAfterFailure = true
+        for (size, theme) in [("system", "light"), ("system", "dark")] {
+            let app = XCUIApplication()
+            app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": size, "MADAR_UI_THEME": theme]
+            app.launchEnvironment.removeValue(forKey: "MADAR_UI_SIZE")
+            app.launch(); finishOnboarding(app)
+            XCTAssertTrue(app.buttons["settings-button"].waitForExistence(timeout: 15), app.debugDescription)
+            print("M0 accessibility home \(theme)/\(size)")
+            attachScreenshot(app, named: "M0-audit-home-\(theme)-\(size)")
+            try app.performAccessibilityAudit { issue in
+                print("M0 audit issue: \(issue.compactDescription); element=\(String(describing: issue.element))")
+                return false
+            }
+            app.buttons["settings-button"].tap()
+            XCTAssertTrue(app.buttons["reset-settings"].waitForExistence(timeout: 10), app.debugDescription)
+            print("M0 accessibility settings \(theme)/\(size)")
+            attachScreenshot(app, named: "M0-audit-settings-\(theme)-\(size)")
+            try app.performAccessibilityAudit { issue in
+                print("M0 audit issue: \(issue.compactDescription); element=\(String(describing: issue.element))")
+                return false
+            }
+            app.terminate()
+        }
+    }
+
     func test_M0T10_TodayPrayerTimesAtDefaultAX3AX5AndDark() throws {
         continueAfterFailure = false
         for (size, theme) in [("L", "light"), ("AX3", "light"), ("AX5", "light"), ("L", "dark")] {
