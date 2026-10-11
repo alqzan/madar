@@ -35,3 +35,13 @@ The 8 new tests cover empty exports with all 55 counts, every synced model plus 
 Also verified: `git diff --check` produced no findings.
 
 Not tested by this implementing agent: app xcodebuild and host integration execution, simulator default/AX3/dark screenshots, share-sheet/file save interaction, iPhone file protection, physical M0 gate, or independent Top review. Root owns those checks. Host test `testPlainExportUIAdapterNeedsNoPasswordAndResumesSession` was added for the actual service/session path. UI identifiers: `plain-export-now`, `plain-export-share`.
+
+## Root integration and UI acceptance — 2026-10-11
+
+Independent Top review3492af4 approved production. Two Standard attempts hit the offscreen virtualized Form test setup at AX3; dedicated Top test-only helper69b0698 repaired the setup without changing password fields or product logic.
+
+Root ran the real simulator flow at default L/light, AX3/light and L/dark: prepare ZIP, open native ShareLink, assert the ZIP title and Save to Files option, dismiss, retain the prepared share URL. `run3-plain-ui-top.log/xcresult`: Executed1 test,0failures in92.682s; ** TEST SUCCEEDED **. Root inspected ready and native-share attachments for all3 modes. Arabic RTL, wrapping and native share layout remained usable. This confirms native sharing, not a write to a Files destination. The inherited numeric middle dots in backup counts remain a separate fix-previous.
+
+Integration12b49c2 retained accepted RA4 journal/preflight/count fixes. Current integrated `swift test --package-path Madar/Packages/MadarData`:57tests in5suites passed12.652s; signed simulator app+host:18tests,0failures in3.606s, ** TEST SUCCEEDED **. Read-only amended contract lint88 passed; git diff --check clean. Logs: root Madar/Artifacts/run3-export-integrated-{data,host}.log and host.xcresult; candidate worktree Madar/Artifacts/run3-plain-ui-top.xcresult/images. No owner store was opened.
+
+T08 scoped acceptance complete. Physical iPhone file protection, complete M0 gate and Files destination write remain not tested.
