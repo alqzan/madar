@@ -8,7 +8,7 @@ import XCTest
             app.launchEnvironment["MADAR_UI_STORE_ID"] = UUID().uuidString
             app.launchEnvironment["MADAR_UI_SIZE"] = size
             app.launchEnvironment["MADAR_UI_THEME"] = theme
-            app.launch(); openBackupSettings(app)
+            app.launch(); openBackupSettings(app, requirePassword: false)
             let export = app.buttons["plain-export-now"]
             XCTAssertTrue(export.waitForExistence(timeout: 10), app.debugDescription)
             scrollTo(export, in: app)
@@ -299,13 +299,17 @@ import XCTest
             }
         }
     }
-    private func openBackupSettings(_ app: XCUIApplication) {
+    private func openBackupSettings(_ app: XCUIApplication, requirePassword: Bool = true) {
         finishOnboarding(app)
         app.buttons["settings-button"].tap()
         let link = app.buttons["backup-settings-link"]
         scrollTo(link, in: app)
         link.tap()
-        XCTAssertTrue(app.secureTextFields["backup-password"].waitForExistence(timeout: 10), app.debugDescription)
+        if requirePassword {
+            XCTAssertTrue(app.secureTextFields["backup-password"].waitForExistence(timeout: 10), app.debugDescription)
+        } else {
+            XCTAssertTrue(app.buttons["plain-export-now"].waitForExistence(timeout: 10), app.debugDescription)
+        }
     }
     private func scrollTo(_ element: XCUIElement, in app: XCUIApplication) {
         for _ in 0..<12 {
