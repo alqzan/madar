@@ -3,6 +3,7 @@ import Observation
 import SwiftUI
 import UniformTypeIdentifiers
 import MadarDesign
+import MadarCore
 
 // UI contracts intentionally expose verified backend facts, never simulated success.
 enum BackupUISchedule: String, CaseIterable, Identifiable, Sendable {
@@ -154,12 +155,16 @@ struct BackupRestoreResult: Sendable { let restoredCount: Int; let skippedCount:
 }
 
 struct BackupSettingsView: View {
+    let numerals: NumeralStyle
     @State private var model: BackupSettingsModel
     @State private var importing = false
     @State private var confirmingRestore = false
     @FocusState private var focusedPassword: Int?
     @Environment(\.roomTheme) private var theme
-    init(service: any BackupUIService) { _model = State(initialValue: BackupSettingsModel(service: service)) }
+    init(service: any BackupUIService, numerals: NumeralStyle = .hindi) {
+        self.numerals = numerals
+        _model = State(initialValue: BackupSettingsModel(service: service))
+    }
     var body: some View {
         @Bindable var model = model
         Form {
@@ -172,7 +177,8 @@ struct BackupSettingsView: View {
                     else { Text("لم تُحفظ نسخة ناجحة بعد.") }
                     if let result = status.lastResult { Text(result).foregroundStyle(theme.secondaryInk) }
                     if status.localOnly { Label("النسخة على الجهاز فقط", systemImage: "internaldrive") }
-                    Text("النسخ المحفوظة: \(arabicNumber(status.automaticCount)) تلقائية، \(arabicNumber(status.manualCount)) يدوية.")
+                    Text("النسخ المحفوظة: \(digits(status.automaticCount)) تلقائية، \(digits(status.manualCount)) يدوية.")
+                        .accessibilityIdentifier("backup-saved-counts")
                     Text("نحتفظ بآخر أربع نسخ تلقائية وكل النسخ اليدوية.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                 } else { ProgressView("يقرأ حالة النسخ…") }
             } header: { Text("النسخ الاحتياطية") } footer: { Text("النسخ المجدولة تُنفّذ حين يسمح النظام، ويمكنك النسخ يدويًا في أي وقت.") }
@@ -273,11 +279,9 @@ struct BackupSettingsView: View {
         Text(model.restoreMode == .replace ? "سيتغيّر هذا على كل أجهزتك." : "تبقى السجلات الحالية، وتُصالح معها النسخة.").font(MadarTypography.caption())
         Button("استعد النسخة") { confirmingRestore = true }.disabled(model.busy).accessibilityIdentifier("restore-confirm")
     }
-    private func digits(_ number: Int) -> String { number.formatted(.number.locale(Locale(identifier: "ar_SA"))) }
+    private func digits(_ number: Int) -> String { MadarNumberFormatter(style: numerals).string(number) }
     private var resultCopy: String? {
         guard let result = model.restoreResult else { return model.resultMessage }
-        return BackupCopy.restoreSummary(result, formattedRestored: digits(result.restoredCount), formattedSkipped: digits(result.skippedCount))
+        return BackupCopy.restoreSummary(result, numerals: numerals)
     }
 }
-
-private func arabicNumber(_ number: Int) -> String { number.formatted(.number.locale(Locale(identifier: "ar_SA"))) }

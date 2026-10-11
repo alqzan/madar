@@ -1,6 +1,32 @@
 import XCTest
 
 @MainActor final class FoundationUITests: XCTestCase {
+    func test_fixPrevious_M0T13_BackupCountsHonorSelectedNumerals() throws {
+        continueAfterFailure = false
+        for (style, expected) in [("hindi", "النسخ المحفوظة: ٠ تلقائية، ٠ يدوية."), ("western", "النسخ المحفوظة: 0 تلقائية، 0 يدوية.")] {
+            let app = XCUIApplication()
+            app.launchEnvironment["MADAR_UI_STORE_ID"] = UUID().uuidString
+            app.launch(); finishOnboarding(app)
+            if style == "western" {
+                app.buttons["settings-button"].tap()
+                let search = app.textFields["settings-search"]
+                scrollTo(search, in: app); search.tap(); search.typeText("core.numerals\n")
+                let option = app.buttons["option-core.numerals-western"]
+                XCTAssertTrue(option.waitForExistence(timeout: 10))
+                scrollTo(option, in: app); option.tap()
+                expectation(for: NSPredicate(format: "selected == true"), evaluatedWith: option)
+                waitForExpectations(timeout: 10)
+                app.terminate(); app.launch()
+            }
+            openBackupSettings(app)
+            let counts = app.staticTexts["backup-saved-counts"]
+            scrollBackupForm(to: counts, in: app, towardsTop: true)
+            XCTAssertEqual(counts.label.filter { $0 != "\u{2068}" && $0 != "\u{2069}" }, expected)
+            attachScreenshot(app, named: "M0-backup-count-numerals-\(style)")
+            app.terminate()
+        }
+    }
+
     func test_M0T10_TodayPrayerTimesAtDefaultAX3AX5AndDark() throws {
         continueAfterFailure = false
         for (size, theme) in [("L", "light"), ("AX3", "light"), ("AX5", "light"), ("L", "dark")] {

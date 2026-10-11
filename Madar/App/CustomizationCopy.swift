@@ -1,4 +1,5 @@
 import Foundation
+import MadarCore
 
 enum CustomizationCopy {
     /// The integer chooses the Arabic plural; display digits follow core.numerals.
@@ -19,9 +20,10 @@ enum BackupCopy {
                table: "Customization", bundle: bundle, locale: Locale(identifier: "ar"))
     }
 
-    static func restoreSummary(_ result: BackupRestoreResult, formattedRestored: String, formattedSkipped: String) -> String {
-        let restored = restored(count: result.restoredCount, formattedCount: formattedRestored)
-        let skipped = skipped(count: result.skippedCount, formattedCount: formattedSkipped)
+    static func restoreSummary(_ result: BackupRestoreResult, numerals: NumeralStyle) -> String {
+        let formatter = MadarNumberFormatter(style: numerals)
+        let restored = restored(count: result.restoredCount, formattedCount: formatter.string(result.restoredCount))
+        let skipped = skipped(count: result.skippedCount, formattedCount: formatter.string(result.skippedCount))
         let summary = String(localized: "backup.restoreSummary", defaultValue: "اكتملت الاستعادة. \(restored) \(skipped)",
                              table: "Customization", locale: Locale(identifier: "ar"))
         return ([summary] + result.warnings).joined(separator: "\n")
