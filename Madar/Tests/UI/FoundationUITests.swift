@@ -23,6 +23,47 @@ import XCTest
             print("M0 focused secure field keyboard \(index) hierarchy:\n\(keyboard.debugDescription)")
         }
     }
+    func test_M0S2_NativeArabicKeyAndTypingTransport() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment["MADAR_UI_STORE_ID"] = UUID().uuidString
+        app.launchEnvironment["MADAR_UI_SIZE"] = "L"
+        app.launch(); openBackupSettings(app)
+        defer { app.terminate() }
+        let password = app.secureTextFields["backup-password"]
+        let export = app.buttons["backup-now"]
+        scrollTo(password, in: app)
+        password.tap()
+        attachScreenshot(app, named: "M0-backup-native-key-empty-L")
+
+        // The root's focus-only capture observed this Arabic key. The software
+        // keyboard must actually be onscreen; an offscreen AX preview is insufficient.
+        let nativeKey = app.keyboards.keys["ت"]
+        guard nativeKey.waitForExistence(timeout: 3), nativeKey.isHittable,
+              app.frame.contains(nativeKey.frame) else {
+            print("M0 native Arabic key unavailable:\n\(app.debugDescription)")
+            XCTFail("Show the Arabic software keyboard and disable simulated hardware keyboard before this probe.")
+            return
+        }
+
+        nativeKey.tap()
+        let afterNativeTap = export.value as? String
+        print("M0 secure input after native Arabic key tap: \(afterNativeTap ?? "no diagnostic")")
+        attachScreenshot(app, named: "M0-backup-native-Arabic-key-L")
+        XCTAssertEqual(afterNativeTap, "passphrase-count=1;confirmation-count=0;matches=false;busy=false")
+
+        password.typeText("ت")
+        let afterArabicTransport = export.value as? String
+        print("M0 secure input after Arabic typeText: \(afterArabicTransport ?? "no diagnostic")")
+        attachScreenshot(app, named: "M0-backup-Arabic-typing-transport-L")
+        XCTAssertEqual(afterArabicTransport, "passphrase-count=2;confirmation-count=0;matches=false;busy=false")
+
+        password.typeText("t")
+        let afterLatinTransport = export.value as? String
+        print("M0 secure input after Latin typeText: \(afterLatinTransport ?? "no diagnostic")")
+        attachScreenshot(app, named: "M0-backup-Latin-typing-transport-L")
+        XCTAssertEqual(afterLatinTransport, "passphrase-count=3;confirmation-count=0;matches=false;busy=false")
+    }
     func test_M0S2_SecureInputCharacterClasses() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
