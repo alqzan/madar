@@ -172,7 +172,7 @@ struct BackupSettingsView: View {
                     else { Text("لم تُحفظ نسخة ناجحة بعد.") }
                     if let result = status.lastResult { Text(result).foregroundStyle(theme.secondaryInk) }
                     if status.localOnly { Label("النسخة على الجهاز فقط", systemImage: "internaldrive") }
-                    Text("النسخ المحفوظة: \(arabicNumber(status.automaticCount)) تلقائية · \(arabicNumber(status.manualCount)) يدوية.")
+                    Text("النسخ المحفوظة: \(arabicNumber(status.automaticCount)) تلقائية، \(arabicNumber(status.manualCount)) يدوية.")
                     Text("نحتفظ بآخر أربع نسخ تلقائية وكل النسخ اليدوية.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                 } else { ProgressView("يقرأ حالة النسخ…") }
             } header: { Text("النسخ الاحتياطية") } footer: { Text("النسخ المجدولة تُنفّذ حين يسمح النظام، ويمكنك النسخ يدويًا في أي وقت.") }
@@ -242,9 +242,9 @@ struct BackupSettingsView: View {
         Text("معاينة \(preview.fileName)").font(MadarTypography.section())
         Text(preview.createdAt, format: .dateTime.year().month().day()).font(MadarTypography.caption())
         ForEach(preview.counts) { row in
-            LabeledContent(row.title) { Text("حاليًا \(digits(row.current)) · في النسخة \(digits(row.saved))") }
+            LabeledContent(row.title) { Text("حاليًا \(digits(row.current))، في النسخة \(digits(row.saved))") }
         }
-        Text("إضافة \(digits(preview.additions)) · تحديث \(digits(preview.updates)) · حذف عند الاستبدال \(digits(preview.deletions))")
+        Text("إضافة \(digits(preview.additions))، تحديث \(digits(preview.updates))، حذف عند الاستبدال \(digits(preview.deletions))")
         if let first = preview.earliestDate, let last = preview.latestDate {
             Text("الفترة: \(first.formatted(.dateTime.day().month().year())) — \(last.formatted(.dateTime.day().month().year()))")
         }
