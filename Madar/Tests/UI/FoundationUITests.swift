@@ -364,27 +364,57 @@ import XCTest
         bottom.press(forDuration: 0.1, thenDragTo: middle, withVelocity: .slow, thenHoldForDuration: 1)
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
         attachSwitcherEvidence(springboard, named: "M0-T09-switcher-default-light-immediate")
-        // Preserve the first OS image/hierarchy before an unsuccessful state or
-        // semantic-card assertion can stop the test and discard its diagnosis.
-        let background = app.wait(for: .runningBackground, timeout: 10)
-        let cards = springboard.descendants(matching: .any).matching(NSPredicate(
-            format: "label IN %@ OR identifier == %@", ["مدار", "Madar"] as NSArray, "com.alqzan.madar2"
+        // Actual trace identifies this window/content and shows the app remains
+        // foreground-inactive in the switcher. Its process-state enum is not a
+        // switcher gate. A second app also uses the display name مدار.
+        let switcherWindow = springboard.windows["SBSwitcherWindow:Main"]
+        let content = switcherWindow.otherElements["AppSwitcherContentView"]
+        let cards = content.descendants(matching: .other).matching(NSPredicate(
+            format: "identifier BEGINSWITH %@", "card:com.alqzan.madar2:sceneID:"
         ))
         let identified = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
             MainActor.assumeIsolated {
-                cards.allElementsBoundByIndex.contains {
-                    $0.exists && $0.frame.width > screenFrame.width * 0.5 && $0.frame.height > screenFrame.height * 0.4
-                }
+                let candidates = cards.allElementsBoundByIndex
+                return switcherWindow.exists && content.exists && candidates.count == 1
+                    && candidates[0].frame.width > screenFrame.width * 0.5
+                    && candidates[0].frame.height > screenFrame.height * 0.4
             }
         }, object: nil)
         let identificationResult = XCTWaiter.wait(for: [identified], timeout: 10)
-        attachSwitcherEvidence(springboard, named: "M0-T09-switcher-default-light-identification")
-        XCTAssertTrue(background, "The app must be in the background while the OS switcher is inspected.")
-        XCTAssertEqual(identificationResult, .completed, "No card-sized Madar semantic element was identified; inspect retained OS image and SpringBoard hierarchy.")
-        let card = try XCTUnwrap(cards.allElementsBoundByIndex.first {
-            $0.exists && $0.frame.width > screenFrame.width * 0.5 && $0.frame.height > screenFrame.height * 0.4
-        })
-        NSLog("MADAR_NATIVE_SWITCHER_CAPTURED label=%@ identifier=%@ frame=%@", card.label, card.identifier, String(describing: card.frame))
+        let candidates = cards.allElementsBoundByIndex
+        if identificationResult == .completed, candidates.count == 1 {
+            let cardFrame = candidates[0].frame
+            if !screenFrame.contains(cardFrame) || abs(cardFrame.midX - screenFrame.midX) > screenFrame.width * 0.1 {
+                // One horizontal pan, directed by the exact target card's frame;
+                // do not tap/relaunch a card or cycle through neighbouring apps.
+                let contentFrame = content.frame
+                let desired = screenFrame.midX - cardFrame.midX
+                let delta = min(max(desired, screenFrame.minX + screenFrame.width * 0.05 - contentFrame.midX),
+                                screenFrame.maxX - screenFrame.width * 0.05 - contentFrame.midX)
+                NSLog("MADAR_NATIVE_SWITCHER_CENTER_ONCE from=%@ dx=%.3f", String(describing: cardFrame), delta)
+                let origin = content.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+                origin.press(forDuration: 0.1, thenDragTo: origin.coordinate(withOffset: CGVector(dx: delta, dy: 0)),
+                             withVelocity: .slow, thenHoldForDuration: 0.1)
+            }
+        }
+        let centered = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            MainActor.assumeIsolated {
+                let candidates = cards.allElementsBoundByIndex
+                guard switcherWindow.exists, content.exists, candidates.count == 1 else { return false }
+                let frame = candidates[0].frame
+                return frame.width > screenFrame.width * 0.5 && frame.height > screenFrame.height * 0.4
+                    && screenFrame.contains(frame) && abs(frame.midX - screenFrame.midX) <= screenFrame.width * 0.1
+            }
+        }, object: nil)
+        let centeringResult = XCTWaiter.wait(for: [centered], timeout: 10)
+        attachSwitcherEvidence(springboard, named: "M0-T09-switcher-default-light-centered")
+        // Retain the full OS image/hierarchy before all post-gesture assertions,
+        // including an unsuccessful identification or one-pan centering result.
+        XCTAssertEqual(identificationResult, .completed, "The real switcher must contain exactly one card for com.alqzan.madar2.")
+        XCTAssertEqual(centeringResult, .completed, "The exact target card must be fully on-screen and centered before visual privacy judgment.")
+        XCTAssertEqual(cards.count, 1)
+        let card = try XCTUnwrap(cards.allElementsBoundByIndex.first)
+        NSLog("MADAR_NATIVE_SWITCHER_CAPTURED label=%@ identifier=%@ frame=%@ appState=%@", card.label, card.identifier, String(describing: card.frame), String(describing: app.state))
         // Test success means an identified OS card was captured. Root and Top
         // review must judge the actual card image for coverage and absence of
         // archive/share/protected content; accessibility absence cannot prove it.
