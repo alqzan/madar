@@ -6,7 +6,7 @@ Snapshot: 12 October 2026, after T09 native acceptance slices and Top SDK split.
 
 - T09: `codex/m0-p1b-fixes` — repaired source; actual AX3 success/cancellation are partial evidence. Preserve T14 copy during eventual integration.
 - Top T09 SDK split: `codex/m0-t09-switcher-sdk-repair` b7cd5d1 — source-approved and native full-card L/light acceptance passed1/0, independent Top approve; preserve bounded evidence.
-- T09 refusal: `codex/m0-t09-native-refusal` fa54e5d — new real nonmatch/cancel/retry regression; native not tested yet.
+- T09 refusal: `codex/m0-t09-native-refusal` fa54e5d — real nonmatch/user-cancel/empty-output/fresh retry atL/light1/0 plus independentTopapprove; otherT09acceptance remains.
 - T12: `codex/m0-t12-audit-triage` — prepared resources, executed diagnostic, contrast remains unresolved.
 - All other non-merged refs below retain historical/source/review evidence; do not merge them wholesale.
 
@@ -26,7 +26,7 @@ Snapshot: 12 October 2026, after T09 native acceptance slices and Top SDK split.
 | `codex/m0-p1b-top-review` | `38d4fec` | Review evidence; preserve, no production merge. |
 | `codex/m0-privacy-host` | `48a3fe4` | Old integration has three High findings; do not merge. |
 | `codex/m0-source-checks-fix-review` | `ffc8e97` | Older source-check review evidence; current T11 is integrated, preserve only. |
-| `codex/m0-t09-native-refusal` | `fa54e5d` | New native refusal/recovery test; source/native acceptance pending. |
+| `codex/m0-t09-native-refusal` | `fa54e5d` | Native L/light refusal/recovery1/0 and independentTopapprove; preserve bounded evidence. |
 | `codex/m0-t09-switcher-sdk-repair` | `b7cd5d1` | Top SDK-only test fix; native full-card default-light1/0 plus independent Top approve. Other T09 gates remain. |
 | `codex/m0-t12-audit-triage` | `bfa878b` | Active diagnostic; fonts validated/build passes, .all contrast still fails; do not merge as a repair. |
 | `m0-fix-previous-plurals` | `cede9ee` | Older RU3 history; equivalent accepted fix is already on main, do not merge again. |
