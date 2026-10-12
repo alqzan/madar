@@ -227,3 +227,15 @@ Branches/worktrees: no branch changes; `main` is still the active checkout. Pres
 Next: native T09/T12 acceptance after manual unlock; then owner-iPhone and remaining M0 gate.
 Usage: start checkpoint 24% five-hour used / 50% weekly; 3–5% remaining session target not reached. No reset credits used and no artificial quota work added.
 Next session: Standard GPT-6.1 Sol high for any production change; independent GPT-6.1 Sol xhigh for required Top reviews/gate.
+
+
+## Handover — M0 T06 current font-license and packaging evidence — 2026-10-12 — codex (Sol)
+
+Done: Checked the current official Arabic Thmanyah license page. It allows app embedding only in a compiled/packaged/obfuscated product and prohibits independent font extraction/reuse, including through apps. Confirmed this checkout registers raw OTF resources via `UIAppFonts`; a saved Debug simulator `.app` contains all eight as separate files. Recorded the possible packaging conflict separately from archive provenance in `docs/reports/M0-T06-font-license-evidence.md`, and updated M0-02/provenance. M0 remains NOT APPROVED; no M1.
+Verified: Official page checked read-only on 2026-10-12; `find Madar/DerivedData/Build/Products/Debug-iphonesimulator/Madar.app -name '*.otf' -type f` returned eight OTF resources. JSON parse and `git diff --check` passed. Documentation/provenance only; no product build/test, signed distribution artifact check, package-PDF extraction, or distribution decision.
+Not verified: Native T09, T12 and owner-device acceptance. The owner has since explicitly confirmed the font approval and required license/permission; do not reopen this as a blocker.
+For the next agent: The font decision is closed by the owner's explicit confirmation; keep M0-02 pass. Keep M0 NOT APPROVED and do not start M1. Continue native T09/T12 and owner-iPhone acceptance from saved evidence without repeating unchanged attempts.
+Branches/worktrees: no branch or product tree changed. `docs/reports/M0-retained-branches.md` records all 26 non-merged refs with tips/dispositions and all 14 non-main worktree paths/heads. Active T09 is repaired `codex/m0-p1b-fixes` `173fe0c` (Top fix-only approval `8876626`, native acceptance pending); old integration `codex/m0-privacy-host` `48a3fe4` has three High findings; T12 `codex/m0-t12-audit-triage` `44d4799` is diagnostic only; `m0-s3-font-license-evidence` `6227d1f` must not be merged wholesale. Preserve all listed worktrees.
+Next: Native T09/T12 and remaining physical M0 gate when access allows.
+Usage: start 24% and final 25% five-hour used / 50% weekly; the requested 3–5% remaining target was not reached because the remaining acceptance work requires the locked native UI/device and owner licensing input. No reset used or quota work added artificially.
+Next session: Standard GPT-6.1 Sol high for production; independent GPT-6.1 Sol xhigh for required Top reviews/gate.

@@ -1,6 +1,6 @@
 # M0 retained branches and worktrees
 
-Snapshot: 12 October 2026, after T09 native acceptance slices and Top SDK split. Current git refs, not old handover tips. No pre-existing branch/worktree was deleted. See PROGRESS for the next acceptance; historical branches are not a queue of new reviews.
+Snapshot: 12 October 2026, after reviewed native refusal/full-card/systemAX3 acceptance (70939f5). Current git refs, not old handover tips. No pre-existing branch/worktree was deleted. See PROGRESS for the next acceptance; historical branches are not a queue of new reviews.
 
 ## Active candidates
 
@@ -57,7 +57,7 @@ Snapshot: 12 October 2026, after T09 native acceptance slices and Top SDK split.
 | `/Users/abdulrahman/.codex/worktrees/m0-foundation-times/بناء مدار 2.0` | `codex/m0-source-checks-terminal-review` @ `a399b1f` | Preserve evidence; use current PROGRESS card before any merge. |
 | `/Users/abdulrahman/.codex/worktrees/m0-gate-report/بناء مدار 2.0` | `codex/m0-gate-readiness` @ `7169fab` | Preserve evidence; use current PROGRESS card before any merge. |
 | `/Users/abdulrahman/.codex/worktrees/m0-local-data/بناء مدار 2.0` | `m0-s1-money-models` @ `dad332e` | Preserve evidence; use current PROGRESS card before any merge. |
-| `/Users/abdulrahman/.codex/worktrees/m0-p1b-fixes/بناء مدار 2.0` | `codex/m0-t09-system-ax3-navigation` @ `70939f5` | Active Top SDK-only switcher split; native not tested. Green T09 branch d28c8dc retained without worktree; section acceptance still open. |
+| `/Users/abdulrahman/.codex/worktrees/m0-p1b-fixes/بناء مدار 2.0` | `codex/m0-t09-system-ax3-navigation` @ `70939f5` | Active repaired T09 candidate with bounded native plain refusal/full-card/systemAX3 acceptance; required section/remaining flows before curated merge. Green d28c8dc retained without worktree. |
 | `/Users/abdulrahman/.codex/worktrees/m0-p1b-rereview/بناء مدار 2.0` | `codex/m0-p1b-rereview` @ `8876626` | Preserve evidence; use current PROGRESS card before any merge. |
 | `/Users/abdulrahman/.codex/worktrees/m0-plain-export/بناء مدار 2.0` | `m0-s1-plain-export` @ `69b0698` | Preserve evidence; use current PROGRESS card before any merge. |
 | `/Users/abdulrahman/.codex/worktrees/m0-presentation-privacy/بناء مدار 2.0` | `codex/m0-export-privacy` @ `2ea40ff` | Preserve evidence; use current PROGRESS card before any merge. |
