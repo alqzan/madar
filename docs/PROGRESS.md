@@ -4,7 +4,9 @@ M0 Foundation — NOT APPROVED. Main contains the accepted local foundation; M1�
 
 # Last checked
 
-Checked `aa54227..feb9515` — OK: main documentation only; no product build/test repeated. Selected T09 candidate advanced `b7cd5d1..70939f5`; each new test/driver delta independently reviewed and selected native acceptance recorded below. Initial sanity check `b7902be..aa54227` was documentation-only.
+Automation checkpoint — 2026-10-12 18:04 UTC: arrived at97% five-hour used/3% remaining (weekly92%). Reserve already reached; no production task, delegation or repeated build/test opened. Main clean at3d14e61 before this docs-only checkpoint. No acceptance completed in this run. FIRST next: one missing T09 native encrypted export/first-key or restore authorization result on70939f5; full T09/M0 remain unapproved. Existing five handovers and retained branch/worktree inventory preserved. No reset credits used.
+
+Checked `feb9515..3d14e61` — OK: main documentation only; no product build/test repeated. Selected T09 candidate advanced `b7cd5d1..70939f5`; each new test/driver delta independently reviewed and selected native acceptance recorded below. Initial sanity check `b7902be..aa54227` was documentation-only.
 
 Reuse unchanged evidence: main T14 `d28c36a` local-only restore copy/focused1/0; T15 `aeb3154` font helper/six regressions; baseline app22/package125. Independent final `git diff --exit-code 33ab2ec..70939f5` returned0 for production sources, Xcode/project configuration, Integration tests and MadarData tests; controlled host15/ManagedBackup13 evidence reused. Command receipt: ignored `Madar/Artifacts/t09-native-retirement-2026-10-12/source-evidence-continuity.txt`. This is source continuity, not a new test/integration approval. T12 `bfa878b` still fails contrast1/1 with nil element/frame; no identical rerun.
 
