@@ -4,7 +4,9 @@ M0 Foundation — NOT APPROVED. Main contains the accepted local foundation; M1�
 
 # Last checked
 
-Checked `79b380f..aeb3154` — M0-T15 workspace tooling and startup docs approved by independent GPT-6.1 Sol high; six focused regressions pass. Main font preflight: all11 resources hash-match, 0 copies. No Swift/product behavior changed; prior app22/package125 baseline and T14 focused1/0 evidence reused. No broad product build/test justified; separate Top T12 diagnostic ran once on its candidate.
+Checked `aeb3154..ea5baac` — OK: documentation/protocol-only continuity changes; no new product checks justified. T09 candidate `fb6b1bb..e53f882` now passes the focused native retirement regression and independent Top review (bounded slice only).
+
+Prior check `79b380f..aeb3154` — M0-T15 workspace tooling and startup docs approved by independent GPT-6.1 Sol high; six focused regressions pass. Main font preflight: all11 resources hash-match, 0 copies. No Swift/product behavior changed; prior app22/package125 baseline and T14 focused1/0 evidence reused. No broad product build/test justified; separate Top T12 diagnostic ran once on its candidate.
 
 Prior accepted product repair: `d28c36a` RA1 local-only restore copy, focused1/0 + independent approval. Prior baseline: `5832a8e`; tooling: `3b273b5`. Full historical checks/cards remain in `docs/progress-archive.md`; reports hold exact commands and acceptance boundaries.
 
@@ -29,7 +31,7 @@ Sections: S0 contracts building; S1 data/commands building (physical acceptance 
 | M0-T13 | done | Arabic backup plural/numeral copy; merged1ee273e | `docs/reviews/M0-backup-copy.md`; no backup behavior change |
 | M0-T14 | done | RA1 this-device-only restore warning; mergedd28c36a | `docs/reviews/M0-backup-copy-t14.md`; focused golden regression passes |
 | M0-T15 | done | Verified missing-font preparation, Makefile guard, current startup docs | `docs/reviews/M0-workspace-preparation.md`; 11 resources checked, no binary publication/overwrite |
-| M0-T09 | in-progress | Repaired source33ab2ec/Top8876626; native AX3 cancellation65e88ca and successfb6b1bb are partial evidence | Scope: owning-scene privacy/export/restore/share; §8.10 (`14-shared.md`), RA1–RA3, `docs/design/M0-presentation-privacy.md`, `docs/reports/M0-T09-P1b-plan.md`. Acceptance: genuine refusal/success, revocation/native-share retirement/switcher/two-scene, default/AX3/dark and section review before curated merge. Out: auth bypass, backup redesign, later-room features. Use repaired branch only. |
+| M0-T09 | in-progress | Repaired source33ab2ec/Top8876626; native AX3 cancellation65e88ca, successfb6b1bb and same-process retirement e53f882 are partial evidence | Scope: owning-scene privacy/export/restore/share; §8.10 (`14-shared.md`), RA1–RA3, `docs/design/M0-presentation-privacy.md`, `docs/reports/M0-T09-P1b-plan.md`. Acceptance: genuine refusal/success, revocation/native-share retirement/switcher/two-scene, default/AX3/dark and section review before curated merge. Out: auth bypass, backup redesign, later-room features. Use repaired branch only. |
 | M0-T12 | needs-fix | Green focus/search/title growth c273bc4; unsuppressed light/system Settings contrast callback has no target | Scope: reachable foundation/settings accessibility; RU2/RU4–6, §13 (`19-qa.md`), `docs/reports/M0-T12-accessibility-top.md` and contrast triage. Acceptance: measured target/pair or actionable platform trace and unchanged failing audit; VoiceOver/Reduce Motion separate. Out: speculative color change or audit suppression. Workspace prepared; Top build now succeeds, but isolated audit fails1/1 with nil target/frame. |
 | M0-T06 Top | in-progress | Source-map approval only; current gate blocked | §12/§13, RA1–RA3/RA8; `docs/reports/M0.md`. Acceptance: integrated candidates, remaining software/owner-iPhone evidence, independent Top gate approve. No M1 before approval. |
 
@@ -55,9 +57,17 @@ M1 prayer logging/sanctity; M2 Quran; M3 diary; M4 lobby/habits/widgets; M5 mone
 
 # Handovers
 
-Active session — 2026-10-12 08:09 UTC: T09 native revocation/share retirement claimed on repaired `codex/m0-p1b-fixes` (`fb6b1bb`). Acceptance: after genuine OS authentication presents a native share, background revocation covers/retires it and re-entry cannot reopen it without explicit action. Developer Sol high owns focused test changes; verifier owns the sole simulator after author handoff; independent Sol xhigh reviews only this new slice. Root owns integration/docs. Initial usage0% used /100% remaining after natural window renewal, weekly62%; no reset credit redeemed.
+Session checkpoint — T09 native retirement slice completed at `e53f882`, independent Top approve. Same-process return4.516s, native share retired, five seconds without reopening; synchronous transition/switcher cover not established. Initial usage0%, boundary26% used/74% remaining (weekly66%). Continue useful missing acceptance; no reset credit redeemed.
 
 Automation checkpoint — 2026-10-12 08:00 UTC: Started with 97% five-hour usage consumed / 3% remaining (weekly62%). Bounded check of `aeb3154..c7a8e35`: documentation/protocol changes only, clean main and identical AGENTS/CLAUDE; current product evidence reused. No new acceptance task, agent, build or audit opened because the delivery reserve was already reached. Next remains T09 native revocation/share retirement on repaired `fb6b1bb`, then independent Sol xhigh section review; T12 requires an actionable contrast trace. Font permission remains closed, M0 NOT APPROVED. All retained refs/worktrees remain listed in `docs/reports/M0-retained-branches.md`. No reset credits used.
+
+## Handover — M0-T09 native share retirement — 2026-10-12 — codex (Sol)
+
+Done: Focused real-native AX3/light retirement regression and bounded biometric driver committed `e53f882` on repaired candidate. Independent GPT-6.1 Sol xhigh approve, no findings for this slice. No production behavior changed and no full T09 integration approval.
+Verified: signed selected native test: `Executed 1 test, with 0 failures (0 unexpected) in 45.041 seconds`; `** TEST SUCCEEDED **`. Genuine Face ID match, same PID18574/service before and after Home, re-entry4.516s (<60), native archive/Files/share-readiness absent for5s. Root/verifier/reviewer inspected both PNGs. Raw command/log/auth/process/xcresult/attachments retained in `Madar/Artifacts/t09-native-retirement-2026-10-12/run-e53f882/` (ignored). Font preflight11 resources/0 copied, author Python syntax/diffcheck pass; unchanged green product/package evidence reused.
+Not verified: synchronous inactive cover/switcher frame, exact lease expiry/reauthentication, refusal, default/dark matrix, true two-scene, VoiceOver/Files destination write/physical iPhone. Runtime warning `Invalid frame dimension (negative or non-finite)` retained, cause uninvestigated; test passed.
+For the next agent: Continue missing T09 acceptance on repaired candidate, preserve T14 during later curated integration. Never treat this regression review as section/M0 approval. T12 still needs an actionable nil-element contrast trace; no unchanged audit retry. All unmerged refs/worktrees are in `docs/reports/M0-retained-branches.md` (active T09 tip e53f882); no branches removed.
+Next: T09 missing native matrix/refusal/switcher; owner-iPhone and Top gate remain. Next session: Sol high production, independent Sol xhigh concurrency/privacy section and gate.
 
 ## Handover — M0-T15 workspace and continuity repair — 2026-10-12 — codex (Sol)
 
@@ -98,14 +108,3 @@ Branches/worktrees: no branch or product tree changed. `docs/reports/M0-retained
 Next: Native T09/T12 and remaining physical M0 gate when access allows.
 Usage: start 24% and final 25% five-hour used / 50% weekly; the requested 3–5% remaining target was not reached because the remaining acceptance work requires the locked native UI/device and owner licensing input. No reset used or quota work added artificially.
 Next session: Standard GPT-6.1 Sol high for production; independent GPT-6.1 Sol xhigh for required Top reviews/gate.
-
-## Handover — M0 native acceptance waiting for unlock — 2026-10-12 — codex (Sol)
-
-Done: Resumed from clean `main` at `c83e724` and reread the project protocol, progress board and automation memory. Current app inventory confirms the Mac is locked, so native simulator/Accessibility Inspector acceptance cannot proceed. Sent the owner a request to unlock manually. No code, docs beyond this handover, builds or tests changed this turn.
-Verified: Git status was clean on `main`; five-hour usage at start was24%. Current CUA state explicitly returned “The Mac is locked and automatic unlock could not unlock it.” This is a current availability check, not a product failure.
-Not verified: T09 real OS auth/share/switcher/two-scene; T12 actionable contrast pair; VoiceOver/Reduce Motion; owner-iPhone, Files destination, protected data/owner store; Thmanyah archive origin. M0 remains NOT APPROVED; no M1.
-For the next agent: Continue when the owner unlocks the Mac; first inspect current UI state, then resume the signed T09 auth/share flow or T12 Accessibility Inspector trace. Do not retry equivalent flows before unlock. If the Mac remains locked, preserve the existing reviewed candidates and wait for owner/device acceptance; do not start M1 or invent a color/auth fix.
-Branches/worktrees: no branch changes; `main` is still the active checkout. Preserve `codex/m0-p1b-fixes` `173fe0c` with Top repair approval `8876626`; old integration `48a3fe4` is changes-requested. T06 source map review and reports are already recorded on main.
-Next: native T09/T12 acceptance after manual unlock; then owner-iPhone and remaining M0 gate.
-Usage: start checkpoint 24% five-hour used / 50% weekly; 3–5% remaining session target not reached. No reset credits used and no artificial quota work added.
-Next session: Standard GPT-6.1 Sol high for any production change; independent GPT-6.1 Sol xhigh for required Top reviews/gate.

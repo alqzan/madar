@@ -216,3 +216,14 @@ Branches/worktrees: `m0-s3-font-license-evidence` at `6227d1f` contains the T06 
 Next: genuine signed P1b OS-auth/share journey and T12 actionable contrast evidence; then owner-iPhone and remaining M0 gate. No M1 before Top gate approval.
 Usage: final observed checkpoint 23% five-hour used / 50% weekly; 3–5% remaining target was not reached. No reset credits used or quota work added artificially.
 Next session: Standard GPT-6.1 Sol high for production; independent GPT-6.1 Sol xhigh for required Top reviews/gate.
+
+## Handover — M0 native acceptance waiting for unlock — 2026-10-12 — codex (Sol)
+
+Done: Resumed from clean `main` at `c83e724` and reread the project protocol, progress board and automation memory. Current app inventory confirms the Mac is locked, so native simulator/Accessibility Inspector acceptance cannot proceed. Sent the owner a request to unlock manually. No code, docs beyond this handover, builds or tests changed this turn.
+Verified: Git status was clean on `main`; five-hour usage at start was24%. Current CUA state explicitly returned “The Mac is locked and automatic unlock could not unlock it.” This is a current availability check, not a product failure.
+Not verified: T09 real OS auth/share/switcher/two-scene; T12 actionable contrast pair; VoiceOver/Reduce Motion; owner-iPhone, Files destination, protected data/owner store; Thmanyah archive origin. M0 remains NOT APPROVED; no M1.
+For the next agent: Continue when the owner unlocks the Mac; first inspect current UI state, then resume the signed T09 auth/share flow or T12 Accessibility Inspector trace. Do not retry equivalent flows before unlock. If the Mac remains locked, preserve the existing reviewed candidates and wait for owner/device acceptance; do not start M1 or invent a color/auth fix.
+Branches/worktrees: no branch changes; `main` is still the active checkout. Preserve `codex/m0-p1b-fixes` `173fe0c` with Top repair approval `8876626`; old integration `48a3fe4` is changes-requested. T06 source map review and reports are already recorded on main.
+Next: native T09/T12 acceptance after manual unlock; then owner-iPhone and remaining M0 gate.
+Usage: start checkpoint 24% five-hour used / 50% weekly; 3–5% remaining session target not reached. No reset credits used and no artificial quota work added.
+Next session: Standard GPT-6.1 Sol high for any production change; independent GPT-6.1 Sol xhigh for required Top reviews/gate.
