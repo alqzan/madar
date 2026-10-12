@@ -1,3 +1,4 @@
+.DEFAULT_GOAL := generate
 SIMULATOR ?= 412F4437-7BD7-44D1-AA3D-2B7158090E14
 .PHONY: fonts generate build preview test test-ios test-links
 fonts:
