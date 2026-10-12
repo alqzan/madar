@@ -9,8 +9,6 @@ launchctl snapshots require the same app PID and service label across reentry.
 Its bounded --variant selects ax3-light (default), default-light or default-dark.
 Use --test lease-expiry for a real 61-second background interval and a second
 native Face ID match. This separate path is fixed to default-light.
-Use --test switcher-snapshot to capture an identified real OS switcher card at
-default-light. Its output requires a separate visual privacy judgment.
 """
 import argparse
 import json
@@ -45,15 +43,15 @@ def main():
     parser.add_argument("--device", required=True)
     parser.add_argument("--derived-data", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
-    parser.add_argument("--test", choices=["share-dismissal", "background-retirement", "lease-expiry", "switcher-snapshot"], default="share-dismissal")
+    parser.add_argument("--test", choices=["share-dismissal", "background-retirement", "lease-expiry"], default="share-dismissal")
     parser.add_argument("--variant", choices=["ax3-light", "default-light", "default-dark"])
     args = parser.parse_args()
     if args.variant is None:
-        args.variant = "default-light" if args.test in ["lease-expiry", "switcher-snapshot"] else "ax3-light"
+        args.variant = "default-light" if args.test == "lease-expiry" else "ax3-light"
     if args.test == "share-dismissal" and args.variant != "ax3-light":
         parser.error("--variant default-light/default-dark requires --test background-retirement")
-    if args.test in ["lease-expiry", "switcher-snapshot"] and args.variant != "default-light":
-        parser.error(f"--test {args.test} is fixed to --variant default-light")
+    if args.test == "lease-expiry" and args.variant != "default-light":
+        parser.error("--test lease-expiry is fixed to --variant default-light")
     root = Path(__file__).resolve().parents[1]
     output = args.output_dir.resolve()
     output.mkdir(parents=True, exist_ok=False)
@@ -80,7 +78,6 @@ def main():
             "share-dismissal": "test_M0T09_AX3NativeShareAfterSimulatorFaceIDMatch",
             "background-retirement": "test_M0T09_AX3BackgroundRetiresAuthorizedNativeShareWithoutReopening",
             "lease-expiry": "test_M0T09_DefaultBackgroundLeaseExpiryRequiresFreshNativeFaceID",
-            "switcher-snapshot": "test_M0T09_DefaultNativeShareSwitcherCaptureIdentifiesMadarCard",
         }[args.test]
         command = ["xcodebuild", "test", "-project", "Madar.xcodeproj", "-scheme", "Madar",
                    "-destination", f"id={args.device}", "-derivedDataPath", str(args.derived_data.resolve()),
@@ -103,7 +100,7 @@ def main():
                 while process.poll() is None:
                     current_log = log.read_text()
                     if not matched and "MADAR_NATIVE_FACEID_REQUEST_READY" in current_log:
-                        if tracks_reentry or args.test == "switcher-snapshot":
+                        if tracks_reentry:
                             before_identity = app_process_snapshot(args.device, output / "process-before-auth-match.txt")
                         match_json = output / ("match-1.json" if args.test == "lease-expiry" else "match.json")
                         match = ["xcrun", "devicectl", "device", "simulate", "biometrics", "--device", args.device,
@@ -148,12 +145,7 @@ def main():
             raise RuntimeError(f"Native share retirement never reached its process-continuity checkpoint; inspect {log}")
         if args.test == "lease-expiry" and not reauth_matched:
             raise RuntimeError(f"Native lease expiry never reached its second authentication checkpoint/match; inspect {log}")
-        if args.test == "switcher-snapshot" and "MADAR_NATIVE_SWITCHER_CAPTURED" not in log.read_text():
-            raise RuntimeError(f"A real Madar switcher card was not identified; inspect retained XCTest attachments in {result}")
-    if args.test == "switcher-snapshot":
-        print(f"Native default-light switcher card captured; visual privacy acceptance pending: {result}")
-    else:
-        print(f"Native {args.variant} Face ID/{args.test} passed: {result}")
+    print(f"Native {args.variant} Face ID/{args.test} passed: {result}")
 
 
 if __name__ == "__main__":

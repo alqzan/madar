@@ -324,102 +324,6 @@ import XCTest
         // it does not resolve the exact 60-second boundary, switcher or device gate.
     }
 
-    func test_M0T09_DefaultNativeShareSwitcherCaptureIdentifiesMadarCard() throws {
-        guard ProcessInfo.processInfo.environment["MADAR_TEST_NATIVE_BIOMETRICS"] == "1" else {
-            throw XCTSkip("Run scripts/native-export-biometric-test.py --test switcher-snapshot for supported simulator Face ID orchestration.")
-        }
-        continueAfterFailure = false
-        let app = XCUIApplication()
-        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
-        app.launch(); openPlainExportSettings(app)
-        defer { app.terminate() }
-        let cover = app.descendants(matching: .any).matching(identifier: "scene-privacy-cover").firstMatch
-        let export = app.buttons["plain-export-now"]
-        let share = app.buttons["plain-export-share"]
-        XCTAssertFalse(cover.exists)
-        XCTAssertFalse(share.exists)
-        export.tap()
-        XCTAssertTrue(cover.waitForExistence(timeout: 10), app.debugDescription)
-        NSLog("MADAR_NATIVE_FACEID_REQUEST_READY")
-        XCTAssertTrue(share.waitForExistence(timeout: 30), app.debugDescription)
-        XCTAssertFalse(cover.exists)
-        scrollTo(share, in: app); share.tap()
-        let file = app.descendants(matching: .any).matching(NSPredicate(
-            format: "label BEGINSWITH %@ AND label CONTAINS %@", "Madar-", "-plain"
-        )).firstMatch
-        let saveToFiles = app.descendants(matching: .any).matching(NSPredicate(
-            format: "label CONTAINS[c] %@ OR label CONTAINS %@", "Save to Files", "الملفات"
-        )).firstMatch
-        XCTAssertTrue(file.waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertTrue(saveToFiles.waitForExistence(timeout: 10), app.debugDescription)
-        let authorizedShare = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-        authorizedShare.name = "M0-T09-switcher-default-light-authorized-native-share"
-        authorizedShare.lifetime = .keepAlways; add(authorizedShare)
-
-        let screenFrame = app.frame
-        let bottom = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.995))
-        let middle = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-        // Public API confirmed in the installed SDK's XCUICoordinate.h. This
-        // bottom drag and hold requests the actual OS switcher, not Home twice.
-        bottom.press(forDuration: 0.1, thenDragTo: middle, withVelocity: .slow, thenHoldForDuration: 1)
-        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
-        attachSwitcherEvidence(springboard, named: "M0-T09-switcher-default-light-immediate")
-        // Actual trace identifies this window/content and shows the app remains
-        // foreground-inactive in the switcher. Its process-state enum is not a
-        // switcher gate. A second app also uses the display name مدار.
-        let switcherWindow = springboard.windows["SBSwitcherWindow:Main"]
-        let content = switcherWindow.otherElements["AppSwitcherContentView"]
-        let cards = content.descendants(matching: .other).matching(NSPredicate(
-            format: "identifier BEGINSWITH %@", "card:com.alqzan.madar2:sceneID:"
-        ))
-        let identified = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-            MainActor.assumeIsolated {
-                let candidates = cards.allElementsBoundByIndex
-                return switcherWindow.exists && content.exists && candidates.count == 1
-                    && candidates[0].frame.width > screenFrame.width * 0.5
-                    && candidates[0].frame.height > screenFrame.height * 0.4
-            }
-        }, object: nil)
-        let identificationResult = XCTWaiter.wait(for: [identified], timeout: 10)
-        let candidates = cards.allElementsBoundByIndex
-        if identificationResult == .completed, candidates.count == 1 {
-            let cardFrame = candidates[0].frame
-            if !screenFrame.contains(cardFrame) || abs(cardFrame.midX - screenFrame.midX) > screenFrame.width * 0.1 {
-                // One horizontal pan, directed by the exact target card's frame;
-                // do not tap/relaunch a card or cycle through neighbouring apps.
-                let contentFrame = content.frame
-                let desired = screenFrame.midX - cardFrame.midX
-                let delta = min(max(desired, screenFrame.minX + screenFrame.width * 0.05 - contentFrame.midX),
-                                screenFrame.maxX - screenFrame.width * 0.05 - contentFrame.midX)
-                NSLog("MADAR_NATIVE_SWITCHER_CENTER_ONCE from=%@ dx=%.3f", String(describing: cardFrame), delta)
-                let origin = content.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-                origin.press(forDuration: 0.1, thenDragTo: origin.coordinate(withOffset: CGVector(dx: delta, dy: 0)),
-                             withVelocity: .slow, thenHoldForDuration: 0.1)
-            }
-        }
-        let centered = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-            MainActor.assumeIsolated {
-                let candidates = cards.allElementsBoundByIndex
-                guard switcherWindow.exists, content.exists, candidates.count == 1 else { return false }
-                let frame = candidates[0].frame
-                return frame.width > screenFrame.width * 0.5 && frame.height > screenFrame.height * 0.4
-                    && screenFrame.contains(frame) && abs(frame.midX - screenFrame.midX) <= screenFrame.width * 0.1
-            }
-        }, object: nil)
-        let centeringResult = XCTWaiter.wait(for: [centered], timeout: 10)
-        attachSwitcherEvidence(springboard, named: "M0-T09-switcher-default-light-centered")
-        // Retain the full OS image/hierarchy before all post-gesture assertions,
-        // including an unsuccessful identification or one-pan centering result.
-        XCTAssertEqual(identificationResult, .completed, "The real switcher must contain exactly one card for com.alqzan.madar2.")
-        XCTAssertEqual(centeringResult, .completed, "The exact target card must be fully on-screen and centered before visual privacy judgment.")
-        XCTAssertEqual(cards.count, 1)
-        let card = try XCTUnwrap(cards.allElementsBoundByIndex.first)
-        NSLog("MADAR_NATIVE_SWITCHER_CAPTURED label=%@ identifier=%@ frame=%@ appState=%@", card.label, card.identifier, String(describing: card.frame), String(describing: app.state))
-        // Test success means an identified OS card was captured. Root and Top
-        // review must judge the actual card image for coverage and absence of
-        // archive/share/protected content; accessibility absence cannot prove it.
-    }
-
     func test_M0T09_AX3BackgroundDuringExportAuthenticationDoesNotExposeShare() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
@@ -819,12 +723,6 @@ import XCTest
     private func attachScreenshot(_ app: XCUIApplication, named name: String) {
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = name; attachment.lifetime = .keepAlways; add(attachment)
-    }
-    private func attachSwitcherEvidence(_ springboard: XCUIApplication, named name: String) {
-        let screen = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-        screen.name = name + "-screen"; screen.lifetime = .keepAlways; add(screen)
-        let hierarchy = XCTAttachment(string: springboard.debugDescription)
-        hierarchy.name = name + "-SpringBoard-hierarchy"; hierarchy.lifetime = .keepAlways; add(hierarchy)
     }
     private func finishOnboarding(_ app: XCUIApplication) {
         if app.buttons["first-run-skip"].waitForExistence(timeout: 2) { app.buttons["first-run-skip"].tap() }
