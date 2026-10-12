@@ -1,8 +1,28 @@
 {
-  "gate": "Local development only until original shipped licence is obtained; not for public repository or font hosting",
+  "gate": "Package license text and font hashes verified locally; owner must confirm the package was downloaded from the official site before any distribution decision. Do not publish font binaries or host them.",
   "officialLicenseURL": "https://font.thmanyah.com/licenses",
   "retrieved": "2026-10-10",
-  "licenseFromExactDownloadPackage": null,
+  "packageEvidenceReviewed": "2026-10-12",
+  "licenseFromExactDownloadPackage": {
+    "archive": "Thmanyah-Font-Family.zip",
+    "archiveSha256": "5b16d16a091cda3b11f8c86de800793ecb75c78943b7e0091003cdff514ede99",
+    "licenseFiles": [
+      {
+        "archiveEntry": "LICENSE.pdf",
+        "file": "thmanyah-package-license.pdf",
+        "sha256": "07bbb2321bd2b944333c25f4d55140ca22625666132394d7399a365bd8b79a10",
+        "language": "English"
+      },
+      {
+        "archiveEntry": "ترخيص خط ثمانية.pdf",
+        "file": "thmanyah-package-license-ar.pdf",
+        "sha256": "1a4ab3594864f4f7f5e31f2681792209501caf841319875fe8e73d2fc471ecf5",
+        "language": "Arabic; controlling version per license"
+      }
+    ],
+    "appFontFilesMatched": 8,
+    "acquisitionEvidence": "Owner-provided ChatGPT library attachment; original official-site download origin not established"
+  },
   "fonts": [
     {
       "file": "thmanyahsans-Light.otf",
