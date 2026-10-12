@@ -55,6 +55,8 @@ M1 prayer logging/sanctity; M2 Quran; M3 diary; M4 lobby/habits/widgets; M5 mone
 
 # Handovers
 
+Active session — 2026-10-12 08:09 UTC: T09 native revocation/share retirement claimed on repaired `codex/m0-p1b-fixes` (`fb6b1bb`). Acceptance: after genuine OS authentication presents a native share, background revocation covers/retires it and re-entry cannot reopen it without explicit action. Developer Sol high owns focused test changes; verifier owns the sole simulator after author handoff; independent Sol xhigh reviews only this new slice. Root owns integration/docs. Initial usage0% used /100% remaining after natural window renewal, weekly62%; no reset credit redeemed.
+
 Automation checkpoint — 2026-10-12 08:00 UTC: Started with 97% five-hour usage consumed / 3% remaining (weekly62%). Bounded check of `aeb3154..c7a8e35`: documentation/protocol changes only, clean main and identical AGENTS/CLAUDE; current product evidence reused. No new acceptance task, agent, build or audit opened because the delivery reserve was already reached. Next remains T09 native revocation/share retirement on repaired `fb6b1bb`, then independent Sol xhigh section review; T12 requires an actionable contrast trace. Font permission remains closed, M0 NOT APPROVED. All retained refs/worktrees remain listed in `docs/reports/M0-retained-branches.md`. No reset credits used.
 
 ## Handover — M0-T15 workspace and continuity repair — 2026-10-12 — codex (Sol)
