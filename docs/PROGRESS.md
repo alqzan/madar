@@ -59,7 +59,7 @@ Not verified: original Thmanyah archive download origin; T09 genuine OS-authenti
 For the next agent: Treat this as source-map approval only. The M0 acceptance matrix is still blocked. Do not merge the T06 candidate branch wholesale: it retains a T14 predecessor code tree and its T06 evidence is now copied to main. Keep `docs/reports/M0.md` NOT APPROVED and do not start M1. Resume native/UI/device gates only when the Mac UI/device is available; owner confirmation is still needed for font archive source.
 Branches/worktrees: `m0-s3-font-license-evidence` at `6227d1f` contains the T06 evidence candidate and remains unmerged; selected docs and license evidence were copied to main, not its product tree. P1b old integration `48a3fe4` remains changes-requested (three High findings); repaired `codex/m0-p1b-fixes` `173fe0c` with Top approval `8876626` is preserved pending native acceptance. Main is documentation-only beyond the earlier T14 fix.
 Next: genuine signed P1b OS-auth/share journey and T12 actionable contrast evidence; then owner-iPhone and remaining M0 gate. No M1 before Top gate approval.
-Usage: latest observed checkpoint 17% five-hour used / 49% weekly; 3–5% remaining target was not reached. No reset credits used or quota work added artificially.
+Usage: final observed checkpoint 23% five-hour used / 50% weekly; 3–5% remaining target was not reached. No reset credits used or quota work added artificially.
 Next session: Standard GPT-6.1 Sol high for production; independent GPT-6.1 Sol xhigh for required Top reviews/gate.
 
 ## Handover — T09 integration review and T06 source dispositions — 2026-10-12 — codex (Sol)
