@@ -57,6 +57,8 @@ M1 prayer logging/sanctity; M2 Quran; M3 diary; M4 lobby/habits/widgets; M5 mone
 
 # Handovers
 
+Active slice — T09 actual native app-switcher snapshot while authorized share is visible (2026-10-12): capture the OS switcher card with a documented XCTest gesture after genuine Face ID/native share. Acceptance: an identified Madar card visibly covered with no archive/share/protected content; full-screen screenshot and SpringBoard hierarchy retained for root/Top visual judgment. Author owns test/driver only, verifier sole simulator; two diagnosed repair attempts maximum. No substitute root-only screenshot or synthetic lifecycle notification. Boundary usage57% used/43% remaining, weekly71%.
+
 Completed slice — T09 native lease expiry `bbc1492`, independent Top approve. Actual confirmed-background61.009s, same PID20735; share retired, second explicit export waits for a fresh OS Face ID request/match. Signed selected test1/0 in101.135s / TEST SUCCEEDED. Two genuine match JSONs and four inspected screenshots/raw outputs retained in `Madar/Artifacts/t09-native-retirement-2026-10-12/run-bbc1492-lease-expiry/`. Exact60 boundary and full privacy acceptance remain separate.
 
 Completed slice — T09 native retirement matrix `daa9e99`, independent Top approve. L/light1/0 in33.750s (return4.642s, same PID19608); L/dark1/0 in34.036s (return4.629s, same PID19787). Correct size/theme and four PNGs inspected by root/verifier/reviewer; AX3 evidence reused. Raw outputs under `Madar/Artifacts/t09-native-retirement-2026-10-12/run-daa9e99-default-{light,dark}/`. No full T09/integration approval.
