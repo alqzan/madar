@@ -3,6 +3,21 @@ import MadarCore
 @testable import Madar
 
 final class CustomizationCopyTests: XCTestCase {
+    func test_fixPrevious_M0S2_RA1_RestoreReplaceWarningIsLocalOnly() {
+        let replacement = BackupCopy.restoreConfirmation(mode: .replace, keyConfigured: true)
+        XCTAssertEqual(replacement, "سيُستبدل محتوى مدار على هذا الجهاز. تُحفظ نسخة أمان أولًا، وتُحذف السجلات غير الموجودة في النسخة حذفًا قابلًا للاسترجاع الصريح.")
+        XCTAssertFalse(replacement.contains("كل أجهزتك"))
+
+        let keyWarning = BackupCopy.restoreConfirmation(mode: .replace, keyConfigured: false)
+        XCTAssertTrue(keyWarning.contains("كلمة مرور النسخة المختارة"))
+        XCTAssertTrue(keyWarning.contains("على هذا الجهاز"))
+
+        XCTAssertEqual(
+            BackupCopy.restoreConfirmation(mode: .merge, keyConfigured: true),
+            "تُدمج السجلات حسب هوياتها، ولا يعيد الدمج سجلًّا محذوفًا إلا باسترجاع صريح."
+        )
+    }
+
     func test_fixPrevious_M0T13_RU3_BackupRecordPluralCategories() {
         // Golden Arabic grammar follows RU3, not production/catalog output.
         let fixtures: [(Int, String, String, String, String)] = [

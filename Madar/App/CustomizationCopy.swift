@@ -10,6 +10,17 @@ enum CustomizationCopy {
 }
 
 enum BackupCopy {
+    static func restoreConfirmation(mode: BackupUIRestoreMode, keyConfigured: Bool) -> String {
+        let message: String
+        switch mode {
+        case .merge:
+            message = "تُدمج السجلات حسب هوياتها، ولا يعيد الدمج سجلًّا محذوفًا إلا باسترجاع صريح."
+        case .replace:
+            message = "سيُستبدل محتوى مدار على هذا الجهاز. تُحفظ نسخة أمان أولًا، وتُحذف السجلات غير الموجودة في النسخة حذفًا قابلًا للاسترجاع الصريح."
+        }
+        return message + (keyConfigured ? "" : " كلمة مرور النسخة المختارة ستحمي نسخة الأمان والنسخ التلقائي على هذا الجهاز.")
+    }
+
     static func restored(count: Int, formattedCount: String, bundle: Bundle = .main) -> String {
         String(localized: "backup.restored", defaultValue: "\(count) \(formattedCount)",
                table: "Customization", bundle: bundle, locale: Locale(identifier: "ar"))
