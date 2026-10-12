@@ -155,6 +155,79 @@ import XCTest
         // authorization lease; this does not establish a Files destination write.
     }
 
+    func test_M0T09_AX3BackgroundRetiresAuthorizedNativeShareWithoutReopening() throws {
+        guard ProcessInfo.processInfo.environment["MADAR_TEST_NATIVE_BIOMETRICS"] == "1" else {
+            throw XCTSkip("Run scripts/native-export-biometric-test.py --test background-retirement for supported simulator Face ID orchestration.")
+        }
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "AX3", "MADAR_UI_THEME": "light"]
+        app.launch(); openPlainExportSettings(app)
+        defer { app.terminate() }
+        let cover = app.descendants(matching: .any).matching(identifier: "scene-privacy-cover").firstMatch
+        let export = app.buttons["plain-export-now"]
+        let share = app.buttons["plain-export-share"]
+        XCTAssertFalse(cover.exists)
+        XCTAssertFalse(share.exists)
+        XCTAssertTrue(export.isEnabled)
+        export.tap()
+        XCTAssertTrue(cover.waitForExistence(timeout: 10), app.debugDescription)
+        NSLog("MADAR_NATIVE_FACEID_REQUEST_READY")
+        XCTAssertTrue(share.waitForExistence(timeout: 30), app.debugDescription)
+        XCTAssertEqual(app.state, .runningForeground)
+        XCTAssertFalse(cover.exists)
+        scrollTo(share, in: app)
+        XCTAssertTrue(share.isEnabled)
+        share.tap()
+        let file = app.descendants(matching: .any).matching(NSPredicate(
+            format: "label BEGINSWITH %@ AND label CONTAINS %@", "Madar-", "-plain"
+        )).firstMatch
+        let saveToFiles = app.descendants(matching: .any).matching(NSPredicate(
+            format: "label CONTAINS[c] %@ OR label CONTAINS %@", "Save to Files", "الملفات"
+        )).firstMatch
+        XCTAssertTrue(file.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(saveToFiles.waitForExistence(timeout: 10), app.debugDescription)
+        attachScreenshot(app, named: "M0-T09-AX3-native-share-before-background")
+        NSLog("MADAR_NATIVE_SHARE_BEFORE_HOME")
+        let backgroundStarted = ProcessInfo.processInfo.systemUptime
+        XCUIDevice.shared.press(.home)
+        XCTAssertTrue(app.wait(for: .runningBackground, timeout: 10), app.debugDescription)
+        // Activate the running background app; do not terminate or launch a new fixture.
+        app.activate()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.navigationBars["النسخ والاستعادة"].waitForExistence(timeout: 10), app.debugDescription)
+        scrollBackupForm(to: export, in: app, towardsTop: true)
+        expectation(for: NSPredicate(format: "exists == true AND enabled == true AND hittable == true"), evaluatedWith: export)
+        waitForExpectations(timeout: 10)
+        let elapsed = ProcessInfo.processInfo.systemUptime - backgroundStarted
+        XCTAssertLessThan(elapsed, 60, "This case must return before the spec's one-minute authorization expiry.")
+        NSLog("MADAR_NATIVE_SHARE_REENTRY_READY elapsed=%.3f", elapsed)
+        XCTAssertFalse(cover.exists, "The settings shell must recover after native share retirement.")
+        XCTAssertFalse(file.exists, "The native archive item must retire on background revocation.")
+        XCTAssertFalse(saveToFiles.exists, "The native share destination must retire with its archive item.")
+        XCTAssertFalse(share.exists, "A revoked cached export must not retain share readiness.")
+        // Inspect the adjacent export rows at AX3 rather than accepting absence
+        // solely from a virtualized offscreen share button.
+        let password = app.secureTextFields["backup-password"]
+        let form = app.collectionViews.firstMatch
+        for _ in 0..<12 {
+            XCTAssertFalse(share.exists, "Revoked share readiness must stay absent while inspecting its section.")
+            if elementIsOnscreenAndHittable(password, in: app) { break }
+            form.swipeUp()
+        }
+        XCTAssertTrue(elementIsOnscreenAndHittable(password, in: app), app.debugDescription)
+        let reopened = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            MainActor.assumeIsolated { file.exists || saveToFiles.exists || share.exists }
+        }, object: nil)
+        reopened.isInverted = true
+        XCTAssertEqual(XCTWaiter.wait(for: [reopened], timeout: 5), .completed,
+                       "Re-entry must not automatically reopen the native sheet or publish share readiness.")
+        XCTAssertFalse(cover.exists)
+        attachScreenshot(app, named: "M0-T09-AX3-native-share-retired-after-reentry")
+        // This proves foreground retirement, not the synchronous inactive cover,
+        // actual app-switcher frame, lease expiry, file deletion or Files write.
+    }
+
     func test_M0T09_AX3BackgroundDuringExportAuthenticationDoesNotExposeShare() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
