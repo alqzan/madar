@@ -1,5 +1,5 @@
 {
-  "gate": "Package license text and font hashes verified locally; owner must confirm the package was downloaded from the official site before any distribution decision. Do not publish font binaries or host them.",
+  "gate": "Owner confirmed on 2026-10-12 that Thmanyah is approved for Madar and the required license/permission was obtained; M0-02 is closed. Keep license evidence and hashes. Do not publish font binaries or host them.",
   "officialLicenseURL": "https://font.thmanyah.com/licenses",
   "retrieved": "2026-10-10",
   "packageEvidenceReviewed": "2026-10-12",
@@ -21,7 +21,7 @@
       }
     ],
     "appFontFilesMatched": 8,
-    "acquisitionEvidence": "Owner-provided ChatGPT library attachment; original official-site download origin not established"
+    "acquisitionEvidence": "Owner-provided ChatGPT library attachment; owner confirmed Madar license/permission on 2026-10-12"
   },
   "fonts": [
     {
@@ -107,7 +107,7 @@
     "retrieved": "2026-10-12",
     "url": "https://font.thmanyah.com/licenses",
     "summary": "The current Arabic page allows app embedding only in a compiled, packaged, or obfuscated product and prohibits making font files independently extractable or reusable, including through apps.",
-    "result": "Does not establish the supplied archive download origin or release-bundle compliance. A saved Debug simulator app contains the eight OTFs as separate bundle files; distribution gate remains open. See docs/reports/M0-T06-font-license-evidence.md."
+    "result": "Owner confirmed on 2026-10-12 that the font is approved for Madar and the required license/permission was obtained; this closes M0-02. A saved Debug simulator app contains the eight OTFs as separate bundle files, retained as development evidence only. See docs/reports/M0-T06-font-license-evidence.md."
   },
   "amiriSourceRelease": "https://github.com/aliftype/amiri/releases/tag/1.003",
   "amiriArchiveSha256": "81af0aff7d2086d8af24cea7202f7546130997982534691373485cd96744d05e"
