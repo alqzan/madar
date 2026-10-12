@@ -31,17 +31,33 @@ public struct NotificationPolicy: Sendable {
         self.notesDailyCap = min(2, max(0, notesDailyCap)); self.dayBoundary = dayBoundary
     }
 }
+/// The single pure timing gate for every scheduled request. It repeatedly advances a
+/// proposal until it is clear of every known window, including a following prayer.
+public struct SanctityGuard: Sendable {
+    private let windows: [SanctityWindow]
+    public init(windows: [SanctityWindow]) { self.windows = windows.sorted { $0.start < $1.start } }
+    public init(prayerDays: [PrayerDay]) { self.init(windows: prayerDays.flatMap(\.sanctityWindows)) }
+    public func clamp(_ proposed: Date) -> Date {
+        var result = proposed
+        while let window = windows.first(where: { $0.contains(result) }) { result = window.end }
+        return result
+    }
+}
 public enum NotificationArbiter {
     public static let pendingCap = 60
     public static func prayerAsk(day: PrayerDay, prayer: Prayer, askAfterAdhanMinutes: Int = 30, recorded: Bool = false) -> NotificationCandidate? {
         guard !recorded else { return nil }
         let adhan = day.time(for: prayer)
-        let window = SanctityWindow(prayer: prayer, adhan: adhan)
-        return .init(id: "salah.\(day.day).\(prayer.rawValue)", room: .salah, kind: .prayerAsk, dueAt: max(window.end, adhan.addingTimeInterval(Double(max(0, askAfterAdhanMinutes)) * 60)), dayKey: day.day.description)
+        let windows = day.sanctityWindows
+        let window = windows.first { $0.prayer == prayer }!
+        let proposed = max(window.end, adhan.addingTimeInterval(Double(max(0, askAfterAdhanMinutes)) * 60))
+        let due = SanctityGuard(windows: windows).clamp(proposed)
+        return .init(id: "salah.\(day.day).\(prayer.rawValue)", room: .salah, kind: .prayerAsk, dueAt: due, dayKey: day.day.description)
     }
     public static func plan(candidates: [NotificationCandidate], prayerDays: [PrayerDay], now: Date, timeZone: TimeZone, policy: NotificationPolicy = .init(), existingPendingCount: Int = 0, deliveredCategoryCycles: Set<String> = [], disabledIDs: Set<String> = [], submittedBudgetByDay: [String: Int] = [:], submittedNotesByDay: [String: Int] = [:]) -> NotificationPlan {
         guard policy.thisDeviceRemindersEnabled else { return .init(scheduled: [], droppedIDs: candidates.map(\.id), digestedIDs: []) }
         let windows = prayerDays.flatMap(\.sanctityWindows).sorted { $0.start < $1.start }
+        let sanctityGuard = SanctityGuard(windows: windows)
         let ordinaryEnd = now.addingTimeInterval(48 * 3600), prayerEnd = now.addingTimeInterval(96 * 3600)
         let capacity = max(0, pendingCap - max(0, existingPendingCount))
         var scheduled: [NotificationCandidate] = [], dropped: [String] = [], digested: [String] = []
@@ -57,7 +73,7 @@ public enum NotificationArbiter {
             guard !disabledIDs.contains(candidate.id), candidate.kind == .reminder || candidate.kind == .prayerAsk else { dropped.append(candidate.id); continue }
             let horizon = candidate.kind == .prayerAsk ? prayerEnd : ordinaryEnd
             guard candidate.dueAt >= now, candidate.dueAt <= horizon else { dropped.append(candidate.id); continue }
-            let due = deferOutsideWindows(candidate.dueAt, windows: windows)
+            let due = sanctityGuard.clamp(candidate.dueAt)
             guard due <= horizon else { dropped.append(candidate.id); continue }
             let shifted = NotificationCandidate(id: candidate.id, room: candidate.room, kind: candidate.kind, dueAt: due, dayKey: candidate.dayKey, categoryCycleKey: candidate.categoryCycleKey)
             if candidate.kind == .prayerAsk { scheduled.append(shifted); continue }
@@ -70,7 +86,7 @@ public enum NotificationArbiter {
             rooms[key, default: []].append(shifted)
         }
         if policy.staleNudgeEnabled {
-            let finalAt = deferOutsideWindows(ordinaryEnd, windows: windows)
+            let finalAt = sanctityGuard.clamp(ordinaryEnd)
             if !isQuiet(finalAt, timeZone: timeZone, policy: policy) {
                 let key = madarKey(at: finalAt, prayerDays: prayerDays, timeZone: timeZone, boundary: policy.dayBoundary)
                 rooms[key, default: []].append(.init(id: "nudge.\(key)", room: .core, kind: .openApp, dueAt: finalAt, dayKey: key))
@@ -88,7 +104,7 @@ public enum NotificationArbiter {
                     let cutoff = prayers.day.date(in: timeZone).addingTimeInterval(Double(quiet - 15) * 60)
                     proposed = min(proposed, cutoff)
                 }
-                proposed = deferOutsideWindows(proposed, windows: windows)
+                proposed = sanctityGuard.clamp(proposed)
                 if proposed >= now && proposed <= ordinaryEnd && !isQuiet(proposed, timeZone: timeZone, policy: policy) { digestTime = proposed }
             }
             if let digestTime {
@@ -132,9 +148,7 @@ public enum NotificationArbiter {
         return (instant < start ? civil.adding(days: -1) : civil).description
     }
     public static func deferOutsideWindows(_ instant: Date, windows: [SanctityWindow]) -> Date {
-        var result = instant
-        for window in windows.sorted(by: { $0.start < $1.start }) { if window.contains(result) { result = window.end } }
-        return result
+        SanctityGuard(windows: windows).clamp(instant)
     }
     private static func isQuiet(_ date: Date, timeZone: TimeZone, policy: NotificationPolicy) -> Bool {
         guard let from = policy.quietFromMinutes else { return false }

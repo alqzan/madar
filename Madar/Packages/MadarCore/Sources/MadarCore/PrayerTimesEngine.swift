@@ -19,9 +19,10 @@ public struct SanctityWindow: Codable, Equatable, Sendable {
     public let prayer: Prayer
     public let start: Date
     public let end: Date
-    public init(prayer: Prayer, adhan: Date) {
+    public init(prayer: Prayer, adhan: Date, durationMinutes: Int? = nil) {
         self.prayer = prayer; start = adhan
-        end = adhan.addingTimeInterval(TimeInterval(prayer == .maghrib ? 20 : 30) * 60)
+        let minutes = durationMinutes ?? (prayer == .maghrib ? 20 : 30)
+        end = adhan.addingTimeInterval(TimeInterval(max(0, minutes)) * 60)
     }
     public func contains(_ instant: Date) -> Bool { instant >= start && instant < end }
 }
@@ -34,8 +35,26 @@ public struct PrayerDay: Codable, Equatable, Sendable {
     public let asr: Date
     public let maghrib: Date
     public let isha: Date
+    /// The calendar date used by the calculation. Nil is supported for older encoded values.
+    public let hijriDate: HijriDate?
+    public init(day: GregorianDay, place: ActivePlace, fajr: Date, sunrise: Date, dhuhr: Date, asr: Date, maghrib: Date, isha: Date, hijriDate: HijriDate? = nil) {
+        self.day = day; self.place = place; self.fajr = fajr; self.sunrise = sunrise
+        self.dhuhr = dhuhr; self.asr = asr; self.maghrib = maghrib; self.isha = isha
+        self.hijriDate = hijriDate
+    }
     public func time(for prayer: Prayer) -> Date { switch prayer { case .fajr: fajr; case .dhuhr: dhuhr; case .asr: asr; case .maghrib: maghrib; case .isha: isha } }
-    public var sanctityWindows: [SanctityWindow] { Prayer.allCases.map { .init(prayer: $0, adhan: time(for: $0)) } }
+    public var sanctityWindows: [SanctityWindow] {
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = place.timeZone
+        let isFriday = calendar.component(.weekday, from: day.date(in: place.timeZone)) == 6
+        let month = hijriDate?.month ?? HijriCalendar.date(for: day.date(in: place.timeZone).addingTimeInterval(12 * 3600), timeZone: place.timeZone).month
+        return Prayer.allCases.map { prayer in
+            let minutes: Int
+            if prayer == .dhuhr && isFriday { minutes = 60 }
+            else if prayer == .isha && month == 9 { minutes = 90 }
+            else { minutes = prayer == .maghrib ? 20 : 30 }
+            return .init(prayer: prayer, adhan: time(for: prayer), durationMinutes: minutes)
+        }
+    }
 }
 public enum PrayerTimesEngine {
     /// Pure Umm Al-Qura calculation. Polar days return nil, never fabricated clock times.
@@ -56,6 +75,6 @@ public enum PrayerTimesEngine {
         let hijri = HijriCalendar.date(for: day.date(in: place.timeZone).addingTimeInterval(12 * 3600), timeZone: place.timeZone, source: options.hijriSource, sightingOffset: options.sightingOffset)
         let isha = options.method == .ummAlQura ? result.maghrib.addingTimeInterval(TimeInterval(hijri.month == 9 ? 120 : 90) * 60) : result.isha
         func shifted(_ time: Date, _ prayer: Prayer) -> Date { time.addingTimeInterval(Double(options.offsets[prayer, default: 0]) * 60) }
-        return PrayerDay(day: day, place: place, fajr: shifted(result.fajr, .fajr), sunrise: result.sunrise, dhuhr: shifted(result.dhuhr, .dhuhr), asr: shifted(result.asr, .asr), maghrib: shifted(result.maghrib, .maghrib), isha: shifted(isha, .isha))
+        return PrayerDay(day: day, place: place, fajr: shifted(result.fajr, .fajr), sunrise: result.sunrise, dhuhr: shifted(result.dhuhr, .dhuhr), asr: shifted(result.asr, .asr), maghrib: shifted(result.maghrib, .maghrib), isha: shifted(isha, .isha), hijriDate: hijri)
     }
 }

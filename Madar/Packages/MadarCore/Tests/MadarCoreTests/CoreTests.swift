@@ -73,6 +73,91 @@ func sanctity() throws {
     #expect(NotificationArbiter.prayerAsk(day: day, prayer: .fajr, askAfterAdhanMinutes: 1)?.dueAt == day.fajr.addingTimeInterval(1800))
     #expect(NotificationArbiter.prayerAsk(day: day, prayer: .fajr, recorded: true) == nil)
 }
+@Test("RP3 prayer-specific sanctity extensions use Friday and Ramadan dates")
+func sanctityExtensions() throws {
+    let friday = try #require(PrayerTimesEngine.calculate(day: GregorianDay("2026-10-09"), place: .riyadh))
+    let fridayWindows = friday.sanctityWindows
+    #expect(fridayWindows.first { $0.prayer == .dhuhr }?.end == friday.dhuhr.addingTimeInterval(60 * 60))
+    #expect(fridayWindows.first { $0.prayer == .maghrib }?.end == friday.maghrib.addingTimeInterval(20 * 60))
+    #expect(fridayWindows.first { $0.prayer == .isha }?.end == friday.isha.addingTimeInterval(30 * 60))
+
+    let ramadan = try #require(PrayerTimesEngine.calculate(day: GregorianDay("2027-02-10"), place: .riyadh))
+    #expect(ramadan.hijriDate?.month == 9)
+    #expect(ramadan.sanctityWindows.first { $0.prayer == .isha }?.end == ramadan.isha.addingTimeInterval(90 * 60))
+    #expect(ramadan.sanctityWindows.first { $0.prayer == .dhuhr }?.end == ramadan.dhuhr.addingTimeInterval(30 * 60))
+}
+@Test("RP3 guard repeats across a following window and clamps exact starts")
+func sanctityGuardCascades() throws {
+    let first = SanctityWindow(prayer: .dhuhr, adhan: try instant(hour: 10), durationMinutes: 60)
+    let following = SanctityWindow(prayer: .asr, adhan: try instant(hour: 10, minute: 55), durationMinutes: 30)
+    let guarder = SanctityGuard(windows: [following, first])
+    let requested = try instant(hour: 10, minute: 30)
+    let clear = try instant(hour: 11, minute: 25)
+    #expect(guarder.clamp(requested) == clear)
+    #expect(guarder.clamp(following.start) == following.end)
+    #expect(guarder.clamp(following.end) == following.end)
+}
+@Test("RP3 planning clamps prayer asks, snoozes, room requests, digest and nudge")
+func sanctityRequestPaths() throws {
+    let friday = try #require(PrayerTimesEngine.calculate(day: GregorianDay("2026-10-09"), place: .riyadh))
+    let dhuhrWindow = try #require(friday.sanctityWindows.first { $0.prayer == .dhuhr })
+    let ask = try #require(NotificationArbiter.prayerAsk(day: friday, prayer: .dhuhr, askAfterAdhanMinutes: 45))
+    #expect(ask.dueAt == dhuhrWindow.end)
+    let snooze = NotificationCandidate(id: "salah.\(friday.day).dhuhr.snooze", room: .salah, kind: .prayerAsk, dueAt: friday.dhuhr.addingTimeInterval(45 * 60), dayKey: friday.day.description)
+    let roomRequest = NotificationCandidate(id: "quran.friday", room: .quran, dueAt: friday.dhuhr.addingTimeInterval(45 * 60), dayKey: friday.day.description)
+    let fridayPlan = NotificationArbiter.plan(candidates: [snooze, roomRequest], prayerDays: [friday], now: friday.dhuhr.addingTimeInterval(-60 * 60), timeZone: friday.place.timeZone, policy: .init(dailyBudget: 10, staleNudgeEnabled: false))
+    #expect(fridayPlan.scheduled.count == 2)
+    #expect(fridayPlan.scheduled.allSatisfy { $0.dueAt == dhuhrWindow.end })
+
+    let ramadan = try #require(PrayerTimesEngine.calculate(day: GregorianDay("2027-02-10"), place: .riyadh))
+    let reminders = (0..<5).map { offset in
+        NotificationCandidate(id: "notes.\(offset)", room: .notes, dueAt: ramadan.isha.addingTimeInterval(-25 * 60 + Double(offset) * 60), dayKey: ramadan.day.description)
+    }
+    let digestPlan = NotificationArbiter.plan(candidates: reminders, prayerDays: [ramadan], now: ramadan.isha.addingTimeInterval(-60 * 60), timeZone: ramadan.place.timeZone, policy: .init(dailyBudget: 1, staleNudgeEnabled: false))
+    let digest = try #require(digestPlan.scheduled.first { $0.kind == .digest })
+    #expect(digest.dueAt == ramadan.isha.addingTimeInterval(90 * 60))
+
+    let nudgeNow = friday.dhuhr.addingTimeInterval(-48 * 60 * 60)
+    let nudgePlan = NotificationArbiter.plan(candidates: [], prayerDays: [friday], now: nudgeNow, timeZone: friday.place.timeZone, policy: .init(staleNudgeEnabled: true))
+    let nudge = try #require(nudgePlan.scheduled.first { $0.kind == .openApp })
+    #expect(nudge.dueAt == dhuhrWindow.end)
+}
+@Test("RP3 full-year property: all requested instants clamp clear in Riyadh, Jeddah and Tromsø")
+func sanctityGuardFullYearProperty() throws {
+    let places = [
+        ActivePlace.riyadh,
+        try ActivePlace(latitude: 21.4858, longitude: 39.1925, timeZoneID: "Asia/Riyadh"),
+        try ActivePlace(latitude: 69.6492, longitude: 18.9553, timeZoneID: "Europe/Oslo")
+    ]
+    let first = try GregorianDay("2025-12-25")
+    let yearStart = try GregorianDay("2026-01-01")
+    let yearEnd = try GregorianDay("2027-01-01")
+    for place in places {
+        var prayerDays: [PrayerDay] = []
+        for offset in 0..<380 {
+            let day = first.adding(days: offset)
+            if let prayers = PrayerTimesEngine.calculate(day: day, place: place) { prayerDays.append(prayers) }
+        }
+        let windows = prayerDays.flatMap(\.sanctityWindows)
+        let yearWindows = windows.filter { $0.start >= yearStart.date(in: place.timeZone) && $0.start < yearEnd.date(in: place.timeZone) }
+        #expect(!yearWindows.isEmpty)
+        let guarder = SanctityGuard(windows: windows)
+        var violations = 0
+        for window in yearWindows {
+            let duration = window.end.timeIntervalSince(window.start)
+            let requested = [
+                window.start.addingTimeInterval(-1), window.start,
+                window.start.addingTimeInterval(duration / 2),
+                window.end.addingTimeInterval(-1), window.end
+            ]
+            for instant in requested {
+                let clamped = guarder.clamp(instant)
+                if clamped < instant || windows.contains(where: { $0.contains(clamped) }) { violations += 1 }
+            }
+        }
+        #expect(violations == 0)
+    }
+}
 @Test("Budget, note ceiling, cycle dedupe, digest and pending reserved slots")
 func notificationBudget() throws {
     let day = try #require(PrayerTimesEngine.calculate(day: GregorianDay("2026-10-09"), place: .riyadh))
