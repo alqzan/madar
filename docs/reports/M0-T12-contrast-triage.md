@@ -52,3 +52,5 @@ Result: the font copy, preview linking and codesigning passed; XCTest ran the is
 Acceptance disposition: workspace resource/build blockage resolved for this run; T12 remains needs-fix because contrast target/pair is unidentified. Obtain an actionable platform trace; do not repeat this unchanged diagnostic or call it an accepted accessibility result. Owner-device, VoiceOver/Reduce Motion and whole M0 gate remain separate.
 
 Durable local copy: `Madar/Artifacts/workflow-repair-2026-10-12/madar-t12-preflight-top.log`, matching `.xcresult` and `madar-t12-preflight-top-attachments/`. Preserved outside `/tmp`, ignored by Git; this adds no new test execution.
+
+Root inspected the preserved failure screenshot `9A8CF555-98C8-4042-863A-D6A3CC3EFCB5.png`: Settings/light is visible, with no highlighted audit target. The floating bar overlays lower visible content; this does not identify the contrast callback or justify a color change.
