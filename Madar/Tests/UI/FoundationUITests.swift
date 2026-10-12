@@ -384,7 +384,7 @@ import XCTest
         let card = try XCTUnwrap(cards.allElementsBoundByIndex.first {
             $0.exists && $0.frame.width > screenFrame.width * 0.5 && $0.frame.height > screenFrame.height * 0.4
         })
-        NSLog("MADAR_NATIVE_SWITCHER_CAPTURED label=%@ identifier=%@ frame=%@", card.label, card.identifier, NSStringFromCGRect(card.frame))
+        NSLog("MADAR_NATIVE_SWITCHER_CAPTURED label=%@ identifier=%@ frame=%@", card.label, card.identifier, String(describing: card.frame))
         // Test success means an identified OS card was captured. Root and Top
         // review must judge the actual card image for coverage and absence of
         // archive/share/protected content; accessibility absence cannot prove it.
