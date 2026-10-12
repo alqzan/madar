@@ -420,6 +420,104 @@ import XCTest
         // archive/share/protected content; accessibility absence cannot prove it.
     }
 
+    func test_M0T09_DefaultNativeFaceIDNonmatchThenCancelRequiresExplicitRetry() throws {
+        guard ProcessInfo.processInfo.environment["MADAR_TEST_NATIVE_BIOMETRICS"] == "1" else {
+            throw XCTSkip("Run scripts/native-export-biometric-test.py --test biometric-refusal for real simulator Face ID nonmatch orchestration.")
+        }
+        continueAfterFailure = false
+        let fixture = try XCTUnwrap(ProcessInfo.processInfo.environment["MADAR_TEST_NATIVE_REFUSAL_STORE_ID"])
+        XCTAssertNotNil(UUID(uuidString: fixture), "The host must supply a new, explicit UUID fixture.")
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": fixture, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
+        app.launch(); openPlainExportSettings(app)
+        defer { app.terminate() }
+        let cover = app.descendants(matching: .any).matching(identifier: "scene-privacy-cover").firstMatch
+        let export = app.buttons["plain-export-now"]
+        let share = app.buttons["plain-export-share"]
+        let file = app.descendants(matching: .any).matching(NSPredicate(
+            format: "label BEGINSWITH %@ AND label CONTAINS %@", "Madar-", "-plain"
+        )).firstMatch
+        let saveToFiles = app.descendants(matching: .any).matching(NSPredicate(
+            format: "label CONTAINS[c] %@ OR label CONTAINS %@", "Save to Files", "الملفات"
+        )).firstMatch
+        XCTAssertFalse(cover.exists)
+        XCTAssertFalse(share.exists)
+        XCTAssertTrue(export.isEnabled)
+        export.tap()
+        XCTAssertTrue(cover.waitForExistence(timeout: 10), app.debugDescription)
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        attachSwitcherEvidence(springboard, named: "M0-T09-refusal-default-light-native-request")
+        NSLog("MADAR_NATIVE_FACEID_NONMATCH_REQUEST_READY fixture=%@", fixture)
+        // This is a real failed match followed by the user's native Cancel,
+        // not a claim that one failed match terminally denies device authentication.
+        let nonmatch = springboard.descendants(matching: .any).matching(NSPredicate(
+            format: "label IN %@", ["Face Not Recognized", "Face Not Recognised", "Try Face ID Again", "لم يتم التعرف على الوجه", "أعد محاولة Face ID"]
+        )).firstMatch
+        let nonmatchObserved = nonmatch.waitForExistence(timeout: 30)
+        attachSwitcherEvidence(springboard, named: "M0-T09-refusal-default-light-native-nonmatch-before-cancel")
+        XCTAssertTrue(nonmatchObserved, "A native failed-match/retry affordance must be observed before cancellation.\n\(springboard.debugDescription)")
+        XCTAssertFalse(share.exists)
+        XCTAssertFalse(file.exists)
+        let cancel = springboard.buttons.matching(NSPredicate(format: "label IN %@", ["إلغاء", "Cancel"])).firstMatch
+        XCTAssertTrue(cancel.waitForExistence(timeout: 10), springboard.debugDescription)
+        XCTAssertTrue(cancel.isHittable, springboard.debugDescription)
+        cancel.tap()
+        // Refusal may show the app's ordinary error alert. Dismiss only that
+        // exact alert, never a passcode fallback or an OS authentication retry.
+        let incomplete = app.alerts["لم يكتمل الإجراء"]
+        if incomplete.waitForExistence(timeout: 5) {
+            attachScreenshot(app, named: "M0-T09-refusal-default-light-app-error")
+            let acknowledge = incomplete.buttons["حسنًا"]
+            XCTAssertTrue(acknowledge.isHittable, app.debugDescription)
+            acknowledge.tap()
+        }
+        XCTAssertTrue(app.navigationBars["النسخ والاستعادة"].waitForExistence(timeout: 10), app.debugDescription)
+        scrollBackupForm(to: export, in: app, towardsTop: true)
+        expectation(for: NSPredicate(format: "exists == true AND enabled == true AND hittable == true"), evaluatedWith: export)
+        waitForExpectations(timeout: 10)
+        XCTAssertEqual(app.state, .runningForeground)
+        XCTAssertFalse(cover.exists, "The default notesOnly shell must recover after native cancellation.")
+        let password = app.secureTextFields["backup-password"]
+        let form = app.collectionViews.firstMatch
+        for _ in 0..<12 {
+            XCTAssertFalse(share.exists, "Refusal must not publish cached readiness anywhere in the export section.")
+            if elementIsOnscreenAndHittable(password, in: app) { break }
+            form.swipeUp()
+        }
+        XCTAssertTrue(elementIsOnscreenAndHittable(password, in: app), app.debugDescription)
+        let unexpectedShare = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            MainActor.assumeIsolated { share.exists || file.exists || saveToFiles.exists }
+        }, object: nil)
+        unexpectedShare.isInverted = true
+        XCTAssertEqual(XCTWaiter.wait(for: [unexpectedShare], timeout: 5), .completed)
+        attachScreenshot(app, named: "M0-T09-refusal-default-light-recovered-without-share")
+        NSLog("MADAR_NATIVE_FACEID_REFUSAL_RECOVERED fixture=%@", fixture)
+        scrollBackupForm(to: export, in: app, towardsTop: true)
+        XCTAssertTrue(export.isEnabled)
+        export.tap()
+        XCTAssertTrue(cover.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(share.exists, "An explicit retry must await fresh native authentication.")
+        NSLog("MADAR_NATIVE_FACEID_REFUSAL_RETRY_REQUEST_READY fixture=%@", fixture)
+        XCTAssertTrue(share.waitForExistence(timeout: 30), app.debugDescription)
+        XCTAssertFalse(cover.exists)
+        scrollTo(share, in: app)
+        XCTAssertTrue(share.isEnabled)
+        NSLog("MADAR_NATIVE_FACEID_REFUSAL_RETRY_EXPORT_READY fixture=%@", fixture)
+        share.tap()
+        XCTAssertTrue(file.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(saveToFiles.waitForExistence(timeout: 10), app.debugDescription)
+        attachScreenshot(app, named: "M0-T09-refusal-default-light-explicit-retry-native-share")
+        let dismiss = app.buttons.matching(NSPredicate(format: "label IN %@", ["Close", "Cancel", "إغلاق", "إلغاء"])).firstMatch
+        if dismiss.exists && dismiss.isHittable { dismiss.tap() }
+        else { app.swipeDown() }
+        expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: file)
+        waitForExpectations(timeout: 10)
+        XCTAssertEqual(app.state, .runningForeground)
+        XCTAssertFalse(cover.exists)
+        // The host separately requires empty initial/post-refusal Backups and
+        // one nonempty plain ZIP after this genuine fresh match. No key claim.
+    }
+
     func test_M0T09_AX3BackgroundDuringExportAuthenticationDoesNotExposeShare() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
