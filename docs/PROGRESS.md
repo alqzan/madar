@@ -4,7 +4,7 @@ M0 Foundation — NOT APPROVED. Main contains the accepted local foundation; M1�
 
 # Last checked
 
-Checked `aeb3154..b7902be` — OK for main documentation/protocol continuity only; native candidate results remain bounded below. Prior check `aeb3154..ea5baac` — OK: documentation/protocol-only continuity changes; no new product checks justified. T09 candidate `fb6b1bb..e53f882` now passes the focused native retirement regression and independent Top review (bounded slice only).
+Checked `b7902be..aa54227` — OK: four documentation-only files, latest handover and candidate tips agree; unchanged native checks reused. Prior check `aeb3154..b7902be` — OK for main documentation/protocol continuity only; native candidate results remain bounded below. Prior check `aeb3154..ea5baac` — OK: documentation/protocol-only continuity changes; no new product checks justified. T09 candidate `fb6b1bb..e53f882` now passes the focused native retirement regression and independent Top review (bounded slice only).
 
 Prior check `79b380f..aeb3154` — M0-T15 workspace tooling and startup docs approved by independent GPT-6.1 Sol high; six focused regressions pass. Main font preflight: all11 resources hash-match, 0 copies. No Swift/product behavior changed; prior app22/package125 baseline and T14 focused1/0 evidence reused. No broad product build/test justified; separate Top T12 diagnostic ran once on its candidate.
 
@@ -57,6 +57,8 @@ Sections: S0 contracts building; S1 data/commands building (physical acceptance 
 M1 prayer logging/sanctity; M2 Quran; M3 diary; M4 lobby/habits/widgets; M5 money; M6 Mihbara; M7 final integration. Preserve existing later-room scaffolding. Distribution/membership and sync decision remain separate owner steps.
 
 # Handovers
+
+Active session — 2026-10-12: M0-T09R native acceptance claimed. Concrete result: inspect the uniquely identified full OS switcher card on source-approved `b7cd5d1`, then independent Sol xhigh judgment. Sol high verifier owns simulator; Top reviewer owns only the new evidence; root owns integration/docs. No repeated green suite; this run is justified because the SDK fix has no native result. Initial usage1% five-hour used /99% remaining, weekly77%; no reset.
 
 Final checkpoint — 2026-10-12: initial0% five-hour used after natural renewal; before Top native run97% used/3% remaining, weekly77%. No reset credit used. Existing successful checks reused; stopped before further expensive work. Full T09/M0 remain unapproved.
 
