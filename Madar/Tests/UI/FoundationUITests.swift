@@ -393,7 +393,7 @@ import XCTest
                                 screenFrame.maxX - screenFrame.width * 0.05 - contentFrame.midX)
                 NSLog("MADAR_NATIVE_SWITCHER_CENTER_ONCE from=%@ dx=%.3f", String(describing: cardFrame), delta)
                 let origin = content.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-                origin.press(forDuration: 0.1, thenDragTo: origin.coordinate(withOffset: CGVector(dx: delta, dy: 0)),
+                origin.press(forDuration: 0.1, thenDragTo: content.coordinate(withNormalizedOffset: CGVector(dx: 0.5 + delta / contentFrame.width, dy: 0.5)),
                              withVelocity: .slow, thenHoldForDuration: 0.1)
             }
         }
