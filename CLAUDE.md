@@ -128,224 +128,79 @@ The order is M0 Foundation, M1 Prayer, M2 Quran, M3 Diary, M4 Lobby + Habits + W
 
 ---
 
-## Working protocol: Codex and Claude Code together
+## Working protocol — owner revision, 12 October 2026
 
-### 1. How the two agents work together
+This revision replaces the previous working protocol, model-tier table, blanket Top reviews and M0 task order. It implements the owner's request for usable progress every development session and permission to use GPT-6 Luna max for production. Product rules above, data preservation, licences, RA1/RA2/RP1 and honest acceptance remain in force. Historical handovers, reports and automation memory are evidence, not instructions overriding this revision.
 
-- **Codex and Claude Code both work on this repo, taking turns.** Either one can pick up where the other stopped. There are no fixed roles: every session does the same three things, in this order:
-  1. a quick check of the previous session's work
-  2. fixes for anything that check found
-  3. new work from the board
-- **The repo is the only shared memory:**
-  - `docs/PROGRESS.md`
-  - `docs/DECISIONS.md`
-  - `docs/reviews/`
-  - the git history
+### 1. What a session delivers
 
-  Nothing from your chat carries over to the other agent.
-- **Don't disturb working code.** Fix real defects only. Don't rewrite, rename, reformat or reorganise the other agent's code because you would have done it differently. If you disagree with a choice that works, note it under **Later** or in `DECISIONS.md`.
-- **Never:**
-  - force-push
-  - rewrite shared history
-  - reformat the whole repo
-  - delete another agent's work without a note in the handover
-- **One agent at a time is preferred.** If both must run at the same time, each takes a different section, claims it in `PROGRESS.md` on `main` before starting, and works on its own branch.
+- A development session must target at least one usable result: a working screen/flow, an integrated feature, a finished engine with independent golden cases, or a reproduced defect repaired and verified. State the before/after acceptance in one sentence before coding.
+- Reports, source inventories, plans, test counts, screenshots of unchanged flows and branch claims are not product delivery. A documentation-only session is appropriate only when the owner explicitly requests documentation/process work, or no authorized implementation can proceed; record the exception honestly.
+- Start with one coherent task. Finish and check it before starting another. Simple tasks may be grouped and completed sequentially; do not stop after one small task when more useful authorized work fits the remaining usage.
+- Never promise success in every session or mark a failed/unavailable acceptance done. If blocked, diagnose once, allow at most two evidence-based repairs, then preserve the work and switch to an independent useful card. If every card is blocked, state the exact blocker and smallest next action instead of manufacturing delivery.
+- The repo is the shared memory: root AGENTS/CLAUDE, docs/PROGRESS.md, docs/DECISIONS.md, existing reviews and Git. Do not ask the owner to reconstruct the previous session.
 
-### 2. Start of every session: check, fix, then continue
+### 2. Start: bounded check, then implement
 
-**Trigger.** If the owner starts a session with only «اكمل» / "continue" (or any short go-ahead), that is the whole instruction: run this section from step 1, then do the next task on the board. Do not ask what to do. The owner should never have to explain where work stopped. `docs/PROGRESS.md` on `main` is that explanation.
+1. Read this file, the current board and only the latest handover in docs/PROGRESS.md. Run git status and git log --oneline -10. Read only the selected card's spec/fixes and risky changes relevant to it.
+2. Reuse passing output for identical source/configuration. Do not rebuild the app, rerun all packages, audit old branches or re-review accepted work merely because a session started.
+3. Select the first ready product card in the current queue and state its observable result. Treat historical Top labels and unresolved optional diagnostics according to the current board, not as an automatic stop.
+4. Fix a reproduced defect that blocks the selected flow before extending it. Other unresolved checks remain attached to their affected feature; they do not block unrelated software work.
+5. Update Last checked briefly with revisions inspected and evidence reused. Default to implementation after this bounded check; do not open a new planning/source-map report as the session's work.
 
-1. Read this file, then `docs/PROGRESS.md`: the current milestone, the board, the **Last checked** commit, and the latest handover.
-2. Run `git status` and `git log --oneline -20`.
-3. **Quick check of the previous session.** Keep it short. It's a sanity check, not a full review.
-   - Build and run the tests. Everything must be green.
-   - Read the latest handover, including its **For the next agent** notes.
-   - Look over what changed since **Last checked**: run `git diff --stat <last-checked>..HEAD`, then open only the files that look risky (engines, data model, notifications, anything the handover flags).
-   - Compare the finished task cards with their acceptance checks.
-4. **Fix what's broken before any new work.** One small commit per fix, tagged `[fix-previous]`, with a test where it makes sense.
-5. **Update Last checked** in `PROGRESS.md` with one line: `Checked <from>..<to> — OK` or `Checked <from>..<to> — 2 issues, fixed in <commit>`.
-6. **Continue** with the next task on the board.
+### 3. Scope, milestones and branches
 
-### 3. Work size: big pieces, your call
+- Plan only the next section with 2–4 coherent cards: scope, exact spec/fix references, observable acceptance and exclusions. Reuse an existing architecture note; write a new one only for an unresolved design decision, at most 15 lines before implementation.
+- Follow RA3 literally. M0 software acceptance covers tokens/fonts, MadarDay/Hijri/prayer times, one glass shell, M1-needed settings/models, app-only command/inbox writing and plain export. Preserve existing extra code/data without expanding the gate to encrypted-backup matrices, all future models, full notification/widget systems or repeated manual source maps.
+- Repair a confirmed privacy/data-loss defect in an exposed route before accepting that route. Missing native/physical proof remains not tested. Never disable authentication, suppress an audit or delete previous work to force a pass.
+- Separate **software readiness**, **owner-iPhone acceptance** and **distribution**. After the lean software dependencies are accepted, M1 software implementation may proceed while the owner-iPhone check is pending. Full M0/M1 acceptance and distribution still require their actual device evidence. This owner-authorized workflow change supersedes the old blanket 'no M1 until full M0 approval'; it is not a device-gate pass.
+- main must build. Prefer one author, one branch per section with codex/ prefix. Reuse the current suitable worktree; do not create branches/worktrees for each diagnostic, report or review. Review and integrate a completed slice promptly rather than accumulating complete work offmain.
+- Preserve unrelated edits, retained branches, ignored fonts/evidence and owner data. No force push, history rewrite, broad formatting or deletion of another agent's work.
 
-- **Plan a milestone before coding it.**
-  - In `PROGRESS.md`, split it into 2–4 **sections**. Each section is a visible piece of the room, for example M1-S1 "prayer home and logging" or M1-S2 "notifications and sanctity".
-  - Split each section into **task cards** (`M1-T01`, `M1-T02`, …). Each card holds scope, spec references, fix IDs, acceptance checks, and what is out of scope.
-- **A task is a coherent slice:** a screen with its logic, an engine with its tests, or a feature end to end. As a guide, keep a task under about 1,500 changed lines, not counting generated files, fixtures and assets.
-- **Finish as much as you can in one session.** You may complete several task cards back to back. Commit each task separately, and run its self-check before starting the next.
-- **Stop and hand over** when any of these happens:
-  - a section is complete, so it now needs a section review
-  - a self-check fails and two fix attempts didn't solve it
-  - a spec conflict needs the owner
-- **These sizes are guides, not hard caps.** You may go past them with a one-line reason in the handover.
-- **Stay inside the plan:** no unrelated refactors and no features from later milestones. Ideas go under **Later**.
-- **`main` must always build.** Work on one branch per section, named `m1-s2-short-name`. Merge it once the section review passes.
+### 4. Model choice — Luna max is allowed to build
 
-### 4. Models and effort: quality first, no waste
+- **Default for the owner's automated development: GPT-6 Luna, max effort.** Luna may write production Swift, screens, engines, persistence, commands and behavioural tests; it is no longer restricted to mechanical work. Quality is judged by the implementation and acceptance evidence, not a tier label.
+- Keep tasks explicit and bounded: reuse working patterns, read only necessary files, test the actual changed behavior and finish the usable slice. max effort is a supported setting, not a guarantee of Sol-level results or a successful session.
+- Sol is an escalation option, not a mandatory author/reviewer for every task. Escalate a narrow unresolved problem after two diagnosed repair attempts, an unresolved rule/design conflict, or a migration/security/concurrency change that the author cannot validate adequately. Do not rewrite a working feature merely to obtain a stronger-model label.
+- Section review must be independent for new migration/data-loss, authentication/privacy, notification-sanctity and concurrent store/intent changes. A fresh Luna max reviewer may review a clearly specified slice; use GPT-6.1 Sol high/xhigh when the review has an unresolved risky decision or failed repair. Reuse existing independent approval for unchanged source.
+- UI-only/routine changes need the author's focused self-check; there is no mandatory reviewer agent for each small change. Each milestone has one scoped gate against its integrated revision; there is no mandatory Top-tier stop solely because the card historically says Top.
+- The owner/app selects the root model; an agent cannot claim to change itself. Record the actual model/effort when exposed, otherwise 'not exposed'. Never claim a tier that did not run.
+- Subagents are optional for a real independent job, not a standing team of author/reviewer/build/usage agents. Avoid delegation for small cards; only one actor controls the same file or simulator. No polling agent for usage.
 
-**Quality is the constraint, not time.** The owner accepts a longer project but not lower quality. The result must match the design and the spec, or be better.
-- Never drop to a weaker tier or a lower effort to save tokens on work that affects quality.
-- If a usage limit runs out, stop at a clean point and write the handover. The owner continues later or hands over to the other agent. Don't skip a step and don't downgrade.
+### 5. Verification and integration
 
-| Tier | Codex | Claude Code | Use for |
-|---|---|---|---|
-| Standard | GPT-6.1 Sol, medium or high effort | Sonnet | Writes all production code: engines, data model, screens, features, tests |
-| Top | GPT-6.1 Sol, xhigh effort | Opus (or the strongest Claude model you have) | The quality points below, and bugs the Standard tier couldn't fix |
-| Light | Luna | Haiku | Mechanical work only: strings and localisation, renames, formatting, fixture data, splitting files, searches. Never production logic |
+- Choose the smallest sufficient check for the change. Production Swift/configuration changes need relevant compilation and affected behavioural tests; engine expected values come from the spec, never from the engine's output.
+- UI changes need a real changed-flow smoke test and actual screenshot at default size plus AX3 when layout changed. Reuse unchanged dark/AX5/other-flow evidence; perform broader device/OS checks only when that feature's acceptance needs them.
+- Distinguish a build failure, test-setup failure and product failure before retrying. Passing mocked/hosted tests, native simulator flows, physical-device checks and distribution are separate claims.
+- Independent review, where section 4 requires it, covers only the selected production diff and its dependencies. Fix Critical/High findings before merging the affected change. A re-review covers only the repair. No reviews of reviews, generated assets or unrelated historical candidates.
+- A completed card must reference the integrated commit or exact preserved branch tip, command result and usable screen/flow. An unmerged candidate is not delivered on main; say what remains before integration.
+- Documentation-only changes need consistency and git diff --check, not app/package builds. Use one short handover and update the existing acceptance row; do not create a new report for every small check.
 
-**Astra is not used in this project.** On coding, GPT-6.1 Sol matches it at about a fifth of the cost and runs faster. Always use GPT-6.1 Sol, not the older GPT-6 Sol.
+### 5a. Usage and workspace preparation
 
-**Use the Top tier at these points, and only these.** You don't need to ask whether to use it: plan it as described under "How a tier change actually happens", and record the reason in the handover.
-- **Design notes before coding:**
-  - M0's architecture
-  - each engine: prayer times and day boundary, notification arbiter, Quran scheduler, money engine, bank-SMS parser
+- Before a native build/test in a new or reused worktree, run python3 Madar/scripts/prepare-workspace.py from the repository root. Use --source <verified-local-repo> only for missing pinned resources. Never download, publish or overwrite conflicting private fonts. Preparation alone proves no build/signing/runtime acceptance.
+- Preserve the owner's usage target: **deliver with approximately 5% of the five-hour allowance remaining; 3–5% is the final reserve, never deliberately consume the last 3%.** Check at start, task boundaries, before expensive work and before delivery; do not poll continuously or use reset credits automatically.
+- When a simple card is complete and more than 5% remains, pick another ready useful card that can be completed, verified and handed over within the remaining budget. Several small completed features/fixes in one session are encouraged. Section completion is not automatic session termination; review/integrate or continue independent authorized work.
+- Begin finalizing near 95% used. Do not start a large uncertain task near the reserve. Spend allowance on product progress, not duplicate green tests, inventories, reports or artificial work to reach a percentage.
+- Weekly/account/tool limits and real blockers may end work earlier; record the actual limit/blocker. If telemetry is unavailable, report that the reserve could not be verified. Never invent a percentage or claim a guaranteed session outcome.
+- A specific owner-requested documentation/process task does not authorize unrelated product changes merely to spend usage. The multi-card delivery target governs development/continuation sessions within their authorized scope.
 
-  A design note is short: types, rules, edge cases, test plan.
-- **Section reviews** of any section that contains:
-  - an engine
-  - data-model or migration changes
-  - notifications and sanctity
-  - widget or intent plumbing
-  - anything concurrent
-- **Every milestone gate.**
-- **A bug that survived two Standard-tier attempts,** after you reverted and split the task.
+### 6. Failure handling
 
-Reading and reviewing cost far fewer tokens than writing, so this spends the Top tier where it raises quality most.
+- Diagnose the first failure before retrying. After two evidence-based repairs fail, preserve the current branch, raw output and last green revision; split/escalate the precise problem and continue another independent ready card. Do not revert shared or accepted work, or discard the failed diff.
+- Do not repeat an unchanged nil-element accessibility audit or guess a color fix. Keep the issue open and pursue an actionable target only when it is the selected task; otherwise build independent functionality.
+- Escalate to the owner only for a new product-rule/default/licence decision or when no authorized path exists. Routine implementation decisions and previously authorized changes need no repeated permission.
+- Previous-session defects get a separate [fix-previous] commit when practical, with a regression that demonstrates the failure; do not hide them inside unrelated work.
 
-**How a tier change actually happens.** The owner picks the model and effort when starting a session, and you can't change your own mid-session. So:
-- Give each Top-tier point its own task card, marked `Top`.
-- Stop before that card and say so in the handover: `Next session: Top (GPT-6.1 Sol xhigh, or Opus)`.
-- If your tool can start a subagent with a chosen model or effort, you may run the Top-tier step as a subagent instead.
-- Light-tier work can simply be done on the Standard tier when switching isn't worth it. The reverse is never allowed: production logic is never written on the Light tier.
-- Never claim a tier you didn't run on.
+### 7. Handover on clean main
 
-**Effort.** The owner picks the effort level when starting a session. Recommended:
-- **medium:** routine screens and features
-- **high:** engines, data model, notifications, widget plumbing, and every review
-- **xhigh:** the Top-tier points in Codex. In published coding-agent tests, GPT-6.1 Sol scored higher at xhigh than at max.
-- **Opus in Claude Code:** high
-- **max:** not needed
+- Commit each completed coherent slice separately after its focused check. Integrate accepted production through the section branch; never copy production files onto main as a docs handover shortcut.
+- Put the short handover/board update on main even when production remains unmerged. Leave the shared checkout on main and clean without disturbing owner changes.
+- Handover fields: **Works now**, **Verified** (exact command/output or unchanged evidence revision), **Not verified**, **Next concrete result**, **Active branch/worktree/tip**, **Model/effort**, **Usage**. A blocker comes first when no product task completed.
+- Link docs/reports/M0-retained-branches.md for unchanged historical inventory; name only branches/worktrees changed or relevant this session. Do not repeat 30 historical refs in each handover.
+- Keep the current queue and at most five handovers in PROGRESS.md; archive older notes. Historical recommendations are superseded by the current queue.
+- Commit format: [M1-T03] <result> (codex|claude, model: <actual or not exposed>, effort: <actual or not exposed>).
 
-Write the recommended tier and effort for the next session in your handover.
+### 8. Historical first-run tasks
 
-**Tests come first for engines.** Write the golden-fixture tests from the spec's worked examples before writing the engine code.
-
-**Subagents** are for independent, narrow jobs that can run in parallel, at the tier the job needs under the rules above. For example:
-- write an engine's fixture tests while you implement the engine
-- compare a built screen with its canonical screenshot
-- review a section with a fresh context
-
-Give each subagent a one-paragraph brief and ask for a short result. Never ask a subagent to read the whole spec.
-
-**Commit messages record the tier you used.**
-
-### 5. Reviews: four kinds, each with a purpose
-
-1. **Self-check, after every task.**
-   - Build: `xcodebuild` for the app, `swift test` for packages.
-   - Run the task's tests and the lint tests: no colour literals, no "·" next to a digit, setting keys exist in the schema, availability flags respected.
-   - For UI: run the screen in the simulator at default size and at AX3, take a screenshot, and compare it with the canonical screenshot.
-   - Paste the last lines of each command's output into the handover.
-2. **Quick check, at the start of every session** (section 2).
-3. **Section review, after each big section.** It happens before the next section starts.
-   - **Reviewer:** the agent that did not build most of the section. If that agent isn't available, a reviewer subagent with a fresh context does it.
-   - **Tier:** Top for the kinds of section listed in section 4; Standard for sections that are only UI.
-   - **Input:**
-     - the section's diff, read commit by commit (`git log -p main..<section-branch>`)
-     - the section's task cards
-     - the spec sections and fix items those cards cite
-   - **Run the section's flows** in the simulator. Use the iPhone when notifications, widgets or Live Activities are involved.
-   - **Compare each screen with its canonical screenshot** at default size, at AX3, and in dark mode where a dark reference exists. A screen that is worse than the design is a High finding.
-   - **Checklist:**
-     - Does it do what the cards say, and only that?
-     - Are the spec and the fix items respected? That means the rules, defaults, availability, privacy and sanctity.
-     - Are the tests meaningful, with expected values taken from the spec?
-     - Does new UI handle RTL, Arabic-Indic digits, Dynamic Type and VoiceOver labels?
-     - Are there hard-coded sample data, colours or setting values?
-   - **Output:** write `docs/reviews/<section-id>.md` containing:
-     - a verdict: `approve` or `changes requested`
-     - at most 15 findings, each with file:line, a severity (Critical/High/Medium/Low) and the fix
-
-     "No findings" is a valid, short review.
-   - **Critical and High findings** are fixed before the next section starts.
-4. **Milestone gate, at the end of each milestone, on the Top tier.** Run the milestone's acceptance checks from §12 and §13. Record the results in `docs/reports/M<n>.md`, and mark anything not tested as "not tested".
-
-**Don't waste tokens:**
-- Never re-read the whole handoff.
-- Never review generated code, assets or unchanged files.
-- No style nitpicks that break no rule.
-- Never review a review.
-- One review pass per change. A re-review covers only the fix diff.
-- If the same mistake appears twice, add a test or a lint check instead of reviewing for it again.
-
-### 5a. Session progress and usage — owner instruction, 11 October 2026
-
-- Workspace preparation: before a native build/test in any new or reused worktree, run `python3 Madar/scripts/prepare-workspace.py` from the repository root. Missing private font resources are prepared only from an explicit verified local source using `--source <repo>`; never download, publish, overwrite a mismatched resource or spend build attempts discovering missing fonts. This font check does not prove build/signing/runtime readiness. `make generate/build/preview/test-ios/test-links` enforce it.
-
-- Continuation discipline (owner request, 12 October 2026): follow the current Recommendations in `docs/PROGRESS.md`. Prefer finishing a missing acceptance result over restarting planning or writing another source-map report. Historical handovers/branches are evidence, not current instructions to reopen closed work; verify their blocker still exists. Review only the selected current candidate/change, not superseded candidates or reviews.
-- A failed runtime check is not always a build defect. Record whether failure occurred before XCTest, in test setup/authentication, or in product acceptance; rerun only after a diagnosed change or to obtain genuinely new evidence. An unchanged nil-element accessibility failure needs an actionable trace, not another identical audit or a speculative color/suppression change.
-- Acceptance/integration discipline: source review, mocked/hosted tests, native simulator flows and owner-iPhone gates are separate. Integrate accepted scope after its required review without reverting previously accepted work; do not inflate lean M0 with deferred features or reopen owner-confirmed licensing decisions without new relevant evidence.
-
-- At the start, select one coherent task from the board and state its concrete acceptance result: a working screen/flow, a finished engine, a proven defect repair, or the decision required by a review card. Finish it before opening another independent task. Aim for at least one completed, verifiable task per session; this is a target, never permission to skip acceptance or fabricate completion.
-- The initial sanity check stays bounded to the latest handover and risky changes. Do not turn it into another full review. If a required check has current passing evidence for the same code/configuration, reuse that evidence and cite its commit/output. Re-run only when a relevant change, failed result or explicit acceptance requirement justifies it; record the reason before an expensive repeat.
-- Diagnose the first failed output before retrying. Respect the existing two-repair-attempt limit; do not cycle through equivalent simulator setup, broad audits or reviews. After the limit, preserve the evidence, split/escalate the problem and continue another independent authorized task if available. An unavailable manual UI does not block work that can proceed independently.
-- Report progress as what now works and what remains, not counts of searches, builds or reviews. If the session produces no completed task, record the concrete blocker, what was tried, and the smallest next step in the handover. Test counts alone do not count as delivered functionality.
-- Owner clarification (11 October 2026): use the smallest sufficient checks for the changed behavior. Do not run full app/package suites, broad audits or the full UI matrix after every task, and do not run product builds/tests for documentation-only changes. Existing current green evidence satisfies unchanged checks. This overrides blanket repeated-run wording in the start-of-session/self-check steps; necessary regression checks and milestone acceptance still apply.
-- The session delivery target is **3–5% of the five-hour usage remaining** (95–97% used), not merely “stop near 90%.” Check usage at session start, task boundaries and before expensive work; keep the handover current while working and start finalizing around95%. Do not end a work session with more than5% remaining just because one task or section finished: complete the required review or select the next authorized useful task small enough to finish within the remaining budget. Section/review boundaries govern integration, not automatic early session termination. Verify usage after preparing the handover and before the final delivery. Never spend the margin on duplicate checks or artificial work; spend it on actual board progress and a clean main handover. Do not deliberately consume the last3% and risk interrupting delivery. If the usage reading is unavailable, explicitly report that the percentage target could not be verified.
-- Keep quality, mandatory reviews and milestone gates intact. Use the required model tier; avoid unnecessary delegation and duplicate review. A completion/session estimate is provisional and must be revised using actually completed tasks, not presented as a deadline or quota.
-
-### 6. When something goes wrong
-
-- **Critical and High findings block the merge.** Fix them on the same branch and add a regression test named after the finding (`test_M1S2_<finding>`).
-- **If the build or the tests still fail after two attempts:**
-  1. Stop.
-  2. Revert to the last green commit.
-  3. Split the task smaller.
-  4. Solve that problem on the Top tier (section 4).
-  5. If it still fails, write it up in the handover and ask the owner.
-- **A fix that would change a spec rule or a `[DEFAULT]` item:** log it in `DECISIONS.md` and ask the owner. Meanwhile, continue with other tasks.
-- **Damage you find from an earlier session** (one the quick check missed): fix it in a `[fix-previous]` commit with a test, and mention it in the handover. Never patch it silently inside an unrelated task.
-
-### 7. End of every session: handover
-
-**The handover must reach `main`.** The next agent starts from `main`, so a handover that exists only on a work branch is invisible to it. Before you stop, whatever branch you worked on:
-1. Commit your `docs/PROGRESS.md` update (board, Last checked, handover) to `main` as a docs-only commit: `git checkout main`, `git checkout <branch> -- docs/PROGRESS.md`, commit. Never put code on `main` this way.
-2. Name every unmerged branch and worktree in the handover, with its latest commit and what is needed to merge it.
-3. Leave the shared checkout on `main`, clean (`git status`), so it builds.
-4. Anything you could not finish goes in the handover as the first line of **For the next agent**, not only in chat.
-
-**Commit message format:** `[M1-T03] <what> (codex|claude, tier: standard)`
-
-**Update `PROGRESS.md`:**
-- Task status: `todo`, `in-progress`, `done` or `needs-fix`.
-- Section status: `building`, `in-review`, `changes-requested` or `approved`.
-- A handover note at the top of **Handovers**:
-
-```
-### Handover — M1-S2 (M1-T03 to M1-T05) — 12/10/2026 — codex (Sol)
-Done: …
-Verified: <commands and the last lines of their output>
-Not verified: … (why)
-For the next agent: what to check first, risks, shortcuts, open questions
-Next: …
-Next session: recommended tier and effort
-```
-
-Keep `PROGRESS.md` short: the board, **Last checked**, and the last 5 handovers. Move older handovers to `docs/progress-archive.md`.
-
-### 8. First run (M0-T00)
-
-1. Place the attached files (see the top of this file), and move the handoff bundle into `docs/HANDOFF/`.
-2. Create `docs/PROGRESS.md` with these headings:
-   - `Current milestone`
-   - `Last checked`
-   - `Board`: sections and tasks, with status and which agent built each
-   - `Later`
-   - `Handovers` (latest first)
-3. Create `docs/DECISIONS.md` if it is missing.
-4. Split `MADAR_HANDOFF.html` into plain-text section files under `docs/HANDOFF/sections/`, one file per §, with no content changes. Task cards then cite single files.
-5. Apply the fixes tagged **Before M0**. These are spec and JSON corrections.
-6. Write `docs/OWNER-RUNBOOK.md` (fix RA6).
-7. Add a task card for M0's design note, marked `Top`, and hand over (section 4). Once the design note exists, plan M0 (fix RA3) as sections and task cards. The next agent checks that plan in its quick check before building starts.
-
-When a room package is created (for example `Packages/RoomSalah/`), add short `AGENTS.md` and `CLAUDE.md` files there: at most one page each, with that room's rules and fix IDs.
+M0-T00 file placement, handoff extraction, Before-M0 corrections, owner runbook and architecture are complete. Reuse them; do not restart foundation planning. New room packages get short identical AGENTS.md/CLAUDE.md files referencing the root protocol and the room's product rules/fix IDs.

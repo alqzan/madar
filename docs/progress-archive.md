@@ -239,3 +239,74 @@ Branches/worktrees: no branch or product tree changed. `docs/reports/M0-retained
 Next: Native T09/T12 and remaining physical M0 gate when access allows.
 Usage: start 24% and final 25% five-hour used / 50% weekly; the requested 3–5% remaining target was not reached because the remaining acceptance work requires the locked native UI/device and owner licensing input. No reset used or quota work added artificially.
 Next session: Standard GPT-6.1 Sol high for production; independent GPT-6.1 Sol xhigh for required Top reviews/gate.
+
+
+## Superseded queue — owner workflow correction, 12 October 2026
+
+# Current milestone
+
+M0 Foundation — NOT APPROVED. Main contains the accepted local foundation; M1–M7 remain unfinished. Font permission is owner-confirmed and closed. No later-room entry points or CloudKit in v1.
+
+# Last checked
+
+Automation checkpoint — 2026-10-12 18:04 UTC: arrived at97% five-hour used/3% remaining (weekly92%). Reserve already reached; no production task, delegation or repeated build/test opened. Main clean at3d14e61 before this docs-only checkpoint. No acceptance completed in this run. FIRST next: one missing T09 native encrypted export/first-key or restore authorization result on70939f5; full T09/M0 remain unapproved. Existing five handovers and retained branch/worktree inventory preserved. No reset credits used.
+
+Checked `feb9515..3d14e61` — OK: main documentation only; no product build/test repeated. Selected T09 candidate advanced `b7cd5d1..70939f5`; each new test/driver delta independently reviewed and selected native acceptance recorded below. Initial sanity check `b7902be..aa54227` was documentation-only.
+
+Reuse unchanged evidence: main T14 `d28c36a` local-only restore copy/focused1/0; T15 `aeb3154` font helper/six regressions; baseline app22/package125. Independent final `git diff --exit-code 33ab2ec..70939f5` returned0 for production sources, Xcode/project configuration, Integration tests and MadarData tests; controlled host15/ManagedBackup13 evidence reused. Command receipt: ignored `Madar/Artifacts/t09-native-retirement-2026-10-12/source-evidence-continuity.txt`. This is source continuity, not a new test/integration approval. T12 `bfa878b` still fails contrast1/1 with nil element/frame; no identical rerun.
+
+# Board
+
+Sections: S0 contracts building; S1 data/commands building (physical acceptance retained); S2 shell/privacy building; S3 tooling/accessibility/gate building. Approval on a task never approves the entire milestone.
+
+| Card | Status | Accepted scope / evidence | Remaining / references |
+|---|---|---|---|
+| M0-T00 | done | Protocol, Before-M0 contract corrections | `docs/reports/M0-T00-protocol.md`; RA4 tracked T07 |
+| M0-T01 Top | done | Architecture note and repair decisions | `docs/design/M0-local-inbox.md`; retain section/gate limits |
+| M0-T02 | done | App-only inbox drain, atomic writes and replay; merged3e54a53 | `docs/reports/M0-T02-command-inbox.md`; RA2 suspended/first-unlock physical check remains |
+| M0-T03 | done | Local factory/RD2 retention; merged3718248 | `docs/reviews/M0-local-retention.md`; no CloudKit |
+| M0-T07 | done | RA4 compatibility/frozen fixtures; mergedcb57e68 | `docs/reports/M0-T07-review-fixes.md`; owner-data/device acceptance remains |
+| M0-T08 | done | Plain portable export; merged12b49c2 | `docs/reports/M0-T08-plain-export.md`; real Files destination write remains |
+| M0-T04 | done | Lean glass shell, built rooms only; merged596dc05 | `docs/reviews/M0-lean-shell.md`; RA3/RL8; presets/styles deferred |
+| M0-T05 | done | Keyboard/password diagnostic repair | `docs/reports/M0-T05-keyboard-dispatch.md`; privacy separately T09 |
+| M0-T10 | done | Read-only today prayer clocks; mergedb6556bb | `docs/reports/M0-T10-foundation-times.md`; no prayer-room logging/notifications |
+| M0-T11 | done | Bounded shipping-source checker; merged3b273b5 | `docs/reports/M0-T11-source-checks.md`; source mapping is not runtime acceptance |
+| M0-T13 | done | Arabic backup plural/numeral copy; merged1ee273e | `docs/reviews/M0-backup-copy.md`; no backup behavior change |
+| M0-T14 | done | RA1 this-device-only restore warning; mergedd28c36a | `docs/reviews/M0-backup-copy-t14.md`; focused golden regression passes |
+| M0-T15 | done | Verified missing-font preparation, Makefile guard, current startup docs | `docs/reviews/M0-workspace-preparation.md`; 11 resources checked, no binary publication/overwrite |
+| M0-T09 | in-progress | Repaired source33ab2ec/Top8876626; cancellation65e88ca, successfb6b1bb, retirement e53f882/daa9e99; full switcher L/light b7cd5d1, appAX3/light + L/dark07d2ada, actual OSAX3/light70939f5; real nonmatch/user-cancel/empty-output/fresh retry fa54e5d. Independent Top-approved bounded native evidence | Scope: owning-scene privacy/export/restore/share; §8.10 (`14-shared.md`), RA1–RA3, `docs/design/M0-presentation-privacy.md`, `docs/reports/M0-T09-P1b-plan.md`. Acceptance: genuine refusal/success, revocation/native-share retirement/switcher/two-scene, default/AX3/dark and section review before curated merge. Out: auth bypass, backup redesign, later-room features. Use repaired branch only. |
+| M0-T12 | needs-fix | Green focus/search/title growth c273bc4; unsuppressed light/system Settings contrast callback has no target | Scope: reachable foundation/settings accessibility; RU2/RU4–6, §13 (`19-qa.md`), `docs/reports/M0-T12-accessibility-top.md` and contrast triage. Acceptance: measured target/pair or actionable platform trace and unchanged failing audit; VoiceOver/Reduce Motion separate. Out: speculative color change or audit suppression. Workspace prepared; Top build now succeeds, but isolated audit fails1/1 with nil target/frame. |
+| M0-T09R Top | done | Top SDK fix b7cd5d1 + actual full centered OS card at L/light, native1/0 in31.396s; independent Top approve | Scope: replace unavailable coordinate helper using SDK-proven normalized endpoint API; §8.10 (`14-shared.md`), presentation-privacy design. Acceptance: independent SDK review and actual identified/full-card OS snapshot completed; `docs/reviews/M0-T09-switcher-native.md`. Out: production/privacy/clock/default changes. Failed history preserved; green candidate restored d28c8dc. |
+| M0-T06 Top | in-progress | Source-map approval only; current gate blocked | §12/§13, RA1–RA3/RA8; `docs/reports/M0.md`. Acceptance: integrated candidates, remaining software/owner-iPhone evidence, independent Top gate approve. No M1 before approval. |
+
+## Next acceptance, in order
+
+1. T09: continue from `codex/m0-t09-system-ax3-navigation`70939f5 in the existing m0-p1b-fixes worktree. One useful missing result is native encrypted export/first-key or restore authorization, using a new synthetic fixture and real OS auth. Keep true two-scene/owning-scene and remaining privacy acceptance separate. Existing plain refusal/share/retirement/lease/switcher results are closed within their recorded bounds.
+2. Required Top section acceptance precedes curated integration. Preserve main's T14 warning, T15 tooling and source-check/font provenance; historical candidate trees must not be merged wholesale. Do not select old48a3fe4 or discard reviewed source33ab2ec.
+3. T12: connect Inspector to the actual settled Settings/light app, then obtain an identified highlighted contrast issue/measured pair or actionable platform report. Current GUI only offers Simulator/All processes and no app target. No identical XCTest audit, speculative color change or suppression.
+4. T06: owner-iPhone/physical acceptance and remaining software gates, then independent Top gate. M0 NOT APPROVED; no M1. Font permission is closed, RA1 sync and later rooms remain deferred.
+
+## Recommendations for the next agent — owner request, 12 October 2026
+
+1. Select one unfinished acceptance result from the order above; read its card/current report only. Start on main, then use the selected repaired candidate. Never replay an already approved native flow or a superseded candidate to reconstruct context.
+2. Existing raw outputs live in ignored `Madar/Artifacts/t09-native-retirement-2026-10-12/`; each review names the exact run/commit/PNG. Main has docs only this session. Full branch/worktree inventory is `docs/reports/M0-retained-branches.md` (30 unmerged refs/14 non-main worktrees).
+3. Before native work use main `prepare-workspace.py --root <candidate>` (candidate predates T15), confirm signing/App Group/simulator and exact new acceptance. All11 font/license resources passed; do not reopen permission or repeat package/app suites without a relevant change.
+4. Actual OSAX3 differs from SwiftUI-only overrides. Recorded system setup large/light → accessibility-extra-large/light → restoredlarge/light proved the cover and native sharing scale. OSAX3 compact share uses native ShowMore before Files;70939f5 handles the exact observed cell. Preserve first pre-switcher failure/timeout; do not diagnose it as a privacy leak.
+5. T12 remains unresolved. Inspector currently has no Madar process target, and the public audit issue API exposes no color/ratio/location when element is nil. Empty Inspector results are not a reproduced/cleared audit. No color or audit-handler change was authorized by these diagnostics.
+6. Keep current handover on clean main; integrate accepted scope after its required review without reverting accepted work. Standard Sol high for production, independent Sol xhigh for Top. Native software/hosted/owner-device results remain separate; M0 waits for its gate.
+
+# Later
+
+M1 prayer logging/sanctity; M2 Quran; M3 diary; M4 lobby/habits/widgets; M5 money; M6 Mihbara; M7 final integration. Preserve existing later-room scaffolding. Distribution/membership and sync decision remain separate owner steps.
+
+
+## Handover — M0-T09 AX3 protected export interruption — 2026-10-12 — codex (Sol)
+
+Done: Added a focused native-simulator UI test on the existing `codex/m0-p1b-fixes` candidate. At AX3/light it starts export authentication, observes the real Face ID prompt/privacy cover, presses Home, returns to the same app, verifies the notesOnly settings shell recovers, and confirms export-share readiness stays absent. The focused test passed; this is a cancellation/re-entry slice, not full T09 acceptance. Font approval/licensing remains closed by the owner's decision; M0-02 passes. Main code is unchanged and M0 remains NOT APPROVED.
+Verified: `xcodebuild test -project Madar/Madar.xcodeproj -scheme Madar -destination 'id=412F4437-7BD7-44D1-AA3D-2B7158090E14' -derivedDataPath /tmp/madar-p1b-native-current -resultBundlePath /tmp/madar-p1b-ax3-background.xcresult -parallel-testing-enabled NO -only-testing:MadarUITests/FoundationUITests/test_M0T09_AX3BackgroundDuringExportAuthenticationDoesNotExposeShare CODE_SIGN_IDENTITY=- CODE_SIGNING_ALLOWED=YES` → `Executed 1 test, with 0 failures in 37.183 seconds`, `** TEST SUCCEEDED **`. Independent GPT-6.1 Sol High review: approve, no findings. Root inspected the Face ID and re-entry screenshots in `/tmp/madar-p1b-ax3-background-attachments/`.
+Not verified: Face ID match/success, biometric refusal, file creation/deletion, native share completion/retirement, AX3 export after successful auth, dark flow, real switcher/two UIWindowScenes, T12 actionable contrast, VoiceOver/Reduce Motion, Files destination write, physical owner-iPhone/protection and full M0 gate.
+For the next agent: Preserve the candidate; do not merge or claim full T09. Continue the same privacy task with a genuine successful-auth/native-share path when simulator biometric input is available; then cover remaining scene/share privacy acceptance and request required Top section review. Keep T12 unsuppressed, keep M0 NOT APPROVED and do not start M1. The owner explicitly closed the font-license decision; do not reopen it.
+Branches/worktrees: `codex/m0-p1b-fixes` at `65e88ca`, `/Users/abdulrahman/.codex/worktrees/m0-p1b-fixes/بناء مدار 2.0`, clean and unmerged; its source repairs are Top fix-only approved at `8876626`. Older integration `codex/m0-privacy-host` `48a3fe4` remains changes-requested (three High); T12 candidate `codex/m0-t12-audit-triage` `44d4799` remains diagnostic only. Main contains only docs changes since prior product commit.
+Next: Continue T09's successful native-auth/export path when available; otherwise preserve evidence and record the smallest remaining device-dependent acceptance. T12 requires a measurable audit target; the M0 owner-iPhone gate also remains.
+Usage: latest reading after the focused test and handover review was 49% five-hour used / 51% remaining and 54% weekly used; all three reset credits remain unused. The requested 3–5% five-hour remaining margin is not met; continue with useful M0 work, then take a final reading before delivery.
+Next session: GPT-6.1 Sol high for production; independent Sol high review for scoped changes and GPT-6.1 Sol xhigh for required Top review/gate.
