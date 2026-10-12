@@ -10,7 +10,8 @@ Its bounded --variant selects ax3-light (default), default-light or default-dark
 Use --test lease-expiry for a real 61-second background interval and a second
 native Face ID match. This separate path is fixed to default-light.
 Use --test switcher-snapshot to capture an identified real OS switcher card at
-default-light. Its output requires a separate visual privacy judgment.
+default-light (default), ax3-light or default-dark. Its output requires a
+separate visual privacy judgment.
 Use --test biometric-refusal for a documented failed match, native user Cancel,
 empty fixture Backups before/after refusal, then an explicit successful retry.
 """
@@ -79,8 +80,8 @@ def main():
     if args.variant is None:
         args.variant = "default-light" if args.test in ["lease-expiry", "switcher-snapshot", "biometric-refusal"] else "ax3-light"
     if args.test == "share-dismissal" and args.variant != "ax3-light":
-        parser.error("--variant default-light/default-dark requires --test background-retirement")
-    if args.test in ["lease-expiry", "switcher-snapshot", "biometric-refusal"] and args.variant != "default-light":
+        parser.error("--test share-dismissal is fixed to --variant ax3-light")
+    if args.test in ["lease-expiry", "biometric-refusal"] and args.variant != "default-light":
         parser.error(f"--test {args.test} is fixed to --variant default-light")
     root = Path(__file__).resolve().parents[1]
     output = args.output_dir.resolve()
@@ -123,7 +124,7 @@ def main():
             fixture = str(uuid.uuid4()).upper()
             environment["TEST_RUNNER_MADAR_TEST_NATIVE_REFUSAL_STORE_ID"] = fixture
             (output / "fixture.json").write_text(json.dumps({"fixture": fixture}, indent=2) + "\n")
-        if args.test == "background-retirement":
+        if args.test in ["background-retirement", "switcher-snapshot"]:
             environment["TEST_RUNNER_MADAR_TEST_NATIVE_SHARE_VARIANT"] = args.variant
         matched = False
         reauth_matched = False
@@ -226,7 +227,7 @@ def main():
         if args.test == "biometric-refusal" and (not nonmatched or refusal_snapshot is None or retry_snapshot is None):
             raise RuntimeError(f"Native nonmatch/cancellation/retry did not complete its fixture evidence; inspect {log}")
     if args.test == "switcher-snapshot":
-        print(f"Native default-light switcher card captured; visual privacy acceptance pending: {result}")
+        print(f"Native {args.variant} switcher card captured; visual privacy acceptance pending: {result}")
     else:
         print(f"Native {args.variant} Face ID/{args.test} passed: {result}")
 

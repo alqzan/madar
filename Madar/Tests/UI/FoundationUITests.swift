@@ -329,8 +329,16 @@ import XCTest
             throw XCTSkip("Run scripts/native-export-biometric-test.py --test switcher-snapshot for supported simulator Face ID orchestration.")
         }
         continueAfterFailure = false
+        let variant = ProcessInfo.processInfo.environment["MADAR_TEST_NATIVE_SHARE_VARIANT"] ?? "default-light"
+        let configurations: [String: (size: String, theme: String)] = [
+            "ax3-light": ("AX3", "light"),
+            "default-light": ("L", "light"),
+            "default-dark": ("L", "dark"),
+        ]
+        let configuration = try XCTUnwrap(configurations[variant], "Unsupported native switcher variant.")
         let app = XCUIApplication()
-        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": configuration.size, "MADAR_UI_THEME": configuration.theme]
+        NSLog("MADAR_NATIVE_SWITCHER_VARIANT %@ size=%@ theme=%@", variant, configuration.size, configuration.theme)
         app.launch(); openPlainExportSettings(app)
         defer { app.terminate() }
         let cover = app.descendants(matching: .any).matching(identifier: "scene-privacy-cover").firstMatch
@@ -353,7 +361,7 @@ import XCTest
         XCTAssertTrue(file.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(saveToFiles.waitForExistence(timeout: 10), app.debugDescription)
         let authorizedShare = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-        authorizedShare.name = "M0-T09-switcher-default-light-authorized-native-share"
+        authorizedShare.name = "M0-T09-switcher-\(variant)-authorized-native-share"
         authorizedShare.lifetime = .keepAlways; add(authorizedShare)
 
         let screenFrame = app.frame
@@ -363,7 +371,7 @@ import XCTest
         // bottom drag and hold requests the actual OS switcher, not Home twice.
         bottom.press(forDuration: 0.1, thenDragTo: middle, withVelocity: .slow, thenHoldForDuration: 1)
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
-        attachSwitcherEvidence(springboard, named: "M0-T09-switcher-default-light-immediate")
+        attachSwitcherEvidence(springboard, named: "M0-T09-switcher-\(variant)-immediate")
         // Actual trace identifies this window/content and shows the app remains
         // foreground-inactive in the switcher. Its process-state enum is not a
         // switcher gate. A second app also uses the display name مدار.
@@ -407,7 +415,7 @@ import XCTest
             }
         }, object: nil)
         let centeringResult = XCTWaiter.wait(for: [centered], timeout: 10)
-        attachSwitcherEvidence(springboard, named: "M0-T09-switcher-default-light-centered")
+        attachSwitcherEvidence(springboard, named: "M0-T09-switcher-\(variant)-centered")
         // Retain the full OS image/hierarchy before all post-gesture assertions,
         // including an unsuccessful identification or one-pan centering result.
         XCTAssertEqual(identificationResult, .completed, "The real switcher must contain exactly one card for com.alqzan.madar2.")
