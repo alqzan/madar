@@ -57,6 +57,8 @@ M1 prayer logging/sanctity; M2 Quran; M3 diary; M4 lobby/habits/widgets; M5 mone
 
 # Handovers
 
+Active slice — T09 actual one-minute background lease expiry and fresh native authentication (2026-10-12): on repaired candidate, prove an authorized share is retired, return after at least60s in the same process, and a new explicit export requires a second real Face ID request before readiness. Sol high author owns test/driver, verifier alone simulator, Sol xhigh new-slice reviewer. Preserve prior matrix; no production clock override/auth bypass or broad rerun. Boundary usage40% used/60% remaining, weekly68%.
+
 Completed slice — T09 native retirement matrix `daa9e99`, independent Top approve. L/light1/0 in33.750s (return4.642s, same PID19608); L/dark1/0 in34.036s (return4.629s, same PID19787). Correct size/theme and four PNGs inspected by root/verifier/reviewer; AX3 evidence reused. Raw outputs under `Madar/Artifacts/t09-native-retirement-2026-10-12/run-daa9e99-default-{light,dark}/`. No full T09/integration approval.
 
 Session checkpoint — T09 native retirement slice completed at `e53f882`, independent Top approve. Same-process return4.516s, native share retired, five seconds without reopening; synchronous transition/switcher cover not established. Initial usage0%, boundary26% used/74% remaining (weekly66%). Continue useful missing acceptance; no reset credit redeemed.
