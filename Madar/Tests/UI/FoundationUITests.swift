@@ -102,6 +102,47 @@ import XCTest
         }
     }
 
+    func test_M0T09_AX3BackgroundDuringExportAuthenticationDoesNotExposeShare() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment["MADAR_UI_STORE_ID"] = UUID().uuidString
+        app.launchEnvironment["MADAR_UI_SIZE"] = "AX3"
+        app.launchEnvironment["MADAR_UI_THEME"] = "light"
+        app.launch(); openPlainExportSettings(app)
+        defer { app.terminate() }
+        let export = app.buttons["plain-export-now"]
+        let share = app.buttons["plain-export-share"]
+        let cover = app.descendants(matching: .any).matching(identifier: "scene-privacy-cover").firstMatch
+        XCTAssertFalse(cover.exists, app.debugDescription)
+        XCTAssertFalse(share.exists)
+        XCTAssertTrue(export.isEnabled)
+        export.tap()
+        XCTAssertTrue(cover.waitForExistence(timeout: 10), app.debugDescription)
+        attachScreenshot(app, named: "M0-T09-AX3-export-authentication-covered")
+        print("M0-T09 AX3: native export authentication is covered; no biometric success supplied.")
+
+        XCUIDevice.shared.press(.home)
+        XCTAssertTrue(app.wait(for: .runningBackground, timeout: 10), app.debugDescription)
+        app.activate()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10), app.debugDescription)
+        // Default notesOnly protects the export, while allowing the settings
+        // shell to recover after its cancelled native authentication request.
+        let failure = app.alerts["لم يكتمل الإجراء"]
+        if failure.waitForExistence(timeout: 2) { failure.buttons["حسنًا"].tap() }
+        expectation(for: NSPredicate(format: "exists == true AND enabled == true AND hittable == true"), evaluatedWith: export)
+        waitForExpectations(timeout: 10)
+        XCTAssertFalse(cover.exists, "The unprotected settings shell must recover after reactivation.")
+        let readiness = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == true"), object: share)
+        readiness.isInverted = true
+        XCTAssertEqual(XCTWaiter.wait(for: [readiness], timeout: 5), .completed,
+                       "An interrupted authentication must not publish export-share readiness.")
+        XCTAssertFalse(share.exists, app.debugDescription)
+        attachScreenshot(app, named: "M0-T09-AX3-export-authentication-background-reentry")
+        print("M0-T09 AX3: settings shell reactivated and export-share readiness absent after interrupted authentication.")
+        // No Face ID success, file creation, native sharing, lease-expiry or
+        // physical-device acceptance is established by this cancellation case.
+    }
+
     func test_M0S2_RU3_CustomizationPluralsAtDefaultAndAX3() throws {
         continueAfterFailure = false
         for size in ["L", "AX3"] {
