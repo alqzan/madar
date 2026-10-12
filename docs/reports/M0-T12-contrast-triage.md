@@ -30,3 +30,12 @@ The Mac is now available. Device Hub shows a booted iPhone 17 Pro / iOS 26.5 sim
 Accessibility Inspector was opened from the active Xcode installation and targeted `Simulator > مدار`. Its Audit view showed `Run Audit`, but both an accessibility-index click and a coordinate click left the results pane empty. The Xcode installation has Device Hub but no standalone `Simulator.app` under `Contents/Developer/Applications`; Device Hub is the active simulator surface. This is not a new pass, actionable contrast measurement, or proof that the earlier nil-element issue is a false positive. No code, audit handler, theme token, or color was changed. Keep T12 `needs-fix` and preserve the existing `.all` failure.
 
 Next: use the candidate-specific accessibility UI test or another actionable platform trace to identify the measured element/pair; keep the finding open if it remains nil. Do not change colors or suppress the audit without that evidence. Current focused green UI output remains reusable; it was not rerun.
+
+
+## Isolated Settings diagnostic attempt — 12 October 2026
+
+A narrow source patch was prepared at `/tmp/madar-t12-settings-only-materialized.patch`: it launches Settings directly with a fresh store and light appearance, captures the pre-audit accessibility hierarchy and screenshot, and invokes `performAccessibilityAudit(for: .all)` without suppressing any issue. Independent GPT-6.1 Sol High source review approved with no findings. The test omits `MADAR_UI_SIZE`, so it follows the simulator's current Dynamic Type setting; this does not prove the simulator is at L. Runtime remains unverified.
+
+The first focused build exited 65 before XCTest because nine ignored font resources were absent from the candidate worktree. Those nine files were copied from the main checkout after matching their hashes. The second build still exited 65 before XCTest: `Amiri-Bold.ttf` remained missing, and the log also reports `Ld Madar.app/__preview.dylib` failure. The saved `.xcresult` and log contain no further linker diagnosis. Zero tests ran; no third attempt was made under the two-attempt limit. A read-only inventory confirms that the main checkout has `Amiri-Bold.ttf`, the candidate worktree does not, and the other nine font/license resources are present.
+
+Next: perform read-only resource and linker-diagnostic preflight before authorizing a new isolated run. The visible tab-bar overlap is not yet tied to the nil-element contrast callback. Keep T12 `needs-fix`; make no color or suppression change without an actionable target and measured pair.
