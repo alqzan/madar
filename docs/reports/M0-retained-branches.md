@@ -2,6 +2,8 @@
 
 Snapshot: 12 October 2026, after reviewed native refusal/full-card/systemAX3 acceptance (70939f5). Current git refs, not old handover tips. No pre-existing branch/worktree was deleted. See PROGRESS for the next acceptance; historical branches are not a queue of new reviews.
 
+Current-session ref: `codex/m1-t01-prayer-logging` @ `e6fbe75` is integrated into main; retain the branch for provenance, do not merge it again.
+
 ## Active candidates
 
 - Active T09: `codex/m0-t09-system-ax3-navigation`70939f5 — selected repaired candidate/current m0-p1b-fixes worktree; reviewed bounded native refusal/full-card/systemAX3 acceptance. Full section/curated integration remains open; preserve T14/T15. `codex/m0-p1b-fixes`d28c8dc is retained green history, not the latest test candidate.
