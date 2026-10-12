@@ -55,6 +55,8 @@ M1 prayer logging/sanctity; M2 Quran; M3 diary; M4 lobby/habits/widgets; M5 mone
 
 # Handovers
 
+Automation checkpoint — 2026-10-12 08:00 UTC: Started with 97% five-hour usage consumed / 3% remaining (weekly62%). Bounded check of `aeb3154..c7a8e35`: documentation/protocol changes only, clean main and identical AGENTS/CLAUDE; current product evidence reused. No new acceptance task, agent, build or audit opened because the delivery reserve was already reached. Next remains T09 native revocation/share retirement on repaired `fb6b1bb`, then independent Sol xhigh section review; T12 requires an actionable contrast trace. Font permission remains closed, M0 NOT APPROVED. All retained refs/worktrees remain listed in `docs/reports/M0-retained-branches.md`. No reset credits used.
+
 ## Handover — M0-T15 workspace and continuity repair — 2026-10-12 — codex (Sol)
 
 Done: Integrated reviewed helper and Makefile font prerequisite; corrected startup/README to current RA1/RA3 behavior, preserved original START-M0 as history, shortened current checks/board and archived the old snapshot. Missing T12 Amiri-Bold materialized with its pinned SHA; independently approved diagnostic patch retained for a Top follow-up that built successfully and reproduced the audit failure. All old branches/worktrees are preserved; the merged temporary T15 worktree was recoverably archived after integration.
