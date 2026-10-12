@@ -103,6 +103,12 @@
   ],
   "officialLicenseFile": "thmanyah-license-2026-10-10.html",
   "officialLicenseSha256": "084945240b72fadd4f0a9f2e53ec50179529c36aecead111648288c7f75fd462",
+  "currentOfficialLicenseReview": {
+    "retrieved": "2026-10-12",
+    "url": "https://font.thmanyah.com/licenses",
+    "summary": "The current Arabic page allows app embedding only in a compiled, packaged, or obfuscated product and prohibits making font files independently extractable or reusable, including through apps.",
+    "result": "Does not establish the supplied archive download origin or that raw UIAppFonts resources satisfy the extraction restriction; distribution gate remains open. See docs/reports/M0-T06-font-license-evidence.md."
+  },
   "amiriSourceRelease": "https://github.com/aliftype/amiri/releases/tag/1.003",
   "amiriArchiveSha256": "81af0aff7d2086d8af24cea7202f7546130997982534691373485cd96744d05e"
 }
