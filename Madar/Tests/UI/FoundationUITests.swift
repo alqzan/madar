@@ -359,7 +359,31 @@ import XCTest
             format: "label CONTAINS[c] %@ OR label CONTAINS %@", "Save to Files", "الملفات"
         )).firstMatch
         XCTAssertTrue(file.waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertTrue(saveToFiles.waitForExistence(timeout: 10), app.debugDescription)
+        let compactShare = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        compactShare.name = "M0-T09-switcher-\(variant)-native-share-before-Files-discovery"
+        compactShare.lifetime = .keepAlways; add(compactShare)
+        let compactHierarchy = XCTAttachment(string: app.debugDescription)
+        compactHierarchy.name = "M0-T09-switcher-\(variant)-native-share-before-Files-hierarchy"
+        compactHierarchy.lifetime = .keepAlways; add(compactHierarchy)
+        if !saveToFiles.waitForExistence(timeout: 10) {
+            // Actual system AX3 trace exposes the native action disclosure here,
+            // rather than a Files row. Tap that exact cell once; never blindly
+            // scroll the sheet or the protected settings form underneath it.
+            let nativeShare = app.otherElements["ActivityListView"]
+            let more = nativeShare.cells.matching(NSPredicate(
+                format: "identifier == %@ AND label == %@", "actionGroupCell", "عرض المزيد"
+            ))
+            XCTAssertEqual(more.count, 1, app.debugDescription)
+            XCTAssertTrue(more.firstMatch.isHittable, app.debugDescription)
+            more.firstMatch.tap()
+            let expandedShare = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+            expandedShare.name = "M0-T09-switcher-\(variant)-native-share-after-action-disclosure"
+            expandedShare.lifetime = .keepAlways; add(expandedShare)
+            let expandedHierarchy = XCTAttachment(string: app.debugDescription)
+            expandedHierarchy.name = "M0-T09-switcher-\(variant)-native-share-after-disclosure-hierarchy"
+            expandedHierarchy.lifetime = .keepAlways; add(expandedHierarchy)
+            XCTAssertTrue(saveToFiles.waitForExistence(timeout: 10), app.debugDescription)
+        }
         let authorizedShare = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         authorizedShare.name = "M0-T09-switcher-\(variant)-authorized-native-share"
         authorizedShare.lifetime = .keepAlways; add(authorizedShare)
