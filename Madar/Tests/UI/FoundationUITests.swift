@@ -236,6 +236,94 @@ import XCTest
         // actual app-switcher frame, lease expiry, file deletion or Files write.
     }
 
+    func test_M0T09_DefaultBackgroundLeaseExpiryRequiresFreshNativeFaceID() throws {
+        guard ProcessInfo.processInfo.environment["MADAR_TEST_NATIVE_BIOMETRICS"] == "1" else {
+            throw XCTSkip("Run scripts/native-export-biometric-test.py --test lease-expiry for supported simulator Face ID orchestration.")
+        }
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
+        app.launch(); openPlainExportSettings(app)
+        defer { app.terminate() }
+        let cover = app.descendants(matching: .any).matching(identifier: "scene-privacy-cover").firstMatch
+        let export = app.buttons["plain-export-now"]
+        let share = app.buttons["plain-export-share"]
+        XCTAssertFalse(cover.exists)
+        XCTAssertFalse(share.exists)
+        XCTAssertTrue(export.isEnabled)
+        export.tap()
+        XCTAssertTrue(cover.waitForExistence(timeout: 10), app.debugDescription)
+        NSLog("MADAR_NATIVE_FACEID_REQUEST_READY")
+        XCTAssertTrue(share.waitForExistence(timeout: 30), app.debugDescription)
+        XCTAssertFalse(cover.exists)
+        scrollTo(share, in: app)
+        XCTAssertTrue(share.isEnabled)
+        share.tap()
+        let file = app.descendants(matching: .any).matching(NSPredicate(
+            format: "label BEGINSWITH %@ AND label CONTAINS %@", "Madar-", "-plain"
+        )).firstMatch
+        let saveToFiles = app.descendants(matching: .any).matching(NSPredicate(
+            format: "label CONTAINS[c] %@ OR label CONTAINS %@", "Save to Files", "الملفات"
+        )).firstMatch
+        XCTAssertTrue(file.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(saveToFiles.waitForExistence(timeout: 10), app.debugDescription)
+        attachScreenshot(app, named: "M0-T09-lease-default-light-share-before-background")
+        NSLog("MADAR_NATIVE_SHARE_BEFORE_HOME")
+        XCUIDevice.shared.press(.home)
+        XCTAssertTrue(app.wait(for: .runningBackground, timeout: 10), app.debugDescription)
+        // Start only after background is confirmed, so the full interval is spent
+        // there. Use actual monotonic time without changing the product's clock.
+        let backgroundStarted = ProcessInfo.processInfo.systemUptime
+        let leaseElapsed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            ProcessInfo.processInfo.systemUptime - backgroundStarted >= 61
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [leaseElapsed], timeout: 65), .completed)
+        XCTAssertEqual(app.state, .runningBackground)
+        let elapsed = ProcessInfo.processInfo.systemUptime - backgroundStarted
+        XCTAssertGreaterThanOrEqual(elapsed, 61)
+        app.activate()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.navigationBars["النسخ والاستعادة"].waitForExistence(timeout: 10), app.debugDescription)
+        scrollBackupForm(to: export, in: app, towardsTop: true)
+        expectation(for: NSPredicate(format: "exists == true AND enabled == true AND hittable == true"), evaluatedWith: export)
+        waitForExpectations(timeout: 10)
+        NSLog("MADAR_NATIVE_SHARE_REENTRY_READY elapsed=%.3f", elapsed)
+        XCTAssertFalse(cover.exists)
+        XCTAssertFalse(file.exists)
+        XCTAssertFalse(saveToFiles.exists)
+        XCTAssertFalse(share.exists)
+        let reopened = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            MainActor.assumeIsolated { file.exists || saveToFiles.exists || share.exists }
+        }, object: nil)
+        reopened.isInverted = true
+        XCTAssertEqual(XCTWaiter.wait(for: [reopened], timeout: 5), .completed,
+                       "Expired authorization must not automatically restore a share presentation.")
+        attachScreenshot(app, named: "M0-T09-lease-default-light-share-retired-after-expiry")
+
+        // Only the explicit new export can start a second request. A cached
+        // success or cancellation cannot satisfy both this wait and readiness
+        // after the distinct second native biometric match.
+        export.tap()
+        XCTAssertTrue(cover.waitForExistence(timeout: 10), app.debugDescription)
+        let prematureReadiness = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == true"), object: share)
+        prematureReadiness.isInverted = true
+        XCTAssertEqual(XCTWaiter.wait(for: [prematureReadiness], timeout: 2), .completed,
+                       "A new export must wait for fresh authentication after lease expiry.")
+        XCTAssertTrue(cover.exists, "Fresh authentication must still cover the scene before the second match.")
+        let nativeAuthentication = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        nativeAuthentication.name = "M0-T09-lease-default-light-fresh-FaceID-request-screen"
+        nativeAuthentication.lifetime = .keepAlways; add(nativeAuthentication)
+        NSLog("MADAR_NATIVE_FACEID_REAUTH_REQUEST_READY")
+        XCTAssertTrue(share.waitForExistence(timeout: 30), app.debugDescription)
+        XCTAssertEqual(app.state, .runningForeground)
+        XCTAssertFalse(cover.exists)
+        scrollTo(share, in: app)
+        XCTAssertTrue(share.isEnabled)
+        attachScreenshot(app, named: "M0-T09-lease-default-light-fresh-authenticated-ready")
+        // The real 61-second interval proves expiry and fresh export readiness;
+        // it does not resolve the exact 60-second boundary, switcher or device gate.
+    }
+
     func test_M0T09_AX3BackgroundDuringExportAuthenticationDoesNotExposeShare() throws {
         continueAfterFailure = false
         let app = XCUIApplication()

@@ -7,6 +7,8 @@ covered the scene. No app authentication seam or production setting is changed.
 Use --test background-retirement for the share-revocation/reentry slice; its
 launchctl snapshots require the same app PID and service label across reentry.
 Its bounded --variant selects ax3-light (default), default-light or default-dark.
+Use --test lease-expiry for a real 61-second background interval and a second
+native Face ID match. This separate path is fixed to default-light.
 """
 import argparse
 import json
@@ -41,11 +43,15 @@ def main():
     parser.add_argument("--device", required=True)
     parser.add_argument("--derived-data", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
-    parser.add_argument("--test", choices=["share-dismissal", "background-retirement"], default="share-dismissal")
-    parser.add_argument("--variant", choices=["ax3-light", "default-light", "default-dark"], default="ax3-light")
+    parser.add_argument("--test", choices=["share-dismissal", "background-retirement", "lease-expiry"], default="share-dismissal")
+    parser.add_argument("--variant", choices=["ax3-light", "default-light", "default-dark"])
     args = parser.parse_args()
-    if args.test != "background-retirement" and args.variant != "ax3-light":
+    if args.variant is None:
+        args.variant = "default-light" if args.test == "lease-expiry" else "ax3-light"
+    if args.test == "share-dismissal" and args.variant != "ax3-light":
         parser.error("--variant default-light/default-dark requires --test background-retirement")
+    if args.test == "lease-expiry" and args.variant != "default-light":
+        parser.error("--test lease-expiry is fixed to --variant default-light")
     root = Path(__file__).resolve().parents[1]
     output = args.output_dir.resolve()
     output.mkdir(parents=True, exist_ok=False)
@@ -71,6 +77,7 @@ def main():
         test_name = {
             "share-dismissal": "test_M0T09_AX3NativeShareAfterSimulatorFaceIDMatch",
             "background-retirement": "test_M0T09_AX3BackgroundRetiresAuthorizedNativeShareWithoutReopening",
+            "lease-expiry": "test_M0T09_DefaultBackgroundLeaseExpiryRequiresFreshNativeFaceID",
         }[args.test]
         command = ["xcodebuild", "test", "-project", "Madar.xcodeproj", "-scheme", "Madar",
                    "-destination", f"id={args.device}", "-derivedDataPath", str(args.derived_data.resolve()),
@@ -82,6 +89,8 @@ def main():
         if args.test == "background-retirement":
             environment["TEST_RUNNER_MADAR_TEST_NATIVE_SHARE_VARIANT"] = args.variant
         matched = False
+        reauth_matched = False
+        tracks_reentry = args.test in ["background-retirement", "lease-expiry"]
         before_identity = None
         reentry_identity = None
         with log.open("w") as build_log:
@@ -91,16 +100,16 @@ def main():
                 while process.poll() is None:
                     current_log = log.read_text()
                     if not matched and "MADAR_NATIVE_FACEID_REQUEST_READY" in current_log:
-                        if args.test == "background-retirement":
+                        if tracks_reentry:
                             before_identity = app_process_snapshot(args.device, output / "process-before-auth-match.txt")
-                        match_json = output / "match.json"
+                        match_json = output / ("match-1.json" if args.test == "lease-expiry" else "match.json")
                         match = ["xcrun", "devicectl", "device", "simulate", "biometrics", "--device", args.device,
                                  "--success", "--timeout", "15", "--json-output", str(match_json)]
                         subprocess.run(match, stdout=biometric_log, stderr=subprocess.STDOUT, check=True)
                         if json.loads(match_json.read_text())["info"]["outcome"] != "success":
                             raise RuntimeError("The simulator biometric match command failed.")
                         matched = True
-                    if args.test == "background-retirement" and reentry_identity is None and "MADAR_NATIVE_SHARE_REENTRY_READY" in current_log:
+                    if tracks_reentry and reentry_identity is None and "MADAR_NATIVE_SHARE_REENTRY_READY" in current_log:
                         if "MADAR_NATIVE_SHARE_BEFORE_HOME" not in current_log:
                             raise RuntimeError("Native share reentry was reported without its before-Home checkpoint.")
                         reentry_identity = app_process_snapshot(args.device, output / "process-after-reentry.txt")
@@ -109,6 +118,16 @@ def main():
                         ) + "\n")
                         if before_identity != reentry_identity:
                             raise RuntimeError("Madar did not return as the same app process; inspect process-identity.json")
+                    if args.test == "lease-expiry" and not reauth_matched and "MADAR_NATIVE_FACEID_REAUTH_REQUEST_READY" in current_log:
+                        if not matched or reentry_identity is None:
+                            raise RuntimeError("Fresh authentication was requested before the first match and verified reentry.")
+                        reauth_json = output / "match-2.json"
+                        reauth = ["xcrun", "devicectl", "device", "simulate", "biometrics", "--device", args.device,
+                                  "--success", "--timeout", "15", "--json-output", str(reauth_json)]
+                        subprocess.run(reauth, stdout=biometric_log, stderr=subprocess.STDOUT, check=True)
+                        if json.loads(reauth_json.read_text())["info"]["outcome"] != "success":
+                            raise RuntimeError("The fresh simulator biometric match command failed.")
+                        reauth_matched = True
                     if time.monotonic() > deadline:
                         raise TimeoutError(f"Native biometric UI test exceeded deadline; inspect {log}")
                     time.sleep(0.1)
@@ -122,8 +141,10 @@ def main():
                         process.wait()
         if not matched or process.returncode != 0:
             raise RuntimeError(f"Native biometric test failed or never reached its checkpoint; inspect {log}")
-        if args.test == "background-retirement" and reentry_identity is None:
+        if tracks_reentry and reentry_identity is None:
             raise RuntimeError(f"Native share retirement never reached its process-continuity checkpoint; inspect {log}")
+        if args.test == "lease-expiry" and not reauth_matched:
+            raise RuntimeError(f"Native lease expiry never reached its second authentication checkpoint/match; inspect {log}")
     print(f"Native {args.variant} Face ID/{args.test} passed: {result}")
 
 
