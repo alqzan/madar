@@ -2,6 +2,7 @@ import Foundation
 
 public enum PrayerStoredStatus: String, Codable, Sendable { case jamaah, alone, qada, missed, unrecordedHistory }
 public enum PrayerHeart: String, Codable, CaseIterable, Sendable { case distracted, present, khashi }
+public enum FridayPrayerKind: String, Codable, CaseIterable, Sendable { case jumuah, dhuhr }
 public enum PrayerPair: String, Codable, Sendable {
     case dhuhrAsr, maghribIsha
     public var prayers: [Prayer] { self == .dhuhrAsr ? [.dhuhr, .asr] : [.maghrib, .isha] }
@@ -14,9 +15,9 @@ public struct PrayerReference: Codable, Hashable, Sendable {
     public var naturalKey: String { day.description + "." + prayer.rawValue }
 }
 public enum PrayerMutation: Codable, Equatable, Sendable {
-    case record(PrayerReference, status: PrayerStoredStatus, heart: PrayerHeart?, shortened: Bool?)
-    case makeUp(PrayerReference)
-    case addOldMissed(PrayerReference)
+    case record(PrayerReference, status: PrayerStoredStatus, heart: PrayerHeart?, shortened: Bool?, fridayKind: FridayPrayerKind? = nil)
+    case makeUp(PrayerReference, fridayKind: FridayPrayerKind? = nil)
+    case addOldMissed(PrayerReference, fridayKind: FridayPrayerKind? = nil)
     case markUnrecorded([PrayerReference])
     case answerHeart(PrayerReference, PrayerHeart?)
     case logPair(day: GregorianDay, pair: PrayerPair, status: PrayerStoredStatus, shortened: Bool, mode: PrayerPairMode)
@@ -47,9 +48,18 @@ extension PrayerMutation {
         case "prayer.endTrip":
             guard Set(payload.keys) == ["tripID"], let id = UUID(uuidString: try string("tripID")) else { throw CoreError.invalidCommand }
             return (.endTrip(id), "trip." + id.uuidString)
-        case "prayer.makeUp", "prayer.addOldMissed", "prayer.clear":
+        case "prayer.clear":
             let value = try ref(payload)
-            let command: Self = name == "prayer.makeUp" ? .makeUp(value) : (name == "prayer.clear" ? .clear(value) : .addOldMissed(value))
+            return (.clear(value), "prayer." + value.naturalKey)
+        case "prayer.makeUp", "prayer.addOldMissed":
+            guard Set(payload.keys).isSubset(of: ["dayKey", "prayer", "fridayKind"]) else { throw CoreError.invalidCommand }
+            let value = try ref(payload.filter { $0.key != "fridayKind" })
+            let fridayKind: FridayPrayerKind?
+            if let raw = payload["fridayKind"], raw != .null {
+                guard case .string(let value) = raw, let parsed = FridayPrayerKind(rawValue: value) else { throw CoreError.invalidCommand }
+                fridayKind = parsed
+            } else { fridayKind = nil }
+            let command: Self = name == "prayer.makeUp" ? .makeUp(value, fridayKind: fridayKind) : .addOldMissed(value, fridayKind: fridayKind)
             return (command, "prayer." + value.naturalKey)
         case "prayer.answerHeart":
             guard Set(payload.keys) == ["dayKey", "prayer", "heart"] else { throw CoreError.invalidCommand }

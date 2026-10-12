@@ -10,10 +10,22 @@ import MadarInbox
     private func fixture() throws -> (ModelContainer, DurableCommandAdapter, PendingInbox) {
         let directory = FileManager.default.temporaryDirectory.appending(path: "MadarDrainFixture-\(UUID())")
         let container = try MadarContainerFactory.makeLocal(at: directory)
+        let now = Date(), context = ModelContext(container), settings = try SettingsStore(context: context)
+        let day = prayerDay(now)
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = TimeZone(identifier: "Asia/Riyadh")!
+        let daysSinceFriday = (calendar.component(.weekday, from: day.date(in: calendar.timeZone)) + 1) % 7
+        _ = try settings.stage(["salah.trackingStart": .object(["dayKey": .string(day.adding(days: -(daysSinceFriday == 0 ? 7 : daysSinceFriday)).description), "edits": .number(0)])], now: now)
+        try context.save()
         return (container, DurableCommandAdapter(container: container, lockDirectory: directory, transactionClock: { $0 }), PendingInbox(directory: directory.appending(path: "PendingInbox")))
     }
     private func prayer(id: UUID = UUID(), generation: UUID, now: Date = Date()) -> InboxRecord {
-        .init(expectedGenerationID: generation, command: .init(commandID: id, name: "prayer.log", payload: .object(["dayKey": .string("2026-10-10"), "prayer": .string("fajr"), "status": .string("jamaah")]), source: .notification, issuedAt: now))
+        .init(expectedGenerationID: generation, command: .init(commandID: id, name: "prayer.log", payload: .object(["dayKey": .string(prayerDay(now).description), "prayer": .string("fajr"), "status": .string("jamaah")]), source: .notification, issuedAt: now))
+    }
+    private func prayerDay(_ now: Date) -> GregorianDay {
+        let place = try! ActivePlace(latitude: 24.7136, longitude: 46.6753, timeZoneID: "Asia/Riyadh")
+        let civil = GregorianDay.containing(now, in: place.timeZone)
+        guard let times = PrayerTimesEngine.calculate(day: civil, place: place) else { return civil }
+        return now < times.fajr ? civil.adding(days: -1) : civil
     }
     @Test func test_M0R03_refreshFailureLeavesCommittedDeliveryAndRetryDoesNotMutate() async throws {
         let (container, adapter, inbox) = try fixture(), generation = UUID(), record = prayer(generation: UUID())

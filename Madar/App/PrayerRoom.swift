@@ -1,5 +1,6 @@
 import SwiftUI
 import Observation
+import MadarCore
 import MadarDesign
 
 // A display projection of the prayer engine. Dates, eligibility and statistics are
@@ -37,13 +38,14 @@ struct PrayerUIEntry: Identifiable, Sendable {
     var shortened: Bool
     var canShorten: Bool
     var isFriday: Bool
+    var fridayKind: FridayPrayerKind?
     var isNext: Bool
     var estimated: Bool
     var id: String { selection.id }
 }
 struct PrayerUINext: Sendable { var title: String; var time: Date; var timeLabel: String }
 struct PrayerUIHistoryDay: Identifiable, Sendable { var dayKey: String; var title: String; var entries: [PrayerUIEntry]; var id: String { dayKey } }
-struct PrayerUIQada: Identifiable, Sendable { var selection: PrayerUISelection; var title: String; var dateLabel: String; var id: String { selection.id } }
+struct PrayerUIQada: Identifiable, Sendable { var selection: PrayerUISelection; var title: String; var dateLabel: String; var fridayKind: FridayPrayerKind?; var isFriday: Bool; var id: String { selection.id } }
 struct PrayerUIBead: Identifiable, Sendable { var id: String; var status: PrayerUIStatus; var accessibilityLabel: String }
 struct PrayerUISummary: Sendable {
     var monthTitle: String
@@ -102,13 +104,13 @@ struct PrayerRoomState: Sendable {
     var timeZoneID: String
 }
 enum PrayerUICommand: Sendable {
-    case log(PrayerUISelection, status: PrayerUIStatus, heart: PrayerUIHeart?, shortened: Bool)
+    case log(PrayerUISelection, status: PrayerUIStatus, heart: PrayerUIHeart?, shortened: Bool, fridayKind: FridayPrayerKind?)
     case setHeart(PrayerUISelection, heart: PrayerUIHeart?)
-    case makeUp(PrayerUISelection)
+    case makeUp(PrayerUISelection, fridayKind: FridayPrayerKind?)
     case clear(PrayerUISelection)
     case markUnrecorded([PrayerUISelection])
     case logPair(dayKey: String, pair: PrayerUIPair, status: PrayerUIStatus, mode: PrayerUIPairMode, shortened: Bool)
-    case addOldMissed(day: Date, prayer: PrayerUICode)
+    case addOldMissed(day: Date, prayer: PrayerUICode, fridayKind: FridayPrayerKind?)
     case saveQiyam(nightKey: String, rakaat: Int, witr: Bool)
     case endTrip
 }
@@ -269,22 +271,30 @@ private struct PrayerLogSheet: View {
     @State private var status: PrayerUIStatus
     @State private var heart: PrayerUIHeart?
     @State private var shortened: Bool
+    @State private var fridayKind: FridayPrayerKind?
     @State private var savedMissed = false
-    init(entry: PrayerUIEntry, model: PrayerRoomModel) { self.entry = entry; self.model = model; _status = State(initialValue: [.jamaah, .alone, .qada, .missed].contains(entry.status) ? entry.status : .jamaah); _heart = State(initialValue: entry.heart); _shortened = State(initialValue: entry.shortened) }
+    init(entry: PrayerUIEntry, model: PrayerRoomModel) { self.entry = entry; self.model = model; _status = State(initialValue: [.jamaah, .alone, .qada, .missed].contains(entry.status) ? entry.status : .jamaah); _heart = State(initialValue: entry.heart); _shortened = State(initialValue: entry.shortened); _fridayKind = State(initialValue: entry.isFriday && entry.status == .alone ? .dhuhr : entry.fridayKind) }
     var body: some View {
         Form {
                 Section { Text(entry.title).font(MadarTypography.title()); if let time = entry.timeLabel { Text(time) } }
                 if entry.canLog && !savedMissed {
                     Section("كيف صلّيت؟") {
                         ForEach([PrayerUIStatus.jamaah, .alone, .qada, .missed], id: \.self) { option in
-                            if option != .qada || entry.canMakeUp { Button { status = option } label: { HStack { Text(option == .qada ? "قضاءً · بعد وقتها" : option.title); Spacer(); if status == option { Image(systemName: "checkmark") } } }.accessibilityAddTraits(status == option ? .isSelected : []).accessibilityIdentifier("prayer-log-status-" + option.rawValue) }
+                            if option != .qada || entry.canMakeUp { Button { status = option; if entry.isFriday && option == .alone { fridayKind = .dhuhr } } label: { HStack { Text(option == .qada ? "قضاءً · بعد وقتها" : option.title); Spacer(); if status == option { Image(systemName: "checkmark") } } }.accessibilityAddTraits(status == option ? .isSelected : []).accessibilityIdentifier("prayer-log-status-" + option.rawValue) }
+                        }
+                        if entry.isFriday {
+                            Picker("نوع صلاة الجمعة", selection: $fridayKind) {
+                                Text("اختر التصنيف").tag(nil as FridayPrayerKind?)
+                                if status != .alone { Text("صلاة الجمعة").tag(FridayPrayerKind?.some(.jumuah)) }
+                                Text("الظهر").tag(FridayPrayerKind?.some(.dhuhr))
+                            }.accessibilityIdentifier("prayer-friday-kind")
                         }
                         if entry.canShorten && [.jamaah, .alone].contains(status) { Toggle(entry.isFriday ? "الظهر قصرًا" : "قصر", isOn: $shortened).accessibilityIdentifier("prayer-log-shortened"); if entry.isFriday { Text("اختيارك يحدّد التسجيل: الجمعة جماعة بلا قصر، أو الظهر قصرًا.").font(MadarTypography.caption()) } }
                     }
                 }
                 if status == .missed || savedMissed {
                     Section { Text("وهي عليك حتى تصلّيها").font(MadarTypography.cardTitle()).foregroundStyle(theme.color("missedText")); PrayerQadaCitation() }
-                    if savedMissed || (entry.status == .missed && status == .missed && entry.canMakeUp) { Button("قضيتُها الآن") { Task { if await model.perform(.makeUp(entry.selection)) { dismiss() } } }.accessibilityIdentifier("prayer-makeup-now"); Button("لاحقًا") { dismiss() } }
+                    if savedMissed || (entry.status == .missed && status == .missed && entry.canMakeUp) { Button("قضيتُها الآن") { Task { if await model.perform(.makeUp(entry.selection, fridayKind: fridayKind ?? entry.fridayKind)) { dismiss() } } }.disabled(entry.isFriday && (fridayKind ?? entry.fridayKind) == nil).accessibilityIdentifier("prayer-makeup-now"); Button("لاحقًا") { dismiss() } }
                 } else if model.state?.askHeart == true && (entry.canLog || [.jamaah, .alone, .qada].contains(entry.status)) {
                     Section("وكيف كان قلبك فيها؟ · اختياري") {
                         ForEach(PrayerUIHeart.allCases) { option in Button { heart = option } label: { HStack { VStack(alignment: .leading) { Text(option.title); Text(option.sentence).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }; Spacer(); if heart == option { Image(systemName: "checkmark") } } }.accessibilityAddTraits(heart == option ? .isSelected : []).accessibilityIdentifier("prayer-heart-" + option.rawValue) }
@@ -292,7 +302,7 @@ private struct PrayerLogSheet: View {
                     }
                 }
                 if !savedMissed {
-                    if entry.canLog { Button("احفظ التسجيل") { Task { let command = PrayerUICommand.log(entry.selection, status: status, heart: status == .missed ? nil : heart, shortened: [.jamaah, .alone].contains(status) && shortened); if await model.perform(command) { if status == .missed { savedMissed = true } else { dismiss() } } } }.accessibilityIdentifier("prayer-log-save") }
+                    if entry.canLog { Button("احفظ التسجيل") { Task { let command = PrayerUICommand.log(entry.selection, status: status, heart: status == .missed ? nil : heart, shortened: [.jamaah, .alone].contains(status) && shortened, fridayKind: entry.isFriday ? fridayKind : nil); if await model.perform(command) { if status == .missed { savedMissed = true } else { dismiss() } } } }.disabled(entry.isFriday && fridayKind == nil).accessibilityIdentifier("prayer-log-save") }
                     else if [.jamaah, .alone, .qada].contains(entry.status), model.state?.askHeart == true { Button("احفظ جواب القلب") { Task { if await model.perform(.setHeart(entry.selection, heart: heart)) { dismiss() } } }.accessibilityIdentifier("prayer-heart-save") }
                     else { Text("لم يحن وقت هذه الصلاة.").foregroundStyle(theme.secondaryInk) }
                     if entry.canClear { Button("امسح التسجيل", role: .destructive) { Task { if await model.perform(.clear(entry.selection)) { dismiss() } } }.accessibilityIdentifier("prayer-log-clear") }
@@ -331,8 +341,56 @@ private struct PrayerQadaSheet: View {
     @State private var addingOld = false
     @State private var day: Date = .now
     @State private var prayer: PrayerUICode = .fajr
+    @State private var fridayKinds: [PrayerUISelection: FridayPrayerKind] = [:]
+    @State private var oldFridayKind: FridayPrayerKind?
+    private var oldMissedIsFriday: Bool {
+        guard prayer == .dhuhr, let state = model.state,
+              let zone = TimeZone(identifier: state.timeZoneID) else { return false }
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = zone
+        return calendar.component(.weekday, from: day) == 6
+    }
     var body: some View {
-        Form { PrayerQadaCitation(); if model.state?.qada.isEmpty == true { Text("لا فوائت مسجّلة عليك.") }; ForEach(model.state?.qada ?? []) { item in VStack(alignment: .leading, spacing: 10) { Text(item.title + "، " + item.dateLabel); Button("قضيتُها") { Task { _ = await model.perform(.makeUp(item.selection)) } }.accessibilityIdentifier("prayer-qada-makeup-" + item.id) } }; Button("أضِف فائتة قديمة") { if let state = model.state { day = state.oldMissedDefault }; addingOld = true }.accessibilityIdentifier("prayer-add-old-missed"); if addingOld, let state = model.state { Section("فائتة أضيفها صراحة") { DatePicker("اليوم", selection: $day, in: state.oldMissedEarliest...state.oldMissedLatest, displayedComponents: .date).environment(\.timeZone, TimeZone(identifier: state.timeZoneID) ?? .gmt); Picker("الصلاة", selection: $prayer) { ForEach(PrayerUICode.allCases) { Text($0.title).tag($0) } }; Button("أضِف الفائتة") { Task { if await model.perform(.addOldMissed(day: day, prayer: prayer)) { addingOld = false } } }.accessibilityIdentifier("prayer-add-old-confirm") } } }.navigationTitle("القضاء").font(MadarTypography.body()).disabled(model.busy)
+        Form {
+            PrayerQadaCitation()
+            if model.state?.qada.isEmpty == true { Text("لا فوائت مسجّلة عليك.") }
+            ForEach(model.state?.qada ?? []) { item in
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(item.title + "، " + item.dateLabel)
+                    if item.isFriday && item.fridayKind == nil {
+                        Picker("نوع صلاة الجمعة", selection: Binding(get: { fridayKinds[item.selection] }, set: { value in
+                            if let value { fridayKinds[item.selection] = value } else { fridayKinds.removeValue(forKey: item.selection) }
+                        })) {
+                            Text("اختر التصنيف").tag(nil as FridayPrayerKind?)
+                            Text("صلاة الجمعة").tag(FridayPrayerKind?.some(.jumuah))
+                            Text("الظهر").tag(FridayPrayerKind?.some(.dhuhr))
+                        }
+                    }
+                    Button("قضيتُها") { Task { _ = await model.perform(.makeUp(item.selection, fridayKind: item.fridayKind ?? fridayKinds[item.selection])) } }
+                        .disabled(item.isFriday && item.fridayKind == nil && fridayKinds[item.selection] == nil)
+                        .accessibilityIdentifier("prayer-qada-makeup-" + item.id)
+                }
+            }
+            Button("أضِف فائتة قديمة") { if let state = model.state { day = state.oldMissedDefault }; oldFridayKind = nil; addingOld = true }.accessibilityIdentifier("prayer-add-old-missed")
+            if addingOld, let state = model.state {
+                Section("فائتة أضيفها صراحة") {
+                    DatePicker("اليوم", selection: $day, in: state.oldMissedEarliest...state.oldMissedLatest, displayedComponents: .date)
+                        .environment(\.timeZone, TimeZone(identifier: state.timeZoneID) ?? .gmt)
+                        .onChange(of: day) { _, _ in oldFridayKind = nil }
+                    Picker("الصلاة", selection: $prayer) { ForEach(PrayerUICode.allCases) { Text($0.title).tag($0) } }
+                        .onChange(of: prayer) { _, _ in oldFridayKind = nil }
+                    if oldMissedIsFriday {
+                        Picker("نوع صلاة الجمعة", selection: $oldFridayKind) {
+                            Text("اختر التصنيف").tag(nil as FridayPrayerKind?)
+                            Text("صلاة الجمعة").tag(FridayPrayerKind?.some(.jumuah))
+                            Text("الظهر").tag(FridayPrayerKind?.some(.dhuhr))
+                        }
+                    }
+                    Button("أضِف الفائتة") { Task { if await model.perform(.addOldMissed(day: day, prayer: prayer, fridayKind: oldMissedIsFriday ? oldFridayKind : nil)) { addingOld = false } } }
+                        .disabled(oldMissedIsFriday && oldFridayKind == nil)
+                        .accessibilityIdentifier("prayer-add-old-confirm")
+                }
+            }
+        }.navigationTitle("القضاء").font(MadarTypography.body()).disabled(model.busy)
     }
 }
 private struct PrayerQiyamSheet: View {
@@ -367,13 +425,13 @@ private struct PrayerQadaCitation: View {
     ]
     var body: some View { Button { index = (index + 1) % citations.count } label: { VStack(alignment: .leading, spacing: 8) { Text(citations[index].0).font(.custom("Amiri-Regular", size: 23, relativeTo: .title3)).fixedSize(horizontal: false, vertical: true); Text(citations[index].1).font(MadarTypography.caption()) } }.buttonStyle(.plain).accessibilityHint("لمسة تعرض نصًا آخر موثّقًا") }
 }
-private struct PrayerStar: Shape {
+struct PrayerStar: Shape {
     func path(in rect: CGRect) -> Path {
         var p = Path(); let center = CGPoint(x: rect.midX, y: rect.midY); let radius = min(rect.width, rect.height) / 2
         for n in 0..<16 { let angle = Double(n) * .pi / 8 - .pi / 2; let r = radius * (n.isMultiple(of: 2) ? 1 : 0.44); let point = CGPoint(x: center.x + cos(angle) * r, y: center.y + sin(angle) * r); if n == 0 { p.move(to: point) } else { p.addLine(to: point) } }; p.closeSubpath(); return p
     }
 }
-private struct PrayerHorseshoe: Shape {
+struct PrayerHorseshoe: Shape {
     func path(in rect: CGRect) -> Path {
         var path = Path(); let r = rect.width / 2; let center = CGPoint(x: rect.midX, y: rect.minY + r); let shoulder = center.y + r * 0.5
         path.move(to: CGPoint(x: rect.minX + rect.width * 0.067, y: rect.maxY)); path.addLine(to: CGPoint(x: rect.minX + rect.width * 0.067, y: shoulder)); path.addArc(center: center, radius: r, startAngle: .degrees(150), endAngle: .degrees(390), clockwise: false); path.addLine(to: CGPoint(x: rect.maxX - rect.width * 0.067, y: rect.maxY)); path.closeSubpath(); return path

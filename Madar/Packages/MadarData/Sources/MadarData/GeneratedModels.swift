@@ -397,6 +397,7 @@ extension ImportLink: MadarRecordModel {
     public var tripID: UUID? = nil
     public var pairID: UUID? = nil
     public var shortened: Bool? = nil
+    public var fridayKind: String? = nil
     public init() {}
 }
 extension PrayerLog: MadarRecordModel {
@@ -422,6 +423,7 @@ extension PrayerLog: MadarRecordModel {
             "tripID": JSONValue.encode(tripID),
             "pairID": JSONValue.encode(pairID),
             "shortened": JSONValue.encode(shortened),
+            "fridayKind": JSONValue.encode(fridayKind),
         ])
     }
     public func apply(_ record: DataRecord) throws {
@@ -445,6 +447,7 @@ extension PrayerLog: MadarRecordModel {
         tripID = try record.decode("tripID", as: UUID?.self)
         pairID = try record.decode("pairID", as: UUID?.self)
         shortened = try record.decode("shortened", as: Bool?.self)
+        fridayKind = try record.fields["fridayKind"]?.decode(String?.self)
     }
 }
 @Model public final class QadaItem {

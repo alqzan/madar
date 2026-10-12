@@ -709,6 +709,16 @@
           "name": "shortened",
           "type": "Bool?",
           "optional": true
+        },
+        {
+          "name": "fridayKind",
+          "type": "String?",
+          "optional": true,
+          "enum": [
+            "jumuah",
+            "dhuhr"
+          ],
+          "note": "For the Friday noon slot only; nil means the historical row did not distinguish Jumuah from Dhuhr."
         }
       ]
     },

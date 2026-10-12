@@ -43,7 +43,7 @@ public enum CommandOperation: Codable, Equatable, Sendable {
     case undo(token: UUID)
     case savePreset(name: String, settings: [String: JSONValue], layouts: [String: JSONValue])
     case completeOnboarding
-    case logPrayer(dayKey: String, prayer: Prayer, status: String, heart: String?, shortened: Bool?)
+    case logPrayer(dayKey: String, prayer: Prayer, status: String, heart: String?, shortened: Bool?, fridayKind: String?)
 }
 public struct CoreCommandReceipt: Codable, Equatable, Sendable {
     public let commandID: UUID
@@ -116,7 +116,7 @@ public struct CommandBus: Sendable {
         let operation: CommandOperation; let semantics: CommandSemantics; let naturalKey: String?
         switch envelope.name {
         case "prayer.log":
-            guard Set(payload.keys).isSubset(of: ["dayKey", "prayer", "status", "heart", "shortened"]),
+            guard Set(payload.keys).isSubset(of: ["dayKey", "prayer", "status", "heart", "shortened", "fridayKind"]),
                   case .string(let dayKey) = payload["dayKey"], (try? GregorianDay(dayKey)) != nil,
                   case .string(let prayerRaw) = payload["prayer"], let prayer = Prayer(rawValue: prayerRaw),
                   case .string(let status) = payload["status"], ["jamaah", "alone", "qada", "missed"].contains(status) else { return .init(status: .rejected, reason: "invalidPayload") }
@@ -129,8 +129,13 @@ public struct CommandBus: Sendable {
                 guard case .bool(let b) = value else { return .init(status: .rejected, reason: "invalidPayload") }
                 shortened = b
             }
+            var fridayKind: String?
+            if let value = payload["fridayKind"], value != .null {
+                guard case .string(let raw) = value, FridayPrayerKind(rawValue: raw) != nil else { return .init(status: .rejected, reason: "invalidPayload") }
+                fridayKind = raw
+            }
             if shortened == true && (prayer == .fajr || prayer == .maghrib) { return .init(status: .rejected, reason: "invalidShortening") }
-            operation = .logPrayer(dayKey: dayKey, prayer: prayer, status: status, heart: heart, shortened: shortened)
+            operation = .logPrayer(dayKey: dayKey, prayer: prayer, status: status, heart: heart, shortened: shortened, fridayKind: fridayKind)
             semantics = .upsert; naturalKey = "prayer." + dayKey + "." + prayer.rawValue
         case "settings.set":
             guard Set(payload.keys) == ["settings"], case .object(let settings) = payload["settings"], !settings.isEmpty else { return .init(status: .rejected, reason: "invalidPayload") }

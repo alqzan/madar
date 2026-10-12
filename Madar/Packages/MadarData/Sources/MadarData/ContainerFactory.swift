@@ -24,7 +24,8 @@ public enum MadarContainerFactory {
         return version
     }
     private static func preflightVersion(at directory: URL) throws {
-        guard try storeVersion(at:directory) == MadarSchema.version else { throw DataError.legacyStoreRequiresAdoption }
+        let version = try storeVersion(at:directory)
+        guard version == MadarSchema.version || version == 2 else { throw DataError.legacyStoreRequiresAdoption }
     }
     public static func make(at syncedDirectory: URL, deviceStoreURL: URL, cloudKitContainerIdentifier: String? = nil) throws -> ModelContainer {
         try FileManager.default.createDirectory(at:syncedDirectory,withIntermediateDirectories:true)
@@ -48,7 +49,10 @@ public enum MadarContainerFactory {
     static func makeSyncedStaging(at directory: URL) throws -> ModelContainer {
         try preflightVersion(at:directory)
         try FileManager.default.createDirectory(at:directory,withIntermediateDirectories:true)
-        let container = try ModelContainer(for:Schema(MadarSchema.syncedTypes),configurations:ModelConfiguration("synced",schema:Schema(MadarSchema.syncedTypes),url:directory.appendingPathComponent("Madar.store"),cloudKitDatabase:.none))
+        let container = try ModelContainer(for:MadarSchema.schema,migrationPlan:MadarMigrationPlan.self,configurations:[
+            ModelConfiguration("synced",schema:Schema(MadarSchema.syncedTypes),url:directory.appendingPathComponent("Madar.store"),cloudKitDatabase:.none),
+            ModelConfiguration("deviceOnly",schema:Schema(MadarSchema.deviceTypes),isStoredInMemoryOnly:true,cloudKitDatabase:.none)
+        ])
         try DurableFiles.encode(MadarSchema.version,to:directory.appendingPathComponent("SchemaVersion.json"))
         return container
     }

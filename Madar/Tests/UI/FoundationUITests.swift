@@ -349,12 +349,66 @@ import XCTest
         finishOnboarding(app)
         let settings = app.buttons["settings-button"]
         XCTAssertTrue(settings.waitForExistence(timeout: 20), app.debugDescription)
-        XCTAssertFalse(app.buttons["الصلاة"].exists)
+        XCTAssertTrue(app.tabBars.buttons["الصلاة"].exists, "The M1 prayer screen is the first built room.")
         XCTAssertFalse(app.buttons["القرآن"].exists)
         let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "M0-iPhone17Pro-RTL-light-L"; shot.lifetime = .keepAlways; add(shot)
         settings.tap()
         XCTAssertTrue(app.buttons["reset-settings"].waitForExistence(timeout: 10), app.debugDescription)
         let settingsShot = XCTAttachment(screenshot: app.screenshot()); settingsShot.name = "M0-customize-RTL"; settingsShot.lifetime = .keepAlways; add(settingsShot)
+    }
+
+    func test_M1T01_PrayerLogPersistsChangeUndoAndAX3() throws {
+        continueAfterFailure = false
+        let storeID = UUID().uuidString
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": storeID, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
+        app.launch(); finishOnboarding(app)
+
+        func openPrayer(_ target: XCUIApplication) {
+            let tab = target.tabBars.buttons["الصلاة"]
+            XCTAssertTrue(tab.waitForExistence(timeout: 10), target.debugDescription)
+            tab.tap()
+            XCTAssertTrue(target.staticTexts["الصلاة"].waitForExistence(timeout: 10), target.debugDescription)
+        }
+        func fajrArch(_ target: XCUIApplication) -> XCUIElement {
+            target.buttons.matching(NSPredicate(format: "label CONTAINS %@", "الفجر")).firstMatch
+        }
+        func record(_ status: String, in target: XCUIApplication) {
+            let arch = fajrArch(target)
+            XCTAssertTrue(arch.waitForExistence(timeout: 10), target.debugDescription)
+            arch.tap()
+            let choice = target.buttons["prayer-status-\(status)"]
+            XCTAssertTrue(choice.waitForExistence(timeout: 10), target.debugDescription)
+            choice.tap()
+            target.buttons["prayer-save"].tap()
+        }
+
+        openPrayer(app)
+        let firstScreen = XCTAttachment(screenshot: app.screenshot())
+        firstScreen.name = "M1-T01-prayer-today-default-L"; firstScreen.lifetime = .keepAlways; add(firstScreen)
+        record("jamaah", in: app)
+        XCTAssertTrue(app.buttons["undo-button"].waitForExistence(timeout: 15), app.debugDescription)
+        app.terminate(); app.launch(); finishOnboarding(app); openPrayer(app)
+        XCTAssertTrue(fajrArch(app).label.contains("جماعة"), fajrArch(app).label)
+
+        record("alone", in: app)
+        XCTAssertTrue(app.buttons["undo-button"].waitForExistence(timeout: 15), app.debugDescription)
+        app.buttons["undo-button"].tap()
+        let restored = fajrArch(app)
+        let jamaahRestored = NSPredicate(format: "label CONTAINS %@", "جماعة")
+        expectation(for: jamaahRestored, evaluatedWith: restored)
+        waitForExpectations(timeout: 15)
+        app.terminate(); app.launch(); finishOnboarding(app); openPrayer(app)
+        XCTAssertTrue(fajrArch(app).label.contains("جماعة"), fajrArch(app).label)
+        app.terminate()
+
+        let ax3 = XCUIApplication()
+        ax3.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "AX3", "MADAR_UI_THEME": "light"]
+        ax3.launch(); finishOnboarding(ax3); openPrayer(ax3)
+        XCTAssertTrue(ax3.staticTexts["الصلاة القادمة"].waitForExistence(timeout: 10), ax3.debugDescription)
+        let ax3Shot = XCTAttachment(screenshot: ax3.screenshot())
+        ax3Shot.name = "M1-T01-prayer-today-AX3"; ax3Shot.lifetime = .keepAlways; add(ax3Shot)
+        ax3.terminate()
     }
     func testLightDarkAndAccessibilityScreenshots() throws {
         continueAfterFailure = false

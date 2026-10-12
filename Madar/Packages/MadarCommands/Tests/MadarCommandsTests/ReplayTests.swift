@@ -9,10 +9,29 @@ import MadarData
     private func fixture() throws -> (ModelContainer, CommandBus, URL) {
         let directory = FileManager.default.temporaryDirectory.appending(path: "MadarCommandFixture-\(UUID())")
         let container = try MadarContainerFactory.makeLocal(at: directory)
+        let now = Date(), context = ModelContext(container), settings = try SettingsStore(context: context)
+        let currentDay = prayerDay(now)
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = TimeZone(identifier: "Asia/Riyadh")!
+        let daysSinceFriday = (calendar.component(.weekday, from: currentDay.date(in: calendar.timeZone)) + 1) % 7
+        let trackDay = currentDay.adding(days: -(daysSinceFriday == 0 ? 7 : daysSinceFriday))
+        _ = try settings.stage(["salah.trackingStart": .object(["dayKey": .string(trackDay.description), "edits": .number(0)])], now: now)
+        try context.save()
         return (container, CommandBus(adapter: DurableCommandAdapter(container: container, lockDirectory: directory, transactionClock: { $0 })), directory)
     }
     private func prayer(_ status: String = "jamaah", id: UUID = UUID(), now: Date) -> CommandEnvelope {
-        .init(commandID: id, name: "prayer.log", payload: .object(["dayKey": .string("2026-10-10"), "prayer": .string("fajr"), "status": .string(status)]), source: .widget, issuedAt: now)
+        .init(commandID: id, name: "prayer.log", payload: .object(["dayKey": .string(prayerDay(now).description), "prayer": .string("fajr"), "status": .string(status)]), source: .widget, issuedAt: now)
+    }
+    private func prayerDay(_ now: Date) -> GregorianDay {
+        let place = try! ActivePlace(latitude: 24.7136, longitude: 46.6753, timeZoneID: "Asia/Riyadh")
+        let civil = GregorianDay.containing(now, in: place.timeZone)
+        guard let times = PrayerTimesEngine.calculate(day: civil, place: place) else { return civil }
+        return now < times.fajr ? civil.adding(days: -1) : civil
+    }
+    private func previousFriday(before day: GregorianDay) -> GregorianDay {
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = TimeZone(identifier: "Asia/Riyadh")!
+        var candidate = day.adding(days: -1)
+        while calendar.component(.weekday, from: candidate.date(in: calendar.timeZone)) != 6 { candidate = candidate.adding(days: -1) }
+        return candidate
     }
     @Test func test_M0R04_distinctDuplicateReceiptNeverOverwritesLaterEdit() async throws {
         let (container, bus, _) = try fixture(), now = Date()
@@ -51,4 +70,41 @@ import MadarData
         #expect(try await second.execute(b, now: now.addingTimeInterval(8 * 86400)).status == .duplicate)
         #expect(try ModelContext(container).fetch(FetchDescriptor<PrayerLog>()).first?.status == "alone")
     }
+    @Test func test_M1T01_prayerChangeUndoAndFutureFridayGuard() async throws {
+        let (container, bus, _) = try fixture(), now = Date()
+        let first = prayer(now: now)
+        #expect(try await bus.execute(first, now: now).status == .applied)
+        let firstRow = try #require(try ModelContext(container).fetch(FetchDescriptor<PrayerLog>()).first)
+        #expect(firstRow.dayKey == prayerDay(now).description && firstRow.status == "jamaah")
+
+        let changed = prayer("alone", now: now.addingTimeInterval(1))
+        #expect(try await bus.execute(changed, now: now.addingTimeInterval(1)).status == .applied)
+        #expect(try ModelContext(container).fetch(FetchDescriptor<PrayerLog>()).first?.status == "alone")
+        let undo = CommandEnvelope(name: "system.undo", payload: .object(["undoToken": .string(changed.commandID.uuidString)]), issuedAt: now.addingTimeInterval(2))
+        #expect(try await bus.execute(undo, now: now.addingTimeInterval(2)).status == .applied)
+        #expect(try ModelContext(container).fetch(FetchDescriptor<PrayerLog>()).first?.status == "jamaah")
+
+        let tomorrow = prayerDay(now).adding(days: 1)
+        let future = CommandEnvelope(name: "prayer.log", payload: .object(["dayKey": .string(tomorrow.description), "prayer": .string("fajr"), "status": .string("jamaah")]), source: .app, issuedAt: now)
+        #expect(try await bus.execute(future, now: now).reason == "futurePrayer")
+
+        let friday = previousFriday(before: prayerDay(now))
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = TimeZone(identifier: "Asia/Riyadh")!
+        let dayAfterFriday = friday.adding(days: 1)
+        #expect(calendar.component(.weekday, from: friday.date(in: calendar.timeZone)) == 6)
+        #expect(calendar.component(.weekday, from: dayAfterFriday.date(in: calendar.timeZone)) == 7)
+        let validFriday = CommandEnvelope(name: "prayer.log", payload: .object(["dayKey": .string(friday.description), "prayer": .string("dhuhr"), "status": .string("jamaah"), "fridayKind": .string("jumuah")]), source: .app, issuedAt: now)
+        let fridayResult = try await bus.execute(validFriday, now: now)
+        #expect(fridayResult.status == .applied)
+        #expect(try ModelContext(container).fetch(FetchDescriptor<PrayerLog>()).first(where: { $0.dayKey == friday.description && $0.prayer == "dhuhr" })?.fridayKind == "jumuah")
+        let invalidFridayKind = CommandEnvelope(name: "prayer.log", payload: .object(["dayKey": .string(dayAfterFriday.description), "prayer": .string("fajr"), "status": .string("jamaah"), "fridayKind": .string("jumuah")]), source: .app, issuedAt: now)
+        #expect(try await bus.execute(invalidFridayKind, now: now).reason == "invalidRecord")
+
+        let jumuahAlone = CommandEnvelope(name: "prayer.log", payload: .object(["dayKey": .string(friday.description), "prayer": .string("dhuhr"), "status": .string("alone"), "fridayKind": .string("jumuah")]), source: .app, issuedAt: now)
+        #expect(try await bus.execute(jumuahAlone, now: now).reason == "invalidRecord")
+        let dhuhrAlone = CommandEnvelope(name: "prayer.log", payload: .object(["dayKey": .string(friday.description), "prayer": .string("dhuhr"), "status": .string("alone"), "fridayKind": .string("dhuhr")]), source: .app, issuedAt: now)
+        #expect(try await bus.execute(dhuhrAlone, now: now).status == .applied)
+        #expect(try ModelContext(container).fetch(FetchDescriptor<PrayerLog>()).first(where: { $0.dayKey == friday.description && $0.prayer == "dhuhr" })?.fridayKind == "dhuhr")
+    }
+
 }

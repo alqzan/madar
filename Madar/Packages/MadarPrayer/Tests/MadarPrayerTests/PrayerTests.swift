@@ -55,6 +55,67 @@ import MadarData
         context.rollback()
         #expect(try context.fetch(FetchDescriptor<PrayerLog>()).isEmpty && context.fetch(FetchDescriptor<QadaItem>()).isEmpty)
     }
+    @Test func fridayNoonRequiresKindAndMissedJumuahKeepsKindThroughQada() throws {
+        let container = try container(start: "2026-10-09T09:00:00+03:00")
+        let context = container.mainContext
+        let fridayDhuhr = try ref("2026-10-09", .dhuhr)
+        #expect(throws: PrayerDomainError.invalidRecord) {
+            try apply(.record(fridayDhuhr, status: .jamaah, heart: nil, shortened: nil), context,
+                at: "2026-10-09T14:00:00+03:00")
+        }
+        context.rollback()
+
+        try apply(.record(fridayDhuhr, status: .missed, heart: nil, shortened: nil, fridayKind: .jumuah), context,
+            at: "2026-10-09T14:00:00+03:00")
+        let missed = try #require(context.fetch(FetchDescriptor<PrayerLog>()).first)
+        #expect(missed.status == "missed" && missed.fridayKind == "jumuah")
+        #expect(try context.fetch(FetchDescriptor<QadaItem>()).first?.madeUpAt == nil)
+
+        try apply(.record(fridayDhuhr, status: .qada, heart: nil, shortened: nil, fridayKind: .jumuah), context,
+            at: "2026-10-09T15:00:00+03:00")
+        let madeUp = try #require(context.fetch(FetchDescriptor<PrayerLog>()).first)
+        #expect(madeUp.status == "qada" && madeUp.fridayKind == "jumuah")
+        #expect(try context.fetch(FetchDescriptor<QadaItem>()).first?.madeUpAt != nil)
+    }
+    @Test func fridayUnrecordedHistoryStaysUnclassifiedAndCreatesNoDebt() throws {
+        let container = try container(start: "2026-10-09T16:00:00+03:00")
+        let context = container.mainContext
+        let fridayDhuhr = try ref("2026-10-09", .dhuhr)
+        try apply(.markUnrecorded([fridayDhuhr]), context, at: "2026-10-09T16:01:00+03:00")
+
+        let row = try #require(context.fetch(FetchDescriptor<PrayerLog>()).first)
+        #expect(row.status == "unrecordedHistory" && row.fridayKind == nil)
+        #expect(try context.fetch(FetchDescriptor<QadaItem>()).isEmpty)
+        let state = try PrayerRepository(context: context).snapshot(now: time("2026-10-09T16:02:00+03:00"))
+        #expect(state.statistics.owed == 0 && state.statistics.denominator == 0)
+    }
+    @Test func oldFridayMissedAndUnclassifiedLegacyQadaRequireExplicitKind() throws {
+        let container = try container(start: "2026-10-10T12:00:00+03:00")
+        let context = container.mainContext
+        let fridayDhuhr = try ref("2026-10-09", .dhuhr)
+        #expect(throws: PrayerDomainError.invalidRecord) {
+            try apply(.addOldMissed(fridayDhuhr), context, at: "2026-10-10T12:01:00+03:00")
+        }
+        context.rollback()
+        try apply(.addOldMissed(fridayDhuhr, fridayKind: .jumuah), context, at: "2026-10-10T12:02:00+03:00")
+        let missed = try #require(context.fetch(FetchDescriptor<PrayerLog>()).first)
+        #expect(missed.status == "missed" && missed.fridayKind == "jumuah")
+
+        let legacyDay = try GregorianDay("2026-10-02")
+        let legacyLog = PrayerLog(); legacyLog.dayKey = legacyDay.description; legacyLog.prayer = Prayer.dhuhr.rawValue
+        legacyLog.status = "missed"; legacyLog.eventAt = time("2026-10-02T12:00:00+03:00"); legacyLog.tzID = "Asia/Riyadh"
+        let legacyDebt = QadaItem(); legacyDebt.originalDayKey = legacyDay.description; legacyDebt.prayer = Prayer.dhuhr.rawValue
+        context.insert(legacyLog); context.insert(legacyDebt); try context.save()
+        let legacyRef = PrayerReference(day: legacyDay, prayer: .dhuhr)
+        #expect(throws: PrayerDomainError.invalidRecord) {
+            try apply(.makeUp(legacyRef), context, at: "2026-10-10T12:03:00+03:00")
+        }
+        context.rollback()
+        try apply(.makeUp(legacyRef, fridayKind: .dhuhr), context, at: "2026-10-10T12:04:00+03:00")
+        let legacyUpdated = try #require(context.fetch(FetchDescriptor<PrayerLog>()).first { $0.dayKey == legacyDay.description })
+        #expect(legacyUpdated.status == "qada" && legacyUpdated.fridayKind == "dhuhr")
+        #expect(try context.fetch(FetchDescriptor<QadaItem>()).first { $0.originalDayKey == legacyDay.description }?.madeUpAt != nil)
+    }
     @Test func test_RP1_unloggedNeverBecomesQada() throws {
         let container = try container(); let context = container.mainContext
         // §7.2's former seven-prayer-day deadline, overridden by RP1.

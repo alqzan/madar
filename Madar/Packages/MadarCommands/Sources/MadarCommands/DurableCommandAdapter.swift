@@ -3,6 +3,7 @@ import SwiftData
 import Darwin
 import MadarCore
 import MadarData
+import MadarPrayer
 
 private struct SettingsInverse: Codable {
     var settings: [String: MadarData.JSONValue]
@@ -11,6 +12,7 @@ private struct SettingsInverse: Codable {
     var afterLayouts: [String: Data]
     var prayerBefore: DataRecord? = nil
     var prayerAfter: DataRecord? = nil
+    var prayerMutation: Data? = nil
 }
 private struct ReceiptNamespace: Codable {
     let version: Int
@@ -107,11 +109,12 @@ private struct ReceiptWire: Codable {
                     existing[key] = try JSONDecoder().decode(MadarCore.JSONValue.self, from: store.value(for: key).canonicalData())
                 }
                 existingHash = try MadarCore.JSONValue.object(["settings": .object(existing)]).sha256()
-            } else if case .logPrayer(let dayKey, let prayer, let status, let heart, let shortened) = request.operation {
+            } else if case .logPrayer(let dayKey, let prayer, let status, let heart, let shortened, let fridayKind) = request.operation {
                 let matches = try context.fetch(FetchDescriptor<PrayerLog>()).filter { $0.dayKey == dayKey && $0.prayer == prayer.rawValue && $0.mergedInto == nil }
                 if matches.contains(where: { $0.deletedAt != nil }) { return .init(status: .rejected, reason: "explicitRestoreRequired") }
                 if let row = matches.max(by: { $0.updatedAt < $1.updatedAt }), row.status == status,
-                   (heart == nil || row.heart == heart), (shortened == nil || row.shortened == shortened) {
+                   (heart == nil || row.heart == heart), (shortened == nil || row.shortened == shortened),
+                   (fridayKind == nil || row.fridayKind == fridayKind) {
                     existingHash = request.payloadHash
                 }
             }
@@ -127,26 +130,20 @@ private struct ReceiptWire: Codable {
             let writer = try store.writerIDForWrite(now: now)
             var inverse: SettingsInverse?
             switch request.operation {
-            case .logPrayer(let dayKey, let prayer, let status, let heart, let shortened):
-                let existing = try context.fetch(FetchDescriptor<PrayerLog>()).filter { $0.dayKey == dayKey && $0.prayer == prayer.rawValue && $0.mergedInto == nil }.max { $0.updatedAt < $1.updatedAt }
-                guard existing?.deletedAt == nil else { return .init(status: .rejected, reason: "explicitRestoreRequired") }
-                let before = try existing?.record()
-                let placeValue = try store.value(for: "core.homeCity")
-                guard case .object(let placeFields) = placeValue,
-                      case .number(let lat) = placeFields["lat"], case .number(let lon) = placeFields["lon"],
-                      case .string(let tzID) = placeFields["tz"], let date = try? GregorianDay(dayKey),
-                      let place = try? ActivePlace(latitude: lat, longitude: lon, timeZoneID: tzID),
-                      let times = PrayerTimesEngine.calculate(day: date, place: place) else { return .init(status: .rejected, reason: "placeUnavailable") }
-                let row = existing ?? PrayerLog()
-                row.id = existing?.id ?? StableIdentity.uuid(for: "PrayerLog:\(dayKey):\(prayer.rawValue)")
-                row.dayKey = dayKey; row.prayer = prayer.rawValue; row.status = status
-                if let heart { row.heart = heart }; if let shortened { row.shortened = shortened }
-                row.eventAt = times.time(for: prayer); row.tzID = tzID; row.dayPolicy = "prayerDay@1"
-                row.loggedAt = now; row.source = request.envelope.source.rawValue
-                row.writerID = writer
-                row.updatedAt = StableIdentity.monotonic(now: now, previous: row.updatedAt)
-                if existing == nil { context.insert(row) }
-                inverse = SettingsInverse(settings: [:], afterSettings: [:], layouts: [:], afterLayouts: [:], prayerBefore: before, prayerAfter: try row.record())
+            case .logPrayer(let dayKey, let prayer, let status, let heart, let shortened, let fridayKind):
+                guard let referenceDay = try? GregorianDay(dayKey), let storedStatus = PrayerStoredStatus(rawValue: status) else {
+                    return .init(status: .rejected, reason: "invalidPrayer")
+                }
+                let mutation = PrayerMutation.record(.init(day: referenceDay, prayer: prayer), status: storedStatus,
+                    heart: heart.flatMap(PrayerHeart.init(rawValue:)), shortened: shortened,
+                    fridayKind: fridayKind.flatMap(FridayPrayerKind.init(rawValue:)))
+                do {
+                    if let undo = try PrayerMutationHandler.stage(operation: mutation, in: context, now: now, writer: writer, source: request.envelope.source) {
+                        inverse = SettingsInverse(settings: [:], afterSettings: [:], layouts: [:], afterLayouts: [:], prayerMutation: undo)
+                    }
+                } catch let error as PrayerDomainError {
+                    return .init(status: .rejected, reason: String(describing: error))
+                }
             case .replaceSettings(let values):
                 let typed = try convert(values)
                 inverse = SettingsInverse(settings: try store.stage(typed, now: now), afterSettings: typed, layouts: [:], afterLayouts: [:])
@@ -181,8 +178,10 @@ private struct ReceiptWire: Codable {
                     return .init(status: .rejected, reason: "undoExpired")
                 }
                 let state = try JSONDecoder().decode(SettingsInverse.self, from: data)
-                if let after = state.prayerAfter {
-                    guard let current = try context.fetch(FetchDescriptor<PrayerLog>()).first(where: { $0.id == after.id && $0.mergedInto == nil }), try current.record() == after else { throw DataError.invalidValue("undo superseded: prayer") }
+                if let mutation = state.prayerMutation {
+                    try PrayerMutationHandler.undo(mutation, in: context, now: now, writer: writer)
+                } else if let after = state.prayerAfter {
+                    guard let current = try context.fetch(FetchDescriptor<PrayerLog>()).first(where: { $0.id == after.id && $0.mergedInto == nil }), normalizedPrayerRecord(try current.record()) == normalizedPrayerRecord(after) else { throw DataError.invalidValue("undo superseded: prayer") }
                     if let before = state.prayerBefore {
                         try current.apply(before); current.updatedAt = StableIdentity.monotonic(now: now, previous: current.updatedAt)
                     } else {
@@ -258,6 +257,12 @@ private struct ReceiptWire: Codable {
         scope.writerID = writer; scope.createdAt = appliedAt; scope.updatedAt = appliedAt
         context.insert(scope)
         try context.save()
+    }
+    private func normalizedPrayerRecord(_ record: DataRecord) -> DataRecord {
+        guard record.model == "PrayerLog" else { return record }
+        var normalized = record
+        if normalized.fields["fridayKind"] == nil { normalized.fields["fridayKind"] = .null }
+        return normalized
     }
     public func hasReceipt(commandID: UUID) throws -> Bool {
         let lease = StoreLease(lockURL: lockDirectory.appending(path: "CommandBus.lock"))

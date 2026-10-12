@@ -7,6 +7,7 @@ import MadarSnapshots
 import WidgetKit
 import MadarCommands
 import MadarInbox
+import MadarPrayer
 import UIKit
 
 typealias JSONValue = MadarData.JSONValue
@@ -32,6 +33,8 @@ final class AppSession {
     var errorMessage: String?
     var onboardingComplete = false
     var selectedTab = "foundation"
+    private(set) var prayerRevision = 0
+    private(set) var prayerWriteInProgress = false
     var settingsQuery = ""
     private let bus: CommandBus
     private let commandAdapter: DurableCommandAdapter
@@ -86,6 +89,53 @@ final class AppSession {
         var current: [String: JSONValue] = [:]
         for item in schema.settings { current[item.key] = try store.value(for: item.key) }
         values = current
+        prayerRevision &+= 1
+    }
+    func prayerSnapshot(at now: Date) throws -> PrayerSnapshot {
+        _ = prayerRevision // Observation invalidates the derived view after a committed write.
+        return try PrayerRepository(context: ModelContext(container)).snapshot(now: now)
+    }
+    func recordPrayer(_ reference: PrayerReference, status: PrayerStoredStatus, fridayKind: FridayPrayerKind? = nil) {
+        guard [.jamaah, .alone].contains(status), !prayerWriteInProgress, beginWrite() else { return }
+        prayerWriteInProgress = true
+        Task {
+            defer { pendingWrites -= 1; prayerWriteInProgress = false }
+            let payload: MadarCore.JSONValue = .object([
+                "dayKey": .string(reference.day.description),
+                "prayer": .string(reference.prayer.rawValue),
+                "status": .string(status.rawValue),
+                "fridayKind": fridayKind.map { .string($0.rawValue) } ?? .null
+            ])
+            do {
+                let command = CommandEnvelope(name: "prayer.log", payload: payload, source: .app)
+                let result = try await bus.execute(command)
+                guard result.status == .applied || result.status == .duplicate else {
+                    errorMessage = prayerFailure(result.reason)
+                    return
+                }
+                try reload()
+                if let id = result.undoToken {
+                    let context = ModelContext(container)
+                    if let receipt = try context.fetch(FetchDescriptor<MadarData.CommandReceipt>()).first(where: { $0.commandID == id }),
+                       let deadline = receipt.undoExpiresAt {
+                        showUndo(AppUndoToken(id: id, expiresAt: deadline), message: "سُجّلت الصلاة · التراجع متاح لعشر دقائق")
+                    }
+                }
+                try publishSnapshot()
+                WidgetCenter.shared.reloadAllTimelines()
+            } catch {
+                errorMessage = "لم تُسجّل الصلاة. \(error.localizedDescription)"
+            }
+        }
+    }
+    private func prayerFailure(_ reason: String?) -> String {
+        switch reason {
+        case "futurePrayer": "لم يحن وقت الصلاة بعد."
+        case "beforeTrackingStart": "هذا اليوم يسبق بداية التسجيل."
+        case "explicitRestoreRequired": "يتطلب هذا السجل استعادة صريحة."
+        case "invalidRecord": "نوع الجمعة متاح لظهر الجمعة فقط."
+        default: "لم تُسجّل الصلاة. حاول مرة أخرى."
+        }
     }
     func string(_ key: String) -> String { if case .string(let v) = values[key] { v } else { "" } }
     func bool(_ key: String) -> Bool { if case .bool(let v) = values[key] { v } else { false } }

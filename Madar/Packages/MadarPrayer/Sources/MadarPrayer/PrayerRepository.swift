@@ -67,7 +67,7 @@ import MadarData
             let zone = row.flatMap { TimeZone(identifier: $0.tzID) } ?? occurrence?.place.timeZone ?? home.timeZone
             var calendar = Calendar(identifier: .gregorian); calendar.timeZone = zone
             let friday = prayer == .dhuhr && calendar.component(.weekday, from: day.date(in: zone)) == 6 && row?.shortened != true
-            return PrayerCell(reference: ref, status: status, heart: row?.heart.flatMap(PrayerHeart.init(rawValue:)), time: occurrence == nil ? nil : row?.eventAt ?? occurrence?.time, shortened: row?.shortened == true, pairID: row?.pairID, isFriday: friday, canLog: day >= start && (due || occurrence == nil), canMakeUp: due && (day >= start || qada(ref) != nil) && qada(ref)?.madeUpAt == nil)
+            return PrayerCell(reference: ref, status: status, heart: row?.heart.flatMap(PrayerHeart.init(rawValue:)), time: occurrence == nil ? nil : row?.eventAt ?? occurrence?.time, shortened: row?.shortened == true, fridayKind: row?.fridayKind.flatMap(FridayPrayerKind.init(rawValue:)), pairID: row?.pairID, isFriday: friday, canLog: day >= start && (due || occurrence == nil), canMakeUp: due && (day >= start || qada(ref) != nil) && qada(ref)?.madeUpAt == nil)
         })
     }
     public func defaultNight(at now: Date) -> GregorianDay {

@@ -5,6 +5,7 @@ import SwiftData
 @MainActor enum LegacyGenerationMigration {
     enum Checkpoint: String { case afterCopy, afterStaging, afterHooksJournal, afterPointer }
     private struct Journal: Codable { let oldID: UUID; let newID: UUID; var preserveDeviceRows: Bool? = nil }
+    private struct CommandReceiptScope: Codable { let version: Int; let generationID: UUID }
     static func migrate(pointer: ManagedPointer, root: URL, interruption: Checkpoint?) throws -> ManagedPointer {
         let journalURL = root.appendingPathComponent("SchemaMigration.json")
         let originalDirectory = root.appendingPathComponent("Generations/\(pointer.generationID.uuidString)")
@@ -14,10 +15,14 @@ import SwiftData
             if FileManager.default.fileExists(atPath:journalURL.path) {
                 let journal = try JSONDecoder().decode(Journal.self,from:Data(contentsOf:journalURL))
                 guard journal.newID == pointer.generationID else { throw BackupOperationError.invalidManagedStore }
+                if journal.preserveDeviceRows == true {
+                    try retagReceiptScopes(in: originalDirectory, root: root, from: journal.oldID, to: journal.newID)
+                }
                 try FileManager.default.removeItem(at:journalURL)
             }
             return pointer
         }
+        if version == 2 { return try migrateV2(pointer: pointer, root: root, interruption: interruption) }
         guard version == 1 else { throw DataError.legacyStoreRequiresAdoption }
         guard FileManager.default.fileExists(atPath:originalDirectory.appendingPathComponent("GenerationReady.json").path) else { throw BackupOperationError.invalidManagedStore }
         try SchemaCompatibility.validateDeviceVersion(at: root)
@@ -100,5 +105,99 @@ import SwiftData
         if interruption == .afterPointer { throw BackupOperationError.simulatedInterruption("migration afterPointer") }
         try FileManager.default.removeItem(at:journalURL)
         return replacement
+    }
+
+    /// Upgrade the prior managed generation on a staged copy so the schema migration never edits its rollback source.
+    private static func migrateV2(pointer: ManagedPointer, root: URL, interruption: Checkpoint?) throws -> ManagedPointer {
+        let oldID = pointer.generationID
+        let originalDirectory = root.appendingPathComponent("Generations/\(oldID.uuidString)", isDirectory: true)
+        let originalReadyURL = originalDirectory.appendingPathComponent("GenerationReady.json")
+        guard FileManager.default.fileExists(atPath: originalReadyURL.path) else { throw BackupOperationError.invalidManagedStore }
+        let originalReady = try JSONDecoder().decode(GenerationReady.self, from: Data(contentsOf: originalReadyURL))
+        guard originalReady.generationID == oldID else { throw BackupOperationError.invalidManagedStore }
+
+        let journalURL = root.appendingPathComponent("SchemaMigration.json")
+        var journal: Journal
+        if FileManager.default.fileExists(atPath: journalURL.path) {
+            journal = try JSONDecoder().decode(Journal.self, from: Data(contentsOf: journalURL))
+            guard journal.oldID == oldID else { throw BackupOperationError.invalidManagedStore }
+        } else {
+            journal = .init(oldID: oldID, newID: UUID())
+        }
+
+        var preserveDeviceRows = true
+        let restoreURL = root.appendingPathComponent("RestoreJournal.json")
+        if FileManager.default.fileExists(atPath: restoreURL.path) {
+            let restore = try JSONDecoder().decode(RestoreJournal.self, from: Data(contentsOf: restoreURL))
+            guard restore.oldGenerationID != restore.newGenerationID else { throw BackupOperationError.invalidManagedStore }
+            if oldID == restore.newGenerationID {
+                preserveDeviceRows = restore.preserveDeviceRows == true
+            } else if oldID == restore.oldGenerationID {
+                guard restore.phase != .promoted else { throw BackupOperationError.invalidManagedStore }
+                if restore.newGenerationID != journal.newID {
+                    let abandoned = root.appendingPathComponent("Generations/\(restore.newGenerationID.uuidString)")
+                    if FileManager.default.fileExists(atPath: abandoned.path) { try FileManager.default.removeItem(at: abandoned) }
+                }
+            } else {
+                throw BackupOperationError.invalidManagedStore
+            }
+        }
+        journal.preserveDeviceRows = journal.preserveDeviceRows ?? preserveDeviceRows
+        try DurableFiles.encode(journal, to: journalURL)
+
+        let staging = root.appendingPathComponent("Generations/\(journal.newID.uuidString)", isDirectory: true)
+        if FileManager.default.fileExists(atPath: staging.path) { try FileManager.default.removeItem(at: staging) }
+        try FileManager.default.copyItem(at: originalDirectory, to: staging)
+        if interruption == .afterCopy { throw BackupOperationError.simulatedInterruption("schema-2 migration afterCopy") }
+
+        let rows = try migrateCopiedV2Generation(staging, root: root, pointer: pointer)
+        guard try MadarContainerFactory.storeVersion(at: staging) == MadarSchema.version else { throw BackupOperationError.invalidManagedStore }
+        try RecordValidator.validate(rows)
+        let ready = GenerationReady(version: 1, generationID: journal.newID,
+            recordsHash: try RecordFingerprint.hash(rows), createdAt: Date())
+        try DurableFiles.encode(ready, to: staging.appendingPathComponent("GenerationReady.json"))
+        if interruption == .afterStaging { throw BackupOperationError.simulatedInterruption("schema-2 migration afterStaging") }
+
+        let replacement = ManagedPointer(version: pointer.version, generationID: journal.newID,
+            previousGenerationID: oldID, accountHash: pointer.accountHash,
+            cloudKitContainerIdentifier: pointer.cloudKitContainerIdentifier)
+        let hooks = RestoreJournal(operationID: UUID(), oldGenerationID: oldID, newGenerationID: journal.newID,
+            phase: .ready, hooksPending: true, preserveDeviceRows: journal.preserveDeviceRows)
+        try DurableFiles.encode(hooks, to: restoreURL)
+        if interruption == .afterHooksJournal { throw BackupOperationError.simulatedInterruption("schema-2 migration afterHooksJournal") }
+        try DurableFiles.encode(replacement, to: root.appendingPathComponent("ActiveGeneration.json"))
+        if interruption == .afterPointer { throw BackupOperationError.simulatedInterruption("schema-2 migration afterPointer") }
+        if journal.preserveDeviceRows == true {
+            try retagReceiptScopes(in: staging, root: root, from: oldID, to: journal.newID)
+        }
+        try FileManager.default.removeItem(at: journalURL)
+        return replacement
+    }
+
+    private static func migrateCopiedV2Generation(_ staging: URL, root: URL, pointer: ManagedPointer) throws -> [DataRecord] {
+        let container = try MadarContainerFactory.make(at: staging,
+            deviceStoreURL: root.appendingPathComponent("Device.store"),
+            cloudKitContainerIdentifier: pointer.cloudKitContainerIdentifier)
+        container.mainContext.autosaveEnabled = false
+        return try RecordBridge.all(container.mainContext)
+    }
+
+    /// Synced facts are identical across this additive schema migration. Keep their
+    /// device-local undo/replay receipts in the new generation so they remain usable.
+    private static func retagReceiptScopes(in generation: URL, root: URL, from oldID: UUID, to newID: UUID) throws {
+        let container = try MadarContainerFactory.make(at: generation, deviceStoreURL: root.appendingPathComponent("Device.store"))
+        let context = ModelContext(container); context.autosaveEnabled = false
+        let receiptIDs = Set(try context.fetch(FetchDescriptor<CommandReceipt>())
+            .filter { $0.deletedAt == nil && $0.mergedInto == nil }
+            .map(\.id))
+        var changed = false
+        for scope in try context.fetch(FetchDescriptor<DeviceSetting>()) where scope.key.hasPrefix("sys.commandReceiptScope:") && scope.deletedAt == nil && scope.mergedInto == nil {
+            guard let id = UUID(uuidString: String(scope.key.dropFirst("sys.commandReceiptScope:".count))), receiptIDs.contains(id),
+                  let decoded = try? JSONDecoder().decode(CommandReceiptScope.self, from: scope.valueJSON),
+                  decoded.version == 1, decoded.generationID == oldID else { continue }
+            scope.valueJSON = try JSONEncoder().encode(CommandReceiptScope(version: 1, generationID: newID))
+            changed = true
+        }
+        if changed { try context.save() }
     }
 }

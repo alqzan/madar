@@ -254,7 +254,7 @@ func foundationPrayerCommand() async throws {
     let payload: JSONValue = .object(["dayKey": .string("2026-10-09"), "prayer": .string("fajr"), "status": .string("jamaah"), "heart": .string("khashi"), "shortened": .bool(false)])
     #expect(try await bus.execute(.init(name: "prayer.log", payload: payload, source: .notification, issuedAt: now), now: now).status == .applied)
     let request = try #require(await adapter.first())
-    #expect(request.operation == .logPrayer(dayKey: "2026-10-09", prayer: .fajr, status: "jamaah", heart: "khashi", shortened: false))
+    #expect(request.operation == .logPrayer(dayKey: "2026-10-09", prayer: .fajr, status: "jamaah", heart: "khashi", shortened: false, fridayKind: nil))
     #expect(request.naturalKey == "prayer.2026-10-09.fajr")
     #expect(request.decision(receipts: [], existingNaturalPayloadHash: request.payloadHash, now: now) == .duplicate)
     #expect(!FeatureAvailability.m0.isAvailable(.salah))
@@ -265,6 +265,18 @@ func foundationPrayerCommand() async throws {
     ] { #expect(try await bus.execute(.init(name: "prayer.log", payload: invalid, source: .widget, issuedAt: now), now: now).status == .rejected) }
     #expect(try await bus.execute(.init(name: "settings.set", payload: .object(["settings": .object(["core.theme": .string("dark")])]), source: .notification, issuedAt: now), now: now).status == .needsApp)
     #expect(await adapter.count() == 1)
+}
+@Test("Friday classification travels through old-missed and make-up commands")
+func fridayPrayerMutationCommands() throws {
+    let day = try GregorianDay("2026-10-09")
+    let ref = PrayerReference(day: day, prayer: .dhuhr)
+    let base: [String: JSONValue] = ["dayKey": .string(day.description), "prayer": .string("dhuhr")]
+    var oldMissed = base; oldMissed["fridayKind"] = .string("jumuah")
+    #expect(try PrayerMutation.parse(name: "prayer.addOldMissed", payload: oldMissed).0 == .addOldMissed(ref, fridayKind: .jumuah))
+    var makeUp = base; makeUp["fridayKind"] = .string("dhuhr")
+    #expect(try PrayerMutation.parse(name: "prayer.makeUp", payload: makeUp).0 == .makeUp(ref, fridayKind: .dhuhr))
+    makeUp["fridayKind"] = .string("unknown")
+    #expect(throws: CoreError.invalidCommand) { try PrayerMutation.parse(name: "prayer.makeUp", payload: makeUp) }
 }
 @Test("Civil day arithmetic is UTC and never repeats/skips a day across device DST")
 func GregorianDay_DSTIndependentArithmetic() throws {

@@ -5,6 +5,7 @@ import Testing
 @testable import MadarData
 
 @Suite(.serialized) @MainActor struct SchemaCompatibilityTests {
+    private struct ReceiptScope: Codable { let version: Int; let generationID: UUID }
     private var resources: URL { Bundle.module.resourceURL!.appendingPathComponent("Resources/LegacyV1") }
     private func fixtureDirectory() throws -> URL {
         let base = FileManager.default.temporaryDirectory.appendingPathComponent("MadarSchemaV1Test-\(UUID())")
@@ -15,7 +16,8 @@ import Testing
         return base
     }
     private func expectedRows() throws -> [DataRecord] {
-        try JSONDecoder().decode([DataRecord].self,from:Data(contentsOf:resources.appendingPathComponent("expected-v2-records.json")))
+        let schemaTwo = try JSONDecoder().decode([DataRecord].self,from:Data(contentsOf:resources.appendingPathComponent("expected-v2-records.json")))
+        return try SchemaCompatibility.currentRecords(schemaTwo, from: 2)
     }
     @Test func originalGlobalTypesSQLiteOpensWithFrozenV1Reader() throws {
         let base = try fixtureDirectory(); defer { try? FileManager.default.removeItem(at:base) }
@@ -27,7 +29,7 @@ import Testing
     @Test func test_M0S1_RA4_originalV1ArchiveMapsOnlyAfterAuthentication() throws {
         let bytes = try Data(contentsOf:resources.appendingPathComponent("source-v1.madarbackup"))
         let backup = try BackupCodec.validate(bytes,passphrase:"legacy fixture password")
-        #expect(MadarSchema.version == 2)
+        #expect(MadarSchema.version == 3)
         #expect(backup.records.contains { $0.model == "MoneyTransaction" })
         #expect(!backup.records.contains { $0.model == "Transaction" })
         let expected = try expectedRows().filter { MadarSchema.syncedNames.contains($0.model) }
@@ -44,18 +46,160 @@ import Testing
         #expect(try RecordFingerprint.hash(RecordBridge.all(target.mainContext)) == RecordFingerprint.hash(expected))
         let newBytes = try BackupCodec.export(records:backup.records,passphrase:"new fixture password")
         let current = try BackupCodec.validate(newBytes,passphrase:"new fixture password")
-        #expect(current.manifest.storeSchemaVersion == 2)
+        #expect(current.manifest.storeSchemaVersion == 3)
         #expect(current.manifest.counts["MoneyTransaction"] == 2 && current.manifest.counts["Transaction"] == nil)
     }
     @Test func test_M0S1_RA4_originalSQLiteIsAdoptedWithoutLosingAnyRow() throws {
         let base = try fixtureDirectory(); defer { try? FileManager.default.removeItem(at:base) }
         let managed = try ManagedDataStore.adoptLegacy(from:base.appendingPathComponent("Flat"),at:base.appendingPathComponent("Managed"))
-        #expect(MadarSchema.version == 2)
+        #expect(MadarSchema.version == 3)
         #expect(try RecordFingerprint.hash(RecordBridge.all(managed.container.mainContext,syncedOnly:false)) == RecordFingerprint.hash(expectedRows()))
         #expect(try managed.container.mainContext.fetchCount(FetchDescriptor<DeviceSetting>()) == 2)
         #expect(try managed.container.mainContext.fetchCount(FetchDescriptor<CommandReceipt>()) == 1)
         let reopened = try ManagedDataStore(root:managed.root)
         #expect(try RecordFingerprint.hash(RecordBridge.all(reopened.container.mainContext,syncedOnly:false)) == RecordFingerprint.hash(expectedRows()))
+    }
+    @Test func schemaV2ManagedGenerationMigratesCopyOnWriteAndRetainsPrayerLog() throws {
+        let base = FileManager.default.temporaryDirectory.appendingPathComponent("MadarSchemaV2Migration-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: base) }
+        let (root, oldID, generation, oldRow) = try schemaV2ManagedFixture(base)
+        let originalFiles = try stableGenerationHashes(generation)
+
+        let migrated = try ManagedDataStore(root: root)
+        #expect(migrated.binding.generationID != oldID)
+        #expect(try MadarContainerFactory.storeVersionForAdoption(at: migrated.binding.syncedDirectory) == 3)
+        #expect(try stableGenerationHashes(generation) == originalFiles)
+        let migratedRows = try RecordBridge.all(migrated.container.mainContext)
+        let expected = try SchemaCompatibility.currentRecords([oldRow], from: 2)
+        #expect(migratedRows.count == 1)
+        #expect(try RecordFingerprint.hash(migratedRows) == RecordFingerprint.hash(expected))
+        let saved = try #require(migrated.container.mainContext.fetch(FetchDescriptor<PrayerLog>()).first)
+        #expect(saved.fridayKind == nil)
+        try assertReceiptScope(in: migrated.container.mainContext, generationID: migrated.binding.generationID)
+
+        let reopened = try ManagedDataStore(root: root)
+        #expect(reopened.binding.generationID == migrated.binding.generationID)
+        #expect(try RecordFingerprint.hash(RecordBridge.all(reopened.container.mainContext)) == RecordFingerprint.hash(expected))
+        try assertReceiptScope(in: reopened.container.mainContext, generationID: reopened.binding.generationID)
+    }
+    @Test(arguments: [LegacyGenerationMigration.Checkpoint.afterCopy, .afterStaging, .afterHooksJournal, .afterPointer])
+    func schemaV2ManagedGenerationRecoversAfterEveryInterruption(_ checkpoint: LegacyGenerationMigration.Checkpoint) throws {
+        let base = FileManager.default.temporaryDirectory.appendingPathComponent("MadarSchemaV2Recovery-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: base) }
+        let (root, oldID, generation, oldRow) = try schemaV2ManagedFixture(base)
+        let sourceHashes = try stableGenerationHashes(generation)
+        let pointerURL = root.appendingPathComponent("ActiveGeneration.json")
+        let pointerBytes = try Data(contentsOf: pointerURL)
+
+        #expect(throws: BackupOperationError.simulatedInterruption("schema-2 migration \(checkpoint.rawValue)")) {
+            try ManagedDataStore(root: root, migrationInterruption: checkpoint)
+        }
+        #expect(try stableGenerationHashes(generation) == sourceHashes)
+        if checkpoint != .afterPointer { #expect(try Data(contentsOf: pointerURL) == pointerBytes) }
+
+        let recovered = try ManagedDataStore(root: root)
+        #expect(recovered.binding.generationID != oldID)
+        #expect(try MadarContainerFactory.storeVersionForAdoption(at: recovered.binding.syncedDirectory) == 3)
+        #expect(try stableGenerationHashes(generation) == sourceHashes)
+        let expected = try SchemaCompatibility.currentRecords([oldRow], from: 2)
+        #expect(try RecordFingerprint.hash(RecordBridge.all(recovered.container.mainContext)) == RecordFingerprint.hash(expected))
+        let prayer = try #require(recovered.container.mainContext.fetch(FetchDescriptor<PrayerLog>()).first)
+        #expect(prayer.fridayKind == nil)
+        try assertReceiptScope(in: recovered.container.mainContext, generationID: recovered.binding.generationID)
+        let reopened = try ManagedDataStore(root: root)
+        #expect(reopened.binding.generationID == recovered.binding.generationID)
+        #expect(try RecordFingerprint.hash(RecordBridge.all(reopened.container.mainContext)) == RecordFingerprint.hash(expected))
+        try assertReceiptScope(in: reopened.container.mainContext, generationID: reopened.binding.generationID)
+    }
+    @Test func schemaV2BackupValidationAndMergeRetainsPrayerLogWithoutFridayKind() async throws {
+        let eventAt = Date(timeIntervalSince1970: 1_797_000_000)
+        let sourceRow = try schemaV2PrayerRow(at: eventAt)
+        let line = try JSONValue.object(sourceRow.fields).canonicalData() + Data([0x0a])
+        var files = Dictionary(uniqueKeysWithValues: MadarSchemaV2.syncedNames.map { ("data/\($0).jsonl", Data()) })
+        files["data/PrayerLog.jsonl"] = line
+        let manifest = BackupManifest(
+            formatVersion: 1, storeSchemaVersion: 2, createdAt: eventAt,
+            counts: Dictionary(uniqueKeysWithValues: MadarSchemaV2.syncedNames.map { ($0, $0 == "PrayerLog" ? 1 : 0) }),
+            files: files.map { BackupManifest.File(path: $0.key, bytes: $0.value.count, sha256: BackupCodec.hash($0.value)) }
+                .sorted { $0.path < $1.path }
+        )
+        files["manifest.json"] = try JSONEncoder().encode(manifest)
+
+        let backup = try BackupCodec.validateFiles(files, manifest: manifest, sourceModels: MadarSchemaV2.syncedNames)
+        #expect(backup.manifest.storeSchemaVersion == 2)
+        #expect(backup.records.count == 1)
+        #expect(backup.records[0].fields["fridayKind"] == .null)
+        let target = try MadarContainerFactory.makeInMemory()
+        #expect(try BackupRestore.merge(backup, into: target.mainContext) == 1)
+        let imported = try #require(target.mainContext.fetch(FetchDescriptor<PrayerLog>()).first)
+        #expect(imported.fridayKind == nil)
+    }
+    private func schemaV2PrayerRow(at eventAt: Date) throws -> DataRecord {
+        let logID = UUID(uuidString: "00000000-0000-0000-0000-000000000303")!
+        return try DataRecord(model: "PrayerLog", fields: [
+            "id": JSONValue.encode(logID), "createdAt": JSONValue.encode(eventAt), "updatedAt": JSONValue.encode(eventAt),
+            "deletedAt": JSONValue.encode(Date?.none), "writerID": JSONValue.encode("fixture-device"),
+            "mergedInto": JSONValue.encode(UUID?.none), "deletionBarrierAt": JSONValue.encode(Date?.none),
+            "restoredAt": JSONValue.encode(Date?.none), "dayKey": JSONValue.encode("2026-10-09"),
+            "prayer": JSONValue.encode("dhuhr"), "status": JSONValue.encode("jamaah"),
+            "heart": JSONValue.encode(String?.none), "eventAt": JSONValue.encode(eventAt),
+            "tzID": JSONValue.encode("Asia/Riyadh"), "dayPolicy": JSONValue.encode("prayerDay@1"),
+            "loggedAt": JSONValue.encode(eventAt), "source": JSONValue.encode("app"),
+            "tripID": JSONValue.encode(UUID?.none), "pairID": JSONValue.encode(UUID?.none),
+            "shortened": JSONValue.encode(Bool?.none)
+        ])
+    }
+    private func schemaV2ManagedFixture(_ base: URL) throws -> (URL, UUID, URL, DataRecord) {
+        let root = base.appendingPathComponent("Managed", isDirectory: true)
+        let oldID = UUID(uuidString: "00000000-0000-0000-0000-000000000203")!
+        let generation = root.appendingPathComponent("Generations/\(oldID.uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: generation, withIntermediateDirectories: true)
+        let eventAt = Date(timeIntervalSince1970: 1_797_000_000)
+        let oldRow = try schemaV2PrayerRow(at: eventAt)
+        do {
+            let oldContainer = try ModelContainer(for: MadarSchemaV2.schema, configurations: [
+                ModelConfiguration("synced", schema: Schema(MadarSchemaV2.syncedTypes),
+                    url: generation.appendingPathComponent("Madar.store"), cloudKitDatabase: .none),
+                ModelConfiguration("deviceOnly", schema: Schema(MadarSchemaV2.deviceTypes),
+                    url: root.appendingPathComponent("Device.store"), cloudKitDatabase: .none)
+            ])
+            oldContainer.mainContext.autosaveEnabled = false
+            let oldLog = MadarSchemaV2.PrayerLog()
+            oldLog.id = try oldRow.decode("id", as: UUID.self)
+            oldLog.createdAt = eventAt; oldLog.updatedAt = eventAt; oldLog.writerID = "fixture-device"
+            oldLog.dayKey = "2026-10-09"; oldLog.prayer = "dhuhr"; oldLog.status = "jamaah"
+            oldLog.eventAt = eventAt; oldLog.tzID = "Asia/Riyadh"; oldLog.dayPolicy = "prayerDay@1"
+            oldLog.loggedAt = eventAt
+            oldContainer.mainContext.insert(oldLog)
+            let receiptID = UUID(uuidString: "00000000-0000-0000-0000-000000000403")!
+            let receipt = CommandReceipt()
+            receipt.id = receiptID; receipt.commandID = UUID(uuidString: "00000000-0000-0000-0000-000000000503")!
+            receipt.name = "prayer.log"; receipt.payloadHash = "synthetic-prayer"; receipt.status = "applied"
+            receipt.undoJSON = Data("synthetic-undo".utf8); receipt.expiresAt = eventAt.addingTimeInterval(86400)
+            receipt.undoExpiresAt = eventAt.addingTimeInterval(600)
+            oldContainer.mainContext.insert(receipt)
+            let scope = DeviceSetting()
+            scope.id = UUID(uuidString: "00000000-0000-0000-0000-000000000603")!
+            scope.key = "sys.commandReceiptScope:\(receiptID.uuidString)"
+            scope.valueJSON = try JSONEncoder().encode(ReceiptScope(version: 1, generationID: oldID))
+            oldContainer.mainContext.insert(scope)
+            try oldContainer.mainContext.save()
+        }
+        try DurableFiles.encode(2, to: generation.appendingPathComponent("SchemaVersion.json"))
+        try DurableFiles.encode(1, to: root.appendingPathComponent("DeviceSchemaVersion.json"))
+        try DurableFiles.encode(GenerationReady(version: 1, generationID: oldID,
+            recordsHash: try RecordFingerprint.hash([oldRow]), createdAt: eventAt),
+            to: generation.appendingPathComponent("GenerationReady.json"))
+        try DurableFiles.encode(ManagedPointer(version: 1, generationID: oldID, previousGenerationID: nil,
+            accountHash: nil, cloudKitContainerIdentifier: nil), to: root.appendingPathComponent("ActiveGeneration.json"))
+        return (root, oldID, generation, oldRow)
+    }
+    private func assertReceiptScope(in context: ModelContext, generationID: UUID) throws {
+        let receipt = try #require(context.fetch(FetchDescriptor<CommandReceipt>()).first)
+        let scope = try #require(context.fetch(FetchDescriptor<DeviceSetting>()).first { $0.key == "sys.commandReceiptScope:\(receipt.id.uuidString)" })
+        let decoded = try JSONDecoder().decode(ReceiptScope.self, from: scope.valueJSON)
+        #expect(decoded.version == 1 && decoded.generationID == generationID)
+        #expect(receipt.undoJSON == Data("synthetic-undo".utf8))
     }
     private func fileHashes(_ directory: URL) throws -> [String:String] {
         let files = try #require(FileManager.default.enumerator(atPath:directory.path))
@@ -64,6 +208,18 @@ import Testing
             let url = directory.appendingPathComponent(relativePath)
             if try url.resourceValues(forKeys:[.isRegularFileKey]).isRegularFile == true {
                 result[relativePath] = BackupCodec.hash(try Data(contentsOf:url))
+            }
+        }
+        return result
+    }
+    private func stableGenerationHashes(_ directory: URL) throws -> [String:String] {
+        let files = try #require(FileManager.default.enumerator(atPath: directory.path))
+        var result: [String:String] = [:]
+        for case let relativePath as String in files {
+            guard !relativePath.hasSuffix("-wal"), !relativePath.hasSuffix("-shm") else { continue }
+            let url = directory.appendingPathComponent(relativePath)
+            if try url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true {
+                result[relativePath] = BackupCodec.hash(try Data(contentsOf: url))
             }
         }
         return result

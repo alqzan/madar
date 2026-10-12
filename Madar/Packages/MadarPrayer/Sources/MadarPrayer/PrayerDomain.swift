@@ -3,12 +3,14 @@ import MadarCore
 
 public enum PrayerDomainError: Error, Equatable { case beforeTrackingStart, futurePrayer, unavailablePrayerTimes, invalidShortening, invalidPair, noActiveTrip, invalidNight, invalidRakaat, trackingAlreadyEdited, invalidTrackingStart, staleUndo, invalidRecord, explicitRestoreRequired }
 public enum PrayerDisplayStatus: String, Codable, Sendable { case jamaah, alone, qada, missed, unrecordedHistory, pending, future }
-public struct PrayerCell: Equatable, Sendable {
+public struct PrayerCell: Equatable, Identifiable, Sendable {
     public let reference: PrayerReference
+    public var id: PrayerReference { reference }
     public let status: PrayerDisplayStatus
     public let heart: PrayerHeart?
     public let time: Date?
     public let shortened: Bool
+    public let fridayKind: FridayPrayerKind?
     public let pairID: UUID?
     public let isFriday: Bool
     public let canLog: Bool
