@@ -411,6 +411,108 @@ import XCTest
         expectation(for: predicate, evaluatedWith: selectedAgain)
         waitForExpectations(timeout: 10)
     }
+    func test_M0T17_LeanFoundationCityNumeralsResetUndoAndRelaunch() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment["MADAR_UI_STORE_ID"] = UUID().uuidString
+        app.launchEnvironment["MADAR_UI_SIZE"] = "L"
+        app.launchEnvironment["MADAR_UI_THEME"] = "light"
+        app.launch(); finishOnboarding(app)
+        let settings = app.buttons["settings-button"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 15), app.debugDescription)
+        let foundation = XCTAttachment(screenshot: app.screenshot())
+        foundation.name = "M0-T17-foundation-default-L"; foundation.lifetime = .keepAlways; add(foundation)
+        settings.tap()
+
+        func filterSettings(_ query: String) {
+            let search = app.textFields["settings-search"]
+            XCTAssertTrue(search.waitForExistence(timeout: 10), app.debugDescription)
+            search.tap()
+            let previous = search.value as? String ?? ""
+            if !previous.isEmpty {
+                search.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: previous.count))
+            }
+            search.typeText(query + "\n")
+        }
+
+        filterSettings("core.homeCity")
+        let city = app.descendants(matching: .any).matching(identifier: "setting-core.homeCity").firstMatch
+        XCTAssertTrue(city.waitForExistence(timeout: 10), app.debugDescription)
+        scrollTo(city, in: app)
+        city.tap()
+        let makkah = app.buttons["مكة المكرمة"]
+        XCTAssertTrue(makkah.waitForExistence(timeout: 10), app.debugDescription)
+        makkah.tap()
+        expectation(for: NSPredicate(format: "label CONTAINS %@", "مكة المكرمة"), evaluatedWith: city)
+        waitForExpectations(timeout: 10)
+
+        app.terminate(); app.launch(); finishOnboarding(app)
+        XCTAssertTrue(settings.waitForExistence(timeout: 10), app.debugDescription)
+        let cityOnHome = app.descendants(matching: .any).matching(NSPredicate(
+            format: "label CONTAINS %@", "مكة المكرمة"
+        )).firstMatch
+        XCTAssertTrue(cityOnHome.exists, app.debugDescription)
+        settings.tap()
+        filterSettings("core.numerals")
+        let western = app.buttons["option-core.numerals-western"]
+        XCTAssertTrue(western.waitForExistence(timeout: 10), app.debugDescription)
+        western.tap()
+        XCTAssertTrue(western.isSelected)
+
+        app.terminate(); app.launch(); finishOnboarding(app)
+        XCTAssertTrue(settings.waitForExistence(timeout: 10), app.debugDescription)
+        settings.tap()
+        filterSettings("core.numerals")
+        XCTAssertTrue(app.buttons["option-core.numerals-western"].isSelected)
+        app.buttons["reset-settings"].tap()
+        let reset = app.buttons["أعِد الافتراضي"].firstMatch
+        XCTAssertTrue(reset.waitForExistence(timeout: 10), app.debugDescription)
+        reset.tap()
+        let arabicIndic = app.buttons["option-core.numerals-arabicIndic"]
+        XCTAssertTrue(arabicIndic.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(arabicIndic.isSelected)
+
+        filterSettings("core.homeCity")
+        let cityAfterReset = app.descendants(matching: .any).matching(identifier: "setting-core.homeCity").firstMatch
+        XCTAssertTrue(cityAfterReset.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(cityAfterReset.label.contains("الرياض"), cityAfterReset.label)
+        let undo = app.buttons["undo-button"]
+        XCTAssertTrue(undo.waitForExistence(timeout: 10), app.debugDescription)
+        undo.tap()
+        expectation(for: NSPredicate(format: "label CONTAINS %@", "مكة المكرمة"), evaluatedWith: cityAfterReset)
+        waitForExpectations(timeout: 10)
+        filterSettings("core.numerals")
+        XCTAssertTrue(app.buttons["option-core.numerals-western"].isSelected)
+
+        app.terminate(); app.launch(); finishOnboarding(app)
+        let restoredCity = app.descendants(matching: .any).matching(NSPredicate(
+            format: "label CONTAINS %@", "مكة المكرمة"
+        )).firstMatch
+        XCTAssertTrue(restoredCity.waitForExistence(timeout: 10), app.debugDescription)
+        let home = XCTAttachment(screenshot: app.screenshot())
+        home.name = "M0-T17-foundation-makkah-western-L"; home.lifetime = .keepAlways; add(home)
+        let content = app.scrollViews.firstMatch
+        XCTAssertTrue(content.waitForExistence(timeout: 10), app.debugDescription)
+        let prayers = [("fajr", "الفجر"), ("dhuhr", "الظهر"), ("asr", "العصر"), ("maghrib", "المغرب"), ("isha", "العشاء")]
+        for (index, prayer) in prayers.enumerated() {
+            let row = app.descendants(matching: .any).matching(identifier: "foundation-prayer-time-\(prayer.0)").firstMatch
+            for _ in 0..<12 {
+                if row.exists && row.isHittable { break }
+                content.swipeUp()
+            }
+            XCTAssertTrue(row.exists, app.debugDescription)
+            XCTAssertTrue(row.isHittable, app.debugDescription)
+            XCTAssertTrue(row.label.hasPrefix("\(prayer.1)، "), row.label)
+            XCTAssertTrue(NSPredicate(format: "SELF MATCHES %@", "[^،]+، [0-9]{2}:[0-9]{2}").evaluate(with: row.label), row.label)
+            if index == 0 || index == prayers.count - 1 {
+                let screenshot = XCTAttachment(screenshot: app.screenshot())
+                screenshot.name = "M0-T17-today-\(prayer.0)-makkah-western-L"; screenshot.lifetime = .keepAlways; add(screenshot)
+            }
+            XCTAssertFalse(app.buttons["foundation-prayer-time-\(prayer.0)"].exists, "Foundation clocks remain read-only.")
+        }
+        XCTAssertFalse(app.buttons["prayer-log"].exists)
+        app.terminate()
+    }
     func testSharedComponentsAtEveryRequiredSizeAndMode() throws {
         for theme in ["light", "dark"] {
             for size in ["L", "AX3", "AX5"] {
