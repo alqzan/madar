@@ -39,3 +39,14 @@ A narrow source patch was prepared at `/tmp/madar-t12-settings-only-materialized
 The first focused build exited 65 before XCTest because nine ignored font resources were absent from the candidate worktree. Those nine files were copied from the main checkout after matching their hashes. The second build still exited 65 before XCTest: `Amiri-Bold.ttf` remained missing, and the log also reports `Ld Madar.app/__preview.dylib` failure. The saved `.xcresult` and log contain no further linker diagnosis. Zero tests ran; no third attempt was made under the two-attempt limit. A read-only inventory confirms that the main checkout has `Amiri-Bold.ttf`, the candidate worktree does not, and the other nine font/license resources are present.
 
 Next: perform read-only resource and linker-diagnostic preflight before authorizing a new isolated run. The visible tab-bar overlap is not yet tied to the nil-element contrast callback. Keep T12 `needs-fix`; make no color or suppression change without an actionable target and measured pair.
+
+
+## Top follow-up after verified workspace preparation — 12 October 2026
+
+Mandatory GPT-6.1 Sol xhigh diagnosis inspected the saved failed build/xcresult without rerunning: the preview-link task failed in .00650394s with only a generic error, overlapping the missing-font copy. Cancellation was plausible, not proven. Main/candidate project, scheme and project.yml matched; no preview-disable or linker override was introduced.
+
+M0-T15 helper validated all11 font/license inputs and copied only the missing pinned `Amiri-Bold.ttf` (SHA256 `8cfed49b66de57e360ac61631d882dddfa23095d3ddb39fc2133eaf93892e79a`). The already independently approved diagnostic patch was preserved at `bfa878b` on the existing T12 branch. One Top attempt used the same destination, signing and derivedData settings with new `/tmp/madar-t12-preflight-top.log` and `.xcresult`.
+
+Result: the font copy, preview linking and codesigning passed; XCTest ran the isolated Settings audit. The unsuppressed callback remains `Contrast failed for SwiftUI.AccessibilityNode; frame=nil; fullyVisible=nil; element=nil`. `Executed 1 test, with 1 failure ... in 13.339 seconds`; command exit65 is now an audit failure, not the prior build blocker. Device: iPhone17Pro/iOS26.5 simulator; system Dynamic Type was unchanged and is not proven L. No second attempt or product color/audit-suppression change.
+
+Acceptance disposition: workspace resource/build blockage resolved for this run; T12 remains needs-fix because contrast target/pair is unidentified. Obtain an actionable platform trace; do not repeat this unchanged diagnostic or call it an accepted accessibility result. Owner-device, VoiceOver/Reduce Motion and whole M0 gate remain separate.
