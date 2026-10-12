@@ -102,6 +102,60 @@ import XCTest
         }
     }
 
+    func test_M0T09_AX3NativeShareAfterSimulatorFaceIDMatch() throws {
+        guard ProcessInfo.processInfo.environment["MADAR_TEST_NATIVE_BIOMETRICS"] == "1" else {
+            throw XCTSkip("Run scripts/native-export-biometric-test.py for supported simulator Face ID orchestration.")
+        }
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "AX3", "MADAR_UI_THEME": "light"]
+        app.launch(); openPlainExportSettings(app)
+        defer { app.terminate() }
+        let cover = app.descendants(matching: .any).matching(identifier: "scene-privacy-cover").firstMatch
+        let export = app.buttons["plain-export-now"]
+        let share = app.buttons["plain-export-share"]
+        XCTAssertFalse(cover.exists)
+        XCTAssertFalse(share.exists)
+        XCTAssertTrue(export.isEnabled)
+        export.tap()
+        XCTAssertTrue(cover.waitForExistence(timeout: 10), app.debugDescription)
+        attachScreenshot(app, named: "M0-T09-AX3-native-FaceID-request")
+        // The host driver sends one documented devicectl simulator match. The
+        // app still evaluates its real LAContext and reactivation guards.
+        NSLog("MADAR_NATIVE_FACEID_REQUEST_READY")
+        XCTAssertTrue(share.waitForExistence(timeout: 30), app.debugDescription)
+        XCTAssertEqual(app.state, .runningForeground)
+        XCTAssertFalse(cover.exists, "Successful authentication must reactivate and uncover this scene.")
+        scrollTo(share, in: app)
+        XCTAssertTrue(share.isEnabled)
+        attachScreenshot(app, named: "M0-T09-AX3-native-authenticated-ready")
+        share.tap()
+        let file = app.descendants(matching: .any).matching(NSPredicate(
+            format: "label BEGINSWITH %@ AND label CONTAINS %@", "Madar-", "-plain"
+        )).firstMatch
+        XCTAssertTrue(file.waitForExistence(timeout: 10), app.debugDescription)
+        let saveToFiles = app.descendants(matching: .any).matching(NSPredicate(
+            format: "label CONTAINS[c] %@ OR label CONTAINS %@", "Save to Files", "الملفات"
+        )).firstMatch
+        XCTAssertTrue(saveToFiles.waitForExistence(timeout: 10), app.debugDescription)
+        attachScreenshot(app, named: "M0-T09-AX3-native-authorized-share")
+        let dismiss = app.buttons.matching(NSPredicate(
+            format: "label IN %@", ["Close", "Cancel", "إغلاق", "إلغاء"]
+        )).firstMatch
+        if dismiss.exists && dismiss.isHittable { dismiss.tap() }
+        else { app.swipeDown() }
+        expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: file)
+        waitForExpectations(timeout: 10)
+        scrollTo(share, in: app)
+        XCTAssertTrue(share.isEnabled)
+        XCTAssertEqual(app.state, .runningForeground)
+        XCTAssertFalse(cover.exists)
+        attachScreenshot(app, named: "M0-T09-AX3-native-authorized-share-dismissed")
+        // Native sheet dismissal retains the cached export under its valid
+        // authorization lease; this does not establish a Files destination write.
+    }
+
+
     func test_M0S2_RU3_CustomizationPluralsAtDefaultAndAX3() throws {
         continueAfterFailure = false
         for size in ["L", "AX3"] {
