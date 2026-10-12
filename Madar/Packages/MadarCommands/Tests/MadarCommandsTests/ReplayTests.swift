@@ -6,10 +6,10 @@ import MadarData
 @testable import MadarCommands
 
 @Suite(.serialized) @MainActor struct ReplayTests {
-    private func fixture() throws -> (ModelContainer, CommandBus, URL) {
+    private func fixture(at now: Date = Date()) throws -> (ModelContainer, CommandBus, URL) {
         let directory = FileManager.default.temporaryDirectory.appending(path: "MadarCommandFixture-\(UUID())")
         let container = try MadarContainerFactory.makeLocal(at: directory)
-        let now = Date(), context = ModelContext(container), settings = try SettingsStore(context: context)
+        let context = ModelContext(container), settings = try SettingsStore(context: context)
         let currentDay = prayerDay(now)
         var calendar = Calendar(identifier: .gregorian); calendar.timeZone = TimeZone(identifier: "Asia/Riyadh")!
         let daysSinceFriday = (calendar.component(.weekday, from: currentDay.date(in: calendar.timeZone)) + 1) % 7
@@ -26,6 +26,11 @@ import MadarData
         let civil = GregorianDay.containing(now, in: place.timeZone)
         guard let times = PrayerTimesEngine.calculate(day: civil, place: place) else { return civil }
         return now < times.fajr ? civil.adding(days: -1) : civil
+    }
+    private func date(_ text: String) -> Date { ISO8601DateFormatter().date(from: text)! }
+    private func iso(_ date: Date) -> String {
+        let formatter = ISO8601DateFormatter(); formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.string(from: date)
     }
     private func previousFriday(before day: GregorianDay) -> GregorianDay {
         var calendar = Calendar(identifier: .gregorian); calendar.timeZone = TimeZone(identifier: "Asia/Riyadh")!
@@ -105,6 +110,36 @@ import MadarData
         let dhuhrAlone = CommandEnvelope(name: "prayer.log", payload: .object(["dayKey": .string(friday.description), "prayer": .string("dhuhr"), "status": .string("alone"), "fridayKind": .string("dhuhr")]), source: .app, issuedAt: now)
         #expect(try await bus.execute(dhuhrAlone, now: now).status == .applied)
         #expect(try ModelContext(container).fetch(FetchDescriptor<PrayerLog>()).first(where: { $0.dayKey == friday.description && $0.prayer == "dhuhr" })?.fridayKind == "dhuhr")
+    }
+    @Test func test_M1T02_makeUpCommandIsAtomicIdempotentAndUndoable() async throws {
+        let now = date("2026-10-13T09:00:00+03:00")
+        let (container, bus, _) = try fixture(at: now)
+        let context = ModelContext(container), dayKey = "2026-10-12"
+        let missed = CommandEnvelope(name: "prayer.log", payload: .object([
+            "dayKey": .string(dayKey), "prayer": .string("fajr"), "status": .string("missed")
+        ]), source: .app, issuedAt: now)
+        #expect(try await bus.execute(missed, now: now).status == .applied)
+        #expect(try context.fetch(FetchDescriptor<QadaItem>()).first?.madeUpAt == nil)
+
+        let makeUp = CommandEnvelope(name: "prayer.makeUp", payload: .object([
+            "dayKey": .string(dayKey), "prayer": .string("fajr"), "at": .string(iso(now)), "fridayKind": .null
+        ]), source: .app, issuedAt: now)
+        let applied = try await bus.execute(makeUp, now: now)
+        #expect(applied.status == .applied && applied.undoToken == makeUp.commandID)
+        let log = try #require(context.fetch(FetchDescriptor<PrayerLog>()).first)
+        let debt = try #require(context.fetch(FetchDescriptor<QadaItem>()).first)
+        #expect(log.status == "qada" && debt.madeUpAt == now)
+        let logStamp = log.updatedAt, debtStamp = debt.updatedAt
+
+        let duplicate = CommandEnvelope(name: "prayer.makeUp", payload: makeUp.payload, source: .app, issuedAt: now.addingTimeInterval(1))
+        #expect(try await bus.execute(duplicate, now: now.addingTimeInterval(1)).status == .duplicate)
+        #expect(try context.fetch(FetchDescriptor<PrayerLog>()).first?.updatedAt == logStamp)
+        #expect(try context.fetch(FetchDescriptor<QadaItem>()).first?.updatedAt == debtStamp)
+
+        let undo = CommandEnvelope(name: "system.undo", payload: .object(["undoToken": .string(makeUp.commandID.uuidString)]), issuedAt: now.addingTimeInterval(2))
+        #expect(try await bus.execute(undo, now: now.addingTimeInterval(2)).status == .applied)
+        #expect(try context.fetch(FetchDescriptor<PrayerLog>()).first?.status == "missed")
+        #expect(try context.fetch(FetchDescriptor<QadaItem>()).first?.madeUpAt == nil)
     }
 
 }

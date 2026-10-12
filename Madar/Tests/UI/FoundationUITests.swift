@@ -410,6 +410,96 @@ import XCTest
         ax3Shot.name = "M1-T01-prayer-today-AX3"; ax3Shot.lifetime = .keepAlways; add(ax3Shot)
         ax3.terminate()
     }
+    func test_M1T02_MissedMakeUpUndoAndRelaunch() throws {
+        continueAfterFailure = false
+        let storeID = UUID().uuidString
+        let app = XCUIApplication()
+        app.launchEnvironment = [
+            "MADAR_UI_STORE_ID": storeID,
+            "MADAR_UI_SIZE": "L",
+            "MADAR_UI_THEME": "light",
+            "MADAR_UI_NOW": "2026-10-13T09:00:00+03:00"
+        ]
+        app.launch(); finishOnboarding(app)
+        func fajrArch(_ target: XCUIApplication) -> XCUIElement {
+            target.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", "الفجر" )).firstMatch
+        }
+        let prayerTab = app.tabBars.buttons["الصلاة"]
+        XCTAssertTrue(prayerTab.waitForExistence(timeout: 10), app.debugDescription)
+        prayerTab.tap()
+        let fajr = fajrArch(app)
+        XCTAssertTrue(fajr.waitForExistence(timeout: 10), app.debugDescription)
+        fajr.tap()
+        app.buttons["prayer-status-missed"].tap()
+        let later = app.buttons["prayer-missed-later"]
+        scrollTo(later, in: app)
+        XCTAssertTrue(later.waitForExistence(timeout: 10), app.debugDescription)
+        later.tap()
+        XCTAssertTrue(app.buttons["undo-button"].waitForExistence(timeout: 15), app.debugDescription)
+        attachScreenshot(app, named: "M1-T02-missed-explicit-L")
+
+        app.terminate(); app.launch(); finishOnboarding(app)
+        let reopenedTab = app.tabBars.buttons["الصلاة"]
+        XCTAssertTrue(reopenedTab.waitForExistence(timeout: 10), app.debugDescription)
+        reopenedTab.tap()
+        let reopenedFajr = fajrArch(app)
+        XCTAssertTrue(reopenedFajr.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(reopenedFajr.label.contains("فاتتني"), reopenedFajr.label)
+        let makeUpButton = app.buttons["prayer-qada-makeup"]
+        scrollTo(makeUpButton, in: app)
+        makeUpButton.tap()
+        let confirmMakeUp = app.buttons["prayer-makeup-confirm"]
+        XCTAssertTrue(confirmMakeUp.waitForExistence(timeout: 10), app.debugDescription)
+        confirmMakeUp.tap()
+        XCTAssertTrue(app.buttons["undo-button"].waitForExistence(timeout: 15), app.debugDescription)
+
+        let qadaArch = fajrArch(app)
+        let qadaLabel = NSPredicate(format: "label CONTAINS %@", "قُضيت")
+        expectation(for: qadaLabel, evaluatedWith: qadaArch)
+        waitForExpectations(timeout: 10)
+        app.buttons["undo-button"].tap()
+        let restored = fajrArch(app)
+        let missedLabel = NSPredicate(format: "label CONTAINS %@", "فاتتني")
+        expectation(for: missedLabel, evaluatedWith: restored)
+        waitForExpectations(timeout: 15)
+        attachScreenshot(app, named: "M1-T02-makeup-undo-restores-missed-L")
+
+        app.terminate(); app.launch(); finishOnboarding(app)
+        app.tabBars.buttons["الصلاة"].tap()
+        let afterRelaunch = fajrArch(app)
+        XCTAssertTrue(afterRelaunch.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(afterRelaunch.label.contains("فاتتني"), afterRelaunch.label)
+        app.terminate()
+    }
+    func test_M1T02_BulkPendingRecoveryAtAX3() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = [
+            "MADAR_UI_STORE_ID": UUID().uuidString,
+            "MADAR_UI_SIZE": "AX3",
+            "MADAR_UI_THEME": "light",
+            "MADAR_UI_NOW": "2026-10-13T09:00:00+03:00",
+            "MADAR_UI_TRACKING_START": "2026-10-01"
+        ]
+        app.launch(); finishOnboarding(app)
+        let prayerTab = app.tabBars.buttons["الصلاة"]
+        XCTAssertTrue(prayerTab.waitForExistence(timeout: 10), app.debugDescription)
+        prayerTab.tap()
+        let recovery = app.buttons["prayer-recovery"]
+        scrollTo(recovery, in: app)
+        recovery.tap()
+        let bulkUnrecorded = app.buttons["prayer-gap-unrecorded-all"]
+        XCTAssertTrue(bulkUnrecorded.waitForExistence(timeout: 10), app.debugDescription)
+        attachScreenshot(app, named: "M1-T02-recovery-sheet-AX3")
+        bulkUnrecorded.tap()
+        let save = app.buttons["prayer-gap-save"]
+        scrollTo(save, in: app)
+        save.tap()
+        let removed = NSPredicate(format: "exists == false")
+        expectation(for: removed, evaluatedWith: app.buttons["prayer-recovery"])
+        waitForExpectations(timeout: 15)
+        app.terminate()
+    }
     func testLightDarkAndAccessibilityScreenshots() throws {
         continueAfterFailure = false
         for theme in ["light", "dark"] {

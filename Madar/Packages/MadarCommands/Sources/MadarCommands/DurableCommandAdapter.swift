@@ -97,7 +97,7 @@ private struct ReceiptWire: Codable {
                                        undoExpiresAt: row.undoExpiresAt ?? row.createdAt,
                                        undoJSON: row.undoJSON,
                                        outcome: .init(status: CommandStatus(rawValue: row.status) ?? .rejected,
-                                                      undoToken: row.status == "applied" && ["prayer.log", "settings.set", "settings.applyPreset"].contains(row.name) ? id : nil))
+                                                      undoToken: row.status == "applied" && ["prayer.log", "prayer.makeUp", "prayer.resolveGap", "settings.set", "settings.applyPreset"].contains(row.name) ? id : nil))
                 return try JSONDecoder().decode(CoreCommandReceipt.self, from: JSONEncoder().encode(wire))
             }
             // Receipt identity is authoritative even after undo/deletion or retention expiry.
@@ -117,6 +117,31 @@ private struct ReceiptWire: Codable {
                    (fridayKind == nil || row.fridayKind == fridayKind) {
                     existingHash = request.payloadHash
                 }
+            } else if case .makeUpPrayer(let dayKey, let prayer, _, let fridayKind) = request.operation {
+                let logs = try context.fetch(FetchDescriptor<PrayerLog>()).filter { $0.dayKey == dayKey && $0.prayer == prayer.rawValue && $0.mergedInto == nil }
+                if logs.contains(where: { $0.deletedAt != nil }) { return .init(status: .rejected, reason: "explicitRestoreRequired") }
+                let debts = try context.fetch(FetchDescriptor<QadaItem>()).filter { $0.originalDayKey == dayKey && $0.prayer == prayer.rawValue && $0.mergedInto == nil }
+                if let log = logs.filter({ $0.deletedAt == nil }).max(by: { $0.updatedAt < $1.updatedAt }),
+                   let debt = debts.filter({ $0.deletedAt == nil }).max(by: { $0.updatedAt < $1.updatedAt }),
+                   log.status == "qada", debt.madeUpAt != nil,
+                   (fridayKind == nil || log.fridayKind == fridayKind) {
+                    existingHash = request.payloadHash
+                }
+            } else if case .resolvePrayerGap(let resolutions) = request.operation {
+                let logs = try context.fetch(FetchDescriptor<PrayerLog>()).filter { $0.mergedInto == nil }
+                let debts = try context.fetch(FetchDescriptor<QadaItem>()).filter { $0.mergedInto == nil }
+                if resolutions.contains(where: { resolution in
+                    logs.contains(where: { $0.dayKey == resolution.reference.day.description && $0.prayer == resolution.reference.prayer.rawValue && $0.deletedAt != nil })
+                }) { return .init(status: .rejected, reason: "explicitRestoreRequired") }
+                let alreadyResolved = resolutions.allSatisfy { resolution in
+                    let dayKey = resolution.reference.day.description, prayer = resolution.reference.prayer.rawValue
+                    let log = logs.filter { $0.dayKey == dayKey && $0.prayer == prayer && $0.deletedAt == nil }.max { $0.updatedAt < $1.updatedAt }
+                    let debt = debts.filter { $0.originalDayKey == dayKey && $0.prayer == prayer && $0.deletedAt == nil }.max { $0.updatedAt < $1.updatedAt }
+                    let debtMatches = resolution.status == .missed ? debt?.madeUpAt == nil : debt == nil
+                    let fridayMatches = [.unrecordedHistory, .excused].contains(resolution.status) || log?.fridayKind == resolution.fridayKind?.rawValue
+                    return log?.status == resolution.status.rawValue && log?.heart == nil && log?.shortened != true && debtMatches && fridayMatches
+                }
+                if alreadyResolved { existingHash = request.payloadHash }
             }
             switch request.decision(receipts: receipts, existingNaturalPayloadHash: existingHash, now: now) {
             case .replay(let outcome): return outcome
@@ -139,6 +164,24 @@ private struct ReceiptWire: Codable {
                     fridayKind: fridayKind.flatMap(FridayPrayerKind.init(rawValue:)))
                 do {
                     if let undo = try PrayerMutationHandler.stage(operation: mutation, in: context, now: now, writer: writer, source: request.envelope.source) {
+                        inverse = SettingsInverse(settings: [:], afterSettings: [:], layouts: [:], afterLayouts: [:], prayerMutation: undo)
+                    }
+                } catch let error as PrayerDomainError {
+                    return .init(status: .rejected, reason: String(describing: error))
+                }
+            case .makeUpPrayer(let dayKey, let prayer, let at, let fridayKind):
+                guard let referenceDay = try? GregorianDay(dayKey) else { return .init(status: .rejected, reason: "invalidPrayer") }
+                do {
+                    let mutation = PrayerMutation.makeUp(.init(day: referenceDay, prayer: prayer), at: at, fridayKind: fridayKind.flatMap(FridayPrayerKind.init(rawValue:)))
+                    if let undo = try PrayerMutationHandler.stage(operation: mutation, in: context, now: now, writer: writer, source: request.envelope.source) {
+                        inverse = SettingsInverse(settings: [:], afterSettings: [:], layouts: [:], afterLayouts: [:], prayerMutation: undo)
+                    }
+                } catch let error as PrayerDomainError {
+                    return .init(status: .rejected, reason: String(describing: error))
+                }
+            case .resolvePrayerGap(let resolutions):
+                do {
+                    if let undo = try PrayerMutationHandler.stage(operation: .resolveGap(resolutions), in: context, now: now, writer: writer, source: request.envelope.source) {
                         inverse = SettingsInverse(settings: [:], afterSettings: [:], layouts: [:], afterLayouts: [:], prayerMutation: undo)
                     }
                 } catch let error as PrayerDomainError {

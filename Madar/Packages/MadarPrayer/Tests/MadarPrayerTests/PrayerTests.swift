@@ -6,7 +6,16 @@ import MadarData
 @testable import MadarPrayer
 
 @Suite(.serialized) @MainActor struct PrayerTests {
-    private func time(_ text: String) -> Date { ISO8601DateFormatter().date(from: text)! }
+    private func time(_ text: String) -> Date {
+        let formatter = ISO8601DateFormatter()
+        if let date = formatter.date(from: text) { return date }
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.date(from: text)!
+    }
+    private func iso(_ date: Date) -> String {
+        let formatter = ISO8601DateFormatter(); formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.string(from: date)
+    }
     private func ref(_ day: String = "2026-10-07", _ prayer: Prayer = .fajr) throws -> PrayerReference { try .init(day: GregorianDay(day), prayer: prayer) }
     private func container(start: String = "2026-10-07T09:00:00+03:00") throws -> ModelContainer {
         let container = try MadarContainerFactory.makeInMemory()
@@ -27,6 +36,46 @@ import MadarData
         #expect(try context.fetch(FetchDescriptor<PrayerLog>()).first?.status == "missed")
         #expect(try context.fetch(FetchDescriptor<QadaItem>()).first?.madeUpAt == nil)
         #expect(try context.fetch(FetchDescriptor<PrayerLog>()).count == 1 && context.fetch(FetchDescriptor<QadaItem>()).count == 1)
+    }
+    @Test func missedAndMakeUpWaitForEachPrayerWindowEnd() throws {
+        let day = try GregorianDay("2026-10-07")
+        let place = try ActivePlace(latitude: 24.7136, longitude: 46.6753, timeZoneID: "Asia/Riyadh")
+        let dayTimes = try #require(PrayerTimesEngine.calculate(day: day, place: place))
+        let nextTimes = try #require(PrayerTimesEngine.calculate(day: day.adding(days: 1), place: place))
+        let expectedEnds: [Prayer: Date] = [
+            .fajr: dayTimes.sunrise,
+            .dhuhr: dayTimes.asr,
+            .asr: dayTimes.maghrib,
+            .maghrib: dayTimes.isha,
+            .isha: nextTimes.fajr
+        ]
+        let baseline = try container(start: "2026-10-06T04:00:00+03:00")
+        let repository = try PrayerRepository(context: baseline.mainContext)
+
+        for prayer in Prayer.allCases {
+            let reference = try ref(day.description, prayer)
+            let windowEnd = try #require(expectedEnds[prayer])
+            #expect(repository.missedWindowEnd(reference) == windowEnd)
+            let testContainer = try container(start: "2026-10-06T04:00:00+03:00")
+            let context = testContainer.mainContext
+
+            #expect(throws: PrayerDomainError.prayerWindowOpen) {
+                try apply(.record(reference, status: .missed, heart: nil, shortened: nil), context, at: iso(windowEnd.addingTimeInterval(-1)))
+            }
+            context.rollback()
+            #expect(try context.fetch(FetchDescriptor<PrayerLog>()).isEmpty)
+
+            try apply(.record(reference, status: .missed, heart: nil, shortened: nil), context, at: iso(windowEnd))
+            #expect(throws: PrayerDomainError.prayerWindowOpen) {
+                try apply(.makeUp(reference), context, at: iso(windowEnd.addingTimeInterval(-1)))
+            }
+            context.rollback()
+            #expect(try context.fetch(FetchDescriptor<QadaItem>()).first?.madeUpAt == nil)
+
+            try apply(.makeUp(reference), context, at: iso(windowEnd))
+            #expect(try context.fetch(FetchDescriptor<PrayerLog>()).first?.status == "qada")
+            #expect(try context.fetch(FetchDescriptor<QadaItem>()).first?.madeUpAt == windowEnd)
+        }
     }
     @Test func qadaFromArcIsAtomicAndCorrectionTombstonesDebt() throws {
         let container = try container(); let context = container.mainContext; let reference = try ref()
@@ -61,18 +110,18 @@ import MadarData
         let fridayDhuhr = try ref("2026-10-09", .dhuhr)
         #expect(throws: PrayerDomainError.invalidRecord) {
             try apply(.record(fridayDhuhr, status: .jamaah, heart: nil, shortened: nil), context,
-                at: "2026-10-09T14:00:00+03:00")
+                at: "2026-10-09T18:00:00+03:00")
         }
         context.rollback()
 
         try apply(.record(fridayDhuhr, status: .missed, heart: nil, shortened: nil, fridayKind: .jumuah), context,
-            at: "2026-10-09T14:00:00+03:00")
+            at: "2026-10-09T18:00:00+03:00")
         let missed = try #require(context.fetch(FetchDescriptor<PrayerLog>()).first)
         #expect(missed.status == "missed" && missed.fridayKind == "jumuah")
         #expect(try context.fetch(FetchDescriptor<QadaItem>()).first?.madeUpAt == nil)
 
         try apply(.record(fridayDhuhr, status: .qada, heart: nil, shortened: nil, fridayKind: .jumuah), context,
-            at: "2026-10-09T15:00:00+03:00")
+            at: "2026-10-09T19:00:00+03:00")
         let madeUp = try #require(context.fetch(FetchDescriptor<PrayerLog>()).first)
         #expect(madeUp.status == "qada" && madeUp.fridayKind == "jumuah")
         #expect(try context.fetch(FetchDescriptor<QadaItem>()).first?.madeUpAt != nil)
@@ -129,7 +178,13 @@ import MadarData
             }
             for _ in 0..<2 {
                 let state = try PrayerRepository(context: context).snapshot(now: now)
-                #expect(state.pending.contains(try ref()))
+                if now < deadline {
+                    #expect(state.pending.contains(try ref()))
+                    #expect(!state.unconfirmed.contains(try ref()))
+                } else {
+                    #expect(!state.pending.contains(try ref()))
+                    #expect(state.unconfirmed.contains(try ref()))
+                }
                 #expect(state.statistics.denominator == 0 && state.statistics.percentage == nil)
                 #expect(state.statistics.owed == 0 && state.statistics.madeUp == 0 && state.qada.isEmpty)
                 #expect(!state.history.flatMap(\.cells).contains { [.missed, .qada].contains($0.status) })
@@ -137,6 +192,32 @@ import MadarData
             #expect(try context.fetch(FetchDescriptor<PrayerLog>()).isEmpty)
             #expect(try context.fetch(FetchDescriptor<QadaItem>()).isEmpty)
         }
+    }
+    @Test func bulkGapResolutionCreatesOnlyExplicitDebtAndCanUndoAsOneChange() throws {
+        let container = try container(start: "2026-10-13T04:00:00+03:00"), context = container.mainContext
+        let references = [try ref("2026-10-13"), try ref("2026-10-13", .dhuhr), try ref("2026-10-13", .asr)]
+        let resolutions = [
+            PrayerGapResolution(reference: references[0], status: .missed),
+            PrayerGapResolution(reference: references[1], status: .unrecordedHistory),
+            PrayerGapResolution(reference: references[2], status: .excused)
+        ]
+        let now = "2026-10-20T09:00:00+03:00"
+        let inverse = try #require(try apply(.resolveGap(resolutions), context, at: now))
+        #expect(try apply(.resolveGap(resolutions), context, at: "2026-10-20T09:01:00+03:00") == nil)
+        let state = try PrayerRepository(context: context).snapshot(now: time(now))
+        #expect(state.statistics.owed == 1)
+        #expect(state.statistics.denominator == 1)
+        #expect(state.statistics.onTime == 0)
+        #expect(state.qada.count == 1 && state.qada.first?.reference == references[0])
+        #expect(try context.fetch(FetchDescriptor<PrayerLog>()).filter { $0.deletedAt == nil }.map(\.status).sorted() == ["excused", "missed", "unrecordedHistory"])
+
+        try PrayerMutationHandler.undo(inverse, in: context, now: time("2026-10-20T09:02:00+03:00"), writer: "test-device")
+        try context.save()
+        let restored = try PrayerRepository(context: context).snapshot(now: time("2026-10-20T09:03:00+03:00"))
+        #expect(restored.statistics.owed == 0 && restored.statistics.denominator == 0)
+        #expect(references.allSatisfy { restored.unconfirmed.contains($0) })
+        #expect(try context.fetch(FetchDescriptor<PrayerLog>()).allSatisfy { $0.deletedAt != nil })
+        #expect(try context.fetch(FetchDescriptor<QadaItem>()).allSatisfy { $0.deletedAt != nil })
     }
     @Test func movedTrackingRemainsUnloggedAndSecondEditFails() throws {
         let container = try container(start: "2026-10-09T12:00:00+03:00"); let context = container.mainContext
@@ -149,7 +230,7 @@ import MadarData
             try context.save()
             let state = try PrayerRepository(context: context).snapshot(now: deadline)
             #expect(state.tracking.day.description == "2026-10-07" && state.tracking.edits == 1)
-            #expect(state.pending.contains(try ref()))
+            #expect(state.unconfirmed.contains(try ref()))
             #expect(state.statistics.denominator == 0 && state.qada.isEmpty)
         }
         #expect(try context.fetch(FetchDescriptor<PrayerLog>()).isEmpty)

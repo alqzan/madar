@@ -61,6 +61,13 @@ private struct PrayerInverse: Codable {
         }
         func setLog(_ ref: PrayerReference, status: PrayerStoredStatus, heart: PrayerHeart? = nil, shortened: Bool? = nil, fridayKind: FridayPrayerKind? = nil, oldAllowed: Bool = false, early: Bool = false, recordSource: String? = nil) throws {
             let occurrence = try validate(ref, oldAllowed: oldAllowed, early: early)
+            if status == .missed || status == .qada {
+                if let windowEnd = repository.missedWindowEnd(ref) {
+                    guard now >= windowEnd else { throw PrayerDomainError.prayerWindowOpen }
+                } else {
+                    guard status == .qada, repository.qada(ref)?.madeUpAt == nil else { throw PrayerDomainError.unavailablePrayerTimes }
+                }
+            }
             if shortened == true && ![.dhuhr, .asr, .isha].contains(ref.prayer) { throw PrayerDomainError.invalidShortening }
             let zone = occurrence?.place.timeZone ?? repository.place(at: now).timeZone
             var calendar = Calendar(identifier: .gregorian); calendar.timeZone = zone
@@ -68,25 +75,27 @@ private struct PrayerInverse: Codable {
             let existingKind = repository.log(ref)?.fridayKind.flatMap(FridayPrayerKind.init(rawValue:))
             let resolvedFridayKind = fridayKind ?? existingKind
             guard isFridayNoon || fridayKind == nil else { throw PrayerDomainError.invalidRecord }
-            guard !isFridayNoon || status == .unrecordedHistory || resolvedFridayKind != nil else { throw PrayerDomainError.invalidRecord }
+            guard !isFridayNoon || [.unrecordedHistory, .excused].contains(status) || resolvedFridayKind != nil else { throw PrayerDomainError.invalidRecord }
             guard resolvedFridayKind != .jumuah || [.jamaah, .missed, .qada].contains(status) else { throw PrayerDomainError.invalidRecord }
             let row = try logRow(ref); try unlinkPair(row)
             row.status = status.rawValue
             if let heart { row.heart = heart.rawValue }
             if let shortened { row.shortened = shortened }
             row.fridayKind = isFridayNoon && status != .unrecordedHistory ? resolvedFridayKind?.rawValue : nil
-            if status == .missed || status == .unrecordedHistory { row.heart = nil; row.shortened = nil }
+            if status == .missed || status == .unrecordedHistory || status == .excused { row.heart = nil; row.shortened = nil }
             if row.loggedAt == nil { row.eventAt = occurrence?.time ?? now; row.tzID = occurrence?.place.timeZoneID ?? repository.place(at: now).timeZoneID; row.dayPolicy = "prayerDay@1"; row.tripID = occurrence?.tripID }
             row.loggedAt = now; row.source = recordSource ?? source.rawValue; try touch(row)
             if status == .missed { let qada = try qadaRow(ref); qada.madeUpAt = nil; try touch(qada) }
-            else if status == .jamaah || status == .alone || status == .unrecordedHistory { if let qada = repository.qada(ref) { try remove(qada) } }
+            else if status == .jamaah || status == .alone || status == .unrecordedHistory || status == .excused { if let qada = repository.qada(ref) { try remove(qada) } }
         }
-        func makeUp(_ ref: PrayerReference, fridayKind: FridayPrayerKind? = nil) throws {
+        func makeUp(_ ref: PrayerReference, at eventAt: Date? = nil, fridayKind: FridayPrayerKind? = nil) throws {
             if repository.qada(ref)?.madeUpAt != nil { return }
+            let madeUpAt = eventAt ?? now
+            guard madeUpAt <= now else { throw PrayerDomainError.invalidRecord }
             let oldAllowed = repository.qada(ref) != nil
             _ = try validate(ref, oldAllowed: oldAllowed)
             try setLog(ref, status: .qada, fridayKind: fridayKind, oldAllowed: oldAllowed)
-            let qada = try qadaRow(ref); qada.madeUpAt = now; try touch(qada, restoringDebt: true)
+            let qada = try qadaRow(ref); qada.madeUpAt = madeUpAt; try touch(qada, restoringDebt: true)
         }
         switch operation {
         case .initializeTracking:
@@ -104,13 +113,13 @@ private struct PrayerInverse: Codable {
             try repository.settings.prepare(.object(["dayKey": .string(start.description), "edits": .number(1)]), for: "salah.trackingStart", now: now)
             after[key(try old.record())] = try old.record()
         case .record(let ref, let status, let heart, let shortened, let fridayKind):
-            guard status != .unrecordedHistory else { throw PrayerDomainError.invalidRecord }
+            guard status != .unrecordedHistory && status != .excused else { throw PrayerDomainError.invalidRecord }
             if status == .qada { try makeUp(ref, fridayKind: fridayKind); if let heart { let row = try logRow(ref); if row.heart != heart.rawValue { row.heart = heart.rawValue; try touch(row) } } }
             else {
                 if let row = repository.log(ref), row.status == status.rawValue, heart == nil || row.heart == heart?.rawValue, shortened == nil || row.shortened == shortened, fridayKind == nil || row.fridayKind == fridayKind?.rawValue { break }
                 try setLog(ref, status: status, heart: heart, shortened: shortened, fridayKind: fridayKind)
             }
-        case .makeUp(let ref, let fridayKind): try makeUp(ref, fridayKind: fridayKind)
+        case .makeUp(let ref, let at, let fridayKind): try makeUp(ref, at: at, fridayKind: fridayKind)
         case .addOldMissed(let ref, let fridayKind):
             guard ref.day < track.day else { throw PrayerDomainError.invalidRecord }
             if repository.qada(ref) == nil { try setLog(ref, status: .missed, fridayKind: fridayKind, oldAllowed: true) }
@@ -120,6 +129,17 @@ private struct PrayerInverse: Codable {
         case .markUnrecorded(let refs):
             guard !refs.isEmpty, Set(refs).count == refs.count else { throw PrayerDomainError.invalidRecord }
             for ref in refs { if repository.log(ref)?.status != "unrecordedHistory" { try setLog(ref, status: .unrecordedHistory) } }
+        case .resolveGap(let resolutions):
+            guard !resolutions.isEmpty, Set(resolutions.map(\.reference)).count == resolutions.count,
+                  resolutions.allSatisfy({ [.jamaah, .alone, .missed, .unrecordedHistory, .excused].contains($0.status) }) else { throw PrayerDomainError.invalidRecord }
+            for resolution in resolutions {
+                let ref = resolution.reference
+                let row = repository.log(ref), debt = repository.qada(ref)
+                let hasCurrentDebt = debt != nil && debt?.madeUpAt == nil
+                let alreadyResolved = row?.status == resolution.status.rawValue && row?.fridayKind == resolution.fridayKind?.rawValue && row?.heart == nil && row?.shortened != true && (resolution.status != .missed || hasCurrentDebt) && (resolution.status == .missed || debt == nil)
+                if alreadyResolved { continue }
+                try setLog(ref, status: resolution.status, fridayKind: resolution.fridayKind)
+            }
         case .clear(let ref):
             if let row = repository.log(ref) { try unlinkPair(row); try remove(row) }
             if let row = repository.qada(ref) { try remove(row) }

@@ -1,8 +1,8 @@
 import Foundation
 import MadarCore
 
-public enum PrayerDomainError: Error, Equatable { case beforeTrackingStart, futurePrayer, unavailablePrayerTimes, invalidShortening, invalidPair, noActiveTrip, invalidNight, invalidRakaat, trackingAlreadyEdited, invalidTrackingStart, staleUndo, invalidRecord, explicitRestoreRequired }
-public enum PrayerDisplayStatus: String, Codable, Sendable { case jamaah, alone, qada, missed, unrecordedHistory, pending, future }
+public enum PrayerDomainError: Error, Equatable { case beforeTrackingStart, futurePrayer, prayerWindowOpen, unavailablePrayerTimes, invalidShortening, invalidPair, noActiveTrip, invalidNight, invalidRakaat, trackingAlreadyEdited, invalidTrackingStart, staleUndo, invalidRecord, explicitRestoreRequired }
+public enum PrayerDisplayStatus: String, Codable, Sendable { case jamaah, alone, qada, missed, unrecordedHistory, unconfirmed, excused, pending, future }
 public struct PrayerCell: Equatable, Identifiable, Sendable {
     public let reference: PrayerReference
     public var id: PrayerReference { reference }
@@ -14,6 +14,7 @@ public struct PrayerCell: Equatable, Identifiable, Sendable {
     public let pairID: UUID?
     public let isFriday: Bool
     public let canLog: Bool
+    public let canMarkMissed: Bool
     public let canMakeUp: Bool
 }
 public struct PrayerDaySummary: Equatable, Sendable {
@@ -35,10 +36,12 @@ public struct PrayerStatistics: Equatable, Sendable {
         lhs.onTime == rhs.onTime && lhs.denominator == rhs.denominator && lhs.madeUp == rhs.madeUp && lhs.owed == rhs.owed && lhs.prayerStreak == rhs.prayerStreak && lhs.mosqueStreak == rhs.mosqueStreak && lhs.heartDistribution == rhs.heartDistribution && lhs.last25 == rhs.last25 && Prayer.allCases.allSatisfy { lhs.commitment[$0]?.jamaah == rhs.commitment[$0]?.jamaah && lhs.commitment[$0]?.alone == rhs.commitment[$0]?.alone && lhs.commitment[$0]?.denominator == rhs.commitment[$0]?.denominator }
     }
 }
-public struct PrayerQada: Equatable, Sendable {
+public struct PrayerQada: Equatable, Identifiable, Sendable {
     public let id: UUID
     public let reference: PrayerReference
     public let madeUpAt: Date?
+    public let fridayKind: FridayPrayerKind?
+    public let isFriday: Bool
 }
 public struct PrayerNight: Equatable, Sendable {
     public let night: GregorianDay
@@ -70,6 +73,8 @@ public struct PrayerSnapshot: Equatable, Sendable {
     public let history: [PrayerDaySummary]
     public let tracking: PrayerTracking
     public let pending: [PrayerReference]
+    public let unconfirmed: [PrayerReference]
+    public let unconfirmedFridayNoon: Set<PrayerReference>
     public let pendingHeart: [PrayerReference]
     public let statistics: PrayerStatistics
     public let qada: [PrayerQada]

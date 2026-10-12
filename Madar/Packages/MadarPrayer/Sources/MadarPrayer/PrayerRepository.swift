@@ -9,6 +9,7 @@ import MadarData
     public let home: ActivePlace
     public let options: PrayerCalculationOptions
     public let placeName: String
+    public let pendingDays: Int
     let logs: [PrayerLog]
     let qadaRows: [QadaItem]
     let nightRows: [QiyamNight]
@@ -20,6 +21,7 @@ import MadarData
         placeName = city["name"]?.string ?? "الرياض"
         let offsets = try settings.value(for: "salah.offsets").object ?? [:]
         options = try PrayerCalculationOptions(method: PrayerCalculationMethod(rawValue: settings.value(for: "salah.method").string ?? "") ?? .ummAlQura, hanafiAsr: settings.value(for: "salah.asr").string == "hanafi", highLatitudeRule: PrayerHighLatitudeRule(rawValue: settings.value(for: "salah.highLatitudeRule").string ?? "") ?? .auto, offsets: Dictionary(uniqueKeysWithValues: Prayer.allCases.map { ($0, Int(offsets[$0.rawValue]?.number ?? 0)) }), hijriSource: HijriSource(rawValue: settings.value(for: "core.hijriSource").string ?? "") ?? .ummAlQura, sightingOffset: Int(settings.value(for: "core.hijriOffset").number ?? 0))
+        pendingDays = min(14, max(3, Int(try settings.value(for: "salah.pendingDays").number ?? 7)))
         logs = try context.fetch(FetchDescriptor<PrayerLog>()).filter { $0.mergedInto == nil }
         qadaRows = try context.fetch(FetchDescriptor<QadaItem>()).filter { $0.mergedInto == nil }
         nightRows = try context.fetch(FetchDescriptor<QiyamNight>()).filter { $0.mergedInto == nil }
@@ -44,6 +46,17 @@ import MadarData
         }
         return .init(reference: ref, time: base, place: home, tripID: nil)
     }
+    public func missedWindowEnd(_ ref: PrayerReference) -> Date? {
+        switch ref.prayer {
+        case .fajr:
+            guard let fajr = occurrence(ref), let times = PrayerTimesEngine.calculate(day: ref.day, place: fajr.place, options: options) else { return nil }
+            return times.sunrise
+        case .dhuhr: return occurrence(.init(day: ref.day, prayer: .asr))?.time
+        case .asr: return occurrence(.init(day: ref.day, prayer: .maghrib))?.time
+        case .maghrib: return occurrence(.init(day: ref.day, prayer: .isha))?.time
+        case .isha: return occurrence(.init(day: ref.day.adding(days: 1), prayer: .fajr))?.time
+        }
+    }
     public func tracking(at now: Date) throws -> PrayerTracking {
         let value = try settings.value(for: "salah.trackingStart").object ?? [:]
         let start = value["dayKey"]?.string.flatMap { try? GregorianDay($0) } ?? prayerDay(at: now)
@@ -59,15 +72,19 @@ import MadarData
         qadaRows.filter { $0.originalDayKey == ref.day.description && $0.prayer == ref.prayer.rawValue && (includeDeleted || $0.deletedAt == nil) }.max { $0.updatedAt < $1.updatedAt }
     }
     public func day(_ day: GregorianDay, now: Date) throws -> PrayerDaySummary {
-        let start = try tracking(at: now).day
+        let start = try tracking(at: now).day, current = prayerDay(at: now)
         return .init(day: day, cells: Prayer.allCases.map { prayer in
             let ref = PrayerReference(day: day, prayer: prayer), occurrence = occurrence(ref), row = log(ref)
             let due = occurrence.map { $0.time <= now } ?? false
-            let status = row.flatMap { PrayerDisplayStatus(rawValue: $0.status) } ?? (due && day >= start ? .pending : .future)
+            let expiredPending = due && day.adding(days: pendingDays) <= current
+            let status = row.flatMap { PrayerDisplayStatus(rawValue: $0.status) } ?? (due && day >= start ? (expiredPending ? .unconfirmed : .pending) : .future)
             let zone = row.flatMap { TimeZone(identifier: $0.tzID) } ?? occurrence?.place.timeZone ?? home.timeZone
             var calendar = Calendar(identifier: .gregorian); calendar.timeZone = zone
             let friday = prayer == .dhuhr && calendar.component(.weekday, from: day.date(in: zone)) == 6 && row?.shortened != true
-            return PrayerCell(reference: ref, status: status, heart: row?.heart.flatMap(PrayerHeart.init(rawValue:)), time: occurrence == nil ? nil : row?.eventAt ?? occurrence?.time, shortened: row?.shortened == true, fridayKind: row?.fridayKind.flatMap(FridayPrayerKind.init(rawValue:)), pairID: row?.pairID, isFriday: friday, canLog: day >= start && (due || occurrence == nil), canMakeUp: due && (day >= start || qada(ref) != nil) && qada(ref)?.madeUpAt == nil)
+            let windowEnded = missedWindowEnd(ref).map { now >= $0 } ?? false
+            let canMarkMissed = day >= start && windowEnded
+            let debt = qada(ref)
+            return PrayerCell(reference: ref, status: status, heart: row?.heart.flatMap(PrayerHeart.init(rawValue:)), time: occurrence == nil ? nil : row?.eventAt ?? occurrence?.time, shortened: row?.shortened == true, fridayKind: row?.fridayKind.flatMap(FridayPrayerKind.init(rawValue:)), pairID: row?.pairID, isFriday: friday, canLog: day >= start && (due || occurrence == nil), canMarkMissed: canMarkMissed, canMakeUp: windowEnded && (day >= start || debt != nil) && debt?.madeUpAt == nil)
         })
     }
     public func defaultNight(at now: Date) -> GregorianDay {
@@ -93,13 +110,19 @@ import MadarData
         let month = all.filter { $0.day >= monthStart }
         let qada = qadaRows.filter { $0.deletedAt == nil }.compactMap { row -> PrayerQada? in
             guard let day = try? GregorianDay(row.originalDayKey), let prayer = Prayer(rawValue: row.prayer) else { return nil }
-            return .init(id: row.id, reference: .init(day: day, prayer: prayer), madeUpAt: row.madeUpAt)
+            let reference = PrayerReference(day: day, prayer: prayer)
+            let logRow = log(reference)
+            let zone = logRow.flatMap { TimeZone(identifier: $0.tzID) } ?? occurrence(reference)?.place.timeZone ?? home.timeZone
+            var calendar = Calendar(identifier: .gregorian); calendar.timeZone = zone
+            let isFriday = prayer == .dhuhr && calendar.component(.weekday, from: day.date(in: zone)) == 6
+            return .init(id: row.id, reference: reference, madeUpAt: row.madeUpAt, fridayKind: logRow?.fridayKind.flatMap(FridayPrayerKind.init(rawValue:)), isFriday: isFriday)
         }.sorted { $0.reference.naturalKey < $1.reference.naturalKey }
         let nights = nightRows.filter { $0.deletedAt == nil }.compactMap { row -> PrayerNight? in guard let day = try? GregorianDay(row.nightKey) else { return nil }; return .init(night: day, rakaat: row.rakaat, witr: row.witr, quranSessionID: row.quranSessionID) }.sorted { $0.night < $1.night }
         let cells = all.flatMap(\.cells)
         let next = (0...1).flatMap { offset in Prayer.allCases.compactMap { occurrence(.init(day: current.adding(days: offset), prayer: $0)) } }.filter { $0.time > now }.min { $0.time < $1.time }
         let active = activeTrip(at: now)
-        return .init(today: today, history: Array(all.suffix(32).reversed()), tracking: track, pending: cells.filter { $0.status == .pending }.map(\.reference), pendingHeart: cells.filter { [.jamaah, .alone, .qada].contains($0.status) && $0.heart == nil }.map(\.reference), statistics: PrayerAnalytics.statistics(month: month, all: all, qada: qada, currentDay: current), qada: qada, nights: nights, nightDefault: defaultNight(at: now), activeTrip: active, next: next, estimated: abs((active?.place ?? home).latitude) > 48, placeName: active?.city ?? placeName, hasTimes: today.cells.contains { $0.time != nil })
+        let unconfirmed = cells.filter { $0.status == .unconfirmed }
+        return .init(today: today, history: Array(all.suffix(32).reversed()), tracking: track, pending: cells.filter { $0.status == .pending }.map(\.reference), unconfirmed: unconfirmed.map(\.reference), unconfirmedFridayNoon: Set(unconfirmed.filter(\.isFriday).map(\.reference)), pendingHeart: cells.filter { [.jamaah, .alone, .qada].contains($0.status) && $0.heart == nil }.map(\.reference), statistics: PrayerAnalytics.statistics(month: month, all: all, qada: qada, currentDay: current), qada: qada, nights: nights, nightDefault: defaultNight(at: now), activeTrip: active, next: next, estimated: abs((active?.place ?? home).latitude) > 48, placeName: active?.city ?? placeName, hasTimes: today.cells.contains { $0.time != nil })
     }
 }
 public enum PrayerAnalytics {
@@ -112,7 +135,7 @@ public enum PrayerAnalytics {
             var count = 0
             for day in all.filter({ $0.day < currentDay }).sorted(by: { $0.day > $1.day }) {
                 if day.cells.contains(where: { [.missed, .qada].contains($0.status) }) { break }
-                let meaningful = day.cells.filter { ![.pending, .future, .unrecordedHistory].contains($0.status) }
+                let meaningful = day.cells.filter { ![.pending, .future, .unrecordedHistory, .unconfirmed, .excused].contains($0.status) }
                 if meaningful.count != 5 { continue }
                 if mosque && meaningful.contains(where: { $0.status != .jamaah }) { break }
                 count += 1

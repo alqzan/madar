@@ -416,7 +416,7 @@ private struct PrayerPairSheet: View {
     }
 }
 
-private struct PrayerQadaCitation: View {
+struct PrayerQadaCitation: View {
     @State private var index = 0
     private let citations = [
         ("مَنْ نَسِيَ صَلَاةً فَلْيُصَلِّ إِذَا ذَكَرَهَا، لَا كَفَّارَةَ لَهَا إِلَّا ذَلِكَ", "البخاري ٥٩٧، مسلم ٦٨٤"),

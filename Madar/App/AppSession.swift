@@ -70,13 +70,16 @@ final class AppSession {
         guard let group = groupDirectory ?? FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.alqzan.madar2") else { throw DataError.missingAppGroup }
         snapshotStore = SnapshotStore(directory: group.appending(path: "Snapshots", directoryHint: .isDirectory))
         pendingInbox = PendingInbox(directory: group.appending(path: "PendingInbox", directoryHint: .isDirectory))
-        commandAdapter = DurableCommandAdapter(containerProvider: { try managedStore?.containerForTransaction() ?? container }, lockDirectory: managedStore?.commandLockURL.deletingLastPathComponent() ?? group, generationProvider: {
+        commandAdapter = DurableCommandAdapter(containerProvider: { try managedStore?.containerForTransaction() ?? container }, lockDirectory: managedStore?.commandLockURL.deletingLastPathComponent() ?? group, transactionClock: { _ in prayerUITestClock(.now) }, generationProvider: {
             if let managedStore { return managedStore.binding.generationID }
             return try PendingInbox(directory: group.appending(path: "PendingInbox")).currentGeneration()?.generationID
         })
         bus = CommandBus(adapter: commandAdapter)
         schema = try SettingsSchema.bundled()
         store = SettingsStore(context: container.mainContext, schema: schema)
+        #if DEBUG
+        try preparePrayerUITestTrackingStart()
+        #endif
         try reload()
         let devices = try container.mainContext.fetch(FetchDescriptor<DeviceSetting>())
         onboardingComplete = devices.contains { $0.key == "sys.onboardingCompleted" && $0.valueJSON == Data("true".utf8) && $0.deletedAt == nil }
@@ -95,20 +98,54 @@ final class AppSession {
         _ = prayerRevision // Observation invalidates the derived view after a committed write.
         return try PrayerRepository(context: ModelContext(container)).snapshot(now: now)
     }
-    func recordPrayer(_ reference: PrayerReference, status: PrayerStoredStatus, fridayKind: FridayPrayerKind? = nil) {
-        guard [.jamaah, .alone].contains(status), !prayerWriteInProgress, beginWrite() else { return }
-        prayerWriteInProgress = true
-        Task {
-            defer { pendingWrites -= 1; prayerWriteInProgress = false }
-            let payload: MadarCore.JSONValue = .object([
-                "dayKey": .string(reference.day.description),
-                "prayer": .string(reference.prayer.rawValue),
-                "status": .string(status.rawValue),
-                "fridayKind": fridayKind.map { .string($0.rawValue) } ?? .null
+    func prayerNow(_ fallback: Date = .now) -> Date {
+        prayerUITestClock(fallback)
+    }
+    func recordPrayer(_ reference: PrayerReference, status: PrayerStoredStatus, fridayKind: FridayPrayerKind? = nil, completion: ((Bool) -> Void)? = nil) {
+        guard [.jamaah, .alone, .missed].contains(status) else { completion?(false); return }
+        let payload: MadarCore.JSONValue = .object([
+            "dayKey": .string(reference.day.description),
+            "prayer": .string(reference.prayer.rawValue),
+            "status": .string(status.rawValue),
+            "fridayKind": fridayKind.map { .string($0.rawValue) } ?? .null
+        ])
+        sendPrayerCommand(name: "prayer.log", payload: payload,
+            undoMessage: status == .missed ? "سُجّلت فائتة · التراجع متاح لعشر دقائق" : "سُجّلت الصلاة · التراجع متاح لعشر دقائق", completion: completion)
+    }
+    func makeUpPrayer(_ reference: PrayerReference, fridayKind: FridayPrayerKind? = nil) {
+        let at = prayerNow()
+        let formatter = ISO8601DateFormatter(); formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let payload: MadarCore.JSONValue = .object([
+            "dayKey": .string(reference.day.description),
+            "prayer": .string(reference.prayer.rawValue),
+            "at": .string(formatter.string(from: at)),
+            "fridayKind": fridayKind.map { .string($0.rawValue) } ?? .null
+        ])
+        sendPrayerCommand(name: "prayer.makeUp", payload: payload, undoMessage: "قُضيت الصلاة · التراجع متاح لعشر دقائق")
+    }
+    func resolvePrayerGap(_ resolutions: [PrayerGapResolution]) {
+        guard !resolutions.isEmpty else { return }
+        let values = resolutions.map { item in
+            MadarCore.JSONValue.object([
+                "dayKey": .string(item.reference.day.description),
+                "prayer": .string(item.reference.prayer.rawValue),
+                "status": .string(item.status.rawValue),
+                "fridayKind": item.fridayKind.map { .string($0.rawValue) } ?? .null
             ])
+        }
+        sendPrayerCommand(name: "prayer.resolveGap", payload: .object(["resolutions": .array(values)]),
+            undoMessage: "حُلّت الفترة · التراجع متاح لعشر دقائق")
+    }
+    private func sendPrayerCommand(name: String, payload: MadarCore.JSONValue, undoMessage: String, completion: ((Bool) -> Void)? = nil) {
+        guard !prayerWriteInProgress, beginWrite() else { completion?(false); return }
+        prayerWriteInProgress = true
+        let now = prayerNow()
+        Task {
+            var succeeded = false
+            defer { pendingWrites -= 1; prayerWriteInProgress = false; completion?(succeeded) }
             do {
-                let command = CommandEnvelope(name: "prayer.log", payload: payload, source: .app)
-                let result = try await bus.execute(command)
+                let command = CommandEnvelope(name: name, payload: payload, source: .app, issuedAt: now)
+                let result = try await bus.execute(command, now: now)
                 guard result.status == .applied || result.status == .duplicate else {
                     errorMessage = prayerFailure(result.reason)
                     return
@@ -118,25 +155,38 @@ final class AppSession {
                     let context = ModelContext(container)
                     if let receipt = try context.fetch(FetchDescriptor<MadarData.CommandReceipt>()).first(where: { $0.commandID == id }),
                        let deadline = receipt.undoExpiresAt {
-                        showUndo(AppUndoToken(id: id, expiresAt: deadline), message: "سُجّلت الصلاة · التراجع متاح لعشر دقائق")
+                        showUndo(AppUndoToken(id: id, expiresAt: deadline), message: undoMessage)
                     }
                 }
                 try publishSnapshot()
                 WidgetCenter.shared.reloadAllTimelines()
+                succeeded = true
             } catch {
-                errorMessage = "لم تُسجّل الصلاة. \(error.localizedDescription)"
+                errorMessage = "لم يُسجّل التغيير. \(error.localizedDescription)"
             }
         }
     }
     private func prayerFailure(_ reason: String?) -> String {
         switch reason {
         case "futurePrayer": "لم يحن وقت الصلاة بعد."
+        case "prayerWindowOpen": "لم ينته وقت الصلاة بعد؛ يمكنك تسجيلها عند انتهائه."
+        case "unavailablePrayerTimes": "لا تتوفر مواقيت مؤكدة لهذا الفرض."
         case "beforeTrackingStart": "هذا اليوم يسبق بداية التسجيل."
         case "explicitRestoreRequired": "يتطلب هذا السجل استعادة صريحة."
         case "invalidRecord": "نوع الجمعة متاح لظهر الجمعة فقط."
         default: "لم تُسجّل الصلاة. حاول مرة أخرى."
         }
     }
+    #if DEBUG
+    private func preparePrayerUITestTrackingStart() throws {
+        guard let raw = ProcessInfo.processInfo.environment["MADAR_UI_TRACKING_START"],
+              let day = try? GregorianDay(raw) else { return }
+        let context = ModelContext(container)
+        let testStore = SettingsStore(context: context, schema: schema)
+        try testStore.prepare(.object(["dayKey": .string(day.description), "edits": .number(0)]), for: "salah.trackingStart")
+        try context.save()
+    }
+    #endif
     func string(_ key: String) -> String { if case .string(let v) = values[key] { v } else { "" } }
     func bool(_ key: String) -> Bool { if case .bool(let v) = values[key] { v } else { false } }
     func number(_ key: String) -> Double { if case .number(let v) = values[key] { v } else { 0 } }
@@ -324,4 +374,16 @@ final class AppSession {
         let snapshot = SnapshotEnvelope(name: "foundation", generatedAt: instant, validUntil: instant.addingTimeInterval(3600), dayKey: key.dayKey, tzID: place.timeZoneID, privacy: SnapshotPrivacy(), payload: FoundationSnapshot(firstCalendar: string("core.firstCalendar"), numerals: string("core.numerals")))
         try snapshotStore.write(snapshot)
     }
+}
+
+private func prayerUITestClock(_ fallback: Date) -> Date {
+    #if DEBUG
+    if let raw = ProcessInfo.processInfo.environment["MADAR_UI_NOW"] {
+        let formatter = ISO8601DateFormatter()
+        if let value = formatter.date(from: raw) { return value }
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let value = formatter.date(from: raw) { return value }
+    }
+    #endif
+    return fallback
 }

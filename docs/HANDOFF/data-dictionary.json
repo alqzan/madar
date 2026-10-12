@@ -639,7 +639,8 @@
       "alone",
       "qada",
       "missed",
-      "unrecordedHistory"
+      "unrecordedHistory",
+      "excused"
      ]
     },
     {
@@ -5331,10 +5332,9 @@
     "auth": "blindWrite"
    },
    "prayer.makeUp": {
-    "intent": "MakeUpPrayer",
-    "payload": "{prayer, dayKey, at}",
-    "kind": "upsert QadaItem (prayer, dayKey).madeUpAt + PrayerLog.status = qada, one transaction",
-    "auth": "blindWrite"
+    "payload": "{prayer, dayKey, at: ISO 8601, fridayKind?}",
+    "kind": "upsert QadaItem (prayer, dayKey).madeUpAt + PrayerLog.status = qada, one transaction; optional fridayKind preserves the explicit Friday classification",
+    "auth": "app"
    },
    "prayer.agePending": {
     "intent": "AgePendingPrayers",
@@ -5418,6 +5418,11 @@
     "payload": "{undoToken}",
     "kind": "applies CommandReceipt.undoJSON within 10 min",
     "auth": "same as the original command"
+   },
+   "prayer.resolveGap": {
+    "payload": "{resolutions:[{dayKey, prayer, status: jamaah|alone|missed|unrecordedHistory|excused, fridayKind?}]}",
+    "kind": "one transaction upsert of the selected PrayerLog rows and matching QadaItems; one inverse restores the whole gap",
+    "auth": "app"
    }
   },
   "undoPolicy": {
