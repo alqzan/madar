@@ -66,6 +66,26 @@ import XCTest
         XCTAssertGreaterThan(ax5, ax3, "The preview heading must keep growing through AX5.")
     }
 
+    func test_M0T12_SettingsLightSystemAccessibilityAuditDiagnostic() throws {
+        continueAfterFailure = true
+        let app = XCUIApplication()
+        // Audit Settings directly: neither a previous Home audit nor a forced
+        // content size may influence this isolated system-size reproduction.
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_THEME": "light"]
+        app.launch(); finishOnboarding(app)
+        defer { app.terminate() }
+        try exposeForAudit(app.buttons["settings-button"], in: app)
+        app.buttons["settings-button"].tap()
+        try exposeForAudit(app.textFields["settings-search"], in: app)
+
+        let hierarchy = XCTAttachment(string: app.debugDescription)
+        hierarchy.name = "M0-T12-settings-light-system-before-audit-hierarchy"
+        hierarchy.lifetime = .keepAlways
+        add(hierarchy)
+        attachScreenshot(app, named: "M0-T12-settings-light-system-before-audit")
+        try auditWithoutSuppression(app, scope: "settings light isolated system")
+    }
+
     func test_M0T12_FoundationAndSettingsAccessibilityAudit() throws {
         continueAfterFailure = true
         for theme in ["light", "dark"] {
@@ -539,7 +559,7 @@ import XCTest
     }
     private func auditWithoutSuppression(_ app: XCUIApplication, scope: String) throws {
         print("M0 native accessibility scope=\(scope), viewport=\(auditViewport(in: app))")
-        try app.performAccessibilityAudit { issue in
+        try app.performAccessibilityAudit(for: .all) { issue in
             let frame = issue.element?.frame
             let fullyVisible = frame.map { self.auditViewport(in: app).contains($0) }
             print("M0 audit issue: \(issue.compactDescription); detail=\(issue.detailedDescription); frame=\(String(describing: frame)); fullyVisible=\(String(describing: fullyVisible)); element=\(String(describing: issue.element))")
