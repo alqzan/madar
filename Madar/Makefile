@@ -1,6 +1,8 @@
 SIMULATOR ?= 412F4437-7BD7-44D1-AA3D-2B7158090E14
-.PHONY: generate build preview test test-ios test-links
-generate:
+.PHONY: fonts generate build preview test test-ios test-links
+fonts:
+	python3 scripts/prepare-workspace.py
+generate: fonts
 	xcodegen generate
 build: generate
 	xcodebuild -project Madar.xcodeproj -scheme Madar -destination 'generic/platform=iOS Simulator' -derivedDataPath DerivedData CODE_SIGNING_ALLOWED=NO build
