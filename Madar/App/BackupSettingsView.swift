@@ -224,7 +224,7 @@ struct BackupSettingsView: View {
             .confirmationDialog(model.restoreMode == .replace ? "استبدل بيانات مدار بهذه النسخة؟" : "ادمج النسخة مع بيانات مدار؟", isPresented: $confirmingRestore, titleVisibility: .visible) {
                 Button(model.restoreMode == .replace ? "استبدل بعد نسخة أمان" : "ادمج النسخة", role: model.restoreMode == .replace ? .destructive : nil, action: model.restore)
             } message: {
-                Text((model.restoreMode == .replace ? "سيتغيّر هذا على كل أجهزتك. تُحفظ نسخة أمان أولًا، وتُحذف السجلات غير الموجودة في النسخة حذفًا قابلًا للاسترجاع الصريح." : "تُدمج السجلات حسب هوياتها، ولا يعيد الدمج سجلًّا محذوفًا إلا باسترجاع صريح.") + (model.status?.keyConfigured == false ? " كلمة مرور النسخة المختارة ستحمي نسخة الأمان والنسخ التلقائي على هذا الجهاز." : ""))
+                Text(BackupCopy.restoreConfirmation(mode: model.restoreMode, keyConfigured: model.status?.keyConfigured != false))
             }
             .alert("لم يكتمل الإجراء", isPresented: Binding(get: { model.errorMessage != nil }, set: { if !$0 { model.errorMessage = nil } })) { Button("حسنًا") { model.errorMessage = nil } } message: { Text(model.errorMessage ?? "") }
     }
@@ -276,7 +276,7 @@ struct BackupSettingsView: View {
             Text("دمج").tag(BackupUIRestoreMode.merge)
             Text("استبدال").tag(BackupUIRestoreMode.replace)
         }.pickerStyle(.segmented).disabled(model.busy).accessibilityIdentifier("restore-mode")
-        Text(model.restoreMode == .replace ? "سيتغيّر هذا على كل أجهزتك." : "تبقى السجلات الحالية، وتُصالح معها النسخة.").font(MadarTypography.caption())
+        Text(model.restoreMode == .replace ? "سيُستبدل محتوى مدار على هذا الجهاز." : "تبقى السجلات الحالية، وتُصالح معها النسخة.").font(MadarTypography.caption())
         Button("استعد النسخة") { confirmingRestore = true }.disabled(model.busy).accessibilityIdentifier("restore-confirm")
     }
     private func digits(_ number: Int) -> String { MadarNumberFormatter(style: numerals).string(number) }
