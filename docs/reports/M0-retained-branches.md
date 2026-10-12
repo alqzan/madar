@@ -4,7 +4,7 @@ Snapshot: 12 October 2026, after reviewed native refusal/full-card/systemAX3 acc
 
 ## Active candidates
 
-- T09: `codex/m0-p1b-fixes` — repaired source; actual AX3 success/cancellation are partial evidence. Preserve T14 copy during eventual integration.
+- Active T09: `codex/m0-t09-system-ax3-navigation`70939f5 — selected repaired candidate/current m0-p1b-fixes worktree; reviewed bounded native refusal/full-card/systemAX3 acceptance. Full section/curated integration remains open; preserve T14/T15. `codex/m0-p1b-fixes`d28c8dc is retained green history, not the latest test candidate.
 - Top T09 SDK split: `codex/m0-t09-switcher-sdk-repair` b7cd5d1 — source-approved and native full-card L/light acceptance passed1/0, independent Top approve; preserve bounded evidence.
 - T09 refusal: `codex/m0-t09-native-refusal` fa54e5d — real nonmatch/user-cancel/empty-output/fresh retry atL/light1/0 plus independentTopapprove; otherT09acceptance remains.
 - T09 switcher variants: `codex/m0-t09-switcher-variants`07d2ada — native AX3/app-SwiftUI-light and L/dark full-card1/0 each, independentTopapprove; system-wide content category remains separate.
