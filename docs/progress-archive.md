@@ -105,6 +105,16 @@ Branches/worktrees: `codex/m0-p1b-fixes` 173fe0c `/Users/abdulrahman/.codex/work
 Next: T12 evidence, T09 native acceptance, remaining manual trace/physical gate; no M1 until an approved M0 report.
 Next session: Standard GPT-6.1 Sol high for production; independent GPT-6.1 Sol xhigh for any Top review/gate.
 
+## Handover — T14 accepted; T06 source trace advanced — 2026-10-12 — codex (Sol)
+
+Done: Corrected the local-only restore replacement warning in both preview and confirmation; integrated `d28c36a` after an independent Standard section review approved with no findings. T06 reports on `m0-s3-font-license-evidence` now map 318/420 raw inventory locations (136 explicitly deferred, 102 remain). M0 remains NOT APPROVED; no M1.
+Verified: Focused Xcode host test `test_fixPrevious_M0S2_RA1_RestoreReplaceWarningIsLocalOnly` — 1 test, 0 failures, **TEST SUCCEEDED** (`/tmp/madar-ra1-restore-copy.log`; result bundle `/tmp/madar-ra1-restore-copy.xcresult`). `git diff --check` passed. Source hashes match T11 for traced files. Reused existing broad app22/package125 evidence; no full suite or doc-only product tests repeated.
+Not verified: Native UI after this copy change, P1b OS-authenticated share/refusal and switcher/two-scene, T12 actionable contrast, spoken VoiceOver/Reduce Motion, Files destination, physical owner-iPhone/protected data/owner store, 102 remaining source locations, and official Thmanyah download origin.
+For the next agent: `docs/reports/M0.md` stays NOT APPROVED. Mac UI was locked and no Simulator.app was available; do not repeat equivalent manual UI attempts until access changes. Ask the owner to confirm whether the supplied Thmanyah archive was originally downloaded from `font.thmanyah.com` before making a distribution decision. Continue T09 native acceptance and T12 contrast when UI is available; source tracing may continue independently.
+Branches/worktrees: `m0-s2-backup-local-only-copy` `d4a869d` is integrated as `d28c36a`; keep its branch as history. `m0-s3-font-license-evidence` is an unmerged documentation/evidence candidate, now advanced beyond this handover; see the newer handover above. Other retained privacy/accessibility/historical branches and worktrees have unchanged dispositions; preserve them and do not merge failed/superseded ancestors wholesale.
+Next: Resume T09 native auth/share and T12 contrast when UI unlocks; otherwise continue bounded T06 source dispositions. Resolve official font-source confirmation and mandatory owner-iPhone gate before any M0 approval. Usage reading: 7% five-hour used at final checkpoint; the requested 3–5% remaining margin was not reached. No reset credits used; no quota-consuming work was added artificially.
+Next session: Standard GPT-6.1 Sol high for production; independent GPT-6.1 Sol xhigh for required Top review/gate. Keep main clean.
+
 ## Handover — M0-T06 supplied font-license evidence — 2026-10-12 — codex (Sol)
 
 Done: Found the owner-provided `Thmanyah-Font-Family.zip`. Candidate `m0-s3-font-license-evidence` at `8ccd9fd` retains both package license PDFs, records their hashes and the archive hash in font provenance, and confirms all eight app OTF hashes match the package. M0 remains NOT APPROVED; no M1 starts.
