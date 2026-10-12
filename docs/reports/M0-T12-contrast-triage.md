@@ -50,3 +50,5 @@ M0-T15 helper validated all11 font/license inputs and copied only the missing pi
 Result: the font copy, preview linking and codesigning passed; XCTest ran the isolated Settings audit. The unsuppressed callback remains `Contrast failed for SwiftUI.AccessibilityNode; frame=nil; fullyVisible=nil; element=nil`. `Executed 1 test, with 1 failure ... in 13.339 seconds`; command exit65 is now an audit failure, not the prior build blocker. Device: iPhone17Pro/iOS26.5 simulator; system Dynamic Type was unchanged and is not proven L. No second attempt or product color/audit-suppression change.
 
 Acceptance disposition: workspace resource/build blockage resolved for this run; T12 remains needs-fix because contrast target/pair is unidentified. Obtain an actionable platform trace; do not repeat this unchanged diagnostic or call it an accepted accessibility result. Owner-device, VoiceOver/Reduce Motion and whole M0 gate remain separate.
+
+Durable local copy: `Madar/Artifacts/workflow-repair-2026-10-12/madar-t12-preflight-top.log`, matching `.xcresult` and `madar-t12-preflight-top-attachments/`. Preserved outside `/tmp`, ignored by Git; this adds no new test execution.
