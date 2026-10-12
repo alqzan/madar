@@ -48,6 +48,8 @@ Checked 2c476bc..429aa54 — T09 AX3 interruption test remains green from `65e88
 
 Production tasks start after M0-T01. Separate agents own separate sections/files. No agent may switch this shared checkout's branch while another runs. Use separate managed worktrees for parallel production after a curated baseline exists. Read-only/design jobs may share the checkout. Do not broadly stage `output/`, `tmp/`, generated build products or user data.
 
+| M0-S3 Workspace preparation | building | M0-T15 in-progress (Standard high; Top T12 diagnosis separate) | codex workflow repair | Check all UIAppFonts and provenance hashes before building; explicit local-source preparation copies only missing validated resources, never overwrites conflicts. Fix stale startup/handover links, retain history and branch/worktree dispositions. Acceptance: focused missing/corrupt-resource regressions, main and isolated-worktree hash checks; T12 native audit and whole M0 gate remain separate. Read AGENTS §5a/§7, font-provenance.json and T12 triage. No font download/publication, user-data change or candidate merge. |
+
 # Later
 
 - RU3 fix committed a4b3a4a; targeted hosted/UI evidence and review in docs/reviews/M0-RU3-plurals.md. No new plural implementation is pending.
