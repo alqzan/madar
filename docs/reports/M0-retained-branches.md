@@ -1,10 +1,11 @@
 # M0 retained branches and worktrees
 
-Snapshot: 12 October 2026, after reviewed M0-T15 integration. Current git refs, not old handover tips. No pre-existing branch/worktree was deleted. See PROGRESS for the next acceptance; historical branches are not a queue of new reviews.
+Snapshot: 12 October 2026, after T09 native acceptance slices and Top SDK split. Current git refs, not old handover tips. No pre-existing branch/worktree was deleted. See PROGRESS for the next acceptance; historical branches are not a queue of new reviews.
 
 ## Active candidates
 
 - T09: `codex/m0-p1b-fixes` — repaired source; actual AX3 success/cancellation are partial evidence. Preserve T14 copy during eventual integration.
+- Top T09 SDK split: `codex/m0-t09-switcher-sdk-repair` b7cd5d1 — source-approved, native NOT TESTED; next selected runtime.
 - T12: `codex/m0-t12-audit-triage` — prepared resources, executed diagnostic, contrast remains unresolved.
 - All other non-merged refs below retain historical/source/review evidence; do not merge them wholesale.
 
@@ -19,11 +20,12 @@ Snapshot: 12 October 2026, after reviewed M0-T15 integration. Current git refs, 
 | `codex/m0-export-privacy` | `2ea40ff` | P1b predecessor; continue only from repaired candidate after native acceptance. |
 | `codex/m0-gate-readiness` | `7169fab` | Report candidate; reconcile against current M0 report before copying any docs. |
 | `codex/m0-p1a-terminal-review` | `3a2bf6b` | Review evidence; preserve, no production merge. |
-| `codex/m0-p1b-fixes` | `bbc1492` | Active T09 at native auth/cancellation and retirement matrix/lease-expiry partial acceptance; finish remaining privacy flows and section review before merge. |
+| `codex/m0-p1b-fixes` | `d28c8dc` | Active T09 at native auth/cancellation and retirement matrix/lease-expiry partial acceptance; finish remaining privacy flows and section review before merge. |
 | `codex/m0-p1b-rereview` | `8876626` | Fix-only Top review evidence for the candidate; no code merge. |
 | `codex/m0-p1b-top-review` | `38d4fec` | Review evidence; preserve, no production merge. |
 | `codex/m0-privacy-host` | `48a3fe4` | Old integration has three High findings; do not merge. |
 | `codex/m0-source-checks-fix-review` | `ffc8e97` | Older source-check review evidence; current T11 is integrated, preserve only. |
+| `codex/m0-t09-switcher-sdk-repair` | `b7cd5d1` | Top SDK-only test fix, independent source approval; next single native switcher run before any acceptance. |
 | `codex/m0-t12-audit-triage` | `bfa878b` | Active diagnostic; fonts validated/build passes, .all contrast still fails; do not merge as a repair. |
 | `m0-fix-previous-plurals` | `cede9ee` | Older RU3 history; equivalent accepted fix is already on main, do not merge again. |
 | `m0-fix-previous-prayer` | `9e4e6f9` | Historical fix branch; preserve, no merge without a new scoped defect. |
@@ -49,7 +51,7 @@ Snapshot: 12 October 2026, after reviewed M0-T15 integration. Current git refs, 
 | `/Users/abdulrahman/.codex/worktrees/m0-foundation-times/بناء مدار 2.0` | `codex/m0-source-checks-terminal-review` @ `a399b1f` | Preserve evidence; use current PROGRESS card before any merge. |
 | `/Users/abdulrahman/.codex/worktrees/m0-gate-report/بناء مدار 2.0` | `codex/m0-gate-readiness` @ `7169fab` | Preserve evidence; use current PROGRESS card before any merge. |
 | `/Users/abdulrahman/.codex/worktrees/m0-local-data/بناء مدار 2.0` | `m0-s1-money-models` @ `dad332e` | Preserve evidence; use current PROGRESS card before any merge. |
-| `/Users/abdulrahman/.codex/worktrees/m0-p1b-fixes/بناء مدار 2.0` | `codex/m0-p1b-fixes` @ `bbc1492` | Active T09 candidate; repaired guards and native AX3 partial acceptance, complete remaining section acceptance before curated merge. |
+| `/Users/abdulrahman/.codex/worktrees/m0-p1b-fixes/بناء مدار 2.0` | `codex/m0-t09-switcher-sdk-repair` @ `b7cd5d1` | Active Top SDK-only switcher split; native not tested. Green T09 branch d28c8dc retained without worktree; section acceptance still open. |
 | `/Users/abdulrahman/.codex/worktrees/m0-p1b-rereview/بناء مدار 2.0` | `codex/m0-p1b-rereview` @ `8876626` | Preserve evidence; use current PROGRESS card before any merge. |
 | `/Users/abdulrahman/.codex/worktrees/m0-plain-export/بناء مدار 2.0` | `m0-s1-plain-export` @ `69b0698` | Preserve evidence; use current PROGRESS card before any merge. |
 | `/Users/abdulrahman/.codex/worktrees/m0-presentation-privacy/بناء مدار 2.0` | `codex/m0-export-privacy` @ `2ea40ff` | Preserve evidence; use current PROGRESS card before any merge. |
