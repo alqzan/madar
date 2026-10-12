@@ -33,6 +33,8 @@
 	<false/>
 	<key>NSFaceIDUsageDescription</key>
 	<string>افتح بيانات مدار المحمية بمصادقة الجهاز.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>UIAppFonts</key>
 	<array>
 		<string>thmanyahsans-Light.otf</string>

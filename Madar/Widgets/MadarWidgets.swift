@@ -1,5 +1,6 @@
 import SwiftUI
 import WidgetKit
+import ActivityKit
 import MadarSnapshots
 
 private struct FoundationEntry: TimelineEntry {
@@ -35,5 +36,47 @@ private struct FoundationWidget: Widget {
     }
 }
 @main struct MadarWidgetBundle: WidgetBundle {
-    var body: some Widget { FoundationWidget() }
+    var body: some Widget {
+        FoundationWidget()
+        PrayerCountdownActivityWidget()
+    }
+}
+
+private struct PrayerCountdownActivityWidget: Widget {
+    var body: some WidgetConfiguration {
+        ActivityConfiguration(for: PrayerCountdownAttributes.self) { context in
+            HStack(spacing: 12) {
+                Image(systemName: "moon.stars").font(.title2).accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("الصلاة القادمة").font(.caption)
+                    Text(context.state.prayerName).font(.headline)
+                }
+                Spacer(minLength: 8)
+                Text(context.state.prayerAt, style: .timer).monospacedDigit().font(.body)
+            }
+            .environment(\.layoutDirection, .rightToLeft)
+            .padding()
+            .activityBackgroundTint(.black.opacity(0.92))
+            .activitySystemActionForegroundColor(.white)
+        } dynamicIsland: { context in
+            DynamicIsland {
+                DynamicIslandExpandedRegion(.center) {
+                    HStack {
+                        Text(context.state.prayerName).font(.headline)
+                        Spacer()
+                        Text(context.state.prayerAt, style: .timer).monospacedDigit()
+                    }
+                    .environment(\.layoutDirection, .rightToLeft)
+                }
+            } compactLeading: {
+                Image(systemName: "moon.stars")
+            } compactTrailing: {
+                Text(context.state.prayerAt, style: .timer).monospacedDigit()
+            } minimal: {
+                Image(systemName: "moon.stars")
+            }
+            .widgetURL(URL(string: "madar://prayer"))
+            .keylineTint(.teal)
+        }
+    }
 }

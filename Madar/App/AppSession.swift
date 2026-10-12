@@ -20,11 +20,17 @@ final class AppSession {
     let snapshotStore: SnapshotStore
     private(set) var maintenanceInProgress = false
     private var pendingWrites = 0
+    private var notificationStoreAccessSuspended = false
     var backupService: (any BackupUIService)?
     var syncService: (any SyncUIService)?
     var lockController: MadarLockController?
     weak var privacyPresenter: ScenePrivacyPresenter?
     private(set) var protectedDataAuthorized = false
+    private(set) var notificationAuthorization = "unknown"
+#if DEBUG
+    var notificationTestResult = ""
+#endif
+    @ObservationIgnored weak var prayerNotifications: PrayerNotificationCoordinator?
     let schema: SettingsSchema
     var store: SettingsStore
     private(set) var values: [String: JSONValue] = [:]
@@ -62,7 +68,7 @@ final class AppSession {
     })
     private var expiryTask: Task<Void, Never>?
 
-    static let supportedKeys = ["core.dayStart", "core.firstCalendar", "core.hijriSource", "core.hijriOffset", "core.weekStart", "core.theme", "core.numerals", "core.homeCity", "core.faceIDLock"]
+    static let supportedKeys = ["core.dayStart", "core.firstCalendar", "core.hijriSource", "core.hijriOffset", "core.weekStart", "core.theme", "core.numerals", "core.homeCity", "core.faceIDLock", "salah.askAfterAdhanMin", "salah.askReminder", "salah.liveActivity", "notif.thisDeviceReminders", "notif.quietAfterIsha", "notif.quietFrom"]
 
     init(container: ModelContainer, managedStore: ManagedDataStore? = nil, groupDirectory: URL? = nil) throws {
         self.container = container
@@ -99,7 +105,7 @@ final class AppSession {
         return try PrayerRepository(context: ModelContext(container)).snapshot(now: now)
     }
     func prayerNow(_ fallback: Date = .now) -> Date {
-        prayerUITestClock(fallback)
+        return prayerUITestClock(fallback)
     }
     func recordPrayer(_ reference: PrayerReference, status: PrayerStoredStatus, fridayKind: FridayPrayerKind? = nil, completion: ((Bool) -> Void)? = nil) {
         guard [.jamaah, .alone, .missed].contains(status) else { completion?(false); return }
@@ -144,23 +150,25 @@ final class AppSession {
             var succeeded = false
             defer { pendingWrites -= 1; prayerWriteInProgress = false; completion?(succeeded) }
             do {
-                let command = CommandEnvelope(name: name, payload: payload, source: .app, issuedAt: now)
-                let result = try await bus.execute(command, now: now)
-                guard result.status == .applied || result.status == .duplicate else {
-                    errorMessage = prayerFailure(result.reason)
-                    return
-                }
-                try reload()
-                if let id = result.undoToken {
-                    let context = ModelContext(container)
-                    if let receipt = try context.fetch(FetchDescriptor<MadarData.CommandReceipt>()).first(where: { $0.commandID == id }),
-                       let deadline = receipt.undoExpiresAt {
-                        showUndo(AppUndoToken(id: id, expiresAt: deadline), message: undoMessage)
+                succeeded = try await withSerializedPrayerNotificationMutation {
+                    let command = CommandEnvelope(name: name, payload: payload, source: .app, issuedAt: now)
+                    let result = try await bus.execute(command, now: now)
+                    guard result.status == .applied || result.status == .duplicate else {
+                        errorMessage = prayerFailure(result.reason)
+                        return false
                     }
+                    try reload()
+                    if let id = result.undoToken {
+                        let context = ModelContext(container)
+                        if let receipt = try context.fetch(FetchDescriptor<MadarData.CommandReceipt>()).first(where: { $0.commandID == id }),
+                           let deadline = receipt.undoExpiresAt {
+                            showUndo(AppUndoToken(id: id, expiresAt: deadline), message: undoMessage)
+                        }
+                    }
+                    try publishSnapshot()
+                    WidgetCenter.shared.reloadAllTimelines()
+                    return true
                 }
-                try publishSnapshot()
-                WidgetCenter.shared.reloadAllTimelines()
-                succeeded = true
             } catch {
                 errorMessage = "لم يُسجّل التغيير. \(error.localizedDescription)"
             }
@@ -258,10 +266,12 @@ final class AppSession {
         Task {
             defer { pendingWrites -= 1 }
             do {
-                let result = try await bus.execute(CommandEnvelope(name: "system.undo", payload: .object(["undoToken": .string(token.id.uuidString)])))
-                guard result.status == .applied else { throw DataError.undoExpired }
-                try reload(); undoToken = nil; expiryTask?.cancel(); try publishSnapshot()
-                WidgetCenter.shared.reloadAllTimelines()
+                try await withSerializedPrayerNotificationMutation {
+                    let result = try await bus.execute(CommandEnvelope(name: "system.undo", payload: .object(["undoToken": .string(token.id.uuidString)])))
+                    guard result.status == .applied else { throw DataError.undoExpired }
+                    try reload(); undoToken = nil; expiryTask?.cancel(); try publishSnapshot()
+                    WidgetCenter.shared.reloadAllTimelines()
+                }
             } catch { errorMessage = "لم يكتمل التراجع. \(error.localizedDescription)" }
         }
     }
@@ -270,20 +280,23 @@ final class AppSession {
         Task {
             defer { pendingWrites -= 1 }
             do {
-                let encoder = JSONEncoder()
-                let typed = try values.mapValues { try JSONDecoder().decode(MadarCore.JSONValue.self, from: encoder.encode($0)) }
-                let command = CommandEnvelope(name: name, payload: .object(["settings": .object(typed)]))
-                let result = try await bus.execute(command)
-                guard result.status == .applied || result.status == .duplicate else { throw DataError.invalidValue(result.reason ?? "command") }
-                try reload()
-                if let id = result.undoToken {
-                    let context = ModelContext(container)
-                    if let receipt = try context.fetch(FetchDescriptor<MadarData.CommandReceipt>()).first(where: { $0.commandID == id }), let deadline = receipt.undoExpiresAt {
-                        showUndo(AppUndoToken(id: id, expiresAt: deadline), message: message)
+                try await withSerializedPrayerNotificationMutation {
+                    let encoder = JSONEncoder()
+                    let typed = try values.mapValues { try JSONDecoder().decode(MadarCore.JSONValue.self, from: encoder.encode($0)) }
+                    let command = CommandEnvelope(name: name, payload: .object(["settings": .object(typed)]))
+                    let result = try await bus.execute(command)
+                    guard result.status == .applied || result.status == .duplicate else { throw DataError.invalidValue(result.reason ?? "command") }
+                    try reload()
+                    if let id = result.undoToken {
+                        let context = ModelContext(container)
+                        if let receipt = try context.fetch(FetchDescriptor<MadarData.CommandReceipt>()).first(where: { $0.commandID == id }), let deadline = receipt.undoExpiresAt {
+                            showUndo(AppUndoToken(id: id, expiresAt: deadline), message: message)
+                        }
                     }
+                    try publishSnapshot()
+                    WidgetCenter.shared.reloadAllTimelines()
                 }
-                try publishSnapshot()
-                WidgetCenter.shared.reloadAllTimelines(); completion?()
+                completion?()
             } catch { errorMessage = "لم يُحفظ التعديل. \(error.localizedDescription)" }
         }
     }
@@ -296,25 +309,47 @@ final class AppSession {
     func quiesceWriters() async throws {
         guard !maintenanceInProgress else { throw BackupOperationError.busy }
         maintenanceInProgress = true
+        notificationStoreAccessSuspended = true
         while pendingWrites > 0 { await Task.yield() }
     }
     func resumeWriters() {
         maintenanceInProgress = false
         Task {
-            do { try await drainInbox() }
-            catch { errorMessage = "لم يكتمل تحديث البيانات. \(error.localizedDescription)" }
+            do {
+                guard try await drainInbox() else { return }
+            } catch { errorMessage = "لم يكتمل تحديث البيانات. \(error.localizedDescription)" }
         }
     }
+    func beginNotificationStoreAccess() -> Bool {
+        guard notificationStoreAccessAvailable else { return false }
+        pendingWrites += 1
+        return true
+    }
+    func endNotificationStoreAccess() {
+        pendingWrites = max(0, pendingWrites - 1)
+    }
+    var notificationStoreAccessAvailable: Bool {
+        !maintenanceInProgress && !notificationStoreAccessSuspended
+    }
     /// Count the drain as an app writer so export/restore can quiesce it cooperatively.
-    func drainInbox() async throws {
-        guard !maintenanceInProgress, !inboxDrainer.isDraining else { return }
+    @discardableResult
+    func drainInbox() async throws -> Bool {
+        guard !maintenanceInProgress, !inboxDrainer.isDraining else { return false }
         pendingWrites += 1; defer { pendingWrites -= 1 }
-        try await inboxDrainer.drain()
-        // A malformed/quarantined record may have an unreadable identity: keep all receipts.
-        let pinned: Set<UUID>
-        do { pinned = try pendingInbox.unacknowledgedCommandIDs() }
-        catch InboxError.malformedRecord { return }
-        try commandAdapter.purgeExpiredReceipts(pinnedIDs: pinned)
+        let drained = try await withSerializedPrayerNotificationMutation(shouldRefresh: { $0 }) {
+            guard try await inboxDrainer.drain() else { return false }
+            // A malformed/quarantined record may have an unreadable identity: keep all receipts.
+            let pinned: Set<UUID>
+            do { pinned = try pendingInbox.unacknowledgedCommandIDs() }
+            catch InboxError.malformedRecord { return true }
+            try commandAdapter.purgeExpiredReceipts(pinnedIDs: pinned)
+            return true
+        }
+        if drained && notificationStoreAccessSuspended && !maintenanceInProgress {
+            notificationStoreAccessSuspended = false
+            await prayerNotifications?.resumeAfterStoreMaintenance()
+        }
+        return drained
     }
     private func inboxGeneration() throws -> InboxGeneration {
         let previous = try pendingInbox.currentGeneration()
@@ -333,10 +368,75 @@ final class AppSession {
     func applySettingsAndWait(_ changes: [String: JSONValue]) async throws {
         guard beginWrite() else { throw BackupOperationError.busy }
         defer { pendingWrites -= 1 }
-        let typed = try changes.mapValues { try JSONDecoder().decode(MadarCore.JSONValue.self, from: $0.canonicalData()) }
-        let result = try await bus.execute(CommandEnvelope(name: "settings.set", payload: .object(["settings": .object(typed)])))
-        guard result.status == .applied || result.status == .duplicate else { throw DataError.invalidValue(result.reason ?? "settings") }
-        try reload(); try publishSnapshot()
+        try await withSerializedPrayerNotificationMutation {
+            let typed = try changes.mapValues { try JSONDecoder().decode(MadarCore.JSONValue.self, from: $0.canonicalData()) }
+            let result = try await bus.execute(CommandEnvelope(name: "settings.set", payload: .object(["settings": .object(typed)])))
+            guard result.status == .applied || result.status == .duplicate else { throw DataError.invalidValue(result.reason ?? "settings") }
+            try reload(); try publishSnapshot()
+        }
+    }
+    func attachPrayerNotifications(_ coordinator: PrayerNotificationCoordinator) async {
+        prayerNotifications = coordinator
+        await coordinator.attach(to: self)
+    }
+    func refreshPrayerNotifications() async {
+        do { try await prayerNotifications?.refresh() }
+        catch { errorMessage = "تعذّر تحديث تذكيرات الصلاة. \(error.localizedDescription)" }
+    }
+    private func withSerializedPrayerNotificationMutation<T>(
+        shouldRefresh: (T) -> Bool = { _ in true },
+        _ operation: @MainActor () async throws -> T
+    ) async rethrows -> T {
+        guard let coordinator = prayerNotifications else { return try await operation() }
+        return try await coordinator.withSerializedMutation {
+            do {
+                let result = try await operation()
+                if shouldRefresh(result) { await coordinator.refreshAfterSerializedMutation() }
+                return result
+            } catch {
+                // A store command can commit before a later reload or snapshot write fails.
+                // Reconcile while still holding the lifecycle lock so that committed prayer
+                // state cannot leave an old request queued.
+                await coordinator.refreshAfterSerializedMutation()
+                throw error
+            }
+        }
+    }
+    func requestPrayerNotificationPermission() {
+        Task {
+            do { try await prayerNotifications?.requestAuthorization() }
+            catch { errorMessage = "تعذّر طلب إذن الإشعارات. \(error.localizedDescription)" }
+        }
+    }
+#if DEBUG
+    func runNotificationScenarioForTesting() {
+        guard let coordinator = prayerNotifications else {
+            notificationTestResult = "FAIL — notification coordinator is not attached"
+            return
+        }
+        notificationTestResult = "RUNNING"
+        Task { [weak self, coordinator] in
+            guard let self else { return }
+            do { notificationTestResult = try await coordinator.runSimulatorAcceptanceScenarioForTesting() }
+            catch { notificationTestResult = "FAIL — \(error.localizedDescription)" }
+        }
+    }
+#endif
+    func openPrayerNotificationSettings() {
+        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+        UIApplication.shared.open(url)
+    }
+    func updateNotificationAuthorization(_ state: String) { notificationAuthorization = state }
+    var notificationsAuthorized: Bool { ["authorized", "provisional", "ephemeral"].contains(notificationAuthorization) }
+    var canRequestNotificationPermission: Bool { notificationAuthorization == "notDetermined" }
+    var shouldOpenNotificationSettings: Bool { notificationAuthorization == "denied" }
+    var notificationPermissionTitle: String {
+        switch notificationAuthorization {
+        case "authorized", "provisional", "ephemeral": "إذن الإشعارات مفعّل لهذا الجهاز."
+        case "denied": "إشعارات الصلاة مطفأة في إعدادات النظام."
+        case "notDetermined": "اسمح بالإشعارات لتصلك أسئلة الصلاة بعد نهاية الحرمة."
+        default: "تُقرأ حالة إذن الإشعارات من النظام."
+        }
     }
     func redactProtectedData() {
         protectedDataAuthorized = false

@@ -6,10 +6,12 @@ import MadarDesign
 
 @main
 struct MadarApp: App {
-    var body: some Scene { WindowGroup { MadarSceneContent() } }
+    @UIApplicationDelegateAdaptor(MadarApplicationDelegate.self) private var appDelegate
+    var body: some Scene { WindowGroup { MadarSceneContent(prayerNotifications: appDelegate.prayerNotifications) } }
 }
 
 private struct MadarSceneContent: View {
+    let prayerNotifications: PrayerNotificationCoordinator
     @State private var session: AppSession?
     @State private var startupError: String?
     @State private var pendingURL: URL?
@@ -33,6 +35,7 @@ private struct MadarSceneContent: View {
                     do { try await session.drainInbox() }
                     catch BackupOperationError.busy { }
                     catch { session.errorMessage = "لم يكتمل تحديث البيانات. \(error.localizedDescription)" }
+                    await session.refreshPrayerNotifications()
                 }
             }
             .onOpenURL { url in
@@ -41,6 +44,19 @@ private struct MadarSceneContent: View {
             }
     }
     private var mainContent: some View {
+        Group {
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["MADAR_NOTIFICATION_TEST_FLOW"] == "1", let session {
+            PrayerNotificationAcceptanceHarness(session: session)
+        } else {
+            roomContent
+        }
+        #else
+        roomContent
+        #endif
+        }
+    }
+    private var roomContent: some View {
         Group {
                 if let session, let lock = session.lockController {
                     MadarLockGate(controller: lock, feature: .app) {
@@ -80,6 +96,7 @@ private struct MadarSceneContent: View {
                 }
             } else { managed = try ManagedDataStore(root: root, commandLockURL: lockURL) }
             let opened = try AppSession(container: managed.container, managedStore: managed, groupDirectory: group)
+            await opened.attachPrayerNotifications(prayerNotifications)
             let backup = AppBackupService(session: opened, store: managed, backupDirectory: group.appending(path: "Backups", directoryHint: .isDirectory), keyStore: KeychainBackupKeyStore(service: backupKeyService))
             opened.backupService = backup
             opened.syncService = AppSyncService(session: opened, store: managed, backup: backup)

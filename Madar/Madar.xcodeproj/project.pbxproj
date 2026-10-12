@@ -15,6 +15,9 @@
 		188EE40FE4D74FF7D7738992 /* MadarDesign in Frameworks */ = {isa = PBXBuildFile; productRef = D7349BC32E9D9D10CE3C790A /* MadarDesign */; };
 		19324DE7D0A3DB449A018ACD /* Amiri-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 95E7A16CBC55D306C7FDC034 /* Amiri-Bold.ttf */; };
 		1EAF9A64BCA74E3F56989549 /* thmanyahserifdisplay-Black.otf in Resources */ = {isa = PBXBuildFile; fileRef = D80269312D7B18D5290E8E80 /* thmanyahserifdisplay-Black.otf */; };
+		21B4D4A88A6C40E7B12F0001 /* PrayerActivityAttributes.swift in App Sources */ = {isa = PBXBuildFile; fileRef = 21B4D4A88A6C40E7B12F1001 /* PrayerActivityAttributes.swift */; };
+		21B4D4A88A6C40E7B12F0002 /* PrayerActivityAttributes.swift in Widget Sources */ = {isa = PBXBuildFile; fileRef = 21B4D4A88A6C40E7B12F1001 /* PrayerActivityAttributes.swift */; };
+		21B4D4A88A6C40E7B12F0003 /* PrayerNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21B4D4A88A6C40E7B12F1002 /* PrayerNotifications.swift */; };
 		22FB5844A23643273F6597EC /* TabShell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C581755E2CC15BBDCFF8899 /* TabShell.swift */; };
 		24595360D6161BE050ADEC31 /* MadarLock.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB9BE21293412A1EFB5907A7 /* MadarLock.swift */; };
 		251712D13E1CB75A086AB762 /* MadarApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52096FB2E7F5C96D70BD4B80 /* MadarApp.swift */; };
@@ -112,6 +115,8 @@
 		1C903CE9D436A9E7A19EEE2C /* ExportPrivacyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportPrivacyTests.swift; sourceTree = "<group>"; };
 		1D4DECF86A1E7DCEBC1D6ADF /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		1D5244CCC79BF2B66C486F51 /* AppSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSession.swift; sourceTree = "<group>"; };
+		21B4D4A88A6C40E7B12F1001 /* PrayerActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrayerActivityAttributes.swift; sourceTree = "<group>"; };
+		21B4D4A88A6C40E7B12F1002 /* PrayerNotifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrayerNotifications.swift; sourceTree = "<group>"; };
 		1F9E40A347AD27478E3FA224 /* thmanyahseriftext-Regular.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "thmanyahseriftext-Regular.otf"; sourceTree = "<group>"; };
 		22667A11D78A7887B0C70B39 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		2293299667730AD8A0496EBC /* MadarCommands */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MadarCommands; path = Packages/MadarCommands; sourceTree = SOURCE_ROOT; };
@@ -243,6 +248,8 @@
 				7884A40C087DAC3CED8FC2B8 /* MadarComponentGallery.swift */,
 				CB9BE21293412A1EFB5907A7 /* MadarLock.swift */,
 				C1541C81F328C40D5A683888 /* PrayerRoom.swift */,
+				21B4D4A88A6C40E7B12F1001 /* PrayerActivityAttributes.swift */,
+				21B4D4A88A6C40E7B12F1002 /* PrayerNotifications.swift */,
 				0A7D4FC457636377F6EF5D76 /* PrayerSettingsView.swift */,
 				D813172B4A91DD6E0930EEA8 /* PrayerTodayView.swift */,
 				5D3EC96D647534DFB18C29D1 /* PresetsView.swift */,
@@ -565,6 +572,8 @@
 				24595360D6161BE050ADEC31 /* MadarLock.swift in Sources */,
 				EA5164A4DA807C4F06A13120 /* OpenMadarIntent.swift in Sources */,
 				CFF94239BC342BA772C26E44 /* PrayerRoom.swift in Sources */,
+				21B4D4A88A6C40E7B12F0001 /* PrayerActivityAttributes.swift in App Sources */,
+				21B4D4A88A6C40E7B12F0003 /* PrayerNotifications.swift in Sources */,
 				74FD6AB907A73C84CA714668 /* PrayerSettingsView.swift in Sources */,
 				2E95780F1D439BE926514901 /* PrayerTodayView.swift in Sources */,
 				3D1F6A8075563D6E074473E2 /* PresetsView.swift in Sources */,
@@ -579,6 +588,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				34C08CE848450C430D0DB1E4 /* MadarWidgets.swift in Sources */,
+				21B4D4A88A6C40E7B12F0002 /* PrayerActivityAttributes.swift in Widget Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -82,9 +82,10 @@ import MadarInbox
         _ = try inbox.enqueue(prayer(generation: generation))
         var refreshes = 0
         let drainer = InboxDrainer(inbox: inbox, bus: CommandBus(adapter: adapter), generation: { .init(generationID: generation, acceptsUnstampedDeliveries: false) }, hasReceipt: { try adapter.hasReceipt(commandID: $0) }, refresh: { refreshes += 1; await Task.yield() })
-        async let a: Void = drainer.drain()
-        async let b: Void = drainer.drain()
-        _ = try await (a, b)
+        async let a = drainer.drain()
+        async let b = drainer.drain()
+        let outcomes = try await (a, b)
+        #expect(outcomes.0 != outcomes.1)
         #expect(refreshes == 1)
         #expect(try ModelContext(container).fetchCount(FetchDescriptor<MadarData.CommandReceipt>()) == 1)
     }
@@ -93,7 +94,7 @@ import MadarInbox
         _ = try inbox.enqueue(prayer(generation: generation))
         var unavailable = true
         let drainer = InboxDrainer(inbox: inbox, bus: CommandBus(adapter: adapter), generation: { .init(generationID: generation, acceptsUnstampedDeliveries: false) }, hasReceipt: { try adapter.hasReceipt(commandID: $0) }, refresh: {}, shouldPause: { unavailable })
-        try await drainer.drain()
+        #expect(!(try await drainer.drain()))
         #expect(try inbox.processingFiles().isEmpty)
         #expect(try ModelContext(container).fetchCount(FetchDescriptor<PrayerLog>()) == 0)
         unavailable = false
@@ -103,7 +104,7 @@ import MadarInbox
         #expect(try inbox.processingFiles().count == 1)
         #expect(try ModelContext(container).fetchCount(FetchDescriptor<PrayerLog>()) == 0)
         try FileManager.default.removeItem(at: marker)
-        try await drainer.drain()
+        #expect(try await drainer.drain())
         #expect(try inbox.processingFiles().isEmpty)
         #expect(try ModelContext(container).fetchCount(FetchDescriptor<PrayerLog>()) == 1)
     }
@@ -118,7 +119,7 @@ import MadarInbox
         let operation = Task { try await drainer.drain() }
         while !entered { await Task.yield() }
         operation.cancel(); allowRefresh = true
-        do { try await operation.value; Issue.record("cancelled drain unexpectedly acknowledged") }
+        do { _ = try await operation.value; Issue.record("cancelled drain unexpectedly acknowledged") }
         catch is CancellationError { }
         let stamp = try #require(try ModelContext(container).fetch(FetchDescriptor<PrayerLog>()).first?.updatedAt)
         #expect(try inbox.processingFiles().count == 1)

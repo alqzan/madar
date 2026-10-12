@@ -57,6 +57,20 @@ struct CustomizeMadar: View {
                     ForEach(sections, id: \.self) { section in
                         SettingsSection(title: section, symbol: symbols[section] ?? "slider.horizontal.3", definitions: filtered.filter { sectionFor($0.key) == section }, session: session, searching: !query.isEmpty)
                     }
+                    if sections.contains("الإشعارات") && session.bool("salah.askReminder") && !session.notificationsAuthorized {
+                        MadarCard {
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text(session.notificationPermissionTitle).font(MadarTypography.body())
+                                if session.canRequestNotificationPermission {
+                                    Button("اسمح بإشعارات الصلاة") { session.requestPrayerNotificationPermission() }
+                                        .frame(minHeight: 44).accessibilityIdentifier("prayer-notification-permission-request")
+                                } else if session.shouldOpenNotificationSettings {
+                                    Button("افتح إعدادات النظام") { session.openPrayerNotificationSettings() }
+                                        .frame(minHeight: 44).accessibilityIdentifier("prayer-notification-permission-settings")
+                                }
+                            }
+                        }
+                    }
                 }
                 if query.isEmpty {
                     if let backup = session.backupService {
@@ -76,11 +90,12 @@ struct CustomizeMadar: View {
         session.schema.settings.filter { definition in
             guard AppSession.supportedKeys.contains(definition.key) else { return false }
             if definition.key == "core.hijriOffset" && session.string("core.hijriSource") != "sighting" { return false }
+            if definition.key == "notif.quietFrom" && !session.bool("notif.quietAfterIsha") { return false }
             return query.isEmpty || normalized(definition.title + " " + sectionFor(definition.key) + " " + definition.key).contains(normalized(query))
         }
     }
-    private var sections: [String] { ["اليوم والتقويم", "المظهر", "مدينتك", "الخصوصية"].filter { section in filtered.contains { sectionFor($0.key) == section } } }
-    private let symbols = ["اليوم والتقويم": "calendar", "المظهر": "textformat", "مدينتك": "location"]
+    private var sections: [String] { ["اليوم والتقويم", "المظهر", "مدينتك", "الخصوصية", "الإشعارات"].filter { section in filtered.contains { sectionFor($0.key) == section } } }
+    private let symbols = ["اليوم والتقويم": "calendar", "المظهر": "textformat", "مدينتك": "location", "الإشعارات": "bell.badge"]
     private var changesLabel: String {
         let count = session.schema.settings.filter { AppSession.supportedKeys.contains($0.key) && session.values[$0.key] != $0.defaultValue }.count
         return CustomizationCopy.changes(count: count, formattedCount: session.digits(count))
@@ -104,6 +119,7 @@ func sectionFor(_ key: String) -> String {
     if ["core.dayStart", "core.firstCalendar", "core.hijriSource", "core.hijriOffset", "core.weekStart"].contains(key) { return "اليوم والتقويم" }
     if key == "core.homeCity" { return "مدينتك" }
     if key == "core.faceIDLock" { return "الخصوصية" }
+    if ["salah.askAfterAdhanMin", "salah.askReminder", "salah.liveActivity", "notif.thisDeviceReminders", "notif.quietAfterIsha", "notif.quietFrom"].contains(key) { return "الإشعارات" }
     return "المظهر"
 }
 func normalized(_ text: String) -> String {
@@ -162,9 +178,32 @@ struct SettingControl: View {
                     Text(session.digits(Int(session.number(definition.key))))
                 }.accessibilityIdentifier("setting-\(definition.key)")
             case "place": NavigationLink(session.cityName) { CityEditor(session: session) }.frame(minHeight: 44).accessibilityIdentifier("setting-\(definition.key)")
+            case "time":
+                DatePicker(definition.title, selection: timeBinding, displayedComponents: .hourAndMinute)
+                    .labelsHidden()
+                    .environment(\.timeZone, session.activePlace.timeZone)
+                    .accessibilityLabel(definition.title)
+                    .accessibilityIdentifier("setting-\(definition.key)")
             default: EmptyView()
             }
         }
+    }
+    private var timeBinding: Binding<Date> {
+        Binding(get: {
+            let parts = session.string(definition.key).split(separator: ":", omittingEmptySubsequences: false)
+            let hour = parts.count == 2 ? Int(parts[0]) : nil
+            let minute = parts.count == 2 ? Int(parts[1]) : nil
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = session.activePlace.timeZone
+            return calendar.date(from: DateComponents(year: 2001, month: 1, day: 1,
+                                                       hour: hour ?? 21, minute: minute ?? 30)) ?? .now
+        }, set: { date in
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = session.activePlace.timeZone
+            let parts = calendar.dateComponents([.hour, .minute], from: date)
+            guard let hour = parts.hour, let minute = parts.minute else { return }
+            session.set(.string(String(format: "%02d:%02d", hour, minute)), key: definition.key)
+        })
     }
     private var integerRange: ClosedRange<Int> { Int(definition.range?.first ?? 0)...Int(definition.range?.last ?? 0) }
     @ViewBuilder private var choices: some View {

@@ -1,6 +1,120 @@
 import XCTest
 
 @MainActor final class FoundationUITests: XCTestCase {
+    func test_M1T04_NotificationPermissionPromptAtDefaultAndAX3() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment["MADAR_UI_STORE_ID"] = UUID().uuidString
+        app.launchEnvironment["MADAR_UI_SIZE"] = "L"
+        app.launch(); finishOnboarding(app)
+        let settings = app.buttons["settings-button"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 10), app.debugDescription)
+        settings.tap()
+        let request = app.buttons["prayer-notification-permission-request"]
+        XCTAssertTrue(request.waitForExistence(timeout: 10), app.debugDescription)
+        scrollTo(request, in: app)
+        attachScreenshot(app, named: "M1-T04-notification-permission-default")
+
+        app.terminate()
+        app.launchEnvironment["MADAR_UI_SIZE"] = "AX3"
+        app.launch(); finishOnboarding(app)
+        XCTAssertTrue(settings.waitForExistence(timeout: 10), app.debugDescription)
+        settings.tap()
+        let ax3Request = app.buttons["prayer-notification-permission-request"]
+        XCTAssertTrue(ax3Request.waitForExistence(timeout: 10), app.debugDescription)
+        scrollTo(ax3Request, in: app)
+        attachScreenshot(app, named: "M1-T04-notification-permission-AX3")
+        ax3Request.tap()
+
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let alert = springboard.alerts.firstMatch
+        XCTAssertTrue(alert.waitForExistence(timeout: 10), springboard.debugDescription)
+        let promptButtons = alert.buttons.allElementsBoundByIndex
+        let allow = promptButtons.first { button in
+            let label = button.label
+            let normalized = label.replacingOccurrences(of: "’", with: "'")
+            let positive = normalized.localizedCaseInsensitiveContains("allow") || label.contains("السماح")
+            let negative = normalized.localizedCaseInsensitiveContains("don't") || label.localizedCaseInsensitiveContains("deny")
+                || label.contains("لا تسمح") || label.contains("عدم")
+            return positive && !negative
+        }
+        XCTAssertNotNil(allow, "Notification prompt buttons: \(promptButtons.map(\.label))")
+        try XCTUnwrap(allow).tap()
+        expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: ax3Request)
+        waitForExpectations(timeout: 10)
+        let deniedSettings = app.buttons["prayer-notification-permission-settings"]
+        expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: deniedSettings)
+        waitForExpectations(timeout: 10)
+        app.terminate()
+    }
+
+    func test_M1T04_RealAppNotificationSchedulingSnoozeAndCancellation() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment["MADAR_UI_STORE_ID"] = UUID().uuidString
+        app.launchEnvironment["MADAR_NOTIFICATION_TEST_FLOW"] = "1"
+        app.launch()
+
+        let authorize = app.buttons["notification-test-authorize"]
+        if authorize.waitForExistence(timeout: 3) {
+            authorize.tap()
+            let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+            let alert = springboard.alerts.firstMatch
+            XCTAssertTrue(alert.waitForExistence(timeout: 10), springboard.debugDescription)
+            let allow = alert.buttons.allElementsBoundByIndex.first { button in
+                let label = button.label
+                let normalized = label.replacingOccurrences(of: "’", with: "'")
+                let positive = normalized.localizedCaseInsensitiveContains("allow") || label.contains("السماح")
+                let negative = normalized.localizedCaseInsensitiveContains("don't") || label.localizedCaseInsensitiveContains("deny")
+                    || label.contains("لا تسمح") || label.contains("عدم")
+                return positive && !negative
+            }
+            XCTAssertNotNil(allow, "Notification prompt buttons: \(alert.buttons.allElementsBoundByIndex.map(\.label))")
+            try XCTUnwrap(allow).tap()
+        }
+
+        let run = app.buttons["notification-test-run"]
+        XCTAssertTrue(run.waitForExistence(timeout: 15), app.debugDescription)
+        let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isEnabled == true"), object: run)
+        XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: 15), .completed, app.debugDescription)
+        run.tap()
+
+        let result = app.staticTexts["notification-test-result"]
+        let passed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", "PASS"), object: result)
+        XCTAssertEqual(XCTWaiter.wait(for: [passed], timeout: 35), .completed, app.debugDescription)
+        XCTAssertTrue(result.label.contains("Fajr"), result.label)
+        XCTAssertTrue(result.label.contains("Maghrib"), result.label)
+    }
+
+    func test_M1T04_QuietHoursSettingsAtDefaultAndAX3() throws {
+        continueAfterFailure = false
+        for size in ["L", "AX3"] {
+            let app = XCUIApplication()
+            app.launchEnvironment["MADAR_UI_STORE_ID"] = UUID().uuidString
+            app.launchEnvironment["MADAR_UI_SIZE"] = size
+            app.launch(); finishOnboarding(app)
+            let settingsButton = app.buttons["settings-button"]
+            XCTAssertTrue(settingsButton.waitForExistence(timeout: 10), app.debugDescription)
+            settingsButton.tap()
+            let search = app.textFields["settings-search"]
+            XCTAssertTrue(search.waitForExistence(timeout: 10), app.debugDescription)
+            search.tap(); search.typeText("notif.quietAfterIsha\n")
+            let quietToggle = app.switches["setting-notif.quietAfterIsha"]
+            XCTAssertTrue(quietToggle.waitForExistence(timeout: 10), app.debugDescription)
+            let quietTime = app.descendants(matching: .any).matching(identifier: "setting-notif.quietFrom").firstMatch
+            XCTAssertFalse(quietTime.exists)
+            if (quietToggle.value as? String) != "1" { quietToggle.tap() }
+            search.tap()
+            let currentSearch = search.value as? String ?? ""
+            search.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: currentSearch.count))
+            search.typeText("notif.quietFrom\n")
+            XCTAssertTrue(quietTime.waitForExistence(timeout: 10), app.debugDescription)
+            scrollTo(quietTime, in: app)
+            attachScreenshot(app, named: "M1-T04-quiet-hours-\(size)")
+            app.terminate()
+        }
+    }
+
     func test_fixPrevious_M0T13_BackupCountsHonorSelectedNumerals() throws {
         continueAfterFailure = false
         for (style, expected) in [("hindi", "النسخ المحفوظة: ٠ تلقائية، ٠ يدوية."), ("western", "النسخ المحفوظة: 0 تلقائية، 0 يدوية.")] {

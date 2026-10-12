@@ -56,6 +56,7 @@ struct MadarRootView: View {
                 try await (session.backupService as? AppBackupService)?.runScheduledBackup()
             } catch BackupOperationError.busy { }
             catch { session.errorMessage = "لم يكتمل تحديث البيانات. \(error.localizedDescription)" }
+            await session.refreshPrayerNotifications()
         }
         .overlay(alignment: .bottom) {
             if session.undoToken != nil { UndoToast(message: session.undoMessage, undo: session.undo).padding(.bottom, 86) }
@@ -75,6 +76,7 @@ struct MadarRootView: View {
                         try await (session.backupService as? AppBackupService)?.runScheduledBackup()
                     } catch BackupOperationError.busy { }
                     catch { session.errorMessage = "لم يكتمل تحديث البيانات. \(error.localizedDescription)" }
+                    await session.refreshPrayerNotifications()
                 }
             }
         }

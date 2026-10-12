@@ -19,8 +19,9 @@ import MadarInbox
         self.inbox = inbox; self.bus = bus; self.generation = generation
         self.hasReceipt = hasReceipt; self.refresh = refresh; self.shouldPause = shouldPause; self.authorization = authorization
     }
-    public func drain(now: Date = Date()) async throws {
-        guard !isDraining, !shouldPause() else { return }
+    @discardableResult
+    public func drain(now: Date = Date()) async throws -> Bool {
+        guard !isDraining, !shouldPause() else { return false }
         isDraining = true; defer { isDraining = false }
         try Task.checkCancellation()
         let recovering = Set(try inbox.processingFiles().map(\.path))
@@ -41,7 +42,7 @@ import MadarInbox
         }
         for (file, record) in records {
             try Task.checkCancellation()
-            guard !shouldPause() else { return }
+            guard !shouldPause() else { return false }
             let active = try generation()
             guard active.permits(record) else {
                 try inbox.retainForResolution(file, reason: "generationChanged"); continue
@@ -81,5 +82,6 @@ import MadarInbox
                 try inbox.acknowledge(file)
             }
         }
+        return true
     }
 }
