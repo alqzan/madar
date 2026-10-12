@@ -4,9 +4,9 @@ M0 Foundation — NOT APPROVED. Main contains the accepted local foundation; M1�
 
 # Last checked
 
-Checked `aa54227..5bf7526` — OK: main documentation only; no product build/test repeated. Selected T09 candidate advanced `b7cd5d1..70939f5`; each new test/driver delta independently reviewed and selected native acceptance recorded below. Initial sanity check `b7902be..aa54227` was documentation-only.
+Checked `aa54227..feb9515` — OK: main documentation only; no product build/test repeated. Selected T09 candidate advanced `b7cd5d1..70939f5`; each new test/driver delta independently reviewed and selected native acceptance recorded below. Initial sanity check `b7902be..aa54227` was documentation-only.
 
-Reuse unchanged evidence: main T14 `d28c36a` local-only restore copy/focused1/0; T15 `aeb3154` font helper/six regressions; baseline app22/package125. T09 source repairs `33ab2ec`/Top `8876626` remain in the selected candidate; no new production delta this session. T12 `bfa878b` still fails contrast1/1 with nil element/frame; no identical rerun.
+Reuse unchanged evidence: main T14 `d28c36a` local-only restore copy/focused1/0; T15 `aeb3154` font helper/six regressions; baseline app22/package125. Independent final `git diff --exit-code 33ab2ec..70939f5` returned0 for production sources, Xcode/project configuration, Integration tests and MadarData tests; controlled host15/ManagedBackup13 evidence reused. Command receipt: ignored `Madar/Artifacts/t09-native-retirement-2026-10-12/source-evidence-continuity.txt`. This is source continuity, not a new test/integration approval. T12 `bfa878b` still fails contrast1/1 with nil element/frame; no identical rerun.
 
 # Board
 
@@ -63,7 +63,7 @@ Not verified: full T09 section/curated main integration, native encrypted/restor
 For the next agent: FIRST finish one missing T09 native encrypted/first-key or restore authorization result on70939f5 (new isolated fixture, no auth bypass), or actual owning-two-scene acceptance when supported; then required Top section/curated integration preserving T14/T15. Do not rerun closed plain/refusal/retirement/lease/switcher flows. For T12, first connect actual app to Inspector; current Simulator/All processes empty Audit pane is a setup blocker, not a successful audit. Keep nil issue unsuppressed, M0 NOT APPROVED/no M1; font permission closed.
 Branches/worktrees: active `codex/m0-t09-system-ax3-navigation`70939f5 at `/Users/abdulrahman/.codex/worktrees/m0-p1b-fixes/بناء مدار 2.0`, clean. New retained refs `codex/m0-t09-native-refusal`fa54e5d, `codex/m0-t09-switcher-variants`07d2ada; prior SDKb7cd5d1 and greenp1b d28c8dc retained. T12bfa878b unchanged/diagnostic only. All30 unmerged refs and14 non-main worktrees named with tips/dispositions in retained inventory; none deleted. Main docs only; no wholesale candidate merge.
 Evidence: ignored `Madar/Artifacts/t09-native-retirement-2026-10-12/run-{b7cd5d1-switcher-snapshot,fa54e5d-biometric-refusal,07d2ada-switcher-ax3-light,07d2ada-switcher-default-dark,07d2ada-switcher-system-ax3-light,70939f5-switcher-system-ax3-light}/`; system runs keep setup before/during/restored receipts. T12 current UI/SDK blocker in contrast-triage and ignored `Madar/Artifacts/t12-inspector-2026-10-12/ui-trace.txt`; GUI screenshot retained in CUA output, no measured contrast result. All prior evidence/resources/data preserved; no native test remains running.
-Usage: start1% five-hour used/99% remaining; before final handover89%used/11%remaining, weekly91%. No reset or quota-only work. Final reading follows handover preparation.
+Usage: start1% five-hour used/99% remaining; before final handover89%used/11%remaining, weekly91%. No reset or quota-only work. Independent final source/config/controlled-test continuity verification passed with zero delta33ab2ec..70939f5; no tests rerun. Final usage reading follows this closure.
 Next: native first-key/scene acceptance, scoped section review/curated integration, T12 actionable target, owner-device gate. Next session: GPT-6.1 Sol high production; independent Sol xhigh Top/privacy section and M0 gate.
 
 ## Handover — M0-T09 native share retirement — 2026-10-12 — codex (Sol)
