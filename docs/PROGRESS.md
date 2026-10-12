@@ -16,6 +16,8 @@ Documentation-only update after `2de33d3`: independent GPT-6.1 Sol xhigh review 
 
 Documentation-only update after `0936e8f`: Top source-map review approved T06 after two documentation corrections. Selected T06 reports and supplied font-license evidence are now on main; `git diff --check` passed. No product code changed; builds/tests were not rerun.
 
+Checked `c83e724..c83e724` — no product diff; current CUA app inventory reports the Mac is locked and cannot access native windows. No build/test or repeated native acceptance attempt.
+
 # Board
 
 | Section | Status | Task | Owner | Scope and acceptance |
@@ -50,6 +52,17 @@ Production tasks start after M0-T01. Separate agents own separate sections/files
 Owner instruction (2026-10-11): AGENTS/CLAUDE §5a now require a concrete session acceptance target, reuse of current green evidence, diagnosis before retries, minimal checks proportional to the change, and delivery with3–5%five-hour usage remaining (95–97%used); continue useful authorized tasks while more than5% remains. T06's source map is integrated as documentation only; native/device blockers still prevent M0 gate closure.
 
 # Handovers
+
+## Handover — M0 native acceptance waiting for unlock — 2026-10-12 — codex (Sol)
+
+Done: Resumed from clean `main` at `c83e724` and reread the project protocol, progress board and automation memory. Current app inventory confirms the Mac is locked, so native simulator/Accessibility Inspector acceptance cannot proceed. Sent the owner a request to unlock manually. No code, docs beyond this handover, builds or tests changed this turn.
+Verified: Git status was clean on `main`; five-hour usage at start was24%. Current CUA state explicitly returned “The Mac is locked and automatic unlock could not unlock it.” This is a current availability check, not a product failure.
+Not verified: T09 real OS auth/share/switcher/two-scene; T12 actionable contrast pair; VoiceOver/Reduce Motion; owner-iPhone, Files destination, protected data/owner store; Thmanyah archive origin. M0 remains NOT APPROVED; no M1.
+For the next agent: Continue when the owner unlocks the Mac; first inspect current UI state, then resume the signed T09 auth/share flow or T12 Accessibility Inspector trace. Do not retry equivalent flows before unlock. If the Mac remains locked, preserve the existing reviewed candidates and wait for owner/device acceptance; do not start M1 or invent a color/auth fix.
+Branches/worktrees: no branch changes; `main` is still the active checkout. Preserve `codex/m0-p1b-fixes` `173fe0c` with Top repair approval `8876626`; old integration `48a3fe4` is changes-requested. T06 source map review and reports are already recorded on main.
+Next: native T09/T12 acceptance after manual unlock; then owner-iPhone and remaining M0 gate.
+Usage: start checkpoint 24% five-hour used / 50% weekly; 3–5% remaining session target not reached. No reset credits used and no artificial quota work added.
+Next session: Standard GPT-6.1 Sol high for any production change; independent GPT-6.1 Sol xhigh for required Top reviews/gate.
 
 ## Handover — T06 source map reviewed and recorded — 2026-10-12 — codex (Sol)
 
@@ -92,13 +105,3 @@ For the next agent: Ask the owner to confirm whether this archive was originally
 Branch: `m0-s3-font-license-evidence` `8ccd9fd` (current checkout at handover: `main` after docs-only checkpoint). This evidence branch is not merged; no code changed. Older/superseded worktrees and raw evidence remain preserved as previously recorded.
 Next: Keep M0 not approved; resolve license source, T12 contrast, T09 native share/auth and remaining device/manual gate requirements.
 Next session: Top GPT-6.1 Sol xhigh for milestone/section reviews; Standard GPT-6.1 Sol high for production work.
-
-## Handover — M0 gate evidence and P1b review — 2026-10-12 — codex (Sol)
-
-Done: T09 P1b three review findings fixed on candidate `codex/m0-p1b-fixes` (33ab2ec), independently Top-approved (8876626); focused host15 and ManagedBackup13 pass; generic simulator test build succeeds. Top M0 evidence report is available at `docs/reports/M0.md`; verdict is **M0 NOT APPROVED**, and no M1 starts. T12 contrast is classified from saved results as an unresolved possible defect in `docs/reports/M0-T12-contrast-triage.md`.
-Verified: current accepted-main evidence reused, not rerun: app22 + packages125, bounded shipping checker60 files/1 catalog/38 pairs and 12 checker fixtures. Read-only inventory recorded J01 v1 hash, prayer fixture hash/upstream commit and inline Hijri expected source; font evidence confirms Amiri OFL hash and the missing original Thmanyah package licence. P1b report paths: `m0-p1b-root-host.log`, `madar-p1b-fixes-package.log`, `madar-p1b-fixes-build-final.log`; exact tails and limits in `docs/reports/M0-T09-P1b-finding-fixes.md`. Usage latest34% five-hour/46% weekly; no reset credits used; the 95–97% session target was not reached because remaining native, accessibility and owner-device gates require unavailable UI/device evidence. No further checks were repeated to consume quota.
-Not verified: P1b native signed share after real OS authentication, inactive/switcher, true two-scene and physical protection; T12 actionable contrast element/ratio, Reduce Motion, spoken VoiceOver; physical owner-iPhone, Files destination write, full font-distribution gate (original Thmanyah package licence), remaining 420-line manual trace and full M0 gate. Signed UI attempt failed before successful auth and must not be called an app defect or acceptance. Manual UI unavailable (no Simulator.app in Xcode Developer directory).
-For the next agent: start from main and read `docs/reports/M0.md`. M0 remains blocked; do not begin M1. First resolve T12 through Accessibility Inspector/actionable trace and T09 through a genuine signed OS-auth journey; preserve failed output and avoid equivalent retries without fixing the authentication path. Then close bounded manual traces and run the mandatory owner-iPhone gate.
-Branches/worktrees: `codex/m0-p1b-fixes` 173fe0c `/Users/abdulrahman/.codex/worktrees/m0-p1b-fixes/بناء مدار 2.0` (fixes, pending native acceptance); `codex/m0-p1b-rereview` 8876626 `/Users/abdulrahman/.codex/worktrees/m0-p1b-rereview/بناء مدار 2.0` (Top approval); `codex/m0-p1b-top-review` 38d4fec `/private/tmp/madar-m0-p1b-top-review` (original findings); `codex/m0-t12-audit-triage` 44d4799 `/Users/abdulrahman/.codex/worktrees/m0-t12-audit-triage/بناء مدار 2.0`; `codex/m0-gate-readiness` 7169fab `/Users/abdulrahman/.codex/worktrees/m0-gate-report/بناء مدار 2.0` (report copied to main); `codex/m0-privacy-host` 48a3fe4 and `codex/m0-export-privacy` 2ea40ff (older privacy integration); `codex/m0-accessibility-host` c273bc4; `codex/m0-accessibility-top` d3fc0cc `/Users/abdulrahman/.codex/worktrees/m0-source-checks-review/بناء مدار 2.0`; `codex/m0-accessibility-fixes-review` 851c6cd `/Users/abdulrahman/.codex/worktrees/m0-ui-debug/بناء مدار 2.0`; `codex/m0-accessibility-audit` 97a1577 (failed predecessor); preserved `codex/m0-p1a-terminal-review` 3a2bf6b, `codex/m0-source-checks-fix-review` ffc8e97, `codex/m0-s2-presentation-privacy` 8e643a1 and `codex/m0-s2-privacy-compile-top` 5102620. Other unmerged refs kept for history/equivalence: `codex/m0-source-checks-fix-review` ffc8e97; `m0-fix-previous-plurals` cede9ee; `m0-fix-previous-prayer` 9e4e6f9; `m0-inbox-lifecycle-tests` 169d4e5; `m0-s1-local-retention` 4297c8a; `m0-s1-money-models` dad332e (managed `/Users/abdulrahman/.codex/worktrees/m0-local-data/بناء مدار 2.0`); `m0-s2-backup-focus` 9c0f47a; `m0-s2-foundation-times` 1308a5b; `m0-software-check-plan` ff09f96; `m0-t11-source-checks-review` 946c87d. These are superseded/integrated equivalents or preserved failures, not merge candidates; details are in preceding handovers. No worktree or ignored evidence was removed. Main has documentation-only edits and is clean after commit.
-Next: T12 evidence, T09 native acceptance, remaining manual trace/physical gate; no M1 until an approved M0 report.
-Next session: Standard GPT-6.1 Sol high for production; independent GPT-6.1 Sol xhigh for any Top review/gate.
