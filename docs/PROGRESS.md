@@ -18,6 +18,8 @@ Documentation-only update after `0936e8f`: Top source-map review approved T06 af
 
 Checked `c83e724..c83e724` — no product diff; current CUA app inventory reports the Mac is locked and cannot access native windows. No build/test or repeated native acceptance attempt.
 
+Checked `fadbe69..c9dc6d9` — M0-02 license evidence only; `python3 -m json.tool Madar/docs/font-provenance.json` and `git diff --check` passed. Read-only inspection of the saved Debug simulator app found eight raw OTF files; no build or product test rerun.
+
 # Board
 
 | Section | Status | Task | Owner | Scope and acceptance |
@@ -36,7 +38,7 @@ Checked `c83e724..c83e724` — no product diff; current CUA app inventory report
 | M0-S2 Backup copy | approved | M0-T13 done (Standard high; Standard reviewed) | codex copy fix | Integrated1ee273e after Standardreviewapprove; rootcopy2goldenhostregressions within39hostpass, actualnumeralUI+gallery2tests0fail83.693s with2backup/12galleryimagesviewed. Six-category catalog grammar/selecteddigits; facts/passwordbehavior unchanged. |
 | M0-S2 Backup copy | approved | M0-T14 done (fix-previous; independent Standard section review approved; integrated d28c36a) | codex | Both replace surfaces describe this-device-only under RA1; focused host golden test 1/0 pass for replace, unchanged merge and key notice. `docs/DECISIONS.md` records §17 precedence. Native UI was not repeated. |
 | M0-S3 Accessibility evidence | building | M0-T12 needs-fix (focus passes; unresolved possible contrast defect) | codex root | Candidate c273bc4 retains green focus/search/title-growth journey. Saved `.all` audit reports one Settings/light/system contrast callback with nil element/frame; T12 triage report `codex/m0-t12-audit-triage` 44d4799 calls it an unresolved possible defect, not a false positive. Do not suppress or merge. Next: Accessibility Inspector measured pair/actionable trace; then OS Reduce Motion and spoken VoiceOver. See docs/reports/M0-T12-contrast-triage.md and19-qa. |
-| M0-S3 Review and gate | building | M0-T06 source map approved (Top); milestone gate blocked | codex + Top | `docs/reports/M0.md` remains NOT APPROVED, no M1. E16–E26 disposition all420 inventory locations: 155 explicitly deferred and265 mapped to scoped sources/evidence; Top source-map review found no remaining mapping gaps after two doc fixes. Strict checker still reports420; mapping is not acceptance. Selected reports and supplied font-license materials are on main; official Thmanyah source confirmation, T09 native acceptance, T12 contrast and owner-iPhone/physical acceptance remain open. Candidate branch `m0-s3-font-license-evidence` is not to be merged wholesale. |
+| M0-S3 Review and gate | building | M0-T06 source map approved (Top); milestone gate blocked | codex + Top | `docs/reports/M0.md` remains NOT APPROVED, no M1. E16–E26 dispositions cover all420 inventory locations: 155 deferred, 265 source-linked; mapping is not acceptance. Live official license is checked, but archive source and raw-OTF `UIAppFonts` extraction condition remain unresolved (font-license report). T09 native acceptance, T12 contrast and owner-iPhone/physical acceptance also remain open. Candidate branch `m0-s3-font-license-evidence` is not to be merged wholesale. |
 
 Production tasks start after M0-T01. Separate agents own separate sections/files. No agent may switch this shared checkout's branch while another runs. Use separate managed worktrees for parallel production after a curated baseline exists. Read-only/design jobs may share the checkout. Do not broadly stage `output/`, `tmp/`, generated build products or user data.
 
@@ -52,6 +54,17 @@ Production tasks start after M0-T01. Separate agents own separate sections/files
 Owner instruction (2026-10-11): AGENTS/CLAUDE §5a now require a concrete session acceptance target, reuse of current green evidence, diagnosis before retries, minimal checks proportional to the change, and delivery with3–5%five-hour usage remaining (95–97%used); continue useful authorized tasks while more than5% remains. T06's source map is integrated as documentation only; native/device blockers still prevent M0 gate closure.
 
 # Handovers
+
+## Handover — M0 T06 current font-license and packaging evidence — 2026-10-12 — codex (Sol)
+
+Done: Checked the current official Arabic Thmanyah license page. It allows app embedding only in a compiled/packaged/obfuscated product and prohibits independent font extraction/reuse, including through apps. Confirmed this checkout registers raw OTF resources via `UIAppFonts`; a saved Debug simulator `.app` contains all eight as separate files. Recorded the possible packaging conflict separately from archive provenance in `docs/reports/M0-T06-font-license-evidence.md`, and updated M0-02/provenance. M0 remains NOT APPROVED; no M1.
+Verified: Official page checked read-only on 2026-10-12; `find Madar/DerivedData/Build/Products/Debug-iphonesimulator/Madar.app -name '*.otf' -type f` returned eight OTF resources. JSON parse and `git diff --check` passed. Documentation/provenance only; no product build/test, signed distribution artifact check, package-PDF extraction, or distribution decision.
+Not verified: Whether the owner-provided archive was downloaded from the official site; whether a distributed signed app satisfies the no-extraction restriction; publisher clarification; native T09, T12 and owner-device acceptance.
+For the next agent: Ask the owner to confirm the archive's official-site origin and resolve the separate extraction/packaging question before distribution. Do not alter the approved font choice or license assumptions without the required owner decision. Keep M0 NOT APPROVED and do not start M1. Mac UI/device acceptance remains blocked until available; continue from saved T09/T12 evidence without repeating unchanged attempts.
+Branches/worktrees: no branch or product tree changed. `docs/reports/M0-retained-branches.md` records all 26 non-merged refs with tips/dispositions and all 14 non-main worktree paths/heads. Active T09 is repaired `codex/m0-p1b-fixes` `173fe0c` (Top fix-only approval `8876626`, native acceptance pending); old integration `codex/m0-privacy-host` `48a3fe4` has three High findings; T12 `codex/m0-t12-audit-triage` `44d4799` is diagnostic only; `m0-s3-font-license-evidence` `6227d1f` must not be merged wholesale. Preserve all listed worktrees.
+Next: Owner licensing confirmation/decision; then native T09/T12 and remaining physical M0 gate when access allows.
+Usage: start 24% and final 25% five-hour used / 50% weekly; the requested 3–5% remaining target was not reached because the remaining acceptance work requires the locked native UI/device and owner licensing input. No reset used or quota work added artificially.
+Next session: Standard GPT-6.1 Sol high for production; independent GPT-6.1 Sol xhigh for required Top reviews/gate.
 
 ## Handover — M0 native acceptance waiting for unlock — 2026-10-12 — codex (Sol)
 
@@ -95,13 +108,3 @@ For the next agent: `docs/reports/M0.md` stays NOT APPROVED. Mac UI was locked a
 Branches/worktrees: `m0-s2-backup-local-only-copy` `d4a869d` is integrated as `d28c36a`; keep its branch as history. `m0-s3-font-license-evidence` is an unmerged documentation/evidence candidate, now advanced beyond this handover; see the newer handover above. Other retained privacy/accessibility/historical branches and worktrees have unchanged dispositions; preserve them and do not merge failed/superseded ancestors wholesale.
 Next: Resume T09 native auth/share and T12 contrast when UI unlocks; otherwise continue bounded T06 source dispositions. Resolve official font-source confirmation and mandatory owner-iPhone gate before any M0 approval. Usage reading: 7% five-hour used at final checkpoint; the requested 3–5% remaining margin was not reached. No reset credits used; no quota-consuming work was added artificially.
 Next session: Standard GPT-6.1 Sol high for production; independent GPT-6.1 Sol xhigh for required Top review/gate. Keep main clean.
-
-## Handover — M0-T06 supplied font-license evidence — 2026-10-12 — codex (Sol)
-
-Done: Found the owner-provided `Thmanyah-Font-Family.zip`. Candidate `m0-s3-font-license-evidence` at `8ccd9fd` retains both package license PDFs, records their hashes and the archive hash in font provenance, and confirms all eight app OTF hashes match the package. M0 remains NOT APPROVED; no M1 starts.
-Verified: `python3 -m json.tool Madar/docs/font-provenance.json` passed; focused archive check printed `PACKAGE EVIDENCE PASS: 8/8 app OTF hashes match; English and Arabic license hashes match provenance`; `git diff --check` passed. PDFKit read both license PDFs (English 5 pages, Arabic 4 pages). Documentation/evidence only; no product build/tests rerun.
-Not verified: Owner-provided archive's download origin from the official Thmanyah site; native P1b OS authentication/share; actionable T12 contrast target; physical owner-iPhone and full M0 gate.
-For the next agent: Ask the owner to confirm whether this archive was originally downloaded from `font.thmanyah.com`; the embedded license requires that source. Do not make a distribution decision until confirmed. T12/T09 UI work also remains blocked while Mac is locked: CUA reported no native app windows and the Xcode Simulator app path is absent. Continue the licensed-source question and resume Accessibility Inspector/auth journeys when UI is available.
-Branch: `m0-s3-font-license-evidence` `8ccd9fd` (current checkout at handover: `main` after docs-only checkpoint). This evidence branch is not merged; no code changed. Older/superseded worktrees and raw evidence remain preserved as previously recorded.
-Next: Keep M0 not approved; resolve license source, T12 contrast, T09 native share/auth and remaining device/manual gate requirements.
-Next session: Top GPT-6.1 Sol xhigh for milestone/section reviews; Standard GPT-6.1 Sol high for production work.
