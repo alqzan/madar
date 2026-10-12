@@ -2,10 +2,11 @@
 """Drive a real simulator Face ID match through documented devicectl commands.
 
 Run from any directory with --device, --derived-data and a new --output-dir.
-The isolated AX3/light UI test emits its checkpoint only after native auth has
+The selected UI test emits its checkpoint only after native auth has
 covered the scene. No app authentication seam or production setting is changed.
 Use --test background-retirement for the share-revocation/reentry slice; its
 launchctl snapshots require the same app PID and service label across reentry.
+Its bounded --variant selects ax3-light (default), default-light or default-dark.
 """
 import argparse
 import json
@@ -41,7 +42,10 @@ def main():
     parser.add_argument("--derived-data", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--test", choices=["share-dismissal", "background-retirement"], default="share-dismissal")
+    parser.add_argument("--variant", choices=["ax3-light", "default-light", "default-dark"], default="ax3-light")
     args = parser.parse_args()
+    if args.test != "background-retirement" and args.variant != "ax3-light":
+        parser.error("--variant default-light/default-dark requires --test background-retirement")
     root = Path(__file__).resolve().parents[1]
     output = args.output_dir.resolve()
     output.mkdir(parents=True, exist_ok=False)
@@ -75,6 +79,8 @@ def main():
                    "CODE_SIGN_IDENTITY=-", "CODE_SIGNING_ALLOWED=YES"]
         (output / "command.json").write_text(json.dumps(command, indent=2) + "\n")
         environment = dict(os.environ, TEST_RUNNER_MADAR_TEST_NATIVE_BIOMETRICS="1")
+        if args.test == "background-retirement":
+            environment["TEST_RUNNER_MADAR_TEST_NATIVE_SHARE_VARIANT"] = args.variant
         matched = False
         before_identity = None
         reentry_identity = None
@@ -118,7 +124,7 @@ def main():
             raise RuntimeError(f"Native biometric test failed or never reached its checkpoint; inspect {log}")
         if args.test == "background-retirement" and reentry_identity is None:
             raise RuntimeError(f"Native share retirement never reached its process-continuity checkpoint; inspect {log}")
-    print(f"Native AX3 Face ID/{args.test} passed: {result}")
+    print(f"Native {args.variant} Face ID/{args.test} passed: {result}")
 
 
 if __name__ == "__main__":

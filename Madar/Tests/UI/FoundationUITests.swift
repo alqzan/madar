@@ -160,8 +160,16 @@ import XCTest
             throw XCTSkip("Run scripts/native-export-biometric-test.py --test background-retirement for supported simulator Face ID orchestration.")
         }
         continueAfterFailure = false
+        let variant = ProcessInfo.processInfo.environment["MADAR_TEST_NATIVE_SHARE_VARIANT"] ?? "ax3-light"
+        let configurations: [String: (size: String, theme: String)] = [
+            "ax3-light": ("AX3", "light"),
+            "default-light": ("L", "light"),
+            "default-dark": ("L", "dark"),
+        ]
+        let configuration = try XCTUnwrap(configurations[variant], "Unsupported native share retirement variant.")
         let app = XCUIApplication()
-        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "AX3", "MADAR_UI_THEME": "light"]
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": configuration.size, "MADAR_UI_THEME": configuration.theme]
+        NSLog("MADAR_NATIVE_SHARE_VARIANT %@ size=%@ theme=%@", variant, configuration.size, configuration.theme)
         app.launch(); openPlainExportSettings(app)
         defer { app.terminate() }
         let cover = app.descendants(matching: .any).matching(identifier: "scene-privacy-cover").firstMatch
@@ -187,7 +195,7 @@ import XCTest
         )).firstMatch
         XCTAssertTrue(file.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(saveToFiles.waitForExistence(timeout: 10), app.debugDescription)
-        attachScreenshot(app, named: "M0-T09-AX3-native-share-before-background")
+        attachScreenshot(app, named: "M0-T09-\(variant)-native-share-before-background")
         NSLog("MADAR_NATIVE_SHARE_BEFORE_HOME")
         let backgroundStarted = ProcessInfo.processInfo.systemUptime
         XCUIDevice.shared.press(.home)
@@ -206,7 +214,7 @@ import XCTest
         XCTAssertFalse(file.exists, "The native archive item must retire on background revocation.")
         XCTAssertFalse(saveToFiles.exists, "The native share destination must retire with its archive item.")
         XCTAssertFalse(share.exists, "A revoked cached export must not retain share readiness.")
-        // Inspect the adjacent export rows at AX3 rather than accepting absence
+        // Inspect the adjacent export rows rather than accepting absence
         // solely from a virtualized offscreen share button.
         let password = app.secureTextFields["backup-password"]
         let form = app.collectionViews.firstMatch
@@ -223,7 +231,7 @@ import XCTest
         XCTAssertEqual(XCTWaiter.wait(for: [reopened], timeout: 5), .completed,
                        "Re-entry must not automatically reopen the native sheet or publish share readiness.")
         XCTAssertFalse(cover.exists)
-        attachScreenshot(app, named: "M0-T09-AX3-native-share-retired-after-reentry")
+        attachScreenshot(app, named: "M0-T09-\(variant)-native-share-retired-after-reentry")
         // This proves foreground retirement, not the synchronous inactive cover,
         // actual app-switcher frame, lease expiry, file deletion or Files write.
     }
