@@ -370,7 +370,7 @@ struct PrayerTodayView: View {
 
     // MARK: Hali, qada and qiyam
 
-    /// «سلاسلك»: the three nested streaks as minbar steps (owner decision, 13 October 2026). Tapping opens the details.
+    /// «سلاسلك»: the three nested streaks as nested arches (owner decision, 13 October 2026). Tapping opens the details.
     private func haliCard(_ snapshot: PrayerSnapshot) -> some View {
         let stats = snapshot.statistics
         let levels = PrayerStreakLevel.shown(congregation: session.bool("salah.showMosqueStreak"))
@@ -384,7 +384,7 @@ struct PrayerTodayView: View {
                         Image(systemName: "chevron.forward").font(.footnote.weight(.semibold))
                             .foregroundStyle(theme.secondaryInk).accessibilityHidden(true)
                     }
-                    PrayerStreakSteps(levels: levels, stats: stats, digits: digits)
+                    PrayerStreakArches(levels: levels, stats: stats, digits: digits)
                 }
             }
         }
@@ -871,7 +871,7 @@ private struct PrayerTodayArch: View {
 }
 
 /// Diamond lattice of 1-point lines (§5: «إطار سبكة معيّنات ١ نقطة»).
-private struct PrayerLatticePattern: Shape {
+struct PrayerLatticePattern: Shape {
     let spacing: CGFloat
     func path(in rect: CGRect) -> Path {
         var path = Path()

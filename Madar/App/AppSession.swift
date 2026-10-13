@@ -305,25 +305,34 @@ final class AppSession {
     /// Use with MADAR_UI_NOW 2026-10-08T16:20+03:00 and MADAR_UI_TRACKING_START 2026-10-01.
     private func preparePrayerStreakShowcaseFixture() throws {
         guard ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"] != nil,
-              ProcessInfo.processInfo.environment["MADAR_UI_PRAYER_FIXTURE"] == "streakShowcase" else { return }
+              let fixture = ProcessInfo.processInfo.environment["MADAR_UI_PRAYER_FIXTURE"], ["streakShowcase", "streakShowcaseMonth"].contains(fixture) else { return }
         let context = ModelContext(container)
         guard try context.fetch(FetchDescriptor<PrayerLog>()).isEmpty else { return }
-        for day in 1...8 {
-            let dayKey = String(format: "2026-10-%02d", day)
+        // `streakShowcaseMonth` (tracking start 2026-09-12): Asr missed on 13 Sep, Fajr made up on 21 Sep,
+        // Dhuhr alone on 28 Sep. Expected: congregation 9, on time 16, completion 24.
+        let month = fixture == "streakShowcaseMonth"
+        let keys = month ? (12...30).map { String(format: "2026-09-%02d", $0) } + (1...8).map { String(format: "2026-10-%02d", $0) }
+                         : (1...8).map { String(format: "2026-10-%02d", $0) }
+        let qadaDay = month ? "2026-09-21" : "2026-10-03", aloneDay = month ? "2026-09-28" : "2026-10-04"
+        let aloneSlot: Prayer = month ? .dhuhr : .asr
+        let fridays: Set<String> = ["2026-09-18", "2026-09-25", "2026-10-02"]
+        for dayKey in keys {
             for prayer in Prayer.allCases {
-                if day == 6 && prayer == .isha { continue }
-                if day == 8 && ![.fajr, .dhuhr].contains(prayer) { continue }
+                if !month && dayKey == "2026-10-06" && prayer == .isha { continue }
+                if dayKey == "2026-10-08" && ![.fajr, .dhuhr].contains(prayer) { continue }
                 let row = PrayerLog()
                 row.dayKey = dayKey
                 row.prayer = prayer.rawValue
-                row.status = day == 3 && prayer == .fajr ? "qada" : day == 4 && prayer == .asr ? "alone" : "jamaah"
-                if prayer == .dhuhr && day == 2 { row.fridayKind = "jumuah" }
+                row.status = month && dayKey == "2026-09-13" && prayer == .asr ? "missed"
+                    : dayKey == qadaDay && prayer == .fajr ? "qada" : dayKey == aloneDay && prayer == aloneSlot ? "alone" : "jamaah"
+                if prayer == .dhuhr && fridays.contains(dayKey) && row.status == "jamaah" { row.fridayKind = "jumuah" }
                 row.tzID = "Asia/Riyadh"
                 row.eventAt = try GregorianDay(dayKey).date(in: ActivePlace.riyadh.timeZone).addingTimeInterval(12 * 3600)
                 row.source = "user"
                 context.insert(row)
-                if row.status == "qada" {
-                    let debt = QadaItem(); debt.originalDayKey = dayKey; debt.prayer = prayer.rawValue; debt.madeUpAt = row.eventAt
+                if row.status == "qada" || row.status == "missed" {
+                    let debt = QadaItem(); debt.originalDayKey = dayKey; debt.prayer = prayer.rawValue
+                    if row.status == "qada" { debt.madeUpAt = row.eventAt }
                     context.insert(debt)
                 }
             }

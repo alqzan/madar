@@ -267,6 +267,24 @@ import XCTest
         app.terminate()
     }
 
+    /// M1-V01: a longer week for the «سلاسلك» arch (hand-authored fixture: congregation 9, on time 16, completion 24).
+    func test_M1V01_StreakArchMonth() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
+            "MADAR_UI_NOW": "2026-10-08T16:20:00+03:00", "MADAR_UI_TRACKING_START": "2026-09-12",
+            "MADAR_UI_PRAYER_FIXTURE": "streakShowcaseMonth", "MADAR_UI_THEME": "light"]
+        app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+        let streaks = app.buttons["prayer-streaks"]
+        scrollTo(streaks, in: app); app.swipeUp()
+        let label = streaks.label.filter { $0 != "\u{2068}" && $0 != "\u{2069}" }
+        XCTAssertTrue(label.contains("الجماعة ٩ أيام"), label)
+        XCTAssertTrue(label.contains("في وقتها ١٦ يومًا"), label)
+        XCTAssertTrue(label.contains("إتمام الخمس ٢٤ يومًا"), label)
+        attachScreenshot(app, named: "M1-V01-streaks-month-L")
+        app.terminate()
+    }
+
     /// M1-V05: the past-day sheet, for comparison with screens/salah/05-S4-Day(-s1).jpg.
     func test_M1V05_DaySheetMatchesCanonical() throws {
         continueAfterFailure = false
