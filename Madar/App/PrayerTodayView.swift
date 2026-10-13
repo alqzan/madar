@@ -20,6 +20,10 @@ struct PrayerTodayView: View {
                         prayerArches(snapshot)
                         if !snapshot.pending.isEmpty { pendingCard(snapshot) }
                         if !snapshot.unconfirmed.isEmpty { recoveryCard(snapshot) }
+                        if session.bool("salah.askHeart"), let cell = snapshot.history.flatMap(\.cells).first(where: { snapshot.pendingHeart.contains($0.reference) }) {
+                            Button("بقي سؤال القلب عن " + title(cell.reference.prayer)) { selectedSheet = .heart(cell) }
+                                .frame(minHeight: 44).font(MadarTypography.section()).accessibilityIdentifier("prayer-heart-review")
+                        }
                         if snapshot.statistics.denominator >= 5 { statisticsCard(snapshot) }
                         Button("سجلّ الصلاة") { selectedSheet = .statistics }
                             .frame(minHeight: 44).accessibilityIdentifier("prayer-history")
@@ -48,6 +52,8 @@ struct PrayerTodayView: View {
         .sheet(item: $selectedSheet) { route in
             Group {
             switch route {
+            case .heart(let cell):
+                PrayerHeartAnswerSheet(session: session, cell: cell, finished: { selectedSheet = nil })
             case .statistics:
                 NavigationStack {
                     if let snapshot = try? session.prayerSnapshot(at: session.prayerNow()) {
@@ -56,7 +62,8 @@ struct PrayerTodayView: View {
                     }
                 }
             case .log(let cell):
-                PrayerTodayLogSheet(cell: cell, isSaving: session.prayerWriteInProgress) { status, fridayKind, makeUpNow in
+                PrayerTodayLogSheet(cell: cell, isSaving: session.prayerWriteInProgress,
+                    answerHeart: session.bool("salah.askHeart") && [.jamaah, .alone, .qada].contains(cell.status) ? { selectedSheet = .heart(cell) } : nil) { status, fridayKind, makeUpNow in
                     if status == .qada {
                         session.makeUpPrayer(cell.reference, fridayKind: fridayKind)
                     } else if status == .missed && makeUpNow {
@@ -354,11 +361,13 @@ private struct PrayerTodayArch: View {
 private enum PrayerTodaySheet: Identifiable {
     case log(PrayerCell)
     case statistics
+    case heart(PrayerCell)
     case makeUp(PrayerQada, isFridayNoon: Bool, dateLabel: String)
     case recovery([PrayerReference], Set<PrayerReference>, TimeZone)
     var id: String {
         switch self {
         case .statistics: "statistics"
+        case .heart(let cell): "heart-\(cell.reference.naturalKey)"
         case .log(let cell): "log-\(cell.reference.naturalKey)"
         case .makeUp(let item, _, _): "makeup-\(item.id.uuidString)"
         case .recovery(let references, _, _): "recovery-\(references.first?.naturalKey ?? "empty")"
@@ -370,13 +379,14 @@ private struct PrayerTodayLogSheet: View {
     let cell: PrayerCell
     let isSaving: Bool
     let save: (PrayerStoredStatus, FridayPrayerKind?, Bool) -> Void
+    let answerHeart: (() -> Void)?
     @Environment(\.dismiss) private var dismiss
     @Environment(\.roomTheme) private var theme
     @State private var status: PrayerStoredStatus
     @State private var fridayKind: FridayPrayerKind?
 
-    init(cell: PrayerCell, isSaving: Bool, save: @escaping (PrayerStoredStatus, FridayPrayerKind?, Bool) -> Void) {
-        self.cell = cell; self.isSaving = isSaving; self.save = save
+    init(cell: PrayerCell, isSaving: Bool, answerHeart: (() -> Void)? = nil, save: @escaping (PrayerStoredStatus, FridayPrayerKind?, Bool) -> Void) {
+        self.cell = cell; self.isSaving = isSaving; self.save = save; self.answerHeart = answerHeart
         let initial: PrayerStoredStatus = switch cell.status { case .alone: .alone; case .missed: .missed; default: .jamaah }
         _status = State(initialValue: initial)
         _fridayKind = State(initialValue: cell.fridayKind)
@@ -395,6 +405,9 @@ private struct PrayerTodayLogSheet: View {
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                         ForEach(statusOptions, id: \.self) { option in statusButton(option) }
                     }
+                }
+                if let answerHeart {
+                    Section { Button("سؤال القلب") { answerHeart() }.frame(minHeight: 44).accessibilityIdentifier("prayer-log-heart") }
                 }
                 if needsFridayKind {
                     Section("تصنيف ظهر الجمعة") {
@@ -647,6 +660,20 @@ private struct PrayerStatisticsView: View {
                         }
                     }
                 }
+                if session.bool("salah.askHeart"), !snapshot.statistics.heartDistribution.isEmpty {
+                    PrayerSummarySection(title: "حضور القلب") {
+                        MadarCard {
+                            VStack(alignment: .leading, spacing: 14) {
+                                Text("كل إجابة لحظة خاصة، بلا درجة أو ترتيب.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                                ForEach(PrayerHeart.allCases, id: \.self) { heart in
+                                    if snapshot.statistics.heartDistribution[heart, default: 0] > 0 {
+                                        Text(heartTitle(heart) + "، " + heartSentence(heart)).font(MadarTypography.section())
+                                    }
+                                }
+                            }.accessibilityIdentifier("prayer-heart-reflection")
+                        }
+                    }
+                }
                 PrayerSummarySection(title: "التزامك بكل صلاة") {
                     MadarCard {
                         VStack(alignment: .leading, spacing: 16) {
@@ -781,4 +808,46 @@ private struct PrayerSummarySection<Content: View>: View {
             content()
         }
     }
+}
+
+private struct PrayerHeartAnswerSheet: View {
+    let session: AppSession
+    let cell: PrayerCell
+    let finished: () -> Void
+    @Environment(\.roomTheme) private var theme
+    @State private var answer: PrayerHeart?
+    init(session: AppSession, cell: PrayerCell, finished: @escaping () -> Void) {
+        self.session = session; self.cell = cell; self.finished = finished; _answer = State(initialValue: cell.heart)
+    }
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Text("كيف كان حضور قلبك في " + prayerTitle(cell.reference.prayer) + "؟").font(MadarTypography.section())
+                    Text("سؤال اختياري للتأمّل، بلا درجة أو مقارنة.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    ForEach(PrayerHeart.allCases, id: \.self) { heart in
+                        Button { answer = heart } label: {
+                            HStack { VStack(alignment: .leading, spacing: 5) { Text(heartTitle(heart)); Text(heartSentence(heart)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }; Spacer(); if answer == heart { Image(systemName: "checkmark") } }.frame(minHeight: 44).contentShape(Rectangle())
+                        }.buttonStyle(.plain).accessibilityIdentifier("prayer-heart-\(heart.rawValue)").accessibilityAddTraits(answer == heart ? [.isSelected] : [])
+                    }
+                }
+                Section {
+                    Button("احفظ الإجابة") { save(answer) }.buttonStyle(MadarPrimaryButton()).disabled(answer == nil).opacity(answer == nil ? 0.5 : 1)
+                        .accessibilityIdentifier("prayer-heart-save")
+                    Button("أمرّ") { save(nil) }.frame(minHeight: 44).accessibilityIdentifier("prayer-heart-skip")
+                }
+            }.navigationTitle("سؤال القلب").navigationBarTitleDisplayMode(.inline)
+                .toolbar { ToolbarItem(placement: .cancellationAction) { Button("إغلاق") { finished() } } }
+                .disabled(session.prayerWriteInProgress)
+        }
+    }
+    private func save(_ value: PrayerHeart?) {
+        session.answerPrayerHeart(cell.reference, heart: value) { succeeded in if succeeded { finished() } }
+    }
+}
+private func heartTitle(_ heart: PrayerHeart) -> String {
+    switch heart { case .distracted: "شارد"; case .present: "حاضر"; case .khashi: "خاشع" }
+}
+private func heartSentence(_ heart: PrayerHeart) -> String {
+    switch heart { case .distracted: "كنت في وادٍ آخر"; case .present: "عرفت ما أقول"; case .khashi: "وجدت لها أثرًا" }
 }

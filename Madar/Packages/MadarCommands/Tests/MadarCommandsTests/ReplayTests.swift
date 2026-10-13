@@ -38,6 +38,38 @@ import MadarData
         while calendar.component(.weekday, from: candidate.date(in: calendar.timeZone)) != 6 { candidate = candidate.adding(days: -1) }
         return candidate
     }
+    @Test func test_M1T06_HeartAnswerClearReplayAndUndoPreservePrayerStatus() async throws {
+        let now = date("2026-10-13T09:00:00+03:00")
+        let (container, bus, directory) = try fixture(at: now)
+        let day = prayerDay(now).description
+        let log = prayer(now: now)
+        _ = try await bus.execute(log, now: now)
+        func heart(_ value: MadarCore.JSONValue, source: CommandSource = .app, id: UUID = UUID()) -> CommandEnvelope {
+            .init(commandID: id, name: "prayer.setHeart", payload: .object(["dayKey": .string(day), "prayer": .string("fajr"), "heart": value]), source: source, issuedAt: now)
+        }
+        let answer = heart(.string("present"))
+        let saved = try await bus.execute(answer, now: now)
+        #expect(saved.status == .applied && saved.undoToken != nil)
+        #expect(try await bus.execute(answer, now: now.addingTimeInterval(1)) == saved)
+        #expect(try await bus.execute(heart(.string("present")), now: now.addingTimeInterval(1)).status == .duplicate)
+        let row = try #require(try ModelContext(container).fetch(FetchDescriptor<PrayerLog>()).first)
+        #expect(row.status == "jamaah" && row.heart == "present")
+        #expect(try await bus.execute(heart(.string("ranked")), now: now).reason == "invalidPayload")
+        #expect(try await bus.execute(heart(.string("present"), source: .widget), now: now).status == .needsApp)
+        let unrecorded = CommandEnvelope(name: "prayer.setHeart", payload: .object(["dayKey": .string(day), "prayer": .string("asr"), "heart": .string("present")]), issuedAt: now)
+        #expect(try await bus.execute(unrecorded, now: now).status == .rejected)
+        let reopened = try MadarContainerFactory.makeLocal(at: directory)
+        let second = CommandBus(adapter: DurableCommandAdapter(container: reopened, lockDirectory: directory, transactionClock: { $0 }))
+        let cleared = try await second.execute(heart(.null), now: now.addingTimeInterval(2))
+        #expect(cleared.status == .applied)
+        #expect(try ModelContext(reopened).fetch(FetchDescriptor<PrayerLog>()).first?.heart == nil)
+        let undo = CommandEnvelope(name: "system.undo", payload: .object(["undoToken": .string(try #require(cleared.undoToken).uuidString)]), issuedAt: now)
+        #expect(try await second.execute(undo, now: now.addingTimeInterval(3)).status == .applied)
+        let restored = try #require(try ModelContext(reopened).fetch(FetchDescriptor<PrayerLog>()).first)
+        #expect(restored.heart == "present" && restored.status == "jamaah")
+        #expect(try ModelContext(reopened).fetchCount(FetchDescriptor<QadaItem>()) == 0)
+    }
+
     @Test func test_M0R04_distinctDuplicateReceiptNeverOverwritesLaterEdit() async throws {
         let (container, bus, _) = try fixture(), now = Date()
         let a = prayer(now: now), b = prayer(now: now)

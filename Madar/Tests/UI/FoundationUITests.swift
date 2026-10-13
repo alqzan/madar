@@ -1,6 +1,57 @@
 import XCTest
 
 @MainActor final class FoundationUITests: XCTestCase {
+    func test_M1T06_OptionalHeartSaveSkipUndoAndRelaunch() throws {
+        continueAfterFailure = false
+        for size in ["L", "AX3"] {
+            let app = XCUIApplication()
+            app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": size,
+                "MADAR_UI_NOW": "2026-10-07T20:00:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01",
+                "MADAR_UI_PRAYER_FIXTURE": "ratio26of30", "MADAR_UI_THEME": "light"]
+            app.launch(); finishOnboarding(app)
+            app.tabBars.buttons["الصلاة"].tap()
+            XCTAssertFalse(app.buttons["prayer-heart-review"].exists, "RP6 defaults to off")
+            app.terminate(); app.launch(); finishOnboarding(app)
+            app.buttons["settings-button"].tap()
+            let search = app.textFields["settings-search"]
+            scrollTo(search, in: app); search.tap(); search.typeText("salah.askHeart\n")
+            let toggle = app.switches["setting-salah.askHeart"]
+            scrollTo(toggle, in: app); XCTAssertEqual(toggle.value as? String, "0"); toggle.tap()
+            app.swipeDown(); app.tabBars.buttons["الصلاة"].tap()
+            let review = app.buttons["prayer-heart-review"]
+            scrollTo(review, in: app); review.tap()
+            let present = app.buttons["prayer-heart-present"]
+            scrollTo(present, in: app); present.tap()
+            let selected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "selected == true"), object: present)
+            XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 10), .completed, app.debugDescription)
+            attachScreenshot(app, named: "M1-T06-heart-\(size)")
+            let save = app.buttons["prayer-heart-save"]
+            scrollTo(save, in: app); save.tap()
+            let closed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: save)
+            XCTAssertEqual(XCTWaiter.wait(for: [closed], timeout: 15), .completed, app.debugDescription)
+            let undo = app.buttons["undo-button"]
+            XCTAssertTrue(undo.waitForExistence(timeout: 15)); undo.tap()
+            scrollTo(review, in: app); review.tap()
+            XCTAssertFalse(present.isSelected)
+            let skip = app.buttons["prayer-heart-skip"]
+            scrollTo(skip, in: app); skip.tap()
+            scrollTo(review, in: app); review.tap()
+            scrollTo(present, in: app); present.tap(); scrollTo(save, in: app); save.tap()
+            app.terminate(); app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+            let history = app.buttons["prayer-history"]
+            scrollTo(history, in: app); history.tap()
+            let day = app.buttons["prayer-history-day-2026-10-06"]
+            scrollTo(day, in: app); day.tap()
+            app.buttons["prayer-history-log-fajr"].tap()
+            let heart = app.buttons["prayer-log-heart"]
+            scrollTo(heart, in: app); heart.tap()
+            XCTAssertTrue(present.waitForExistence(timeout: 10)); XCTAssertTrue(present.isSelected)
+            scrollTo(skip, in: app); skip.tap()
+            XCTAssertTrue(undo.waitForExistence(timeout: 15)); undo.tap()
+            app.terminate()
+        }
+    }
+
     func test_M1T05_HaliGoldenRatioHistoryEditUndoAndAX3() throws {
         continueAfterFailure = false
         for size in ["L", "AX3"] {

@@ -68,7 +68,7 @@ final class AppSession {
     })
     private var expiryTask: Task<Void, Never>?
 
-    static let supportedKeys = ["core.dayStart", "core.firstCalendar", "core.hijriSource", "core.hijriOffset", "core.weekStart", "core.theme", "core.numerals", "core.homeCity", "core.faceIDLock", "salah.askAfterAdhanMin", "salah.askReminder", "salah.liveActivity", "salah.showMosqueStreak", "notif.thisDeviceReminders", "notif.quietAfterIsha", "notif.quietFrom"]
+    static let supportedKeys = ["core.dayStart", "core.firstCalendar", "core.hijriSource", "core.hijriOffset", "core.weekStart", "core.theme", "core.numerals", "core.homeCity", "core.faceIDLock", "salah.askAfterAdhanMin", "salah.askReminder", "salah.liveActivity", "salah.showMosqueStreak", "salah.askHeart", "notif.thisDeviceReminders", "notif.quietAfterIsha", "notif.quietFrom"]
 
     init(container: ModelContainer, managedStore: ManagedDataStore? = nil, groupDirectory: URL? = nil) throws {
         self.container = container
@@ -118,6 +118,12 @@ final class AppSession {
         ])
         sendPrayerCommand(name: "prayer.log", payload: payload,
             undoMessage: status == .missed ? "سُجّلت فائتة · التراجع متاح لعشر دقائق" : "سُجّلت الصلاة · التراجع متاح لعشر دقائق", completion: completion)
+    }
+    func answerPrayerHeart(_ reference: PrayerReference, heart: PrayerHeart?, completion: ((Bool) -> Void)? = nil) {
+        sendPrayerCommand(name: "prayer.setHeart", payload: .object([
+            "dayKey": .string(reference.day.description), "prayer": .string(reference.prayer.rawValue),
+            "heart": heart.map { .string($0.rawValue) } ?? .null
+        ]), undoMessage: "حُفظت إجابة القلب · التراجع متاح لعشر دقائق", completion: completion)
     }
     func makeUpPrayer(_ reference: PrayerReference, fridayKind: FridayPrayerKind? = nil) {
         let at = prayerNow()

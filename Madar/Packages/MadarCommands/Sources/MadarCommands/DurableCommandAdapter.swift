@@ -97,7 +97,7 @@ private struct ReceiptWire: Codable {
                                        undoExpiresAt: row.undoExpiresAt ?? row.createdAt,
                                        undoJSON: row.undoJSON,
                                        outcome: .init(status: CommandStatus(rawValue: row.status) ?? .rejected,
-                                                      undoToken: row.status == "applied" && ["prayer.log", "prayer.makeUp", "prayer.resolveGap", "settings.set", "settings.applyPreset"].contains(row.name) ? id : nil))
+                                                      undoToken: row.status == "applied" && ["prayer.log", "prayer.makeUp", "prayer.resolveGap", "prayer.setHeart", "settings.set", "settings.applyPreset"].contains(row.name) ? id : nil))
                 return try JSONDecoder().decode(CoreCommandReceipt.self, from: JSONEncoder().encode(wire))
             }
             // Receipt identity is authoritative even after undo/deletion or retention expiry.
@@ -115,6 +115,12 @@ private struct ReceiptWire: Codable {
                 if let row = matches.max(by: { $0.updatedAt < $1.updatedAt }), row.status == status,
                    (heart == nil || row.heart == heart), (shortened == nil || row.shortened == shortened),
                    (fridayKind == nil || row.fridayKind == fridayKind) {
+                    existingHash = request.payloadHash
+                }
+            } else if case .answerPrayerHeart(let reference, let heart) = request.operation {
+                let rows = try context.fetch(FetchDescriptor<PrayerLog>()).filter { $0.dayKey == reference.day.description && $0.prayer == reference.prayer.rawValue && $0.mergedInto == nil }
+                if rows.contains(where: { $0.deletedAt != nil }) { return .init(status: .rejected, reason: "explicitRestoreRequired") }
+                if let row = rows.max(by: { $0.updatedAt < $1.updatedAt }), ["jamaah", "alone", "qada"].contains(row.status), row.heart == heart?.rawValue {
                     existingHash = request.payloadHash
                 }
             } else if case .makeUpPrayer(let dayKey, let prayer, _, let fridayKind) = request.operation {
@@ -164,6 +170,14 @@ private struct ReceiptWire: Codable {
                     fridayKind: fridayKind.flatMap(FridayPrayerKind.init(rawValue:)))
                 do {
                     if let undo = try PrayerMutationHandler.stage(operation: mutation, in: context, now: now, writer: writer, source: request.envelope.source) {
+                        inverse = SettingsInverse(settings: [:], afterSettings: [:], layouts: [:], afterLayouts: [:], prayerMutation: undo)
+                    }
+                } catch let error as PrayerDomainError {
+                    return .init(status: .rejected, reason: String(describing: error))
+                }
+            case .answerPrayerHeart(let reference, let heart):
+                do {
+                    if let undo = try PrayerMutationHandler.stage(operation: .answerHeart(reference, heart), in: context, now: now, writer: writer, source: request.envelope.source) {
                         inverse = SettingsInverse(settings: [:], afterSettings: [:], layouts: [:], afterLayouts: [:], prayerMutation: undo)
                     }
                 } catch let error as PrayerDomainError {

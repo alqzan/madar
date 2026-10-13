@@ -118,7 +118,7 @@ struct CustomizeMadar: View {
 func sectionFor(_ key: String) -> String {
     if ["core.dayStart", "core.firstCalendar", "core.hijriSource", "core.hijriOffset", "core.weekStart"].contains(key) { return "اليوم والتقويم" }
     if key == "core.homeCity" { return "مدينتك" }
-    if key == "salah.showMosqueStreak" { return "الصلاة" }
+    if ["salah.showMosqueStreak", "salah.askHeart"].contains(key) { return "الصلاة" }
     if key == "core.faceIDLock" { return "الخصوصية" }
     if ["salah.askAfterAdhanMin", "salah.askReminder", "salah.liveActivity", "notif.thisDeviceReminders", "notif.quietAfterIsha", "notif.quietFrom"].contains(key) { return "الإشعارات" }
     return "المظهر"
