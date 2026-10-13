@@ -3,52 +3,65 @@ import MadarCore
 import MadarDesign
 import MadarPrayer
 
+/// S1 · Prayer home («الرواق والبركة»), matched to `screens/salah/01-S1-Home.jpg` and `-s1`.
+/// Not copied from the canonical: the day/night button (prototype only), sample numbers,
+/// the heart label under the arches (RP6), and the «تُحسب فائتة» line (RP1).
 struct PrayerTodayView: View {
     @Bindable var session: AppSession
-    @Environment(\.roomTheme) private var theme
+    @Environment(\.roomTheme) private var inheritedTheme
     @Environment(\.dynamicTypeSize) private var dynamicType
     @State private var selectedSheet: PrayerTodaySheet?
+
+    private var theme: RoomTheme { RoomTheme(room: "salah", dark: inheritedTheme.dark, calmPaper: inheritedTheme.calmPaper) }
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 60)) { timeline in
             let instant = session.prayerNow(timeline.date)
             ScrollView {
-                VStack(alignment: .leading, spacing: 22) {
+                VStack(spacing: 0) {
                     if let snapshot = try? session.prayerSnapshot(at: instant) {
-                        header(day: snapshot.today.day, at: instant)
+                        header(day: snapshot.today.day)
+                            .padding(.top, 8)
                         nextPrayer(snapshot, now: instant)
-                        prayerArches(snapshot)
-                        if !snapshot.pending.isEmpty { pendingCard(snapshot) }
-                        if !snapshot.unconfirmed.isEmpty { recoveryCard(snapshot) }
-                        if session.bool("salah.askHeart"), let cell = snapshot.history.flatMap(\.cells).first(where: { snapshot.pendingHeart.contains($0.reference) }) {
-                            Button("بقي سؤال القلب عن " + title(cell.reference.prayer)) { selectedSheet = .heart(cell) }
-                                .frame(minHeight: 44).font(MadarTypography.section()).accessibilityIdentifier("prayer-heart-review")
-                        }
-                        if snapshot.statistics.denominator >= 5 { statisticsCard(snapshot) }
-                        Button("سجلّ الصلاة") { selectedSheet = .statistics }
-                            .frame(minHeight: 44).accessibilityIdentifier("prayer-history")
-                        qadaCard(snapshot)
-                        qiyamCard(snapshot)
-                        MadarCard {
-                            Text("ما لم تُسجّله يبقى غير محسوم؛ لا ينشأ قضاء تلقائيًا.")
-                                .font(MadarTypography.caption())
+                            .padding(.top, 26)
+                        verseDivider
+                            .padding(.top, 18)
+                        riwaq(snapshot, now: instant)
+                            .padding(.top, 18)
+                        if snapshot.hasTimes {
+                            Text(todaySummary(snapshot))
+                                .font(PrayerHomeType.body)
                                 .foregroundStyle(theme.secondaryInk)
+                                .multilineTextAlignment(.center)
+                                .padding(.top, 14)
+                                .accessibilityIdentifier("prayer-today-summary")
                         }
+                        VStack(spacing: 16) {
+                            if let pending = notice(snapshot, now: instant) { pending }
+                            heartNotice(snapshot)
+                            haliCard(snapshot)
+                            qadaCard(snapshot)
+                            qiyamCard(snapshot)
+                        }
+                        .padding(.top, 20)
                     } else {
-                        header(day: nil, at: instant)
-                        MadarCard {
+                        header(day: nil)
+                        PrayerPaperCard {
                             Text("تعذّر حساب صلاة اليوم. راجع المدينة وطريقة الحساب في خصّص مدار.")
                                 .font(MadarTypography.body())
                         }
+                        .padding(.top, 24)
                     }
                 }
-                .padding(18)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 32)
                 .frame(maxWidth: 620)
                 .frame(maxWidth: .infinity)
             }
             .background(theme.background)
             .foregroundStyle(theme.ink)
         }
+        .environment(\.roomTheme, theme)
         .toolbarVisibility(.hidden, for: .navigationBar)
         .sheet(item: $selectedSheet) { route in
             Group {
@@ -69,6 +82,13 @@ struct PrayerTodayView: View {
                         PrayerStatisticsView(session: session, snapshot: snapshot) { choose($0) }
                             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("تم") { selectedSheet = nil } } }
                     }
+                }
+            case .qadaList:
+                NavigationStack {
+                    PrayerQadaListSheet(session: session, dateLabel: qadaDate,
+                        makeUp: { item in selectedSheet = .makeUp(item, isFridayNoon: item.isFriday, dateLabel: qadaDate(item.reference.day)) },
+                        addOld: { selectedSheet = .oldMissed })
+                        .toolbar { ToolbarItem(placement: .confirmationAction) { Button("تم") { selectedSheet = nil } } }
                 }
             case .log(let cell):
                 PrayerTodayLogSheet(cell: cell, isSaving: session.prayerWriteInProgress,
@@ -92,39 +112,61 @@ struct PrayerTodayView: View {
                     session.resolvePrayerGap(resolutions)
                 }
             }
-            }.dynamicTypeSize(dynamicType)
+            }
+            .dynamicTypeSize(dynamicType)
+            .environment(\.roomTheme, theme)
         }
     }
 
-    private func header(day prayerDay: GregorianDay?, at instant: Date) -> some View {
-        let place = session.activePlace
-        let day = prayerDay ?? GregorianDay.containing(instant, in: place.timeZone)
-        let midday = day.date(in: place.timeZone).addingTimeInterval(12 * 3600)
-        let dualDate = DualDate(instant: midday, timeZone: place.timeZone,
-            source: HijriSource(rawValue: session.string("core.hijriSource")) ?? .ummAlQura,
-            sightingOffset: Int(session.number("core.hijriOffset")))
-        let numerals: NumeralStyle = session.string("core.numerals") == "western" ? .western : .hindi
-        let firstCalendar: FirstCalendar = session.string("core.firstCalendar") == "gregorian" ? .gregorian : .hijri
-        return VStack(alignment: .leading, spacing: 6) {
+    // MARK: Header and next prayer
+
+    private func header(day prayerDay: GregorianDay?) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
             Text("الصلاة").font(MadarTypography.title()).accessibilityAddTraits(.isHeader)
-            Text(dualDate.text(firstCalendar: firstCalendar, numerals: numerals))
-                .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+            Text(headerDate(prayerDay ?? GregorianDay.containing(session.prayerNow(), in: session.activePlace.timeZone)))
+                .font(PrayerHomeType.body)
+                .foregroundStyle(theme.secondaryInk)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
         .accessibilityIdentifier("prayer-today-header")
     }
 
+    /// «الأربعاء ٢٦ ربيع الآخر ١٤٤٨، ٧ أكتوبر». RU1: «،» separates the two dates, never «·».
+    private func headerDate(_ day: GregorianDay) -> String {
+        let place = session.activePlace
+        let midday = day.date(in: place.timeZone).addingTimeInterval(12 * 3600)
+        let dual = DualDate(instant: midday, timeZone: place.timeZone,
+            source: HijriSource(rawValue: session.string("core.hijriSource")) ?? .ummAlQura,
+            sightingOffset: Int(session.number("core.hijriOffset")))
+        let numerals: NumeralStyle = session.string("core.numerals") == "western" ? .western : .hindi
+        let digits = MadarNumberFormatter(style: numerals)
+        let months = ["محرم", "صفر", "ربيع الأول", "ربيع الآخر", "جمادى الأولى", "جمادى الآخرة", "رجب", "شعبان", "رمضان", "شوال", "ذو القعدة", "ذو الحجة"]
+        let hijri = "\(digits.string(dual.hijri.day)) \(months[dual.hijri.month - 1]) \(digits.string(dual.hijri.year))"
+        let formatter = DateFormatter()
+        formatter.locale = numeralLocale
+        formatter.timeZone = place.timeZone
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.dateFormat = "EEEE"
+        let weekday = formatter.string(from: midday)
+        formatter.dateFormat = "d MMMM"
+        let gregorian = formatter.string(from: midday)
+        return session.string("core.firstCalendar") == "gregorian"
+            ? "\(weekday) \(gregorian)، \(hijri)"
+            : "\(weekday) \(hijri)، \(gregorian)"
+    }
+
     private func nextPrayer(_ snapshot: PrayerSnapshot, now: Date) -> some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 6) {
             if let next = snapshot.next {
-                Text("الصلاة القادمة").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                Text(title(next.reference.prayer)).font(MadarTypography.title())
-                Text(clock(next.time, timeZone: next.place.timeZone))
-                    .font(MadarTypography.body()).monospacedDigit()
-                if next.time > now {
-                    Text("بعد \(next.time, style: .relative)")
-                        .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                }
+                Text("الصلاة القادمة").font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk)
+                Text(nextTitle(next.reference, snapshot: snapshot))
+                    .font(PrayerHomeType.hero)
+                    .lineLimit(1).minimumScaleFactor(0.7)
+                Text(nextLine(next, now: now))
+                    .font(PrayerHomeType.lead)
+                    .foregroundStyle(theme.secondaryInk)
+                    .multilineTextAlignment(.center)
             } else if snapshot.hasTimes {
                 Text("اكتمل يوم الصلاة").font(MadarTypography.cardTitle())
             } else {
@@ -134,34 +176,64 @@ struct PrayerTodayView: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 12)
+        .accessibilityElement(children: .combine)
         .accessibilityIdentifier("prayer-next")
     }
 
-    private func prayerArches(_ snapshot: PrayerSnapshot) -> some View {
-        MadarCard {
-            VStack(spacing: 12) {
-                if dynamicType.isAccessibilitySize {
+    private func nextLine(_ next: PrayerOccurrence, now: Date) -> String {
+        let time = clock(next.time, timeZone: next.place.timeZone)
+        guard next.time > now else { return time }
+        return time + " · " + PrayerCopy.after(seconds: next.time.timeIntervalSince(now), digits: digits)
+    }
+
+    private var verseDivider: some View {
+        HStack(spacing: 10) {
+            Rectangle().fill(theme.line).frame(height: 1)
+            PrayerStar().fill(theme.accent).frame(width: 9, height: 9)
+            Text("إِنَّ الصَّلَاةَ كَانَتْ عَلَى الْمُؤْمِنِينَ كِتَابًا مَوْقُوتًا")
+                .font(.custom("Amiri-Regular", size: 15, relativeTo: .subheadline))
+                .foregroundStyle(theme.secondaryInk)
+                .lineLimit(1).minimumScaleFactor(0.6)
+                .layoutPriority(1)
+            PrayerStar().fill(theme.accent).frame(width: 9, height: 9)
+            Rectangle().fill(theme.line).frame(height: 1)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("إن الصلاة كانت على المؤمنين كتابًا موقوتًا")
+    }
+
+    // MARK: Riwaq
+
+    private func riwaq(_ snapshot: PrayerSnapshot, now: Date) -> some View {
+        Group {
+            if dynamicType.isAccessibilitySize {
+                PrayerPaperCard(tinted: true) {
                     VStack(spacing: 8) {
-                        ForEach(snapshot.today.cells, id: \.reference) { cell in prayerEntry(cell, snapshot: snapshot) }
-                    }
-                } else {
-                    HStack(alignment: .bottom, spacing: 6) {
-                        ForEach(snapshot.today.cells, id: \.reference) { cell in prayerEntry(cell, snapshot: snapshot) }
+                        ForEach(snapshot.today.cells, id: \.reference) { cell in prayerEntry(cell, snapshot: snapshot, now: now) }
                     }
                 }
-                if !snapshot.hasTimes {
-                    Text("يمكنك اختيار المدينة من خصّص مدار عند توفر المواقيت.")
-                        .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+            } else {
+                PrayerRiwaq(pool: session.bool("salah.pool")) {
+                    ForEach(snapshot.today.cells, id: \.reference) { cell in prayerEntry(cell, snapshot: snapshot, now: now) }
                 }
+            }
+        }
+        .overlay(alignment: .bottom) {
+            if !snapshot.hasTimes {
+                Text("يمكنك اختيار المدينة من خصّص مدار عند توفر المواقيت.")
+                    .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).padding(12)
             }
         }
     }
 
-    @ViewBuilder private func prayerEntry(_ cell: PrayerCell, snapshot: PrayerSnapshot) -> some View {
+    @ViewBuilder private func prayerEntry(_ cell: PrayerCell, snapshot: PrayerSnapshot, now: Date) -> some View {
         let canEdit = cell.canLog && cell.time != nil && [.pending, .jamaah, .alone, .missed].contains(cell.status)
-        let arch = PrayerTodayArch(cell: cell, isNext: snapshot.next?.reference == cell.reference,
-            timeLabel: cell.time.map { clock($0, timeZone: snapshot.activeTrip?.place.timeZone ?? session.activePlace.timeZone) } ?? "—")
+        let isNext = snapshot.next?.reference == cell.reference
+        let arch = PrayerTodayArch(cell: cell, isNext: isNext,
+            title: cell.isFriday && cell.reference.prayer == .dhuhr ? "الجمعة" : title(cell.reference.prayer),
+            tall: cell.isFriday && cell.reference.prayer == .dhuhr && session.bool("salah.fridayTallArch"),
+            timeLabel: (cell.prayerTime ?? cell.time).map { clock($0, timeZone: snapshot.activeTrip?.place.timeZone ?? session.activePlace.timeZone) } ?? "—",
+            countdown: isNext && cell.status == .future ? cell.prayerTime.flatMap { PrayerCopy.countdown(until: $0, now: now, digits: digits) } : nil)
         if canEdit {
             Button { choose(cell) } label: { arch }
                 .buttonStyle(.plain)
@@ -176,110 +248,212 @@ struct PrayerTodayView: View {
         }
     }
 
-    @ViewBuilder private func pendingCard(_ snapshot: PrayerSnapshot) -> some View {
-        let pending = Set(snapshot.pending)
-        let first = snapshot.history.flatMap(\.cells).first { pending.contains($0.reference) && $0.canLog && $0.time != nil }
-        if let first {
-            MadarCard {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("\(number(snapshot.pending.count)) صلاة تنتظر تسجيلك").font(MadarTypography.section())
-                    Text("تبقى غير محسومة حتى تختار حالها؛ لا تتحول إلى فائتة تلقائيًا.")
-                        .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                    Button("راجع \(title(first.reference.prayer))") { choose(first) }
-                        .frame(minHeight: 44).accessibilityIdentifier("prayer-pending-review")
-                }
-            }
-        }
+    /// «٣ من ٥ اليوم · بقيت صلاتان»: «·» sits between words only (RU1).
+    private func todaySummary(_ snapshot: PrayerSnapshot) -> String {
+        let cells = snapshot.today.cells.filter { $0.time != nil }
+        let recorded = cells.filter { [.jamaah, .alone, .qada, .missed, .excused].contains($0.status) }.count
+        let remaining = cells.count - recorded
+        return "\(digits.string(recorded)) من \(digits.string(cells.count)) اليوم · " + PrayerCopy.remaining(remaining, digits: digits)
     }
 
-    private func recoveryCard(_ snapshot: PrayerSnapshot) -> some View {
-        MadarCard {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("\(number(snapshot.unconfirmed.count)) صلاة غير محسومة").font(MadarTypography.section())
-                Text("اختر ما ينطبق على الفترة؛ لن نعدّها فائتة من تلقاء أنفسنا.")
-                    .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                Button("راجع الفترة") {
+    // MARK: Notices
+
+    /// One quiet notice: an unrecorded prayer whose window has ended, or an older unresolved gap.
+    /// RP1: neither ever turns into a missed prayer by itself.
+    private func notice(_ snapshot: PrayerSnapshot, now: Date) -> AnyView? {
+        if !snapshot.unconfirmed.isEmpty {
+            return AnyView(PrayerNoticeRow(
+                title: PrayerCopy.unconfirmed(snapshot.unconfirmed.count, digits: digits),
+                detail: "لا تُحسب فائتة إلا باختيارك.",
+                action: "راجعها", identifier: "prayer-recovery") {
                     selectedSheet = .recovery(snapshot.unconfirmed, snapshot.unconfirmedFridayNoon, session.activePlace.timeZone)
+                })
+        }
+        let pending = Set(snapshot.pending)
+        let open = currentPrayer(snapshot, now: now)
+        let closed = snapshot.history.flatMap(\.cells)
+            .filter { pending.contains($0.reference) && $0.canLog && $0.time != nil && $0.reference != open }
+        guard let first = closed.first else { return nil }
+        let title = closed.count == 1
+            ? "مضى وقت \(self.title(first.reference.prayer))\(dayWord(first.reference.day, today: snapshot.today.day)) ولم تُسجِّلها."
+            : PrayerCopy.pending(closed.count, digits: digits)
+        return AnyView(PrayerNoticeRow(title: title, detail: "تبقى معلّقة حتى تختار حالها.",
+            action: closed.count == 1 ? "سجِّلها" : "راجعها", identifier: "prayer-pending-review") { choose(first) })
+    }
+
+    /// The prayer whose window is still open (its time has come and the next prayer has not).
+    private func currentPrayer(_ snapshot: PrayerSnapshot, now: Date) -> PrayerReference? {
+        snapshot.history.flatMap(\.cells).filter { ($0.prayerTime ?? .distantFuture) <= now }.max { ($0.prayerTime ?? .distantPast) < ($1.prayerTime ?? .distantPast) }?.reference
+    }
+
+    private func dayWord(_ day: GregorianDay, today: GregorianDay) -> String {
+        if day == today { return "" }
+        if day.adding(days: 1) == today { return " أمس" }
+        return " يوم " + qadaDate(day)
+    }
+
+    @ViewBuilder private func heartNotice(_ snapshot: PrayerSnapshot) -> some View {
+        // RP6: shown only when the owner turned the heart question on (default off).
+        if session.bool("salah.askHeart"), let cell = snapshot.history.flatMap(\.cells).first(where: { snapshot.pendingHeart.contains($0.reference) }) {
+            Button { selectedSheet = .heart(cell) } label: {
+                HStack(spacing: 12) {
+                    PrayerStar().fill(theme.accent).frame(width: 14, height: 14)
+                    Text("بقي سؤال القلب عن \(title(cell.reference.prayer)).")
+                        .font(PrayerHomeType.strong)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Text("أجِب").font(PrayerHomeType.strong).foregroundStyle(theme.accent)
                 }
-                .frame(minHeight: 44).accessibilityIdentifier("prayer-recovery")
+                .padding(.horizontal, 18).frame(minHeight: 58)
+                .background(theme.color("surface"), in: .rect(cornerRadius: 18))
+                .overlay { RoundedRectangle(cornerRadius: 18).stroke(theme.line, lineWidth: 1) }
             }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("prayer-heart-review")
         }
     }
 
-    private func qadaCard(_ snapshot: PrayerSnapshot) -> some View {
-        let outstanding = snapshot.qada.filter { $0.madeUpAt == nil }
-        let shown = Array(snapshot.qada.suffix(5))
-        return MadarCard {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("الفوائت والقضاء").font(MadarTypography.cardTitle())
-                Text("\(number(snapshot.qada.count)) فوائت مسجّلة، \(number(snapshot.statistics.owed)) لم تُقضَ")
-                    .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                Button("أضف فائتة قديمة") { selectedSheet = .oldMissed }
-                    .frame(minHeight: 44).accessibilityIdentifier("prayer-old-missed")
-                PrayerQadaCitation()
-                ForEach(shown) { item in
-                    HStack {
-                        PrayerStar().stroke(item.madeUpAt == nil ? theme.color("missedTextOnSurface") : theme.secondaryInk, lineWidth: 1).frame(width: 14, height: 14)
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(title(item.reference.prayer)).font(MadarTypography.section())
-                            Text(qadaDate(item.reference.day)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+    // MARK: Hali, qada and qiyam
+
+    private func haliCard(_ snapshot: PrayerSnapshot) -> some View {
+        let stats = snapshot.statistics
+        let prayerStreak = "سلسلة الصلاة " + PrayerCopy.days(stats.prayerStreak, digits: digits)
+        let mosqueStreak = session.bool("salah.showMosqueStreak") ? "المسجد " + PrayerCopy.days(stats.mosqueStreak, digits: digits) : nil
+        let streaks = [prayerStreak, mosqueStreak].compactMap { $0 }.joined(separator: " · ")
+        return Button { selectedSheet = .statistics } label: {
+            PrayerPaperCard {
+                HStack(spacing: 14) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("حالي").font(PrayerHomeType.cardHead)
+                        HStack(alignment: .firstTextBaseline, spacing: 10) {
+                            Text(stats.percentage.map(percent) ?? "—")
+                                .font(PrayerHomeType.number)
+                                .accessibilityIdentifier("prayer-month-percentage")
+                            Text("هذا الشهر").font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk)
                         }
-                        Spacer()
-                        Text(item.madeUpAt == nil ? "لم تُقضَ" : "قُضيت").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                    }.accessibilityIdentifier("prayer-qada-row-\(item.reference.day)-\(item.reference.prayer.rawValue)")
-                }
-                if let item = outstanding.first {
-                    Button("اقضِ واحدة") { selectedSheet = .makeUp(item, isFridayNoon: item.isFriday, dateLabel: qadaDate(item.reference.day)) }
-                        .buttonStyle(MadarPrimaryButton()).disabled(session.prayerWriteInProgress)
-                        .accessibilityIdentifier("prayer-qada-makeup")
+                        ViewThatFits(in: .horizontal) {
+                            Text(streaks).lineLimit(1)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(prayerStreak)
+                                if let mosqueStreak { Text(mosqueStreak) }
+                            }
+                        }
+                        .font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    if !dynamicType.isAccessibilitySize {
+                        PrayerRecentBeads(cells: stats.last25, compact: true).frame(width: 118)
+                        Image(systemName: "chevron.forward").font(.footnote.weight(.semibold))
+                            .foregroundStyle(theme.secondaryInk).accessibilityHidden(true)
+                    }
                 }
             }
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("حالي، " + (stats.percentage.map(percent) ?? "لم تُحسب النسبة بعد") + " هذا الشهر، " + streaks)
+        .accessibilityHint("افتح حالي وسجلّ الشهر")
+        .accessibilityIdentifier("prayer-history")
+    }
+
+    @ViewBuilder private func qadaCard(_ snapshot: PrayerSnapshot) -> some View {
+        let outstanding = snapshot.qada.filter { $0.madeUpAt == nil }
+        if let first = outstanding.first {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    PrayerStar().fill(theme.color("missed")).frame(width: 15, height: 15)
+                    Text(digits.string(outstanding.count)).font(PrayerHomeType.number)
+                    Text(PrayerCopy.owed(outstanding.count)).font(PrayerHomeType.strong)
+                    Spacer(minLength: 0)
+                }
+                .accessibilityElement(children: .combine)
+                HStack(alignment: .top, spacing: 12) {
+                    Rectangle().fill(theme.color("missed")).frame(width: 2)
+                    PrayerQadaCitation()
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                buttonsRow(first: first)
+            }
+            .padding(20)
+            .background(theme.color("missed").opacity(0.05), in: .rect(cornerRadius: 22))
+            .background(theme.background, in: .rect(cornerRadius: 22))
+            .overlay { RoundedRectangle(cornerRadius: 22).stroke(theme.color("missed").opacity(0.28), lineWidth: 1) }
+        } else {
+            Button { selectedSheet = .oldMissed } label: {
+                HStack {
+                    Text(snapshot.qada.isEmpty ? "لا فوائت مسجّلة عليك" : "قضيتَ ما سجّلتَه من الفوائت")
+                        .font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Text("أضف فائتة قديمة").font(PrayerHomeType.strong).foregroundStyle(theme.accent)
+                }
+                .padding(.horizontal, 18).frame(minHeight: 54)
+                .overlay { RoundedRectangle(cornerRadius: 18).stroke(theme.line, lineWidth: 1) }
+                .contentShape(.rect(cornerRadius: 18))
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("prayer-old-missed")
+        }
+    }
+
+    @ViewBuilder private func buttonsRow(first: PrayerQada) -> some View {
+        let makeUp = Button { selectedSheet = .makeUp(first, isFridayNoon: first.isFriday, dateLabel: qadaDate(first.reference.day)) } label: {
+            Text("قضيتُ واحدة").font(PrayerHomeType.strong).frame(maxWidth: .infinity, minHeight: 54)
+                .foregroundStyle(theme.background).background(theme.ink, in: .rect(cornerRadius: 16))
+        }
+        .buttonStyle(.plain).disabled(session.prayerWriteInProgress)
+        .accessibilityIdentifier("prayer-qada-makeup")
+        let places = Button { selectedSheet = .qadaList } label: {
+            Text("مواضعها").font(PrayerHomeType.strong).frame(minHeight: 54).padding(.horizontal, 26)
+                .overlay { RoundedRectangle(cornerRadius: 16).stroke(theme.ink.opacity(0.18), lineWidth: 1) }
+                .contentShape(.rect(cornerRadius: 16))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("prayer-qada-places")
+        if dynamicType.isAccessibilitySize {
+            VStack(spacing: 10) { makeUp; places.frame(maxWidth: .infinity) }
+        } else {
+            HStack(spacing: 12) { makeUp; places }
         }
     }
 
     private func qiyamCard(_ snapshot: PrayerSnapshot) -> some View {
         let night = snapshot.nights.first { $0.night == snapshot.nightDefault }
+        let summary = night.map { PrayerCopy.rakaat($0.rakaat, digits: digits) + ($0.witr ? "، أوترتُ" : "") } ?? "لم تُسجَّل ليلتك"
         return Button { selectedSheet = .qiyam } label: {
-            MadarCard {
-                VStack(alignment: .leading, spacing: 10) {
-                    Label("قيام الليل", systemImage: "moon.stars").font(MadarTypography.cardTitle())
-                    Text(night.map { "\(number($0.rakaat)) ركعات" + ($0.witr ? "، أوترتُ" : "") } ?? "سجّل ما قمتَه")
-                        .font(MadarTypography.section()).accessibilityIdentifier("prayer-qiyam-summary")
-                    Text("ليس سلسلة تنكسر، أثرٌ يُرى").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                }.frame(maxWidth: .infinity, alignment: .leading)
-            }
-        }.buttonStyle(.plain).accessibilityIdentifier("prayer-qiyam")
-    }
-
-    private func statisticsCard(_ snapshot: PrayerSnapshot) -> some View {
-        Button { selectedSheet = .statistics } label: {
-            MadarCard {
+            PrayerPaperCard {
                 VStack(alignment: .leading, spacing: 12) {
-                    HStack { Text("حالي").font(MadarTypography.cardTitle()); Spacer(); Image(systemName: "chevron.forward") }
-                    Text("\(number(snapshot.statistics.percentage ?? 0))٪ هذا الشهر الهجري")
-                        .font(MadarTypography.section()).accessibilityIdentifier("prayer-month-percentage")
-                    Text("سلسلة الصلاة: \(number(snapshot.statistics.prayerStreak)) أيام")
-                        .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                    if session.bool("salah.showMosqueStreak") {
-                        Text("سلسلة المسجد: \(number(snapshot.statistics.mosqueStreak)) أيام")
-                            .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("قيام الليل").font(PrayerHomeType.cardHead)
+                        Spacer(minLength: 8)
+                        Text(summary).font(PrayerHomeType.strong).foregroundStyle(theme.accent)
+                            .accessibilityIdentifier("prayer-qiyam-summary")
                     }
-                    if !dynamicType.isAccessibilitySize { PrayerRecentBeads(cells: snapshot.statistics.last25, compact: true) }
+                    if !dynamicType.isAccessibilitySize {
+                        PrayerNightFootprint(nights: snapshot.nights, last: snapshot.nightDefault)
+                    }
+                    Text("آخر ثلاثين ليلة")
+                        .font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
                 }
             }
-        }.buttonStyle(.plain).accessibilityIdentifier("prayer-hali")
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("prayer-qiyam")
     }
 
-    private func number(_ value: Int) -> String {
+    // MARK: Formatting
+
+    private var digits: MadarNumberFormatter { MadarNumberFormatter(style: session.string("core.numerals") == "western" ? .western : .hindi) }
+    private var numeralLocale: Locale { Locale(identifier: session.string("core.numerals") == "western" ? "ar_SA@numbers=latn" : "ar_SA@numbers=arab") }
+
+    private func percent(_ value: Int) -> String {
         let formatter = NumberFormatter()
-        formatter.locale = Locale(identifier: session.string("core.numerals") == "western" ? "ar_SA@numbers=latn" : "ar_SA@numbers=arab")
-        formatter.numberStyle = .decimal
-        return formatter.string(from: NSNumber(value: value)) ?? String(value)
+        formatter.locale = numeralLocale
+        formatter.numberStyle = .percent
+        return formatter.string(from: NSNumber(value: Double(value) / 100)) ?? digits.string(value)
     }
 
     private func qadaDate(_ day: GregorianDay) -> String {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: session.string("core.numerals") == "western" ? "ar_SA@numbers=latn" : "ar_SA@numbers=arab")
+        formatter.locale = numeralLocale
         formatter.timeZone = session.activePlace.timeZone
         formatter.calendar = Calendar(identifier: .gregorian)
         formatter.dateFormat = "EEEE d MMMM"
@@ -294,45 +468,195 @@ struct PrayerTodayView: View {
         switch prayer { case .fajr: "الفجر"; case .dhuhr: "الظهر"; case .asr: "العصر"; case .maghrib: "المغرب"; case .isha: "العشاء" }
     }
 
+    private func nextTitle(_ reference: PrayerReference, snapshot: PrayerSnapshot) -> String {
+        let friday = snapshot.today.cells.first { $0.reference == reference }?.isFriday ?? false
+        return friday && reference.prayer == .dhuhr ? "الجمعة" : title(reference.prayer)
+    }
+
     private func clock(_ date: Date, timeZone: TimeZone) -> String {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: session.string("core.numerals") == "western" ? "ar_SA@numbers=latn" : "ar_SA@numbers=arab")
+        formatter.locale = numeralLocale
         formatter.timeZone = timeZone
         formatter.dateFormat = "h:mm a"
         return formatter.string(from: date)
     }
 }
 
-private struct PrayerTodayArch: View {
-    let cell: PrayerCell
-    let isNext: Bool
-    let timeLabel: String
+// MARK: - Type roles measured from the canonical S1 (iOS points at the Large size)
+
+enum PrayerHomeType {
+    static let hero = Font.custom("thmanyahserifdisplay-Bold", size: 46, relativeTo: .largeTitle)
+    static let number = Font.custom("thmanyahserifdisplay-Bold", size: 36, relativeTo: .title)
+    static let cardHead = Font.custom("thmanyahserifdisplay-Bold", size: 20, relativeTo: .title3)
+    static let archName = Font.custom("thmanyahserifdisplay-Bold", size: 18, relativeTo: .headline)
+    static let lead = Font.custom("thmanyahsans-Regular", size: 16, relativeTo: .callout)
+    static let strong = Font.custom("thmanyahsans-Bold", size: 16, relativeTo: .headline)
+    static let body = Font.custom("thmanyahsans-Regular", size: 15, relativeTo: .subheadline)
+    static let small = Font.custom("thmanyahsans-Regular", size: 13, relativeTo: .footnote)
+    static let smallBold = Font.custom("thmanyahsans-Bold", size: 13, relativeTo: .footnote)
+}
+
+// MARK: - Arabic plural copy (RU3: String Catalog variants, digits follow core.numerals)
+
+enum PrayerCopy {
+    // Argument 1 chooses the Arabic plural; argument 2 is the count in core.numerals digits.
+    static func hours(_ count: Int, digits: MadarNumberFormatter, bundle: Bundle = .main) -> String {
+        let formatted = digits.string(count)
+        return String(localized: "prayer.hours", defaultValue: "\(count) \(formatted)", table: "Prayer", bundle: bundle, locale: Locale(identifier: "ar"))
+    }
+    static func minutes(_ count: Int, digits: MadarNumberFormatter, bundle: Bundle = .main) -> String {
+        let formatted = digits.string(count)
+        return String(localized: "prayer.minutes", defaultValue: "\(count) \(formatted)", table: "Prayer", bundle: bundle, locale: Locale(identifier: "ar"))
+    }
+    static func days(_ count: Int, digits: MadarNumberFormatter, bundle: Bundle = .main) -> String {
+        let formatted = digits.string(count)
+        return String(localized: "prayer.days", defaultValue: "\(count) \(formatted)", table: "Prayer", bundle: bundle, locale: Locale(identifier: "ar"))
+    }
+    static func remaining(_ count: Int, digits: MadarNumberFormatter, bundle: Bundle = .main) -> String {
+        let formatted = digits.string(count)
+        return String(localized: "prayer.remaining", defaultValue: "\(count) \(formatted)", table: "Prayer", bundle: bundle, locale: Locale(identifier: "ar"))
+    }
+    static func pending(_ count: Int, digits: MadarNumberFormatter, bundle: Bundle = .main) -> String {
+        let formatted = digits.string(count)
+        return String(localized: "prayer.pending", defaultValue: "\(count) \(formatted)", table: "Prayer", bundle: bundle, locale: Locale(identifier: "ar"))
+    }
+    static func unconfirmed(_ count: Int, digits: MadarNumberFormatter, bundle: Bundle = .main) -> String {
+        let formatted = digits.string(count)
+        return String(localized: "prayer.unconfirmed", defaultValue: "\(count) \(formatted)", table: "Prayer", bundle: bundle, locale: Locale(identifier: "ar"))
+    }
+    static func rakaat(_ count: Int, digits: MadarNumberFormatter, bundle: Bundle = .main) -> String {
+        let formatted = digits.string(count)
+        return String(localized: "prayer.rakaat", defaultValue: "\(count) \(formatted)", table: "Prayer", bundle: bundle, locale: Locale(identifier: "ar"))
+    }
+    /// The count is shown large beside this phrase, so the phrase carries no digits.
+    static func owed(_ count: Int, bundle: Bundle = .main) -> String {
+        String(localized: "prayer.owed", defaultValue: "\(count)", table: "Prayer", bundle: bundle, locale: Locale(identifier: "ar"))
+    }
+    /// «بعد ساعة و١٤ دقيقة».
+    static func after(seconds: TimeInterval, digits: MadarNumberFormatter) -> String {
+        let total = max(0, Int(seconds / 60))
+        let hours = total / 60, minutes = total % 60
+        if total == 0 { return "الآن" }
+        if hours == 0 { return "بعد " + self.minutes(minutes, digits: digits) }
+        return "بعد " + self.hours(hours, digits: digits) + (minutes > 0 ? " و" + self.minutes(minutes, digits: digits) : "")
+    }
+    /// RL7: two fields, «بعد ١:١٤».
+    static func countdown(until date: Date, now: Date, digits: MadarNumberFormatter) -> String? {
+        guard date > now else { return nil }
+        let total = Int(date.timeIntervalSince(now) / 60)
+        let minutes = total % 60
+        return "بعد " + digits.string(total / 60) + ":" + (minutes < 10 ? digits.string(0) : "") + digits.string(minutes)
+    }
+}
+
+// MARK: - Shared S1 pieces
+
+/// A paper card: the room background with a quiet hairline, as on S1.
+struct PrayerPaperCard<Content: View>: View {
+    var tinted = false
+    @ViewBuilder let content: () -> Content
+    @Environment(\.roomTheme) private var theme
+    var body: some View {
+        content()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 20).padding(.vertical, 18)
+            .background(tinted ? theme.color("goldSoft") : .clear, in: .rect(cornerRadius: 22))
+            .background(theme.background, in: .rect(cornerRadius: 22))
+            .overlay { RoundedRectangle(cornerRadius: 22).stroke(tinted ? theme.line : theme.ink.opacity(0.1), lineWidth: 1) }
+    }
+}
+
+private struct PrayerNoticeRow: View {
+    let title: String
+    let detail: String
+    let action: String
+    let identifier: String
+    let perform: () -> Void
     @Environment(\.roomTheme) private var theme
     @Environment(\.dynamicTypeSize) private var dynamicType
+    var body: some View {
+        Button(action: perform) {
+            PrayerPaperCard {
+                let layout = dynamicType.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 10)) : AnyLayout(HStackLayout(spacing: 12))
+                layout {
+                    HStack(alignment: .top, spacing: 12) {
+                        Rectangle().fill(theme.color("missed")).frame(width: 8, height: 8).rotationEffect(.degrees(45)).padding(.top, 7)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(title).font(PrayerHomeType.strong).fixedSize(horizontal: false, vertical: true)
+                            Text(detail).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    Text(action).font(PrayerHomeType.strong).foregroundStyle(theme.accent)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier(identifier)
+    }
+}
+
+/// The arcade card: arches stand on a water line; the pool reflects them (§5 HorseshoeArch).
+private struct PrayerRiwaq<Content: View>: View {
+    let pool: Bool
+    @ViewBuilder let content: () -> Content
+    @Environment(\.roomTheme) private var theme
+    var body: some View {
+        HStack(alignment: .top, spacing: 0) { content() }
+            .padding(.horizontal, 10)
+            .padding(.top, 22).padding(.bottom, 18)
+            .background(alignment: .top) {
+                // The water line runs edge to edge under the arches.
+                Rectangle().fill(theme.ink.opacity(0.22)).frame(height: 1)
+                    .padding(.top, 22 + PrayerTodayArch.archHeight)
+            }
+            .background(theme.color("goldSoft"), in: .rect(cornerRadius: 22))
+            .background(theme.background, in: .rect(cornerRadius: 22))
+            .clipShape(.rect(cornerRadius: 22))
+            .overlay { RoundedRectangle(cornerRadius: 22).stroke(theme.line, lineWidth: 1) }
+            .environment(\.prayerPool, pool)
+    }
+}
+
+private extension EnvironmentValues {
+    @Entry var prayerPool = true
+}
+
+private struct PrayerTodayArch: View {
+    static let archHeight: CGFloat = 92
+    let cell: PrayerCell
+    let isNext: Bool
+    let title: String
+    let tall: Bool
+    let timeLabel: String
+    let countdown: String?
+    @Environment(\.roomTheme) private var theme
+    @Environment(\.dynamicTypeSize) private var dynamicType
+    @Environment(\.prayerPool) private var pool
 
     private var statusText: String {
         switch cell.status {
         case .jamaah: "جماعة"
-        case .alone: "منفردًا"
+        case .alone: "وحدي"
         case .qada: "قُضيت"
         case .missed: "فاتتني"
-        case .unrecordedHistory: "غير مسجلة تاريخيًا"
+        case .unrecordedHistory: "لم أسجّل"
         case .unconfirmed: "غير محسومة"
-        case .excused: "معذورة"
-        case .pending: "لم تُسجّل"
+        case .excused: "معذور"
+        case .pending: "لم تُسجَّل"
         case .future: "لم يحن"
         }
     }
-    var accessibilityText: String { "\(prayerTitle)، \(timeLabel)، \(statusText)" }
-    private var prayerTitle: String {
-        switch cell.reference.prayer { case .fajr: "الفجر"; case .dhuhr: "الظهر"; case .asr: "العصر"; case .maghrib: "المغرب"; case .isha: "العشاء" }
-    }
-    private var statusColor: Color {
+    var accessibilityText: String { "\(title)، \(timeLabel)، \(statusText)" }
+    private var gold: Color { theme.color("goldMid") }
+    private var logged: Bool { [.jamaah, .alone, .qada, .missed].contains(cell.status) }
+    private var bodyFill: Color {
         switch cell.status {
-        case .missed: theme.color("missedTextOnSurface")
-        case .jamaah: theme.accent
-        case .alone: theme.color("goldMidText")
-        case .pending, .future, .qada, .unrecordedHistory, .unconfirmed, .excused: theme.secondaryInk
+        case .jamaah: gold.opacity(0.62)
+        case .alone: gold.opacity(0.36)
+        case .qada: theme.ink.opacity(0.07)
+        default: theme.background
         }
     }
 
@@ -340,39 +664,108 @@ private struct PrayerTodayArch: View {
         if dynamicType.isAccessibilitySize {
             accessibilityRow
         } else {
-            VStack(spacing: 5) {
-                ZStack {
-                    PrayerHorseshoe().fill([.jamaah, .alone].contains(cell.status) ? theme.color("goldSoft") : .clear)
-                    PrayerHorseshoe().stroke(isNext ? theme.accent : theme.line,
-                        style: StrokeStyle(lineWidth: isNext ? 3 : 1, dash: cell.status == .pending ? [3, 3] : []))
-                    VStack {
-                        Spacer()
-                        if cell.status == .pending || cell.status == .future || cell.status == .unrecordedHistory || cell.status == .unconfirmed || cell.status == .excused {
-                            Capsule().fill(statusColor).frame(width: 12, height: 2).opacity(cell.status == .pending ? 0.7 : 0.25)
-                        } else {
-                            PrayerStar().fill(cell.status == .missed ? .clear : statusColor)
-                                .overlay { if cell.status == .alone || cell.status == .missed { PrayerStar().stroke(statusColor, lineWidth: 1) } }
-                                .frame(width: 16, height: 16)
-                        }
-                        Spacer()
-                    }
+            VStack(spacing: 0) {
+                arch
+                    .frame(height: Self.archHeight + (tall ? 12 : 0))
+                    .frame(height: Self.archHeight, alignment: .bottom)
+                reflection
+                    .frame(height: Self.archHeight * 0.42, alignment: .top)
+                    .clipped()
+                VStack(spacing: 3) {
+                    Text(title).font(PrayerHomeType.archName).lineLimit(1).minimumScaleFactor(0.75)
+                    Text(timeLabel).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk).lineLimit(1).minimumScaleFactor(0.8)
+                    Text(countdown ?? statusText)
+                        .font(countdown != nil || cell.status == .missed ? PrayerHomeType.smallBold : PrayerHomeType.small)
+                        .foregroundStyle(countdown != nil ? theme.accent : cell.status == .missed ? theme.color("missedTextOnSurface") : cell.status == .future ? theme.secondaryInk : theme.ink.opacity(0.78))
+                        .lineLimit(1).minimumScaleFactor(0.8)
                 }
-                .frame(height: 94)
-                Text(prayerTitle).font(MadarTypography.section()).lineLimit(1).minimumScaleFactor(0.75)
-                Text(timeLabel).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).lineLimit(1).minimumScaleFactor(0.7)
-                Text(statusText).font(MadarTypography.fine()).foregroundStyle(statusColor).lineLimit(1).minimumScaleFactor(0.7)
+                .padding(.top, 8)
             }
             .frame(maxWidth: .infinity)
             .contentShape(Rectangle())
         }
     }
 
+    private var arch: some View {
+        GeometryReader { geometry in
+            let width = min(geometry.size.width - 12, 58)
+            let height = geometry.size.height
+            let rect = CGRect(x: (geometry.size.width - width) / 2, y: 0, width: width, height: height)
+            let shape = PrayerHorseshoe().path(in: rect)
+            let spring = rect.minY + width / 2 * 1.5
+            ZStack {
+                // Pillars beside the arch.
+                ForEach([rect.minX - 5, rect.maxX], id: \.self) { x in
+                    Rectangle().fill(gold.opacity(0.1)).frame(width: 5, height: height - spring + 6)
+                        .position(x: x + 2.5, y: (spring - 6 + height) / 2)
+                }
+                shape.fill(bodyFill)
+                // Lattice: the whole head once a prayer is recorded, a frame band otherwise.
+                PrayerLatticePattern(spacing: 9)
+                    .stroke(theme.accent.opacity(logged ? 0.55 : 0.45), lineWidth: 1)
+                    .mask {
+                        if logged {
+                            shape.fill().mask(alignment: .top) { Rectangle().frame(height: spring + 2) }
+                        } else {
+                            shape.stroke(lineWidth: 11).mask(alignment: .top) { Rectangle().frame(height: spring + 4) }
+                        }
+                    }
+                if isNext {
+                    shape.stroke(theme.accent, style: StrokeStyle(lineWidth: 5, lineJoin: .round))
+                } else if cell.status == .missed {
+                    shape.stroke(theme.color("missed"), lineWidth: 1.5)
+                } else if cell.status == .pending {
+                    shape.stroke(gold, style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                }
+                symbol.position(x: rect.midX, y: spring)
+            }
+        }
+    }
+
+    @ViewBuilder private var symbol: some View {
+        switch cell.status {
+        case .jamaah:
+            PrayerStar().fill(theme.accent).frame(width: 15, height: 15)
+        case .alone:
+            PrayerStar().fill(gold).overlay { PrayerStar().stroke(theme.accent, lineWidth: 1) }.frame(width: 15, height: 15)
+        case .qada:
+            PrayerStar().fill(theme.ink.opacity(0.32)).frame(width: 15, height: 15)
+        case .missed:
+            PrayerStar().stroke(theme.color("missed"), lineWidth: 1.2).frame(width: 15, height: 15)
+        case .pending:
+            TimelineView(.animation(minimumInterval: 1 / 15)) { context in
+                let phase = context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 2) / 2
+                Capsule().fill(theme.accent).frame(width: 14, height: 2).opacity(0.35 + 0.5 * abs(1 - 2 * phase))
+            }
+        default:
+            Capsule().fill(theme.ink.opacity(0.22)).frame(width: 14, height: 2)
+        }
+    }
+
+    /// Mirrored, at about half the height, 28% opacity, with water lines every 6 points.
+    @ViewBuilder private var reflection: some View {
+        if pool {
+            arch
+                .frame(height: Self.archHeight)
+                .scaleEffect(x: 1, y: -1)
+                .scaleEffect(x: 1, y: 0.5, anchor: .top)
+                .opacity(0.28)
+                .overlay {
+                    VStack(spacing: 5) { ForEach(0..<8, id: \.self) { _ in Rectangle().fill(theme.background.opacity(0.7)).frame(height: 1) } }
+                }
+                .mask(LinearGradient(colors: [.black, .black.opacity(0)], startPoint: .top, endPoint: .bottom))
+                .accessibilityHidden(true)
+        } else {
+            Color.clear
+        }
+    }
+
     var accessibilityRow: some View {
         HStack(spacing: 12) {
-            PrayerStar().fill(statusColor).frame(width: 20, height: 20)
+            symbol.frame(width: 20, height: 20)
             VStack(alignment: .leading, spacing: 4) {
-                Text(prayerTitle).font(MadarTypography.section())
-                Text("\(timeLabel)، \(statusText)").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                Text(title).font(MadarTypography.section())
+                Text("\(timeLabel)، \(countdown ?? statusText)").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
             }
             Spacer(minLength: 8)
             if isNext { Image(systemName: "arrow.left").foregroundStyle(theme.accent).accessibilityHidden(true) }
@@ -383,17 +776,100 @@ private struct PrayerTodayArch: View {
     }
 }
 
+/// Diamond lattice of 1-point lines (§5: «إطار سبكة معيّنات ١ نقطة»).
+private struct PrayerLatticePattern: Shape {
+    let spacing: CGFloat
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        var x = rect.minX - rect.height
+        while x <= rect.maxX + rect.height {
+            path.move(to: CGPoint(x: x, y: rect.minY)); path.addLine(to: CGPoint(x: x + rect.height, y: rect.maxY))
+            path.move(to: CGPoint(x: x, y: rect.minY)); path.addLine(to: CGPoint(x: x - rect.height, y: rect.maxY))
+            x += spacing
+        }
+        return path
+    }
+}
+
+/// Last 30 nights as small squares, oldest on the right (RTL), the newest on the left.
+private struct PrayerNightFootprint: View {
+    let nights: [PrayerNight]
+    let last: GregorianDay
+    @Environment(\.roomTheme) private var theme
+    var body: some View {
+        let byDay = Dictionary(nights.map { ($0.night, $0) }, uniquingKeysWith: { $1 })
+        HStack(spacing: 3) {
+            ForEach(0..<30, id: \.self) { offset in
+                let night = byDay[last.adding(days: offset - 29)]
+                RoundedRectangle(cornerRadius: 1.5)
+                    .fill(color(night))
+                    .aspectRatio(1, contentMode: .fit)
+            }
+        }
+        .accessibilityHidden(true)
+    }
+    private func color(_ night: PrayerNight?) -> Color {
+        guard let night, night.rakaat > 0 || night.witr else { return theme.ink.opacity(0.1) }
+        return night.rakaat >= 8 ? theme.accent : theme.color("goldMid")
+    }
+}
+
+/// «مواضعها»: every recorded missed prayer, oldest first, with one make-up action each.
+private struct PrayerQadaListSheet: View {
+    let session: AppSession
+    let dateLabel: (GregorianDay) -> String
+    let makeUp: (PrayerQada) -> Void
+    let addOld: () -> Void
+    @Environment(\.roomTheme) private var theme
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("الفوائت").font(MadarTypography.title())
+                if let snapshot = try? session.prayerSnapshot(at: session.prayerNow()) {
+                    ForEach(snapshot.qada) { item in
+                        HStack(spacing: 12) {
+                            PrayerStar().stroke(item.madeUpAt == nil ? theme.color("missed") : theme.secondaryInk, lineWidth: 1).frame(width: 14, height: 14)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(prayerTitle(item.reference.prayer)).font(PrayerHomeType.strong)
+                                Text(dateLabel(item.reference.day)).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
+                            }
+                            Spacer()
+                            if item.madeUpAt == nil {
+                                Button("اقضِها") { makeUp(item) }.font(PrayerHomeType.strong).foregroundStyle(theme.accent).frame(minHeight: 44)
+                            } else {
+                                Text("قُضيت").font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
+                            }
+                        }
+                        .padding(.vertical, 6)
+                        .accessibilityElement(children: .contain)
+                        .accessibilityIdentifier("prayer-qada-row-\(item.reference.day)-\(item.reference.prayer.rawValue)")
+                        Divider()
+                    }
+                }
+                Button("أضف فائتة قديمة", action: addOld)
+                    .font(PrayerHomeType.strong).foregroundStyle(theme.accent).frame(minHeight: 44)
+                    .accessibilityIdentifier("prayer-old-missed")
+            }
+            .padding(20)
+        }
+        .background(theme.background)
+        .foregroundStyle(theme.ink)
+    }
+}
+
 private enum PrayerTodaySheet: Identifiable {
     case log(PrayerCell)
     case statistics
     case heart(PrayerCell)
     case qiyam
     case oldMissed
+    case qadaList
     case makeUp(PrayerQada, isFridayNoon: Bool, dateLabel: String)
     case recovery([PrayerReference], Set<PrayerReference>, TimeZone)
     var id: String {
         switch self {
         case .oldMissed: "old-missed"
+        case .qadaList: "qada-list"
         case .qiyam: "qiyam"
         case .statistics: "statistics"
         case .heart(let cell): "heart-\(cell.reference.naturalKey)"
@@ -830,7 +1306,7 @@ private struct PrayerSummarySection<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
-                Image(systemName: "diamond.fill").font(.system(size: 7)).foregroundStyle(theme.accent).accessibilityHidden(true)
+                Rectangle().fill(theme.accent).frame(width: 6, height: 6).rotationEffect(.degrees(45)).accessibilityHidden(true)
                 Text(title).font(MadarTypography.section()).accessibilityAddTraits(.isHeader)
                 Rectangle().fill(theme.line).frame(height: 1).accessibilityHidden(true)
             }

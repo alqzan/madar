@@ -9,6 +9,8 @@ public struct PrayerCell: Equatable, Identifiable, Sendable {
     public let status: PrayerDisplayStatus
     public let heart: PrayerHeart?
     public let time: Date?
+    /// The calculated prayer time, even after the prayer is logged (`time` then holds the log's eventAt).
+    public let prayerTime: Date?
     public let shortened: Bool
     public let fridayKind: FridayPrayerKind?
     public let pairID: UUID?

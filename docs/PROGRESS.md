@@ -4,19 +4,19 @@
 
 # Last checked
 
-2026-10-13, claude (model: Opus 5.5; effort: not exposed). Reorganized the repository and board at the owner's request; no app source changed. Main `410375e` before this change. `check-review-contracts.py`: PASS (86). `check-shipping-sources.py`: **3 FAILs already on main** (confirmed on an unchanged `410375e` snapshot): `PrayerTodayView.swift:833` font size 7 for a decorative diamond (fix in M1-V01); `salah.offsets` and `notif.quietFrom` have no shipped SettingControl branch (fix in M1-V10). Unmerged candidate: `codex/m1-s4-prayer-settings-debt` at `c9bd527` (full qada list and qada calendar dates); its last native rerun was never checked.
+2026-10-13, claude (Opus 5.5; effort not exposed). M1-V01 done on main. Owner decisions today: no enlarged-text (AX) testing, no reviews except a data-migration change; the script checks run only at a milestone gate. Known `check-shipping-sources.py` FAILs: `salah.offsets`, `notif.quietFrom` (M1-V10). `make build` fixed: the widget target now takes its sources from `project.yml`. Unmerged candidate: `codex/m1-s4-prayer-settings-debt` at `c9bd527`.
 
 # Board
 
 Status values: `ready` · `in progress` · `blocked: <reason>` · `matched — awaiting owner` · `approved` (owner only) · `done` (engines and flows without a screen).
 
-Every screen card follows protocol §2: canonical files → default-size screenshots → `python3 Madar/scripts/compare-screens.py <board> <shots>` → fix → AX3 check → `matched — awaiting owner`. Spec for every prayer card: §7.2 `docs/HANDOFF/sections/09-r-salah.md` (the part for that screen), §5 shapes `05-ds.md`, and the fixes listed.
+Every screen card follows protocol §2: canonical files → default-size screenshots → `python3 Madar/scripts/compare-screens.py <board> <shots>` → fix → `matched — awaiting owner` (default text size only; no enlarged-text testing, owner 13 October 2026). Spec for every prayer card: §7.2 `docs/HANDOFF/sections/09-r-salah.md` (the part for that screen), §5 shapes `05-ds.md`, and the fixes listed.
 
 ## Section M1-V — prayer screens match the design (do in this order)
 
 | Card | Screen | Canonical | Current code | Status | Do not copy (fixes and defaults win) | Notes |
 |---|---|---|---|---|---|---|
-| M1-V01 | S1 Home | `salah/01-S1-Home.jpg`, `-s1` | `App/PrayerTodayView.swift` | ready | Moon day/night button (prototype only). «تبقى معلّقة ٦ أيام ثم تُحسب فائتة»: RP1, an unlogged prayer becomes *unconfirmed*, never missed. «خاشع» or any heart label under the arches (RP6). Heart-question card unless `salah.askHeart` is on (default off). "·" next to a digit in the date (RU1, use «،»). Sample numbers (٩٨٪، ٨ أيام، ٣ فوائت، times). | Missing now: lattice horseshoe arches with reflection pool (`salah.pool` default true), state fill per arch, verse divider, pending-gap card, Hali card with beads, qada card per canonical, spec date format, countdown «بعد ١:١٤» (RL7). Possible source for the drawing (not yet checked against the canonical): `PrayerArchView`, `PrayerLattice`, `PrayerBeads` in the unused `App/PrayerRoom.swift`. Keep `PrayerTodayView`'s data wiring. Also fix the shipping-check FAIL at line 833. |
+| M1-V01 | S1 Home | `salah/01-S1-Home.jpg`, `-s1` | `App/PrayerTodayView.swift` | matched — awaiting owner | Moon day/night button (prototype only). «تبقى معلّقة ٦ أيام ثم تُحسب فائتة» (RP1). Heart labels (RP6). Heart card unless `salah.askHeart`. "·" next to a digit (RU1). Sample numbers. | Salah palette, lattice arches with reflection pool, verse divider, pending notice, Hali card with beads, qada card with citation and «مواضعها» list, qiyam footprint, spec date and RL7 countdown, plurals via `Prayer.xcstrings` (RU3). Compare page: `Madar/Artifacts/compare/S1-Home.html`. Open question: future/next arches show a line (spec text) where the canonical image shows stars. |
 | M1-V02 | S2 Light log | `salah/02-S2-Log.jpg`, `-s1` | `PrayerTodayLogSheet` | ready | Heart question unless on (RP6). Friday noon records `fridayKind` explicitly (RP5). Sample times. | Must be a room-styled sheet, not a grey system form. |
 | M1-V03 | S2b Missed and reminder | `salah/03-S2b-Missed.jpg`, `-s1` | `PrayerMakeUpSheet`, `PrayerGapResolutionSheet` | ready | «فاتتني… نزلت في القضاء» before the prayer's window ends (RP2: before the end only «لم أصلّها بعد» or snooze). «فاتتني» in the +30 notification (RP2). Automatic aging (RP1). | The return sheet resolves a gap as prayed, missed, not recorded, or excused (RP1). |
 | M1-V04 | S3 Hali | `salah/04-S3-Hali.jpg`, `-s1` | `PrayerStatisticsView` | ready | Any ranking or superlative such as «أخشعُ صلواتك…» (RP6). Sample numbers. Balance-style picker (`salah.balanceView` is v2: beads only). | Seen defects: title shown twice; «٠ أيام» needs the Arabic plural rule (RU3); month grid lacks each day's bead glyph; Mizan card lacks «الأحدث / الأقدم» labels and the «آخر ٢٥ فرضًا» header. |
@@ -63,14 +63,22 @@ M0-T06 (device acceptance paperwork), M0-T09 (encrypted backup and privacy matri
 
 1. Approve or reject each screen marked `matched — awaiting owner`.
 2. Run the app on your iPhone (steps: `docs/OWNER-RUNBOOK.md`) when M1-V is done.
-3. The Codex automation prompt still names old tasks: replace it with `docs/AUTOMATION-PROMPT.md`.
-4. 57 local branches and 15 worktrees remain from earlier sessions. Cleanup waits for your go (merged branches only, `git branch -d`).
+3. The Codex automation now uses `docs/AUTOMATION-PROMPT.md` but is still **paused**; resume it from Codex when you want.
+4. 20 merged local branches can be deleted (`git branch -d`); the tool blocked me from deleting them. 31 unmerged branches are kept.
 
 # Later
 
 M1 gate, then M2 Quran, M3 Diary, M4 Lobby + Habits + Widgets, M5 Money, M6 Mihbara, M7 integration. Plan each milestone as screen cards in this same format when its turn comes; no entry point to an unbuilt room.
 
 # Handovers
+
+## Handover — M1-V01 prayer home — 2026-10-13 — claude
+
+Works now: the prayer home matches `01-S1-Home` in layout, palette and wording (compare page `Madar/Artifacts/compare/S1-Home.html`); whole cards are tappable (the «أضف فائتة قديمة» card and «مواضعها» used to respond only on their text).
+Verified: `PrayerCopyTests` and the prayer UI set (V01, T01, T02 ×2, T05, T07, T09: 9 passed; T04 permission passes after uninstalling the app, because the simulator keeps the earlier grant) at default size; MadarPrayer `swift test` 18/18.
+Not verified: owner iPhone; enlarged text (no longer tested, owner decision).
+Next: M1-V02, the log sheet matching `02-S2-Log.jpg`.
+Model/effort: Claude Opus 5.5; effort not exposed. Usage: not exposed.
 
 ## Handover — repository reorganized — 2026-10-13 — claude
 

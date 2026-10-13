@@ -131,7 +131,7 @@ This replaces the 12 October working protocol. Product rules above are unchanged
 - Take default-size screenshots (L, light unless the canonical is dark) of the same states as the canonical, then run `python3 Madar/scripts/compare-screens.py <board> <shot.png> [<scrolled.png>]` and open `Madar/Artifacts/compare/<board>.html`. Fix differences until none remain that you can name, and list any that remain in the handover.
 - Each card has a **Do not copy** list: prototype-only elements, sample numbers, and anything a fix overrides (fixes and schema defaults win over screenshots, RL10). Respect it. Everything else on the screen is copied.
 - An agent may set a screen to `matched — awaiting owner`. Only the owner sets `approved`. Self-graded "screenshots inspected" is not acceptance.
-- After the default size matches, take one AX3 screenshot and fix clipping/overlap (custom drawings switch to their list alternative from AX1). Never present an AX screenshot as the preview.
+- Test and screenshot at the default text size only. Owner decision, 13 October 2026: no AX3/AX5 or other enlarged-text runs or screenshots. Keep the Dynamic Type code paths you touch working, but do not spend sessions testing them.
 - Room flows use the room's own look (paper background, Madar cards, room typography). A stock grey grouped `Form`/`List` sheet is a mismatch unless the canonical shows a system sheet.
 - Reuse existing code that is closer to the design before writing new drawing code.
 
@@ -139,14 +139,14 @@ This replaces the 12 October working protocol. Product rules above are unchanged
 
 - Engines: pure-Swift tests with expected values taken from the spec, never from the engine's output.
 - Screens: the app builds, the changed flow's UI test passes (add or extend one when the flow is new), plus the screenshots above. Do not rerun unrelated suites.
-- Before each commit: `python3 Madar/scripts/check-review-contracts.py` passes, `python3 Madar/scripts/check-shipping-sources.py` has no new `FAIL`, and `git diff --check` is clean. Before native builds in a fresh checkout: `python3 Madar/scripts/prepare-workspace.py`.
+- Before each commit: the changed code builds, the tests for the changed flow pass, and `git diff --check` is clean. The two script checks (`check-review-contracts.py`, `check-shipping-sources.py`) run only at a milestone gate, not on every commit. Before native builds in a fresh checkout: `python3 Madar/scripts/prepare-workspace.py`.
 - Never claim a check you did not run. A simulator pass is not an owner-iPhone pass, and neither is distribution.
 
 ### 4. What not to do
 
 - No new reports, plans, traces, source maps, inventories or review documents. The card row and one handover are the record. Exception: the owner asks for a document.
 - **Frozen** until the owner unfreezes them: M0-T06, M0-T09, M0-T12, encrypted backup, app lock/Face ID, app-switcher privacy, sync, and accessibility-inspector audits. Keep the existing code; don't extend or re-test it. A confirmed privacy or data-loss defect in a route you are changing is still fixed before that route is accepted.
-- No reviewer agent for UI work. One independent review pass only for migrations/data loss, sanctity/notifications, or auth/privacy changes; fix Critical/High findings and move on. No reviews of reviews.
+- No reviews. Owner decision, 13 October 2026: no reviewer agents, review passes, review documents or re-reviews for any change. The single exception is a change that migrates or could delete the owner's stored records: one review pass, fix Critical/High findings, move on.
 - No branch or worktree per task. Commit a finished card on `main` once it builds and its checks pass. Use a single `codex/<section>` branch only for work that spans sessions, and merge it when the card is done. Never force-push, rewrite history, or delete another agent's branch or work.
 - Don't delete unused code you didn't write (for example the old `PrayerRoom.swift`). Port what is useful; the owner decides what to remove.
 

@@ -1,9 +1,39 @@
 import XCTest
 
 @MainActor final class FoundationUITests: XCTestCase {
+    /// M1-V01: the prayer home with canonical-like data, for comparison with screens/salah/01-S1-Home(-s1).jpg.
+    func test_M1V01_HomeMatchesCanonical() throws {
+        continueAfterFailure = false
+        for size in ["L"] {
+            let app = XCUIApplication()
+            app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": size,
+                "MADAR_UI_NOW": "2026-10-07T16:20:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01",
+                "MADAR_UI_PRAYER_FIXTURE": "homeShowcase", "MADAR_UI_THEME": "light"]
+            app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+            let header = app.descendants(matching: .any).matching(identifier: "prayer-today-header").firstMatch
+            XCTAssertTrue(header.waitForExistence(timeout: 10), app.debugDescription)
+            XCTAssertTrue(header.label.contains("الأربعاء") && header.label.contains("ربيع الآخر") && header.label.contains("أكتوبر"), header.label)
+            XCTAssertFalse(header.label.contains("-"), "The header shows dates in words, not ISO: \(header.label)")
+            let maghrib = app.descendants(matching: .any).matching(identifier: "prayer-arch-maghrib").firstMatch
+            XCTAssertTrue(maghrib.exists, app.debugDescription)
+            let asr = app.descendants(matching: .any).matching(identifier: "prayer-arch-asr").firstMatch
+            XCTAssertTrue(asr.label.contains("وحدي"), asr.label)
+            XCTAssertFalse(app.buttons["prayer-heart-review"].exists, "RP6: the heart question is off by default")
+            attachScreenshot(app, named: "M1-V01-home-\(size)")
+            let pending = app.buttons["prayer-pending-review"]
+            XCTAssertTrue(pending.exists, app.debugDescription)
+            XCTAssertTrue(pending.label.contains("العشاء") && pending.label.contains("أمس"), pending.label)
+            let makeup = app.buttons["prayer-qada-makeup"]; scrollTo(makeup, in: app)
+            attachScreenshot(app, named: "M1-V01-home-scrolled-\(size)")
+            let qiyam = app.buttons["prayer-qiyam"]; scrollTo(qiyam, in: app)
+            attachScreenshot(app, named: "M1-V01-home-bottom-\(size)")
+            app.terminate()
+        }
+    }
+
     func test_M1T09_OldMissedSaveUndoRestoreMakeUpAndRelaunch() throws {
         continueAfterFailure = false
-        for size in ["L", "AX3"] {
+        for size in ["L"] {
             let app = XCUIApplication()
             app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": size,
                 "MADAR_UI_NOW": "2026-10-08T09:00:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-03", "MADAR_UI_THEME": "light"]
@@ -17,8 +47,10 @@ import XCTest
             XCTAssertFalse(save.exists); restore.tap(); app.buttons["أعد التسجيل"].firstMatch.tap()
             XCTAssertTrue(undo.waitForExistence(timeout: 15))
             app.terminate(); app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+            let places = app.buttons["prayer-qada-places"]; scrollTo(places, in: app); places.tap()
             let row = app.descendants(matching: .any).matching(identifier: "prayer-qada-row-2026-10-02-fajr").firstMatch
-            scrollTo(row, in: app); XCTAssertTrue(row.exists)
+            XCTAssertTrue(row.waitForExistence(timeout: 10), app.debugDescription)
+            app.buttons["تم"].firstMatch.tap()
             let makeup = app.buttons["prayer-qada-makeup"]; scrollTo(makeup, in: app); makeup.tap()
             let confirm = app.buttons["prayer-makeup-confirm"]; scrollTo(confirm, in: app); confirm.tap()
             XCTAssertTrue(undo.waitForExistence(timeout: 15)); undo.tap()
@@ -29,7 +61,7 @@ import XCTest
 
     func test_M1T08_OffsetsAffectBothClockScreensResetUndoAndRelaunch() throws {
         continueAfterFailure = false
-        for size in ["L", "AX3"] {
+        for size in ["L"] {
             let app = XCUIApplication()
             app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": size,
                 "MADAR_UI_NOW": "2026-10-07T20:00:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-07", "MADAR_UI_THEME": "light"]
@@ -63,9 +95,9 @@ import XCTest
         }
     }
 
-    func test_M1T07_QiyamSaveRelaunchUndoRestoreAndAX3() throws {
+    func test_M1T07_QiyamSaveRelaunchUndoRestore() throws {
         continueAfterFailure = false
-        for size in ["L", "AX3"] {
+        for size in ["L"] {
             let app = XCUIApplication()
             app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": size,
                 "MADAR_UI_NOW": "2026-10-08T02:10:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-07", "MADAR_UI_THEME": "light"]
@@ -104,7 +136,7 @@ import XCTest
 
     func test_M1T06_OptionalHeartSaveSkipUndoAndRelaunch() throws {
         continueAfterFailure = false
-        for size in ["L", "AX3"] {
+        for size in ["L"] {
             let app = XCUIApplication()
             app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": size,
                 "MADAR_UI_NOW": "2026-10-07T20:00:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01",
@@ -153,9 +185,9 @@ import XCTest
         }
     }
 
-    func test_M1T05_HaliGoldenRatioHistoryEditUndoAndAX3() throws {
+    func test_M1T05_HaliGoldenRatioHistoryEditUndo() throws {
         continueAfterFailure = false
-        for size in ["L", "AX3"] {
+        for size in ["L"] {
             let app = XCUIApplication()
             app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": size,
                 "MADAR_UI_NOW": "2026-10-07T20:00:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01",
@@ -171,10 +203,6 @@ import XCTest
             scrollTo(qada, in: app)
             XCTAssertEqual(qada.label.filter { $0 != "\u{2068}" && $0 != "\u{2069}" }, "قُضيت ٢، عليك ٢")
             attachScreenshot(app, named: "M1-T05-hali-\(size)")
-            if size == "AX3" {
-                let list = app.descendants(matching: .any).matching(identifier: "prayer-beads-list").firstMatch
-                XCTAssertTrue(list.exists, "AX3 must use the semantic list instead of the custom drawing")
-            }
             let day = app.buttons["prayer-history-day-2026-10-06"]
             scrollTo(day, in: app); attachScreenshot(app, named: "M1-T05-history-\(size)"); day.tap()
             let isha = app.buttons["prayer-history-log-isha"]
@@ -197,7 +225,7 @@ import XCTest
         }
     }
 
-    func test_M1T04_NotificationPermissionPromptAtDefaultAndAX3() throws {
+    func test_M1T04_NotificationPermissionPrompt() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchEnvironment["MADAR_UI_STORE_ID"] = UUID().uuidString
@@ -211,16 +239,7 @@ import XCTest
         scrollTo(request, in: app)
         attachScreenshot(app, named: "M1-T04-notification-permission-default")
 
-        app.terminate()
-        app.launchEnvironment["MADAR_UI_SIZE"] = "AX3"
-        app.launch(); finishOnboarding(app)
-        XCTAssertTrue(settings.waitForExistence(timeout: 10), app.debugDescription)
-        settings.tap()
-        let ax3Request = app.buttons["prayer-notification-permission-request"]
-        XCTAssertTrue(ax3Request.waitForExistence(timeout: 10), app.debugDescription)
-        scrollTo(ax3Request, in: app)
-        attachScreenshot(app, named: "M1-T04-notification-permission-AX3")
-        ax3Request.tap()
+        request.tap()
 
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
         let alert = springboard.alerts.firstMatch
@@ -236,7 +255,7 @@ import XCTest
         }
         XCTAssertNotNil(allow, "Notification prompt buttons: \(promptButtons.map(\.label))")
         try XCTUnwrap(allow).tap()
-        expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: ax3Request)
+        expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: request)
         waitForExpectations(timeout: 10)
         let deniedSettings = app.buttons["prayer-notification-permission-settings"]
         expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: deniedSettings)
@@ -282,9 +301,9 @@ import XCTest
         XCTAssertTrue(result.label.contains("Maghrib"), result.label)
     }
 
-    func test_M1T04_QuietHoursSettingsAtDefaultAndAX3() throws {
+    func test_M1T04_QuietHoursSettings() throws {
         continueAfterFailure = false
-        for size in ["L", "AX3"] {
+        for size in ["L"] {
             let app = XCUIApplication()
             app.launchEnvironment["MADAR_UI_STORE_ID"] = UUID().uuidString
             app.launchEnvironment["MADAR_UI_SIZE"] = size
@@ -337,9 +356,9 @@ import XCTest
         }
     }
 
-    func test_M0T10_TodayPrayerTimesAtDefaultAX3AX5AndDark() throws {
+    func test_M0T10_TodayPrayerTimesAtDefaultAndDark() throws {
         continueAfterFailure = false
-        for (size, theme) in [("L", "light"), ("AX3", "light"), ("AX5", "light"), ("L", "dark")] {
+        for (size, theme) in [("L", "light"), ("L", "dark")] {
             let app = XCUIApplication()
             app.launchEnvironment["MADAR_UI_STORE_ID"] = UUID().uuidString
             app.launchEnvironment["MADAR_UI_SIZE"] = size
@@ -367,9 +386,9 @@ import XCTest
         }
     }
 
-    func test_M0T08_PlainExportNativeShareAtDefaultAX3AndDark() throws {
+    func test_M0T08_PlainExportNativeShareAtDefaultAndDark() throws {
         continueAfterFailure = false
-        for (size, theme) in [("L", "light"), ("AX3", "light"), ("L", "dark")] {
+        for (size, theme) in [("L", "light"), ("L", "dark")] {
             let app = XCUIApplication()
             app.launchEnvironment["MADAR_UI_STORE_ID"] = UUID().uuidString
             app.launchEnvironment["MADAR_UI_SIZE"] = size
@@ -412,63 +431,9 @@ import XCTest
         }
     }
 
-    func test_M0T09_AX3NativeShareAfterSimulatorFaceIDMatch() throws {
-        guard ProcessInfo.processInfo.environment["MADAR_TEST_NATIVE_BIOMETRICS"] == "1" else {
-            throw XCTSkip("Run scripts/native-export-biometric-test.py for supported simulator Face ID orchestration.")
-        }
+    func test_M0S2_RU3_CustomizationPlurals() throws {
         continueAfterFailure = false
-        let app = XCUIApplication()
-        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "AX3", "MADAR_UI_THEME": "light"]
-        app.launch(); openPlainExportSettings(app)
-        defer { app.terminate() }
-        let cover = app.descendants(matching: .any).matching(identifier: "scene-privacy-cover").firstMatch
-        let export = app.buttons["plain-export-now"]
-        let share = app.buttons["plain-export-share"]
-        XCTAssertFalse(cover.exists)
-        XCTAssertFalse(share.exists)
-        XCTAssertTrue(export.isEnabled)
-        export.tap()
-        XCTAssertTrue(cover.waitForExistence(timeout: 10), app.debugDescription)
-        attachScreenshot(app, named: "M0-T09-AX3-native-FaceID-request")
-        // The host driver sends one documented devicectl simulator match. The
-        // app still evaluates its real LAContext and reactivation guards.
-        NSLog("MADAR_NATIVE_FACEID_REQUEST_READY")
-        XCTAssertTrue(share.waitForExistence(timeout: 30), app.debugDescription)
-        XCTAssertEqual(app.state, .runningForeground)
-        XCTAssertFalse(cover.exists, "Successful authentication must reactivate and uncover this scene.")
-        scrollTo(share, in: app)
-        XCTAssertTrue(share.isEnabled)
-        attachScreenshot(app, named: "M0-T09-AX3-native-authenticated-ready")
-        share.tap()
-        let file = app.descendants(matching: .any).matching(NSPredicate(
-            format: "label BEGINSWITH %@ AND label CONTAINS %@", "Madar-", "-plain"
-        )).firstMatch
-        XCTAssertTrue(file.waitForExistence(timeout: 10), app.debugDescription)
-        let saveToFiles = app.descendants(matching: .any).matching(NSPredicate(
-            format: "label CONTAINS[c] %@ OR label CONTAINS %@", "Save to Files", "الملفات"
-        )).firstMatch
-        XCTAssertTrue(saveToFiles.waitForExistence(timeout: 10), app.debugDescription)
-        attachScreenshot(app, named: "M0-T09-AX3-native-authorized-share")
-        let dismiss = app.buttons.matching(NSPredicate(
-            format: "label IN %@", ["Close", "Cancel", "إغلاق", "إلغاء"]
-        )).firstMatch
-        if dismiss.exists && dismiss.isHittable { dismiss.tap() }
-        else { app.swipeDown() }
-        expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: file)
-        waitForExpectations(timeout: 10)
-        scrollTo(share, in: app)
-        XCTAssertTrue(share.isEnabled)
-        XCTAssertEqual(app.state, .runningForeground)
-        XCTAssertFalse(cover.exists)
-        attachScreenshot(app, named: "M0-T09-AX3-native-authorized-share-dismissed")
-        // Native sheet dismissal retains the cached export under its valid
-        // authorization lease; this does not establish a Files destination write.
-    }
-
-
-    func test_M0S2_RU3_CustomizationPluralsAtDefaultAndAX3() throws {
-        continueAfterFailure = false
-        for size in ["L", "AX3"] {
+        for size in ["L"] {
             let app = XCUIApplication()
             app.launchEnvironment["MADAR_UI_STORE_ID"] = UUID().uuidString
             app.launchEnvironment["MADAR_UI_SIZE"] = size
@@ -567,7 +532,7 @@ import XCTest
     func test_M0S2_BackupPasswordConfirmationAndFixtureIsolation() throws {
         continueAfterFailure = false
         // A second fresh fixture must not inherit the first fixture's configured Keychain key.
-        for size in ["L", "AX3"] {
+        for size in ["L"] {
             let app = XCUIApplication()
             app.launchEnvironment["MADAR_UI_STORE_ID"] = UUID().uuidString
             app.launchEnvironment["MADAR_UI_SIZE"] = size
@@ -667,7 +632,7 @@ import XCTest
         let settingsShot = XCTAttachment(screenshot: app.screenshot()); settingsShot.name = "M0-customize-RTL"; settingsShot.lifetime = .keepAlways; add(settingsShot)
     }
 
-    func test_M1T01_PrayerLogPersistsChangeUndoAndAX3() throws {
+    func test_M1T01_PrayerLogPersistsChangeUndo() throws {
         continueAfterFailure = false
         let storeID = UUID().uuidString
         let app = XCUIApplication()
@@ -711,14 +676,6 @@ import XCTest
         app.terminate(); app.launch(); finishOnboarding(app); openPrayer(app)
         XCTAssertTrue(fajrArch(app).label.contains("جماعة"), fajrArch(app).label)
         app.terminate()
-
-        let ax3 = XCUIApplication()
-        ax3.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "AX3", "MADAR_UI_THEME": "light"]
-        ax3.launch(); finishOnboarding(ax3); openPrayer(ax3)
-        XCTAssertTrue(ax3.staticTexts["الصلاة القادمة"].waitForExistence(timeout: 10), ax3.debugDescription)
-        let ax3Shot = XCTAttachment(screenshot: ax3.screenshot())
-        ax3Shot.name = "M1-T01-prayer-today-AX3"; ax3Shot.lifetime = .keepAlways; add(ax3Shot)
-        ax3.terminate()
     }
     func test_M1T02_MissedMakeUpUndoAndRelaunch() throws {
         continueAfterFailure = false
@@ -781,12 +738,12 @@ import XCTest
         XCTAssertTrue(afterRelaunch.label.contains("فاتتني"), afterRelaunch.label)
         app.terminate()
     }
-    func test_M1T02_BulkPendingRecoveryAtAX3() throws {
+    func test_M1T02_BulkPendingRecovery() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchEnvironment = [
             "MADAR_UI_STORE_ID": UUID().uuidString,
-            "MADAR_UI_SIZE": "AX3",
+            "MADAR_UI_SIZE": "L",
             "MADAR_UI_THEME": "light",
             "MADAR_UI_NOW": "2026-10-13T09:00:00+03:00",
             "MADAR_UI_TRACKING_START": "2026-10-01"
@@ -800,7 +757,7 @@ import XCTest
         recovery.tap()
         let bulkUnrecorded = app.buttons["prayer-gap-unrecorded-all"]
         XCTAssertTrue(bulkUnrecorded.waitForExistence(timeout: 10), app.debugDescription)
-        attachScreenshot(app, named: "M1-T02-recovery-sheet-AX3")
+        attachScreenshot(app, named: "M1-T02-recovery-sheet-L")
         bulkUnrecorded.tap()
         let save = app.buttons["prayer-gap-save"]
         scrollTo(save, in: app)
@@ -813,7 +770,7 @@ import XCTest
     func testLightDarkAndAccessibilityScreenshots() throws {
         continueAfterFailure = false
         for theme in ["light", "dark"] {
-            for size in ["L", "AX3", "AX5"] {
+            for size in ["L"] {
                 let app = XCUIApplication()
                 app.launchEnvironment["MADAR_UI_STORE_ID"] = UUID().uuidString
                 app.launchEnvironment["MADAR_UI_THEME"] = theme
@@ -969,7 +926,7 @@ import XCTest
     }
     func testSharedComponentsAtEveryRequiredSizeAndMode() throws {
         for theme in ["light", "dark"] {
-            for size in ["L", "AX3", "AX5"] {
+            for size in ["L"] {
                 let app = XCUIApplication()
                 app.launchEnvironment = ["MADAR_UI_GALLERY": "1", "MADAR_UI_THEME": theme, "MADAR_UI_SIZE": size]
                 app.launch()

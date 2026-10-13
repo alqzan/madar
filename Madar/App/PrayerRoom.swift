@@ -419,11 +419,11 @@ private struct PrayerPairSheet: View {
 struct PrayerQadaCitation: View {
     @State private var index = 0
     private let citations = [
-        ("مَنْ نَسِيَ صَلَاةً فَلْيُصَلِّ إِذَا ذَكَرَهَا، لَا كَفَّارَةَ لَهَا إِلَّا ذَلِكَ", "البخاري ٥٩٧، مسلم ٦٨٤"),
+        ("«مَنْ نَسِيَ صَلَاةً فَلْيُصَلِّ إِذَا ذَكَرَهَا، لَا كَفَّارَةَ لَهَا إِلَّا ذَلِكَ»، ﴿وَأَقِمِ الصَّلَاةَ لِذِكْرِي﴾", "متفق عليه، البخاري ٥٩٧ ومسلم ٦٨٤"),
         ("مَنْ نَسِيَ صَلَاةً أَوْ نَامَ عَنْهَا فَكَفَّارَتُهَا أَنْ يُصَلِّيَهَا إِذَا ذَكَرَهَا", "مسلم ٦٨٤"),
         ("﴿حَافِظُوا عَلَى الصَّلَوَاتِ وَالصَّلَاةِ الْوُسْطَىٰ وَقُومُوا لِلَّهِ قَانِتِينَ﴾", "البقرة ٢٣٨")
     ]
-    var body: some View { Button { index = (index + 1) % citations.count } label: { VStack(alignment: .leading, spacing: 8) { Text(citations[index].0).font(.custom("Amiri-Regular", size: 23, relativeTo: .title3)).fixedSize(horizontal: false, vertical: true); Text(citations[index].1).font(MadarTypography.caption()) } }.buttonStyle(.plain).accessibilityHint("لمسة تعرض نصًا آخر موثّقًا") }
+    var body: some View { Button { index = (index + 1) % citations.count } label: { VStack(alignment: .leading, spacing: 8) { Text(citations[index].0).font(.custom("Amiri-Regular", size: 21, relativeTo: .title3)).fixedSize(horizontal: false, vertical: true); Text(citations[index].1).font(MadarTypography.caption()) } }.buttonStyle(.plain).accessibilityHint("لمسة تعرض نصًا آخر موثّقًا") }
 }
 struct PrayerStar: Shape {
     func path(in rect: CGRect) -> Path {

@@ -69,6 +69,7 @@ targets:
             CFBundleURLSchemes: [madar]
         ITSAppUsesNonExemptEncryption: false
         NSFaceIDUsageDescription: افتح بيانات مدار المحمية بمصادقة الجهاز.
+        NSSupportsLiveActivities: true
         UIAppFonts:
           - thmanyahsans-Light.otf
           - thmanyahsans-Regular.otf
@@ -87,7 +88,9 @@ targets:
   MadarWidgets:
     type: app-extension
     platform: iOS
-    sources: [Widgets]
+    sources:
+      - Widgets
+      - App/PrayerActivityAttributes.swift
     dependencies:
       - package: MadarSnapshots
     settings:

@@ -87,7 +87,7 @@ import MadarData
             let windowEnded = missedWindowEnd(ref).map { now >= $0 } ?? false
             let canMarkMissed = day >= start && windowEnded
             let debt = qada(ref)
-            return PrayerCell(reference: ref, status: status, heart: row?.heart.flatMap(PrayerHeart.init(rawValue:)), time: occurrence == nil ? nil : row?.eventAt ?? occurrence?.time, shortened: row?.shortened == true, fridayKind: row?.fridayKind.flatMap(FridayPrayerKind.init(rawValue:)), pairID: row?.pairID, isFriday: friday, canLog: day >= start && (due || occurrence == nil), canMarkMissed: canMarkMissed, canMakeUp: windowEnded && (day >= start || debt != nil) && debt?.madeUpAt == nil)
+            return PrayerCell(reference: ref, status: status, heart: row?.heart.flatMap(PrayerHeart.init(rawValue:)), time: occurrence == nil ? nil : row?.eventAt ?? occurrence?.time, prayerTime: occurrence?.time, shortened: row?.shortened == true, fridayKind: row?.fridayKind.flatMap(FridayPrayerKind.init(rawValue:)), pairID: row?.pairID, isFriday: friday, canLog: day >= start && (due || occurrence == nil), canMarkMissed: canMarkMissed, canMakeUp: windowEnded && (day >= start || debt != nil) && debt?.madeUpAt == nil)
         })
     }
     public func nightRequiresRestore(_ night: GregorianDay) -> Bool {
