@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1440" viewBox="0 0 1440 1440" role="img" aria-labelledby="title desc">
+  <title id="title">شجرة طريق إنجاز مدار 2.0</title>
+  <desc id="desc">المسار الحالي في الصلاة، ثم القرآن واليوميات والردهة والعادات والمال والمِهبرة، ثم التكامل والإقفال. قرارات المالك تظهر كمسار جانبي ولا توقف العمل المستقل.</desc>
+  <defs>
+    <linearGradient id="paper" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fbf8f0"/>
+      <stop offset="1" stop-color="#eee8d8"/>
+    </linearGradient>
+    <linearGradient id="green" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#183d35"/>
+      <stop offset="1" stop-color="#2d5b4d"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="7" stdDeviation="10" flood-color="#352d20" flood-opacity=".10"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#927744"/>
+    </marker>
+    <style>
+      text { font-family: "Geeza Pro", "Noto Naskh Arabic", "Arial", sans-serif; }
+      .head { fill:#f8f4e9; font-size:40px; font-weight:700; }
+      .sub { fill:#e5d9bd; font-size:20px; }
+      .title { fill:#203a32; font-size:25px; font-weight:700; }
+      .body { fill:#555348; font-size:17px; }
+      .small { fill:#756f5f; font-size:15px; }
+      .light { fill:#fffaf0; }
+      .gold { fill:#b59053; }
+      .node { fill:#fffdf8; stroke:#ddd3c0; stroke-width:2; }
+      .pending { fill:#fff9ed; stroke:#c7a56b; stroke-width:2; stroke-dasharray:9 7; }
+    </style>
+  </defs>
+  <rect width="1440" height="1440" rx="32" fill="url(#paper)"/>
+
+  <rect x="44" y="38" width="1352" height="144" rx="26" fill="url(#green)"/>
+  <text x="1340" y="92" text-anchor="start" class="head" direction="rtl">مدار ٢٫٠ — شجرة طريق الإنجاز</text>
+  <text x="1340" y="137" text-anchor="start" class="sub" direction="rtl">تقدّم على دفعات قابلة للتحقق؛ القرار معلّم بوضوح، والفحص لا يُدّعى قبل إجرائه</text>
+  <rect x="70" y="67" width="188" height="42" rx="21" fill="#f4ead2" opacity=".15"/>
+  <text x="164" y="95" text-anchor="middle" class="sub" font-size="16">تحديث ١٣ أكتوبر ٢٠٢٦</text>
+
+  <!-- Current work -->
+  <rect x="314" y="218" width="812" height="142" rx="24" fill="url(#green)" filter="url(#shadow)"/>
+  <text x="1088" y="261" text-anchor="start" class="light" font-size="27" font-weight="700" direction="rtl">الآن · M2 القرآن — تدقيق RQ2 اكتمل</text>
+  <text x="1088" y="301" text-anchor="start" class="light" font-size="18" direction="rtl">واجهة Home غير مدمجة؛ لا خدمة بيانات أو وجهة للقرآن حتى الآن.</text>
+  <text x="1088" y="333" text-anchor="start" class="sub" font-size="16" direction="rtl">M1 يبقى بانتظار اعتمادك وفحص iPhone؛ stage والترخيص لا يُخمّنان.</text>
+
+  <!-- branching -->
+  <path d="M720 360 V408 H412 V443" fill="none" stroke="#927744" stroke-width="4" marker-end="url(#arrow)"/>
+  <path d="M720 408 H1084 V443" fill="none" stroke="#b59a69" stroke-width="3" stroke-dasharray="9 8" marker-end="url(#arrow)"/>
+
+  <!-- Main project path -->
+  <rect x="90" y="454" width="650" height="600" rx="26" fill="#f4efe3" stroke="#d8cdb9" stroke-width="2"/>
+  <text x="700" y="493" text-anchor="start" class="title" direction="rtl">مسار الإنجاز · نكمل ما لا يحتاج قرارًا</text>
+
+  <rect x="150" y="518" width="530" height="80" rx="18" class="node"/>
+  <circle cx="638" cy="558" r="20" fill="#2d5b4d"/><text x="638" y="565" text-anchor="middle" class="light" font-size="17" font-weight="700">٢</text>
+  <text x="598" y="550" text-anchor="start" class="title" font-size="21" direction="rtl">M2 · القرآن</text>
+  <text x="598" y="578" text-anchor="start" class="small" direction="rtl">RQ2 جاهز؛ تأسيس خدمة البيانات والمسار يسبق الشاشة.</text>
+
+  <path d="M415 598 V617" stroke="#927744" stroke-width="3" marker-end="url(#arrow)"/>
+  <rect x="150" y="626" width="530" height="65" rx="16" class="node"/>
+  <circle cx="638" cy="658" r="20" fill="#557466"/><text x="638" y="665" text-anchor="middle" class="light" font-size="17" font-weight="700">٣</text>
+  <text x="598" y="666" text-anchor="start" class="title" font-size="21" direction="rtl">M3 · اليوميات</text>
+
+  <path d="M415 691 V709" stroke="#927744" stroke-width="3" marker-end="url(#arrow)"/>
+  <rect x="150" y="718" width="530" height="65" rx="16" class="node"/>
+  <circle cx="638" cy="750" r="20" fill="#557466"/><text x="638" y="757" text-anchor="middle" class="light" font-size="17" font-weight="700">٤</text>
+  <text x="598" y="758" text-anchor="start" class="title" font-size="21" direction="rtl">M4 · الردهة والعادات والودجات</text>
+
+  <path d="M415 783 V801" stroke="#927744" stroke-width="3" marker-end="url(#arrow)"/>
+  <rect x="150" y="810" width="530" height="65" rx="16" class="node"/>
+  <circle cx="638" cy="842" r="20" fill="#557466"/><text x="638" y="849" text-anchor="middle" class="light" font-size="17" font-weight="700">٥</text>
+  <text x="598" y="850" text-anchor="start" class="title" font-size="21" direction="rtl">M5 · المال</text>
+
+  <path d="M415 875 V893" stroke="#927744" stroke-width="3" marker-end="url(#arrow)"/>
+  <rect x="150" y="902" width="530" height="65" rx="16" class="node"/>
+  <circle cx="638" cy="934" r="20" fill="#557466"/><text x="638" y="941" text-anchor="middle" class="light" font-size="17" font-weight="700">٦</text>
+  <text x="598" y="942" text-anchor="start" class="title" font-size="21" direction="rtl">M6 · المِهبرة</text>
+
+  <path d="M415 967 V985" stroke="#927744" stroke-width="3" marker-end="url(#arrow)"/>
+  <rect x="150" y="994" width="530" height="65" rx="16" fill="#e9dfc9" stroke="#bca778" stroke-width="2"/>
+  <circle cx="638" cy="1026" r="20" fill="#9a7942"/><text x="638" y="1033" text-anchor="middle" class="light" font-size="17" font-weight="700">٧</text>
+  <text x="598" y="1034" text-anchor="start" class="title" font-size="21" direction="rtl">M7 · التكامل والإقفال والتقرير النهائي</text>
+
+  <!-- Owner branch -->
+  <rect x="790" y="454" width="560" height="600" rx="26" fill="#f4efe3" stroke="#d8cdb9" stroke-width="2"/>
+  <text x="1310" y="493" text-anchor="start" class="title" direction="rtl">مسار المالك · قرارات وفحوص معلّقة</text>
+
+  <rect x="840" y="500" width="460" height="128" rx="20" class="pending"/>
+  <text x="1266" y="528" text-anchor="start" class="title" font-size="20" direction="rtl">١ · اعتماد شاشات الصلاة</text>
+  <text x="1266" y="558" text-anchor="start" class="body" font-size="16" direction="rtl">١٠ شاشات V01–V10 + شاشة الجمعة.</text>
+  <text x="1266" y="584" text-anchor="start" class="small" font-size="14" direction="rtl">صور المرجع والمقارنة داخل ملف الطريق.</text>
+  <text x="1266" y="608" text-anchor="start" class="small" font-size="14" direction="rtl">تؤجل الموافقة الآن حسب طلبك.</text>
+
+  <rect x="840" y="642" width="460" height="128" rx="20" class="pending"/>
+  <text x="1266" y="670" text-anchor="start" class="title" font-size="20" direction="rtl">٢ · سياسة السجلات القديمة · F05</text>
+  <text x="1266" y="700" text-anchor="start" class="body" font-size="16" direction="rtl">المصدر لا يحمل وقت الأذان أو منطقته أو وقت القضاء.</text>
+  <text x="1266" y="726" text-anchor="start" class="small" font-size="14" direction="rtl">لا نخمن؛ المعاينة الاصطناعية للقراءة فقط موجودة.</text>
+  <text x="1266" y="750" text-anchor="start" class="small" font-size="14" direction="rtl">الاستيراد ينتظر سياسة الحدث ومصدر القضاء.</text>
+
+  <rect x="840" y="784" width="460" height="128" rx="20" class="pending"/>
+  <text x="1266" y="812" text-anchor="start" class="title" font-size="20" direction="rtl">٣ · فحوص الجهاز وقبول M1</text>
+  <text x="1266" y="842" text-anchor="start" class="body" font-size="16" direction="rtl">السفر والموقع، الاختصار وControl والودجات.</text>
+  <text x="1266" y="868" text-anchor="start" class="small" font-size="14" direction="rtl">ثم تحقق القبول على iPhone نفسه.</text>
+  <text x="1266" y="892" text-anchor="start" class="small" font-size="14" direction="rtl">البناء والمحاكي لا يثبتان ذلك.</text>
+
+  <rect x="840" y="926" width="460" height="128" rx="20" class="pending"/>
+  <text x="1266" y="954" text-anchor="start" class="title" font-size="20" direction="rtl">٤ · قرارات القرآن قبل المحرك</text>
+  <text x="1266" y="984" text-anchor="start" class="body" font-size="16" direction="rtl">معنى stage ٠–١٢ وقاعدة RQ1 الدقيقة.</text>
+  <text x="1266" y="1010" text-anchor="start" class="small" font-size="14" direction="rtl">ثم محاكاة هدف ١٠٪ والترخيص.</text>
+  <text x="1266" y="1034" text-anchor="start" class="small" font-size="14" direction="rtl">يمكنني مواصلة العمل المستقل قبلها.</text>
+
+  <rect x="90" y="1100" width="1260" height="100" rx="22" fill="#e8e1d1"/>
+  <text x="1300" y="1141" text-anchor="start" class="title" font-size="21" direction="rtl">طريقة كل بطاقة</text>
+  <text x="1300" y="1175" text-anchor="start" class="body" direction="rtl">المواصفة والإصلاحات المطلوبة ← التنفيذ ← أصغر فحص يثبت التغيير ← لقطة ومقارنة للشاشة ← تحديث اللوحة وتسليم واضح.</text>
+</svg>

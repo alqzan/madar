@@ -20,7 +20,7 @@
    "license": "owner's own code — no third-party license applies",
    "licenseStatus": "n/a",
    "checksum": null,
-   "checksumNote": "pinned by full commit SHA; repo access must be granted by the owner (not readable in this session)",
+   "checksumNote": "Read-only Quran source audit completed at the pinned SHA on 2026-10-13; no separate tree checksum is recorded.",
    "gate": "M0",
    "usedBy": "§11 migration map, §7.4 Quran engine port, §7.5 money bug corpus",
    "note": "Replaces \"aba0c1b or later\". Moving the pin = provenance diff + re-run of port tests."

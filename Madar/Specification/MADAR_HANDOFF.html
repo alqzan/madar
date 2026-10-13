@@ -1255,7 +1255,7 @@ details summary{cursor:pointer;font-weight:700}
 <li><b>يوم الراحة:</b> يوم الأسبوع = <code>quran.restDay</code> ← الجديد ٠ (مراجعة فقط، والسلسلة لا تنقطع)؛ إلا إن ضغط «زِد حفظك رغم ذلك» (<code>QuranDayState.forceNewHifz</code>) فيُكمل من ٢.</li>
 <li><b>الأساس:</b> <code>HifzPlan.amount</code> (عشري &gt; ٠) بوحدة الخطة × معامل درجة اليوم (<code>QuranDayState.hifzLevel</code> إن اختير، وإلا <code>quran.hifzLevel</code>): بسيط ٠٫٥ · متوسط ١ · عميق ١٫٥ · مُحكَم ٢.</li>
 <li><b>المخصّصات:</b> + <code>QuranAllotment(kind = hifzExtra)</code> ليوم <code>d</code> («وزّعه» أو «ضاعف»). المخصّص هدف يوم لا دين: إن لم يُحفظ لا يُرحَّل، ويُعاد حساب الختم المتوقع.</li>
-<li><b>الميزان</b> (إن <code>quran.balanceDecides</code> ولم يُضغط «زِد حفظك»): تثبيت ← الجديد ٠ ويُعاد الورد السابق بالمدرّب؛ نصف ورد ← ناتج ٢+٣ × ½. سقف الإيقاع (٤/٧/١٢) و<code>adaptiveReviewCap</code> يُستعملان هنا وحدهما: عتبة «نصف ورد» = <code>BACKLOG_FACTOR</code> × السقف.</li>
+<li><b>الميزان</b> (إن <code>quran.balanceDecides</code> ولم يُضغط «زِد حفظك»): تثبيت ← الجديد ٠ ويُعاد الورد السابق بالمدرّب؛ نصف ورد ← ناتج ٢+٣ × ½. وفق [FIX] RQ1، قرار نصف الورد مرتبط بالحاجة المحسوبة للمراجعة، ولا يستخدم عتبة ثابتة من نوع <code>BACKLOG_FACTOR × السقف</code>. لا تحدد RQ1 معادلة المقارنة كاملة؛ تُحسم قبل محاكاة الحمل واختبارات محرك M2.</li>
 <li><b>الحدود:</b> البداية = <code>frontierAyah</code> (أول فجوة)، والنهاية من الكمية بقاعدة الكسور أدناه.</li>
 </ol>
 <p><b>المراجعة ليوم <code>d</code>:</b> (١) العدد N = ٤ / ٨ / ١٢ / ٢٢ بدرجة اليوم أو المعتادة — اختيار المستخدم يغلب أي سقف آلي. (٢) القريب أولًا ثم المستحق بالمتانة الأدنى، تؤخذ N والباقي يؤجَّل. (٣) فوق N: حصة اليوم من <code>RecoveryPlan</code> ومخصّصات «ارفعه». (٤) اختبار القديم مقطعًا أخيرًا إن استحق. يوم الراحة يتبع القاعدة نفسها.</p>
@@ -1340,6 +1340,39 @@ strength = round(100 × g × 2^(−x/2))               // 0…100</pre>
 العيّنة البشرية: أول وآخر وجه من كل جزء (٦٠) + أوجه السجدات الـ١٥ + الوجهان ١ و٢ + ١٠ أوجه عشوائية؛ يراجعها المالك أو من يسمّيه، ويُسجَّل الاسم والتاريخ في <code>provenance.json</code>. في التشغيل: مورد مفقود أو بصمة مخالفة ← «تعذّر تحميل هذا الوجه» وتتعطل الجلسات عليه؛ <b>لا يُرسم محرف QCF بخط آخر أبدًا</b>.</li>
 <li><b>موارد النص:</b> نص القرآن وخرائط الكلمات والأسطر موارد مضمّنة للقراءة فقط في الحزمة، ليست نماذج SwiftData. أرقام الآيات في كل النموذج <code>ayahId</code> من ١ إلى ٦٢٣٦ (§١١). خطوط QCF تُسجَّل كسولًا في التطبيق وحده (§٥).</li>
 </ul>
+<div dir="rtl" style="margin:24px 0;padding:22px;border:1px solid #c8b477;border-radius:18px;background:#fbf8ef">
+<h3 style="margin-top:0">ملحق RQ2 · تدقيق محرك القرآن عند المصدر المثبّت</h3>
+<p><b>المصدر:</b> My-dream عند commit <code>aba0c1b18a3bf3fc070395a40595e939c3b73aa3</code>؛ قراءة للملفات <code>intensity.ts</code> و<code>schedule.ts</code> و<code>hifz.ts</code> و<code>session.ts</code> و<code>utils.ts</code> فقط. هذه تفاصيل المصدر القديم وليست اعتمادًا تلقائيًا لسلوكه؛ إصلاحات RQ1–RQ8 وقواعد هذا القسم هي الحاكمة.</p>
+<h4>المعادلات والثوابت التي كانت ناقصة</h4>
+<ul>
+<li><b>الإيقاعات:</b> خفيف = تكرار ٣، قريب ٣، سقف ٤، سلّم ١٠/٢١/٤٥/٩٠، جيد ٥ أيام، يحتاج ٢، وأخطاء ٣. متوازن (الافتراضي) = ٥، ٥، ٧، ٧/١٤/٣٠/٦٠، جيد ٣، يحتاج ١، وأخطاء ٥. مكثف = ٧، ٨، ١٢، ٥/١٠/٢١/٤٥، جيد ٢، يحتاج ١، وأخطاء ٨.</li>
+<li><b>المعامل:</b> البداية ١، والنطاق ٠٫٦–١٫٤. يضرب تقييم «يحتاج/جيد/متقن» المعامل بـ٠٫٨٢/٠٫٩٥/١٫٠٦، ثم تقريب منزلتين وحصر بالنطاق. «يحتاج» موعده <code>max(1, needsDays)</code> بلا ضرب؛ «جيد» <code>max(1, round(goodDays × ease))</code>.</li>
+<li><b>«متقن»:</b> يطبّع المدة السابقة بقسمتها على <code>ease</code>. إن لم توجد مدة أو كانت أقل من ٧٥٪ من <code>goodDays</code> يبدأ بـ<code>round(goodDays × ease)</code>؛ وإلا يأخذ الدرجة التالية لأقرب سلّم. تأخر الصمود يرفع الأساس إلى <code>min(elapsedDays, 2 × rung)</code>. الناتج يُقرّب ويُحصر بين يوم واحد و<code>round(maxLadder × 1.4)</code>. الإتقان قبل ٨٠٪ من الموعد يبقي المدة والمعامل كما هما؛ التعثر المبكر يُحتسب.</li>
+<li><b>الخطر:</b> للصفحة التي روجعت: <code>round2(2 × overdue/interval + 0.6 × lapses + 0.5 × openMistakes)</code>. لغير المراجعة: <code>round2(2.5 + 0.5 × openMistakes)</code>؛ ثابت غير المراجعة ٢٫٥. الترتيب: الخطر تنازليًا، ثم أيام التأخر، ثم رقم الصفحة.</li>
+<li><b>المواظبة والسقف:</b> <code>CONSISTENCY_WINDOW = 14</code>، المواظبة = أيام الحفظ أو المراجعة المميزة في النافذة ÷ ١٤. <code>adaptiveReviewCap = max(2, round(dailyReviewPages × (0.7 + 0.8 × consistency)))</code>. <code>BACKLOG_FACTOR = 2</code>؛ المصدر ينصف الجديد فقط إذا تجاوز المستحق ضعفي السقف. شرط RQ1 النسبي للحاجة هو الحاكم في النقل.</li>
+<li><b>الاختبار الذكي:</b> <code>RANDOM_TEST_INTERVAL_DAYS = 3</code>؛ أول اختبار فوري مع وجود محفوظ، ثم كل ٣ أيام. يختار من خارج القريب إن وُجدت صفحات أقدم، ويقيّم الصفحة بأيام سكونها (+٥ إذا كان آخر تقييم «يحتاج»، أو ٦٠ إن لم تُراجع). يختار عشوائيًا من أعلى ثلث المرشحين ويعيد صفحة واحدة مقصوصة إلى خطة الحفظ والجبهة.</li>
+<li><b>اليوم:</b> المصدر القديم يحسب مفاتيح تاريخ مدني محلية. الاختبارات المنقولة تستخدم <code>MadarDay</code> و<code>core.dayStart</code> المحفوظة وقت الحدث؛ الافتراضي فجر. تغطي fixtures اللحظة قبل الفجر وبعده ولا تعيد حساب <code>dayKey</code> مخزن.</li>
+</ul>
+<p><b>تعارض يحتاج قرار المالك:</b> لا يوجد <code>stage</code> في <code>PageSchedule</code> القديم، بينما نموذج مدار يعرّفه من ٠ إلى ١٢؛ لا يحدد المصدر كيف تغيّر «جيد» أو «يحتاج» هذا الحقل. لا يُنقل الحقل ولا يُخترع تحويل قبل تعريف معناه. هدف RQ1 المقترح (أيام نصف الورد ≤١٠٪ في محاكاة ٣٦٥ يومًا) يبقى قابلًا للتعديل. ترخيص QCF والتفسير بوابة مستقلة.</p>
+<h4>مصير اختبارات غرفة القرآن الاثني عشر</h4>
+<div style="overflow:auto"><table style="border-collapse:collapse;width:100%;min-width:760px">
+<thead><tr><th style="text-align:right;padding:6px;border-bottom:1px solid #c9c0ae">الملف</th><th style="text-align:right;padding:6px;border-bottom:1px solid #c9c0ae">القرار</th><th style="text-align:right;padding:6px;border-bottom:1px solid #c9c0ae">السبب</th></tr></thead>
+<tbody>
+<tr><td><code>book.test.ts</code></td><td>إعادة كتابة</td><td>اتجاه RTL يبقى؛ الاختبار يطابق صفحة الهاتف والمرجع.</td></tr>
+<tr><td><code>hifz.test.ts</code></td><td>إعادة كتابة</td><td>تطبيق RQ3 على التلقين، وتحديث قواعد الأخطاء والتقدم.</td></tr>
+<tr><td><code>khatma.test.ts</code></td><td>حذف</td><td>ختمة التلاوة وهدف الصفحات خارج v1.</td></tr>
+<tr><td><code>mushafLayout.test.ts</code></td><td>إعادة كتابة</td><td>إبقاء الشكل؛ استخدام بيانات طبعة ١٤٠٥ نفسها مع QCF V1.</td></tr>
+<tr><td><code>mushafOrder.test.ts</code></td><td>إعادة كتابة</td><td>خرائط الترتيب والحدود من مصدر طبعة واحدة وفق RQ7.</td></tr>
+<tr><td><code>mushafSource.test.ts</code></td><td>إعادة كتابة</td><td>فحص الحزمة والبصمات والشروط بعد إدخال مرخّص موثّق.</td></tr>
+<tr><td><code>mutashabihat.test.ts</code></td><td>إبقاء</td><td>اختبارات اصطناعية مستقلة للتشابه النصي، بلا تواريخ أو مصدر خارجي.</td></tr>
+<tr><td><code>page.test.ts</code></td><td>إعادة كتابة</td><td>إعادة التوقعات إلى خريطة طبعة ١٤٠٥ المعتمدة.</td></tr>
+<tr><td><code>portionPage.test.ts</code></td><td>إعادة كتابة</td><td>إبقاء قصّ المقاطع مع بيانات الطبعة نفسها.</td></tr>
+<tr><td><code>readPrefs.test.ts</code></td><td>إعادة كتابة</td><td>استخدام إعدادات iOS وبوابة الترخيص؛ تبقى اختبارات fallback.</td></tr>
+<tr><td><code>schedule.test.ts</code></td><td>إعادة كتابة</td><td>تطبيق RQ1 وMadarDay؛ دلالة stage تنتظر قرار المالك.</td></tr>
+<tr><td><code>session.test.ts</code></td><td>إعادة كتابة</td><td>تطبيق RQ1 وRQ3 ومفتاح اليوم الصحيح.</td></tr>
+</tbody></table></div>
+<p style="margin-bottom:0"><small>التصنيف يشمل <code>src/lib/quran/*.test.ts</code> فقط؛ بقية اختبارات المستودع خارج بوابة M2. القيم المتوقعة للاختبارات الجديدة تأتي من المواصفة وfixtures مستقلة، لا من مخرجات المحرك نفسه.</small></p>
+</div>
 </section>
 
 <section id="r-mal">

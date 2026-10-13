@@ -3,7 +3,7 @@
 **M1 Prayer: make the built screens match the approved design, then build what is missing.** Protocol: root `AGENTS.md` (owner revision, 13 October 2026). Full M0 and M1 are **not approved**: owner-iPhone acceptance and distribution are still not tested. RA1 (local only), RA2 (app-only store writes), RP1 (no automatic missed/qada), RU1 and data preservation stay mandatory.
 
 # Last checked
-
+2026-10-13, codex (model/effort not exposed). M1 remains unapproved and owner-device checks stay open. M2 preflight RQ2: audited the pinned Quran source, documented formulas/constants and dispositions for its 12 test files, corrected the provenance note, and recorded that legacy `PageSchedule` has no `stage`. Found a rule conflict: RQ1 supersedes §7.4's fixed half-wird threshold, but does not provide the exact computed-need comparison; updated both HTML specs and the extract to flag the open rule instead of guessing. `QuranRoom.swift` is excluded from the target and no Quran service/route exists. Current test/build/hash results follow in the handover below.
 2026-10-13, claude (Opus 5.5; effort not exposed). M1-V01 done on main. Owner decisions today: no enlarged-text (AX) testing, no reviews except a data-migration change; the script checks run only at a milestone gate. Known `check-shipping-sources.py` FAILs: `salah.offsets`, `notif.quietFrom` (M1-V10). `make build` fixed: the widget target now takes its sources from `project.yml`. Unmerged candidate: `codex/m1-s4-prayer-settings-debt` at `c9bd527`.
 
 # Board
@@ -39,6 +39,12 @@ Every screen card follows protocol §2: canonical files → default-size screens
 | M1-G | M1 gate on the owner's iPhone | §12/§13 M1, `docs/reports/M1.md` | closed by agent 13 Oct; owner-iPhone check pending (owner will do it later); table in `docs/reports/M1.md` | Fill the gate table only at the gate. |
 
 S0-Jard and S12-Khulasa are explainer boards (`kind: explainer`): use them for reference, don't build them.
+
+## M2 preflight — RQ2, before porting the Quran engine
+
+| Card | Task | Inputs | Status | Result and remaining |
+|---|---|---|---|---|
+| M2-RQ2 | Audit the pinned Quran engine before porting | `[FIX] RQ2`; §7.4; My-dream `aba0c1b18a3bf3fc070395a40595e939c3b73aa3` | done — source audit and test disposition | The interval/ease, due-risk, adaptive-cap, legacy backlog, and smart-test rules are documented; all 12 Quran tests are KEEP/REWRITE/DROP classified. Date fixtures use stored MadarDay keys (default Fajr). RQ1 now supersedes §7.4's fixed half-wird threshold; its exact computed-need formula is still open. Engine port waits on that formula and `PageSchedule.stage`; RQ1's 10% target and asset licensing remain open. Quran Home is not integrated into the app. |
 
 ## Done — software (integrated on main, visual acceptance pending in M1-V)
 
