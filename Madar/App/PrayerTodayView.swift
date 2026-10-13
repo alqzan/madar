@@ -80,7 +80,6 @@ struct PrayerTodayView: View {
                 NavigationStack {
                     if let snapshot = try? session.prayerSnapshot(at: session.prayerNow()) {
                         PrayerStatisticsView(session: session, snapshot: snapshot) { choose($0) }
-                            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("تم") { selectedSheet = nil } } }
                     }
                 }
             case .qadaList:
@@ -1407,115 +1406,157 @@ private struct PrayerStatisticsView: View {
         return names[month.month - 1] + " " + formatter.string(month.year)
     }
 
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
-                Text("حالي").font(MadarTypography.title()).accessibilityAddTraits(.isHeader)
-                if snapshot.statistics.denominator >= 5 {
-                    metrics
-                    PrayerSummarySection(title: "الميزان") {
-                        MadarCard {
-                            VStack(spacing: 12) {
-                                if typeSize.isAccessibilitySize {
-                                    DisclosureGroup("آخر \(formatter.string(snapshot.statistics.last25.count)) فرضًا") {
-                                        ForEach(snapshot.statistics.last25) { cell in
-                                            Text(cellLabel(cell)).font(MadarTypography.caption())
-                                                .accessibilityIdentifier("prayer-bead-list-\(cell.reference.naturalKey)")
-                                        }
-                                    }.accessibilityIdentifier("prayer-beads-list")
-                                } else {
-                                    ZStack {
-                                        PrayerRecentBeads(cells: snapshot.statistics.last25, compact: false)
-                                        Text(snapshot.statistics.percentage.map { formatter.percent($0) } ?? "—")
-                                            .font(MadarTypography.title()).offset(y: 15)
-                                    }
-                                }
-                                Text("\(formatter.string(snapshot.statistics.onTime)) في وقتها من \(formatter.string(snapshot.statistics.denominator)) فرضًا محسوبًا")
-                                    .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                                Text("ميزان يُرى، لا سجلّ يُعَدّ").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                            }
-                        }
-                    }
-                } else {
-                    Text("يظهر حالي بعد خمسة فروض مسجّلة؛ المعلّقة لا تدخل في النسبة.")
-                        .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                }
-                PrayerSummarySection(title: "سجلّ الشهر") {
-                    MadarCard {
-                        VStack(alignment: .leading, spacing: 16) {
-                            Text(monthTitle).font(MadarTypography.cardTitle()).accessibilityIdentifier("prayer-history-month")
-                            Text("المس يومًا لتعدّل تسجيله").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                            if typeSize.isAccessibilitySize {
-                                ForEach(snapshot.history.filter { hijri($0.day).month == month.month && hijri($0.day).year == month.year }, id: \.day) { day in
-                                    NavigationLink { dayView(day) } label: { Text(dateTitle(day.day)).font(MadarTypography.caption()).fixedSize(horizontal: false, vertical: true).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading) }
-                                        .accessibilityIdentifier("prayer-history-day-\(day.day)")
-                                }
-                            } else { calendarGrid }
-                        }
-                    }
-                }
-                if session.bool("salah.askHeart"), !snapshot.statistics.heartDistribution.isEmpty {
-                    PrayerSummarySection(title: "حضور القلب") {
-                        MadarCard {
-                            VStack(alignment: .leading, spacing: 14) {
-                                Text("كل إجابة لحظة خاصة، بلا درجة أو ترتيب.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                                ForEach(PrayerHeart.allCases, id: \.self) { heart in
-                                    if snapshot.statistics.heartDistribution[heart, default: 0] > 0 {
-                                        Text(heartTitle(heart) + "، " + heartSentence(heart)).font(MadarTypography.section())
-                                    }
-                                }
-                            }.accessibilityIdentifier("prayer-heart-reflection")
-                        }
-                    }
-                }
-                PrayerSummarySection(title: "التزامك بكل صلاة") {
-                    MadarCard {
-                        VStack(alignment: .leading, spacing: 16) {
-                            ForEach(Prayer.allCases, id: \.self) { prayer in
-                                let value = snapshot.statistics.commitment[prayer]
-                                VStack(alignment: .leading, spacing: 6) {
-                                    Text(prayerTitle(prayer)).font(MadarTypography.section())
-                                    Text("\(formatter.string(value?.jamaah ?? 0)) جماعة، \(formatter.string(value?.alone ?? 0)) وحدي")
-                                        .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                                    if !typeSize.isAccessibilitySize, let value, value.denominator > 0 {
-                                        GeometryReader { geometry in
-                                            HStack(spacing: 0) {
-                                                Rectangle().fill(theme.accent).frame(width: geometry.size.width * Double(value.jamaah) / Double(value.denominator))
-                                                Rectangle().fill(theme.color("goldMid")).frame(width: geometry.size.width * Double(value.alone) / Double(value.denominator))
-                                                Spacer(minLength: 0)
-                                            }
-                                        }.frame(height: 7).background(theme.line).clipShape(.capsule).accessibilityHidden(true)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }.padding(18).frame(maxWidth: 620).frame(maxWidth: .infinity)
-        }.background(theme.background).foregroundStyle(theme.ink)
-            .navigationTitle("حالي").navigationBarTitleDisplayMode(.inline)
+    @Environment(\.dismiss) private var dismiss
+
+    private var digits: MadarNumberFormatter { formatter }
+    private var numeralLocale: Locale { Locale(identifier: session.string("core.numerals") == "western" ? "ar_SA@numbers=latn" : "ar_SA@numbers=arab") }
+    /// «١٢ سبتمبر – ١١ أكتوبر»: the Gregorian span of the Hijri month shown.
+    private var monthSpan: String {
+        guard let first = monthDays.first, let last = monthDays.last else { return "" }
+        let f = DateFormatter(); f.locale = numeralLocale; f.timeZone = session.activePlace.timeZone
+        f.calendar = Calendar(identifier: .gregorian); f.dateFormat = "d MMMM"
+        func text(_ day: GregorianDay) -> String { f.string(from: day.date(in: session.activePlace.timeZone).addingTimeInterval(12 * 3600)) }
+        return text(first) + " – " + text(last)
+    }
+    /// The Mizan's own count over the last 25 prayers: on time ÷ prayers whose time came (pending and unrecorded stay out).
+    private var mizan: (onTime: Int, due: Int, pending: Int) {
+        let cells = snapshot.statistics.last25
+        let due = cells.filter { [.jamaah, .alone, .qada, .missed].contains($0.status) }
+        return (due.filter { $0.status == .jamaah || $0.status == .alone }.count, due.count, cells.filter { $0.status == .pending }.count)
+    }
+    private func serif(_ size: CGFloat) -> Font { .custom("thmanyahserifdisplay-Bold", size: size, relativeTo: .title) }
+    private func summaryCard<C: View>(@ViewBuilder _ content: () -> C) -> some View {
+        content().frame(maxWidth: .infinity)
+            .background(theme.color("goldSoft"), in: .rect(cornerRadius: 26))
+            .overlay { RoundedRectangle(cornerRadius: 26).stroke(theme.line, lineWidth: 1) }
     }
 
-    private var metrics: some View {
-        VStack(spacing: 12) {
-            if typeSize.isAccessibilitySize {
-                metric("هذا الشهر الهجري", value: snapshot.statistics.percentage.map { formatter.percent($0) } ?? "—", id: "prayer-stat-percentage")
-                metric("سلسلة الصلاة", value: formatter.string(snapshot.statistics.prayerStreak) + " أيام", id: "prayer-stat-streak")
-                if session.bool("salah.showMosqueStreak") { metric("سلسلة المسجد", value: formatter.string(snapshot.statistics.mosqueStreak) + " أيام", id: "prayer-stat-mosque") }
-            } else {
-                HStack(alignment: .top, spacing: 8) {
-                    metric("هذا الشهر", value: snapshot.statistics.percentage.map { formatter.percent($0) } ?? "—", id: "prayer-stat-percentage")
-                    metric("سلسلة الصلاة", value: formatter.string(snapshot.statistics.prayerStreak) + " أيام", id: "prayer-stat-streak")
-                    if session.bool("salah.showMosqueStreak") { metric("سلسلة المسجد", value: formatter.string(snapshot.statistics.mosqueStreak) + " أيام", id: "prayer-stat-mosque") }
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 26) {
+                VStack(alignment: .leading, spacing: 14) {
+                    Button { dismiss() } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "chevron.backward").font(.system(size: 14, weight: .semibold))
+                            Text("الصلاة").font(PrayerHomeType.strong)
+                        }.frame(minHeight: 44).contentShape(.rect)
+                    }
+                    .buttonStyle(.plain).accessibilityIdentifier("prayer-hali-back")
+                    Text("حالي").font(serif(44)).accessibilityAddTraits(.isHeader)
+                }
+                if snapshot.statistics.denominator >= 5 {
+                    metrics
+                    PrayerSummarySection(title: "الميزان", trailing: "آخر \(formatter.string(snapshot.statistics.last25.count)) فرضًا") { mizanCard }
+                } else {
+                    Text("يظهر حالي بعد خمسة فروض مسجّلة؛ المعلّقة لا تدخل في النسبة.")
+                        .font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk)
+                }
+                PrayerSummarySection(title: "سجلّ الشهر", trailing: "المس يومًا لتعدّله") { monthCard }
+                PrayerSummarySection(title: "التزامك بكل صلاة", trailing: "هذا الشهر") { commitmentCard }
+                if session.bool("salah.askHeart"), !snapshot.statistics.heartDistribution.isEmpty {
+                    PrayerSummarySection(title: "حضور القلب", trailing: "جُمَلٌ لا أرقام") { heartCard }
                 }
             }
+            .padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 32).frame(maxWidth: 620).frame(maxWidth: .infinity)
+        }
+        .background(theme.background).foregroundStyle(theme.ink)
+        .toolbarVisibility(.hidden, for: .navigationBar)
+    }
+
+    // MARK: Three figures
+
+    private var metrics: some View {
+        VStack(spacing: 10) {
+            if typeSize.isAccessibilitySize {
+                VStack(spacing: 10) { metricCards }
+            } else {
+                HStack(alignment: .top, spacing: 10) { metricCards }
+            }
             Text("قُضيت \(formatter.string(snapshot.statistics.madeUp))، عليك \(formatter.string(snapshot.statistics.owed))")
-                .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("prayer-stat-qada")
+                .font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("prayer-stat-qada")
+        }
+    }
+    @ViewBuilder private var metricCards: some View {
+        metric("هذا الشهر", value: snapshot.statistics.percentage.map { formatter.percent($0) } ?? "—", id: "prayer-stat-percentage")
+        metric("سلسلة الصلاة", value: streakText(snapshot.statistics.prayerStreak), id: "prayer-stat-streak")
+        if session.bool("salah.showMosqueStreak") {
+            metric("سلسلة المسجد", value: streakText(snapshot.statistics.mosqueStreak), id: "prayer-stat-mosque")
+        }
+    }
+    /// RU3 for the figure cards: «٠ أيام»، «يوم»، «يومان»، «٨ أيام»، «١١ يومًا» (the sentence form «لم تبدأ بعد» is for the home card).
+    private func streakText(_ count: Int) -> String {
+        switch count {
+        case 1: "يوم"
+        case 2: "يومان"
+        case 0, 3...10: formatter.string(count) + " أيام"
+        default: formatter.string(count) + " يومًا"
         }
     }
     private func metric(_ title: String, value: String, id: String) -> some View {
-        MadarCard { VStack(spacing: 8) { Text(value).font(MadarTypography.cardTitle()).accessibilityIdentifier(id); Text(title).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }.frame(maxWidth: .infinity) }
+        VStack(spacing: 6) {
+            Text(value).font(serif(28)).minimumScaleFactor(0.7).lineLimit(1).accessibilityIdentifier(id)
+            Text(title).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
+        }
+        .frame(maxWidth: .infinity, minHeight: 78).padding(.vertical, 8)
+        .background(theme.color("goldSoft"), in: .rect(cornerRadius: 24))
+        .overlay { RoundedRectangle(cornerRadius: 24).stroke(theme.line, lineWidth: 1) }
     }
+
+    // MARK: Mizan: the beads on an arc
+
+    private var mizanCard: some View {
+        summaryCard {
+            VStack(spacing: 10) {
+                if typeSize.isAccessibilitySize {
+                    DisclosureGroup("آخر \(formatter.string(snapshot.statistics.last25.count)) فرضًا") {
+                        ForEach(snapshot.statistics.last25) { cell in
+                            Text(cellLabel(cell)).font(MadarTypography.caption())
+                                .accessibilityIdentifier("prayer-bead-list-\(cell.reference.naturalKey)")
+                        }
+                    }.accessibilityIdentifier("prayer-beads-list")
+                } else {
+                    ZStack {
+                        PrayerRecentBeads(cells: snapshot.statistics.last25, compact: false)
+                        VStack(spacing: 4) {
+                            Text(mizan.due == 0 ? "—" : formatter.percent(Int((Double(mizan.onTime) / Double(mizan.due) * 100).rounded())))
+                                .font(serif(46))
+                            Text("أوفيت \(formatter.string(mizan.onTime)) · معلّقة \(formatter.string(mizan.pending))")
+                                .font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
+                        }.offset(y: 12)
+                    }
+                    HStack {
+                        Text("الأقدم")
+                        Spacer(minLength: 6)
+                        Text("ميزانٌ يُرى، لا سجلٌّ يُعدّ")
+                        Spacer(minLength: 6)
+                        Text("الأحدث")
+                    }.font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
+                }
+            }
+            .padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 18)
+        }
+    }
+
+    // MARK: Month log
+
+    private var monthCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(monthTitle).font(serif(26)).accessibilityIdentifier("prayer-history-month")
+                Spacer(minLength: 8)
+                Text(monthSpan).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
+            }
+            if typeSize.isAccessibilitySize {
+                ForEach(snapshot.history.filter { hijri($0.day).month == month.month && hijri($0.day).year == month.year }, id: \.day) { day in
+                    NavigationLink { dayView(day) } label: { Text(dateTitle(day.day)).font(MadarTypography.caption()).fixedSize(horizontal: false, vertical: true).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading) }
+                        .accessibilityIdentifier("prayer-history-day-\(day.day)")
+                }
+            } else { calendarGrid }
+        }
+        .padding(20).frame(maxWidth: .infinity)
+        .overlay { RoundedRectangle(cornerRadius: 26).stroke(theme.ink.opacity(0.1), lineWidth: 1) }
+    }
+
     private var calendarGrid: some View {
         let firstWeekday = session.string("core.weekStart") == "monday" ? 2 : session.string("core.weekStart") == "sunday" ? 1 : 7
         let names = ["أح", "إث", "ثل", "أر", "خم", "جم", "سب"]
@@ -1523,21 +1564,93 @@ private struct PrayerStatisticsView: View {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = session.activePlace.timeZone
         let leading = ((calendar.component(.weekday, from: monthDays[0].date(in: calendar.timeZone)) - firstWeekday) + 7) % 7
-        return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 7), spacing: 12) {
-            ForEach(weekdays, id: \.self) { Text($0).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
-            ForEach(0..<leading, id: \.self) { _ in Color.clear.frame(height: 44).accessibilityHidden(true) }
+        return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 2), count: 7), spacing: 6) {
+            ForEach(weekdays, id: \.self) { Text($0).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk).padding(.bottom, 4) }
+            ForEach(0..<leading, id: \.self) { _ in Color.clear.frame(height: 50).accessibilityHidden(true) }
             ForEach(monthDays, id: \.self) { day in
+                let isToday = day == snapshot.today.day
                 if let summary = snapshot.history.first(where: { $0.day == day }) {
-                    NavigationLink { dayView(summary) } label: {
-                        VStack(spacing: 5) {
-                            HStack(spacing: 2) { ForEach(summary.cells) { cell in Circle().fill(cell.status == .jamaah || cell.status == .alone ? theme.accent : .clear).overlay { Circle().stroke(cell.status == .missed ? theme.color("missed") : theme.line, lineWidth: 1) }.frame(width: 4, height: 4) } }.accessibilityHidden(true)
-                            Text(formatter.string(hijri(day).day)).font(MadarTypography.caption())
-                        }.frame(minHeight: 44)
-                    }.accessibilityLabel(dateTitle(day)).accessibilityIdentifier("prayer-history-day-\(day)")
-                } else { Text(formatter.string(hijri(day).day)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).frame(minHeight: 44) }
+                    NavigationLink { dayView(summary) } label: { dayCell(day, cells: summary.cells, today: isToday) }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(dateTitle(day)).accessibilityIdentifier("prayer-history-day-\(day)")
+                } else {
+                    dayCell(day, cells: [], today: isToday).opacity(0.3).accessibilityHidden(true)
+                }
             }
         }
     }
+
+    private func dayCell(_ day: GregorianDay, cells: [PrayerCell], today: Bool) -> some View {
+        VStack(spacing: 3) {
+            PrayerDayGlyph(cells: cells).frame(width: 28, height: 26).accessibilityHidden(true)
+            Text(formatter.string(hijri(day).day)).font(today ? PrayerHomeType.smallBold : PrayerHomeType.small)
+                .foregroundStyle(today ? theme.ink : theme.secondaryInk)
+        }
+        .frame(maxWidth: .infinity, minHeight: 50)
+        .background(today ? theme.color("goldSoft") : .clear, in: .rect(cornerRadius: 12))
+        .contentShape(.rect)
+    }
+
+    // MARK: Commitment per prayer
+
+    private var commitmentCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            ForEach(Prayer.allCases, id: \.self) { prayer in
+                let value = snapshot.statistics.commitment[prayer]
+                let jamaah = value?.jamaah ?? 0, alone = value?.alone ?? 0, due = value?.denominator ?? 0
+                HStack(spacing: 12) {
+                    Text(prayerTitle(prayer)).font(PrayerHomeType.lead).frame(width: 66, alignment: .leading)
+                    if typeSize.isAccessibilitySize {
+                        Text("\(formatter.string(jamaah)) جماعة، \(formatter.string(alone)) وحدي").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    } else {
+                        GeometryReader { geometry in
+                            HStack(spacing: 0) {
+                                Rectangle().fill(theme.accent).frame(width: due > 0 ? geometry.size.width * Double(jamaah) / Double(due) : 0)
+                                Rectangle().fill(theme.color("goldMid")).frame(width: due > 0 ? geometry.size.width * Double(alone) / Double(due) : 0)
+                                Spacer(minLength: 0)
+                            }
+                        }
+                        .frame(height: 11).background(theme.ink.opacity(0.08)).clipShape(.capsule).accessibilityHidden(true)
+                    }
+                    Text(due > 0 ? formatter.percent(Int((Double(jamaah + alone) / Double(due) * 100).rounded())) : "—")
+                        .font(PrayerHomeType.smallBold).frame(width: 44, alignment: .trailing)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("\(prayerTitle(prayer))، \(formatter.string(jamaah)) جماعة، \(formatter.string(alone)) وحدي")
+            }
+            HStack(spacing: 18) {
+                legend("جماعة", theme.accent)
+                legend("وحدي في وقتها", theme.color("goldMid"))
+                Spacer(minLength: 0)
+            }.padding(.top, 2)
+        }
+    }
+    private func legend(_ title: String, _ color: Color) -> some View {
+        HStack(spacing: 6) {
+            RoundedRectangle(cornerRadius: 3).fill(color).frame(width: 12, height: 12)
+            Text(title).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
+        }
+    }
+
+    // MARK: Heart: sentences only, no numbers, no ranking (RP6)
+
+    private var heartCard: some View {
+        summaryCard {
+            VStack(alignment: .leading, spacing: 14) {
+                ForEach(PrayerHeart.allCases, id: \.self) { heart in
+                    if snapshot.statistics.heartDistribution[heart, default: 0] > 0 {
+                        HStack(alignment: .firstTextBaseline, spacing: 10) {
+                            Rectangle().fill(theme.accent).frame(width: 7, height: 7).rotationEffect(.degrees(45)).accessibilityHidden(true)
+                            Text(heartTitle(heart) + "، " + heartSentence(heart)).font(PrayerHomeType.lead)
+                        }
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading).padding(20)
+            .accessibilityIdentifier("prayer-heart-reflection")
+        }
+    }
+
     private func dayView(_ day: PrayerDaySummary) -> some View {
         List {
             Section { Text(dateTitle(day.day)).font(MadarTypography.section()) }
@@ -1561,23 +1674,81 @@ private struct PrayerStatisticsView: View {
     private func cellLabel(_ cell: PrayerCell) -> String { dateTitle(cell.reference.day) + "، " + prayerTitle(cell.reference.prayer) + "، " + statusTitle(cell.status) }
 }
 
+/// The Mizan: 25 beads, 10° apart on a 240° arc, oldest on the right and the newest, larger, on the left.
 private struct PrayerRecentBeads: View {
     let cells: [PrayerCell]
     let compact: Bool
     @Environment(\.roomTheme) private var theme
     var body: some View {
+        GeometryReader { geometry in arc(in: geometry.size) }
+            .frame(height: compact ? 92 : 176).environment(\.layoutDirection, .leftToRight).accessibilityHidden(true)
+    }
+    private func arc(in size: CGSize) -> some View {
+        let radius: CGFloat = min(size.width * 0.34, (size.height - 24) / 1.5)
+        let center = CGPoint(x: size.width / 2, y: radius + 12)
+        return ZStack {
+            Path { path in
+                path.addArc(center: center, radius: radius, startAngle: .degrees(-210), endAngle: .degrees(30), clockwise: false)
+            }
+            .stroke(theme.color("goldMid").opacity(0.5), lineWidth: 1)
+            ForEach(Array(cells.enumerated()), id: \.element.reference) { index, cell in
+                bead(cell, last: index == cells.count - 1)
+                    .position(position(index, center: center, radius: radius))
+            }
+        }
+    }
+    private func position(_ index: Int, center: CGPoint, radius: CGFloat) -> CGPoint {
+        let angle = Double(30 - index * 10) * Double.pi / 180
+        return CGPoint(x: center.x + CGFloat(cos(angle)) * radius, y: center.y + CGFloat(sin(angle)) * radius)
+    }
+    private func bead(_ cell: PrayerCell, last: Bool) -> some View {
+        let size: CGFloat = last ? 16 : 11
+        let dashed = cell.status == .pending || cell.status == .unconfirmed
+        return Circle().fill(fill(cell.status))
+            .overlay { Circle().stroke(stroke(cell.status), style: StrokeStyle(lineWidth: 1, dash: dashed ? [2, 2] : [])) }
+            .frame(width: size, height: size)
+    }
+    private func fill(_ status: PrayerDisplayStatus) -> Color {
+        switch status { case .jamaah: theme.accent; case .alone: theme.color("goldMid"); case .qada: theme.ink.opacity(0.3); default: .clear }
+    }
+    private func stroke(_ status: PrayerDisplayStatus) -> Color {
+        switch status { case .missed: theme.color("missed"); case .jamaah, .alone, .qada: .clear; default: theme.ink.opacity(0.35) }
+    }
+}
+
+/// One day of the month as five small beads on an arch, Fajr on the right.
+private struct PrayerDayGlyph: View {
+    let cells: [PrayerCell]
+    @Environment(\.roomTheme) private var theme
+    private static let spots: [CGPoint] = [.init(x: 0.9, y: 0.78), .init(x: 0.8, y: 0.34), .init(x: 0.5, y: 0.06), .init(x: 0.2, y: 0.34), .init(x: 0.1, y: 0.78)]
+    var body: some View {
         GeometryReader { geometry in
+            let w = geometry.size.width, h = geometry.size.height
             ZStack {
-                ForEach(Array(cells.enumerated()), id: \.element.reference) { index, cell in
-                    let angle = Double(30 - index * 10) * .pi / 180
-                    let radius = min(geometry.size.width * 0.42, geometry.size.height * 0.47)
-                    Circle().fill(cell.status == .jamaah ? theme.accent : cell.status == .alone ? theme.color("goldMid") : .clear)
-                        .overlay { Circle().stroke(cell.status == .missed ? theme.color("missed") : theme.line, style: StrokeStyle(lineWidth: 1, dash: [.pending, .unconfirmed].contains(cell.status) ? [2, 2] : [])) }
-                        .frame(width: index == cells.count - 1 ? 12 : 9, height: index == cells.count - 1 ? 12 : 9)
-                        .position(x: geometry.size.width / 2 + cos(angle) * radius, y: geometry.size.height * 0.51 + sin(angle) * radius)
+                ForEach([0, 4], id: \.self) { i in
+                    Rectangle().fill(theme.color("goldMid").opacity(0.55)).frame(width: 1, height: h * 0.26)
+                        .position(x: w * Self.spots[i].x, y: h * Self.spots[i].y + h * 0.13)
+                }
+                ForEach(0..<5, id: \.self) { i in
+                    let cell = i < cells.count ? cells[i] : nil
+                    Circle().fill(color(cell?.status)).overlay { Circle().stroke(outline(cell?.status), lineWidth: 0.8) }
+                        .frame(width: 5, height: 5).position(x: w * Self.spots[i].x, y: h * Self.spots[i].y)
                 }
             }
-        }.frame(height: compact ? 92 : 190).environment(\.layoutDirection, .leftToRight).accessibilityHidden(true)
+        }
+        .environment(\.layoutDirection, .leftToRight)
+    }
+    private func color(_ status: PrayerDisplayStatus?) -> Color {
+        switch status {
+        case .jamaah: theme.accent
+        case .alone: theme.color("goldMid")
+        case .qada: theme.ink.opacity(0.3)
+        case .missed: theme.color("missed")
+        default: .clear
+        }
+    }
+    private func outline(_ status: PrayerDisplayStatus?) -> Color {
+        switch status { case .jamaah, .alone, .qada, .missed: .clear; default: theme.ink.opacity(0.28) }
     }
 }
 
@@ -1590,14 +1761,16 @@ private func statusTitle(_ status: PrayerDisplayStatus) -> String {
 
 private struct PrayerSummarySection<Content: View>: View {
     let title: String
+    var trailing: String? = nil
     @ViewBuilder let content: () -> Content
     @Environment(\.roomTheme) private var theme
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
-                Rectangle().fill(theme.accent).frame(width: 6, height: 6).rotationEffect(.degrees(45)).accessibilityHidden(true)
-                Text(title).font(MadarTypography.section()).accessibilityAddTraits(.isHeader)
+                Rectangle().fill(theme.accent).frame(width: 7, height: 7).rotationEffect(.degrees(45)).accessibilityHidden(true)
+                Text(title).font(PrayerHomeType.strong).foregroundStyle(theme.secondaryInk).accessibilityAddTraits(.isHeader)
                 Rectangle().fill(theme.line).frame(height: 1).accessibilityHidden(true)
+                if let trailing { Text(trailing).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk).fixedSize() }
             }
             content()
         }

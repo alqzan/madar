@@ -19,7 +19,7 @@ Every screen card follows protocol §2: canonical files → default-size screens
 | M1-V01 | S1 Home | `salah/01-S1-Home.jpg`, `-s1` | `App/PrayerTodayView.swift` | matched — awaiting owner | Moon day/night button (prototype only). «تبقى معلّقة ٦ أيام ثم تُحسب فائتة» (RP1). Heart labels (RP6). Heart card unless `salah.askHeart`. "·" next to a digit (RU1). Sample numbers. | Salah palette, lattice arches with reflection pool, verse divider, pending notice, Hali card with beads, qada card with citation and «مواضعها» list, qiyam footprint, spec date and RL7 countdown, plurals via `Prayer.xcstrings` (RU3). Compare page: `Madar/Artifacts/compare/S1-Home.html`. Open question: future/next arches show a line (spec text) where the canonical image shows stars. |
 | M1-V02 | S2 Light log | `salah/02-S2-Log.jpg`, `-s1` | `PrayerTodayLogSheet` | matched — awaiting owner | Heart question unless on (RP6). Friday noon records `fridayKind` explicitly (RP5). Sample times. «امسح التسجيل» (screenshot only: no clear command in the spec, and a tombstone would block logging again; see DECISIONS). | Room-styled sheet: lattice-arch thumbnail, «صلّيتَ العصر؟», one tap on «في جماعة / وحدي / قضاءً» records, inline heart row (only when `salah.askHeart`), Friday kind chips. «فاتتني» opens the make-up panel (S2b look) in the same sheet. Compare page: `Madar/Artifacts/compare/S2-Log.html`. Differences: iOS 26 floating sheet; only the states allowed by RP2 show (canonical shows all four on Asr before its window ends). |
 | M1-V03 | S2b Missed and reminder | `salah/03-S2b-Missed.jpg`, `-s1` | `PrayerMakeUpSheet`, `PrayerGapResolutionSheet` | matched — awaiting owner | «فاتتني… نزلت في القضاء» before the prayer's window ends (RP2: before the end only «لم أصلّها بعد» or snooze). «فاتتني» in the +30 notification (RP2). Automatic aging (RP1). | Gap sheet «صلوات بلا تسجيل» rebuilt at the owner's request (room look, one-tap settle, by day, partial save). The S2b panel lives in the log sheet (M1-V02): «فاتتني» shows «نزلت في القضاء…», the citation bar, «قضيتُها الآن» / «لاحقًا» and saves nothing until a choice. The +30 notification has only the snooze action (no «فاتتني», RP2). Compare page: `Madar/Artifacts/compare/S2b-Missed.html`. Difference: the canonical shows the panel on Asr before its window ends, which RP2 forbids. |
-| M1-V04 | S3 Hali | `salah/04-S3-Hali.jpg`, `-s1` | `PrayerStatisticsView` | ready | Any ranking or superlative such as «أخشعُ صلواتك…» (RP6). Sample numbers. Balance-style picker (`salah.balanceView` is v2: beads only). | Seen defects: title shown twice; «٠ أيام» needs the Arabic plural rule (RU3); month grid lacks each day's bead glyph; Mizan card lacks «الأحدث / الأقدم» labels and the «آخر ٢٥ فرضًا» header. |
+| M1-V04 | S3 Hali | `salah/04-S3-Hali.jpg`, `-s1` | `PrayerStatisticsView` | matched — awaiting owner | Any ranking or superlative such as «أخشعُ صلواتك…» (RP6). Sample numbers. Balance-style picker (`salah.balanceView` is v2: beads only). | «حالي» rebuilt: back row «‹ الصلاة» and serif title, three figure cards with the Arabic plural («٠ أيام»، «يومان»), Mizan card (bead arc with thread, ratio over the last 25, «أوفيت · معلّقة», «الأقدم / الأحدث», «آخر ٢٥ فرضًا»), month card with a five-bead arch glyph per day and today highlighted, commitment bars with percentages and legend, heart card only when `salah.askHeart`. Compare page: `Madar/Artifacts/compare/S3-Hali.html`. Differences: sheet presentation instead of a pushed page; the «قُضيت ٢، عليك ٢» line is kept under the figures (spec text, not in the canonical); days before tracking start show faded. |
 | M1-V05 | S4 Edit a past day | `salah/05-S4-Day.jpg`, `-s1` | day edit in `PrayerStatisticsView` (T05) | ready | Sample data. | A stored `dayKey` is never recomputed. |
 | M1-V06 | S5 Qada | `salah/06-S5-Qada.jpg`, `-s1` | `codex/m1-s4-prayer-settings-debt` `c9bd527` | ready | Counts outside the app unless opted in (RP9). Sample counts. | First rerun the candidate's T10 UI test and merge it only if green, then match the design. Dates follow `core.firstCalendar`. |
 | M1-V07 | S6 Qiyam | `salah/07-S6-Qiyam.jpg`, `-s1` | `PrayerNightLoggingSheet` | ready | Streak wording for qiyam (it is a footprint, not a streak). Sample rakaat. | 0...99 rakaat and witr already work (T07). |
@@ -71,6 +71,15 @@ M1 gate, then M2 Quran, M3 Diary, M4 Lobby + Habits + Widgets, M5 Money, M6 Mihb
 
 # Handovers
 
+## Handover — M1-V04 Hali — 2026-10-13 — claude
+
+Works now: «حالي» matches `04-S3-Hali` and `-s1` (see the board row). The title is no longer shown twice and the streak cards use the Arabic plural.
+Verified: UI tests V04, T05 (ratio, history edit, undo) and T06 passed at default size; screenshots `Madar/Artifacts/m1-gap-shots/M1-V04-hali-L.png` and `-scrolled-L.png`.
+Differences left: see the board row; the heart card was not screenshotted (the question is off by default).
+Not verified: owner iPhone.
+Next: M1-V05.
+Model/effort: Claude Sonnet 5.5; effort not exposed. Usage: not exposed.
+
 ## Handover — M1-V02 log sheet — 2026-10-13 — claude
 
 Works now: the prayer log sheet matches `02-S2-Log` (room look, one tap records, inline heart row only when `salah.askHeart`, Friday kind chips, «فاتتني» opens the make-up panel in the sheet). «امسح التسجيل» is not built (DECISIONS).
@@ -79,21 +88,5 @@ Differences left: floating iOS 26 sheet; fewer pills than the canonical when RP2
 Not verified: owner iPhone.
 Next: M1-V04.
 Model/effort: Claude Sonnet 5.5; effort not exposed. Usage: not exposed.
-
-## Handover — gap sheet redesign — 2026-10-13 — claude
-
-Works now: «صلوات بلا تسجيل» replaces the grey «مراجعة الفترة» form (room look, «صلّيتها كلها» and «لم أسجّل هذه الفترة» settle everything in one tap with undo, prayers grouped by day with «اليوم كله», save whatever is chosen). The home «سجِّلها» opens every pending prayer, not only the first. 20 merged branches deleted at the owner's go.
-Verified: `test_M1T02_BulkPendingRecovery`, `test_M1T02_MissedMakeUpUndoAndRelaunch`, `test_M1V01_HomeMatchesCanonical`: passed; screenshot `Madar/Artifacts/m1-gap-shots/M1-T02-recovery-sheet-L.png`.
-Not verified: owner iPhone.
-Next: M1-V03.
-Model/effort: Claude Opus 5.5; effort not exposed. Usage: not exposed.
-
-## Handover — M1-V01 prayer home — 2026-10-13 — claude
-
-Works now: the prayer home matches `01-S1-Home` in layout, palette and wording (compare page `Madar/Artifacts/compare/S1-Home.html`); whole cards are tappable (the «أضف فائتة قديمة» card and «مواضعها» used to respond only on their text).
-Verified: `PrayerCopyTests` and the prayer UI set (V01, T01, T02 ×2, T05, T07, T09: 9 passed; T04 permission passes after uninstalling the app, because the simulator keeps the earlier grant) at default size; MadarPrayer `swift test` 18/18.
-Not verified: owner iPhone; enlarged text (no longer tested, owner decision).
-Next: M1-V03.
-Model/effort: Claude Opus 5.5; effort not exposed. Usage: not exposed.
 
 Earlier handovers: `docs/archive/PROGRESS-2026-10-13.md`.

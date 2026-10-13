@@ -77,6 +77,27 @@ import XCTest
         app.terminate()
     }
 
+    /// M1-V04: «حالي», for comparison with screens/salah/04-S3-Hali(-s1).jpg.
+    func test_M1V04_HaliMatchesCanonical() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
+            "MADAR_UI_NOW": "2026-10-07T20:00:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01",
+            "MADAR_UI_PRAYER_FIXTURE": "ratio26of30", "MADAR_UI_THEME": "light"]
+        app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+        let history = app.buttons["prayer-history"]
+        scrollTo(history, in: app); history.tap()
+        XCTAssertTrue(app.staticTexts["prayer-stat-percentage"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.buttons["prayer-hali-back"].exists)
+        XCTAssertTrue(app.staticTexts["حالي"].exists)
+        attachScreenshot(app, named: "M1-V04-hali-L")
+        let month = app.staticTexts["prayer-history-month"]
+        scrollTo(month, in: app)
+        app.swipeUp()
+        attachScreenshot(app, named: "M1-V04-hali-scrolled-L")
+        app.terminate()
+    }
+
     func test_M1T09_OldMissedSaveUndoRestoreMakeUpAndRelaunch() throws {
         continueAfterFailure = false
         for size in ["L"] {
@@ -257,7 +278,7 @@ import XCTest
             XCTAssertTrue(undo.waitForExistence(timeout: 10), app.debugDescription)
             scrollTo(history, in: app); history.tap()
             XCTAssertTrue(ratio.waitForExistence(timeout: 10)); XCTAssertEqual(ratio.label, "٩٠٪")
-            app.buttons["تم"].tap()
+            app.buttons["prayer-hali-back"].tap()
             undo.tap()
             scrollTo(history, in: app); history.tap()
             XCTAssertTrue(ratio.waitForExistence(timeout: 10)); XCTAssertEqual(ratio.label, "٨٧٪")
