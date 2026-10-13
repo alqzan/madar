@@ -1,10 +1,10 @@
 # Current milestone
 
-**M1 Prayer: make the built screens match the approved design, then build what is missing.** Protocol: root `AGENTS.md` (owner revision, 13 October 2026). Full M0 and M1 are **not approved**: owner-iPhone acceptance and distribution are still not tested. RA1 (local only), RA2 (app-only store writes), RP1 (no automatic missed/qada), RU1 and data preservation stay mandatory.
+**M2 Quran: build the next section after the owner lifted its pause on 13 October 2026** (see `docs/CODEX-M2-BRIEF.md`). M1-G remains deferred until the whole app is finished. M0/M1 gates and distribution are not claimed approved. RA1 (local only), RA2 (app-only store writes), RP1 (no automatic missed/qada), RU1 and data preservation stay mandatory.
 
 # Last checked
 
-2026-10-13 — Claude (Opus 5.5). S1 «حالي» streak redesigned per the owner's answer («سلسلة بسيطة عادية بالأيام، ما يحتاج تكرر»): one day streak «سلسلتك ١٢ يومًا» plus a short qualifier naming only what differs («كلها في جماعة»، «كلها في وقتها، وآخر يومين في جماعة»). The five rejected mockups and Codex's three-arch code are replaced. Codex's uncommitted F04/F05/S4/streak-engine work was checked (package tests pass) and committed with it. «سلاسلك» is now a stone arch (30 stones per layer, a month) plus a details sheet. Awaiting the owner's look.
+2026-10-13 — Codex. M2-E01 is complete: pure Swift spaced-review engine; 10 XCTest cases pass, including 100/300/604-page balance simulations. Owner chose fixed-cycle review as an optional v1 method with spaced review default; recorded in `docs/DECISIONS.md`. Next ready card: M2-E02. No app screen or iPhone pass is claimed.
 
 # Board
 
@@ -44,7 +44,38 @@ S0-Jard and S12-Khulasa are explainer boards (`kind: explainer`): use them for r
 
 | Card | Task | Inputs | Status | Result and remaining |
 |---|---|---|---|---|
-| M2-RQ2 | Audit the pinned Quran engine before porting | `[FIX] RQ2`; §7.4; My-dream `aba0c1b18a3bf3fc070395a40595e939c3b73aa3` | done — source audit and test disposition; M2 paused by owner | The interval/ease, due-risk, adaptive-cap, legacy backlog and smart-test rules are documented; all 12 Quran tests are KEEP/REWRITE/DROP classified. The delegated decisions are recorded in `docs/DECISIONS.md`: `PageSchedule.stage` is removed because it is derived from `intervalDays`; RQ1 computed-need formula and simulation targets are defined. Owner confirms the Mushaf license is obtained and M2 has been paused since the outset. No Quran runtime route is integrated. Any separate tafsir-license check is deferred until M2 resumes; no current owner action is requested. |
+| M2-RQ2 | Audit the pinned Quran engine before porting | `[FIX] RQ2`; §7.4; My-dream `aba0c1b18a3bf3fc070395a40595e939c3b73aa3` | done | The interval/ease, due-risk, adaptive-cap, legacy backlog and smart-test rules are documented; all 12 Quran tests are KEEP/REWRITE/DROP classified. The delegated decisions are recorded in `docs/DECISIONS.md`: `PageSchedule.stage` is removed because it is derived from `intervalDays`; RQ1 computed-need formula and simulation targets are defined. The owner later lifted the M2 pause in `docs/CODEX-M2-BRIEF.md`. No Quran runtime route is integrated yet. |
+
+## M2 Quran — engine, data, and screens
+
+The owner lifted the M2 pause in `docs/CODEX-M2-BRIEF.md`. Build a pure Swift engine first, then its persistence adapter, then these screens in order. `R18-Sharh` and `R18-Map` are `explainer` boards in `screens-index.json`; they have no app entry point. No Quran `-s1` companion files are supplied in the handoff; note that in each screen handover if a scrolled state is needed.
+
+| Card | Result / canonical | Status | Do not copy / Notes |
+|---|---|---|---|
+| M2-E01 | Spaced review core: grade intervals/ease, due risk/order and adaptive capacity; implement RQ1's computed-need balance and run the 100/300/604-page simulations. Pure Swift `MadarQuran`; no persistence types in the engine. | done | `swift test --package-path Madar/Packages/MadarQuran`: 10 XCTest passed. RQ1 simulations: 100/300/604 pages, both mastery profiles at 0% half-wird days and 0 consecutive; within the 10%/20%/3-day limits. |
+| M2-E02 | Coach and error engine: learning reveals are hints; blind-recitation slips alone affect grades; mistake spots and two-success closure. | ready | Learning hints never enter «أخطائي» or the grade. |
+| M2-R01 | One verified 1405 resource set for page/line/word maps and QCF V1; manifest and automatic resource checks (RQ7, Q08). | blocked: provenance source is unresolved and the resource files are absent from `Madar/` | Do not use the pinned legacy map as 1405 data. Owner says the Mushaf licence is obtained; keep the resource disabled until source, terms, hashes and required review evidence are recorded. |
+| M2-E03 | Coverage, partial-page portions and completion/khatm rules against the verified 1405 maps. | blocked: M2-R01 | Union coverage from non-deleted sessions; a khatm requires all 604 pages. |
+| M2-E04 | Plan and session engine: levels, rest/missed-day allotments, recovery, pace, streak and qiyam assignments. | blocked: M2-E01, M2-E02 and M2-E03 | Use `MadarDay`; preserve a stored `dayKey`; one atomic `CommitQuranSession`. |
+| M2-E05 | Add RQ1 fixed-cycle review beside spaced review. | ready | Owner decision, 13 Oct: v1 offers fixed cycle (one juz daily or seven manzils weekly) beside spaced review; spaced review is the default. Add the selector to settings with reset and undo. |
+| M2-D01 | Quran app adapter: derive `QuranUIService` projections from the engine and existing `MadarData` records; route session commits atomically through the app. | blocked: M2-E01–E04 | Reuse the existing Quran SwiftData models; app process alone opens the store (RA2), local-only v1 (RA1). |
+| M2-V01 | Home — `screens/quran/03-R18-Home.jpg` | blocked: M2-E01–E04, M2-D01 | No sample counts. Apply RQ9: one line per step, one «ابدأ», details behind tap; «عميق» and «مُحكَم» state ×1½ and ×2. |
+| M2-V02 | Hifz coach — `screens/quran/04-R18-Hifz.jpg` | blocked: M2-V01, M2-R01, M2-E02 | No voice method (v2), no learning-hint penalty. |
+| M2-V03 | One-step review — `screens/quran/05-R18-Rev.jpg` | blocked: M2-V02, M2-E01 | No voice method (v2); recent and due review order follows the engine. |
+| M2-V04 | Mistake locations — `screens/quran/06-R18-Drill.jpg` | blocked: M2-V03, M2-E02, M2-R01 | No audio/microphone; a whole-ayah mistake has no word index. |
+| M2-V05 | Day close — `screens/quran/07-R18-Khitam.jpg` | blocked: M2-V04, M2-E04 | No recitation khatma or page goal; khatm means all 604 pages memorised. |
+| M2-V06 | Full-screen Mushaf — `screens/quran/08-R18-Mushaf.jpg` | blocked: M2-V05, M2-R01 | Tafsir tap/hint stays hidden until licensed; never draw a missing QCF glyph in another font. |
+| M2-V07 | Reminder and widget — `screens/quran/09-R18-Widgets.jpg` | blocked: M2-V06 | Widget reads JSON snapshot only; v2 features have no entry point. |
+| M2-V08 | Weekly log — `screens/quran/10-R18-Sijil-Week.jpg` | blocked: M2-V07, M2-E03 | One 28-day pace window where shown; rest day uses one rule. |
+| M2-V09 | Year log — `screens/quran/11-R18-Sijil-Year.jpg` | blocked: M2-V08 | No sample counts. |
+| M2-V10 | All-time log — `screens/quran/12-R18-Sijil-All.jpg` | blocked: M2-V09 | No sample counts; pace window is 28 days. |
+| M2-V11 | Session log — `screens/quran/13-R18-Sijil-Log.jpg` | blocked: M2-V10, M2-D01 | Deletion uses tombstones and undo; keep sessions unless explicitly deleted. |
+| M2-V12 | Plan — `screens/quran/14-R18-Khitta.jpg` | blocked: M2-V11, M2-E04, M2-E05 | «وزّعه» is +⅓ face over three days (RQ6); no reverse-order option (v2). |
+| M2-V13 | Plan setup — `screens/quran/15-R18-Setup.jpg` | blocked: M2-V12, M2-E04 | No reverse-order option (v2); default values come from the schema. |
+| M2-V14 | Free review — `screens/quran/16-R18-Hurra.jpg` | blocked: M2-V13, M2-E01 | Pages outside saved coverage are read-only and do not change grades or streaks. |
+| M2-V15 | Index — `screens/quran/17-R18-Fihris.jpg` | blocked: M2-V14, M2-E03, M2-R01 | No sample data; use the verified 1405 map for every boundary. |
+| M2-V16 | Strength and recovery — `screens/quran/18-R18-Mansub.jpg` | blocked: M2-V15, M2-E04 | «Far» uses the single RQ4 definition; do not use 20/30-day shortcuts. |
+| M2-V17 | Night prayer wird — `screens/quran/19-R18-Qiyam.jpg` | blocked: M2-V16, M2-E04 | No stored duplicate facts; an ayah/page is assigned at most once per session. |
 
 ## Done — software (integrated on main, visual acceptance pending in M1-V)
 
@@ -71,7 +102,7 @@ M0-T06 (device acceptance paperwork), M0-T09 (encrypted backup and privacy matri
 
 # Later
 
-Finish the remaining M1-V01/V05 screenshot comparisons, then the owner-iPhone M1 acceptance. M1-F04 remains blocked on a safe shared budget reservation for an RL5 LiveActivityIntent. M2 remains paused per owner direction; the Mushaf license is obtained, and no Quran runtime route exists. Recheck any separate tafsir license only if M2 resumes. No M1 or M2 gate is claimed closed.
+Build the M2 Quran queue above. M1-G remains deferred until the whole app is finished. M1-F04 remains blocked on a safe shared budget reservation for an RL5 LiveActivityIntent. Keep tafsir off until its separate licence is verified. Do not claim an M1/M2 gate or iPhone pass.
 
 # Handovers
 
