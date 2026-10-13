@@ -1390,10 +1390,17 @@ private extension String {
 
 private struct PrayerStatisticsView: View {
     let session: AppSession
-    let snapshot: PrayerSnapshot
+    private let fallback: PrayerSnapshot
     let select: (PrayerCell) -> Void
     @Environment(\.roomTheme) private var theme
     @Environment(\.dynamicTypeSize) private var typeSize
+    @State private var editing: PrayerDayRoute?
+
+    init(session: AppSession, snapshot: PrayerSnapshot, select: @escaping (PrayerCell) -> Void) {
+        self.session = session; self.fallback = snapshot; self.select = select
+    }
+    /// Read afresh so an edit in the day sheet shows here at once.
+    private var snapshot: PrayerSnapshot { (try? session.prayerSnapshot(at: session.prayerNow())) ?? fallback }
 
     private var formatter: MadarNumberFormatter { .init(style: session.string("core.numerals") == "western" ? .western : .hindi) }
     private var month: HijriDate { hijri(snapshot.today.day) }
@@ -1461,6 +1468,24 @@ private struct PrayerStatisticsView: View {
         }
         .background(theme.background).foregroundStyle(theme.ink)
         .toolbarVisibility(.hidden, for: .navigationBar)
+        .sheet(item: $editing) { route in
+            PrayerDayEditSheet(session: session, day: route.day, hijriTitle: hijriDayTitle(route.day), gregorianTitle: gregorianDayTitle(route.day),
+                firstGregorian: session.string("core.firstCalendar") == "gregorian", digits: formatter, openLog: { cell in editing = nil; select(cell) })
+                .environment(\.roomTheme, theme)
+        }
+    }
+
+    private static let monthNames = ["محرم", "صفر", "ربيع الأول", "ربيع الآخر", "جمادى الأولى", "جمادى الآخرة", "رجب", "شعبان", "رمضان", "شوال", "ذو القعدة", "ذو الحجة"]
+    /// «الثلاثاء ٢٥ ربيع الآخر».
+    private func hijriDayTitle(_ day: GregorianDay) -> String {
+        let f = DateFormatter(); f.locale = numeralLocale; f.timeZone = session.activePlace.timeZone; f.calendar = Calendar(identifier: .gregorian); f.dateFormat = "EEEE"
+        let date = hijri(day)
+        return f.string(from: day.date(in: session.activePlace.timeZone).addingTimeInterval(12 * 3600)) + " " + formatter.string(date.day) + " " + Self.monthNames[date.month - 1]
+    }
+    /// «٦ أكتوبر».
+    private func gregorianDayTitle(_ day: GregorianDay) -> String {
+        let f = DateFormatter(); f.locale = numeralLocale; f.timeZone = session.activePlace.timeZone; f.calendar = Calendar(identifier: .gregorian); f.dateFormat = "d MMMM"
+        return f.string(from: day.date(in: session.activePlace.timeZone).addingTimeInterval(12 * 3600))
     }
 
     // MARK: Three figures
@@ -1548,7 +1573,7 @@ private struct PrayerStatisticsView: View {
             }
             if typeSize.isAccessibilitySize {
                 ForEach(snapshot.history.filter { hijri($0.day).month == month.month && hijri($0.day).year == month.year }, id: \.day) { day in
-                    NavigationLink { dayView(day) } label: { Text(dateTitle(day.day)).font(MadarTypography.caption()).fixedSize(horizontal: false, vertical: true).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading) }
+                    Button { editing = PrayerDayRoute(day: day.day) } label: { Text(dateTitle(day.day)).font(MadarTypography.caption()).fixedSize(horizontal: false, vertical: true).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading) }
                         .accessibilityIdentifier("prayer-history-day-\(day.day)")
                 }
             } else { calendarGrid }
@@ -1570,7 +1595,7 @@ private struct PrayerStatisticsView: View {
             ForEach(monthDays, id: \.self) { day in
                 let isToday = day == snapshot.today.day
                 if let summary = snapshot.history.first(where: { $0.day == day }) {
-                    NavigationLink { dayView(summary) } label: { dayCell(day, cells: summary.cells, today: isToday) }
+                    Button { editing = PrayerDayRoute(day: day) } label: { dayCell(day, cells: summary.cells, today: isToday) }
                         .buttonStyle(.plain)
                         .accessibilityLabel(dateTitle(day)).accessibilityIdentifier("prayer-history-day-\(day)")
                 } else {
@@ -1672,6 +1697,117 @@ private struct PrayerStatisticsView: View {
             .text(firstCalendar: session.string("core.firstCalendar") == "gregorian" ? .gregorian : .hijri, numerals: formatter.style)
     }
     private func cellLabel(_ cell: PrayerCell) -> String { dateTitle(cell.reference.day) + "، " + prayerTitle(cell.reference.prayer) + "، " + statusTitle(cell.status) }
+}
+
+private struct PrayerDayRoute: Identifiable { let day: GregorianDay; var id: String { day.description } }
+
+/// S4 · edit a past day, matched to `screens/salah/05-S4-Day.jpg`. One tap on a state records it;
+/// what is unrecorded stays pending until the user chooses (RP1, not «ثم تُحسب فائتة»).
+/// A stored `dayKey` is read, never recomputed.
+private struct PrayerDayEditSheet: View {
+    let session: AppSession
+    let day: GregorianDay
+    let hijriTitle: String
+    let gregorianTitle: String
+    let firstGregorian: Bool
+    let digits: MadarNumberFormatter
+    let openLog: (PrayerCell) -> Void
+    @Environment(\.roomTheme) private var theme
+    @State private var contentHeight: CGFloat = 560
+
+    private var summary: PrayerDaySummary? {
+        (try? session.prayerSnapshot(at: session.prayerNow()))?.history.first { $0.day == day }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if let summary {
+                header(summary)
+                ForEach(summary.cells) { cell in
+                    Rectangle().fill(theme.ink.opacity(0.1)).frame(height: 1)
+                    row(cell)
+                }
+                Rectangle().fill(theme.ink.opacity(0.1)).frame(height: 1)
+                Text("غير المسجّلة تبقى معلّقة حتى تختار حالها.").font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
+                    .frame(maxWidth: .infinity).padding(.top, 14)
+            }
+        }
+        .padding(.horizontal, 20).padding(.top, 26).padding(.bottom, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 + 20 }
+        .frame(maxHeight: .infinity, alignment: .top)
+        .background(theme.background).foregroundStyle(theme.ink)
+        .presentationDetents([.height(min(max(contentHeight, 300), 760)), .large])
+        .presentationBackground(theme.background)
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(34)
+    }
+
+    private func header(_ summary: PrayerDaySummary) -> some View {
+        let together = summary.cells.filter { $0.status == .jamaah }.count
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(firstGregorian ? gregorianTitle : hijriTitle).font(.custom("thmanyahserifdisplay-Bold", size: 26, relativeTo: .title))
+                    .accessibilityAddTraits(.isHeader)
+                Spacer(minLength: 8)
+                Text("\(digits.string(together)) من \(digits.string(summary.cells.count)) جماعة").font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
+            }
+            Text(firstGregorian ? hijriTitle : gregorianTitle).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
+        }
+        .padding(.bottom, 14)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("prayer-day-header")
+    }
+
+    private func row(_ cell: PrayerCell) -> some View {
+        let editable = cell.canLog && cell.time != nil && cell.status != .future
+        return HStack(spacing: 8) {
+            Button { openLog(cell) } label: {
+                Text(prayerTitle(cell.reference.prayer)).font(PrayerHomeType.lead).frame(width: 58, alignment: .leading).frame(minHeight: 44)
+            }
+            .buttonStyle(.plain).accessibilityLabel("تفاصيل \(prayerTitle(cell.reference.prayer))")
+            .accessibilityIdentifier("prayer-history-log-\(cell.reference.prayer.rawValue)")
+            if editable {
+                ForEach(options(cell), id: \.self) { pill($0, cell) }
+                Spacer(minLength: 0)
+            } else {
+                Text(statusTitle(cell.status)).font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk)
+                Spacer(minLength: 0)
+            }
+        }
+        .frame(minHeight: 70)
+    }
+
+    private func options(_ cell: PrayerCell) -> [PrayerStoredStatus] {
+        [.jamaah, .alone] + (cell.canMakeUp ? [.qada] : []) + (cell.canMarkMissed || cell.status == .missed ? [.missed] : [])
+    }
+
+    private func pill(_ option: PrayerStoredStatus, _ cell: PrayerCell) -> some View {
+        let on = cell.status.rawValue == option.rawValue
+        let missed = option == .missed
+        let tint = missed ? theme.color("missed") : theme.accent
+        let title: String = switch option { case .jamaah: "جماعة"; case .alone: "وحدي"; case .qada: "قضاء"; default: "فاتتني" }
+        return Button {
+            guard !session.prayerWriteInProgress, !on else { return }
+            // Friday noon carries its kind explicitly (RP5): the full sheet asks for it.
+            if cell.isFriday && option != .alone { openLog(cell); return }
+            switch option {
+            case .qada: session.makeUpPrayer(cell.reference, fridayKind: nil)
+            default: session.recordPrayer(cell.reference, status: option, fridayKind: cell.isFriday ? .dhuhr : nil)
+            }
+        } label: {
+            Text(title).font(on ? PrayerHomeType.smallBold : PrayerHomeType.small)
+                .foregroundStyle(on ? (missed ? theme.color("missedTextOnSurface") : theme.color("accentText")) : theme.secondaryInk)
+                .lineLimit(1).minimumScaleFactor(0.8)
+                .frame(maxWidth: 76, minHeight: 52)
+                .background(on ? tint.opacity(0.12) : .clear, in: .rect(cornerRadius: 18))
+                .overlay { RoundedRectangle(cornerRadius: 18).stroke(on ? tint : theme.ink.opacity(0.13), lineWidth: on ? 1.5 : 1) }
+                .contentShape(.rect(cornerRadius: 18))
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(on ? .isSelected : [])
+        .accessibilityIdentifier("prayer-day-\(cell.reference.prayer.rawValue)-\(option.rawValue)")
+    }
 }
 
 /// The Mizan: 25 beads, 10° apart on a 240° arc, oldest on the right and the newest, larger, on the left.

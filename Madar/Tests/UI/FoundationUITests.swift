@@ -98,6 +98,24 @@ import XCTest
         app.terminate()
     }
 
+    /// M1-V05: the past-day sheet, for comparison with screens/salah/05-S4-Day(-s1).jpg.
+    func test_M1V05_DaySheetMatchesCanonical() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
+            "MADAR_UI_NOW": "2026-10-07T20:00:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01",
+            "MADAR_UI_PRAYER_FIXTURE": "ratio26of30", "MADAR_UI_THEME": "light"]
+        app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+        let history = app.buttons["prayer-history"]
+        scrollTo(history, in: app); history.tap()
+        let day = app.buttons["prayer-history-day-2026-10-06"]
+        scrollTo(day, in: app); day.tap()
+        XCTAssertTrue(app.buttons["prayer-day-fajr-jamaah"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "prayer-day-header").firstMatch.exists)
+        attachScreenshot(app, named: "M1-V05-day-L")
+        app.terminate()
+    }
+
     func test_M1T09_OldMissedSaveUndoRestoreMakeUpAndRelaunch() throws {
         continueAfterFailure = false
         for size in ["L"] {
@@ -270,15 +288,19 @@ import XCTest
             attachScreenshot(app, named: "M1-T05-hali-\(size)")
             let day = app.buttons["prayer-history-day-2026-10-06"]
             scrollTo(day, in: app); attachScreenshot(app, named: "M1-T05-history-\(size)"); day.tap()
-            let isha = app.buttons["prayer-history-log-isha"]
-            XCTAssertTrue(isha.waitForExistence(timeout: 10), app.debugDescription); isha.tap()
-            let alone = app.buttons["prayer-status-alone"]
+            let alone = app.buttons["prayer-day-isha-alone"]
             XCTAssertTrue(alone.waitForExistence(timeout: 10), app.debugDescription); alone.tap()
             let undo = app.buttons["undo-button"]
             XCTAssertTrue(undo.waitForExistence(timeout: 10), app.debugDescription)
-            scrollTo(history, in: app); history.tap()
-            XCTAssertTrue(ratio.waitForExistence(timeout: 10)); XCTAssertEqual(ratio.label, "٩٠٪")
-            app.buttons["prayer-hali-back"].tap()
+            XCTAssertTrue(alone.isSelected, "The edited prayer shows its new state in the day sheet")
+            XCTAssertTrue(ratio.waitForExistence(timeout: 10)); XCTAssertEqual(ratio.label, "٩٠٪", "The figures follow the edit without reopening")
+            let header = app.descendants(matching: .any).matching(identifier: "prayer-day-header").firstMatch
+            let grabber = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: app.frame.width / 2, dy: header.frame.minY - 24))
+            grabber.press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: app.frame.width / 2, dy: app.frame.height - 10)))
+            let back = app.buttons["prayer-hali-back"]
+            XCTAssertTrue(back.waitForExistence(timeout: 10))
+            for _ in 0..<12 where !back.isHittable { app.swipeDown() }
+            back.tap()
             undo.tap()
             scrollTo(history, in: app); history.tap()
             XCTAssertTrue(ratio.waitForExistence(timeout: 10)); XCTAssertEqual(ratio.label, "٨٧٪")
