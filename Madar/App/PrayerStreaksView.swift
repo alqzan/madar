@@ -72,23 +72,9 @@ struct PrayerFiveBeads: Shape {
     }
 }
 
-/// One archivolt of the «سلاسلك» arch: a horseshoe arc (240°, springing 30° below the centre line), foot to foot.
-struct PrayerStreakArc: Shape {
-    /// Radius as a fraction of the drawing width.
-    let radius: CGFloat
-    /// The shared centre, as a fraction of the drawing height.
-    var centerY: CGFloat = 0.6
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        path.addArc(center: CGPoint(x: rect.midX, y: rect.minY + rect.height * centerY), radius: rect.width * radius,
-                    startAngle: .degrees(150), endAngle: .degrees(390), clockwise: false)
-        return path
-    }
-}
-
-/// S1 «سلاسلك»: one arch of three archivolts, congregation inside, on time around it, completion outside
-/// (owner decision, 13 October 2026). Each archivolt has 30 stones, one per streak day, laid from both feet
-/// towards the keystone; at a month the arch closes. The count keeps growing after that.
+/// S1 «سلاسلك»: three nested horseshoe arches in the shape of the home arches (`PrayerHorseshoe`) — congregation inside,
+/// on time around it, completion outside (owner decision, 13 October 2026). Each arch is one continuous line that fills
+/// from both feet with the streak and closes at the crown at a month (30 days). The count keeps growing after that.
 struct PrayerStreakArches: View {
     static let monthDays = 30
     let levels: [PrayerStreakLevel]
@@ -97,62 +83,62 @@ struct PrayerStreakArches: View {
     @Environment(\.roomTheme) private var theme
 
     var body: some View {
-        VStack(spacing: 14) {
-            arch.frame(height: 176).frame(maxWidth: 300).accessibilityHidden(true)
-            HStack(alignment: .top, spacing: 0) {
-                ForEach(Array(levels.enumerated()), id: \.element) { index, level in
-                    if index > 0 { Rectangle().fill(theme.line).frame(width: 1, height: 58) }
-                    VStack(spacing: 3) {
-                        HStack(spacing: 5) {
-                            Capsule().fill(color(level)).frame(width: 12, height: 5)
-                            Text(level.title).font(PrayerHomeType.smallBold).lineLimit(1)
+        HStack(alignment: .center, spacing: 14) {
+            VStack(alignment: .leading, spacing: 16) {
+                ForEach(levels, id: \.self) { level in
+                    HStack(spacing: 8) {
+                        Capsule().fill(color(level)).frame(width: 6, height: 30).accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text(level.title).font(PrayerHomeType.strong).lineLimit(1)
+                            Text(level.short).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk).lineLimit(1)
                         }
+                        Spacer(minLength: 4)
                         Text(PrayerCopy.days(level.count(stats), digits: digits))
-                            .font(.custom("thmanyahserifdisplay-Bold", size: 19, relativeTo: .headline))
-                            .lineLimit(1).minimumScaleFactor(0.75)
-                        Text(level.short).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk).lineLimit(1)
+                            .font(.custom("thmanyahserifdisplay-Bold", size: 18, relativeTo: .headline))
+                            .lineLimit(1).minimumScaleFactor(0.8)
                     }
-                    .frame(maxWidth: .infinity)
                 }
             }
+            .frame(maxWidth: .infinity)
+            arch.frame(width: 132, height: 196).accessibilityHidden(true)
         }
     }
 
     private var arch: some View {
-        // Outer archivolt is completion; widths step inwards.
-        let radii: [CGFloat] = [0.40, 0.315, 0.23]
+        // Outer arch is completion; each inner arch is inset on the sides and the crown, standing on the same floor.
         let ordered = Array(levels.reversed())
-        return ZStack {
-            // Pillars and the floor line, as under the home arches.
-            GeometryReader { geometry in
-                let w = geometry.size.width, h = geometry.size.height
-                let foot = radii[0] * w * 0.5 // sin 30°
-                Path { path in
-                    for x in [w / 2 - radii[0] * w * 0.866, w / 2 + radii[0] * w * 0.866] {
-                        path.move(to: CGPoint(x: x, y: h * 0.6 + foot)); path.addLine(to: CGPoint(x: x, y: h))
-                    }
-                }
-                .stroke(theme.line, lineWidth: 1)
-                Capsule().fill(theme.line).frame(width: w * 0.92, height: 2).position(x: w / 2, y: h - 1)
-                PrayerLatticePattern(spacing: 9).stroke(theme.color("goldMid").opacity(0.35), lineWidth: 0.6)
-                    .clipShape(InnerArch(radius: radii[radii.count - 1] - 0.045))
-                PrayerStar().fill(theme.accent).frame(width: 18, height: 18).position(x: w / 2, y: h * 0.6)
+        let inset: CGFloat = 17
+        return GeometryReader { geometry in
+            let full = CGRect(origin: .zero, size: geometry.size).insetBy(dx: 5, dy: 0)
+            let rects = (0..<3).map { i in
+                CGRect(x: full.minX + CGFloat(i) * inset, y: full.minY + 5 + CGFloat(i) * inset,
+                       width: full.width - CGFloat(i) * inset * 2, height: full.height - 5 - CGFloat(i) * inset - 3)
             }
-            ForEach(Array(ordered.enumerated()), id: \.element) { index, level in
-                stones(PrayerStreakArc(radius: radii[index]), level: level)
+            let inner = rects[2]
+            ZStack {
+                PrayerLatticePattern(spacing: 8).stroke(theme.color("goldMid").opacity(0.4), lineWidth: 0.6)
+                    .clipShape(PrayerHorseshoe().path(in: inner.insetBy(dx: 8, dy: 0).offsetBy(dx: 0, dy: 8)))
+                PrayerStar().fill(theme.accent).frame(width: 16, height: 16)
+                    .position(x: inner.midX, y: inner.minY + inner.width / 2 + 6)
+                ForEach(Array(ordered.enumerated()), id: \.element) { index, level in
+                    stones(in: rects[index], level: level)
+                }
+                Capsule().fill(theme.line).frame(width: geometry.size.width, height: 2)
+                    .position(x: geometry.size.width / 2, y: geometry.size.height - 1)
             }
         }
     }
 
-    /// Thirty stones; the n-th streak day lays the next stone, alternating feet, so the keystone is the 30th.
-    private func stones(_ arc: PrayerStreakArc, level: PrayerStreakLevel) -> some View {
-        let days = min(level.count(stats), Self.monthDays), n = Self.monthDays
-        let laid = Set((0..<days).map { day in day % 2 == 0 ? day / 2 : n - 1 - day / 2 })
+    /// One continuous arch line, filled from both feet by the streak; the two halves meet at the crown at a month.
+    private func stones(in rect: CGRect, level: PrayerStreakLevel) -> some View {
+        let fraction = min(CGFloat(level.count(stats)), CGFloat(Self.monthDays)) / CGFloat(Self.monthDays)
+        let path = PrayerHorseshoe().path(in: rect)
+        let style = StrokeStyle(lineWidth: 8, lineCap: .butt, lineJoin: .round)
         return ZStack {
-            ForEach(0..<n, id: \.self) { stone in
-                let gap = 0.12 / CGFloat(n)
-                arc.trim(from: CGFloat(stone) / CGFloat(n) + gap, to: CGFloat(stone + 1) / CGFloat(n) - gap)
-                    .stroke(laid.contains(stone) ? color(level) : theme.ink.opacity(0.07), style: StrokeStyle(lineWidth: 9, lineCap: .butt))
+            path.stroke(theme.ink.opacity(0.07), style: style)
+            if fraction > 0 {
+                path.trimmedPath(from: 0, to: fraction / 2).stroke(color(level), style: style)
+                path.trimmedPath(from: 1 - fraction / 2, to: 1).stroke(color(level), style: style)
             }
         }
     }
@@ -162,19 +148,6 @@ struct PrayerStreakArches: View {
         case .congregation: theme.accent
         case .onTime: theme.color("goldMid")
         case .completion: theme.secondaryInk
-        }
-    }
-
-    /// The opening of the innermost arch, closed down to the floor, for the lattice.
-    private struct InnerArch: Shape {
-        let radius: CGFloat
-        func path(in rect: CGRect) -> Path {
-            var path = PrayerStreakArc(radius: radius).path(in: rect)
-            let r = rect.width * radius
-            path.addLine(to: CGPoint(x: rect.midX + r * 0.866, y: rect.maxY))
-            path.addLine(to: CGPoint(x: rect.midX - r * 0.866, y: rect.maxY))
-            path.closeSubpath()
-            return path
         }
     }
 }
