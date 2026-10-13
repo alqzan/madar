@@ -6,7 +6,7 @@ Current model policy: **GPT-6 Luna max may implement production.** Sol is narrow
 
 # Last checked
 
-Integrated main `288ef7e`: T04 `e4ecf59`, T05 `7769d6d`, T06 `e18601c`, T07 `288ef7e`; focused software/native checks and L/AX3 screenshots passed, with scoped independent notification/heart/qiyam reviews. Reuse unchanged green outputs; exact evidence is in the board/reviews below. Preflight 11 pinned resources, 0 copied. Owner-device and distribution gates remain separate. Physical iPhone 15 Pro Max is paired/available in CoreDevice; no install/run or owner-data migration was performed. Latest usage 32% five-hour used / 68% remaining, 5% weekly used; no reset was consumed by this agent.
+Main `03c304e`: T08 settings and T09 explicit old missed are integrated; focused native L/AX3 and Commands checks passed. Owner rejected the visual resemblance/font presentation on 2026-10-13. Functional evidence is not visual approval. Preserve T10/calendar candidate on `codex/m1-s4-prayer-settings-debt`; no visual acceptance or full milestone approval. Latest telemetry 98% five-hour used / 2% remaining, 15% weekly; no reset consumed. End new work immediately.
 
 # Board
 
@@ -46,8 +46,8 @@ Active sections: **M0-S2 shipping integration (software slice delivered)**; **M0
 
 ## Next results, in order
 
-1. **M1-T08 — prayer calculation settings**: expose the agreed calculation method, Asr, high-latitude rule and per-prayer minute offsets; both home and prayer clocks reflect change, reset/undo and relaunch. §7.2 المواقيت/P01/P02, settings-schema exact defaults/ranges, RP3. Out: trip-specific settings and location permission.
-2. **M1-T09 — add an old missed prayer**: explicit date/prayer/Friday-kind entry before tracking is allowed, one debt, durable make-up/undo and no inferred misses. §7.2 القضاء/بداية التتبّع, RP1/RP2/RP5, §10/§11. Preserve tombstones; any recreation needs an explicit restoration route. Out: automatic aging and unbuilt room links.
+1. **Visual correction first — owner request 2026-10-13**: compare actual default-size screens with canonical handoff screens (`screens/salah/01-S1-Home-s1.jpg`, S2/S5/S7 and settings); restore approved typography, spacing, card density and arch layout. Clearly label accessibility screenshots AX3; never use them as the default product preview. No new functional cards before this correction. Respect RP1/RP6 fixes over historical sample copy.
+2. Resume preserved T10/calendar slice only after changed-flow and visual checks; then T11 one-time tracking start edit (§7.2/P04, schema, §10/11).
 3. Keep owner-iPhone, actual ActivityKit start, Files destination write, T12 and distribution unverified until their actual evidence. Device validation must isolate owner data/OS requests and preserve production signing/App Group; paired availability alone proves no run.
 
 ## Instructions for the next agent
@@ -61,6 +61,16 @@ Active sections: **M0-S2 shipping integration (software slice delivered)**; **M0
 M1-S2 notification/sanctity + relevant physical RA2 checks; M1-S3 remaining prayer flows/statistics/travel and room gate. M2 Quran; M3 diary; M4 lobby/habits/widgets; M5 money; M6 Mihbara; M7 final integration. Plan each next section only when ready. Preserve existing scaffolding; shipping later features requires their actual acceptance and licensing.
 
 # Handovers
+
+## Handover — owner visual correction takes priority — 2026-10-13 — codex
+
+Works now: Main `03347b6` calculation settings and `03c304e` old missed/explicit restoration; earlier T04–T07 remain integrated. T10 full-qada list and qada-calendar correction preserved on `codex/m1-s4-prayer-settings-debt`, not delivered on main.
+Verified: T08 signed simulator offsets/both clocks/reset/undo/relaunch L+AX3 1/0 (`/tmp/madar-t08-settings-confirm-20261013.xcresult`). T09 Commands Friday/replay/undo/barriers/denominator 1/1; native old missed L+AX3 1/0 (`/tmp/madar-t09-old-calendar-20261013.xcresult`); independent writer review no findings. T10 initial native 1/0 (`/tmp/madar-t10-qada-history-20261013.xcresult`); subsequent calendar run failed because test scrolled past the target at AX3; directional scroll repair rerun at `/tmp/madar-t10-qada-scroll-20261013.xcresult`, result must be checked next. Actual L/AX3 artifacts preserved. `git diff --check` passed.
+Not verified: visual resemblance is owner-rejected; corrected default preview not delivered. Final T10 rerun outcome, physical device, ActivityKit, full M0/M1 and distribution remain unverified. No owner store opened/migrated.
+Next concrete result: match canonical design and default font before further functions, show default preview clearly separate from AX3.
+Active branch/worktree/tip: main `03c304e`; candidate `c9bd527` section branch retains T10 + `55632d2` calendar fix; no new worktree. Historical inventory unchanged.
+Model/effort: root not exposed; T09 independent reviewer requested Luna/max, actual identity/effort not exposed.
+Usage: 98% five-hour used / 2% remaining, 15% weekly used; reserve target was not achieved in the latest account reading. No reset used; no further implementation started.
 
 ## Handover — M1-T04/T05/T06/T07 integrated software — 2026-10-13 — codex
 
@@ -103,13 +113,3 @@ Next concrete result: M1-T02 explicit missed/make-up and pending recovery; prese
 Active branch/worktree/tip: clean `main` after this handover commit; retained `codex/m1-t01-prayer-logging` at `e6fbe75`. Existing T16/T17 refs preserved; [historical branch/worktree inventory](docs/reports/M0-retained-branches.md).
 Model/effort: root model and effort not exposed; do not infer Luna/max. Independent review was limited to the new migration/domain slice.
 Usage: latest account reading before handover was 33% five-hour used and 98% weekly used; reset credits unused. Weekly limit is near its cap, so no further card was started.
-
-## Handover — M0-T16/T17 lean software delivery — 12/10/2026 — codex
-
-Works now: T16's reviewed privacy repair is integrated on main; a fresh synthetic store completes Face ID authorization, creates the plain export, opens the native share sheet, and dismisses back to the recovered app. T17's foundation flow changes city/numerals, persists across relaunch, resets and undoes settings, then relaunches to five current prayer clocks. Lean M0 software readiness is recorded; full M0 remains NOT APPROVED.
-Verified: main `95804a1` includes T16 `ea3e63d` and T17 `95804a1`. `python3 Madar/scripts/prepare-workspace.py`: 11 resources pass, 0 copied. Selected signed simulator host tests: 15/0 (`/tmp/madar-t16-20261012-4e69691-host.log`); `swift test --filter ManagedBackupTests`: 13/0. `python3 scripts/native-export-biometric-test.py --device 412F4437-7BD7-44D1-AA3D-2B7158090E14 --derived-data /tmp/madar-t16-20261012-4e69691-native-derived --output-dir /tmp/madar-t16-20261012-4e69691-native`: 1/0 in 43.607s. T17 signed simulator UI test: 1/0 in 75.702s; default/Makkah-western/today-clock screenshots inspected. Ignored raw evidence is retained in `Madar/Artifacts/m0-t16-20261012-main/` and `Madar/Artifacts/m0-t17-20261012-main/`.
-Not verified: actual Files destination write, owner-iPhone build/acceptance, physical RA2 transport/protected-data behavior, full VoiceOver/Reduce Motion, unresolved T12 contrast, complete route/privacy/two-scene matrices, full M0 approval and distribution.
-Next concrete result: M1-T01 today's prayer display and persistent basic logging, including save/relaunch/change/undo against a synthetic local store; reject future logging and never auto-create missed/qada.
-Active branch/worktree/tip: clean `main` `95804a1`; retained T16 `codex/m0-t16-curated-export` `ea3e63d` and T17 `codex/m0-t17-lean-readiness` `95804a1`. No worktree created or archived.
-Model/effort: root model and effort not exposed; cannot claim Luna/max ran. No independent review needed for T17 test-only change; reused T16 production approval `8876626` for unchanged reviewed source.
-Usage: latest at the T17 boundary 13% five-hour used / 87% remaining, weekly 95% used / 5% remaining; reset credits unused. The documentation checkpoint read 16% five-hour used / 84% remaining, weekly 95% used / 5% remaining. Weekly allowance may end this session early.
