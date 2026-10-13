@@ -312,3 +312,23 @@ import MadarData
         #expect(!state.hasTimes && state.next == nil && state.pending.isEmpty && state.today.cells.allSatisfy { $0.time == nil })
     }
 }
+
+@Suite struct TravelRuleTests {
+    // Riyadh 24.7136, 46.6753. Reference distances are great-circle values (haversine, R = 6371 km) computed by hand from the coordinates.
+    private func place(_ lat: Double, _ lon: Double) throws -> ActivePlace { try ActivePlace(latitude: lat, longitude: lon, timeZoneID: "Asia/Riyadh") }
+    @Test func eightyKilometresBeyondTheCityEdge() throws {
+        let riyadh = try place(24.7136, 46.6753)
+        // One degree of latitude is 111.19 km: 0.9 deg = 100 km (inside 25 + 80), 1.0 deg = 111 km (outside).
+        #expect(!TravelRule.isAway(home: riyadh, current: try place(24.7136 + 0.9, 46.6753), thresholdKm: 80))
+        #expect(TravelRule.isAway(home: riyadh, current: try place(24.7136 + 1.0, 46.6753), thresholdKm: 80))
+        // Jeddah is about 845 km away; the old 300 km default is not what decides it any more.
+        #expect(TravelRule.isAway(home: riyadh, current: try place(21.4858, 39.1925), thresholdKm: 80))
+        #expect(!TravelRule.isAway(home: riyadh, current: riyadh, thresholdKm: 80))
+    }
+    @Test func localMethodSuggestion() {
+        #expect(TravelRule.suggestedMethod(country: "TR") == .turkey)
+        #expect(TravelRule.suggestedMethod(country: "GB") == .mwl)
+        #expect(TravelRule.suggestedMethod(country: "us") == .isna)
+        #expect(TravelRule.suggestedMethod(country: "SA") == .ummAlQura)
+    }
+}

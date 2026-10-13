@@ -100,6 +100,41 @@ import XCTest
         app.terminate()
     }
 
+    /// M1-F02: «خارج مدينتك» until the one question is answered; then the trip pill and a paired log (RP7).
+    func test_M1F02_TravelQuestionPillAndPair() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
+            "MADAR_UI_NOW": "2026-10-07T13:00:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01", "MADAR_UI_THEME": "light",
+            "MADAR_UI_TRAVEL_FIX": "41.0082,28.9784,إسطنبول,TR,Europe/Istanbul"]
+        app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+        let pill = app.buttons["prayer-travel-pill"]
+        XCTAssertTrue(pill.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(pill.label.contains("خارج مدينتك"), pill.label)
+        attachScreenshot(app, named: "M1-F02-away-L")
+        pill.tap()
+        let yes = app.buttons["prayer-travel-yes"]
+        XCTAssertTrue(yes.waitForExistence(timeout: 8), app.debugDescription)
+        attachScreenshot(app, named: "M1-F02-question-L")
+        yes.tap()
+        let trip = app.buttons["prayer-travel-pill"]
+        XCTAssertTrue(trip.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(NSPredicate(format: "label CONTAINS 'مسافر' AND label CONTAINS 'إسطنبول'").evaluate(with: trip), trip.label)
+        let dhuhr = app.descendants(matching: .any).matching(identifier: "prayer-arch-dhuhr").firstMatch
+        XCTAssertTrue(dhuhr.label.contains("قصر"), dhuhr.label)
+        attachScreenshot(app, named: "M1-F02-trip-L")
+        dhuhr.tap()
+        let taqdim = app.buttons["prayer-pair-taqdim"]
+        XCTAssertTrue(taqdim.waitForExistence(timeout: 8), app.debugDescription)
+        taqdim.tap()
+        app.buttons["prayer-pair-save"].tap()
+        let after = app.descendants(matching: .any).matching(identifier: "prayer-arch-asr").firstMatch
+        XCTAssertTrue(NSPredicate(format: "label CONTAINS 'جماعة'").evaluate(with: after) || after.waitForExistence(timeout: 8), app.debugDescription)
+        attachScreenshot(app, named: "M1-F02-paired-L")
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "prayer-arch-dhuhr").firstMatch.label.contains("جماعة"), app.debugDescription)
+        app.terminate()
+    }
+
     /// M1-V10: «خصّص الصلاة», for comparison with screens/flex/06-K-Salah(-s1).jpg; order and hide change the home.
     func test_M1V10_CustomizePrayerReordersAndHidesHomeBlocks() throws {
         continueAfterFailure = false

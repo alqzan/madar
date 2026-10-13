@@ -148,6 +148,21 @@ final class AppSession {
         sendPrayerCommand(name: "prayer.editTrackingStart", payload: .object(["dayKey": .string(day.description)]),
             undoMessage: "عُدّلت بداية التتبّع · التراجع متاح لعشر دقائق", completion: completion)
     }
+    /// RP4/RP7: the owner answered the one question. The method is stored first; times then use it for this trip only.
+    func startPrayerTrip(city: String, country: String, place: ActivePlace, homeKm: Double?, method: PrayerCalculationMethod, completion: ((Bool) -> Void)? = nil) {
+        set(.string(method.rawValue), key: "salah.tripMethod") { [self] in
+            var payload: [String: MadarCore.JSONValue] = ["city": .string(city), "country": .string(country), "lat": .number(place.latitude), "lon": .number(place.longitude), "tzID": .string(place.timeZoneID)]
+            if let homeKm { payload["homeKm"] = .number(homeKm) }
+            sendPrayerCommand(name: "prayer.startTrip", payload: .object(payload), undoMessage: "بدأت الرحلة · التراجع متاح لعشر دقائق", completion: completion)
+        }
+    }
+    func endPrayerTrip(_ id: UUID, completion: ((Bool) -> Void)? = nil) {
+        sendPrayerCommand(name: "prayer.endTrip", payload: .object(["tripID": .string(id.uuidString)]), undoMessage: "انتهت الرحلة · التراجع متاح لعشر دقائق", completion: completion)
+    }
+    func logPrayerPair(day: GregorianDay, pair: PrayerPair, status: PrayerStoredStatus, shortened: Bool, mode: PrayerPairMode, completion: ((Bool) -> Void)? = nil) {
+        sendPrayerCommand(name: "prayer.logPair", payload: .object(["dayKey": .string(day.description), "pair": .string(pair.rawValue), "status": .string(status.rawValue), "shortened": .bool(shortened), "mode": .string(mode.rawValue)]),
+            undoMessage: "سُجّلت الصلاتان · التراجع متاح لعشر دقائق", completion: completion)
+    }
     func makeUpPrayer(_ reference: PrayerReference, fridayKind: FridayPrayerKind? = nil, completion: ((Bool) -> Void)? = nil) {
         let at = prayerNow()
         let formatter = ISO8601DateFormatter(); formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -212,6 +227,9 @@ final class AppSession {
         case "beforeTrackingStart": "هذا اليوم يسبق بداية التسجيل."
         case "explicitRestoreRequired": "يتطلب هذا السجل استعادة صريحة."
         case "invalidRecord": "نوع الجمعة متاح لظهر الجمعة فقط."
+        case "noActiveTrip": "لا توجد رحلة جارية."
+        case "invalidPair": "هاتان الصلاتان لا تُجمعان الآن."
+        case "invalidShortening": "القصر لا ينطبق على هذه الصلاة."
         case "trackingAlreadyEdited": "اكتمل التعديل الوحيد لبداية التتبّع."
         case "invalidTrackingStart": "البداية خارج المدى: حتى ثلاثين يومًا قبل أول تشغيل."
         default: "لم تُسجّل الصلاة. حاول مرة أخرى."

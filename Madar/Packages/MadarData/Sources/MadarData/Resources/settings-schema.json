@@ -372,7 +372,7 @@
    "section": "مدينتك والسفر",
    "title": "يتفعّل بعد (كم)",
    "type": "int",
-   "default": 300,
+   "default": 80,
    "scope": "sync",
    "range": [
     80,

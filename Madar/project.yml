@@ -69,6 +69,7 @@ targets:
             CFBundleURLSchemes: [madar]
         ITSAppUsesNonExemptEncryption: false
         NSFaceIDUsageDescription: افتح بيانات مدار المحمية بمصادقة الجهاز.
+        NSLocationWhenInUseUsageDescription: يعرف مدار أنك خارج مدينتك ليسألك عن السفر. لا يُحفظ موقعك ولا يغادر جهازك.
         NSSupportsLiveActivities: true
         UIAppFonts:
           - thmanyahsans-Light.otf

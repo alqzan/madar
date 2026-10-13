@@ -97,7 +97,7 @@ private struct ReceiptWire: Codable {
                                        undoExpiresAt: row.undoExpiresAt ?? row.createdAt,
                                        undoJSON: row.undoJSON,
                                        outcome: .init(status: CommandStatus(rawValue: row.status) ?? .rejected,
-                                                      undoToken: row.status == "applied" && ["prayer.log", "prayer.makeUp", "prayer.resolveGap", "prayer.setHeart", "prayer.logQiyam", "prayer.addOldMissed", "prayer.editTrackingStart", "settings.set", "settings.applyPreset"].contains(row.name) ? id : nil))
+                                                      undoToken: row.status == "applied" && ["prayer.log", "prayer.makeUp", "prayer.resolveGap", "prayer.setHeart", "prayer.logQiyam", "prayer.addOldMissed", "prayer.editTrackingStart", "prayer.startTrip", "prayer.endTrip", "prayer.logPair", "settings.set", "settings.applyPreset"].contains(row.name) ? id : nil))
                 return try JSONDecoder().decode(CoreCommandReceipt.self, from: JSONEncoder().encode(wire))
             }
             // Receipt identity is authoritative even after undo/deletion or retention expiry.
@@ -200,6 +200,19 @@ private struct ReceiptWire: Codable {
             case .editPrayerTrackingStart(let day):
                 do {
                     if let undo = try PrayerMutationHandler.stage(operation: .editTrackingStart(day), in: context, now: now, writer: writer, source: request.envelope.source) {
+                        inverse = SettingsInverse(settings: [:], afterSettings: [:], layouts: [:], afterLayouts: [:], prayerMutation: undo)
+                    }
+                } catch let error as PrayerDomainError { return .init(status: .rejected, reason: String(describing: error)) }
+            case .startPrayerTrip, .endPrayerTrip, .logPrayerPair:
+                let mutation: PrayerMutation
+                switch request.operation {
+                case .startPrayerTrip(let city, let country, let place, let homeKm): mutation = .startTrip(city: city, country: country, place: place, homeKm: homeKm)
+                case .endPrayerTrip(let id): mutation = .endTrip(id)
+                case .logPrayerPair(let day, let pair, let status, let shortened, let mode): mutation = .logPair(day: day, pair: pair, status: status, shortened: shortened, mode: mode)
+                default: return .init(status: .rejected, reason: "invalidPayload")
+                }
+                do {
+                    if let undo = try PrayerMutationHandler.stage(operation: mutation, in: context, now: now, writer: writer, source: request.envelope.source) {
                         inverse = SettingsInverse(settings: [:], afterSettings: [:], layouts: [:], afterLayouts: [:], prayerMutation: undo)
                     }
                 } catch let error as PrayerDomainError { return .init(status: .rejected, reason: String(describing: error)) }

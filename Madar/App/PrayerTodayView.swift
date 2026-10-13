@@ -11,6 +11,8 @@ struct PrayerTodayView: View {
     @Environment(\.roomTheme) private var inheritedTheme
     @Environment(\.dynamicTypeSize) private var dynamicType
     @State private var selectedSheet: PrayerTodaySheet?
+    @State private var locator = TravelLocator()
+    @Environment(\.scenePhase) private var scenePhase
 
     private var theme: RoomTheme { RoomTheme(room: "salah", dark: inheritedTheme.dark, calmPaper: inheritedTheme.calmPaper) }
 
@@ -22,11 +24,16 @@ struct PrayerTodayView: View {
                     if let snapshot = try? session.prayerSnapshot(at: instant) {
                         header(day: snapshot.today.day)
                             .padding(.top, 8)
-                        if snapshot.today.cells.contains(where: { $0.isFriday }) {
-                            fridayPill.padding(.top, 16)
+                        let pills = travelPillText(snapshot) != nil || snapshot.today.cells.contains(where: { $0.isFriday })
+                        VStack(spacing: 10) {
+                            if let text = travelPillText(snapshot) {
+                                PrayerTravelPill(text: text) { openTravel(snapshot) }
+                            }
+                            if snapshot.today.cells.contains(where: { $0.isFriday }) { fridayPill }
                         }
+                        .padding(.top, pills ? 16 : 0)
                         nextPrayer(snapshot, now: instant)
-                            .padding(.top, snapshot.today.cells.contains(where: { $0.isFriday }) ? 18 : 26)
+                            .padding(.top, pills ? 18 : 26)
                         verseDivider
                             .padding(.top, 18)
                         riwaq(snapshot, now: instant)
@@ -71,9 +78,17 @@ struct PrayerTodayView: View {
         }
         .environment(\.roomTheme, theme)
         .toolbarVisibility(.hidden, for: .navigationBar)
+        .onAppear { detectTravel() }
+        .onChange(of: scenePhase) { _, phase in if phase == .active { detectTravel() } }
         .sheet(item: $selectedSheet) { route in
             Group {
             switch route {
+            case .travelQuestion(let fix, let km):
+                PrayerTravelQuestionSheet(session: session, fix: fix, homeKm: km, finished: { selectedSheet = nil })
+            case .trip(let trip):
+                PrayerTripSheet(session: session, trip: trip, finished: { selectedSheet = nil })
+            case .pair(let day, let pair, let cell):
+                PrayerTravelPairSheet(session: session, day: day, pair: pair, alone: { selectedSheet = .log(cell) }, finished: { selectedSheet = nil })
             case .oldMissed:
                 if let snapshot = try? session.prayerSnapshot(at: session.prayerNow()) {
                     PrayerOldMissedSheet(session: session, trackingStart: snapshot.tracking.day, finished: { selectedSheet = nil })
@@ -263,6 +278,7 @@ struct PrayerTodayView: View {
             title: cell.isFriday && cell.reference.prayer == .dhuhr ? "الجمعة" : title(cell.reference.prayer),
             tall: cell.isFriday && cell.reference.prayer == .dhuhr && session.bool("salah.fridayTallArch"),
             timeLabel: (cell.prayerTime ?? cell.time).map { clock($0, timeZone: snapshot.activeTrip?.place.timeZone ?? session.activePlace.timeZone) } ?? "—",
+            note: pairNote(cell, snapshot: snapshot),
             countdown: isNext && cell.status == .future ? cell.prayerTime.flatMap { PrayerCopy.countdown(until: $0, now: now, digits: digits) } : nil)
         if canEdit {
             Button { choose(cell) } label: { arch }
@@ -497,7 +513,51 @@ struct PrayerTodayView: View {
     }
 
     private func choose(_ cell: PrayerCell) {
-        selectedSheet = .log(cell)
+        if let pair = travelPair(for: cell), [.pending, .future].contains(cell.status) {
+            selectedSheet = .pair(cell.reference.day, pair, cell)
+        } else {
+            selectedSheet = .log(cell)
+        }
+    }
+
+    // MARK: Travel (RP4, RP7)
+
+    private var travelDetects: Bool { session.string("core.travelMode") != "manual" && session.bool("salah.travelShortenCombine") }
+    private var travelThresholdKm: Double {
+        if case .number(let km) = session.values["core.travelKm"] { km } else { 80 }
+    }
+    private func detectTravel() { if travelDetects { locator.refresh() } }
+    private func awayFix() -> TravelFix? {
+        guard let fix = locator.fix,
+              TravelRule.isAway(home: session.activePlace, current: fix.place, thresholdKm: travelThresholdKm),
+              !PrayerTravelCopy.declined(near: fix.place, thresholdKm: travelThresholdKm) else { return nil }
+        return fix
+    }
+    /// «مسافر · جدة · قصرٌ وجمع» on a trip; «خارج مدينتك» until the one question is answered; nothing otherwise.
+    private func travelPillText(_ snapshot: PrayerSnapshot) -> String? {
+        if let trip = snapshot.activeTrip {
+            if let fix = locator.fix, !TravelRule.isAway(home: session.activePlace, current: fix.place, thresholdKm: travelThresholdKm) { return "عدتَ إلى مدينتك؟" }
+            return session.bool("salah.travelShortenCombine") ? "مسافر · \(trip.city) · قصرٌ وجمع" : "مسافر · \(trip.city)"
+        }
+        return travelDetects && awayFix() != nil ? "خارج مدينتك" : nil
+    }
+    private func openTravel(_ snapshot: PrayerSnapshot) {
+        if let trip = snapshot.activeTrip { selectedSheet = .trip(trip) }
+        else if let fix = awayFix() { selectedSheet = .travelQuestion(fix, max(0, TravelRule.distanceKm(from: session.activePlace, to: fix.place) - TravelRule.homeRadiusKm)) }
+    }
+    private func travelPair(for cell: PrayerCell) -> PrayerPair? {
+        guard session.bool("salah.travelShortenCombine"), (try? session.prayerSnapshot(at: session.prayerNow()))?.activeTrip != nil else { return nil }
+        switch cell.reference.prayer { case .dhuhr, .asr: return .dhuhrAsr; case .maghrib, .isha: return .maghribIsha; default: return nil }
+    }
+    /// Under the arch of a prayer that can be combined: «قصر · جمع» on the first Dhuhr, «مع الظهر» on Asr, and so on.
+    private func pairNote(_ cell: PrayerCell, snapshot: PrayerSnapshot) -> String? {
+        guard snapshot.activeTrip != nil, session.bool("salah.travelShortenCombine"), [.pending, .future].contains(cell.status) else { return nil }
+        switch cell.reference.prayer {
+        case .dhuhr: return "قصر · جمع"
+        case .asr: return "مع الظهر"
+        case .isha: return "مع المغرب"
+        default: return nil
+        }
     }
 
     private func title(_ prayer: Prayer) -> String {
@@ -666,6 +726,7 @@ private struct PrayerTodayArch: View {
     let title: String
     let tall: Bool
     let timeLabel: String
+    var note: String?
     let countdown: String?
     @Environment(\.roomTheme) private var theme
     @Environment(\.dynamicTypeSize) private var dynamicType
@@ -684,7 +745,7 @@ private struct PrayerTodayArch: View {
         case .future: "لم يحن"
         }
     }
-    var accessibilityText: String { "\(title)، \(timeLabel)، \(statusText)" }
+    var accessibilityText: String { "\(title)، \(timeLabel)، \(note ?? statusText)" }
     private var gold: Color { theme.color("goldMid") }
     private var logged: Bool { [.jamaah, .alone, .qada, .missed].contains(cell.status) }
     private var bodyFill: Color {
@@ -710,7 +771,7 @@ private struct PrayerTodayArch: View {
                 VStack(spacing: 3) {
                     Text(title).font(PrayerHomeType.archName).lineLimit(1).minimumScaleFactor(0.75)
                     Text(timeLabel).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk).lineLimit(1).minimumScaleFactor(0.8)
-                    Text(countdown ?? statusText)
+                    Text(countdown ?? note ?? statusText)
                         .font(countdown != nil || cell.status == .missed ? PrayerHomeType.smallBold : PrayerHomeType.small)
                         .foregroundStyle(countdown != nil ? theme.accent : cell.status == .missed ? theme.color("missedTextOnSurface") : cell.status == .future ? theme.secondaryInk : theme.ink.opacity(0.78))
                         .lineLimit(1).minimumScaleFactor(0.8)
@@ -944,6 +1005,9 @@ private struct PrayerQadaListSheet: View {
 }
 
 private enum PrayerTodaySheet: Identifiable {
+    case travelQuestion(TravelFix, Double)
+    case trip(PrayerTrip)
+    case pair(GregorianDay, PrayerPair, PrayerCell)
     case log(PrayerCell)
     case statistics
     case heart(PrayerCell)
@@ -954,6 +1018,9 @@ private enum PrayerTodaySheet: Identifiable {
     case recovery([PrayerReference], Set<PrayerReference>, TimeZone)
     var id: String {
         switch self {
+        case .travelQuestion: "travel-question"
+        case .trip(let trip): "trip-\(trip.id.uuidString)"
+        case .pair(let day, let pair, _): "pair-\(day)-\(pair.rawValue)"
         case .oldMissed: "old-missed"
         case .qadaList: "qada-list"
         case .qiyam: "qiyam"

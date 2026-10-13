@@ -35,6 +35,7 @@
 		515BF7C677ACA9EA442A84EC /* MadarCore in Frameworks */ = {isa = PBXBuildFile; productRef = D04FCD79967981AED2E8C7FE /* MadarCore */; };
 		59CFCB83C498D00A1C66BA5F /* MadarInbox in Frameworks */ = {isa = PBXBuildFile; productRef = CD612AE668CD8323078B4B8B /* MadarInbox */; };
 		61008D4E1402C2503A5A3F54 /* MadarSnapshots in Frameworks */ = {isa = PBXBuildFile; productRef = 84C88E462FB52C233E333734 /* MadarSnapshots */; };
+		622DDEFF6296FADC2ED4F0A0 /* PrayerTravel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD8F17E41C4B94AE7A6B7D27 /* PrayerTravel.swift */; };
 		63381DAA1409F348D6E16B85 /* Amiri-OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = 56174C04CFE7BB474B46291C /* Amiri-OFL.txt */; };
 		6719E30E96A27275B6352121 /* MadarSnapshots in Frameworks */ = {isa = PBXBuildFile; productRef = 8536634CB7C0A26F02B922D9 /* MadarSnapshots */; };
 		69E2EDB77052A3EC02406C0F /* thmanyahseriftext-Bold.otf in Resources */ = {isa = PBXBuildFile; fileRef = 71314BC22D8E14936362031A /* thmanyahseriftext-Bold.otf */; };
@@ -159,6 +160,7 @@
 		AA5DF286ED4CF242BEF2D537 /* MadarSnapshots */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MadarSnapshots; path = Packages/MadarSnapshots; sourceTree = SOURCE_ROOT; };
 		ACA285A1762593401A2BBEBA /* Madar.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Madar.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AE67096C4A1239F83DCD8EF6 /* FoundationUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoundationUITests.swift; sourceTree = "<group>"; };
+		BD8F17E41C4B94AE7A6B7D27 /* PrayerTravel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrayerTravel.swift; sourceTree = "<group>"; };
 		C105008888548BF995BA7B6D /* AppServiceIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppServiceIntegrationTests.swift; sourceTree = "<group>"; };
 		C1541C81F328C40D5A683888 /* PrayerRoom.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrayerRoom.swift; sourceTree = "<group>"; };
 		C63BADA5C6BD423F06356E09 /* CustomizationCopyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomizationCopyTests.swift; sourceTree = "<group>"; };
@@ -263,6 +265,7 @@
 				C1541C81F328C40D5A683888 /* PrayerRoom.swift */,
 				0A7D4FC457636377F6EF5D76 /* PrayerSettingsView.swift */,
 				D813172B4A91DD6E0930EEA8 /* PrayerTodayView.swift */,
+				BD8F17E41C4B94AE7A6B7D27 /* PrayerTravel.swift */,
 				5D3EC96D647534DFB18C29D1 /* PresetsView.swift */,
 				7E78D6FA9A7292B69D980621 /* ScenePrivacyPresenter.swift */,
 				0AAF9DA5CBAEE9C391B62E8A /* SyncSettingsView.swift */,
@@ -591,6 +594,7 @@
 				CFF94239BC342BA772C26E44 /* PrayerRoom.swift in Sources */,
 				74FD6AB907A73C84CA714668 /* PrayerSettingsView.swift in Sources */,
 				2E95780F1D439BE926514901 /* PrayerTodayView.swift in Sources */,
+				622DDEFF6296FADC2ED4F0A0 /* PrayerTravel.swift in Sources */,
 				3D1F6A8075563D6E074473E2 /* PresetsView.swift in Sources */,
 				47BE2D7525651AC4D45DCA31 /* ScenePrivacyPresenter.swift in Sources */,
 				A04F5C188C09BF1D8C769F7D /* SyncSettingsView.swift in Sources */,
