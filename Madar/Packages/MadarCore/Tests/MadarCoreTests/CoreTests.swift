@@ -403,3 +403,25 @@ func liveActivityQuietAndOff() throws {
     #expect(NotificationArbiter.liveActivityStart(id: "boundary", proposedAt: try instant(hour: 21, minute: 30),
         prayerDays: [day], timeZone: zone, policy: .init(quietFromMinutes: 21 * 60 + 30), submittedBudgetByDay: [:]) == nil)
 }
+
+/// RP4. Expected clocks come from an independent implementation, not from this engine:
+/// Aladhan API (api.aladhan.com/v1/timings), fetched 13 Oct 2026. London = method 3 (Muslim World League, Fajr 18°, Isha 17°);
+/// Istanbul = method 13 (Diyanet, Turkey). The source applies the angle-based high-latitude rule, so the test pins `.twilightAngle` (Madar's own default above 48° is the seventh of the night, per the spec). Owner decision 13 Oct 2026: a few minutes of difference is acceptable.
+@Test("Trip methods: London with MWL and Istanbul with Turkey match an independent source", arguments: [
+    ("London", 51.5074, -0.1278, "Europe/London", PrayerCalculationMethod.mwl, "2026-12-21", ["05:59", "11:59", "13:38", "15:53", "17:51"]),
+    ("London", 51.5074, -0.1278, "Europe/London", PrayerCalculationMethod.mwl, "2026-03-20", ["04:10", "12:08", "15:24", "18:14", "20:00"]),
+    ("Istanbul", 41.0082, 28.9784, "Europe/Istanbul", PrayerCalculationMethod.turkey, "2026-12-21", ["06:46", "13:07", "15:25", "17:46", "19:13"]),
+    ("Istanbul", 41.0082, 28.9784, "Europe/Istanbul", PrayerCalculationMethod.turkey, "2026-03-20", ["05:36", "13:17", "16:39", "19:23", "20:43"]),
+    ("Istanbul", 41.0082, 28.9784, "Europe/Istanbul", PrayerCalculationMethod.turkey, "2026-06-21", ["03:24", "13:11", "17:11", "20:47", "22:38"]),
+])
+func tripMethodTimes(_ city: String, _ lat: Double, _ lon: Double, _ zoneID: String, _ method: PrayerCalculationMethod, _ date: String, _ expected: [String]) throws {
+    let place = try ActivePlace(latitude: lat, longitude: lon, timeZoneID: zoneID)
+    let day = try #require(PrayerTimesEngine.calculate(day: GregorianDay(date), place: place, options: .init(method: method, highLatitudeRule: .twilightAngle)))
+    var cal = Calendar(identifier: .gregorian); cal.timeZone = place.timeZone
+    for (prayer, clock) in zip(Prayer.allCases, expected) {
+        let pieces = clock.split(separator: ":").map { Int($0)! }
+        let c = cal.dateComponents([.hour, .minute], from: day.time(for: prayer))
+        let difference = abs((c.hour! * 60 + c.minute!) - (pieces[0] * 60 + pieces[1]))
+        #expect(difference <= 3, "\(city) \(date) \(prayer): got \(c.hour!):\(c.minute!), expected \(clock)")
+    }
+}

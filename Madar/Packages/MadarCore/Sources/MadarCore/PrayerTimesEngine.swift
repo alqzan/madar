@@ -2,7 +2,8 @@ import Foundation
 import Adhan
 
 public enum Prayer: String, Codable, CaseIterable, Sendable { case fajr, dhuhr, asr, maghrib, isha }
-public enum PrayerCalculationMethod: String, Codable, Sendable { case ummAlQura, mwl, egyptian }
+/// The first three are the global `salah.method` options. The rest are offered per trip (RP4) when a trip starts outside Saudi Arabia.
+public enum PrayerCalculationMethod: String, Codable, Sendable, CaseIterable { case ummAlQura, mwl, egyptian, turkey, isna, dubai, kuwait, qatar }
 public enum PrayerHighLatitudeRule: String, Codable, Sendable { case auto, middleOfTheNight, seventhOfTheNight, twilightAngle }
 public struct PrayerCalculationOptions: Codable, Equatable, Sendable {
     public var method: PrayerCalculationMethod
@@ -63,7 +64,10 @@ public enum PrayerTimesEngine {
     }
     public static func calculate(day: GregorianDay, place: ActivePlace, options: PrayerCalculationOptions) -> PrayerDay? {
         guard options.offsets.values.allSatisfy({ (-60...60).contains($0) }), (-2...2).contains(options.sightingOffset) else { return nil }
-        let method: CalculationMethod = switch options.method { case .ummAlQura: .ummAlQura; case .mwl: .muslimWorldLeague; case .egyptian: .egyptian }
+        let method: CalculationMethod = switch options.method {
+        case .ummAlQura: .ummAlQura; case .mwl: .muslimWorldLeague; case .egyptian: .egyptian
+        case .turkey: .turkey; case .isna: .northAmerica; case .dubai: .dubai; case .kuwait: .kuwait; case .qatar: .qatar
+        }
         var params = method.params; params.madhab = options.hanafiAsr ? .hanafi : .shafi
         params.highLatitudeRule = switch options.highLatitudeRule {
         case .auto: abs(place.latitude) > 48 ? .seventhOfTheNight : .middleOfTheNight
