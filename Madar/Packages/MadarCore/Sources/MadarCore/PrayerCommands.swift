@@ -26,6 +26,7 @@ public enum PrayerMutation: Codable, Equatable, Sendable {
     case record(PrayerReference, status: PrayerStoredStatus, heart: PrayerHeart?, shortened: Bool?, fridayKind: FridayPrayerKind? = nil)
     case makeUp(PrayerReference, at: Date? = nil, fridayKind: FridayPrayerKind? = nil)
     case addOldMissed(PrayerReference, fridayKind: FridayPrayerKind? = nil)
+    case restoreOldMissed(PrayerReference, fridayKind: FridayPrayerKind? = nil)
     case markUnrecorded([PrayerReference])
     case resolveGap([PrayerGapResolution])
     case answerHeart(PrayerReference, PrayerHeart?)
@@ -61,7 +62,17 @@ extension PrayerMutation {
         case "prayer.clear":
             let value = try ref(payload)
             return (.clear(value), "prayer." + value.naturalKey)
-        case "prayer.makeUp", "prayer.addOldMissed":
+        case "prayer.addOldMissed":
+            guard Set(payload.keys).isSubset(of: ["dayKey", "prayer", "fridayKind", "restoreDeleted"]) else { throw CoreError.invalidCommand }
+            let value = try ref(payload.filter { $0.key != "fridayKind" && $0.key != "restoreDeleted" })
+            let kind: FridayPrayerKind?
+            if let raw = payload["fridayKind"], raw != .null {
+                guard case .string(let text) = raw, let parsed = FridayPrayerKind(rawValue: text) else { throw CoreError.invalidCommand }; kind = parsed
+            } else { kind = nil }
+            var restoring = false
+            if let raw = payload["restoreDeleted"] { guard case .bool(let flag) = raw else { throw CoreError.invalidCommand }; restoring = flag }
+            return (restoring ? .restoreOldMissed(value, fridayKind: kind) : .addOldMissed(value, fridayKind: kind), "prayer." + value.naturalKey)
+        case "prayer.makeUp":
             guard Set(payload.keys).isSubset(of: ["dayKey", "prayer", "fridayKind", "at"]) else { throw CoreError.invalidCommand }
             let value = try ref(payload.filter { $0.key != "fridayKind" && $0.key != "at" })
             let fridayKind: FridayPrayerKind?

@@ -119,6 +119,15 @@ final class AppSession {
         sendPrayerCommand(name: "prayer.log", payload: payload,
             undoMessage: status == .missed ? "سُجّلت فائتة · التراجع متاح لعشر دقائق" : "سُجّلت الصلاة · التراجع متاح لعشر دقائق", completion: completion)
     }
+    func oldMissedRequiresRestore(_ reference: PrayerReference) throws -> Bool {
+        try PrayerRepository(context: ModelContext(container)).oldMissedRequiresRestore(reference)
+    }
+    func addOldMissedPrayer(_ reference: PrayerReference, fridayKind: FridayPrayerKind?, restoreDeleted: Bool = false, completion: ((Bool) -> Void)? = nil) {
+        sendPrayerCommand(name: "prayer.addOldMissed", payload: .object([
+            "dayKey": .string(reference.day.description), "prayer": .string(reference.prayer.rawValue),
+            "fridayKind": fridayKind.map { .string($0.rawValue) } ?? .null, "restoreDeleted": .bool(restoreDeleted)
+        ]), undoMessage: "أُضيفت الفائتة القديمة · التراجع متاح لعشر دقائق", completion: completion)
+    }
     func qiyamRequiresRestore(_ night: GregorianDay) throws -> Bool {
         try PrayerRepository(context: ModelContext(container)).nightRequiresRestore(night)
     }

@@ -1,6 +1,32 @@
 import XCTest
 
 @MainActor final class FoundationUITests: XCTestCase {
+    func test_M1T09_OldMissedSaveUndoRestoreMakeUpAndRelaunch() throws {
+        continueAfterFailure = false
+        for size in ["L", "AX3"] {
+            let app = XCUIApplication()
+            app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": size,
+                "MADAR_UI_NOW": "2026-10-08T09:00:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-03", "MADAR_UI_THEME": "light"]
+            app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+            let add = app.buttons["prayer-old-missed"]; scrollTo(add, in: app); add.tap()
+            let save = app.buttons["prayer-old-save"]; scrollTo(save, in: app)
+            attachScreenshot(app, named: "M1-T09-old-missed-\(size)"); save.tap()
+            let undo = app.buttons["undo-button"]; XCTAssertTrue(undo.waitForExistence(timeout: 15)); undo.tap()
+            scrollTo(add, in: app); add.tap()
+            let restore = app.buttons["prayer-old-restore"]; scrollTo(restore, in: app)
+            XCTAssertFalse(save.exists); restore.tap(); app.buttons["أعد التسجيل"].firstMatch.tap()
+            XCTAssertTrue(undo.waitForExistence(timeout: 15))
+            app.terminate(); app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+            let row = app.descendants(matching: .any).matching(identifier: "prayer-qada-row-2026-10-02-fajr").firstMatch
+            scrollTo(row, in: app); XCTAssertTrue(row.exists)
+            let makeup = app.buttons["prayer-qada-makeup"]; scrollTo(makeup, in: app); makeup.tap()
+            let confirm = app.buttons["prayer-makeup-confirm"]; scrollTo(confirm, in: app); confirm.tap()
+            XCTAssertTrue(undo.waitForExistence(timeout: 15)); undo.tap()
+            scrollTo(makeup, in: app); XCTAssertTrue(makeup.isEnabled)
+            app.terminate()
+        }
+    }
+
     func test_M1T08_OffsetsAffectBothClockScreensResetUndoAndRelaunch() throws {
         continueAfterFailure = false
         for size in ["L", "AX3"] {

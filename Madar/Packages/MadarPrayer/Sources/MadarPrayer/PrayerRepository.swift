@@ -57,6 +57,9 @@ import MadarData
         case .isha: return occurrence(.init(day: ref.day.adding(days: 1), prayer: .fajr))?.time
         }
     }
+    public func oldMissedRequiresRestore(_ ref: PrayerReference) -> Bool {
+        log(ref, includeDeleted: true)?.deletedAt != nil || qada(ref, includeDeleted: true)?.deletedAt != nil
+    }
     public func tracking(at now: Date) throws -> PrayerTracking {
         let value = try settings.value(for: "salah.trackingStart").object ?? [:]
         let start = value["dayKey"]?.string.flatMap { try? GregorianDay($0) } ?? prayerDay(at: now)

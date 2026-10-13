@@ -97,7 +97,7 @@ private struct ReceiptWire: Codable {
                                        undoExpiresAt: row.undoExpiresAt ?? row.createdAt,
                                        undoJSON: row.undoJSON,
                                        outcome: .init(status: CommandStatus(rawValue: row.status) ?? .rejected,
-                                                      undoToken: row.status == "applied" && ["prayer.log", "prayer.makeUp", "prayer.resolveGap", "prayer.setHeart", "prayer.logQiyam", "settings.set", "settings.applyPreset"].contains(row.name) ? id : nil))
+                                                      undoToken: row.status == "applied" && ["prayer.log", "prayer.makeUp", "prayer.resolveGap", "prayer.setHeart", "prayer.logQiyam", "prayer.addOldMissed", "settings.set", "settings.applyPreset"].contains(row.name) ? id : nil))
                 return try JSONDecoder().decode(CoreCommandReceipt.self, from: JSONEncoder().encode(wire))
             }
             // Receipt identity is authoritative even after undo/deletion or retention expiry.
@@ -181,6 +181,13 @@ private struct ReceiptWire: Codable {
                 } catch let error as PrayerDomainError {
                     return .init(status: .rejected, reason: String(describing: error))
                 }
+            case .addOldMissedPrayer(let ref, let kind, let restoring):
+                let mutation: PrayerMutation = restoring ? .restoreOldMissed(ref, fridayKind: kind) : .addOldMissed(ref, fridayKind: kind)
+                do {
+                    if let undo = try PrayerMutationHandler.stage(operation: mutation, in: context, now: now, writer: writer, source: request.envelope.source) {
+                        inverse = SettingsInverse(settings: [:], afterSettings: [:], layouts: [:], afterLayouts: [:], prayerMutation: undo)
+                    }
+                } catch let error as PrayerDomainError { return .init(status: .rejected, reason: String(describing: error)) }
             case .recordQiyamNight(let night, let rakaat, let witr, let restoring):
                 let mutation: PrayerMutation = restoring ? .restoreQiyam(night: night, rakaat: rakaat, witr: witr) : .logQiyam(night: night, rakaat: rakaat, witr: witr)
                 do {

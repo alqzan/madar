@@ -27,7 +27,7 @@ struct PrayerTodayView: View {
                         if snapshot.statistics.denominator >= 5 { statisticsCard(snapshot) }
                         Button("سجلّ الصلاة") { selectedSheet = .statistics }
                             .frame(minHeight: 44).accessibilityIdentifier("prayer-history")
-                        if !snapshot.qada.isEmpty { qadaCard(snapshot) }
+                        qadaCard(snapshot)
                         qiyamCard(snapshot)
                         MadarCard {
                             Text("ما لم تُسجّله يبقى غير محسوم؛ لا ينشأ قضاء تلقائيًا.")
@@ -53,6 +53,10 @@ struct PrayerTodayView: View {
         .sheet(item: $selectedSheet) { route in
             Group {
             switch route {
+            case .oldMissed:
+                if let snapshot = try? session.prayerSnapshot(at: session.prayerNow()) {
+                    PrayerOldMissedSheet(session: session, trackingStart: snapshot.tracking.day, finished: { selectedSheet = nil })
+                }
             case .qiyam:
                 if let snapshot = try? session.prayerSnapshot(at: session.prayerNow()) {
                     PrayerNightLoggingSheet(session: session, snapshot: snapshot, finished: { selectedSheet = nil })
@@ -210,6 +214,8 @@ struct PrayerTodayView: View {
                 Text("الفوائت والقضاء").font(MadarTypography.cardTitle())
                 Text("\(number(snapshot.qada.count)) فوائت مسجّلة، \(number(snapshot.statistics.owed)) لم تُقضَ")
                     .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                Button("أضف فائتة قديمة") { selectedSheet = .oldMissed }
+                    .frame(minHeight: 44).accessibilityIdentifier("prayer-old-missed")
                 PrayerQadaCitation()
                 ForEach(shown) { item in
                     HStack {
@@ -382,10 +388,12 @@ private enum PrayerTodaySheet: Identifiable {
     case statistics
     case heart(PrayerCell)
     case qiyam
+    case oldMissed
     case makeUp(PrayerQada, isFridayNoon: Bool, dateLabel: String)
     case recovery([PrayerReference], Set<PrayerReference>, TimeZone)
     var id: String {
         switch self {
+        case .oldMissed: "old-missed"
         case .qiyam: "qiyam"
         case .statistics: "statistics"
         case .heart(let cell): "heart-\(cell.reference.naturalKey)"
@@ -966,4 +974,67 @@ private struct PrayerNightLoggingSheet: View {
             source: HijriSource(rawValue: session.string("core.hijriSource")) ?? .ummAlQura, sightingOffset: Int(session.number("core.hijriOffset")))
             .text(firstCalendar: session.string("core.firstCalendar") == "gregorian" ? .gregorian : .hijri, numerals: formatter.style)
     }
+}
+
+private struct PrayerOldMissedSheet: View {
+    @Bindable var session: AppSession
+    let trackingStart: GregorianDay
+    let finished: () -> Void
+    @State private var date: Date
+    @State private var prayer: Prayer = .fajr
+    @State private var fridayKind: FridayPrayerKind? = nil
+    @State private var confirmRestore = false
+    init(session: AppSession, trackingStart: GregorianDay, finished: @escaping () -> Void) {
+        self.session = session; self.trackingStart = trackingStart; self.finished = finished
+        _date = State(initialValue: trackingStart.adding(days: -1).date(in: session.activePlace.timeZone).addingTimeInterval(12 * 3600))
+    }
+    private var reference: PrayerReference { .init(day: GregorianDay.containing(date, in: session.activePlace.timeZone), prayer: prayer) }
+    private var fridayNoon: Bool { var calendar = Calendar(identifier: .gregorian); calendar.timeZone = session.activePlace.timeZone; return prayer == .dhuhr && calendar.component(.weekday, from: date) == 6 }
+    private var restoring: Bool { (try? session.oldMissedRequiresRestore(reference)) ?? true }
+    private var calendar: Calendar { var c = Calendar(identifier: session.string("core.firstCalendar") == "gregorian" ? .gregorian : .islamicUmmAlQura); c.timeZone = session.activePlace.timeZone; return c }
+    private var sightingOffset: Int {
+        session.string("core.firstCalendar") != "gregorian" && session.string("core.hijriSource") == "sighting" ? Int(session.number("core.hijriOffset")) : 0
+    }
+    private func shifted(_ value: Date, by days: Int) -> Date { calendar.date(byAdding: .day, value: days, to: value) ?? value }
+    private var pickerDate: Binding<Date> { Binding(get: { shifted(date, by: sightingOffset) }, set: { date = shifted($0, by: -sightingOffset) }) }
+    private var maximumDate: Date { shifted(trackingStart.date(in: session.activePlace.timeZone).addingTimeInterval(-1), by: sightingOffset) }
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Text("الفوائت القديمة لا تُضاف إلا باختيارك؛ ما قبل بداية التتبّع يبقى بلا تسجيل.")
+                    DatePicker("التاريخ", selection: pickerDate, in: ...maximumDate, displayedComponents: .date)
+                        .environment(\.calendar, calendar).environment(\.timeZone, session.activePlace.timeZone)
+                        .accessibilityIdentifier("prayer-old-date")
+                    Picker("الصلاة", selection: $prayer) {
+                        ForEach(Prayer.allCases, id: \.self) { Text(title($0)).tag($0) }
+                    }.accessibilityIdentifier("prayer-old-prayer")
+                    if fridayNoon {
+                        Picker("فرض ظهر الجمعة", selection: $fridayKind) {
+                            Text("اختر النوع").tag(Optional<FridayPrayerKind>.none)
+                            Text("الجمعة").tag(Optional(FridayPrayerKind.jumuah))
+                            Text("الظهر").tag(Optional(FridayPrayerKind.dhuhr))
+                        }.accessibilityIdentifier("prayer-old-friday")
+                    }
+                }
+                Section {
+                    if restoring {
+                        Text("سبق حذف هذا التسجيل أو التراجع عنه؛ إعادته تحتاج اختيارًا صريحًا.")
+                        Button("أعد تسجيل الفائتة") { confirmRestore = true }.accessibilityIdentifier("prayer-old-restore")
+                    } else {
+                        Button("أضف الفائتة") { save(false) }.accessibilityIdentifier("prayer-old-save")
+                    }
+                }.disabled(session.prayerWriteInProgress || (fridayNoon && fridayKind == nil))
+            }
+            .navigationTitle("فائتة قديمة").navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("إغلاق") { finished() } } }
+            .confirmationDialog("أعد تسجيل هذه الفائتة؟", isPresented: $confirmRestore, titleVisibility: .visible) {
+                Button("أعد التسجيل") { save(true) }
+            }
+            .onChange(of: date) { _, _ in fridayKind = nil }
+            .onChange(of: prayer) { _, _ in fridayKind = nil }
+        }
+    }
+    private func save(_ restore: Bool) { session.addOldMissedPrayer(reference, fridayKind: fridayNoon ? fridayKind : nil, restoreDeleted: restore) { success in if success { finished() } } }
+    private func title(_ prayer: Prayer) -> String { switch prayer { case .fajr: "الفجر"; case .dhuhr: "الظهر"; case .asr: "العصر"; case .maghrib: "المغرب"; case .isha: "العشاء" } }
 }

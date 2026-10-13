@@ -19,3 +19,7 @@ P05 uses Isha–Fajr and seven eligible nights; fractional/future/out-of-window 
 Author evidence: `swift test --package-path Madar/Packages/MadarPrayer --filter qiyamRakaatContract`: 1/1; Commands `--filter test_M1T07`: 1/1 after bound repair. Native `test_M1T07_QiyamSaveRelaunchUndoRestoreAndAX3`: 1/0 in 76.606s, `/tmp/madar-t07-qiyam-range-20261013.xcresult`; earlier same flow 1/0 in 77.370s. L/AX3 screenshots inspected. Reviewer did not run tests or use simulator.
 
 Not verified: owner iPhone, cross-room Quran integration or distribution.
+
+## M1-T09 — old missed and explicit restore — 2026-10-13
+
+Independent read-only reviewer requested GPT-6 Luna/max; actual identity/effort not exposed. Reviewed only the T09 command/domain/writer/UI diff against `03347b6`/`2c326de`. No actionable findings. Normal save rejects tombstones; confirmed restore retains deletion barriers and advances restoredAt for log/debt. Old entries precede trackingStart, remain outside its denominator, and retain owed count. No model field/schema/automatic aging. Review ran no tests/simulator. Native sighting-date projection was subsequently adjusted in UI only; writer source unchanged.

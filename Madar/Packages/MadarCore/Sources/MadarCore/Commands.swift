@@ -47,6 +47,7 @@ public enum CommandOperation: Codable, Equatable, Sendable {
     case makeUpPrayer(dayKey: String, prayer: Prayer, at: Date, fridayKind: String?)
     case resolvePrayerGap([PrayerGapResolution])
     case answerPrayerHeart(PrayerReference, PrayerHeart?)
+    case addOldMissedPrayer(PrayerReference, fridayKind: FridayPrayerKind?, restoreDeleted: Bool)
     case recordQiyamNight(night: GregorianDay, rakaat: Int, witr: Bool, restoreDeleted: Bool)
 }
 public struct CoreCommandReceipt: Codable, Equatable, Sendable {
@@ -107,7 +108,7 @@ public protocol CommandStoreAdapter: Sendable {
 public struct CommandBus: Sendable {
     // Names implemented by this milestone. Unknown and later-room names are invalid
     // before authorization, so they cannot become indefinitely recoverable needsApp work.
-    public static let appOnlyCommandNames: Set<String> = ["settings.set", "settings.applyPreset", "preset.save", "core.completeOnboarding", "system.undo", "prayer.makeUp", "prayer.resolveGap", "prayer.setHeart", "prayer.logQiyam"]
+    public static let appOnlyCommandNames: Set<String> = ["settings.set", "settings.applyPreset", "preset.save", "core.completeOnboarding", "system.undo", "prayer.makeUp", "prayer.resolveGap", "prayer.setHeart", "prayer.logQiyam", "prayer.addOldMissed"]
     public static let supportedCommandNames = appOnlyCommandNames.union(["prayer.log"])
     private let adapter: any CommandStoreAdapter
     public init(adapter: any CommandStoreAdapter) { self.adapter = adapter }
@@ -141,6 +142,16 @@ public struct CommandBus: Sendable {
             if shortened == true && (prayer == .fajr || prayer == .maghrib) { return .init(status: .rejected, reason: "invalidShortening") }
             operation = .logPrayer(dayKey: dayKey, prayer: prayer, status: status, heart: heart, shortened: shortened, fridayKind: fridayKind)
             semantics = .upsert; naturalKey = "prayer." + dayKey + "." + prayer.rawValue
+        case "prayer.addOldMissed":
+            do {
+                let (mutation, key) = try PrayerMutation.parse(name: envelope.name, payload: payload)
+                switch mutation {
+                case .addOldMissed(let ref, let kind): operation = .addOldMissedPrayer(ref, fridayKind: kind, restoreDeleted: false)
+                case .restoreOldMissed(let ref, let kind): operation = .addOldMissedPrayer(ref, fridayKind: kind, restoreDeleted: true)
+                default: return .init(status: .rejected, reason: "invalidPayload")
+                }
+                semantics = .upsert; naturalKey = key
+            } catch { return .init(status: .rejected, reason: "invalidPayload") }
         case "prayer.logQiyam":
             do {
                 let (mutation, key) = try PrayerMutation.parse(name: envelope.name, payload: payload)
