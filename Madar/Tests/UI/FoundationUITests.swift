@@ -68,6 +68,38 @@ import XCTest
         app.terminate()
     }
 
+    /// M1-F03: the tracking start can be edited once from «خصّص الصلاة»; the second edit is not offered.
+    func test_M1F03_TrackingStartEditsOnce() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
+            "MADAR_UI_NOW": "2026-10-13T09:00:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-10", "MADAR_UI_THEME": "light"]
+        app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+        let open = app.buttons["prayer-customize"]
+        XCTAssertTrue(open.waitForExistence(timeout: 10), app.debugDescription)
+        open.tap()
+        let log = app.buttons["prayer-customize-card-log"]; scrollTo(log, in: app); log.tap()
+        let edit = app.buttons["prayer-tracking-edit"]; scrollTo(edit, in: app)
+        attachScreenshot(app, named: "M1-F03-tracking-L")
+        edit.tap()
+        attachScreenshot(app, named: "M1-F03-tracking-editing-L")
+        let save = app.buttons["prayer-tracking-save"]
+        XCTAssertTrue(save.waitForExistence(timeout: 5), app.debugDescription)
+        save.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        let confirm = app.buttons["احفظ البداية"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 8), app.debugDescription)
+        attachScreenshot(app, named: "M1-F03-tracking-confirm-L")
+        confirm.tap()
+        let done = app.descendants(matching: .any).matching(identifier: "prayer-tracking-done").firstMatch
+        _ = done.waitForExistence(timeout: 10)
+        attachScreenshot(app, named: "M1-F03-tracking-after-L")
+        XCTAssertTrue(done.exists, app.alerts.firstMatch.label + " " + app.staticTexts.allElementsBoundByIndex.prefix(40).map(\.label).joined(separator: " | "))
+        XCTAssertFalse(app.buttons["prayer-tracking-edit"].exists, "A second edit is not offered")
+        XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "prayer-tracking-start").firstMatch.label.contains("-"), "The start shows in words, not ISO")
+        attachScreenshot(app, named: "M1-F03-tracking-done-L")
+        app.terminate()
+    }
+
     /// M1-V10: «خصّص الصلاة», for comparison with screens/flex/06-K-Salah(-s1).jpg; order and hide change the home.
     func test_M1V10_CustomizePrayerReordersAndHidesHomeBlocks() throws {
         continueAfterFailure = false

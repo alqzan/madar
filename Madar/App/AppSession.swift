@@ -143,6 +143,11 @@ final class AppSession {
             "heart": heart.map { .string($0.rawValue) } ?? .null
         ]), undoMessage: "حُفظت إجابة القلب · التراجع متاح لعشر دقائق", completion: completion)
     }
+    /// P04: the tracking start moves once, up to 30 days before the first run. The engine enforces both limits.
+    func editPrayerTrackingStart(_ day: GregorianDay, completion: ((Bool) -> Void)? = nil) {
+        sendPrayerCommand(name: "prayer.editTrackingStart", payload: .object(["dayKey": .string(day.description)]),
+            undoMessage: "عُدّلت بداية التتبّع · التراجع متاح لعشر دقائق", completion: completion)
+    }
     func makeUpPrayer(_ reference: PrayerReference, fridayKind: FridayPrayerKind? = nil, completion: ((Bool) -> Void)? = nil) {
         let at = prayerNow()
         let formatter = ISO8601DateFormatter(); formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -207,6 +212,8 @@ final class AppSession {
         case "beforeTrackingStart": "هذا اليوم يسبق بداية التسجيل."
         case "explicitRestoreRequired": "يتطلب هذا السجل استعادة صريحة."
         case "invalidRecord": "نوع الجمعة متاح لظهر الجمعة فقط."
+        case "trackingAlreadyEdited": "اكتمل التعديل الوحيد لبداية التتبّع."
+        case "invalidTrackingStart": "البداية خارج المدى: حتى ثلاثين يومًا قبل أول تشغيل."
         default: "لم تُسجّل الصلاة. حاول مرة أخرى."
         }
     }

@@ -33,7 +33,7 @@ Every screen card follows protocol §2: canonical files → default-size screens
 |---|---|---|---|---|
 | M1-F01 | Friday screen with explicit Jumu'ah/Dhuhr choice and the tall Friday arch | `salah/09-S8-Friday.jpg`, `-s1`; RP5 | matched — awaiting owner | `fridayKind` is already stored (T01). `salah.fridayTallArch` default true. Built: the «جمعة مباركة» pill (no «الكهف في قسم القرآن» pointer: no entry to the Quran room yet), tall dome «الجمعة» arch, and the explicit Jumu'ah/Dhuhr choice in the log and make-up sheets (V02, V06). Fixture `homeShowcaseFriday` (UI-test only). Differences: the pill is narrower than the canonical (shorter text); pending notice comes from the fixture. Compare page: `Madar/Artifacts/compare/S8-Friday.html`.|
 | M1-F02 | Travel: ask once, method per trip, shorten/combine without pre-pairing | `salah/10-S9-Travel.jpg`, `-s1`; RP4, RP7 | ready after V | Show «خارج مدينتك» until answered. Fixtures: London with MWL, Istanbul with Turkey. Needs `Trip.calcMethod` (data change → one independent review). |
-| M1-F03 | Edit the tracking start date once | §7.2 P04, `salah.trackingStart` | ready after V | |
+| M1-F03 | Edit the tracking start date once | §7.2 P04, `salah.trackingStart` | matched — awaiting owner | Built in «خصّص الصلاة» → التسجيل: the start in words, one edit (date picker up to 30 days before first run), confirm dialog, then «اكتمل التعديل الوحيد». New command `prayer.editTrackingStart` is now accepted by the command bus (it was parsed but not routed); undo is available for ten minutes. No canonical screen exists for this row, so there is no compare page. |
 | M1-F04 | Outside the app: next-prayer widget, lock-screen widgets, countdown | `salah/11-S10-Abwab.jpg`; §9; RL7, RP9, RU2 | ready after V | Widgets read JSON snapshots only. Default shows only the next prayer and its time. |
 | M1-F05 | Import the old prayer history | §7.2, `Madar/docs/MIGRATION.md` | blocked: needs the owner's go and a synthetic fixture first | Never open or migrate the owner's real store without explicit permission. |
 | M1-G | M1 gate on the owner's iPhone | §12/§13 M1, `docs/reports/M1.md` | blocked: needs the owner's iPhone run | Fill the gate table only at the gate. |
@@ -71,6 +71,15 @@ M1 gate, then M2 Quran, M3 Diary, M4 Lobby + Habits + Widgets, M5 Money, M6 Mihb
 
 # Handovers
 
+## Handover — M1-F03 tracking start — 2026-10-13 — claude
+
+Works now: «خصّص الصلاة» → التسجيل shows the tracking start in words and lets the owner move it once, up to 30 days before first run; afterwards only «اكتمل التعديل الوحيد» shows. Fix: `prayer.editTrackingStart` was parsed but the bus rejected it as `unavailableInM0`; it is now routed (MadarCore `Commands.swift`, MadarCommands adapter).
+Verified: UI test F03 passed at default size; package tests passed (MadarCore 29, MadarCommands 23, MadarPrayer 18); screenshots `Madar/Artifacts/m1-gap-shots/M1-F03-*.png`.
+Differences left: no canonical screen for this row; the date picker shows the system's own digits.
+Not verified: owner iPhone; picking a date other than the current start through the picker; undo of the edit; the pending days that appear after moving the start back.
+Next: M1-F02 (travel) or M1-F04 (outside the app).
+Model/effort: Claude Sonnet 5.5; effort not exposed. Usage: not exposed.
+
 ## Handover — M1-F01 Friday home — 2026-10-13 — claude
 
 Works now: on a Friday the home shows «جمعة مباركة» and the tall dome «الجمعة» arch; the Jumu'ah/Dhuhr choice was already in the log and make-up sheets.
@@ -87,15 +96,6 @@ Verified: UI test V10 (reorder qiyam, hide Hali, home follows) and V01/V07/V08 p
 Differences left: see the board row.
 Not verified: owner iPhone; relaunch persistence of the layout; the notification-permission card inside the reminders group.
 Next: M1-V11 or the next `ready` card on the board.
-Model/effort: Claude Sonnet 5.5; effort not exposed. Usage: not exposed.
-
-## Handover — M1-V09 Mizan beads — 2026-10-13 — claude
-
-Works now: the beads Mizan (variant A of S11) is the card in «حالي», built in M1-V04; no code change.
-Verified: no new run; V04 test and screenshot from the earlier commit are the evidence.
-Differences left: see the board row.
-Not verified: owner iPhone.
-Next: M1-V10 (customize prayer, `flex/06-K-Salah`).
 Model/effort: Claude Sonnet 5.5; effort not exposed. Usage: not exposed.
 
 Earlier handovers: `docs/archive/PROGRESS-2026-10-13.md`.

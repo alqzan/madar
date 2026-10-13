@@ -49,6 +49,7 @@ public enum CommandOperation: Codable, Equatable, Sendable {
     case answerPrayerHeart(PrayerReference, PrayerHeart?)
     case addOldMissedPrayer(PrayerReference, fridayKind: FridayPrayerKind?, restoreDeleted: Bool)
     case recordQiyamNight(night: GregorianDay, rakaat: Int, witr: Bool, restoreDeleted: Bool)
+    case editPrayerTrackingStart(GregorianDay)
 }
 public struct CoreCommandReceipt: Codable, Equatable, Sendable {
     public let commandID: UUID
@@ -108,7 +109,7 @@ public protocol CommandStoreAdapter: Sendable {
 public struct CommandBus: Sendable {
     // Names implemented by this milestone. Unknown and later-room names are invalid
     // before authorization, so they cannot become indefinitely recoverable needsApp work.
-    public static let appOnlyCommandNames: Set<String> = ["settings.set", "settings.applyPreset", "preset.save", "core.completeOnboarding", "system.undo", "prayer.makeUp", "prayer.resolveGap", "prayer.setHeart", "prayer.logQiyam", "prayer.addOldMissed"]
+    public static let appOnlyCommandNames: Set<String> = ["settings.set", "settings.applyPreset", "preset.save", "core.completeOnboarding", "system.undo", "prayer.makeUp", "prayer.resolveGap", "prayer.setHeart", "prayer.logQiyam", "prayer.addOldMissed", "prayer.editTrackingStart"]
     public static let supportedCommandNames = appOnlyCommandNames.union(["prayer.log"])
     private let adapter: any CommandStoreAdapter
     public init(adapter: any CommandStoreAdapter) { self.adapter = adapter }
@@ -151,6 +152,12 @@ public struct CommandBus: Sendable {
                 default: return .init(status: .rejected, reason: "invalidPayload")
                 }
                 semantics = .upsert; naturalKey = key
+            } catch { return .init(status: .rejected, reason: "invalidPayload") }
+        case "prayer.editTrackingStart":
+            do {
+                let (mutation, key) = try PrayerMutation.parse(name: envelope.name, payload: payload)
+                guard case .editTrackingStart(let day) = mutation else { return .init(status: .rejected, reason: "invalidPayload") }
+                operation = .editPrayerTrackingStart(day); semantics = .upsert; naturalKey = key
             } catch { return .init(status: .rejected, reason: "invalidPayload") }
         case "prayer.logQiyam":
             do {
