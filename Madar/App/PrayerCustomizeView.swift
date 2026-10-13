@@ -89,7 +89,7 @@ struct PrayerCustomizeView: View {
     }
     private func subtitle(_ group: CustomizeGroup) -> String {
         switch group.id {
-        case "riwaq": return session.bool("salah.showMosqueStreak") ? "سلسلة المسجد ظاهرة" : "سلسلة المسجد مخفية"
+        case "riwaq": return session.bool("salah.showMosqueStreak") ? "سلسلة الجماعة ظاهرة" : "سلسلة الجماعة مخفية"
         case "log": return session.bool("salah.askHeart") ? "اسألني عن القلب" : "بلا سؤال القلب"
         case "times": return label("salah.method") + " · " + label("salah.asr")
         default: return session.bool("salah.askReminder") ? "بعد الأذان بـ \(session.digits(Int(session.number("salah.askAfterAdhanMin")))) دقيقة" : "بلا تذكير"

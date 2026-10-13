@@ -175,6 +175,64 @@
         }
       }
     },
+    "prayer.lastDays": {
+      "comment": "Prayer home Hali card: «the last N days» inside a streak qualifier. Argument 1 chooses the Arabic plural; argument 2 supplies core.numerals display digits.",
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%#@count@"
+          },
+          "substitutions": {
+            "count": {
+              "argNum": 1,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "zero": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "آخر %2$@ يوم"
+                    }
+                  },
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "آخر يوم"
+                    }
+                  },
+                  "two": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "آخر يومين"
+                    }
+                  },
+                  "few": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "آخر %2$@ أيام"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "آخر %2$@ يومًا"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "آخر %2$@ يوم"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "prayer.remaining": {
       "comment": "Prayer home: argument 1 chooses the Arabic plural; argument 2 supplies core.numerals display digits. Prayers of today not recorded yet.",
       "extractionState": "manual",

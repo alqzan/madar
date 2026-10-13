@@ -14,6 +14,17 @@ public struct PrayerNextSnapshot: Codable, Sendable, Equatable {
     public var numerals: String
     public init(items: [Item], numerals: String) { self.items = items.sorted { $0.at < $1.at }; self.numerals = numerals }
 
+    /// Retains today's and tomorrow's prayer times, including prayers that have
+    /// already occurred today. Controls need today's Fajr to resolve the prayer
+    /// day, and earlier times to validate a selected prayer.
+    public static func itemsForTodayAndTomorrow(_ items: [Item], at instant: Date, timeZone: TimeZone) -> [Item] {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let today = calendar.startOfDay(for: instant)
+        guard let end = calendar.date(byAdding: .day, value: 2, to: today) else { return [] }
+        return items.filter { $0.at >= today && $0.at < end }
+    }
+
     public struct State: Sendable, Equatable {
         public var item: Item
         /// Whole minutes until the prayer, never negative.

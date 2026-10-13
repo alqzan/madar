@@ -596,13 +596,16 @@ final class AppSession {
         for offset in [0, 1] {
             guard let day = try? prayerSnapshot(at: instant.addingTimeInterval(Double(offset) * 86_400)).today else { continue }
             for cell in day.cells {
-                guard let at = cell.prayerTime, at > instant.addingTimeInterval(-3_600), !items.contains(where: { $0.at == at }) else { continue }
+                guard let at = cell.prayerTime, !items.contains(where: { $0.at == at }) else { continue }
                 items.append(.init(prayer: cell.reference.prayer.rawValue, name: names[cell.reference.prayer] ?? "", at: at))
             }
         }
-        guard let last = items.map(\.at).max(), last > instant else { try? snapshotStore.remove("prayerNext"); return }
+        let snapshotItems = PrayerNextSnapshot.itemsForTodayAndTomorrow(
+            items, at: instant, timeZone: TimeZone(identifier: tzID) ?? .current
+        )
+        guard let last = snapshotItems.map(\.at).max(), last > instant else { try? snapshotStore.remove("prayerNext"); return }
         let envelope = SnapshotEnvelope(name: "prayerNext", generatedAt: instant, validUntil: last, dayKey: dayKey, tzID: tzID, privacy: SnapshotPrivacy(),
-                                        payload: PrayerNextSnapshot(items: items, numerals: string("core.numerals") == "western" ? "western" : "hindi"))
+                                        payload: PrayerNextSnapshot(items: snapshotItems, numerals: string("core.numerals") == "western" ? "western" : "hindi"))
         try? snapshotStore.write(envelope)
     }
 }

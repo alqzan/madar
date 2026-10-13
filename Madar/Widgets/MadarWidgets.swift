@@ -1,6 +1,7 @@
 import SwiftUI
 import WidgetKit
 import ActivityKit
+import AppIntents
 import MadarSnapshots
 
 private struct FoundationEntry: TimelineEntry {
@@ -40,6 +41,7 @@ private struct FoundationWidget: Widget {
         FoundationWidget()
         NextPrayerWidget()
         PrayerCountdownActivityWidget()
+        PrayerLogControl()
     }
 }
 

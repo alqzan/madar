@@ -19,6 +19,9 @@ import XCTest
             let asr = app.descendants(matching: .any).matching(identifier: "prayer-arch-asr").firstMatch
             XCTAssertTrue(asr.label.contains("وحدي"), asr.label)
             XCTAssertFalse(app.buttons["prayer-heart-review"].exists, "RP6: the heart question is off by default")
+            let hali = app.buttons["prayer-history"]
+            XCTAssertTrue(hali.waitForExistence(timeout: 5), app.debugDescription)
+            XCTAssertTrue(hali.label.contains("سلسلتك"), hali.label)
             attachScreenshot(app, named: "M1-V01-home-\(size)")
             let pending = app.buttons["prayer-pending-review"]
             XCTAssertTrue(pending.exists, app.debugDescription)

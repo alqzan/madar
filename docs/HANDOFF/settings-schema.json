@@ -1180,7 +1180,7 @@
    "key": "salah.showMosqueStreak",
    "owner": "salah",
    "section": "الرواق والميزان",
-   "title": "سلسلة المسجد",
+   "title": "سلسلة الجماعة",
    "type": "bool",
    "default": true,
    "scope": "sync",

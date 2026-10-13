@@ -301,6 +301,39 @@ import MadarData
         let state = try PrayerRepository(context: context).snapshot(now: time("2026-10-07T20:00:00+03:00"))
         #expect(state.statistics.onTime == 26 && state.statistics.denominator == 30 && state.statistics.percentage == 87)
         #expect(state.statistics.madeUp == 2 && state.statistics.owed == 2 && state.statistics.prayerStreak == 0)
+        #expect(state.statistics.completionStreak == 0)
+    }
+    @Test func completionStreakCountsFiveCompletedPrayersAndIncludesPaidQadaOnly() throws {
+        func result(for madeUpAt: Date?) throws -> PrayerStatistics {
+            let container = try container(start: "2026-10-01T12:00:00+03:00")
+            let context = container.mainContext
+            for day in ["2026-10-05", "2026-10-06"] {
+                for (index, prayer) in Prayer.allCases.enumerated() {
+                    let isQada = day == "2026-10-06" && index == 0
+                    let row = PrayerLog()
+                    row.dayKey = day
+                    row.prayer = prayer.rawValue
+                    row.status = isQada ? "qada" : "jamaah"
+                    row.eventAt = time("\(day)T05:00:00+03:00")
+                    row.tzID = "Asia/Riyadh"
+                    context.insert(row)
+                    if isQada {
+                        let debt = QadaItem()
+                        debt.originalDayKey = day
+                        debt.prayer = prayer.rawValue
+                        debt.madeUpAt = madeUpAt
+                        context.insert(debt)
+                    }
+                }
+            }
+            try context.save()
+            return try PrayerRepository(context: context)
+                .snapshot(now: time("2026-10-07T20:00:00+03:00")).statistics
+        }
+        let completed = try result(for: time("2026-10-07T05:00:00+03:00"))
+        #expect(completed.completionStreak == 2)
+        #expect(completed.prayerStreak == 0 && completed.congregationStreak == 0)
+        #expect(try result(for: nil).completionStreak == 0)
     }
     @Test func polarManualLogHasNoFabricatedAdhanOrDerivedPending() throws {
         let container = try container(start: "2026-06-21T12:00:00+02:00"); let context = container.mainContext

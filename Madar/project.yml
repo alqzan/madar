@@ -92,8 +92,12 @@ targets:
     sources:
       - Widgets
       - App/PrayerActivityAttributes.swift
+      - Intents/LogPrayerIntent.swift
+      - Intents/PrayerControlIntent.swift
     dependencies:
       - package: MadarSnapshots
+      - package: MadarInbox
+      - package: MadarCore
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.alqzan.madar2.widgets

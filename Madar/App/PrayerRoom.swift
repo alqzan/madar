@@ -433,8 +433,19 @@ struct PrayerStar: Shape {
 }
 struct PrayerHorseshoe: Shape {
     func path(in rect: CGRect) -> Path {
-        var path = Path(); let r = rect.width / 2; let center = CGPoint(x: rect.midX, y: rect.minY + r); let shoulder = center.y + r * 0.5
-        path.move(to: CGPoint(x: rect.minX + rect.width * 0.067, y: rect.maxY)); path.addLine(to: CGPoint(x: rect.minX + rect.width * 0.067, y: shoulder)); path.addArc(center: center, radius: r, startAngle: .degrees(150), endAngle: .degrees(390), clockwise: false); path.addLine(to: CGPoint(x: rect.maxX - rect.width * 0.067, y: rect.maxY)); path.closeSubpath(); return path
+        var path = Path()
+        let radius = rect.width / 2
+        let center = CGPoint(x: rect.midX, y: rect.minY + radius)
+        let shoulder = center.y + radius * 0.5
+        let left = rect.minX + rect.width * 0.067
+        let right = rect.maxX - rect.width * 0.067
+
+        path.move(to: CGPoint(x: left, y: rect.maxY))
+        path.addLine(to: CGPoint(x: left, y: shoulder))
+        path.addArc(center: center, radius: radius, startAngle: .degrees(150), endAngle: .degrees(390), clockwise: false)
+        path.addLine(to: CGPoint(x: right, y: rect.maxY))
+        // The fill closes this contour implicitly; the stroke stays open where the feet meet the waterline.
+        return path
     }
 }
 private struct PrayerArchView: View {

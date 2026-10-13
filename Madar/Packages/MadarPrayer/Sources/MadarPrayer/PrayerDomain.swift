@@ -29,13 +29,14 @@ public struct PrayerStatistics: Equatable, Sendable {
     public let madeUp: Int
     public let owed: Int
     public let prayerStreak: Int
-    public let mosqueStreak: Int
+    public let congregationStreak: Int
+    public let completionStreak: Int
     public let heartDistribution: [PrayerHeart: Int]
     public let last25: [PrayerCell]
     public let commitment: [Prayer: (jamaah: Int, alone: Int, denominator: Int)]
     public var percentage: Int? { denominator == 0 ? nil : Int((Double(onTime) / Double(denominator) * 100).rounded()) }
     public static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.onTime == rhs.onTime && lhs.denominator == rhs.denominator && lhs.madeUp == rhs.madeUp && lhs.owed == rhs.owed && lhs.prayerStreak == rhs.prayerStreak && lhs.mosqueStreak == rhs.mosqueStreak && lhs.heartDistribution == rhs.heartDistribution && lhs.last25 == rhs.last25 && Prayer.allCases.allSatisfy { lhs.commitment[$0]?.jamaah == rhs.commitment[$0]?.jamaah && lhs.commitment[$0]?.alone == rhs.commitment[$0]?.alone && lhs.commitment[$0]?.denominator == rhs.commitment[$0]?.denominator }
+        lhs.onTime == rhs.onTime && lhs.denominator == rhs.denominator && lhs.madeUp == rhs.madeUp && lhs.owed == rhs.owed && lhs.prayerStreak == rhs.prayerStreak && lhs.congregationStreak == rhs.congregationStreak && lhs.completionStreak == rhs.completionStreak && lhs.heartDistribution == rhs.heartDistribution && lhs.last25 == rhs.last25 && Prayer.allCases.allSatisfy { lhs.commitment[$0]?.jamaah == rhs.commitment[$0]?.jamaah && lhs.commitment[$0]?.alone == rhs.commitment[$0]?.alone && lhs.commitment[$0]?.denominator == rhs.commitment[$0]?.denominator }
     }
 }
 public struct PrayerQada: Equatable, Identifiable, Sendable {

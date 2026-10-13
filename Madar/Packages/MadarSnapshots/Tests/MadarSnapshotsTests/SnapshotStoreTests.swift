@@ -58,6 +58,23 @@ struct PrayerNextSnapshotTests {
         #expect(snapshot().state(at: base.addingTimeInterval(74 * 60 + 27))?.item.prayer == "isha")
         #expect(snapshot().state(at: base.addingTimeInterval(194 * 60)) == nil)
     }
+    @Test func todayAndTomorrowKeepTodaysFajrForControlsAfterItOccurred() throws {
+        let zone = try #require(TimeZone(identifier: "Asia/Riyadh"))
+        let formatter = ISO8601DateFormatter()
+        func instant(_ value: String) throws -> Date { try #require(formatter.date(from: value)) }
+        let candidates = [
+            PrayerNextSnapshot.Item(prayer: "isha", name: "العشاء", at: try instant("2026-10-12T19:30:00+03:00")),
+            PrayerNextSnapshot.Item(prayer: "fajr", name: "الفجر", at: try instant("2026-10-13T05:00:00+03:00")),
+            PrayerNextSnapshot.Item(prayer: "dhuhr", name: "الظهر", at: try instant("2026-10-13T12:00:00+03:00")),
+            PrayerNextSnapshot.Item(prayer: "fajr", name: "الفجر", at: try instant("2026-10-14T05:00:00+03:00"))
+        ]
+
+        let retained = PrayerNextSnapshot.itemsForTodayAndTomorrow(
+            candidates, at: try instant("2026-10-13T12:15:00+03:00"), timeZone: zone
+        )
+        #expect(retained.map(\.prayer) == ["fajr", "dhuhr", "fajr"])
+        #expect(retained.first?.at == (try instant("2026-10-13T05:00:00+03:00")))
+    }
     @Test func countdownUsesTwoFieldsAndTheChosenNumerals() {
         #expect(snapshot().countdown(minutes: 5) == "٠:٠٥")
         #expect(snapshot().countdown(minutes: 600) == "١٠:٠٠")
