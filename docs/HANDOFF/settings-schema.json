@@ -1263,6 +1263,53 @@
    "preset": false
   },
   {
+   "key": "salah.tripMethod",
+   "owner": "salah",
+   "section": "المواقيت",
+   "title": "طريقة الحساب في السفر",
+   "type": "choice",
+   "default": "ummAlQura",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "ummAlQura",
+     "label": "أم القرى"
+    },
+    {
+     "value": "mwl",
+     "label": "رابطة العالم الإسلامي"
+    },
+    {
+     "value": "egyptian",
+     "label": "الهيئة المصرية"
+    },
+    {
+     "value": "turkey",
+     "label": "تركيا (الديانت)"
+    },
+    {
+     "value": "isna",
+     "label": "أمريكا الشمالية (ISNA)"
+    },
+    {
+     "value": "dubai",
+     "label": "دبي"
+    },
+    {
+     "value": "kuwait",
+     "label": "الكويت"
+    },
+    {
+     "value": "qatar",
+     "label": "قطر"
+    }
+   ],
+   "note": "RP4: تُطبَّق على الرحلة النشطة فقط. تُسأل مرة عند بدء رحلة خارج السعودية ويُقترح محلّي المكان.",
+   "storage": "Setting (synced)",
+   "preset": false,
+   "reviewFix": "RP4"
+  },
+  {
    "key": "salah.asr",
    "owner": "salah",
    "section": "المواقيت",

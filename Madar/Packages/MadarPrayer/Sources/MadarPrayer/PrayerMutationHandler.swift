@@ -154,7 +154,7 @@ private struct PrayerInverse: Codable {
         case .logPair(let day, let pair, let status, let shortened, let mode):
             guard [.jamaah, .alone].contains(status), try repository.settings.value(for: "salah.travelShortenCombine") == .bool(true), let trip = repository.activeTrip(at: now) else { throw PrayerDomainError.noActiveTrip }
             let first = PrayerReference(day: day, prayer: pair.prayers[0]), second = PrayerReference(day: day, prayer: pair.prayers[1])
-            guard let times = PrayerTimesEngine.calculate(day: day, place: trip.place, options: repository.options), day == current, now >= times.time(for: mode == .taqdim ? first.prayer : second.prayer) else { throw PrayerDomainError.invalidPair }
+            guard let times = PrayerTimesEngine.calculate(day: day, place: trip.place, options: repository.tripOptions), day == current, now >= times.time(for: mode == .taqdim ? first.prayer : second.prayer) else { throw PrayerDomainError.invalidPair }
             if let a = repository.log(first), let b = repository.log(second), a.pairID != nil, a.pairID == b.pairID, a.status == status.rawValue, b.status == status.rawValue, a.shortened == (shortened && first.prayer != .maghrib), b.shortened == shortened { break }
             let pairID = StableIdentity.uuid(for: "PrayerPair:\(day):\(pair.rawValue)")
             for ref in [first, second] {

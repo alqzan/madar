@@ -8,6 +8,8 @@ import MadarData
     public let settings: SettingsStore
     public let home: ActivePlace
     public let options: PrayerCalculationOptions
+    /// RP4: options used for a trip's place. Only the method differs; offsets and Asr school still apply.
+    public let tripOptions: PrayerCalculationOptions
     public let placeName: String
     public let pendingDays: Int
     let logs: [PrayerLog]
@@ -21,6 +23,9 @@ import MadarData
         placeName = city["name"]?.string ?? "الرياض"
         let offsets = try settings.value(for: "salah.offsets").object ?? [:]
         options = try PrayerCalculationOptions(method: PrayerCalculationMethod(rawValue: settings.value(for: "salah.method").string ?? "") ?? .ummAlQura, hanafiAsr: settings.value(for: "salah.asr").string == "hanafi", highLatitudeRule: PrayerHighLatitudeRule(rawValue: settings.value(for: "salah.highLatitudeRule").string ?? "") ?? .auto, offsets: Dictionary(uniqueKeysWithValues: Prayer.allCases.map { ($0, Int(offsets[$0.rawValue]?.number ?? 0)) }), hijriSource: HijriSource(rawValue: settings.value(for: "core.hijriSource").string ?? "") ?? .ummAlQura, sightingOffset: Int(settings.value(for: "core.hijriOffset").number ?? 0))
+        var forTrip = options
+        forTrip.method = PrayerCalculationMethod(rawValue: try settings.value(for: "salah.tripMethod").string ?? "") ?? options.method
+        tripOptions = forTrip
         pendingDays = min(14, max(3, Int(try settings.value(for: "salah.pendingDays").number ?? 7)))
         logs = try context.fetch(FetchDescriptor<PrayerLog>()).filter { $0.mergedInto == nil }
         qadaRows = try context.fetch(FetchDescriptor<QadaItem>()).filter { $0.mergedInto == nil }
@@ -40,7 +45,7 @@ import MadarData
     public func occurrence(_ ref: PrayerReference) -> PrayerOccurrence? {
         guard let homeTimes = PrayerTimesEngine.calculate(day: ref.day, place: home, options: options) else { return nil }
         let base = homeTimes.time(for: ref.prayer)
-        if let trip = activeTrip(at: base), let times = PrayerTimesEngine.calculate(day: ref.day, place: trip.place, options: options) {
+        if let trip = activeTrip(at: base), let times = PrayerTimesEngine.calculate(day: ref.day, place: trip.place, options: tripOptions) {
             let actual = times.time(for: ref.prayer)
             if trip.start <= actual && (trip.end == nil || actual < trip.end!) { return .init(reference: ref, time: actual, place: trip.place, tripID: trip.id) }
         }
@@ -49,7 +54,7 @@ import MadarData
     public func missedWindowEnd(_ ref: PrayerReference) -> Date? {
         switch ref.prayer {
         case .fajr:
-            guard let fajr = occurrence(ref), let times = PrayerTimesEngine.calculate(day: ref.day, place: fajr.place, options: options) else { return nil }
+            guard let fajr = occurrence(ref), let times = PrayerTimesEngine.calculate(day: ref.day, place: fajr.place, options: fajr.tripID == nil ? options : tripOptions) else { return nil }
             return times.sunrise
         case .dhuhr: return occurrence(.init(day: ref.day, prayer: .asr))?.time
         case .asr: return occurrence(.init(day: ref.day, prayer: .maghrib))?.time
