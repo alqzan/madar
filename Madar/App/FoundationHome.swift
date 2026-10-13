@@ -72,17 +72,18 @@ struct FoundationHome: View {
     @Environment(\.roomTheme) private var theme
     var body: some View {
         TimelineView(.periodic(from: .now, by: 60)) { timeline in
+            let instant = session.prayerNow(timeline.date)
             let place = session.activePlace
             let options = prayerOptions
-            let today = FoundationPrayerTimesPresentation(instant: timeline.date, place: place, options: options, numerals: session.string("core.numerals") == "western" ? .western : .hindi)
+            let today = FoundationPrayerTimesPresentation(instant: instant, place: place, options: options, numerals: session.string("core.numerals") == "western" ? .western : .hindi)
             let prayerDays = [PrayerTimesEngine.calculate(day: today.day.adding(days: -1), place: place, options: options), today.prayerDay].compactMap { $0 }
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     HStack(alignment: .top) {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text(dateLine(timeline.date, primary: true, place: place, day: today.day, prayerDays: prayerDays)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                            Text(dateLine(instant, primary: true, place: place, day: today.day, prayerDays: prayerDays)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                             Text("يومك بين الصلوات").font(MadarTypography.title())
-                            Text(dateLine(timeline.date, primary: false, place: place, day: today.day, prayerDays: prayerDays)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                            Text(dateLine(instant, primary: false, place: place, day: today.day, prayerDays: prayerDays)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                         }
                         Spacer()
                         Button { session.selectedTab = "customize" } label: {

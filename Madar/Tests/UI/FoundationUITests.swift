@@ -1,6 +1,42 @@
 import XCTest
 
 @MainActor final class FoundationUITests: XCTestCase {
+    func test_M1T08_OffsetsAffectBothClockScreensResetUndoAndRelaunch() throws {
+        continueAfterFailure = false
+        for size in ["L", "AX3"] {
+            let app = XCUIApplication()
+            app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": size,
+                "MADAR_UI_NOW": "2026-10-07T20:00:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-07", "MADAR_UI_THEME": "light"]
+            app.launch(); finishOnboarding(app); app.buttons["settings-button"].tap()
+            let search = app.textFields["settings-search"]
+            scrollTo(search, in: app); search.tap(); search.typeText("salah.offsets\n")
+            let plus = app.buttons["offset-isha-plus"]
+            let value = app.staticTexts["offset-isha-value"]
+            scrollTo(plus, in: app)
+            for expected in ["١", "٢", "٣", "٤", "٥"] {
+                plus.tap()
+                let changed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", expected), object: value)
+                XCTAssertEqual(XCTWaiter.wait(for: [changed], timeout: 10), .completed)
+            }
+            attachScreenshot(app, named: "M1-T08-offsets-\(size)")
+            app.terminate(); app.launch(); finishOnboarding(app)
+            let clock = app.descendants(matching: .any).matching(identifier: "foundation-prayer-time-isha").firstMatch
+            scrollTo(clock, in: app); XCTAssertTrue(clock.label.contains("١٩:٠٩"), clock.label)
+            app.swipeDown(); app.tabBars.buttons["الصلاة"].tap()
+            let isha = app.descendants(matching: .any).matching(identifier: "prayer-arch-isha").firstMatch
+            scrollTo(isha, in: app); XCTAssertTrue(isha.label.contains("٧:٠٩"), isha.label)
+            app.terminate(); app.launch(); finishOnboarding(app); app.buttons["settings-button"].tap()
+            let reset = app.buttons["reset-settings"]
+            scrollTo(reset, in: app); reset.tap()
+            app.buttons["أعِد الافتراضي"].firstMatch.tap()
+            let undo = app.buttons["undo-button"]
+            XCTAssertTrue(undo.waitForExistence(timeout: 15)); undo.tap()
+            scrollTo(search, in: app); search.tap(); search.typeText("salah.offsets\n")
+            XCTAssertTrue(value.waitForExistence(timeout: 10)); XCTAssertEqual(value.label, "٥")
+            app.terminate()
+        }
+    }
+
     func test_M1T07_QiyamSaveRelaunchUndoRestoreAndAX3() throws {
         continueAfterFailure = false
         for size in ["L", "AX3"] {

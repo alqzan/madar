@@ -68,7 +68,7 @@ final class AppSession {
     })
     private var expiryTask: Task<Void, Never>?
 
-    static let supportedKeys = ["core.dayStart", "core.firstCalendar", "core.hijriSource", "core.hijriOffset", "core.weekStart", "core.theme", "core.numerals", "core.homeCity", "core.faceIDLock", "salah.askAfterAdhanMin", "salah.askReminder", "salah.liveActivity", "salah.showMosqueStreak", "salah.askHeart", "notif.thisDeviceReminders", "notif.quietAfterIsha", "notif.quietFrom"]
+    static let supportedKeys = ["core.dayStart", "core.firstCalendar", "core.hijriSource", "core.hijriOffset", "core.weekStart", "core.theme", "core.numerals", "core.homeCity", "core.faceIDLock", "salah.askAfterAdhanMin", "salah.askReminder", "salah.liveActivity", "salah.showMosqueStreak", "salah.askHeart", "salah.method", "salah.asr", "salah.highLatitudeRule", "salah.offsets", "notif.thisDeviceReminders", "notif.quietAfterIsha", "notif.quietFrom"]
 
     init(container: ModelContainer, managedStore: ManagedDataStore? = nil, groupDirectory: URL? = nil) throws {
         self.container = container
@@ -234,6 +234,7 @@ final class AppSession {
         try context.save()
     }
     #endif
+    var settingsWriteInProgress: Bool { pendingWrites > 0 || maintenanceInProgress }
     func string(_ key: String) -> String { if case .string(let v) = values[key] { v } else { "" } }
     func bool(_ key: String) -> Bool { if case .bool(let v) = values[key] { v } else { false } }
     func number(_ key: String) -> Double { if case .number(let v) = values[key] { v } else { 0 } }

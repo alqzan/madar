@@ -94,7 +94,7 @@ struct CustomizeMadar: View {
             return query.isEmpty || normalized(definition.title + " " + sectionFor(definition.key) + " " + definition.key).contains(normalized(query))
         }
     }
-    private var sections: [String] { ["اليوم والتقويم", "المظهر", "مدينتك", "الخصوصية", "الإشعارات", "الصلاة"].filter { section in filtered.contains { sectionFor($0.key) == section } } }
+    private var sections: [String] { ["اليوم والتقويم", "المظهر", "مدينتك", "الخصوصية", "الإشعارات", "الصلاة", "المواقيت"].filter { section in filtered.contains { sectionFor($0.key) == section } } }
     private let symbols = ["اليوم والتقويم": "calendar", "المظهر": "textformat", "مدينتك": "location", "الإشعارات": "bell.badge"]
     private var changesLabel: String {
         let count = session.schema.settings.filter { AppSession.supportedKeys.contains($0.key) && session.values[$0.key] != $0.defaultValue }.count
@@ -117,6 +117,7 @@ struct CustomizeMadar: View {
 
 func sectionFor(_ key: String) -> String {
     if ["core.dayStart", "core.firstCalendar", "core.hijriSource", "core.hijriOffset", "core.weekStart"].contains(key) { return "اليوم والتقويم" }
+    if ["salah.method", "salah.asr", "salah.highLatitudeRule", "salah.offsets"].contains(key) { return "المواقيت" }
     if key == "core.homeCity" { return "مدينتك" }
     if ["salah.showMosqueStreak", "salah.askHeart"].contains(key) { return "الصلاة" }
     if key == "core.faceIDLock" { return "الخصوصية" }
@@ -178,6 +179,18 @@ struct SettingControl: View {
                 Stepper(value: Binding(get: { Int(session.number(definition.key)) }, set: { session.set(.number(Double($0)), key: definition.key) }), in: integerRange) {
                     Text(session.digits(Int(session.number(definition.key))))
                 }.accessibilityIdentifier("setting-\(definition.key)")
+            case "map":
+                if definition.key == "salah.offsets" {
+                    ForEach(Prayer.allCases, id: \.self) { prayer in
+                        if dynamicType.isAccessibilitySize {
+                            VStack(alignment: .leading, spacing: 8) { Text(prayerTitle(prayer)); offsetControls(prayer) }
+                        } else {
+                            HStack { Text(prayerTitle(prayer)); Spacer(); offsetControls(prayer) }
+                        }
+                    }
+                    Text("التعديل بالدقائق من −٦٠ إلى ٦٠، ويُطبّق على المواقيت دون تغيير تسجيلاتك.")
+                        .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                }
             case "place": NavigationLink(session.cityName) { CityEditor(session: session) }.frame(minHeight: 44).accessibilityIdentifier("setting-\(definition.key)")
             case "time":
                 DatePicker(definition.title, selection: timeBinding, displayedComponents: .hourAndMinute)
@@ -188,6 +201,32 @@ struct SettingControl: View {
             default: EmptyView()
             }
         }
+    }
+    private var offsetRange: ClosedRange<Int> {
+        let limits = definition.contract?["range"]?.array?.compactMap(\.number) ?? [-60, 60]
+        return Int(limits[0])...Int(limits[1])
+    }
+    private func offset(_ prayer: Prayer) -> Int { Int(session.values[definition.key]?.object?[prayer.rawValue]?.number ?? 0) }
+    private func setOffset(_ prayer: Prayer, delta: Int) {
+        guard !session.settingsWriteInProgress else { return }
+        var values = session.values[definition.key]?.object ?? definition.defaultValue.object ?? [:]
+        values[prayer.rawValue] = .number(Double(min(offsetRange.upperBound, max(offsetRange.lowerBound, offset(prayer) + delta))))
+        session.set(.object(values), key: definition.key)
+    }
+    private func offsetControls(_ prayer: Prayer) -> some View {
+        HStack(spacing: 10) {
+            Button { setOffset(prayer, delta: -1) } label: { Image(systemName: "minus").frame(width: 44, height: 44).contentShape(Rectangle()) }
+                .accessibilityLabel("أنقص دقيقة من " + prayerTitle(prayer)).accessibilityIdentifier("offset-\(prayer.rawValue)-minus")
+                .disabled(session.settingsWriteInProgress || offset(prayer) <= offsetRange.lowerBound)
+            Text(session.digits(offset(prayer))).font(MadarTypography.body()).monospacedDigit()
+                .accessibilityIdentifier("offset-\(prayer.rawValue)-value")
+            Button { setOffset(prayer, delta: 1) } label: { Image(systemName: "plus").frame(width: 44, height: 44).contentShape(Rectangle()) }
+                .accessibilityLabel("زد دقيقة على " + prayerTitle(prayer)).accessibilityIdentifier("offset-\(prayer.rawValue)-plus")
+                .disabled(session.settingsWriteInProgress || offset(prayer) >= offsetRange.upperBound)
+        }
+    }
+    private func prayerTitle(_ prayer: Prayer) -> String {
+        switch prayer { case .fajr: "الفجر"; case .dhuhr: "الظهر"; case .asr: "العصر"; case .maghrib: "المغرب"; case .isha: "العشاء" }
     }
     private var timeBinding: Binding<Date> {
         Binding(get: {
