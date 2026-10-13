@@ -91,18 +91,21 @@ struct PrayerTodayView: View {
                         .toolbar { ToolbarItem(placement: .confirmationAction) { Button("تم") { selectedSheet = nil } } }
                 }
             case .log(let cell):
-                PrayerTodayLogSheet(cell: cell, isSaving: session.prayerWriteInProgress,
-                    answerHeart: session.bool("salah.askHeart") && [.jamaah, .alone, .qada].contains(cell.status) ? { selectedSheet = .heart(cell) } : nil) { status, fridayKind, makeUpNow in
-                    if status == .qada {
-                        session.makeUpPrayer(cell.reference, fridayKind: fridayKind)
-                    } else if status == .missed && makeUpNow {
-                        session.recordPrayer(cell.reference, status: .missed, fridayKind: fridayKind) { succeeded in
-                            if succeeded { session.makeUpPrayer(cell.reference, fridayKind: fridayKind) }
+                PrayerTodayLogSheet(cell: cell,
+                    clock: (cell.prayerTime ?? cell.time).map { clock($0, timeZone: session.activePlace.timeZone) } ?? "",
+                    askHeart: session.bool("salah.askHeart"), isSaving: session.prayerWriteInProgress,
+                    save: { status, fridayKind, makeUpNow, done in
+                        if status == .qada {
+                            session.makeUpPrayer(cell.reference, fridayKind: fridayKind, completion: done)
+                        } else if status == .missed && makeUpNow {
+                            session.recordPrayer(cell.reference, status: .missed, fridayKind: fridayKind) { succeeded in
+                                if succeeded { session.makeUpPrayer(cell.reference, fridayKind: fridayKind, completion: done) } else { done(false) }
+                            }
+                        } else {
+                            session.recordPrayer(cell.reference, status: status, fridayKind: fridayKind, completion: done)
                         }
-                    } else {
-                        session.recordPrayer(cell.reference, status: status, fridayKind: fridayKind)
-                    }
-                }
+                    },
+                    answerHeart: { heart, done in session.answerPrayerHeart(cell.reference, heart: heart, completion: done) })
             case .makeUp(let item, let isFridayNoon, let dateLabel):
                 PrayerMakeUpSheet(item: item, isFridayNoon: isFridayNoon, dateLabel: dateLabel, isSaving: session.prayerWriteInProgress) { kind in
                     session.makeUpPrayer(item.reference, fridayKind: kind)
@@ -881,92 +884,240 @@ private enum PrayerTodaySheet: Identifiable {
     }
 }
 
+/// S2 · the light log sheet, matched to `screens/salah/02-S2-Log.jpg` and `03-S2b-Missed.jpg`.
+/// One tap on a state records it (RP2: «فاتتني» is offered only once the window has ended and
+/// opens its make-up panel instead of saving); the heart question is inline and only when
+/// `salah.askHeart` is on (RP6); Friday noon records its kind explicitly (RP5).
+/// Not built: «امسح التسجيل» (screenshot only; the spec defines no clear command, see DECISIONS).
 private struct PrayerTodayLogSheet: View {
     let cell: PrayerCell
+    let clock: String
+    let askHeart: Bool
     let isSaving: Bool
-    let save: (PrayerStoredStatus, FridayPrayerKind?, Bool) -> Void
-    let answerHeart: (() -> Void)?
+    let save: (PrayerStoredStatus, FridayPrayerKind?, Bool, @escaping (Bool) -> Void) -> Void
+    let answerHeart: (PrayerHeart?, @escaping (Bool) -> Void) -> Void
     @Environment(\.dismiss) private var dismiss
     @Environment(\.roomTheme) private var theme
-    @State private var status: PrayerStoredStatus
+    @State private var selected: PrayerStoredStatus?
+    @State private var recorded: Bool
+    @State private var heart: PrayerHeart?
     @State private var fridayKind: FridayPrayerKind?
+    @State private var contentHeight: CGFloat = 430
 
-    init(cell: PrayerCell, isSaving: Bool, answerHeart: (() -> Void)? = nil, save: @escaping (PrayerStoredStatus, FridayPrayerKind?, Bool) -> Void) {
-        self.cell = cell; self.isSaving = isSaving; self.save = save; self.answerHeart = answerHeart
-        let initial: PrayerStoredStatus = switch cell.status { case .alone: .alone; case .missed: .missed; default: .jamaah }
-        _status = State(initialValue: initial)
+    init(cell: PrayerCell, clock: String, askHeart: Bool, isSaving: Bool,
+         save: @escaping (PrayerStoredStatus, FridayPrayerKind?, Bool, @escaping (Bool) -> Void) -> Void,
+         answerHeart: @escaping (PrayerHeart?, @escaping (Bool) -> Void) -> Void) {
+        self.cell = cell; self.clock = clock; self.askHeart = askHeart; self.isSaving = isSaving
+        self.save = save; self.answerHeart = answerHeart
+        let initial: PrayerStoredStatus? = switch cell.status { case .jamaah: .jamaah; case .alone: .alone; case .qada: .qada; case .missed: .missed; default: nil }
+        _selected = State(initialValue: initial)
+        _recorded = State(initialValue: initial != nil)
+        _heart = State(initialValue: cell.heart)
         _fridayKind = State(initialValue: cell.fridayKind)
     }
 
-    private var statusOptions: [PrayerStoredStatus] {
-        [.jamaah, .alone] + (cell.canMarkMissed ? [.missed] : []) + (cell.canMakeUp ? [.qada] : [])
+    private var options: [PrayerStoredStatus] {
+        [.jamaah, .alone] + (cell.canMakeUp ? [.qada] : []) + (cell.canMarkMissed || cell.status == .missed ? [.missed] : [])
     }
-    private var needsFridayKind: Bool { cell.isFriday && [.jamaah, .alone, .missed, .qada].contains(status) }
-    private var saveDisabled: Bool { isSaving || (needsFridayKind && fridayKind == nil) }
+    /// Friday noon: everything but «وحدي» (always the noon prayer) waits for the kind.
+    private func needsKind(_ option: PrayerStoredStatus) -> Bool { cell.isFriday && option != .alone && fridayKind == nil }
+    private var showsHeart: Bool { askHeart && recorded && [.jamaah, .alone, .qada].contains(selected ?? .missed) }
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section("حال الصلاة") {
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                        ForEach(statusOptions, id: \.self) { option in statusButton(option) }
-                    }
+        VStack(alignment: .leading, spacing: 0) {
+            header
+            if cell.isFriday { fridayKindRow.padding(.top, 16) }
+            optionRow.padding(.top, 20)
+            if selected == .missed { missedPanel.padding(.top, 14) }
+            if showsHeart { heartSection.padding(.top, 22) }
+        }
+        .padding(.horizontal, 20).padding(.top, 26).padding(.bottom, 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 + 20 }
+        .frame(maxHeight: .infinity, alignment: .top)
+        .background(theme.background)
+        .foregroundStyle(theme.ink)
+        .presentationDetents([.height(min(max(contentHeight, 160), 640)), .large])
+        .presentationBackground(theme.background)
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(34)
+    }
+
+    // MARK: Header
+
+    private var header: some View {
+        HStack(alignment: .center, spacing: 14) {
+            PrayerSheetArch().frame(width: 34, height: 52).accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("صلّيتَ \(prayerTitle(cell.reference.prayer))؟")
+                    .font(Font.custom("thmanyahserifdisplay-Bold", size: 28, relativeTo: .title))
+                    .accessibilityAddTraits(.isHeader)
+                if !clock.isEmpty { Text(clock).font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk) }
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    // MARK: Friday kind (RP5)
+
+    private var fridayKindRow: some View {
+        HStack(spacing: 10) {
+            Text("ظهر الجمعة:").font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk)
+            ForEach([FridayPrayerKind.jumuah, .dhuhr], id: \.self) { kind in
+                let on = fridayKind == kind
+                Button { fridayKind = kind } label: {
+                    Text(kind == .jumuah ? "صلاة الجمعة" : "الظهر").font(on ? PrayerHomeType.smallBold : PrayerHomeType.small)
+                        .foregroundStyle(on ? theme.color("accentText") : theme.ink)
+                        .padding(.horizontal, 16).frame(minHeight: 40)
+                        .background(on ? theme.color("goldSoft") : .clear, in: .capsule)
+                        .overlay { Capsule().stroke(on ? theme.accent : theme.ink.opacity(0.14), lineWidth: on ? 1.5 : 1) }
+                        .frame(minHeight: 44).contentShape(.rect)
                 }
-                if let answerHeart {
-                    Section { Button("سؤال القلب") { answerHeart() }.frame(minHeight: 44).accessibilityIdentifier("prayer-log-heart") }
+                .buttonStyle(.plain).accessibilityAddTraits(on ? .isSelected : [])
+                .accessibilityIdentifier("prayer-friday-kind-\(kind.rawValue)")
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    // MARK: The four states
+
+    private var optionRow: some View {
+        HStack(spacing: 8) { ForEach(options, id: \.self) { optionPill($0) } }
+    }
+
+    private func optionPill(_ option: PrayerStoredStatus) -> some View {
+        let on = selected == option
+        let missed = option == .missed
+        let tint = missed ? theme.color("missed") : theme.accent
+        let (title, detail): (String, String) = switch option {
+        case .jamaah: ("في جماعة", "مع الناس")
+        case .alone: ("وحدي", "في وقتها")
+        case .qada: ("قضاءً", "بعد وقتها")
+        default: ("فاتتني", "تُعدّ عليك")
+        }
+        return Button {
+            guard !isSaving else { return }
+            if option == .alone, cell.isFriday { fridayKind = .dhuhr }
+            if missed { selected = .missed; return }
+            record(option, kind: cell.isFriday ? (option == .alone ? .dhuhr : fridayKind) : nil)
+        } label: {
+            VStack(spacing: 4) {
+                Text(title).font(PrayerHomeType.strong)
+                    .foregroundStyle(on ? (missed ? theme.color("missedTextOnSurface") : theme.color("accentText")) : theme.ink)
+                Text(detail).font(PrayerHomeType.small).foregroundStyle(on && missed ? theme.color("missedTextOnSurface") : theme.secondaryInk)
+            }
+            .lineLimit(1).minimumScaleFactor(0.8)
+            .frame(maxWidth: .infinity, minHeight: 62)
+            .background(on ? tint.opacity(0.12) : .clear, in: .rect(cornerRadius: 20))
+            .overlay { RoundedRectangle(cornerRadius: 20).stroke(on ? tint : theme.ink.opacity(0.13), lineWidth: on ? 1.5 : 1) }
+            .contentShape(.rect(cornerRadius: 20))
+        }
+        .buttonStyle(.plain)
+        .opacity(needsKind(option) ? 0.45 : 1)
+        .disabled(needsKind(option))
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(on ? .isSelected : [])
+        .accessibilityIdentifier("prayer-status-\(option.rawValue)")
+    }
+
+    /// Records the choice; the sheet closes unless the heart question follows.
+    private func record(_ option: PrayerStoredStatus, kind: FridayPrayerKind?) {
+        save(option, kind, false) { ok in
+            guard ok else { return }
+            selected = option; recorded = true
+            if !askHeart { dismiss() }
+        }
+    }
+
+    // MARK: «فاتتني»: explicit, never automatic (RP1, RP2)
+
+    private var missedPanel: some View {
+        let kind = cell.isFriday ? fridayKind : nil
+        return VStack(alignment: .leading, spacing: 12) {
+            Text("نزلت في القضاء، وهي عليك حتى تصلّيها.").font(PrayerHomeType.strong)
+            HStack(alignment: .top, spacing: 10) {
+                Rectangle().fill(theme.color("missed")).frame(width: 2)
+                PrayerQadaCitation()
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 10) {
+                Button {
+                    save(.missed, kind, true) { ok in if ok { dismiss() } }
+                } label: {
+                    Text("قضيتُها الآن").font(PrayerHomeType.strong).foregroundStyle(theme.background)
+                        .frame(maxWidth: .infinity, minHeight: 54).background(theme.ink, in: .rect(cornerRadius: 18))
                 }
-                if needsFridayKind {
-                    Section("تصنيف ظهر الجمعة") {
-                        Picker("نوع الصلاة", selection: $fridayKind) {
-                            Text("اختر التصنيف").tag(nil as FridayPrayerKind?)
-                            if status != .alone { Text("صلاة الجمعة").tag(FridayPrayerKind?.some(.jumuah)) }
-                            Text("الظهر").tag(FridayPrayerKind?.some(.dhuhr))
-                        }.accessibilityIdentifier("prayer-friday-kind")
-                    }
+                .buttonStyle(.plain).accessibilityIdentifier("prayer-makeup-now")
+                Button {
+                    save(.missed, kind, false) { ok in if ok { dismiss() } }
+                } label: {
+                    Text("لاحقًا").font(PrayerHomeType.strong)
+                        .padding(.horizontal, 22).frame(minHeight: 54)
+                        .overlay { RoundedRectangle(cornerRadius: 18).stroke(theme.ink.opacity(0.14), lineWidth: 1) }
                 }
-                if status == .missed {
-                    Section {
-                        Text("نزلت في القضاء، وهي عليك حتى تصلّيها.").font(MadarTypography.section()).foregroundStyle(theme.color("missedTextOnSurface"))
-                        PrayerQadaCitation()
-                        Button("قضيتُها الآن") { save(.missed, cell.isFriday ? fridayKind : nil, true); dismiss() }
-                            .buttonStyle(MadarPrimaryButton()).disabled(saveDisabled).accessibilityIdentifier("prayer-makeup-now")
-                        Button("لاحقًا") { save(.missed, cell.isFriday ? fridayKind : nil, false); dismiss() }
-                            .disabled(saveDisabled).accessibilityIdentifier("prayer-missed-later")
-                    }
-                } else {
-                    Section {
-                        Button(status == .qada ? "قضيتُها الآن" : "احفظ التسجيل") {
-                            save(status, cell.isFriday ? fridayKind : nil, false); dismiss()
+                .buttonStyle(.plain).accessibilityIdentifier("prayer-missed-later")
+            }
+            .disabled(isSaving || (cell.isFriday && fridayKind == nil))
+        }
+        .padding(16)
+        .background(theme.color("missed").opacity(0.07), in: .rect(cornerRadius: 22))
+        .overlay { RoundedRectangle(cornerRadius: 22).stroke(theme.color("missed").opacity(0.35), lineWidth: 1) }
+    }
+
+    // MARK: Heart (RP6: only when `salah.askHeart` is on)
+
+    private var heartSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("كيف كان قلبك فيها؟").font(PrayerHomeType.strong)
+                Spacer(minLength: 8)
+                Button { if heart != nil { answerHeart(nil) { ok in if ok { dismiss() } } } else { dismiss() } } label: {
+                    Text("أمرُّ").font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk).frame(minHeight: 44).contentShape(.rect)
+                }
+                .buttonStyle(.plain).accessibilityIdentifier("prayer-heart-skip")
+            }
+            HStack(spacing: 8) {
+                ForEach(PrayerHeart.allCases, id: \.self) { value in
+                    let on = heart == value
+                    Button {
+                        guard !isSaving else { return }
+                        answerHeart(value) { ok in if ok { heart = value; dismiss() } }
+                    } label: {
+                        VStack(spacing: 3) {
+                            Text(heartTitle(value)).font(PrayerHomeType.strong)
+                                .foregroundStyle(on ? theme.color("accentText") : theme.ink)
+                            Text(heartSentence(value)).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
                         }
-                        .buttonStyle(MadarPrimaryButton()).disabled(saveDisabled)
-                        .accessibilityIdentifier(status == .qada ? "prayer-makeup-now" : "prayer-save")
+                        .lineLimit(1).minimumScaleFactor(0.75)
+                        .frame(maxWidth: .infinity, minHeight: 56)
+                        .background(on ? theme.accent.opacity(0.12) : .clear, in: .rect(cornerRadius: 20))
+                        .overlay { RoundedRectangle(cornerRadius: 20).stroke(on ? theme.accent : theme.ink.opacity(0.13), lineWidth: on ? 1.5 : 1) }
+                        .contentShape(.rect(cornerRadius: 20))
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityAddTraits(on ? .isSelected : [])
+                    .accessibilityIdentifier("prayer-heart-\(value.rawValue)")
                 }
             }
-            .navigationTitle("تسجيل \(title(cell.reference.prayer))")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("إغلاق") { dismiss() }.accessibilityIdentifier("prayer-log-dismiss") } }
         }
-        .presentationDetents([.medium, .large])
     }
+}
 
-    private func statusButton(_ value: PrayerStoredStatus) -> some View {
-        let title: String = switch value { case .jamaah: "جماعة"; case .alone: "منفردًا"; case .missed: "فاتتني"; case .qada: "قضاءً"; default: value.rawValue }
-        return Button {
-            status = value
-            if cell.isFriday && value == .alone { fridayKind = .dhuhr }
-        } label: {
-            Text(title).font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 50)
-                .foregroundStyle(status == value ? theme.onAccent : theme.ink)
-                .background(status == value ? theme.accentFill : theme.surface, in: .rect(cornerRadius: 14))
-                .overlay { RoundedRectangle(cornerRadius: 14).stroke(theme.line, lineWidth: 1) }
+/// The small lattice arch beside the sheet title.
+private struct PrayerSheetArch: View {
+    @Environment(\.roomTheme) private var theme
+    var body: some View {
+        GeometryReader { geometry in
+            let rect = CGRect(origin: .zero, size: geometry.size)
+            let shape = PrayerHorseshoe().path(in: rect)
+            ZStack {
+                shape.fill(theme.color("goldSoft"))
+                PrayerLatticePattern(spacing: 7).stroke(theme.accent.opacity(0.5), lineWidth: 1).mask { shape.fill() }
+                shape.stroke(theme.color("goldMid").opacity(0.7), lineWidth: 1)
+            }
         }
-        .buttonStyle(.plain).accessibilityIdentifier("prayer-status-\(value.rawValue)")
-        .accessibilityAddTraits(status == value ? .isSelected : [])
-    }
-
-    private func title(_ prayer: Prayer) -> String {
-        switch prayer { case .fajr: "الفجر"; case .dhuhr: "الظهر"; case .asr: "العصر"; case .maghrib: "المغرب"; case .isha: "العشاء" }
     }
 }
 

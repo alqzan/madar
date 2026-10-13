@@ -143,7 +143,7 @@ final class AppSession {
             "heart": heart.map { .string($0.rawValue) } ?? .null
         ]), undoMessage: "حُفظت إجابة القلب · التراجع متاح لعشر دقائق", completion: completion)
     }
-    func makeUpPrayer(_ reference: PrayerReference, fridayKind: FridayPrayerKind? = nil) {
+    func makeUpPrayer(_ reference: PrayerReference, fridayKind: FridayPrayerKind? = nil, completion: ((Bool) -> Void)? = nil) {
         let at = prayerNow()
         let formatter = ISO8601DateFormatter(); formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let payload: MadarCore.JSONValue = .object([
@@ -152,7 +152,7 @@ final class AppSession {
             "at": .string(formatter.string(from: at)),
             "fridayKind": fridayKind.map { .string($0.rawValue) } ?? .null
         ])
-        sendPrayerCommand(name: "prayer.makeUp", payload: payload, undoMessage: "قُضيت الصلاة · التراجع متاح لعشر دقائق")
+        sendPrayerCommand(name: "prayer.makeUp", payload: payload, undoMessage: "قُضيت الصلاة · التراجع متاح لعشر دقائق", completion: completion)
     }
     func resolvePrayerGap(_ resolutions: [PrayerGapResolution]) {
         guard !resolutions.isEmpty else { return }

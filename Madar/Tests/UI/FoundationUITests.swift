@@ -31,6 +31,32 @@ import XCTest
         }
     }
 
+    /// M1-V02: the light log sheet, for comparison with screens/salah/02-S2-Log.jpg.
+    func test_M1V02_LogSheetMatchesCanonicalAndRecordsInOneTap() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
+            "MADAR_UI_NOW": "2026-10-07T16:20:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01",
+            "MADAR_UI_PRAYER_FIXTURE": "homeShowcase", "MADAR_UI_THEME": "light"]
+        app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+        let asr = app.descendants(matching: .any).matching(identifier: "prayer-arch-asr").firstMatch
+        XCTAssertTrue(asr.waitForExistence(timeout: 10), app.debugDescription)
+        asr.tap()
+        let alone = app.buttons["prayer-status-alone"]
+        XCTAssertTrue(alone.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(alone.isSelected, "Asr is already logged alone")
+        XCTAssertFalse(app.buttons["prayer-status-missed"].exists, "RP2: no «فاتتني» before the window ends")
+        XCTAssertFalse(app.buttons["prayer-heart-present"].exists, "RP6: heart question off by default")
+        attachScreenshot(app, named: "M1-V02-log-L")
+        XCTAssertFalse(app.buttons["prayer-clear"].exists, "«امسح التسجيل» is not a v1 action")
+        // One tap re-records; the sheet closes and the home reflects it.
+        app.buttons["prayer-status-jamaah"].tap()
+        let changed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", "جماعة"), object: asr)
+        XCTAssertEqual(XCTWaiter.wait(for: [changed], timeout: 15), .completed, asr.label)
+        XCTAssertTrue(app.buttons["undo-button"].waitForExistence(timeout: 15), app.debugDescription)
+        app.terminate()
+    }
+
     func test_M1T09_OldMissedSaveUndoRestoreMakeUpAndRelaunch() throws {
         continueAfterFailure = false
         for size in ["L"] {
@@ -176,8 +202,6 @@ import XCTest
             let day = app.buttons["prayer-history-day-2026-10-06"]
             scrollTo(day, in: app); day.tap()
             app.buttons["prayer-history-log-fajr"].tap()
-            let heart = app.buttons["prayer-log-heart"]
-            scrollTo(heart, in: app); heart.tap()
             XCTAssertTrue(present.waitForExistence(timeout: 10)); XCTAssertTrue(present.isSelected)
             scrollTo(skip, in: app); skip.tap()
             XCTAssertTrue(undo.waitForExistence(timeout: 15)); undo.tap()
@@ -209,7 +233,6 @@ import XCTest
             XCTAssertTrue(isha.waitForExistence(timeout: 10), app.debugDescription); isha.tap()
             let alone = app.buttons["prayer-status-alone"]
             XCTAssertTrue(alone.waitForExistence(timeout: 10), app.debugDescription); alone.tap()
-            app.buttons["prayer-save"].tap()
             let undo = app.buttons["undo-button"]
             XCTAssertTrue(undo.waitForExistence(timeout: 10), app.debugDescription)
             scrollTo(history, in: app); history.tap()
@@ -655,7 +678,6 @@ import XCTest
             let choice = target.buttons["prayer-status-\(status)"]
             XCTAssertTrue(choice.waitForExistence(timeout: 10), target.debugDescription)
             choice.tap()
-            target.buttons["prayer-save"].tap()
         }
 
         openPrayer(app)
