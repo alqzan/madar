@@ -285,6 +285,21 @@ import XCTest
         app.terminate()
     }
 
+    /// Dark mode of the prayer home (arches and «سلاسلك»), captured for a quick look.
+    func test_M1V01_HomeDark() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
+            "MADAR_UI_NOW": "2026-10-07T16:20:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01",
+            "MADAR_UI_PRAYER_FIXTURE": "homeShowcase", "MADAR_UI_THEME": "dark"]
+        app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+        XCTAssertTrue(app.buttons["prayer-streaks"].waitForExistence(timeout: 10), app.debugDescription)
+        attachScreenshot(app, named: "M1-V01-home-dark")
+        let streaks = app.buttons["prayer-streaks"]; scrollTo(streaks, in: app); app.swipeUp()
+        attachScreenshot(app, named: "M1-V01-streak-dark")
+        app.terminate()
+    }
+
     /// M1-V05: the past-day sheet, for comparison with screens/salah/05-S4-Day(-s1).jpg.
     func test_M1V05_DaySheetMatchesCanonical() throws {
         continueAfterFailure = false

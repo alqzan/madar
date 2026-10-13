@@ -91,18 +91,18 @@ struct PrayerStreakArches: View {
                     HStack(spacing: 8) {
                         Capsule().fill(color(level)).frame(width: 6, height: 30).accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 0) {
-                            Text(level.title).font(PrayerHomeType.strong).lineLimit(1)
-                            Text(level.short).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk).lineLimit(1)
+                            Text(level.title).font(PrayerHomeType.strong).lineLimit(2).minimumScaleFactor(0.85).fixedSize(horizontal: false, vertical: true)
+                            Text(level.short).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk).lineLimit(2).minimumScaleFactor(0.85).fixedSize(horizontal: false, vertical: true)
                         }
                         Spacer(minLength: 4)
                         Text(PrayerCopy.days(level.count(stats), digits: digits))
                             .font(.custom("thmanyahserifdisplay-Bold", size: 18, relativeTo: .headline))
-                            .lineLimit(1).minimumScaleFactor(0.8)
+                            .lineLimit(1).fixedSize()
                     }
                 }
             }
             .frame(maxWidth: .infinity)
-            arch.frame(width: 132, height: 196).accessibilityHidden(true)
+            arch.frame(width: 120, height: 196).accessibilityHidden(true)
         }
         .onAppear {
             if reduceMotion { grown = true } else { withAnimation(.easeOut(duration: 0.9)) { grown = true } }
