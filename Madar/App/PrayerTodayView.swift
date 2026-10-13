@@ -14,7 +14,10 @@ struct PrayerTodayView: View {
     @State private var locator = TravelLocator()
     @Environment(\.scenePhase) private var scenePhase
 
-    private var theme: RoomTheme { RoomTheme(room: "salah", dark: inheritedTheme.dark, calmPaper: inheritedTheme.calmPaper) }
+    @State private var onTrip = false
+    /// On a trip the home takes the calm-paper palette (cooler sand, same gold ornaments) so travel looks different at a glance.
+    private var theme: RoomTheme { RoomTheme(room: "salah", dark: inheritedTheme.dark, calmPaper: inheritedTheme.calmPaper || onTrip) }
+    private func refreshTrip() { onTrip = (try? session.prayerSnapshot(at: session.prayerNow()))?.activeTrip != nil }
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 60)) { timeline in
@@ -78,7 +81,8 @@ struct PrayerTodayView: View {
         }
         .environment(\.roomTheme, theme)
         .toolbarVisibility(.hidden, for: .navigationBar)
-        .onAppear { detectTravel() }
+        .onAppear { detectTravel(); refreshTrip() }
+        .onChange(of: selectedSheet == nil) { _, _ in refreshTrip() }
         .onChange(of: scenePhase) { _, phase in if phase == .active { detectTravel() } }
         .sheet(item: $selectedSheet) { route in
             Group {
