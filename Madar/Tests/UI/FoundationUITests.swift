@@ -299,6 +299,8 @@ import XCTest
         XCTAssertTrue(app.buttons["prayer-day-fajr-jamaah"].waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "prayer-day-header").firstMatch.exists)
         attachScreenshot(app, named: "M1-V05-day-L")
+        app.swipeUp()
+        attachScreenshot(app, named: "M1-V05-day-L-s1")
         app.terminate()
     }
 

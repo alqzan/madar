@@ -801,9 +801,15 @@ private struct PrayerTodayArch: View {
                         if logged {
                             shape.fill().mask(alignment: .top) { Rectangle().frame(height: spring + 2) }
                         } else {
-                            shape.stroke(lineWidth: 11).mask(alignment: .top) { Rectangle().frame(height: spring + 4) }
+                            shape.stroke(lineWidth: 14).mask(alignment: .top) { Rectangle().frame(height: spring) }
                         }
                     }
+                    .clipShape(shape)
+                if !logged && !isNext {
+                    // A fine rim keeps the open dome edge clean where the lattice band ends.
+                    shape.trim(from: 0, to: 1).stroke(theme.accent.opacity(0.4), lineWidth: 1)
+                        .mask(alignment: .top) { Rectangle().frame(height: spring) }
+                }
                 if isNext {
                     outline.stroke(theme.accent, style: StrokeStyle(lineWidth: 5, lineJoin: .round))
                 } else if cell.status == .missed {
