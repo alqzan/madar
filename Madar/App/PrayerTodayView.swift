@@ -1914,7 +1914,7 @@ private struct PrayerDayEditSheet: View {
         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 + 20 }
         .frame(maxHeight: .infinity, alignment: .top)
         .background(theme.background).foregroundStyle(theme.ink)
-        .presentationDetents([.height(min(max(contentHeight, 300), 760)), .large])
+        .presentationDetents([.height(min(max(contentHeight, 300), 760))])
         .presentationBackground(theme.background)
         .presentationDragIndicator(.visible)
         .presentationCornerRadius(34)
