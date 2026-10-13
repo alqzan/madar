@@ -108,7 +108,7 @@ struct PrayerTodayView: View {
                     session.makeUpPrayer(item.reference, fridayKind: kind)
                 }
             case .recovery(let references, let fridayReferences, let timeZone):
-                PrayerGapResolutionSheet(references: references, fridayReferences: fridayReferences, timeZone: timeZone) { resolutions in
+                PrayerGapResolutionSheet(references: references, fridayReferences: fridayReferences, dateLabel: qadaDate, digits: digits) { resolutions in
                     session.resolvePrayerGap(resolutions)
                 }
             }
@@ -261,24 +261,25 @@ struct PrayerTodayView: View {
     /// One quiet notice: an unrecorded prayer whose window has ended, or an older unresolved gap.
     /// RP1: neither ever turns into a missed prayer by itself.
     private func notice(_ snapshot: PrayerSnapshot, now: Date) -> AnyView? {
-        if !snapshot.unconfirmed.isEmpty {
-            return AnyView(PrayerNoticeRow(
-                title: PrayerCopy.unconfirmed(snapshot.unconfirmed.count, digits: digits),
-                detail: "لا تُحسب فائتة إلا باختيارك.",
-                action: "راجعها", identifier: "prayer-recovery") {
-                    selectedSheet = .recovery(snapshot.unconfirmed, snapshot.unconfirmedFridayNoon, session.activePlace.timeZone)
-                })
-        }
         let pending = Set(snapshot.pending)
         let open = currentPrayer(snapshot, now: now)
         let closed = snapshot.history.flatMap(\.cells)
             .filter { pending.contains($0.reference) && $0.canLog && $0.time != nil && $0.reference != open }
-        guard let first = closed.first else { return nil }
-        let title = closed.count == 1
-            ? "مضى وقت \(self.title(first.reference.prayer))\(dayWord(first.reference.day, today: snapshot.today.day)) ولم تُسجِّلها."
-            : PrayerCopy.pending(closed.count, digits: digits)
-        return AnyView(PrayerNoticeRow(title: title, detail: "تبقى معلّقة حتى تختار حالها.",
-            action: closed.count == 1 ? "سجِّلها" : "راجعها", identifier: "prayer-pending-review") { choose(first) })
+        let gap = snapshot.unconfirmed + closed.map(\.reference).filter { !snapshot.unconfirmed.contains($0) }
+        guard !gap.isEmpty else { return nil }
+        if gap.count == 1, let first = closed.first {
+            return AnyView(PrayerNoticeRow(
+                title: "مضى وقت \(self.title(first.reference.prayer))\(dayWord(first.reference.day, today: snapshot.today.day)) ولم تُسجِّلها.",
+                detail: "تبقى معلّقة حتى تختار حالها.",
+                action: "سجِّلها", identifier: "prayer-pending-review") { choose(first) })
+        }
+        let fridays = snapshot.unconfirmedFridayNoon.union(closed.filter { $0.isFriday && $0.reference.prayer == .dhuhr }.map(\.reference))
+        return AnyView(PrayerNoticeRow(
+            title: PrayerCopy.unconfirmed(gap.count, digits: digits),
+            detail: "لا تُحسب فائتة إلا باختيارك.",
+            action: "سجِّلها", identifier: snapshot.unconfirmed.isEmpty ? "prayer-pending-review" : "prayer-recovery") {
+                selectedSheet = .recovery(gap, fridays, session.activePlace.timeZone)
+            })
     }
 
     /// The prayer whose window is still open (its time has come and the next prayer has not).
@@ -1017,86 +1018,223 @@ private struct PrayerMakeUpSheet: View {
     }
 }
 
+/// «صلوات بلا تسجيل»: settle a gap in one tap, a day at a time, or prayer by prayer.
+/// RP1: nothing here is chosen for the user; what is left unchosen stays as it is.
 private struct PrayerGapResolutionSheet: View {
     let references: [PrayerReference]
     let fridayReferences: Set<PrayerReference>
-    let timeZone: TimeZone
+    let dateLabel: (GregorianDay) -> String
+    let digits: MadarNumberFormatter
     let resolve: ([PrayerGapResolution]) -> Void
     @Environment(\.dismiss) private var dismiss
-    @State private var choices: [PrayerReference: PrayerStoredStatus] = [:]
-    @State private var fridayKinds: [PrayerReference: FridayPrayerKind] = [:]
+    @Environment(\.roomTheme) private var theme
+    @State private var choices: [PrayerReference: Choice] = [:]
 
-    private let options: [PrayerStoredStatus] = [.jamaah, .alone, .missed, .unrecordedHistory, .excused]
-    private var canSave: Bool {
-        guard choices.count == references.count else { return false }
-        return references.allSatisfy { ref in
-            guard let status = choices[ref] else { return false }
-            guard fridayReferences.contains(ref), ![.unrecordedHistory, .excused].contains(status) else { return true }
-            guard let kind = fridayKinds[ref] else { return false }
-            return status != .alone || kind == .dhuhr
-        }
+    /// One choice as the user reads it; Friday noon carries its kind explicitly (RP5).
+    struct Choice: Hashable {
+        let status: PrayerStoredStatus
+        var fridayKind: FridayPrayerKind? = nil
+    }
+
+    private var days: [GregorianDay] { Array(Set(references.map(\.day))).sorted() }
+    private func prayers(on day: GregorianDay) -> [PrayerReference] {
+        references.filter { $0.day == day }.sorted { $0.prayer.rawValue.order < $1.prayer.rawValue.order }
     }
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    Text("هذه الصلوات بقيت بلا تسجيل. اختر لكل واحدة ما ينطبق؛ لا يتحول الصمت إلى فائتة تلقائيًا.")
-                        .font(MadarTypography.body())
-                    Button("لم أُسجّل هذه الفترة") {
-                        choices = Dictionary(uniqueKeysWithValues: references.map { ($0, .unrecordedHistory) })
-                        fridayKinds = [:]
-                    }.accessibilityIdentifier("prayer-gap-unrecorded-all")
-                }
-                ForEach(references, id: \.self) { reference in
-                    Section("\(title(reference.prayer)) · \(dateLabel(reference.day))") {
-                        Picker("حال الصلاة", selection: Binding(get: { choices[reference] }, set: { value in
-                            choices[reference] = value
-                            if value == .alone && fridayReferences.contains(reference) { fridayKinds[reference] = .dhuhr }
-                            if value == .excused || value == .unrecordedHistory { fridayKinds[reference] = nil }
-                        })) {
-                            Text("اختر الحال").tag(nil as PrayerStoredStatus?)
-                            ForEach(options, id: \.self) { value in Text(title(value)).tag(PrayerStoredStatus?.some(value)) }
-                        }
-                        .accessibilityIdentifier("prayer-gap-status-\(reference.day)-\(reference.prayer.rawValue)")
-                        if fridayReferences.contains(reference), let status = choices[reference], ![.excused, .unrecordedHistory].contains(status) {
-                            Picker("نوع صلاة الجمعة", selection: Binding(get: { fridayKinds[reference] }, set: { fridayKinds[reference] = $0 })) {
-                                Text("اختر التصنيف").tag(nil as FridayPrayerKind?)
-                                if status != .alone { Text("صلاة الجمعة").tag(FridayPrayerKind?.some(.jumuah)) }
-                                Text("الظهر").tag(FridayPrayerKind?.some(.dhuhr))
-                            }.accessibilityIdentifier("prayer-gap-friday-\(reference.day)")
-                        }
-                    }
-                }
-                Section {
-                    Button("احفظ المراجعة") {
-                        let resolutions = references.compactMap { ref -> PrayerGapResolution? in
-                            guard let status = choices[ref] else { return nil }
-                            return .init(reference: ref, status: status, fridayKind: fridayKinds[ref])
-                        }
-                        resolve(resolutions); dismiss()
-                    }
-                    .buttonStyle(MadarPrimaryButton()).disabled(!canSave)
-                    .accessibilityIdentifier("prayer-gap-save")
-                }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                header
+                quickActions
+                ForEach(days, id: \.self) { day in dayCard(day) }
             }
-            .navigationTitle("مراجعة الفترة")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("إغلاق") { dismiss() } } }
-        }.presentationDetents([.large])
+            .padding(.horizontal, 20).padding(.top, 24).padding(.bottom, 24)
+        }
+        .safeAreaInset(edge: .bottom) { saveBar }
+        .background(theme.background)
+        .foregroundStyle(theme.ink)
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
     }
 
-    private func dateLabel(_ day: GregorianDay) -> String {
-        let formatter = DateFormatter(); formatter.locale = Locale(identifier: "ar_SA@numbers=arab")
-        formatter.timeZone = timeZone; formatter.calendar = Calendar(identifier: .gregorian); formatter.dateFormat = "EEEE d MMMM"
-        return formatter.string(from: day.date(in: timeZone).addingTimeInterval(12 * 3600))
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("صلوات بلا تسجيل").font(PrayerHomeType.cardHead).accessibilityAddTraits(.isHeader)
+                Spacer()
+                Button("إغلاق") { dismiss() }.font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk)
+                    .frame(minHeight: 44)
+            }
+            Text(PrayerCopy.unconfirmed(references.count, digits: digits))
+                .font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk)
+            if !rangeText.isEmpty {
+                Text(rangeText).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
+            }
+            Text("لا يُحسب شيء منها فائتة إلا باختيارك، وما تتركه يبقى كما هو.")
+                .font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
+        }
     }
-    private func title(_ prayer: Prayer) -> String {
-        switch prayer { case .fajr: "الفجر"; case .dhuhr: "الظهر"; case .asr: "العصر"; case .maghrib: "المغرب"; case .isha: "العشاء" }
+
+    private var rangeText: String {
+        guard let first = days.first, let last = days.last else { return "" }
+        return first == last ? dateLabel(first) : "من " + dateLabel(first) + " إلى " + dateLabel(last)
     }
-    private func title(_ status: PrayerStoredStatus) -> String {
-        switch status { case .jamaah: "في جماعة"; case .alone: "وحدي"; case .missed: "فاتتني"; case .unrecordedHistory: "لم أسجّل"; case .excused: "معذورة"; default: status.rawValue }
+
+    /// One tap settles the whole gap and closes; the undo bar on the home page reverses it.
+    private var quickActions: some View {
+        VStack(spacing: 10) {
+            Button { apply(Choice(status: .alone, fridayKind: nil), to: references, saveNow: true) } label: {
+                quickLabel("صلّيتها كلها", detail: "تُسجَّل في وقتها، وحدي")
+            }
+            .buttonStyle(.plain).accessibilityIdentifier("prayer-gap-alone-all")
+            Button { apply(Choice(status: .unrecordedHistory), to: references, saveNow: true) } label: {
+                quickLabel("لم أسجّل هذه الفترة", detail: "لا قضاء ولا نسبة ولا سلسلة")
+            }
+            .buttonStyle(.plain).accessibilityIdentifier("prayer-gap-unrecorded-all")
+        }
     }
+
+    private func quickLabel(_ title: String, detail: String) -> some View {
+        HStack {
+            Text(title).font(PrayerHomeType.strong)
+            Spacer(minLength: 8)
+            Text(detail).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
+        }
+        .padding(.horizontal, 18).frame(maxWidth: .infinity, minHeight: 56)
+        .background(theme.color("goldSoft"), in: .rect(cornerRadius: 18))
+        .overlay { RoundedRectangle(cornerRadius: 18).stroke(theme.line, lineWidth: 1) }
+        .contentShape(.rect(cornerRadius: 18))
+    }
+
+    private func dayCard(_ day: GregorianDay) -> some View {
+        let refs = prayers(on: day)
+        return PrayerPaperCard {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(dateLabel(day)).font(PrayerHomeType.strong)
+                    Spacer(minLength: 8)
+                    Menu {
+                        ForEach(dayOptions, id: \.self) { choice in
+                            Button(title(choice, friday: false)) { apply(choice, to: refs, saveNow: false) }
+                        }
+                    } label: {
+                        Text("اليوم كله").font(PrayerHomeType.smallBold).foregroundStyle(theme.accent)
+                            .frame(minHeight: 44).contentShape(.rect)
+                    }
+                    .accessibilityIdentifier("prayer-gap-day-\(day)")
+                }
+                ForEach(refs, id: \.self) { ref in
+                    prayerRow(ref)
+                    if ref != refs.last { Divider().overlay(theme.line) }
+                }
+            }
+        }
+    }
+
+    private func prayerRow(_ ref: PrayerReference) -> some View {
+        let friday = fridayReferences.contains(ref)
+        let chosen = choices[ref]
+        return HStack {
+            Text(friday ? "الجمعة" : prayerTitle(ref.prayer)).font(PrayerHomeType.body)
+            Spacer(minLength: 8)
+            Menu {
+                ForEach(options(friday: friday), id: \.self) { choice in
+                    Button(title(choice, friday: friday)) { choices[ref] = choice }
+                }
+                if chosen != nil {
+                    Divider()
+                    Button("اتركها كما هي") { choices[ref] = nil }
+                }
+            } label: {
+                Text(chosen.map { title($0, friday: friday) } ?? "اختر")
+                    .font(chosen == nil ? PrayerHomeType.small : PrayerHomeType.smallBold)
+                    .foregroundStyle(chosen == nil ? theme.secondaryInk : chosenColor(chosen!))
+                    .padding(.horizontal, 14).frame(minHeight: 36)
+                    .overlay { Capsule().stroke(chosen == nil ? theme.ink.opacity(0.14) : theme.line, lineWidth: 1) }
+                    .frame(minHeight: 44).contentShape(.rect)
+            }
+            .accessibilityIdentifier("prayer-gap-status-\(ref.day)-\(ref.prayer.rawValue)")
+        }
+        .frame(minHeight: 48)
+    }
+
+    private var saveBar: some View {
+        let count = choices.count
+        return Button {
+            save()
+        } label: {
+            Text(count == 0 ? "اختر حال صلاة لتحفظها" : "احفظ ما اخترت")
+                .font(PrayerHomeType.strong).frame(maxWidth: .infinity, minHeight: 54)
+                .foregroundStyle(count == 0 ? theme.secondaryInk : theme.background)
+                .background(count == 0 ? theme.color("surface") : theme.ink, in: .rect(cornerRadius: 16))
+        }
+        .buttonStyle(.plain).disabled(count == 0)
+        .padding(.horizontal, 20).padding(.vertical, 10)
+        .background(theme.background)
+        .accessibilityIdentifier("prayer-gap-save")
+    }
+
+    // MARK: Choices
+
+    private var dayOptions: [Choice] {
+        [.init(status: .jamaah, fridayKind: nil), .init(status: .alone), .init(status: .missed), .init(status: .unrecordedHistory), .init(status: .excused)]
+    }
+    private func options(friday: Bool) -> [Choice] {
+        guard friday else { return dayOptions }
+        return [.init(status: .jamaah, fridayKind: .jumuah), .init(status: .jamaah, fridayKind: .dhuhr), .init(status: .alone, fridayKind: .dhuhr),
+                .init(status: .missed, fridayKind: .jumuah), .init(status: .missed, fridayKind: .dhuhr), .init(status: .unrecordedHistory), .init(status: .excused)]
+    }
+
+    /// A whole-day or whole-gap choice; Friday noon gets the kind the choice implies, and
+    /// «في جماعة» or «فاتتني» on a Friday is left for the user to pick explicitly (RP5).
+    private func apply(_ choice: Choice, to refs: [PrayerReference], saveNow: Bool) {
+        for ref in refs {
+            guard fridayReferences.contains(ref) else { choices[ref] = Choice(status: choice.status); continue }
+            switch choice.status {
+            case .alone: choices[ref] = Choice(status: .alone, fridayKind: .dhuhr)
+            case .unrecordedHistory, .excused: choices[ref] = Choice(status: choice.status)
+            default: if saveNow { choices[ref] = nil }
+            }
+        }
+        if saveNow { save() }
+    }
+
+    private func save() {
+        let resolutions = references.compactMap { ref -> PrayerGapResolution? in
+            guard let choice = choices[ref] else { return nil }
+            return .init(reference: ref, status: choice.status, fridayKind: choice.fridayKind)
+        }
+        guard !resolutions.isEmpty else { return }
+        resolve(resolutions); dismiss()
+    }
+
+    private func title(_ choice: Choice, friday: Bool) -> String {
+        switch (choice.status, choice.fridayKind) {
+        case (.jamaah, .jumuah?): "صلّيت الجمعة"
+        case (.jamaah, .dhuhr?): "الظهر في جماعة"
+        case (.alone, .dhuhr?) where friday: "الظهر وحدي"
+        case (.missed, .jumuah?): "فاتتني الجمعة"
+        case (.missed, .dhuhr?): "فاتني الظهر"
+        case (.jamaah, _): "في جماعة"
+        case (.alone, _): "وحدي"
+        case (.missed, _): "فاتتني"
+        case (.unrecordedHistory, _): "لم أسجّل"
+        case (.excused, _): "لي عذر"
+        default: choice.status.rawValue
+        }
+    }
+    private func chosenColor(_ choice: Choice) -> Color {
+        switch choice.status {
+        case .missed: theme.color("missedTextOnSurface")
+        case .unrecordedHistory, .excused: theme.secondaryInk
+        default: theme.accent
+        }
+    }
+}
+
+private extension String {
+    /// Day order of the five prayers by raw value.
+    var order: Int { ["fajr", "dhuhr", "asr", "maghrib", "isha"].firstIndex(of: self) ?? 9 }
 }
 
 

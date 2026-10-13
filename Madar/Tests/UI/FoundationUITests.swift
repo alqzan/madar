@@ -758,10 +758,12 @@ import XCTest
         let bulkUnrecorded = app.buttons["prayer-gap-unrecorded-all"]
         XCTAssertTrue(bulkUnrecorded.waitForExistence(timeout: 10), app.debugDescription)
         attachScreenshot(app, named: "M1-T02-recovery-sheet-L")
+        let fajr = app.buttons["prayer-gap-status-2026-10-01-fajr"]
+        XCTAssertTrue(fajr.exists, app.debugDescription)
+        XCTAssertFalse(app.buttons["prayer-gap-save"].isEnabled, "Nothing chosen yet, nothing to save")
+        // One tap settles the whole gap and closes the sheet (RP1: only by explicit choice).
         bulkUnrecorded.tap()
-        let save = app.buttons["prayer-gap-save"]
-        scrollTo(save, in: app)
-        save.tap()
+        XCTAssertTrue(app.buttons["undo-button"].waitForExistence(timeout: 15), app.debugDescription)
         let removed = NSPredicate(format: "exists == false")
         expectation(for: removed, evaluatedWith: app.buttons["prayer-recovery"])
         waitForExpectations(timeout: 15)

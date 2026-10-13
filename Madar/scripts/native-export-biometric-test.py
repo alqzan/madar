@@ -14,6 +14,9 @@ import time
 
 
 def main():
+    # Owner decision 2026-10-13: M0-T09 is frozen and enlarged-text (AX) tests were removed,
+    # so the UI test this script drove no longer exists. Kept for when M0-T09 is unfrozen.
+    raise SystemExit("M0-T09 is frozen; its AX3 Face ID UI test was removed on 2026-10-13. See docs/DECISIONS.md.")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--device", required=True)
     parser.add_argument("--derived-data", type=Path, required=True)

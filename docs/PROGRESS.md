@@ -18,7 +18,7 @@ Every screen card follows protocol §2: canonical files → default-size screens
 |---|---|---|---|---|---|---|
 | M1-V01 | S1 Home | `salah/01-S1-Home.jpg`, `-s1` | `App/PrayerTodayView.swift` | matched — awaiting owner | Moon day/night button (prototype only). «تبقى معلّقة ٦ أيام ثم تُحسب فائتة» (RP1). Heart labels (RP6). Heart card unless `salah.askHeart`. "·" next to a digit (RU1). Sample numbers. | Salah palette, lattice arches with reflection pool, verse divider, pending notice, Hali card with beads, qada card with citation and «مواضعها» list, qiyam footprint, spec date and RL7 countdown, plurals via `Prayer.xcstrings` (RU3). Compare page: `Madar/Artifacts/compare/S1-Home.html`. Open question: future/next arches show a line (spec text) where the canonical image shows stars. |
 | M1-V02 | S2 Light log | `salah/02-S2-Log.jpg`, `-s1` | `PrayerTodayLogSheet` | ready | Heart question unless on (RP6). Friday noon records `fridayKind` explicitly (RP5). Sample times. | Must be a room-styled sheet, not a grey system form. |
-| M1-V03 | S2b Missed and reminder | `salah/03-S2b-Missed.jpg`, `-s1` | `PrayerMakeUpSheet`, `PrayerGapResolutionSheet` | ready | «فاتتني… نزلت في القضاء» before the prayer's window ends (RP2: before the end only «لم أصلّها بعد» or snooze). «فاتتني» in the +30 notification (RP2). Automatic aging (RP1). | The return sheet resolves a gap as prayed, missed, not recorded, or excused (RP1). |
+| M1-V03 | S2b Missed and reminder | `salah/03-S2b-Missed.jpg`, `-s1` | `PrayerMakeUpSheet`, `PrayerGapResolutionSheet` | ready | «فاتتني… نزلت في القضاء» before the prayer's window ends (RP2: before the end only «لم أصلّها بعد» or snooze). «فاتتني» in the +30 notification (RP2). Automatic aging (RP1). | Gap sheet «صلوات بلا تسجيل» rebuilt at the owner's request (room look, one-tap settle, by day, partial save). Still to match: the S2b log/missed sheet. |
 | M1-V04 | S3 Hali | `salah/04-S3-Hali.jpg`, `-s1` | `PrayerStatisticsView` | ready | Any ranking or superlative such as «أخشعُ صلواتك…» (RP6). Sample numbers. Balance-style picker (`salah.balanceView` is v2: beads only). | Seen defects: title shown twice; «٠ أيام» needs the Arabic plural rule (RU3); month grid lacks each day's bead glyph; Mizan card lacks «الأحدث / الأقدم» labels and the «آخر ٢٥ فرضًا» header. |
 | M1-V05 | S4 Edit a past day | `salah/05-S4-Day.jpg`, `-s1` | day edit in `PrayerStatisticsView` (T05) | ready | Sample data. | A stored `dayKey` is never recomputed. |
 | M1-V06 | S5 Qada | `salah/06-S5-Qada.jpg`, `-s1` | `codex/m1-s4-prayer-settings-debt` `c9bd527` | ready | Counts outside the app unless opted in (RP9). Sample counts. | First rerun the candidate's T10 UI test and merge it only if green, then match the design. Dates follow `core.firstCalendar`. |
@@ -64,13 +64,20 @@ M0-T06 (device acceptance paperwork), M0-T09 (encrypted backup and privacy matri
 1. Approve or reject each screen marked `matched — awaiting owner`.
 2. Run the app on your iPhone (steps: `docs/OWNER-RUNBOOK.md`) when M1-V is done.
 3. The Codex automation now uses `docs/AUTOMATION-PROMPT.md` but is still **paused**; resume it from Codex when you want.
-4. 20 merged local branches can be deleted (`git branch -d`); the tool blocked me from deleting them. 31 unmerged branches are kept.
 
 # Later
 
 M1 gate, then M2 Quran, M3 Diary, M4 Lobby + Habits + Widgets, M5 Money, M6 Mihbara, M7 integration. Plan each milestone as screen cards in this same format when its turn comes; no entry point to an unbuilt room.
 
 # Handovers
+
+## Handover — gap sheet redesign — 2026-10-13 — claude
+
+Works now: «صلوات بلا تسجيل» replaces the grey «مراجعة الفترة» form (room look, «صلّيتها كلها» and «لم أسجّل هذه الفترة» settle everything in one tap with undo, prayers grouped by day with «اليوم كله», save whatever is chosen). The home «سجِّلها» opens every pending prayer, not only the first. 20 merged branches deleted at the owner's go.
+Verified: `test_M1T02_BulkPendingRecovery`, `test_M1T02_MissedMakeUpUndoAndRelaunch`, `test_M1V01_HomeMatchesCanonical`: passed; screenshot `Madar/Artifacts/m1-gap-shots/M1-T02-recovery-sheet-L.png`.
+Not verified: owner iPhone.
+Next: M1-V02, the log sheet matching `02-S2-Log.jpg`.
+Model/effort: Claude Opus 5.5; effort not exposed. Usage: not exposed.
 
 ## Handover — M1-V01 prayer home — 2026-10-13 — claude
 
