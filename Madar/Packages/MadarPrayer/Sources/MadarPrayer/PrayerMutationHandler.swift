@@ -161,7 +161,7 @@ private struct PrayerInverse: Codable {
         case .logQiyam(let night, let rakaat, let witr):
             let latest = repository.defaultNight(at: now)
             guard night <= latest, night >= latest.adding(days: -6) else { throw PrayerDomainError.invalidNight }
-            guard (0...1000).contains(rakaat) else { throw PrayerDomainError.invalidRakaat }
+            guard (0...99).contains(rakaat) else { throw PrayerDomainError.invalidRakaat }
             let old = repository.nightRows.filter { $0.nightKey == night.description }.max { $0.updatedAt < $1.updatedAt }
             if let old { guard old.deletedAt == nil else { throw PrayerDomainError.explicitRestoreRequired }; try capture(old) }
             if old?.deletedAt == nil, old?.rakaat == rakaat, old?.witr == witr { break }

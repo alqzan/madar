@@ -245,6 +245,15 @@ import MadarData
         try PrayerMutationHandler.undo(inverse, in: context, now: time("2026-10-07T12:06:00+03:00"), writer: "test-device"); try context.save()
         #expect(try PrayerRepository(context: context).snapshot(now: time("2026-10-07T12:07:00+03:00")).pending.count == 2)
     }
+    @Test func qiyamRakaatContractRejects100WithoutWriting() throws {
+        let container = try container(); let context = container.mainContext
+        #expect(throws: PrayerDomainError.invalidRakaat) {
+            try apply(.logQiyam(night: GregorianDay("2026-10-07"), rakaat: 100, witr: false), context, at: "2026-10-07T23:30:00+03:00")
+        }
+        #expect(try context.fetchCount(FetchDescriptor<QiyamNight>()) == 0)
+        try apply(.logQiyam(night: GregorianDay("2026-10-07"), rakaat: 99, witr: false), context, at: "2026-10-07T23:30:00+03:00")
+        #expect(try context.fetch(FetchDescriptor<QiyamNight>()).first?.rakaat == 99)
+    }
     @Test func qiyamMidnightBelongsToOneNightAndNeverWritesQuranPages() throws {
         let container = try container(); let context = container.mainContext
         let repository = try PrayerRepository(context: context)
