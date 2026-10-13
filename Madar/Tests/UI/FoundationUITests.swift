@@ -141,6 +141,20 @@ import XCTest
         app.terminate()
     }
 
+    /// M1-V07: the qiyam sheet, for comparison with screens/salah/07-S6-Qiyam(-s1).jpg.
+    func test_M1V07_QiyamSheetMatchesCanonical() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
+            "MADAR_UI_NOW": "2026-10-08T02:10:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-07", "MADAR_UI_THEME": "light"]
+        app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+        let qiyam = app.buttons["prayer-qiyam"]; scrollTo(qiyam, in: app); qiyam.tap()
+        XCTAssertTrue(app.buttons["prayer-qiyam-plus"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(app.buttons["ورد القيام من محفوظك"].exists, "The Quran room is not built, so it has no entry point")
+        attachScreenshot(app, named: "M1-V07-qiyam-L")
+        app.terminate()
+    }
+
     func test_M1T09_OldMissedSaveUndoRestoreMakeUpAndRelaunch() throws {
         continueAfterFailure = false
         for size in ["L"] {

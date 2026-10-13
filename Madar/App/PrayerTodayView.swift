@@ -2038,6 +2038,7 @@ private struct PrayerNightLoggingSheet: View {
     @State private var rakaat: Int
     @State private var witr: Bool
     @State private var confirmRestore = false
+    @State private var contentHeight: CGFloat = 520
     @Environment(\.roomTheme) private var theme
     @Environment(\.dynamicTypeSize) private var typeSize
     init(session: AppSession, snapshot: PrayerSnapshot, finished: @escaping () -> Void) {
@@ -2050,69 +2051,108 @@ private struct PrayerNightLoggingSheet: View {
     private var eligibleNights: [GregorianDay] { (0..<7).map { snapshot.nightDefault.adding(days: -$0) } }
     private var footprint: [GregorianDay] { (0..<30).reversed().map { snapshot.nightDefault.adding(days: -$0) } }
     private var restoreNeeded: Bool { (try? session.qiyamRequiresRestore(selectedNight)) ?? true }
+    private var logged: Bool { hasRecord(selectedNight) }
+    private func footprintColor(_ night: GregorianDay) -> Color {
+        guard let row = snapshot.nights.first(where: { $0.night == night }), row.rakaat > 0 || row.witr else { return theme.ink.opacity(0.1) }
+        return row.rakaat >= 8 ? theme.accent : theme.color("goldMid")
+    }
+
+    /// S6 · «قيام الليل», matched to `screens/salah/07-S6-Qiyam.jpg`. Not copied: the Quran-room entry
+    /// «ورد القيام من محفوظك» (that room is not built) and any streak wording (qiyam is a footprint).
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 22) {
-                    Text("قيام الليل").font(MadarTypography.title()).accessibilityAddTraits(.isHeader)
-                    Text("لم تُسجّل ليلتك؟ سجّل ما قمتَه.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                    MadarCard {
-                        VStack(alignment: .leading, spacing: 18) {
-                            Picker("الليلة", selection: $selectedNight) {
-                                ForEach(eligibleNights, id: \.self) { Text(dateTitle($0)).tag($0) }
-                            }.accessibilityIdentifier("prayer-qiyam-night")
-                            Text("من العشاء إلى الفجر التالي؛ وبعد الفجر نختار آخر ليلة انقضت.")
-                                .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                            HStack(spacing: 16) {
-                                Text("الركعات").font(MadarTypography.section())
-                                Spacer()
-                                Button { rakaat = max(0, rakaat - 2) } label: { Image(systemName: "minus").frame(width: 44, height: 44).contentShape(Circle()) }
-                                    .accessibilityLabel(rakaat == 1 ? "أنقص ركعة" : "أنقص ركعتين").accessibilityIdentifier("prayer-qiyam-minus").disabled(rakaat == 0)
-                                Text(formatter.string(rakaat)).font(MadarTypography.cardTitle()).monospacedDigit().accessibilityIdentifier("prayer-qiyam-count")
-                                Button { rakaat = min(99, rakaat + 2) } label: { Image(systemName: "plus").frame(width: 44, height: 44).contentShape(Circle()) }
-                                    .accessibilityLabel(rakaat == 98 ? "زد ركعة" : "زد ركعتين").accessibilityIdentifier("prayer-qiyam-plus").disabled(rakaat >= 99)
-                            }
-                            Toggle("أوترتُ", isOn: $witr).font(MadarTypography.section()).accessibilityIdentifier("prayer-qiyam-witr")
-                            if restoreNeeded {
-                                Text("سبق التراجع عن تسجيل هذه الليلة. يمكنك إعادة تسجيلها صراحة.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                                Button("أعد تسجيل الليلة") { confirmRestore = true }.buttonStyle(MadarPrimaryButton()).accessibilityIdentifier("prayer-qiyam-restore")
-                            } else {
-                                Button("احفظ قيام الليلة") { save(restoring: false) }.buttonStyle(MadarPrimaryButton()).accessibilityIdentifier("prayer-qiyam-save")
-                            }
-                        }
-                    }
-                    PrayerSummarySection(title: "آخر ثلاثين ليلة") {
-                        MadarCard {
-                            VStack(alignment: .leading, spacing: 14) {
-                                if !typeSize.isAccessibilitySize {
-                                    HStack(spacing: 3) { ForEach(footprint, id: \.self) { night in
-                                        RoundedRectangle(cornerRadius: 3).fill(hasRecord(night) ? theme.accent : theme.line).frame(maxWidth: .infinity).frame(height: 22)
-                                    } }.accessibilityHidden(true)
-                                }
-                                Text("ليس سلسلة تنكسر، أثرٌ يُرى.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                                DisclosureGroup("سجلّ الليالي") {
-                                    ForEach(footprint.reversed(), id: \.self) { night in
-                                        Text(dateTitle(night) + (hasRecord(night) ? "، قيام مسجّل" : "، بلا تسجيل"))
-                                            .font(MadarTypography.caption()).fixedSize(horizontal: false, vertical: true)
-                                    }
-                                }.accessibilityIdentifier("prayer-qiyam-footprint-list")
-                            }
-                        }
-                    }
-                }.padding(18).frame(maxWidth: 620).frame(maxWidth: .infinity)
-            }.background(theme.background).foregroundStyle(theme.ink)
-                .navigationTitle("قيام الليل").navigationBarTitleDisplayMode(.inline)
-                .toolbar { ToolbarItem(placement: .cancellationAction) { Button("إغلاق") { finished() } } }
-                .disabled(session.prayerWriteInProgress)
-                .confirmationDialog("أعد تسجيل هذه الليلة؟", isPresented: $confirmRestore, titleVisibility: .visible) {
-                    Button("أعد التسجيل") { save(restoring: true) }
-                } message: { Text("يعود تسجيل الركعات والوتر لهذه الليلة؛ يبقى أثر التراجع محفوظًا.") }
-                .onChange(of: selectedNight) { _, night in
-                    let previous = snapshot.nights.first { $0.night == night }
-                    rakaat = previous?.rakaat ?? 0; witr = previous?.witr ?? false
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("قيام الليل").font(.custom("thmanyahserifdisplay-Bold", size: 30, relativeTo: .title)).accessibilityAddTraits(.isHeader)
+                Spacer(minLength: 8)
+                Text(logged ? "سُجّلت ليلتك" : "لم تُسجَّل ليلتك").font(PrayerHomeType.smallBold).foregroundStyle(theme.color("accentText"))
+            }
+            Text("ثنتان تُثبتان الليلة خيرٌ من إحدى عشرة تنقطع. سجِّل ما قمتَه.").font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk).padding(.top, 10)
+            if eligibleNights.count > 1 {
+                Picker("الليلة", selection: $selectedNight) {
+                    ForEach(eligibleNights, id: \.self) { Text(dateTitle($0)).tag($0) }
                 }
+                .pickerStyle(.menu).tint(theme.secondaryInk).accessibilityIdentifier("prayer-qiyam-night").padding(.top, 2)
+            }
+            divider.padding(.top, 14)
+            HStack(spacing: 14) {
+                Text("الركعات").font(PrayerHomeType.strong)
+                Spacer(minLength: 8)
+                stepButton("minus", id: "prayer-qiyam-minus", disabled: rakaat == 0, label: rakaat == 1 ? "أنقص ركعة" : "أنقص ركعتين") { rakaat = max(0, rakaat - 2) }
+                Text(formatter.string(rakaat)).font(.custom("thmanyahserifdisplay-Bold", size: 26, relativeTo: .title2)).monospacedDigit()
+                    .frame(minWidth: 44).accessibilityIdentifier("prayer-qiyam-count")
+                stepButton("plus", id: "prayer-qiyam-plus", disabled: rakaat >= 99, label: rakaat == 98 ? "زد ركعة" : "زد ركعتين") { rakaat = min(99, rakaat + 2) }
+            }
+            .frame(minHeight: 76)
+            divider
+            Toggle("أوترتُ", isOn: $witr).toggleStyle(PrayerPillToggleStyle()).padding(.top, 14).accessibilityIdentifier("prayer-qiyam-witr")
+            footprintStrip.padding(.top, 18)
+            Text("آخر ثلاثين ليلة · ليست سلسلة تنكسر، أثرٌ يُرى").font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk).padding(.top, 10)
+            if restoreNeeded {
+                Text("سبق التراجع عن تسجيل هذه الليلة. يمكنك إعادة تسجيلها صراحة.").font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk).padding(.top, 14)
+                primary("أعد تسجيل الليلة", id: "prayer-qiyam-restore") { confirmRestore = true }.padding(.top, 8)
+            } else {
+                primary("احفظ قيام الليلة", id: "prayer-qiyam-save") { save(restoring: false) }.padding(.top, 16)
+            }
+        }
+        .padding(.horizontal, 20).padding(.top, 26).padding(.bottom, 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 + 20 }
+        .frame(maxHeight: .infinity, alignment: .top)
+        .background(theme.background).foregroundStyle(theme.ink)
+        .presentationDetents([.height(min(max(contentHeight, 300), 760)), .large])
+        .presentationBackground(theme.background)
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(34)
+        .disabled(session.prayerWriteInProgress)
+        .confirmationDialog("أعد تسجيل هذه الليلة؟", isPresented: $confirmRestore, titleVisibility: .visible) {
+            Button("أعد التسجيل") { save(restoring: true) }
+        } message: { Text("يعود تسجيل الركعات والوتر لهذه الليلة؛ يبقى أثر التراجع محفوظًا.") }
+        .onChange(of: selectedNight) { _, night in
+            let previous = snapshot.nights.first { $0.night == night }
+            rakaat = previous?.rakaat ?? 0; witr = previous?.witr ?? false
         }
     }
+
+    private var divider: some View { Rectangle().fill(theme.ink.opacity(0.1)).frame(height: 1) }
+
+    private func stepButton(_ symbol: String, id: String, disabled: Bool, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol).font(.system(size: 17, weight: .medium)).frame(width: 52, height: 52)
+                .overlay { Circle().stroke(theme.ink.opacity(0.14), lineWidth: 1) }.contentShape(Circle())
+        }
+        .buttonStyle(.plain).opacity(disabled ? 0.35 : 1).disabled(disabled)
+        .accessibilityLabel(label).accessibilityIdentifier(id)
+    }
+
+    private func primary(_ title: String, id: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title).font(PrayerHomeType.strong).foregroundStyle(theme.background)
+                .frame(maxWidth: .infinity, minHeight: 56).background(theme.ink, in: .rect(cornerRadius: 18))
+        }
+        .buttonStyle(.plain).accessibilityIdentifier(id)
+    }
+
+    /// The last 30 nights, oldest on the right: a footprint, not a streak.
+    @ViewBuilder private var footprintStrip: some View {
+        if typeSize.isAccessibilitySize {
+            DisclosureGroup("سجلّ الليالي") {
+                ForEach(footprint.reversed(), id: \.self) { night in
+                    Text(dateTitle(night) + (hasRecord(night) ? "، قيام مسجّل" : "، بلا تسجيل"))
+                        .font(MadarTypography.caption()).fixedSize(horizontal: false, vertical: true)
+                }
+            }.accessibilityIdentifier("prayer-qiyam-footprint-list")
+        } else {
+            HStack(spacing: 3) {
+                ForEach(footprint, id: \.self) { night in
+                    RoundedRectangle(cornerRadius: 3).fill(footprintColor(night)).frame(maxWidth: .infinity).frame(height: 15)
+                }
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("آخر ثلاثين ليلة، \(formatter.string(footprint.filter(hasRecord).count)) منها فيها قيام")
+            .accessibilityIdentifier("prayer-qiyam-footprint-list")
+        }
+    }
+
     private func save(restoring: Bool) {
         session.recordQiyamNight(selectedNight, rakaat: rakaat, witr: witr, restoreDeleted: restoring) { succeeded in if succeeded { finished() } }
     }
@@ -2121,6 +2161,27 @@ private struct PrayerNightLoggingSheet: View {
         DualDate(instant: night.date(in: session.activePlace.timeZone).addingTimeInterval(12 * 3600), timeZone: session.activePlace.timeZone,
             source: HijriSource(rawValue: session.string("core.hijriSource")) ?? .ummAlQura, sightingOffset: Int(session.number("core.hijriOffset")))
             .text(firstCalendar: session.string("core.firstCalendar") == "gregorian" ? .gregorian : .hijri, numerals: formatter.style)
+    }
+}
+
+/// «أوترتُ»: a quiet pill that keeps the switch semantics.
+private struct PrayerPillToggleStyle: ToggleStyle {
+    @Environment(\.roomTheme) private var theme
+    func makeBody(configuration: Configuration) -> some View {
+        Button { configuration.isOn.toggle() } label: {
+            HStack(spacing: 8) {
+                if configuration.isOn { Image(systemName: "checkmark").font(.system(size: 14, weight: .semibold)) }
+                configuration.label.font(PrayerHomeType.strong)
+            }
+            .foregroundStyle(configuration.isOn ? theme.color("accentText") : theme.ink)
+            .padding(.horizontal, 28).frame(minHeight: 56)
+            .background(configuration.isOn ? theme.color("goldSoft") : .clear, in: .rect(cornerRadius: 18))
+            .overlay { RoundedRectangle(cornerRadius: 18).stroke(configuration.isOn ? theme.accent : theme.ink.opacity(0.14), lineWidth: configuration.isOn ? 1.5 : 1) }
+            .contentShape(.rect(cornerRadius: 18))
+        }
+        .buttonStyle(.plain)
+        .accessibilityValue(configuration.isOn ? "1" : "0")
+        .accessibilityAddTraits(.isToggle)
     }
 }
 
