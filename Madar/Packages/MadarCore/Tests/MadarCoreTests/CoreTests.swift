@@ -371,3 +371,35 @@ func GregorianDay_DSTIndependentArithmetic() throws {
     #expect(try GregorianDay("2028-02-28").adding(days: 1).description == "2028-02-29")
     #expect(try GregorianDay("2026-12-31").adding(days: 1).description == "2027-01-01")
 }
+
+@Test("RL5 activity starts consume the actual Madar day's budget after sanctity")
+func liveActivityBudgetAndSanctity() throws {
+    let day = try #require(PrayerTimesEngine.calculate(day: GregorianDay("2026-10-09"), place: .riyadh))
+    // Approved golden row: Fajr 04:31 and fixed 30-minute sanctity -> 05:01.
+    let proposed = try instant(hour: 4, minute: 40)
+    let expected = try instant(hour: 5, minute: 1)
+    let allowed = NotificationArbiter.liveActivityStart(id: "activity.one", proposedAt: proposed, prayerDays: [day],
+        timeZone: zone, policy: .init(dailyBudget: 4), submittedBudgetByDay: ["2026-10-09": 3])
+    #expect(allowed?.dueAt == expected)
+    #expect(allowed?.dayKey == "2026-10-09")
+    #expect(NotificationArbiter.liveActivityStart(id: "activity.full", proposedAt: proposed, prayerDays: [day],
+        timeZone: zone, policy: .init(dailyBudget: 4), submittedBudgetByDay: ["2026-10-09": 4]) == nil)
+    // At 04:00 the Fajr-based day is yesterday; midnight-based day is today.
+    let early = try instant(hour: 4)
+    #expect(NotificationArbiter.liveActivityStart(id: "early", proposedAt: early, prayerDays: [day], timeZone: zone,
+        policy: .init(), submittedBudgetByDay: ["2026-10-08": 4]) == nil)
+    #expect(NotificationArbiter.liveActivityStart(id: "early", proposedAt: early, prayerDays: [day], timeZone: zone,
+        policy: .init(dayBoundary: .midnight), submittedBudgetByDay: ["2026-10-08": 4])?.dayKey == "2026-10-09")
+}
+
+@Test("RL5 activity starts respect quiet hours after clamping and device reminders")
+func liveActivityQuietAndOff() throws {
+    let day = try #require(PrayerTimesEngine.calculate(day: GregorianDay("2026-10-09"), place: .riyadh))
+    // Friday noon is 11:41 + 60 min -> 12:41, which crosses the supplied quiet cutoff.
+    #expect(NotificationArbiter.liveActivityStart(id: "quiet", proposedAt: try instant(hour: 12), prayerDays: [day],
+        timeZone: zone, policy: .init(quietFromMinutes: 12 * 60 + 30), submittedBudgetByDay: [:]) == nil)
+    #expect(NotificationArbiter.liveActivityStart(id: "off", proposedAt: try instant(hour: 10), prayerDays: [day],
+        timeZone: zone, policy: .init(thisDeviceRemindersEnabled: false), submittedBudgetByDay: [:]) == nil)
+    #expect(NotificationArbiter.liveActivityStart(id: "boundary", proposedAt: try instant(hour: 21, minute: 30),
+        prayerDays: [day], timeZone: zone, policy: .init(quietFromMinutes: 21 * 60 + 30), submittedBudgetByDay: [:]) == nil)
+}

@@ -45,6 +45,16 @@ public struct SanctityGuard: Sendable {
 }
 public enum NotificationArbiter {
     public static let pendingCap = 60
+    /// RL5: a scheduled ActivityKit start is an alert and consumes one room-budget slot.
+    public static func liveActivityStart(id: String, proposedAt: Date, prayerDays: [PrayerDay], timeZone: TimeZone,
+                                         policy: NotificationPolicy, submittedBudgetByDay: [String: Int]) -> NotificationCandidate? {
+        guard policy.thisDeviceRemindersEnabled else { return nil }
+        let due = SanctityGuard(prayerDays: prayerDays).clamp(proposedAt)
+        guard !isQuiet(due, timeZone: timeZone, policy: policy) else { return nil }
+        let key = madarKey(at: due, prayerDays: prayerDays, timeZone: timeZone, boundary: policy.dayBoundary)
+        guard max(0, submittedBudgetByDay[key, default: 0]) < policy.dailyBudget else { return nil }
+        return .init(id: id, room: .salah, dueAt: due, dayKey: key)
+    }
     public static func prayerAsk(day: PrayerDay, prayer: Prayer, askAfterAdhanMinutes: Int = 30, recorded: Bool = false) -> NotificationCandidate? {
         guard !recorded else { return nil }
         let adhan = day.time(for: prayer)

@@ -5,6 +5,30 @@ import MadarCore
 @testable import Madar
 
 @MainActor final class AppServiceIntegrationTests: XCTestCase {
+    func test_M1T04_ActivityBudgetLedgerCountsSubmittedAndObservedOnce() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "MadarActivityBudget-\(UUID())")
+        let managed = try ManagedDataStore(root: root.appending(path: "Data"), commandLockURL: root.appending(path: "CommandBus.lock"))
+        // Real synthetic persistence, without attaching to the system notification center.
+        let context = ModelContext(managed.container)
+        for (id, kind, state, deleted) in [
+            ("activity.one", "room", "submitted", false),
+            ("activity.one", "room", "submitted", false),
+            ("room.observed", "room", "observed", false),
+            ("digest.one", "digest", "submitted", false),
+            ("nudge.one", "nudge", "submitted", false),
+            ("cancelled", "room", "cancelled", false),
+            ("prayer.one", "prayer", "submitted", false),
+            ("deleted", "room", "submitted", true)
+        ] {
+            let row = NotificationLedger()
+            row.dayKey = "2026-10-09"; row.requestID = id; row.requestClass = kind; row.state = state
+            if deleted { row.deletedAt = Date() }
+            context.insert(row)
+        }
+        try context.save()
+        XCTAssertEqual(PrayerNotificationCoordinator.activityBudgetCounts(rows: try context.fetch(FetchDescriptor<NotificationLedger>())), ["2026-10-09": 4])
+    }
+
     func test_M0T10_FoundationPrayerClocksUseGoldenDayNumeralsAndZone() throws {
         // Expected clocks are copied from the approved Riyadh 2026-10-09 handoff row.
         // This UTC instant is still October 8 in UTC, but October 9 in the active place.

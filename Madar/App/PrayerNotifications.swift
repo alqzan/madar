@@ -332,9 +332,10 @@ final class PrayerNotificationCoordinator {
         }
         let stale = activities.filter { $0.activityState == .stale }
         let active = activities.filter { $0.activityState == .active || $0.activityState == .pending }
-        for activity in stale { await activity.end(nil, dismissalPolicy: .immediate) }
-        guard session.bool("salah.liveActivity"), ActivityAuthorizationInfo().areActivitiesEnabled else {
-            for activity in active { await activity.end(nil, dismissalPolicy: .immediate) }
+        for activity in stale { try await endPrayerActivity(activity, now: now) }
+        guard session.bool("salah.liveActivity"), session.bool("notif.thisDeviceReminders"),
+              ActivityAuthorizationInfo().areActivitiesEnabled else {
+            for activity in active { try await endPrayerActivity(activity, now: now) }
             return
         }
         let occurrences = prayerDays.flatMap { day in
@@ -346,7 +347,7 @@ final class PrayerNotificationCoordinator {
         guard !Self.isQuiet(startAt, timeZone: timeZone,
                             quietAfterIsha: session.bool("notif.quietAfterIsha"),
                             quietFrom: session.string("notif.quietFrom")) else {
-            for activity in active { await activity.end(nil, dismissalPolicy: .immediate) }
+            for activity in active { try await endPrayerActivity(activity, now: now) }
             return
         }
         // ActivityKit may retain the Lock Screen presentation for four hours
@@ -354,29 +355,80 @@ final class PrayerNotificationCoordinator {
         let maximumDisplayedLifetimeEnd = startAt.addingTimeInterval(12 * 60 * 60)
         if let nextIsha = occurrences.first(where: { $0.1 == .isha && $0.0 > startAt }),
            nextIsha.0 <= maximumDisplayedLifetimeEnd {
-            for activity in active { await activity.end(nil, dismissalPolicy: .immediate) }
+            for activity in active { try await endPrayerActivity(activity, now: now) }
             return
         }
         guard let next = occurrences.first(where: { $0.0 > startAt }),
               next.0.timeIntervalSince(startAt) <= 8 * 60 * 60 else {
-            for activity in active { await activity.end(nil, dismissalPolicy: .immediate) }
+            for activity in active { try await endPrayerActivity(activity, now: now) }
             return
         }
         let previous = occurrences.last(where: { $0.0 <= startAt })
         if previous?.1 == .isha && next.1 == .fajr {
-            for activity in active { await activity.end(nil, dismissalPolicy: .immediate) }
+            for activity in active { try await endPrayerActivity(activity, now: now) }
             return
         }
         if active.contains(where: {
             $0.attributes.activityKey == "prayer.next" && abs($0.content.state.prayerAt.timeIntervalSince(next.0)) < 1
         }) { return }
-        for activity in active { await activity.end(nil, dismissalPolicy: .immediate) }
-        let attributes = PrayerCountdownAttributes(activityKey: "prayer.next", scheduledStartAt: startAt)
+        // Only foreground requests are authorized by RL5. A refresh caused by an
+        // inbox/background notification must never try to start an activity.
+        guard UIApplication.shared.applicationState == .active else { return }
+        let quietMinutes: Int?
+        if session.bool("notif.quietAfterIsha") {
+            let parts = session.string("notif.quietFrom").split(separator: ":").compactMap { Int($0) }
+            guard parts.count == 2, (0...23).contains(parts[0]), (0...59).contains(parts[1]) else { return }
+            quietMinutes = parts[0] * 60 + parts[1]
+        } else { quietMinutes = nil }
+        let policy = NotificationPolicy(dailyBudget: Int(session.number("notif.dailyBudget")),
+                                        quietFromMinutes: quietMinutes, thisDeviceRemindersEnabled: session.bool("notif.thisDeviceReminders"),
+                                        dayBoundary: DayBoundary(rawValue: session.string("core.dayStart")) ?? .fajr)
+        let requestID = "activity." + UUID().uuidString
+        guard let candidate = NotificationArbiter.liveActivityStart(id: requestID, proposedAt: startAt,
+                prayerDays: prayerDays, timeZone: timeZone, policy: policy,
+                submittedBudgetByDay: try activityBudgetCounts()) else { return }
+        for activity in active { try await endPrayerActivity(activity, now: now) }
+        let attributes = PrayerCountdownAttributes(activityKey: "prayer.next", scheduledStartAt: startAt, budgetRequestID: requestID)
         let state = PrayerCountdownAttributes.ContentState(prayerName: Self.title(next.1), prayerAt: next.0)
         let content = ActivityContent(state: state, staleDate: next.0, relevanceScore: 1)
         let alert = AlertConfiguration(title: "الصلاة القادمة", body: "بدأت متابعة الصلاة القادمة.", sound: .default)
-        _ = try Activity.request(attributes: attributes, content: content, pushType: nil, style: .standard,
-                                alertConfiguration: alert, start: startAt)
+        // Persist the reservation before asking the OS, so a failed save can never
+        // leave a scheduled alert outside the device ledger.
+        try updateLedger(requestID: requestID, dayKey: candidate.dayKey, dueAt: startAt,
+                         state: "submitted", kind: "activityStart")
+        do {
+            _ = try Activity.request(attributes: attributes, content: content, pushType: nil, style: .standard,
+                                     alertConfiguration: alert, start: startAt)
+        } catch {
+            try updateLedger(requestID: requestID, state: "cancelled")
+            throw error
+        }
+    }
+
+    private func endPrayerActivity(_ activity: Activity<PrayerCountdownAttributes>, now: Date) async throws {
+        await activity.end(nil, dismissalPolicy: .immediate)
+        // A submitted start keeps consuming its slot once its scheduled time has
+        // passed; we do not infer whether the system delivered the alert.
+        if activity.attributes.scheduledStartAt > now, let id = activity.attributes.budgetRequestID {
+            try updateLedger(requestID: id, state: "cancelled")
+        }
+    }
+
+    func activityBudgetCounts() throws -> [String: Int] {
+        guard let session else { return [:] }
+        let container = try session.managedStore?.containerForTransaction() ?? session.container
+        let rows = try ModelContext(container).fetch(FetchDescriptor<NotificationLedger>())
+        return Self.activityBudgetCounts(rows: rows)
+    }
+
+    static func activityBudgetCounts(rows: [NotificationLedger]) -> [String: Int] {
+        var counts: [String: Set<String>] = [:]
+        for row in rows where row.deletedAt == nil && ["room", "digest", "nudge"].contains(row.requestClass)
+            && ["submitted", "observed"].contains(row.state) {
+            // Natural request identity avoids counting duplicate ledger rows.
+            counts[row.dayKey, default: []].insert(row.requestID)
+        }
+        return counts.mapValues(\.count)
     }
 
     private static func isQuiet(_ date: Date, timeZone: TimeZone, quietAfterIsha: Bool, quietFrom: String) -> Bool {
@@ -414,7 +466,7 @@ final class PrayerNotificationCoordinator {
             row.requestID = requestID
             row.room = "salah"
             row.kind = kind ?? (requestID.hasSuffix(".snooze") ? "snooze" : "ask")
-            row.requestClass = "prayer"
+            row.requestClass = kind == "activityStart" ? "room" : "prayer"
             row.scheduledFor = dueAt ?? Date()
             row.state = state
             row.reason = reason
