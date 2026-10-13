@@ -4976,16 +4976,6 @@
      "optional": true
     },
     {
-     "name": "stage",
-     "type": "Int",
-     "optional": false,
-     "default": 0,
-     "range": [
-      0,
-      12
-     ]
-    },
-    {
      "name": "ease",
      "type": "Double",
      "optional": false,
