@@ -103,6 +103,11 @@ struct PrayerTodayView: View {
                 }
             case .heart(let cell):
                 PrayerHeartAnswerSheet(session: session, cell: cell, finished: { selectedSheet = nil })
+            case .streaks:
+                if let snapshot = try? session.prayerSnapshot(at: session.prayerNow()) {
+                    PrayerStreaksSheet(snapshot: snapshot, levels: PrayerStreakLevel.shown(congregation: session.bool("salah.showMosqueStreak")),
+                                       digits: digits, timeZone: session.activePlace.timeZone, openHali: { selectedSheet = .statistics })
+                }
             case .statistics:
                 NavigationStack {
                     if let snapshot = try? session.prayerSnapshot(at: session.prayerNow()) {
@@ -365,57 +370,29 @@ struct PrayerTodayView: View {
 
     // MARK: Hali, qada and qiyam
 
+    /// «سلاسلك»: the three nested streaks as minbar steps (owner decision, 13 October 2026). Tapping opens the details.
     private func haliCard(_ snapshot: PrayerSnapshot) -> some View {
         let stats = snapshot.statistics
-        let streak = PrayerCopy.days(stats.completionStreak, digits: digits)
-        let detail = streakDetail(stats)
-        return Button { selectedSheet = .statistics } label: {
+        let levels = PrayerStreakLevel.shown(congregation: session.bool("salah.showMosqueStreak"))
+        let summary = levels.map { "\($0.title) \(PrayerCopy.days($0.count(stats), digits: digits))" }.joined(separator: "، ")
+        return Button { selectedSheet = .streaks } label: {
             PrayerPaperCard {
-                HStack(spacing: 14) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("حالي").font(PrayerHomeType.cardHead)
-                        HStack(alignment: .firstTextBaseline, spacing: 10) {
-                            Text(stats.percentage.map(percent) ?? "—")
-                                .font(PrayerHomeType.number)
-                                .accessibilityIdentifier("prayer-month-percentage")
-                            Text("هذا الشهر").font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk)
-                        }
-                        HStack(alignment: .firstTextBaseline, spacing: 5) {
-                            Text("سلسلتك").font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk)
-                            Text(streak).font(PrayerHomeType.strong).foregroundStyle(theme.ink)
-                        }
-                        .padding(.top, 4)
-                        if let detail {
-                            Text(detail).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack {
+                        Text("سلاسلك").font(PrayerHomeType.cardHead)
+                        Spacer()
+                        Image(systemName: "chevron.forward").font(.footnote.weight(.semibold))
+                            .foregroundStyle(theme.secondaryInk).accessibilityHidden(true)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    Image(systemName: "chevron.forward").font(.footnote.weight(.semibold))
-                        .foregroundStyle(theme.secondaryInk).accessibilityHidden(true)
+                    PrayerStreakSteps(levels: levels, stats: stats, digits: digits)
                 }
             }
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(Text("حالي، \(stats.percentage.map(percent) ?? "لم تُحسب النسبة بعد") هذا الشهر، سلسلتك \(streak)" + (detail.map { "، " + $0 } ?? "")))
-        .accessibilityHint("افتح حالي وسجلّ الشهر")
-        .accessibilityIdentifier("prayer-history")
-    }
-
-    /// One streak, not three: the layers nest (congregation days are on time, on-time days are complete),
-    /// so the home shows the completion length once and names only the part of it that is on time or in congregation.
-    private func streakDetail(_ stats: PrayerStatistics) -> String? {
-        let total = stats.completionStreak
-        guard total > 0 else { return nil }
-        let onTime = min(stats.prayerStreak, total)
-        let congregation = session.bool("salah.showMosqueStreak") ? min(stats.congregationStreak, onTime) : 0
-        if congregation == total { return "كلها في جماعة" }
-        var parts: [String] = []
-        if onTime == total { parts.append("كلها في وقتها") }
-        else if onTime > 0 { parts.append(PrayerCopy.lastDays(onTime, digits: digits) + " في وقتها") }
-        if congregation > 0 { parts.append(PrayerCopy.lastDays(congregation, digits: digits) + " في جماعة") }
-        return parts.isEmpty ? "فيها قضاء" : parts.joined(separator: "، و")
+        .accessibilityLabel("سلاسلك: " + summary)
+        .accessibilityHint("افتح تفاصيل السلاسل")
+        .accessibilityIdentifier("prayer-streaks")
     }
 
     @ViewBuilder private func qadaCard(_ snapshot: PrayerSnapshot) -> some View {
@@ -623,10 +600,6 @@ enum PrayerCopy {
     static func days(_ count: Int, digits: MadarNumberFormatter, bundle: Bundle = .main) -> String {
         let formatted = digits.string(count)
         return String(localized: "prayer.days", defaultValue: "\(count) \(formatted)", table: "Prayer", bundle: bundle, locale: Locale(identifier: "ar"))
-    }
-    static func lastDays(_ count: Int, digits: MadarNumberFormatter, bundle: Bundle = .main) -> String {
-        let formatted = digits.string(count)
-        return String(localized: "prayer.lastDays", defaultValue: "\(count) \(formatted)", table: "Prayer", bundle: bundle, locale: Locale(identifier: "ar"))
     }
     static func remaining(_ count: Int, digits: MadarNumberFormatter, bundle: Bundle = .main) -> String {
         let formatted = digits.string(count)
@@ -1034,6 +1007,7 @@ private enum PrayerTodaySheet: Identifiable {
     case pair(GregorianDay, PrayerPair, PrayerCell)
     case log(PrayerCell)
     case statistics
+    case streaks
     case heart(PrayerCell)
     case qiyam
     case oldMissed
@@ -1049,6 +1023,7 @@ private enum PrayerTodaySheet: Identifiable {
         case .qadaList: "qada-list"
         case .qiyam: "qiyam"
         case .statistics: "statistics"
+        case .streaks: "streaks"
         case .heart(let cell): "heart-\(cell.reference.naturalKey)"
         case .log(let cell): "log-\(cell.reference.naturalKey)"
         case .makeUp(let item, _, _): "makeup-\(item.id.uuidString)"

@@ -142,38 +142,9 @@ public enum PrayerAnalytics {
         let onTime = counted.filter { [.jamaah, .alone].contains($0.status) }.count
         var heart: [PrayerHeart: Int] = [:]
         for cell in cells { if let value = cell.heart { heart[value, default: 0] += 1 } }
-        func streak(congregation: Bool) -> Int {
-            var count = 0
-            for day in all.filter({ $0.day < currentDay }).sorted(by: { $0.day > $1.day }) {
-                if day.cells.contains(where: { [.missed, .qada].contains($0.status) }) { break }
-                let meaningful = day.cells.filter { ![.pending, .future, .unrecordedHistory, .unconfirmed, .excused].contains($0.status) }
-                if meaningful.count != 5 { continue }
-                if congregation && meaningful.contains(where: { $0.status != .jamaah }) { break }
-                count += 1
-            }
-            return count
-        }
-        let madeUpReferences = Set(qada.filter { $0.madeUpAt != nil }.map { $0.reference.naturalKey })
-        func completionStreak() -> Int {
-            var count = 0
-            for day in all.filter({ $0.day < currentDay }).sorted(by: { $0.day > $1.day }) {
-                if day.cells.contains(where: { cell in
-                    cell.status == .missed || (cell.status == .qada && !madeUpReferences.contains(cell.reference.naturalKey))
-                }) { break }
-                let completed = day.cells.filter { cell in
-                    switch cell.status {
-                    case .jamaah, .alone: true
-                    case .qada: madeUpReferences.contains(cell.reference.naturalKey)
-                    default: false
-                    }
-                }
-                if completed.count != 5 { continue }
-                count += 1
-            }
-            return count
-        }
+        func streak(_ level: PrayerStreakLevel) -> Int { PrayerStreaks.length(all, level: level, qada: qada, before: currentDay) }
         var commitment: [Prayer: (jamaah: Int, alone: Int, denominator: Int)] = [:]
         for prayer in Prayer.allCases { let rows = counted.filter { $0.reference.prayer == prayer }; commitment[prayer] = (rows.filter { $0.status == .jamaah }.count, rows.filter { $0.status == .alone }.count, rows.count) }
-        return .init(onTime: onTime, denominator: counted.count, madeUp: counted.filter { $0.status == .qada }.count, owed: qada.filter { $0.madeUpAt == nil }.count, prayerStreak: streak(congregation: false), congregationStreak: streak(congregation: true), completionStreak: completionStreak(), heartDistribution: heart, last25: Array(all.flatMap(\.cells).filter { $0.status != .future && $0.status != .unrecordedHistory }.suffix(25)), commitment: commitment)
+        return .init(onTime: onTime, denominator: counted.count, madeUp: counted.filter { $0.status == .qada }.count, owed: qada.filter { $0.madeUpAt == nil }.count, prayerStreak: streak(.onTime), congregationStreak: streak(.congregation), completionStreak: streak(.completion), heartDistribution: heart, last25: Array(all.flatMap(\.cells).filter { $0.status != .future && $0.status != .unrecordedHistory }.suffix(25)), commitment: commitment)
     }
 }

@@ -87,6 +87,7 @@ final class AppSession {
         try preparePrayerUITestTrackingStart()
         try preparePrayerStatisticsFixture()
         try preparePrayerHomeShowcaseFixture()
+        try preparePrayerStreakShowcaseFixture()
         #endif
         try reload()
         let devices = try container.mainContext.fetch(FetchDescriptor<DeviceSetting>())
@@ -296,6 +297,36 @@ final class AppSession {
         for (night, rakaat, witr) in [("2026-10-01", 8, true), ("2026-10-02", 4, false), ("2026-10-04", 2, true), ("2026-10-05", 8, true)] {
             let row = QiyamNight(); row.nightKey = night; row.rakaat = rakaat; row.witr = witr; row.tzID = "Asia/Riyadh"
             context.insert(row)
+        }
+        try context.save()
+    }
+    /// DEBUG-only «سلاسلك» showcase: the hand-worked week of `PrayerStreakTests` (a made-up Fajr on 3 Oct,
+    /// Asr alone on 4 Oct, Isha unrecorded on 6 Oct). Expected: congregation 2, on time 3, completion 6.
+    /// Use with MADAR_UI_NOW 2026-10-08T16:20+03:00 and MADAR_UI_TRACKING_START 2026-10-01.
+    private func preparePrayerStreakShowcaseFixture() throws {
+        guard ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"] != nil,
+              ProcessInfo.processInfo.environment["MADAR_UI_PRAYER_FIXTURE"] == "streakShowcase" else { return }
+        let context = ModelContext(container)
+        guard try context.fetch(FetchDescriptor<PrayerLog>()).isEmpty else { return }
+        for day in 1...8 {
+            let dayKey = String(format: "2026-10-%02d", day)
+            for prayer in Prayer.allCases {
+                if day == 6 && prayer == .isha { continue }
+                if day == 8 && ![.fajr, .dhuhr].contains(prayer) { continue }
+                let row = PrayerLog()
+                row.dayKey = dayKey
+                row.prayer = prayer.rawValue
+                row.status = day == 3 && prayer == .fajr ? "qada" : day == 4 && prayer == .asr ? "alone" : "jamaah"
+                if prayer == .dhuhr && day == 2 { row.fridayKind = "jumuah" }
+                row.tzID = "Asia/Riyadh"
+                row.eventAt = try GregorianDay(dayKey).date(in: ActivePlace.riyadh.timeZone).addingTimeInterval(12 * 3600)
+                row.source = "user"
+                context.insert(row)
+                if row.status == "qada" {
+                    let debt = QadaItem(); debt.originalDayKey = dayKey; debt.prayer = prayer.rawValue; debt.madeUpAt = row.eventAt
+                    context.insert(debt)
+                }
+            }
         }
         try context.save()
     }

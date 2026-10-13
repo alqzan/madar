@@ -19,9 +19,9 @@ import XCTest
             let asr = app.descendants(matching: .any).matching(identifier: "prayer-arch-asr").firstMatch
             XCTAssertTrue(asr.label.contains("وحدي"), asr.label)
             XCTAssertFalse(app.buttons["prayer-heart-review"].exists, "RP6: the heart question is off by default")
-            let hali = app.buttons["prayer-history"]
-            XCTAssertTrue(hali.waitForExistence(timeout: 5), app.debugDescription)
-            XCTAssertTrue(hali.label.contains("سلسلتك"), hali.label)
+            let streaks = app.buttons["prayer-streaks"]
+            XCTAssertTrue(streaks.waitForExistence(timeout: 5), app.debugDescription)
+            for name in ["الجماعة", "في وقتها", "إتمام الخمس"] { XCTAssertTrue(streaks.label.contains(name), streaks.label) }
             attachScreenshot(app, named: "M1-V01-home-\(size)")
             let pending = app.buttons["prayer-pending-review"]
             XCTAssertTrue(pending.exists, app.debugDescription)
@@ -227,8 +227,7 @@ import XCTest
             "MADAR_UI_NOW": "2026-10-07T20:00:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01",
             "MADAR_UI_PRAYER_FIXTURE": "ratio26of30", "MADAR_UI_THEME": "light"]
         app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
-        let history = app.buttons["prayer-history"]
-        scrollTo(history, in: app); history.tap()
+        openHali(app)
         XCTAssertTrue(app.staticTexts["prayer-stat-percentage"].waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(app.buttons["prayer-hali-back"].exists)
         XCTAssertTrue(app.staticTexts["حالي"].exists)
@@ -240,6 +239,34 @@ import XCTest
         app.terminate()
     }
 
+    /// M1-V01: «سلاسلك» opens the streak details: meaning, last seven days, and why each streak broke.
+    func test_M1V01_StreakDetailsSheet() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
+            "MADAR_UI_NOW": "2026-10-08T16:20:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01",
+            "MADAR_UI_PRAYER_FIXTURE": "streakShowcase", "MADAR_UI_THEME": "light"]
+        app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+        let streaks = app.buttons["prayer-streaks"]
+        scrollTo(streaks, in: app); app.swipeUp()
+        // Hand-worked week (PrayerStreakTests): congregation 2, on time 3, completion 6.
+        let label = streaks.label.filter { $0 != "\u{2068}" && $0 != "\u{2069}" }
+        XCTAssertTrue(label.contains("الجماعة يومان"), label)
+        XCTAssertTrue(label.contains("في وقتها ٣ أيام"), label)
+        XCTAssertTrue(label.contains("إتمام الخمس ٦ أيام"), label)
+        attachScreenshot(app, named: "M1-V01-streaks-card-L")
+        streaks.tap()
+        XCTAssertTrue(app.staticTexts["prayer-streaks-title"].waitForExistence(timeout: 10), app.debugDescription)
+        for level in ["congregation", "onTime", "completion"] {
+            XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "prayer-streak-\(level)").firstMatch.exists, level)
+        }
+        attachScreenshot(app, named: "M1-V01-streaks-sheet-L")
+        let hali = app.buttons["prayer-history"]
+        scrollTo(hali, in: app); hali.tap()
+        XCTAssertTrue(app.staticTexts["prayer-stat-percentage"].waitForExistence(timeout: 10), app.debugDescription)
+        app.terminate()
+    }
+
     /// M1-V05: the past-day sheet, for comparison with screens/salah/05-S4-Day(-s1).jpg.
     func test_M1V05_DaySheetMatchesCanonical() throws {
         continueAfterFailure = false
@@ -248,8 +275,7 @@ import XCTest
             "MADAR_UI_NOW": "2026-10-07T20:00:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01",
             "MADAR_UI_PRAYER_FIXTURE": "ratio26of30", "MADAR_UI_THEME": "light"]
         app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
-        let history = app.buttons["prayer-history"]
-        scrollTo(history, in: app); history.tap()
+        openHali(app)
         let day = app.buttons["prayer-history-day-2026-10-06"]
         scrollTo(day, in: app); day.tap()
         XCTAssertTrue(app.buttons["prayer-day-fajr-jamaah"].waitForExistence(timeout: 10), app.debugDescription)
@@ -438,8 +464,7 @@ import XCTest
             scrollTo(review, in: app); review.tap()
             scrollTo(present, in: app); present.tap(); scrollTo(save, in: app); save.tap()
             app.terminate(); app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
-            let history = app.buttons["prayer-history"]
-            scrollTo(history, in: app); history.tap()
+            openHali(app)
             let day = app.buttons["prayer-history-day-2026-10-06"]
             scrollTo(day, in: app); day.tap()
             app.buttons["prayer-history-log-fajr"].tap()
@@ -459,8 +484,7 @@ import XCTest
                 "MADAR_UI_PRAYER_FIXTURE": "ratio26of30", "MADAR_UI_THEME": "light"]
             app.launch(); finishOnboarding(app)
             app.tabBars.buttons["الصلاة"].tap()
-            let history = app.buttons["prayer-history"]
-            scrollTo(history, in: app); history.tap()
+            openHali(app)
             let ratio = app.staticTexts["prayer-stat-percentage"]
             XCTAssertTrue(ratio.waitForExistence(timeout: 10), app.debugDescription)
             XCTAssertEqual(ratio.label, "٨٧٪")
@@ -484,10 +508,10 @@ import XCTest
             for _ in 0..<12 where !back.isHittable { app.swipeDown() }
             back.tap()
             undo.tap()
-            scrollTo(history, in: app); history.tap()
+            openHali(app)
             XCTAssertTrue(ratio.waitForExistence(timeout: 10)); XCTAssertEqual(ratio.label, "٨٧٪")
             app.terminate(); app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
-            scrollTo(history, in: app); history.tap()
+            openHali(app)
             XCTAssertTrue(ratio.waitForExistence(timeout: 10)); XCTAssertEqual(ratio.label, "٨٧٪")
             app.terminate()
         }
@@ -1286,6 +1310,15 @@ import XCTest
         XCTAssertTrue(export.exists, app.debugDescription)
         XCTAssertTrue(export.isHittable, app.debugDescription)
     }
+    /// Home «سلاسلك» → details sheet → «حالي».
+    private func openHali(_ app: XCUIApplication) {
+        let streaks = app.buttons["prayer-streaks"]
+        scrollTo(streaks, in: app); streaks.tap()
+        let hali = app.buttons["prayer-history"]
+        XCTAssertTrue(hali.waitForExistence(timeout: 10), app.debugDescription)
+        scrollTo(hali, in: app); hali.tap()
+    }
+
     private func scrollTo(_ element: XCUIElement, in app: XCUIApplication) {
         for _ in 0..<12 {
             if element.isHittable { break }
