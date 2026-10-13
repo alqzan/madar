@@ -74,7 +74,7 @@ struct PrayerFiveBeads: Shape {
 
 /// S1 «سلاسلك»: three nested horseshoe arches in the shape of the home arches (`PrayerHorseshoe`) — congregation inside,
 /// on time around it, completion outside (owner decision, 13 October 2026). Each arch is one continuous line that fills
-/// from both feet with the streak and closes at the crown at a month (30 days). The count keeps growing after that.
+/// right to left with the streak and is complete at a month (30 days). The count keeps growing after that.
 struct PrayerStreakArches: View {
     static let monthDays = 30
     let levels: [PrayerStreakLevel]
@@ -132,7 +132,7 @@ struct PrayerStreakArches: View {
         }
     }
 
-    /// One continuous arch line, filled from both feet by the streak; the two halves meet at the crown at a month.
+    /// One continuous arch line, filled right to left by the streak: up the right leg, over the crown, down to the left foot at a month.
     private func stones(in rect: CGRect, level: PrayerStreakLevel) -> some View {
         let fraction = grown ? min(CGFloat(level.count(stats)), CGFloat(Self.monthDays)) / CGFloat(Self.monthDays) : 0
         let shape = PrayerHorseshoe().path(in: rect)
@@ -140,8 +140,8 @@ struct PrayerStreakArches: View {
         return ZStack {
             shape.stroke(theme.ink.opacity(0.07), style: StrokeStyle(lineWidth: 8, lineCap: .butt, lineJoin: .round))
             if level.count(stats) > 0 {
-                PathShape(path: shape).trim(from: 0, to: fraction / 2).stroke(color(level), style: fill)
-                PathShape(path: shape).trim(from: 1 - fraction / 2, to: 1).stroke(color(level), style: fill)
+                // The path starts at the left foot in code; the RTL layout mirrors it, so the fill reads right to left.
+                PathShape(path: shape).trim(from: 0, to: fraction).stroke(color(level), style: fill)
             }
         }
     }
