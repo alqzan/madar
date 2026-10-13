@@ -34,7 +34,7 @@ Every screen card follows protocol §2: canonical files → default-size screens
 | M1-F01 | Friday screen with explicit Jumu'ah/Dhuhr choice and the tall Friday arch | `salah/09-S8-Friday.jpg`, `-s1`; RP5 | matched — awaiting owner | `fridayKind` is already stored (T01). `salah.fridayTallArch` default true. Built: the «جمعة مباركة» pill (no «الكهف في قسم القرآن» pointer: no entry to the Quran room yet), tall dome «الجمعة» arch, and the explicit Jumu'ah/Dhuhr choice in the log and make-up sheets (V02, V06). Fixture `homeShowcaseFriday` (UI-test only). Differences: the pill is narrower than the canonical (shorter text); pending notice comes from the fixture. Compare page: `Madar/Artifacts/compare/S8-Friday.html`.|
 | M1-F02 | Travel: ask once, method per trip, shorten/combine without pre-pairing | `salah/10-S9-Travel.jpg`, `-s1`; RP4, RP7 | ready after V | Show «خارج مدينتك» until answered. Fixtures: London with MWL, Istanbul with Turkey. Needs `Trip.calcMethod` (data change → one independent review). |
 | M1-F03 | Edit the tracking start date once | §7.2 P04, `salah.trackingStart` | matched — awaiting owner | Built in «خصّص الصلاة» → التسجيل: the start in words, one edit (date picker up to 30 days before first run), confirm dialog, then «اكتمل التعديل الوحيد». New command `prayer.editTrackingStart` is now accepted by the command bus (it was parsed but not routed); undo is available for ten minutes. No canonical screen exists for this row, so there is no compare page. |
-| M1-F04 | Outside the app: next-prayer widget, lock-screen widgets, countdown | `salah/11-S10-Abwab.jpg`; §9; RL7, RP9, RU2 | ready after V | Widgets read JSON snapshots only. Default shows only the next prayer and its time. |
+| M1-F04 | Outside the app: next-prayer widget, lock-screen widgets, countdown | `salah/11-S10-Abwab.jpg`; §9; RL7, RP9, RU2 | in progress: next-prayer widget built, not yet seen on a device | Widgets read JSON snapshots only. Default shows only the next prayer and its time. Slice 1 (done): `prayerNext` snapshot (times only; `PrayerNextSnapshot` in MadarSnapshots with tests), widget «الصلاة القادمة» in small, medium, lock-screen rectangular and inline, one timeline entry per minute so the countdown reads «بعد ١:١٤» (RL7) without refreshes. Left: the notification with «في جماعة / وحدي / فاتتني» actions (S10), the Live Activity start rules, the Control and Intent, the opt-in for qada counts (RP9), and a visual check on a device (widget uses system fonts: the Thmanyah fonts are not in the extension).|
 | M1-F05 | Import the old prayer history | §7.2, `Madar/docs/MIGRATION.md` | blocked: needs the owner's go and a synthetic fixture first | Never open or migrate the owner's real store without explicit permission. |
 | M1-G | M1 gate on the owner's iPhone | §12/§13 M1, `docs/reports/M1.md` | blocked: needs the owner's iPhone run | Fill the gate table only at the gate. |
 
@@ -71,6 +71,15 @@ M1 gate, then M2 Quran, M3 Diary, M4 Lobby + Habits + Widgets, M5 Money, M6 Mihb
 
 # Handovers
 
+## Handover — M1-F04 next-prayer widget (slice 1) — 2026-10-13 — claude
+
+Works now: the app writes `prayerNext.json` (times for today and tomorrow, no counts) and the widget «الصلاة القادمة» reads it: home small/medium, lock-screen rectangular and inline, countdown «بعد ١:١٤» from per-minute timeline entries.
+Verified: package tests for `PrayerNextSnapshot` passed (8 tests in MadarSnapshots, expected values from the canonical: 16:20 → Maghrib 17:34 → ١:١٤); the app and widget extension build; the Home UI test ran and the simulator's app-group folder held a valid `prayerNext.json` (Riyadh times, validUntil = last prayer).
+Differences left: not seen on a device or in the widget gallery; system fonts instead of Thmanyah; no S10 notification actions, Live Activity rules, Control or opt-in counts yet.
+Not verified: widget rendering and tap-through to `madar://prayer`; behaviour across midnight and a city change.
+Next: the S10 notification actions, or M1-F02 (travel, needs one review pass for `Trip.calcMethod`).
+Model/effort: Claude Sonnet 5.5; effort not exposed. Usage: not exposed.
+
 ## Handover — M1-F03 tracking start — 2026-10-13 — claude
 
 Works now: «خصّص الصلاة» → التسجيل shows the tracking start in words and lets the owner move it once, up to 30 days before first run; afterwards only «اكتمل التعديل الوحيد» shows. Fix: `prayer.editTrackingStart` was parsed but the bus rejected it as `unavailableInM0`; it is now routed (MadarCore `Commands.swift`, MadarCommands adapter).
@@ -87,15 +96,6 @@ Verified: UI test F01 (Friday 2026-10-09 fixture) passed at default size; screen
 Differences left: see the board row.
 Not verified: owner iPhone; a Friday in a travel city; the Friday log flow on this fixture.
 Next: M1-F02 (travel), M1-F03 (tracking start), M1-F04 (outside the app).
-Model/effort: Claude Sonnet 5.5; effort not exposed. Usage: not exposed.
-
-## Handover — M1-V10 customize prayer — 2026-10-13 — claude
-
-Works now: sliders button on the prayer home opens «خصّص الصلاة» (live preview, search, order and hide of home blocks, collapsible groups for the wired settings); order and hide change the home at once, and reset restores the defaults.
-Verified: UI test V10 (reorder qiyam, hide Hali, home follows) and V01/V07/V08 passed at default size; `check-shipping-sources.py` now ends `STATIC PASS`; screenshots `Madar/Artifacts/m1-gap-shots/M1-V10-*.png`.
-Differences left: see the board row.
-Not verified: owner iPhone; relaunch persistence of the layout; the notification-permission card inside the reminders group.
-Next: M1-V11 or the next `ready` card on the board.
 Model/effort: Claude Sonnet 5.5; effort not exposed. Usage: not exposed.
 
 Earlier handovers: `docs/archive/PROGRESS-2026-10-13.md`.

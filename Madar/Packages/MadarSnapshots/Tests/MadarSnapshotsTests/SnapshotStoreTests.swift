@@ -37,3 +37,42 @@ struct SnapshotStoreTests {
         }
     }
 }
+
+/// Expected values come from the S1/S7 canonical: at 16:20 the next prayer is Maghrib 17:34, «بعد ١:١٤».
+struct PrayerNextSnapshotTests {
+    private let base = Date(timeIntervalSince1970: 1_791_000_000) // arbitrary instant; only differences matter
+    private func snapshot(numerals: String = "hindi") -> PrayerNextSnapshot {
+        PrayerNextSnapshot(items: [
+            .init(prayer: "isha", name: "العشاء", at: base.addingTimeInterval(194 * 60)),
+            .init(prayer: "maghrib", name: "المغرب", at: base.addingTimeInterval(74 * 60 + 27)),
+            .init(prayer: "asr", name: "العصر", at: base.addingTimeInterval(-10 * 60)),
+        ], numerals: numerals)
+    }
+    @Test func nextPrayerAndCountdownMatchTheCanonical() {
+        let state = snapshot().state(at: base)
+        #expect(state?.item.prayer == "maghrib")
+        #expect(state?.minutes == 74)
+        #expect(snapshot().countdown(minutes: 74) == "١:١٤")
+    }
+    @Test func movesToTheFollowingPrayerAtTheTimeAndEndsWhenOutOfData() {
+        #expect(snapshot().state(at: base.addingTimeInterval(74 * 60 + 27))?.item.prayer == "isha")
+        #expect(snapshot().state(at: base.addingTimeInterval(194 * 60)) == nil)
+    }
+    @Test func countdownUsesTwoFieldsAndTheChosenNumerals() {
+        #expect(snapshot().countdown(minutes: 5) == "٠:٠٥")
+        #expect(snapshot().countdown(minutes: 600) == "١٠:٠٠")
+        #expect(snapshot(numerals: "western").countdown(minutes: 74) == "1:14")
+    }
+    @Test func timelineHasOneEntryPerMinuteAndStopsAtTheLastPrayer() {
+        let dates = snapshot().timelineDates(from: base.addingTimeInterval(30))
+        #expect(dates.count == 195) // base+0 ... base+194 min
+        #expect(zip(dates, dates.dropFirst()).allSatisfy { $1.timeIntervalSince($0) == 60 })
+    }
+    @Test func roundTripsThroughTheSnapshotStore() throws {
+        let store = SnapshotStore(directory: FileManager.default.temporaryDirectory.appending(path: UUID().uuidString))
+        defer { try? FileManager.default.removeItem(at: store.directory) }
+        let value = snapshot()
+        try store.write(SnapshotEnvelope(name: "prayerNext", generatedAt: base, validUntil: base.addingTimeInterval(3600), dayKey: "2026-10-07", tzID: "Asia/Riyadh", privacy: SnapshotPrivacy(), payload: value))
+        #expect(store.read("prayerNext", as: PrayerNextSnapshot.self, now: base.addingTimeInterval(1))?.payload == value)
+    }
+}

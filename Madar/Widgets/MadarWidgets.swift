@@ -38,6 +38,7 @@ private struct FoundationWidget: Widget {
 @main struct MadarWidgetBundle: WidgetBundle {
     var body: some Widget {
         FoundationWidget()
+        NextPrayerWidget()
         PrayerCountdownActivityWidget()
     }
 }

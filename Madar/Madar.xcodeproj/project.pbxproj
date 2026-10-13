@@ -43,6 +43,7 @@
 		6E9C8889C99E331FEFFD9F6A /* AppServiceIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C105008888548BF995BA7B6D /* AppServiceIntegrationTests.swift */; };
 		74FD6AB907A73C84CA714668 /* PrayerSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A7D4FC457636377F6EF5D76 /* PrayerSettingsView.swift */; };
 		78E8D48DC47F5DEA058B6138 /* PresentationPrivacyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51D072137ACF840D7A277E1C /* PresentationPrivacyTests.swift */; };
+		7C0AF343F838C67B15A0AB9C /* NextPrayerWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43A5C6A40CB96FDF39DD29CA /* NextPrayerWidget.swift */; };
 		7E85C9D2A873F8F790F68F66 /* thmanyahsans-Light.otf in Resources */ = {isa = PBXBuildFile; fileRef = F5C14B0401F68E78003D252D /* thmanyahsans-Light.otf */; };
 		847CAFBC8C0A856177DA1BD1 /* AppSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7253DB8148176A664FA3CF89 /* AppSyncService.swift */; };
 		8C394D8C60E8C0E6316C36FE /* AppInboxLifecycleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3F6E4B2C320BA85D0C94586 /* AppInboxLifecycleTests.swift */; };
@@ -128,6 +129,7 @@
 		30548ADF1D2BBABB66489408 /* BackupSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupSettingsView.swift; sourceTree = "<group>"; };
 		3883565EC8BCC1379DC30626 /* PrayerActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrayerActivityAttributes.swift; sourceTree = "<group>"; };
 		3B030435F71CD96C42619105 /* Customization.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Customization.xcstrings; sourceTree = "<group>"; };
+		43A5C6A40CB96FDF39DD29CA /* NextPrayerWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextPrayerWidget.swift; sourceTree = "<group>"; };
 		4C581755E2CC15BBDCFF8899 /* TabShell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabShell.swift; sourceTree = "<group>"; };
 		4E82713EFD04D42E929BB0F7 /* PrayerCustomizeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrayerCustomizeView.swift; sourceTree = "<group>"; };
 		4FB250BC5106613476C01D41 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -232,6 +234,7 @@
 				1D4DECF86A1E7DCEBC1D6ADF /* Info.plist */,
 				723A592F407CF38115B5691E /* MadarWidgets.entitlements */,
 				2BF0DFC3D1738347A82224A8 /* MadarWidgets.swift */,
+				43A5C6A40CB96FDF39DD29CA /* NextPrayerWidget.swift */,
 			);
 			path = Widgets;
 			sourceTree = "<group>";
@@ -600,6 +603,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				34C08CE848450C430D0DB1E4 /* MadarWidgets.swift in Sources */,
+				7C0AF343F838C67B15A0AB9C /* NextPrayerWidget.swift in Sources */,
 				320323BDDB522460AD28B544 /* PrayerActivityAttributes.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

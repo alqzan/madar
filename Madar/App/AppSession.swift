@@ -569,6 +569,23 @@ final class AppSession {
         }
         let snapshot = SnapshotEnvelope(name: "foundation", generatedAt: instant, validUntil: instant.addingTimeInterval(3600), dayKey: key.dayKey, tzID: place.timeZoneID, privacy: SnapshotPrivacy(), payload: FoundationSnapshot(firstCalendar: string("core.firstCalendar"), numerals: string("core.numerals")))
         try snapshotStore.write(snapshot)
+        publishPrayerNextSnapshot(at: instant, tzID: place.timeZoneID, dayKey: key.dayKey)
+    }
+    /// The next-prayer widget reads this file only; it holds times, never counts or streaks (RP9, RU2).
+    private func publishPrayerNextSnapshot(at instant: Date, tzID: String, dayKey: String) {
+        let names: [Prayer: String] = [.fajr: "الفجر", .dhuhr: "الظهر", .asr: "العصر", .maghrib: "المغرب", .isha: "العشاء"]
+        var items: [PrayerNextSnapshot.Item] = []
+        for offset in [0, 1] {
+            guard let day = try? prayerSnapshot(at: instant.addingTimeInterval(Double(offset) * 86_400)).today else { continue }
+            for cell in day.cells {
+                guard let at = cell.prayerTime, at > instant.addingTimeInterval(-3_600), !items.contains(where: { $0.at == at }) else { continue }
+                items.append(.init(prayer: cell.reference.prayer.rawValue, name: names[cell.reference.prayer] ?? "", at: at))
+            }
+        }
+        guard let last = items.map(\.at).max(), last > instant else { try? snapshotStore.remove("prayerNext"); return }
+        let envelope = SnapshotEnvelope(name: "prayerNext", generatedAt: instant, validUntil: last, dayKey: dayKey, tzID: tzID, privacy: SnapshotPrivacy(),
+                                        payload: PrayerNextSnapshot(items: items, numerals: string("core.numerals") == "western" ? "western" : "hindi"))
+        try? snapshotStore.write(envelope)
     }
 }
 
