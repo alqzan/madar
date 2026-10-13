@@ -450,7 +450,7 @@ final class AppSession {
     private func showUndo(_ token: AppUndoToken, message: String) {
         undoToken = token; undoMessage = message; expiryTask?.cancel()
         expiryTask = Task { [weak self] in
-            let delay = max(0, token.expiresAt.timeIntervalSinceNow)
+            let delay = max(0, token.expiresAt.timeIntervalSince(self?.prayerNow() ?? .now))
             try? await Task.sleep(for: .seconds(delay))
             guard !Task.isCancelled else { return }
             if self?.undoToken?.id == token.id { self?.undoToken = nil }
