@@ -57,6 +57,26 @@ import XCTest
         app.terminate()
     }
 
+    /// M1-V03: «فاتتني» opens the make-up panel and saves nothing until a choice, for screens/salah/03-S2b-Missed.jpg.
+    func test_M1V03_MissedPanelOpensWithoutSaving() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
+            "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-13T09:00:00+03:00"]
+        app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+        let fajr = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", "الفجر")).firstMatch
+        XCTAssertTrue(fajr.waitForExistence(timeout: 10), app.debugDescription)
+        fajr.tap()
+        let missed = app.buttons["prayer-status-missed"]
+        XCTAssertTrue(missed.waitForExistence(timeout: 10), "Fajr's window has ended, so «فاتتني» is offered (RP2)")
+        missed.tap()
+        XCTAssertTrue(app.buttons["prayer-makeup-now"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.buttons["prayer-missed-later"].exists)
+        XCTAssertFalse(app.buttons["undo-button"].exists, "Nothing is saved until «قضيتُها الآن» or «لاحقًا»")
+        attachScreenshot(app, named: "M1-V03-missed-L")
+        app.terminate()
+    }
+
     func test_M1T09_OldMissedSaveUndoRestoreMakeUpAndRelaunch() throws {
         continueAfterFailure = false
         for size in ["L"] {
