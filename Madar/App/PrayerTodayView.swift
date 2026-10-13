@@ -278,12 +278,10 @@ struct PrayerTodayView: View {
     }
 
     private func qadaDate(_ day: GregorianDay) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: session.string("core.numerals") == "western" ? "ar_SA@numbers=latn" : "ar_SA@numbers=arab")
-        formatter.timeZone = session.activePlace.timeZone
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.dateFormat = "EEEE d MMMM"
-        return formatter.string(from: day.date(in: session.activePlace.timeZone).addingTimeInterval(12 * 3600))
+        DualDate(instant: day.date(in: session.activePlace.timeZone).addingTimeInterval(12 * 3600), timeZone: session.activePlace.timeZone,
+            source: HijriSource(rawValue: session.string("core.hijriSource")) ?? .ummAlQura, sightingOffset: Int(session.number("core.hijriOffset")))
+            .text(firstCalendar: session.string("core.firstCalendar") == "gregorian" ? .gregorian : .hijri,
+                  numerals: session.string("core.numerals") == "western" ? .western : .hindi)
     }
 
     private func choose(_ cell: PrayerCell) {
