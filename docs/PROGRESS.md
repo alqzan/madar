@@ -23,7 +23,7 @@ Every screen card follows protocol §2: canonical files → default-size screens
 | M1-V05 | S4 Edit a past day | `salah/05-S4-Day.jpg`, `-s1` | day edit in `PrayerStatisticsView` (T05) | matched — awaiting owner | Sample data. | Day sheet over «حالي»: serif date, «٤ من ٥ جماعة», five rows with one-tap pills, the pending footer worded per RP1 (the canonical «ثم تُحسب فائتة» is not copied). Tapping a month day opens it; edits show in the figures at once; the prayer name opens the full log sheet (heart, Friday kind). Friday noon pills other than «وحدي» open the full sheet for its kind (RP5). Compare page: `Madar/Artifacts/compare/S4-Day.html`. Differences: unavailable states (RP2) are left out rather than disabled, so some rows have three pills. |
 | M1-V06 | S5 Qada | `salah/06-S5-Qada.jpg`, `-s1` | `PrayerQadaListSheet`, `PrayerMakeUpSheet` | matched — awaiting owner | Counts outside the app unless opted in (RP9). Sample counts. | Not merged: the candidate branch `codex/m1-s4-prayer-settings-debt` (`c9bd527`) is superseded. Its grey full-history list was replaced by this sheet; its first-calendar qada dates and its T10 test (choose a specific qada, make it up, undo) were ported (T10 now `test_M1V06_QadaSheetChoosesSpecificPrayerAndUndoes`, default size). «الفوائت والقضاء»: big count with the plural phrase, cited text with its bar, every recorded qada oldest first (touch one to choose it), «اقضِ واحدة» and «أضِف فائتة قديمة»; the confirm step is a room sheet (Friday kind chips, RP5). Dates are words («الثلاثاء ٢٥ ربيع الآخر»), never ISO. Compare page: `Madar/Artifacts/compare/S5-Qada.html`. Differences: the count phrase is the home wording («فائتتان عليك، لم تُقضيا بعد»), no «فوائت أقدم» summary row (every item is listed instead). |
 | M1-V07 | S6 Qiyam | `salah/07-S6-Qiyam.jpg`, `-s1` | `PrayerNightLoggingSheet` | matched — awaiting owner | Streak wording for qiyam (it is a footprint, not a streak). Sample rakaat. Differences: no «ورد القيام من محفوظك» row (Quran room not built); explicit save button and night picker kept; the night picker shows the older date title with ISO digits; the footprint strip is empty in the fixture.| 0...99 rakaat and witr already work (T07). |
-| M1-V08 | S7 Night (dark) | `salah/08-S7-Night.jpg`, `-s1` | home after Isha | ready | Day/night buttons (prototype only). | Dark canonical: compare in dark mode. Night ordering puts qiyam near the top. |
+| M1-V08 | S7 Night (dark) | `salah/08-S7-Night.jpg`, `-s1` | home after Isha | matched — awaiting owner | Day/night buttons (prototype only). Differences: no heart card (RP6: off by default); pending notice reads «تبقى معلّقة حتى تختار حالها» (RP1); figures come from the test fixture; the active arch uses the same shape as the light home. Compare page: `Madar/Artifacts/compare/S7-Night.html`.| Dark canonical: compare in dark mode. Night ordering puts qiyam near the top. |
 | M1-V09 | S11 Mizan (beads) | `salah/12-S11-Mizan.jpg`, `-s1` | Hali beads | ready | The style picker (v2). | Beads view only. |
 | M1-V10 | Customize prayer | `flex/06-K-Salah.jpg`, `-s1`; order and hide per `flex/12-Tahrir.jpg` | `App/PrayerSettingsView.swift` | ready | v2 or deferred keys (see `settings-schema.json` `availability`). Hijri-offset stepper unless sighting is chosen (RL10). | `salah.layout` (block order and hide) is v1 and not wired in `PrayerTodayView` yet. Clear the shipping-check FAILs for `salah.offsets` and `notif.quietFrom`. |
 
@@ -71,6 +71,15 @@ M1 gate, then M2 Quran, M3 Diary, M4 Lobby + Habits + Widgets, M5 Money, M6 Mihb
 
 # Handovers
 
+## Handover — M1-V08 night home — 2026-10-13 — claude
+
+Works now: the prayer home in the dark theme matches `08-S7-Night` (palette, lattice arches, notices, Hali card, qada card, qiyam footprint); no code change was needed, only a dark-mode test.
+Verified: UI test V08 passed at default size; screenshots `Madar/Artifacts/m1-gap-shots/M1-V08-night-L.png` and `-bottom-L.png`.
+Differences left: see the board row.
+Not verified: owner iPhone; the Hali card figures with the canonical sample data.
+Next: M1-V09 (S11 Mizan beads).
+Model/effort: Claude Sonnet 5.5; effort not exposed. Usage: not exposed.
+
 ## Handover — M1-V07 qiyam sheet — 2026-10-13 — claude
 
 Works now: «قيام الليل» matches `07-S6-Qiyam` (room look, −/+ rakaat, «أوترتُ» pill, 30-night footprint strip); the Quran-room entry is not built (room not in v1 yet).
@@ -87,15 +96,6 @@ Verified: UI tests V06 (choose, make up, undo), T09 (old missed, add, undo, rest
 Differences left: see the board row; «أضِف فائتة قديمة» still opens the older form-style sheet (`PrayerOldMissedSheet`).
 Not verified: owner iPhone; a Friday make-up.
 Next: M1-V07 (qiyam sheet).
-Model/effort: Claude Sonnet 5.5; effort not exposed. Usage: not exposed.
-
-## Handover — M1-V05 past-day sheet — 2026-10-13 — claude
-
-Works now: tapping a day in «حالي» opens the S4 sheet (see the board row); the stock grey day list is no longer used. «حالي» now reads the snapshot afresh, so figures follow an edit without reopening.
-Verified: UI tests V05, T05 (edit, undo, relaunch) and T06 (heart via the prayer name) passed at default size; screenshot `Madar/Artifacts/m1-gap-shots/M1-V05-day-L.png`.
-Differences left: see the board row; the scrolled canonical (`-s1`) only repeats the same sheet over the month grid.
-Not verified: owner iPhone; a Friday day edit.
-Next: M1-V06 (needs the candidate branch's T10 test rerun first).
 Model/effort: Claude Sonnet 5.5; effort not exposed. Usage: not exposed.
 
 Earlier handovers: `docs/archive/PROGRESS-2026-10-13.md`.

@@ -31,6 +31,23 @@ import XCTest
         }
     }
 
+    /// M1-V08: the same home in the dark theme, for comparison with screens/salah/08-S7-Night(-s1).jpg.
+    func test_M1V08_NightHomeMatchesCanonical() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
+            "MADAR_UI_NOW": "2026-10-07T16:20:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01",
+            "MADAR_UI_PRAYER_FIXTURE": "homeShowcase", "MADAR_UI_THEME": "dark"]
+        app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+        let header = app.descendants(matching: .any).matching(identifier: "prayer-today-header").firstMatch
+        XCTAssertTrue(header.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "prayer-arch-maghrib").firstMatch.exists)
+        attachScreenshot(app, named: "M1-V08-night-L")
+        let qiyam = app.buttons["prayer-qiyam"]; scrollTo(qiyam, in: app)
+        attachScreenshot(app, named: "M1-V08-night-bottom-L")
+        app.terminate()
+    }
+
     /// M1-V02: the light log sheet, for comparison with screens/salah/02-S2-Log.jpg.
     func test_M1V02_LogSheetMatchesCanonicalAndRecordsInOneTap() throws {
         continueAfterFailure = false
