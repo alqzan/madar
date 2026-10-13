@@ -116,6 +116,31 @@ import XCTest
         app.terminate()
     }
 
+    /// M1-V06: the qada sheet, for comparison with screens/salah/06-S5-Qada.jpg; also choosing a specific one (T10).
+    func test_M1V06_QadaSheetChoosesSpecificPrayerAndUndoes() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
+            "MADAR_UI_NOW": "2026-10-07T20:00:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01",
+            "MADAR_UI_PRAYER_FIXTURE": "ratio26of30", "MADAR_UI_THEME": "light"]
+        app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+        let places = app.buttons["prayer-qada-places"]; scrollTo(places, in: app); places.tap()
+        XCTAssertTrue(app.staticTexts["prayer-qada-title"].waitForExistence(timeout: 10), app.debugDescription)
+        let isha = app.buttons["prayer-qada-row-2026-10-06-isha"]
+        XCTAssertTrue(isha.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.buttons["prayer-qada-row-2026-10-06-maghrib"].exists)
+        attachScreenshot(app, named: "M1-V06-qada-L")
+        isha.tap()
+        XCTAssertTrue(isha.isSelected)
+        app.buttons["prayer-qada-makeup-chosen"].tap()
+        let confirm = app.buttons["prayer-makeup-confirm"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 10), app.debugDescription)
+        confirm.tap()
+        let undo = app.buttons["undo-button"]; XCTAssertTrue(undo.waitForExistence(timeout: 15), app.debugDescription)
+        undo.tap()
+        app.terminate()
+    }
+
     func test_M1T09_OldMissedSaveUndoRestoreMakeUpAndRelaunch() throws {
         continueAfterFailure = false
         for size in ["L"] {
@@ -135,7 +160,8 @@ import XCTest
             let places = app.buttons["prayer-qada-places"]; scrollTo(places, in: app); places.tap()
             let row = app.descendants(matching: .any).matching(identifier: "prayer-qada-row-2026-10-02-fajr").firstMatch
             XCTAssertTrue(row.waitForExistence(timeout: 10), app.debugDescription)
-            app.buttons["تم"].firstMatch.tap()
+            let sheetTitle = app.staticTexts["prayer-qada-title"]
+            sheetTitle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.99)))
             let makeup = app.buttons["prayer-qada-makeup"]; scrollTo(makeup, in: app); makeup.tap()
             let confirm = app.buttons["prayer-makeup-confirm"]; scrollTo(confirm, in: app); confirm.tap()
             XCTAssertTrue(undo.waitForExistence(timeout: 15)); undo.tap()

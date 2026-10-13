@@ -83,12 +83,9 @@ struct PrayerTodayView: View {
                     }
                 }
             case .qadaList:
-                NavigationStack {
-                    PrayerQadaListSheet(session: session, dateLabel: qadaDate,
-                        makeUp: { item in selectedSheet = .makeUp(item, isFridayNoon: item.isFriday, dateLabel: qadaDate(item.reference.day)) },
-                        addOld: { selectedSheet = .oldMissed })
-                        .toolbar { ToolbarItem(placement: .confirmationAction) { Button("تم") { selectedSheet = nil } } }
-                }
+                PrayerQadaListSheet(session: session, dateLabel: qadaDate,
+                    makeUp: { item in selectedSheet = .makeUp(item, isFridayNoon: item.isFriday, dateLabel: qadaDate(item.reference.day)) },
+                    addOld: { selectedSheet = .oldMissed })
             case .log(let cell):
                 PrayerTodayLogSheet(cell: cell,
                     clock: (cell.prayerTime ?? cell.time).map { clock($0, timeZone: session.activePlace.timeZone) } ?? "",
@@ -454,13 +451,18 @@ struct PrayerTodayView: View {
         return formatter.string(from: NSNumber(value: Double(value) / 100)) ?? digits.string(value)
     }
 
+    /// «الثلاثاء ٢٥ ربيع الآخر» or «الثلاثاء ٦ أكتوبر», following `core.firstCalendar`; never ISO digits.
     private func qadaDate(_ day: GregorianDay) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = numeralLocale
-        formatter.timeZone = session.activePlace.timeZone
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.dateFormat = "EEEE d MMMM"
-        return formatter.string(from: day.date(in: session.activePlace.timeZone).addingTimeInterval(12 * 3600))
+        let zone = session.activePlace.timeZone
+        let noon = day.date(in: zone).addingTimeInterval(12 * 3600)
+        let f = DateFormatter(); f.locale = numeralLocale; f.timeZone = zone; f.calendar = Calendar(identifier: .gregorian)
+        f.dateFormat = session.string("core.firstCalendar") == "gregorian" ? "EEEE d MMMM" : "EEEE"
+        let weekday = f.string(from: noon)
+        if session.string("core.firstCalendar") == "gregorian" { return weekday }
+        let names = ["محرم", "صفر", "ربيع الأول", "ربيع الآخر", "جمادى الأولى", "جمادى الآخرة", "رجب", "شعبان", "رمضان", "شوال", "ذو القعدة", "ذو الحجة"]
+        let date = HijriCalendar.date(for: noon, timeZone: zone, source: HijriSource(rawValue: session.string("core.hijriSource")) ?? .ummAlQura,
+                                      sightingOffset: Int(session.number("core.hijriOffset")))
+        return weekday + " " + digits.string(date.day) + " " + names[date.month - 1]
     }
 
     private func choose(_ cell: PrayerCell) {
@@ -817,46 +819,96 @@ private struct PrayerNightFootprint: View {
     }
 }
 
-/// «مواضعها»: every recorded missed prayer, oldest first, with one make-up action each.
+/// S5 · «الفوائت والقضاء», matched to `screens/salah/06-S5-Qada.jpg`: the count, the cited text,
+/// every recorded missed prayer oldest first (touch one to choose it), then «اقضِ واحدة».
 private struct PrayerQadaListSheet: View {
     let session: AppSession
     let dateLabel: (GregorianDay) -> String
     let makeUp: (PrayerQada) -> Void
     let addOld: () -> Void
     @Environment(\.roomTheme) private var theme
+    @State private var chosen: UUID?
+    @State private var contentHeight: CGFloat = 640
+
+    private var outstanding: [PrayerQada] {
+        ((try? session.prayerSnapshot(at: session.prayerNow()))?.qada ?? []).filter { $0.madeUpAt == nil }
+    }
+    private var digits: MadarNumberFormatter { MadarNumberFormatter(style: session.string("core.numerals") == "western" ? .western : .hindi) }
+
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                Text("الفوائت").font(MadarTypography.title())
-                if let snapshot = try? session.prayerSnapshot(at: session.prayerNow()) {
-                    ForEach(snapshot.qada) { item in
-                        HStack(spacing: 12) {
-                            PrayerStar().stroke(item.madeUpAt == nil ? theme.color("missed") : theme.secondaryInk, lineWidth: 1).frame(width: 14, height: 14)
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(prayerTitle(item.reference.prayer)).font(PrayerHomeType.strong)
-                                Text(dateLabel(item.reference.day)).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
-                            }
-                            Spacer()
-                            if item.madeUpAt == nil {
-                                Button("اقضِها") { makeUp(item) }.font(PrayerHomeType.strong).foregroundStyle(theme.accent).frame(minHeight: 44)
-                            } else {
-                                Text("قُضيت").font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
-                            }
-                        }
-                        .padding(.vertical, 6)
-                        .accessibilityElement(children: .contain)
-                        .accessibilityIdentifier("prayer-qada-row-\(item.reference.day)-\(item.reference.prayer.rawValue)")
-                        Divider()
-                    }
-                }
-                Button("أضف فائتة قديمة", action: addOld)
-                    .font(PrayerHomeType.strong).foregroundStyle(theme.accent).frame(minHeight: 44)
-                    .accessibilityIdentifier("prayer-old-missed")
+        let items = outstanding
+        let selected = items.first { $0.id == chosen } ?? items.first
+        VStack(alignment: .leading, spacing: 0) {
+            Text("الفوائت والقضاء").font(.custom("thmanyahserifdisplay-Bold", size: 30, relativeTo: .title)).accessibilityAddTraits(.isHeader)
+                .accessibilityIdentifier("prayer-qada-title")
+            HStack(alignment: .center, spacing: 12) {
+                Text(digits.string(items.count)).font(.custom("thmanyahserifdisplay-Bold", size: 64, relativeTo: .largeTitle))
+                Text(PrayerCopy.owed(items.count)).font(PrayerHomeType.lead).foregroundStyle(theme.secondaryInk)
+                Spacer(minLength: 0)
             }
-            .padding(20)
+            .padding(.top, 14).accessibilityElement(children: .combine)
+            HStack(alignment: .top, spacing: 12) {
+                Rectangle().fill(theme.color("missed")).frame(width: 2)
+                PrayerQadaCitation()
+            }
+            .fixedSize(horizontal: false, vertical: true).padding(.top, 8)
+            ScrollView {
+                VStack(spacing: 0) {
+                    ForEach(items) { item in
+                        Rectangle().fill(theme.ink.opacity(0.1)).frame(height: 1)
+                        row(item, on: item.id == selected?.id)
+                    }
+                    Rectangle().fill(theme.ink.opacity(0.1)).frame(height: 1)
+                }
+            }
+            .scrollBounceBehavior(.basedOnSize).frame(height: min(CGFloat(items.count) * 61 + 1, 280)).padding(.top, 16)
+            actions(selected)
         }
-        .background(theme.background)
-        .foregroundStyle(theme.ink)
+        .padding(.horizontal, 20).padding(.top, 26).padding(.bottom, 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 + 20 }
+        .frame(maxHeight: .infinity, alignment: .top)
+        .background(theme.background).foregroundStyle(theme.ink)
+        .presentationDetents([.height(min(max(contentHeight, 360), 760)), .large])
+        .presentationBackground(theme.background)
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(34)
+    }
+
+    private func row(_ item: PrayerQada, on: Bool) -> some View {
+        Button { chosen = item.id } label: {
+            HStack(spacing: 12) {
+                PrayerStar().fill(theme.color("missed")).frame(width: 14, height: 14).accessibilityHidden(true)
+                Text(prayerTitle(item.reference.prayer)).font(PrayerHomeType.lead)
+                Spacer(minLength: 8)
+                Text(dateLabel(item.reference.day)).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
+            }
+            .padding(.horizontal, 10).frame(minHeight: 60)
+            .background(on ? theme.color("missed").opacity(0.08) : .clear, in: .rect(cornerRadius: 14))
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(on ? .isSelected : [])
+        .accessibilityIdentifier("prayer-qada-row-\(item.reference.day)-\(item.reference.prayer.rawValue)")
+    }
+
+    private func actions(_ selected: PrayerQada?) -> some View {
+        HStack(spacing: 12) {
+            Button { if let selected { makeUp(selected) } } label: {
+                Text("اقضِ واحدة").font(PrayerHomeType.strong).foregroundStyle(theme.background)
+                    .frame(maxWidth: .infinity, minHeight: 56).background(theme.ink, in: .rect(cornerRadius: 18))
+            }
+            .buttonStyle(.plain).disabled(selected == nil || session.prayerWriteInProgress)
+            .opacity(selected == nil ? 0.4 : 1).accessibilityIdentifier("prayer-qada-makeup-chosen")
+            Button(action: addOld) {
+                Text("أضِف فائتة قديمة").font(PrayerHomeType.strong).padding(.horizontal, 22).frame(minHeight: 56)
+                    .overlay { RoundedRectangle(cornerRadius: 18).stroke(theme.ink.opacity(0.14), lineWidth: 1) }
+                    .contentShape(.rect(cornerRadius: 18))
+            }
+            .buttonStyle(.plain).accessibilityIdentifier("prayer-old-missed")
+        }
+        .padding(.top, 16)
     }
 }
 
@@ -1120,6 +1172,7 @@ private struct PrayerSheetArch: View {
     }
 }
 
+/// «قضيتُها»: confirms one make-up. Friday noon asks for its kind explicitly (RP5).
 private struct PrayerMakeUpSheet: View {
     let item: PrayerQada
     let isFridayNoon: Bool
@@ -1127,44 +1180,65 @@ private struct PrayerMakeUpSheet: View {
     let isSaving: Bool
     let makeUp: (FridayPrayerKind?) -> Void
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.roomTheme) private var theme
     @State private var fridayKind: FridayPrayerKind?
+    @State private var contentHeight: CGFloat = 420
     init(item: PrayerQada, isFridayNoon: Bool, dateLabel: String, isSaving: Bool, makeUp: @escaping (FridayPrayerKind?) -> Void) {
         self.item = item; self.isFridayNoon = isFridayNoon; self.dateLabel = dateLabel; self.isSaving = isSaving; self.makeUp = makeUp
         _fridayKind = State(initialValue: item.fridayKind)
     }
     var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    Text("\(title(item.reference.prayer)) · \(dateLabel)").font(MadarTypography.cardTitle())
-                    PrayerQadaCitation()
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .center, spacing: 14) {
+                PrayerSheetArch().frame(width: 34, height: 52).accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("قضاء \(prayerTitle(item.reference.prayer))").font(.custom("thmanyahserifdisplay-Bold", size: 28, relativeTo: .title))
+                        .accessibilityAddTraits(.isHeader)
+                    Text(dateLabel).font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk)
                 }
-                if isFridayNoon {
-                    Section("نوع صلاة الجمعة") {
-                        if let fridayKind { Text(fridayKind == .jumuah ? "صلاة الجمعة" : "الظهر") }
-                        else {
-                            Picker("التصنيف", selection: $fridayKind) {
-                                Text("اختر التصنيف").tag(nil as FridayPrayerKind?)
-                                Text("صلاة الجمعة").tag(FridayPrayerKind?.some(.jumuah))
-                                Text("الظهر").tag(FridayPrayerKind?.some(.dhuhr))
-                            }.accessibilityIdentifier("prayer-makeup-friday-kind")
+                Spacer(minLength: 0)
+            }
+            HStack(alignment: .top, spacing: 12) {
+                Rectangle().fill(theme.color("missed")).frame(width: 2)
+                PrayerQadaCitation()
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            if isFridayNoon {
+                HStack(spacing: 10) {
+                    Text("ظهر الجمعة:").font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk)
+                    ForEach([FridayPrayerKind.jumuah, .dhuhr], id: \.self) { kind in
+                        let on = fridayKind == kind
+                        Button { if item.fridayKind == nil { fridayKind = kind } } label: {
+                            Text(kind == .jumuah ? "صلاة الجمعة" : "الظهر").font(on ? PrayerHomeType.smallBold : PrayerHomeType.small)
+                                .foregroundStyle(on ? theme.color("accentText") : theme.ink)
+                                .padding(.horizontal, 16).frame(minHeight: 40)
+                                .background(on ? theme.color("goldSoft") : .clear, in: .capsule)
+                                .overlay { Capsule().stroke(on ? theme.accent : theme.ink.opacity(0.14), lineWidth: on ? 1.5 : 1) }
+                                .frame(minHeight: 44).contentShape(.rect)
                         }
+                        .buttonStyle(.plain).accessibilityAddTraits(on ? .isSelected : [])
+                        .accessibilityIdentifier("prayer-makeup-friday-kind-\(kind.rawValue)")
                     }
-                }
-                Section {
-                    Button("قضيتُها الآن") { makeUp(isFridayNoon ? fridayKind : nil); dismiss() }
-                        .buttonStyle(MadarPrimaryButton())
-                        .disabled(isSaving || (isFridayNoon && fridayKind == nil))
-                        .accessibilityIdentifier("prayer-makeup-confirm")
+                    Spacer(minLength: 0)
                 }
             }
-            .navigationTitle("القضاء")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("إغلاق") { dismiss() } } }
-        }.presentationDetents([.medium, .large])
-    }
-    private func title(_ prayer: Prayer) -> String {
-        switch prayer { case .fajr: "الفجر"; case .dhuhr: "الظهر"; case .asr: "العصر"; case .maghrib: "المغرب"; case .isha: "العشاء" }
+            Button { makeUp(isFridayNoon ? fridayKind : nil); dismiss() } label: {
+                Text("قضيتُها الآن").font(PrayerHomeType.strong).foregroundStyle(theme.background)
+                    .frame(maxWidth: .infinity, minHeight: 56).background(theme.ink, in: .rect(cornerRadius: 18))
+            }
+            .buttonStyle(.plain).disabled(isSaving || (isFridayNoon && fridayKind == nil))
+            .opacity(isSaving || (isFridayNoon && fridayKind == nil) ? 0.4 : 1)
+            .accessibilityIdentifier("prayer-makeup-confirm")
+        }
+        .padding(.horizontal, 20).padding(.top, 26).padding(.bottom, 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 + 20 }
+        .frame(maxHeight: .infinity, alignment: .top)
+        .background(theme.background).foregroundStyle(theme.ink)
+        .presentationDetents([.height(min(max(contentHeight, 300), 700)), .large])
+        .presentationBackground(theme.background)
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(34)
     }
 }
 

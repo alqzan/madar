@@ -21,7 +21,7 @@ Every screen card follows protocol §2: canonical files → default-size screens
 | M1-V03 | S2b Missed and reminder | `salah/03-S2b-Missed.jpg`, `-s1` | `PrayerMakeUpSheet`, `PrayerGapResolutionSheet` | matched — awaiting owner | «فاتتني… نزلت في القضاء» before the prayer's window ends (RP2: before the end only «لم أصلّها بعد» or snooze). «فاتتني» in the +30 notification (RP2). Automatic aging (RP1). | Gap sheet «صلوات بلا تسجيل» rebuilt at the owner's request (room look, one-tap settle, by day, partial save). The S2b panel lives in the log sheet (M1-V02): «فاتتني» shows «نزلت في القضاء…», the citation bar, «قضيتُها الآن» / «لاحقًا» and saves nothing until a choice. The +30 notification has only the snooze action (no «فاتتني», RP2). Compare page: `Madar/Artifacts/compare/S2b-Missed.html`. Difference: the canonical shows the panel on Asr before its window ends, which RP2 forbids. |
 | M1-V04 | S3 Hali | `salah/04-S3-Hali.jpg`, `-s1` | `PrayerStatisticsView` | matched — awaiting owner | Any ranking or superlative such as «أخشعُ صلواتك…» (RP6). Sample numbers. Balance-style picker (`salah.balanceView` is v2: beads only). | «حالي» rebuilt: back row «‹ الصلاة» and serif title, three figure cards with the Arabic plural («٠ أيام»، «يومان»), Mizan card (bead arc with thread, ratio over the last 25, «أوفيت · معلّقة», «الأقدم / الأحدث», «آخر ٢٥ فرضًا»), month card with a five-bead arch glyph per day and today highlighted, commitment bars with percentages and legend, heart card only when `salah.askHeart`. Compare page: `Madar/Artifacts/compare/S3-Hali.html`. Differences: sheet presentation instead of a pushed page; the «قُضيت ٢، عليك ٢» line is kept under the figures (spec text, not in the canonical); days before tracking start show faded. |
 | M1-V05 | S4 Edit a past day | `salah/05-S4-Day.jpg`, `-s1` | day edit in `PrayerStatisticsView` (T05) | matched — awaiting owner | Sample data. | Day sheet over «حالي»: serif date, «٤ من ٥ جماعة», five rows with one-tap pills, the pending footer worded per RP1 (the canonical «ثم تُحسب فائتة» is not copied). Tapping a month day opens it; edits show in the figures at once; the prayer name opens the full log sheet (heart, Friday kind). Friday noon pills other than «وحدي» open the full sheet for its kind (RP5). Compare page: `Madar/Artifacts/compare/S4-Day.html`. Differences: unavailable states (RP2) are left out rather than disabled, so some rows have three pills. |
-| M1-V06 | S5 Qada | `salah/06-S5-Qada.jpg`, `-s1` | `codex/m1-s4-prayer-settings-debt` `c9bd527` | ready | Counts outside the app unless opted in (RP9). Sample counts. | First rerun the candidate's T10 UI test and merge it only if green, then match the design. Dates follow `core.firstCalendar`. |
+| M1-V06 | S5 Qada | `salah/06-S5-Qada.jpg`, `-s1` | `PrayerQadaListSheet`, `PrayerMakeUpSheet` | matched — awaiting owner | Counts outside the app unless opted in (RP9). Sample counts. | Not merged: the candidate branch `codex/m1-s4-prayer-settings-debt` (`c9bd527`) is superseded. Its grey full-history list was replaced by this sheet; its first-calendar qada dates and its T10 test (choose a specific qada, make it up, undo) were ported (T10 now `test_M1V06_QadaSheetChoosesSpecificPrayerAndUndoes`, default size). «الفوائت والقضاء»: big count with the plural phrase, cited text with its bar, every recorded qada oldest first (touch one to choose it), «اقضِ واحدة» and «أضِف فائتة قديمة»; the confirm step is a room sheet (Friday kind chips, RP5). Dates are words («الثلاثاء ٢٥ ربيع الآخر»), never ISO. Compare page: `Madar/Artifacts/compare/S5-Qada.html`. Differences: the count phrase is the home wording («فائتتان عليك، لم تُقضيا بعد»), no «فوائت أقدم» summary row (every item is listed instead). |
 | M1-V07 | S6 Qiyam | `salah/07-S6-Qiyam.jpg`, `-s1` | `PrayerNightLoggingSheet` | ready | Streak wording for qiyam (it is a footprint, not a streak). Sample rakaat. | 0...99 rakaat and witr already work (T07). |
 | M1-V08 | S7 Night (dark) | `salah/08-S7-Night.jpg`, `-s1` | home after Isha | ready | Day/night buttons (prototype only). | Dark canonical: compare in dark mode. Night ordering puts qiyam near the top. |
 | M1-V09 | S11 Mizan (beads) | `salah/12-S11-Mizan.jpg`, `-s1` | Hali beads | ready | The style picker (v2). | Beads view only. |
@@ -71,6 +71,15 @@ M1 gate, then M2 Quran, M3 Diary, M4 Lobby + Habits + Widgets, M5 Money, M6 Mihb
 
 # Handovers
 
+## Handover — M1-V06 qada sheet — 2026-10-13 — claude
+
+Works now: «الفوائت والقضاء» matches `06-S5-Qada` (see the board row); choosing a specific qada works; the make-up confirm sheet and the qada dates follow the room look and `core.firstCalendar`.
+Verified: UI tests V06 (choose, make up, undo), T09 (old missed, add, undo, restore, make up) and T02 (missed, make up, undo) passed at default size; screenshot `Madar/Artifacts/m1-gap-shots/M1-V06-qada-L.png`.
+Differences left: see the board row; «أضِف فائتة قديمة» still opens the older form-style sheet (`PrayerOldMissedSheet`).
+Not verified: owner iPhone; a Friday make-up.
+Next: M1-V07 (qiyam sheet).
+Model/effort: Claude Sonnet 5.5; effort not exposed. Usage: not exposed.
+
 ## Handover — M1-V05 past-day sheet — 2026-10-13 — claude
 
 Works now: tapping a day in «حالي» opens the S4 sheet (see the board row); the stock grey day list is no longer used. «حالي» now reads the snapshot afresh, so figures follow an edit without reopening.
@@ -78,15 +87,6 @@ Verified: UI tests V05, T05 (edit, undo, relaunch) and T06 (heart via the prayer
 Differences left: see the board row; the scrolled canonical (`-s1`) only repeats the same sheet over the month grid.
 Not verified: owner iPhone; a Friday day edit.
 Next: M1-V06 (needs the candidate branch's T10 test rerun first).
-Model/effort: Claude Sonnet 5.5; effort not exposed. Usage: not exposed.
-
-## Handover — M1-V04 Hali — 2026-10-13 — claude
-
-Works now: «حالي» matches `04-S3-Hali` and `-s1` (see the board row). The title is no longer shown twice and the streak cards use the Arabic plural.
-Verified: UI tests V04, T05 (ratio, history edit, undo) and T06 passed at default size; screenshots `Madar/Artifacts/m1-gap-shots/M1-V04-hali-L.png` and `-scrolled-L.png`.
-Differences left: see the board row; the heart card was not screenshotted (the question is off by default).
-Not verified: owner iPhone.
-Next: M1-V05.
 Model/effort: Claude Sonnet 5.5; effort not exposed. Usage: not exposed.
 
 Earlier handovers: `docs/archive/PROGRESS-2026-10-13.md`.
