@@ -208,7 +208,7 @@ struct PrayerTodayView: View {
         return MadarCard {
             VStack(alignment: .leading, spacing: 12) {
                 Text("الفوائت والقضاء").font(MadarTypography.cardTitle())
-                Text("\(number(snapshot.qada.count)) فوائت مسجّلة · \(number(snapshot.statistics.owed)) لم تُقضَ")
+                Text("\(number(snapshot.qada.count)) فوائت مسجّلة، \(number(snapshot.statistics.owed)) لم تُقضَ")
                     .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                 PrayerQadaCitation()
                 ForEach(shown) { item in
