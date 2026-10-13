@@ -91,7 +91,7 @@ struct PrayerTravelPill: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 8) {
-                Image(systemName: "diamond.fill").font(.system(size: 9))
+                Image(systemName: "diamond.fill").font(.system(size: 11))
                 Text(text).font(PrayerHomeType.strong)
             }
             .foregroundStyle(theme.color("accentText"))

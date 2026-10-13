@@ -194,7 +194,7 @@ struct PrayerTodayView: View {
     /// Friday greeting. The Quran room has no entry point yet, so the pill carries no link and no Al-Kahf pointer.
     private var fridayPill: some View {
         HStack(spacing: 8) {
-            Image(systemName: "diamond.fill").font(.system(size: 9))
+            Image(systemName: "diamond.fill").font(.system(size: 11))
             Text("جمعة مباركة").font(PrayerHomeType.strong)
         }
         .foregroundStyle(theme.color("accentText"))

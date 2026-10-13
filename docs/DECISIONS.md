@@ -47,3 +47,4 @@
 | 2026-10-13 | M1-F02 trip method | `Trip.calcMethod` stored as setting `salah.tripMethod` (applies to the active trip place only; past records not recomputed). No SwiftData migration, so no data review was needed. Travel distance threshold is about 80 km from the Riyadh borders (owner, 13 Oct). | claude |
 | 2026-10-13 | M1-F02 travel threshold | `core.travelKm` default 300 → 80 km, counted from the home city's edge (≈25 km radius); the question is always asked (RP7), also in «تلقائي». | owner/claude |
 | 2026-10-13 | M1-F02 travel look | Owner asked for a different look on trips: while a trip is active the prayer home uses the calm-paper palette (existing tokens, `roomIdentity.calmPaper`), gold ornaments unchanged. | owner/claude |
+| 2026-10-13 | M1 close and F05 | Owner: close M1 now and verify on the iPhone later; F05 goes to Codex; the travel question is always asked beyond 80 km (RP7 confirmed). | owner |
