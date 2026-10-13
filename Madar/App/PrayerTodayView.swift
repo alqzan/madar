@@ -53,6 +53,31 @@ struct PrayerTodayView: View {
         .sheet(item: $selectedSheet) { route in
             Group {
             switch route {
+            case .qadaHistory:
+                NavigationStack {
+                    if let snapshot = try? session.prayerSnapshot(at: session.prayerNow()) {
+                        List {
+                            ForEach([false, true], id: \.self) { completed in
+                                Section(completed ? "قُضيت" : "لم تُقضَ") {
+                                    ForEach(snapshot.qada.filter { ($0.madeUpAt != nil) == completed }) { item in
+                                        if completed {
+                                            Text(title(item.reference.prayer) + "، " + qadaDate(item.reference.day))
+                                                .font(MadarTypography.body()).fixedSize(horizontal: false, vertical: true)
+                                        } else {
+                                            Button { selectedSheet = .makeUp(item, isFridayNoon: item.isFriday, dateLabel: qadaDate(item.reference.day)) } label: {
+                                                VStack(alignment: .leading, spacing: 6) {
+                                                    Text(title(item.reference.prayer)).font(MadarTypography.section())
+                                                    Text(qadaDate(item.reference.day)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                                                }.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).contentShape(Rectangle())
+                                            }.accessibilityIdentifier("prayer-qada-select-\(item.reference.naturalKey)")
+                                        }
+                                    }
+                                }
+                            }
+                        }.foregroundStyle(theme.ink).navigationTitle("سجلّ الفوائت").navigationBarTitleDisplayMode(.inline)
+                            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("تم") { selectedSheet = nil } } }
+                    }
+                }
             case .oldMissed:
                 if let snapshot = try? session.prayerSnapshot(at: session.prayerNow()) {
                     PrayerOldMissedSheet(session: session, trackingStart: snapshot.tracking.day, finished: { selectedSheet = nil })
@@ -216,6 +241,10 @@ struct PrayerTodayView: View {
                     .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                 Button("أضف فائتة قديمة") { selectedSheet = .oldMissed }
                     .frame(minHeight: 44).accessibilityIdentifier("prayer-old-missed")
+                if !snapshot.qada.isEmpty {
+                    Button("اعرض سجلّ الفوائت كله") { selectedSheet = .qadaHistory }
+                        .frame(minHeight: 44).accessibilityIdentifier("prayer-qada-history")
+                }
                 PrayerQadaCitation()
                 ForEach(shown) { item in
                     HStack {
@@ -387,10 +416,12 @@ private enum PrayerTodaySheet: Identifiable {
     case heart(PrayerCell)
     case qiyam
     case oldMissed
+    case qadaHistory
     case makeUp(PrayerQada, isFridayNoon: Bool, dateLabel: String)
     case recovery([PrayerReference], Set<PrayerReference>, TimeZone)
     var id: String {
         switch self {
+        case .qadaHistory: "qada-history"
         case .oldMissed: "old-missed"
         case .qiyam: "qiyam"
         case .statistics: "statistics"

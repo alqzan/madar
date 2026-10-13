@@ -1,6 +1,25 @@
 import XCTest
 
 @MainActor final class FoundationUITests: XCTestCase {
+    func test_M1T10_SelectSpecificQadaFromFullHistoryAndUndo() throws {
+        continueAfterFailure = false
+        for size in ["L", "AX3"] {
+            let app = XCUIApplication()
+            app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": size,
+                "MADAR_UI_NOW": "2026-10-07T20:00:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01", "MADAR_UI_PRAYER_FIXTURE": "ratio26of30", "MADAR_UI_THEME": "light"]
+            app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+            let history = app.buttons["prayer-qada-history"]; scrollTo(history, in: app); history.tap()
+            let isha = app.buttons["prayer-qada-select-2026-10-06.isha"]; scrollTo(isha, in: app)
+            XCTAssertTrue(app.buttons["prayer-qada-select-2026-10-06.maghrib"].exists)
+            attachScreenshot(app, named: "M1-T10-qada-history-\(size)"); isha.tap()
+            let confirm = app.buttons["prayer-makeup-confirm"]; scrollTo(confirm, in: app); confirm.tap()
+            let undo = app.buttons["undo-button"]; XCTAssertTrue(undo.waitForExistence(timeout: 15))
+            undo.tap(); app.terminate(); app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+            scrollTo(history, in: app); history.tap(); scrollTo(isha, in: app); XCTAssertTrue(isha.isEnabled)
+            app.terminate()
+        }
+    }
+
     func test_M1T09_OldMissedSaveUndoRestoreMakeUpAndRelaunch() throws {
         continueAfterFailure = false
         for size in ["L", "AX3"] {
@@ -1063,7 +1082,7 @@ import XCTest
     private func scrollTo(_ element: XCUIElement, in app: XCUIApplication) {
         for _ in 0..<12 {
             if element.isHittable { break }
-            app.swipeUp()
+            if element.exists && element.frame.maxY < 0 { app.swipeDown() } else { app.swipeUp() }
         }
         XCTAssertTrue(element.isHittable, app.debugDescription)
     }
