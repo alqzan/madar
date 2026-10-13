@@ -22,8 +22,11 @@ struct PrayerTodayView: View {
                     if let snapshot = try? session.prayerSnapshot(at: instant) {
                         header(day: snapshot.today.day)
                             .padding(.top, 8)
+                        if snapshot.today.cells.contains(where: { $0.isFriday }) {
+                            fridayPill.padding(.top, 16)
+                        }
                         nextPrayer(snapshot, now: instant)
-                            .padding(.top, 26)
+                            .padding(.top, snapshot.today.cells.contains(where: { $0.isFriday }) ? 18 : 26)
                         verseDivider
                             .padding(.top, 18)
                         riwaq(snapshot, now: instant)
@@ -167,6 +170,20 @@ struct PrayerTodayView: View {
         return session.string("core.firstCalendar") == "gregorian"
             ? "\(weekday) \(gregorian)، \(hijri)"
             : "\(weekday) \(hijri)، \(gregorian)"
+    }
+
+    /// Friday greeting. The Quran room has no entry point yet, so the pill carries no link and no Al-Kahf pointer.
+    private var fridayPill: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "diamond.fill").font(.system(size: 9))
+            Text("جمعة مباركة").font(PrayerHomeType.strong)
+        }
+        .foregroundStyle(theme.color("accentText"))
+        .padding(.horizontal, 22).frame(minHeight: 44)
+        .background(theme.color("goldSoft"), in: .capsule)
+        .overlay { Capsule().stroke(theme.line, lineWidth: 1) }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("prayer-friday-pill")
     }
 
     private func nextPrayer(_ snapshot: PrayerSnapshot, now: Date) -> some View {

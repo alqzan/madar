@@ -240,21 +240,24 @@ final class AppSession {
     /// Hand-authored rows, never engine output; use with MADAR_UI_NOW 2026-10-07T16:20+03:00.
     private func preparePrayerHomeShowcaseFixture() throws {
         guard ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"] != nil,
-              ProcessInfo.processInfo.environment["MADAR_UI_PRAYER_FIXTURE"] == "homeShowcase" else { return }
+              let fixture = ProcessInfo.processInfo.environment["MADAR_UI_PRAYER_FIXTURE"], ["homeShowcase", "homeShowcaseFriday"].contains(fixture) else { return }
+        // `homeShowcaseFriday` is the same week carried to Friday 2026-10-09 (use MADAR_UI_NOW 2026-10-09T16:20+03:00).
+        let lastDay = fixture == "homeShowcaseFriday" ? 9 : 7
         let context = ModelContext(container)
         guard try context.fetch(FetchDescriptor<PrayerLog>()).isEmpty else { return }
         let alone: Set<String> = ["2026-10-03.dhuhr", "2026-10-05.fajr", "2026-10-07.asr"]
         let missed: Set<String> = ["2026-10-02.asr", "2026-10-03.fajr", "2026-10-04.isha"]
-        for day in 1...7 {
+        for day in 1...lastDay {
             let dayKey = String(format: "2026-10-%02d", day)
             for prayer in Prayer.allCases {
                 let key = dayKey + "." + prayer.rawValue
                 if dayKey == "2026-10-06" && prayer == .isha { continue }
-                if dayKey == "2026-10-07" && [.maghrib, .isha].contains(prayer) { continue }
+                if day == lastDay && [.maghrib, .isha].contains(prayer) { continue }
                 let row = PrayerLog()
                 row.dayKey = dayKey
                 row.prayer = prayer.rawValue
                 row.status = missed.contains(key) ? "missed" : alone.contains(key) ? "alone" : "jamaah"
+                if prayer == .dhuhr && (day == 2 || day == 9) { row.fridayKind = row.status == "jamaah" ? "jumuah" : "dhuhr" }
                 row.tzID = "Asia/Riyadh"
                 row.eventAt = try GregorianDay(dayKey).date(in: ActivePlace.riyadh.timeZone).addingTimeInterval(12 * 3600)
                 row.source = "user"

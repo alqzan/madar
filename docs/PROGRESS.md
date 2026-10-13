@@ -31,7 +31,7 @@ Every screen card follows protocol §2: canonical files → default-size screens
 
 | Card | Result | Canonical / spec | Status | Notes |
 |---|---|---|---|---|
-| M1-F01 | Friday screen with explicit Jumu'ah/Dhuhr choice and the tall Friday arch | `salah/09-S8-Friday.jpg`, `-s1`; RP5 | ready after V | `fridayKind` is already stored (T01). `salah.fridayTallArch` default true. |
+| M1-F01 | Friday screen with explicit Jumu'ah/Dhuhr choice and the tall Friday arch | `salah/09-S8-Friday.jpg`, `-s1`; RP5 | matched — awaiting owner | `fridayKind` is already stored (T01). `salah.fridayTallArch` default true. Built: the «جمعة مباركة» pill (no «الكهف في قسم القرآن» pointer: no entry to the Quran room yet), tall dome «الجمعة» arch, and the explicit Jumu'ah/Dhuhr choice in the log and make-up sheets (V02, V06). Fixture `homeShowcaseFriday` (UI-test only). Differences: the pill is narrower than the canonical (shorter text); pending notice comes from the fixture. Compare page: `Madar/Artifacts/compare/S8-Friday.html`.|
 | M1-F02 | Travel: ask once, method per trip, shorten/combine without pre-pairing | `salah/10-S9-Travel.jpg`, `-s1`; RP4, RP7 | ready after V | Show «خارج مدينتك» until answered. Fixtures: London with MWL, Istanbul with Turkey. Needs `Trip.calcMethod` (data change → one independent review). |
 | M1-F03 | Edit the tracking start date once | §7.2 P04, `salah.trackingStart` | ready after V | |
 | M1-F04 | Outside the app: next-prayer widget, lock-screen widgets, countdown | `salah/11-S10-Abwab.jpg`; §9; RL7, RP9, RU2 | ready after V | Widgets read JSON snapshots only. Default shows only the next prayer and its time. |
@@ -71,6 +71,15 @@ M1 gate, then M2 Quran, M3 Diary, M4 Lobby + Habits + Widgets, M5 Money, M6 Mihb
 
 # Handovers
 
+## Handover — M1-F01 Friday home — 2026-10-13 — claude
+
+Works now: on a Friday the home shows «جمعة مباركة» and the tall dome «الجمعة» arch; the Jumu'ah/Dhuhr choice was already in the log and make-up sheets.
+Verified: UI test F01 (Friday 2026-10-09 fixture) passed at default size; screenshots `Madar/Artifacts/m1-gap-shots/M1-F01-friday-L.png` and `-scrolled-L.png`.
+Differences left: see the board row.
+Not verified: owner iPhone; a Friday in a travel city; the Friday log flow on this fixture.
+Next: M1-F02 (travel), M1-F03 (tracking start), M1-F04 (outside the app).
+Model/effort: Claude Sonnet 5.5; effort not exposed. Usage: not exposed.
+
 ## Handover — M1-V10 customize prayer — 2026-10-13 — claude
 
 Works now: sliders button on the prayer home opens «خصّص الصلاة» (live preview, search, order and hide of home blocks, collapsible groups for the wired settings); order and hide change the home at once, and reset restores the defaults.
@@ -87,15 +96,6 @@ Verified: no new run; V04 test and screenshot from the earlier commit are the ev
 Differences left: see the board row.
 Not verified: owner iPhone.
 Next: M1-V10 (customize prayer, `flex/06-K-Salah`).
-Model/effort: Claude Sonnet 5.5; effort not exposed. Usage: not exposed.
-
-## Handover — M1-V08 night home — 2026-10-13 — claude
-
-Works now: the prayer home in the dark theme matches `08-S7-Night` (palette, lattice arches, notices, Hali card, qada card, qiyam footprint); no code change was needed, only a dark-mode test.
-Verified: UI test V08 passed at default size; screenshots `Madar/Artifacts/m1-gap-shots/M1-V08-night-L.png` and `-bottom-L.png`.
-Differences left: see the board row.
-Not verified: owner iPhone; the Hali card figures with the canonical sample data.
-Next: M1-V09 (S11 Mizan beads).
 Model/effort: Claude Sonnet 5.5; effort not exposed. Usage: not exposed.
 
 Earlier handovers: `docs/archive/PROGRESS-2026-10-13.md`.

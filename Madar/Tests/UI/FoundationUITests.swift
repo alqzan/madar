@@ -48,6 +48,26 @@ import XCTest
         app.terminate()
     }
 
+    /// M1-F01: the Friday home, for comparison with screens/salah/09-S8-Friday(-s1).jpg.
+    func test_M1F01_FridayHomeMatchesCanonical() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
+            "MADAR_UI_NOW": "2026-10-09T16:20:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01",
+            "MADAR_UI_PRAYER_FIXTURE": "homeShowcaseFriday", "MADAR_UI_THEME": "light"]
+        app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+        let header = app.descendants(matching: .any).matching(identifier: "prayer-today-header").firstMatch
+        XCTAssertTrue(header.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(header.label.contains("الجمعة"), header.label)
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "prayer-friday-pill").firstMatch.exists)
+        let noon = app.descendants(matching: .any).matching(identifier: "prayer-arch-dhuhr").firstMatch
+        XCTAssertTrue(noon.label.contains("الجمعة"), noon.label)
+        attachScreenshot(app, named: "M1-F01-friday-L")
+        let qada = app.buttons["prayer-qada-makeup"]; scrollTo(qada, in: app)
+        attachScreenshot(app, named: "M1-F01-friday-scrolled-L")
+        app.terminate()
+    }
+
     /// M1-V10: «خصّص الصلاة», for comparison with screens/flex/06-K-Salah(-s1).jpg; order and hide change the home.
     func test_M1V10_CustomizePrayerReordersAndHidesHomeBlocks() throws {
         continueAfterFailure = false
