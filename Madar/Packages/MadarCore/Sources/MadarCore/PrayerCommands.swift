@@ -31,6 +31,7 @@ public enum PrayerMutation: Codable, Equatable, Sendable {
     case answerHeart(PrayerReference, PrayerHeart?)
     case logPair(day: GregorianDay, pair: PrayerPair, status: PrayerStoredStatus, shortened: Bool, mode: PrayerPairMode)
     case logQiyam(night: GregorianDay, rakaat: Int, witr: Bool)
+    case restoreQiyam(night: GregorianDay, rakaat: Int, witr: Bool)
     case agePending
     case editTrackingStart(GregorianDay)
     case initializeTracking
@@ -113,9 +114,12 @@ extension PrayerMutation {
             let day = try GregorianDay(string("dayKey"))
             return (.logPair(day: day, pair: pair, status: status, shortened: shortened, mode: mode), "prayer.pair." + day.description + "." + pair.rawValue)
         case "prayer.logQiyam":
-            guard Set(payload.keys) == ["nightKey", "rakaat", "witr"], case .number(let rakaat) = payload["rakaat"], rakaat.isFinite, rakaat.rounded() == rakaat, (0...99).contains(rakaat), case .bool(let witr) = payload["witr"] else { throw CoreError.invalidCommand }
+            guard Set(payload.keys).isSubset(of: ["nightKey", "rakaat", "witr", "restoreDeleted"]), case .number(let rakaat) = payload["rakaat"], rakaat.isFinite, rakaat.rounded() == rakaat, (0...99).contains(rakaat), case .bool(let witr) = payload["witr"] else { throw CoreError.invalidCommand }
             let day = try GregorianDay(string("nightKey"))
-            return (.logQiyam(night: day, rakaat: Int(rakaat), witr: witr), "prayer.qiyam." + day.description)
+            let restoreDeleted: Bool
+            if let value = payload["restoreDeleted"] { guard case .bool(let flag) = value else { throw CoreError.invalidCommand }; restoreDeleted = flag }
+            else { restoreDeleted = false }
+            return (restoreDeleted ? .restoreQiyam(night: day, rakaat: Int(rakaat), witr: witr) : .logQiyam(night: day, rakaat: Int(rakaat), witr: witr), "prayer.qiyam." + day.description)
         case "prayer.editTrackingStart":
             guard Set(payload.keys) == ["dayKey"] else { throw CoreError.invalidCommand }
             return (.editTrackingStart(try GregorianDay(string("dayKey"))), "salah.trackingStart")

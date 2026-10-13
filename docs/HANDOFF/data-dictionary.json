@@ -5419,6 +5419,12 @@
     "kind": "applies CommandReceipt.undoJSON within 10 min",
     "auth": "same as the original command"
    },
+   "prayer.logQiyam": {
+    "payload": "{nightKey, rakaat: Int 0...99, witr: Bool, restoreDeleted?: Bool = false}",
+    "kind": "upsert QiyamNight (nightKey), durable undo; deleted night requires explicit restoreDeleted=true and retains its deletion barrier",
+    "auth": "app",
+    "after": "no HifzSession or Quran page writes; preserve quranSessionID"
+   },
    "prayer.resolveGap": {
     "payload": "{resolutions:[{dayKey, prayer, status: jamaah|alone|missed|unrecordedHistory|excused, fridayKind?}]}",
     "kind": "one transaction upsert of the selected PrayerLog rows and matching QadaItems; one inverse restores the whole gap",

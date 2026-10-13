@@ -38,6 +38,39 @@ import MadarData
         while calendar.component(.weekday, from: candidate.date(in: calendar.timeZone)) != 6 { candidate = candidate.adding(days: -1) }
         return candidate
     }
+    @Test func test_M1T07_QiyamMidnightReplayUndoAndExplicitRestoration() async throws {
+        // P05 golden: Oct 7 at 23:30 and Oct 8 at 02:10 belong to night 2026-10-07.
+        let late = date("2026-10-07T23:30:00+03:00"), early = date("2026-10-08T02:10:00+03:00")
+        let (container, bus, _) = try fixture(at: late)
+        func command(_ night: String = "2026-10-07", rakaat: Double = 8, restore: Bool = false, source: CommandSource = .app, at: Date) -> CommandEnvelope {
+            .init(name: "prayer.logQiyam", payload: .object(["nightKey": .string(night), "rakaat": .number(rakaat), "witr": .bool(true), "restoreDeleted": .bool(restore)]), source: source, issuedAt: at)
+        }
+        let first = command(at: late)
+        let result = try await bus.execute(first, now: late)
+        #expect(result.status == .applied && result.undoToken != nil)
+        #expect(try await bus.execute(first, now: early) == result)
+        #expect(try await bus.execute(command(at: early), now: early).status == .duplicate)
+        let context = ModelContext(container)
+        var rows = try context.fetch(FetchDescriptor<QiyamNight>())
+        #expect(rows.count == 1 && rows[0].nightKey == "2026-10-07" && rows[0].rakaat == 8 && rows[0].witr)
+        #expect(rows[0].quranSessionID == nil)
+        #expect(try context.fetchCount(FetchDescriptor<HifzSession>()) == 0)
+        #expect(try await bus.execute(command("2026-10-08", at: early), now: early).reason == "invalidNight")
+        #expect(try await bus.execute(command("2026-09-30", at: early), now: early).reason == "invalidNight")
+        #expect(try await bus.execute(command(rakaat: 8.5, at: early), now: early).reason == "invalidPayload")
+        #expect(try await bus.execute(command(rakaat: 100, at: early), now: early).reason == "invalidPayload")
+        #expect(try await bus.execute(command(source: .widget, at: early), now: early).status == .needsApp)
+        // New insertion undo is a tombstone. A normal save must never resurrect it.
+        let undo = CommandEnvelope(name: "system.undo", payload: .object(["undoToken": .string(try #require(result.undoToken).uuidString)]), issuedAt: late)
+        #expect(try await bus.execute(undo, now: late.addingTimeInterval(1)).status == .applied)
+        #expect(try await bus.execute(command(at: late.addingTimeInterval(2)), now: late.addingTimeInterval(2)).reason == "explicitRestoreRequired")
+        #expect(try await bus.execute(command(restore: true, at: late.addingTimeInterval(3)), now: late.addingTimeInterval(3)).status == .applied)
+        rows = try ModelContext(container).fetch(FetchDescriptor<QiyamNight>())
+        #expect(rows.count == 1 && rows[0].deletedAt == nil)
+        #expect(try #require(rows[0].restoredAt) > #require(rows[0].deletionBarrierAt))
+        #expect(rows[0].rakaat == 8 && rows[0].witr && rows[0].quranSessionID == nil)
+    }
+
     @Test func test_M1T06_HeartAnswerClearReplayAndUndoPreservePrayerStatus() async throws {
         let now = date("2026-10-13T09:00:00+03:00")
         let (container, bus, directory) = try fixture(at: now)

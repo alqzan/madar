@@ -1,6 +1,45 @@
 import XCTest
 
 @MainActor final class FoundationUITests: XCTestCase {
+    func test_M1T07_QiyamSaveRelaunchUndoRestoreAndAX3() throws {
+        continueAfterFailure = false
+        for size in ["L", "AX3"] {
+            let app = XCUIApplication()
+            app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": size,
+                "MADAR_UI_NOW": "2026-10-08T02:10:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-07", "MADAR_UI_THEME": "light"]
+            app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+            let qiyam = app.buttons["prayer-qiyam"]
+            scrollTo(qiyam, in: app); qiyam.tap()
+            let plus = app.buttons["prayer-qiyam-plus"]
+            scrollTo(plus, in: app); for _ in 0..<4 { plus.tap() }
+            let count = app.staticTexts["prayer-qiyam-count"]
+            XCTAssertEqual(count.label, "٨")
+            let witr = app.switches["prayer-qiyam-witr"]
+            scrollTo(witr, in: app); witr.tap()
+            attachScreenshot(app, named: "M1-T07-qiyam-\(size)")
+            let save = app.buttons["prayer-qiyam-save"]
+            scrollTo(save, in: app); save.tap()
+            let closed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: save)
+            XCTAssertEqual(XCTWaiter.wait(for: [closed], timeout: 15), .completed)
+            let undo = app.buttons["undo-button"]
+            XCTAssertTrue(undo.waitForExistence(timeout: 15)); undo.tap()
+            scrollTo(qiyam, in: app); qiyam.tap()
+            let restore = app.buttons["prayer-qiyam-restore"]
+            XCTAssertFalse(save.exists, "Undo must require explicit restoration")
+            scrollTo(plus, in: app); for _ in 0..<4 { plus.tap() }
+            scrollTo(witr, in: app); witr.tap()
+            scrollTo(restore, in: app); restore.tap(); app.buttons["أعد التسجيل"].tap()
+            XCTAssertTrue(undo.waitForExistence(timeout: 15))
+            app.terminate(); app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+            scrollTo(qiyam, in: app); qiyam.tap()
+            XCTAssertTrue(count.waitForExistence(timeout: 10)); XCTAssertEqual(count.label, "٨")
+            XCTAssertEqual(witr.value as? String, "1")
+            let list = app.descendants(matching: .any).matching(identifier: "prayer-qiyam-footprint-list").firstMatch
+            XCTAssertTrue(list.exists)
+            app.terminate()
+        }
+    }
+
     func test_M1T06_OptionalHeartSaveSkipUndoAndRelaunch() throws {
         continueAfterFailure = false
         for size in ["L", "AX3"] {

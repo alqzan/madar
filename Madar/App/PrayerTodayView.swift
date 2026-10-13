@@ -28,6 +28,7 @@ struct PrayerTodayView: View {
                         Button("سجلّ الصلاة") { selectedSheet = .statistics }
                             .frame(minHeight: 44).accessibilityIdentifier("prayer-history")
                         if !snapshot.qada.isEmpty { qadaCard(snapshot) }
+                        qiyamCard(snapshot)
                         MadarCard {
                             Text("ما لم تُسجّله يبقى غير محسوم؛ لا ينشأ قضاء تلقائيًا.")
                                 .font(MadarTypography.caption())
@@ -52,6 +53,10 @@ struct PrayerTodayView: View {
         .sheet(item: $selectedSheet) { route in
             Group {
             switch route {
+            case .qiyam:
+                if let snapshot = try? session.prayerSnapshot(at: session.prayerNow()) {
+                    PrayerNightLoggingSheet(session: session, snapshot: snapshot, finished: { selectedSheet = nil })
+                }
             case .heart(let cell):
                 PrayerHeartAnswerSheet(session: session, cell: cell, finished: { selectedSheet = nil })
             case .statistics:
@@ -226,6 +231,20 @@ struct PrayerTodayView: View {
         }
     }
 
+    private func qiyamCard(_ snapshot: PrayerSnapshot) -> some View {
+        let night = snapshot.nights.first { $0.night == snapshot.nightDefault }
+        return Button { selectedSheet = .qiyam } label: {
+            MadarCard {
+                VStack(alignment: .leading, spacing: 10) {
+                    Label("قيام الليل", systemImage: "moon.stars").font(MadarTypography.cardTitle())
+                    Text(night.map { "\(number($0.rakaat)) ركعات" + ($0.witr ? "، أوترتُ" : "") } ?? "سجّل ما قمتَه")
+                        .font(MadarTypography.section()).accessibilityIdentifier("prayer-qiyam-summary")
+                    Text("ليس سلسلة تنكسر، أثرٌ يُرى").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                }.frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }.buttonStyle(.plain).accessibilityIdentifier("prayer-qiyam")
+    }
+
     private func statisticsCard(_ snapshot: PrayerSnapshot) -> some View {
         Button { selectedSheet = .statistics } label: {
             MadarCard {
@@ -362,10 +381,12 @@ private enum PrayerTodaySheet: Identifiable {
     case log(PrayerCell)
     case statistics
     case heart(PrayerCell)
+    case qiyam
     case makeUp(PrayerQada, isFridayNoon: Bool, dateLabel: String)
     case recovery([PrayerReference], Set<PrayerReference>, TimeZone)
     var id: String {
         switch self {
+        case .qiyam: "qiyam"
         case .statistics: "statistics"
         case .heart(let cell): "heart-\(cell.reference.naturalKey)"
         case .log(let cell): "log-\(cell.reference.naturalKey)"
@@ -850,4 +871,99 @@ private func heartTitle(_ heart: PrayerHeart) -> String {
 }
 private func heartSentence(_ heart: PrayerHeart) -> String {
     switch heart { case .distracted: "كنت في وادٍ آخر"; case .present: "عرفت ما أقول"; case .khashi: "وجدت لها أثرًا" }
+}
+
+
+private struct PrayerNightLoggingSheet: View {
+    let session: AppSession
+    let snapshot: PrayerSnapshot
+    let finished: () -> Void
+    @State private var selectedNight: GregorianDay
+    @State private var rakaat: Int
+    @State private var witr: Bool
+    @State private var confirmRestore = false
+    @Environment(\.roomTheme) private var theme
+    @Environment(\.dynamicTypeSize) private var typeSize
+    init(session: AppSession, snapshot: PrayerSnapshot, finished: @escaping () -> Void) {
+        self.session = session; self.snapshot = snapshot; self.finished = finished
+        _selectedNight = State(initialValue: snapshot.nightDefault)
+        let previous = snapshot.nights.first { $0.night == snapshot.nightDefault }
+        _rakaat = State(initialValue: previous?.rakaat ?? 0); _witr = State(initialValue: previous?.witr ?? false)
+    }
+    private var formatter: MadarNumberFormatter { .init(style: session.string("core.numerals") == "western" ? .western : .hindi) }
+    private var eligibleNights: [GregorianDay] { (0..<7).map { snapshot.nightDefault.adding(days: -$0) } }
+    private var footprint: [GregorianDay] { (0..<30).reversed().map { snapshot.nightDefault.adding(days: -$0) } }
+    private var restoreNeeded: Bool { (try? session.qiyamRequiresRestore(selectedNight)) ?? true }
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 22) {
+                    Text("قيام الليل").font(MadarTypography.title()).accessibilityAddTraits(.isHeader)
+                    Text("لم تُسجّل ليلتك؟ سجّل ما قمتَه.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    MadarCard {
+                        VStack(alignment: .leading, spacing: 18) {
+                            Picker("الليلة", selection: $selectedNight) {
+                                ForEach(eligibleNights, id: \.self) { Text(dateTitle($0)).tag($0) }
+                            }.accessibilityIdentifier("prayer-qiyam-night")
+                            Text("من العشاء إلى الفجر التالي؛ وبعد الفجر نختار آخر ليلة انقضت.")
+                                .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                            HStack(spacing: 16) {
+                                Text("الركعات").font(MadarTypography.section())
+                                Spacer()
+                                Button { rakaat = max(0, rakaat - 2) } label: { Image(systemName: "minus").frame(width: 44, height: 44).contentShape(Circle()) }
+                                    .accessibilityLabel(rakaat == 1 ? "أنقص ركعة" : "أنقص ركعتين").accessibilityIdentifier("prayer-qiyam-minus").disabled(rakaat == 0)
+                                Text(formatter.string(rakaat)).font(MadarTypography.cardTitle()).monospacedDigit().accessibilityIdentifier("prayer-qiyam-count")
+                                Button { rakaat = min(99, rakaat + 2) } label: { Image(systemName: "plus").frame(width: 44, height: 44).contentShape(Circle()) }
+                                    .accessibilityLabel(rakaat == 98 ? "زد ركعة" : "زد ركعتين").accessibilityIdentifier("prayer-qiyam-plus").disabled(rakaat >= 99)
+                            }
+                            Toggle("أوترتُ", isOn: $witr).font(MadarTypography.section()).accessibilityIdentifier("prayer-qiyam-witr")
+                            if restoreNeeded {
+                                Text("سبق التراجع عن تسجيل هذه الليلة. يمكنك إعادة تسجيلها صراحة.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                                Button("أعد تسجيل الليلة") { confirmRestore = true }.buttonStyle(MadarPrimaryButton()).accessibilityIdentifier("prayer-qiyam-restore")
+                            } else {
+                                Button("احفظ قيام الليلة") { save(restoring: false) }.buttonStyle(MadarPrimaryButton()).accessibilityIdentifier("prayer-qiyam-save")
+                            }
+                        }
+                    }
+                    PrayerSummarySection(title: "آخر ثلاثين ليلة") {
+                        MadarCard {
+                            VStack(alignment: .leading, spacing: 14) {
+                                if !typeSize.isAccessibilitySize {
+                                    HStack(spacing: 3) { ForEach(footprint, id: \.self) { night in
+                                        RoundedRectangle(cornerRadius: 3).fill(hasRecord(night) ? theme.accent : theme.line).frame(maxWidth: .infinity).frame(height: 22)
+                                    } }.accessibilityHidden(true)
+                                }
+                                Text("ليس سلسلة تنكسر، أثرٌ يُرى.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                                DisclosureGroup("سجلّ الليالي") {
+                                    ForEach(footprint.reversed(), id: \.self) { night in
+                                        Text(dateTitle(night) + (hasRecord(night) ? "، قيام مسجّل" : "، بلا تسجيل"))
+                                            .font(MadarTypography.caption()).fixedSize(horizontal: false, vertical: true)
+                                    }
+                                }.accessibilityIdentifier("prayer-qiyam-footprint-list")
+                            }
+                        }
+                    }
+                }.padding(18).frame(maxWidth: 620).frame(maxWidth: .infinity)
+            }.background(theme.background).foregroundStyle(theme.ink)
+                .navigationTitle("قيام الليل").navigationBarTitleDisplayMode(.inline)
+                .toolbar { ToolbarItem(placement: .cancellationAction) { Button("إغلاق") { finished() } } }
+                .disabled(session.prayerWriteInProgress)
+                .confirmationDialog("أعد تسجيل هذه الليلة؟", isPresented: $confirmRestore, titleVisibility: .visible) {
+                    Button("أعد التسجيل") { save(restoring: true) }
+                } message: { Text("يعود تسجيل الركعات والوتر لهذه الليلة؛ يبقى أثر التراجع محفوظًا.") }
+                .onChange(of: selectedNight) { _, night in
+                    let previous = snapshot.nights.first { $0.night == night }
+                    rakaat = previous?.rakaat ?? 0; witr = previous?.witr ?? false
+                }
+        }
+    }
+    private func save(restoring: Bool) {
+        session.recordQiyamNight(selectedNight, rakaat: rakaat, witr: witr, restoreDeleted: restoring) { succeeded in if succeeded { finished() } }
+    }
+    private func hasRecord(_ night: GregorianDay) -> Bool { snapshot.nights.contains { $0.night == night && ($0.rakaat > 0 || $0.witr) } }
+    private func dateTitle(_ night: GregorianDay) -> String {
+        DualDate(instant: night.date(in: session.activePlace.timeZone).addingTimeInterval(12 * 3600), timeZone: session.activePlace.timeZone,
+            source: HijriSource(rawValue: session.string("core.hijriSource")) ?? .ummAlQura, sightingOffset: Int(session.number("core.hijriOffset")))
+            .text(firstCalendar: session.string("core.firstCalendar") == "gregorian" ? .gregorian : .hijri, numerals: formatter.style)
+    }
 }

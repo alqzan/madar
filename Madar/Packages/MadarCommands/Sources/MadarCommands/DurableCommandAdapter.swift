@@ -97,7 +97,7 @@ private struct ReceiptWire: Codable {
                                        undoExpiresAt: row.undoExpiresAt ?? row.createdAt,
                                        undoJSON: row.undoJSON,
                                        outcome: .init(status: CommandStatus(rawValue: row.status) ?? .rejected,
-                                                      undoToken: row.status == "applied" && ["prayer.log", "prayer.makeUp", "prayer.resolveGap", "prayer.setHeart", "settings.set", "settings.applyPreset"].contains(row.name) ? id : nil))
+                                                      undoToken: row.status == "applied" && ["prayer.log", "prayer.makeUp", "prayer.resolveGap", "prayer.setHeart", "prayer.logQiyam", "settings.set", "settings.applyPreset"].contains(row.name) ? id : nil))
                 return try JSONDecoder().decode(CoreCommandReceipt.self, from: JSONEncoder().encode(wire))
             }
             // Receipt identity is authoritative even after undo/deletion or retention expiry.
@@ -116,6 +116,12 @@ private struct ReceiptWire: Codable {
                    (heart == nil || row.heart == heart), (shortened == nil || row.shortened == shortened),
                    (fridayKind == nil || row.fridayKind == fridayKind) {
                     existingHash = request.payloadHash
+                }
+            } else if case .recordQiyamNight(let night, let rakaat, let witr, let restoring) = request.operation {
+                let rows = try context.fetch(FetchDescriptor<QiyamNight>()).filter { $0.nightKey == night.description && $0.mergedInto == nil }
+                if let row = rows.max(by: { $0.updatedAt < $1.updatedAt }) {
+                    if row.deletedAt != nil && !restoring { return .init(status: .rejected, reason: "explicitRestoreRequired") }
+                    if row.deletedAt == nil && row.rakaat == rakaat && row.witr == witr { existingHash = request.payloadHash }
                 }
             } else if case .answerPrayerHeart(let reference, let heart) = request.operation {
                 let rows = try context.fetch(FetchDescriptor<PrayerLog>()).filter { $0.dayKey == reference.day.description && $0.prayer == reference.prayer.rawValue && $0.mergedInto == nil }
@@ -168,6 +174,15 @@ private struct ReceiptWire: Codable {
                 let mutation = PrayerMutation.record(.init(day: referenceDay, prayer: prayer), status: storedStatus,
                     heart: heart.flatMap(PrayerHeart.init(rawValue:)), shortened: shortened,
                     fridayKind: fridayKind.flatMap(FridayPrayerKind.init(rawValue:)))
+                do {
+                    if let undo = try PrayerMutationHandler.stage(operation: mutation, in: context, now: now, writer: writer, source: request.envelope.source) {
+                        inverse = SettingsInverse(settings: [:], afterSettings: [:], layouts: [:], afterLayouts: [:], prayerMutation: undo)
+                    }
+                } catch let error as PrayerDomainError {
+                    return .init(status: .rejected, reason: String(describing: error))
+                }
+            case .recordQiyamNight(let night, let rakaat, let witr, let restoring):
+                let mutation: PrayerMutation = restoring ? .restoreQiyam(night: night, rakaat: rakaat, witr: witr) : .logQiyam(night: night, rakaat: rakaat, witr: witr)
                 do {
                     if let undo = try PrayerMutationHandler.stage(operation: mutation, in: context, now: now, writer: writer, source: request.envelope.source) {
                         inverse = SettingsInverse(settings: [:], afterSettings: [:], layouts: [:], afterLayouts: [:], prayerMutation: undo)

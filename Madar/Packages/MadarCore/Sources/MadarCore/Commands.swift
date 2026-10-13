@@ -47,6 +47,7 @@ public enum CommandOperation: Codable, Equatable, Sendable {
     case makeUpPrayer(dayKey: String, prayer: Prayer, at: Date, fridayKind: String?)
     case resolvePrayerGap([PrayerGapResolution])
     case answerPrayerHeart(PrayerReference, PrayerHeart?)
+    case recordQiyamNight(night: GregorianDay, rakaat: Int, witr: Bool, restoreDeleted: Bool)
 }
 public struct CoreCommandReceipt: Codable, Equatable, Sendable {
     public let commandID: UUID
@@ -106,7 +107,7 @@ public protocol CommandStoreAdapter: Sendable {
 public struct CommandBus: Sendable {
     // Names implemented by this milestone. Unknown and later-room names are invalid
     // before authorization, so they cannot become indefinitely recoverable needsApp work.
-    public static let appOnlyCommandNames: Set<String> = ["settings.set", "settings.applyPreset", "preset.save", "core.completeOnboarding", "system.undo", "prayer.makeUp", "prayer.resolveGap", "prayer.setHeart"]
+    public static let appOnlyCommandNames: Set<String> = ["settings.set", "settings.applyPreset", "preset.save", "core.completeOnboarding", "system.undo", "prayer.makeUp", "prayer.resolveGap", "prayer.setHeart", "prayer.logQiyam"]
     public static let supportedCommandNames = appOnlyCommandNames.union(["prayer.log"])
     private let adapter: any CommandStoreAdapter
     public init(adapter: any CommandStoreAdapter) { self.adapter = adapter }
@@ -140,6 +141,16 @@ public struct CommandBus: Sendable {
             if shortened == true && (prayer == .fajr || prayer == .maghrib) { return .init(status: .rejected, reason: "invalidShortening") }
             operation = .logPrayer(dayKey: dayKey, prayer: prayer, status: status, heart: heart, shortened: shortened, fridayKind: fridayKind)
             semantics = .upsert; naturalKey = "prayer." + dayKey + "." + prayer.rawValue
+        case "prayer.logQiyam":
+            do {
+                let (mutation, key) = try PrayerMutation.parse(name: envelope.name, payload: payload)
+                switch mutation {
+                case .logQiyam(let night, let rakaat, let witr): operation = .recordQiyamNight(night: night, rakaat: rakaat, witr: witr, restoreDeleted: false)
+                case .restoreQiyam(let night, let rakaat, let witr): operation = .recordQiyamNight(night: night, rakaat: rakaat, witr: witr, restoreDeleted: true)
+                default: return .init(status: .rejected, reason: "invalidPayload")
+                }
+                semantics = .upsert; naturalKey = key
+            } catch { return .init(status: .rejected, reason: "invalidPayload") }
         case "prayer.setHeart":
             do {
                 let (mutation, key) = try PrayerMutation.parse(name: "prayer.answerHeart", payload: payload)

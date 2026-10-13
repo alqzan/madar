@@ -158,17 +158,19 @@ private struct PrayerInverse: Codable {
                 try setLog(ref, status: status, shortened: shortened && ref.prayer != .maghrib, early: true)
                 let row = try logRow(ref); row.pairID = pairID; row.tripID = trip.id; row.eventAt = times.time(for: ref.prayer); row.tzID = trip.place.timeZoneID; try touch(row)
             }
-        case .logQiyam(let night, let rakaat, let witr):
+        case .logQiyam(let night, let rakaat, let witr), .restoreQiyam(let night, let rakaat, let witr):
+            let restoring: Bool
+            if case .restoreQiyam = operation { restoring = true } else { restoring = false }
             let latest = repository.defaultNight(at: now)
             guard night <= latest, night >= latest.adding(days: -6) else { throw PrayerDomainError.invalidNight }
             guard (0...99).contains(rakaat) else { throw PrayerDomainError.invalidRakaat }
             let old = repository.nightRows.filter { $0.nightKey == night.description }.max { $0.updatedAt < $1.updatedAt }
-            if let old { guard old.deletedAt == nil else { throw PrayerDomainError.explicitRestoreRequired }; try capture(old) }
+            if let old { guard old.deletedAt == nil || restoring else { throw PrayerDomainError.explicitRestoreRequired }; try capture(old) }
             if old?.deletedAt == nil, old?.rakaat == rakaat, old?.witr == witr { break }
             let row = old ?? QiyamNight(); if old == nil { row.id = StableIdentity.uuid(for: "QiyamNight:\(night)"); row.createdAt = now; row.updatedAt = now; context.insert(row); try registerNew(row) }
             row.nightKey = night.description; row.rakaat = rakaat; row.witr = witr
             if old == nil { row.tzID = repository.place(at: now).timeZoneID; row.dayPolicy = "prayerDay@1" }
-            try touch(row) // QuranSessionID stays untouched; prayer never fabricates Quran pages.
+            try touch(row, restoringDebt: restoring) // Explicit restoration retains the barrier; QuranSessionID stays untouched.
         case .startTrip(let city, let country, let place, let homeKm):
             guard repository.activeTrip(at: now) == nil else { throw PrayerDomainError.invalidRecord }
             let row = Trip(); row.city = city; row.country = country; row.lat = place.latitude; row.lon = place.longitude; row.tzID = place.timeZoneID; row.mode = "manual"; row.start = now; row.homeKm = homeKm; row.createdAt = now; row.updatedAt = now; context.insert(row); try registerNew(row); try touch(row)
