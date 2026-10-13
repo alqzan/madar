@@ -4,7 +4,7 @@
 
 # Last checked
 
-2026-10-13 — Codex. M2-E01 is complete: pure Swift spaced-review engine; 10 XCTest cases pass, including 100/300/604-page balance simulations. Owner chose fixed-cycle review as an optional v1 method with spaced review default; recorded in `docs/DECISIONS.md`. Next ready card: M2-E02. No app screen or iPhone pass is claimed.
+2026-10-13 — Codex. M2-E01 and M2-E02 are complete in `MadarQuran`; 17 XCTest cases pass, including the 100/300/604-page balance simulations. Owner chose fixed-cycle review as an optional v1 method with spaced review default; recorded in `docs/DECISIONS.md`. Next ready card: M2-E05. No app screen or iPhone pass is claimed.
 
 # Board
 
@@ -53,7 +53,7 @@ The owner lifted the M2 pause in `docs/CODEX-M2-BRIEF.md`. Build a pure Swift en
 | Card | Result / canonical | Status | Do not copy / Notes |
 |---|---|---|---|
 | M2-E01 | Spaced review core: grade intervals/ease, due risk/order and adaptive capacity; implement RQ1's computed-need balance and run the 100/300/604-page simulations. Pure Swift `MadarQuran`; no persistence types in the engine. | done | `swift test --package-path Madar/Packages/MadarQuran`: 10 XCTest passed. RQ1 simulations: 100/300/604 pages, both mastery profiles at 0% half-wird days and 0 consecutive; within the 10%/20%/3-day limits. |
-| M2-E02 | Coach and error engine: learning reveals are hints; blind-recitation slips alone affect grades; mistake spots and two-success closure. | ready | Learning hints never enter «أخطائي» or the grade. |
+| M2-E02 | Coach and error engine: learning reveals are hints; blind-recitation slips alone affect grades; mistake spots and two-success closure. | done | `swift test --package-path Madar/Packages/MadarQuran`: 17 XCTest passed. Learning reveals stay as coach hints; blind slips alone grade the session; deleting a drill session rebuilds its two-success closure. Drill limits follow the selected intensity (3/5/8). |
 | M2-R01 | One verified 1405 resource set for page/line/word maps and QCF V1; manifest and automatic resource checks (RQ7, Q08). | blocked: provenance source is unresolved and the resource files are absent from `Madar/` | Do not use the pinned legacy map as 1405 data. Owner says the Mushaf licence is obtained; keep the resource disabled until source, terms, hashes and required review evidence are recorded. |
 | M2-E03 | Coverage, partial-page portions and completion/khatm rules against the verified 1405 maps. | blocked: M2-R01 | Union coverage from non-deleted sessions; a khatm requires all 604 pages. |
 | M2-E04 | Plan and session engine: levels, rest/missed-day allotments, recovery, pace, streak and qiyam assignments. | blocked: M2-E01, M2-E02 and M2-E03 | Use `MadarDay`; preserve a stored `dayKey`; one atomic `CommitQuranSession`. |

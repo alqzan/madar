@@ -38,21 +38,24 @@ public enum QuranReviewIntensity: String, Codable, CaseIterable, Sendable {
                 dailyReviewPages: 4,
                 ladder: [10, 21, 45, 90],
                 goodDays: 5,
-                needsDays: 2
+                needsDays: 2,
+                drillsPerDay: 3
             )
         case .balanced:
             QuranReviewPreset(
                 dailyReviewPages: 7,
                 ladder: [7, 14, 30, 60],
                 goodDays: 3,
-                needsDays: 1
+                needsDays: 1,
+                drillsPerDay: 5
             )
         case .intense:
             QuranReviewPreset(
                 dailyReviewPages: 12,
                 ladder: [5, 10, 21, 45],
                 goodDays: 2,
-                needsDays: 1
+                needsDays: 1,
+                drillsPerDay: 8
             )
         }
     }
@@ -63,12 +66,14 @@ public struct QuranReviewPreset: Hashable, Sendable {
     public let ladder: [Int]
     public let goodDays: Int
     public let needsDays: Int
+    public let drillsPerDay: Int
 
-    public init(dailyReviewPages: Int, ladder: [Int], goodDays: Int, needsDays: Int) {
+    public init(dailyReviewPages: Int, ladder: [Int], goodDays: Int, needsDays: Int, drillsPerDay: Int) {
         self.dailyReviewPages = dailyReviewPages
         self.ladder = ladder
         self.goodDays = goodDays
         self.needsDays = needsDays
+        self.drillsPerDay = drillsPerDay
     }
 
     public static let balanced = QuranReviewIntensity.balanced.preset
