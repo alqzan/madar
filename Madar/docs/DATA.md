@@ -1,6 +1,6 @@
 # MadarData — M0 data foundation
 
-Built against the approved working dictionary v3 (2026-10-10). Store schema is independently versioned v1. Reference material is the rechecked handoff; its four conflicting contracts are superseded by `START-M0.md`. No old or user store was opened or modified.
+Built against the approved working dictionary v3 (2026-10-10). Store schema is independently versioned v1. Reference material is the rechecked handoff; its four conflicting contracts are superseded by `docs/archive/START-M0.md`. No old or user store was opened or modified.
 
 ## Implemented
 

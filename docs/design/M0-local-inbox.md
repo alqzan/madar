@@ -2,7 +2,7 @@
 
 Date: 2026-10-10. Author: Codex, GPT-6.1 Sol xhigh (Top architecture step). Status: design note; implementation and gate remain pending.
 
-Authority: root `AGENTS.md`, `docs/DECISIONS.md`, handoff extracts `16-tech`, `17-data`, `18-plan`, `19-qa`; corrections RA1/RA2/RA3/RA8 and RD2. The owner's current RD2 decision preserves Entry margins and replaces the earlier cascade in `START-M0.md`. Original handoff excerpts remain historical inputs where the corrections override them.
+Authority: root `AGENTS.md`, `docs/DECISIONS.md`, handoff extracts `16-tech`, `17-data`, `18-plan`, `19-qa`; corrections RA1/RA2/RA3/RA8 and RD2. The owner's current RD2 decision preserves Entry margins and replaces the earlier cascade in `docs/archive/START-M0.md`. Original handoff excerpts remain historical inputs where the corrections override them.
 
 ## Keep the foundation; change ownership
 

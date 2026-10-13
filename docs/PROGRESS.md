@@ -1,115 +1,85 @@
 # Current milestone
 
-M0 lean software closure → M1 prayer implementation. **Full M0 NOT APPROVED: owner-iPhone acceptance is still not tested.** Owner revision 12 October 2026 separates software readiness from the device/distribution gate; after accepted lean dependencies, M1 software may proceed. Font permission is closed; RA1 local-only, RA2 app-only store writes, RP1 and data preservation remain mandatory.
-
-Current model policy: **GPT-6 Luna max may implement production.** Sol is narrow escalation, not a default stop. Deliver a usable integrated slice or proven repair, reuse passing evidence, and preserve about 3–5% of the five-hour allowance. The current queue supersedes historical handovers and automation memory.
+**M1 Prayer: make the built screens match the approved design, then build what is missing.** Protocol: root `AGENTS.md` (owner revision, 13 October 2026). Full M0 and M1 are **not approved**: owner-iPhone acceptance and distribution are still not tested. RA1 (local only), RA2 (app-only store writes), RP1 (no automatic missed/qada), RU1 and data preservation stay mandatory.
 
 # Last checked
 
-Main `03c304e`: T08 settings and T09 explicit old missed are integrated; focused native L/AX3 and Commands checks passed. Owner rejected the visual resemblance/font presentation on 2026-10-13. Functional evidence is not visual approval. Preserve T10/calendar candidate on `codex/m1-s4-prayer-settings-debt`; no visual acceptance or full milestone approval. Latest telemetry 98% five-hour used / 2% remaining, 15% weekly; no reset consumed. End new work immediately.
+2026-10-13, claude (model: Opus 5.5; effort: not exposed). Reorganized the repository and board at the owner's request; no app source changed. Main `410375e` before this change. `check-review-contracts.py`: PASS (86). `check-shipping-sources.py`: **3 FAILs already on main** (confirmed on an unchanged `410375e` snapshot): `PrayerTodayView.swift:833` font size 7 for a decorative diamond (fix in M1-V01); `salah.offsets` and `notif.quietFrom` have no shipped SettingControl branch (fix in M1-V10). Unmerged candidate: `codex/m1-s4-prayer-settings-debt` at `c9bd527` (full qada list and qada calendar dates); its last native rerun was never checked.
 
 # Board
 
-Active sections: **M0-S2 shipping integration (software slice delivered)**; **M0-S3 lean software acceptance (software-ready; device gate pending)**; **M1-S1 prayer home/logging (delivered)**; **M1-S2 prayer sanctity and notifications (in progress)**. Prior accepted work stays accepted. Advanced backup/privacy/platform checks remain tracked below; they are not the default development queue.
+Status values: `ready` · `in progress` · `blocked: <reason>` · `matched — awaiting owner` · `approved` (owner only) · `done` (engines and flows without a screen).
 
-| Card | Status | Accepted scope / evidence | Remaining / references |
-|---|---|---|---|
-| M0-T00 | done | Protocol, Before-M0 contract corrections | `docs/reports/M0-T00-protocol.md`; RA4 tracked T07 |
-| M0-T01 Top | done | Architecture note and repair decisions | `docs/design/M0-local-inbox.md`; retain section/gate limits |
-| M0-T02 | done | App-only inbox drain, atomic writes and replay; merged3e54a53 | `docs/reports/M0-T02-command-inbox.md`; RA2 suspended/first-unlock physical check remains |
-| M0-T03 | done | Local factory/RD2 retention; merged3718248 | `docs/reviews/M0-local-retention.md`; no CloudKit |
-| M0-T07 | done | RA4 compatibility/frozen fixtures; mergedcb57e68 | `docs/reports/M0-T07-review-fixes.md`; owner-data/device acceptance remains |
-| M0-T08 | done | Plain portable export; merged12b49c2 | `docs/reports/M0-T08-plain-export.md`; real Files destination write remains |
-| M0-T04 | done | Lean glass shell, built rooms only; merged596dc05 | `docs/reviews/M0-lean-shell.md`; RA3/RL8; presets/styles deferred |
-| M0-T05 | done | Keyboard/password diagnostic repair | `docs/reports/M0-T05-keyboard-dispatch.md`; privacy separately T09 |
-| M0-T10 | done | Read-only today prayer clocks; mergedb6556bb | `docs/reports/M0-T10-foundation-times.md`; no prayer-room logging/notifications |
-| M0-T11 | done | Bounded shipping-source checker; merged3b273b5 | `docs/reports/M0-T11-source-checks.md`; source mapping is not runtime acceptance |
-| M0-T13 | done | Arabic backup plural/numeral copy; merged1ee273e | `docs/reviews/M0-backup-copy.md`; no backup behavior change |
-| M0-T14 | done | RA1 this-device-only restore warning; mergedd28c36a | `docs/reviews/M0-backup-copy-t14.md`; focused golden regression passes |
-| M0-T15 | done | Verified missing-font preparation, Makefile guard, current startup docs | `docs/reviews/M0-workspace-preparation.md`; 11 resources checked, no binary publication/overwrite |
-| M0-T09R Top | done | Top SDK fix b7cd5d1 + actual full centered OS card at L/light, native1/0 in31.396s; independent Top approve | Scope: replace unavailable coordinate helper using SDK-proven normalized endpoint API; §8.10 (`14-shared.md`), presentation-privacy design. Acceptance: independent SDK review and actual identified/full-card OS snapshot completed; `docs/reviews/M0-T09-switcher-native.md`. Out: production/privacy/clock/default changes. Failed history preserved; green candidate restored d28c8dc. |
-| M0-T18 | done | Owner-requested outcome-first/Luna protocol, lean queue and automation alignment | Documentation delivery only; no app feature or gate pass. Root/nested AGENTS and CLAUDE identical. |
-| M0-T16 | done | **Reviewed privacy repair integrated; authorized plain-export native share and dismissal work on current main** (`ea3e63d`) | Reused production approval `8876626`; selected simulator host privacy/presentation 15/0, `ManagedBackupTests` 13/0, and fresh synthetic-store Face ID/share/dismissal 1/0. Raw output retained under `Madar/Artifacts/m0-t16-20261012-main/`. Actual Files destination write, physical iPhone, and broader two-scene/device privacy remain untested. No owner data or auth bypass. |
-| M0-T17 | done — lean software-ready | **Foundation settings and today's clocks are usable across city/numeral change, reset/undo, and relaunch** (`95804a1`) | Reused accepted day/clock/inbox/default evidence; new signed simulator journey 1/0 in 75.702s with L screenshots inspected. Preflight: 11 font/license resources pass, 0 copied. Checklist and evidence in `docs/reports/M0.md`; raw run under `Madar/Artifacts/m0-t17-20261012-main/`. Owner-iPhone and applicable RA2 device acceptance remain not tested; this is not full M0 approval. |
-| M1-T01 | done | **Today's prayer home and persistent basic logging integrated on main** (`e6fbe75`): five computed prayers/next prayer, due prayer→Jamaah/Alone save, Friday kind, change/undo and relaunch persistence. Additive v3 migration preserves v2 data and undo receipts; no automatic missed/qada. | Focused domain/Core/command/migration tests and signed simulator save/relaunch/change/undo passed; default and AX3 screenshots inspected; independent migration review had no Critical/High/Medium findings. Synthetic stores only. §7.2 `09-r-salah.md`, §10 `16-tech.md`, data `17-data.md`, RP1/RP2/RP6/RU1. Owner-iPhone and distribution remain untested. |
-| M1-T02 | done | **Explicit missed/make-up and pending recovery** integrated `1697c09`: explicit missed adds debt; one timestamped MakeUpPrayer updates log+QadaItem atomically/idempotently; undo restores both. Bulk gap review distinguishes missed, unrecorded, and excused; silence never ages automatically. | Core/Prayer/Commands tests and focused native flows passed; owner iPhone/distribution untested. §7.2/§10/§11, RP1/RP2. Out: automatic aging and notification/intent entry points. |
-| M1-T03 | done — pure engine (`dc4d011`) | **One pure SanctityGuard for every scheduled notification time**, including prayer asks, snoozes, room reminders, digest and open-app nudge; apply the approved Friday Dhuhr (~60 min) and Ramadan Isha (~90 min) windows. | Full-year 2026 property coverage for Riyadh, Jeddah and Tromsø plus boundary/cascade tests; 27 Core tests passed. Independent RP3 review: no findings. Out: OS request lifecycle and Live Activity implementation. §7.2/§8.8, RP3. |
-| M1-T04 | done — software slice; device proof pending | **Guarded iOS notification scheduling, tap-time snooze, cancellation after prayer logging, and a maintenance-safe inbox/notification lifecycle.** | Commands 14/14; selected simulator prayer-log + notification flow 2/2; independent lifecycle review found no actionable issue. RL5 precedence applied; new start budget/quiet/device gate and persisted ledger checks passed; scoped independent review no findings. Physical-device/ActivityKit start and distribution remain untested. §7.2/§8.8/§10/§11, RP3/RL5. |
-| M1-T05 | done — software slice | **حالي and editable Hijri-month history**: actual month ratio, separate made-up/debt counts, derived prayer/mosque streaks, last 25 states, per-prayer commitment and day edit. Mosque streak can be hidden; default/AX3 layouts have real screenshots. | Native `test_M1T05_HaliGoldenRatioHistoryEditUndoAndAX3`: 1/0 in 93.443s, includes 87%→90%→undo 87%, relaunch and true AX3 semantic-list assertion; `/tmp/madar-t05-hali-wrap-20261013.xcresult`. Reuses unchanged §7.2 golden analytics. Synthetic data only; owner iPhone/distribution not tested. |
-| M1-T06 | done — software slice | **Opt-in heart answer**: default off, save/skip/clear/undo and relaunch, answer can be revisited from a recorded prayer. Reflection has no ranking or numerical heart score; home arches retain no heart label. | Commands focused test 1/1; signed simulator flow 1/0 in 129.873s for L+AX3, screenshots inspected, `/tmp/madar-t06-heart-target-20261013.xcresult`. Independent writer/privacy review no findings; `docs/reviews/M1-prayer-writers.md`. Owner iPhone and external-release wording/distribution not tested. §7.2/RP6, canonical prayer.setHeart. |
-| M1-T07 | done — software slice | **Qiyam night logging**: 0...99 rakaat and witr, seven eligible nights, Isha–Fajr nightKey, save/relaunch/undo, explicit restoration after insertion undo and qualitative 30-night footprint. No unbuilt Quran entry. | Prayer range 1/1 + Commands midnight/replay/restore 1/1; native L+AX3 flow 1/0 in 76.606s, `/tmp/madar-t07-qiyam-range-20261013.xcresult`. Independent review no remaining findings after approved-range repair; screenshots inspected. Existing quranSessionID preserved; owner iPhone, Quran integration and distribution not tested. §7.2/P05, §10/§11. |
-| M1-T08 | done — software | Calculation method/Asr/high-latitude preferences and five offsets use agreed defaults/ranges; shared clocks refresh and settings reset/undo persist | Selected signed native L/AX3 offsets + both clock screens + reset/undo/relaunch: 1 passed, 0 failed (`/tmp/madar-t08-settings-confirm-20261013.xcresult`); actual screenshots inspected in `Madar/Artifacts/m1-t08-20261013/`. No new clock algorithm. Physical device and alternate-method golden clock proof remain untested. |
-| M1-T09 | done — software | Explicit old-date/prayer/Friday-kind entry, one log/debt, undo and confirmed restoration; no automatic aging | Commands `swift test --filter test_M1T09`: 1/1 (Friday/replay/make-up/undo/barriers + denominator 0/owed 1). Signed native L/AX3 save/undo/restore/relaunch/make-up undo: 1/0 (`/tmp/madar-t09-old-calendar-20261013.xcresult`); actual screenshots inspected. Independent review no findings, `docs/reviews/M1-prayer-writers.md`. Native Friday choice and sighting-offset choice not exercised; physical device remains untested. |
-| M0-T09 | in-progress | Existing repaired privacy slice is input to T16; many bounded native results already approved | Remaining encrypted first-key/restore authorization, true two-scene and other private surfaces tracked for first exposed use; focused independent review + actual feature acceptance before claiming them. Do not restart completed plain/switcher matrix or hold independent M1 software for this entire backlog. |
-| M0-T12 | needs-fix | Focus/search/title growth sourcec273bc4; nil-target contrast remains unsuppressed | Reuse approved focus diff only if needed by current screen. Diagnose actual element/pair when tooling can produce it; no identical rerun. A confirmed defect blocks acceptance of its affected screen, not unrelated implementation. VoiceOver/Reduce Motion/physical proof remain not tested. |
-| M0-T06 | in-progress | Existing evidence is preserved in M0.md | Lean software decision recorded at T17; owner-iPhone shell/today clocks and applicable local-store acceptance remain a separate required device gate. No TestFlight/distribution or full milestone approval without actual proof. |
+Every screen card follows protocol §2: canonical files → default-size screenshots → `python3 Madar/scripts/compare-screens.py <board> <shots>` → fix → AX3 check → `matched — awaiting owner`. Spec for every prayer card: §7.2 `docs/HANDOFF/sections/09-r-salah.md` (the part for that screen), §5 shapes `05-ds.md`, and the fixes listed.
 
-## Next results, in order
+## Section M1-V — prayer screens match the design (do in this order)
 
-1. **Visual correction first — owner request 2026-10-13**: compare actual default-size screens with canonical handoff screens (`screens/salah/01-S1-Home-s1.jpg`, S2/S5/S7 and settings); restore approved typography, spacing, card density and arch layout. Clearly label accessibility screenshots AX3; never use them as the default product preview. No new functional cards before this correction. Respect RP1/RP6 fixes over historical sample copy.
-2. Resume preserved T10/calendar slice only after changed-flow and visual checks; then T11 one-time tracking start edit (§7.2/P04, schema, §10/11).
-3. Keep owner-iPhone, actual ActivityKit start, Files destination write, T12 and distribution unverified until their actual evidence. Device validation must isolate owner data/OS requests and preserve production signing/App Group; paired availability alone proves no run.
+| Card | Screen | Canonical | Current code | Status | Do not copy (fixes and defaults win) | Notes |
+|---|---|---|---|---|---|---|
+| M1-V01 | S1 Home | `salah/01-S1-Home.jpg`, `-s1` | `App/PrayerTodayView.swift` | ready | Moon day/night button (prototype only). «تبقى معلّقة ٦ أيام ثم تُحسب فائتة»: RP1, an unlogged prayer becomes *unconfirmed*, never missed. «خاشع» or any heart label under the arches (RP6). Heart-question card unless `salah.askHeart` is on (default off). "·" next to a digit in the date (RU1, use «،»). Sample numbers (٩٨٪، ٨ أيام، ٣ فوائت، times). | Missing now: lattice horseshoe arches with reflection pool (`salah.pool` default true), state fill per arch, verse divider, pending-gap card, Hali card with beads, qada card per canonical, spec date format, countdown «بعد ١:١٤» (RL7). Possible source for the drawing (not yet checked against the canonical): `PrayerArchView`, `PrayerLattice`, `PrayerBeads` in the unused `App/PrayerRoom.swift`. Keep `PrayerTodayView`'s data wiring. Also fix the shipping-check FAIL at line 833. |
+| M1-V02 | S2 Light log | `salah/02-S2-Log.jpg`, `-s1` | `PrayerTodayLogSheet` | ready | Heart question unless on (RP6). Friday noon records `fridayKind` explicitly (RP5). Sample times. | Must be a room-styled sheet, not a grey system form. |
+| M1-V03 | S2b Missed and reminder | `salah/03-S2b-Missed.jpg`, `-s1` | `PrayerMakeUpSheet`, `PrayerGapResolutionSheet` | ready | «فاتتني… نزلت في القضاء» before the prayer's window ends (RP2: before the end only «لم أصلّها بعد» or snooze). «فاتتني» in the +30 notification (RP2). Automatic aging (RP1). | The return sheet resolves a gap as prayed, missed, not recorded, or excused (RP1). |
+| M1-V04 | S3 Hali | `salah/04-S3-Hali.jpg`, `-s1` | `PrayerStatisticsView` | ready | Any ranking or superlative such as «أخشعُ صلواتك…» (RP6). Sample numbers. Balance-style picker (`salah.balanceView` is v2: beads only). | Seen defects: title shown twice; «٠ أيام» needs the Arabic plural rule (RU3); month grid lacks each day's bead glyph; Mizan card lacks «الأحدث / الأقدم» labels and the «آخر ٢٥ فرضًا» header. |
+| M1-V05 | S4 Edit a past day | `salah/05-S4-Day.jpg`, `-s1` | day edit in `PrayerStatisticsView` (T05) | ready | Sample data. | A stored `dayKey` is never recomputed. |
+| M1-V06 | S5 Qada | `salah/06-S5-Qada.jpg`, `-s1` | `codex/m1-s4-prayer-settings-debt` `c9bd527` | ready | Counts outside the app unless opted in (RP9). Sample counts. | First rerun the candidate's T10 UI test and merge it only if green, then match the design. Dates follow `core.firstCalendar`. |
+| M1-V07 | S6 Qiyam | `salah/07-S6-Qiyam.jpg`, `-s1` | `PrayerNightLoggingSheet` | ready | Streak wording for qiyam (it is a footprint, not a streak). Sample rakaat. | 0...99 rakaat and witr already work (T07). |
+| M1-V08 | S7 Night (dark) | `salah/08-S7-Night.jpg`, `-s1` | home after Isha | ready | Day/night buttons (prototype only). | Dark canonical: compare in dark mode. Night ordering puts qiyam near the top. |
+| M1-V09 | S11 Mizan (beads) | `salah/12-S11-Mizan.jpg`, `-s1` | Hali beads | ready | The style picker (v2). | Beads view only. |
+| M1-V10 | Customize prayer | `flex/06-K-Salah.jpg`, `-s1`; order and hide per `flex/12-Tahrir.jpg` | `App/PrayerSettingsView.swift` | ready | v2 or deferred keys (see `settings-schema.json` `availability`). Hijri-offset stepper unless sighting is chosen (RL10). | `salah.layout` (block order and hide) is v1 and not wired in `PrayerTodayView` yet. Clear the shipping-check FAILs for `salah.offsets` and `notif.quietFrom`. |
 
-## Instructions for the next agent
+## Section M1-F — prayer features not built yet (after M1-V)
 
-- Start from the current queue, root protocol and latest handover. T04's prior command/native notification and lifecycle results are retained; do not repeat unchanged green checks. Before native work run `python3 Madar/scripts/prepare-workspace.py`.
-- RL5 is a [FIX] overriding §9: no new owner decision is required. Notification start budgeting has focused new tests and needs its scoped independent review before integration. Preserve actual-device and ActivityKit proof as untested.
-- Keep owner-iPhone acceptance, actual Files destination write, T12 contrast, broader privacy/accessibility and distribution separate. Unchanged historical refs: `docs/reports/M0-retained-branches.md`. Historical advice is superseded by this queue.
+| Card | Result | Canonical / spec | Status | Notes |
+|---|---|---|---|---|
+| M1-F01 | Friday screen with explicit Jumu'ah/Dhuhr choice and the tall Friday arch | `salah/09-S8-Friday.jpg`, `-s1`; RP5 | ready after V | `fridayKind` is already stored (T01). `salah.fridayTallArch` default true. |
+| M1-F02 | Travel: ask once, method per trip, shorten/combine without pre-pairing | `salah/10-S9-Travel.jpg`, `-s1`; RP4, RP7 | ready after V | Show «خارج مدينتك» until answered. Fixtures: London with MWL, Istanbul with Turkey. Needs `Trip.calcMethod` (data change → one independent review). |
+| M1-F03 | Edit the tracking start date once | §7.2 P04, `salah.trackingStart` | ready after V | |
+| M1-F04 | Outside the app: next-prayer widget, lock-screen widgets, countdown | `salah/11-S10-Abwab.jpg`; §9; RL7, RP9, RU2 | ready after V | Widgets read JSON snapshots only. Default shows only the next prayer and its time. |
+| M1-F05 | Import the old prayer history | §7.2, `Madar/docs/MIGRATION.md` | blocked: needs the owner's go and a synthetic fixture first | Never open or migrate the owner's real store without explicit permission. |
+| M1-G | M1 gate on the owner's iPhone | §12/§13 M1, `docs/reports/M1.md` | blocked: needs the owner's iPhone run | Fill the gate table only at the gate. |
+
+S0-Jard and S12-Khulasa are explainer boards (`kind: explainer`): use them for reference, don't build them.
+
+## Done — software (integrated on main, visual acceptance pending in M1-V)
+
+| Card | Result | Commit |
+|---|---|---|
+| M0 lean | Tokens and fonts, MadarDay, Hijri, prayer times, glass shell, M1 settings and models, app-only inbox, plain export | `95804a1`, `ea3e63d`; gate table `docs/reports/M0.md` |
+| M1-T01 | Today's five prayers, next prayer, log Jamaah/Alone, Friday kind, change/undo/relaunch, v3 migration | `e6fbe75` |
+| M1-T02 | Explicit missed and make-up, bulk gap resolution, no automatic aging | `1697c09` |
+| M1-T03 | One pure sanctity guard for every scheduled time (Friday Dhuhr and Ramadan Isha windows) | `dc4d011` |
+| M1-T04 | Guarded notification scheduling, snooze, cancel on log; Live Activity start budget | `433cbf6`, `e4ecf59` |
+| M1-T05 | Hali ratio, streaks, editable Hijri-month history | `7769d6d` |
+| M1-T06 | Optional heart answer (default off) | `e18601c` |
+| M1-T07 | Qiyam night logging | `288ef7e` |
+| M1-T08 | Calculation method, Asr, high latitude, offsets | `03347b6` |
+| M1-T09 | Explicit old missed prayer and restoration | `03c304e` |
+
+## Frozen — do not work on until the owner unfreezes
+
+M0-T06 (device acceptance paperwork), M0-T09 (encrypted backup and privacy matrix), M0-T12 (contrast inspector), app lock/Face ID, app-switcher privacy, sync. The code stays; it is not extended or re-tested. Earlier evidence: `docs/archive/reports/`, `docs/archive/reviews/`.
+
+## Waiting on the owner
+
+1. Approve or reject each screen marked `matched — awaiting owner`.
+2. Run the app on your iPhone (steps: `docs/OWNER-RUNBOOK.md`) when M1-V is done.
+3. The Codex automation prompt still names old tasks: replace it with `docs/AUTOMATION-PROMPT.md`.
+4. 57 local branches and 15 worktrees remain from earlier sessions. Cleanup waits for your go (merged branches only, `git branch -d`).
 
 # Later
 
-M1-S2 notification/sanctity + relevant physical RA2 checks; M1-S3 remaining prayer flows/statistics/travel and room gate. M2 Quran; M3 diary; M4 lobby/habits/widgets; M5 money; M6 Mihbara; M7 final integration. Plan each next section only when ready. Preserve existing scaffolding; shipping later features requires their actual acceptance and licensing.
+M1 gate, then M2 Quran, M3 Diary, M4 Lobby + Habits + Widgets, M5 Money, M6 Mihbara, M7 integration. Plan each milestone as screen cards in this same format when its turn comes; no entry point to an unbuilt room.
 
 # Handovers
 
-## Handover — owner visual correction takes priority — 2026-10-13 — codex
+## Handover — repository reorganized — 2026-10-13 — claude
 
-Works now: Main `03347b6` calculation settings and `03c304e` old missed/explicit restoration; earlier T04–T07 remain integrated. T10 full-qada list and qada-calendar correction preserved on `codex/m1-s4-prayer-settings-debt`, not delivered on main.
-Verified: T08 signed simulator offsets/both clocks/reset/undo/relaunch L+AX3 1/0 (`/tmp/madar-t08-settings-confirm-20261013.xcresult`). T09 Commands Friday/replay/undo/barriers/denominator 1/1; native old missed L+AX3 1/0 (`/tmp/madar-t09-old-calendar-20261013.xcresult`); independent writer review no findings. T10 initial native 1/0 (`/tmp/madar-t10-qada-history-20261013.xcresult`); subsequent calendar run failed because test scrolled past the target at AX3; directional scroll repair rerun at `/tmp/madar-t10-qada-scroll-20261013.xcresult`, result must be checked next. Actual L/AX3 artifacts preserved. `git diff --check` passed.
-Not verified: visual resemblance is owner-rejected; corrected default preview not delivered. Final T10 rerun outcome, physical device, ActivityKit, full M0/M1 and distribution remain unverified. No owner store opened/migrated.
-Next concrete result: match canonical design and default font before further functions, show default preview clearly separate from AX3.
-Active branch/worktree/tip: main `03c304e`; candidate `c9bd527` section branch retains T10 + `55632d2` calendar fix; no new worktree. Historical inventory unchanged.
-Model/effort: root not exposed; T09 independent reviewer requested Luna/max, actual identity/effort not exposed.
-Usage: 98% five-hour used / 2% remaining, 15% weekly used; reserve target was not achieved in the latest account reading. No reset used; no further implementation started.
+Works now: the app is unchanged. New protocol (visual acceptance, no report work, frozen list), this board with one card per prayer screen, `Madar/scripts/compare-screens.py`, history moved to `docs/archive/`.
+Verified: `check-review-contracts.py` PASS; `python3 -m unittest discover -s Madar/scripts/tests` OK; `compare-screens.py` produced S1-Home with valid embedded images; `cmp` shows both protocol pairs identical; `git diff --check` clean.
+Differences left: all prayer screens, see M1-V01…V10.
+Not verified: no app build or test run (no app source changed). `check-shipping-sources.py` shows the same 3 FAILs as unchanged main (assigned to M1-V01 and M1-V10).
+Next: M1-V01, the prayer home matching `01-S1-Home.jpg`.
+Model/effort: Claude Opus 5.5; effort not exposed.
+Usage: not exposed.
 
-## Handover — M1-T04/T05/T06/T07 integrated software — 2026-10-13 — codex
-
-Works now: Main `288ef7e` integrates guarded prayer notification scheduling/snooze/cancellation and RL5 budgeted starts (`e4ecf59`), Hali + editable Hijri-month history (`7769d6d`), opt-in heart save/skip/clear/undo (`e18601c`), and qiyam night save/undo/explicit restore (`288ef7e`). Previous defects repaired separately: test-clock undo `6b4d123`, approved qiyam 0...99 range `f30654b`.
-Verified: Preflight 11 resources, 0 copied. T04 Core activity 2/2, native notification+ledger 2/2 and isolated ledger 1/1; independent RL5 review no findings. T05 native golden 87%→90%→undo 87%/relaunch + true AX3 list: 1/0, 93.443s (`/tmp/madar-t05-hali-wrap-20261013.xcresult`). T06 Commands 1/1 and native L/AX3 save/skip/clear/undo/relaunch 1/0, 129.873s (`/tmp/madar-t06-heart-target-20261013.xcresult`). T07 Prayer range 1/1 + Commands midnight/restore 1/1; native L/AX3 1/0, 76.606s (`/tmp/madar-t07-qiyam-range-20261013.xcresult`). Actual screenshots inspected under ignored `Madar/Artifacts/m1-t05-20261013/`, `m1-t06-20261013/`, `m1-t07-20261013/`. Independent heart/qiyam reviews in `docs/reviews/M1-prayer-writers.md`; qiyam bound finding repaired. `git diff --check` passed.
-Not verified: owner iPhone flows, actual ActivityKit start, full M0/M1 acceptance, Files destination write, T12 contrast, external-release heart wording and distribution. Tests used isolated synthetic stores; no owner-data migration or auth bypass.
-Next concrete result: T08 calculation settings affect both clock screens and survive reset/undo/relaunch; then T09 explicit old missed prayer. Keep physical-device proof distinct.
-Active branch/worktree/tip: clean main `288ef7e`; retained `codex/m1-s2-sanctity` `e4ecf59`, `codex/m1-s3-prayer-history` `288ef7e`; no new worktree. Historical refs remain in retained inventory.
-Model/effort: root not exposed; independent reviewers requested Luna/max, returned actual identity/effort not exposed.
-Usage: latest 32% five-hour used / 68% remaining, 5% weekly used; no reset consumed by this agent. Account readings changed during the session; the latest value is reported without inferring a cause.
-
-
-## Handover — M1-T04 guarded notification candidate — 2026-10-13 — codex
-
-Works now: Candidate `433cbf6` on `codex/m1-s2-sanctity` schedules prayer notifications through the sanctity path, handles tap-time snooze/cancellation after prayer logging, and keeps notification store access suspended until maintenance and inbox draining complete.
-Verified: `python3 Madar/scripts/prepare-workspace.py` passed 11 pinned resources, 0 copied. `swift test --filter InboxDrainTests` passed 14/14. Selected `xcodebuild` run passed `test_M1T04_RealAppNotificationSchedulingSnoozeAndCancellation` and `test_M1T01_PrayerLogPersistsChangeUndoAndAX3` (2/2) on iPhone 17 Pro simulator, iOS 26.5; xcresult: `/tmp/madar-m1-t04-derived/Logs/Test/Test-Madar-final-maintenance-gate.xcresult`. Independent static review of the maintenance/drain lifecycle found no actionable issue. `git diff --check` passed before the candidate commit.
-Not verified: physical iPhone behavior, an actual Live Activity start, the unresolved Live Activity budget rule, or distribution. This candidate is not integrated; full M0 remains NOT APPROVED.
-Next concrete result: owner decision on whether Live Activity starts count against the per-device notification budget, then finalize the affected behavior and integrate the selected T04 slice. Keep device acceptance distinct from simulator results.
-Active branch/worktree/tip: clean `main` at `f320836`; unmerged candidate `codex/m1-s2-sanctity` at `433cbf6`; no worktree created.
-Model/effort: root model and effort not exposed; independent review result is static only.
-Usage: latest reading 33% five-hour used / 67% remaining, 5% weekly used / 95% remaining; no reset used.
-
-
-## Handover — M1-T02/T03 prayer recovery and sanctity engine — 2026-10-13 — codex
-
-Works now: Main `dc4d011` includes M1-T02 explicit missed/make-up and review of pending gaps, plus M1-T03's single pure guard that moves all planner candidates outside overlapping prayer sanctity windows. Friday Dhuhr and Ramadan Isha use the approved extensions; prayer days carry the calculated Hijri date so Ramadan rules are selected from the active Hijri source. Silence still never creates missed/qada automatically.
-Verified: T02 Core/Prayer/Commands suites passed 23/23, 17/17 and 20/20; signed iPhone 17 Pro/iOS 26.5 tests `test_M1T02_MissedMakeUpUndoAndRelaunch` and `test_M1T02_BulkPendingRecoveryAtAX3` each passed. Default and AX3 screenshots inspected. T03 `cd Madar/Packages/MadarCore && swift test`: 27 passed, 0 failed; focused sanctity cases include boundaries, cascades, request paths, and a 2026 property sweep for Riyadh, Jeddah and Tromsø. Independent RP3 review: no findings. T03 `git diff --check` passed before commit.
-Not verified: native `UNUserNotificationCenter` request lifecycle, tap-time OS snoozes, cancellation after logging, actual Live Activity starts, owner-iPhone acceptance, or distribution. Tests used synthetic stores; no owner data was opened. Full M0 remains NOT APPROVED.
-Next concrete result: M1-T04: connect the existing pure guard to real iOS request scheduling, tap-time snoozes, cancellation, and Live Activity starts; verify the selected simulator flow and preserve separate device/distribution gates.
-Active branch/worktree/tip: `main` production tip `dc4d011`; section branch `codex/m1-s2-sanctity` contains the same T03 source tip. The progress handover will be committed separately on main. Prior refs and worktrees are preserved.
-Model/effort: root model and effort not exposed; independent RP3 review completed with no findings.
-Usage: latest boundary reading 15% five-hour used / 85% remaining, 2% weekly used; reset credits unused. Continue useful authorized M1 work while preserving the owner's final 3–5% reserve.
-
-## Handover — M1-T01 prayer home and logging — 2026-10-12 — codex
-
-Works now: Main `e6fbe75` shows today's five computed prayers and next prayer; recording a due prayer as Jamaah/Alone, Friday kind, change, undo and relaunch persistence work. Additive v3 migration preserves synthetic v2 prayer data and undo receipts. No automatic missed/qada.
-Verified: `prepare-workspace.py` passed 11/11 pinned resources, 0 copied. In their package directories: Prayer `swift test --filter 'fridayNoonRequiresKind|fridayUnrecordedHistory|oldFridayMissed'` 3/3; Core `swift test --filter fridayPrayerMutationCommands` 1/1; Commands `swift test --filter 'ReplayTests|SchemaMigrationUndoTests'` 5/5; Data `swift test --filter schemaV2` 3/3. From `Madar/`, signed simulator command `xcodebuild -quiet -project Madar.xcodeproj -scheme Madar -destination 'platform=iOS Simulator,id=412F4437-7BD7-44D1-AA3D-2B7158090E14' -only-testing:MadarUITests/FoundationUITests/test_M1T01_PrayerLogPersistsChangeUndoAndAX3 test` succeeded; xcresult: 1 passed, 0 failed. Default and AX3 screenshots inspected. Independent narrow migration/domain review: no Critical/High/Medium findings.
-Not verified: owner-iPhone acceptance, migration against owner data, distribution, full M0 approval, and T12 contrast. All stores used for this migration check were synthetic.
-Next concrete result: M1-T02 explicit missed/make-up and pending recovery; preserve RP1, atomic/idempotent log+QadaItem updates, undo, and no automatic aging.
-Active branch/worktree/tip: clean `main` after this handover commit; retained `codex/m1-t01-prayer-logging` at `e6fbe75`. Existing T16/T17 refs preserved; [historical branch/worktree inventory](docs/reports/M0-retained-branches.md).
-Model/effort: root model and effort not exposed; do not infer Luna/max. Independent review was limited to the new migration/domain slice.
-Usage: latest account reading before handover was 33% five-hour used and 98% weekly used; reset credits unused. Weekly limit is near its cap, so no further card was started.
+Earlier handovers: `docs/archive/PROGRESS-2026-10-13.md`.
