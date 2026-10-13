@@ -25,7 +25,7 @@ Every screen card follows protocol §2: canonical files → default-size screens
 | M1-V07 | S6 Qiyam | `salah/07-S6-Qiyam.jpg`, `-s1` | `PrayerNightLoggingSheet` | matched — awaiting owner | Streak wording for qiyam (it is a footprint, not a streak). Sample rakaat. Differences: no «ورد القيام من محفوظك» row (Quran room not built); explicit save button and night picker kept; the night picker shows the older date title with ISO digits; the footprint strip is empty in the fixture.| 0...99 rakaat and witr already work (T07). |
 | M1-V08 | S7 Night (dark) | `salah/08-S7-Night.jpg`, `-s1` | home after Isha | matched — awaiting owner | Day/night buttons (prototype only). Differences: no heart card (RP6: off by default); pending notice reads «تبقى معلّقة حتى تختار حالها» (RP1); figures come from the test fixture; the active arch uses the same shape as the light home. Compare page: `Madar/Artifacts/compare/S7-Night.html`.| Dark canonical: compare in dark mode. Night ordering puts qiyam near the top. |
 | M1-V09 | S11 Mizan (beads) | `salah/12-S11-Mizan.jpg`, `-s1` | Hali beads | matched — awaiting owner | The style picker (v2). Built in M1-V04: variant A is the Mizan card in «حالي» (`Madar/Artifacts/m1-gap-shots/M1-V04-hali-L.png`, compare page `S3-Hali.html`). Variants B and C and the «أضف فائتة / أعِد» controls of the style picker are not built (v2). Differences: the arc here is wider and the centre figure follows the spec ratio over the last 25, not the sample 96%.| Beads view only. |
-| M1-V10 | Customize prayer | `flex/06-K-Salah.jpg`, `-s1`; order and hide per `flex/12-Tahrir.jpg` | `App/PrayerSettingsView.swift` | ready | v2 or deferred keys (see `settings-schema.json` `availability`). Hijri-offset stepper unless sighting is chosen (RL10). | `salah.layout` (block order and hide) is v1 and not wired in `PrayerTodayView` yet. Clear the shipping-check FAILs for `salah.offsets` and `notif.quietFrom`. |
+| M1-V10 | Customize prayer | `flex/06-K-Salah.jpg`, `-s1`; order and hide per `flex/12-Tahrir.jpg` | `App/PrayerSettingsView.swift` | matched — awaiting owner | v2 or deferred keys (see `settings-schema.json` `availability`). Hijri-offset stepper unless sighting is chosen (RL10). Built: `App/PrayerCustomizeView.swift` (room look; entry = sliders button on the home header), `salah.layout` order/hide wired in `PrayerTodayView`; the two shipping-check FAILs cleared (checker now knows the `map` and `time` controls). Differences: «الصلاة القادمة»/«الرواق» are fixed at the top with no arrows (DECISIONS); the mini phone is shape-only (11 pt minimum); the «رتّب» mode on the home itself (`flex/12-Tahrir`) is not built; `salah.pool`, `salah.fridayTallArch`, `salah.pendingDays`, `salah.qadaReminder` are not wired, so not shown. Old `PrayerSettingsView` kept unused. Compare page: `Madar/Artifacts/compare/K-Salah.html`.| `salah.layout` (block order and hide) is v1 and not wired in `PrayerTodayView` yet. Clear the shipping-check FAILs for `salah.offsets` and `notif.quietFrom`. |
 
 ## Section M1-F — prayer features not built yet (after M1-V)
 
@@ -71,6 +71,15 @@ M1 gate, then M2 Quran, M3 Diary, M4 Lobby + Habits + Widgets, M5 Money, M6 Mihb
 
 # Handovers
 
+## Handover — M1-V10 customize prayer — 2026-10-13 — claude
+
+Works now: sliders button on the prayer home opens «خصّص الصلاة» (live preview, search, order and hide of home blocks, collapsible groups for the wired settings); order and hide change the home at once, and reset restores the defaults.
+Verified: UI test V10 (reorder qiyam, hide Hali, home follows) and V01/V07/V08 passed at default size; `check-shipping-sources.py` now ends `STATIC PASS`; screenshots `Madar/Artifacts/m1-gap-shots/M1-V10-*.png`.
+Differences left: see the board row.
+Not verified: owner iPhone; relaunch persistence of the layout; the notification-permission card inside the reminders group.
+Next: M1-V11 or the next `ready` card on the board.
+Model/effort: Claude Sonnet 5.5; effort not exposed. Usage: not exposed.
+
 ## Handover — M1-V09 Mizan beads — 2026-10-13 — claude
 
 Works now: the beads Mizan (variant A of S11) is the card in «حالي», built in M1-V04; no code change.
@@ -87,15 +96,6 @@ Verified: UI test V08 passed at default size; screenshots `Madar/Artifacts/m1-ga
 Differences left: see the board row.
 Not verified: owner iPhone; the Hali card figures with the canonical sample data.
 Next: M1-V09 (S11 Mizan beads).
-Model/effort: Claude Sonnet 5.5; effort not exposed. Usage: not exposed.
-
-## Handover — M1-V07 qiyam sheet — 2026-10-13 — claude
-
-Works now: «قيام الليل» matches `07-S6-Qiyam` (room look, −/+ rakaat, «أوترتُ» pill, 30-night footprint strip); the Quran-room entry is not built (room not in v1 yet).
-Verified: UI tests V07 and T07 (save, relaunch, undo, restore) passed at default size; screenshot `Madar/Artifacts/m1-gap-shots/M1-V07-qiyam-L.png`.
-Differences left: see the board row.
-Not verified: owner iPhone; the scrolled canonical.
-Next: M1-V08 (S7 Night, dark).
 Model/effort: Claude Sonnet 5.5; effort not exposed. Usage: not exposed.
 
 Earlier handovers: `docs/archive/PROGRESS-2026-10-13.md`.

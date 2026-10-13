@@ -37,11 +37,16 @@ struct PrayerTodayView: View {
                                 .accessibilityIdentifier("prayer-today-summary")
                         }
                         VStack(spacing: 16) {
-                            if let pending = notice(snapshot, now: instant) { pending }
-                            heartNotice(snapshot)
-                            haliCard(snapshot)
-                            qadaCard(snapshot)
-                            qiyamCard(snapshot)
+                            ForEach(PrayerHomeLayout(session.values["salah.layout"]).visible, id: \.self) { block in
+                                switch block {
+                                case "pending":
+                                    if let pending = notice(snapshot, now: instant) { pending }
+                                    heartNotice(snapshot)
+                                case "hali": haliCard(snapshot)
+                                case "qada": qadaCard(snapshot)
+                                default: qiyamCard(snapshot)
+                                }
+                            }
                         }
                         .padding(.top, 20)
                     } else {
@@ -120,15 +125,24 @@ struct PrayerTodayView: View {
     // MARK: Header and next prayer
 
     private func header(day prayerDay: GregorianDay?) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("الصلاة").font(MadarTypography.title()).accessibilityAddTraits(.isHeader)
-            Text(headerDate(prayerDay ?? GregorianDay.containing(session.prayerNow(), in: session.activePlace.timeZone)))
-                .font(PrayerHomeType.body)
-                .foregroundStyle(theme.secondaryInk)
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("الصلاة").font(MadarTypography.title()).accessibilityAddTraits(.isHeader)
+                Text(headerDate(prayerDay ?? GregorianDay.containing(session.prayerNow(), in: session.activePlace.timeZone)))
+                    .font(PrayerHomeType.body)
+                    .foregroundStyle(theme.secondaryInk)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("prayer-today-header")
+            NavigationLink { PrayerCustomizeView(session: session) } label: {
+                Image(systemName: "slider.horizontal.3").font(.system(size: 17))
+                    .frame(width: 48, height: 48)
+                    .overlay { Circle().stroke(theme.ink.opacity(0.14), lineWidth: 1) }
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain).accessibilityLabel("خصّص الصلاة").accessibilityIdentifier("prayer-customize")
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("prayer-today-header")
     }
 
     /// «الأربعاء ٢٦ ربيع الآخر ١٤٤٨، ٧ أكتوبر». RU1: «،» separates the two dates, never «·».

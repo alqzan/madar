@@ -267,7 +267,7 @@ def schema_checks(schema, supported):
     for key in supported:
         if key not in definitions: failures.append(f'unknown supported key {key}')
         elif definitions[key].get('availability', 'v1') != 'v1': failures.append(f'cut key supported: {key}')
-        elif definitions[key]['type'] not in {'choice', 'bool', 'int', 'place'}:
+        elif definitions[key]['type'] not in {'choice', 'bool', 'int', 'place', 'map', 'time'}:
             failures.append(f'supported key has no shipped SettingControl branch: {key}')
     return failures, definitions
 

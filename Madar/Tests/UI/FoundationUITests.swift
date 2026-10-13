@@ -48,6 +48,41 @@ import XCTest
         app.terminate()
     }
 
+    /// M1-V10: «خصّص الصلاة», for comparison with screens/flex/06-K-Salah(-s1).jpg; order and hide change the home.
+    func test_M1V10_CustomizePrayerReordersAndHidesHomeBlocks() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
+            "MADAR_UI_NOW": "2026-10-07T16:20:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01",
+            "MADAR_UI_PRAYER_FIXTURE": "homeShowcase", "MADAR_UI_THEME": "light"]
+        app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+        let open = app.buttons["prayer-customize"]
+        XCTAssertTrue(open.waitForExistence(timeout: 10), app.debugDescription)
+        let any = { (id: String) in app.descendants(matching: .any).matching(identifier: id).firstMatch }
+        XCTAssertTrue(any("prayer-month-percentage").exists, "Hali is visible by default")
+        open.tap()
+        XCTAssertTrue(app.buttons["prayer-customize-back"].waitForExistence(timeout: 5), app.debugDescription)
+        attachScreenshot(app, named: "M1-V10-customize-L")
+        let up = app.buttons["prayer-block-up-qiyam"]; scrollTo(up, in: app)
+        up.tap()
+        let hali = app.switches["prayer-block-hali"]; scrollTo(hali, in: app)
+        hali.tap()
+        XCTAssertEqual(hali.value as? String, "0")
+        attachScreenshot(app, named: "M1-V10-customize-scrolled-L")
+        let remind = app.buttons["prayer-customize-card-remind"]; scrollTo(remind, in: app)
+        remind.tap()
+        attachScreenshot(app, named: "M1-V10-customize-groups-L")
+        let back = app.buttons["prayer-customize-back"]
+        for _ in 0..<8 where !back.isHittable { app.swipeDown() }
+        back.tap()
+        XCTAssertTrue(any("prayer-today-header").waitForExistence(timeout: 5))
+        XCTAssertFalse(any("prayer-month-percentage").exists, "A hidden block leaves the home")
+        let qiyam = app.buttons["prayer-qiyam"], qada = app.buttons["prayer-qada-makeup"]
+        XCTAssertTrue(qiyam.exists && qada.exists, app.debugDescription)
+        XCTAssertLessThan(qiyam.frame.minY, qada.frame.minY, "Qiyam moved above qada")
+        app.terminate()
+    }
+
     /// M1-V02: the light log sheet, for comparison with screens/salah/02-S2-Log.jpg.
     func test_M1V02_LogSheetMatchesCanonicalAndRecordsInOneTap() throws {
         continueAfterFailure = false
