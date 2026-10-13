@@ -4,7 +4,7 @@
 
 # Last checked
 
-2026-10-13 — Codex. M2-E01 and M2-E02 are complete in `MadarQuran`; 17 XCTest cases pass, including the 100/300/604-page balance simulations. Owner chose fixed-cycle review as an optional v1 method with spaced review default; recorded in `docs/DECISIONS.md`. Next ready card: M2-E05. No app screen or iPhone pass is claimed.
+2026-10-13 — Codex. M2-E01, E02 and E05 are complete: 22 Quran XCTest cases pass, including fixed-cycle rotation and the 100/300/604-page balance simulations; two focused settings tests pass. Fixed review is selectable and spaced review remains the default. Next queue item: M2-R01 is blocked on verified licensed-resource provenance and files; no app screen or iPhone pass is claimed.
 
 # Board
 
@@ -57,7 +57,7 @@ The owner lifted the M2 pause in `docs/CODEX-M2-BRIEF.md`. Build a pure Swift en
 | M2-R01 | One verified 1405 resource set for page/line/word maps and QCF V1; manifest and automatic resource checks (RQ7, Q08). | blocked: provenance source is unresolved and the resource files are absent from `Madar/` | Do not use the pinned legacy map as 1405 data. Owner says the Mushaf licence is obtained; keep the resource disabled until source, terms, hashes and required review evidence are recorded. |
 | M2-E03 | Coverage, partial-page portions and completion/khatm rules against the verified 1405 maps. | blocked: M2-R01 | Union coverage from non-deleted sessions; a khatm requires all 604 pages. |
 | M2-E04 | Plan and session engine: levels, rest/missed-day allotments, recovery, pace, streak and qiyam assignments. | blocked: M2-E01, M2-E02 and M2-E03 | Use `MadarDay`; preserve a stored `dayKey`; one atomic `CommitQuranSession`. |
-| M2-E05 | Add RQ1 fixed-cycle review beside spaced review. | ready | Owner decision, 13 Oct: v1 offers fixed cycle (one juz daily or seven manzils weekly) beside spaced review; spaced review is the default. Add the selector to settings with reset and undo. |
+| M2-E05 | Add RQ1 fixed-cycle review beside spaced review. | done | `QuranFixedCycleEngine` selects the daily juz or one of seven weekly manzils from injected, validated ayah ranges; spaced mode remains separate. Added `quran.reviewSchedule` (`spaced` default, daily juz, weekly manzils) to all three settings-schema copies. Generic settings set/reset/undo verified. Cycle map integration awaits M2-R01; current selector is schema/store support, not a built screen. |
 | M2-D01 | Quran app adapter: derive `QuranUIService` projections from the engine and existing `MadarData` records; route session commits atomically through the app. | blocked: M2-E01–E04 | Reuse the existing Quran SwiftData models; app process alone opens the store (RA2), local-only v1 (RA1). |
 | M2-V01 | Home — `screens/quran/03-R18-Home.jpg` | blocked: M2-E01–E04, M2-D01 | No sample counts. Apply RQ9: one line per step, one «ابدأ», details behind tap; «عميق» and «مُحكَم» state ×1½ and ×2. |
 | M2-V02 | Hifz coach — `screens/quran/04-R18-Hifz.jpg` | blocked: M2-V01, M2-R01, M2-E02 | No voice method (v2), no learning-hint penalty. |

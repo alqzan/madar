@@ -101,10 +101,24 @@ import Testing
     }
     @Test func settingsDefaultsPersistenceAndInvalidRejection() throws {
         let c = try MadarContainerFactory.makeInMemory(); let store = try SettingsStore(context:c.mainContext)
-        #expect(store.schema.settings.count == 128); #expect(try store.value(for:"core.firstCalendar") == .string("hijri"))
+        #expect(store.schema.settings.count == 129); #expect(try store.value(for:"core.firstCalendar") == .string("hijri"))
         #expect(throws:DataError.invalidValue("core.hijriOffset")) { try store.set(.number(9),for:"core.hijriOffset") }
         let undo = try store.set(.number(1),for:"core.hijriOffset"); #expect(try store.value(for:"core.hijriOffset") == .number(1)); try store.undo(undo); #expect(try store.value(for:"core.hijriOffset") == .number(0))
         let bad = Setting(); bad.key = "core.firstCalendar"; bad.valueJSON = Data("\"garbage\"".utf8); c.mainContext.insert(bad); try c.mainContext.save(); #expect(try store.value(for:bad.key) == .string("hijri"))
+    }
+    @Test func QuranReviewScheduleDefaultsToSpacedAndSupportsResetUndo() throws {
+        let c = try MadarContainerFactory.makeInMemory(); let store = try SettingsStore(context:c.mainContext)
+        #expect(try store.value(for:"quran.reviewSchedule") == .string("spaced"))
+        #expect(throws:DataError.invalidValue("quran.reviewSchedule")) { try store.set(.string("voice"),for:"quran.reviewSchedule") }
+
+        let changed = try store.set(.string("fixedManzilWeekly"),for:"quran.reviewSchedule")
+        #expect(try store.value(for:"quran.reviewSchedule") == .string("fixedManzilWeekly"))
+        let reset = try store.reset("quran.reviewSchedule")
+        #expect(try store.value(for:"quran.reviewSchedule") == .string("spaced"))
+        try store.undo(reset)
+        #expect(try store.value(for:"quran.reviewSchedule") == .string("fixedManzilWeekly"))
+        try store.undo(changed)
+        #expect(try store.value(for:"quran.reviewSchedule") == .string("spaced"))
     }
     @Test func presetImmediateUndoAndExactDeadlineAndReceiptLifetime() throws {
         let c = try MadarContainerFactory.makeInMemory(); let store = try SettingsStore(context:c.mainContext); let now = Date(timeIntervalSince1970:100000)

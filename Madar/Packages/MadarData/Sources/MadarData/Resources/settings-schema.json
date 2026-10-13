@@ -1686,6 +1686,32 @@
    "preset": false
   },
   {
+   "key": "quran.reviewSchedule",
+   "owner": "quran",
+   "section": "الجلسة",
+   "title": "دورة المراجعة",
+   "type": "choice",
+   "default": "spaced",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "spaced",
+     "label": "متباعدة"
+    },
+    {
+     "value": "fixedJuzDaily",
+     "label": "جزء يوميًا"
+    },
+    {
+     "value": "fixedManzilWeekly",
+     "label": "منزل يوميًا (٧ في الأسبوع)"
+    }
+   ],
+   "note": "المتباعدة هي الافتراضية؛ الدورة الثابتة: جزء يوميًا أو منزل يوميًا ضمن سبعة منازل أسبوعيًا",
+   "storage": "Setting (synced)",
+   "preset": false
+  },
+  {
    "key": "quran.similarAlert",
    "owner": "quran",
    "section": "الجلسة",

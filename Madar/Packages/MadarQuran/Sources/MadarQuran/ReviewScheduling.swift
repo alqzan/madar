@@ -3,6 +3,7 @@ import MadarCore
 
 public enum QuranReviewError: Error, Equatable {
     case invalidPageRange
+    case invalidAyahRange
 }
 
 public struct QuranPageRange: Codable, Hashable, Sendable {
