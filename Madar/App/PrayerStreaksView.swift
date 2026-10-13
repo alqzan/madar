@@ -81,6 +81,8 @@ struct PrayerStreakArches: View {
     let stats: PrayerStatistics
     let digits: MadarNumberFormatter
     @Environment(\.roomTheme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var grown = false
 
     var body: some View {
         HStack(alignment: .center, spacing: 14) {
@@ -102,6 +104,9 @@ struct PrayerStreakArches: View {
             .frame(maxWidth: .infinity)
             arch.frame(width: 132, height: 196).accessibilityHidden(true)
         }
+        .onAppear {
+            if reduceMotion { grown = true } else { withAnimation(.easeOut(duration: 0.9)) { grown = true } }
+        }
     }
 
     private var arch: some View {
@@ -116,8 +121,6 @@ struct PrayerStreakArches: View {
             }
             let inner = rects[2]
             ZStack {
-                PrayerLatticePattern(spacing: 8).stroke(theme.color("goldMid").opacity(0.4), lineWidth: 0.6)
-                    .clipShape(PrayerHorseshoe().path(in: inner.insetBy(dx: 8, dy: 0).offsetBy(dx: 0, dy: 8)))
                 PrayerStar().fill(theme.accent).frame(width: 16, height: 16)
                     .position(x: inner.midX, y: inner.minY + inner.width / 2 + 6)
                 ForEach(Array(ordered.enumerated()), id: \.element) { index, level in
@@ -131,14 +134,14 @@ struct PrayerStreakArches: View {
 
     /// One continuous arch line, filled from both feet by the streak; the two halves meet at the crown at a month.
     private func stones(in rect: CGRect, level: PrayerStreakLevel) -> some View {
-        let fraction = min(CGFloat(level.count(stats)), CGFloat(Self.monthDays)) / CGFloat(Self.monthDays)
-        let path = PrayerHorseshoe().path(in: rect)
-        let style = StrokeStyle(lineWidth: 8, lineCap: .butt, lineJoin: .round)
+        let fraction = grown ? min(CGFloat(level.count(stats)), CGFloat(Self.monthDays)) / CGFloat(Self.monthDays) : 0
+        let shape = PrayerHorseshoe().path(in: rect)
+        let fill = StrokeStyle(lineWidth: 8, lineCap: .round, lineJoin: .round)
         return ZStack {
-            path.stroke(theme.ink.opacity(0.07), style: style)
-            if fraction > 0 {
-                path.trimmedPath(from: 0, to: fraction / 2).stroke(color(level), style: style)
-                path.trimmedPath(from: 1 - fraction / 2, to: 1).stroke(color(level), style: style)
+            shape.stroke(theme.ink.opacity(0.07), style: StrokeStyle(lineWidth: 8, lineCap: .butt, lineJoin: .round))
+            if level.count(stats) > 0 {
+                PathShape(path: shape).trim(from: 0, to: fraction / 2).stroke(color(level), style: fill)
+                PathShape(path: shape).trim(from: 1 - fraction / 2, to: 1).stroke(color(level), style: fill)
             }
         }
     }
@@ -149,6 +152,12 @@ struct PrayerStreakArches: View {
         case .onTime: theme.color("goldMid")
         case .completion: theme.secondaryInk
         }
+    }
+
+    /// A fixed path as a `Shape`, so its trim animates.
+    private struct PathShape: Shape {
+        let path: Path
+        func path(in rect: CGRect) -> Path { path }
     }
 }
 
