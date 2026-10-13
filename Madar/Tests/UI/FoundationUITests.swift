@@ -1,6 +1,50 @@
 import XCTest
 
 @MainActor final class FoundationUITests: XCTestCase {
+    func test_M1T05_HaliGoldenRatioHistoryEditUndoAndAX3() throws {
+        continueAfterFailure = false
+        for size in ["L", "AX3"] {
+            let app = XCUIApplication()
+            app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": size,
+                "MADAR_UI_NOW": "2026-10-07T20:00:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01",
+                "MADAR_UI_PRAYER_FIXTURE": "ratio26of30", "MADAR_UI_THEME": "light"]
+            app.launch(); finishOnboarding(app)
+            app.tabBars.buttons["الصلاة"].tap()
+            let history = app.buttons["prayer-history"]
+            scrollTo(history, in: app); history.tap()
+            let ratio = app.staticTexts["prayer-stat-percentage"]
+            XCTAssertTrue(ratio.waitForExistence(timeout: 10), app.debugDescription)
+            XCTAssertEqual(ratio.label, "٨٧٪")
+            let qada = app.staticTexts["prayer-stat-qada"]
+            scrollTo(qada, in: app)
+            XCTAssertEqual(qada.label.filter { $0 != "\u{2068}" && $0 != "\u{2069}" }, "قُضيت ٢، عليك ٢")
+            attachScreenshot(app, named: "M1-T05-hali-\(size)")
+            if size == "AX3" {
+                let list = app.descendants(matching: .any).matching(identifier: "prayer-beads-list").firstMatch
+                XCTAssertTrue(list.exists, "AX3 must use the semantic list instead of the custom drawing")
+            }
+            let day = app.buttons["prayer-history-day-2026-10-06"]
+            scrollTo(day, in: app); attachScreenshot(app, named: "M1-T05-history-\(size)"); day.tap()
+            let isha = app.buttons["prayer-history-log-isha"]
+            XCTAssertTrue(isha.waitForExistence(timeout: 10), app.debugDescription); isha.tap()
+            let alone = app.buttons["prayer-status-alone"]
+            XCTAssertTrue(alone.waitForExistence(timeout: 10), app.debugDescription); alone.tap()
+            app.buttons["prayer-save"].tap()
+            let undo = app.buttons["undo-button"]
+            XCTAssertTrue(undo.waitForExistence(timeout: 10), app.debugDescription)
+            scrollTo(history, in: app); history.tap()
+            XCTAssertTrue(ratio.waitForExistence(timeout: 10)); XCTAssertEqual(ratio.label, "٩٠٪")
+            app.buttons["تم"].tap()
+            undo.tap()
+            scrollTo(history, in: app); history.tap()
+            XCTAssertTrue(ratio.waitForExistence(timeout: 10)); XCTAssertEqual(ratio.label, "٨٧٪")
+            app.terminate(); app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+            scrollTo(history, in: app); history.tap()
+            XCTAssertTrue(ratio.waitForExistence(timeout: 10)); XCTAssertEqual(ratio.label, "٨٧٪")
+            app.terminate()
+        }
+    }
+
     func test_M1T04_NotificationPermissionPromptAtDefaultAndAX3() throws {
         continueAfterFailure = false
         let app = XCUIApplication()

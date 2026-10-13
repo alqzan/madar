@@ -94,7 +94,7 @@ struct CustomizeMadar: View {
             return query.isEmpty || normalized(definition.title + " " + sectionFor(definition.key) + " " + definition.key).contains(normalized(query))
         }
     }
-    private var sections: [String] { ["اليوم والتقويم", "المظهر", "مدينتك", "الخصوصية", "الإشعارات"].filter { section in filtered.contains { sectionFor($0.key) == section } } }
+    private var sections: [String] { ["اليوم والتقويم", "المظهر", "مدينتك", "الخصوصية", "الإشعارات", "الصلاة"].filter { section in filtered.contains { sectionFor($0.key) == section } } }
     private let symbols = ["اليوم والتقويم": "calendar", "المظهر": "textformat", "مدينتك": "location", "الإشعارات": "bell.badge"]
     private var changesLabel: String {
         let count = session.schema.settings.filter { AppSession.supportedKeys.contains($0.key) && session.values[$0.key] != $0.defaultValue }.count
@@ -118,6 +118,7 @@ struct CustomizeMadar: View {
 func sectionFor(_ key: String) -> String {
     if ["core.dayStart", "core.firstCalendar", "core.hijriSource", "core.hijriOffset", "core.weekStart"].contains(key) { return "اليوم والتقويم" }
     if key == "core.homeCity" { return "مدينتك" }
+    if key == "salah.showMosqueStreak" { return "الصلاة" }
     if key == "core.faceIDLock" { return "الخصوصية" }
     if ["salah.askAfterAdhanMin", "salah.askReminder", "salah.liveActivity", "notif.thisDeviceReminders", "notif.quietAfterIsha", "notif.quietFrom"].contains(key) { return "الإشعارات" }
     return "المظهر"

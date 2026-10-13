@@ -68,7 +68,7 @@ final class AppSession {
     })
     private var expiryTask: Task<Void, Never>?
 
-    static let supportedKeys = ["core.dayStart", "core.firstCalendar", "core.hijriSource", "core.hijriOffset", "core.weekStart", "core.theme", "core.numerals", "core.homeCity", "core.faceIDLock", "salah.askAfterAdhanMin", "salah.askReminder", "salah.liveActivity", "notif.thisDeviceReminders", "notif.quietAfterIsha", "notif.quietFrom"]
+    static let supportedKeys = ["core.dayStart", "core.firstCalendar", "core.hijriSource", "core.hijriOffset", "core.weekStart", "core.theme", "core.numerals", "core.homeCity", "core.faceIDLock", "salah.askAfterAdhanMin", "salah.askReminder", "salah.liveActivity", "salah.showMosqueStreak", "notif.thisDeviceReminders", "notif.quietAfterIsha", "notif.quietFrom"]
 
     init(container: ModelContainer, managedStore: ManagedDataStore? = nil, groupDirectory: URL? = nil) throws {
         self.container = container
@@ -85,6 +85,7 @@ final class AppSession {
         store = SettingsStore(context: container.mainContext, schema: schema)
         #if DEBUG
         try preparePrayerUITestTrackingStart()
+        try preparePrayerStatisticsFixture()
         #endif
         try reload()
         let devices = try container.mainContext.fetch(FetchDescriptor<DeviceSetting>())
@@ -186,6 +187,30 @@ final class AppSession {
         }
     }
     #if DEBUG
+    private func preparePrayerStatisticsFixture() throws {
+        guard ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"] != nil,
+              ProcessInfo.processInfo.environment["MADAR_UI_PRAYER_FIXTURE"] == "ratio26of30" else { return }
+        let context = ModelContext(container)
+        // Seed only once in an explicitly isolated DEBUG UI-test store. Values come
+        // from the hand-authored §7.2 example, never from engine output.
+        guard try context.fetch(FetchDescriptor<PrayerLog>()).isEmpty else { return }
+        for index in 0..<30 {
+            let row = PrayerLog()
+            row.dayKey = String(format: "2026-10-%02d", index / 5 + 1)
+            row.prayer = Prayer.allCases[index % 5].rawValue
+            row.status = index < 26 ? "jamaah" : index < 28 ? "qada" : "missed"
+            row.tzID = "Asia/Riyadh"
+            row.eventAt = try GregorianDay(row.dayKey).date(in: ActivePlace.riyadh.timeZone).addingTimeInterval(12 * 3600)
+            row.source = "user"
+            context.insert(row)
+            if index >= 26 {
+                let debt = QadaItem(); debt.originalDayKey = row.dayKey; debt.prayer = row.prayer
+                if index < 28 { debt.madeUpAt = row.eventAt }
+                context.insert(debt)
+            }
+        }
+        try context.save()
+    }
     private func preparePrayerUITestTrackingStart() throws {
         guard let raw = ProcessInfo.processInfo.environment["MADAR_UI_TRACKING_START"],
               let day = try? GregorianDay(raw) else { return }
