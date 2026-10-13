@@ -6,7 +6,7 @@ Current model policy: **GPT-6 Luna max may implement production.** Sol is narrow
 
 # Last checked
 
-Checked clean main `3c877df`, latest handover, and retained T04 candidate `433cbf6`; main was merged into `codex/m1-s2-sanctity`. Reused prior unchanged notification/inbox lifecycle approval. The supposed §9/RL5 blocker is resolved by the explicit review-fix precedence: RL5 starts consume budget and respect quiet hours. New focused Core activity tests 2/2; signed simulator notification + ledger flow 2/2, isolated persisted ledger test 1/1. Scoped independent RL5 review: no actionable findings. Preflight 11 pinned resources pass, 0 copied. Actual ActivityKit start, owner iPhone and distribution remain not tested. Start usage 1% five-hour used, latest boundary 9%; no reset used.
+Integrated main `288ef7e`: T04 `e4ecf59`, T05 `7769d6d`, T06 `e18601c`, T07 `288ef7e`; focused software/native checks and L/AX3 screenshots passed, with scoped independent notification/heart/qiyam reviews. Reuse unchanged green outputs; exact evidence is in the board/reviews below. Preflight 11 pinned resources, 0 copied. Owner-device and distribution gates remain separate. Physical iPhone 15 Pro Max is paired/available in CoreDevice; no install/run or owner-data migration was performed. Latest usage 32% five-hour used / 68% remaining, 5% weekly used; no reset was consumed by this agent.
 
 # Board
 
@@ -44,10 +44,9 @@ Active sections: **M0-S2 shipping integration (software slice delivered)**; **M0
 
 ## Next results, in order
 
-1. **M1-T04**: integrated `e4ecf59`; actual ActivityKit start and owner-device acceptance remain separate.
-2. **M1-T05 — delivered, see board — حالي + editable history**: show the existing engine's Hijri-month ratio, independent qada/debt counts and derived streaks, plus last 25 states and a selectable history day. Changing a past missed record and undo updates the ratio. §7.2 `09-r-salah.md` (حالي/القواعد/السجل), RP1/RP2/RP5/RP6/RU1; canonical S3-Hali. Out: travel, heart collection and qiyam.
-3. **M1-T06 — delivered, see board — optional heart answer**: explicit opt-in, optional answer with save/skip/undo; no ranking or persistent home labels. §7.2 التسجيل/حضور القلب, RP6, §10 commands. Out: external-release wording approval.
-4. **M1-T07 — delivered, see board — qiyam night logging**: record rakaat/witr for an eligible night with save/relaunch/undo, using the approved Isha–Fajr nightKey and qualitative 30-night footprint. §7.2 قيام الليل/P05, §10/§11. Out: unbuilt Quran entry points or cross-room Quran writes.
+1. **M1-T08 — prayer calculation settings**: expose the agreed calculation method, Asr, high-latitude rule and per-prayer minute offsets; both home and prayer clocks reflect change, reset/undo and relaunch. §7.2 المواقيت/P01/P02, settings-schema exact defaults/ranges, RP3. Out: trip-specific settings and location permission.
+2. **M1-T09 — add an old missed prayer**: explicit date/prayer/Friday-kind entry before tracking is allowed, one debt, durable make-up/undo and no inferred misses. §7.2 القضاء/بداية التتبّع, RP1/RP2/RP5, §10/§11. Preserve tombstones; any recreation needs an explicit restoration route. Out: automatic aging and unbuilt room links.
+3. Keep owner-iPhone, actual ActivityKit start, Files destination write, T12 and distribution unverified until their actual evidence. Device validation must isolate owner data/OS requests and preserve production signing/App Group; paired availability alone proves no run.
 
 ## Instructions for the next agent
 
@@ -60,6 +59,17 @@ Active sections: **M0-S2 shipping integration (software slice delivered)**; **M0
 M1-S2 notification/sanctity + relevant physical RA2 checks; M1-S3 remaining prayer flows/statistics/travel and room gate. M2 Quran; M3 diary; M4 lobby/habits/widgets; M5 money; M6 Mihbara; M7 final integration. Plan each next section only when ready. Preserve existing scaffolding; shipping later features requires their actual acceptance and licensing.
 
 # Handovers
+
+## Handover — M1-T04/T05/T06/T07 integrated software — 2026-10-13 — codex
+
+Works now: Main `288ef7e` integrates guarded prayer notification scheduling/snooze/cancellation and RL5 budgeted starts (`e4ecf59`), Hali + editable Hijri-month history (`7769d6d`), opt-in heart save/skip/clear/undo (`e18601c`), and qiyam night save/undo/explicit restore (`288ef7e`). Previous defects repaired separately: test-clock undo `6b4d123`, approved qiyam 0...99 range `f30654b`.
+Verified: Preflight 11 resources, 0 copied. T04 Core activity 2/2, native notification+ledger 2/2 and isolated ledger 1/1; independent RL5 review no findings. T05 native golden 87%→90%→undo 87%/relaunch + true AX3 list: 1/0, 93.443s (`/tmp/madar-t05-hali-wrap-20261013.xcresult`). T06 Commands 1/1 and native L/AX3 save/skip/clear/undo/relaunch 1/0, 129.873s (`/tmp/madar-t06-heart-target-20261013.xcresult`). T07 Prayer range 1/1 + Commands midnight/restore 1/1; native L/AX3 1/0, 76.606s (`/tmp/madar-t07-qiyam-range-20261013.xcresult`). Actual screenshots inspected under ignored `Madar/Artifacts/m1-t05-20261013/`, `m1-t06-20261013/`, `m1-t07-20261013/`. Independent heart/qiyam reviews in `docs/reviews/M1-prayer-writers.md`; qiyam bound finding repaired. `git diff --check` passed.
+Not verified: owner iPhone flows, actual ActivityKit start, full M0/M1 acceptance, Files destination write, T12 contrast, external-release heart wording and distribution. Tests used isolated synthetic stores; no owner-data migration or auth bypass.
+Next concrete result: T08 calculation settings affect both clock screens and survive reset/undo/relaunch; then T09 explicit old missed prayer. Keep physical-device proof distinct.
+Active branch/worktree/tip: clean main `288ef7e`; retained `codex/m1-s2-sanctity` `e4ecf59`, `codex/m1-s3-prayer-history` `288ef7e`; no new worktree. Historical refs remain in retained inventory.
+Model/effort: root not exposed; independent reviewers requested Luna/max, returned actual identity/effort not exposed.
+Usage: latest 32% five-hour used / 68% remaining, 5% weekly used; no reset consumed by this agent. Account readings changed during the session; the latest value is reported without inferring a cause.
+
 
 ## Handover — M1-T04 guarded notification candidate — 2026-10-13 — codex
 
@@ -101,13 +111,3 @@ Next concrete result: M1-T01 today's prayer display and persistent basic logging
 Active branch/worktree/tip: clean `main` `95804a1`; retained T16 `codex/m0-t16-curated-export` `ea3e63d` and T17 `codex/m0-t17-lean-readiness` `95804a1`. No worktree created or archived.
 Model/effort: root model and effort not exposed; cannot claim Luna/max ran. No independent review needed for T17 test-only change; reused T16 production approval `8876626` for unchanged reviewed source.
 Usage: latest at the T17 boundary 13% five-hour used / 87% remaining, weekly 95% used / 5% remaining; reset credits unused. The documentation checkpoint read 16% five-hour used / 84% remaining, weekly 95% used / 5% remaining. Weekly allowance may end this session early.
-
-## Handover — owner correction: usable deliveries and Luna max — 12/10/2026 — codex
-
-Works now: root/nested agent protocols and startup queue use outcome-first development, Luna max production permission, scoped review/escalation, grouped small cards until about5% reserve, and lean software/device separation. This is the owner's requested process correction, not app delivery.
-Verified: paired root/nested protocols identical; five handovers/current card queue and spec references checked; git diff --check passed. Automation tool update/readback: gpt-6-luna/max, PAUSED, unchanged five-hour schedule/local project. No product build/test repeated. The first whitespace check found one trailing blank line and it was removed; the host Python lacks tomllib, so readback uses its built-in regex without installs.
-Not verified: Luna performance on production work, T16 integration, T17 software readiness, M1 logging and owner-iPhone/full M0 acceptance. No guarantee that every future session succeeds.
-Next concrete result: FIRST T16 integrate reviewed existing export/privacy repair and deliver ordinary authorized native share on main; then T17 lean software flow; then M1-T01 persistent prayer logging. No extended encrypted/Inspector loop as the default queue.
-Active branch/worktree/tip: main process docs only; T09 `codex/m0-t09-system-ax3-navigation`70939f5 in m0-p1b-fixes; T12bfa878b unchanged. Historical refs listed in retained inventory; nothing deleted.
-Model/effort: future automated author GPT-6 Luna max; current root identity/effort not exposed. Sol escalation only for a concrete unresolved problem.
-Usage: setup reading5% five-hour used/95%remaining, weekly94%used. This specific documentation/process request does not authorize unrelated coding just to consume the allowance; future development sessions keep the owner's approximately5% reserve and multi-card target. Final reading9% five-hour used/91%remaining, weekly94%used; this process-only task did not target spending the allowance. No reset used.
