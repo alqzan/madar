@@ -1,6 +1,10 @@
 import SwiftUI
 import MadarDesign
 
+enum QuranMemorizationHadith {
+    static let text = "«يُقال لصاحب القرآن: اقرأ وارتق ورتّل، كما كنت ترتّل في الدنيا؛ فإن منزلك عند آخر آية تقرؤها»"
+}
+
 /// Arabic wording of Sunan Abi Dawud 1464, verified at https://sunnah.com/abudawud:1464.
 struct QuranCoverageHadithSheet: View {
     let theme: RoomTheme
@@ -15,7 +19,7 @@ struct QuranCoverageHadithSheet: View {
                 Text("قال رسول الله ﷺ")
                     .font(.custom("thmanyahsans-Regular", size: 13, relativeTo: .body))
                     .foregroundStyle(theme.secondaryInk)
-                Text("«يُقال لصاحب القرآن: اقرأ وارتق ورتّل، كما كنت ترتّل في الدنيا؛ فإن منزلك عند آخر آية تقرؤها»")
+                Text(QuranMemorizationHadith.text)
                     .font(.custom("Amiri-Bold", size: 22, relativeTo: .title2))
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("quran-hadith-text")

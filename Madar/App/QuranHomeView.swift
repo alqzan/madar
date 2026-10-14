@@ -94,17 +94,19 @@ struct QuranHomeView: View {
     }
     private func coverage(_ state: QuranRoomState) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 12) {
-                Text("في صدرك").font(bodyFont(13)).foregroundStyle(theme.secondaryInk)
-                    .accessibilityIdentifier("quran-coverage-label")
-                Button { detail = .hadith } label: {
-                    Text("اقرأ وارتق").font(bodyFont(13, bold: true)).foregroundStyle(theme.color("hifzText"))
-                        .frame(minHeight: 44).contentShape(Rectangle())
-                }.buttonStyle(.plain)
-                    .accessibilityLabel("اقرأ وارتق، عرض الحديث")
-                    .accessibilityIdentifier("quran-coverage-hadith")
-                Spacer(minLength: 0)
-            }
+            Text("في صدرك").font(bodyFont(13)).foregroundStyle(theme.secondaryInk)
+                .accessibilityIdentifier("quran-coverage-label")
+            Button { detail = .hadith } label: {
+                Text(QuranMemorizationHadith.text)
+                    .font(.custom("Amiri-Regular", size: 21, relativeTo: .title2))
+                    .lineSpacing(3).multilineTextAlignment(.leading)
+                    .foregroundStyle(theme.color("hifzText"))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .padding(.vertical, 2).contentShape(Rectangle())
+            }.buttonStyle(.plain)
+                .accessibilityHint("عرض مصدر الحديث")
+                .accessibilityIdentifier("quran-coverage-hadith")
             HStack(alignment: .firstTextBaseline, spacing: 12) {
                 Text(state.coverageTitle).font(serif(34)).fixedSize(horizontal: false, vertical: true).accessibilityIdentifier("quran-coverage-title")
                 Spacer(minLength: 0)

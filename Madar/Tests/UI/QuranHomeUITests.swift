@@ -10,9 +10,10 @@ import XCTest
         XCTAssertTrue(app.buttons["quran-begin"].exists)
         let coverageLabel = app.staticTexts["quran-coverage-label"]
         let hadith = app.buttons["quran-coverage-hadith"]
-        XCTAssertEqual(coverageLabel.frame.midY, hadith.frame.midY, accuracy: 1)
-        XCTAssertLessThan(hadith.frame.maxX, coverageLabel.frame.minX)
-        XCTAssertLessThanOrEqual(coverageLabel.frame.minX - hadith.frame.maxX, 13)
+        XCTAssertGreaterThan(hadith.frame.minY, coverageLabel.frame.maxY)
+        XCTAssertLessThan(hadith.frame.maxY, app.staticTexts["quran-coverage-title"].frame.minY)
+        XCTAssertTrue(hadith.label.contains("يُقال لصاحب القرآن"))
+        XCTAssertTrue(hadith.label.contains("فإن منزلك عند آخر آية تقرؤها"))
         attach(app, "M2-V01-home-L")
         app.swipeUp()
         XCTAssertTrue(app.otherElements["quran-log14"].exists)
