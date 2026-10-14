@@ -149,7 +149,7 @@ import XCTest
         let open = app.buttons["prayer-customize"]
         XCTAssertTrue(open.waitForExistence(timeout: 10), app.debugDescription)
         let any = { (id: String) in app.descendants(matching: .any).matching(identifier: id).firstMatch }
-        XCTAssertTrue(any("prayer-month-percentage").exists, "Hali is visible by default")
+        XCTAssertTrue(app.buttons["prayer-streaks"].exists, "The current Hali block is visible by default")
         open.tap()
         XCTAssertTrue(app.buttons["prayer-customize-back"].waitForExistence(timeout: 5), app.debugDescription)
         attachScreenshot(app, named: "M1-V10-customize-L")
@@ -166,7 +166,7 @@ import XCTest
         for _ in 0..<8 where !back.isHittable { app.swipeDown() }
         back.tap()
         XCTAssertTrue(any("prayer-today-header").waitForExistence(timeout: 5))
-        XCTAssertFalse(any("prayer-month-percentage").exists, "A hidden block leaves the home")
+        XCTAssertFalse(app.buttons["prayer-streaks"].exists, "A hidden block leaves the home")
         let qiyam = app.buttons["prayer-qiyam"], qada = app.buttons["prayer-qada-makeup"]
         XCTAssertTrue(qiyam.exists && qada.exists, app.debugDescription)
         XCTAssertLessThan(qiyam.frame.minY, qada.frame.minY, "Qiyam moved above qada")
@@ -473,7 +473,7 @@ import XCTest
             app.tabBars.buttons["الصلاة"].tap()
             XCTAssertFalse(app.buttons["prayer-heart-review"].exists, "RP6 defaults to off")
             app.terminate(); app.launch(); finishOnboarding(app)
-            app.buttons["settings-button"].tap()
+            app.tabBars.buttons["خصّص"].tap()
             let search = app.textFields["settings-search"]
             scrollTo(search, in: app); search.tap(); search.typeText("salah.askHeart\n")
             let toggle = app.switches["setting-salah.askHeart"]
@@ -504,7 +504,12 @@ import XCTest
             scrollTo(day, in: app); day.tap()
             app.buttons["prayer-history-log-fajr"].tap()
             XCTAssertTrue(present.waitForExistence(timeout: 10)); XCTAssertTrue(present.isSelected)
-            scrollTo(skip, in: app); skip.tap()
+            scrollTo(skip, in: app)
+            let skipReady = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true AND hittable == true"), object: skip)
+            XCTAssertEqual(XCTWaiter.wait(for: [skipReady], timeout: 10), .completed)
+            skip.tap()
+            let skipClosed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: skip)
+            XCTAssertEqual(XCTWaiter.wait(for: [skipClosed], timeout: 10), .completed, app.debugDescription)
             XCTAssertTrue(undo.waitForExistence(timeout: 15)); undo.tap()
             app.terminate()
         }
@@ -952,7 +957,10 @@ import XCTest
         let settings = app.buttons["settings-button"]
         XCTAssertTrue(settings.waitForExistence(timeout: 20), app.debugDescription)
         XCTAssertTrue(app.tabBars.buttons["الصلاة"].exists, "The M1 prayer screen is the first built room.")
-        XCTAssertFalse(app.buttons["القرآن"].exists)
+        XCTAssertTrue(app.tabBars.buttons["القرآن"].exists, "M2 Quran home is now built.")
+        for room in ["المذكرات", "المال", "المحبرة"] {
+            XCTAssertFalse(app.tabBars.buttons[room].exists, "Unbuilt rooms have no tab entry.")
+        }
         let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "M0-iPhone17Pro-RTL-light-L"; shot.lifetime = .keepAlways; add(shot)
         settings.tap()
         XCTAssertTrue(app.buttons["reset-settings"].waitForExistence(timeout: 10), app.debugDescription)
