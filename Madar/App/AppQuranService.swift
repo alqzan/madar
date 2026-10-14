@@ -10,7 +10,7 @@ import MadarPrayer
 @MainActor final class AppQuranService: QuranUIService {
     unowned let app: AppSession
     let clock: @MainActor () -> Date
-    init(session: AppSession, clock: @escaping @MainActor () -> Date = { .now }) { app = session; self.clock = clock }
+    init(session: AppSession, clock: @escaping @MainActor () -> Date = { prayerUITestClock(.now) }) { app = session; self.clock = clock }
     func repository() throws -> QuranRepository {
         guard !app.maintenanceInProgress else { throw BackupOperationError.busy }
         return try QuranRepository(context: ModelContext(app.container), catalog: QuranResources.catalog())
@@ -21,7 +21,13 @@ import MadarPrayer
     }
     var numerals: MadarNumberFormatter { MadarNumberFormatter(style: app.values["core.numerals"]?.string == "western" ? .western : .hindi) }
     func count(_ value: Int, singular: String, dual: String, plural: String) -> String {
-        switch value { case 1: singular; case 2: dual; default: "\(numerals.string(value)) \(plural)" }
+        switch value {
+        case 1: return singular
+        case 2: return dual
+        default:
+            let counted = value >= 11 ? ["أجزاء": "جزءًا", "أوجه": "وجهًا", "أيام": "يومًا", "آيات": "آيةً", "مواضع": "موضعًا"][plural] ?? plural : plural
+            return "\(numerals.string(value)) \(counted)"
+        }
     }
     func faceCount(_ value: Int) -> String { count(value, singular: "وجه واحد", dual: "وجهان", plural: "أوجه") }
     func dayCount(_ value: Int) -> String { count(value, singular: "يوم واحد", dual: "يومان", plural: "أيام") }
@@ -29,6 +35,13 @@ import MadarPrayer
         let pages = try QuranPortionEngine.pages(for: portion, catalog: catalog)
         guard let first = pages.first?.page, let last = pages.last?.page else { throw QuranPlanError.invalidPages }
         return QuranUIRange(fromPage: first, toPage: last)
+    }
+    func serviceWeekRatio(_ completed: Int, _ eligible: Int) -> String {
+        numerals.string(completed) + " من " + numerals.string(eligible) + " أيام الحفظ"
+    }
+    func portionTitle(_ portion: QuranAyahRange, catalog: QuranResourceCatalog) -> String {
+        guard let first = catalog.ayah(id: portion.first), let last = catalog.ayah(id: portion.last) else { return "" }
+        return first.surahNameArabic + " " + numerals.string(first.ayahNumber) + "–" + (first.surahID == last.surahID ? "" : last.surahNameArabic + " ") + numerals.string(last.ayahNumber)
     }
     func load() async throws -> QuranRoomState {
         let snapshot = try snapshot(), catalog = try QuranResources.catalog(), today = snapshot.day.date
@@ -39,18 +52,18 @@ import MadarPrayer
         let alreadyHifz = snapshot.sessions.contains { $0.kind == .hifz && $0.dayKey == today }
         var steps: [QuranUIStep] = []
         if let bridge = snapshot.hifz?.bridge {
-            steps.append(QuranUIStep(id: "bridge", title: "الجسر", detail: "آخر ثلاث آيات قبل الورد", kind: .bridge,
+            steps.append(QuranUIStep(id: "bridge", title: "الجسر", detail: portionTitle(bridge, catalog: catalog), kind: .bridge,
                 completed: alreadyHifz, available: true, range: try range(bridge, catalog: catalog)))
         }
         if let portion = snapshot.hifz?.portion {
-            let count = portion.last - portion.first + 1
             steps.append(QuranUIStep(id: "hifz", title: snapshot.hifz?.balance == .consolidation ? "تثبيت الورد" : "الورد",
-                detail: self.count(count, singular: "آية واحدة", dual: "آيتان", plural: "آيات"), kind: .hifz,
+                detail: portionTitle(portion, catalog: catalog), kind: .hifz,
                 completed: alreadyHifz, available: true, range: try range(portion, catalog: catalog)))
         }
         if !snapshot.review.allPages.isEmpty || !snapshot.partialRecent.isEmpty {
             let all = snapshot.review.allPages + snapshot.partialRecent.map(\.page)
-            steps.append(QuranUIStep(id: "review", title: "المراجعة", detail: faceCount(Set(all).count) + " في خطوة واحدة",
+            let detail = snapshot.review.allPages.isEmpty ? "الآيات المحفوظة من وجه جزئي" : faceCount(Set(snapshot.review.allPages).count) + " في خطوة واحدة"
+            steps.append(QuranUIStep(id: "review", title: "المراجعة", detail: detail,
                 kind: .review, completed: false, available: true, range: QuranUIRange(fromPage: all.min()!, toPage: all.max()!)))
         }
         let open = snapshot.mistakes.filter { $0.isOpen && $0.hits > 0 }
@@ -59,13 +72,27 @@ import MadarPrayer
                 completed: false, available: true, range: nil))
         }
         var heat: [QuranUIHeatDay] = []
+        let firstHifzDay = snapshot.sessions.filter { $0.kind == .hifz }.map(\.dayKey).min()
         for offset in (-13)...0 {
-            let key = today.adding(days: offset), sessions = snapshot.sessions.filter { $0.dayKey == key }
+            let key = today.adding(days: offset)
+            guard let firstHifzDay, key >= firstHifzDay else { continue }
+            let sessions = snapshot.sessions.filter { $0.dayKey == key }
             let memorized = snapshot.completedOn.values.filter { $0 == key }.count
             let reviewed = Set(sessions.filter { [.review, .free, .qiyam].contains($0.kind) }.flatMap { $0.grades.map(\.page) }).count
             heat.append(QuranUIHeatDay(id: key.description, title: numerals.string(key.day), hifzFraction: Double(memorized),
                 reviewFraction: Double(reviewed) / 8, accessibilityLabel: numerals.localized(key.description) + "، حفظ " + faceCount(memorized) + "، مراجعة " + faceCount(reviewed)))
         }
+        let weekStart = today.adding(days: -6)
+        let memorizedThisWeek = snapshot.completedOn.values.filter { $0 >= weekStart && $0 <= today }.count
+        let weekReviews = snapshot.sessions.filter { $0.dayKey >= weekStart && $0.dayKey <= today && [.review, .free, .qiyam].contains($0.kind) }
+        let reviewedThisWeek = Dictionary(grouping: weekReviews, by: \.dayKey).values.reduce(0) { total, sessions in
+            total + Set(sessions.flatMap { $0.grades.map(\.page) }).count
+        }
+        let eligibleWeekDays = (0..<7).map { weekStart.adding(days: $0) }.filter { !snapshot.restDay.contains($0) }
+        let activeDays = Set(snapshot.activities.filter(\.countsForStreak).map(\.dayKey))
+        let completedDays = eligibleWeekDays.filter { activeDays.contains($0) }.count
+        let weeklySummary = firstHifzDay == nil ? "أول يوم" : "آخر " + numerals.string(7) + " أيام: حفظت " + faceCount(memorizedThisWeek) + "، راجعت " + faceCount(reviewedThisWeek)
+            + "، " + serviceWeekRatio(completedDays, eligibleWeekDays.count)
         let historySessions = snapshot.sessions.reversed().map { fact in
             QuranUIHistorySession(id: fact.id, title: fact.kind == .hifz ? "حفظ" : "مراجعة", dateLabel: numerals.localized(fact.dayKey.description),
                 detail: faceCount(fact.pages.count), grades: fact.grades.map { QuranUIPageGrade(page: $0.page, title: "الوجه " + numerals.string($0.page),
@@ -103,7 +130,7 @@ import MadarPrayer
             balanceExplanation: "تتبع الخطة حاجة المراجعة ومقدار حفظك", hifzLevel: QuranUILevel(rawValue: snapshot.hifzLevel.rawValue)!,
             reviewLevel: QuranUILevel(rawValue: snapshot.reviewLevel.rawValue)!, steps: steps, recentDays: heat, plan: plan, surahs: surahs, draft: draft,
             missedDayKey: missedDay?.description, missedDayTitle: missedDay.map { "لو فاتك يوم " + numerals.localized($0.description) },
-            summary: ["في صدرك " + coverageTitle], history: QuranUIHistory(weekSummary: [], yearSummary: [], allSummary: [], days: heat, coverage: [], sessions: historySessions),
+            summary: ["في صدرك " + coverageTitle], history: QuranUIHistory(weekSummary: [weeklySummary], yearSummary: [], allSummary: [], days: heat, coverage: [], sessions: historySessions),
             strengthTitle: "مؤشر وصفي من تقييمك ومواعيد المراجعة", strength: strength,
             recovery: QuranUIRecovery(distantLabel: faceCount(snapshot.pages.filter(\.isFar).count) + " بعيدة", activeTitle: snapshot.recovery == nil ? nil : "خطة استرداد", canCreate: snapshot.pages.contains(where: \.isFar), previews: [:]),
             errors: errors, toolsOrder: [], availableTools: [], blockOrder: ["sadr", "path", "log14", "tools"], hiddenBlocks: [],
@@ -176,4 +203,11 @@ import MadarPrayer
         let snapshot = try snapshot(), result = try QuranQiyamEngine.assignment(rakats: rakaat, pages: snapshot.pages)
         return QuranUIQiyamPreview(rakaat: rakaat, nightKey: try PrayerRepository(context: repository().context).defaultNight(at: clock()).description, title: "ورد القيام", assignments: result.pageByRakah.map { $0.map { "الوجه " + numerals.string($0) } ?? "أعد ما شئت" }, canBegin: !result.pagesToRecord.isEmpty)
     }
+}
+
+func quranUserMessage(_ error: any Error) -> String {
+    if let data = error as? DataError, case .invalidValue(let message) = data,
+       message.unicodeScalars.contains(where: { (0x0600...0x06FF).contains($0.value) }) { return message }
+    if case BackupOperationError.busy = error { return "انتظر انتهاء العملية الحالية، ثم حاول مرة أخرى" }
+    return "تعذّر إتمام العملية. حاول مرة أخرى"
 }

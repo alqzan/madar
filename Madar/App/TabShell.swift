@@ -19,7 +19,7 @@ struct TabShell<Content: View>: View {
         TabView(selection: $selection) {
             ForEach(tabs) { tab in
                 Tab(tab.title, systemImage: tab.symbol, value: tab.id) {
-                    content(tab.id).accessibilityIdentifier(tab.id == "customize" ? "settings-tab" : tab.id == "prayer" ? "prayer-tab" : "foundation-tab")
+                    content(tab.id).accessibilityIdentifier(tab.id == "customize" ? "settings-tab" : tab.id == "prayer" ? "prayer-tab" : tab.id == "quran" ? "quran-tab" : "foundation-tab")
                 }
             }
         }
@@ -37,10 +37,11 @@ struct MadarRootView: View {
     var body: some View {
         let dark = forcedColorScheme == .dark || (forcedColorScheme == nil && colorScheme == .dark)
         let theme = RoomTheme(dark: dark, calmPaper: false)
-        TabShell(selection: $session.selectedTab, tabs: [.init(id: "foundation", title: "مدار", symbol: "circle.hexagongrid"), .init(id: "prayer", title: "الصلاة", symbol: "moon.stars"), .init(id: "customize", title: "خصّص", symbol: "slider.horizontal.3")]) { tab in
+        TabShell(selection: $session.selectedTab, tabs: [.init(id: "foundation", title: "مدار", symbol: "circle.hexagongrid"), .init(id: "prayer", title: "الصلاة", symbol: "moon.stars"), .init(id: "quran", title: "القرآن", symbol: "book.closed"), .init(id: "customize", title: "خصّص", symbol: "slider.horizontal.3")]) { tab in
             NavigationStack {
                 if tab == "customize" { CustomizeMadar(session: session) }
                 else if tab == "prayer" { PrayerTodayView(session: session) }
+                else if tab == "quran" { QuranHomeView(service: AppQuranService(session: session)) }
                 else { FoundationHome(session: session) }
             }
         }

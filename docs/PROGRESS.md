@@ -4,7 +4,7 @@
 
 # Last checked
 
-2026-10-14 — Codex. M2-D01 app/data adapter implemented without a schema change: real Quran projections, durable drafts, atomic session facts/receipt, guarded deletion/undo, and daily juz/weekly manzil integration. Targeted package checks 8/8 and app integration checks 2/2 passed; native app builds. M2-V01 is next ready; no Quran tab/screen has been added yet.
+2026-10-14 — Codex. M2-D01 app/data adapter is done and M2-V01 Quran home is matched — awaiting owner. The app now has a Quran tab, real coverage/levels/steps/log, and durable session entry/resume. L/light UI flow 1/1 and app integration 3/3 passed; pure planning/session tests 21/21 and targeted storage tests 9/9 passed, including selected-Fajr offsets. Native app builds. V02 is next ready; detailed coach visual acceptance, owner-iPhone gate and external-release human resource sample remain pending.
 
 # Board
 
@@ -59,8 +59,8 @@ The owner lifted the M2 pause in `docs/CODEX-M2-BRIEF.md`. Build a pure Swift en
 | M2-E04 | Plan and session engine: levels, rest/missed-day allotments, recovery, pace, streak and qiyam assignments. | done | Pure Swift daily planning, all due above level minimum, merged review runs by weakest strength, RQ4 far/recovery/raise/test selection, 28-day pace/calendar forecast, derived study streak, unique qiyam pages, serializable draft and eligible commit batch. Stored MadarDay is preserved, including partial review; duplicate commit IDs (including tombstones) are no-ops. `DailyPlanningTests` + `SessionPlanningTests`: 20/20 passed; iOS Simulator package build passed. The one-save database commit and post-commit draft deletion belong to D01, not this pure engine. |
 | M2-E05 | Add RQ1 fixed-cycle review beside spaced review. | done | `QuranFixedCycleEngine` selects the daily juz or one of seven weekly manzils from injected, validated ayah ranges; spaced mode remains separate. Added `quran.reviewSchedule` (`spaced` default, daily juz, weekly manzils) to all three settings-schema copies. Generic settings set/reset/undo verified. Cycle map integration awaits M2-R01; current selector is schema/store support, not a built screen. |
 | M2-D01 | Quran app adapter: derive `QuranUIService` projections from the engine and existing `MadarData` records; route session commits atomically through the app. | done | `QuranRepository` rebuilds coverage/schedule/mistakes and daily plans from live facts; `AppQuranService` supplies typed projections, resources and durable drafts. App-only commands share the current lease/receipt and one save; commit/delete/grade/plan undo rejects superseded rows. No schema migration or owner-store access. Targeted package tests 8/8 (including one prayer command regression), app service integration 2/2 on L simulator; app builds. One data-preservation pass completed for delete/undo. | |
-| M2-V01 | Home — `screens/quran/03-R18-Home.jpg` | ready | No sample counts. Apply RQ9: one line per step, one «ابدأ», details behind tap; «عميق» and «مُحكَم» state ×1½ and ×2. |
-| M2-V02 | Hifz coach — `screens/quran/04-R18-Hifz.jpg` | blocked: M2-V01, M2-R01, M2-E02 | No voice method (v2), no learning-hint penalty. |
+| M2-V01 | Home — `screens/quran/03-R18-Home.jpg` | matched — awaiting owner | `QuranHomeView` is the Quran tab: paper/card palette, coverage, levels, balance, connected step rail, one start action, details sheet and 14-day heat log. All counts/ranges come from the adapter; RQ9 hifz multipliers are explicit, review levels show their actual minima. Level choice persists and the draft resumes after relaunch. Default L/light top + scrolled shots: `Artifacts/m2-home-owner/`; comparison: `Artifacts/compare/R18-Home.html`. Differences by rule: RQ9 removes dense secondary labels; OS status/tab bar (RL8); tools/full-log/plan links remain absent until their screen cards. No Quran scrolled canonical exists. The home entry/exit flow works; the detailed coach's visual match remains V02. |
+| M2-V02 | Hifz coach — `screens/quran/04-R18-Hifz.jpg` | ready | No voice method (v2), no learning-hint penalty. |
 | M2-V03 | One-step review — `screens/quran/05-R18-Rev.jpg` | blocked: M2-V02, M2-E01 | No voice method (v2); recent and due review order follows the engine. |
 | M2-V04 | Mistake locations — `screens/quran/06-R18-Drill.jpg` | blocked: M2-V03, M2-E02, M2-R01 | No audio/microphone; a whole-ayah mistake has no word index. |
 | M2-V05 | Day close — `screens/quran/07-R18-Khitam.jpg` | blocked: M2-V04, M2-E04 | No recitation khatma or page goal; khatm means all 604 pages memorised. |
@@ -98,21 +98,21 @@ M0-T06 (device acceptance paperwork), M0-T09 (encrypted backup and privacy matri
 
 ## Waiting on the owner
 
-No current owner action: M1 screens were approved on 13 October. Fresh default-size comparisons for S1/S4/S5 are available. The owner-iPhone gate stays deferred until the whole app is finished, as requested.
+M2-V01 visual approval is now waiting on the owner; `Madar/Artifacts/compare/R18-Home.html` compares the canonical with default-size simulator captures from an isolated test store. M1 screens stay owner-approved. The owner-iPhone gate stays deferred until the whole app is finished, as requested.
 
 # Later
 
 Build the M2 Quran queue above. M1-G remains deferred until the whole app is finished. M1-F04 remains blocked on a safe shared budget reservation for an RL5 LiveActivityIntent. Keep tafsir off until its separate licence is verified. Do not claim an M1/M2 gate or iPhone pass.
 
 # Handovers
-## Handover — M2 app adapter and continuation — 2026-10-14 — Codex
-Works now: M2-D01 typed app projections, durable draft resume, atomic commit/receipt, tombstone delete/undo, plan versions and fixed cycles; no Quran screen entry yet.
-Verified: `swift test --package-path Madar/Packages/MadarCommands --filter 'QuranPersistenceTests|QuranCycleResourceTests|test_M1T01_prayerChangeUndoAndFutureFridayGuard'` 8/8; `xcodebuild ... -only-testing:MadarTests/QuranServiceIntegrationTests ... test` 2/2 on iPhone 17 Pro L; native app build passed; `git diff --check` clean.
-Differences left: no Quran screen changed or compared; the old excluded `QuranRoom.swift` stays preserved.
-Not verified: owner iPhone, external-release human sample, distribution; later Quran screen journeys.
-Next: M2-V01 ready; match `quran/03-R18-Home.jpg` with RQ9 density and no entry to unbuilt screens.
+## Handover — M2 app adapter and Quran home — 2026-10-14 — Codex
+Works now: D01 is done; V01 Quran tab/home has real coverage, levels, balance/step details, one start action, 14-day log and durable resume/partial commit. Daily minimum/recovery share stop after completion; the producer uses selected prayer offsets.
+Verified: `swift test --package-path Madar/Packages/MadarQuran --filter 'DailyPlanningTests|SessionPlanningTests|QuranDailyCompletionTests'` 21/21; targeted MadarCommands Quran/one prayer checks 9/9; `xcodebuild ... -only-testing:MadarTests/QuranServiceIntegrationTests -only-testing:MadarUITests/QuranHomeUITests ... test` 3+1 passed at L/light; native build passed; `git diff --check` clean.
+Differences left: RQ9 simplified labels; native status/tab bar; unbuilt tools and full-log/plan entries hidden. `compare-screens.py R18-Home` page opened; scrolled shot is supplementary because no Quran scrolled canonical exists.
+Not verified: V02 coach visual match, later Quran screens, owner iPhone, human resource sample or distribution; screenshot data is an isolated fixture, never owner records.
+Next: M2-V02 ready (`quran/04-R18-Hifz.jpg`); preserve the home shape and data contracts; V01 is awaiting owner, not approved.
 Model/effort: Codex GPT-6; exact variant/effort not exposed.
-Usage: 36% five-hour and 65% weekly at checkpoint; no reset used.
+Usage: 62% five-hour and 69% weekly at closing checkpoint; no reset used.
 
 ## Handover — M2-E04 plan and session engine — 2026-10-14 — Codex
 Works now: daily hifz/review, rest and missed-day targets, RQ4 recovery/strength, test selection, 28-day pace/forecast, derived streak and unique qiyam assignments; draft resume and eligible commit batch preserve the stored day.

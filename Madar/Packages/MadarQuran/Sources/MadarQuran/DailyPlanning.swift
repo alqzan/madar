@@ -137,7 +137,8 @@ public enum QuranDailyPlanEngine {
         let due = pages.filter { serveDue && $0.isDue && eligible.contains($0.page) }.sorted(by: QuranPlanningPage.weakestFirst)
         var regular = (recent + due.map(\.page)).uniqued()
         let fillers = pages.filter { eligible.contains($0.page) }.sorted(by: QuranPlanningPage.weakestFirst)
-        for page in fillers where regular.count < level.reviewMinimum && !regular.contains(page.page) {
+        let remainingMinimum = Swift.max(0, level.reviewMinimum - completedToday.intersection(Set(indexed.keys)).count)
+        for page in fillers where regular.count < remainingMinimum && !regular.contains(page.page) {
             regular.append(page.page)
         }
         regular = (regular + recovery + raised).uniqued().filter { eligible.contains($0) }

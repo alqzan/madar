@@ -88,6 +88,7 @@ final class AppSession {
         try preparePrayerStatisticsFixture()
         try preparePrayerHomeShowcaseFixture()
         try preparePrayerStreakShowcaseFixture()
+        try prepareQuranHomeFixture(group: group)
         #endif
         try reload()
         let devices = try container.mainContext.fetch(FetchDescriptor<DeviceSetting>())
@@ -662,7 +663,7 @@ final class AppSession {
     }
 }
 
-private func prayerUITestClock(_ fallback: Date) -> Date {
+func prayerUITestClock(_ fallback: Date) -> Date {
     #if DEBUG
     if let raw = ProcessInfo.processInfo.environment["MADAR_UI_NOW"] {
         let formatter = ISO8601DateFormatter()

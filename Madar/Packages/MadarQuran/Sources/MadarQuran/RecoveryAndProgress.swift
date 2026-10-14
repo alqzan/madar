@@ -46,13 +46,15 @@ public struct QuranRecoveryPlan: Codable, Equatable, Sendable {
     /// Pass live review facts only. Rest days also serve review, so recovery uses calendar days.
     public func share(on day: GregorianDay, reviewedOn: [Int: GregorianDay]) -> [Int] {
         guard !cancelled, day >= startDayKey else { return [] }
-        let remaining = pages.filter { page in
+        let atDayStart = pages.filter { page in
             guard let review = reviewedOn[page] else { return true }
-            return review < startDayKey || review > day
+            return review < startDayKey || review >= day
         }
+        let completedToday = atDayStart.filter { reviewedOn[$0] == day }.count
+        let remaining = atDayStart.filter { reviewedOn[$0] != day }
         let daysLeft = Swift.max(1, days - startDayKey.distance(to: day))
-        let count = (remaining.count + daysLeft - 1) / daysLeft
-        return Array(remaining.prefix(count))
+        let quota = (atDayStart.count + daysLeft - 1) / daysLeft
+        return Array(remaining.prefix(Swift.max(0, quota - completedToday)))
     }
 }
 

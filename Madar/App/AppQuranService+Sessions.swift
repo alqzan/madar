@@ -80,6 +80,7 @@ extension AppQuranService {
             value.method = method
         case .reveal(let ayah, let word), .mistake(let ayah, let word):
             guard planned.contains(ayah), let record = catalog.ayah(id: ayah), word.map({ record.wordTokens.indices.contains($0) }) ?? true else { throw QuranPlanError.invalidSession }
+            if case .reveal = action { value.revealedAyahs = (value.revealedAyahs ?? []).union([ayah]) }
             // Coach learning reveals stay hints. Only blind recitation records a slip.
             if draft.coachStage == .blindRecitation {
                 let coverage = try snapshot().coverage
@@ -103,21 +104,38 @@ extension AppQuranService {
                 case .lineStarts: draft.coachStage = .promptedRecall
                 case .promptedRecall: draft.coachStage = .blindRecitation
                 case .blindRecitation:
-                    draft.blindPassedAyahs.formUnion(planned)
+                    let completed = Set(catalog.ayahs(on: draft.page).map(\.id)).intersection(planned)
+                    draft.blindPassedAyahs.formUnion(completed)
                     draft.coachStage = .rating
-                    for page in Set(try draft.portions.flatMap { try QuranPortionEngine.pages(for: $0, catalog: catalog).map(\.page) }).sorted() {
+                    for page in [draft.page] {
                         let ayahs = Set(catalog.ayahs(on: page).map(\.id)).intersection(planned)
                         let slips = draft.mistakes.filter { $0.kind == .mistake && ayahs.contains($0.key.ayahID) }.count
                         let rating = QuranMistakeEngine.gradeFromBlindSlips(slips, ayatCount: ayahs.count)
                         if !draft.grades.contains(where: { $0.page == page }) { draft.grades.append(QuranDraftGrade(page: page, rating: rating)) }
                     }
-                case .rating: break
+                case .rating:
+                    let pages = Set(try draft.portions.flatMap { try QuranPortionEngine.pages(for: $0, catalog: catalog).map(\.page) }).sorted()
+                    if let current = pages.firstIndex(of: draft.page), pages.indices.contains(current + 1) {
+                        draft.page = pages[current + 1]
+                        draft.ayahID = catalog.ayahs(on: draft.page).first(where: { planned.contains($0.id) })?.id ?? draft.ayahID
+                        draft.coachStage = .repetition
+                    }
                 }
-            } else {
-                let pages = try draft.portions.flatMap { try QuranPortionEngine.pages(for: $0, catalog: catalog).map(\.page) }
+                value.revealedAyahs = []
+            } else if draft.kind != .drill {
+                let coverage = try snapshot().coverage
+                let covered = Set(catalog.ayahs(on: draft.page).map(\.id)).intersection(planned).intersection(coverage.coveredAyahs)
+                if !covered.isEmpty && (draft.kind != .free || coverage.completedPages.contains(draft.page)) && !draft.grades.contains(where: { $0.page == draft.page }) {
+                    let slips = draft.mistakes.filter { $0.kind == .mistake && covered.contains($0.key.ayahID) }.count
+                    let rating = draft.kind == .qiyam ? QuranReviewRating.good : QuranMistakeEngine.gradeFromBlindSlips(slips, ayatCount: covered.count)
+                    draft.grades.append(QuranDraftGrade(page: draft.page, rating: rating, isTest: value.testPages?.contains(draft.page) == true))
+                }
+                var seen = Set<Int>()
+                let pages = try draft.portions.flatMap { try QuranPortionEngine.pages(for: $0, catalog: catalog).map(\.page) }.filter { seen.insert($0).inserted }
                 if let current = pages.firstIndex(of: draft.page), pages.indices.contains(current + 1) {
                     draft.page = pages[current + 1]; draft.ayahID = catalog.ayahs(on: draft.page).first?.id ?? draft.ayahID
-                }
+                } else { draft.coachStage = .rating }
+                value.revealedAyahs = []
             }
         }
         value.draft = draft; try await save(value)
@@ -127,20 +145,28 @@ extension AppQuranService {
         let draft = value.draft, catalog = try QuranResources.catalog()
         let ids = Set(draft.portions.flatMap { Array($0.first...$0.last) })
         let verses = catalog.ayahs(on: draft.page).filter { ids.contains($0.id) }.map { ayah in
-            QuranUIVerse(id: ayah.id, title: ayah.surahNameArabic + " " + numerals.string(ayah.ayahNumber), text: ayah.uthmaniText,
-                hidden: draft.coachStage == .blindRecitation, canReveal: draft.coachStage != .rating)
+            QuranUIVerse(id: ayah.id, title: ayah.surahNameArabic + " " + numerals.string(ayah.ayahNumber), text: draft.coachStage == .lineStarts ? (ayah.wordTokens.first?.text ?? "") : ayah.uthmaniText,
+                hidden: (draft.coachStage == .blindRecitation || draft.coachStage == .promptedRecall) && !(value.revealedAyahs?.contains(ayah.id) ?? false), canReveal: draft.coachStage != .rating)
         }
         let stage: QuranUISessionStage = switch draft.kind {
         case .hifz: switch draft.coachStage { case .repetition: .repetition; case .lineStarts: .lineStarts; case .promptedRecall: .recall; case .blindRecitation: .covered; case .rating: .grading }
         case .drill: .drill
-        case .qiyam: .qiyam
-        default: .review
+        case .qiyam: draft.coachStage == .rating ? .grading : .qiyam
+        default: draft.coachStage == .rating ? .grading : .review
         }
-        let grades = draft.grades.map { QuranUIPageGrade(page: $0.page, title: "الوجه " + numerals.string($0.page), grade: QuranUIGrade(rawValue: $0.rating.storedRaw)!, explanation: "التقييم المقترح؛ يمكنك تغييره") }
+        var displayGrades = draft.grades.filter { $0.page == draft.page }
+        let canGrade = draft.kind != .free ? true : try snapshot().coverage.completedPages.contains(draft.page)
+        if displayGrades.isEmpty && draft.kind != .drill && canGrade {
+            displayGrades = [QuranDraftGrade(page: draft.page, rating: draft.kind == .qiyam ? .good : .mastered)]
+        }
+        let grades = displayGrades.map { QuranUIPageGrade(page: $0.page, title: "الوجه " + numerals.string($0.page), grade: QuranUIGrade(rawValue: $0.rating.storedRaw)!, explanation: "التقييم المقترح؛ يمكنك تغييره") }
+        let hifzComplete = draft.kind == .hifz && ids.isSubset(of: draft.blindPassedAyahs)
+        let finished = draft.coachStage == .rating && (draft.kind != .hifz || hifzComplete) || draft.kind == .drill && !draft.mistakes.isEmpty
+        let readOnlyFinished = finished && draft.kind == .free && draft.grades.isEmpty
         return QuranUISessionState(id: draft.id, title: draft.kind == .hifz ? "الورد" : "المراجعة", segmentTitle: "الوجه " + numerals.string(draft.page), stage: stage,
             progress: ids.isEmpty ? 0 : Double(draft.blindPassedAyahs.count) / Double(ids.count), prompt: "أكمل ثم سجّل ما تمّ", verses: verses,
             page: try await page(draft.page), answers: draft.kind == .drill ? [QuranUIAnswer(id: "pass", text: "أتقنت الموضع"), QuranUIAnswer(id: "fail", text: "أحتاج تدريبًا")] : [],
-            grades: grades, primaryTitle: draft.coachStage == .rating ? "أنهِ وسجّل" : "تابع", primaryAction: draft.coachStage == .rating ? .commit : .advance,
+            grades: grades, primaryTitle: readOnlyFinished ? "أغلق القراءة" : finished ? "أنهِ وسجّل" : "تابع", primaryAction: readOnlyFinished ? .discard : finished ? .commit : .advance,
             canAdvance: true, mistakeAyahID: draft.ayahID, method: value.method, availableMethods: [:], similar: nil, resourceError: nil)
     }
 }

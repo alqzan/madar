@@ -28,6 +28,17 @@ import MadarCommands
         XCTAssertEqual(page.lines.count, 15); XCTAssertFalse(page.postScriptName.isEmpty); XCTAssertFalse(page.lines[0].glyphs.isEmpty)
         XCTAssertNotNil(app.undoToken)
     }
+    func testPartialHifzCommitContainsOnlyThePageBlindRecited() async throws {
+        let (app, service, root) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
+        try await service.perform(.savePlan(QuranUIPlanInput(startAyah: 149, unit: .page, amount: 2, rhythm: .balanced, restDay: "none", missPolicy: "ask")))
+        let started = try await service.start(kind: .hifz, stepID: "hifz", range: nil, rakaat: nil, spotID: nil)
+        for _ in 0..<4 { _ = try await service.session(draftID: started.id, action: .advance) }
+        _ = try await service.session(draftID: started.id, action: .commitPartial)
+        let session = try XCTUnwrap(ModelContext(app.container).fetch(FetchDescriptor<HifzSession>()).first)
+        XCTAssertEqual(session.fromAyah, 149); XCTAssertEqual(session.toAyah, 152)
+        XCTAssertEqual(session.pages, [22])
+    }
+
     func testCoachLearningHintDoesNotWriteMistakeResumeAndCommitUsePersistedDraft() async throws {
         let (app, service, root) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
         try await service.perform(.savePlan(QuranUIPlanInput(startAyah: 1, unit: .ayah, amount: 7, rhythm: .balanced, restDay: "none", missPolicy: "ask")))

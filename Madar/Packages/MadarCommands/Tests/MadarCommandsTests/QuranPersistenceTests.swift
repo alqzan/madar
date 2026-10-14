@@ -41,6 +41,19 @@ import MadarQuran
         return try await bus.execute(envelope("quran.commitSession", ["draftID": .string(draft.draft.id.uuidString)], at: time), now: time)
     }
 
+    @Test func QuranDayUsesSelectedPrayerOffsetsBeforeFajr() throws {
+        let (container, _, directory) = try fixture(); defer { try? FileManager.default.removeItem(at: directory) }
+        let context = ModelContext(container), settings = try SettingsStore(context: context)
+        var offsets = try settings.value(for: "salah.offsets").object ?? [:]
+        offsets["fajr"] = .number(10)
+        _ = try settings.stage(["core.dayStart": .string("fajr"), "salah.offsets": .object(offsets)], now: now)
+        try context.save()
+        // §7.2 / J01 fixture: Riyadh Oct 9 Fajr 04:31; +10 min => 04:41.
+        // At 04:35 the Quran day is still Oct 8, rather than the unadjusted Oct 9.
+        let captured = try repo(container).currentDay(at: date("2026-10-09T04:35:00+03:00"))
+        #expect(captured.dayKey == "2026-10-08" && captured.boundary == .fajr)
+    }
+
     @Test func commitChildrenReceiptAndDraftTogetherReplayUndoLeavesNoCoverageScheduleOrStreak() async throws {
         let (container, bus, directory) = try fixture(); defer { try? FileManager.default.removeItem(at: directory) }
         var draft = try makeDraft(container)

@@ -56,7 +56,8 @@ public struct QuranDataSnapshot: Sendable {
     public func currentDay(at now: Date) throws -> StoredDayKey {
         let prayers = try PrayerRepository(context: context)
         let place = prayers.place(at: now), civil = GregorianDay.containing(now, in: place.timeZone)
-        let days = PrayerTimesEngine.calculate(day: civil, place: place).map { [$0] } ?? []
+        let options = prayers.activeTrip(at: now) == nil ? prayers.options : prayers.tripOptions
+        let days = PrayerTimesEngine.calculate(day: civil, place: place, options: options).map { [$0] } ?? []
         return try MadarDay.resolve(instant: now, place: place,
             boundary: DayBoundary(rawValue: settings.value(for: "core.dayStart").string ?? "fajr") ?? .fajr,
             prayerDays: days, hijriSource: HijriSource(rawValue: settings.value(for: "core.hijriSource").string ?? "ummAlQura") ?? .ummAlQura,

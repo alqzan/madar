@@ -6,14 +6,15 @@ import MadarQuran
 
 public struct QuranDraftPayload: Codable, Sendable {
     public var draft: QuranSessionDraft
+    public var revealedAyahs: Set<Int>?
     public var testPages: [Int]?
     public var drillKey: QuranMistakeKey?
     public var method: String
     public var nightKey: GregorianDay?
     public var rakats: Int?
     public var witr: Bool?
-    public init(draft: QuranSessionDraft, method: String = "coach", nightKey: GregorianDay? = nil, rakats: Int? = nil, witr: Bool? = nil, drillKey: QuranMistakeKey? = nil, testPages: [Int]? = nil) {
-        self.draft = draft; self.testPages = testPages; self.drillKey = drillKey; self.method = method; self.nightKey = nightKey; self.rakats = rakats; self.witr = witr
+    public init(draft: QuranSessionDraft, method: String = "coach", nightKey: GregorianDay? = nil, rakats: Int? = nil, witr: Bool? = nil, drillKey: QuranMistakeKey? = nil, testPages: [Int]? = nil, revealedAyahs: Set<Int>? = nil) {
+        self.draft = draft; self.revealedAyahs = revealedAyahs; self.testPages = testPages; self.drillKey = drillKey; self.method = method; self.nightKey = nightKey; self.rakats = rakats; self.witr = witr
     }
 }
 private struct QuranInverse: Codable {

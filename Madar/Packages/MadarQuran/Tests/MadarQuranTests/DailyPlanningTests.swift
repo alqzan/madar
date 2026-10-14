@@ -187,3 +187,16 @@ final class DailyPlanningTests: XCTestCase {
         XCTAssertThrowsError(try QuranQiyamEngine.assignment(rakats: 3, pages: pages))
     }
 }
+
+final class QuranDailyCompletionTests: XCTestCase {
+    func testCompletingTheMinimumDoesNotGenerateAnotherWirdAndRecoveryShareDoesNotRefill() throws {
+        let today = try GregorianDay("2026-10-15")
+        let pages = try (1...30).map { try QuranPlanningPage(page: $0, lastReviewed: today, nextDue: today.adding(days: 7), today: today) }
+        let review = QuranDailyPlanEngine.review(pages: pages, recent: [1, 2, 3], level: .medium, completedToday: Set(1...8))
+        XCTAssertTrue(review.allPages.isEmpty)
+        let recovery = try QuranRecoveryPlan(startDayKey: today, days: 5, pages: Array(1...11))
+        XCTAssertEqual(recovery.share(on: today, reviewedOn: [:]), [1, 2, 3])
+        XCTAssertTrue(recovery.share(on: today, reviewedOn: [1: today, 2: today, 3: today]).isEmpty)
+        XCTAssertEqual(recovery.share(on: today, reviewedOn: [1: today]), [2, 3])
+    }
+}
