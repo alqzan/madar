@@ -9,9 +9,13 @@ struct QuranHomeView: View {
     @Environment(\.dynamicTypeSize) private var dynamicType
     @State private var state: QuranRoomState?
     @State private var error: String?
-    @State private var detail: QuranUIStep?
+    @State private var detail: HomeDetail?
     @State private var active: QuranUISessionState?
     @State private var busy = false
+    private enum HomeDetail: Identifiable {
+        case step(QuranUIStep), hadith
+        var id: String { switch self { case .step(let step): "step-" + step.id; case .hadith: "hadith" } }
+    }
     private var theme: RoomTheme { RoomTheme(room: "quran", dark: colorScheme == .dark) }
     private var next: QuranUIStep? { state?.steps.first { !$0.completed && $0.available } }
     var body: some View {
@@ -50,7 +54,12 @@ struct QuranHomeView: View {
         .environment(\.roomTheme, theme)
         .accessibilityIdentifier("quran-home")
         .task { do { try await refresh() } catch { self.error = quranUserMessage(error) } }
-        .sheet(item: $detail) { step in
+        .sheet(item: $detail) { item in
+            switch item {
+            case .hadith:
+                QuranCoverageHadithSheet(theme: theme)
+                    .environment(\.layoutDirection, .rightToLeft)
+            case .step(let step):
             VStack(alignment: .leading, spacing: 18) {
                 Text(step.title).font(serif(22))
                 Text(step.detail).font(bodyFont(14))
@@ -59,6 +68,7 @@ struct QuranHomeView: View {
             }.padding(24).frame(maxWidth: .infinity, alignment: .leading).background(theme.surface)
                 .presentationDetents([.height(260)]).presentationDragIndicator(.visible)
                 .environment(\.layoutDirection, .rightToLeft)
+            }
         }
         .fullScreenCover(item: $active, onDismiss: { run { try await refresh() } }) { initial in
             QuranHomeSessionFlow(service: service, state: Binding(get: { active ?? initial }, set: { active = $0 }), close: { active = nil })
@@ -94,6 +104,19 @@ struct QuranHomeView: View {
                 Capsule().fill(theme.color("track"))
                     .overlay(alignment: .leading) { Capsule().fill(theme.color("review")).frame(width: proxy.size.width * state.coverageFraction) }
             }.frame(height: 6).accessibilityLabel("في صدرك").accessibilityValue(state.percentageLabel)
+            Button { detail = .hadith } label: {
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("اقرأ وارتق").font(serif(18)).foregroundStyle(theme.color("hifzText"))
+                        Text("فإن منزلك عند آخر آية تقرؤها").font(bodyFont(12)).foregroundStyle(theme.secondaryInk)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.backward").font(.system(size: 11, weight: .semibold)).foregroundStyle(theme.secondaryInk)
+                }.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .contentShape(Rectangle())
+            }.buttonStyle(.plain)
+                .accessibilityLabel("اقرأ وارتق، عرض الحديث")
+                .accessibilityIdentifier("quran-coverage-hadith")
         }.padding(.horizontal, 8)
     }
     private func path(_ state: QuranRoomState) -> some View {
@@ -180,7 +203,7 @@ struct QuranHomeView: View {
                 if step.id == next?.id { Circle().stroke(color.opacity(0.7), lineWidth: 2).frame(width: 18, height: 18) }
             }.frame(width: 20, height: 72).accessibilityHidden(true)
             HStack(spacing: 10) {
-            Button { detail = step } label: {
+            Button { detail = .step(step) } label: {
                 HStack(spacing: 10) {
                     Text(step.title).font(bodyFont(12, bold: true)).foregroundStyle(color)
                     Text(step.detail).font(serif(19)).foregroundStyle(theme.ink).fixedSize(horizontal: false, vertical: true)

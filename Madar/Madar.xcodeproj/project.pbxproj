@@ -77,6 +77,7 @@
 		BE02C00CD8F58BFD8E1448E0 /* MadarCore in Frameworks */ = {isa = PBXBuildFile; productRef = C0F01EF9460620030E8156F6 /* MadarCore */; };
 		BF23E89931E07B6BC749034D /* CityEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92023291C0FE69B0EBEF5B79 /* CityEditor.swift */; };
 		CC016523289DC8ED355808DD /* AppQuranService+Sessions.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD37167C8A2CCDCFFFDDDA94 /* AppQuranService+Sessions.swift */; };
+		CD0CD18A0B02BEB2076B47EC /* QuranCoverageHadithSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46608ED938A8063F29071DDC /* QuranCoverageHadithSheet.swift */; };
 		CFF94239BC342BA772C26E44 /* PrayerRoom.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1541C81F328C40D5A683888 /* PrayerRoom.swift */; };
 		D014E265D655396867C4A1DA /* QuranHomeFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBFFF71C3E962BAE2E738136 /* QuranHomeFixture.swift */; };
 		D368F59501A24EEC8D475168 /* CustomizationCopy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68E6E87340ED90E80146719D /* CustomizationCopy.swift */; };
@@ -151,6 +152,7 @@
 		3B030435F71CD96C42619105 /* Customization.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Customization.xcstrings; sourceTree = "<group>"; };
 		3C51B7F621FD8CA7685E7B45 /* MadarPrayerShortcuts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MadarPrayerShortcuts.swift; sourceTree = "<group>"; };
 		43A5C6A40CB96FDF39DD29CA /* NextPrayerWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextPrayerWidget.swift; sourceTree = "<group>"; };
+		46608ED938A8063F29071DDC /* QuranCoverageHadithSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranCoverageHadithSheet.swift; sourceTree = "<group>"; };
 		49443C53BC48AC114815D351 /* MadarQuran */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MadarQuran; path = Packages/MadarQuran; sourceTree = SOURCE_ROOT; };
 		4C581755E2CC15BBDCFF8899 /* TabShell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabShell.swift; sourceTree = "<group>"; };
 		4E82713EFD04D42E929BB0F7 /* PrayerCustomizeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrayerCustomizeView.swift; sourceTree = "<group>"; };
@@ -306,6 +308,7 @@
 				D813172B4A91DD6E0930EEA8 /* PrayerTodayView.swift */,
 				BD8F17E41C4B94AE7A6B7D27 /* PrayerTravel.swift */,
 				5D3EC96D647534DFB18C29D1 /* PresetsView.swift */,
+				46608ED938A8063F29071DDC /* QuranCoverageHadithSheet.swift */,
 				BBFFF71C3E962BAE2E738136 /* QuranHomeFixture.swift */,
 				F637551CAD826503A70B7CD8 /* QuranHomeSessionFlow.swift */,
 				03DE6A691DDAF38C2D4B00AA /* QuranHomeView.swift */,
@@ -657,6 +660,7 @@
 				2E95780F1D439BE926514901 /* PrayerTodayView.swift in Sources */,
 				622DDEFF6296FADC2ED4F0A0 /* PrayerTravel.swift in Sources */,
 				3D1F6A8075563D6E074473E2 /* PresetsView.swift in Sources */,
+				CD0CD18A0B02BEB2076B47EC /* QuranCoverageHadithSheet.swift in Sources */,
 				D014E265D655396867C4A1DA /* QuranHomeFixture.swift in Sources */,
 				640D1ED77F7D51F8BA530C0E /* QuranHomeSessionFlow.swift in Sources */,
 				211E823EE865926858A063DD /* QuranHomeView.swift in Sources */,
