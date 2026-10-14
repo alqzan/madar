@@ -61,9 +61,11 @@ page = f'''<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><meta 
 <title>مقارنة {html.escape(board)}</title>
 <style>body{{margin:0;padding:24px;background:#eee8dd;color:#1d1913;font:16px system-ui,sans-serif}}
 .bar{{position:sticky;top:0;background:#fffdf8;padding:12px 16px;border-radius:14px;margin-bottom:20px;display:flex;gap:16px;align-items:center;z-index:2}}
-.pair{{display:flex;gap:20px;flex-wrap:wrap}}figure{{margin:0;width:393px}}img{{display:block;width:393px;border-radius:18px;box-shadow:0 4px 18px #0002}}
-figcaption{{text-align:center;padding:8px;color:#6b6356}}.stack{{position:relative;width:393px}}.stack img{{position:absolute;inset:0 auto auto 0}}
-.stack img:first-child{{position:relative}}.top{{opacity:.5}}.none{{width:393px;height:200px;display:grid;place-items:center;background:#fff8;border-radius:18px}}</style>
+.pair{{display:grid;grid-template-columns:repeat(2,minmax(0,393px));gap:20px;align-items:start}}figure{{margin:0;width:100%;display:flex;flex-direction:column-reverse}}img{{display:block;width:100%;border-radius:18px;box-shadow:0 4px 18px #0002}}
+.pair>figure:nth-child(3){{grid-column:1/-1;max-width:393px}}figcaption{{text-align:center;padding:8px;color:#6b6356}}.stack{{position:relative;width:100%}}.stack img{{position:absolute;inset:0 auto auto 0}}
+.stack img:first-child{{position:relative}}.top{{opacity:.5}}.none{{width:100%;height:200px;display:grid;place-items:center;background:#fff8;border-radius:18px}}
+@media(min-width:1260px){{.pair{{grid-template-columns:repeat(3,393px)}}.pair>figure:nth-child(3){{grid-column:auto}}}}
+@media(max-width:600px){{body{{padding:12px}}.pair{{gap:10px}}.bar{{flex-wrap:wrap;gap:8px}}}}</style>
 <div class="bar"><b>{html.escape(board)}</b><label>شفافية الفعلي في التراكب <input id="o" type="range" min="0" max="100" value="50"></label>
 <span>القرار للمالك: «مطابق — بانتظار المالك» ليس اعتمادًا.</span></div>
 {''.join(rows)}
