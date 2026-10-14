@@ -94,7 +94,17 @@ struct QuranHomeView: View {
     }
     private func coverage(_ state: QuranRoomState) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("في صدرك").font(bodyFont(13)).foregroundStyle(theme.secondaryInk)
+            HStack(spacing: 12) {
+                Text("في صدرك").font(bodyFont(13)).foregroundStyle(theme.secondaryInk)
+                    .accessibilityIdentifier("quran-coverage-label")
+                Button { detail = .hadith } label: {
+                    Text("اقرأ وارتق").font(bodyFont(13, bold: true)).foregroundStyle(theme.color("hifzText"))
+                        .frame(minHeight: 44).contentShape(Rectangle())
+                }.buttonStyle(.plain)
+                    .accessibilityLabel("اقرأ وارتق، عرض الحديث")
+                    .accessibilityIdentifier("quran-coverage-hadith")
+                Spacer(minLength: 0)
+            }
             HStack(alignment: .firstTextBaseline, spacing: 12) {
                 Text(state.coverageTitle).font(serif(34)).fixedSize(horizontal: false, vertical: true).accessibilityIdentifier("quran-coverage-title")
                 Spacer(minLength: 0)
@@ -104,19 +114,6 @@ struct QuranHomeView: View {
                 Capsule().fill(theme.color("track"))
                     .overlay(alignment: .leading) { Capsule().fill(theme.color("review")).frame(width: proxy.size.width * state.coverageFraction) }
             }.frame(height: 6).accessibilityLabel("في صدرك").accessibilityValue(state.percentageLabel)
-            Button { detail = .hadith } label: {
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("اقرأ وارتق").font(serif(18)).foregroundStyle(theme.color("hifzText"))
-                        Text("فإن منزلك عند آخر آية تقرؤها").font(bodyFont(12)).foregroundStyle(theme.secondaryInk)
-                    }
-                    Spacer(minLength: 0)
-                    Image(systemName: "chevron.backward").font(.system(size: 11, weight: .semibold)).foregroundStyle(theme.secondaryInk)
-                }.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                    .contentShape(Rectangle())
-            }.buttonStyle(.plain)
-                .accessibilityLabel("اقرأ وارتق، عرض الحديث")
-                .accessibilityIdentifier("quran-coverage-hadith")
         }.padding(.horizontal, 8)
     }
     private func path(_ state: QuranRoomState) -> some View {

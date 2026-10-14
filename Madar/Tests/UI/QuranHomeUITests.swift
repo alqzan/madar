@@ -8,6 +8,11 @@ import XCTest
         app.launch()
         XCTAssertTrue(app.staticTexts["quran-coverage-title"].waitForExistence(timeout: 20), app.debugDescription)
         XCTAssertTrue(app.buttons["quran-begin"].exists)
+        let coverageLabel = app.staticTexts["quran-coverage-label"]
+        let hadith = app.buttons["quran-coverage-hadith"]
+        XCTAssertEqual(coverageLabel.frame.midY, hadith.frame.midY, accuracy: 1)
+        XCTAssertLessThan(hadith.frame.maxX, coverageLabel.frame.minX)
+        XCTAssertLessThanOrEqual(coverageLabel.frame.minX - hadith.frame.maxX, 13)
         attach(app, "M2-V01-home-L")
         app.swipeUp()
         XCTAssertTrue(app.otherElements["quran-log14"].exists)
