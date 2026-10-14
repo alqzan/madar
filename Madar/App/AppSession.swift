@@ -519,6 +519,18 @@ final class AppSession {
         let permitsLegacy = pointer.previousGenerationID == nil && !changed && previous?.acceptsUnstampedDeliveries != false
         return .init(generationID: managedStore.binding.generationID, acceptsUnstampedDeliveries: permitsLegacy)
     }
+    func executeQuranCommand(_ name: String, payload: [String: MadarCore.JSONValue]) async throws -> CommandOutcome {
+        guard beginWrite() else { throw BackupOperationError.busy }
+        defer { pendingWrites -= 1 }
+        let result = try await bus.execute(CommandEnvelope(name: name, payload: .object(payload)))
+        guard result.status == .applied || result.status == .duplicate else { throw DataError.invalidValue(result.reason ?? "Quran command") }
+        try reload(); try publishSnapshot()
+        if let id = result.undoToken, let receipt = try ModelContext(container).fetch(FetchDescriptor<MadarData.CommandReceipt>()).first(where: { $0.commandID == id }), let deadline = receipt.undoExpiresAt {
+            showUndo(AppUndoToken(id: id, expiresAt: deadline), message: "حُفظ التغيير · التراجع متاح لعشر دقائق")
+        }
+        return result
+    }
+
     func applySettingsAndWait(_ changes: [String: JSONValue]) async throws {
         guard beginWrite() else { throw BackupOperationError.busy }
         defer { pendingWrites -= 1 }

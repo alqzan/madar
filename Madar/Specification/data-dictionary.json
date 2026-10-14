@@ -5356,6 +5356,66 @@
         "kind": "upsert QuranAllotment(kind = reviewExtra, origin = raise)",
         "auth": "app"
       },
+      "quran.saveDraft": {
+        "intent": "SaveQuranDraft",
+        "payload": "{draft: base64 QuranDraftPayload}",
+        "kind": "upsert device-only SessionDraft; immutable identity/day/portion",
+        "auth": "app"
+      },
+      "quran.discardDraft": {
+        "intent": "DiscardQuranDraft",
+        "payload": "{draftID}",
+        "kind": "tombstone device-only draft; no session facts",
+        "auth": "app"
+      },
+      "quran.savePlan": {
+        "intent": "SaveHifzPlan",
+        "payload": "{startAyah, unit, amount, rhythm, restDay, missPolicy}",
+        "kind": "version HifzPlan; supersede previous; settings rest day",
+        "auth": "app"
+      },
+      "quran.setTodayLevel": {
+        "intent": "SetQuranTodayLevel",
+        "payload": "{kind: hifz|review, level: simple|medium|deep|max}",
+        "kind": "upsert QuranDayState for current MadarDay",
+        "auth": "app"
+      },
+      "quran.forceNewHifz": {
+        "intent": "ForceQuranHifz",
+        "payload": "{}",
+        "kind": "upsert QuranDayState.forceNewHifz",
+        "auth": "app"
+      },
+      "quran.createRecovery": {
+        "intent": "CreateQuranRecovery",
+        "payload": "{days: 5|7|14}",
+        "kind": "cancel previous RecoveryPlan and insert far-page selection",
+        "auth": "app"
+      },
+      "quran.cancelRecovery": {
+        "intent": "CancelQuranRecovery",
+        "payload": "{}",
+        "kind": "cancel active RecoveryPlan",
+        "auth": "app"
+      },
+      "quran.freezeTest": {
+        "intent": "FreezeQuranTest",
+        "payload": "{}",
+        "kind": "freeze QuranDayState.testPages for current MadarDay",
+        "auth": "app"
+      },
+      "quran.editSessionGrade": {
+        "intent": "EditQuranSessionGrade",
+        "payload": "{sessionID, page, grade: mastered|good|needs}",
+        "kind": "update PageGrade and rebuild derived schedule",
+        "auth": "app"
+      },
+      "quran.deleteSession": {
+        "intent": "DeleteQuranSession",
+        "payload": "{sessionID}",
+        "kind": "tombstone session, grades and mistake events; detach qiyam link; undo",
+        "auth": "app"
+      },
       "habit.complete": {
         "intent": "CompleteHabitIntent",
         "payload": "{habitID, periodKey?, delta: Int = 1}",

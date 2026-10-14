@@ -25,6 +25,8 @@ packages:
     path: Packages/MadarSnapshots
   MadarCommands:
     path: Packages/MadarCommands
+  MadarQuran:
+    path: Packages/MadarQuran
   MadarPrayer:
     path: Packages/MadarPrayer
   MadarInbox:
@@ -47,6 +49,7 @@ targets:
       - package: MadarSnapshots
       - package: MadarCommands
       - package: MadarPrayer
+      - package: MadarQuran
       - package: MadarInbox
       - package: MadarSync
       - target: MadarWidgets

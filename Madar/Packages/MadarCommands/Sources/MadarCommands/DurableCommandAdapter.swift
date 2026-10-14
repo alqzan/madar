@@ -4,6 +4,7 @@ import Darwin
 import MadarCore
 import MadarData
 import MadarPrayer
+import MadarQuran
 
 private struct SettingsInverse: Codable {
     var settings: [String: MadarData.JSONValue]
@@ -12,6 +13,7 @@ private struct SettingsInverse: Codable {
     var afterLayouts: [String: Data]
     var prayerBefore: DataRecord? = nil
     var prayerAfter: DataRecord? = nil
+    var quranMutation: Data? = nil
     var prayerMutation: Data? = nil
 }
 private struct ReceiptNamespace: Codable {
@@ -97,7 +99,7 @@ private struct ReceiptWire: Codable {
                                        undoExpiresAt: row.undoExpiresAt ?? row.createdAt,
                                        undoJSON: row.undoJSON,
                                        outcome: .init(status: CommandStatus(rawValue: row.status) ?? .rejected,
-                                                      undoToken: row.status == "applied" && ["prayer.log", "prayer.makeUp", "prayer.resolveGap", "prayer.setHeart", "prayer.logQiyam", "prayer.addOldMissed", "prayer.editTrackingStart", "prayer.startTrip", "prayer.endTrip", "prayer.logPair", "settings.set", "settings.applyPreset"].contains(row.name) ? id : nil))
+                                                      undoToken: row.status == "applied" && ["prayer.log", "prayer.makeUp", "prayer.resolveGap", "prayer.setHeart", "prayer.logQiyam", "prayer.addOldMissed", "prayer.editTrackingStart", "prayer.startTrip", "prayer.endTrip", "prayer.logPair", "settings.set", "settings.applyPreset"].contains(row.name) || row.status == "applied" && QuranCommandPayload.names.contains(row.name) && row.undoJSON != nil ? id : nil))
                 return try JSONDecoder().decode(CoreCommandReceipt.self, from: JSONEncoder().encode(wire))
             }
             // Receipt identity is authoritative even after undo/deletion or retention expiry.
@@ -167,6 +169,15 @@ private struct ReceiptWire: Codable {
             let writer = try store.writerIDForWrite(now: now)
             var inverse: SettingsInverse?
             switch request.operation {
+            case .quran(let name, let payload):
+                let staged = try QuranMutationHandler.stage(name: name, payload: payload, in: context,
+                    catalog: QuranResources.catalog(), now: now, writer: writer)
+                if staged.duplicate {
+                    let outcome = CommandOutcome(status: .duplicate)
+                    try saveReceipt(request, outcome: outcome, inverseJSON: nil, writer: writer, generationID: generationID, at: now, context: context)
+                    return outcome
+                }
+                if let undo = staged.inverse { inverse = SettingsInverse(settings: [:], afterSettings: [:], layouts: [:], afterLayouts: [:], quranMutation: undo) }
             case .logPrayer(let dayKey, let prayer, let status, let heart, let shortened, let fridayKind):
                 guard let referenceDay = try? GregorianDay(dayKey), let storedStatus = PrayerStoredStatus(rawValue: status) else {
                     return .init(status: .rejected, reason: "invalidPrayer")
@@ -276,7 +287,9 @@ private struct ReceiptWire: Codable {
                     return .init(status: .rejected, reason: "undoExpired")
                 }
                 let state = try JSONDecoder().decode(SettingsInverse.self, from: data)
-                if let mutation = state.prayerMutation {
+                if let mutation = state.quranMutation {
+                    try QuranMutationHandler.undo(mutation, in: context, catalog: QuranResources.catalog(), now: now, writer: writer)
+                } else if let mutation = state.prayerMutation {
                     try PrayerMutationHandler.undo(mutation, in: context, now: now, writer: writer)
                 } else if let after = state.prayerAfter {
                     guard let current = try context.fetch(FetchDescriptor<PrayerLog>()).first(where: { $0.id == after.id && $0.mergedInto == nil }), normalizedPrayerRecord(try current.record()) == normalizedPrayerRecord(after) else { throw DataError.invalidValue("undo superseded: prayer") }

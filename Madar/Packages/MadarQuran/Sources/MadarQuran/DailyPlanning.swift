@@ -129,12 +129,12 @@ public enum QuranDailyPlanEngine {
     /// Recovery/raise are extra targets; test pages are always the final segment, once only.
     public static func review(
         pages: [QuranPlanningPage], recent: [Int], level: QuranDayLevel = .medium,
-        recovery: [Int] = [], raised: [Int] = [], test: [Int] = [], completedToday: Set<Int> = []
+        recovery: [Int] = [], raised: [Int] = [], test: [Int] = [], completedToday: Set<Int> = [], serveDue: Bool = true
     ) -> QuranDailyReview {
         let indexed = Dictionary(pages.map { ($0.page, $0) }, uniquingKeysWith: { first, _ in first })
         let eligible = Set(indexed.keys).subtracting(completedToday)
         let recent = recent.uniqued().filter { eligible.contains($0) }.sorted()
-        let due = pages.filter { $0.isDue && eligible.contains($0.page) }.sorted(by: QuranPlanningPage.weakestFirst)
+        let due = pages.filter { serveDue && $0.isDue && eligible.contains($0.page) }.sorted(by: QuranPlanningPage.weakestFirst)
         var regular = (recent + due.map(\.page)).uniqued()
         let fillers = pages.filter { eligible.contains($0.page) }.sorted(by: QuranPlanningPage.weakestFirst)
         for page in fillers where regular.count < level.reviewMinimum && !regular.contains(page.page) {

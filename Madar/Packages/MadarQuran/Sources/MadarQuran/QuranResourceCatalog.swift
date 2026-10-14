@@ -224,6 +224,19 @@ public struct QuranResourceCatalog: Sendable {
         (indexesByPage[page] ?? []).map { ayahs[$0] }
     }
 
+    /// Seven weekly manzils start at these surahs (Tanzil metadata, stations).
+    /// Only the grouping is prescribed here; every ayah/page boundary comes from our verified 1439 catalog.
+    /// Source checked 2026-10-14: https://tanzil.net/res/text/metadata/quran-data.xml
+    public func manzilCycleSegments() throws -> [QuranCycleSegment] {
+        let starts = [1, 5, 10, 17, 26, 37, 50]
+        return try starts.enumerated().map { index, surah in
+            let next = index + 1 < starts.count ? starts[index + 1] : 115
+            guard let first = ayahs.first(where: { $0.surahID == surah })?.id,
+                  let last = ayahs.last(where: { $0.surahID < next })?.id else { throw QuranResourceCatalogError.malformedData }
+            return QuranCycleSegment(number: index + 1, ayahs: try QuranAyahRange(first: first, last: last))
+        }
+    }
+
     public func juzCycleSegments() throws -> [QuranCycleSegment] {
         let recordsByJuz = Dictionary(grouping: ayahs, by: \.juz)
         return try (1...30).map { number in

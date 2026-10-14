@@ -43,6 +43,7 @@ public enum CommandOperation: Codable, Equatable, Sendable {
     case undo(token: UUID)
     case savePreset(name: String, settings: [String: JSONValue], layouts: [String: JSONValue])
     case completeOnboarding
+    case quran(name: String, payload: [String: JSONValue])
     case logPrayer(dayKey: String, prayer: Prayer, status: String, heart: String?, shortened: Bool?, fridayKind: String?)
     case makeUpPrayer(dayKey: String, prayer: Prayer, at: Date, fridayKind: String?)
     case resolvePrayerGap([PrayerGapResolution])
@@ -112,7 +113,7 @@ public protocol CommandStoreAdapter: Sendable {
 public struct CommandBus: Sendable {
     // Names implemented by this milestone. Unknown and later-room names are invalid
     // before authorization, so they cannot become indefinitely recoverable needsApp work.
-    public static let appOnlyCommandNames: Set<String> = ["settings.set", "settings.applyPreset", "preset.save", "core.completeOnboarding", "system.undo", "prayer.makeUp", "prayer.resolveGap", "prayer.setHeart", "prayer.logQiyam", "prayer.addOldMissed", "prayer.editTrackingStart", "prayer.startTrip", "prayer.endTrip", "prayer.logPair"]
+    public static let appOnlyCommandNames: Set<String> = Set(["settings.set", "settings.applyPreset", "preset.save", "core.completeOnboarding", "system.undo", "prayer.makeUp", "prayer.resolveGap", "prayer.setHeart", "prayer.logQiyam", "prayer.addOldMissed", "prayer.editTrackingStart", "prayer.startTrip", "prayer.endTrip", "prayer.logPair"]).union(QuranCommandPayload.names)
     public static let supportedCommandNames = appOnlyCommandNames.union(["prayer.log"])
     private let adapter: any CommandStoreAdapter
     public init(adapter: any CommandStoreAdapter) { self.adapter = adapter }
@@ -124,6 +125,11 @@ public struct CommandBus: Sendable {
         }
         let operation: CommandOperation; let semantics: CommandSemantics; let naturalKey: String?
         switch envelope.name {
+        case let name where QuranCommandPayload.names.contains(name):
+            guard QuranCommandPayload.validate(name: name, payload: payload) else { return .init(status: .rejected, reason: "invalidPayload") }
+            operation = .quran(name: name, payload: payload)
+            semantics = name == "quran.savePlan" ? .append : .upsert
+            naturalKey = name
         case "prayer.log":
             guard Set(payload.keys).isSubset(of: ["dayKey", "prayer", "status", "heart", "shortened", "fridayKind"]),
                   case .string(let dayKey) = payload["dayKey"], (try? GregorianDay(dayKey)) != nil,
