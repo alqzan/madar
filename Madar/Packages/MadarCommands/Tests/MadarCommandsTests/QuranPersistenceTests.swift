@@ -54,6 +54,36 @@ import MadarQuran
         #expect(captured.dayKey == "2026-10-08" && captured.boundary == .fajr)
     }
 
+    @Test func undoneDayChoiceAndMissedDayCanBeChosenAgain() async throws {
+        let (container, bus, directory) = try fixture(); defer { try? FileManager.default.removeItem(at: directory) }
+        func undo(_ result: CommandOutcome, at time: Date) async throws {
+            let token = try #require(result.undoToken)
+            #expect(try await bus.execute(envelope("system.undo", ["undoToken": .string(token.uuidString)], at: time), now: time).status == .applied)
+        }
+        // A tombstoned day choice must not lock today's level (undo leaves the day usable).
+        let first = try await bus.execute(envelope("quran.setTodayLevel", ["kind": .string("hifz"), "level": .string("deep")]), now: now)
+        #expect(first.status == .applied)
+        try await undo(first, at: now.addingTimeInterval(10))
+        #expect(try repo(container).snapshot(at: now.addingTimeInterval(20)).hifzLevel != .deep)
+        let again = now.addingTimeInterval(30)
+        #expect(try await bus.execute(envelope("quran.setTodayLevel", ["kind": .string("review"), "level": .string("max")], at: again), now: again).status == .applied)
+        let revived = try repo(container).snapshot(at: again.addingTimeInterval(1))
+        #expect(revived.reviewLevel == .max && revived.hifzLevel != .deep)
+        // A missed-day choice that was undone can be chosen again.
+        let planAt = now.addingTimeInterval(-5 * 86400)
+        let plan: [String: MadarCore.JSONValue] = ["startAyah": .number(1), "unit": .string("page"), "amount": .number(1), "rhythm": .string("balanced"), "restDay": .string("none"), "missPolicy": .string("ask")]
+        #expect(try await bus.execute(envelope("quran.savePlan", plan, at: planAt), now: planAt).status == .applied)
+        let missed = try repo(container).currentDay(at: now).date.adding(days: -1).description
+        let resolve = envelope("quran.resolveMissedDay", ["dayKey": .string(missed), "choice": .string("double")], at: again.addingTimeInterval(60))
+        let resolved = try await bus.execute(resolve, now: again.addingTimeInterval(60))
+        #expect(resolved.status == .applied)
+        try await undo(resolved, at: again.addingTimeInterval(70))
+        #expect(try repo(container).snapshot(at: again.addingTimeInterval(80)).allotments.isEmpty)
+        let redo = try await bus.execute(envelope("quran.resolveMissedDay", ["dayKey": .string(missed), "choice": .string("double")], at: again.addingTimeInterval(90)), now: again.addingTimeInterval(90))
+        #expect(redo.status == .applied)
+        #expect(!(try repo(container).snapshot(at: again.addingTimeInterval(100)).allotments.isEmpty))
+    }
+
     @Test func commitChildrenReceiptAndDraftTogetherReplayUndoLeavesNoCoverageScheduleOrStreak() async throws {
         let (container, bus, directory) = try fixture(); defer { try? FileManager.default.removeItem(at: directory) }
         var draft = try makeDraft(container)

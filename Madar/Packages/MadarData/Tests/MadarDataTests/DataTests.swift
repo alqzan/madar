@@ -205,7 +205,7 @@ import Testing
         var newer = backup
         let length = Int(newer.prefix(4).reduce(UInt64(0)) { ($0 << 8) | UInt64($1) })
         var header = String(data:newer.subdata(in:4..<4+length),encoding:.utf8)!
-        header = header.replacingOccurrences(of:"\"storeSchemaVersion\":2",with:"\"storeSchemaVersion\":9")
+        header = header.replacingOccurrences(of:"\"storeSchemaVersion\":\(MadarSchema.version)",with:"\"storeSchemaVersion\":\(MadarSchema.version + 1)")
         newer.replaceSubrange(4..<4+length,with:Data(header.utf8))
         #expect(throws:DataError.newerStore) { try BackupCodec.validate(newer,passphrase:"correct long password") }
         #expect(try diskBytes() == before)

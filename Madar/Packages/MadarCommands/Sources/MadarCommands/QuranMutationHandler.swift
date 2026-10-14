@@ -46,10 +46,24 @@ public struct QuranStagedResult: Sendable {
             if deleting { try record.set(stamp, for: "deletedAt"); try record.set(stamp, for: "deletionBarrierAt") }
             try row.apply(record)
         }
+        // Same restore stamping as undo: keep the barrier, mark restoredAt after it.
+        func revive<T: MadarRecordModel>(_ row: T) throws {
+            var record = try row.record()
+            let stamp = StableIdentity.monotonic(now: now, previous: record.date("updatedAt") ?? now)
+            let barrier = record.date("deletionBarrierAt") ?? record.date("deletedAt")
+            try record.set(nil as Date?, for: "deletedAt"); try record.set(barrier, for: "deletionBarrierAt")
+            try record.set(max(stamp, (barrier ?? .distantPast).addingTimeInterval(0.001)), for: "restoredAt")
+            try row.apply(record)
+        }
         func dayState(_ day: GregorianDay) throws -> QuranDayState {
             let rows = try context.fetch(FetchDescriptor<QuranDayState>()).filter { $0.dayKey == day.description && $0.mergedInto == nil }
             if let row = rows.max(by: { $0.updatedAt < $1.updatedAt }) {
-                guard row.deletedAt == nil else { throw DataError.invalidValue("explicitRestoreRequired") }; return row
+                // An undone day choice is a tombstone; a new choice revives it from clean defaults.
+                if row.deletedAt != nil {
+                    row.hifzLevel = nil; row.reviewLevel = nil; row.forceNewHifz = false; row.testPages = []
+                    try revive(row)
+                }
+                return row
             }
             let row = QuranDayState(); row.id = StableIdentity.uuid(for: "QuranDayState:\(day)"); row.dayKey = day.description
             row.createdAt = now; context.insert(row); return row
@@ -57,7 +71,12 @@ public struct QuranStagedResult: Sendable {
         func putAllotment(_ value: QuranDailyAllotment) throws {
             let rows = try context.fetch(FetchDescriptor<QuranAllotment>()).filter { $0.mergedInto == nil }
             if let existing = rows.first(where: { $0.origin == value.origin.rawValue && $0.originDayKey == value.originDayKey.description && $0.dayKey == value.dayKey.description && $0.kind == value.kind.rawValue }) {
-                if existing.deletedAt == nil && value.origin == .raise {
+                if existing.deletedAt != nil {
+                    // An undone allotment is revived with the new choice instead of silently swallowing it.
+                    existing.amount = value.amount; existing.pages = value.pages
+                    try revive(existing); try touch(existing); return
+                }
+                if value.origin == .raise {
                     var seen = Set<Int>()
                     let union = (existing.pages + value.pages).filter { seen.insert($0).inserted }
                     if union != existing.pages { existing.pages = union; try touch(existing) }
@@ -171,7 +190,7 @@ public struct QuranStagedResult: Sendable {
                   origin >= GregorianDay.containing(plan.activeFrom, in: TimeZone(identifier: snapshot.day.timeZoneID)!),
                   !snapshot.restDay.contains(origin), !snapshot.sessions.contains(where: { $0.kind == .hifz && $0.dayKey == origin }) else { throw DataError.invalidValue("Quran missed day") }
             let rows = try context.fetch(FetchDescriptor<QuranAllotment>()).filter { $0.mergedInto == nil }
-            if rows.contains(where: { $0.origin == "missPolicy" && $0.originDayKey == origin.description }) { duplicate = true; break }
+            if rows.contains(where: { $0.deletedAt == nil && $0.origin == "missPolicy" && $0.originDayKey == origin.description }) { duplicate = true; break }
             let habitual = QuranDayLevel(rawValue: try repository.settings.value(for: "quran.hifzLevel").string ?? "medium") ?? .medium
             let choice = QuranMissedDayChoice(rawValue: text("choice"))!
             let targets = try QuranDailyPlanEngine.missedDayAllotments(originDay: origin, resolvingOn: snapshot.day.date, choice: choice,
