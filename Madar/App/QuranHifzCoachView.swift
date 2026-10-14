@@ -18,7 +18,8 @@ struct QuranHifzCoachView: View {
         VStack(spacing: 0) {
             if !fullPage { header }
             if let page = state.page {
-                QuranCoachPage(page: page, coach: coach, stage: state.stage) { action(.reveal(ayahID: $0, wordIndex: nil)) }
+                QuranCoachPage(page: page, coach: coach, stage: state.stage, reveal: { action(.reveal(ayahID: $0, wordIndex: nil)) },
+                    markWord: { action(.mistake(ayahID: $0, wordIndex: $1)) })
                     .padding(.horizontal, 6)
                     .allowsHitTesting(!fullPage).accessibilityHidden(fullPage)
                     .overlay {

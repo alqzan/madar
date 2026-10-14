@@ -157,6 +157,8 @@ struct QuranUICoach: Sendable {
     var pastDay: Bool
     var review = false
     var flaggedAyahs: Set<Int> = []
+    var flaggedWords: Set<String> = []
+    static func wordKey(_ ayah: Int, _ word: Int) -> String { "\(ayah):\(word)" }
 }
 enum QuranUISessionResult: Sendable { case active(QuranUISessionState), completed(summary: [String]), discarded }
 @MainActor protocol QuranUIService: AnyObject {

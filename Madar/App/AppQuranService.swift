@@ -12,6 +12,8 @@ import MadarPrayer
     private static var printedGlyphs: QuranPrintedGlyphs?
     private static var printedFontNames: [Int: String] = [:]
     unowned let app: AppSession
+    /// Guards the automatic missed-day choice so a failed write is never retried in a loop.
+    var autoResolvedMissedDay: GregorianDay?
     let clock: @MainActor () -> Date
     init(session: AppSession, clock: @escaping @MainActor () -> Date = { prayerUITestClock(.now) }) { app = session; self.clock = clock }
     func repository() throws -> QuranRepository {
@@ -114,11 +116,20 @@ import MadarPrayer
         let balance = switch snapshot.hifz?.balance { case .half: "نصف ورد"; case .consolidation: "تثبيت"; case .rest: "يوم راحة"; case .complete: "اكتمل نطاق الخطّة"; default: "ورد كامل" }
         let draft = snapshot.drafts.sorted { $0.startedAt > $1.startedAt }.first.map { QuranUIDraft(id: $0.id, title: "تابع جلستك", isPastDay: $0.storedDay.date != today) }
         var missedDay: GregorianDay?
-        if let plan = snapshot.plan, plan.missPolicy == "ask" {
+        if let plan = snapshot.plan {
             var previous = today.adding(days: -1)
             while snapshot.restDay.contains(previous) { previous = previous.adding(days: -1) }
             let firstDay = snapshot.planStartDay ?? today
             if previous >= firstDay && !snapshot.sessions.contains(where: { $0.dayKey == previous && $0.kind == .hifz }) && !snapshot.allotments.contains(where: { $0.origin == .missPolicy && $0.originDayKey == previous }) { missedDay = previous }
+            // «لو فاتك يوم» chosen in the plan (وزّعه/ضاعف/تجاوزه) is applied once, without asking; only «اسألني» shows the card.
+            if let day = missedDay, plan.missPolicy != "ask", autoResolvedMissedDay != day {
+                autoResolvedMissedDay = day
+                do {
+                    try await command("quran.resolveMissedDay", ["dayKey": .string(day.description), "choice": .string(plan.missPolicy)])
+                    return try await load()
+                } catch { missedDay = nil }
+            }
+            if plan.missPolicy != "ask" { missedDay = nil }
         }
         let surahs = Dictionary(grouping: catalog.ayahs, by: \.surahID).sorted { $0.key < $1.key }.map { id, ayahs in
             QuranUISurah(id: id, title: ayahs[0].surahNameArabic, firstAyah: ayahs[0].id, ayahCount: ayahs.count)

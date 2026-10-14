@@ -23,9 +23,9 @@ import MadarQuran
     private func envelope(_ name: String, _ payload: [String: MadarCore.JSONValue], at: Date? = nil) -> CommandEnvelope {
         CommandEnvelope(name: name, payload: .object(payload), issuedAt: at ?? now)
     }
-    private func makeDraft(_ container: ModelContainer, kind: QuranSessionKind = .hifz, first: Int = 1, last: Int = 7, page: Int = 1) throws -> QuranDraftPayload {
-        let key = try repo(container).currentDay(at: now)
-        var draft = QuranSessionDraft(planID: nil, kind: kind, storedDay: key, startedAt: now,
+    private func makeDraft(_ container: ModelContainer, kind: QuranSessionKind = .hifz, first: Int = 1, last: Int = 7, page: Int = 1, at: Date? = nil) throws -> QuranDraftPayload {
+        let key = try repo(container).currentDay(at: at ?? now)
+        var draft = QuranSessionDraft(planID: nil, kind: kind, storedDay: key, startedAt: at ?? now,
             portions: [try QuranAyahRange(first: first, last: last)], page: page, ayahID: first)
         draft.coachStage = .blindRecitation; draft.blindPassedAyahs = kind == .hifz ? Set(first...last) : []
         draft.grades = [QuranDraftGrade(page: page, rating: .mastered)]
@@ -82,6 +82,22 @@ import MadarQuran
         // RQ3 / §7.4: «يحتاج» stops new hifz the next day; the day it was graded keeps its own label.
         #expect(try repo(container).snapshot(at: now.addingTimeInterval(120)).hifz?.balance != .consolidation)
         #expect(try repo(container).snapshot(at: now.addingTimeInterval(86400)).hifz?.balance == .consolidation)
+    }
+
+    @Test func recentFacesAreTheMostRecentlyMemorisedNotTheHighest() async throws {
+        let (container, bus, directory) = try fixture(); defer { try? FileManager.default.removeItem(at: directory) }
+        let catalog = try QuranResources.catalog()
+        func memorise(_ pages: ClosedRange<Int>, at time: Date) async throws {
+            var value = try makeDraft(container, first: catalog.ayahs(on: pages.lowerBound).first!.id, last: catalog.ayahs(on: pages.upperBound).last!.id, page: pages.lowerBound, at: time)
+            value.draft.grades = pages.map { QuranDraftGrade(page: $0, rating: .mastered) }
+            try await save(value, bus: bus, at: time)
+            #expect(try await commit(value, bus: bus, at: time.addingTimeInterval(60)).status == .applied)
+        }
+        // Faces 10–20 first, then the gap 2–3 filled later: with no plan the rhythm is balanced (five recent faces).
+        try await memorise(10...20, at: now.addingTimeInterval(-3 * 86400))
+        try await memorise(2...3, at: now.addingTimeInterval(-86400))
+        let recent = try repo(container).snapshot(at: now).recentPages
+        #expect(recent == [2, 3, 18, 19, 20])
     }
 
     @Test func undoneDayChoiceAndMissedDayCanBeChosenAgain() async throws {

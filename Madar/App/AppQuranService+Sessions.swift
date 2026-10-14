@@ -115,6 +115,10 @@ extension AppQuranService {
             }
             // Coach learning reveals stay hints. Only blind recitation records a slip.
             let explicitMistake: Bool = if case .mistake = action { true } else { false }
+            // A word slip is recorded once per session; pressing the same word again does not add a second slip.
+            if let word, explicitMistake, draft.mistakes.contains(where: { $0.kind == .mistake && $0.key == QuranMistakeKey(ayahID: ayah, wordIndex: word) }) {
+                return .active(try await sessionState(value))
+            }
             if draft.coachStage == .blindRecitation && (draft.kind == .hifz || explicitMistake) {
                 let coverage = try snapshot().coverage
                 if draft.kind != .free || coverage.completedPages.contains(draft.page) {
@@ -300,13 +304,14 @@ extension AppQuranService {
             state.coach = QuranUICoach(activeAyahID: next?.id ?? currentAyahs.last?.id ?? draft.ayahID, activeAyahNumber: numerals.string(next?.ayahNumber ?? 0),
                 plannedAyahs: ids, revealedAyahs: revealed, repetition: 0, target: 0, bridge: false, method: "continuous", stageTitle: stage == .grading ? "تقييمك" : "المراجعة المستورة",
                 pageProgress: "المقطع " + numerals.string(sectionIndex + 1) + " من " + numerals.string(sections.count), caption: caption, pages: orderedPages, referenceText: nil,
-                pastDay: draft.storedDay.date != (try snapshot().day.date), review: true, flaggedAyahs: Set(draft.mistakes.map { $0.key.ayahID }))
+                pastDay: draft.storedDay.date != (try snapshot().day.date), review: true, flaggedAyahs: Set(draft.mistakes.filter { $0.key.wordIndex == nil }.map { $0.key.ayahID }))
             state.availableMethods = ["continuous": "سرد متصل"]
             if stage == .review {
                 if let next { state.primaryTitle = "كشفت التالية"; state.primaryAction = .reveal(ayahID: next.id, wordIndex: nil) }
                 else { state.primaryTitle = "قيّم هذا الوجه"; state.primaryAction = .advance }
             } else if !finished { state.primaryTitle = "تابع" }
         }
+        state.coach?.flaggedWords = Set(draft.mistakes.compactMap { mistake in mistake.key.wordIndex.map { QuranUICoach.wordKey(mistake.key.ayahID, $0) } })
         return state
     }
 }

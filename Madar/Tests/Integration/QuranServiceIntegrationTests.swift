@@ -28,6 +28,44 @@ import MadarCommands
         XCTAssertEqual(page.lines.count, 15); XCTAssertFalse(page.postScriptName.isEmpty); XCTAssertFalse(page.lines[0].glyphs.isEmpty)
         XCTAssertNotNil(app.undoToken)
     }
+    /// §7.4 «لو فاتك يوم»: a plan policy of «وزّعه» is applied without asking (+⅓ face over three days, RQ6); «اسألني» shows the card.
+    func testMissedDayPolicyIsAppliedOnceWithoutAsking() async throws {
+        for policy in ["spread", "ask"] {
+            let (app, service, root) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
+            try await service.perform(.savePlan(QuranUIPlanInput(startAyah: 1, unit: .page, amount: 1, rhythm: .balanced, restDay: "none", missPolicy: policy)))
+            let context = ModelContext(app.container)
+            let plan = try XCTUnwrap(context.fetch(FetchDescriptor<HifzPlan>()).first)
+            plan.activeFrom = plan.activeFrom.addingTimeInterval(-3 * 86400); try context.save()
+            let state = try await service.load()
+            let missed = try ModelContext(app.container).fetch(FetchDescriptor<QuranAllotment>()).filter { $0.origin == "missPolicy" && $0.deletedAt == nil }
+            if policy == "spread" {
+                XCTAssertNil(state.missedDayKey)
+                XCTAssertEqual(missed.count, 3)
+                for row in missed { XCTAssertEqual(row.amount, 1.0 / 3, accuracy: 0.0001) }
+                _ = try await service.load()
+                XCTAssertEqual(try ModelContext(app.container).fetch(FetchDescriptor<QuranAllotment>()).filter { $0.origin == "missPolicy" }.count, 3, "applied once")
+            } else {
+                XCTAssertNotNil(state.missedDayKey); XCTAssertTrue(missed.isEmpty)
+            }
+        }
+    }
+    /// §7.4: a word slip keeps its wordIndex, counts once, and becomes a word spot for «مواضع الخطأ».
+    func testWordSlipInReviewIsStoredOnceAndBecomesAWordDrillSpot() async throws {
+        let (app, service, root) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
+        try await service.perform(.savePlan(QuranUIPlanInput(startAyah: 1, unit: .page, amount: 1, rhythm: .balanced, restDay: "none", missPolicy: "ask")))
+        let hifz = try await service.start(kind: .hifz, stepID: "hifz", range: nil, rakaat: nil, spotID: nil)
+        try await learnPage(service, id: hifz.id)
+        _ = try await service.session(draftID: hifz.id, action: .mistake(ayahID: 2, wordIndex: 1))
+        _ = try await service.session(draftID: hifz.id, action: .mistake(ayahID: 2, wordIndex: 1))
+        let state = try await service.resume(draftID: hifz.id)
+        XCTAssertTrue(state.coach?.flaggedWords.contains(QuranUICoach.wordKey(2, 1)) == true)
+        _ = try await service.session(draftID: hifz.id, action: .advance)
+        _ = try await service.session(draftID: hifz.id, action: .commitPartial)
+        let events = try ModelContext(app.container).fetch(FetchDescriptor<MistakeEvent>()).filter { $0.deletedAt == nil }
+        XCTAssertEqual(events.map(\.wordIndex), [1], "one slip on the exact word")
+        let board = try service.drillBoard()
+        XCTAssertEqual(board.today, ["2:1"])
+    }
     func testPartialHifzCommitContainsOnlyThePageBlindRecited() async throws {
         let (app, service, root) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
         try await service.perform(.savePlan(QuranUIPlanInput(startAyah: 149, unit: .page, amount: 2, rhythm: .balanced, restDay: "none", missPolicy: "ask")))

@@ -144,7 +144,11 @@ public struct QuranDataSnapshot: Sendable {
         let recoveryRow = try context.fetch(FetchDescriptor<RecoveryPlan>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.cancelledAt == nil }.max { $0.updatedAt < $1.updatedAt }
         let recovery = try recoveryRow.map { try QuranRecoveryPlan(startDayKey: GregorianDay($0.startDayKey), days: $0.days, pages: $0.pages) }
         let recentCount = switch plan?.plan.intensity ?? .balanced { case .light: 3; case .balanced: 5; case .intense: 8 }
-        let recent = Array(coverage.completedPages.sorted().suffix(recentCount))
+        // «القريب» = the faces memorised most recently (completion time; ties → the higher face), so a filled gap counts as recent.
+        let recent = coverage.completedPages.sorted {
+            let l = coverage.memorizedAt[$0] ?? .distantPast, r = coverage.memorizedAt[$1] ?? .distantPast
+            return l == r ? $0 < $1 : l < r
+        }.suffix(recentCount).sorted()
         var reviewedOn: [Int: GregorianDay] = [:]
         for session in sessions where [.review, .free, .qiyam].contains(session.kind) {
             for grade in session.grades { reviewedOn[grade.page] = Swift.max(reviewedOn[grade.page] ?? session.dayKey, session.dayKey) }
