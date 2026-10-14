@@ -4,7 +4,7 @@
 
 # Last checked
 
-2026-10-13 — Codex. M2-E01, E02 and E05 are complete: 22 Quran XCTest cases pass, including fixed-cycle rotation and the 100/300/604-page balance simulations; two focused settings tests pass. Fixed review is selectable and spaced review remains the default. Next queue item: M2-R01 is blocked on verified licensed-resource provenance and files; no app screen or iPhone pass is claimed.
+2026-10-14 — Codex. M2-R01 resources implemented: official Hafs 2.0 text/font, a bound 1439 page/line/word map (604 pages, 6236 ayahs, 77429 word groups), and separately extracted 1405 frame/surah artwork with edition-seal evidence and file hashes. Resource tests 11/11 passed; app build and three prayer UI tests at L passed. Mushaf licence is closed. M2-E03 is next ready; Quran runtime and external-release human sample are not yet accepted.
 
 # Board
 
@@ -16,7 +16,7 @@ Every screen card follows protocol §2: canonical files → default-size screens
 
 | Card | Screen | Canonical | Current code | Status | Do not copy (fixes and defaults win) | Notes |
 |---|---|---|---|---|---|---|
-| M1-V01 | S1 Home | `salah/01-S1-Home.jpg`, `-s1` | `App/PrayerTodayView.swift` | approved | Moon day/night button (prototype only). «تبقى معلّقة ٦ أيام ثم تُحسب فائتة» (RP1). Heart labels (RP6). Heart card unless `salah.askHeart`. "·" next to a digit (RU1). Sample numbers. The home streak meaning is three layers per owner direction; no day count. S3 Mizan beads remain. | Hali streak (owner, 13 Oct): one day count, «سلسلتك N», the completion streak; under it one qualifier that names only the part on time or in congregation (the three layers nest, so nothing repeats). Home card «سلاسلك» (owner, 13 Oct: arches, full at a month): three nested horseshoe arches in the home-arch shape (`PrayerHorseshoe`, legs to the floor, star inside) — congregation inside, on time, completion outside; each is one continuous smooth line filling right to left with the streak (up the right leg, over the crown, down to the left foot at 30 days) (gentle fill animation, none under Reduce Motion); legend beside it (name, short meaning, days); no month %. Tap opens the «سلاسلك» sheet (meaning, last seven days, the day and reason of any break) with «حالي: سجلّ الشهر» to S3. One engine definition: `PrayerStreaks`. Captures: `Madar/Artifacts/m1-streak-rtl-shots/` (fixtures `streakShowcase`, `streakShowcaseMonth`). Awaiting the owner's look. Preserve the rest of S1 scope: verse divider, pending notice, qada card with citation and «مواضعها» list, qiyam footprint, spec date and RL7 countdown, plurals via `Prayer.xcstrings` (RU3). Compare page: `Madar/Artifacts/compare/S1-Home.html`; actual L captures: `Madar/Artifacts/m1-s1-streak-shots/`. Design and visual acceptance remain open; main S1 scrolled alignment and V05 scrolled capture remain unresolved. |
+| M1-V01 | S1 Home | `salah/01-S1-Home.jpg`, `-s1` | `App/PrayerTodayView.swift` | approved | Moon day/night button (prototype only). «تبقى معلّقة ٦ أيام ثم تُحسب فائتة» (RP1). Heart labels (RP6). Heart card unless `salah.askHeart`. "·" next to a digit (RU1). Sample numbers. The home streak meaning is three layers per owner direction; no day count. S3 Mizan beads remain. | Hali streak (owner, 13 Oct): one day count, «سلسلتك N», the completion streak; under it one qualifier that names only the part on time or in congregation (the three layers nest, so nothing repeats). Home card «سلاسلك» (owner, 13 Oct: arches, full at a month): three nested horseshoe arches in the home-arch shape (`PrayerHorseshoe`, legs to the floor, star inside) — congregation inside, on time, completion outside; each is one continuous smooth line filling right to left with the streak (up the right leg, over the crown, down to the left foot at 30 days) (gentle fill animation, none under Reduce Motion); legend beside it (name, short meaning, days); no month %. Tap opens the «سلاسلك» sheet (meaning, last seven days, the day and reason of any break) with «حالي: سجلّ الشهر» to S3. One engine definition: `PrayerStreaks`. Captures: `Madar/Artifacts/m1-streak-rtl-shots/` (fixtures `streakShowcase`, `streakShowcaseMonth`). Owner approved on 13 Oct; do not request that approval again. Preserve the rest of S1 scope: verse divider, pending notice, qada card with citation and «مواضعها» list, qiyam footprint, spec date and RL7 countdown, plurals via `Prayer.xcstrings` (RU3). Compare page: `Madar/Artifacts/compare/S1-Home.html`; actual L captures: `Madar/Artifacts/m1-s1-streak-shots/`. Owner approval is recorded in DECISIONS. Fresh L comparison captured top/scrolled on 14 Oct; no enlarged-text run. |
 | M1-V02 | S2 Light log | `salah/02-S2-Log.jpg`, `-s1` | `PrayerTodayLogSheet` | approved | Heart question unless on (RP6). Friday noon records `fridayKind` explicitly (RP5). Sample times. «امسح التسجيل» (screenshot only: no clear command in the spec, and a tombstone would block logging again; see DECISIONS). | Room-styled sheet: lattice-arch thumbnail, «صلّيتَ العصر؟», one tap on «في جماعة / وحدي / قضاءً» records, inline heart row (only when `salah.askHeart`), Friday kind chips. «فاتتني» opens the make-up panel (S2b look) in the same sheet. Compare page: `Madar/Artifacts/compare/S2-Log.html`. Differences: iOS 26 floating sheet; only the states allowed by RP2 show (canonical shows all four on Asr before its window ends). |
 | M1-V03 | S2b Missed and reminder | `salah/03-S2b-Missed.jpg`, `-s1` | `PrayerMakeUpSheet`, `PrayerGapResolutionSheet` | approved | «فاتتني… نزلت في القضاء» before the prayer's window ends (RP2: before the end only «لم أصلّها بعد» or snooze). «فاتتني» in the +30 notification (RP2). Automatic aging (RP1). | Gap sheet «صلوات بلا تسجيل» rebuilt at the owner's request (room look, one-tap settle, by day, partial save). The S2b panel lives in the log sheet (M1-V02): «فاتتني» shows «نزلت في القضاء…», the citation bar, «قضيتُها الآن» / «لاحقًا» and saves nothing until a choice. The +30 notification has only the snooze action (no «فاتتني», RP2). Compare page: `Madar/Artifacts/compare/S2b-Missed.html`. Difference: the canonical shows the panel on Asr before its window ends, which RP2 forbids. |
 | M1-V04 | S3 Hali | `salah/04-S3-Hali.jpg`, `-s1` | `PrayerStatisticsView` | approved | Any ranking or superlative such as «أخشعُ صلواتك…» (RP6). Sample numbers. Balance-style picker (`salah.balanceView` is v2: beads only). | «حالي» rebuilt: back row «‹ الصلاة» and serif title, three figure cards with the Arabic plural («٠ أيام»، «يومان»), Mizan card (bead arc with thread, ratio over the last 25, «أوفيت · معلّقة», «الأقدم / الأحدث», «آخر ٢٥ فرضًا»), month card with a five-bead arch glyph per day and today highlighted, commitment bars with percentages and legend, heart card only when `salah.askHeart`. The congregation streak label now says «الجماعة» per owner terminology; the detailed Mizan bead arc stays. Compare page: `Madar/Artifacts/compare/S3-Hali.html`. Differences: sheet presentation instead of a pushed page; the «قُضيت ٢، عليك ٢» line is kept under the figures (spec text, not in the canonical); days before tracking start show faded. |
@@ -36,7 +36,7 @@ Every screen card follows protocol §2: canonical files → default-size screens
 | M1-F03 | Edit the tracking start date once | §7.2 P04, `salah.trackingStart` | approved | Built in «خصّص الصلاة» → التسجيل: the start in words, one edit (date picker up to 30 days before first run), confirm dialog, then «اكتمل التعديل الوحيد». New command `prayer.editTrackingStart` is now accepted by the command bus (it was parsed but not routed); undo is available for ten minutes. No canonical screen exists for this row, so there is no compare page. |
 | M1-F04 | Outside the app: next-prayer widget, lock-screen widgets, countdown | `salah/11-S10-Abwab.jpg`; §9; RL7, RP9, RU2 | blocked: a `LiveActivityIntent` needs a budget reservation shared with the app; the current ledger is SwiftData and the extension must not open it (RA2) | Slices 1–4 are implemented: next-prayer JSON snapshot and widgets; reminder notification; Shortcuts `LogPrayerIntent`; configurable `PrayerLogControl`. Both intents enqueue through `PendingInbox`, and the app alone opens SwiftData. Regression fixes: the snapshot retains today's Fajr and occurred prayer times; Friday «الجمعة + وحدي» is rejected before enqueue with a clear Arabic error. The app's scheduled Live Activity path uses `SanctityGuard` and `NotificationArbiter`. Remaining: design and test an atomic cross-process budget reservation before adding the RL5 `LiveActivityIntent`; RP9 remains times-only by default (no qada/streak values outside the app); shortcut/control/widget and scheduled-start device checks remain pending. The Control action has not been exercised on iPhone.
 | M1-F05 | Import the old prayer history | §7.2, §11, `Madar/docs/MIGRATION.md` | deferred (owner, 13 Oct): not needed; no import, owner store never opened | Preview maps explicit statuses, leaves post-start `لم` derived, maps pre-start unlogged history to `unrecordedHistory`, flags required timestamps, and never writes. Never open or migrate the owner's real store without explicit permission. |
-| M1-G | M1 gate on the owner's iPhone | §12/§13 M1, `docs/reports/M1.md` | blocked: owner-iPhone acceptance has not been run; M1 is not approved | Agent-side prechecks do not close the gate. Complete the iPhone acceptance checks before recording an M1 pass. Fill the gate table only at the gate. |
+| M1-G | M1 gate on the owner's iPhone | §12/§13 M1, `docs/reports/M1.md` | deferred (owner, 13 Oct): run after the whole app is finished | Agent-side prechecks do not close the gate. Complete the iPhone acceptance checks before recording an M1 pass. Fill the gate table only at the gate. |
 
 S0-Jard and S12-Khulasa are explainer boards (`kind: explainer`): use them for reference, don't build them.
 
@@ -54,8 +54,8 @@ The owner lifted the M2 pause in `docs/CODEX-M2-BRIEF.md`. Build a pure Swift en
 |---|---|---|---|
 | M2-E01 | Spaced review core: grade intervals/ease, due risk/order and adaptive capacity; implement RQ1's computed-need balance and run the 100/300/604-page simulations. Pure Swift `MadarQuran`; no persistence types in the engine. | done | `swift test --package-path Madar/Packages/MadarQuran`: 10 XCTest passed. RQ1 simulations: 100/300/604 pages, both mastery profiles at 0% half-wird days and 0 consecutive; within the 10%/20%/3-day limits. |
 | M2-E02 | Coach and error engine: learning reveals are hints; blind-recitation slips alone affect grades; mistake spots and two-success closure. | done | `swift test --package-path Madar/Packages/MadarQuran`: 17 XCTest passed. Learning reveals stay as coach hints; blind slips alone grade the session; deleting a drill session rebuilds its two-success closure. Drill limits follow the selected intensity (3/5/8). |
-| M2-R01 | One verified 1405 resource set for page/line/word maps and QCF V1; manifest and automatic resource checks (RQ7, Q08). | blocked: provenance source is unresolved and the resource files are absent from `Madar/` | Do not use the pinned legacy map as 1405 data. Owner says the Mushaf licence is obtained; keep the resource disabled until source, terms, hashes and required review evidence are recorded. |
-| M2-E03 | Coverage, partial-page portions and completion/khatm rules against the verified 1405 maps. | blocked: M2-R01 | Union coverage from non-deleted sessions; a khatm requires all 604 pages. |
+| M2-R01 | Verify a 1439 resource set for Quran text and page/line/word maps, plus isolated 1405 page-frame and surah-opening ornament; manifest and automatic resource checks (owner override to RQ7, Q08). | done | Official Hafs 2.0 JSON/font unchanged; 604-page logical map bound to all 6236 official ayah boundaries and 77429 word groups. UTF-16 ranges supply native hit testing; no static image coordinates or QCF fallback needed. 1405 frame/surah artwork isolated from a scan with committee seal 1405 (PDF page 620), manifest SHA-256 pins all five resources. `swift test --package-path Madar/Packages/MadarQuran --filter QuranResourceCatalogTests`: 11/11 passed, including glyph coverage, compound words, integrity and corrupt-map rejection. Human sample remains a release gate. |
+| M2-E03 | Coverage, partial-page portions and completion/khatm rules against the verified 1439 maps. | ready | Union coverage from non-deleted sessions; a khatm requires all 604 pages. |
 | M2-E04 | Plan and session engine: levels, rest/missed-day allotments, recovery, pace, streak and qiyam assignments. | blocked: M2-E01, M2-E02 and M2-E03 | Use `MadarDay`; preserve a stored `dayKey`; one atomic `CommitQuranSession`. |
 | M2-E05 | Add RQ1 fixed-cycle review beside spaced review. | done | `QuranFixedCycleEngine` selects the daily juz or one of seven weekly manzils from injected, validated ayah ranges; spaced mode remains separate. Added `quran.reviewSchedule` (`spaced` default, daily juz, weekly manzils) to all three settings-schema copies. Generic settings set/reset/undo verified. Cycle map integration awaits M2-R01; current selector is schema/store support, not a built screen. |
 | M2-D01 | Quran app adapter: derive `QuranUIService` projections from the engine and existing `MadarData` records; route session commits atomically through the app. | blocked: M2-E01–E04 | Reuse the existing Quran SwiftData models; app process alone opens the store (RA2), local-only v1 (RA1). |
@@ -73,7 +73,7 @@ The owner lifted the M2 pause in `docs/CODEX-M2-BRIEF.md`. Build a pure Swift en
 | M2-V12 | Plan — `screens/quran/14-R18-Khitta.jpg` | blocked: M2-V11, M2-E04, M2-E05 | «وزّعه» is +⅓ face over three days (RQ6); no reverse-order option (v2). |
 | M2-V13 | Plan setup — `screens/quran/15-R18-Setup.jpg` | blocked: M2-V12, M2-E04 | No reverse-order option (v2); default values come from the schema. |
 | M2-V14 | Free review — `screens/quran/16-R18-Hurra.jpg` | blocked: M2-V13, M2-E01 | Pages outside saved coverage are read-only and do not change grades or streaks. |
-| M2-V15 | Index — `screens/quran/17-R18-Fihris.jpg` | blocked: M2-V14, M2-E03, M2-R01 | No sample data; use the verified 1405 map for every boundary. |
+| M2-V15 | Index — `screens/quran/17-R18-Fihris.jpg` | blocked: M2-V14, M2-E03, M2-R01 | No sample data; use the verified 1439 map for every boundary. |
 | M2-V16 | Strength and recovery — `screens/quran/18-R18-Mansub.jpg` | blocked: M2-V15, M2-E04 | «Far» uses the single RQ4 definition; do not use 20/30-day shortcuts. |
 | M2-V17 | Night prayer wird — `screens/quran/19-R18-Qiyam.jpg` | blocked: M2-V16, M2-E04 | No stored duplicate facts; an ayah/page is assigned at most once per session. |
 
@@ -98,48 +98,36 @@ M0-T06 (device acceptance paperwork), M0-T09 (encrypted backup and privacy matri
 
 ## Waiting on the owner
 
-1. After M1-V01/V05 screenshot comparisons are complete, run M1 acceptance on your iPhone using `docs/OWNER-RUNBOOK.md`. The S4 qada icon and the other supplied screen images are approved.
+No current owner action: M1 screens were approved on 13 October. Fresh default-size comparisons for S1/S4/S5 are available. The owner-iPhone gate stays deferred until the whole app is finished, as requested.
 
 # Later
 
 Build the M2 Quran queue above. M1-G remains deferred until the whole app is finished. M1-F04 remains blocked on a safe shared budget reservation for an RL5 LiveActivityIntent. Keep tafsir off until its separate licence is verified. Do not claim an M1/M2 gate or iPhone pass.
 
 # Handovers
+## Handover — resource intake and continuation — 2026-10-14 — Codex
+Works now: M2-R01 bundles unchanged official text/font, 604-page/77429-word logical layout and isolated 1405 frame/surah artwork; licence blocker removed from current records, source copies, automation memory and a memory correction.
+Verified: `swift test --package-path Madar/Packages/MadarQuran --filter QuranResourceCatalogTests` 11/11; app build + three L prayer UI tests passed; S1/S4/S5 comparisons regenerated; `git diff --check` clean.
+Differences left: no Quran app screen exists yet; resource artwork inspected as extracted strips, not accepted as a finished Mushaf screen.
+Not verified: external-release human Quran sample, owner-iPhone gate or distribution.
+Next: M2-E03 ready, then E04 and D01 in board order; M1 screens already owner-approved, iPhone gate deferred.
+Model/effort: current Codex; model/effort not exposed; owner authorized direct resolution.
+Usage: 67% five-hour and 54% weekly at checkpoint; no reset used.
 
-## Handover — M1-V01/V05 arches and day sheet — 2026-10-13 — Claude
+## Handover — M2-R01 source inspection — 2026-10-14 — Codex
+Works now: official KFGQPC sources confirm the v2.0 ayah-data fields and 604 Hafs39 vector pages; no resource was promoted into the app.
+Verified: v2.0/update 13 README lists ayah text, page, line_start/end and juz only; sampled AI pages have category layers, not word layers. No tests/build/screenshots run at that checkpoint.
+Differences left: 1439 source-to-word-map proof, word coordinates, isolated 1405 frame/surah ornaments and resource-specific manifest remain absent.
+Not verified: app integration/build, automatic resource checks, human page review or owner-device acceptance.
+Next: no `ready` card exists; keep M2-R01 blocked until the 1439 word map and separate 1405 ornaments have verified sources and manifest entries.
+Model/effort: not exposed.
+Usage: 19% five-hour and 43% weekly at 2026-10-14 05:02:46 UTC.
 
-Works now: home prayer arches keep their lattice inside the dome with a clean rim (no clipped or spilled lattice); the past-day sheet opens at content height over «حالي» like the canonical; V05 test now also captures `-s1`.
-Verified: UI tests V01 home, V05, T05, StreakArchMonth passed on iPhone 17 Pro simulator; compare page `Madar/Artifacts/compare/S4-Day.html`.
-Differences left: state icons on day-sheet pills (earlier owner colour decision); next-prayer arch shows a thick outline with the lattice mostly under it.
-Dark mode checked in the simulator (home arches and «سلاسلك»): fine; the truncated streak labels («الخمس في…», «إتمام الخم…») now wrap. Owner decision 13 Oct: no iPhone test until the whole app is finished, so M1-G waits.
-Not verified: owner look; owner iPhone (M1-G).
-Next: owner approves V01/V05, then the M1-G iPhone gate.
-Model/effort: Claude Sonnet 5.5; effort not exposed. Usage: not exposed.
-
-## Handover — M1-V01 «سلاسلك» stone arch — 2026-10-13 — Claude
-
-Works now: home «سلاسلك» is three nested horseshoe arches in the home-arch shape (congregation inside, on time, completion outside), each one continuous line filling right to left and complete at a month; tap opens the details sheet (meaning, last seven days, break reason) and from it «حالي». Codex's pending F04/F05/S4 work committed earlier (`7182082`).
-Verified: MadarPrayer `swift test` 25 passed; UI tests V01 home, streak sheet, streak month (9/16/24), V04 passed; V05, T05, T06 passed after the route change.
-Differences left: no bead arc or month % on the home card (owner decision); S1 scrolled alignment and V05 `-s1` capture open.
-Not verified: owner look; owner iPhone; dark-mode capture of the arch.
-Next: owner reviews the arch; then V05 `-s1` and the S1 compare page.
-Model/effort: Claude Opus 5.5; effort not exposed. Usage: not exposed.
-
-## Handover — M1-V01 rejected visuals and redesign assignment — 2026-10-13 — codex
-
-Works now: the five visual alternatives were shown and rejected; none is approved. The three meanings remain الجماعة / الصلاة في وقتها بلا قضاء / إتمام الصلوات الخمس, with no day count. Latest mockups did not change app code.
-Verified: no build or tests run for this documentation update. The earlier simulator pass applies to the previous implementation only and is not visual approval.
-Differences left: the streak shape and final S1 visual design are unresolved; main S1 scrolled alignment and V05 scrolled capture are still open.
-Not verified: a Claude Opus 5.5 design has not yet been produced; owner-iPhone acceptance or distribution.
-Next: Claude Opus 5.5 designs a fresh S1 Hali streak visual; show that screen to the owner, then implement after its visual direction is accepted. Continue S1/V05 comparisons.
-Model/effort: Codex, effort not exposed. Requested design model: Claude Opus 5.5 (not yet run). Usage: not exposed.
-
-
-## Handover — M2-RQ1/RQ2 delegated decisions — 2026-10-13 — Claude
-
-Works now: `PageSchedule.stage` is removed; the computed-need rule and 100/300/604-page simulation targets are recorded in `docs/DECISIONS.md` and the Quran extract. Commit: `e72966a`.
-Verified: commit changes five documentation/data-dictionary files; no engine code was ported. No tests or load simulation were run in this decision-only task.
-Differences left: Quran runtime is not integrated; M2 remains paused per owner direction. The Mushaf license is obtained; any separate tafsir-license check is deferred until M2 resumes. M1-F04 still needs a safe shared budget reservation.
-Not verified: Quran engine/screen integration or M1 owner-iPhone acceptance; no owner store was opened.
-Next: finish M1-V01/V05 screenshot comparisons, then owner-iPhone acceptance. Do not resume Quran work unless the owner asks; review any separate tafsir licensing then.
-Model/effort: Claude Sonnet 5.5; effort not exposed. Usage: not exposed.
+## Handover — M2-R01 source documentation — 2026-10-14 — Codex
+Works now: official KFGQPC documentation ties a 604-page, one-word-per-layer digital copy to the 1439H print; no candidate resource was promoted.
+Verified: inspected the official source description and v2.0 developer schema, plus QUL's edition labels. QUL offers no 1439-tagged layout. No tests, build, or screenshots run at that checkpoint.
+Differences left: no screen comparison applies; the 1439 layer/map files and isolated 1405 frame and surah-opening ornaments are still unavailable.
+Not verified: resource integration/checks, app build, human page review, or owner-device acceptance.
+Next: no `ready` rows exist; M2-R01 remains blocked until actual edition-specific assets are obtained, so no new card was started.
+Model/effort: not exposed.
+Usage: 22% five-hour and 44% weekly, from the current usage reading.

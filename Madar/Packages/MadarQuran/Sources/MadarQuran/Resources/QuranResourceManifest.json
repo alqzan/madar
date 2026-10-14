@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "retrieved": "2026-10-14",
+  "licenseStatus": "owner-confirmed; closed",
+  "rendering": "Native Unicode using the official KFGQPC Hafs 2.0 font. Logical word ranges and line placement; native text layout supplies hit rectangles. No QCF presentation codes are rendered through a fallback font.",
+  "textSource": {
+    "url": "https://download.qurancomplex.gov.sa/resources_dev/UthmanicHafs_v2-0.zip",
+    "version": "2.0",
+    "archiveSHA256": "a7b0e5591945712ec5e4d6142938ae4d1e9b49bdc89dff06222789bfebdfd72c",
+    "fields": "id, jozz, page, line_start, line_end, aya_text, aya_text_emlaey, sura_no, aya_no"
+  },
+  "layoutSource": {
+    "repository": "https://github.com/abdoadel123/mutqin-resources",
+    "commit": "0cd14756e44d52d012e00fb15b128979c5c0b213",
+    "paths": "mushaf/pages/1.json ... 604.json",
+    "sourceSnapshotSHA256": "99683fed8b2ff4bcd0ed747f52f2ced52bd5fac777ec679281eb8789e58aefd9",
+    "editionClaim": "https://github.com/nacer80/moshaf/blob/bb38a7226bd9ccf562bc80c549105c7ff3160298/tools/make_layout_1439.py",
+    "verification": "All 6236 page/start-line/end-line records match the Complex dataset. Opening pages have a seven-row grid offset, normalized explicitly. All 77429 visual word groups bind to unchanged official UTF-16 spans. Seven compound spellings checked against Quran.com word responses. No Quran.com juz/hizb metadata imported."
+  },
+  "editionEvidence": {
+    "officialDescription": "https://qurancomplex.gov.sa/en/kfgqpc/kfq-structure/",
+    "description": "The Complex describes its 604-page digital Mushaf as conforming to the 1439 print. Layout data is cross-checked against its current Hafs 2.0 dataset, not accepted from a filename. The 1441 AI archive is a later digital distribution and is not bundled."
+  },
+  "ornamentSource": {
+    "url": "https://e-quran.com/masahef/pdf/almadinah-qadim.pdf",
+    "archiveSHA256": "c3d68d9a85e7ab8fea022da42b480e923b4f81f3e6d72d1d3cd6b8b778b26988",
+    "edition": 1405,
+    "editionEvidence": "PDF page 620: committee authorization in Jumada I 1405 and committee seal 1405. Printed old Madinah layout.",
+    "extraction": "Only four disjoint raster strips from PDF page 607 per SVG. Quran text, surah title lettering, numbers and the full source page are not embedded.",
+    "script": "Madar/scripts/extract-mushaf-ornaments.py"
+  },
+  "releaseHumanSample": {
+    "status": "not performed; required before external release",
+    "name": null,
+    "date": null
+  },
+  "files": [
+    {
+      "path": "Mushaf1405/page-frame.svg",
+      "sha256": "448f4e73d3f4e8f116f351d0b37f4af8aea90faf145259d716ac23b49400864c",
+      "edition": 1405,
+      "role": "visualOnly"
+    },
+    {
+      "path": "Mushaf1405/surah-opening.svg",
+      "sha256": "fa832bc01d493f1b9e8a320be298e964a5667f5aa54016bb184774b06d414304",
+      "edition": 1405,
+      "role": "visualOnly"
+    },
+    {
+      "path": "Quran1439/layout.json",
+      "sha256": "250c326545852deff4da21d4da1dc11c233e33ebabd64d16d82898cb3d610feb",
+      "edition": 1439,
+      "role": "quranData"
+    },
+    {
+      "path": "UthmanicHafs_v2-0/hafsData_v2-0.json",
+      "sha256": "d2960b3217962e7e4252abdcece67bea3d6b48271e4cd3af45bbbb2dd5c872ca",
+      "edition": 1439,
+      "role": "quranData"
+    },
+    {
+      "path": "UthmanicHafs_v2-0/uthmanic_hafs_v20.ttf",
+      "sha256": "d560bbbc7a90a4f4d416d206a5ac48bd8a1ad00273d64d232f16ca54941bd041",
+      "edition": 1439,
+      "role": "quranData"
+    }
+  ]
+}

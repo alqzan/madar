@@ -49,9 +49,9 @@
    "license": "OFL"
   },
   "quranPage": {
-   "name": "QCF V1 (one font per page, 604)",
+   "name": "KFGQPC Hafs Uthmanic 2.0 (native Unicode; verified 1439 word/line map)",
    "source": "King Fahd Complex",
-   "license": "decision-needed: King Fahd Complex terms for QCF V1 page fonts must be obtained in writing before App Store submission; record terms + SHA-256 in provenance.json"
+   "license": "owner-confirmed: Madar Mushaf permission obtained; licence closed. Record each resource source, edition and SHA-256 in provenance.json."
   },
   "quranSnippet": {
    "name": "Amiri Quran",

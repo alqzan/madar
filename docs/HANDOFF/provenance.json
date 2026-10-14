@@ -40,70 +40,70 @@
    "note": "Isha = Maghrib + 90 / +120 in Ramadan is Madar code, not the library. Golden times fixture: evidence/prayer-times-results.json (review)."
   },
   {
-   "id": "qcf-v1-page-fonts",
-   "kind": "font assets (604 files)",
-   "source": "King Fahd Glorious Quran Printing Complex — https://qurancomplex.gov.sa/techquran/dev/techquran-dev-mushf/",
-   "version": null,
+   "id": "kfgqpc-hafs-v2-font",
+   "kind": "native Unicode font",
+   "source": "https://download.qurancomplex.gov.sa/resources_dev/UthmanicHafs_v2-0.zip",
+   "version": "2.0",
    "commit": null,
-   "license": "to verify",
-   "licenseStatus": "decision-needed",
-   "checksum": null,
+   "license": "Mushaf permission obtained by the owner for Madar",
+   "licenseStatus": "owner-confirmed",
+   "checksum": "d560bbbc7a90a4f4d416d206a5ac48bd8a1ad00273d64d232f16ca54941bd041",
    "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
    "gate": "M2",
-   "usedBy": "Mushaf, Hifz screens",
-   "note": "Right to use these specific files in an App Store app not established in the package; contact the Complex before App Store (§14). Fallback KFGQPC HAFS has the same open question.",
-   "edition": null,
-   "downloadDate": null,
-   "termsCopied": null,
+   "usedBy": "native Mushaf text with semantic word ranges",
+   "note": "Register the exact Unicode font in the app process. QCF codes are not bundled or rendered with another font.",
+   "edition": "1439 layout; KFGQPC Hafs Uthmanic 2.0",
+   "downloadDate": "2026-10-14",
    "humanReview": {
     "name": null,
     "date": null
    },
-   "gateRule": "per §7.4 «بوابة سلامة الموارد»: edition, version, download date, SHA-256, terms as copied, and a named human review are all filled before the resource is enabled"
+   "gateRule": "Automated resource checks before enabling; named human sample before external release. The owner-confirmed Mushaf licence is closed.",
+   "licenseDecision": "docs/DECISIONS.md — 2026-10-14"
   },
   {
    "id": "quran-word-map",
    "kind": "data asset (word map)",
-   "source": "Quran.com code_v1/line_number or QUL — source not yet chosen",
-   "version": null,
-   "commit": null,
-   "license": "to verify",
-   "licenseStatus": "decision-needed",
-   "checksum": null,
+   "source": "https://github.com/abdoadel123/mutqin-resources",
+   "version": "Madar bound UTF-16 layout v1",
+   "commit": "0cd14756e44d52d012e00fb15b128979c5c0b213",
+   "license": "Mushaf permission obtained by the owner for Madar",
+   "licenseStatus": "owner-confirmed",
+   "checksum": "250c326545852deff4da21d4da1dc11c233e33ebabd64d16d82898cb3d610feb",
    "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
    "gate": "M2",
    "usedBy": "word hit-testing, hide/reveal, MistakeSpot.wordIndex",
-   "note": "Choose one source, pin its release/commit here, record its license.",
-   "edition": null,
-   "downloadDate": null,
-   "termsCopied": null,
+   "note": "All 6236 page/start-line/end-line records match the Complex dataset. Opening pages have a seven-row grid offset, normalized explicitly. All 77429 visual word groups bind to unchanged official UTF-16 spans. Seven compound spellings checked against Quran.com word responses. No Quran.com juz/hizb metadata imported.",
+   "edition": 1439,
+   "downloadDate": "2026-10-14",
    "humanReview": {
     "name": null,
     "date": null
    },
-   "gateRule": "per §7.4 «بوابة سلامة الموارد»: edition, version, download date, SHA-256, terms as copied, and a named human review are all filled before the resource is enabled"
+   "gateRule": "Automated resource checks before enabling; named human sample before external release. The owner-confirmed Mushaf licence is closed.",
+   "licenseDecision": "docs/DECISIONS.md — 2026-10-14"
   },
   {
    "id": "quran-text",
    "kind": "data asset",
-   "source": "not yet chosen (needed for search/tafsir sheet text)",
-   "version": null,
+   "source": "https://download.qurancomplex.gov.sa/resources_dev/UthmanicHafs_v2-0.zip",
+   "version": "2.0",
    "commit": null,
-   "license": "to verify",
-   "licenseStatus": "decision-needed",
-   "checksum": null,
+   "license": "Mushaf permission obtained by the owner for Madar",
+   "licenseStatus": "owner-confirmed",
+   "checksum": "d2960b3217962e7e4252abdcece67bea3d6b48271e4cd3af45bbbb2dd5c872ca",
    "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
    "gate": "M2",
    "usedBy": "search, tafsir sheet",
-   "note": "Source, edition and license are open.",
-   "edition": null,
-   "downloadDate": null,
-   "termsCopied": null,
+   "note": "Official source JSON unchanged. Quran.com juz/hizb metadata is not used.",
+   "edition": 1439,
+   "downloadDate": "2026-10-14",
    "humanReview": {
     "name": null,
     "date": null
    },
-   "gateRule": "per §7.4 «بوابة سلامة الموارد»: edition, version, download date, SHA-256, terms as copied, and a named human review are all filled before the resource is enabled"
+   "gateRule": "Automated resource checks before enabling; named human sample before external release. The owner-confirmed Mushaf licence is closed.",
+   "licenseDecision": "docs/DECISIONS.md — 2026-10-14"
   },
   {
    "id": "tafsir-muyassar",
@@ -436,6 +436,46 @@
    "source": "ISO 4217 currency list (maintenance agency publication) — exact file not yet chosen",
    "gate": "M5",
    "usedBy": "money minor-unit exponents (SAR 2, JPY 0, KWD/BHD/OMR 3)"
+  },
+  {
+   "license": "Mushaf permission obtained by the owner for Madar",
+   "licenseStatus": "owner-confirmed",
+   "licenseDecision": "docs/DECISIONS.md — 2026-10-14",
+   "gate": "M2",
+   "downloadDate": "2026-10-14",
+   "humanReview": {
+    "name": null,
+    "date": null
+   },
+   "gateRule": "Automated resource checks before enabling; named human sample before external release. The owner-confirmed Mushaf licence is closed.",
+   "id": "mushaf-1405-page-frame",
+   "kind": "visual-only artwork",
+   "source": "https://e-quran.com/masahef/pdf/almadinah-qadim.pdf",
+   "version": "old Madinah scan; committee seal 1405, PDF page 620",
+   "edition": 1405,
+   "checksum": "448f4e73d3f4e8f116f351d0b37f4af8aea90faf145259d716ac23b49400864c",
+   "usedBy": "Mushaf frame and surah banner only",
+   "note": "Extracted as four separate ornamental strips. No Quran text or page/line/word boundaries are imported from 1405."
+  },
+  {
+   "license": "Mushaf permission obtained by the owner for Madar",
+   "licenseStatus": "owner-confirmed",
+   "licenseDecision": "docs/DECISIONS.md — 2026-10-14",
+   "gate": "M2",
+   "downloadDate": "2026-10-14",
+   "humanReview": {
+    "name": null,
+    "date": null
+   },
+   "gateRule": "Automated resource checks before enabling; named human sample before external release. The owner-confirmed Mushaf licence is closed.",
+   "id": "mushaf-1405-surah-opening",
+   "kind": "visual-only artwork",
+   "source": "https://e-quran.com/masahef/pdf/almadinah-qadim.pdf",
+   "version": "old Madinah scan; committee seal 1405, PDF page 620",
+   "edition": 1405,
+   "checksum": "fa832bc01d493f1b9e8a320be298e964a5667f5aa54016bb184774b06d414304",
+   "usedBy": "Mushaf frame and surah banner only",
+   "note": "Extracted as four separate ornamental strips. No Quran text or page/line/word boundaries are imported from 1405."
   }
  ],
  "fonts": {
@@ -749,21 +789,22 @@
     }
    },
    {
-    "family": "QCF V1 page fonts",
-    "file": "QCF_P001 … QCF_P604 (604 files)",
-    "version": null,
-    "sha256": null,
-    "licence": "KFGQPC terms",
+    "family": "KFGQPC Hafs Uthmanic 2.0",
+    "file": "Madar/Packages/MadarQuran/Sources/MadarQuran/Resources/UthmanicHafs_v2-0/uthmanic_hafs_v20.ttf",
+    "version": "2.0",
+    "sha256": "d560bbbc7a90a4f4d416d206a5ac48bd8a1ad00273d64d232f16ca54941bd041",
+    "licence": "owner-confirmed; closed",
     "licenceFile": null,
     "licenceSha256": null,
-    "licenceURL": "https://qurancomplex.gov.sa/techquran/dev/techquran-dev-mushf/",
-    "retrieved": null,
+    "licenceURL": null,
+    "retrieved": "2026-10-14",
     "allowedUses": {
      "appBundle": true,
      "widgetBundle": false,
      "exportEmbed": false,
      "publicHosting": false
-    }
+    },
+    "ownerDecision": "docs/DECISIONS.md — 2026-10-14"
    }
   ]
  }
