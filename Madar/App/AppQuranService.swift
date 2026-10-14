@@ -88,10 +88,12 @@ import MadarPrayer
         let reviewedThisWeek = Dictionary(grouping: weekReviews, by: \.dayKey).values.reduce(0) { total, sessions in
             total + Set(sessions.flatMap { $0.grades.map(\.page) }).count
         }
-        let eligibleWeekDays = (0..<7).map { weekStart.adding(days: $0) }.filter { !snapshot.restDay.contains($0) }
+        let eligibleWeekDays = (0..<7).map { weekStart.adding(days: $0) }.filter { day in
+            !snapshot.restDay.contains(day) && firstHifzDay.map { day >= $0 } == true
+        }
         let activeDays = Set(snapshot.activities.filter(\.countsForStreak).map(\.dayKey))
         let completedDays = eligibleWeekDays.filter { activeDays.contains($0) }.count
-        let weeklySummary = firstHifzDay == nil ? "أول يوم" : "آخر " + numerals.string(7) + " أيام: حفظت " + faceCount(memorizedThisWeek) + "، راجعت " + faceCount(reviewedThisWeek)
+        let weeklySummary = firstHifzDay == nil || firstHifzDay == today ? "أول يوم" : "آخر " + numerals.string(7) + " أيام: حفظت " + faceCount(memorizedThisWeek) + "، راجعت " + faceCount(reviewedThisWeek)
             + "، " + serviceWeekRatio(completedDays, eligibleWeekDays.count)
         let historySessions = snapshot.sessions.reversed().map { fact in
             QuranUIHistorySession(id: fact.id, title: fact.kind == .hifz ? "حفظ" : "مراجعة", dateLabel: numerals.localized(fact.dayKey.description),

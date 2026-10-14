@@ -15,7 +15,10 @@ import MadarData
     }
     func testNotificationAndWidgetUpsertProduceOneDurablePrayerLog() async throws {
         let (container, bus, directory) = try fixture()
-        let now = Date()
+        let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-10-10T12:00:00+03:00"))
+        let fixtureContext = ModelContext(container)
+        _ = try SettingsStore(context: fixtureContext).stage(["salah.trackingStart": .object(["dayKey": .string("2026-10-10"), "edits": .number(0)])], now: now)
+        try fixtureContext.save()
         let payload = MadarCore.JSONValue.object(["dayKey": .string("2026-10-10"), "prayer": .string("fajr"), "status": .string("jamaah")])
         let notification = CommandEnvelope(name: "prayer.log", payload: payload, source: .notification, issuedAt: now)
         let initial = try await bus.execute(notification, now: now)
@@ -30,8 +33,9 @@ import MadarData
         let reopened = try MadarContainerFactory.makeLocal(at: directory)
         let persisted = try ModelContext(reopened).fetch(FetchDescriptor<PrayerLog>())
         XCTAssertEqual(persisted.count, 1)
-        XCTAssertEqual(persisted[0].status, "jamaah")
-        XCTAssertEqual(persisted[0].dayPolicy, "prayerDay@1")
+        let saved = try XCTUnwrap(persisted.first)
+        XCTAssertEqual(saved.status, "jamaah")
+        XCTAssertEqual(saved.dayPolicy, "prayerDay@1")
     }
     func testPresetUndoImmediateAndExpiresAtSixtySeconds() async throws {
         let (container, bus, _) = try fixture()

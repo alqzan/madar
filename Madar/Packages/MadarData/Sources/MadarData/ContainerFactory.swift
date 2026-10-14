@@ -37,7 +37,12 @@ public enum MadarContainerFactory {
             guard version <= MadarSchema.version else { throw DataError.newerStore }
             guard version >= 1 else { throw DataError.invalidValue("device store version") }
         }
-        let container = try ModelContainer(for:MadarSchema.schema,migrationPlan:MadarMigrationPlan.self,configurations:[
+        // V2 synced facts need the declared additive migration. A staged current generation
+        // can be paired with the unchanged V1 device entities: their original combined
+        // metadata is not a version in that plan. Infer only that device metadata upgrade;
+        // LegacyGenerationMigration validates it on an expendable clone before promotion.
+        let migrationPlan: (any SchemaMigrationPlan.Type)? = try storeVersion(at: syncedDirectory) == 2 ? MadarMigrationPlan.self : nil
+        let container = try ModelContainer(for:MadarSchema.schema,migrationPlan:migrationPlan,configurations:[
             ModelConfiguration("synced",schema:Schema(MadarSchema.syncedTypes),url:syncedDirectory.appendingPathComponent("Madar.store"),cloudKitDatabase:.none),
             ModelConfiguration("deviceOnly",schema:Schema(MadarSchema.deviceTypes),url:deviceStoreURL,cloudKitDatabase:.none)
         ])
