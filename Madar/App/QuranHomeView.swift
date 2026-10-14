@@ -94,8 +94,6 @@ struct QuranHomeView: View {
     }
     private func coverage(_ state: QuranRoomState) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("في صدرك").font(bodyFont(13)).foregroundStyle(theme.secondaryInk)
-                .accessibilityIdentifier("quran-coverage-label")
             Button { detail = .hadith } label: {
                 Text(QuranMemorizationHadith.text)
                     .font(.custom("Amiri-Regular", size: 21, relativeTo: .title2))
@@ -107,10 +105,14 @@ struct QuranHomeView: View {
             }.buttonStyle(.plain)
                 .accessibilityHint("عرض مصدر الحديث")
                 .accessibilityIdentifier("quran-coverage-hadith")
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Text(state.coverageTitle).font(serif(34)).fixedSize(horizontal: false, vertical: true).accessibilityIdentifier("quran-coverage-title")
-                Spacer(minLength: 0)
-                Text(state.percentageLabel + " من القرآن").font(bodyFont(12)).foregroundStyle(theme.secondaryInk)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("في صدرك").font(bodyFont(13)).foregroundStyle(theme.secondaryInk)
+                    .accessibilityIdentifier("quran-coverage-label")
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    Text(state.coverageTitle).font(serif(34)).fixedSize(horizontal: false, vertical: true).accessibilityIdentifier("quran-coverage-title")
+                    Spacer(minLength: 0)
+                    Text(state.percentageLabel + " من القرآن").font(bodyFont(12)).foregroundStyle(theme.secondaryInk)
+                }
             }
             GeometryReader { proxy in
                 Capsule().fill(theme.color("track"))
