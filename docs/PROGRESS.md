@@ -4,7 +4,7 @@
 
 # Last checked
 
-2026-10-14 — Codex. M2-R01 resources implemented: official Hafs 2.0 text/font, a bound 1439 page/line/word map (604 pages, 6236 ayahs, 77429 word groups), and separately extracted 1405 frame/surah artwork with edition-seal evidence and file hashes. Resource tests 11/11 passed; app build and three prayer UI tests at L passed. Mushaf licence is closed. M2-E03 is implemented; M2-E04 is next ready; Quran runtime and external-release human sample are not yet accepted.
+2026-10-14 — Codex. M2-E04 plan/session engine implemented: daily levels, RQ1 review minimum, rest/missed-day allotments, strength/recovery, 28-day pace/forecast, study streak and qiyam assignments. Twenty targeted engine tests and the native iOS Simulator package build passed. M2-D01 is next ready; database transactions, Quran runtime screens, external-release human sample and owner-device acceptance remain pending.
 
 # Board
 
@@ -56,9 +56,9 @@ The owner lifted the M2 pause in `docs/CODEX-M2-BRIEF.md`. Build a pure Swift en
 | M2-E02 | Coach and error engine: learning reveals are hints; blind-recitation slips alone affect grades; mistake spots and two-success closure. | done | `swift test --package-path Madar/Packages/MadarQuran`: 17 XCTest passed. Learning reveals stay as coach hints; blind slips alone grade the session; deleting a drill session rebuilds its two-success closure. Drill limits follow the selected intensity (3/5/8). |
 | M2-R01 | Verify a 1439 resource set for Quran text and page/line/word maps, plus isolated 1405 page-frame and surah-opening ornament; manifest and automatic resource checks (owner override to RQ7, Q08). | done | Official Hafs 2.0 JSON/font unchanged; 604-page logical map bound to all 6236 official ayah boundaries and 77429 word groups. UTF-16 ranges supply native hit testing; no static image coordinates or QCF fallback needed. 1405 frame/surah artwork isolated from a scan with committee seal 1405 (PDF page 620), manifest SHA-256 pins all five resources. `swift test --package-path Madar/Packages/MadarQuran --filter QuranResourceCatalogTests`: 11/11 passed, including glyph coverage, compound words, integrity and corrupt-map rejection. Human sample remains a release gate. |
 | M2-E03 | Coverage, partial-page portions and completion/khatm rules against the verified 1439 maps. | done | `CoverageAndPortions.swift`: union of active hifz facts, first-gap frontier after delete/restore, completion timestamps rebuilt from facts, complete juz/pages and partial recent-review ranges (RQ5). Half/quarter portions use official line endpoints, preserve whole-face page boundaries, never split an ayah. `swift test --package-path Madar/Packages/MadarQuran --filter CoverageAndPortionsTests`: 9/9 passed. An-Naba to An-Nas is 23 pages / one juz, not a khatm; all 604 pages required. |
-| M2-E04 | Plan and session engine: levels, rest/missed-day allotments, recovery, pace, streak and qiyam assignments. | ready | Use `MadarDay`; preserve a stored `dayKey`; one atomic `CommitQuranSession`. |
+| M2-E04 | Plan and session engine: levels, rest/missed-day allotments, recovery, pace, streak and qiyam assignments. | done | Pure Swift daily planning, all due above level minimum, merged review runs by weakest strength, RQ4 far/recovery/raise/test selection, 28-day pace/calendar forecast, derived study streak, unique qiyam pages, serializable draft and eligible commit batch. Stored MadarDay is preserved, including partial review; duplicate commit IDs (including tombstones) are no-ops. `DailyPlanningTests` + `SessionPlanningTests`: 20/20 passed; iOS Simulator package build passed. The one-save database commit and post-commit draft deletion belong to D01, not this pure engine. |
 | M2-E05 | Add RQ1 fixed-cycle review beside spaced review. | done | `QuranFixedCycleEngine` selects the daily juz or one of seven weekly manzils from injected, validated ayah ranges; spaced mode remains separate. Added `quran.reviewSchedule` (`spaced` default, daily juz, weekly manzils) to all three settings-schema copies. Generic settings set/reset/undo verified. Cycle map integration awaits M2-R01; current selector is schema/store support, not a built screen. |
-| M2-D01 | Quran app adapter: derive `QuranUIService` projections from the engine and existing `MadarData` records; route session commits atomically through the app. | blocked: M2-E01–E04 | Reuse the existing Quran SwiftData models; app process alone opens the store (RA2), local-only v1 (RA1). |
+| M2-D01 | Quran app adapter: derive `QuranUIService` projections from the engine and existing `MadarData` records; route session commits atomically through the app. | ready | Reuse the existing Quran SwiftData models; app process alone opens the store (RA2), local-only v1 (RA1). |
 | M2-V01 | Home — `screens/quran/03-R18-Home.jpg` | blocked: M2-E01–E04, M2-D01 | No sample counts. Apply RQ9: one line per step, one «ابدأ», details behind tap; «عميق» and «مُحكَم» state ×1½ and ×2. |
 | M2-V02 | Hifz coach — `screens/quran/04-R18-Hifz.jpg` | blocked: M2-V01, M2-R01, M2-E02 | No voice method (v2), no learning-hint penalty. |
 | M2-V03 | One-step review — `screens/quran/05-R18-Rev.jpg` | blocked: M2-V02, M2-E01 | No voice method (v2); recent and due review order follows the engine. |
@@ -105,6 +105,15 @@ No current owner action: M1 screens were approved on 13 October. Fresh default-s
 Build the M2 Quran queue above. M1-G remains deferred until the whole app is finished. M1-F04 remains blocked on a safe shared budget reservation for an RL5 LiveActivityIntent. Keep tafsir off until its separate licence is verified. Do not claim an M1/M2 gate or iPhone pass.
 
 # Handovers
+## Handover — M2-E04 plan and session engine — 2026-10-14 — Codex
+Works now: daily hifz/review, rest and missed-day targets, RQ4 recovery/strength, test selection, 28-day pace/forecast, derived streak and unique qiyam assignments; draft resume and eligible commit batch preserve the stored day.
+Verified: `swift test --package-path Madar/Packages/MadarQuran --filter 'DailyPlanningTests|SessionPlanningTests'` 20/20; in the package, `xcodebuild -scheme MadarQuran -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/madar-e04-ios CODE_SIGNING_ALLOWED=NO build` BUILD SUCCEEDED; `git diff --check` clean.
+Differences left: engine card only; no Quran screen was changed or compared.
+Not verified: app adapter, database atomic commit/undo, disk-backed draft lifecycle, Quran UI, human resource sample, owner iPhone or distribution.
+Next: M2-D01 ready; persist the commit batch in one save through the app, rebuild projections, then delete the draft; V01 follows D01.
+Model/effort: Codex GPT-6; exact variant/effort not exposed.
+Usage: 15% five-hour and 62% weekly at the closing checkpoint; no reset used.
+
 ## Handover — resource intake and continuation — 2026-10-14 — Codex
 Works now: M2-R01 resources and M2-E03 coverage/partial-page engine implemented; hifz overlaps count once, delete/undo reopens/restores gaps, 604 pages required for khatm. Mushaf licence closed across current records, source copies, automation and a memory correction.
 Verified: `swift test --package-path Madar/Packages/MadarQuran --filter QuranResourceCatalogTests` 11/11 and `--filter CoverageAndPortionsTests` 9/9; app build + three L prayer UI tests passed; S1/S4/S5 comparisons regenerated (S5 top only); native iOS Simulator library build passed; `git diff --check` clean.
@@ -122,12 +131,3 @@ Not verified: app integration/build, automatic resource checks, human page revie
 Next: no `ready` card exists; keep M2-R01 blocked until the 1439 word map and separate 1405 ornaments have verified sources and manifest entries.
 Model/effort: not exposed.
 Usage: 19% five-hour and 43% weekly at 2026-10-14 05:02:46 UTC.
-
-## Handover — M2-R01 source documentation — 2026-10-14 — Codex
-Works now: official KFGQPC documentation ties a 604-page, one-word-per-layer digital copy to the 1439H print; no candidate resource was promoted.
-Verified: inspected the official source description and v2.0 developer schema, plus QUL's edition labels. QUL offers no 1439-tagged layout. No tests, build, or screenshots run at that checkpoint.
-Differences left: no screen comparison applies; the 1439 layer/map files and isolated 1405 frame and surah-opening ornaments are still unavailable.
-Not verified: resource integration/checks, app build, human page review, or owner-device acceptance.
-Next: no `ready` rows exist; M2-R01 remains blocked until actual edition-specific assets are obtained, so no new card was started.
-Model/effort: not exposed.
-Usage: 22% five-hour and 44% weekly, from the current usage reading.
