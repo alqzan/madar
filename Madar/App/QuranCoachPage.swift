@@ -91,20 +91,8 @@ private final class QuranCoachTextView: UIView {
         let rowHeight = bounds.height / CGFloat(page.lines.count)
         let minimumGap: CGFloat = 2.5
         let preferredSize: CGFloat = 23.3
-        // Keep the normal page unchanged. In shorter layouts (such as grading),
-        // fit the glyph height to each row so vowel marks retain clear air.
-        var pageSize = preferredSize
-        for row in page.lines where !row.words.isEmpty {
-            for word in row.words {
-                let glyphs = word.printedGlyphs ?? ""
-                let text = NSMutableAttributedString(string: glyphs, attributes: [.font: printedFont])
-                for (offset, character) in glyphs.utf16.enumerated() where character == 32 {
-                    text.addAttribute(.font, value: unicodeFont, range: NSRange(location: offset, length: 1))
-                }
-                let image = CTLineGetImageBounds(CTLineCreateWithAttributedString(text), nil)
-                pageSize = min(pageSize, preferredSize * rowHeight * 0.82 / max(image.height, 1))
-            }
-        }
+        // The compact control strip leaves the page its normal type size.
+        let pageSize = preferredSize
         var masks: [Int: Set<Int>] = [:]
         func visibility(_ word: QuranUIWord, firstInLine: Bool) -> Bool {
             let planned = coach.plannedAyahs.contains(word.ayahID)

@@ -29,7 +29,7 @@ struct QuranHifzCoachView: View {
                         }
                     }
                     .overlay(alignment: .bottom) {
-                        if !fullPage {
+                        if !fullPage && state.stage != .grading {
                         Text(coach.caption).font(font(12, bold: true)).multilineTextAlignment(.center)
                             .foregroundStyle(theme.onAccent).padding(.horizontal, 15).padding(.vertical, 10)
                             .background(theme.accent, in: Capsule()).padding(.horizontal, 22).offset(y: 8)
@@ -38,25 +38,38 @@ struct QuranHifzCoachView: View {
                         }
                     }
             }
-            if state.stage == .grading && !fullPage {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("تقييمك لهذا الوجه").font(font(13, bold: true))
-                    ForEach(state.grades) { grade in
-                        HStack(spacing: 8) {
-                            ForEach(QuranUIGrade.allCases) { value in
-                                Button { action(.grade(page: grade.page, grade: value)) } label: {
-                                    Text(value.title).font(font(12, bold: value == grade.grade))
-                                        .frame(maxWidth: .infinity, minHeight: 44)
-                                        .foregroundStyle(value == grade.grade ? theme.onAccent : theme.ink)
-                                        .background(value == grade.grade ? theme.accent : theme.surface, in: Capsule())
-                                }.buttonStyle(.plain).accessibilityAddTraits(value == grade.grade ? .isSelected : [])
-                                    .accessibilityIdentifier("quran-coach-grade-" + value.rawValue)
+            if !fullPage {
+                if state.stage == .grading {
+                    HStack(spacing: 8) {
+                        VStack(spacing: 4) {
+                            ForEach(state.grades) { grade in
+                                HStack(spacing: 4) {
+                                    if state.grades.count > 1 { Text(grade.title).font(font(11)) }
+                                    ForEach(QuranUIGrade.allCases) { value in
+                                        Button { action(.grade(page: grade.page, grade: value)) } label: {
+                                            Text(value.title).font(font(11, bold: value == grade.grade))
+                                                .lineLimit(1).minimumScaleFactor(0.9)
+                                                .frame(maxWidth: .infinity, minHeight: 32)
+                                                .foregroundStyle(value == grade.grade ? theme.onAccent : theme.ink)
+                                                .background(value == grade.grade ? theme.accent : theme.surface, in: Capsule())
+                                                .frame(minHeight: 44).contentShape(Rectangle())
+                                        }.buttonStyle(.plain).accessibilityAddTraits(value == grade.grade ? .isSelected : [])
+                                            .accessibilityIdentifier("quran-coach-grade-" + value.rawValue)
+                                    }
+                                }
                             }
-                        }
-                    }
-                }.padding(.horizontal, 20).padding(.top, 20)
+                        }.accessibilityLabel("تقييمك لهذا الوجه")
+                        Button { action(state.primaryAction) } label: {
+                            Image(systemName: "arrow.left").font(.system(size: 16, weight: .semibold))
+                                .frame(width: 44, height: 36).foregroundStyle(theme.onAccent)
+                                .background(theme.accent, in: Capsule()).frame(minHeight: 44).contentShape(Rectangle())
+                        }.buttonStyle(.plain).accessibilityLabel(state.primaryTitle)
+                            .accessibilityIdentifier("quran-session-advance")
+                    }.padding(.horizontal, 14).padding(.bottom, 12).disabled(busy)
+                } else {
+                    controls.padding(.top, 12).padding(.horizontal, 12).padding(.bottom, 10)
+                }
             }
-            if !fullPage { controls.padding(.top, 20).padding(.horizontal, 12).padding(.bottom, 14) }
         }
         .padding(.bottom, fullPage ? 14 : 0)
         .background(theme.color("mushafPaper").ignoresSafeArea()).foregroundStyle(theme.ink)
