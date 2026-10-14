@@ -14,6 +14,7 @@ public struct QuranDraftPayload: Codable, Sendable {
     public var rakats: Int?
     public var witr: Bool?
     public var coach: QuranCoachProgress?
+    public var reviewSections: [QuranReviewSection]?
     public init(draft: QuranSessionDraft, method: String = "coach", nightKey: GregorianDay? = nil, rakats: Int? = nil, witr: Bool? = nil, drillKey: QuranMistakeKey? = nil, testPages: [Int]? = nil, revealedAyahs: Set<Int>? = nil) {
         self.draft = draft; self.revealedAyahs = revealedAyahs; self.testPages = testPages; self.drillKey = drillKey; self.method = method; self.nightKey = nightKey; self.rakats = rakats; self.witr = witr
     }

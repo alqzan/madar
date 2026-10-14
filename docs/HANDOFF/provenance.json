@@ -50,8 +50,8 @@
    "checksum": "d560bbbc7a90a4f4d416d206a5ac48bd8a1ad00273d64d232f16ca54941bd041",
    "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
    "gate": "M2",
-   "usedBy": "native Mushaf text with semantic word ranges",
-   "note": "Register the exact Unicode font in the app process. QCF codes are not bundled or rendered with another font.",
+   "usedBy": "unchanged semantic text, headings and explicit whitespace; printed words use their original page font",
+   "note": "The Unicode font and text remain unchanged. QCF V2 private codes use only the corresponding verified 1439 page font.",
    "edition": "1439 layout; KFGQPC Hafs Uthmanic 2.0",
    "downloadDate": "2026-10-14",
    "humanReview": {
@@ -476,6 +476,25 @@
    "checksum": "fa832bc01d493f1b9e8a320be298e964a5667f5aa54016bb184774b06d414304",
    "usedBy": "Mushaf frame and surah banner only",
    "note": "Extracted as four separate ornamental strips. No Quran text or page/line/word boundaries are imported from 1405."
+  },
+  {
+   "id": "qcf-v2-1439-printed-fonts",
+   "kind": "original printed word fonts and glyph binding",
+   "source": "https://github.com/abdoadel123/mutqin-resources",
+   "commit": "0cd14756e44d52d012e00fb15b128979c5c0b213",
+   "edition": 1439,
+   "license": "Mushaf permission obtained by the owner for Madar",
+   "licenseStatus": "owner-confirmed",
+   "downloadDate": "2026-10-14",
+   "checksum": "264bb7c4d0db6f87efdb0ac6b2263b1a64c706673d436b5bf5b8fb5ed1d9d592",
+   "checksumNote": "Each of 604 original WOFF2 files is pinned separately in QuranResourceManifest.json. All 604 font and 604 source page JSON bytes match the pinned Git blob IDs.",
+   "usedBy": "QuranCoachPage, per-word learning masks, ayah hit testing and the full-page view",
+   "note": "All 77429 visual word groups and 6236 verse-end glyphs match the existing 1439 semantic map. Every presentation glyph exists in its own page font; only ASCII space uses the verified Unicode font.",
+   "humanReview": {
+    "name": null,
+    "date": null
+   },
+   "gateRule": "Automated resource checks before enabling; named human sample before external release. The owner-confirmed Mushaf licence is closed."
   }
  ],
  "fonts": {

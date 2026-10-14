@@ -16,6 +16,11 @@ import XCTest
         advance.tap()
         waitLabel(advance, contains: "١ من ٥")
         attach(app, "M2-V02-hifz-L")
+        app.buttons["quran-session-full-page"].tap()
+        XCTAssertTrue(app.buttons["quran-session-show-tools"].waitForExistence(timeout: 5))
+        attach(app, "M2-V02-full-page-L")
+        app.buttons["quran-session-show-tools"].tap()
+        waitLabel(advance, contains: "١ من ٥")
         app.terminate(); app.launch()
         let resume = app.buttons["quran-resume"]
         XCTAssertTrue(resume.waitForExistence(timeout: 20)); resume.tap()

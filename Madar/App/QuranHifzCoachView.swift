@@ -9,25 +9,36 @@ struct QuranHifzCoachView: View {
     let action: (QuranUISessionAction) -> Void
     @Environment(\.roomTheme) private var theme
     @State private var sheet: CoachSheet?
+    @State private var fullPage = false
     private enum CoachSheet: String, Identifiable { case methods, exit; var id: String { rawValue } }
     private func font(_ size: CGFloat, bold: Bool = false) -> Font {
         .custom(bold ? "thmanyahsans-Bold" : "thmanyahsans-Regular", size: size, relativeTo: .body)
     }
     var body: some View {
         VStack(spacing: 0) {
-            header
+            if !fullPage { header }
             if let page = state.page {
                 QuranCoachPage(page: page, coach: coach, stage: state.stage) { action(.reveal(ayahID: $0, wordIndex: nil)) }
                     .padding(.horizontal, 6)
+                    .allowsHitTesting(!fullPage).accessibilityHidden(fullPage)
+                    .overlay {
+                        if fullPage {
+                            Button { fullPage = false } label: { Color.clear.contentShape(Rectangle()) }
+                                .buttonStyle(.plain).accessibilityLabel("إظهار أدوات الجلسة")
+                                .accessibilityIdentifier("quran-session-show-tools")
+                        }
+                    }
                     .overlay(alignment: .bottom) {
+                        if !fullPage {
                         Text(coach.caption).font(font(12, bold: true)).multilineTextAlignment(.center)
                             .foregroundStyle(theme.onAccent).padding(.horizontal, 15).padding(.vertical, 10)
                             .background(theme.accent, in: Capsule()).padding(.horizontal, 22).offset(y: 8)
                             .accessibilityLabel(coach.stageTitle + "، " + coach.caption)
                             .accessibilityIdentifier("quran-session-stage")
+                        }
                     }
             }
-            if state.stage == .grading {
+            if state.stage == .grading && !fullPage {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("تقييمك لهذا الوجه").font(font(13, bold: true))
                     ForEach(state.grades) { grade in
@@ -45,18 +56,23 @@ struct QuranHifzCoachView: View {
                     }
                 }.padding(.horizontal, 20).padding(.top, 20)
             }
-            controls.padding(.top, 24).padding(.horizontal, 12).padding(.bottom, 14)
+            if !fullPage { controls.padding(.top, 20).padding(.horizontal, 12).padding(.bottom, 14) }
         }
-        .background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
+        .padding(.bottom, fullPage ? 14 : 0)
+        .background(theme.color("mushafPaper").ignoresSafeArea()).foregroundStyle(theme.ink)
         .ignoresSafeArea(.container, edges: .bottom)
         .statusBarHidden().persistentSystemOverlays(.hidden)
         .onAppear { if coach.pastDay { sheet = .exit } }
         .sheet(item: $sheet) { route in
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    Text(route == .methods ? "طريقة الحفظ" : "الجلسة")
+                    Text(route == .methods ? (coach.review ? "طريقة المراجعة" : "طريقة الحفظ") : "الجلسة")
                         .font(.custom("Amiri-Bold", size: 25, relativeTo: .title2))
                     if route == .methods {
+                        if coach.review {
+                            Text("سرد متصل").font(font(16, bold: true))
+                            Text("سمّع من حفظك ثم اكشف الآية. «تعثّرت» يسجّل موضع الخطأ، والتقييم لكل وجه.").font(font(14)).foregroundStyle(theme.secondaryInk)
+                        }
                         ForEach(QuranLearningMethod.allCases.filter { state.availableMethods[$0.rawValue] != nil }, id: \.rawValue) { method in
                             Button {
                                 sheet = nil; action(.changeMethod(method.rawValue))
@@ -66,7 +82,7 @@ struct QuranHifzCoachView: View {
                             }.buttonStyle(.plain).accessibilityIdentifier("quran-method-" + method.rawValue)
                         }
                     } else {
-                        Text(coach.pastDay ? "هذه جلسة من يوم سابق. احفظ ما تمّ بيومه أو تجاهل المسودة." : "المسودة محفوظة تلقائيًا. سجّل ما اجتاز التسميع المستور، أو تجاهل الجلسة، أو تابع.")
+                        Text(coach.pastDay ? "هذه جلسة من يوم سابق. احفظ ما تمّ بيومه أو تجاهل المسودة." : coach.review ? "المسودة محفوظة تلقائيًا. سجّل الأوجه التي قيّمتها، أو تجاهل الجلسة، أو تابع." : "المسودة محفوظة تلقائيًا. سجّل ما اجتاز التسميع المستور، أو تجاهل الجلسة، أو تابع.")
                             .font(font(14)).foregroundStyle(theme.secondaryInk)
                         sheetButton("أنهِ وسجّل ما تمّ", id: "quran-session-save-partial") { action(.commitPartial) }
                         sheetButton("تجاهل الجلسة", id: "quran-session-discard") { action(.discard) }
@@ -93,16 +109,20 @@ struct QuranHifzCoachView: View {
                     .frame(width: 44, height: 44).background(theme.color("track").opacity(0.35), in: Circle())
             }.buttonStyle(.plain).accessibilityLabel("إغلاق الجلسة").accessibilityIdentifier("quran-session-close")
             VStack(spacing: 4) {
-                Text(state.title).font(font(14, bold: true))
-                Text(state.segmentTitle + " · " + coach.pageProgress).font(font(11)).foregroundStyle(theme.secondaryInk)
-                    .multilineTextAlignment(.center)
+                Text(state.title).font(font(14, bold: true)).lineLimit(1).minimumScaleFactor(0.8)
+                Text(coach.pageProgress + "، " + state.segmentTitle).font(font(11)).foregroundStyle(theme.secondaryInk)
+                    .multilineTextAlignment(.center).lineLimit(2)
                 HStack(spacing: 3) {
                     ForEach(coach.pages, id: \.self) { page in
-                        Capsule().fill(page <= (state.page?.page ?? 0) ? theme.color("hifz") : theme.color("track")).frame(height: 3)
+                        Capsule().fill((coach.pages.firstIndex(of: page) ?? 0) <= (coach.pages.firstIndex(of: state.page?.page ?? 0) ?? 0) ? theme.color(coach.review ? "review" : "hifz") : theme.color("track")).frame(height: 3)
                     }
                 }.frame(maxWidth: 156)
             }.frame(maxWidth: .infinity)
-            Color.clear.frame(width: 44, height: 44)
+            Button { fullPage = true } label: {
+                Image(systemName: "arrow.up.left.and.arrow.down.right").font(.system(size: 15))
+                    .frame(width: 44, height: 44)
+            }.buttonStyle(.plain).accessibilityLabel("عرض الصفحة كاملة")
+                .accessibilityIdentifier("quran-session-full-page")
         }.padding(.horizontal, 12).padding(.bottom, 10)
             .accessibilityElement(children: .contain)
     }
@@ -110,7 +130,7 @@ struct QuranHifzCoachView: View {
         HStack(spacing: 8) {
             Button { sheet = .methods } label: {
                 HStack(spacing: 5) {
-                    Image(systemName: "star")
+                    Image(systemName: coach.review ? "text.justify" : "star")
                     Text(state.availableMethods[state.method] ?? "المدرّب الموجّه").font(font(12, bold: true)).multilineTextAlignment(.center)
                 }.frame(maxWidth: .infinity, minHeight: 48).contentShape(Capsule())
             }.buttonStyle(.plain).accessibilityIdentifier("quran-session-method")
@@ -119,11 +139,11 @@ struct QuranHifzCoachView: View {
                     .frame(maxWidth: .infinity, minHeight: 52).foregroundStyle(theme.onAccent)
                     .background(theme.accent, in: Capsule())
             }.buttonStyle(.plain).accessibilityIdentifier("quran-session-advance")
-            Button { action(.reveal(ayahID: coach.activeAyahID, wordIndex: nil)) } label: {
-                Image(systemName: "chevron.forward.2").font(.system(size: 18)).frame(width: 48, height: 48)
+            Button { action(coach.review ? .mistake(ayahID: coach.activeAyahID, wordIndex: nil) : .reveal(ayahID: coach.activeAyahID, wordIndex: nil)) } label: {
+                Image(systemName: coach.review ? "flag" : "chevron.forward.2").font(.system(size: 18)).frame(width: 48, height: 48)
                     .background(theme.color("track").opacity(0.4), in: Circle())
-            }.buttonStyle(.plain).accessibilityLabel("تلقين الآية").accessibilityIdentifier("quran-session-hint")
-                .disabled(coach.bridge || state.stage == .grading)
+            }.buttonStyle(.plain).accessibilityLabel(coach.review ? "تعثّرت" : "تلقين الآية").accessibilityIdentifier("quran-session-hint")
+                .disabled(coach.bridge || state.stage == .grading || (coach.review && coach.flaggedAyahs.contains(coach.activeAyahID)))
         }.padding(8).background(theme.surface, in: Capsule()).disabled(busy)
     }
 }

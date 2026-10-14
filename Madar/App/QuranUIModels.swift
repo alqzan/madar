@@ -91,7 +91,7 @@ enum QuranUICommand: Sendable {
     case cancelRecovery
     case raisePages(juz: Int)
 }
-struct QuranUIWord: Sendable { var ayahID: Int; var index: Int?; var text: String; var ayahWordCount = 0 }
+struct QuranUIWord: Sendable { var ayahID: Int; var index: Int?; var text: String; var ayahWordCount = 0; var printedGlyphs: String? }
 struct QuranUILine: Identifiable, Sendable { var id: Int; var glyphs: String; var semanticText: String; var words: [QuranUIWord] = []; var centered = false; var surahOpening = false }
 struct QuranUIPage: Sendable {
     var page: Int
@@ -102,6 +102,7 @@ struct QuranUIPage: Sendable {
     var surahTitle = ""
     var juzTitle = ""
     var numberLabel = ""
+    var printedPostScriptName: String?
 }
 struct QuranUIVerse: Identifiable, Sendable { var id: Int; var title: String; var text: String; var hidden: Bool; var canReveal: Bool }
 struct QuranUIAnswer: Identifiable, Sendable { var id: String; var text: String }
@@ -143,6 +144,8 @@ struct QuranUICoach: Sendable {
     var stageTitle: String; var pageProgress: String; var caption: String
     var pages: [Int]; var referenceText: String?
     var pastDay: Bool
+    var review = false
+    var flaggedAyahs: Set<Int> = []
 }
 enum QuranUISessionResult: Sendable { case active(QuranUISessionState), completed(summary: [String]), discarded }
 @MainActor protocol QuranUIService: AnyObject {

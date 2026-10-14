@@ -9,6 +9,8 @@ import MadarPrayer
 
 @MainActor final class AppQuranService: QuranUIService {
     private static var registeredPageFontName: String?
+    private static var printedGlyphs: QuranPrintedGlyphs?
+    private static var printedFontNames: [Int: String] = [:]
     unowned let app: AppSession
     let clock: @MainActor () -> Date
     init(session: AppSession, clock: @escaping @MainActor () -> Date = { prayerUITestClock(.now) }) { app = session; self.clock = clock }
@@ -193,6 +195,21 @@ import MadarPrayer
             name = CTFontCopyPostScriptName(CTFontCreateWithFontDescriptor(descriptor, 23.3, nil)) as String
             Self.registeredPageFontName = name
         }
+        let printed: QuranPrintedGlyphs
+        if let cached = Self.printedGlyphs { printed = cached }
+        else { printed = try QuranPrintedGlyphs.bundled(); Self.printedGlyphs = printed }
+        let printPage = printed.pages[number - 1]
+        let printName: String
+        if let cached = Self.printedFontNames[number] { printName = cached }
+        else {
+            let url = try QuranPrintedGlyphs.fontURL(page: number)
+            _ = CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
+            guard let descriptors = CTFontManagerCreateFontDescriptorsFromURL(url as CFURL) as? [CTFontDescriptor], let descriptor = descriptors.first else { throw QuranPlanError.invalidPages }
+            printName = CTFontCopyPostScriptName(CTFontCreateWithFontDescriptor(descriptor, 23.3, nil)) as String
+            guard printName == printPage.fontName else { throw QuranPlanError.invalidPages }
+            Self.printedFontNames[number] = printName
+        }
+        let glyphs = Dictionary(uniqueKeysWithValues: printPage.entries.map { ("\($0.ayahID):\($0.wordIndex.map(String.init) ?? "end")", $0.glyphs) })
         let lines = try layout.lines.map { line -> QuranUILine in
             var parts: [String] = []
             var words: [QuranUIWord] = []
@@ -201,10 +218,14 @@ import MadarPrayer
                 let tokens = ayah.wordTokens
                 guard tokens.indices.contains(word.wordIndex) else { throw QuranPlanError.invalidPages }
                 parts.append(tokens[word.wordIndex].text)
-                words.append(QuranUIWord(ayahID: ayah.id, index: word.wordIndex, text: tokens[word.wordIndex].text, ayahWordCount: tokens.count))
+                guard let printedWord = glyphs["\(ayah.id):\(word.wordIndex)"] else { throw QuranPlanError.invalidPages }
+                words.append(QuranUIWord(ayahID: ayah.id, index: word.wordIndex, text: tokens[word.wordIndex].text, ayahWordCount: tokens.count, printedGlyphs: printedWord))
                 if word.wordIndex == tokens.count - 1, line.ayahEnds.contains(ayah.id) {
                     let marker = (ayah.uthmaniText as NSString).substring(from: tokens[word.wordIndex].utf16Range.upperBound).trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !marker.isEmpty { parts.append(marker); words.append(QuranUIWord(ayahID: ayah.id, index: nil, text: marker)) }
+                    if !marker.isEmpty {
+                        guard let printedMark = glyphs["\(ayah.id):end"] else { throw QuranPlanError.invalidPages }
+                        parts.append(marker); words.append(QuranUIWord(ayahID: ayah.id, index: nil, text: marker, printedGlyphs: printedMark))
+                    }
                 }
             }
             let text = line.kind == .surah ? (catalog.ayahs.first { $0.surahID == line.surahID }?.surahNameArabic ?? "") : line.kind == .basmala ? "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ" : parts.joined(separator: " ")
@@ -212,7 +233,7 @@ import MadarPrayer
         }
         return QuranUIPage(page: number, title: "الوجه " + numerals.string(number), postScriptName: name, lines: lines,
             semanticAyat: catalog.ayahs(on: number).map { QuranUIVerse(id: $0.id, title: $0.surahNameArabic + " " + numerals.string($0.ayahNumber), text: $0.uthmaniText, hidden: false, canReveal: false) },
-            surahTitle: catalog.ayahs(on: number).first?.surahNameArabic ?? "", juzTitle: "الجزء " + numerals.string(catalog.ayahs(on: number).first?.juz ?? 1), numberLabel: numerals.string(number))
+            surahTitle: catalog.ayahs(on: number).first?.surahNameArabic ?? "", juzTitle: "الجزء " + numerals.string(catalog.ayahs(on: number).first?.juz ?? 1), numberLabel: numerals.string(number), printedPostScriptName: printName)
     }
     func qiyamPreview(rakaat: Int) async throws -> QuranUIQiyamPreview {
         let snapshot = try snapshot(), result = try QuranQiyamEngine.assignment(rakats: rakaat, pages: snapshot.pages)

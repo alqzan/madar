@@ -106,6 +106,88 @@ import MadarCommands
         XCTAssertEqual(try ModelContext(app.container).fetchCount(FetchDescriptor<HifzSession>()), 0)
         let after = try await tomorrow.load(); XCTAssertNil(after.draft)
     }
+    func testReviewRevealsDoNotPenalizeAndPartialExitOnlyCommitsTheRatedPage() async throws {
+        let (app, service, root) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
+        try await seedTwoPages(service)
+        let review = AppQuranService(session: app, clock: service.clock)
+        var state = try await review.start(kind: .review, stepID: nil, range: nil, rakaat: nil, spotID: nil)
+        // With only two memorized pages, the old-test fallback selects page 1 last.
+        XCTAssertEqual(state.coach?.pages, [2, 1])
+        XCTAssertEqual(state.coach?.review, true)
+        _ = try await review.session(draftID: state.id, action: .mistake(ayahID: 8, wordIndex: nil))
+        for _ in 0..<5 {
+            guard case .active(let next) = try await review.session(draftID: state.id, action: state.primaryAction) else { return XCTFail("Reveal must keep the draft") }
+            state = next
+        }
+        XCTAssertEqual(try review.savedDraft(state.id).draft.mistakes.count, 1)
+        XCTAssertEqual(state.primaryTitle, "قيّم هذا الوجه")
+        guard case .active(let graded) = try await review.session(draftID: state.id, action: state.primaryAction) else { return XCTFail("Rate before moving") }
+        XCTAssertEqual(graded.stage, .grading); XCTAssertEqual(graded.page?.page, 2)
+        XCTAssertEqual(graded.grades.first?.grade, .good)
+        _ = try await review.session(draftID: state.id, action: .grade(page: 2, grade: .needs))
+        guard case .active(let second) = try await review.session(draftID: state.id, action: .advance) else { return XCTFail("Next page must stay active") }
+        XCTAssertEqual(second.page?.page, 1); XCTAssertEqual(second.stage, .review)
+        XCTAssertEqual(second.coach?.revealedAyahs, [])
+        let resumed = try await AppQuranService(session: app, clock: review.clock).resume(draftID: state.id)
+        XCTAssertEqual(resumed.page?.page, 1)
+        _ = try await review.session(draftID: state.id, action: .commitPartial)
+        let rows = try ModelContext(app.container).fetch(FetchDescriptor<HifzSession>()).filter { $0.kind == "review" }
+        XCTAssertEqual(rows.count, 1); XCTAssertEqual(rows.first?.pages, [2])
+        XCTAssertEqual(rows.first?.mistakes, 1)
+        let coverage = try await review.load(); XCTAssertEqual(coverage.coverageFraction, 2.0 / 604)
+    }
+    private func seedTwoPages(_ service: AppQuranService) async throws {
+        try await service.perform(.savePlan(QuranUIPlanInput(startAyah: 1, unit: .page, amount: 2, rhythm: .balanced, restDay: "none", missPolicy: "ask")))
+        let start = try await service.start(kind: .hifz, stepID: nil, range: nil, rakaat: nil, spotID: nil)
+        _ = try await service.session(draftID: start.id, action: .changeMethod("completeAyah"))
+        for page in 1...2 {
+            try await learnPage(service, id: start.id)
+            _ = try await service.session(draftID: start.id, action: .advance)
+            if page == 1 { _ = try await service.session(draftID: start.id, action: .advance) }
+        }
+        _ = try await service.session(draftID: start.id, action: .commit)
+    }
+    func testReviewFullCommitWaitsForTheFinalPageRating() async throws {
+        let (app, service, root) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
+        try await seedTwoPages(service)
+        let review = AppQuranService(session: app, clock: service.clock)
+        var state = try await review.start(kind: .review, stepID: nil, range: nil, rakaat: nil, spotID: nil)
+        let sections = try review.savedDraft(state.id).reviewSections
+        for page in [2, 1] {
+            for _ in 0..<(page == 1 ? 7 : 5) {
+                guard case .active(let next) = try await review.session(draftID: state.id, action: state.primaryAction) else { return XCTFail("Reveal must stay active") }; state = next
+            }
+            guard case .active(let graded) = try await review.session(draftID: state.id, action: state.primaryAction) else { return XCTFail("Grade must stay active") }; state = graded
+            XCTAssertEqual(state.stage, .grading)
+            if page == 2 {
+                XCTAssertEqual(state.primaryTitle, "تابع")
+                guard case .active(let next) = try await review.session(draftID: state.id, action: state.primaryAction) else { return XCTFail("Page one cannot complete the session") }; state = next
+            }
+        }
+        XCTAssertEqual(state.primaryTitle, "أنهِ وسجّل")
+        XCTAssertEqual(try review.savedDraft(state.id).reviewSections, sections)
+        guard case .completed = try await review.session(draftID: state.id, action: state.primaryAction) else { return XCTFail("Final rating should commit") }
+        let rows = try ModelContext(app.container).fetch(FetchDescriptor<HifzSession>()).filter { $0.kind == "review" }
+        XCTAssertEqual(rows.count, 1); XCTAssertEqual(rows.first?.pages, [1, 2]); XCTAssertEqual(rows.first?.mistakes, 0)
+    }
+    func testReviewedPartialFaceDoesNotReappearInTodaysQueueOrCompleteCoverage() async throws {
+        let (app, service, root) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
+        try await service.perform(.savePlan(QuranUIPlanInput(startAyah: 149, unit: .ayah, amount: 1, rhythm: .balanced, restDay: "none", missPolicy: "ask")))
+        let start = try await service.start(kind: .hifz, stepID: nil, range: nil, rakaat: nil, spotID: nil)
+        _ = try await service.session(draftID: start.id, action: .changeMethod("completeAyah"))
+        try await learnPage(service, id: start.id)
+        _ = try await service.session(draftID: start.id, action: .advance)
+        _ = try await service.session(draftID: start.id, action: .commit)
+        let review = try await service.start(kind: .review, stepID: nil, range: nil, rakaat: nil, spotID: nil)
+        XCTAssertEqual(review.coach?.plannedAyahs, [149])
+        _ = try await service.session(draftID: review.id, action: review.primaryAction)
+        _ = try await service.session(draftID: review.id, action: .advance)
+        _ = try await service.session(draftID: review.id, action: .commit)
+        let result = try await service.load()
+        XCTAssertFalse(result.steps.contains { $0.kind == .review && !$0.completed })
+        XCTAssertEqual(result.coverageFraction, 0)
+        XCTAssertEqual(try ModelContext(app.container).fetch(FetchDescriptor<HifzSession>()).filter { $0.kind == "review" }.first?.pages, [22])
+    }
     private func learnPage(_ service: AppQuranService, id: UUID) async throws {
         var state = try await service.resume(draftID: id)
         for _ in 0..<100 {

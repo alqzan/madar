@@ -53,6 +53,7 @@
 		69E2EDB77052A3EC02406C0F /* thmanyahseriftext-Bold.otf in Resources */ = {isa = PBXBuildFile; fileRef = 71314BC22D8E14936362031A /* thmanyahseriftext-Bold.otf */; };
 		6A0993283286BFD137A6421F /* PrayerNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D2B7534A65CA14B25771639 /* PrayerNotifications.swift */; };
 		6C30416A0287E6C5B89852E7 /* FirstRunView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86377C72BA91AAD12F0EFD41 /* FirstRunView.swift */; };
+		6C75F9ABC51016430A499F3A /* QuranReviewUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 935C91C1DA3A1899374095B0 /* QuranReviewUITests.swift */; };
 		6E9C8889C99E331FEFFD9F6A /* AppServiceIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C105008888548BF995BA7B6D /* AppServiceIntegrationTests.swift */; };
 		74FD6AB907A73C84CA714668 /* PrayerSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A7D4FC457636377F6EF5D76 /* PrayerSettingsView.swift */; };
 		78E8D48DC47F5DEA058B6138 /* PresentationPrivacyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51D072137ACF840D7A277E1C /* PresentationPrivacyTests.swift */; };
@@ -186,6 +187,7 @@
 		86377C72BA91AAD12F0EFD41 /* FirstRunView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirstRunView.swift; sourceTree = "<group>"; };
 		863A4A54342817F175DA4371 /* MadarSync */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MadarSync; path = Packages/MadarSync; sourceTree = SOURCE_ROOT; };
 		92023291C0FE69B0EBEF5B79 /* CityEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CityEditor.swift; sourceTree = "<group>"; };
+		935C91C1DA3A1899374095B0 /* QuranReviewUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranReviewUITests.swift; sourceTree = "<group>"; };
 		95E7A16CBC55D306C7FDC034 /* Amiri-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Amiri-Bold.ttf"; sourceTree = "<group>"; };
 		AA5DF286ED4CF242BEF2D537 /* MadarSnapshots */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MadarSnapshots; path = Packages/MadarSnapshots; sourceTree = SOURCE_ROOT; };
 		ACA285A1762593401A2BBEBA /* Madar.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Madar.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -353,6 +355,7 @@
 				AE67096C4A1239F83DCD8EF6 /* FoundationUITests.swift */,
 				FB394D0AA548ADD478457293 /* QuranCoachUITests.swift */,
 				CBD6281E275A0464F067271E /* QuranHomeUITests.swift */,
+				935C91C1DA3A1899374095B0 /* QuranReviewUITests.swift */,
 			);
 			path = UI;
 			sourceTree = "<group>";
@@ -638,6 +641,7 @@
 				DA23D00C67DC70824DF82D13 /* FoundationUITests.swift in Sources */,
 				56D09B30E80044902F44350D /* QuranCoachUITests.swift in Sources */,
 				1F59790F471AA612E893D832 /* QuranHomeUITests.swift in Sources */,
+				6C75F9ABC51016430A499F3A /* QuranReviewUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

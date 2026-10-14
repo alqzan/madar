@@ -23,6 +23,7 @@ extension AppQuranService {
         var drillKey: QuranMistakeKey?
         var nightKey: GregorianDay?
         var bridgeAyahs: [Int] = []
+        var reviewSections: [QuranReviewSection]?
         switch kind {
         case .hifz, .bridge:
             guard let portion = kind == .bridge ? snapshot.hifz?.bridge : snapshot.hifz?.portion else { throw DataError.invalidValue("لا يوجد ورد جديد الآن") }
@@ -34,12 +35,18 @@ extension AppQuranService {
         case .review:
             try await command("quran.freezeTest")
             let fresh = try self.snapshot()
-            for page in fresh.review.allPages {
+            let recent = Set(fresh.recentPages)
+            let sections = QuranReviewSection.make(regular: fresh.review.regularPages, recent: recent,
+                partialRecent: fresh.partialRecent.map(\.page), tests: fresh.review.testPages)
+            reviewSections = sections
+            let partialByPage = Dictionary(uniqueKeysWithValues: fresh.partialRecent.map { ($0.page, $0.memorizedRanges) })
+            for page in sections.flatMap(\.pages) {
+                if let ranges = partialByPage[page] { portions += ranges; continue }
                 let ids = catalog.ayahs(on: page).map(\.id)
                 guard let first = ids.min(), let last = ids.max() else { continue }
                 portions.append(try QuranAyahRange(first: first, last: last))
             }
-            portions += fresh.partialRecent.flatMap(\.memorizedRanges); storedKind = .review
+            storedKind = .review
         case .free:
             guard let range, (1...604).contains(range.fromPage), (range.fromPage...604).contains(range.toPage),
                   let first = catalog.ayahs(on: range.fromPage).first?.id, let last = catalog.ayahs(on: range.toPage).last?.id else { throw QuranPlanError.invalidPages }
@@ -63,6 +70,7 @@ extension AppQuranService {
         if storedKind != .hifz { draft.coachStage = .blindRecitation }
         var value = QuranDraftPayload(draft: draft, method: storedKind == .hifz ? "coach" : "continuous", nightKey: nightKey, rakats: rakaat, drillKey: drillKey, testPages: storedKind == .review ? snapshot.review.testPages : [])
         if storedKind == .hifz { value.coach = QuranCoachProgress(bridgeAyahs: bridgeAyahs, intensity: snapshot.plan?.plan.intensity ?? .balanced) }
+        value.reviewSections = reviewSections
         try await save(value)
         return try await sessionState(value)
     }
@@ -104,7 +112,8 @@ extension AppQuranService {
                 if draft.coachStage != .blindRecitation { value.coach?.learningHints += 1 }
             }
             // Coach learning reveals stay hints. Only blind recitation records a slip.
-            if draft.coachStage == .blindRecitation {
+            let explicitMistake: Bool = if case .mistake = action { true } else { false }
+            if draft.coachStage == .blindRecitation && (draft.kind == .hifz || explicitMistake) {
                 let coverage = try snapshot().coverage
                 if draft.kind != .free || coverage.completedPages.contains(draft.page) {
                     draft.mistakes.append(QuranDraftMistake(key: QuranMistakeKey(ayahID: ayah, wordIndex: word), at: clock(), kind: .mistake))
@@ -156,6 +165,21 @@ extension AppQuranService {
                 }
                 }
                 value.revealedAyahs = []
+            } else if draft.kind == .review {
+                var seen = Set<Int>()
+                let pages = try draft.portions.flatMap { try QuranPortionEngine.pages(for: $0, catalog: catalog).map(\.page) }.filter { seen.insert($0).inserted }
+                if draft.coachStage == .blindRecitation {
+                    let ayahs = Set(catalog.ayahs(on: draft.page).map(\.id)).intersection(planned)
+                    let slips = draft.mistakes.filter { $0.kind == .mistake && ayahs.contains($0.key.ayahID) }.count
+                    if !draft.grades.contains(where: { $0.page == draft.page }) {
+                        draft.grades.append(QuranDraftGrade(page: draft.page, rating: QuranMistakeEngine.gradeFromBlindSlips(slips, ayatCount: ayahs.count), isTest: value.testPages?.contains(draft.page) == true))
+                    }
+                    draft.coachStage = .rating
+                } else if let current = pages.firstIndex(of: draft.page), pages.indices.contains(current + 1) {
+                    draft.page = pages[current + 1]
+                    draft.ayahID = catalog.ayahs(on: draft.page).first(where: { planned.contains($0.id) })?.id ?? draft.ayahID
+                    draft.coachStage = .blindRecitation; value.revealedAyahs = []
+                }
             } else if draft.kind != .drill {
                 let coverage = try snapshot().coverage
                 let covered = Set(catalog.ayahs(on: draft.page).map(\.id)).intersection(planned).intersection(coverage.coveredAyahs)
@@ -195,7 +219,9 @@ extension AppQuranService {
         }
         let grades = displayGrades.map { QuranUIPageGrade(page: $0.page, title: "الوجه " + numerals.string($0.page), grade: QuranUIGrade(rawValue: $0.rating.storedRaw)!, explanation: "التقييم المقترح؛ يمكنك تغييره") }
         let hifzComplete = draft.kind == .hifz && ids.isSubset(of: draft.blindPassedAyahs)
-        let finished = draft.coachStage == .rating && (draft.kind != .hifz || hifzComplete) || draft.kind == .drill && !draft.mistakes.isEmpty
+        var orderedSeen = Set<Int>()
+        let orderedPages = try draft.portions.flatMap { try QuranPortionEngine.pages(for: $0, catalog: catalog).map(\.page) }.filter { orderedSeen.insert($0).inserted }
+        let finished = draft.coachStage == .rating && (draft.kind != .hifz || hifzComplete) && (draft.kind != .review || draft.page == orderedPages.last) || draft.kind == .drill && !draft.mistakes.isEmpty
         let readOnlyFinished = finished && draft.kind == .free && draft.grades.isEmpty
         var state = QuranUISessionState(id: draft.id, title: draft.kind == .hifz ? "الورد" : "المراجعة", segmentTitle: "الوجه " + numerals.string(draft.page), stage: stage,
             progress: ids.isEmpty ? 0 : Double(draft.blindPassedAyahs.count) / Double(ids.count), prompt: "أكمل ثم سجّل ما تمّ", verses: verses,
@@ -251,6 +277,28 @@ extension AppQuranService {
             case .rating: "الوجه التالي"
             } }
             if value.method == "gradual", draft.coachStage == .repetition, coach.repetitions < 3 { state.primaryTitle = "أخفِ المزيد" }
+        }
+        if draft.kind == .review {
+            let sections = value.reviewSections ?? [QuranReviewSection(kind: .due, pages: orderedPages)]
+            let sectionIndex = sections.firstIndex { $0.pages.contains(draft.page) } ?? 0
+            let section = sections[sectionIndex]
+            let currentAyahs = catalog.ayahs(on: draft.page).filter { ids.contains($0.id) }
+            let revealed = value.revealedAyahs ?? []
+            let next = currentAyahs.first { !revealed.contains($0.id) }
+            let revealedCount = currentAyahs.filter { revealed.contains($0.id) }.count
+            state.title = "المراجعة · " + faceCount(orderedPages.count) + " في خطوة واحدة"
+            let range = section.pages.first == section.pages.last ? numerals.string(section.pages.first ?? draft.page) : numerals.string(section.pages.first ?? draft.page) + "–" + numerals.string(section.pages.last ?? draft.page)
+            state.segmentTitle = section.title + " " + range + "، الوجه " + numerals.string(draft.page)
+            let caption = stage == .grading ? "تقييم مقترح من تعثّرك؛ يمكنك تغييره" : "كشفت " + numerals.string(revealedCount) + " من " + numerals.string(currentAyahs.count)
+            state.coach = QuranUICoach(activeAyahID: next?.id ?? currentAyahs.last?.id ?? draft.ayahID, activeAyahNumber: numerals.string(next?.ayahNumber ?? 0),
+                plannedAyahs: ids, revealedAyahs: revealed, repetition: 0, target: 0, bridge: false, method: "continuous", stageTitle: stage == .grading ? "تقييمك" : "المراجعة المستورة",
+                pageProgress: "المقطع " + numerals.string(sectionIndex + 1) + " من " + numerals.string(sections.count), caption: caption, pages: orderedPages, referenceText: nil,
+                pastDay: draft.storedDay.date != (try snapshot().day.date), review: true, flaggedAyahs: Set(draft.mistakes.map { $0.key.ayahID }))
+            state.availableMethods = ["continuous": "سرد متصل"]
+            if stage == .review {
+                if let next { state.primaryTitle = "كشفت التالية"; state.primaryAction = .reveal(ayahID: next.id, wordIndex: nil) }
+                else { state.primaryTitle = "قيّم هذا الوجه"; state.primaryAction = .advance }
+            } else if !finished { state.primaryTitle = "تابع" }
         }
         return state
     }

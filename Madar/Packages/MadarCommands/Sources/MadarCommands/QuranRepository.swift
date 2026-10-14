@@ -37,6 +37,7 @@ public struct QuranDataSnapshot: Sendable {
     public let forceNewHifz: Bool
     public let hifz: QuranDailyHifz?
     public let review: QuranDailyReview
+    public let recentPages: [Int]
     public let partialRecent: [QuranPartialPage]
     public let allotments: [QuranDailyAllotment]
     public let recovery: QuranRecoveryPlan?
@@ -180,7 +181,7 @@ public struct QuranDataSnapshot: Sendable {
         let drafts = try context.fetch(FetchDescriptor<SessionDraft>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }.compactMap { try draft($0.id) }
         return QuranDataSnapshot(day: storedDay, plan: plan, coverage: coverage, sessions: sessions, pages: pages, memories: memories, completedOn: completedOn,
             activities: activities, hifzLevel: hifzLevel, reviewLevel: reviewLevel, restDay: restDay, forceNewHifz: dayState?.forceNewHifz ?? false,
-            hifz: hifz, review: review, partialRecent: coverage.partialRecentPortions, allotments: allotments, recovery: recovery,
+            hifz: hifz, review: review, recentPages: recent, partialRecent: coverage.partialRecentPortions.filter { !completedToday.contains($0.page) }, allotments: allotments, recovery: recovery,
             mistakes: QuranMistakeEngine.summaries(seeds: seeds, events: mistakeEvents, sessions: mistakeSessions), drafts: drafts, lastTest: lastTest, testPages: tests)
     }
 }
