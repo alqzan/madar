@@ -4,7 +4,7 @@ import CoreText
 import MadarDesign
 import MadarQuran
 
-/// The verified word map is drawn with the bundled Hafs font. Semantic ayahs live above it.
+/// Original page glyphs retain the verified word map; semantic ayahs live above them.
 struct QuranCoachPage: View {
     let page: QuranUIPage
     let coach: QuranUICoach
@@ -89,6 +89,22 @@ private final class QuranCoachTextView: UIView {
               let printedName = page.printedPostScriptName, let printedFont = UIFont(name: printedName, size: 23.3) else { return }
         hits = []
         let rowHeight = bounds.height / CGFloat(page.lines.count)
+        let minimumGap: CGFloat = 2.5
+        let preferredSize: CGFloat = 23.3
+        // Keep the normal page unchanged. In shorter layouts (such as grading),
+        // fit the glyph height to each row so vowel marks retain clear air.
+        var pageSize = preferredSize
+        for row in page.lines where !row.words.isEmpty {
+            for word in row.words {
+                let glyphs = word.printedGlyphs ?? ""
+                let text = NSMutableAttributedString(string: glyphs, attributes: [.font: printedFont])
+                for (offset, character) in glyphs.utf16.enumerated() where character == 32 {
+                    text.addAttribute(.font, value: unicodeFont, range: NSRange(location: offset, length: 1))
+                }
+                let image = CTLineGetImageBounds(CTLineCreateWithAttributedString(text), nil)
+                pageSize = min(pageSize, preferredSize * rowHeight * 0.82 / max(image.height, 1))
+            }
+        }
         var masks: [Int: Set<Int>] = [:]
         func visibility(_ word: QuranUIWord, firstInLine: Bool) -> Bool {
             let planned = coach.plannedAyahs.contains(word.ayahID)
@@ -143,9 +159,8 @@ private final class QuranCoachTextView: UIView {
                     return CTLineCreateWithAttributedString(text)
                 }
             }
-            var size: CGFloat = 23.3, wordLines = lines(size: 23.3)
+            var size = pageSize, wordLines = lines(size: pageSize)
             var widths = wordLines.map { CGFloat(CTLineGetTypographicBounds($0, nil, nil, nil)) }
-            let minimumGap: CGFloat = 2.5
             let gapCount = CGFloat(max(0, widths.count - 1))
             let total = widths.reduce(0, +)
             if total + minimumGap * gapCount > bounds.width {
