@@ -159,4 +159,40 @@ final class CoachAndMistakesTests: XCTestCase {
         XCTAssertEqual(QuranReviewIntensity.intense.preset.drillsPerDay, 8)
         XCTAssertEqual(QuranMistakeEngine.drillsForToday(openSpots: open, alreadyDrilledToday: [returnedKey, frequentKey], intensity: .balanced).count, 3)
     }
+
+    // §7.4: today's mistakes = mistake events of today's sessions; drills 3/5/8 by intensity;
+    // order: returned-after-closure first, then most hits, then most recent; a spot drilled today is not offered again.
+    func testDrillBoardSharesTheDailyAllowanceAndSplitsTodayFromMine() throws {
+        let today = try day("2026-01-10"), yesterday = try day("2026-01-09")
+        let old = UUID(), todayHifz = UUID(), todayDrill = UUID()
+        let sessions = [QuranMistakeSession(id: old, dayKey: yesterday), QuranMistakeSession(id: todayHifz, dayKey: today), QuranMistakeSession(id: todayDrill, dayKey: today)]
+        let a = QuranMistakeKey(ayahID: 10, wordIndex: 2), b = QuranMistakeKey(ayahID: 20, wordIndex: nil)
+        let c = QuranMistakeKey(ayahID: 30, wordIndex: 1), d = QuranMistakeKey(ayahID: 40, wordIndex: 0), e = QuranMistakeKey(ayahID: 50, wordIndex: 3)
+        var events: [QuranMistakeEvent] = []
+        // a: three old hits; b: one old hit and one today; c: one today; d: one old hit, drilled today; e: closed then returned.
+        for hour in 1...3 { events.append(QuranMistakeEvent(key: a, sessionID: old, at: instant(9, hour: hour), kind: .mistake)) }
+        events.append(QuranMistakeEvent(key: b, sessionID: old, at: instant(9, hour: 4), kind: .mistake))
+        events.append(QuranMistakeEvent(key: b, sessionID: todayHifz, at: instant(10, hour: 1), kind: .mistake))
+        events.append(QuranMistakeEvent(key: c, sessionID: todayHifz, at: instant(10, hour: 2), kind: .mistake))
+        events.append(QuranMistakeEvent(key: d, sessionID: old, at: instant(9, hour: 5), kind: .mistake))
+        events.append(QuranMistakeEvent(key: d, sessionID: todayDrill, at: instant(10, hour: 3), kind: .drillPass))
+        events.append(QuranMistakeEvent(key: e, sessionID: old, at: instant(8, hour: 1), kind: .mistake))
+        events.append(QuranMistakeEvent(key: e, sessionID: old, at: instant(8, hour: 2), kind: .drillPass))
+        events.append(QuranMistakeEvent(key: e, sessionID: old, at: instant(8, hour: 3), kind: .drillPass))
+        events.append(QuranMistakeEvent(key: e, sessionID: old, at: instant(9, hour: 6), kind: .mistake))
+
+        let light = QuranMistakeEngine.drillBoard(seeds: [], events: events, sessions: sessions, dayKey: today, intensity: .light)
+        XCTAssertEqual(light.todayMistakes, 2)          // b and c, from today's hifz session
+        XCTAssertEqual(light.openCount, 5)
+        XCTAssertEqual(light.drilledToday, 1)           // d
+        XCTAssertEqual(light.dailyAllowance, 3)
+        // 3 − 1 drilled = 2 left: e (returned) first, then a (3 hits); d is not offered again today.
+        XCTAssertEqual(light.mineQueue.map(\.key), [e, a])
+        // Today's tab: b (2 hits) before c (1 hit), within the same allowance.
+        XCTAssertEqual(light.todayQueue.map(\.key), [b, c])
+
+        let intense = QuranMistakeEngine.drillBoard(seeds: [], events: events, sessions: sessions, dayKey: today, intensity: .intense)
+        XCTAssertEqual(intense.dailyAllowance, 8)
+        XCTAssertEqual(intense.mineQueue.map(\.key), [e, a, b, c])
+    }
 }

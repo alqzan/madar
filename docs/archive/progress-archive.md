@@ -321,3 +321,12 @@ For the next agent: First do read-only preflight for all ten app fonts and inspe
 Branches/worktrees: T12 `codex/m0-t12-audit-triage` remains at `44d4799` in `/Users/abdulrahman/.codex/worktrees/m0-t12-audit-triage/بناء مدار 2.0`; nine hash-verified font files are ignored local copies, `Amiri-Bold.ttf` is missing, and tracked files are clean. The diagnostic test remains an uncommitted `/tmp` patch. T09 candidate `codex/m0-p1b-fixes` is being continued separately from `65e88ca`; do not merge either candidate wholesale.
 Next: T09 simulator Face ID success/native-share check if deterministic; otherwise preserve its device-dependent gap. Then resume T12 only after isolated resource/linker preflight and gather owner-iPhone acceptance. Usage: 62% five-hour used / 38% remaining, 56% weekly used at this checkpoint; no reset credits used. Keep working on useful authorized M0 acceptance and verify usage before final delivery; do not add quota-only work.
 Next session: GPT-6.1 Sol high for production; independent GPT-6.1 Sol xhigh for mandatory section/milestone Top review.
+
+## Handover — M2-V01 hadith beside coverage — 2026-10-14 — Codex
+Works now: owner correction applied — «اقرأ وارتق» immediately beside «في صدرك» on the same line opens the cited hadith sheet; the separate row under the progress bar is removed. No stored-data change.
+Verified: `xcodebuild -project Madar/Madar.xcodeproj -scheme Madar -destination 'platform=iOS Simulator,id=412F4437-7BD7-44D1-AA3D-2B7158090E14' -only-testing:MadarUITests/QuranHomeUITests ... test` TEST SUCCEEDED, 1/1 including same-line RTL geometry/hadith/close/coverage/levels/resume; app built; `git diff --check` clean. Wording checked at https://sunnah.com/abudawud:1464.
+Differences left: inline hadith phrase is owner-requested addition to R18-Home; prior RQ9/native shell/unbuilt-entry differences remain. L/light shots `Artifacts/m2-hadith-adjacent/`; comparison regenerated, Codex open request queued (not confirmed displayed).
+Not verified: owner iPhone, later screens, distribution or milestone gate; screenshot facts use an isolated test fixture. Prior opening failure fixed; final inline placement and existing home flow pass.
+Next: M2-V02 ready; V01 remains matched — awaiting owner.
+Model/effort: Codex GPT-6; exact variant/effort not exposed.
+Usage: 77% five-hour and 71% weekly at closing checkpoint; no reset used.

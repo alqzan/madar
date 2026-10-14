@@ -70,9 +70,11 @@ import MadarPrayer
                 kind: .review, completed: false, available: true, range: QuranUIRange(fromPage: all.min()!, toPage: all.max()!)))
         }
         let open = snapshot.mistakes.filter { $0.isOpen && $0.hits > 0 }
-        if !open.isEmpty {
-            steps.append(QuranUIStep(id: "drill", title: "مواضع الخطأ", detail: count(open.count, singular: "موضع واحد", dual: "موضعان", plural: "مواضع"), kind: .drill,
-                completed: false, available: true, range: nil))
+        // The step counts today's drills (3/5/8 allowance), not every open spot.
+        let board = snapshot.drillBoard, left = Set((board.todayQueue + board.mineQueue).map(\.key)).count
+        if left > 0 || board.drilledToday > 0 && board.openCount > 0 {
+            steps.append(QuranUIStep(id: "drill", title: "مواضع الخطأ", detail: count(left > 0 ? left : board.drilledToday, singular: "موضع واحد", dual: "موضعان", plural: "مواضع"), kind: .drill,
+                completed: left == 0, available: left > 0, range: nil))
         }
         var heat: [QuranUIHeatDay] = []
         let firstHifzDay = snapshot.sessions.filter { $0.kind == .hifz }.map(\.dayKey).min()
@@ -128,8 +130,10 @@ import MadarPrayer
             return QuranUIStrength(id: segment.number, title: "الجزء " + numerals.string(segment.number), value: mean.map { Int($0.rounded()) },
                 pageDetails: pages.map { "الوجه " + numerals.string($0.page) + "، " + numerals.percent($0.strength) }, canRaise: pages.contains(where: \.isFar), reviewRange: nil)
         }
-        let errors = open.map { value in QuranUIErrorSpot(id: "\(value.key.ayahID):\(value.key.wordIndex.map(String.init) ?? "ayah")", title: "آية " + numerals.string(value.key.ayahID),
-            detail: value.key.wordIndex == nil ? "الآية كاملة" : "موضع كلمة", isToday: false, closed: !value.isOpen, canDrill: true) }
+        let todayKeys = Set(board.todayQueue.map(\.key))
+        let errors = open.map { value in QuranUIErrorSpot(id: Self.spotID(value.key),
+            title: catalog.ayah(id: value.key.ayahID).map { $0.surahNameArabic + " " + numerals.string($0.ayahNumber) } ?? "",
+            detail: value.key.wordIndex == nil ? "الآية كاملة" : "موضع كلمة", isToday: todayKeys.contains(value.key), closed: !value.isOpen, canDrill: true) }
         return QuranRoomState(coverageTitle: coverageTitle, coverageFraction: Double(completed) / 604,
             percentageLabel: numerals.percent(coverage.percent), streakLabel: "سلسلة " + dayCount(streak.days), balanceTitle: balance,
             balanceExplanation: "تتبع الخطة حاجة المراجعة ومقدار حفظك", hifzLevel: QuranUILevel(rawValue: snapshot.hifzLevel.rawValue)!,

@@ -114,6 +114,15 @@ public struct QuranMistakeSpotSummary: Equatable, Sendable {
     public var returnedAfterClosure: Bool { isOpen && reopenedAt != nil }
 }
 
+public struct QuranDrillBoard: Equatable, Sendable {
+    public let todayMistakes: Int
+    public let openCount: Int
+    public let todayQueue: [QuranMistakeSpotSummary]
+    public let mineQueue: [QuranMistakeSpotSummary]
+    public let drilledToday: Int
+    public let dailyAllowance: Int
+}
+
 public enum QuranMistakeEngine {
     public static let masteryThreshold = 2
 
@@ -223,6 +232,28 @@ public enum QuranMistakeEngine {
                 return keyOrder($0, $1)
             }
         return Array(eligible.prefix(remaining))
+    }
+
+    /// §7.4 «اليوم» و«أخطائي»: one daily drill allowance (3/5/8 by intensity) shared by both tabs.
+    /// «اليوم» drills open spots that had a mistake in today's sessions; «أخطائي» drills every open spot.
+    /// A spot drilled today (pass or fail in a session stored on today's dayKey) is not offered again today.
+    public static func drillBoard(
+        seeds: [QuranMistakeSpotSeed],
+        events: [QuranMistakeEvent],
+        sessions: [QuranMistakeSession],
+        dayKey: GregorianDay,
+        intensity: QuranReviewIntensity
+    ) -> QuranDrillBoard {
+        let todaysSessionIDs = Set(sessions.filter { !$0.isDeleted && $0.dayKey == dayKey }.map(\.id))
+        let todays = events.filter { $0.sessionID.map(todaysSessionIDs.contains) == true }
+        let drilled = Set(todays.filter { $0.kind != .mistake }.map(\.key))
+        let mistakenToday = Set(todays.filter { $0.kind == .mistake }.map(\.key))
+        let open = openSpots(seeds: seeds, events: events, sessions: sessions)
+        let mine = drillsForToday(openSpots: open, alreadyDrilledToday: drilled, intensity: intensity)
+        let today = drillsForToday(openSpots: open.filter { mistakenToday.contains($0.key) }, alreadyDrilledToday: drilled, intensity: intensity)
+        return QuranDrillBoard(todayMistakes: mistakesToday(events: events, sessions: sessions, dayKey: dayKey),
+            openCount: open.count, todayQueue: today, mineQueue: mine, drilledToday: drilled.count,
+            dailyAllowance: intensity.preset.drillsPerDay)
     }
 
     /// The stored session dayKey decides which mistakes belong to today.

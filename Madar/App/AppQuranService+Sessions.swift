@@ -59,7 +59,9 @@ extension AppQuranService {
             }
             nightKey = try PrayerRepository(context: repository().context).defaultNight(at: clock()); storedKind = .qiyam
         case .drill:
-            let spot = snapshot.mistakes.first { $0.isOpen && $0.hits > 0 && (spotID == nil || "\($0.key.ayahID):\($0.key.wordIndex.map(String.init) ?? "ayah")" == spotID) }
+            // §7.4 order and the shared 3/5/8 allowance: today's spots first, then «أخطائي».
+            let queue = snapshot.drillBoard.todayQueue + snapshot.drillBoard.mineQueue
+            let spot = queue.first { spotID == nil || Self.spotID($0.key) == spotID }
             guard let spot else { throw DataError.invalidValue("لا يوجد موضع تدريب") }
             drillKey = spot.key
             portions = [try QuranAyahRange(first: spot.key.ayahID, last: spot.key.ayahID)]; storedKind = .drill
@@ -121,6 +123,8 @@ extension AppQuranService {
             }
         case .chooseAnswer(let answer):
             guard draft.kind == .drill, ["pass", "fail"].contains(answer) else { throw QuranPlanError.invalidSession }
+            // One result per drill session: a second tap replaces the first, it never counts as a second success.
+            draft.mistakes.removeAll { $0.kind != .mistake }
             draft.mistakes.append(QuranDraftMistake(key: value.drillKey ?? QuranMistakeKey(ayahID: draft.ayahID, wordIndex: nil), at: clock(), kind: answer == "pass" ? .drillPass : .drillFail))
         case .grade(let page, let grade):
             guard let rating = QuranReviewRating(storedRaw: grade.rawValue),
@@ -228,6 +232,9 @@ extension AppQuranService {
             page: try await page(draft.page), answers: draft.kind == .drill ? [QuranUIAnswer(id: "pass", text: "أتقنت الموضع"), QuranUIAnswer(id: "fail", text: "أحتاج تدريبًا")] : [],
             grades: grades, primaryTitle: readOnlyFinished ? "أغلق القراءة" : finished ? "أنهِ وسجّل" : "تابع", primaryAction: readOnlyFinished ? .discard : finished ? .commit : .advance,
             canAdvance: true, mistakeAyahID: draft.ayahID, method: value.method, availableMethods: [:], similar: nil, resourceError: nil)
+        if draft.kind == .drill, let card = try await drillCard(value, catalog: catalog) {
+            state.title = "اختبار مواضع الخطأ"; state.drill = card
+        }
         if let coach = value.coach {
             let record = catalog.ayah(id: draft.ayahID)!
             let target = QuranCoachProgress.repetitionTarget(coach.intensity)

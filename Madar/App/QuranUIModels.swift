@@ -49,6 +49,16 @@ struct QuranUIIndexItem: Identifiable, Sendable { var id: String; var title: Str
 struct QuranUIStrength: Identifiable, Sendable { var id: Int; var title: String; var value: Int?; var pageDetails: [String]; var canRaise: Bool; var reviewRange: QuranUIRange? }
 struct QuranUIRecovery: Sendable { var distantLabel: String; var activeTitle: String?; var canCreate: Bool; var previews: [Int: QuranUIForecast] }
 struct QuranUIQiyamPreview: Sendable { var rakaat: Int; var nightKey: String; var title: String; var assignments: [String]; var canBegin: Bool }
+enum QuranUIDrillTab: String, Sendable { case today, mine }
+struct QuranUIDrillBoard: Sendable { var todayLabel: String; var mineLabel: String; var today: [String]; var mine: [String]; var done: Int; var allowance: Int }
+struct QuranUIDrillCard: Sendable {
+    var tab: QuranUIDrillTab; var todayLabel: String; var mineLabel: String
+    var done: Int; var todayTotal: Int; var mineTotal: Int
+    var title: String; var timesLabel: String; var prompt: String?
+    var words: [String]; var hiddenIndex: Int?; var continues: Bool
+    var revealed: Bool; var answered: Bool; var successStreak: Int; var mastery: Int
+    var fontName: String
+}
 struct QuranUIErrorSpot: Identifiable, Sendable { var id: String; var title: String; var detail: String; var isToday: Bool; var closed: Bool; var canDrill: Bool }
 struct QuranRoomState: Sendable {
     var coverageTitle: String
@@ -137,6 +147,7 @@ struct QuranUISessionState: Identifiable, Sendable {
     var similar: QuranUISimilar?
     var resourceError: String?
     var coach: QuranUICoach?
+    var drill: QuranUIDrillCard? = nil
 }
 struct QuranUICoach: Sendable {
     var activeAyahID: Int; var activeAyahNumber: String; var plannedAyahs: Set<Int>; var revealedAyahs: Set<Int>

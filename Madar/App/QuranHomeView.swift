@@ -64,9 +64,17 @@ struct QuranHomeView: View {
                 Text(step.title).font(serif(22))
                 Text(step.detail).font(bodyFont(14))
                 if let range = step.range { Text("الأوجه " + service.numerals.string(range.fromPage) + " إلى " + service.numerals.string(range.toPage)).font(bodyFont(13)).foregroundStyle(theme.secondaryInk) }
+                // §7.4: mistake locations are their own session entry, not only after the review step.
+                if step.kind == .drill, step.available, state?.draft == nil {
+                    Button("ابدأ التدريب") { detail = nil; run { active = try await service.start(kind: .drill, stepID: step.id, range: nil, rakaat: nil, spotID: nil) } }
+                        .font(bodyFont(14, bold: true)).frame(maxWidth: .infinity, minHeight: 48).foregroundStyle(theme.onAccent).background(theme.color("accent"), in: Capsule())
+                        .accessibilityIdentifier("quran-drill-start")
+                    Button("تمّ") { detail = nil }.font(bodyFont(14, bold: true)).frame(maxWidth: .infinity, minHeight: 44).foregroundStyle(theme.ink)
+                } else {
                 Button("تمّ") { detail = nil }.font(bodyFont(14, bold: true)).frame(maxWidth: .infinity, minHeight: 48).foregroundStyle(theme.onAccent).background(theme.color("accent"), in: Capsule())
+                }
             }.padding(24).frame(maxWidth: .infinity, alignment: .leading).background(theme.surface)
-                .presentationDetents([.height(260)]).presentationDragIndicator(.visible)
+                .presentationDetents([.height(step.kind == .drill ? 300 : 260)]).presentationDragIndicator(.visible)
                 .environment(\.layoutDirection, .rightToLeft)
             }
         }

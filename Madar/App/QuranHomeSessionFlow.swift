@@ -12,7 +12,9 @@ struct QuranHomeSessionFlow: View {
     @State private var error: String?
     var body: some View {
         Group {
-            if let coach = state.coach {
+            if state.drill != nil {
+                QuranDrillView(service: service, initial: state, close: close)
+            } else if let coach = state.coach {
                 QuranHifzCoachView(state: state, coach: coach, busy: busy, action: perform)
             } else { legacyBody }
         }

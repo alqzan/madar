@@ -42,6 +42,7 @@ public struct QuranDataSnapshot: Sendable {
     public let allotments: [QuranDailyAllotment]
     public let recovery: QuranRecoveryPlan?
     public let mistakes: [QuranMistakeSpotSummary]
+    public let drillBoard: QuranDrillBoard
     public let drafts: [QuranSessionDraft]
     public let lastTest: GregorianDay?
     public let testPages: [Int]
@@ -182,7 +183,8 @@ public struct QuranDataSnapshot: Sendable {
         return QuranDataSnapshot(day: storedDay, plan: plan, coverage: coverage, sessions: sessions, pages: pages, memories: memories, completedOn: completedOn,
             activities: activities, hifzLevel: hifzLevel, reviewLevel: reviewLevel, restDay: restDay, forceNewHifz: dayState?.forceNewHifz ?? false,
             hifz: hifz, review: review, recentPages: recent, partialRecent: coverage.partialRecentPortions.filter { !completedToday.contains($0.page) }, allotments: allotments, recovery: recovery,
-            mistakes: QuranMistakeEngine.summaries(seeds: seeds, events: mistakeEvents, sessions: mistakeSessions), drafts: drafts, lastTest: lastTest, testPages: tests)
+            mistakes: QuranMistakeEngine.summaries(seeds: seeds, events: mistakeEvents, sessions: mistakeSessions),
+            drillBoard: QuranMistakeEngine.drillBoard(seeds: seeds, events: mistakeEvents, sessions: mistakeSessions, dayKey: today, intensity: plan?.plan.intensity ?? .balanced), drafts: drafts, lastTest: lastTest, testPages: tests)
     }
 }
 
