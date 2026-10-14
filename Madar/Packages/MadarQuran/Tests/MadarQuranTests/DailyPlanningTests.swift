@@ -199,4 +199,21 @@ final class QuranDailyCompletionTests: XCTestCase {
         XCTAssertTrue(recovery.share(on: today, reviewedOn: [1: today, 2: today, 3: today]).isEmpty)
         XCTAssertEqual(recovery.share(on: today, reviewedOn: [1: today]), [2, 3])
     }
+
+    // §7.4 smart test: random among the top max(1, ceil(n/3)) by dormancy; the pick is stable within a day.
+    func testDayTestPickIsRandomWithinTheTopThirdAndStableForTheDay() throws {
+        let start = try GregorianDay("2026-10-01")
+        let pages = try (1...9).map { try QuranPlanningPage(page: $0, lastReviewed: start.adding(days: -$0), nextDue: start, grade: .good, today: start) }
+        var picks = Set<Int>()
+        for offset in 0..<30 {
+            let day = start.adding(days: offset)
+            let index = QuranRecoveryEngine.daySelectionIndex(day)
+            XCTAssertEqual(index, QuranRecoveryEngine.daySelectionIndex(day))
+            let pick = QuranRecoveryEngine.testPages(on: day, lastTest: nil, frozen: nil, pages: pages, recent: [], selectionIndex: index)
+            XCTAssertEqual(pick.count, 1)
+            XCTAssertTrue([9, 8, 7].contains(pick[0]), "top third by dormancy: \(pick)")
+            picks.formUnion(pick)
+        }
+        XCTAssertGreaterThan(picks.count, 1, "never random")
+    }
 }

@@ -187,7 +187,7 @@ public struct QuranStagedResult: Sendable {
         case "quran.resolveMissedDay":
             let origin = try GregorianDay(text("dayKey")), snapshot = try repository.snapshot(at: now)
             guard origin < snapshot.day.date, let plan = snapshot.plan,
-                  origin >= GregorianDay.containing(plan.activeFrom, in: TimeZone(identifier: snapshot.day.timeZoneID)!),
+                  origin >= snapshot.planStartDay ?? origin,
                   !snapshot.restDay.contains(origin), !snapshot.sessions.contains(where: { $0.kind == .hifz && $0.dayKey == origin }) else { throw DataError.invalidValue("Quran missed day") }
             let rows = try context.fetch(FetchDescriptor<QuranAllotment>()).filter { $0.mergedInto == nil }
             if rows.contains(where: { $0.deletedAt == nil && $0.origin == "missPolicy" && $0.originDayKey == origin.description }) { duplicate = true; break }

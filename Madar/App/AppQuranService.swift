@@ -28,7 +28,7 @@ import MadarPrayer
         case 1: return singular
         case 2: return dual
         default:
-            let counted = value >= 11 ? ["أجزاء": "جزءًا", "أوجه": "وجهًا", "أيام": "يومًا", "آيات": "آيةً", "مواضع": "موضعًا"][plural] ?? plural : plural
+            let counted = value >= 11 ? ["أجزاء": "جزءًا", "أوجه": "وجهًا", "أيام": "يومًا", "آيات": "آيةً", "مواضع": "موضعًا", "مرات": "مرةً"][plural] ?? plural : plural
             return "\(numerals.string(value)) \(counted)"
         }
     }
@@ -117,7 +117,7 @@ import MadarPrayer
         if let plan = snapshot.plan, plan.missPolicy == "ask" {
             var previous = today.adding(days: -1)
             while snapshot.restDay.contains(previous) { previous = previous.adding(days: -1) }
-            let firstDay = GregorianDay.containing(plan.activeFrom, in: TimeZone(identifier: snapshot.day.timeZoneID)!)
+            let firstDay = snapshot.planStartDay ?? today
             if previous >= firstDay && !snapshot.sessions.contains(where: { $0.dayKey == previous && $0.kind == .hifz }) && !snapshot.allotments.contains(where: { $0.origin == .missPolicy && $0.originDayKey == previous }) { missedDay = previous }
         }
         let surahs = Dictionary(grouping: catalog.ayahs, by: \.surahID).sorted { $0.key < $1.key }.map { id, ayahs in
@@ -165,7 +165,7 @@ import MadarPrayer
         let catalog = try QuranResources.catalog()
         let remainingPages = Set(catalog.ayahs.filter { $0.id >= input.startAyah }.map(\.page)).subtracting(snapshot.coverage.completedPages).count
         let unitFaces = unit == .ayah ? (remainingAyahs == 0 ? 0 : Double(remainingPages) / Double(remainingAyahs)) : (unit == .half ? 0.5 : unit == .quarter ? 0.25 : 1)
-        let result = QuranProgressEngine.forecast(remainingPages: Double(remainingPages), dailyPages: input.amount * unitFaces * snapshot.hifzLevel.hifzFactor,
+        let result = QuranProgressEngine.forecast(remainingPages: Double(remainingPages), dailyPages: input.amount * unitFaces * snapshot.habitualHifzLevel.hifzFactor,
             startingOn: snapshot.day.date, restDay: rest, allotments: snapshot.allotments, pagesPerPlanUnit: unitFaces)
         let title: String
         switch result {

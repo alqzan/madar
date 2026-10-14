@@ -84,6 +84,14 @@ public enum QuranRecoveryEngine {
         // The app injects a random nonnegative index and persists the result in QuranDayState.
         return [pool[Swift.max(0, selectionIndex) % topCount].page]
     }
+
+    /// §7.4 smart test: a random pick among the top third, stable for the whole day so the step does not change
+    /// between loads before `freezeTest` stores it. FNV-1a of the day key (Swift's hashValue changes per launch).
+    public static func daySelectionIndex(_ day: GregorianDay) -> Int {
+        var hash: UInt64 = 0xcbf29ce484222325
+        for byte in day.description.utf8 { hash = (hash ^ UInt64(byte)) &* 0x100000001b3 }
+        return Int(hash % 1_000_003)
+    }
 }
 
 public struct QuranActivityDay: Sendable {

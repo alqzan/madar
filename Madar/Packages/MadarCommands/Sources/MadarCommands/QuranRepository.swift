@@ -43,6 +43,9 @@ public struct QuranDataSnapshot: Sendable {
     public let recovery: QuranRecoveryPlan?
     public let mistakes: [QuranMistakeSpotSummary]
     public let drillBoard: QuranDrillBoard
+    /// The plan's first Madar day under core.dayStart, and the habitual hifz level (the forecast ignores a one-day choice).
+    public let planStartDay: GregorianDay?
+    public let habitualHifzLevel: QuranDayLevel
     public let drafts: [QuranSessionDraft]
     public let lastTest: GregorianDay?
     public let testPages: [Int]
@@ -149,11 +152,14 @@ public struct QuranDataSnapshot: Sendable {
         let share = recovery?.share(on: today, reviewedOn: reviewedOn) ?? []
         let lastTest = sessions.filter { $0.grades.contains(where: \.isTest) }.map(\.dayKey).max()
         let frozen = dayState.map(\.testPages).flatMap { $0.isEmpty ? nil : $0 }
-        let tests = QuranRecoveryEngine.testPages(on: today, lastTest: lastTest, frozen: frozen, pages: pages, recent: Set(recent))
+        let tests = QuranRecoveryEngine.testPages(on: today, lastTest: lastTest, frozen: frozen, pages: pages, recent: Set(recent),
+            selectionIndex: QuranRecoveryEngine.daySelectionIndex(today))
         let completedToday = Set(sessions.filter { $0.dayKey == today && [.review, .free, .qiyam].contains($0.kind) }.flatMap { $0.grades.map(\.page) })
         let raised = allotments.filter { $0.dayKey == today && $0.kind == .reviewExtra }.flatMap(\.pages)
         let mode = QuranReviewScheduleMode(rawValue: try settings.value(for: "quran.reviewSchedule").string ?? "spaced") ?? .spaced
-        let cycleStart = plan.map { GregorianDay.containing($0.activeFrom, in: TimeZone(identifier: storedDay.timeZoneID)!) } ?? today
+        // core.dayStart governs the plan's first day too (a plan saved before Fajr belongs to the previous Madar day).
+        let planStartDay = try plan.map { try currentDay(at: $0.activeFrom).date }
+        let cycleStart = planStartDay ?? today
         let cycle = try QuranFixedCycleEngine.target(mode: mode, cycleStartDayKey: cycleStart, todayDayKey: today,
             juzSegments: catalog.juzCycleSegments(), manzilSegments: catalog.manzilCycleSegments())
         let cyclePages = cycle.map { target in
@@ -164,7 +170,8 @@ public struct QuranDataSnapshot: Sendable {
         let dueCount = mode == .spaced ? pages.filter { $0.isDue && !recent.contains($0.page) }.count : cyclePages.filter { !recent.contains($0) }.count
         let need = QuranReviewEngine.need(recentCount: recent.count + coverage.partialRecentPortions.count,
             memorizedIntervals: intervals, dueCount: dueCount, recoveryShare: Double(share.count))
-        let previous = sessions.last { $0.kind == .hifz }
+        // RQ3: a «يحتاج» grade turns the *next* day into «تثبيت»; today's own session does not relabel today.
+        let previous = sessions.last { $0.kind == .hifz && $0.dayKey < today }
         let consolidation = previous?.grades.contains { $0.rating == .needsMastery } == true ? previous?.ayahs : nil
         let hifz = try plan.map { try QuranDailyPlanEngine.hifz(plan: $0.plan, day: today, restDay: restDay, level: hifzLevel,
             forceNewHifz: dayState?.forceNewHifz ?? false, balanceDecides: settings.value(for: "quran.balanceDecides") == .bool(true),
@@ -184,7 +191,8 @@ public struct QuranDataSnapshot: Sendable {
             activities: activities, hifzLevel: hifzLevel, reviewLevel: reviewLevel, restDay: restDay, forceNewHifz: dayState?.forceNewHifz ?? false,
             hifz: hifz, review: review, recentPages: recent, partialRecent: coverage.partialRecentPortions.filter { !completedToday.contains($0.page) }, allotments: allotments, recovery: recovery,
             mistakes: QuranMistakeEngine.summaries(seeds: seeds, events: mistakeEvents, sessions: mistakeSessions),
-            drillBoard: QuranMistakeEngine.drillBoard(seeds: seeds, events: mistakeEvents, sessions: mistakeSessions, dayKey: today, intensity: plan?.plan.intensity ?? .balanced), drafts: drafts, lastTest: lastTest, testPages: tests)
+            drillBoard: QuranMistakeEngine.drillBoard(seeds: seeds, events: mistakeEvents, sessions: mistakeSessions, dayKey: today, intensity: plan?.plan.intensity ?? .balanced),
+            planStartDay: planStartDay, habitualHifzLevel: QuranDayLevel(rawValue: try settings.value(for: "quran.hifzLevel").string ?? "medium") ?? .medium, drafts: drafts, lastTest: lastTest, testPages: tests)
     }
 }
 

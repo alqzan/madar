@@ -54,6 +54,36 @@ import MadarQuran
         #expect(captured.dayKey == "2026-10-08" && captured.boundary == .fajr)
     }
 
+    private let planPayload: [String: MadarCore.JSONValue] = ["startAyah": .number(1), "unit": .string("page"), "amount": .number(1), "rhythm": .string("balanced"), "restDay": .string("none"), "missPolicy": .string("ask")]
+
+    @Test func planStartDayFollowsDayStartAndForecastLevelIsHabitual() async throws {
+        let (container, bus, directory) = try fixture(); defer { try? FileManager.default.removeItem(at: directory) }
+        let context = ModelContext(container), settings = try SettingsStore(context: context)
+        _ = try settings.stage(["core.dayStart": .string("fajr")], now: now); try context.save()
+        // §7.2/J01 Riyadh Fajr 04:31 on 9 Oct: a plan saved at 03:00 belongs to the Madar day of 8 Oct.
+        let saved = date("2026-10-09T03:00:00+03:00")
+        #expect(try await bus.execute(envelope("quran.savePlan", planPayload, at: saved), now: saved).status == .applied)
+        let later = date("2026-10-10T12:00:00+03:00")
+        #expect(try repo(container).snapshot(at: later).planStartDay == GregorianDay("2026-10-08"))
+        // §7.4 forecast uses quran.hifzLevel; a one-day «عميق» changes today only.
+        #expect(try await bus.execute(envelope("quran.setTodayLevel", ["kind": .string("hifz"), "level": .string("deep")], at: later), now: later).status == .applied)
+        let snapshot = try repo(container).snapshot(at: later.addingTimeInterval(1))
+        #expect(snapshot.hifzLevel == .deep && snapshot.habitualHifzLevel == .medium)
+    }
+
+    @Test func needsGradeTurnsTheNextDayIntoConsolidationNotToday() async throws {
+        let (container, bus, directory) = try fixture(); defer { try? FileManager.default.removeItem(at: directory) }
+        let planAt = now.addingTimeInterval(-3 * 86400)
+        #expect(try await bus.execute(envelope("quran.savePlan", planPayload, at: planAt), now: planAt).status == .applied)
+        var draft = try makeDraft(container)
+        draft.draft.grades = [QuranDraftGrade(page: 1, rating: .needsMastery)]
+        try await save(draft, bus: bus)
+        #expect(try await commit(draft, bus: bus).status == .applied)
+        // RQ3 / §7.4: «يحتاج» stops new hifz the next day; the day it was graded keeps its own label.
+        #expect(try repo(container).snapshot(at: now.addingTimeInterval(120)).hifz?.balance != .consolidation)
+        #expect(try repo(container).snapshot(at: now.addingTimeInterval(86400)).hifz?.balance == .consolidation)
+    }
+
     @Test func undoneDayChoiceAndMissedDayCanBeChosenAgain() async throws {
         let (container, bus, directory) = try fixture(); defer { try? FileManager.default.removeItem(at: directory) }
         func undo(_ result: CommandOutcome, at time: Date) async throws {
@@ -69,6 +99,10 @@ import MadarQuran
         #expect(try await bus.execute(envelope("quran.setTodayLevel", ["kind": .string("review"), "level": .string("max")], at: again), now: again).status == .applied)
         let revived = try repo(container).snapshot(at: again.addingTimeInterval(1))
         #expect(revived.reviewLevel == .max && revived.hifzLevel != .deep)
+        // The dedupe pass after an import must not re-delete the revived row.
+        let mergeContext = ModelContext(container)
+        _ = try RowMerger(context: mergeContext).run(); try mergeContext.save()
+        #expect(try repo(container).snapshot(at: again.addingTimeInterval(2)).reviewLevel == .max)
         // A missed-day choice that was undone can be chosen again.
         let planAt = now.addingTimeInterval(-5 * 86400)
         let plan: [String: MadarCore.JSONValue] = ["startAyah": .number(1), "unit": .string("page"), "amount": .number(1), "rhythm": .string("balanced"), "restDay": .string("none"), "missPolicy": .string("ask")]
@@ -82,6 +116,8 @@ import MadarQuran
         let redo = try await bus.execute(envelope("quran.resolveMissedDay", ["dayKey": .string(missed), "choice": .string("double")], at: again.addingTimeInterval(90)), now: again.addingTimeInterval(90))
         #expect(redo.status == .applied)
         #expect(!(try repo(container).snapshot(at: again.addingTimeInterval(100)).allotments.isEmpty))
+        let merge = ModelContext(container); _ = try RowMerger(context: merge).run(); try merge.save()
+        #expect(!(try repo(container).snapshot(at: again.addingTimeInterval(110)).allotments.isEmpty))
     }
 
     @Test func commitChildrenReceiptAndDraftTogetherReplayUndoLeavesNoCoverageScheduleOrStreak() async throws {
