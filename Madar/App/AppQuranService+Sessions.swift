@@ -22,11 +22,13 @@ extension AppQuranService {
         let storedKind: QuranSessionKind
         var drillKey: QuranMistakeKey?
         var nightKey: GregorianDay?
+        var bridgeAyahs: [Int] = []
         switch kind {
         case .hifz, .bridge:
             guard let portion = kind == .bridge ? snapshot.hifz?.bridge : snapshot.hifz?.portion else { throw DataError.invalidValue("لا يوجد ورد جديد الآن") }
             if kind == .bridge, let wird = snapshot.hifz?.portion {
-                portions = [try QuranAyahRange(first: portion.first, last: wird.last)]
+                bridgeAyahs = Array(portion.first...portion.last)
+                portions = [wird]
             } else { portions = [portion] }
             storedKind = .hifz
         case .review:
@@ -59,7 +61,8 @@ extension AppQuranService {
         var draft = QuranSessionDraft(planID: snapshot.plan?.plan.id, kind: storedKind, storedDay: snapshot.day,
             startedAt: clock(), portions: portions, page: firstPage, ayahID: first.first)
         if storedKind != .hifz { draft.coachStage = .blindRecitation }
-        let value = QuranDraftPayload(draft: draft, method: storedKind == .hifz ? "coach" : "continuous", nightKey: nightKey, rakats: rakaat, drillKey: drillKey, testPages: storedKind == .review ? snapshot.review.testPages : [])
+        var value = QuranDraftPayload(draft: draft, method: storedKind == .hifz ? "coach" : "continuous", nightKey: nightKey, rakats: rakaat, drillKey: drillKey, testPages: storedKind == .review ? snapshot.review.testPages : [])
+        if storedKind == .hifz { value.coach = QuranCoachProgress(bridgeAyahs: bridgeAyahs, intensity: snapshot.plan?.plan.intensity ?? .balanced) }
         try await save(value)
         return try await sessionState(value)
     }
@@ -67,20 +70,39 @@ extension AppQuranService {
     func session(draftID: UUID, action: QuranUISessionAction) async throws -> QuranUISessionResult {
         var value = try savedDraft(draftID), draft = value.draft
         let catalog = try QuranResources.catalog()
+        if draft.storedDay.date != (try snapshot().day.date) {
+            switch action {
+            case .commitPartial, .discard, .saveProgress: break
+            default: throw DataError.invalidValue("احفظ ما تمّ من الجلسة السابقة أو تجاهلها")
+            }
+        }
         let planned = Set(draft.portions.flatMap { Array($0.first...$0.last) })
         switch action {
         case .discard:
             try await command("quran.discardDraft", ["draftID": .string(draftID.uuidString)]); return .discarded
         case .commit, .commitPartial:
+            if case .commitPartial = action, draft.grades.isEmpty, draft.blindPassedAyahs.isEmpty, draft.kind != .drill {
+                try await command("quran.discardDraft", ["draftID": .string(draftID.uuidString)])
+                return .discarded
+            }
             try await command("quran.commitSession", ["draftID": .string(draftID.uuidString)])
             let state = try await load(); return .completed(summary: state.summary)
         case .saveProgress: break
         case .changeMethod(let method):
-            guard ["coach", "continuous"].contains(method), (draft.kind == .hifz ? method == "coach" : method == "continuous") else { throw DataError.invalidValue("هذه الطريقة غير متاحة للجلسة") }
+            guard draft.kind == .hifz ? QuranLearningMethod(rawValue: method) != nil : method == "continuous" else { throw DataError.invalidValue("هذه الطريقة غير متاحة للجلسة") }
+            if method == "link", draft.page == 1 { throw QuranPlanError.invalidPages }
+            if method == "next", draft.ayahID == 1 { throw QuranPlanError.invalidSession }
             value.method = method
+            if value.coach != nil, [.repetition, .lineStarts, .promptedRecall].contains(draft.coachStage) {
+                value.coach?.repetitions = 0; draft.coachStage = .repetition; value.revealedAyahs = []
+            }
         case .reveal(let ayah, let word), .mistake(let ayah, let word):
             guard planned.contains(ayah), let record = catalog.ayah(id: ayah), word.map({ record.wordTokens.indices.contains($0) }) ?? true else { throw QuranPlanError.invalidSession }
-            if case .reveal = action { value.revealedAyahs = (value.revealedAyahs ?? []).union([ayah]) }
+            if case .reveal = action {
+                if value.revealedAyahs?.contains(ayah) == true { return .active(try await sessionState(value)) }
+                value.revealedAyahs = (value.revealedAyahs ?? []).union([ayah])
+                if draft.coachStage != .blindRecitation { value.coach?.learningHints += 1 }
+            }
             // Coach learning reveals stay hints. Only blind recitation records a slip.
             if draft.coachStage == .blindRecitation {
                 let coverage = try snapshot().coverage
@@ -99,6 +121,16 @@ extension AppQuranService {
             draft.grades.removeAll { $0.page == page }; draft.grades.append(QuranDraftGrade(page: page, rating: rating, isTest: isTest))
         case .advance:
             if draft.kind == .hifz {
+                if var coach = value.coach, coach.bridgePending {
+                    coach.bridgePending = false; value.coach = coach; value.draft = draft
+                    try await save(value); return .active(try await sessionState(value))
+                }
+                if var coach = value.coach, [.repetition, .lineStarts, .promptedRecall].contains(draft.coachStage) {
+                    let pageAyahs = catalog.ayahs(on: draft.page).map(\.id).filter { planned.contains($0) }
+                    coach.advanceLearning(stage: &draft.coachStage, ayahID: &draft.ayahID, pageAyahs: pageAyahs,
+                        intensity: coach.intensity, method: QuranLearningMethod(rawValue: value.method) ?? .coach)
+                    value.coach = coach
+                } else {
                 switch draft.coachStage {
                 case .repetition: draft.coachStage = .lineStarts
                 case .lineStarts: draft.coachStage = .promptedRecall
@@ -119,7 +151,9 @@ extension AppQuranService {
                         draft.page = pages[current + 1]
                         draft.ayahID = catalog.ayahs(on: draft.page).first(where: { planned.contains($0.id) })?.id ?? draft.ayahID
                         draft.coachStage = .repetition
+                        value.coach?.repetitions = 0
                     }
+                }
                 }
                 value.revealedAyahs = []
             } else if draft.kind != .drill {
@@ -163,10 +197,61 @@ extension AppQuranService {
         let hifzComplete = draft.kind == .hifz && ids.isSubset(of: draft.blindPassedAyahs)
         let finished = draft.coachStage == .rating && (draft.kind != .hifz || hifzComplete) || draft.kind == .drill && !draft.mistakes.isEmpty
         let readOnlyFinished = finished && draft.kind == .free && draft.grades.isEmpty
-        return QuranUISessionState(id: draft.id, title: draft.kind == .hifz ? "الورد" : "المراجعة", segmentTitle: "الوجه " + numerals.string(draft.page), stage: stage,
+        var state = QuranUISessionState(id: draft.id, title: draft.kind == .hifz ? "الورد" : "المراجعة", segmentTitle: "الوجه " + numerals.string(draft.page), stage: stage,
             progress: ids.isEmpty ? 0 : Double(draft.blindPassedAyahs.count) / Double(ids.count), prompt: "أكمل ثم سجّل ما تمّ", verses: verses,
             page: try await page(draft.page), answers: draft.kind == .drill ? [QuranUIAnswer(id: "pass", text: "أتقنت الموضع"), QuranUIAnswer(id: "fail", text: "أحتاج تدريبًا")] : [],
             grades: grades, primaryTitle: readOnlyFinished ? "أغلق القراءة" : finished ? "أنهِ وسجّل" : "تابع", primaryAction: readOnlyFinished ? .discard : finished ? .commit : .advance,
             canAdvance: true, mistakeAyahID: draft.ayahID, method: value.method, availableMethods: [:], similar: nil, resourceError: nil)
+        if let coach = value.coach {
+            let record = catalog.ayah(id: draft.ayahID)!
+            let target = QuranCoachProgress.repetitionTarget(coach.intensity)
+            let ayahNumber = numerals.string(record.ayahNumber)
+            let pages = Set(try draft.portions.flatMap { try QuranPortionEngine.pages(for: $0, catalog: catalog).map(\.page) }).sorted()
+            let isBridge = coach.bridgePending
+            if isBridge, let id = coach.bridgeAyahs.last, let bridge = catalog.ayah(id: id) { state.page = try await page(bridge.page) }
+            state.title = isBridge ? "الجسر" : "الحفظ الجديد · الورد"
+            state.segmentTitle = portionTitle(try QuranAyahRange(first: ids.min()!, last: ids.max()!), catalog: catalog) + " · " + (QuranLearningMethod(rawValue: value.method)?.title ?? "المدرّب الموجّه")
+            let stageTitle: String = switch draft.coachStage { case .repetition: "التكرار"; case .lineStarts: "أوائل الأسطر"; case .promptedRecall: "استرجاع بالتلقين"; case .blindRecitation: "تسميع مستور"; case .rating: "تقييمك" }
+            var caption: String = switch draft.coachStage {
+            case .repetition: "كرّر الآية " + ayahNumber + " وهي أمامك"
+            case .lineStarts: "استعن بأوائل الأسطر، واللمس يكشف التلقين"
+            case .promptedRecall: "سمّع الآية من حفظك؛ التلقين هنا بلا خطأ"
+            case .blindRecitation: "سمّع الورد مستورًا؛ اللمس يسجّل تعثّرًا"
+            case .rating: "تقييم مقترح من تعثّرك؛ يمكنك تغييره"
+            }
+            if isBridge { caption = switch coach.bridgeAyahs.count {
+            case 1: "اقرأ الآية المحفوظة السابقة، ثم ابدأ الورد"
+            case 2: "اقرأ الآيتين المحفوظتين السابقتين، ثم ابدأ الورد"
+            default: "اقرأ آخر " + numerals.string(coach.bridgeAyahs.count) + " آيات محفوظة، ثم ابدأ الورد"
+            } }
+            else if draft.coachStage == .repetition {
+                switch value.method {
+                case "completeAyah": caption = "أكمل الآية من كلمتيها الأوليين؛ اللمس تلقين"
+                case "next": caption = "ما الآية التي تلي هذا الموضع؟"
+                case "gradual": caption = "أُخفي " + ["ربع الآية", "نصف الآية", "ثلاثة أرباع الآية", "الآية كلها"][min(3, coach.repetitions)] + "؛ اللمس تلقين"
+                case "link": caption = "صل آخر سطر من الوجه السابق بأول هذا الوجه"
+                default: break
+                }
+            }
+            let reference: String?
+            if value.method == "link", draft.page > 1 { reference = try await page(draft.page - 1).lines.last?.glyphs }
+            else if value.method == "next", draft.ayahID > 1 { reference = catalog.ayah(id: draft.ayahID - 1)?.uthmaniText }
+            else { reference = nil }
+            state.coach = QuranUICoach(activeAyahID: draft.ayahID, activeAyahNumber: ayahNumber,
+                plannedAyahs: isBridge ? Set(coach.bridgeAyahs) : ids, revealedAyahs: value.revealedAyahs ?? [],
+                repetition: coach.repetitions, target: target, bridge: isBridge, method: value.method, stageTitle: stageTitle,
+                pageProgress: "الوجه " + numerals.string((pages.firstIndex(of: draft.page) ?? 0) + 1) + " من " + numerals.string(pages.count), caption: caption, pages: pages, referenceText: reference, pastDay: draft.storedDay.date != (try snapshot().day.date))
+            state.availableMethods = Dictionary(uniqueKeysWithValues: QuranLearningMethod.allCases.filter { ($0 != .link || draft.page > 1) && ($0 != .next || draft.ayahID > 1) }.map { ($0.rawValue, $0.title) })
+            if isBridge { state.primaryTitle = "ابدأ الورد" }
+            else if !finished { state.primaryTitle = switch draft.coachStage {
+            case .repetition: value.method == "coach" ? "كرّرتها " + numerals.string(coach.repetitions) + " من " + numerals.string(target) : "سمّعتها"
+            case .lineStarts: "عرفت أوائل الأسطر"
+            case .promptedRecall: "سمّعت الآية"
+            case .blindRecitation: "سمّعت الورد"
+            case .rating: "الوجه التالي"
+            } }
+            if value.method == "gradual", draft.coachStage == .repetition, coach.repetitions < 3 { state.primaryTitle = "أخفِ المزيد" }
+        }
+        return state
     }
 }

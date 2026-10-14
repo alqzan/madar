@@ -122,6 +122,7 @@ targets:
     platform: iOS
     sources: [Tests/Integration]
     dependencies:
+      - package: MadarQuran
       - target: Madar
       - package: MadarData
       - package: MadarCore

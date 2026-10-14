@@ -11,6 +11,15 @@ struct QuranHomeSessionFlow: View {
     @State private var busy = false
     @State private var error: String?
     var body: some View {
+        Group {
+            if let coach = state.coach {
+                QuranHifzCoachView(state: state, coach: coach, busy: busy, action: perform)
+            } else { legacyBody }
+        }
+        .alert("لم تكتمل العملية", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) { Button("تمّ") { error = nil } } message: { Text(error ?? "") }
+        .interactiveDismissDisabled()
+    }
+    private var legacyBody: some View {
         VStack(spacing: 18) {
             HStack { Text(state.title).font(MadarTypography.cardTitle()); Spacer(); Button("إغلاق", systemImage: "xmark") { showExit = true }.labelStyle(.iconOnly).frame(width: 44, height: 44) }
             Text(state.segmentTitle).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
@@ -39,8 +48,6 @@ struct QuranHomeSessionFlow: View {
             Button("تجاهل الجلسة", role: .destructive) { perform(.discard) }
             Button("تابع", role: .cancel) {}
         }
-        .alert("لم تكتمل العملية", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) { Button("تمّ") { error = nil } } message: { Text(error ?? "") }
-        .interactiveDismissDisabled()
     }
     private var stageTitle: String {
         switch state.stage { case .repetition: "التكرار"; case .lineStarts: "أوائل الأسطر"; case .recall: "استرجاع بالتلقين"; case .covered: "تسميع مستور"; case .grading: "تقييمك"; default: "المراجعة" }

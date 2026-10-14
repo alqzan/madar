@@ -8,6 +8,7 @@ import MadarQuran
 import MadarPrayer
 
 @MainActor final class AppQuranService: QuranUIService {
+    private static var registeredPageFontName: String?
     unowned let app: AppSession
     let clock: @MainActor () -> Date
     init(session: AppSession, clock: @escaping @MainActor () -> Date = { prayerUITestClock(.now) }) { app = session; self.clock = clock }
@@ -183,23 +184,35 @@ import MadarPrayer
     func page(_ number: Int) async throws -> QuranUIPage {
         let catalog = try QuranResources.catalog()
         guard let layout = catalog.layout?.page(number), let fontURL = QuranResourceCatalog.bundledFontURL() else { throw QuranPlanError.invalidPages }
-        var error: Unmanaged<CFError>?
-        _ = CTFontManagerRegisterFontsForURL(fontURL as CFURL, .process, &error)
-        guard let descriptors = CTFontManagerCreateFontDescriptorsFromURL(fontURL as CFURL) as? [CTFontDescriptor], let descriptor = descriptors.first else { throw QuranPlanError.invalidPages }
-        let name = CTFontCopyPostScriptName(CTFontCreateWithFontDescriptor(descriptor, 23.3, nil)) as String
+        let name: String
+        if let cached = Self.registeredPageFontName { name = cached }
+        else {
+            var error: Unmanaged<CFError>?
+            _ = CTFontManagerRegisterFontsForURL(fontURL as CFURL, .process, &error)
+            guard let descriptors = CTFontManagerCreateFontDescriptorsFromURL(fontURL as CFURL) as? [CTFontDescriptor], let descriptor = descriptors.first else { throw QuranPlanError.invalidPages }
+            name = CTFontCopyPostScriptName(CTFontCreateWithFontDescriptor(descriptor, 23.3, nil)) as String
+            Self.registeredPageFontName = name
+        }
         let lines = try layout.lines.map { line -> QuranUILine in
             var parts: [String] = []
+            var words: [QuranUIWord] = []
             for word in line.words {
                 guard let ayah = catalog.ayah(id: word.ayahID) else { throw QuranPlanError.invalidPages }
                 let tokens = ayah.wordTokens
                 guard tokens.indices.contains(word.wordIndex) else { throw QuranPlanError.invalidPages }
                 parts.append(tokens[word.wordIndex].text)
+                words.append(QuranUIWord(ayahID: ayah.id, index: word.wordIndex, text: tokens[word.wordIndex].text, ayahWordCount: tokens.count))
+                if word.wordIndex == tokens.count - 1, line.ayahEnds.contains(ayah.id) {
+                    let marker = (ayah.uthmaniText as NSString).substring(from: tokens[word.wordIndex].utf16Range.upperBound).trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !marker.isEmpty { parts.append(marker); words.append(QuranUIWord(ayahID: ayah.id, index: nil, text: marker)) }
+                }
             }
             let text = line.kind == .surah ? (catalog.ayahs.first { $0.surahID == line.surahID }?.surahNameArabic ?? "") : line.kind == .basmala ? "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ" : parts.joined(separator: " ")
-            return QuranUILine(id: line.number, glyphs: text, semanticText: text)
+            return QuranUILine(id: line.number, glyphs: text, semanticText: text, words: words, centered: line.kind != .ayah || number <= 2, surahOpening: line.kind == .surah)
         }
         return QuranUIPage(page: number, title: "الوجه " + numerals.string(number), postScriptName: name, lines: lines,
-            semanticAyat: catalog.ayahs(on: number).map { QuranUIVerse(id: $0.id, title: $0.surahNameArabic + " " + numerals.string($0.ayahNumber), text: $0.uthmaniText, hidden: false, canReveal: false) })
+            semanticAyat: catalog.ayahs(on: number).map { QuranUIVerse(id: $0.id, title: $0.surahNameArabic + " " + numerals.string($0.ayahNumber), text: $0.uthmaniText, hidden: false, canReveal: false) },
+            surahTitle: catalog.ayahs(on: number).first?.surahNameArabic ?? "", juzTitle: "الجزء " + numerals.string(catalog.ayahs(on: number).first?.juz ?? 1), numberLabel: numerals.string(number))
     }
     func qiyamPreview(rakaat: Int) async throws -> QuranUIQiyamPreview {
         let snapshot = try snapshot(), result = try QuranQiyamEngine.assignment(rakats: rakaat, pages: snapshot.pages)

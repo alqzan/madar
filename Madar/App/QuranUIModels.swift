@@ -91,13 +91,17 @@ enum QuranUICommand: Sendable {
     case cancelRecovery
     case raisePages(juz: Int)
 }
-struct QuranUILine: Identifiable, Sendable { var id: Int; var glyphs: String; var semanticText: String }
+struct QuranUIWord: Sendable { var ayahID: Int; var index: Int?; var text: String; var ayahWordCount = 0 }
+struct QuranUILine: Identifiable, Sendable { var id: Int; var glyphs: String; var semanticText: String; var words: [QuranUIWord] = []; var centered = false; var surahOpening = false }
 struct QuranUIPage: Sendable {
     var page: Int
     var title: String
     var postScriptName: String // registered official Hafs 2.0 font; text and 1439 logical layout verified
     var lines: [QuranUILine]
     var semanticAyat: [QuranUIVerse]
+    var surahTitle = ""
+    var juzTitle = ""
+    var numberLabel = ""
 }
 struct QuranUIVerse: Identifiable, Sendable { var id: Int; var title: String; var text: String; var hidden: Bool; var canReveal: Bool }
 struct QuranUIAnswer: Identifiable, Sendable { var id: String; var text: String }
@@ -131,6 +135,14 @@ struct QuranUISessionState: Identifiable, Sendable {
     var availableMethods: [String: String]
     var similar: QuranUISimilar?
     var resourceError: String?
+    var coach: QuranUICoach?
+}
+struct QuranUICoach: Sendable {
+    var activeAyahID: Int; var activeAyahNumber: String; var plannedAyahs: Set<Int>; var revealedAyahs: Set<Int>
+    var repetition: Int; var target: Int; var bridge: Bool; var method: String
+    var stageTitle: String; var pageProgress: String; var caption: String
+    var pages: [Int]; var referenceText: String?
+    var pastDay: Bool
 }
 enum QuranUISessionResult: Sendable { case active(QuranUISessionState), completed(summary: [String]), discarded }
 @MainActor protocol QuranUIService: AnyObject {

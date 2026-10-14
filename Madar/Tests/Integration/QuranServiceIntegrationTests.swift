@@ -32,7 +32,8 @@ import MadarCommands
         let (app, service, root) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
         try await service.perform(.savePlan(QuranUIPlanInput(startAyah: 149, unit: .page, amount: 2, rhythm: .balanced, restDay: "none", missPolicy: "ask")))
         let started = try await service.start(kind: .hifz, stepID: "hifz", range: nil, rakaat: nil, spotID: nil)
-        for _ in 0..<4 { _ = try await service.session(draftID: started.id, action: .advance) }
+        try await learnPage(service, id: started.id)
+        _ = try await service.session(draftID: started.id, action: .advance)
         _ = try await service.session(draftID: started.id, action: .commitPartial)
         let session = try XCTUnwrap(ModelContext(app.container).fetch(FetchDescriptor<HifzSession>()).first)
         XCTAssertEqual(session.fromAyah, 149); XCTAssertEqual(session.toAyah, 152)
@@ -46,11 +47,15 @@ import MadarCommands
         _ = try await service.session(draftID: started.id, action: .reveal(ayahID: 1, wordIndex: nil))
         let context = ModelContext(app.container)
         XCTAssertEqual(try context.fetch(FetchDescriptor<MistakeEvent>()).count, 0)
+        XCTAssertEqual(try service.savedDraft(started.id).coach?.learningHints, 1)
         let reopened = AppQuranService(session: app)
         let resumed = try await reopened.resume(draftID: started.id)
         XCTAssertEqual(resumed.stage, .repetition)
-        for _ in 0..<3 { _ = try await reopened.session(draftID: started.id, action: .advance) }
-        _ = try await reopened.session(draftID: started.id, action: .mistake(ayahID: 3, wordIndex: nil))
+        _ = try await reopened.session(draftID: started.id, action: .advance)
+        XCTAssertEqual(try reopened.savedDraft(started.id).coach?.repetitions, 1)
+        try await learnPage(reopened, id: started.id)
+        _ = try await reopened.session(draftID: started.id, action: .reveal(ayahID: 3, wordIndex: nil))
+        _ = try await reopened.session(draftID: started.id, action: .reveal(ayahID: 3, wordIndex: nil))
         _ = try await reopened.session(draftID: started.id, action: .advance)
         _ = try await reopened.session(draftID: started.id, action: .commit)
         let result = try await reopened.load()
@@ -63,5 +68,51 @@ import MadarCommands
         let sessions = try ModelContext(app.container).fetch(FetchDescriptor<HifzSession>())
         XCTAssertEqual(sessions.filter { $0.deletedAt == nil }.count, 1)
         XCTAssertEqual(sessions.first?.mistakes, 1)
+    }
+    func testMethodsAndEmptyPartialExitPreserveFacts() async throws {
+        let (app, service, root) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
+        try await service.perform(.savePlan(QuranUIPlanInput(startAyah: 149, unit: .ayah, amount: 1, rhythm: .light, restDay: "none", missPolicy: "ask")))
+        let started = try await service.start(kind: .hifz, stepID: nil, range: nil, rakaat: nil, spotID: nil)
+        _ = try await service.session(draftID: started.id, action: .changeMethod("link"))
+        let linked = try await service.resume(draftID: started.id)
+        XCTAssertNotNil(linked.coach?.referenceText)
+        _ = try await service.session(draftID: started.id, action: .commitPartial)
+        XCTAssertEqual(try ModelContext(app.container).fetchCount(FetchDescriptor<HifzSession>()), 0)
+        let after = try await service.load(); XCTAssertNil(after.draft)
+    }
+    func testCoachKeepsItsOriginalIntensityWhenPlanChanges() async throws {
+        let (app, service, root) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
+        try await service.perform(.savePlan(QuranUIPlanInput(startAyah: 1, unit: .ayah, amount: 7, rhythm: .light, restDay: "none", missPolicy: "ask")))
+        let started = try await service.start(kind: .hifz, stepID: nil, range: nil, rakaat: nil, spotID: nil)
+        try await service.perform(.savePlan(QuranUIPlanInput(startAyah: 1, unit: .ayah, amount: 7, rhythm: .intense, restDay: "none", missPolicy: "ask")))
+        let resumed = try await AppQuranService(session: app).resume(draftID: started.id)
+        XCTAssertEqual(resumed.coach?.target, 3)
+        for _ in 0..<3 { _ = try await service.session(draftID: started.id, action: .advance) }
+        let after = try await service.resume(draftID: started.id)
+        XCTAssertEqual(after.stage, .lineStarts)
+    }
+    func testPastDayCoachOnlyAllowsSavingCompletedWorkOrDiscarding() async throws {
+        let (app, service, root) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
+        try await service.perform(.savePlan(QuranUIPlanInput(startAyah: 1, unit: .ayah, amount: 7, rhythm: .balanced, restDay: "none", missPolicy: "ask")))
+        let started = try await service.start(kind: .hifz, stepID: nil, range: nil, rakaat: nil, spotID: nil)
+        let tomorrow = AppQuranService(session: app, clock: { service.clock().addingTimeInterval(86_400) })
+        let resumed = try await tomorrow.resume(draftID: started.id)
+        XCTAssertEqual(resumed.coach?.pastDay, true)
+        do {
+            _ = try await tomorrow.session(draftID: started.id, action: .advance)
+            XCTFail("An old-day draft must not continue on another day")
+        } catch { XCTAssertEqual(error as? DataError, .invalidValue("احفظ ما تمّ من الجلسة السابقة أو تجاهلها")) }
+        _ = try await tomorrow.session(draftID: started.id, action: .commitPartial)
+        XCTAssertEqual(try ModelContext(app.container).fetchCount(FetchDescriptor<HifzSession>()), 0)
+        let after = try await tomorrow.load(); XCTAssertNil(after.draft)
+    }
+    private func learnPage(_ service: AppQuranService, id: UUID) async throws {
+        var state = try await service.resume(draftID: id)
+        for _ in 0..<100 {
+            if state.stage == .covered { return }
+            guard case .active(let next) = try await service.session(draftID: id, action: .advance) else { XCTFail("Learning must not commit"); return }
+            state = next
+        }
+        XCTFail("The page never reached blind recitation")
     }
 }
