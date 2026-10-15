@@ -113,6 +113,27 @@ import XCTest
         XCTAssertTrue(writer.waitForExistence(timeout: 5))
         XCTAssertEqual(writer.value as? String, "بداية هادئة من البهو")
     }
+    func testNativeMinimizedBarAndVisibleTabsSwitchOnce() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": "empty", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
+        app.launch()
+        XCTAssertTrue(app.buttons["diary-write"].waitForExistence(timeout: 20))
+        app.tabBars.buttons["مدار"].tap()
+        XCTAssertTrue(app.staticTexts["bahw-greeting"].waitForExistence(timeout: 10))
+        app.swipeUp(velocity: .slow)
+        capture(app, "UX-10-native-scrolled-L")
+        let quran = app.tabBars.buttons["القرآن"]
+        print("UX-10 collapsed Quran: exists=\(quran.exists), hittable=\(quran.isHittable)")
+        if !quran.isHittable { app.tabBars.buttons["مدار"].tap() }
+        XCTAssertTrue(quran.waitForExistence(timeout: 5)); quran.tap()
+        XCTAssertTrue(app.staticTexts["quran-coverage-title"].waitForExistence(timeout: 10), app.debugDescription)
+        capture(app, "UX-10-single-tap-quran-L")
+        for (tab, id) in [("الصلاة", "prayer-today-header"), ("خصّص", "settings-search"), ("المذكرات", "diary-home-title"), ("مدار", "bahw-block-salah")] {
+            app.tabBars.buttons[tab].tap()
+            XCTAssertTrue(app.descendants(matching: .any).matching(identifier: id).firstMatch.waitForExistence(timeout: 10), tab + app.debugDescription)
+        }
+    }
     private func finishOnboarding(_ app: XCUIApplication) {
         if app.buttons["first-run-skip"].waitForExistence(timeout: 2) { app.buttons["first-run-skip"].tap() }
         let start = app.buttons["first-run-continue"]
