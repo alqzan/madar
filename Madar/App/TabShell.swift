@@ -43,7 +43,8 @@ struct MadarRootView: View {
                 else if tab == "prayer" { PrayerTodayView(session: session) }
                 else if tab == "quran" { QuranHomeView(service: AppQuranService(session: session)) }
                 else if tab == "notes" { DiaryRoomView(app: session) }
-                else { FoundationHome(session: session) }
+                // M4-V01: the lobby replaces the M0 foundation home (kept in FoundationHome.swift, unused).
+                else { BahwLobbyView(session: session) }
             }
         }
         .font(MadarTypography.body())

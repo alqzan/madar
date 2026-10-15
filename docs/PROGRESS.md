@@ -1,6 +1,6 @@
 # Current milestone
 
-**M3 Diary — E01/D01 done; V01–V08, V10–V11, V13–V15 and F01 matched — awaiting owner; M4 opened 15 Oct: E01 done, V01 next; habits blocked on RL3/RL2.** V09 blocked (Day One fixture), V12 blocked (frozen privacy cleanup). M2-V01–V17 are approved; M1-F04 software is complete. Device/milestone gates stay deferred until the whole app is finished. RA1/RA2, RP1, RU1 and data preservation remain mandatory.
+**M3 Diary — E01/D01 done; V01–V08, V10–V11, V13–V15 and F01 matched — awaiting owner; M4 opened 15 Oct: E01 done, V01 matched — awaiting owner, V03 next; habits blocked on RL3/RL2.** V09 blocked (Day One fixture), V12 blocked (frozen privacy cleanup). M2-V01–V17 are approved; M1-F04 software is complete. Device/milestone gates stay deferred until the whole app is finished. RA1/RA2, RP1, RU1 and data preservation remain mandatory.
 
 # Last checked
 
@@ -111,7 +111,7 @@ Read §7.1 `sections/08-r-bahw.md`, §9 widgets, §5 for shared shapes; RL1–RL
 |---|---|---|---|
 | M4-E01 | Year and upcoming-day engines — §7.1 «السنة وما يهمّك», B03, B04. | done | `MadarYear` (Gregorian/Hijri year and month, Saturday week, crescent, five landmarks, Ramadan countdown) and `MadarUpcomingRule` (rule stored, next/previous derived, short-month fallback, ring from countStart). `swift test --filter MadarYearTests` 6/6; expected values from §7.1/B03/B04/RL10. |
 | M4-E02 | Habit engine — §7.1, J08, RL2 HabitEvent, RL3 rules, RL4 one streak per fact. | blocked: owner rules (RL3) and schema go (RL2) | RL3 open: does «أقل القليل» count toward «٤ من ١٠»; HabitPolicy or the designated days as the target source; which period a frequency change applies to; target of the 7–13-day transitional week; freeze limits and backdating; keep `streakBreakAfter` fixed at 2 [DEFAULT]. RL2 adds an append-only `HabitEvent` model (schema V4): needs the owner's go before any store change. |
-| M4-V01 | Lobby — `bahw/02-W1-Bahw.jpg`, `-s1`; RL1 labelled rings. | ready | Blocks for built rooms (prayer, Quran, diary, year, upcoming); habits block waits for E02; no money/Mihbara entry. F1-Nihai orbit is not the lobby default (RL1). |
+| M4-V01 | Lobby — `bahw/02-W1-Bahw.jpg`, `-s1`; RL1 labelled rings. | matched — awaiting owner | `BahwLobbyView` replaces the M0 home on the «مدار» tab (FoundationHome kept, unused). Fixed header (greeting by prayer time, both dates joined by «، », «رتّب», «خصّص مدار»); 4-column dense first-fit grid from the right (`BahwGrid`, Core 2/2); built blocks at four sizes read from their rooms (prayer snapshot, Quran widget snapshot, diary day, `MadarYear`, upcoming rules + seasons); tap opens the room sheet with «افتح …»; arrange by «رتّب» or a 0.52 s press: drag to reorder, − to hide, size menu, + drawer with the hidden count, saved in `bahw.layout` with settings undo. Verified: `BahwLobbyUITests` 1/1, FoundationUITests M0-T10, M0-T17, M1-T08, M1-V10 pass on the lobby (arch ids keep `foundation-prayer-time-*`); compare `W1-Bahw`. Differences: no habits/money/Mihbara blocks (not built), prayer is wide per the schema default (canonical shows small), large size reuses the wide content, size by menu instead of the copper drag handle, no moon button (prototype). |
 | M4-V02 | Habits room — `bahw/03-W2-Adat.jpg`, `-s1`, `-s2`. | blocked: M4-E02 | Orbit with labels; no state by colour alone (RL1). |
 | M4-V03 | Year and what matters — `bahw/04-W3-Sana.jpg`, `-s1`, `-s2`. | ready | Strip only in v1 (`bahw.yearView` alternatives are v2); upcoming as rings; auto sources (seasons, next juz, trips) are read models, never rows; salary absent until M5. |
 | M4-V04 | Customise Madar — `bahw/05-W4-Takhsis.jpg`, `-s1`, `-s2`. | ready | RL9: hide `tabbar.openOn` byTime, `bahw.smartPresence` levels, `core.fontScale`, `core.motion` calm. |
@@ -150,14 +150,13 @@ M3-V01–V08, V10–V11 and V13–V14 await owner visual acceptance. Owner visua
 No ready screen card remains in the M2 queue; owner accepted the completed screens and selected the M1-F04 blocker next. M1-G remains deferred until the whole app is finished. M1-F04 software blocker is resolved; its OS/device checks remain deferred. M3 opened by owner on 15 October; E01/D01 are complete, V01–V08, V10–V11, V13–V15 and F01 are matched awaiting owner. V09 remains blocked by an owner Day One fixture, V12 by the frozen privacy-cleanup interaction. Keep tafsir off until its separate licence is verified. Do not claim an M1/M2 gate or iPhone pass.
 
 # Handovers
-## Handover — M3-F01 revisions, letters, projects — 2026-10-15 — Claude
-Works now: edit a diary line (in place before the RD1 freeze, a revision row with «عُدّل · الأصل» after); letters mailbox with sealed/waiting/opened states, envelope opening moment, blurred sealed line on the written day, reschedule for orphaned letters; projects with keyword suggestions, linked lines, finish into «الفصول», delete with undo. Undo now refuses a revision that a later revision replaced.
-Verified: `swift test` Core 55, Commands 47, Data 63 passed; `xcodebuild … test` all Diary UI + integration classes: 32 passed, 1 failed (DiaryEditorUITests transcript tap hidden behind the «اكتب» bar since V13 grew the page; locator fixed, class rerun 3/3); RU1 check and git diff --check pass.
-Differences left: no canonical board for the mailbox/projects panels in this card (built in the diary paper style); «يتعلّق بـ…؟» shows on the day page, not inside the editor.
-Also: travel days framed in the calendars, return-day envelope, letters re-checked when the app returns to the foreground (`DiaryTravelUITests` 2/2, `DiaryHubUITests` 1/1, `DiarySeasonUITests` 2/2, `DiaryTodayUITests` 2/2, `DiaryLettersUITests` 1/1).
-Not verified: owner visual/iPhone; dark mode; foreground letter re-check (no UI test); bookFinished/khatma triggers not built.
-Next: owner review of V01–V15 and F01, then open M4 (no ready card left); V09 waits for the Day One fixture, V12 for the frozen privacy cleanup. Pause Codex automation (00:17).
-Model/effort: Claude Opus 5.5; effort not exposed. Usage: not exposed.
+## Handover — M3-F01, V15 follow-up, M4-E01/V01 — 2026-10-15 — Claude
+Works now: diary edits/revisions, letters, projects, travel frames and return envelope (M3 has no ready card left); M4 opened: year/upcoming engines and the lobby with built blocks, room sheets and arranging saved in `bahw.layout`.
+Verified: Core `MadarYearTests` 6/6 and `BahwGridTests` 2/2; Commands 47; diary UI+integration regression 33 (one locator fixed); `BahwLobbyUITests` 1/1 and FoundationUITests M0-T10/M0-T17/M1-T08/M1-V10 on the lobby; full FoundationUITests run in progress: M0-S2 backup, M0-T08 export share and M1-F02 travel pill failed in it and are being checked; RU1 and git diff --check pass.
+Differences left: lobby without habits/money/Mihbara, prayer block wide by schema, large size reuses wide content, size by menu; letters/projects panels have no canonical board.
+Not verified: owner visual/iPhone; dark mode; foreground letter re-check (no UI test).
+Next: owner answers RL3 questions and gives RL2 (HabitEvent, schema V4) go for M4-E02; then M4-V03 «السنة وما يهمّك» (ready), V04, W01. Pause Codex automation (00:17).
+Model/effort: Claude Opus 5.5; effort not exposed. Usage: 5-hour 55% at this checkpoint (session tool), weekly 27%.
 
 ## Handover — Review + M3-V15 travel diary — 2026-10-15 — Claude
 Works now: travel today page on the shared Trip (air-mail head, distance, stamp, day ordinal, drawn route, passport stamp, «اكتب من [المدينة]», stamps sheet). Review fixes: RU1 script no longer flags comments; diary search trip window is now [start, end).

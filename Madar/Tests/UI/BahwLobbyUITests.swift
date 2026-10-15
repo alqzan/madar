@@ -1,0 +1,41 @@
+import XCTest
+
+/// M4-V01 · bahw/02-W1-Bahw: the lobby shows built rooms only, arranges through settings, and opens a room from its sheet.
+@MainActor final class BahwLobbyUITests: XCTestCase {
+    func testLobbyBuiltBlocksArrangeAndOpen() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_NOW": "2026-10-07T16:20:00+03:00",
+                                 "MADAR_UI_TRACKING_START": "2026-10-01", "MADAR_UI_PRAYER_FIXTURE": "homeShowcase", "MADAR_UI_THEME": "light"]
+        app.launch(); finishOnboarding(app)
+        func element(_ id: String) -> XCUIElement { app.descendants(matching: .any).matching(identifier: id).firstMatch }
+        XCTAssertTrue(element("bahw-greeting").waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertEqual(element("bahw-greeting").label, "مساء الخير")
+        XCTAssertFalse(element("bahw-date").label.contains("·"))
+        for block in ["salah", "quran", "year", "upcoming"] { XCTAssertTrue(element("bahw-block-" + block).exists, block) }
+        // Rooms not built yet have no entry point (habits wait for RL3; money and Mihbara for M5/M6).
+        for block in ["habits", "mal", "mihbara"] { XCTAssertFalse(element("bahw-block-" + block).exists, block) }
+        XCTAssertTrue(element("bahw-salah-next").label.contains("المغرب"), element("bahw-salah-next").label)
+        capture(app, "M4-V01-lobby-L")
+        app.swipeUp(); XCTAssertTrue(element("bahw-block-notes").waitForExistence(timeout: 5)); capture(app, "M4-V01-lobby-s1-L")
+        app.swipeDown()
+
+        app.buttons["bahw-arrange"].tap()
+        let hide = app.buttons["bahw-hide-year"]; XCTAssertTrue(hide.waitForExistence(timeout: 5)); hide.tap()
+        XCTAssertTrue(element("bahw-block-year").waitForNonExistence(timeout: 5))
+        app.swipeUp(); app.buttons["bahw-drawer"].tap()
+        let show = app.buttons["bahw-show-year"]; XCTAssertTrue(show.waitForExistence(timeout: 5)); show.tap()
+        XCTAssertTrue(element("bahw-block-year").waitForExistence(timeout: 5))
+        app.swipeDown(); app.buttons["bahw-arrange"].tap()
+
+        element("bahw-block-salah").tap()
+        let open = app.buttons["bahw-open-prayer"]; XCTAssertTrue(open.waitForExistence(timeout: 5)); capture(app, "M4-V01-salah-sheet-L"); open.tap()
+        XCTAssertTrue(element("prayer-today-header").waitForExistence(timeout: 10), app.debugDescription)
+    }
+    private func finishOnboarding(_ app: XCUIApplication) {
+        if app.buttons["first-run-skip"].waitForExistence(timeout: 2) { app.buttons["first-run-skip"].tap() }
+        let start = app.buttons["first-run-continue"]
+        if start.waitForExistence(timeout: 2) { start.tap(); if start.exists && start.isHittable { start.tap() } }
+    }
+    private func capture(_ app: XCUIApplication, _ name: String) { let a = XCTAttachment(screenshot: app.screenshot()); a.name = name; a.lifetime = .keepAlways; add(a) }
+}
