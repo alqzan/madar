@@ -51,7 +51,7 @@ struct DiaryDayView: View {
                 }
 
                 if let travel {
-                    DiaryTravelHeader(page:travel,subtitle:service.weekday(shownDay)+"، "+service.dateTitle(shownDay,calendar:first),distance:service.kilometres(travel.kilometres),digits:service.digits)
+                    DiaryTravelHeader(page:travel,subtitle:service.bothDates(shownDay,calendar:first),distance:service.kilometres(travel.kilometres),digits:service.digits)
                 } else {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(service.weekday(shownDay) + "، " + service.dateTitle(shownDay, calendar: first == .hijri ? .gregorian : .hijri) + (friday ? "، " + service.dateTitle(shownDay,calendar:first):""))
@@ -69,7 +69,7 @@ struct DiaryDayView: View {
                 }
                 if let returnDay,!returnDismissed {
                     VStack(alignment:.leading,spacing:8){
-                        Text("آخر صفحة كتبتها: "+service.dateTitle(returnDay,calendar:first)).font(DiaryType.label)
+                        Text("آخر صفحة كتبتها: "+service.bothDates(returnDay,calendar:first)).font(DiaryType.label)
                         Text("يمكنك أن تبدأ من اليوم أو تفتح يومًا سابقًا. لا تحتاج إلى تعويض شيء.").font(MadarTypography.body())
                         HStack(spacing:8){
                             Button{archiveOpen=true}label:{Text("افتح يومًا سابقًا").frame(maxWidth:.infinity,minHeight:44).overlay{Capsule().stroke(theme.line)}}.accessibilityIdentifier("diary-return-days")
@@ -84,7 +84,7 @@ struct DiaryDayView: View {
                     DiaryTravelReturnCard(trip:travelReturn,days:dayCount(travelReturn.days),distance:service.kilometres(travelReturn.kilometres)){stampsOpen=true}.padding(.horizontal,18).padding(.vertical,6)
                 }
                 if shownDay == today,let waitingLetter {
-                    DiaryLetterWaitingCard(letter:waitingLetter,digitsTitle:service.dateTitle(waitingLetter.writtenDay,calendar:.gregorian)){openingLetter=waitingLetter}.padding(.horizontal,18).padding(.vertical,6)
+                    DiaryLetterWaitingCard(letter:waitingLetter,digitsTitle:service.bothDates(waitingLetter.writtenDay)){openingLetter=waitingLetter}.padding(.horizontal,18).padding(.vertical,6)
                 }
                 if shownDay == today || !intentions.isEmpty {
                     Button {intentionsOpen=true} label:{
@@ -125,7 +125,7 @@ struct DiaryDayView: View {
                             context.stroke(margin, with: .color(theme.color("margin")), lineWidth: 1)
                         }
                     }
-                }.overlay(alignment:.topTrailing){if let travel,!typeSize.isAccessibilitySize {DiaryPassportStamp(city:travel.city,date:service.shortDate(travel.arrival)).padding(.top,40).padding(.trailing,4)}}.overlay(alignment:.topTrailing){if friday,!typeSize.isAccessibilitySize {HStack(alignment:.top,spacing:5){ribbon("يوم الجمعة",color:theme.accent,height:88);if appearance?.weekAvailable == true {Button{weekOpen=true}label:{ribbon("صندوق الأسبوع",color:theme.color("ghad"),height:130).frame(width:44).contentShape(.rect)}.buttonStyle(.plain).accessibilityIdentifier("diary-week-open")}}.padding(.trailing,12)}}
+                }.overlay(alignment:.topTrailing){if let travel,!typeSize.isAccessibilitySize {DiaryPassportStamp(city:travel.city,date:service.stampDate(travel.arrival)).padding(.top,40).padding(.trailing,4)}}.overlay(alignment:.topTrailing){if friday,!typeSize.isAccessibilitySize {HStack(alignment:.top,spacing:5){ribbon("يوم الجمعة",color:theme.accent,height:88);if appearance?.weekAvailable == true {Button{weekOpen=true}label:{ribbon("صندوق الأسبوع",color:theme.color("ghad"),height:130).frame(width:44).contentShape(.rect)}.buttonStyle(.plain).accessibilityIdentifier("diary-week-open")}}.padding(.trailing,12)}}
                 }
             }.background(theme.background).foregroundStyle(theme.ink).environment(\.roomTheme,theme)
                 .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -207,7 +207,7 @@ struct DiaryDayView: View {
                 }
                 if line.kind == "late" { Text("كُتبت لاحقًا").font(DiaryType.label) }
                 if line.kind == "margin" {
-                    Text("هامش · " + (page.marginDays[line.id].map { service.dateTitle($0, calendar: .gregorian) } ?? "تاريخ الكتابة غير متاح")).font(DiaryType.label)
+                    Text("هامش · " + (page.marginDays[line.id].map { service.bothDates($0) } ?? "تاريخ الكتابة غير متاح")).font(DiaryType.label)
                 }
                 if auto { Text(line.kind == "salah" ? "الصلاة" : "القرآن").font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)) }
             }.foregroundStyle(line.kind == "margin" ? secondInk : line.kind == "late" ? theme.color("late") : auto ? theme.color("autoInkText") : theme.ink)

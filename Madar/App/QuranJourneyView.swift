@@ -21,8 +21,8 @@ struct QuranJourneyView: View {
                             Text("رحلة الحفظ").font(quranFont(17, bold: true))
                             Text("أوجه القرآن الباقية").font(quranFont(12)).foregroundStyle(theme.secondaryInk)
                             journeyChart(value)
-                            Text("بالخطة: " + value.planned).font(quranFont(13, bold: true))
-                            Text("بوتيرتك: " + value.actual).font(quranFont(13, bold: true)).accessibilityIdentifier("quran-journey-forecast")
+                            MadarDateLabel("بالخطة: " + value.planned).font(quranFont(13, bold: true))
+                            MadarDateLabel("بوتيرتك: " + value.actual).font(quranFont(13, bold: true)).accessibilityIdentifier("quran-journey-forecast")
                             Text(value.explanation).font(quranFont(11)).foregroundStyle(theme.secondaryInk)
                         }
                     }

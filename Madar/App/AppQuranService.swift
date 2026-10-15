@@ -87,7 +87,7 @@ import MadarPrayer
             let memorized = snapshot.completedOn.values.filter { $0 == key }.count
             let reviewed = Set(sessions.filter { [.review, .free, .qiyam].contains($0.kind) }.flatMap { $0.grades.map(\.page) }).count
             heat.append(QuranUIHeatDay(id: key.description, title: numerals.string(key.day), hifzFraction: Double(memorized),
-                reviewFraction: Double(reviewed) / 8, accessibilityLabel: numerals.localized(key.description) + "، حفظ " + faceCount(memorized) + "، مراجعة " + faceCount(reviewed)))
+                reviewFraction: Double(reviewed) / 8, accessibilityLabel: displayDate(key) + "، حفظ " + faceCount(memorized) + "، مراجعة " + faceCount(reviewed)))
         }
         let weekStart = today.adding(days: -6)
         let memorizedThisWeek = snapshot.completedOn.values.filter { $0 >= weekStart && $0 <= today }.count
@@ -103,7 +103,7 @@ import MadarPrayer
         let weeklySummary = firstHifzDay == nil || firstHifzDay == today ? "أول يوم" : "آخر " + numerals.string(7) + " أيام: حفظت " + faceCount(memorizedThisWeek) + "، راجعت " + faceCount(reviewedThisWeek)
             + "، " + serviceWeekRatio(completedDays, eligibleWeekDays.count)
         let historySessions = snapshot.sessions.reversed().map { fact in
-            QuranUIHistorySession(id: fact.id, title: fact.kind == .hifz ? "حفظ" : "مراجعة", dateLabel: numerals.localized(fact.dayKey.description),
+            QuranUIHistorySession(id: fact.id, title: fact.kind == .hifz ? "حفظ" : "مراجعة", dateLabel: displayDate(fact.dayKey),
                 detail: faceCount(fact.pages.count), grades: fact.grades.map { QuranUIPageGrade(page: $0.page, title: "الوجه " + numerals.string($0.page),
                     grade: QuranUIGrade(rawValue: $0.rating.storedRaw)!, explanation: "تقييمك") }, warning: nil)
         }
@@ -149,7 +149,7 @@ import MadarPrayer
             percentageLabel: numerals.percent(coverage.percent), streakLabel: "سلسلة " + dayCount(streak.days), streakDays: streak.days, balanceTitle: balance,
             balanceExplanation: "تتبع الخطة حاجة المراجعة ومقدار حفظك", hifzLevel: QuranUILevel(rawValue: snapshot.hifzLevel.rawValue)!,
             reviewLevel: QuranUILevel(rawValue: snapshot.reviewLevel.rawValue)!, steps: steps, recentDays: heat, plan: plan, surahs: surahs, draft: draft,
-            missedDayKey: missedDay?.description, missedDayTitle: missedDay.map { "لو فاتك يوم " + numerals.localized($0.description) },
+            missedDayKey: missedDay?.description, missedDayTitle: missedDay.map { "لو فاتك يوم " + displayDate($0) },
             summary: ["في صدرك " + coverageTitle], history: QuranUIHistory(weekSummary: [weeklySummary], yearSummary: [], allSummary: [], days: heat, coverage: [], sessions: historySessions),
             strengthTitle: "مؤشر وصفي من تقييمك ومواعيد المراجعة", strength: strength,
             recovery: QuranUIRecovery(distantLabel: faceCount(snapshot.pages.filter(\.isFar).count) + " بعيدة", activeTitle: snapshot.recovery == nil ? nil : "خطة استرداد", canCreate: snapshot.pages.contains(where: \.isFar), previews: [:]),
@@ -191,13 +191,16 @@ import MadarPrayer
             startingOn: startingOn, restDay: rest, allotments: snapshot.allotments, pagesPerPlanUnit: unitFaces)
         let title: String
         let estimatedDays: Int?
+        var secondaryDate: String?
         switch result {
         case .complete: title = snapshot.coverage.isKhatm ? "ختمت" : "اكتمل نطاق خطّتك"; estimatedDays = nil
         case .unavailable: title = "لم تتضح الوتيرة بعد"; estimatedDays = nil
-        case .estimated(let day): title = displayDate(day, hijriOnly: true); estimatedDays = startingOn.quranDistance(to: day) + 1
+        case .estimated(let day):
+            let dates = app.dateLabels(day); title = dates.primary; secondaryDate = dates.secondary
+            estimatedDays = startingOn.quranDistance(to: day) + 1
         }
         return QuranUIForecast(title: title, assumptions: "تقدير بافتراض إتمام أيام الحفظ بلا فوت أو تثبيت، حُسب في " + displayDate(snapshot.day.date),
-            warning: input.amount * unitFaces > 2 ? "المقدار يتجاوز وجهين في يوم الحفظ" : nil, portions: [], estimatedDays: estimatedDays)
+            warning: input.amount * unitFaces > 2 ? "المقدار يتجاوز وجهين في يوم الحفظ" : nil, portions: [], estimatedDays: estimatedDays, secondaryDate: secondaryDate)
     }
     func page(_ number: Int) async throws -> QuranUIPage {
         let catalog = try QuranResources.catalog()

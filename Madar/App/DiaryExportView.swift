@@ -22,6 +22,7 @@ struct DiaryExportView:View {
                     Text("كلّها أو سنة أو شهر").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
                     card {
                         HStack{Text("الفترة");Spacer();Picker("السنة",selection:$options.year){Text("كل الأيام").tag(Int?.none);ForEach(years,id:\.self){Text(service.digits.string($0)).tag(Optional($0))}}.labelsHidden().accessibilityIdentifier("diary-export-year")}.font(DiaryType.label)
+                        if let year = options.year { MadarDateLabel(app.yearLabels(year)) }
                         if options.year != nil {Picker("الشهر الميلادي",selection:$options.month){Text("السنة كاملة").tag(Int?.none);ForEach(1...12,id:\.self){Text(service.digits.string($0)).tag(Optional($0))}}.font(DiaryType.label).accessibilityIdentifier("diary-export-month")}
                         Text("الصيغة").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
                         ForEach([("pdf","PDF","الصفحات بالهوامش والصور"),("markdown","Markdown","ملف لكل يوم والمرفقات الأصلية في أرشيف"),("json","JSON لداي ون","نص وصور، وبقية المرفقات محفوظة في الأرشيف")],id:\.0){id,title,subtitle in

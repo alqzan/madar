@@ -15,6 +15,6 @@ extension AppDiaryService {
         try authorizeRead();guard !pages.isEmpty,pages.allSatisfy({$0.day.year==year}) else{throw DataError.invalidValue("لا توجد صفحات لهذه السنة")}
         let root=FileManager.default.temporaryDirectory.appending(path:"DiaryExport/"+UUID().uuidString,directoryHint:.isDirectory)
         try FileManager.default.createDirectory(at:root,withIntermediateDirectories:true,attributes:[.protectionKey:FileProtectionType.complete])
-        do {let url=root.appending(path:"كتاب-"+String(year)+".pdf");try DiaryPDF.render(pages,digits:digits,coverYear:year,index:index).write(to:url,options:[.atomic,.completeFileProtection]);try authorizeRead();return .init(url:url,dayCount:pages.count)}catch{try? FileManager.default.removeItem(at:root);throw error}
+        do {let url=root.appending(path:"كتاب-"+String(year)+".pdf");try DiaryPDF.render(pages,digits:digits,coverYear:year,index:index,coverDates:app.yearLabels(year)).write(to:url,options:[.atomic,.completeFileProtection]);try authorizeRead();return .init(url:url,dayCount:pages.count)}catch{try? FileManager.default.removeItem(at:root);throw error}
     }
 }

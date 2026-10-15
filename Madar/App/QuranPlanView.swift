@@ -38,11 +38,12 @@ struct QuranPlanView: View {
                             if let input = overview.input {
                                 let level = app.string("quran.hifzLevel")
                                 Text(overview.forecasts[level]?.title ?? "—").font(quranSerif(29)).accessibilityIdentifier("quran-plan-forecast")
+                                if let secondary = overview.forecasts[level]?.secondaryDate { Text(secondary).font(quranFont(12)).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("quran-plan-forecast-secondary") }
                                 Text(overview.forecasts[level]?.assumptions ?? "").font(quranFont(11)).foregroundStyle(theme.secondaryInk)
                                 ForEach(QuranUILevel.allCases) { item in
                                     HStack { Text(item.title).font(quranFont(12, bold: item.id == level)).frame(width: 48, alignment: .leading)
                                         Capsule().fill(theme.color("hifz").opacity(item.id == level ? 1 : 0.4)).frame(width: 150 * CGFloat(overview.forecasts[item.id]?.estimatedDays ?? 0) / CGFloat(max(1, overview.forecasts.values.compactMap(\.estimatedDays).max() ?? 1)), height: 4)
-                                        Spacer(minLength: 4); Text(overview.forecasts[item.id]?.title ?? "—").font(quranFont(11)) }
+                                        Spacer(minLength: 4); VStack(alignment: .trailing, spacing: 2) { Text(overview.forecasts[item.id]?.title ?? "—").font(quranFont(12)); if let secondary = overview.forecasts[item.id]?.secondaryDate { Text(secondary).font(quranFont(11)).foregroundStyle(theme.secondaryInk) } } }
                                 }
                                 if let warning = overview.forecasts[level]?.warning { Text(warning).font(quranFont(13)).foregroundStyle(theme.color("dueText")) }
                                 Text(input.startAyah == 1 ? "ختم القرآن يتطلّب اكتمال الأوجه كلها، والفجوات معها." : "هذا موعد نطاق خطّتك؛ ختم القرآن لا يكون إلا بحفظ الأوجه كلها.").font(quranFont(12)).foregroundStyle(theme.secondaryInk)

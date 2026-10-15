@@ -50,7 +50,7 @@ extension AppQuranService {
         formatter.calendar = calendar; formatter.timeZone = calendar.timeZone; formatter.dateFormat = "EEEE"
         let weekday = formatter.string(from: dayInstant)
         formatter.dateFormat = "d MMMM yyyy"
-        let dateTitle = firstCalendar == .hijri ? String(date.text(numerals: numerals.style).split(separator: "،")[0]) : numerals.localized(formatter.string(from: dayInstant))
+        let dateTitle = date.labels(firstCalendar: firstCalendar, numerals: numerals.style).combined
         return QuranUIDayClose(title: complete ? "أتممت يومك" : "حصيلة يومك", dateAndStreak: weekday + " " + dateTitle + "، سلسلتك " + PrayerCopy.days(streak.days, digits: numerals),
             beforeFaces: before.coverage.completedPages.count, afterFaces: after.coverage.completedPages.count,
             addedFaces: after.coverage.completedPages.subtracting(before.coverage.completedPages).count,

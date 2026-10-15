@@ -274,12 +274,9 @@ struct PrayerCustomizeView: View {
 
     private var numeralLocale: Locale { Locale(identifier: session.string("core.numerals") == "western" ? "ar_SA@numbers=latn" : "ar_SA@numbers=arab") }
     private func dateWords(_ day: GregorianDay) -> String {
-        let zone = session.activePlace.timeZone
-        let formatter = DateFormatter()
-        formatter.locale = numeralLocale; formatter.timeZone = zone; formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.dateFormat = "EEEE d MMMM yyyy"
-        return formatter.string(from: day.date(in: zone).addingTimeInterval(12 * 3600))
+        session.dateLabels(day).combined
     }
+
     @ViewBuilder private var trackingStartBlock: some View {
         if let tracking = try? session.prayerSnapshot(at: session.prayerNow()).tracking {
             let zone = session.activePlace.timeZone
@@ -287,7 +284,7 @@ struct PrayerCustomizeView: View {
             let latest = tracking.firstRun.date(in: zone).addingTimeInterval(12 * 3600)
             VStack(alignment: .leading, spacing: 8) {
                 Text("بداية التتبّع").font(PrayerHomeType.strong)
-                Text(dateWords(tracking.day)).font(PrayerHomeType.body).accessibilityIdentifier("prayer-tracking-start")
+                MadarDateLabel(session.dateLabels(tracking.day), primaryFont: PrayerHomeType.body).accessibilityIdentifier("prayer-tracking-start")
                 Text("ما قبل هذا اليوم لا يُعدّ معلّقًا ولا فائتًا أبدًا. يمكنك تقديم البداية مرة واحدة، حتى ثلاثين يومًا قبل أول تشغيل.")
                     .font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
                 if tracking.edits == 0 {
@@ -295,6 +292,7 @@ struct PrayerCustomizeView: View {
                         DatePicker("البداية", selection: $startDate, in: earliest...latest, displayedComponents: .date)
                             .environment(\.timeZone, zone)
                             .accessibilityIdentifier("prayer-tracking-date")
+                        MadarDateLabel(session.dateLabels(GregorianDay.containing(startDate, in: zone)))
                         Button { confirmStart = true } label: {
                             Text("احفظ التعديل الوحيد").font(PrayerHomeType.strong).foregroundStyle(theme.color("onAccent"))
                                 .padding(.horizontal, 20).frame(minHeight: 48).background(theme.ink, in: .rect(cornerRadius: 24))

@@ -129,12 +129,11 @@ struct DiaryHomeSnapshot {
             editable: Set(entries.filter { $0.mediaID == nil && $0.source != "autoPinned" && ["normal", "late", "ghad"].contains($0.ink) }.map(\.id.uuidString)))
     }
     func dateTitle(_ day: GregorianDay, calendar: FirstCalendar) -> String {
-        let formatter = DateFormatter(); formatter.locale = Locale(identifier: "ar_SA@numbers=" + (app.string("core.numerals") == "western" ? "latn" : "arab"))
-        formatter.calendar = Calendar(identifier: calendar == .gregorian ? .gregorian : .islamicUmmAlQura)
-        formatter.timeZone = app.activePlace.timeZone; formatter.dateFormat = "d MMMM yyyy"
-        let offset = calendar == .hijri && app.string("core.hijriSource") == "sighting" ? Int(app.number("core.hijriOffset")) : 0
-        return formatter.string(from: day.adding(days: offset).date(in: app.activePlace.timeZone).addingTimeInterval(12*3600))
+        let labels = dateLabels(day, first: calendar)
+        let suffix = calendar == .hijri ? " هـ" : " م"
+        return String(labels.primary.dropLast(suffix.count))
     }
+
     func prepareClosedDay(_ day: GregorianDay) async throws {
         try authorizeRead()
         guard day < (try currentDay()) else { return }

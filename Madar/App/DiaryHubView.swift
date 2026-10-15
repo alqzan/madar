@@ -59,7 +59,7 @@ struct DiaryHubView: View {
         VStack(alignment: .leading, spacing: 18) {
             HStack {
                 Button { year = selectedYear-1 } label: { Image(systemName: "chevron.forward").frame(width: 44, height: 44) }.accessibilityLabel("السنة السابقة").accessibilityIdentifier("diary-year-previous")
-                Text(service.digits.string(selectedYear)).font(DiaryType.title).accessibilityIdentifier("diary-hub-year")
+                VStack(alignment: .leading, spacing: 3) { Text(service.digits.string(selectedYear)).font(DiaryType.title).accessibilityIdentifier("diary-hub-year"); Text(alternateYearTitle).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
                 Button { year = selectedYear+1 } label: { Image(systemName: "chevron.backward").frame(width: 44, height: 44) }.accessibilityLabel("السنة التالية")
                 Spacer()
                 Button { month = month == nil ? grid.parts(archive.today).month : nil } label: { Text(month == nil ? "ورقة الشهر" : "السنة").font(DiaryType.label).padding(.horizontal, 12).frame(minHeight: 44).overlay { Capsule().stroke(theme.line) } }.accessibilityIdentifier("diary-calendar-scale")
@@ -82,12 +82,26 @@ struct DiaryHubView: View {
             }
         }
     }
+    private var alternateYearTitle: String {
+        guard let first = grid.days(year: selectedYear, month: 1).first, let last = grid.days(year: selectedYear, month: 12).last else { return "" }
+        let a = service.dateLabels(first, first: grid.first).secondary.split(separator: " ").suffix(2).joined(separator: " ")
+        let b = service.dateLabels(last, first: grid.first).secondary.split(separator: " ").suffix(2).joined(separator: " ")
+        return a == b ? a : a + " – " + b
+    }
+    private func alternateMonthTitle(_ month: Int) -> String {
+        let days = grid.days(year: selectedYear, month: month)
+        guard let first = days.first, let last = days.last else { return "" }
+        let a = service.dateLabels(first, first: grid.first).secondary.split(separator: " ").dropFirst().joined(separator: " ")
+        let b = service.dateLabels(last, first: grid.first).secondary.split(separator: " ").dropFirst().joined(separator: " ")
+        return a == b ? a : a + " – " + b
+    }
     private func miniMonth(_ archive: DiaryArchiveSnapshot, month: Int) -> some View {
         let days = grid.days(year: selectedYear, month: month), counts = Dictionary(uniqueKeysWithValues: archive.days.map { ($0.day,$0.writings) })
         let current = grid.parts(archive.today)
         return Button { self.month = month } label: {
             VStack(alignment: .leading, spacing: 8) {
                 Text(grid.monthName(year: selectedYear, month: month)).font(.custom("thmanyahseriftext-Bold", size: 13, relativeTo: .caption))
+                Text(alternateMonthTitle(month)).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 2), count: 7), spacing: 2) {
                     ForEach(0..<grid.leading(days), id: \.self) { _ in Color.clear.aspectRatio(1, contentMode: .fit) }
                     ForEach(days, id: \.description) { day in
@@ -102,15 +116,15 @@ struct DiaryHubView: View {
     private func monthPage(_ archive: DiaryArchiveSnapshot, month: Int) -> some View {
         let days = grid.days(year: selectedYear, month: month), written = Set(archive.days.filter { $0.writings > 0 || !$0.photoIDs.isEmpty }.map(\.day))
         return VStack(alignment: .leading, spacing: 16) {
-            HStack { Button { if month > 1 { self.month = month-1 } else { year = selectedYear-1; self.month = 12 } } label: { Image(systemName: "chevron.forward").frame(width: 44, height: 44) }; Text(grid.monthName(year: selectedYear, month: month)).font(DiaryType.heading); Spacer(); Button { if month < 12 { self.month = month+1 } else { year = selectedYear+1; self.month = 1 } } label: { Image(systemName: "chevron.backward").frame(width: 44, height: 44) } }.buttonStyle(.plain)
+            HStack { Button { if month > 1 { self.month = month-1 } else { year = selectedYear-1; self.month = 12 } } label: { Image(systemName: "chevron.forward").frame(width: 44, height: 44) }; VStack(alignment: .leading, spacing: 3) { Text(grid.monthName(year: selectedYear, month: month)).font(DiaryType.heading); Text(alternateMonthTitle(month)).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }; Spacer(); Button { if month < 12 { self.month = month+1 } else { year = selectedYear+1; self.month = 1 } } label: { Image(systemName: "chevron.backward").frame(width: 44, height: 44) } }.buttonStyle(.plain)
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 2), count: 7), spacing: 6) {
                 ForEach(0..<grid.leading(days), id: \.self) { _ in Color.clear.frame(height: 44) }
                 ForEach(days, id: \.description) { day in
                     Button { reader = day } label: {
-                        VStack(spacing: 3) { Text(service.digits.string(grid.parts(day).day ?? day.day)).font(MadarTypography.body()); Circle().fill(written.contains(day) ? theme.accent : .clear).frame(width: 4,height: 4) }
+                        VStack(spacing: 3) { Text(service.digits.string(grid.parts(day).day ?? day.day)).font(MadarTypography.body()); Text(service.digits.string(grid.first == .gregorian ? HijriCalendar.date(for: day.date(in: grid.zone).addingTimeInterval(43200), timeZone: grid.zone, source: HijriSource(rawValue: app.string("core.hijriSource")) ?? .ummAlQura, sightingOffset: grid.offset).day : day.day)).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk); Circle().fill(written.contains(day) ? theme.accent : .clear).frame(width: 4,height: 4) }
                             .frame(maxWidth: .infinity, minHeight: 44).background(day == archive.today ? theme.surface : .clear, in: .rect(cornerRadius: 10))
                             .overlay { if travelDays.contains(day) { DiaryAirmailFrame(lineWidth: 1.6, dash: 4).padding(2) } }
-                    }.buttonStyle(.plain).disabled(day > archive.today).accessibilityLabel(service.dateTitle(day, calendar: grid.first) + (travelDays.contains(day) ? "، يوم سفر" : "")).accessibilityIdentifier("diary-calendar-day-" + day.description)
+                    }.buttonStyle(.plain).disabled(day > archive.today).accessibilityLabel(service.bothDates(day, calendar: grid.first) + (travelDays.contains(day) ? "، يوم سفر" : "")).accessibilityIdentifier("diary-calendar-day-" + day.description)
                 }
             }
             timeline(archive.days.filter { let parts = grid.parts($0.day); return parts.year == selectedYear && parts.month == month })
@@ -120,7 +134,7 @@ struct DiaryHubView: View {
         VStack(alignment: .leading, spacing: 0) {
             if days.isEmpty { Text("لا كتابة في هذه الفترة. يمكنك فتح أي يوم من التقويم.").font(DiaryType.writing).padding(.vertical, 24) }
             ForEach(days) { day in
-                Button { reader = day.day } label: { VStack(alignment: .leading, spacing: 7) { Text(service.weekday(day.day) + "، " + service.dateTitle(day.day, calendar: grid.first)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text")); Text(day.excerpt).font(DiaryType.writing).lineLimit(3).multilineTextAlignment(.leading) }.padding(16).frame(maxWidth: .infinity, alignment: .leading) }.buttonStyle(.plain).accessibilityIdentifier("diary-hub-day-" + day.id)
+                Button { reader = day.day } label: { VStack(alignment: .leading, spacing: 7) { Text(service.weekday(day.day) + "، " + service.bothDates(day.day, calendar: grid.first)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text")); Text(day.excerpt).font(DiaryType.writing).lineLimit(3).multilineTextAlignment(.leading) }.padding(16).frame(maxWidth: .infinity, alignment: .leading) }.buttonStyle(.plain).accessibilityIdentifier("diary-hub-day-" + day.id)
                 Divider().overlay(theme.line)
             }
         }.background(theme.surface, in: .rect(cornerRadius: 18))
@@ -133,7 +147,7 @@ struct DiaryHubView: View {
                 ForEach(days) { day in
                     ForEach(day.photoIDs, id: \.self) { id in
                         if let data = try? service.archivePhoto(id), let image = UIImage(data: data) {
-                            Button { reader = day.day } label: { VStack(spacing: 8) { Image(uiImage: image).resizable().scaledToFill().frame(height: 135).clipped(); Text(service.dateTitle(day.day, calendar: grid.first)).font(DiaryType.label) }.padding(7).background(theme.surface).rotationEffect(.degrees(-1)) }.buttonStyle(.plain).accessibilityLabel("افتح يوم الصورة " + service.dateTitle(day.day, calendar: grid.first))
+                            Button { reader = day.day } label: { VStack(spacing: 8) { Image(uiImage: image).resizable().scaledToFill().frame(height: 135).clipped(); MadarDateLabel(service.dateLabels(day.day, first: grid.first)) }.padding(7).background(theme.surface).rotationEffect(.degrees(-1)) }.buttonStyle(.plain).accessibilityLabel("افتح يوم الصورة " + service.bothDates(day.day, calendar: grid.first))
                         }
                     }
                 }

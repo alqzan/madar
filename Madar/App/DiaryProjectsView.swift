@@ -96,7 +96,7 @@ struct DiaryProjectDetail: View {
                     if project.lines.isEmpty { Text("لم تُربط سطور بعد.").font(DiaryType.writing).foregroundStyle(theme.color("ink3Text")) }
                     ForEach(project.lines) { line in
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(service.dateTitle(line.day, calendar: .gregorian)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
+                            MadarDateLabel(service.bothDates(line.day)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
                             Text(line.text).font(DiaryType.writing)
                         }.padding(.vertical, 8).frame(maxWidth: .infinity, alignment: .leading).overlay(alignment: .bottom) { Rectangle().fill(theme.line).frame(height: 1) }
                     }

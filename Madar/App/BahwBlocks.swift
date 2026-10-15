@@ -185,7 +185,7 @@ struct BahwBlockView: View {
         } else if size == .small, let first = items.first {
             VStack(alignment: .leading, spacing: 6) {
                 title(lobby.accent)
-                HStack { ring(first, diameter: 66); VStack(alignment: .leading) { Text(first.title).font(label); Text(service.shortDate(first.day, hijri: false)).font(small).foregroundStyle(lobby.secondaryInk) } }
+                HStack { ring(first, diameter: 66); VStack(alignment: .leading) { Text(first.title).font(label); MadarDateLabel(service.session.dateLabels(first.day, compact: true)).foregroundStyle(lobby.secondaryInk) } }
                 ForEach(items.dropFirst()) { item in Text(item.title + " بعد " + digits.string(item.daysLeft) + " " + service.dayCount(item.daysLeft)).font(small).foregroundStyle(lobby.secondaryInk).lineLimit(1) }
             }
         } else {
@@ -196,7 +196,7 @@ struct BahwBlockView: View {
                         VStack(spacing: 6) {
                             ring(item, diameter: 64)
                             Text(item.title).font(label).lineLimit(1).minimumScaleFactor(0.75)
-                            Text(service.shortDate(item.day, hijri: false)).font(small).foregroundStyle(lobby.secondaryInk).lineLimit(1)
+                            MadarDateLabel(service.session.dateLabels(item.day, compact: true)).foregroundStyle(lobby.secondaryInk)
                         }.frame(maxWidth: .infinity).accessibilityElement(children: .ignore)
                             .accessibilityLabel(item.title + " بعد " + digits.string(item.daysLeft) + " " + service.dayCount(item.daysLeft)).accessibilityIdentifier("bahw-upcoming-item")
                     }

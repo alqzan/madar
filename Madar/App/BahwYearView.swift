@@ -285,8 +285,8 @@ struct BahwYearView: View {
                     Image(systemName: "seal.fill").font(.system(size: 10)).foregroundStyle(lobby.color(item.tone)).accessibilityHidden(true)
                     Text(item.title).font(MadarTypography.section()).lineLimit(1)
                 }
-                Text(([service.shortDate(item.day, hijri: item.hijri), service.shortDate(item.day, hijri: !item.hijri)] + (service.approx(item.daysLeft).map { [$0] } ?? [])).joined(separator: "، "))
-                    .font(MadarTypography.caption()).foregroundStyle(lobby.secondaryInk).lineLimit(1).minimumScaleFactor(0.8)
+                MadarDateLabel(session.dateLabels(item.day)).foregroundStyle(lobby.secondaryInk)
+                if let approximation = service.approx(item.daysLeft) { Text(approximation).font(MadarTypography.fine()).foregroundStyle(lobby.secondaryInk) }
                 GeometryReader { geometry in
                     ZStack(alignment: .leading) {
                         Capsule().fill(lobby.line).frame(height: 5)
@@ -380,6 +380,7 @@ struct BahwDaySheet: View {
                             }
                         }
                     }
+                    if let next = previewOccurrence { MadarDateLabel(session.dateLabels(next)).accessibilityIdentifier("bahw-day-date-preview") }
                     Text("يُحسب الموعد من القاعدة كل مرة، وإن لم يكن في الشهر هذا اليوم فآخر يوم فيه.").font(MadarTypography.caption()).foregroundStyle(lobby.secondaryInk)
                     if let failure { Text(failure).font(MadarTypography.caption()).foregroundStyle(lobby.ink) }
                     Button { save() } label: {
@@ -398,6 +399,12 @@ struct BahwDaySheet: View {
     }
     private func field<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 6) { Text(title).font(MadarTypography.caption()).foregroundStyle(lobby.secondaryInk); content() }
+    }
+    private var previewOccurrence: GregorianDay? {
+        let service = AppBahwService(session: session)
+        let rule = MadarUpcomingRule(calendar: draft.hijri ? .hijri : .gregorian, year: draft.year, month: draft.month, day: draft.day,
+                                     repeats: MadarUpcomingRule.Repeats(rawValue: draft.repeats) ?? .yearly)
+        return rule.ring(today: service.today, service.calendarDays)?.next
     }
     private func save() {
         let today = AppBahwService(session: session).today

@@ -25,11 +25,11 @@ struct DiaryLettersPanel: View {
             let waiting = letters.filter { $0.state == .eligible }, orphaned = letters.filter { $0.state == .orphaned }
             let sealed = letters.filter { $0.state == .sealed }, opened = letters.filter { $0.state == .opened }
             if letters.isEmpty { Text("لا رسائل بعد. اكتب لنفسك في موعد أو بعد حدث.").font(DiaryType.writing).foregroundStyle(theme.color("ink3Text")).padding(.vertical, 20) }
-            ForEach(waiting) { letter in DiaryLetterWaitingCard(letter: letter, digitsTitle: service.dateTitle(letter.writtenDay, calendar: .gregorian)) { opening = letter } }
+            ForEach(waiting) { letter in DiaryLetterWaitingCard(letter: letter, digitsTitle: service.bothDates(letter.writtenDay)) { opening = letter } }
             ForEach(orphaned) { letter in
                 VStack(alignment: .leading, spacing: 10) {
                     Text("هدف رسالتك حُذف").font(DiaryType.heading)
-                    Text("كتبتها في " + service.dateTitle(letter.writtenDay, calendar: .gregorian) + ". لا تُفتح وحدها.").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
+                    MadarDateLabel("كتبتها في " + service.bothDates(letter.writtenDay) + ". لا تُفتح وحدها.").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
                     HStack(spacing: 8) {
                         Button { opening = letter } label: { Text("افتحها الآن").frame(maxWidth: .infinity, minHeight: 44).foregroundStyle(theme.background).background(theme.ink, in: .capsule) }.accessibilityIdentifier("diary-letter-orphan-open")
                         Button { rescheduling = letter } label: { Text("اختر موعدًا").frame(maxWidth: .infinity, minHeight: 44).overlay { Capsule().stroke(theme.line) } }.accessibilityIdentifier("diary-letter-orphan-date")
@@ -43,7 +43,7 @@ struct DiaryLettersPanel: View {
                         DiaryEnvelope(sealed: true).frame(width: 64, height: 44)
                         VStack(alignment: .leading, spacing: 4) {
                             Text(letter.waitingFor).font(DiaryType.writing)
-                            Text("كُتبت في " + service.dateTitle(letter.writtenDay, calendar: .gregorian)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
+                            MadarDateLabel("كُتبت في " + service.bothDates(letter.writtenDay)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
                         }
                         Spacer(minLength: 0)
                         Image(systemName: "hourglass").foregroundStyle(theme.color("ink3Text")).accessibilityLabel("تنتظر")
@@ -59,7 +59,7 @@ struct DiaryLettersPanel: View {
                             DiaryEnvelope(sealed: false).frame(width: 64, height: 44)
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(letter.text ?? "").font(DiaryType.writing).lineLimit(2).multilineTextAlignment(.leading)
-                                Text("من " + service.dateTitle(letter.writtenDay, calendar: .gregorian)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
+                                MadarDateLabel("من " + service.bothDates(letter.writtenDay)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
                             }
                             Spacer(minLength: 0)
                         }.padding(.vertical, 8).contentShape(.rect)
@@ -70,7 +70,7 @@ struct DiaryLettersPanel: View {
         .task(id: app.prayerRevision) { await load() }
         .sheet(isPresented: $composing) { DiaryLetterComposer(app: app).environment(\.roomTheme, theme) }
         .sheet(item: $opening) { letter in DiaryLetterMoment(app: app, letter: letter).environment(\.roomTheme, theme) }
-        .sheet(item: $reading) { letter in DiaryLetterReader(text: letter.text ?? "", written: service.dateTitle(letter.writtenDay, calendar: .gregorian)).environment(\.roomTheme, theme).presentationDetents([.medium, .large]) }
+        .sheet(item: $reading) { letter in DiaryLetterReader(text: letter.text ?? "", written: service.bothDates(letter.writtenDay)).environment(\.roomTheme, theme).presentationDetents([.medium, .large]) }
         .sheet(item: $rescheduling) { letter in DiaryLetterReschedule(app: app, letter: letter).environment(\.roomTheme, theme).presentationDetents([.medium]) }
     }
     private func load() async {
@@ -89,7 +89,7 @@ struct DiaryLetterWaitingCard: View {
                 DiaryEnvelope(sealed: true).frame(width: 72, height: 50)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("رسالة من الماضي تنتظرك").font(DiaryType.heading)
-                    Text("كتبتها في " + digitsTitle).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
+                    MadarDateLabel("كتبتها في " + digitsTitle).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
                 }
                 Spacer(minLength: 0)
                 Image(systemName: "chevron.backward").font(.caption)
@@ -136,7 +136,7 @@ struct DiaryLetterMoment: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 22) {
-                    Text("رسالة كتبتها في " + service.dateTitle(letter.writtenDay, calendar: .gregorian)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
+                    MadarDateLabel("رسالة كتبتها في " + service.bothDates(letter.writtenDay)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
                     if let text {
                         Text(text).font(.custom("thmanyahseriftext-Regular", size: 21, relativeTo: .body)).lineSpacing(10).frame(maxWidth: .infinity, alignment: .leading)
                             .padding(22).background(theme.surface, in: .rect(cornerRadius: 6)).overlay { RoundedRectangle(cornerRadius: 6).stroke(theme.line) }
@@ -198,6 +198,7 @@ struct DiaryLetterComposer: View {
                     if choice?.trigger == .date || choice?.trigger == .hijriDate {
                         DatePicker("اليوم", selection: $date, in: Date().addingTimeInterval(86_400)..., displayedComponents: .date)
                             .environment(\.calendar, Calendar(identifier: choice?.trigger == .hijriDate ? .islamicUmmAlQura : .gregorian)).font(DiaryType.writing)
+                        MadarDateLabel(app.dateLabels(GregorianDay.containing(date, in: app.activePlace.timeZone)))
                     }
                     Text("لا يدخل نصّها البحث ولا الودجات ولا الإشعارات قبل أن تُفتح.").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
                     if let failure { Text(failure).font(MadarTypography.body()) }
@@ -228,6 +229,7 @@ struct DiaryLetterReschedule: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("اختر موعدًا لرسالتك").font(DiaryType.heading)
             DatePicker("اليوم", selection: $date, in: Date().addingTimeInterval(86_400)..., displayedComponents: .date).font(DiaryType.writing)
+            MadarDateLabel(app.dateLabels(GregorianDay.containing(date, in: app.activePlace.timeZone)))
             if let failure { Text(failure).font(MadarTypography.body()) }
             Button { Task { do { try await AppDiaryService(app: app).rescheduleLetter(letter.id, to: date); dismiss() } catch { failure = error.localizedDescription } } } label: {
                 Text("احفظ الموعد").font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 50).foregroundStyle(theme.background).background(theme.ink, in: .capsule)

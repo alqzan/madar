@@ -36,7 +36,7 @@ struct QuranSessionLogView: View {
                     if records.isEmpty { Text("لا جلسات مسجّلة").font(quranFont(15)).padding(20) }
                     ForEach(records) { record in
                         VStack(alignment: .leading, spacing: 8) {
-                            Text(record.day).font(quranFont(12, bold: true)).foregroundStyle(theme.secondaryInk)
+                            MadarDateLabel(record.day).font(quranFont(12, bold: true)).foregroundStyle(theme.secondaryInk)
                             QuranPaperCard {
                                 VStack(alignment: .leading, spacing: 12) {
                                     Button {

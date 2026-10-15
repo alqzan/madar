@@ -106,7 +106,7 @@ struct BahwLobbyView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(dateLine).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("bahw-date")
+            MadarDateLabel(session.dateLabels(service.today, weekday: true)).foregroundStyle(theme.secondaryInk).accessibilityElement(children: .combine).accessibilityIdentifier("bahw-date")
             Text(greeting).font(MadarTypography.title()).accessibilityAddTraits(.isHeader).accessibilityIdentifier("bahw-greeting")
         }.frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -116,13 +116,7 @@ struct BahwLobbyView: View {
         return service.now >= times.fajr && service.now < times.dhuhr ? "صباح الخير" : "مساء الخير"
     }
     /// Both dates, the first calendar first; joined with «، », never "·" beside a digit (RU1).
-    private var dateLine: String {
-        let day = service.today, hijriFirst = session.string("core.firstCalendar") != "gregorian"
-        let weekday = { () -> String in let f = DateFormatter(); f.locale = Locale(identifier: "ar"); f.timeZone = .gmt; f.dateFormat = "EEEE"; return f.string(from: day.date(in: .gmt).addingTimeInterval(12 * 3600)) }()
-        let hijri = service.shortDate(day, hijri: true) + " " + service.digits.string(service.calendarDays.hijri(day).year)
-        let gregorian = service.shortDate(day, hijri: false)
-        return weekday + " " + (hijriFirst ? hijri + "، " + gregorian : gregorian + " " + service.digits.string(day.year) + "، " + service.shortDate(day, hijri: true))
-    }
+    private var dateLine: String { session.dateLabels(service.today).combined }
 
     @ViewBuilder private func tile(_ block: BahwBlock, size: BahwBlockSize) -> some View {
         if arranging {

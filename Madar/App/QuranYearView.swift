@@ -56,7 +56,7 @@ struct QuranYearView: View {
                 ScrollView { VStack(alignment: .leading, spacing: 14) {
                     Text(item.title).font(quranSerif(25))
                     ForEach(value?.days.filter { $0.monthID == item.id && ($0.hifz > 0 || $0.review > 0) } ?? []) { day in
-                        Text(day.date).font(quranFont(13, bold: true)); Text("حفظ " + service.faceCount(day.hifz) + "، مراجعة " + service.faceCount(day.review)).font(quranFont(13))
+                        MadarDateLabel(day.date); Text("حفظ " + service.faceCount(day.hifz) + "، مراجعة " + service.faceCount(day.review)).font(quranFont(13))
                     }
                     if item.hifz == 0 && item.review == 0 { Text("لا جلسات مسجّلة").font(quranFont(15)) }
                     Button("تمّ") { month = nil }.frame(minHeight: 44)

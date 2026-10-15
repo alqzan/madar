@@ -128,11 +128,9 @@ struct BahwUpcomingItem: Identifiable, Equatable {
         switch n { case 0: "لا سطور بعد"; case 1: "سطر واحد"; case 2: "سطران"; default: digits.string(n) + ((3...10).contains(n % 100) ? " أسطر" : " سطرًا") }
     }
     func shortDate(_ day: GregorianDay, hijri: Bool) -> String {
-        let formatter = DateFormatter(); formatter.locale = Locale(identifier: "ar_SA@numbers=" + (session.string("core.numerals") == "western" ? "latn" : "arab"))
-        formatter.calendar = Calendar(identifier: hijri ? .islamicUmmAlQura : .gregorian); formatter.timeZone = session.activePlace.timeZone; formatter.dateFormat = "d MMMM"
-        let noon = day.date(in: session.activePlace.timeZone).addingTimeInterval(12 * 3600)
-        return formatter.string(from: hijri && session.string("core.hijriSource") == "sighting" ? noon.addingTimeInterval(session.number("core.hijriOffset") * 86_400) : noon)
+        session.dateLabels(day, first: hijri ? .hijri : .gregorian, compact: true).primary
     }
+
     func time(_ at: Date) -> String {
         let formatter = DateFormatter(); formatter.locale = Locale(identifier: "ar_SA@numbers=" + (session.string("core.numerals") == "western" ? "latn" : "arab"))
         formatter.timeZone = session.activePlace.timeZone; formatter.dateFormat = "h:mm a"

@@ -31,7 +31,7 @@ struct DiaryTextEditor: View {
         NavigationStack {
             VStack(spacing: 0) {
                 if let margin {
-                    Text("هامش " + AppDiaryService(app: app).dateTitle(margin, calendar: .gregorian)).font(MadarTypography.caption()).padding(14)
+                    Text("هامش " + AppDiaryService(app: app).bothDates(margin)).font(MadarTypography.caption()).padding(14)
                 } else {
                     HStack(spacing: 8) {
                         choice("today", "اليوم"); choice("yesterday", "أمس")
@@ -39,7 +39,7 @@ struct DiaryTextEditor: View {
                     }.padding(.horizontal, 16).padding(.bottom, 14)
                 }
                 if let writingDay, let today = try? AppDiaryService(app: app).currentDay(), writingDay < today.adding(days: -1) {
-                    Text("مسودة عن " + AppDiaryService(app: app).dateTitle(writingDay, calendar: .gregorian) + " · تُحفظ في صفحتها الأصلية").font(MadarTypography.fine()).padding(.horizontal, 16)
+                    Text("مسودة عن " + AppDiaryService(app: app).bothDates(writingDay) + " · تُحفظ في صفحتها الأصلية").font(MadarTypography.fine()).padding(.horizontal, 16)
                 }
                 ZStack(alignment: .topLeading) {
                     Canvas { context, size in

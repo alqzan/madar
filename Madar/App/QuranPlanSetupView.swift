@@ -36,6 +36,7 @@ struct QuranPlanSetupView: View {
                         VStack(alignment: .leading, spacing: 5) {
                             Text("الإتمام المتوقع بالخطة").font(quranFont(12)).foregroundStyle(theme.secondaryInk)
                             Text(forecast?.title ?? "نحسب موعدك").font(quranSerif(27)).accessibilityIdentifier("quran-setup-forecast")
+                            if let secondary = forecast?.secondaryDate { Text(secondary).font(quranFont(12)).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("quran-setup-forecast-secondary") }
                             if let warning = forecast?.warning { Text(warning).font(quranFont(13, bold: true)).foregroundStyle(theme.color("dueText")) }
                             Text("تقدير بافتراض إتمام أيام الحفظ بلا فوت أو تثبيت.").font(quranFont(11)).foregroundStyle(theme.secondaryInk)
                         }

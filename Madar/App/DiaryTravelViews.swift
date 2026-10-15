@@ -56,7 +56,7 @@ struct DiaryTravelHeader: View {
                         Text("من: " + page.city + " · إلى: مذكراتي").font(DiaryType.label).foregroundStyle(theme.color("ink2"))
                         Text("اليوم " + (DiaryTravelCalendar.ordinal(page.number) ?? digits.string(page.number)))
                             .font(.custom("thmanyahserifdisplay-Bold", size: 32, relativeTo: .largeTitle)).foregroundStyle(theme.ink).accessibilityIdentifier("diary-travel-title")
-                        Text(subtitle).font(DiaryType.label).foregroundStyle(theme.color("ink2"))
+                        MadarDateLabel(subtitle).font(DiaryType.label).foregroundStyle(theme.color("ink2"))
                     }.frame(maxWidth: .infinity, alignment: .leading)
                     DiaryCityStamp(city: page.city).rotationEffect(.degrees(-4))
                 }
@@ -145,7 +145,9 @@ struct DiaryPassportStamp: View {
     var body: some View {
         VStack(spacing: 2) {
             Text(city).font(.custom("thmanyahsans-Bold", size: 12, relativeTo: .caption))
-            Text(date + "، دخول").font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).lineLimit(2).multilineTextAlignment(.center)
+            let parts = date.components(separatedBy: "، ")
+            Text(parts.first ?? date).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).lineLimit(2).multilineTextAlignment(.center)
+            if parts.count > 1 { Text(parts.dropFirst().joined(separator: "، ")).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).lineLimit(2).multilineTextAlignment(.center) }
         }.foregroundStyle(theme.accent).padding(10).frame(width: 84, height: 84)
             .overlay { Circle().stroke(theme.accent, lineWidth: 1.6).padding(2) }.overlay { Circle().stroke(theme.accent.opacity(0.5), lineWidth: 0.8).padding(7) }
             .rotationEffect(.degrees(-14)).accessibilityElement(children: .combine).accessibilityIdentifier("diary-passport-stamp")
@@ -193,7 +195,7 @@ struct DiaryStampsView: View {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: 12)], spacing: 18) {
                         ForEach(stamps) { stamp in
                             VStack(spacing: 8) {
-                                DiaryPassportStamp(city: stamp.city, date: service.shortDate(stamp.arrival))
+                                DiaryPassportStamp(city: stamp.city, date: service.stampDate(stamp.arrival))
                                 Text(stamp.departure.map { "العودة " + service.shortDate($0) } ?? "الرحلة مستمرة").font(DiaryType.label).foregroundStyle(theme.color("ink2"))
                             }.frame(maxWidth: .infinity)
                         }
@@ -212,9 +214,8 @@ extension AppDiaryService {
     func kilometres(_ value: Int) -> String {
         value.formatted(.number.locale(Locale(identifier: "ar_SA@numbers=" + (app.string("core.numerals") == "western" ? "latn" : "arab"))))
     }
+    func stampDate(_ day: GregorianDay) -> String { app.dateLabels(day, compact: true).combined }
     func shortDate(_ day: GregorianDay) -> String {
-        let formatter = DateFormatter(); formatter.locale = Locale(identifier: "ar_SA@numbers=" + (app.string("core.numerals") == "western" ? "latn" : "arab"))
-        formatter.calendar = Calendar(identifier: .gregorian); formatter.timeZone = .gmt; formatter.dateFormat = "d MMMM"
-        return formatter.string(from: day.date(in: .gmt).addingTimeInterval(12*3600))
+        bothDates(day)
     }
 }

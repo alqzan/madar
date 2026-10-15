@@ -53,7 +53,7 @@ struct DiaryYearbookView:View {
         }
     }
     private var cover:some View {
-        VStack(spacing:20){Text("مذكرات").font(.custom("thmanyahserifdisplay-Bold",size:32,relativeTo:.largeTitle));Rectangle().fill(coverInk.opacity(0.6)).frame(width:60,height:1);Text(service.digits.string(selectedYear)).font(.custom("thmanyahseriftext-Bold",size:42,relativeTo:.largeTitle));Text("أيام محفوظة: "+service.digits.string(pages.count)).font(DiaryType.label)}
+        VStack(spacing:20){Text("مذكرات").font(.custom("thmanyahserifdisplay-Bold",size:32,relativeTo:.largeTitle));Rectangle().fill(coverInk.opacity(0.6)).frame(width:60,height:1);VStack(spacing: 4) { Text(app.yearLabels(selectedYear).primary).font(.custom("thmanyahseriftext-Bold",size:26,relativeTo:.largeTitle)).multilineTextAlignment(.center).lineLimit(2).minimumScaleFactor(0.85).padding(.horizontal,12); Text(app.yearLabels(selectedYear).secondary).font(DiaryType.label) };Text("أيام محفوظة: "+service.digits.string(pages.count)).font(DiaryType.label)}
             .foregroundStyle(coverInk).frame(width:210,height:280).background(bookColor,in:.rect(topLeadingRadius:4,bottomLeadingRadius:4,bottomTrailingRadius:10,topTrailingRadius:10))
             .overlay(alignment:.trailing){Rectangle().fill(.black.opacity(0.14)).frame(width:10)}.shadow(color:theme.ink.opacity(0.2),radius:16,x:5,y:14).padding(.vertical,4).accessibilityElement(children:.combine).accessibilityIdentifier("diary-book-cover")
     }
@@ -65,7 +65,7 @@ struct DiaryYearbookView:View {
         }.background(theme.line).clipShape(.rect(cornerRadius:4)).shadow(color:theme.ink.opacity(0.12),radius:8,y:7)
     }
     private func previewPage(_ page:DiaryExportPage)->some View {
-        VStack(alignment:.leading,spacing:8){Text(page.title).font(.custom("thmanyahseriftext-Bold",size:13,relativeTo:.caption));ForEach(Array(page.lines.prefix(4))){line in Text(AppDiaryService.exportLabel(line.kind)+line.text).font(.custom("thmanyahseriftext-Regular",size:12,relativeTo:.caption)).foregroundStyle(line.kind=="margin" ? theme.color("pencil"):theme.ink).lineLimit(3)};if photos,let item=page.media.first(where:{$0.kind=="photo"}),let image=UIImage(data:item.data){Image(uiImage:image).resizable().scaledToFill().frame(height:50).clipped()};Spacer(minLength:0)}.frame(maxWidth:.infinity,alignment:.leading).frame(minHeight:155,alignment:.top).padding(10).background(theme.surface)
+        VStack(alignment:.leading,spacing:8){MadarDateLabel(page.title);ForEach(Array(page.lines.prefix(4))){line in Text(AppDiaryService.exportLabel(line.kind)+line.text).font(.custom("thmanyahseriftext-Regular",size:12,relativeTo:.caption)).foregroundStyle(line.kind=="margin" ? theme.color("pencil"):theme.ink).lineLimit(3)};if photos,let item=page.media.first(where:{$0.kind=="photo"}),let image=UIImage(data:item.data){Image(uiImage:image).resizable().scaledToFill().frame(height:50).clipped()};Spacer(minLength:0)}.frame(maxWidth:.infinity,alignment:.leading).frame(minHeight:155,alignment:.top).padding(10).background(theme.surface)
     }
     private func load(){clear();do{pages=try service.yearbookPages(year:selectedYear,margins:margins,sources:sources,photos:photos);failure=nil}catch{failure=error.localizedDescription}}
     private func prepare(){busy=true;failure=nil;clear();Task{@MainActor in await Task.yield();defer{busy=false};do{artifact=try service.exportYearbook(pages:pages,year:selectedYear,index:includeIndex)}catch{failure=error.localizedDescription}}}

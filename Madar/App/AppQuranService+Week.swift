@@ -31,7 +31,7 @@ extension AppQuranService {
             let weekday = weekdays[calendar.component(.weekday, from: instant) - 1]
             let date = DualDate(instant: instant, timeZone: calendar.timeZone,
                 source: HijriSource(rawValue: app.string("core.hijriSource")) ?? .ummAlQura, sightingOffset: Int(app.number("core.hijriOffset")))
-                .text(firstCalendar: firstCalendar, numerals: numerals.style)
+                .labels(firstCalendar: firstCalendar, numerals: numerals.style).combined
             let reviewed = Set(value.sessions.filter { $0.dayKey == key && [.review, .free, .qiyam].contains($0.kind) }.flatMap { $0.grades.map(\.page) }).count
             let eligible = first.map { key >= $0 } == true && !value.restDay.contains(key)
             return QuranUIWeekDay(id: key.description, label: key == today ? "اليوم" : weekday, date: weekday + " " + date,

@@ -12,14 +12,7 @@ struct QuranUIYear: Sendable {
     var days: [QuranUIYearDay]; var months: [QuranUIYearMonth]; var activeDays: Int; var title: String
 }
 extension AppQuranService {
-    func displayDate(_ day: GregorianDay, hijriOnly: Bool = false) -> String {
-        let zone = TimeZone(identifier: app.string("core.timeZone")) ?? TimeZone(identifier: "Asia/Riyadh")!
-        let date = DualDate(instant: day.date(in: zone).addingTimeInterval(43200), timeZone: zone,
-            source: HijriSource(rawValue: app.string("core.hijriSource")) ?? .ummAlQura, sightingOffset: Int(app.number("core.hijriOffset")))
-        let first = hijriOnly ? FirstCalendar.hijri : FirstCalendar(rawValue: app.string("core.firstCalendar")) ?? .hijri
-        let text = date.text(firstCalendar: first, numerals: numerals.style)
-        return hijriOnly ? String(text.split(separator: "،")[0]) + " هـ" : text
-    }
+    func displayDate(_ day: GregorianDay) -> String { app.dateLabels(day).combined }
     func yearLog() throws -> QuranUIYear {
         let value = try snapshot(), today = value.day.date
         let zone = TimeZone(identifier: value.day.timeZoneID) ?? .gmt

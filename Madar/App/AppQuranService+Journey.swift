@@ -21,7 +21,7 @@ extension AppQuranService {
         if value.coverage.isKhatm { actual = "ختمت القرآن" }
         else if let rate = pace.pagesPerHifzDay {
             if case .estimated(let day) = QuranProgressEngine.forecast(remainingPages: Double(604 - completed), dailyPages: rate, startingOn: start, restDay: value.restDay) {
-                actual = displayDate(day, hijriOnly: true); forecastDay = day
+                actual = displayDate(day); forecastDay = day
             } else { actual = "لم تتضح الوتيرة بعد" }
         } else { actual = "بعد خمسة أيام حفظ وخمسين آية" }
         var planned = "ابدأ خطة الحفظ لتقدير الموعد"

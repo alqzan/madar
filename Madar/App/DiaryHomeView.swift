@@ -119,9 +119,7 @@ struct DiaryHomeView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text("المذكرات").font(DiaryType.title).accessibilityIdentifier("diary-home-title")
                 if let snapshot {
-                    Text(service.dateTitle(snapshot.today, calendar: FirstCalendar(rawValue: app.string("core.firstCalendar")) ?? .hijri)
-                        + "، " + service.dateTitle(snapshot.today, calendar: app.string("core.firstCalendar") == "gregorian" ? .hijri : .gregorian))
-                        .font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
+                    MadarDateLabel(app.dateLabels(snapshot.today, weekday: true)).foregroundStyle(theme.color("ink3Text"))
                 }
             }.frame(maxWidth: .infinity, alignment: .leading)
             Button { searchOpen = true } label: { Image(systemName: "magnifyingglass").frame(width: 44, height: 44) }.buttonStyle(.plain).accessibilityLabel("ابحث في مذكراتك").accessibilityIdentifier("diary-search")
@@ -160,7 +158,7 @@ struct DiaryHomeView: View {
                     HStack(spacing: 7) {
                         ForEach(snapshot.selection.days, id: \.description) { day in
                             Button { selected = day } label: {
-                                Text(yearTitle(day, snapshot: snapshot)).font(.custom("thmanyahsans-Bold", size: 12, relativeTo: .caption))
+                                MadarDateLabel(yearTitle(day, snapshot: snapshot))
                                     .frame(minWidth: 42, minHeight: 36).padding(.horizontal, 4)
                                     .foregroundStyle(day == page.day ? theme.ink : hasPhoto ? .white : theme.ink)
                                     .background(day == page.day ? theme.surface : hasPhoto ? Color.black.opacity(0.62) : theme.background, in: .capsule)
@@ -175,8 +173,8 @@ struct DiaryHomeView: View {
                         .padding(.horizontal, 9).padding(.vertical, 4).background(hasPhoto ? Color.black.opacity(0.3) : theme.background, in: .capsule)
                     Text(service.weekday(page.day)).font(DiaryType.label)
                 }
-                Text(service.dateTitle(page.day, calendar: snapshot.selection.match == .hijri ? .hijri : .gregorian)).font(DiaryType.title)
-                Text(service.dateTitle(page.day, calendar: snapshot.selection.match == .hijri ? .gregorian : .hijri) + (page.place.map { " · " + $0 } ?? ""))
+                Text(service.dateTitle(page.day, calendar: FirstCalendar(rawValue: app.string("core.firstCalendar")) ?? .hijri)).font(DiaryType.title)
+                Text(service.dateTitle(page.day, calendar: app.string("core.firstCalendar") == "gregorian" ? .hijri : .gregorian) + (page.place.map { " · " + $0 } ?? ""))
                     .font(DiaryType.label).opacity(hasPhoto ? 1 : 0.8)
                 Text(snapshot.selection.days.isEmpty && page.lines.isEmpty ? "اكتب ما تيسّر من يومك." : page.excerpt)
                     .font(DiaryType.writing).lineSpacing(8).lineLimit(4).fixedSize(horizontal: false, vertical: true)
@@ -242,7 +240,7 @@ struct DiaryHomeView: View {
                     Button { reader = day.day } label: {
                         HStack(spacing: 14) {
                             VStack(spacing: 2) {
-                                Text(service.digits.string(day.day.day)).font(.custom("thmanyahseriftext-Regular", size: 24, relativeTo: .title2))
+                                MadarDateLabel(app.dateLabels(day.day, compact: true)).frame(width: 80, alignment: .leading)
                                 Text(service.weekday(day.day)).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(theme.color("ink3Text"))
                             }.frame(minWidth: 35)
                             Text(day.excerpt).font(.custom("thmanyahseriftext-Regular", size: 17, relativeTo: .body)).frame(maxWidth: .infinity, alignment: .leading).multilineTextAlignment(.leading)
@@ -294,7 +292,11 @@ struct DiaryHomeView: View {
     }
     private var blocks: [String] { DiaryHomeLayout(app.values["notes.layout"]).order }
     private func hidden(_ block: String) -> Bool { app.values["notes.layout"]?.object?["hidden"]?.array?.contains(.string(block)) == true }
-    private func yearTitle(_ day: GregorianDay, snapshot: DiaryHomeSnapshot) -> String { String(service.dateTitle(day, calendar: snapshot.selection.match == .hijri ? .hijri : .gregorian).split(separator: " ").last ?? "") }
+    private func yearTitle(_ day: GregorianDay, snapshot: DiaryHomeSnapshot) -> String {
+        let labels = service.dateLabels(day)
+        return labels.primary.split(separator: " ").suffix(2).joined(separator: " ") + "، " + labels.secondary.split(separator: " ").suffix(2).joined(separator: " ")
+    }
+
     private func refresh() async {
         do {
             var value = try service.home()

@@ -155,8 +155,7 @@ struct PrayerTodayView: View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("الصلاة").font(MadarTypography.title()).accessibilityAddTraits(.isHeader)
-                Text(headerDate(prayerDay ?? GregorianDay.containing(session.prayerNow(), in: session.activePlace.timeZone)))
-                    .font(PrayerHomeType.body)
+                MadarDateLabel(session.dateLabels(prayerDay ?? GregorianDay.containing(session.prayerNow(), in: session.activePlace.timeZone), weekday: true), primaryFont: PrayerHomeType.body)
                     .foregroundStyle(theme.secondaryInk)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -174,26 +173,7 @@ struct PrayerTodayView: View {
 
     /// «الأربعاء ٢٦ ربيع الآخر ١٤٤٨، ٧ أكتوبر». RU1: «،» separates the two dates, never «·».
     private func headerDate(_ day: GregorianDay) -> String {
-        let place = session.activePlace
-        let midday = day.date(in: place.timeZone).addingTimeInterval(12 * 3600)
-        let dual = DualDate(instant: midday, timeZone: place.timeZone,
-            source: HijriSource(rawValue: session.string("core.hijriSource")) ?? .ummAlQura,
-            sightingOffset: Int(session.number("core.hijriOffset")))
-        let numerals: NumeralStyle = session.string("core.numerals") == "western" ? .western : .hindi
-        let digits = MadarNumberFormatter(style: numerals)
-        let months = ["محرم", "صفر", "ربيع الأول", "ربيع الآخر", "جمادى الأولى", "جمادى الآخرة", "رجب", "شعبان", "رمضان", "شوال", "ذو القعدة", "ذو الحجة"]
-        let hijri = "\(digits.string(dual.hijri.day)) \(months[dual.hijri.month - 1]) \(digits.string(dual.hijri.year))"
-        let formatter = DateFormatter()
-        formatter.locale = numeralLocale
-        formatter.timeZone = place.timeZone
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.dateFormat = "EEEE"
-        let weekday = formatter.string(from: midday)
-        formatter.dateFormat = "d MMMM"
-        let gregorian = formatter.string(from: midday)
-        return session.string("core.firstCalendar") == "gregorian"
-            ? "\(weekday) \(gregorian)، \(hijri)"
-            : "\(weekday) \(hijri)، \(gregorian)"
+        session.dateLabels(day).combined
     }
 
     /// Friday greeting. The Quran room has no entry point yet, so the pill carries no link and no Al-Kahf pointer.
@@ -496,16 +476,7 @@ struct PrayerTodayView: View {
 
     /// «الثلاثاء ٢٥ ربيع الآخر» or «الثلاثاء ٦ أكتوبر», following `core.firstCalendar`; never ISO digits.
     private func qadaDate(_ day: GregorianDay) -> String {
-        let zone = session.activePlace.timeZone
-        let noon = day.date(in: zone).addingTimeInterval(12 * 3600)
-        let f = DateFormatter(); f.locale = numeralLocale; f.timeZone = zone; f.calendar = Calendar(identifier: .gregorian)
-        f.dateFormat = session.string("core.firstCalendar") == "gregorian" ? "EEEE d MMMM" : "EEEE"
-        let weekday = f.string(from: noon)
-        if session.string("core.firstCalendar") == "gregorian" { return weekday }
-        let names = ["محرم", "صفر", "ربيع الأول", "ربيع الآخر", "جمادى الأولى", "جمادى الآخرة", "رجب", "شعبان", "رمضان", "شوال", "ذو القعدة", "ذو الحجة"]
-        let date = HijriCalendar.date(for: noon, timeZone: zone, source: HijriSource(rawValue: session.string("core.hijriSource")) ?? .ummAlQura,
-                                      sightingOffset: Int(session.number("core.hijriOffset")))
-        return weekday + " " + digits.string(date.day) + " " + names[date.month - 1]
+        session.dateLabels(day).combined
     }
 
     private func choose(_ cell: PrayerCell) {
@@ -979,7 +950,7 @@ private struct PrayerQadaListSheet: View {
                 PrayerStar().fill(theme.color("missed")).frame(width: 14, height: 14).accessibilityHidden(true)
                 Text(prayerTitle(item.reference.prayer)).font(PrayerHomeType.lead)
                 Spacer(minLength: 8)
-                Text(dateLabel(item.reference.day)).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
+                MadarDateLabel(dateLabel(item.reference.day)).foregroundStyle(theme.secondaryInk)
             }
             .padding(.horizontal, 10).frame(minHeight: 60)
             .background(on ? theme.color("missed").opacity(0.08) : .clear, in: .rect(cornerRadius: 14))
@@ -1300,7 +1271,7 @@ private struct PrayerMakeUpSheet: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("قضاء \(prayerTitle(item.reference.prayer))").font(.custom("thmanyahserifdisplay-Bold", size: 28, relativeTo: .title))
                         .accessibilityAddTraits(.isHeader)
-                    Text(dateLabel).font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk)
+                    MadarDateLabel(dateLabel).foregroundStyle(theme.secondaryInk)
                 }
                 Spacer(minLength: 0)
             }
@@ -1753,7 +1724,7 @@ private struct PrayerStatisticsView: View {
             }
             if typeSize.isAccessibilitySize {
                 ForEach(snapshot.history.filter { hijri($0.day).month == month.month && hijri($0.day).year == month.year }, id: \.day) { day in
-                    Button { editing = PrayerDayRoute(day: day.day) } label: { Text(dateTitle(day.day)).font(MadarTypography.caption()).fixedSize(horizontal: false, vertical: true).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading) }
+                    Button { editing = PrayerDayRoute(day: day.day) } label: { MadarDateLabel(dateTitle(day.day)).fixedSize(horizontal: false, vertical: true).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading) }
                         .accessibilityIdentifier("prayer-history-day-\(day.day)")
                 }
             } else { calendarGrid }
@@ -1858,7 +1829,7 @@ private struct PrayerStatisticsView: View {
 
     private func dayView(_ day: PrayerDaySummary) -> some View {
         List {
-            Section { Text(dateTitle(day.day)).font(MadarTypography.section()) }
+            Section { MadarDateLabel(dateTitle(day.day)) }
             ForEach(day.cells) { cell in
                 if cell.canLog && cell.time != nil && cell.status != .future {
                     Button { select(cell) } label: { Text(prayerTitle(cell.reference.prayer) + "، " + statusTitle(cell.status)).frame(minHeight: 44) }
@@ -1874,7 +1845,7 @@ private struct PrayerStatisticsView: View {
     private func dateTitle(_ day: GregorianDay) -> String {
         DualDate(instant: day.date(in: session.activePlace.timeZone).addingTimeInterval(12 * 3600), timeZone: session.activePlace.timeZone,
             source: HijriSource(rawValue: session.string("core.hijriSource")) ?? .ummAlQura, sightingOffset: Int(session.number("core.hijriOffset")))
-            .text(firstCalendar: session.string("core.firstCalendar") == "gregorian" ? .gregorian : .hijri, numerals: formatter.style)
+            .labels(firstCalendar: session.string("core.firstCalendar") == "gregorian" ? .gregorian : .hijri, numerals: formatter.style).combined
     }
     private func cellLabel(_ cell: PrayerCell) -> String { dateTitle(cell.reference.day) + "، " + prayerTitle(cell.reference.prayer) + "، " + statusTitle(cell.status) }
 }
@@ -2324,7 +2295,7 @@ private struct PrayerNightLoggingSheet: View {
     private func dateTitle(_ night: GregorianDay) -> String {
         DualDate(instant: night.date(in: session.activePlace.timeZone).addingTimeInterval(12 * 3600), timeZone: session.activePlace.timeZone,
             source: HijriSource(rawValue: session.string("core.hijriSource")) ?? .ummAlQura, sightingOffset: Int(session.number("core.hijriOffset")))
-            .text(firstCalendar: session.string("core.firstCalendar") == "gregorian" ? .gregorian : .hijri, numerals: formatter.style)
+            .labels(firstCalendar: session.string("core.firstCalendar") == "gregorian" ? .gregorian : .hijri, numerals: formatter.style).combined
     }
 }
 

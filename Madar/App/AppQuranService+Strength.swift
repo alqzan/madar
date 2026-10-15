@@ -30,10 +30,10 @@ extension AppQuranService {
         let far=v.pages.filter(\.isFar).count
         let options=try [5,7,14].map { days in
             let plan=try QuranRecoveryPlan.starting(on:v.day.date,days:days,candidates:v.pages)
-            return QuranUIRecoveryOption(id:days,title:days == 5 ? "خمسة أيام" : days == 7 ? "أسبوع" : "أسبوعان",daily:plan.share(on:v.day.date,reviewedOn:reviewed).count,end:displayDate(v.day.date.adding(days:days-1),hijriOnly:true))
+            return QuranUIRecoveryOption(id:days,title:days == 5 ? "خمسة أيام" : days == 7 ? "أسبوع" : "أسبوعان",daily:plan.share(on:v.day.date,reviewedOn:reviewed).count,end:displayDate(v.day.date.adding(days:days-1)))
         }
         let remaining=v.recovery.map {p in p.pages.filter {reviewed[$0].map {$0 < p.startDayKey} ?? true}.count} ?? 0
-        let active=v.recovery.map {p in remaining == 0 ? "اكتمل الاسترداد" : "ينتهي في " + displayDate(p.startDayKey.adding(days:p.days-1),hijriOnly:true)}
+        let active=v.recovery.map {p in remaining == 0 ? "اكتمل الاسترداد" : "ينتهي في " + displayDate(p.startDayKey.adding(days:p.days-1))}
         return QuranUIStrengthBoard(mean:QuranProgressEngine.meanStrength(v.pages).map {Int($0.rounded())},parts:parts,far:far,options:options,active:active,activeShare:v.recovery?.share(on:v.day.date,reviewedOn:reviewed).count ?? 0,remaining:remaining)
     }
 }
