@@ -67,11 +67,9 @@ struct BahwLobbyView: View {
     private var layout: BahwLayoutValue { BahwLayoutValue(session.values["bahw.layout"]) }
     var body: some View {
         TimelineView(.periodic(from: .now, by: 60)) { _ in
-            // The header stays fixed while the blocks scroll under it (02-W1-Bahw-s1).
-            VStack(spacing: 0) {
-            header.padding(.horizontal, 14).padding(.top, 8).padding(.bottom, 12).frame(maxWidth: 620)
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+                    header.padding(.top, 8).padding(.bottom, 4)
                     let visible = layout.visible
                     let placements = BahwGrid.pack(visible.map { ($0.rawValue, layout.size($0)) })
                     BahwGridLayout(placements: placements) {
@@ -85,6 +83,17 @@ struct BahwLobbyView: View {
                     }
                 }.padding(.horizontal, 14).padding(.top, 4).padding(.bottom, 24).frame(maxWidth: 620).frame(maxWidth: .infinity)
             }
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if arranging {
+                HStack {
+                    Text("رتّب البهو").font(MadarTypography.section())
+                    Spacer()
+                    Button("تمّ") { withAnimation(.snappy) { arranging = false } }
+                        .font(MadarTypography.section()).frame(minHeight: 44).padding(.horizontal, 20)
+                        .background(theme.accentFill, in: .capsule).foregroundStyle(theme.onAccent)
+                        .accessibilityIdentifier("bahw-arrange")
+                }.padding(.horizontal, 14).padding(.vertical, 6).background(theme.background)
             }
         }
         .background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
@@ -96,19 +105,10 @@ struct BahwLobbyView: View {
     }
 
     private var header: some View {
-        HStack(alignment: .top, spacing: 10) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(dateLine).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("bahw-date")
-                Text(greeting).font(MadarTypography.title()).accessibilityAddTraits(.isHeader).accessibilityIdentifier("bahw-greeting")
-            }
-            Spacer(minLength: 8)
-            Button { withAnimation(.snappy) { arranging.toggle() } } label: {
-                Text(arranging ? "تمّ" : "رتّب").font(MadarTypography.section()).padding(.horizontal, 16).frame(minHeight: 46)
-                    .background(arranging ? theme.accentFill : .clear, in: .capsule).foregroundStyle(arranging ? theme.onAccent : theme.ink).overlay { Capsule().stroke(theme.line) }
-            }.buttonStyle(.plain).accessibilityIdentifier("bahw-arrange")
-            Button { session.selectedTab = "customize" } label: { Image(systemName: "slider.horizontal.3").frame(width: 46, height: 46).overlay { Circle().stroke(theme.line) } }
-                .buttonStyle(.plain).accessibilityLabel("خصّص مدار").accessibilityIdentifier("settings-button")
-        }
+        VStack(alignment: .leading, spacing: 4) {
+            Text(dateLine).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("bahw-date")
+            Text(greeting).font(MadarTypography.title()).accessibilityAddTraits(.isHeader).accessibilityIdentifier("bahw-greeting")
+        }.frame(maxWidth: .infinity, alignment: .leading)
     }
     private var greeting: String {
         let place = session.activePlace, day = GregorianDay.containing(service.now, in: place.timeZone)

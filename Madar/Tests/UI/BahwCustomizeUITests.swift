@@ -9,8 +9,8 @@ import XCTest
                                  "MADAR_UI_TRACKING_START": "2026-10-01", "MADAR_UI_PRAYER_FIXTURE": "homeShowcase", "MADAR_UI_THEME": "light"]
         app.launch(); finishOnboarding(app)
         func element(_ id: String) -> XCUIElement { app.descendants(matching: .any).matching(identifier: id).firstMatch }
-        XCTAssertTrue(element("settings-button").waitForExistence(timeout: 15), app.debugDescription)
-        element("settings-button").tap()
+        XCTAssertTrue(app.tabBars.buttons["خصّص"].waitForExistence(timeout: 15), app.debugDescription)
+        app.tabBars.buttons["خصّص"].tap()
         XCTAssertTrue(element("bahw-custom-blocks").waitForExistence(timeout: 10), app.debugDescription)
         for block in ["salah", "quran", "year", "upcoming", "notes"] { XCTAssertTrue(element("bahw-custom-block-" + block).exists, block) }
         // RL9: rooms not built yet have no row.
@@ -30,7 +30,7 @@ import XCTest
         XCTAssertTrue(element("bahw-block-quran").waitForExistence(timeout: 8))
         XCTAssertFalse(element("bahw-block-year").exists)
 
-        element("settings-button").tap()
+        app.tabBars.buttons["خصّص"].tap()
         let reset = app.buttons["reset-settings"]; XCTAssertTrue(reset.waitForExistence(timeout: 8)); reset.tap()
         let confirm = app.buttons.matching(NSPredicate(format: "label == %@ AND identifier != %@", "أعِد الافتراضي", "reset-settings")).firstMatch; XCTAssertTrue(confirm.waitForExistence(timeout: 5)); confirm.tap()
         XCTAssertTrue(app.buttons["bahw-custom-size-quran-small"].waitForExistence(timeout: 5)); reveal(app.buttons["bahw-custom-size-quran-small"])

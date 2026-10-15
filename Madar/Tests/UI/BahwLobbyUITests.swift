@@ -57,6 +57,28 @@ import XCTest
         XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "bahw-year-gregorian").firstMatch.exists)
         capture(app, "UX-04-year-strips-L")
     }
+    func testGreetingScrollsAndEditingControlsStayContextual() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
+        app.launch(); finishOnboarding(app)
+        let greeting = app.staticTexts["bahw-greeting"]
+        XCTAssertTrue(greeting.waitForExistence(timeout: 15))
+        XCTAssertFalse(app.buttons["bahw-arrange"].exists)
+        XCTAssertFalse(app.buttons["settings-button"].exists)
+        capture(app, "UX-05-lobby-L")
+        app.swipeUp(velocity: .slow); app.swipeUp(velocity: .slow)
+        XCTAssertFalse(greeting.isHittable)
+        capture(app, "UX-05-lobby-s1-L")
+        app.swipeDown(velocity: .fast); app.swipeDown(velocity: .fast)
+        let prayer = app.descendants(matching: .any).matching(identifier: "bahw-block-salah").firstMatch
+        prayer.press(forDuration: 0.7)
+        XCTAssertTrue(app.buttons["bahw-arrange"].waitForExistence(timeout: 5))
+        app.buttons["bahw-arrange"].tap()
+        XCTAssertFalse(app.buttons["bahw-arrange"].exists)
+        app.tabBars.buttons["خصّص"].tap()
+        XCTAssertTrue(app.textFields["settings-search"].waitForExistence(timeout: 10))
+    }
     private func finishOnboarding(_ app: XCUIApplication) {
         if app.buttons["first-run-skip"].waitForExistence(timeout: 2) { app.buttons["first-run-skip"].tap() }
         let start = app.buttons["first-run-continue"]

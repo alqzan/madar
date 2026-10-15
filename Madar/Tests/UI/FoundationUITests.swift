@@ -393,7 +393,7 @@ import XCTest
             let app = XCUIApplication()
             app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": size,
                 "MADAR_UI_NOW": "2026-10-07T20:00:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-07", "MADAR_UI_THEME": "light"]
-            app.launch(); finishOnboarding(app); app.buttons["settings-button"].tap()
+            app.launch(); finishOnboarding(app); app.tabBars.buttons["خصّص"].tap()
             let search = app.textFields["settings-search"]
             scrollTo(search, in: app); search.tap(); search.typeText("salah.offsets\n")
             let plus = app.buttons["offset-isha-plus"]
@@ -411,7 +411,7 @@ import XCTest
             app.swipeDown(); app.tabBars.buttons["الصلاة"].tap()
             let isha = app.descendants(matching: .any).matching(identifier: "prayer-arch-isha").firstMatch
             scrollTo(isha, in: app); XCTAssertTrue(isha.label.contains("٧:٠٩"), isha.label)
-            app.terminate(); app.launch(); finishOnboarding(app); app.buttons["settings-button"].tap()
+            app.terminate(); app.launch(); finishOnboarding(app); app.tabBars.buttons["خصّص"].tap()
             let reset = app.buttons["reset-settings"]
             scrollTo(reset, in: app); reset.tap()
             app.buttons["أعِد الافتراضي"].firstMatch.tap()
@@ -563,7 +563,7 @@ import XCTest
         app.launchEnvironment["MADAR_UI_STORE_ID"] = UUID().uuidString
         app.launchEnvironment["MADAR_UI_SIZE"] = "L"
         app.launch(); finishOnboarding(app)
-        let settings = app.buttons["settings-button"]
+        let settings = app.tabBars.buttons["خصّص"]
         XCTAssertTrue(settings.waitForExistence(timeout: 10), app.debugDescription)
         settings.tap()
         let request = app.buttons["prayer-notification-permission-request"]
@@ -640,7 +640,7 @@ import XCTest
             app.launchEnvironment["MADAR_UI_STORE_ID"] = UUID().uuidString
             app.launchEnvironment["MADAR_UI_SIZE"] = size
             app.launch(); finishOnboarding(app)
-            let settingsButton = app.buttons["settings-button"]
+            let settingsButton = app.tabBars.buttons["خصّص"]
             XCTAssertTrue(settingsButton.waitForExistence(timeout: 10), app.debugDescription)
             settingsButton.tap()
             let search = app.textFields["settings-search"]
@@ -669,7 +669,7 @@ import XCTest
             app.launchEnvironment["MADAR_UI_STORE_ID"] = UUID().uuidString
             app.launch(); finishOnboarding(app)
             if style == "western" {
-                app.buttons["settings-button"].tap()
+                app.tabBars.buttons["خصّص"].tap()
                 let search = app.textFields["settings-search"]
                 scrollTo(search, in: app); search.tap(); search.typeText("core.numerals\n")
                 let option = app.buttons["option-core.numerals-western"]
@@ -770,8 +770,8 @@ import XCTest
             app.launchEnvironment["MADAR_UI_STORE_ID"] = UUID().uuidString
             app.launchEnvironment["MADAR_UI_SIZE"] = size
             app.launch(); finishOnboarding(app)
-            XCTAssertTrue(app.buttons["settings-button"].waitForExistence(timeout: 10))
-            app.buttons["settings-button"].tap()
+            XCTAssertTrue(app.tabBars.buttons["خصّص"].waitForExistence(timeout: 10))
+            app.tabBars.buttons["خصّص"].tap()
             let changes = app.staticTexts["customization-changes"]
             XCTAssertTrue(changes.waitForExistence(timeout: 10))
             XCTAssertEqual(changes.label, "كما اتفقنا")
@@ -792,8 +792,8 @@ import XCTest
                 waitForExpectations(timeout: 10)
                 // The same disposable store verifies persistence; a fresh screen clears search.
                 app.terminate(); app.launch(); finishOnboarding(app)
-                XCTAssertTrue(app.buttons["settings-button"].waitForExistence(timeout: 10))
-                app.buttons["settings-button"].tap()
+                XCTAssertTrue(app.tabBars.buttons["خصّص"].waitForExistence(timeout: 10))
+                app.tabBars.buttons["خصّص"].tap()
                 XCTAssertTrue(changes.waitForExistence(timeout: 10))
                 XCTAssertEqual(changes.label, expected)
                 attachScreenshot(app, named: "M0-RU3-\(key)-\(size)")
@@ -810,8 +810,8 @@ import XCTest
         // Relaunch keeps the same disposable store but gives every query a clean search field.
         for query in hiddenQueries + ["core.theme"] {
             app.launch(); finishOnboarding(app)
-            XCTAssertTrue(app.buttons["settings-button"].waitForExistence(timeout: 10))
-            app.buttons["settings-button"].tap()
+            XCTAssertTrue(app.tabBars.buttons["خصّص"].waitForExistence(timeout: 10))
+            app.tabBars.buttons["خصّص"].tap()
             let search = app.textFields["settings-search"]
             XCTAssertTrue(search.waitForExistence(timeout: 10))
             XCTAssertFalse(app.buttons["sync-settings-link"].exists)
@@ -832,8 +832,8 @@ import XCTest
             app.terminate()
         }
         app.launch(); finishOnboarding(app)
-        XCTAssertTrue(app.buttons["settings-button"].waitForExistence(timeout: 10))
-        app.buttons["settings-button"].tap()
+        XCTAssertTrue(app.tabBars.buttons["خصّص"].waitForExistence(timeout: 10))
+        app.tabBars.buttons["خصّص"].tap()
         XCTAssertTrue(app.textFields["settings-search"].waitForExistence(timeout: 10))
         attachScreenshot(app, named: "M0-native-bar-before-scroll")
         app.swipeUp(); app.swipeUp()
@@ -918,16 +918,16 @@ import XCTest
         let app = XCUIApplication()
         app.launchEnvironment["MADAR_UI_STORE_ID"] = UUID().uuidString
         app.launch(); finishOnboarding(app)
-        app.buttons["settings-button"].tap()
+        app.tabBars.buttons["خصّص"].tap()
         let search = app.textFields["settings-search"]
         search.tap(); search.typeText("core.faceIDLock\n")
         let wholeApp = app.buttons["option-core.faceIDLock-app"]
         XCTAssertTrue(wholeApp.waitForExistence(timeout: 10)); wholeApp.tap()
         XCTAssertTrue(app.buttons["lock-authenticate"].waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertFalse(app.buttons["settings-button"].exists)
+        XCTAssertFalse(app.tabBars.buttons["خصّص"].exists)
         app.terminate(); app.launch()
         XCTAssertTrue(app.buttons["lock-authenticate"].waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertFalse(app.buttons["settings-button"].exists)
+        XCTAssertFalse(app.tabBars.buttons["خصّص"].exists)
         let screenshot = XCTAttachment(screenshot: app.screenshot()); screenshot.name = "M0-lock-native-persisted"; screenshot.lifetime = .keepAlways; add(screenshot)
     }
     /// The host script supplies a real simctl URL after this test terminates the app.
@@ -954,7 +954,7 @@ import XCTest
         app.launchEnvironment["MADAR_UI_STORE_ID"] = UUID().uuidString
         app.launch()
         finishOnboarding(app)
-        let settings = app.buttons["settings-button"]
+        let settings = app.tabBars.buttons["خصّص"]
         XCTAssertTrue(settings.waitForExistence(timeout: 20), app.debugDescription)
         XCTAssertTrue(app.tabBars.buttons["الصلاة"].exists, "The M1 prayer screen is the first built room.")
         XCTAssertTrue(app.tabBars.buttons["القرآن"].exists, "M2 Quran home is now built.")
@@ -1114,9 +1114,9 @@ import XCTest
                 app.launchEnvironment["MADAR_UI_SIZE"] = size
                 app.launch()
                 finishOnboarding(app)
-                XCTAssertTrue(app.buttons["settings-button"].waitForExistence(timeout: 15))
+                XCTAssertTrue(app.tabBars.buttons["خصّص"].waitForExistence(timeout: 15))
                 let home = XCTAttachment(screenshot: app.screenshot()); home.name = "M0-home-\(theme)-\(size)"; home.lifetime = .keepAlways; add(home)
-                app.buttons["settings-button"].tap()
+                app.tabBars.buttons["خصّص"].tap()
                 XCTAssertTrue(app.buttons["reset-settings"].waitForExistence(timeout: 10))
                 let settings = XCTAttachment(screenshot: app.screenshot()); settings.name = "M0-settings-\(theme)-\(size)"; settings.lifetime = .keepAlways; add(settings)
                 app.terminate()
@@ -1128,8 +1128,8 @@ import XCTest
         let app = XCUIApplication()
         app.launchEnvironment["MADAR_UI_STORE_ID"] = UUID().uuidString
         app.launch(); finishOnboarding(app)
-        XCTAssertTrue(app.buttons["settings-button"].waitForExistence(timeout: 10))
-        app.buttons["settings-button"].tap()
+        XCTAssertTrue(app.tabBars.buttons["خصّص"].waitForExistence(timeout: 10))
+        app.tabBars.buttons["خصّص"].tap()
         let search = app.textFields["settings-search"]
         XCTAssertTrue(search.waitForExistence(timeout: 10))
         search.tap(); search.typeText("core.theme\n")
@@ -1145,7 +1145,7 @@ import XCTest
         dark.tap()
         XCTAssertTrue(app.buttons["undo-button"].waitForExistence(timeout: 10))
         app.terminate(); app.launch(); finishOnboarding(app)
-        app.buttons["settings-button"].tap()
+        app.tabBars.buttons["خصّص"].tap()
         let newSearch = app.textFields["settings-search"]
         newSearch.tap(); newSearch.typeText("core.theme\n")
         XCTAssertTrue(app.buttons["option-core.theme-dark"].isSelected)
@@ -1166,7 +1166,7 @@ import XCTest
         app.launchEnvironment["MADAR_UI_SIZE"] = "L"
         app.launchEnvironment["MADAR_UI_THEME"] = "light"
         app.launch(); finishOnboarding(app)
-        let settings = app.buttons["settings-button"]
+        let settings = app.tabBars.buttons["خصّص"]
         XCTAssertTrue(settings.waitForExistence(timeout: 15), app.debugDescription)
         let foundation = XCTAttachment(screenshot: app.screenshot())
         foundation.name = "M0-T17-foundation-default-L"; foundation.lifetime = .keepAlways; add(foundation)
@@ -1309,7 +1309,7 @@ import XCTest
     }
     private func openBackupSettings(_ app: XCUIApplication) {
         finishOnboarding(app)
-        app.buttons["settings-button"].tap()
+        app.tabBars.buttons["خصّص"].tap()
         let link = app.buttons["backup-settings-link"]
         scrollTo(link, in: app)
         link.tap()
@@ -1337,7 +1337,7 @@ import XCTest
     }
     private func openPlainExportSettings(_ app: XCUIApplication) {
         finishOnboarding(app)
-        app.buttons["settings-button"].tap()
+        app.tabBars.buttons["خصّص"].tap()
         let link = app.buttons["backup-settings-link"]
         scrollTo(link, in: app)
         link.tap()
