@@ -27,6 +27,11 @@ struct DiaryDayView: View {
     @State private var stampsOpen=false
     @State private var editing:DiaryLineEdit?
     @State private var original:DiaryLineEdit?
+    @State private var waitingLetter:DiaryLetterCard?
+    @State private var openingLetter:DiaryLetterCard?
+    @State private var sealedHere=0
+    @State private var projectLinks:[String:String]=[:]
+    @State private var projectSuggestions:[String:DiaryProjectCard]=[:]
     /// Travel days wear the air-mail paper everywhere on the page and in its sheets (§7.3).
     private var theme:RoomTheme {travel == nil ? roomTheme:RoomTheme(room:"notes.travel",dark:roomTheme.dark)}
     private var friday:Bool {appearance?.friday == true && travel == nil}
@@ -73,6 +78,9 @@ struct DiaryDayView: View {
                 if appearance?.weekAvailable == true,typeSize.isAccessibilitySize {
                     HStack{Button("صندوق الأسبوع"){weekOpen=true}.accessibilityIdentifier("diary-week-open");Spacer();Text("يوم الجمعة").foregroundStyle(theme.color("ghad"))}.font(DiaryType.label).frame(minHeight:44).padding(.horizontal,22)
                 }
+                if shownDay == today,let waitingLetter {
+                    DiaryLetterWaitingCard(letter:waitingLetter,digitsTitle:service.dateTitle(waitingLetter.writtenDay,calendar:.gregorian)){openingLetter=waitingLetter}.padding(.horizontal,18).padding(.vertical,6)
+                }
                 if shownDay == today || !intentions.isEmpty {
                     Button {intentionsOpen=true} label:{
                         HStack(alignment:.firstTextBaseline,spacing:10){Text("النيّة").font(DiaryType.label).foregroundStyle(theme.accent);Text(intentions.first?.text ?? "أضف نيّتك لليوم").font(DiaryType.writing).frame(maxWidth:.infinity,alignment:.leading).lineLimit(2);Image(systemName:"chevron.backward").font(.caption)}.padding(.horizontal,18).frame(minHeight:54).contentShape(.rect)
@@ -84,6 +92,12 @@ struct DiaryDayView: View {
                             ForEach(page.lines.filter{$0.kind != "intention"}) { line in
                                 lineRow(line, page: page)
                                 ForEach(page.media.filter { $0.entryID == line.id }) { media in DiaryMediaCard(app: app, media: media, transcript: line.text) }
+                            }
+                            ForEach(0..<sealedHere,id:\.self){_ in
+                                HStack(alignment:.center,spacing:12){
+                                    DiaryEnvelope(sealed:true).frame(width:38,height:26)
+                                    Text("رسالة مختومة تُفتح في وقتها، ولا تُقرأ قبله").font(DiaryType.writing).redacted(reason:.placeholder).blur(radius:2.2).accessibilityHidden(true)
+                                }.padding(.leading,6).padding(.trailing,18).padding(.vertical,10).accessibilityElement(children:.ignore).accessibilityLabel("رسالة مختومة").accessibilityIdentifier("diary-sealed-letter-line")
                             }
                             if !page.media.contains(where: { $0.id == page.photoID }), let data = page.photo, let image = UIImage(data: data) {
                                 Image(uiImage: image).resizable().scaledToFit().frame(maxWidth: 150).padding(8).background(theme.surface)
@@ -129,6 +143,7 @@ struct DiaryDayView: View {
                 .toolbarBackground(theme.background, for: .navigationBar).tint(theme.accent)
                 .fullScreenCover(isPresented:$searchOpen){DiarySearchView(app:app).environment(\.roomTheme,theme)}
                 .fullScreenCover(isPresented:$archiveOpen){DiaryHubView(app:app).environment(\.roomTheme,theme)}
+                .sheet(item:$openingLetter,onDismiss:{retry+=1}){letter in DiaryLetterMoment(app:app,letter:letter).environment(\.roomTheme,theme)}
                 .sheet(item:$editing){edit in DiaryLineEditSheet(app:app,edit:edit){niyyaSaved=true}.environment(\.roomTheme,theme)}
                 .sheet(item:$original){first in DiaryOriginalSheet(text:first.text).environment(\.roomTheme,theme).presentationDetents([.medium,.large])}
                 .sheet(isPresented:$stampsOpen){DiaryStampsView(app:app).environment(\.roomTheme,theme)}
@@ -137,7 +152,10 @@ struct DiaryDayView: View {
                 .sheet(isPresented: $writing) { DiaryTextEditor(app: app, margin: shownDay == today ? nil : shownDay).environment(\.roomTheme, theme) }
                 .task {while !Task.isCancelled {do{try await Task.sleep(for:.seconds(30));displayNow=service.clock();appearance=try service.appearance(shownDay)}catch{break}}}
                 .task(id: shownDay.description + ":" + String(app.prayerRevision) + ":" + String(retry)) {
-                    do { try await service.prepareClosedDay(shownDay); page = try service.day(shownDay); intentions=try service.intentions(shownDay); appearance=try service.appearance(shownDay);displayNow=service.clock();returnDay=try service.returnAfterAbsence(shownDay);travel=try service.travel(shownDay); failure = nil }
+                    do { try await service.prepareClosedDay(shownDay); page = try service.day(shownDay); intentions=try service.intentions(shownDay); appearance=try service.appearance(shownDay);displayNow=service.clock();returnDay=try service.returnAfterAbsence(shownDay);travel=try service.travel(shownDay)
+                        if shownDay == today {try? await service.refreshLetters()}
+                        let letters=try service.letters();waitingLetter=letters.first{$0.state == .eligible};sealedHere=letters.filter{$0.writtenDay==shownDay && $0.state != .opened}.count
+                        (projectLinks,projectSuggestions)=try service.projectNotes(shownDay); failure = nil }
                     catch { page = nil; failure = error.localizedDescription }
                 }
         }
@@ -168,6 +186,10 @@ struct DiaryDayView: View {
                         if page.editable.contains(line.id) {Button("عدّل السطر",systemImage:"pencil"){editing = .init(id:line.id,text:line.text)}}
                         if shownDay==today,["normal","late","ghad"].contains(line.kind),!line.text.isEmpty {Button("اجعلها نيّة اليوم"){Task{do{try await service.saveIntention(line.text,day:shownDay);niyyaSaved=true}catch{failure=error.localizedDescription}}}}
                     }
+                if let name = projectLinks[line.id] {Text("مشروع: "+name).font(DiaryType.label).foregroundStyle(theme.color("ink3Text")).accessibilityIdentifier("diary-line-project")}
+                else if let project = projectSuggestions[line.id] {
+                    Button{Task{do{try await service.link(line.id,to:project.id);niyyaSaved=true}catch{failure=error.localizedDescription}}}label:{Text("يتعلّق بـ«"+project.name+"»؟").font(DiaryType.label).padding(.horizontal,10).frame(minHeight:30).overlay{Capsule().stroke(theme.line)}}.buttonStyle(.plain).accessibilityIdentifier("diary-line-project-suggest")
+                }
                 if let first = page.originals[line.id] {
                     Button{original = .init(id:line.id,text:first)}label:{Text("عُدّل · الأصل").font(DiaryType.label).frame(minHeight:30)}.buttonStyle(.plain).foregroundStyle(theme.color("ink3Text")).accessibilityIdentifier("diary-line-edited")
                 }

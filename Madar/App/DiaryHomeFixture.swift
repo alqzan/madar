@@ -9,7 +9,7 @@ import MadarData
 extension AppSession {
     func prepareDiaryHomeFixture(group: URL) throws {
         let env = ProcessInfo.processInfo.environment
-        guard let variant = env["MADAR_UI_DIARY_FIXTURE"], ["home", "empty", "echoes", "margin", "welcome", "today", "editor", "return", "travel"].contains(variant), let id = env["MADAR_UI_STORE_ID"],
+        guard let variant = env["MADAR_UI_DIARY_FIXTURE"], ["home", "empty", "echoes", "margin", "welcome", "today", "editor", "return", "travel", "letters"].contains(variant), let id = env["MADAR_UI_STORE_ID"],
               group.lastPathComponent == id, group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         selectedTab = "notes"
         let context = ModelContext(container)
@@ -19,6 +19,15 @@ extension AppSession {
         for key in ["sys.onboardingCompleted", "sys.diaryFixture"] { let row = DeviceSetting(); row.key = key; row.valueJSON = Data("true".utf8); context.insert(row) }
         if variant != "welcome" { let marker = DeviceSetting(); marker.key = "sys.diaryWelcomeSeen"; marker.valueJSON = Data("true".utf8); context.insert(marker) }
         if variant == "echoes" || variant == "margin" { _ = try settings.stage(["notes.homeShape": .string(variant)]) }
+        if variant == "letters" {
+            // N04: one letter due since yesterday, one sealed today, and a project whose keyword today's line mentions.
+            let now=prayerUITestClock(.now),today=GregorianDay.containing(now,in:.riyadh)
+            let due=Letter();due.text="أرجو أن تكون أخفّ مما كنت يوم كتبتها.";due.triggerKind="date";due.triggerValue=today.adding(days:-1).description;due.openAt=today.adding(days:-1).date(in:.riyadh);due.createdAt=now.addingTimeInterval(-40*86400);context.insert(due)
+            let sealed=Letter();sealed.text="لا تُقرأ قبل وقتها";sealed.triggerKind="date";sealed.triggerValue=today.adding(days:60).description;sealed.createdAt=now.addingTimeInterval(-3600);context.insert(sealed)
+            let project=Project();project.name="ترتيب البيت";project.intention="بيت أهدأ قبل رمضان";project.keyword="البيت";context.insert(project)
+            let row=Entry();row.dayKey=today.description;row.text="دهنّا غرفة البيت الصغيرة.";row.eventAt=now.addingTimeInterval(-2*3600);row.tzID="Asia/Riyadh";row.dayPolicy="midnight@1";context.insert(row)
+            try context.save();return
+        }
         if variant == "travel" {
             // A shared Trip as Prayer's explicit arrival would store it: Istanbul since yesterday; no homeKm, so distance is derived.
             let now=prayerUITestClock(.now),istanbul=TimeZone(identifier:"Europe/Istanbul")!,trip=Trip()

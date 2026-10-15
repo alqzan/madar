@@ -4,7 +4,7 @@ import MadarCore
 import MadarData
 import MadarPrayer
 
-private struct DiaryInverse: Codable {
+struct DiaryInverse: Codable {
     let model: String
     let after: DataRecord
     let dayKey: String
@@ -117,13 +117,35 @@ private struct DiaryInverse: Codable {
             guard let row = rows.first(where: { $0.id == inverse.after.id && $0.mergedInto == nil }) else { throw DataError.invalidValue("missing diary entry") }
             if let before = inverse.before {
                 guard try row.record() == inverse.after else { throw DataError.invalidValue("undo superseded: transcript") }
-                row.text = try before.decode("text", as: String.self); row.updatedAt = StableIdentity.monotonic(now: now, previous: row.updatedAt); row.writerID = writer
-            } else { try tombstone(row) }
+                row.text = try before.decode("text", as: String.self); row.projectID = try before.decode("projectID", as: UUID?.self)
+                row.updatedAt = StableIdentity.monotonic(now: now, previous: row.updatedAt); row.writerID = writer
+            } else {
+                // RD1: a revision that a later live revision replaces cannot be undone on its own, or two heads would show.
+                guard !rows.contains(where: { $0.source == "revision" && $0.sourceID == row.id.uuidString && $0.deletedAt == nil && $0.mergedInto == nil }) else { throw DataError.invalidValue("undo superseded: revision") }
+                try tombstone(row)
+            }
             if inverse.previousOrigin == "dayOne", !rows.contains(where: { $0.id != row.id && $0.dayKey == inverse.dayKey && $0.source == "native" && $0.deletedAt == nil && $0.mergedInto == nil }) {
                 for page in try context.fetch(FetchDescriptor<DayPage>()) where page.dayKey == inverse.dayKey && page.deletedAt == nil && page.mergedInto == nil {
                     page.origin = "dayOne"; page.updatedAt = StableIdentity.monotonic(now: now, previous: page.updatedAt); page.writerID = writer
                 }
             }
+        } else if inverse.model == "Letter" {
+            guard let row = try context.fetch(FetchDescriptor<Letter>()).first(where: { $0.id == inverse.after.id && $0.mergedInto == nil }) else { throw DataError.invalidValue("missing letter") }
+            if let before = inverse.before {
+                guard try row.record() == inverse.after else { throw DataError.invalidValue("undo superseded: letter") }
+                row.triggerKind = try before.decode("triggerKind", as: String.self); row.triggerValue = try before.decode("triggerValue", as: String?.self)
+                row.triggerTargetID = try before.decode("triggerTargetID", as: UUID?.self); row.openAt = try before.decode("openAt", as: Date?.self)
+                row.state = try before.decode("state", as: String.self); row.updatedAt = StableIdentity.monotonic(now: now, previous: row.updatedAt); row.writerID = writer
+            } else { try tombstone(row) }
+        } else if inverse.model == "Project" {
+            guard let row = try context.fetch(FetchDescriptor<Project>()).first(where: { $0.id == inverse.after.id && $0.mergedInto == nil }), try row.record() == inverse.after else { throw DataError.invalidValue("undo superseded: project") }
+            if let before = inverse.before {
+                row.name = try before.decode("name", as: String.self); row.intention = try before.decode("intention", as: String.self); row.keyword = try before.decode("keyword", as: String?.self)
+                row.finishedAt = try before.decode("finishedAt", as: Date?.self); row.reflection = try before.decode("reflection", as: String?.self)
+                row.deletedAt = try before.decode("deletedAt", as: Date?.self); row.deletionBarrierAt = try before.decode("deletionBarrierAt", as: Date?.self)
+                if row.deletedAt == nil { row.restoredAt = now }
+                row.updatedAt = StableIdentity.monotonic(now: now, previous: row.updatedAt); row.writerID = writer
+            } else { try tombstone(row) }
         } else {
             guard let row = try context.fetch(FetchDescriptor<MarginNote>()).first(where: { $0.id == inverse.after.id && $0.mergedInto == nil }) else { throw DataError.invalidValue("missing margin") }
             try tombstone(row)

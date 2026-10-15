@@ -27,7 +27,9 @@ import XCTest
         for _ in 0..<5 where !play.isHittable { app.swipeUp() }; XCTAssertTrue(play.isHittable); play.tap()
         let disclosure = app.buttons["التسجيل والنص"]; XCTAssertTrue(disclosure.waitForExistence(timeout: 5)); disclosure.tap()
         let edit = app.buttons["diary-transcript-edit-33333333-3333-4333-8333-333333330002"]
-        for _ in 0..<5 where !edit.isHittable { app.swipeUp() }; edit.tap()
+        // The floating «اكتب» bar covers the bottom of the page; scroll until the button sits above it.
+        let write = app.buttons["diary-day-write"]
+        for _ in 0..<5 where !edit.isHittable || (write.exists && edit.frame.maxY > write.frame.minY) { app.swipeUp() }; edit.tap()
         let text = app.textViews["diary-transcript-text"]; XCTAssertTrue(text.waitForExistence(timeout: 10)); text.tap(); text.typeText(" أضفت تصحيحًا.")
         app.buttons["diary-transcript-save"].tap()
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "أضفت تصحيحًا")).firstMatch.waitForExistence(timeout: 10))

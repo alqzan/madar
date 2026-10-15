@@ -19,7 +19,7 @@ struct DiaryHubView: View {
     private var service: AppDiaryService { .init(app: app) }
     private var grid: DiaryCalendarGrid { service.diaryCalendar }
     private var selectedYear: Int { year ?? archive.map { grid.parts($0.today).year ?? $0.today.year } ?? grid.parts(GregorianDay.containing(.now, in: app.activePlace.timeZone)).year ?? Calendar.current.component(.year, from: .now) }
-    private let tabs = [("calendar","الشهر"),("timeline","الأيام"),("memories","الذكريات"),("photos","الصور"),("index","الفهرس")]
+    private let tabs = [("calendar","الشهر"),("timeline","الأيام"),("memories","الذكريات"),("photos","الصور"),("letters","الرسائل"),("projects","المشاريع"),("index","الفهرس")]
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 0) {
@@ -34,6 +34,8 @@ struct DiaryHubView: View {
                             case "photos": photos(archive)
                             case "memories": memories(archive)
                             case "index": index(archive)
+                            case "letters": DiaryLettersPanel(app: app)
+                            case "projects": DiaryProjectsPanel(app: app)
                             default: timeline(archive.days)
                             }
                         } else if let failure { Text(failure).font(MadarTypography.body()) }
