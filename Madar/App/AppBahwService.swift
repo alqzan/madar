@@ -45,7 +45,8 @@ struct BahwUpcomingItem: Identifiable, Equatable {
 
 @MainActor struct AppBahwService {
     let session: AppSession
-    var now: Date { session.prayerNow() }
+    var evaluationDate: Date? = nil
+    var now: Date { evaluationDate ?? session.prayerNow() }
     var digits: MadarNumberFormatter { .init(style: session.string("core.numerals") == "western" ? .western : .hindi) }
     var calendarDays: MadarCalendarDays {
         .init(zone: session.activePlace.timeZone, source: HijriSource(rawValue: session.string("core.hijriSource")) ?? .ummAlQura, offset: Int(session.number("core.hijriOffset")))
@@ -60,8 +61,8 @@ struct BahwUpcomingItem: Identifiable, Equatable {
     func prayer() -> BahwPrayerModel? {
         guard let snapshot = try? session.prayerSnapshot(at: now) else { return nil }
         let names: [Prayer: String] = [.fajr: "الفجر", .dhuhr: "الظهر", .asr: "العصر", .maghrib: "المغرب", .isha: "العشاء"]
-        let zone = session.activePlace.timeZone, instant = now
-        let upcoming = snapshot.today.cells.filter { ($0.prayerTime ?? .distantPast) > instant }.min { ($0.prayerTime ?? .distantFuture) < ($1.prayerTime ?? .distantFuture) }
+        let zone = snapshot.next?.place.timeZone ?? session.activePlace.timeZone, instant = now
+        let upcoming = snapshot.next
         func clock(_ date: Date?) -> String {
             guard let date else { return "" }
             var calendar = Calendar(identifier: .gregorian); calendar.timeZone = zone
@@ -75,10 +76,10 @@ struct BahwUpcomingItem: Identifiable, Equatable {
             return digits.localized(String(format: "%02d:%02d", locale: Locale(identifier: "en_US_POSIX"), parts.hour ?? 0, parts.minute ?? 0))
         }
         let arches = snapshot.today.cells.map { cell in
-            BahwPrayerModel.Arch(id: cell.reference.prayer.rawValue, name: names[cell.reference.prayer] ?? "", time: clock(cell.prayerTime), clock24: clock24(cell.prayerTime), done: [.jamaah, .alone].contains(cell.status), next: cell.id == upcoming?.id)
+            BahwPrayerModel.Arch(id: cell.reference.prayer.rawValue, name: names[cell.reference.prayer] ?? "", time: clock(cell.prayerTime), clock24: clock24(cell.prayerTime), done: [.jamaah, .alone].contains(cell.status), next: cell.reference == upcoming?.reference)
         }
-        return .init(arches: arches, done: arches.filter(\.done).count, nextName: upcoming.flatMap { names[$0.reference.prayer] }, nextTime: clock(upcoming?.prayerTime),
-                     nextAfter: upcoming?.prayerTime.map { PrayerCopy.after(seconds: $0.timeIntervalSince(instant), digits: digits) })
+        return .init(arches: arches, done: arches.filter(\.done).count, nextName: upcoming.flatMap { names[$0.reference.prayer] }, nextTime: clock(upcoming?.time),
+                     nextAfter: upcoming.map { $0.time }.map { PrayerCopy.after(seconds: $0.timeIntervalSince(instant), digits: digits) })
     }
     func quran() -> BahwQuranModel? {
         guard let value = try? AppQuranService(session: session).widgetSnapshot().payload else { return nil }

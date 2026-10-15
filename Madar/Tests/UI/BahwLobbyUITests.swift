@@ -33,6 +33,17 @@ import XCTest
         XCTAssertFalse(app.buttons["bahw-open-prayer"].exists)
         capture(app, "UX-02-direct-prayer-L")
     }
+    func testNextFajrAfterIsha() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T22:00:00+03:00"]
+        app.launch(); finishOnboarding(app)
+        let next = app.descendants(matching: .any).matching(identifier: "bahw-salah-next").firstMatch
+        XCTAssertTrue(next.waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertTrue(next.label.contains("الفجر"), next.label)
+        XCTAssertTrue(next.label.contains("بعد"), next.label)
+        capture(app, "UX-03-next-fajr-L")
+    }
     private func finishOnboarding(_ app: XCUIApplication) {
         if app.buttons["first-run-skip"].waitForExistence(timeout: 2) { app.buttons["first-run-skip"].tap() }
         let start = app.buttons["first-run-continue"]
