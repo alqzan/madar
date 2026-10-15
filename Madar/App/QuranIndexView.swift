@@ -18,7 +18,7 @@ struct QuranIndexView: View {
             VStack(alignment:.leading,spacing:16) {
                 QuranScreenHeader(title:"الفهرس",close:close)
                 HStack(spacing:4) { ForEach(QuranUIIndexUnit.allCases) { option in
-                    Button { withAnimation(reduceMotion ? nil : .easeInOut(duration:0.2)) { unit=option } } label: {
+                    Button { withAnimation(reduceMotion ? nil : .easeInOut(duration:0.2)) { unit=option; query="" } } label: {
                         VStack(spacing:4) { Image(systemName:option.icon).font(.system(size:18));Text(option.title).font(quranFont(11)) }.frame(maxWidth:.infinity,minHeight:52).foregroundStyle(unit == option ? theme.onAccent : theme.ink).background(unit == option ? theme.accent : .clear,in:Capsule())
                     }.buttonStyle(.plain).accessibilityIdentifier("quran-index-unit-"+option.id).accessibilityAddTraits(unit == option ? .isSelected : [])
                 } }.padding(4).background(theme.color("track"),in:Capsule())
@@ -41,7 +41,7 @@ struct QuranIndexView: View {
             .sheet(item:$selected) { item in VStack(alignment:.leading,spacing:15) {Text(item.title).font(quranSerif(28));Text(item.subtitle).font(quranFont(14));Text(status(item)).font(quranFont(14,bold:true));Button("افتح في المصحف") {selected=nil;reader=item.firstPage}.frame(minHeight:44);Button("تمّ") {selected=nil}.frame(minHeight:44)}.padding(24).frame(maxWidth:.infinity,alignment:.leading).background(theme.surface).foregroundStyle(theme.ink).presentationDetents([.height(310),.large]).environment(\.layoutDirection,.rightToLeft) }
             .fullScreenCover(isPresented:Binding(get:{reader != nil},set:{if !$0 {reader=nil}})) {QuranMushafView(service:service,initialPage:reader ?? 1,close:{reader=nil})}
     }
-    private var filtered:[QuranUIIndexItem] {query.isEmpty ? items : items.filter {$0.title.contains(query) || $0.subtitle.contains(query)} }
+    private var filtered:[QuranUIIndexItem] {query.isEmpty ? items : items.filter {$0.title.contains(query) || $0.searchText.contains(QuranIndexSearch.normalize(query))} }
     private func status(_ i:QuranUIIndexItem)->String { (i.memorized ? "محفوظ" : i.fraction > 0 ? "حفظ جزئي" : "لم تحفظه") + (i.reviewed ? "، راجعته" : "") + (i.due ? "، مستحق" : "") + (i.isToday ? "، ورد اليوم" : "") }
 }
 struct QuranSurahRopes:View {

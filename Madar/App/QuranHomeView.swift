@@ -21,6 +21,7 @@ struct QuranHomeView: View {
     @State private var showFree = false
     @State private var showIndex = false
     @State private var showStrength = false
+    @State private var showQiyam = false
     @State private var readerPage: Int?
     private enum HomeDetail: Identifiable {
         case step(QuranUIStep), hadith
@@ -53,15 +54,7 @@ struct QuranHomeView: View {
                     if state.plan == nil { Button("ابدأ خطة الحفظ") { showSetup = true }.font(bodyFont(16, bold: true)).frame(maxWidth: .infinity, minHeight: 50).foregroundStyle(theme.onAccent).background(theme.accent, in: Capsule()).accessibilityIdentifier("quran-start-plan") }
                     path(state)
                     log(state)
-                    card {
-                        Button { readerPage = nil; showMushaf = true } label: {
-                            Label("المصحف", systemImage: "book").font(bodyFont(15, bold: true)).frame(maxWidth: .infinity, minHeight: 44)
-                        }.buttonStyle(.plain).accessibilityIdentifier("quran-tool-mushaf")
-                        Button { showIndex = true } label: { Label("الفهرس", systemImage: "line.3.horizontal.decrease").font(bodyFont(14)).frame(maxWidth: .infinity, minHeight: 44) }.buttonStyle(.plain).accessibilityIdentifier("quran-tool-index")
-                        Button { showFree = true } label: { Label("مراجعة حرة", systemImage: "arrow.left.arrow.right").font(bodyFont(14)).frame(maxWidth: .infinity, minHeight: 44) }.buttonStyle(.plain).accessibilityIdentifier("quran-tool-free")
-                        Button { showStrength = true } label: { Label("منسوب الحفظ", systemImage: "chart.bar").font(bodyFont(14)).frame(maxWidth: .infinity, minHeight: 44) }.buttonStyle(.plain).accessibilityIdentifier("quran-tool-strength")
-                        Button { showOutside = true } label: { Label("التذكير والودجات", systemImage: "bell").font(bodyFont(14)).frame(maxWidth: .infinity, minHeight: 44) }.buttonStyle(.plain).accessibilityIdentifier("quran-outside")
-                    }
+                    tools(state)
                 }.padding(.horizontal, 16).padding(.top, 20).padding(.bottom, 36)
             } else if let error {
                 VStack(spacing: 16) { Text(error); Button("حاول مرة أخرى") { run { try await refresh() } } }
@@ -80,7 +73,8 @@ struct QuranHomeView: View {
                 if state == nil { try await refresh() }
                 if route.path.first == "page", let number = Int(route.path.last ?? "") { readerPage = number; showMushaf = true }
                 else if route.path.first == "session" {
-                    if let draft = state?.draft { active = try await service.resume(draftID: draft.id) }
+                    if route.path.last == "qiyam" { showQiyam = true }
+                    else if let draft = state?.draft { active = try await service.resume(draftID: draft.id) }
                     else if let kind = QuranUIKind(rawValue: route.path.last == "wird" ? "hifz" : route.path.last ?? "") { active = try await service.start(kind: kind, stepID: nil, range: nil, rakaat: nil, spotID: nil) }
                 }
             }
@@ -122,6 +116,7 @@ struct QuranHomeView: View {
                 .environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft)
         }
         .fullScreenCover(isPresented: $showOutside) { QuranOutsideView(service: service, close: { showOutside = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
+        .fullScreenCover(isPresented: $showQiyam, onDismiss: { run { try await refresh() } }) { QuranQiyamView(service: service, close: { showQiyam = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
         .fullScreenCover(isPresented: $showStrength, onDismiss: { run { try await refresh() } }) { QuranStrengthView(service: service, close: { showStrength = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
         .fullScreenCover(isPresented: $showIndex) { QuranIndexView(service: service, close: { showIndex = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
         .fullScreenCover(isPresented: $showFree, onDismiss: { run { try await refresh() } }) { QuranFreeView(service: service, close: { showFree = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
@@ -309,6 +304,24 @@ struct QuranHomeView: View {
                     .accessibilityLabel(day.accessibilityLabel)
             } }
         }
+    }
+    private func tools(_ state: QuranRoomState) -> some View {
+        card {
+            VStack(spacing: 12) {
+                HStack(alignment: .top, spacing: 4) {
+                    tool("المصحف", icon: "book", id: "mushaf") { readerPage = nil; showMushaf = true }
+                    tool("الفهرس", icon: "line.3.horizontal.decrease", id: "index") { showIndex = true }
+                    tool("مراجعة حرة", icon: "arrow.left.arrow.right", id: "free") { showFree = true }
+                    tool("منسوب الحفظ", icon: "chart.bar", id: "strength") { showStrength = true }
+                    if state.coverageFraction > 0 { tool("ورد القيام", icon: "moon", id: "qiyam") { showQiyam = true } }
+                }
+                Divider().overlay(theme.line)
+                Button { showOutside = true } label: { Label("التذكير والودجات", systemImage: "bell").font(bodyFont(14)).frame(maxWidth: .infinity, minHeight: 44) }.buttonStyle(.plain).accessibilityIdentifier("quran-outside")
+            }
+        }
+    }
+    private func tool(_ title: String, icon: String, id: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) { VStack(spacing: 8) { Image(systemName: icon).font(.system(size: 18)); Text(title).font(bodyFont(11, bold: true)).multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true) }.frame(maxWidth: .infinity, minHeight: 74, alignment: .top).contentShape(Rectangle()) }.buttonStyle(.plain).accessibilityIdentifier("quran-tool-" + id)
     }
     private func refresh() async throws { state = try await service.load() }
     private func run(_ operation: @escaping @MainActor () async throws -> Void) {

@@ -15,6 +15,7 @@ public struct QuranDraftPayload: Codable, Sendable {
     public var witr: Bool?
     public var coach: QuranCoachProgress?
     public var reviewSections: [QuranReviewSection]?
+    public var qiyamRakahIndex: Int?
     public init(draft: QuranSessionDraft, method: String = "coach", nightKey: GregorianDay? = nil, rakats: Int? = nil, witr: Bool? = nil, drillKey: QuranMistakeKey? = nil, testPages: [Int]? = nil, revealedAyahs: Set<Int>? = nil) {
         self.draft = draft; self.revealedAyahs = revealedAyahs; self.testPages = testPages; self.drillKey = drillKey; self.method = method; self.nightKey = nightKey; self.rakats = rakats; self.witr = witr
     }
@@ -97,7 +98,7 @@ public struct QuranStagedResult: Sendable {
             guard draft.startedAt <= now, [.hifz, .review, .free, .qiyam, .drill].contains(draft.kind),
                   ["coach", "completeAyah", "gradual", "next", "link", "continuous"].contains(value.method) else { throw DataError.invalidValue("Quran draft") }
             if draft.kind == .qiyam {
-                guard value.nightKey != nil, let rakats = value.rakats, [2, 4, 6, 8].contains(rakats) else { throw DataError.invalidValue("Quran qiyam draft") }
+                guard value.nightKey != nil, let rakats = value.rakats, [2, 4, 6, 8].contains(rakats), (0...rakats).contains(value.qiyamRakahIndex ?? draft.grades.count) else { throw DataError.invalidValue("Quran qiyam draft") }
             }
             let snapshot = try repository.snapshot(at: now)
             // Validation is reused even for a learning-only draft that has nothing eligible to commit yet.
@@ -110,7 +111,7 @@ public struct QuranStagedResult: Sendable {
                 guard existing.deletedAt == nil, previous.draft.startedAt == draft.startedAt,
                       previous.draft.storedDay == draft.storedDay, previous.draft.portions == draft.portions,
                       previous.draft.planID == draft.planID, previous.draft.kind == draft.kind,
-                      previous.nightKey == value.nightKey, previous.testPages == value.testPages,
+                      previous.nightKey == value.nightKey, previous.rakats == value.rakats, previous.testPages == value.testPages,
                       previous.drillKey == value.drillKey else { throw DataError.invalidValue("Quran draft identity") }
             } else {
                 guard !snapshot.drafts.contains(where: { $0.id != draft.id }) else { throw DataError.invalidValue("Quran draft already active") }
@@ -158,7 +159,11 @@ public struct QuranStagedResult: Sendable {
                 row.at = event.at; row.createdAt = now; context.insert(row); try touch(row)
             }
             if commit.kind == .qiyam {
-                guard let night = value.nightKey, let rakats = value.rakats else { throw DataError.invalidValue("Quran qiyam metadata") }
+                guard let night = value.nightKey, let target = value.rakats else { throw DataError.invalidValue("Quran qiyam metadata") }
+                let completed = value.qiyamRakahIndex ?? value.draft.grades.count
+                let partial: Bool = if case .bool(true) = payload["partial"] { true } else { false }
+                guard completed > 0, completed <= target, partial || completed == target else { throw DataError.invalidValue("أكمل الركعات أو سجّل ما أتممت صراحة") }
+                let rakats = partial ? completed : target
                 let existing = try context.fetch(FetchDescriptor<QiyamNight>()).filter { $0.nightKey == night.description && $0.mergedInto == nil }.max { $0.updatedAt < $1.updatedAt }
                 guard existing?.deletedAt == nil else { throw DataError.invalidValue("explicitRestoreRequired") }
                 guard existing?.quranSessionID == nil else { throw DataError.invalidValue("Qiyam wird already recorded") }

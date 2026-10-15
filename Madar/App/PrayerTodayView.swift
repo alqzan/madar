@@ -2213,8 +2213,7 @@ private struct PrayerNightLoggingSheet: View {
         return row.rakaat >= 8 ? theme.accent : theme.color("goldMid")
     }
 
-    /// S6 · «قيام الليل», matched to `screens/salah/07-S6-Qiyam.jpg`. Not copied: the Quran-room entry
-    /// «ورد القيام من محفوظك» (that room is not built) and any streak wording (qiyam is a footprint).
+    /// S6 · Quran owns its wird; this link opens its built current-night preview. Qiyam remains a footprint.
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .firstTextBaseline) {
@@ -2243,6 +2242,10 @@ private struct PrayerNightLoggingSheet: View {
             Toggle("أوترتُ", isOn: $witr).toggleStyle(PrayerPillToggleStyle()).padding(.top, 14).accessibilityIdentifier("prayer-qiyam-witr")
             footprintStrip.padding(.top, 18)
             Text("آخر ثلاثين ليلة · ليست سلسلة تنكسر، أثرٌ يُرى").font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk).padding(.top, 10)
+            if selectedNight == snapshot.nightDefault && !restoreNeeded && hasQuranCoverage {
+                Button("ورد القيام من محفوظك") { finished(); session.open(URL(string: "madar://quran/session/qiyam")!) }
+                    .font(PrayerHomeType.strong).frame(maxWidth: .infinity, minHeight: 44).accessibilityIdentifier("prayer-quran-qiyam").padding(.top, 8)
+            }
             if restoreNeeded {
                 Text("سبق التراجع عن تسجيل هذه الليلة. يمكنك إعادة تسجيلها صراحة.").font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk).padding(.top, 14)
                 primary("أعد تسجيل الليلة", id: "prayer-qiyam-restore") { confirmRestore = true }.padding(.top, 8)
@@ -2268,6 +2271,8 @@ private struct PrayerNightLoggingSheet: View {
             rakaat = previous?.rakaat ?? 0; witr = previous?.witr ?? false
         }
     }
+
+    private var hasQuranCoverage: Bool { (try? AppQuranService(session: session).snapshot().coverage.completedPages.isEmpty) == false }
 
     private var divider: some View { Rectangle().fill(theme.ink.opacity(0.1)).frame(height: 1) }
 

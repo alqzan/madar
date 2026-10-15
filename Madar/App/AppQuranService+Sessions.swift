@@ -73,6 +73,7 @@ extension AppQuranService {
         var value = QuranDraftPayload(draft: draft, method: storedKind == .hifz ? "coach" : "continuous", nightKey: nightKey, rakats: rakaat, drillKey: drillKey, testPages: storedKind == .review ? snapshot.review.testPages : [])
         if storedKind == .hifz { value.coach = QuranCoachProgress(bridgeAyahs: bridgeAyahs, intensity: snapshot.plan?.plan.intensity ?? .balanced) }
         value.reviewSections = reviewSections
+        if storedKind == .qiyam { value.qiyamRakahIndex = 0 }
         try await save(value)
         return try await sessionState(value)
     }
@@ -95,7 +96,9 @@ extension AppQuranService {
                 try await command("quran.discardDraft", ["draftID": .string(draftID.uuidString)])
                 return .discarded
             }
-            try await command("quran.commitSession", ["draftID": .string(draftID.uuidString)])
+            var payload: [String: MadarCore.JSONValue] = ["draftID": .string(draftID.uuidString)]
+            if draft.kind == .qiyam, case .commitPartial = action { payload["partial"] = .bool(true) }
+            try await command("quran.commitSession", payload)
             let state = try await load(); return .completed(summary: state.summary)
         case .saveProgress: break
         case .changeMethod(let method):
@@ -137,7 +140,20 @@ extension AppQuranService {
             let isTest = value.testPages?.contains(page) == true && draft.kind == .review
             draft.grades.removeAll { $0.page == page }; draft.grades.append(QuranDraftGrade(page: page, rating: rating, isTest: isTest))
         case .advance:
-            if draft.kind == .hifz {
+            if draft.kind == .qiyam {
+                let pages = qiyamPages(draft, catalog: catalog), total = value.rakats ?? 2
+                let index = value.qiyamRakahIndex ?? draft.grades.count
+                guard index < total else { throw QuranPlanError.invalidSession }
+                if pages.indices.contains(index), !draft.grades.contains(where: { $0.page == pages[index] }) {
+                    draft.grades.append(QuranDraftGrade(page: pages[index], rating: .good))
+                }
+                value.qiyamRakahIndex = index + 1
+                if index + 1 == total { draft.coachStage = .rating }
+                else {
+                    draft.coachStage = .blindRecitation
+                    if pages.indices.contains(index + 1) { draft.page = pages[index + 1]; draft.ayahID = catalog.ayahs(on: draft.page).first!.id }
+                }
+            } else if draft.kind == .hifz {
                 if var coach = value.coach, coach.bridgePending {
                     coach.bridgePending = false; value.coach = coach; value.draft = draft
                     try await save(value); return .active(try await sessionState(value))
@@ -312,6 +328,11 @@ extension AppQuranService {
                 if let next { state.primaryTitle = "كشفت التالية"; state.primaryAction = .reveal(ayahID: next.id, wordIndex: nil) }
                 else { state.primaryTitle = "قيّم هذا الوجه"; state.primaryAction = .advance }
             } else if !finished { state.primaryTitle = "تابع" }
+        }
+        if draft.kind == .qiyam {
+            state.qiyam = try qiyamSession(value, catalog: catalog)
+            state.title = "ورد القيام"
+            state.grades = draft.grades.map { QuranUIPageGrade(page: $0.page, title: "الوجه " + numerals.string($0.page), grade: QuranUIGrade(rawValue: $0.rating.storedRaw)!, explanation: "جيد مقترح؛ عدّل تقييمك") }
         }
         state.coach?.flaggedWords = Set(draft.mistakes.compactMap { mistake in mistake.key.wordIndex.map { QuranUICoach.wordKey(mistake.key.ayahID, $0) } })
         return state

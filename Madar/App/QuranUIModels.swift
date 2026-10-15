@@ -45,7 +45,7 @@ enum QuranUIIndexUnit: String, CaseIterable, Identifiable, Sendable {
     var title: String { switch self { case .surah: "السور"; case .ayah: "الآيات"; case .juz: "الأجزاء"; case .hizb: "الأحزاب"; case .page: "الأوجه" } }
     var icon: String { switch self { case .surah: "line.3.horizontal.decrease"; case .ayah: "rosette"; case .juz: "square.grid.2x2"; case .hizb: "square.grid.3x3"; case .page: "doc" } }
 }
-struct QuranUIIndexItem: Identifiable, Sendable { var id: String; var title: String; var subtitle: String; var firstPage: Int; var fraction: Double; var memorized: Bool; var reviewed: Bool; var due: Bool; var isToday: Bool; var weight: Int = 1 }
+struct QuranUIIndexItem: Identifiable, Sendable { var id: String; var title: String; var subtitle: String; var firstPage: Int; var fraction: Double; var memorized: Bool; var reviewed: Bool; var due: Bool; var isToday: Bool; var weight: Int = 1; var searchText: String = "" }
 struct QuranUIStrength: Identifiable, Sendable { var id: Int; var title: String; var value: Int?; var pageDetails: [String]; var canRaise: Bool; var reviewRange: QuranUIRange? }
 struct QuranUIRecovery: Sendable { var distantLabel: String; var activeTitle: String?; var canCreate: Bool; var previews: [Int: QuranUIForecast] }
 struct QuranUIQiyamPreview: Sendable { var rakaat: Int; var nightKey: String; var title: String; var assignments: [String]; var canBegin: Bool }
@@ -158,6 +158,7 @@ struct QuranUISessionState: Identifiable, Sendable {
     var resourceError: String?
     var coach: QuranUICoach?
     var drill: QuranUIDrillCard? = nil
+    var qiyam: QuranUIQiyamSession? = nil
     var startedAt: Date? = nil
     var numeralLocale = "ar"
 }

@@ -15,6 +15,8 @@ struct QuranHomeSessionFlow: View {
         Group {
             if showDayClose {
                 QuranDayCloseView(service: service, close: close)
+            } else if let qiyam = state.qiyam {
+                QuranQiyamSessionView(state: state, qiyam: qiyam, busy: busy, action: perform, close: close)
             } else if state.drill != nil {
                 QuranDrillView(service: service, initial: state, close: close)
             } else if let coach = state.coach {

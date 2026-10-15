@@ -59,7 +59,7 @@ public enum RouteRegistry {
                 case (.salah, "qada", 2), (.notes, "entry", 2), (.notes, "letter", 2), (.notes, "project", 2), (.quran, "history", 2), (.mal, "tx", 2), (.mal, "envelope", 2), (.mihbara, "notebook", 2): try uuid(path[1])
                 case (.quran, "page", 2): try integer(path[1], range: 1...604)
                 case (.quran, "juz", 2): try integer(path[1], range: 1...30)
-                case (.quran, "session", 2): guard ["hifz", "review", "drill", "bridge", "wird"].contains(path[1]) else { throw CoreError.invalidRoute }; mode = .prefill
+                case (.quran, "session", 2): guard ["hifz", "review", "drill", "bridge", "wird", "qiyam"].contains(path[1]) else { throw CoreError.invalidRoute }; mode = .prefill
                 case (.mal, "card", 2): try uuid(path[1]); allowed = ["tab"]; if let tab = p["tab"], !["overview", "cash", "calendar", "match"].contains(tab) { throw CoreError.invalidRoute }
                 case (.mal, "add", 1):
                     mode = .prefill; allowed = ["amount", "merchant", "method"]

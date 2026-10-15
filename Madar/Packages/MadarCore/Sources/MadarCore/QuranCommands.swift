@@ -12,7 +12,12 @@ public enum QuranCommandPayload {
         func uuid(_ key: String) -> Bool { string(key).flatMap(UUID.init(uuidString:)) != nil }
         switch name {
         case "quran.saveDraft": return keys(["draft"]) && (string("draft")?.utf8.count ?? 0) > 0 && (string("draft")?.utf8.count ?? 0) <= 4_000_000
-        case "quran.discardDraft", "quran.commitSession": return keys(["draftID"]) && uuid("draftID")
+        case "quran.discardDraft": return keys(["draftID"]) && uuid("draftID")
+        case "quran.commitSession":
+            guard uuid("draftID") else { return false }
+            if keys(["draftID"]) { return true }
+            if keys(["draftID", "partial"]), case .bool = payload["partial"] { return true }
+            return false
         case "quran.deleteSession": return keys(["sessionID"]) && uuid("sessionID")
         case "quran.savePlan":
             guard keys(["startAyah", "unit", "amount", "rhythm", "restDay", "missPolicy"]),
