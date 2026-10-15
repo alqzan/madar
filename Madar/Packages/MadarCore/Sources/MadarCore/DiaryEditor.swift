@@ -7,7 +7,8 @@ public enum DiaryEditorCommand: Codable, Equatable, Sendable {
     case transcript(entry: UUID, text: String)
     case intention(id: UUID, day: String, text: String)
     case intentionResult(id: UUID, result: String?)
-    public static let names: Set<String> = ["diary.saveDraft", "diary.commitDraft", "diary.appendMedia", "diary.setTranscript", "diary.setIntention", "diary.setIntentionResult"]
+    case edit(entry: UUID, revision: UUID, text: String)
+    public static let names: Set<String> = ["diary.saveDraft", "diary.commitDraft", "diary.appendMedia", "diary.setTranscript", "diary.setIntention", "diary.setIntentionResult", "diary.editEntry"]
     public static func parse(_ name: String, _ value: [String: JSONValue]) -> Self? {
         func uuid(_ key: String) -> UUID? { value[key]?.string.flatMap(UUID.init(uuidString:)) }
         switch name {
@@ -32,6 +33,10 @@ public enum DiaryEditorCommand: Codable, Equatable, Sendable {
         case "diary.setIntentionResult":
             guard Set(value.keys) == ["id","result"],let id=uuid("id"),value["result"] == .null || value["result"]?.string.map({["done","partial","notEasy"].contains($0)}) == true else{return nil}
             return .intentionResult(id:id,result:value["result"]?.string)
+        case "diary.editEntry":
+            guard Set(value.keys) == ["entryID", "revisionID", "text"], let id = uuid("entryID"), let revision = uuid("revisionID"), revision != id, let text = value["text"]?.string,
+                !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+            return .edit(entry: id, revision: revision, text: text)
         case "diary.setTranscript":
             guard Set(value.keys) == ["entryID", "text"], let id = uuid("entryID"), let text = value["text"]?.string else { return nil }; return .transcript(entry: id, text: text)
         default: return nil

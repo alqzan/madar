@@ -120,7 +120,7 @@ struct DiaryHomeView: View {
                 Text("المذكرات").font(DiaryType.title).accessibilityIdentifier("diary-home-title")
                 if let snapshot {
                     Text(service.dateTitle(snapshot.today, calendar: FirstCalendar(rawValue: app.string("core.firstCalendar")) ?? .hijri)
-                        + " · " + service.dateTitle(snapshot.today, calendar: app.string("core.firstCalendar") == "gregorian" ? .hijri : .gregorian))
+                        + "، " + service.dateTitle(snapshot.today, calendar: app.string("core.firstCalendar") == "gregorian" ? .hijri : .gregorian))
                         .font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
                 }
             }.frame(maxWidth: .infinity, alignment: .leading)

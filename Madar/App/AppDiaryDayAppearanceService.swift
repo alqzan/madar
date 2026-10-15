@@ -14,7 +14,7 @@ extension AppDiaryService {
     func returnAfterAbsence(_ day:GregorianDay) throws -> GregorianDay? {
         try authorizeRead();guard day == (try currentDay()) else{return nil}
         let context=ModelContext(app.container)
-        let entries=try context.fetch(FetchDescriptor<Entry>(predicate:#Predicate{$0.deletedAt==nil && $0.mergedInto==nil}))
+        let entries=Self.visible(try context.fetch(FetchDescriptor<Entry>(predicate:#Predicate{$0.deletedAt==nil && $0.mergedInto==nil})))
         let intentions=try context.fetch(FetchDescriptor<Niyya>(predicate:#Predicate{$0.deletedAt==nil && $0.mergedInto==nil}))
         let keys=entries.filter{!$0.text.isEmpty || $0.mediaID != nil || !$0.attachmentMediaIDs.isEmpty}.map(\.dayKey)+intentions.map(\.dayKey)
         guard let latest=keys.compactMap({try? GregorianDay($0)}).filter({$0<=day}).max(),latest<day.adding(days:-1) else{return nil}

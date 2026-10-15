@@ -25,6 +25,8 @@ struct DiaryDayView: View {
     @State private var displayNow=Date()
     @State private var travel:DiaryTravelPage?
     @State private var stampsOpen=false
+    @State private var editing:DiaryLineEdit?
+    @State private var original:DiaryLineEdit?
     /// Travel days wear the air-mail paper everywhere on the page and in its sheets (§7.3).
     private var theme:RoomTheme {travel == nil ? roomTheme:RoomTheme(room:"notes.travel",dark:roomTheme.dark)}
     private var friday:Bool {appearance?.friday == true && travel == nil}
@@ -45,7 +47,7 @@ struct DiaryDayView: View {
                     DiaryTravelHeader(page:travel,subtitle:service.weekday(shownDay)+"، "+service.dateTitle(shownDay,calendar:first),distance:service.kilometres(travel.kilometres),digits:service.digits)
                 } else {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(service.weekday(shownDay) + " · " + service.dateTitle(shownDay, calendar: first == .hijri ? .gregorian : .hijri) + (friday ? " · " + service.dateTitle(shownDay,calendar:first):""))
+                    Text(service.weekday(shownDay) + "، " + service.dateTitle(shownDay, calendar: first == .hijri ? .gregorian : .hijri) + (friday ? "، " + service.dateTitle(shownDay,calendar:first):""))
                         .font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
                     Text(friday ? "جمعة مباركة" : (first == .hijri && appearance?.night == true ? "ليلة " : "") + service.dateTitle(first == .hijri ? appearance?.hijriDisplayDay ?? shownDay : shownDay, calendar: first)).foregroundStyle(friday ? theme.accent:theme.ink).font(.custom("thmanyahserifdisplay-Bold", size: 32, relativeTo: .largeTitle)).accessibilityIdentifier("diary-day-title")
                     if !friday { HStack(spacing: 6) {
@@ -127,6 +129,8 @@ struct DiaryDayView: View {
                 .toolbarBackground(theme.background, for: .navigationBar).tint(theme.accent)
                 .fullScreenCover(isPresented:$searchOpen){DiarySearchView(app:app).environment(\.roomTheme,theme)}
                 .fullScreenCover(isPresented:$archiveOpen){DiaryHubView(app:app).environment(\.roomTheme,theme)}
+                .sheet(item:$editing){edit in DiaryLineEditSheet(app:app,edit:edit){niyyaSaved=true}.environment(\.roomTheme,theme)}
+                .sheet(item:$original){first in DiaryOriginalSheet(text:first.text).environment(\.roomTheme,theme).presentationDetents([.medium,.large])}
                 .sheet(isPresented:$stampsOpen){DiaryStampsView(app:app).environment(\.roomTheme,theme)}
                 .sheet(isPresented:$weekOpen){DiaryWeekView(app:app,day:shownDay).environment(\.roomTheme,theme)}
                 .sheet(isPresented:$intentionsOpen){DiaryIntentionsView(app:app,day:shownDay,evening:service.intentionEvening(shownDay)).environment(\.roomTheme,theme)}
@@ -160,7 +164,13 @@ struct DiaryDayView: View {
             VStack(alignment: .leading, spacing: 5) {
                 Text(line.text).font(.custom("thmanyahseriftext-Regular", size: auto ? 17 : 19, relativeTo: .body)).lineSpacing(11).italic(auto || line.kind == "margin")
                     .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
-                    .contextMenu {if shownDay==today,["normal","late","ghad"].contains(line.kind),!line.text.isEmpty {Button("اجعلها نيّة اليوم"){Task{do{try await service.saveIntention(line.text,day:shownDay);niyyaSaved=true}catch{failure=error.localizedDescription}}}}}
+                    .contextMenu {
+                        if page.editable.contains(line.id) {Button("عدّل السطر",systemImage:"pencil"){editing = .init(id:line.id,text:line.text)}}
+                        if shownDay==today,["normal","late","ghad"].contains(line.kind),!line.text.isEmpty {Button("اجعلها نيّة اليوم"){Task{do{try await service.saveIntention(line.text,day:shownDay);niyyaSaved=true}catch{failure=error.localizedDescription}}}}
+                    }
+                if let first = page.originals[line.id] {
+                    Button{original = .init(id:line.id,text:first)}label:{Text("عُدّل · الأصل").font(DiaryType.label).frame(minHeight:30)}.buttonStyle(.plain).foregroundStyle(theme.color("ink3Text")).accessibilityIdentifier("diary-line-edited")
+                }
                 if line.kind == "late" { Text("كُتبت لاحقًا").font(DiaryType.label) }
                 if line.kind == "margin" {
                     Text("هامش · " + (page.marginDays[line.id].map { service.dateTitle($0, calendar: .gregorian) } ?? "تاريخ الكتابة غير متاح")).font(DiaryType.label)

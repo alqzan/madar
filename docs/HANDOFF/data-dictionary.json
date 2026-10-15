@@ -1689,7 +1689,8 @@
       "native",
       "dayOne",
       "migration",
-      "autoPinned"
+      "autoPinned",
+      "revision"
      ]
     },
     {
@@ -5510,6 +5511,12 @@
     "payload": "{fileID: UUID, kind: photo|audio|video|document, contentType: String, caption: String, day: today|yesterday, writingDayKey: YYYY-MM-DD, durationS?: Int >= 0}",
     "kind": "append Entry and referenced Media from private staged UUID file; sha256; original audio before transcription",
     "auth": "app-only + diary unlocked"
+   },
+   "diary.editEntry": {
+     "intent": null,
+     "payload": "{entryID: UUID, revisionID: UUID, text: String}",
+     "kind": "RD1: before the freeze edit the line in place with undo; after it insert a revision Entry (source revision, sourceID = replaced id) and never change the original",
+     "auth": "app-only + diary unlocked"
    },
    "diary.setTranscript": {
     "intent": null,

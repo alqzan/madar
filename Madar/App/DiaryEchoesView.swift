@@ -65,7 +65,7 @@ struct DiaryEchoesView: View {
             }.accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 10) {
                 ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .firstTextBaseline) { Text(title).font(DiaryType.heading); Text(service.weekday(day) + " · " + service.dateTitle(day, calendar: .gregorian)).font(DiaryType.label) }
+                    HStack(alignment: .firstTextBaseline) { Text(title).font(DiaryType.heading); Text(service.weekday(day) + "، " + service.dateTitle(day, calendar: .gregorian)).font(DiaryType.label) }
                     VStack(alignment: .leading, spacing: 3) { Text(title).font(DiaryType.heading); Text(service.dateTitle(day, calendar: .gregorian)).font(DiaryType.label) }
                 }.foregroundStyle(current ? theme.accent : theme.ink)
                 content()

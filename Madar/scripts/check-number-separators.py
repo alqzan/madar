@@ -6,12 +6,14 @@ from pathlib import Path
 root = Path(__file__).resolve().parents[1]
 literal = re.compile(r"[0-9٠-٩۰-۹][\s\u2066-\u2069]*·|·[\s\u2066-\u2069]*[0-9٠-٩۰-۹]")
 numeric = re.compile(r"\\\((?:arabicNumber|digits)\(")
+# A separator joined straight onto a formatted date or number (e.g. " · " + service.dateTitle(...)).
+joined = re.compile(r"·\s*\"\s*\+\s*(?:\w+\.)?(?:dateTitle|shortDate|time|digits\.string|kilometres)\(")
 failures = []
 for path in sorted((root / "App").rglob("*.swift")):
     for number, line in enumerate(path.read_text().splitlines(), 1):
         if line.lstrip().startswith("//"):
             continue
-        if literal.search(line) or ("·" in line and numeric.search(line)):
+        if literal.search(line) or joined.search(line) or ("·" in line and numeric.search(line)):
             failures.append(f"{path.relative_to(root)}:{number}: numeric middle dot")
 if failures:
     raise SystemExit("\n".join(failures))

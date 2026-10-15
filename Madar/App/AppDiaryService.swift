@@ -17,6 +17,10 @@ struct DiaryDisplayDay: Identifiable {
     var photoID: UUID? = nil
     var media: [DiaryDisplayMedia] = []
     var marginDays: [String: GregorianDay] = [:]
+    /// RD1: line id → the text it was first written with, for lines edited after the freeze.
+    var originals: [String: String] = [:]
+    /// Written lines the owner may edit (text entries; voice keeps its own transcript editor).
+    var editable: Set<String> = []
     var excerpt: String { lines.first(where: { $0.kind == "normal" || $0.kind == "late" })?.text ?? lines.first?.text ?? "صفحة بلا كتابة" }
 }
 struct DiaryHomeSnapshot {
@@ -58,7 +62,7 @@ struct DiaryHomeSnapshot {
         try authorizeRead()
         let today = try currentDay(), context = ModelContext(app.container)
         let pages = try context.fetch(FetchDescriptor<DayPage>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
-        let entries = try context.fetch(FetchDescriptor<Entry>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
+        let entries = Self.visible(try context.fetch(FetchDescriptor<Entry>()).filter { $0.deletedAt == nil && $0.mergedInto == nil })
         var photoDescriptor = FetchDescriptor<Media>(predicate: #Predicate { $0.kind == "photo" && $0.deletedAt == nil && $0.mergedInto == nil })
         photoDescriptor.propertiesToFetch = [\.id]
         let photos = Set(try context.fetch(photoDescriptor).map(\.id))
@@ -84,7 +88,8 @@ struct DiaryHomeSnapshot {
     func day(_ day: GregorianDay) throws -> DiaryDisplayDay {
         try authorizeRead()
         let context = ModelContext(app.container), key = day.description
-        let entries = try context.fetch(FetchDescriptor<Entry>(predicate: #Predicate { $0.dayKey == key && $0.deletedAt == nil && $0.mergedInto == nil }, sortBy: [SortDescriptor(\.eventAt)]))
+        let all = try context.fetch(FetchDescriptor<Entry>(predicate: #Predicate { $0.dayKey == key && $0.deletedAt == nil && $0.mergedInto == nil }, sortBy: [SortDescriptor(\.eventAt)]))
+        let chains = Self.revisionChains(all), entries = all.filter { chains.heads.contains($0.id) }
         let page = try context.fetch(FetchDescriptor<DayPage>(predicate: #Predicate { $0.dayKey == key && $0.deletedAt == nil && $0.mergedInto == nil })).max { $0.updatedAt < $1.updatedAt }
         var lines = entries.map { DiaryDisplayLine(id: $0.id.uuidString, at: $0.eventAt, text: $0.text, kind: $0.ink) }
         for niyya in try context.fetch(FetchDescriptor<Niyya>(predicate:#Predicate{$0.dayKey==key && $0.deletedAt==nil && $0.mergedInto==nil})) {lines.append(.init(id:niyya.id.uuidString,at:niyya.createdAt,text:niyya.text,kind:"intention"))}
@@ -120,7 +125,8 @@ struct DiaryHomeSnapshot {
         return .init(day: day, lines: lines.sorted { $0.at == $1.at ? $0.id < $1.id : $0.at < $1.at }, photo: photo,
             place: app.bool("notes.showPlace") ? entries.compactMap(\.place).first : nil, dayOne: page?.origin == "dayOne", photoID: photoID, media: attachments, marginDays: Dictionary(uniqueKeysWithValues: margins.compactMap { margin in
                 guard let day = try? GregorianDay(margin.writtenDayKey) else { return nil }; return ("margin." + margin.id.uuidString, day)
-            }))
+            }), originals: Dictionary(uniqueKeysWithValues: chains.originals.compactMap { head, root in all.first { $0.id == root }.map { (head.uuidString, $0.text) } }),
+            editable: Set(entries.filter { $0.mediaID == nil && $0.source != "autoPinned" && ["normal", "late", "ghad"].contains($0.ink) }.map(\.id.uuidString)))
     }
     func dateTitle(_ day: GregorianDay, calendar: FirstCalendar) -> String {
         let formatter = DateFormatter(); formatter.locale = Locale(identifier: "ar_SA@numbers=" + (app.string("core.numerals") == "western" ? "latn" : "arab"))
@@ -192,4 +198,15 @@ struct DiaryHomeSnapshot {
         return values.isEmpty ? "اليوم" : "قبل " + values.joined(separator: " و")
     }
 
+}
+
+extension AppDiaryService {
+    /// RD1 single choke point: every diary reader shows only the newest row of an edited line.
+    static func revisionChains(_ entries: [Entry]) -> DiaryRevisionChains {
+        DiaryRevisionChains(entries.map { .init(id: $0.id, replaces: $0.source == "revision" ? $0.sourceID.flatMap(UUID.init(uuidString:)) : nil) })
+    }
+    static func visible(_ entries: [Entry]) -> [Entry] { let chains = revisionChains(entries); return entries.filter { chains.heads.contains($0.id) } }
+    func edit(_ line: String, text: String) async throws {
+        try await app.executeDiaryCommand("diary.editEntry", payload: ["entryID": .string(line), "revisionID": .string(UUID().uuidString), "text": .string(text)])
+    }
 }

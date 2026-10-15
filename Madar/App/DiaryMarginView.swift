@@ -83,7 +83,7 @@ struct DiaryMarginView: View {
         VStack(alignment: .leading, spacing: 5) {
             Text(service.distance(page.day, snapshot.today)).font(MadarTypography.caption()).foregroundStyle(theme.accent)
             Text(service.dateTitle(page.day, calendar: snapshot.selection.match == .hijri ? .hijri : .gregorian)).font(DiaryType.title)
-            Text(service.weekday(page.day) + " · " + service.dateTitle(page.day, calendar: snapshot.selection.match == .hijri ? .gregorian : .hijri))
+            Text(service.weekday(page.day) + "، " + service.dateTitle(page.day, calendar: snapshot.selection.match == .hijri ? .gregorian : .hijri))
                 .font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
         }.frame(maxWidth: .infinity, alignment: .leading)
     }

@@ -70,6 +70,36 @@ private struct DiaryInverse: Codable {
         let before = try row.record(); row.text = text; row.updatedAt = StableIdentity.monotonic(now: now, previous: row.updatedAt); row.writerID = writer
         return try JSONEncoder().encode(DiaryInverse(model: "Entry", after: row.record(), dayKey: row.dayKey, previousOrigin: nil, before: before))
     }
+    /// RD1. Before the freeze the line is corrected in place (undo restores the text). After it, a new row replaces
+    /// the head and names it; the original row is never changed, and undo tombstones only the new row.
+    static func edit(entry: UUID, revision: UUID, text: String, context: ModelContext, now: Date, writer: String) throws -> Data? {
+        let rows = try context.fetch(FetchDescriptor<Entry>())
+        if let existing = rows.first(where: { $0.id == revision }) {
+            guard existing.source == "revision", existing.sourceID == entry.uuidString, existing.text == text else { throw DataError.invalidValue("revision identity") }
+            return nil
+        }
+        let live = rows.filter { $0.deletedAt == nil && $0.mergedInto == nil }
+        guard let row = live.first(where: { $0.id == entry }), row.source != "autoPinned", row.mediaID == nil,
+              !live.contains(where: { $0.source == "revision" && $0.sourceID == entry.uuidString }) else { throw DataError.invalidValue("editable diary line required") }
+        guard row.text != text else { return nil }
+        if now < (try freezesAt(row, context: context)) {
+            let before = try row.record(); row.text = text; row.updatedAt = StableIdentity.monotonic(now: now, previous: row.updatedAt); row.writerID = writer
+            return try JSONEncoder().encode(DiaryInverse(model: "Entry", after: row.record(), dayKey: row.dayKey, previousOrigin: nil, before: before))
+        }
+        let next = Entry(); next.id = revision; next.dayKey = row.dayKey; next.eventAt = row.eventAt; next.tzID = row.tzID; next.dayPolicy = row.dayPolicy
+        next.text = text; next.textFormat = row.textFormat; next.ink = row.ink; next.attachmentMediaIDs = row.attachmentMediaIDs; next.projectID = row.projectID
+        next.place = row.place; next.lat = row.lat; next.lon = row.lon; next.source = "revision"; next.sourceID = row.id.uuidString
+        next.createdAt = now; next.updatedAt = now; next.writerID = writer; context.insert(next)
+        return try JSONEncoder().encode(DiaryInverse(model: "Entry", after: next.record(), dayKey: next.dayKey, previousOrigin: nil))
+    }
+    static func freezesAt(_ row: Entry, context: ModelContext) throws -> Date {
+        let day = try GregorianDay(row.dayKey), boundary = DiaryFreeze.boundary(policy: row.dayPolicy)
+        let repository = try PrayerRepository(context: context), active = repository.place(at: row.eventAt)
+        let place = (try? ActivePlace(latitude: active.latitude, longitude: active.longitude, timeZoneID: row.tzID)) ?? active
+        let next = boundary == .midnight ? nil : PrayerTimesEngine.calculate(day: day.adding(days: 1), place: place, options: repository.options)
+        guard let freeze = DiaryFreeze.freezesAt(day: day, boundary: boundary, timeZone: place.timeZone, nextDay: next) else { throw CoreError.missingPrayerTimes }
+        return freeze
+    }
     static func undo(_ data: Data, context: ModelContext, now: Date, writer: String) throws {
         let inverse = try JSONDecoder().decode(DiaryInverse.self, from: data)
         func tombstone<T: MadarRecordModel>(_ row: T) throws {

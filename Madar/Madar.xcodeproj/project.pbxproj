@@ -36,6 +36,7 @@
 		24595360D6161BE050ADEC31 /* MadarLock.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB9BE21293412A1EFB5907A7 /* MadarLock.swift */; };
 		251712D13E1CB75A086AB762 /* MadarApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52096FB2E7F5C96D70BD4B80 /* MadarApp.swift */; };
 		2563AC7047488BF0C403770D /* QuranFreeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFA1650F886CEC29CF1CF3CC /* QuranFreeView.swift */; };
+		25B1B904AF1F1EB89C461DF1 /* DiaryRevisionUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0101738752502D6818310CA /* DiaryRevisionUITests.swift */; };
 		26468487F24FF8C7F539D471 /* AppDiaryTravelService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E5E5EDA5A9E080C9BF0CE9E /* AppDiaryTravelService.swift */; };
 		27011F02CB2CF2ACD80C1241 /* DiaryEchoesUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B7247D7F044DA8DC2E72929 /* DiaryEchoesUITests.swift */; };
 		2708B599D4DE94431189E7AA /* BackupSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30548ADF1D2BBABB66489408 /* BackupSettingsView.swift */; };
@@ -61,6 +62,7 @@
 		3C3CE588D53678991AE203CC /* QuranOutsideUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEE0730F258DD7FDBFB0D3F9 /* QuranOutsideUITests.swift */; };
 		3D09D46C8D6D1C6CF1CB3BEF /* DiaryWelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 395BE5B23BEE8DAE09D54222 /* DiaryWelcomeView.swift */; };
 		3D1F6A8075563D6E074473E2 /* PresetsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D3EC96D647534DFB18C29D1 /* PresetsView.swift */; };
+		3F8FD8CF8ECBE72603F1C735 /* DiaryLineEditSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A262BEAF3B31CCD7E6FA8D5F /* DiaryLineEditSheet.swift */; };
 		3FEA8FB15F8EB51DEB9ADAA6 /* AppQuranService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD01076802F7C86446475EE9 /* AppQuranService.swift */; };
 		40AEC490ABF0A0DB6D7B4DDE /* QuranDayCloseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C83F53C2034722DE17B40FDF /* QuranDayCloseView.swift */; };
 		41A7643B253AFF8A7C6F7417 /* MadarWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = E9A234078D9BE6530E46FC1E /* MadarWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -131,6 +133,7 @@
 		93A8C28498B8EE4F17A57C1E /* thmanyahsans-Bold.otf in Resources */ = {isa = PBXBuildFile; fileRef = 5E6D8632065B521B685FADB6 /* thmanyahsans-Bold.otf */; };
 		9558FF661BD71D4D43D56E43 /* QuranHifzCoachView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71D1A5F2A06F98A46CEC4BD2 /* QuranHifzCoachView.swift */; };
 		9581035B91FCDBCF02BE250A /* MadarQuran in Frameworks */ = {isa = PBXBuildFile; productRef = 656749C563874CC2409C70BE /* MadarQuran */; };
+		97C46EC6E50736B4F8B47D23 /* DiaryRevisionIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C18FA90A451CFAAC47F6E3A7 /* DiaryRevisionIntegrationTests.swift */; };
 		9873E1D9F4E418EE4960B31A /* QuranPageMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54CAED3F538D952FE59BBE34 /* QuranPageMap.swift */; };
 		99581338624B2854E78D8E0B /* DiarySearchIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 169422FA3D388450CA8DA3DD /* DiarySearchIntegrationTests.swift */; };
 		9A0377D130B6D4ED10A27543 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 4FB250BC5106613476C01D41 /* Assets.xcassets */; };
@@ -356,8 +359,10 @@
 		97C5186966B3BE345A9B38A1 /* DiarySeasonIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiarySeasonIntegrationTests.swift; sourceTree = "<group>"; };
 		9CB01E6837C74E167DE5E222 /* DiaryTravelIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryTravelIntegrationTests.swift; sourceTree = "<group>"; };
 		9D68DFEF63B65ADBC328CAAF /* QuranWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranWidget.swift; sourceTree = "<group>"; };
+		A0101738752502D6818310CA /* DiaryRevisionUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryRevisionUITests.swift; sourceTree = "<group>"; };
 		A04672B7B893D0B6547D3773 /* AppDiaryYearbookService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDiaryYearbookService.swift; sourceTree = "<group>"; };
 		A25C0D6BA40AA1BEA7F9ABDB /* DiaryIntentionUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryIntentionUITests.swift; sourceTree = "<group>"; };
+		A262BEAF3B31CCD7E6FA8D5F /* DiaryLineEditSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryLineEditSheet.swift; sourceTree = "<group>"; };
 		A7F9377CE9EE94387459ADAC /* QuranPlanUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranPlanUITests.swift; sourceTree = "<group>"; };
 		A985462627BB3887641D57F9 /* QuranJourneyUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranJourneyUITests.swift; sourceTree = "<group>"; };
 		AA5DF286ED4CF242BEF2D537 /* MadarSnapshots */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MadarSnapshots; path = Packages/MadarSnapshots; sourceTree = SOURCE_ROOT; };
@@ -380,6 +385,7 @@
 		BF4D218E30D4A52E0F9F14BD /* AppQuranService+DayClose.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppQuranService+DayClose.swift"; sourceTree = "<group>"; };
 		C105008888548BF995BA7B6D /* AppServiceIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppServiceIntegrationTests.swift; sourceTree = "<group>"; };
 		C1541C81F328C40D5A683888 /* PrayerRoom.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrayerRoom.swift; sourceTree = "<group>"; };
+		C18FA90A451CFAAC47F6E3A7 /* DiaryRevisionIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryRevisionIntegrationTests.swift; sourceTree = "<group>"; };
 		C465C55A47592A6081EE8186 /* PrayerLogControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrayerLogControl.swift; sourceTree = "<group>"; };
 		C63BADA5C6BD423F06356E09 /* CustomizationCopyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomizationCopyTests.swift; sourceTree = "<group>"; };
 		C6661268F5C60E85AA211014 /* thmanyahserifdisplay-Bold.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "thmanyahserifdisplay-Bold.otf"; sourceTree = "<group>"; };
@@ -550,6 +556,7 @@
 				2B32E22D47EB8FE84B717D27 /* DiaryHomeView.swift */,
 				6764E0E9D2FA97372D563051 /* DiaryHubView.swift */,
 				898CA02CE00E58C1CB81BD5F /* DiaryIntentionsView.swift */,
+				A262BEAF3B31CCD7E6FA8D5F /* DiaryLineEditSheet.swift */,
 				8165555D964598615489F76A /* DiaryMarginView.swift */,
 				CC3AF33190C35B300A8B025F /* DiaryMediaCard.swift */,
 				D4881D4D4F799E9A19EB4E38 /* DiarySearchView.swift */,
@@ -635,6 +642,7 @@
 				78ED38B6659E8BFBD97E22AB /* DiaryHubUITests.swift */,
 				A25C0D6BA40AA1BEA7F9ABDB /* DiaryIntentionUITests.swift */,
 				42DA4C49434D107B02E1810F /* DiaryMarginUITests.swift */,
+				A0101738752502D6818310CA /* DiaryRevisionUITests.swift */,
 				DA46B4CDAC5516908264FB88 /* DiarySearchUITests.swift */,
 				62A1A46778A8E38A5339986E /* DiarySeasonUITests.swift */,
 				3F2989DAFF327646B3C614EA /* DiaryTodayUITests.swift */,
@@ -697,6 +705,7 @@
 				4E1F17572CD54A4B855DD164 /* DiaryEditorIntegrationTests.swift */,
 				B1CD3D0D13859EF7127463D7 /* DiaryExportIntegrationTests.swift */,
 				ECCCB31F5C15E710433FEA6F /* DiaryIntentionIntegrationTests.swift */,
+				C18FA90A451CFAAC47F6E3A7 /* DiaryRevisionIntegrationTests.swift */,
 				169422FA3D388450CA8DA3DD /* DiarySearchIntegrationTests.swift */,
 				97C5186966B3BE345A9B38A1 /* DiarySeasonIntegrationTests.swift */,
 				E2133677F509BE825A66C00D /* DiaryServiceIntegrationTests.swift */,
@@ -956,6 +965,7 @@
 				BB6BCE8F7D71255076789321 /* DiaryEditorIntegrationTests.swift in Sources */,
 				537DB9EFDA549FAA9716CAE8 /* DiaryExportIntegrationTests.swift in Sources */,
 				C807923861DBB2FB84CB0237 /* DiaryIntentionIntegrationTests.swift in Sources */,
+				97C46EC6E50736B4F8B47D23 /* DiaryRevisionIntegrationTests.swift in Sources */,
 				99581338624B2854E78D8E0B /* DiarySearchIntegrationTests.swift in Sources */,
 				2D17AE3E488BB68C5E1D8650 /* DiarySeasonIntegrationTests.swift in Sources */,
 				08EE79187A4247518D825917 /* DiaryServiceIntegrationTests.swift in Sources */,
@@ -987,6 +997,7 @@
 				F53D20CC48364DF385160E05 /* DiaryHubUITests.swift in Sources */,
 				BFA4A93FF8F56E0AFF93E327 /* DiaryIntentionUITests.swift in Sources */,
 				A2DDB78E4B7498CD651D360F /* DiaryMarginUITests.swift in Sources */,
+				25B1B904AF1F1EB89C461DF1 /* DiaryRevisionUITests.swift in Sources */,
 				738F3EBC7827BEBEE7E0F7F4 /* DiarySearchUITests.swift in Sources */,
 				5896B12F88D3C188ABF089B8 /* DiarySeasonUITests.swift in Sources */,
 				D5ECFF4CA89A7D774FE1B8DA /* DiaryTodayUITests.swift in Sources */,
@@ -1057,6 +1068,7 @@
 				4A403E7720EA985BB9FF3AED /* DiaryHomeView.swift in Sources */,
 				E00129F812044215CA334E48 /* DiaryHubView.swift in Sources */,
 				DC769DFEC9FEE93E57ACDDD5 /* DiaryIntentionsView.swift in Sources */,
+				3F8FD8CF8ECBE72603F1C735 /* DiaryLineEditSheet.swift in Sources */,
 				55C8F801B2EFACD459460CB0 /* DiaryMarginView.swift in Sources */,
 				4ACC0D33308B0BE6768251A7 /* DiaryMediaCard.swift in Sources */,
 				7EF0148B1FC1018672F7B6EE /* DiarySearchView.swift in Sources */,

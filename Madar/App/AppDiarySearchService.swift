@@ -16,7 +16,7 @@ extension AppDiaryService {
     func searchIndex() throws -> DiarySearchIndex {
         try authorizeRead()
         let context=ModelContext(app.container)
-        let entries=try context.fetch(FetchDescriptor<Entry>(predicate:#Predicate { $0.deletedAt == nil && $0.mergedInto == nil }))
+        let entries=Self.visible(try context.fetch(FetchDescriptor<Entry>(predicate:#Predicate { $0.deletedAt == nil && $0.mergedInto == nil })))
         let trips=try context.fetch(FetchDescriptor<Trip>(predicate:#Predicate { $0.deletedAt == nil && $0.mergedInto == nil && !$0.dismissed }))
         var mediaDescriptor=FetchDescriptor<Media>(predicate:#Predicate { $0.deletedAt == nil && $0.mergedInto == nil }); mediaDescriptor.propertiesToFetch=[\.id,\.kind]
         let media=Dictionary(uniqueKeysWithValues:try context.fetch(mediaDescriptor).map{($0.id,$0.kind)})
