@@ -132,4 +132,3 @@ Not verified: owner visual approval, owner-iPhone, human resource sample/release
 Next: M2-V06 full-screen Mushaf ready; M2-V01–V05 matched — awaiting owner.
 Model/effort: Codex GPT-6; exact variant/effort not exposed.
 Usage: 19% five-hour and 93% weekly at closing checkpoint; no reset credit used.
-
