@@ -21,9 +21,9 @@ struct QuranScreenHeader: View {
     }
 }
 enum QuranLogTab: String, CaseIterable, Identifiable {
-    case week, year
+    case week, year, all
     var id: String { rawValue }
-    var title: String { switch self { case .week: "الأسبوع"; case .year: "السنة" } }
+    var title: String { switch self { case .week: "الأسبوع"; case .year: "السنة"; case .all: "منذ البداية" } }
 }
 struct QuranLogTabs: View {
     @Binding var selection: QuranLogTab
@@ -45,6 +45,7 @@ struct QuranLogView: View {
         switch selection {
         case .week: QuranWeekView(service: service, close: close, selection: $selection)
         case .year: QuranYearView(service: service, close: close, selection: $selection)
+        case .all: QuranJourneyView(service: service, close: close, selection: $selection)
         }
     }
 }

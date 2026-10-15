@@ -17,7 +17,8 @@ extension AppQuranService {
         let date = DualDate(instant: day.date(in: zone).addingTimeInterval(43200), timeZone: zone,
             source: HijriSource(rawValue: app.string("core.hijriSource")) ?? .ummAlQura, sightingOffset: Int(app.number("core.hijriOffset")))
         let first = hijriOnly ? FirstCalendar.hijri : FirstCalendar(rawValue: app.string("core.firstCalendar")) ?? .hijri
-        return date.text(firstCalendar: first, numerals: numerals.style)
+        let text = date.text(firstCalendar: first, numerals: numerals.style)
+        return hijriOnly ? String(text.split(separator: "،")[0]) + " هـ" : text
     }
     func yearLog() throws -> QuranUIYear {
         let value = try snapshot(), today = value.day.date

@@ -6,7 +6,7 @@ import MadarCommands
 @testable import Madar
 
 @MainActor final class QuranWeekIntegrationTests: XCTestCase {
-    func testRollingWeekRestDayDedupedReviewsAndWidgetHaveOneDefinition() throws {
+    func testRollingWeekRestDayDedupedReviewsAndWidgetHaveOneDefinition() async throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "MadarWeek-\(UUID())")
         let container = try MadarContainerFactory.makeLocal(at: root.appending(path: "Data"))
         let context = ModelContext(container), settings = try SettingsStore(context: context)
@@ -40,6 +40,13 @@ import MadarCommands
         XCTAssertEqual(year.days.reduce(0) { $0 + $1.review }, 1)
         XCTAssertEqual(year.activeDays, 3) // Actual rest-day work is activity; drill is not.
         XCTAssertEqual(year.days.last?.id, "2026-10-15")
+        let journey = try await service.journeyLog()
+        XCTAssertEqual(journey.remaining, 602)
+        XCTAssertEqual(journey.pageDates.count, 2)
+        XCTAssertEqual(journey.pages.count, 604)
+        XCTAssertNil(journey.forecastDay) // Fewer than five hifz days.
+        XCTAssertEqual(journey.shades[1], 1)
+        XCTAssertLessThan(journey.shades[2]!, journey.shades[1]!)
         _ = root // An isolated temporary store, never the owner's data.
     }
 }
