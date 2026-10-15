@@ -12,6 +12,7 @@ struct DiaryHubView: View {
     @State private var month: Int?
     @State private var tab = "calendar"
     @State private var reader: GregorianDay?
+    @State private var searchOpen = false
     @State private var failure: String?
     private var service: AppDiaryService { .init(app: app) }
     private var grid: DiaryCalendarGrid { service.diaryCalendar }
@@ -38,7 +39,8 @@ struct DiaryHubView: View {
                     }.padding(18)
                 }
             }.background(theme.background).foregroundStyle(theme.ink)
-                .toolbar { ToolbarItem(placement: .topBarLeading) { Button { dismiss() } label: { Label("المذكرات", systemImage: "chevron.backward") }.accessibilityIdentifier("diary-hub-close") } }
+                .fullScreenCover(isPresented: $searchOpen) { DiarySearchView(app: app).environment(\.roomTheme, theme) }
+                .toolbar { ToolbarItem(placement: .topBarTrailing) { Button { searchOpen = true } label: { Image(systemName: "magnifyingglass") }.accessibilityLabel("ابحث في مذكراتك") }; ToolbarItem(placement: .topBarLeading) { Button { dismiss() } label: { Label("المذكرات", systemImage: "chevron.backward") }.accessibilityIdentifier("diary-hub-close") } }
                 .toolbarBackground(theme.background, for: .navigationBar).tint(theme.accent)
                 .sheet(isPresented: Binding(get: { reader != nil }, set: { if !$0 { reader = nil } })) { if let reader { DiaryDayView(app: app, day: reader).environment(\.roomTheme, theme) } }
                 .task(id: app.prayerRevision) { do { archive = try service.archive(); failure = nil } catch { failure = error.localizedDescription } }

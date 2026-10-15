@@ -34,6 +34,7 @@ struct DiaryHomeView: View {
     @State private var selected: GregorianDay?
     @State private var customizing = false
     @State private var archiveOpen = false
+    @State private var searchOpen = false
     @State private var editor: DiaryEditorTarget?
     @State private var reader: GregorianDay?
     @State private var failure: String?
@@ -99,6 +100,7 @@ struct DiaryHomeView: View {
             }
         }
         .onChange(of: selected) { _, day in if let day { Task { try? await service.prepareClosedDay(day); await refresh() } } }
+        .fullScreenCover(isPresented: $searchOpen) { DiarySearchView(app: app).environment(\.roomTheme, theme) }
         .fullScreenCover(isPresented: $archiveOpen) { DiaryHubView(app: app).environment(\.roomTheme, theme) }
         .sheet(isPresented: $customizing, onDismiss: { selected = nil; Task { await refresh() } }) { DiaryCustomizeView(app: app).environment(\.roomTheme, theme) }
         .sheet(item: $editor) { target in DiaryTextEditor(app: app, margin: target.margin, initialDay: target.day).environment(\.roomTheme, theme) }
@@ -122,6 +124,7 @@ struct DiaryHomeView: View {
                         .font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
                 }
             }.frame(maxWidth: .infinity, alignment: .leading)
+            Button { searchOpen = true } label: { Image(systemName: "magnifyingglass").frame(width: 44, height: 44) }.buttonStyle(.plain).accessibilityLabel("ابحث في مذكراتك").accessibilityIdentifier("diary-search")
             Button { archiveOpen = true } label: { Image(systemName: "calendar").frame(width: 44, height: 44) }.buttonStyle(.plain).accessibilityLabel("أيامك").accessibilityIdentifier("diary-days")
             Button { customizing = true } label: { Image(systemName: "slider.horizontal.3").frame(width: 44, height: 44).overlay { Circle().stroke(theme.line) } }
                 .buttonStyle(.plain).accessibilityLabel("خصّص المذكرات").accessibilityIdentifier("diary-customize")
@@ -230,7 +233,7 @@ struct DiaryHomeView: View {
         let days = snapshot.days.filter { $0.day < snapshot.today }.prefix(5)
         return VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Button { archiveOpen = true } label: { HStack { Text("أيامك").font(DiaryType.heading); Image(systemName: "arrow.left").font(.caption) } }.buttonStyle(.plain)
+            Button { archiveOpen = true } label: { HStack { Text("أيامك").font(DiaryType.heading); Image(systemName: "arrow.left").font(.caption) } }.buttonStyle(.plain)
                 Spacer()
                 Text(service.monthTitle(snapshot.today)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
             }.padding(.top, 4)
