@@ -5507,6 +5507,12 @@
         "kind": "upsert",
         "auth": "app-only + diary unlocked",
         "note": "RD1 closed-day auto-line snapshot; device-local sys.diaryAutoLines.<dayKey>, included by diary exports."
+      },
+      "diary.completeWelcome": {
+        "intent": null,
+        "payload": "{}",
+        "kind": "upsert device-local sys.diaryWelcomeSeen after explicit diary welcome completion",
+        "auth": "app-only + diary unlocked"
       }
     },
     "undoPolicy": {

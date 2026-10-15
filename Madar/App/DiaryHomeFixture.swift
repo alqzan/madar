@@ -8,7 +8,7 @@ import MadarData
 extension AppSession {
     func prepareDiaryHomeFixture(group: URL) throws {
         let env = ProcessInfo.processInfo.environment
-        guard let variant = env["MADAR_UI_DIARY_FIXTURE"], ["home", "empty", "echoes", "margin"].contains(variant), let id = env["MADAR_UI_STORE_ID"],
+        guard let variant = env["MADAR_UI_DIARY_FIXTURE"], ["home", "empty", "echoes", "margin", "welcome", "today"].contains(variant), let id = env["MADAR_UI_STORE_ID"],
               group.lastPathComponent == id, group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         selectedTab = "notes"
         let context = ModelContext(container)
@@ -16,8 +16,9 @@ extension AppSession {
         let settings = try SettingsStore(context: context)
         _ = try settings.stage(["core.faceIDLock": .string("none"), "core.dayStart": .string("midnight")])
         for key in ["sys.onboardingCompleted", "sys.diaryFixture"] { let row = DeviceSetting(); row.key = key; row.valueJSON = Data("true".utf8); context.insert(row) }
+        if variant != "welcome" { let marker = DeviceSetting(); marker.key = "sys.diaryWelcomeSeen"; marker.valueJSON = Data("true".utf8); context.insert(marker) }
         if variant == "echoes" || variant == "margin" { _ = try settings.stage(["notes.homeShape": .string(variant)]) }
-        if variant != "empty" {
+        if variant != "empty" && variant != "welcome" {
             let today = GregorianDay.containing(prayerUITestClock(.now), in: .riyadh)
             func append(_ day: GregorianDay, _ text: String, hour: Int, imported: Bool = false) {
                 let row = Entry(); row.dayKey = day.description; row.text = text; row.eventAt = day.date(in: .riyadh).addingTimeInterval(Double(hour) * 3600)
@@ -47,6 +48,14 @@ extension AppSession {
                 }
             }
             append(today, "ما زال في اليوم متّسع.", hour: 12)
+            if variant == "today" {
+                let page = DayPage(); page.dayKey = today.description
+                let media = Media(); media.kind = "photo"; media.contentType = "image/jpeg"; media.data = Self.diaryFixturePhoto(variant: 1); media.sizeBytes = media.data?.count ?? 0
+                context.insert(media); page.photoMediaID = media.id; context.insert(page)
+                let prayer = PrayerLog(); prayer.dayKey = today.description; prayer.prayer = "fajr"; prayer.status = "jamaah"; prayer.eventAt = today.date(in: .riyadh).addingTimeInterval(5*3600); context.insert(prayer)
+                for (n, text) in ["الهواء أول مرة فيه برودة خفيفة.", "قهوة على الشرفة قبل ما أفتح الجوال.", "اجتماع طويل، ثم رجعت للمكتب.", "مشيت قليلًا بعد الظهر.", "كتبت فكرة أريد أن أتذكرها.", "اتصلت بأمي واطمأننت عليها.", "قرأت قليلًا قبل الغداء.", "وصلت إلى آخر ما كتبت اليوم."].enumerated() { append(today, text, hour: 6+n) }
+            }
+
         }
         try context.save()
     }

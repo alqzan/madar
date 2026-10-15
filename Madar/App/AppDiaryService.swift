@@ -40,6 +40,11 @@ struct DiaryHomeSnapshot {
             source: HijriSource(rawValue: app.string("core.hijriSource")) ?? .ummAlQura, sightingOffset: Int(app.number("core.hijriOffset")))
         return h.month == 9 || h.month == 12 || h.month == 10 && h.day <= 3 ? .hijri : .gregorian
     }
+    func hasWelcomed() throws -> Bool {
+        try authorizeRead()
+        let key = "sys.diaryWelcomeSeen"
+        return try ModelContext(app.container).fetch(FetchDescriptor<DeviceSetting>(predicate: #Predicate { $0.key == key && $0.deletedAt == nil && $0.mergedInto == nil })).first?.valueJSON == Data("true".utf8)
+    }
     func currentDay() throws -> GregorianDay {
         try authorizeRead()
         let repository = try PrayerRepository(context: ModelContext(app.container)), now = clock(), place = repository.place(at: now)

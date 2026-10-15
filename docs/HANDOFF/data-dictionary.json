@@ -5486,6 +5486,12 @@
     "payload": "{resolutions:[{dayKey, prayer, status: jamaah|alone|missed|unrecordedHistory|excused, fridayKind?}]}",
     "kind": "one transaction upsert of the selected PrayerLog rows and matching QadaItems; one inverse restores the whole gap",
     "auth": "app"
+   },
+   "diary.completeWelcome": {
+    "intent": null,
+    "payload": "{}",
+    "kind": "upsert device-local sys.diaryWelcomeSeen after explicit diary welcome completion",
+    "auth": "app-only + diary unlocked"
    }
   },
   "undoPolicy": {

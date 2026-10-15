@@ -349,6 +349,12 @@ private struct ReceiptWire: Codable {
                 preset.createdAt = now; preset.updatedAt = now
                 preset.payloadJSON = try MadarCore.JSONValue.object(["v": .number(1), "settings": .object(settings), "layouts": .object(layouts)]).canonicalData()
                 context.insert(preset)
+            case .completeDiaryWelcome:
+                let key = "sys.diaryWelcomeSeen"
+                let existing = try context.fetch(FetchDescriptor<DeviceSetting>()).first { $0.key == key && $0.mergedInto == nil }
+                let row = existing ?? DeviceSetting(); row.key = key; row.valueJSON = Data("true".utf8); row.writerID = writer
+                row.updatedAt = StableIdentity.monotonic(now: now, previous: row.updatedAt)
+                if existing == nil { context.insert(row) }
             case .completeOnboarding:
                 let existing = try context.fetch(FetchDescriptor<DeviceSetting>()).first { $0.key == "sys.onboardingCompleted" && $0.mergedInto == nil }
                 let row = existing ?? DeviceSetting(); row.key = "sys.onboardingCompleted"

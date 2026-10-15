@@ -34,4 +34,19 @@ import MadarCommands
         app.redactProtectedData()
         XCTAssertThrowsError(try service.home())
     }
+    func testWelcomePersistsLocallyWithoutDiaryFacts() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "DiaryWelcome-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root.appending(path: "Data"))
+        let app = try AppSession(container: container, groupDirectory: root); app.authorizeProtectedData()
+        let service = AppDiaryService(app: app)
+        XCTAssertFalse(try service.hasWelcomed())
+        try await app.executeDiaryCommand("diary.completeWelcome", payload: [:])
+        try await app.executeDiaryCommand("diary.completeWelcome", payload: [:])
+        XCTAssertTrue(try AppDiaryService(app: app).hasWelcomed())
+        let context = ModelContext(container)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<Entry>()), 0)
+        XCTAssertEqual(try context.fetch(FetchDescriptor<DeviceSetting>()).filter { $0.key == "sys.diaryWelcomeSeen" }.count, 1)
+    }
+
 }

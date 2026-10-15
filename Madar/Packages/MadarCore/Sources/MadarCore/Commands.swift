@@ -43,6 +43,7 @@ public enum CommandOperation: Codable, Equatable, Sendable {
     case undo(token: UUID)
     case savePreset(name: String, settings: [String: JSONValue], layouts: [String: JSONValue])
     case completeOnboarding
+    case completeDiaryWelcome
     case quran(name: String, payload: [String: JSONValue])
     case diary(text: String, day: String, targetDay: String?)
     case freezeDiaryDay(String)
@@ -115,7 +116,7 @@ public protocol CommandStoreAdapter: Sendable {
 public struct CommandBus: Sendable {
     // Names implemented by this milestone. Unknown and later-room names are invalid
     // before authorization, so they cannot become indefinitely recoverable needsApp work.
-    public static let appOnlyCommandNames: Set<String> = Set(["settings.set", "settings.applyPreset", "preset.save", "core.completeOnboarding", "system.undo", "prayer.makeUp", "prayer.resolveGap", "prayer.setHeart", "prayer.logQiyam", "prayer.addOldMissed", "prayer.editTrackingStart", "prayer.startTrip", "prayer.endTrip", "prayer.logPair"]).union(QuranCommandPayload.names).union(["diary.appendLine", "diary.addMargin", "diary.freezeDay"])
+    public static let appOnlyCommandNames: Set<String> = Set(["settings.set", "settings.applyPreset", "preset.save", "core.completeOnboarding", "system.undo", "prayer.makeUp", "prayer.resolveGap", "prayer.setHeart", "prayer.logQiyam", "prayer.addOldMissed", "prayer.editTrackingStart", "prayer.startTrip", "prayer.endTrip", "prayer.logPair"]).union(QuranCommandPayload.names).union(["diary.appendLine", "diary.addMargin", "diary.freezeDay", "diary.completeWelcome"])
     public static let supportedCommandNames = appOnlyCommandNames.union(["prayer.log", "diary.appendLine", "diary.addMargin"])
     private let adapter: any CommandStoreAdapter
     public init(adapter: any CommandStoreAdapter) { self.adapter = adapter }
@@ -127,6 +128,9 @@ public struct CommandBus: Sendable {
         }
         let operation: CommandOperation; let semantics: CommandSemantics; let naturalKey: String?
         switch envelope.name {
+        case "diary.completeWelcome":
+            guard payload.isEmpty else { return .init(status: .rejected, reason: "invalidPayload") }
+            operation = .completeDiaryWelcome; semantics = .upsert; naturalKey = "sys.diaryWelcomeSeen"
         case "diary.freezeDay":
             guard Set(payload.keys) == ["dayKey"], case .string(let day) = payload["dayKey"], (try? GregorianDay(day)) != nil else { return .init(status: .rejected, reason: "invalidPayload") }
             operation = .freezeDiaryDay(day); semantics = .upsert; naturalKey = day
