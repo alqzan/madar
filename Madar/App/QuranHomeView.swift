@@ -15,6 +15,7 @@ struct QuranHomeView: View {
     @State private var showDayClose = false
     @State private var showMushaf = false
     @State private var showOutside = false
+    @State private var showWeek = false
     @State private var readerPage: Int?
     private enum HomeDetail: Identifiable {
         case step(QuranUIStep), hadith
@@ -112,6 +113,7 @@ struct QuranHomeView: View {
                 .environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft)
         }
         .fullScreenCover(isPresented: $showOutside) { QuranOutsideView(service: service, close: { showOutside = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
+        .fullScreenCover(isPresented: $showWeek) { QuranWeekView(service: service, close: { showWeek = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
         .alert("تعذّر إتمام العملية", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) { Button("تمّ") { error = nil } } message: { Text(error ?? "") }
     }
     private func serif(_ size: CGFloat) -> Font { .custom("Amiri-Bold", size: size, relativeTo: size > 26 ? .largeTitle : .title2) }
@@ -268,7 +270,7 @@ struct QuranHomeView: View {
     private func log(_ state: QuranRoomState) -> some View {
         card {
             VStack(alignment: .leading, spacing: 14) {
-                Text("سجلّك").font(serif(22))
+                HStack { Text("سجلّك").font(serif(22)); Spacer(); Button("الأسبوع") { showWeek = true }.font(bodyFont(13, bold: true)).frame(minHeight: 44).accessibilityIdentifier("quran-week-open") }
                 Text(state.history.weekSummary.first ?? "آخر أربعة عشر يومًا").font(bodyFont(13)).foregroundStyle(theme.secondaryInk)
                 if state.recentDays.isEmpty {
                     Text("تظهر هنا أيام الحفظ والمراجعة بعد التسجيل").font(bodyFont(13)).foregroundStyle(theme.secondaryInk)
@@ -281,7 +283,7 @@ struct QuranHomeView: View {
                     HStack(spacing: 4) { Text("أقل").font(bodyFont(11)); ForEach([0.15, 0.35, 0.55, 0.8, 1.0], id: \.self) { alpha in RoundedRectangle(cornerRadius: 3).fill(theme.color("review").opacity(alpha)).frame(width: 14, height: 9) }; Text("أكثر").font(bodyFont(11)) }.foregroundStyle(theme.secondaryInk)
                 }
             }
-        }.accessibilityIdentifier("quran-log14")
+        }.accessibilityElement(children: .contain).accessibilityIdentifier("quran-log14")
     }
     private func heatRow(_ title: String, days: [QuranUIHeatDay], color: Color, value: KeyPath<QuranUIHeatDay, Double>) -> some View {
         VStack(alignment: .leading, spacing: 8) {

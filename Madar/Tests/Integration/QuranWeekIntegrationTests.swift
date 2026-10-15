@@ -1,0 +1,39 @@
+import XCTest
+import SwiftData
+import MadarData
+import MadarCore
+import MadarCommands
+@testable import Madar
+
+@MainActor final class QuranWeekIntegrationTests: XCTestCase {
+    func testRollingWeekRestDayDedupedReviewsAndWidgetHaveOneDefinition() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "MadarWeek-\(UUID())")
+        let container = try MadarContainerFactory.makeLocal(at: root.appending(path: "Data"))
+        let context = ModelContext(container), settings = try SettingsStore(context: context)
+        _ = try settings.stage(["core.dayStart": .string("midnight"), "quran.restDay": .string("friday")])
+        let now = ISO8601DateFormatter().date(from: "2026-10-15T15:00:00+03:00")!, catalog = try QuranResources.catalog()
+        func append(_ kind: String, page: Int, day: String, graded: Bool = true) {
+            let row = HifzSession(); row.kind = kind; row.pages = [page]; row.dayKey = day
+            row.fromAyah = catalog.ayahs(on: page).first!.id; row.toAyah = catalog.ayahs(on: page).last!.id
+            row.endedAt = try! GregorianDay(day).date(in: TimeZone(identifier: "Asia/Riyadh")!).addingTimeInterval(12 * 3600); context.insert(row)
+            if graded { let grade = PageGrade(); grade.sessionID = row.id; grade.page = page; grade.grade = "mastered"; context.insert(grade) }
+        }
+        append("hifz", page: 1, day: "2026-10-09") // Friday, actual work counted as coverage, outside the eligible denominator.
+        append("hifz", page: 2, day: "2026-10-10")
+        append("review", page: 1, day: "2026-10-14")
+        append("free", page: 1, day: "2026-10-14") // Same face twice on one day counts once.
+        append("drill", page: 1, day: "2026-10-15", graded: false) // Never a study day.
+        try context.save()
+        let app = try AppSession(container: container, groupDirectory: root), service = AppQuranService(session: app, clock: { now })
+        let week = try service.weeklyLog(), widget = try service.widgetSnapshot().payload
+        XCTAssertEqual(week.days.map(\.id), (9...15).map { "2026-10-\(String(format: "%02d", $0))" })
+        XCTAssertEqual(week.hifz, 2); XCTAssertEqual(week.review, 1)
+        XCTAssertEqual(week.eligibleDays, 6); XCTAssertEqual(week.activeDays, 2); XCTAssertEqual(week.closedDays, 0)
+        XCTAssertTrue(week.days[0].rest); XCTAssertFalse(week.days[0].eligible)
+        XCTAssertEqual(week.days[5].review, 1)
+        XCTAssertEqual(widget.hifzWeek, QuranDayCloseCopy.faces(week.hifz, digits: service.numerals))
+        XCTAssertEqual(widget.reviewWeek, QuranDayCloseCopy.faces(week.review, digits: service.numerals))
+        XCTAssertEqual(widget.days.map(\.review), week.days.map { Double($0.review) / 8 })
+        _ = root // An isolated temporary store, never the owner's data.
+    }
+}
