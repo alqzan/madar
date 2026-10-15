@@ -29,6 +29,7 @@ Found by Claude walking the app on the simulator as a user (15 Oct 23:40); the o
 | UX-09 | Quran home: hide the streak pill when the streak is 0 (Arabic zero reads like a dot); hide the «٠/٠» counters and the plan-depth controls until a plan exists. | ready | |
 | UX-10 | Tab bar: on the simulator each tab switch needed two taps after the bar minimised. Confirm on device or simulator; if real, fix (e.g. minimise behaviour). | ready | Record evidence either way. |
 | UX-11 | Both dates everywhere — owner rule 15 Oct (AGENTS.md «Dates»). Audit every date the user sees in every built room (prayer, Quran incl. the plan's expected completion, diary, lobby, year, upcoming, settings, exports): primary calendar per `core.firstCalendar` (diary calendar per `notes.calendarFirst`) as the main text, the other smaller beneath or beside it. Use one shared formatter. | ready | Owner example: «الإتمام المتوقع» shows Hijri only; add the Gregorian date under it, small. |
+| UX-12 | Quran «الحفظ الجديد» levels show the real amount, not a multiplier — owner 15 Oct: «×1½» and «×2» mean nothing to the user. Under بسيط/متوسط/عميق/محكم show what today's new memorisation actually is at that level, from the plan's portion (for example «٥ أسطر»، «نصف صفحة»، «صفحة»، بلا أنصاف أسطر), the way the review row already shows face counts. Same check for every other multiplier or abstract label in the app. | ready | `App/QuranHomeView.swift` levelOption: hifz subtitle is `×1½`/`×2`. Keep amounts consistent with the engine (no new number definitions). |
 
 ## Ideas — for the owner
 
