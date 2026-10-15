@@ -158,6 +158,8 @@ struct QuranUISessionState: Identifiable, Sendable {
     var resourceError: String?
     var coach: QuranUICoach?
     var drill: QuranUIDrillCard? = nil
+    var startedAt: Date? = nil
+    var numeralLocale = "ar"
 }
 struct QuranUICoach: Sendable {
     var activeAyahID: Int; var activeAyahNumber: String; var plannedAyahs: Set<Int>; var revealedAyahs: Set<Int>

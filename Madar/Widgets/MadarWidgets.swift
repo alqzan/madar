@@ -40,6 +40,8 @@ private struct FoundationWidget: Widget {
     var body: some Widget {
         FoundationWidget()
         NextPrayerWidget()
+        QuranWidget()
+        QuranReviewTimerControl()
         PrayerCountdownActivityWidget()
         PrayerLogControl()
     }

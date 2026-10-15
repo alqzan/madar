@@ -97,10 +97,13 @@ targets:
       - App/PrayerActivityAttributes.swift
       - Intents/LogPrayerIntent.swift
       - Intents/PrayerControlIntent.swift
+      - Intents/StartQuranSessionIntent.swift
+      - App/QuranWidgetContent.swift
     dependencies:
       - package: MadarSnapshots
       - package: MadarInbox
       - package: MadarCore
+      - package: MadarDesign
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.alqzan.madar2.widgets

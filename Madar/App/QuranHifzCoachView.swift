@@ -1,6 +1,7 @@
 import SwiftUI
 import MadarDesign
 import MadarQuran
+import MadarCore
 
 struct QuranHifzCoachView: View {
     let state: QuranUISessionState
@@ -84,6 +85,13 @@ struct QuranHifzCoachView: View {
                         .font(.custom("Amiri-Bold", size: 25, relativeTo: .title2))
                     if route == .methods {
                         if coach.review {
+                            if let start = state.startedAt {
+                                TimelineView(.periodic(from: .now, by: 1)) { context in
+                                    let seconds = max(0, Int(prayerUITestClock(context.date).timeIntervalSince(start)))
+                                    let digits = MadarNumberFormatter(style: state.numeralLocale.contains("latn") ? .western : .hindi)
+                                    HStack { Text("مؤقّت المراجعة"); Spacer(); Text(digits.localized(String(format: "%02d:%02d", seconds / 60, seconds % 60))).monospacedDigit() }
+                                }.font(font(18, bold: true)).accessibilityIdentifier("quran-review-timer")
+                            }
                             Text("سرد متصل").font(font(16, bold: true))
                             Text("سمّع من حفظك ثم اكشف الآية. «تعثّرت» يسجّل موضع الخطأ، والتقييم لكل وجه.").font(font(14)).foregroundStyle(theme.secondaryInk)
                         }
@@ -95,6 +103,7 @@ struct QuranHifzCoachView: View {
                                     .font(font(14)).frame(minHeight: 44).contentShape(Rectangle())
                             }.buttonStyle(.plain).accessibilityIdentifier("quran-method-" + method.rawValue)
                         }
+                        Button("تمّ") { sheet = nil }.font(font(14, bold: true)).frame(maxWidth: .infinity, minHeight: 44).accessibilityIdentifier("quran-method-done")
                     } else {
                         Text(coach.pastDay ? "هذه جلسة من يوم سابق. احفظ ما تمّ بيومه أو تجاهل المسودة." : coach.review ? "المسودة محفوظة تلقائيًا. سجّل الأوجه التي قيّمتها، أو تجاهل الجلسة، أو تابع." : "المسودة محفوظة تلقائيًا. سجّل ما اجتاز التسميع المستور، أو تجاهل الجلسة، أو تابع.")
                             .font(font(14)).foregroundStyle(theme.secondaryInk)

@@ -14,6 +14,8 @@ struct QuranHomeView: View {
     @State private var busy = false
     @State private var showDayClose = false
     @State private var showMushaf = false
+    @State private var showOutside = false
+    @State private var readerPage: Int?
     private enum HomeDetail: Identifiable {
         case step(QuranUIStep), hadith
         var id: String { switch self { case .step(let step): "step-" + step.id; case .hadith: "hadith" } }
@@ -45,9 +47,10 @@ struct QuranHomeView: View {
                     path(state)
                     log(state)
                     card {
-                        Button { showMushaf = true } label: {
+                        Button { readerPage = nil; showMushaf = true } label: {
                             Label("المصحف", systemImage: "book").font(bodyFont(15, bold: true)).frame(maxWidth: .infinity, minHeight: 44)
                         }.buttonStyle(.plain).accessibilityIdentifier("quran-tool-mushaf")
+                        Button { showOutside = true } label: { Label("التذكير والودجات", systemImage: "bell").font(bodyFont(14)).frame(maxWidth: .infinity, minHeight: 44) }.buttonStyle(.plain).accessibilityIdentifier("quran-outside")
                     }
                 }.padding(.horizontal, 16).padding(.top, 20).padding(.bottom, 36)
             } else if let error {
@@ -61,6 +64,17 @@ struct QuranHomeView: View {
         .environment(\.roomTheme, theme)
         .accessibilityIdentifier("quran-home")
         .task { do { try await refresh() } catch { self.error = quranUserMessage(error) } }
+        .onChange(of: service.app.quranRoute, initial: true) { _, route in
+            guard let route else { return }; service.app.quranRoute = nil
+            run {
+                if state == nil { try await refresh() }
+                if route.path.first == "page", let number = Int(route.path.last ?? "") { readerPage = number; showMushaf = true }
+                else if route.path.first == "session" {
+                    if let draft = state?.draft { active = try await service.resume(draftID: draft.id) }
+                    else if let kind = QuranUIKind(rawValue: route.path.last == "wird" ? "hifz" : route.path.last ?? "") { active = try await service.start(kind: kind, stepID: nil, range: nil, rakaat: nil, spotID: nil) }
+                }
+            }
+        }
         .sheet(item: $detail) { item in
             switch item {
             case .hadith:
@@ -94,9 +108,10 @@ struct QuranHomeView: View {
                 .environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft)
         }
         .fullScreenCover(isPresented: $showMushaf) {
-            QuranMushafView(service: service, initialPage: state?.steps.first(where: { $0.kind == .hifz })?.range?.fromPage ?? 1, close: { showMushaf = false })
+            QuranMushafView(service: service, initialPage: readerPage ?? state?.steps.first(where: { $0.kind == .hifz })?.range?.fromPage ?? 1, close: { showMushaf = false })
                 .environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft)
         }
+        .fullScreenCover(isPresented: $showOutside) { QuranOutsideView(service: service, close: { showOutside = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
         .alert("تعذّر إتمام العملية", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) { Button("تمّ") { error = nil } } message: { Text(error ?? "") }
     }
     private func serif(_ size: CGFloat) -> Font { .custom("Amiri-Bold", size: size, relativeTo: size > 26 ? .largeTitle : .title2) }

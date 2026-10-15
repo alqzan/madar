@@ -15,6 +15,7 @@ struct AppUndoToken { let id: UUID; let expiresAt: Date }
 
 @MainActor @Observable
 final class AppSession {
+    var quranRoute: Route?
     private(set) var container: ModelContainer
     let managedStore: ManagedDataStore?
     let snapshotStore: SnapshotStore
@@ -355,9 +356,12 @@ final class AppSession {
     func number(_ key: String) -> Double { if case .number(let v) = values[key] { v } else { 0 } }
     func open(_ url: URL) {
         let today = GregorianDay.containing(.now, in: activePlace.timeZone)
-        let context = RouteContext(trackingStart: today.adding(days: -36500), today: today, settingsKeys: Set(Self.supportedKeys), availability: .m0)
+        let context = RouteContext(trackingStart: today.adding(days: -36500), today: today, settingsKeys: Set(Self.supportedKeys), availability: .init(builtRooms: [.core, .salah, .quran]))
         do {
             let route = try RouteRegistry.parse(url, context: context)
+            if route.room == .quran, route.path.isEmpty || route.path.first == "session" || route.path.first == "page" {
+                quranRoute = route; selectedTab = "quran"; return
+            }
             guard url.host == "settings", route.room == .core else { throw CoreError.unavailableFeature }
             settingsQuery = try schema.definition(for: route.path[1]).title
             selectedTab = "customize"
@@ -523,9 +527,12 @@ final class AppSession {
     func executeQuranCommand(_ name: String, payload: [String: MadarCore.JSONValue]) async throws -> CommandOutcome {
         guard beginWrite() else { throw BackupOperationError.busy }
         defer { pendingWrites -= 1 }
-        let result = try await bus.execute(CommandEnvelope(name: name, payload: .object(payload)))
-        guard result.status == .applied || result.status == .duplicate else { throw DataError.invalidValue(result.reason ?? "Quran command") }
-        try reload(); try publishSnapshot()
+        let result = try await withSerializedPrayerNotificationMutation {
+            let result = try await bus.execute(CommandEnvelope(name: name, payload: .object(payload)))
+            guard result.status == .applied || result.status == .duplicate else { throw DataError.invalidValue(result.reason ?? "Quran command") }
+            try reload(); try publishSnapshot()
+            return result
+        }
         if let id = result.undoToken, let receipt = try ModelContext(container).fetch(FetchDescriptor<MadarData.CommandReceipt>()).first(where: { $0.commandID == id }), let deadline = receipt.undoExpiresAt {
             showUndo(AppUndoToken(id: id, expiresAt: deadline), message: "حُفظ التغيير · التراجع متاح لعشر دقائق")
         }
@@ -636,11 +643,15 @@ final class AppSession {
         let prayers = [day.adding(days: -1), day].compactMap { PrayerTimesEngine.calculate(day: $0, place: place) }
         guard let key = try? MadarDay.resolve(instant: instant, place: place, boundary: DayBoundary(rawValue: string("core.dayStart")) ?? .fajr, prayerDays: prayers, hijriSource: HijriSource(rawValue: string("core.hijriSource")) ?? .ummAlQura, sightingOffset: Int(number("core.hijriOffset"))) else {
             try snapshotStore.remove("foundation")
+            try? snapshotStore.remove("quran")
             return
         }
         let snapshot = SnapshotEnvelope(name: "foundation", generatedAt: instant, validUntil: instant.addingTimeInterval(3600), dayKey: key.dayKey, tzID: place.timeZoneID, privacy: SnapshotPrivacy(), payload: FoundationSnapshot(firstCalendar: string("core.firstCalendar"), numerals: string("core.numerals")))
         try snapshotStore.write(snapshot)
         publishPrayerNextSnapshot(at: instant, tzID: place.timeZoneID, dayKey: key.dayKey)
+        let quran = AppQuranService(session: self, clock: { instant })
+        do { try snapshotStore.write(quran.widgetSnapshot()); WidgetCenter.shared.reloadTimelines(ofKind: "MadarQuran") }
+        catch { try? snapshotStore.remove("quran") }
     }
     /// The next-prayer widget reads this file only; it holds times, never counts or streaks (RP9, RU2).
     private func publishPrayerNextSnapshot(at instant: Date, tzID: String, dayKey: String) {

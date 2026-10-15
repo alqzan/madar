@@ -71,6 +71,7 @@ extension AppSession {
         }
         let done = DeviceSetting(); done.key = "sys.onboardingCompleted"; done.valueJSON = Data("true".utf8); context.insert(done)
         try context.save()
+        if let raw = env["MADAR_UI_QURAN_ROUTE"], let url = URL(string: raw) { open(url) }
     }
 }
 private extension TimeZone { static var riyadhZone: TimeZone { TimeZone(identifier: "Asia/Riyadh")! } }

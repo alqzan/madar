@@ -236,6 +236,7 @@ extension AppQuranService {
             page: try await page(draft.page), answers: draft.kind == .drill ? [QuranUIAnswer(id: "pass", text: "أتقنت الموضع"), QuranUIAnswer(id: "fail", text: "أحتاج تدريبًا")] : [],
             grades: grades, primaryTitle: readOnlyFinished ? "أغلق القراءة" : finished ? "أنهِ وسجّل" : "تابع", primaryAction: readOnlyFinished ? .discard : finished ? .commit : .advance,
             canAdvance: true, mistakeAyahID: draft.ayahID, method: value.method, availableMethods: [:], similar: nil, resourceError: nil)
+        state.startedAt = draft.startedAt; state.numeralLocale = app.string("core.numerals") == "western" ? "ar_SA@numbers=latn" : "ar_SA@numbers=arab"
         if draft.kind == .drill, let card = try await drillCard(value, catalog: catalog) {
             state.title = "اختبار مواضع الخطأ"; state.drill = card
         }
