@@ -1,6 +1,6 @@
 # Current milestone
 
-**M2 Quran: all 17 v1 screen cards visually approved by the owner on 15 October; M1-F04 external countdown software completed by owner direction** (see `docs/CODEX-M2-BRIEF.md`). M1-G remains deferred until the whole app is finished. M0/M1 gates and distribution are not claimed approved. RA1 (local only), RA2 (app-only store writes), RP1 (no automatic missed/qada), RU1 and data preservation stay mandatory.
+**M3 Diary — started by owner on 15 October.** M2-V01–V17 are approved; M1-F04 software is complete. Device/milestone gates stay deferred until the whole app is finished. RA1/RA2, RP1, RU1 and data preservation remain mandatory.
 
 # Last checked
 
@@ -77,6 +77,32 @@ The owner lifted the M2 pause in `docs/CODEX-M2-BRIEF.md`. Build a pure Swift en
 | M2-V16 | Strength and recovery — `screens/quran/18-R18-Mansub.jpg` | approved | `QuranStrengthView`: one water tube per represented juz, 70% reference, selected-part face strengths/dates, overall descriptive mean, raise up to five far faces to tomorrow with conditional good-grade projection, review-now range, recovery 5/7/14-day previews/create/cancel/undo. All far decisions reuse RQ4, all selections and shares come from the pure engines; opening writes nothing. Integration 1/1 (85% projected two-face fixture, raise dedupe, recovery quota/cancel/undo) + default L/light raise/recovery UI 1/1 passed (`M2-V16`); app builds; shots `Artifacts/m2-v16-shots/`, comparison `R18-Mansub.html`. Differences: approved green/1405 palette, actual represented juz/counts, descriptive explanation and face detail button, paper recovery sheet; no 20/30-day shortcut/moon, no scrolled canonical. |
 | M2-V17 | Night prayer wird — `screens/quran/19-R18-Qiyam.jpg` | approved | `QuranQiyamView` and its quiet prayer screen: night palette, 2/4/6/8-rakah preview ordered by the engine, each face once with repeat-as-you-wish slots, durable completed-rakah cursor/resume, editable proposed-good grades, explicit full/partial confirmation and atomic Quran/prayer link with undo. Partial save uses actual completed rakahs; planned target never inflates PrayerNight. Existing rakaat/witr retained; no new SwiftData field/store migration. Current-night prayer entry and five-tool home row integrated. Native integration 3/3 across `M2-V17-final` and `M2-Quran-final` (repeat slots, full/partial, undo and preexisting night); payload/routes 2/2, assignment 1/1 and failed-link rollback 1/1 passed; night/resume/save + prayer-link UI 2/2 passed, final compact night UI included in `M2-Quran-gallery` 4/4. App/widget build; `git diff --check` clean. Default L/night preview/prayer/grade shots `Artifacts/m2-quran-gallery/`, comparison `R18-Qiyam.html`. Differences: live pages/night, native safe area, 60% text opacity per contrast token instead of 55%, explicit grade/save summary and partial exit; no prototype moon, no scrolled canonical. Combined nine-page gallery `Artifacts/quran-nine-pages.html`. |
 
+## M3 Diary — owner opened 15 October, approved-spec order
+
+Read §7.3 `sections/10-r-notes.md`, §5 `05-ds.md`, §10/§11 for data; RD1–RD8 override the original extract. Room lock/Face ID, encrypted backup, sync and privacy audits stay frozen: reuse the existing lock gate only. Screen rows exclude prototype controls/sample values, RD6 question/suggestion features, unbuilt-room metrics and every unavailable action. N4/notes-app settings are superseded by shared flex per RD7.
+
+| Card | Result / canonical | Status | Do not copy / Notes |
+|---|---|---|---|
+| M3-E01 | Pure memory selection — §7.3 N03: stored day keys, Gregorian/Hijri match, leap-day/month-end, other-calendar fallback, nearest echo ±3 days/older tie, hidden/Day One exclusion, first day. | done | `swift test --package-path Madar/Packages/MadarCore --filter DiaryMemoryTests`: 4/4 passed; pure Swift, no data writes; N03 fixtures. |
+| M3-D01 | App-only diary append/margin commands and read adapter — §7.3 N02/N04, §10/§11; existing Entry/DayPage/MarginNote, stamped day provenance, receipt/replay/undo. | ready | No schema migration, import, revision edit or deletion UI. One margin fact renders in its target and written day. |
+| M3-V01 | Window home — `notes/01-N1-Nafidha.jpg`, `-s1`; §7.3 home/N03, §5; RD5/RD6/RD7. Includes the text composer/day reader this home needs, based on `notes-app/07-editor.jpg` and `05-today.jpg`. | ready | Actual photos/text/years/dates; default memory match and source-derived comparisons. No moon, experience panel, fake photo, money metric before M5, search/customization routes before built; keyboard first. Existing lock gate wraps room before fetching. |
+| M3-V02 | Echoes home — `notes/02-N2-Asda.jpg`; §7.3/N03. | ready | Fixed approved echo distances; configurable distance list is v2. |
+| M3-V03 | Margin home — `notes/03-N3-Hamish.jpg`, `-s1`; §7.3/N03/N04. | ready | One original memory with dated second-ink reply, no duplicate fact. |
+| M3-V04 | Diary customization — `flex/09-K-Mudhakkirat.jpg`, `-s1`, shared flex template; §6/§7.3, RD7. | ready | no legacy N4/notes-app settings, smart suggestion controls or frozen lock changes. |
+| M3-V05 | First-open and full today page — `notes-app/01-onboard.jpg`, `05-today.jpg`, `06-today-s1.jpg`; §7.3; RD1/RD5/RD6. | ready | No daily question until rules/bank/ID exist. Default keyboard-first and existing lock gate. |
+| M3-V06 | Editor, attachments, dictation/audio — `notes-app/07-editor.jpg`; §7.3 N06; RD1/RD5. | ready | Text route starts in V01; runtime language checks, explicit server consent, audio-first retention. No simulated feature controls. |
+| M3-V07 | Your days — `notes-app/08-hub.jpg`; §7.3 calendar/timeline/index/photos/letters. | ready | Gregorian-first calendar, no sealed-letter text. |
+| M3-V08 | Local diary search — `notes-app/09-search.jpg`; §7.3 N05; RD6. | ready | Supported filters only; no LLM/network/generated answers or name inference. |
+| M3-V09 | Day One import — `notes-app/12-import.jpg`; §7.3 N01, §11; RD8. | blocked: real anonymized Day One export fixture required before parser | Preserve tags/inline media/original zone; no owner-store import without explicit approval. |
+| M3-V10 | Export — `notes-app/13-export.jpg`; §7.3/§11. | ready | Plain diary exports only; encrypted backup work stays frozen. |
+| M3-V11 | Yearbook — `notes-app/14-yearbook.jpg`, `15-yearbook-s1.jpg`; §7.3. | ready | Actual eligible entries/photos, no samples. |
+| M3-V12 | Outside the app — `notes-app/16-outside.jpg`; §9, RD7, RU2, RL5. | ready | Locked content omitted from JSON; shared budget/sanctity; no frozen privacy extension work. |
+| M3-V13 | Morning intention/evening outcome — `notes-app/17-today-morning.jpg`, `18-today-evening.jpg`; §7.3. | ready | Intention outcomes only; no unwritten question bank. |
+| M3-V14 | Friday/Ramadan/night/return — `notes-app/19-today-friday.jpg`, `20-today-ramadan.jpg`, `22-today-return.jpg`, `23-today-dark.jpg`; §7.3. | ready | Native default-size states; sample counts, moon and lantern omitted. |
+| M3-V15 | Travel diary — `notes-app/21-today-travel.jpg`; §7.3/§8 shared trips. | ready | Shared trip, explicit reversible choice; no sample city/map. |
+| M3-F01 | Letters/projects and past-edit revisions — §7.3 N04/RD1. | ready | Existing models first; resolve revision preservation without data loss before exposing edits. |
+| M3-G | Device acceptance — §12/§13; RD4 release dependency. | deferred: after the whole app is finished | No new encrypted-backup or frozen lock/privacy audit work. |
+
 ## Done — software (integrated on main, visual acceptance pending in M1-V)
 
 | Card | Result | Commit |
@@ -102,7 +128,7 @@ Owner visually approved M2-V01–V17 and the prayer/Quran link on 15 October. OS
 
 # Later
 
-No ready screen card remains in the M2 queue; owner accepted the completed screens and selected the M1-F04 blocker next. M1-G remains deferred until the whole app is finished. M1-F04 software blocker is resolved; its OS/device checks remain deferred. M3 is next in milestone order; its cards must be opened from the approved spec before coding. Keep tafsir off until its separate licence is verified. Do not claim an M1/M2 gate or iPhone pass.
+No ready screen card remains in the M2 queue; owner accepted the completed screens and selected the M1-F04 blocker next. M1-G remains deferred until the whole app is finished. M1-F04 software blocker is resolved; its OS/device checks remain deferred. M3 opened by owner on 15 October; take the first ready card after current work. Keep tafsir off until its separate licence is verified. Do not claim an M1/M2 gate or iPhone pass.
 
 # Handovers
 ## Handover — M1-F04 shared device budget and external countdown — 2026-10-15 — Codex
