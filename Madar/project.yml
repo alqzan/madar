@@ -98,6 +98,7 @@ targets:
       - Intents/LogPrayerIntent.swift
       - Intents/PrayerControlIntent.swift
       - Intents/StartQuranSessionIntent.swift
+      - Intents/StartPrayerActivityIntent.swift
       - App/QuranWidgetContent.swift
     dependencies:
       - package: MadarSnapshots

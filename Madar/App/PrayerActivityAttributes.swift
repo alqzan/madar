@@ -10,4 +10,5 @@ struct PrayerCountdownAttributes: ActivityAttributes {
     var activityKey: String
     var scheduledStartAt: Date
     var budgetRequestID: String? = nil
+    var numerals: String? = nil
 }

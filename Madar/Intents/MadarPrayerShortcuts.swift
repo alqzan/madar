@@ -8,5 +8,11 @@ struct MadarPrayerShortcuts: AppShortcutsProvider {
             shortTitle: "سجّل صلاة",
             systemImageName: "checkmark.circle"
         )
+        AppShortcut(
+            intent: StartPrayerActivityIntent(),
+            phrases: ["ابدأ عداد الصلاة في \(.applicationName)", "تابع الصلاة القادمة في \(.applicationName)"],
+            shortTitle: "عدّاد الصلاة",
+            systemImageName: "timer"
+        )
     }
 }

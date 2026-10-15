@@ -639,6 +639,7 @@ final class AppSession {
     }
     func publishSnapshot() throws {
         try pendingInbox.publishGeneration(inboxGeneration())
+        try publishNotificationBudget(at: Date())
         let instant = Date(), place = activePlace, day = GregorianDay.containing(instant, in: place.timeZone)
         let prayers = [day.adding(days: -1), day].compactMap { PrayerTimesEngine.calculate(day: $0, place: place) }
         guard let key = try? MadarDay.resolve(instant: instant, place: place, boundary: DayBoundary(rawValue: string("core.dayStart")) ?? .fajr, prayerDays: prayers, hijriSource: HijriSource(rawValue: string("core.hijriSource")) ?? .ummAlQura, sightingOffset: Int(number("core.hijriOffset"))) else {

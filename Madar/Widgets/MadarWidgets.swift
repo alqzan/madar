@@ -44,6 +44,7 @@ private struct FoundationWidget: Widget {
         QuranReviewTimerControl()
         PrayerCountdownActivityWidget()
         PrayerLogControl()
+        PrayerCountdownControl()
     }
 }
 
@@ -57,7 +58,7 @@ private struct PrayerCountdownActivityWidget: Widget {
                     Text(context.state.prayerName).font(.headline)
                 }
                 Spacer(minLength: 8)
-                Text(context.state.prayerAt, style: .timer).monospacedDigit().font(.body)
+                PrayerActivityTimer(start: context.attributes.scheduledStartAt, end: context.state.prayerAt, numerals: context.attributes.numerals).font(.body)
             }
             .environment(\.layoutDirection, .rightToLeft)
             .padding()
@@ -69,19 +70,32 @@ private struct PrayerCountdownActivityWidget: Widget {
                     HStack {
                         Text(context.state.prayerName).font(.headline)
                         Spacer()
-                        Text(context.state.prayerAt, style: .timer).monospacedDigit()
+                        PrayerActivityTimer(start: context.attributes.scheduledStartAt, end: context.state.prayerAt, numerals: context.attributes.numerals)
                     }
                     .environment(\.layoutDirection, .rightToLeft)
                 }
             } compactLeading: {
                 Image(systemName: "moon.stars")
             } compactTrailing: {
-                Text(context.state.prayerAt, style: .timer).monospacedDigit()
+                PrayerActivityTimer(start: context.attributes.scheduledStartAt, end: context.state.prayerAt, numerals: context.attributes.numerals)
             } minimal: {
                 Image(systemName: "moon.stars")
             }
             .widgetURL(URL(string: "madar://prayer"))
             .keylineTint(.teal)
         }
+    }
+}
+
+/// RL7: hours and minutes; the discrete system formatter refreshes only when a minute changes.
+private struct PrayerActivityTimer: View {
+    let start: Date
+    let end: Date
+    let numerals: String?
+    var body: some View {
+        Text(.currentDate, format: .timer(countingDownIn: min(start, end.addingTimeInterval(-1))..<end,
+            maxFieldCount: 2, maxPrecision: .seconds(60)))
+            .monospacedDigit()
+            .environment(\.locale, Locale(identifier: numerals == "western" ? "ar_SA@numbers=latn" : "ar_SA@numbers=arab"))
     }
 }

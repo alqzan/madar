@@ -3,6 +3,7 @@ import Foundation
 import MadarCore
 import MadarData
 import MadarPrayer
+import MadarInbox
 import SwiftData
 import UIKit
 @preconcurrency import UserNotifications
@@ -87,6 +88,7 @@ final class PrayerNotificationCoordinator {
     private func refreshLocked(session: AppSession, suppliedNow: Date?) async throws {
         try session.reload()
         let now = suppliedNow ?? session.prayerNow()
+        try session.publishNotificationBudget(at: now)
         let repository = try PrayerRepository(context: ModelContext(session.container))
         let days = prayerDays(repository: repository, now: now)
         let currentAuthorization = await authorizationStatus()
@@ -115,7 +117,8 @@ final class PrayerNotificationCoordinator {
         let externalPendingCount = existing.filter { !Self.manages($0.identifier) }.count
         let ledger = try ModelContext(session.container).fetch(FetchDescriptor<NotificationLedger>()).filter { $0.deletedAt == nil && ["submitted", "observed"].contains($0.state) && $0.requestClass != "prayer" }
         let consumed = ledger.filter { $0.scheduledFor <= now || $0.kind == "activityStart" }
-        let counts = Dictionary(grouping: consumed, by: \.dayKey).mapValues { Set($0.map(\.requestID)).count }
+        let sharedConsumed = try session.notificationBudget.reservations().filter { $0.scheduledAt <= now || $0.activity }
+        let counts = Dictionary(grouping: sharedConsumed, by: \.dayKey).mapValues { Set($0.map(\.id)).count }
         let quiet = session.string("notif.quietFrom").split(separator: ":").compactMap { Int($0) }
         let quietMinutes = session.bool("notif.quietAfterIsha") ? (quiet.count == 2 ? quiet[0] * 60 + quiet[1] : 0) : nil
         let priority: [Room]
@@ -134,7 +137,7 @@ final class PrayerNotificationCoordinator {
         try await reconcile(plan: plan, candidates: candidates,
                             current: existing.filter { $0.identifier.hasPrefix(Self.requestPrefix) },
                             prayerDays: days)
-        try await reconcileQuran(plan: plan, candidates: candidates, current: existing.filter { $0.identifier.hasPrefix("quran.") || $0.identifier.hasPrefix("digest.") }, timeZone: repository.place(at: now).timeZone, consumed: Set(consumed.map(\.requestID)))
+        try await reconcileQuran(plan: plan, candidates: candidates, current: existing.filter { $0.identifier.hasPrefix("quran.") || $0.identifier.hasPrefix("digest.") }, timeZone: repository.place(at: now).timeZone, consumed: Set(consumed.map(\.requestID)), now: now)
         try await reconcilePrayerActivity(prayerDays: days, now: now, session: session)
     }
 
@@ -309,12 +312,15 @@ final class PrayerNotificationCoordinator {
     }
 
     private static func manages(_ id: String) -> Bool { id.hasPrefix(requestPrefix) || id.hasPrefix("quran.") || id.hasPrefix("digest.") }
-    private func reconcileQuran(plan: NotificationPlan, candidates: [NotificationCandidate], current: [UNNotificationRequest], timeZone: TimeZone, consumed: Set<String>) async throws {
+    private func reconcileQuran(plan: NotificationPlan, candidates: [NotificationCandidate], current: [UNNotificationRequest], timeZone: TimeZone, consumed: Set<String>, now: Date) async throws {
         guard let session else { return }
         let targets = plan.scheduled.filter { ($0.room == .quran || $0.kind == .digest) && !consumed.contains($0.id) }
         let ids = Set(targets.map(\.id)), obsolete = current.filter { !ids.contains($0.identifier) }.map(\.identifier)
         center.removePendingNotificationRequests(withIdentifiers: obsolete)
-        for id in obsolete where !consumed.contains(id) { try updateLedger(requestID: id, state: "cancelled") }
+        for id in obsolete where !consumed.contains(id) {
+            try session.notificationBudget.cancel(id: id, now: now)
+            try updateLedger(requestID: id, state: "cancelled")
+        }
         for candidate in targets {
             let content = UNMutableNotificationContent()
             let late = candidate.id.hasSuffix(".late")
@@ -324,8 +330,20 @@ final class PrayerNotificationCoordinator {
             content.userInfo = ["dayKey": candidate.dayKey, "room": "quran"]
             var calendar = Calendar(identifier: .gregorian); calendar.timeZone = timeZone
             var date = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: candidate.dueAt); date.timeZone = timeZone
+            do {
+                try session.notificationBudget.reserve(.init(id: candidate.id, dayKey: candidate.dayKey, scheduledAt: candidate.dueAt), now: now)
+            } catch NotificationBudgetError.full {
+                center.removePendingNotificationRequests(withIdentifiers: [candidate.id])
+                try session.notificationBudget.cancel(id: candidate.id, now: now)
+                try updateLedger(requestID: candidate.id, dayKey: candidate.dayKey, dueAt: candidate.dueAt, state: "dropped", reason: "budget")
+                continue
+            }
             if !current.contains(where: { $0.identifier == candidate.id && Self.matches($0, dueAt: candidate.dueAt) && $0.content.body == content.body }) {
-                try await center.add(UNNotificationRequest(identifier: candidate.id, content: content, trigger: UNCalendarNotificationTrigger(dateMatching: date, repeats: false)))
+                do { try await center.add(UNNotificationRequest(identifier: candidate.id, content: content, trigger: UNCalendarNotificationTrigger(dateMatching: date, repeats: false))) }
+                catch {
+                    try session.notificationBudget.cancel(id: candidate.id, now: now, requestFailed: true)
+                    throw error
+                }
             }
             try updateLedger(requestID: candidate.id, dayKey: candidate.dayKey, dueAt: candidate.dueAt, state: "submitted", kind: candidate.kind == .digest ? "digest" : late ? "late" : "wird")
         }
@@ -444,32 +462,26 @@ final class PrayerNotificationCoordinator {
         // Only foreground requests are authorized by RL5. A refresh caused by an
         // inbox/background notification must never try to start an activity.
         guard UIApplication.shared.applicationState == .active else { return }
-        let quietMinutes: Int?
-        if session.bool("notif.quietAfterIsha") {
-            let parts = session.string("notif.quietFrom").split(separator: ":").compactMap { Int($0) }
-            guard parts.count == 2, (0...23).contains(parts[0]), (0...59).contains(parts[1]) else { return }
-            quietMinutes = parts[0] * 60 + parts[1]
-        } else { quietMinutes = nil }
-        let policy = NotificationPolicy(dailyBudget: Int(session.number("notif.dailyBudget")),
-                                        quietFromMinutes: quietMinutes, thisDeviceRemindersEnabled: session.bool("notif.thisDeviceReminders"),
-                                        dayBoundary: DayBoundary(rawValue: session.string("core.dayStart")) ?? .fajr)
         let requestID = "activity." + UUID().uuidString
-        guard let candidate = NotificationArbiter.liveActivityStart(id: requestID, proposedAt: startAt,
-                prayerDays: prayerDays, timeZone: timeZone, policy: policy,
-                submittedBudgetByDay: try activityBudgetCounts()) else { return }
+        let reservation: ReservedPrayerActivity
+        do { reservation = try session.notificationBudget.reservePrayerActivity(id: requestID, now: now) }
+        catch NotificationBudgetError.full { return }
+        catch NotificationBudgetError.disabled { return }
+        catch NotificationBudgetError.duplicate { return }
         for activity in active { try await endPrayerActivity(activity, now: now) }
-        let attributes = PrayerCountdownAttributes(activityKey: "prayer.next", scheduledStartAt: startAt, budgetRequestID: requestID)
+        let attributes = PrayerCountdownAttributes(activityKey: "prayer.next", scheduledStartAt: startAt, budgetRequestID: requestID, numerals: reservation.numerals)
         let state = PrayerCountdownAttributes.ContentState(prayerName: Self.title(next.1), prayerAt: next.0)
         let content = ActivityContent(state: state, staleDate: next.0, relevanceScore: 1)
         let alert = AlertConfiguration(title: "الصلاة القادمة", body: "بدأت متابعة الصلاة القادمة.", sound: .default)
         // Persist the reservation before asking the OS, so a failed save can never
         // leave a scheduled alert outside the device ledger.
-        try updateLedger(requestID: requestID, dayKey: candidate.dayKey, dueAt: startAt,
+        try updateLedger(requestID: requestID, dayKey: reservation.reservation.dayKey, dueAt: reservation.reservation.scheduledAt,
                          state: "submitted", kind: "activityStart")
         do {
             _ = try Activity.request(attributes: attributes, content: content, pushType: nil, style: .standard,
                                      alertConfiguration: alert, start: startAt)
         } catch {
+            try session.notificationBudget.cancel(id: requestID, now: now, requestFailed: true)
             try updateLedger(requestID: requestID, state: "cancelled")
             throw error
         }
@@ -480,6 +492,7 @@ final class PrayerNotificationCoordinator {
         // A submitted start keeps consuming its slot once its scheduled time has
         // passed; we do not infer whether the system delivered the alert.
         if activity.attributes.scheduledStartAt > now, let id = activity.attributes.budgetRequestID {
+            try session?.notificationBudget.cancel(id: id, now: now)
             try updateLedger(requestID: id, state: "cancelled")
         }
     }
