@@ -45,6 +45,30 @@ import XCTest
         XCTAssertTrue(app.buttons["quran-session-advance"].waitForExistence(timeout: 15))
         app.terminate()
     }
+    func testFirstUseShowsPlanActionWithoutZeroStreakOrDepthControls() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
+        app.launch()
+        if app.buttons["first-run-skip"].waitForExistence(timeout: 2) { app.buttons["first-run-skip"].tap() }
+        let start = app.buttons["first-run-continue"]
+        if start.waitForExistence(timeout: 2) { start.tap(); if start.exists && start.isHittable { start.tap() } }
+        app.tabBars.buttons["القرآن"].tap()
+        XCTAssertTrue(app.buttons["quran-start-plan"].waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertFalse(app.buttons["quran-streak"].exists)
+        XCTAssertFalse(app.buttons["quran-level-hifz-medium"].exists)
+        XCTAssertFalse(app.buttons["quran-level-review-medium"].exists)
+        attach(app, "UX-09-first-use-L")
+        app.buttons["quran-start-plan"].tap()
+        XCTAssertTrue(app.staticTexts["quran-setup-title"].waitForExistence(timeout: 10), app.debugDescription)
+        for _ in 0..<5 { let next = app.buttons["quran-setup-next"]; XCTAssertTrue(next.waitForExistence(timeout: 5)); next.tap() }
+        XCTAssertTrue(app.buttons["quran-open-plan"].waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertFalse(app.buttons["quran-streak"].exists)
+        XCTAssertTrue(app.buttons["quran-level-hifz-medium"].exists)
+        attach(app, "UX-09-new-plan-L")
+        app.buttons["quran-open-plan"].tap()
+        XCTAssertTrue(app.staticTexts["quran-plan-forecast"].waitForExistence(timeout: 10))
+    }
     private func waitSelected(_ button: XCUIElement) {
         let expectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", "محدد"), object: button)
         XCTAssertEqual(XCTWaiter.wait(for: [expectation], timeout: 8), .completed)

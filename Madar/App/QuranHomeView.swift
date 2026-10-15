@@ -52,7 +52,7 @@ struct QuranHomeView: View {
                         } }
                     }
                     if state.plan == nil { Button("ابدأ خطة الحفظ") { showSetup = true }.font(bodyFont(16, bold: true)).frame(maxWidth: .infinity, minHeight: 50).foregroundStyle(theme.onAccent).background(theme.accent, in: Capsule()).accessibilityIdentifier("quran-start-plan") }
-                    path(state)
+                    if state.plan != nil || !state.steps.isEmpty { path(state) }
                     log(state)
                     tools(state)
                 }.padding(.horizontal, 16).padding(.top, 20).padding(.bottom, 36)
@@ -136,9 +136,14 @@ struct QuranHomeView: View {
         HStack(alignment: .center) {
             Text("القرآن").font(serif(28))
             Spacer()
+            if state.streakDays > 0 {
             Button { showPlan = true } label: { HStack(spacing: 6) { Circle().fill(theme.color("hifz")).frame(width: 7, height: 7); Text(state.streakLabel).font(bodyFont(12, bold: true)) }
                 .padding(.horizontal, 13).padding(.vertical, 9).background(theme.color("hifzTint"), in: Capsule())
                 }.buttonStyle(.plain).accessibilityIdentifier("quran-streak")
+            } else if state.plan != nil {
+                Button { showPlan = true } label: { Label("خطّتك", systemImage: "slider.horizontal.3").font(bodyFont(12, bold: true)).frame(minHeight: 44) }
+                    .buttonStyle(.plain).accessibilityIdentifier("quran-open-plan")
+            }
         }.padding(.horizontal, 8)
     }
     private func coverage(_ state: QuranRoomState) -> some View {
@@ -173,6 +178,7 @@ struct QuranHomeView: View {
         card {
             VStack(alignment: .leading, spacing: 18) {
                 Text("مسار اليوم").font(bodyFont(13)).foregroundStyle(theme.secondaryInk).frame(maxWidth: .infinity, alignment: .leading)
+                if state.plan != nil {
                 level("الحفظ الجديد", kind: .hifz, value: state.hifzLevel, color: theme.color("hifz"), text: theme.color("hifzText"), badge: "الآن", progress: progress(state, kinds: [.bridge, .hifz]))
                 HStack(spacing: 7) {
                     Text("الميزان: " + state.balanceTitle).font(bodyFont(12, bold: true)).foregroundStyle(theme.color("reviewText"))
@@ -182,11 +188,12 @@ struct QuranHomeView: View {
                         Button("زِد حفظك") { run { try await service.perform(.forceNewHifz); try await refresh() } }.font(bodyFont(12, bold: true)).foregroundStyle(theme.color("hifzText"))
                     }
                 }
+                }
                 let hifzSteps = state.steps.filter { $0.kind == .bridge || $0.kind == .hifz }
-                if hifzSteps.isEmpty { Text(state.plan == nil ? "في صدرك يبدأ الطريق" : state.balanceTitle).font(bodyFont(14)).foregroundStyle(theme.secondaryInk) }
+                if hifzSteps.isEmpty, state.plan != nil { Text(state.balanceTitle).font(bodyFont(14)).foregroundStyle(theme.secondaryInk) }
                 VStack(spacing: 18) { ForEach(hifzSteps) { step in stepRow(step, color: theme.color("hifzText")) } }
                     .background(alignment: .leading) { if !hifzSteps.isEmpty { Rectangle().fill(theme.color("track")).frame(width: 1.5).padding(.vertical, 16).padding(.leading, 10) } }
-                level("المراجعة", kind: .review, value: state.reviewLevel, color: theme.color("review"), text: theme.color("reviewText"), badge: "بعد الحفظ", progress: progress(state, kinds: [.review, .drill]))
+                if state.plan != nil { level("المراجعة", kind: .review, value: state.reviewLevel, color: theme.color("review"), text: theme.color("reviewText"), badge: "بعد الحفظ", progress: progress(state, kinds: [.review, .drill])) }
                 let reviewSteps = state.steps.filter { $0.kind == .review || $0.kind == .drill }
                 VStack(spacing: 18) { ForEach(reviewSteps) { step in stepRow(step, color: theme.color("reviewText")) } }
                     .background(alignment: .leading) { if !reviewSteps.isEmpty { Rectangle().fill(theme.color("track")).frame(width: 1.5).padding(.vertical, 16).padding(.leading, 10) } }

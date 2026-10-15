@@ -146,7 +146,7 @@ import MadarPrayer
             title: catalog.ayah(id: value.key.ayahID).map { $0.surahNameArabic + " " + numerals.string($0.ayahNumber) } ?? "",
             detail: value.key.wordIndex == nil ? "الآية كاملة" : "موضع كلمة", isToday: todayKeys.contains(value.key), closed: !value.isOpen, canDrill: true) }
         return QuranRoomState(coverageTitle: coverageTitle, coverageFraction: Double(completed) / 604,
-            percentageLabel: numerals.percent(coverage.percent), streakLabel: "سلسلة " + dayCount(streak.days), balanceTitle: balance,
+            percentageLabel: numerals.percent(coverage.percent), streakLabel: "سلسلة " + dayCount(streak.days), streakDays: streak.days, balanceTitle: balance,
             balanceExplanation: "تتبع الخطة حاجة المراجعة ومقدار حفظك", hifzLevel: QuranUILevel(rawValue: snapshot.hifzLevel.rawValue)!,
             reviewLevel: QuranUILevel(rawValue: snapshot.reviewLevel.rawValue)!, steps: steps, recentDays: heat, plan: plan, surahs: surahs, draft: draft,
             missedDayKey: missedDay?.description, missedDayTitle: missedDay.map { "لو فاتك يوم " + numerals.localized($0.description) },
