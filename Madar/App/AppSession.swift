@@ -18,6 +18,8 @@ final class AppSession {
     let diaryPlayback = DiaryPlayback()
     var diaryRoute: Route?
     var quranRoute: Route?
+    /// M4-V03: «السنة وما يهمّك» pushed from the lobby (`madar://bahw/year`).
+    var yearOpen = false
     private(set) var container: ModelContainer
     let managedStore: ManagedDataStore?
     let snapshotStore: SnapshotStore
@@ -359,7 +361,7 @@ final class AppSession {
     func number(_ key: String) -> Double { if case .number(let v) = values[key] { v } else { 0 } }
     func open(_ url: URL) {
         let today = GregorianDay.containing(.now, in: activePlace.timeZone)
-        let context = RouteContext(trackingStart: today.adding(days: -36500), today: today, settingsKeys: Set(Self.supportedKeys), availability: .init(builtRooms: [.core, .salah, .quran, .notes]))
+        let context = RouteContext(trackingStart: today.adding(days: -36500), today: today, settingsKeys: Set(Self.supportedKeys), availability: .init(builtRooms: [.core, .salah, .quran, .notes, .bahw, .year]))
         do {
             let route = try RouteRegistry.parse(url, context: context)
             if route.room == .quran, route.path.isEmpty || route.path.first == "session" || route.path.first == "page" {
@@ -368,6 +370,7 @@ final class AppSession {
             if route.room == .notes, route.path.isEmpty || ["today", "day", "write"].contains(route.path.first ?? "") {
                 diaryRoute = route; selectedTab = "notes"; return
             }
+            if route.room == .year, route.path == ["year"] { selectedTab = "foundation"; yearOpen = true; return }
             guard url.host == "settings", route.room == .core else { throw CoreError.unavailableFeature }
             settingsQuery = try schema.definition(for: route.path[1]).title
             selectedTab = "customize"
@@ -547,7 +550,7 @@ final class AppSession {
 
     var diaryStagingDirectory: URL { commandAdapter.diaryStagingDirectory }
     func executeDiaryCommand(_ name: String, payload: [String: MadarCore.JSONValue], id: UUID = UUID()) async throws {
-        guard lockController?.canPresent(.notes) ?? protectedDataAuthorized else { throw DataError.invalidValue("المذكرات مقفلة") }
+        guard !name.hasPrefix("diary.") || (lockController?.canPresent(.notes) ?? protectedDataAuthorized) else { throw DataError.invalidValue("المذكرات مقفلة") }
         guard beginWrite() else { throw BackupOperationError.busy }
         defer { pendingWrites -= 1 }
         let now = prayerNow()
@@ -555,7 +558,7 @@ final class AppSession {
         guard result.status == .applied || result.status == .duplicate else { throw DataError.invalidValue(result.reason ?? "diary command") }
         try reload(); try publishSnapshot()
         if let id = result.undoToken {
-            showUndo(AppUndoToken(id: id, expiresAt: now.addingTimeInterval(600)), message: name.contains("Intention") ? "حُفظت النيّة · التراجع متاح لعشر دقائق" : "حُفظ السطر · التراجع متاح لعشر دقائق")
+            showUndo(AppUndoToken(id: id, expiresAt: now.addingTimeInterval(600)), message: name == "bahw.saveUpcomingDay" ? "حُفظ اليوم · التراجع متاح لعشر دقائق" : name == "bahw.deleteUpcomingDay" ? "حُذف اليوم · التراجع متاح لعشر دقائق" : name.contains("Intention") ? "حُفظت النيّة · التراجع متاح لعشر دقائق" : "حُفظ السطر · التراجع متاح لعشر دقائق")
         }
     }
 

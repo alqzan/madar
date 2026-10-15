@@ -17,7 +17,10 @@ public enum DiaryEditorCommand: Codable, Equatable, Sendable {
     case finishProject(id: UUID, reflection: String?)
     case deleteProject(UUID)
     case linkEntry(entry: UUID, project: UUID?)
-    public static let names: Set<String> = ["diary.saveDraft", "diary.commitDraft", "diary.appendMedia", "diary.setTranscript", "diary.setIntention", "diary.setIntentionResult", "diary.editEntry", "diary.sealLetter", "diary.refreshLetters", "diary.openLetter", "diary.rescheduleLetter", "diary.saveProject", "diary.finishProject", "diary.deleteProject", "diary.linkEntry"]
+    // §7.1 B03 «يوم تنتظره»: the row stores the rule; occurrences are derived.
+    case saveUpcomingDay(id: UUID, title: String, calendar: String, year: Int?, month: Int, day: Int, repeats: String, countFrom: String)
+    case deleteUpcomingDay(UUID)
+    public static let names: Set<String> = ["diary.saveDraft", "diary.commitDraft", "diary.appendMedia", "diary.setTranscript", "diary.setIntention", "diary.setIntentionResult", "diary.editEntry", "diary.sealLetter", "diary.refreshLetters", "diary.openLetter", "diary.rescheduleLetter", "diary.saveProject", "diary.finishProject", "diary.deleteProject", "diary.linkEntry", "bahw.saveUpcomingDay", "bahw.deleteUpcomingDay"]
     public static func parse(_ name: String, _ value: [String: JSONValue]) -> Self? {
         func uuid(_ key: String) -> UUID? { value[key]?.string.flatMap(UUID.init(uuidString:)) }
         switch name {
@@ -70,6 +73,17 @@ public enum DiaryEditorCommand: Codable, Equatable, Sendable {
             return .saveProject(id: id, name: name, intention: intention, keyword: keyword?.isEmpty == true ? nil : keyword)
         case "diary.finishProject":
             guard Set(value.keys).isSubset(of: ["id", "reflection"]), let id = uuid("id") else { return nil }; return .finishProject(id: id, reflection: value["reflection"]?.string)
+        case "bahw.saveUpcomingDay":
+            guard Set(value.keys).isSubset(of: ["id", "title", "calendar", "year", "month", "day", "repeats", "countFromDayKey"]), let id = uuid("id"),
+                  let title = value["title"]?.string?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty, title.count <= 80,
+                  let calendar = value["calendar"]?.string, ["hijri", "greg"].contains(calendar), let repeats = value["repeats"]?.string, ["none", "yearly", "monthly"].contains(repeats),
+                  case .number(let m) = value["month"], case .number(let d) = value["day"], (1...12).contains(Int(m)), (1...(calendar == "hijri" ? 30 : 31)).contains(Int(d)),
+                  let from = value["countFromDayKey"]?.string, (try? GregorianDay(from)) != nil else { return nil }
+            var year: Int? = nil
+            if case .number(let y) = value["year"] { year = Int(y) } else if value["year"] != nil && value["year"] != .null { return nil }
+            guard repeats != "none" || year != nil else { return nil }
+            return .saveUpcomingDay(id: id, title: title, calendar: calendar, year: year, month: Int(m), day: Int(d), repeats: repeats, countFrom: from)
+        case "bahw.deleteUpcomingDay": guard Set(value.keys) == ["id"], let id = uuid("id") else { return nil }; return .deleteUpcomingDay(id)
         case "diary.deleteProject": guard Set(value.keys) == ["id"], let id = uuid("id") else { return nil }; return .deleteProject(id)
         case "diary.linkEntry":
             guard Set(value.keys) == ["entryID", "projectID"], let entry = uuid("entryID"), value["projectID"] == .null || uuid("projectID") != nil else { return nil }

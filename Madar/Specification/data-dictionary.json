@@ -5594,6 +5594,18 @@
         "payload": "{id: UUID, result: done|partial|notEasy|null}",
         "kind": "explicit outcome only; preserve Niyya dayKey and text; conditional undo",
         "auth": "app-only + diary unlocked"
+      },
+      "bahw.saveUpcomingDay": {
+        "intent": null,
+        "payload": "{id: UUID, title: String, calendar: hijri|greg, year?: Int, month: Int, day: Int, repeats: none|yearly|monthly, countFromDayKey: yyyy-MM-dd}",
+        "kind": "§7.1 B03: create or edit a user UpcomingDay rule with undo",
+        "auth": "app-only"
+      },
+      "bahw.deleteUpcomingDay": {
+        "intent": null,
+        "payload": "{id: UUID}",
+        "kind": "§7.1 B03: tombstone a user UpcomingDay with undo",
+        "auth": "app-only"
       }
     },
     "undoPolicy": {

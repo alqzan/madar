@@ -91,7 +91,8 @@ struct BahwLobbyView: View {
         .background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
         .environment(\.roomTheme, theme)
         .toolbarVisibility(.hidden, for: .navigationBar)
-        .sheet(item: Binding(get: { opened.map(BahwOpened.init) }, set: { opened = $0?.block })) { item in BahwBlockSheet(session: session, block: item.block) { opened = nil; if let tab = item.block.tab { session.selectedTab = tab } } }
+        .sheet(item: Binding(get: { opened.map(BahwOpened.init) }, set: { opened = $0?.block })) { item in BahwBlockSheet(session: session, block: item.block) { opened = nil; if let tab = item.block.tab { session.selectedTab = tab } else { session.yearOpen = true } } }
+        .navigationDestination(isPresented: $session.yearOpen) { BahwYearView(session: session) }
         .sheet(isPresented: $drawerOpen) { drawer.presentationDetents([.medium]) }
         .onChange(of: arranging) { _, on in wiggle = on && !reduceMotion }
     }
@@ -197,9 +198,9 @@ struct BahwBlockSheet: View {
             ScrollView {
                 VStack(spacing: 18) {
                     BahwBlockView(service: .init(session: session), block: block, size: .large).frame(height: 365)
-                    if let tab = block.tab {
-                        Button { open() } label: { Text("افتح " + block.title).font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 50).foregroundStyle(theme.onAccent).background(theme.accentFill, in: .capsule) }
-                            .buttonStyle(.plain).accessibilityIdentifier("bahw-open-" + tab)
+                    if block.tab != nil || block == .year || block == .upcoming {
+                        Button { open() } label: { Text(block.tab == nil ? "افتح السنة وما يهمّك" : "افتح " + block.title).font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 50).foregroundStyle(theme.onAccent).background(theme.accentFill, in: .capsule) }
+                            .buttonStyle(.plain).accessibilityIdentifier("bahw-open-" + (block.tab ?? "year"))
                     }
                 }.padding(18)
             }.background(theme.background).foregroundStyle(theme.ink)

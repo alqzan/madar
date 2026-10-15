@@ -179,7 +179,7 @@ struct BahwBlockView: View {
             }
         }.environment(\.layoutDirection, .rightToLeft).accessibilityHidden(true)
     }
-    private func percent(_ period: MadarPeriod) -> String { digits.string(period.basisPoints / 100) + "٪" }
+    private func percent(_ period: MadarPeriod) -> String { digits.string(period.basisPoints / 100) + "٪\u{061C}" }
     private func markTitle(_ name: MadarLandmark.Name) -> String {
         switch name { case .ramadan: "رمضان"; case .eidAlFitr: "العيد"; case .arafah: "عرفة"; case .hijriNewYear: "رأس السنة"; case .gregorianYearEnd: "نهاية السنة" }
     }

@@ -137,6 +137,16 @@ struct DiaryInverse: Codable {
                 row.triggerTargetID = try before.decode("triggerTargetID", as: UUID?.self); row.openAt = try before.decode("openAt", as: Date?.self)
                 row.state = try before.decode("state", as: String.self); row.updatedAt = StableIdentity.monotonic(now: now, previous: row.updatedAt); row.writerID = writer
             } else { try tombstone(row) }
+        } else if inverse.model == "UpcomingDay" {
+            guard let row = try context.fetch(FetchDescriptor<UpcomingDay>()).first(where: { $0.id == inverse.after.id && $0.mergedInto == nil }), try row.record() == inverse.after else { throw DataError.invalidValue("undo superseded: upcoming day") }
+            if let before = inverse.before {
+                row.title = try before.decode("title", as: String.self); row.calendar = try before.decode("calendar", as: String.self); row.year = try before.decode("year", as: Int?.self)
+                row.month = try before.decode("month", as: Int.self); row.day = try before.decode("day", as: Int.self); row.repeats = try before.decode("repeats", as: String.self)
+                row.countFromDayKey = try before.decode("countFromDayKey", as: String.self)
+                row.deletedAt = try before.decode("deletedAt", as: Date?.self); row.deletionBarrierAt = try before.decode("deletionBarrierAt", as: Date?.self)
+                if row.deletedAt == nil { row.restoredAt = now }
+                row.updatedAt = StableIdentity.monotonic(now: now, previous: row.updatedAt); row.writerID = writer
+            } else { try tombstone(row) }
         } else if inverse.model == "Project" {
             guard let row = try context.fetch(FetchDescriptor<Project>()).first(where: { $0.id == inverse.after.id && $0.mergedInto == nil }), try row.record() == inverse.after else { throw DataError.invalidValue("undo superseded: project") }
             if let before = inverse.before {
