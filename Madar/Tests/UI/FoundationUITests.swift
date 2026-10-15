@@ -958,7 +958,8 @@ import XCTest
         XCTAssertTrue(settings.waitForExistence(timeout: 20), app.debugDescription)
         XCTAssertTrue(app.tabBars.buttons["الصلاة"].exists, "The M1 prayer screen is the first built room.")
         XCTAssertTrue(app.tabBars.buttons["القرآن"].exists, "M2 Quran home is now built.")
-        for room in ["المذكرات", "المال", "المحبرة"] {
+        XCTAssertTrue(app.tabBars.buttons["المذكرات"].exists, "M3 diary is built.")
+        for room in ["المال", "المحبرة"] {
             XCTAssertFalse(app.tabBars.buttons[room].exists, "Unbuilt rooms have no tab entry.")
         }
         let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "M0-iPhone17Pro-RTL-light-L"; shot.lifetime = .keepAlways; add(shot)
