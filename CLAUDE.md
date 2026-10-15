@@ -159,6 +159,8 @@ This replaces the 12 October working protocol. Product rules above are unchanged
 ### 6. Model, usage and failure
 
 - GPT-6 Luna max may write production code. Escalate a narrow problem to Sol only after two evidence-based repairs fail, or for an unresolved rule conflict.
+- **Money (M5) gets our full strength — owner, 15 October 2026.** The owner sees money as the hardest room. Before its first card, read §7.5 (mal), §8 money definitions, the money data dictionary and every mal fix item end to end, and write the money engine with golden fixtures for every number before any screen. Use the strongest model and effort available for the money engine and its data model (Codex: Sol at its highest effort; Claude: the session's model at its highest effort). Every money number has one definition (§8), `Int` minor units, and a test from the spec.
+- **Continuous improvement is the principle — owner, 15 October 2026.** Nothing built is final. Every session, after its cards, spends a share of its time going back to an earlier room and making it clearly better (the «Go deeper and improve» rule above), with a DECISIONS row and before/after screenshots.
 - Usage: stop starting new work near 95% of the five-hour allowance, and keep a 3–5% reserve for the commit and handover. Never invent a usage number; say "not exposed".
 - When something fails: diagnose once, try at most two evidence-based repairs, then record the blocker in the card and move on. Never mark a failed or unrun check as passed.
 
