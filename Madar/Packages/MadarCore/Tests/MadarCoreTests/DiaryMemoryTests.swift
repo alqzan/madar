@@ -38,4 +38,14 @@ struct DiaryMemoryTests {
         let shifted = DiaryMemories.select(days: [old], today: try day("2025-03-29"), match: .hijri, zone: zone, hijriSource: .sighting, sightingOffset: -2)
         #expect(shifted.days.isEmpty)
     }
+    @Test func fixedEchoesUseCalendarDistancesAndActualDays() throws {
+        let rows = try [memory("2026-10-07"), memory("2026-10-09"), memory("2026-09-16"), memory("2026-07-15"), memory("2026-04-15"), memory("2025-10-15"), memory("2024-10-15", hidden: true), memory("2023-10-15", dayOne: true)]
+        let result = DiaryMemories.echoes(days: rows, today: try day("2026-10-15"), includeDayOne: false, zone: zone)
+        #expect(result.map(\.distance.rawValue) == ["1w", "1m", "3m", "6m", "1y", "2y", "3y"])
+        #expect(result.map { $0.day?.description } == ["2026-10-07", "2026-09-16", "2026-07-15", "2026-04-15", "2025-10-15", nil, nil])
+        #expect(result[1].target == (try day("2026-09-15")))
+        let leap = DiaryMemories.echoes(days: [], today: try day("2024-03-31"), zone: zone)
+        #expect(leap[1].target == (try day("2024-02-29")))
+    }
+
 }

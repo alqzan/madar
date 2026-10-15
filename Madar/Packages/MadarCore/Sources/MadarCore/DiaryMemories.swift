@@ -16,8 +16,37 @@ public struct DiaryMemorySelection: Equatable, Sendable {
     public let match: DiaryMemoryMatch
 }
 
+public enum DiaryEchoDistance: String, CaseIterable, Sendable {
+    case week = "1w", month = "1m", threeMonths = "3m", sixMonths = "6m", year = "1y", twoYears = "2y", threeYears = "3y"
+    public var title: String {
+        switch self { case .week: "أسبوع"; case .month: "شهر"; case .threeMonths: "٣ أشهر"; case .sixMonths: "٦ أشهر"; case .year: "سنة"; case .twoYears: "سنتان"; case .threeYears: "٣ سنوات" }
+    }
+    var component: Calendar.Component { switch self { case .week: .day; case .month, .threeMonths, .sixMonths: .month; default: .year } }
+    var amount: Int { switch self { case .week: 7; case .month, .year: 1; case .threeMonths, .threeYears: 3; case .sixMonths: 6; case .twoYears: 2 } }
+}
+public struct DiaryEcho: Equatable, Sendable {
+    public let distance: DiaryEchoDistance
+    public let target: GregorianDay
+    public let day: GregorianDay?
+}
+
 /// N03: selection changes presentation only. Every candidate retains its original stored day.
 public enum DiaryMemories {
+    /// The seven v1 distances are fixed (RA8). Nearby matches always keep the actual stored date.
+    public static func echoes(days: [DiaryMemoryDay], today: GregorianDay, includeDayOne: Bool = true, zone: TimeZone) -> [DiaryEcho] {
+        let candidates = Set(days.filter { $0.day < today && !$0.hidden && ($0.hasWriting || $0.hasPhoto) && (includeDayOne || !$0.dayOne) }.map(\.day))
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = zone
+        return DiaryEchoDistance.allCases.compactMap { distance in
+            guard let date = calendar.date(byAdding: distance.component, value: -distance.amount, to: today.date(in: zone)) else { return nil }
+            let target = GregorianDay.containing(date, in: zone)
+            let nearest = candidates.compactMap { day -> (GregorianDay, Int)? in
+                let gap = abs(calendar.dateComponents([.day], from: target.date(in: zone), to: day.date(in: zone)).day ?? Int.max)
+                return gap <= 3 ? (day, gap) : nil
+            }.sorted { $0.1 == $1.1 ? $0.0 < $1.0 : $0.1 < $1.1 }.first?.0
+            return .init(distance: distance, target: target, day: nearest)
+        }
+    }
+
     public static func select(days: [DiaryMemoryDay], today: GregorianDay, match: FirstCalendar = .gregorian,
                               includeDayOne: Bool = true, yearsBack: Int? = nil, noMemory: String = "nearestEcho",
                               zone: TimeZone, hijriSource: HijriSource = .ummAlQura, sightingOffset: Int = 0) -> DiaryMemorySelection {

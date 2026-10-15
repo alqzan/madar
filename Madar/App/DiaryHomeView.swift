@@ -3,7 +3,7 @@ import UIKit
 import MadarCore
 import MadarDesign
 
-private enum DiaryType {
+enum DiaryType {
     static let title = Font.custom("thmanyahserifdisplay-Bold", size: 28, relativeTo: .largeTitle)
     static let heading = Font.custom("thmanyahserifdisplay-Bold", size: 21, relativeTo: .title2)
     static let writing = Font.custom("thmanyahseriftext-Regular", size: 19, relativeTo: .body)
@@ -47,6 +47,10 @@ struct DiaryHomeView: View {
             ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 if let snapshot {
+                    if app.string("notes.homeShape") == "echoes" {
+                        DiaryEchoesView(snapshot: snapshot, service: service, open: { reader = $0 })
+                        if !hidden("days") { recentDays(snapshot) }
+                    } else {
                     HStack {
                         Text(snapshot.selection.match == .echo ? "أقرب صدى" : "في مثل هذا اليوم").font(DiaryType.heading)
                         Spacer()
@@ -63,6 +67,7 @@ struct DiaryHomeView: View {
                         case "days": if !hidden(block) { recentDays(snapshot) }
                         default: EmptyView()
                         }
+                    }
                     }
                 } else if let failure { Text(failure).font(DiaryType.writing) }
                 else { ProgressView("تُفتح صفحتك…") }
@@ -146,7 +151,7 @@ struct DiaryHomeView: View {
                 }
                 Spacer(minLength: 90)
                 HStack(spacing: 8) {
-                    Text(snapshot.selection.days.isEmpty ? "صفحتك الأولى" : distance(page.day, snapshot.today)).font(DiaryType.label)
+                    Text(snapshot.selection.days.isEmpty ? "صفحتك الأولى" : service.distance(page.day, snapshot.today)).font(DiaryType.label)
                         .padding(.horizontal, 9).padding(.vertical, 4).background(hasPhoto ? Color.black.opacity(0.3) : theme.background, in: .capsule)
                     Text(service.weekday(page.day)).font(DiaryType.label)
                 }
@@ -239,21 +244,12 @@ struct DiaryHomeView: View {
     private var blocks: [String] { app.values["notes.layout"]?.object?["blocks"]?.array?.compactMap(\.string) ?? ["memory", "thatDay", "sinceThatDay", "days"] }
     private func hidden(_ block: String) -> Bool { app.values["notes.layout"]?.object?["hidden"]?.array?.contains(.string(block)) == true }
     private func yearTitle(_ day: GregorianDay, snapshot: DiaryHomeSnapshot) -> String { String(service.dateTitle(day, calendar: snapshot.selection.match == .hijri ? .hijri : .gregorian).split(separator: " ").last ?? "") }
-    private func distance(_ day: GregorianDay, _ today: GregorianDay) -> String {
-        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = app.activePlace.timeZone
-        let parts = calendar.dateComponents([.year, .month, .day], from: day.date(in: app.activePlace.timeZone), to: today.date(in: app.activePlace.timeZone))
-        func unit(_ count: Int, _ one: String, _ two: String, _ few: String, _ many: String) -> String? {
-            guard count > 0 else { return nil }
-            if count == 1 { return one }; if count == 2 { return two }
-            return service.digits.string(count) + " " + ((3...10).contains(count % 100) ? few : many)
-        }
-        let values = [unit(parts.year ?? 0, "سنة", "سنتين", "سنوات", "سنة"), unit(parts.month ?? 0, "شهر", "شهرين", "أشهر", "شهر"), unit(parts.day ?? 0, "يوم", "يومين", "أيام", "يوم")].compactMap { $0 }
-        return values.isEmpty ? "اليوم" : "قبل " + values.joined(separator: " و")
-    }
     private func refresh() async {
         do {
             var value = try service.home(match: match)
-            if let first = selected ?? value.selection.days.first { try await service.prepareClosedDay(first); value = try service.home(match: match) }
+            let displayed = app.string("notes.homeShape") == "echoes" ? value.echoes.compactMap(\.day) : [selected ?? value.selection.days.first].compactMap { $0 }
+            for day in Set(displayed) { try await service.prepareClosedDay(day) }
+            value = try service.home(match: match)
             snapshot = value; failure = nil
         } catch { failure = error.localizedDescription }
     }

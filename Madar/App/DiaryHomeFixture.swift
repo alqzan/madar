@@ -8,7 +8,7 @@ import MadarData
 extension AppSession {
     func prepareDiaryHomeFixture(group: URL) throws {
         let env = ProcessInfo.processInfo.environment
-        guard let variant = env["MADAR_UI_DIARY_FIXTURE"], ["home", "empty"].contains(variant), let id = env["MADAR_UI_STORE_ID"],
+        guard let variant = env["MADAR_UI_DIARY_FIXTURE"], ["home", "empty", "echoes", "margin"].contains(variant), let id = env["MADAR_UI_STORE_ID"],
               group.lastPathComponent == id, group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         selectedTab = "notes"
         let context = ModelContext(container)
@@ -16,7 +16,8 @@ extension AppSession {
         let settings = try SettingsStore(context: context)
         _ = try settings.stage(["core.faceIDLock": .string("none"), "core.dayStart": .string("midnight")])
         for key in ["sys.onboardingCompleted", "sys.diaryFixture"] { let row = DeviceSetting(); row.key = key; row.valueJSON = Data("true".utf8); context.insert(row) }
-        if variant == "home" {
+        if variant == "echoes" || variant == "margin" { _ = try settings.stage(["notes.homeShape": .string(variant)]) }
+        if variant != "empty" {
             let today = GregorianDay.containing(prayerUITestClock(.now), in: .riyadh)
             func append(_ day: GregorianDay, _ text: String, hour: Int, imported: Bool = false) {
                 let row = Entry(); row.dayKey = day.description; row.text = text; row.eventAt = day.date(in: .riyadh).addingTimeInterval(Double(hour) * 3600)
@@ -36,6 +37,14 @@ extension AppSession {
             for n in 1...5 {
                 let day = today.adding(days: -n), page = DayPage(); page.dayKey = day.description; context.insert(page)
                 append(day, ["دوام طويل. وصلت البيت قبل العشاء بدقائق.", "مشيت بعد المغرب، والجو صار يحتمل.", "اتصلت على خالي، وطال الحديث.", "صمت. الإفطار عند أخي.", "بداية أسبوع هادئة."][n-1], hour: 18)
+            }
+            if variant == "echoes" {
+                for (n, offset) in [7, 30, 92, 183].enumerated() {
+                    let day = today.adding(days: -offset), page = DayPage(); page.dayKey = day.description
+                    let media = Media(); media.kind = "photo"; media.contentType = "image/jpeg"; media.data = Self.diaryFixturePhoto(variant: n+1); media.sizeBytes = media.data?.count ?? 0
+                    context.insert(media); page.photoMediaID = media.id; context.insert(page)
+                    append(day, ["جلست بعد الفجر حتى الشروق.", "قهوة وحديث طويل مع أخي.", "قرأت ثم مشيت قليلًا.", "يوم هادئ جمعنا في البيت."][n], hour: 18)
+                }
             }
             append(today, "ما زال في اليوم متّسع.", hour: 12)
         }

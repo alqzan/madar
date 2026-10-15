@@ -20,6 +20,7 @@ struct DiaryHomeSnapshot {
     let today: GregorianDay
     let selection: DiaryMemorySelection
     let days: [DiaryDisplayDay]
+    let echoes: [DiaryEcho]
     let todayPage: DiaryDisplayDay
 }
 
@@ -67,8 +68,9 @@ struct DiaryHomeSnapshot {
             noMemory: app.string("notes.noMemory"), zone: app.activePlace.timeZone,
             hijriSource: HijriSource(rawValue: app.string("core.hijriSource")) ?? .ummAlQura, sightingOffset: Int(app.number("core.hijriOffset")))
         let recent = facts.map(\.day).filter { $0 < today }.sorted(by: >).prefix(5)
-        let visible = Set(selection.days + Array(recent))
-        return try .init(today: today, selection: selection, days: visible.sorted(by: >).map { try self.day($0) }, todayPage: day(today))
+        let echoes = DiaryMemories.echoes(days: facts, today: today, includeDayOne: app.bool("notes.includeDayOne"), zone: app.activePlace.timeZone)
+        let visible = Set(selection.days + Array(recent) + echoes.compactMap(\.day))
+        return try .init(today: today, selection: selection, days: visible.sorted(by: >).map { try self.day($0) }, echoes: echoes, todayPage: day(today))
     }
     func day(_ day: GregorianDay) throws -> DiaryDisplayDay {
         try authorizeRead()
@@ -157,4 +159,16 @@ struct DiaryHomeSnapshot {
         }
         return result
     }
+    func distance(_ day: GregorianDay, _ today: GregorianDay) -> String {
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = app.activePlace.timeZone
+        let parts = calendar.dateComponents([.year, .month, .day], from: day.date(in: app.activePlace.timeZone), to: today.date(in: app.activePlace.timeZone))
+        func unit(_ count: Int, _ one: String, _ two: String, _ few: String, _ many: String) -> String? {
+            guard count > 0 else { return nil }
+            if count == 1 { return one }; if count == 2 { return two }
+            return digits.string(count) + " " + ((3...10).contains(count % 100) ? few : many)
+        }
+        let values = [unit(parts.year ?? 0, "سنة", "سنتين", "سنوات", "سنة"), unit(parts.month ?? 0, "شهر", "شهرين", "أشهر", "شهر"), unit(parts.day ?? 0, "يوم", "يومين", "أيام", "يوم")].compactMap { $0 }
+        return values.isEmpty ? "اليوم" : "قبل " + values.joined(separator: " و")
+    }
+
 }
