@@ -28,14 +28,14 @@ extension AppDiaryService {
         let context=ModelContext(app.container),repository=try PrayerRepository(context:context)
         let boundary=DayBoundary(rawValue:app.string("core.dayStart")) ?? .fajr
         let rows=try context.fetch(FetchDescriptor<Trip>(predicate:#Predicate{$0.deletedAt==nil && $0.mergedInto==nil && !$0.dismissed}))
-        func key(_ instant:Date,_ place:ActivePlace) throws -> GregorianDay {
+        func key(_ instant:Date,_ place:ActivePlace,_ options:PrayerCalculationOptions) throws -> GregorianDay {
             let civil=GregorianDay.containing(instant,in:place.timeZone)
-            let days=[civil.adding(days:-1),civil].compactMap{PrayerTimesEngine.calculate(day:$0,place:place,options:repository.tripOptions)}
+            let days=[civil.adding(days:-1),civil].compactMap{PrayerTimesEngine.calculate(day:$0,place:place,options:options)}
             return try MadarDay.resolve(instant:instant,place:place,boundary:boundary,prayerDays:days).date
         }
         let spans:[(Trip,DiaryTravelSpan)]=try rows.compactMap{row in
             guard let start=row.start,let place=try? ActivePlace(latitude:row.lat,longitude:row.lon,timeZoneID:row.tzID) else{return nil}
-            return (row,.init(id:row.id,city:row.city,arrival:try key(start,place),departure:try row.end.map{try key($0,repository.home)}))
+            return (row,.init(id:row.id,city:row.city,arrival:try key(start,place,repository.tripOptions),departure:try row.end.map{try key($0,repository.home,repository.options)}))
         }
         return (repository,spans)
     }

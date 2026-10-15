@@ -134,7 +134,7 @@ No ready screen card remains in the M2 queue; owner accepted the completed scree
 ## Handover — Review + M3-V15 travel diary — 2026-10-15 — Claude
 Works now: travel today page on the shared Trip (air-mail head, distance, stamp, day ordinal, drawn route, passport stamp, «اكتب من [المدينة]», stamps sheet). Review fixes: RU1 script no longer flags comments; diary search trip window is now [start, end).
 Verified: package suites Core 43+4, Prayer 25, Quran 76, Data 63, Commands 44, Snapshots 9, Inbox 17 passed; baseline app build succeeded; `xcodebuild … test` DiaryTravelIntegration 1/1, DiarySearchIntegration 1/1, DiaryTravelUI 1/1, DiarySeasonUI 2/2, DiaryTodayUI 2/2; RU1 check and git diff --check pass.
-Differences left: back button shows chevron only (shared nav style); subtitle follows core.firstCalendar (Hijri) where canonical shows Gregorian; no trip name/total days/return date (no data).
+Differences left: back button shows chevron only (shared nav style); passport stamp stays fixed over the scrolling paper; subtitle follows core.firstCalendar (Hijri) where canonical shows Gregorian; no trip name/total days/return date (no data).
 Not verified: owner visual/iPhone; dark travel paper not screenshotted; return envelope and calendar travel days not built.
 Next: M3-F01 letters/projects and revision preservation. Codex automation was set for 2026-10-16 00:17; V15 is done, start at F01.
 Model/effort: Claude Opus 5.5; effort not exposed. Usage: not exposed.

@@ -9,7 +9,9 @@ import MadarData
     func testTripZoneStampsWritesAndDiaryReadsTheSharedTrip() async throws {
         let root=FileManager.default.temporaryDirectory.appending(path:"DiaryTravel-\(UUID())");defer{try? FileManager.default.removeItem(at:root)}
         let container=try MadarContainerFactory.makeLocal(at:root.appending(path:"Data")),app=try AppSession(container:container,groupDirectory:root)
-        app.authorizeProtectedData();let context=ModelContext(container),start=Date().addingTimeInterval(-2*3600)
+        app.authorizeProtectedData();try await app.applySettingsAndWait(["core.dayStart":.string("midnight")])
+        // Arrive one minute after Tokyo midnight so the stored arrival day is today's Tokyo day whatever the wall clock.
+        let tokyo=TimeZone(identifier:"Asia/Tokyo")!,context=ModelContext(container),start=GregorianDay.containing(Date(),in:tokyo).date(in:tokyo).addingTimeInterval(60)
         let trip=Trip();trip.city="طوكيو";trip.lat=35.6762;trip.lon=139.6503;trip.tzID="Asia/Tokyo";trip.mode="manual";trip.start=start;context.insert(trip);try context.save()
         let service=AppDiaryService(app:app,clock:{Date()})
         try await app.executeDiaryCommand("diary.appendLine",payload:["text":.string("كتبت من طوكيو"),"day":.string("today")])

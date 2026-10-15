@@ -24,6 +24,7 @@ struct DiaryTravelHeader: View {
     let distance: String
     let digits: MadarNumberFormatter
     @Environment(\.roomTheme) private var theme
+    @Environment(\.dynamicTypeSize) private var typeSize
     var body: some View {
         VStack(spacing: 0) {
             DiaryAirmailStripe()
@@ -35,7 +36,9 @@ struct DiaryTravelHeader: View {
                     Label(distance + " كم عن " + page.homeName, systemImage: "mappin")
                         .font(DiaryType.label).foregroundStyle(theme.color("ink2")).accessibilityIdentifier("diary-travel-distance")
                 }
-                HStack(alignment: .top, spacing: 12) {
+                // From AX1 the stamp stacks under the title and the drawn route becomes plain lines.
+                let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12)) : AnyLayout(HStackLayout(alignment: .top, spacing: 12))
+                layout {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("من: " + page.city + " · إلى: مذكراتي").font(DiaryType.label).foregroundStyle(theme.color("ink2"))
                         Text("اليوم " + (DiaryTravelCalendar.ordinal(page.number) ?? digits.string(page.number)))
@@ -44,7 +47,15 @@ struct DiaryTravelHeader: View {
                     }.frame(maxWidth: .infinity, alignment: .leading)
                     DiaryCityStamp(city: page.city).rotationEffect(.degrees(-4))
                 }
-                DiaryTravelRoute(page: page).frame(height: 150).padding(.top, 8)
+                if typeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("من " + page.homeName + " إلى " + page.city)
+                        if page.current { Text("أنت هنا الآن") }
+                        Text(page.returned ? "العودة تمّت" : "العودة لم تأتِ بعد")
+                    }.font(MadarTypography.body()).foregroundStyle(theme.color("ink2")).accessibilityIdentifier("diary-travel-route-list")
+                } else {
+                    DiaryTravelRoute(page: page).frame(height: 150).padding(.top, 8)
+                }
             }.padding(.horizontal, 18).padding(.vertical, 14)
             DiaryAirmailStripe()
         }.accessibilityElement(children: .contain).accessibilityIdentifier("diary-travel")
