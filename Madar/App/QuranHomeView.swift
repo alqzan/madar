@@ -13,6 +13,7 @@ struct QuranHomeView: View {
     @State private var active: QuranUISessionState?
     @State private var busy = false
     @State private var showDayClose = false
+    @State private var showMushaf = false
     private enum HomeDetail: Identifiable {
         case step(QuranUIStep), hadith
         var id: String { switch self { case .step(let step): "step-" + step.id; case .hadith: "hadith" } }
@@ -43,6 +44,11 @@ struct QuranHomeView: View {
                     }
                     path(state)
                     log(state)
+                    card {
+                        Button { showMushaf = true } label: {
+                            Label("المصحف", systemImage: "book").font(bodyFont(15, bold: true)).frame(maxWidth: .infinity, minHeight: 44)
+                        }.buttonStyle(.plain).accessibilityIdentifier("quran-tool-mushaf")
+                    }
                 }.padding(.horizontal, 16).padding(.top, 20).padding(.bottom, 36)
             } else if let error {
                 VStack(spacing: 16) { Text(error); Button("حاول مرة أخرى") { run { try await refresh() } } }
@@ -85,6 +91,10 @@ struct QuranHomeView: View {
         }
         .fullScreenCover(isPresented: $showDayClose, onDismiss: { run { try await refresh() } }) {
             QuranDayCloseView(service: service, close: { showDayClose = false })
+                .environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft)
+        }
+        .fullScreenCover(isPresented: $showMushaf) {
+            QuranMushafView(service: service, initialPage: state?.steps.first(where: { $0.kind == .hifz })?.range?.fromPage ?? 1, close: { showMushaf = false })
                 .environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft)
         }
         .alert("تعذّر إتمام العملية", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) { Button("تمّ") { error = nil } } message: { Text(error ?? "") }

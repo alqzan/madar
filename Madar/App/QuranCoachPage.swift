@@ -12,6 +12,7 @@ struct QuranCoachPage: View {
     let reveal: (Int) -> Void
     /// Long press on a hidden word records a slip on that exact word (§7.4 MistakeEvent.wordIndex).
     var markWord: ((Int, Int) -> Void)? = nil
+    var readingTap: (() -> Void)? = nil
     @Environment(\.roomTheme) private var theme
     var body: some View {
         VStack(spacing: 4) {
@@ -31,7 +32,7 @@ struct QuranCoachPage: View {
                         .blur(radius: 3.5).opacity(0.28).padding(.horizontal, 8).padding(.vertical, 4)
                         .allowsHitTesting(false).accessibilityHidden(true)
                 }
-                QuranCoachTextCanvas(page: page, coach: coach, stage: stage, ink: UIColor(theme.color("mushafInk")), tint: UIColor(theme.color("hifzTint")), reveal: reveal, markWord: markWord, mark: UIColor(theme.color("due")), sealInk: UIColor(theme.color("hifzText")), sealTint: UIColor(theme.color("reviewTint")))
+                QuranCoachTextCanvas(page: page, coach: coach, stage: stage, ink: UIColor(theme.color("mushafInk")), tint: UIColor(theme.color("hifzTint")), reveal: reveal, markWord: markWord, readingTap: readingTap, mark: UIColor(theme.color("due")), sealInk: UIColor(theme.color("hifzText")), sealTint: UIColor(theme.color("reviewTint")))
                     .padding(.horizontal, 8).padding(.vertical, 4).accessibilityHidden(true)
             }
             .accessibilityRepresentation {
@@ -59,13 +60,14 @@ private struct QuranCoachTextCanvas: UIViewRepresentable {
     let tint: UIColor
     let reveal: (Int) -> Void
     var markWord: ((Int, Int) -> Void)? = nil
+    var readingTap: (() -> Void)? = nil
     var mark: UIColor = .red
     var blurredWordsOnly = false
     var sealInk: UIColor = .black
     var sealTint: UIColor = .clear
     func makeUIView(context: Context) -> QuranCoachTextView { QuranCoachTextView() }
     func updateUIView(_ view: QuranCoachTextView, context: Context) {
-        view.page = page; view.coach = coach; view.stage = stage; view.ink = ink; view.tint = tint; view.reveal = reveal; view.markWord = markWord; view.mark = mark; view.blurredWordsOnly = blurredWordsOnly; view.sealInk = sealInk; view.sealTint = sealTint
+        view.page = page; view.coach = coach; view.stage = stage; view.ink = ink; view.tint = tint; view.reveal = reveal; view.markWord = markWord; view.readingTap = readingTap; view.mark = mark; view.blurredWordsOnly = blurredWordsOnly; view.sealInk = sealInk; view.sealTint = sealTint
         view.setNeedsDisplay()
     }
 }
@@ -78,6 +80,7 @@ private final class QuranCoachTextView: UIView {
     var tint = UIColor.clear
     var reveal: ((Int) -> Void)?
     var markWord: ((Int, Int) -> Void)?
+    var readingTap: (() -> Void)?
     var mark = UIColor.red
     var blurredWordsOnly = false
     var sealInk = UIColor.black
@@ -204,6 +207,7 @@ private final class QuranCoachTextView: UIView {
         CTLineDraw(line, context); context.restoreGState()
     }
     @objc private func tap(_ gesture: UITapGestureRecognizer) {
+        if let readingTap { readingTap(); return }
         guard let coach, stage != .grading, !coach.bridge else { return }
         let point = gesture.location(in: self)
         if let id = hits.first(where: { $0.0.contains(point) })?.1, coach.plannedAyahs.contains(id) { reveal?(id) }
