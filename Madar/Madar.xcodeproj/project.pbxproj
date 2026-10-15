@@ -185,6 +185,7 @@
 		D42D965F67207DA336C2B9FD /* AppQuranService+History.swift in Sources */ = {isa = PBXBuildFile; fileRef = 536586BCDBC61C002DDD0579 /* AppQuranService+History.swift */; };
 		D54A04C289C8A41C4DF864F3 /* DiaryYearbookView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48E43B1113B23E0C3CB98D51 /* DiaryYearbookView.swift */; };
 		D5ECFF4CA89A7D774FE1B8DA /* DiaryTodayUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F2989DAFF327646B3C614EA /* DiaryTodayUITests.swift */; };
+		D91DBE0F03F464917FAFC5C2 /* BahwCustomizeUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2D9411E8F26C40A825042E7 /* BahwCustomizeUITests.swift */; };
 		DA23D00C67DC70824DF82D13 /* FoundationUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE67096C4A1239F83DCD8EF6 /* FoundationUITests.swift */; };
 		DBEA06252F77587FD33FCD01 /* AppQuranService+Strength.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE46D844F82E2405427C712B /* AppQuranService+Strength.swift */; };
 		DC2B4184D75AEF4CD8E6B86F /* thmanyahsans-Medium.otf in Resources */ = {isa = PBXBuildFile; fileRef = 5DFE82C4D216FC9A003ED7A2 /* thmanyahsans-Medium.otf */; };
@@ -218,6 +219,7 @@
 		FB37D97402D47D39F8E8E923 /* DiaryTravelViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38883E3D82A6980302E28CAA /* DiaryTravelViews.swift */; };
 		FD4667401CF79F84F60037C7 /* StartPrayerActivityIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8E97AEF232F2E84BCBB4F00 /* StartPrayerActivityIntent.swift */; };
 		FDB0548480EAB2464847CF8A /* DiaryExportUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEC512B2A14C24C781301195 /* DiaryExportUITests.swift */; };
+		FF96CFADCF4C0757B4085CC0 /* BahwCustomizeParts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20304C3F7DCC7BAAB0C5632E /* BahwCustomizeParts.swift */; };
 		FFBDD80B72B60213D08D2685 /* DiaryEditorUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C9F3310DE33902199BFE97A /* DiaryEditorUITests.swift */; };
 /* End PBXBuildFile section */
 
@@ -278,6 +280,7 @@
 		1D4DECF86A1E7DCEBC1D6ADF /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		1D5244CCC79BF2B66C486F51 /* AppSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSession.swift; sourceTree = "<group>"; };
 		1F9E40A347AD27478E3FA224 /* thmanyahseriftext-Regular.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "thmanyahseriftext-Regular.otf"; sourceTree = "<group>"; };
+		20304C3F7DCC7BAAB0C5632E /* BahwCustomizeParts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BahwCustomizeParts.swift; sourceTree = "<group>"; };
 		2234F4C1215CD275CE96CFAD /* DiaryCustomizeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryCustomizeView.swift; sourceTree = "<group>"; };
 		22667A11D78A7887B0C70B39 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		2293299667730AD8A0496EBC /* MadarCommands */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MadarCommands; path = Packages/MadarCommands; sourceTree = SOURCE_ROOT; };
@@ -406,6 +409,7 @@
 		C105008888548BF995BA7B6D /* AppServiceIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppServiceIntegrationTests.swift; sourceTree = "<group>"; };
 		C1541C81F328C40D5A683888 /* PrayerRoom.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrayerRoom.swift; sourceTree = "<group>"; };
 		C18FA90A451CFAAC47F6E3A7 /* DiaryRevisionIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryRevisionIntegrationTests.swift; sourceTree = "<group>"; };
+		C2D9411E8F26C40A825042E7 /* BahwCustomizeUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BahwCustomizeUITests.swift; sourceTree = "<group>"; };
 		C465C55A47592A6081EE8186 /* PrayerLogControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrayerLogControl.swift; sourceTree = "<group>"; };
 		C63BADA5C6BD423F06356E09 /* CustomizationCopyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomizationCopyTests.swift; sourceTree = "<group>"; };
 		C6661268F5C60E85AA211014 /* thmanyahserifdisplay-Bold.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "thmanyahserifdisplay-Bold.otf"; sourceTree = "<group>"; };
@@ -568,6 +572,7 @@
 				7253DB8148176A664FA3CF89 /* AppSyncService.swift */,
 				30548ADF1D2BBABB66489408 /* BackupSettingsView.swift */,
 				9FC02C42FB7004B6F30B7052 /* BahwBlocks.swift */,
+				20304C3F7DCC7BAAB0C5632E /* BahwCustomizeParts.swift */,
 				60F1C857764292ABD2F14C47 /* BahwLobbyView.swift */,
 				9586F680008485EF08F16C54 /* BahwYearView.swift */,
 				92023291C0FE69B0EBEF5B79 /* CityEditor.swift */,
@@ -662,6 +667,7 @@
 		6DAB36BB6DB887E468958868 /* UI */ = {
 			isa = PBXGroup;
 			children = (
+				C2D9411E8F26C40A825042E7 /* BahwCustomizeUITests.swift */,
 				638BDCBA5000C51E47C80BDA /* BahwLobbyUITests.swift */,
 				9B031AA8A32A509374B4BC38 /* BahwYearUITests.swift */,
 				156373CD20DDBC2829A5AED5 /* DiaryCustomizeUITests.swift */,
@@ -1020,6 +1026,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D91DBE0F03F464917FAFC5C2 /* BahwCustomizeUITests.swift in Sources */,
 				5CEB91C12B25B51E04B5BB09 /* BahwLobbyUITests.swift in Sources */,
 				A44A6C744C7BCFAA082D426D /* BahwYearUITests.swift in Sources */,
 				E39098AF2817AAE1C9916E34 /* DiaryCustomizeUITests.swift in Sources */,
@@ -1093,6 +1100,7 @@
 				847CAFBC8C0A856177DA1BD1 /* AppSyncService.swift in Sources */,
 				2708B599D4DE94431189E7AA /* BackupSettingsView.swift in Sources */,
 				6C20B5F11059503EA5B4876E /* BahwBlocks.swift in Sources */,
+				FF96CFADCF4C0757B4085CC0 /* BahwCustomizeParts.swift in Sources */,
 				69E3D00BAA054BFFC4E07EE5 /* BahwLobbyView.swift in Sources */,
 				1F6725D4AA749A526B4DE664 /* BahwYearView.swift in Sources */,
 				BF23E89931E07B6BC749034D /* CityEditor.swift in Sources */,

@@ -186,7 +186,7 @@ struct BahwBlockView: View {
 
     // MARK: upcoming
     @ViewBuilder private var upcoming: some View {
-        let items = service.upcoming(limit: size == .small ? 3 : 4)
+        let items = service.upcoming(limit: size == .small ? 3 : size == .large ? max(4, Int(service.session.number("bahw.upcomingCount"))) : 4)
         if size == .icon, let first = items.first {
             ring(first, diameter: 54).frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if size == .small, let first = items.first {
@@ -199,7 +199,7 @@ struct BahwBlockView: View {
             VStack(alignment: .leading, spacing: 10) {
                 HStack { title(lobby.accent); Spacer(); Text("كم بقي، بالأيام").font(small).foregroundStyle(lobby.secondaryInk) }
                 HStack(alignment: .top, spacing: 6) {
-                    ForEach(items) { item in
+                    ForEach(items.prefix(4)) { item in
                         VStack(spacing: 6) {
                             ring(item, diameter: 64)
                             Text(item.title).font(label).lineLimit(1).minimumScaleFactor(0.75)
@@ -207,6 +207,11 @@ struct BahwBlockView: View {
                         }.frame(maxWidth: .infinity).accessibilityElement(children: .ignore)
                             .accessibilityLabel(item.title + " بعد " + digits.string(item.daysLeft) + " " + service.dayCount(item.daysLeft)).accessibilityIdentifier("bahw-upcoming-item")
                     }
+                }
+                // Large: the rest of `bahw.upcomingCount` as lines.
+                ForEach(items.dropFirst(4)) { item in
+                    HStack { Text(item.title).font(label); Spacer(); Text(digits.string(item.daysLeft) + " " + service.dayCount(item.daysLeft)).font(small).foregroundStyle(lobby.secondaryInk) }
+                        .accessibilityElement(children: .combine).accessibilityIdentifier("bahw-upcoming-item")
                 }
             }
         }

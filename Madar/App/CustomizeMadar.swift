@@ -11,39 +11,9 @@ struct CustomizeMadar: View {
     @Environment(\.dynamicTypeSize) private var dynamicType
     var body: some View {
         CustomizationTemplate(title: "خصّص مدار", subtitle: "كل تعديل يُحفظ وحده") {
-            MadarCard {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("نموذج حيّ").font(MadarTypography.fine()).foregroundStyle(theme.accent)
-                    Text("مدار كما سيظهر").font(MadarTypography.cardTitle())
-                    if dynamicType.isAccessibilitySize {
-                        VStack(alignment: .leading, spacing: 16) {
-                            previewLine("اليوم يبدأ", value: valueLabel("core.dayStart"))
-                            previewLine("التقويم الأول", value: valueLabel("core.firstCalendar"))
-                            Label(session.cityName, systemImage: "circle.hexagongrid").font(MadarTypography.caption())
-                        }
-                    } else { HStack {
-                        VStack(alignment: .leading, spacing: 8) {
-                            previewLine("اليوم يبدأ", value: valueLabel("core.dayStart"))
-                            previewLine("التقويم الأول", value: valueLabel("core.firstCalendar"))
-                        }
-                        Spacer(minLength: 8)
-                        VStack(spacing: 10) {
-                            Image(systemName: "circle.hexagongrid").font(.system(size: 38)).foregroundStyle(theme.accent)
-                            Text(session.cityName).font(MadarTypography.caption())
-                        }.padding(16).background(theme.background, in: .rect(cornerRadius: 24))
-                    } }
-                    if dynamicType.isAccessibilitySize {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(changesLabel).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("customization-changes")
-                            Button("أعِد الافتراضي") { confirmReset = true }.frame(minHeight: 44).accessibilityIdentifier("reset-settings")
-                        }
-                    } else { HStack {
-                        Text(changesLabel).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("customization-changes")
-                        Spacer()
-                        Button("أعِد الافتراضي") { confirmReset = true }.frame(minHeight: 44).accessibilityIdentifier("reset-settings")
-                    } }
-                }
-            }
+            // M4-V04: the live model is the lobby itself (05-W4-Takhsis).
+            // While searching, results come first; the model returns when the search is cleared.
+            if query.isEmpty { BahwCustomizePreview(session: session, changes: changesLabel) { confirmReset = true } }
         } content: {
             VStack(spacing: 16) {
                 HStack {
@@ -51,6 +21,7 @@ struct CustomizeMadar: View {
                     TextField("ابحث في إعدادات مدار…", text: $session.settingsQuery).accessibilityIdentifier("settings-search")
                         .submitLabel(.search)
                 }.padding(16).background(theme.surface, in: .capsule)
+                if query.isEmpty || normalized("الودجات وأحجامها البهو الكتل").contains(normalized(query)) { BahwBlocksSection(session: session) }
                 if filtered.isEmpty {
                     ContentUnavailableView.search(text: query)
                 } else {
@@ -83,7 +54,7 @@ struct CustomizeMadar: View {
         }
         .toolbarVisibility(.hidden, for: .navigationBar)
         .confirmationDialog("أعِد الإعدادات المتفق عليها؟", isPresented: $confirmReset, titleVisibility: .visible) {
-            Button("أعِد الافتراضي", role: .destructive) { session.reset(AppSession.supportedKeys) }
+            Button("أعِد الافتراضي", role: .destructive) { session.reset(AppSession.supportedKeys + ["bahw.layout"]) }
         } message: { Text("يعود الشكل والترتيب والإعدادات. البيانات لا تُمسّ.") }
     }
     private var filtered: [SettingDefinition] {
@@ -94,10 +65,10 @@ struct CustomizeMadar: View {
             return query.isEmpty || normalized(definition.title + " " + sectionFor(definition.key) + " " + definition.key).contains(normalized(query))
         }
     }
-    private var sections: [String] { ["اليوم والتقويم", "المظهر", "مدينتك", "الخصوصية", "الإشعارات", "الصلاة", "المواقيت"].filter { section in filtered.contains { sectionFor($0.key) == section } } }
-    private let symbols = ["اليوم والتقويم": "calendar", "المظهر": "textformat", "مدينتك": "location", "الإشعارات": "bell.badge"]
+    private var sections: [String] { ["السنة", "الأيام القادمة", "اليوم والتقويم", "المظهر", "مدينتك", "الخصوصية", "الإشعارات", "الصلاة", "المواقيت"].filter { section in filtered.contains { sectionFor($0.key) == section } } }
+    private let symbols = ["السنة": "clock", "الأيام القادمة": "calendar.badge.clock", "اليوم والتقويم": "moon", "الصلاة": "building.columns", "المواقيت": "clock.arrow.circlepath", "الخصوصية": "lock", "المظهر": "paintpalette", "مدينتك": "location", "الإشعارات": "bell.badge"]
     private var changesLabel: String {
-        let count = session.schema.settings.filter { AppSession.supportedKeys.contains($0.key) && session.values[$0.key] != $0.defaultValue }.count
+        let count = session.schema.settings.filter { (AppSession.supportedKeys + ["bahw.layout"]).contains($0.key) && session.values[$0.key] != $0.defaultValue }.count
         return CustomizationCopy.changes(count: count, formattedCount: session.digits(count))
     }
     private func valueLabel(_ key: String) -> String {
@@ -116,6 +87,8 @@ struct CustomizeMadar: View {
 }
 
 func sectionFor(_ key: String) -> String {
+    if key == "bahw.yearWhich" { return "السنة" }
+    if key == "bahw.upcomingCount" { return "الأيام القادمة" }
     if ["core.dayStart", "core.firstCalendar", "core.hijriSource", "core.hijriOffset", "core.weekStart"].contains(key) { return "اليوم والتقويم" }
     if ["salah.method", "salah.asr", "salah.highLatitudeRule", "salah.offsets"].contains(key) { return "المواقيت" }
     if key == "core.homeCity" { return "مدينتك" }
@@ -136,8 +109,17 @@ struct SettingsSection: View {
     let definitions: [SettingDefinition]
     @Bindable var session: AppSession
     let searching: Bool
-    @State private var expanded = true
+    @State private var expanded = false
     @Environment(\.roomTheme) private var theme
+    /// The current choices, read from the values (05-W4-Takhsis-s1: «هجري أولًا، يبدأ اليوم من الفجر»).
+    private var summary: String {
+        definitions.prefix(3).compactMap { definition -> String? in
+            if let option = definition.options.first(where: { $0.value == session.values[definition.key] }) { return option.label }
+            if definition.type == "place" { return session.cityName }
+            if definition.type == "bool" { return nil }
+            return nil
+        }.joined(separator: "، ")
+    }
     var body: some View {
         MadarCard {
             DisclosureGroup(isExpanded: Binding(get: { searching || expanded }, set: { expanded = $0 })) {
@@ -148,7 +130,13 @@ struct SettingsSection: View {
                     }
                 }.padding(.top, 12)
             } label: {
-                Label(title, systemImage: symbol).font(MadarTypography.section()).foregroundStyle(theme.ink)
+                HStack(spacing: 12) {
+                    Image(systemName: symbol).font(.system(size: 18)).foregroundStyle(theme.ink).frame(width: 48, height: 48).background(theme.background, in: .rect(cornerRadius: 14)).accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(title).font(MadarTypography.section()).foregroundStyle(theme.ink)
+                        if !summary.isEmpty { Text(summary).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).lineLimit(1) }
+                    }
+                }
             }
         }
     }
