@@ -9,7 +9,7 @@ import MadarData
 extension AppSession {
     func prepareDiaryHomeFixture(group: URL) throws {
         let env = ProcessInfo.processInfo.environment
-        guard let variant = env["MADAR_UI_DIARY_FIXTURE"], ["home", "empty", "echoes", "margin", "welcome", "today", "editor"].contains(variant), let id = env["MADAR_UI_STORE_ID"],
+        guard let variant = env["MADAR_UI_DIARY_FIXTURE"], ["home", "empty", "echoes", "margin", "welcome", "today", "editor", "return"].contains(variant), let id = env["MADAR_UI_STORE_ID"],
               group.lastPathComponent == id, group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         selectedTab = "notes"
         let context = ModelContext(container)
@@ -19,6 +19,9 @@ extension AppSession {
         for key in ["sys.onboardingCompleted", "sys.diaryFixture"] { let row = DeviceSetting(); row.key = key; row.valueJSON = Data("true".utf8); context.insert(row) }
         if variant != "welcome" { let marker = DeviceSetting(); marker.key = "sys.diaryWelcomeSeen"; marker.valueJSON = Data("true".utf8); context.insert(marker) }
         if variant == "echoes" || variant == "margin" { _ = try settings.stage(["notes.homeShape": .string(variant)]) }
+        if variant == "return" {
+            let day=GregorianDay.containing(prayerUITestClock(.now),in:.riyadh).adding(days:-5),row=Entry();row.dayKey=day.description;row.text="آخر سطر محفوظ قبل الانقطاع";row.tzID="Asia/Riyadh";row.eventAt=day.date(in:.riyadh).addingTimeInterval(12*3600);context.insert(row);try context.save();return
+        }
         if variant != "empty" && variant != "welcome" {
             let today = GregorianDay.containing(prayerUITestClock(.now), in: .riyadh)
             func append(_ day: GregorianDay, _ text: String, hour: Int, imported: Bool = false) {

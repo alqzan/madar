@@ -7,6 +7,7 @@ struct DiaryDayView: View {
     let day: GregorianDay
     @Environment(\.roomTheme) private var theme
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var selected: GregorianDay?
     @State private var page: DiaryDisplayDay?
     @State private var failure: String?
@@ -15,26 +16,52 @@ struct DiaryDayView: View {
     @State private var intentions:[DiaryIntention]=[]
     @State private var intentionsOpen=false
     @State private var niyyaSaved=false
+    @State private var appearance:DiaryDayAppearance?
+    @State private var returnDay:GregorianDay?
+    @State private var returnDismissed=false
+    @State private var archiveOpen=false
+    @State private var weekOpen=false
+    @State private var searchOpen=false
+    @State private var displayNow=Date()
     private var shownDay: GregorianDay { selected ?? day }
     private var service: AppDiaryService { AppDiaryService(app: app) }
     private var today: GregorianDay { (try? service.currentDay()) ?? day }
     private var first: FirstCalendar { FirstCalendar(rawValue: app.string("core.firstCalendar")) ?? .hijri }
+    private var eveningPrimary:Bool {shownDay==today && !intentions.isEmpty && service.intentionEvening(shownDay)}
     private var secondInk: Color { switch app.string("notes.secondInk") { case "green": theme.color("ghad"); case "brown": theme.color("autoInkText"); default: theme.color("pencil") } }
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
+                if let appearance,let ramadanDay=appearance.ramadanDay {
+                    HStack{VStack(alignment:.leading,spacing:6){Text("رمضان · اليوم: "+service.digits.string(ramadanDay)).font(DiaryType.label);if let iftar=appearance.iftarAt {Text("الإفطار بعد "+countdown(iftar)).font(DiaryType.heading)}else{Text(appearance.night ? "ليلة من رمضان":"رمضان").font(DiaryType.heading)}};Spacer()}.padding(16).background((MadarToken.colors[theme.dark ? "rooms.notes.ramadan.accentDark":"rooms.notes.ramadan.accent"] ?? theme.accent).opacity(0.12),in:.rect(cornerRadius:16)).padding(.horizontal,18).padding(.vertical,6).accessibilityElement(children:.combine).accessibilityIdentifier("diary-ramadan")
+                }
+
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(service.weekday(shownDay) + " · " + service.dateTitle(shownDay, calendar: first == .hijri ? .gregorian : .hijri))
+                    Text(service.weekday(shownDay) + " · " + service.dateTitle(shownDay, calendar: first == .hijri ? .gregorian : .hijri) + (appearance?.friday == true ? " · " + service.dateTitle(shownDay,calendar:first):""))
                         .font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
-                    Text(service.dateTitle(shownDay, calendar: first)).font(.custom("thmanyahserifdisplay-Bold", size: 32, relativeTo: .largeTitle)).accessibilityIdentifier("diary-day-title")
-                    HStack(spacing: 6) {
+                    Text(appearance?.friday == true ? "جمعة مباركة" : (first == .hijri && appearance?.night == true ? "ليلة " : "") + service.dateTitle(first == .hijri ? appearance?.hijriDisplayDay ?? shownDay : shownDay, calendar: first)).foregroundStyle(appearance?.friday == true ? theme.accent:theme.ink).font(.custom("thmanyahserifdisplay-Bold", size: 32, relativeTo: .largeTitle)).accessibilityIdentifier("diary-day-title")
+                    if appearance?.friday != true { HStack(spacing: 6) {
                         dateChoice("اليوم", id: "today", value: today)
                         dateChoice("أمس", id: "yesterday", value: today.adding(days: -1))
                         dateChoice("قبل سنة", id: "year", value: aYearAgo)
                         Spacer(minLength: 0)
                         if shownDay == today { Text("حتى الآن").font(DiaryType.label).foregroundStyle(theme.color("ink3Text")) }
                     }
-                }.padding(.horizontal, 18).padding(.bottom, 12)
+                    }
+                }.padding(.horizontal,18).padding(.vertical,10).frame(maxWidth:.infinity,alignment:appearance?.friday == true ? .center:.leading).overlay{if appearance?.friday == true {DiaryFridayFrame().stroke(theme.accent.opacity(0.65),lineWidth:0.7).padding(.horizontal,12)}}
+                if let returnDay,!returnDismissed {
+                    VStack(alignment:.leading,spacing:8){
+                        Text("آخر صفحة كتبتها: "+service.dateTitle(returnDay,calendar:first)).font(DiaryType.label)
+                        Text("يمكنك أن تبدأ من اليوم أو تفتح يومًا سابقًا. لا تحتاج إلى تعويض شيء.").font(MadarTypography.body())
+                        HStack(spacing:8){
+                            Button{archiveOpen=true}label:{Text("افتح يومًا سابقًا").frame(maxWidth:.infinity,minHeight:44).overlay{Capsule().stroke(theme.line)}}.accessibilityIdentifier("diary-return-days")
+                            Button{returnDismissed=true;writing=true}label:{Text("ابدأ من اليوم").frame(maxWidth:.infinity,minHeight:44).foregroundStyle(theme.background).background(theme.ink,in:.capsule)}.accessibilityIdentifier("diary-return-write")
+                        }.font(DiaryType.label).buttonStyle(.plain)
+                    }.padding(16).overlay(alignment:.bottom){Rectangle().fill(theme.line).frame(height:1)}.accessibilityElement(children:.contain).accessibilityIdentifier("diary-return")
+                }
+                if appearance?.weekAvailable == true,typeSize.isAccessibilitySize {
+                    HStack{Button("صندوق الأسبوع"){weekOpen=true}.accessibilityIdentifier("diary-week-open");Spacer();Text("يوم الجمعة").foregroundStyle(theme.color("ghad"))}.font(DiaryType.label).frame(minHeight:44).padding(.horizontal,22)
+                }
                 if shownDay == today || !intentions.isEmpty {
                     Button {intentionsOpen=true} label:{
                         HStack(alignment:.firstTextBaseline,spacing:10){Text("النيّة").font(DiaryType.label).foregroundStyle(theme.accent);Text(intentions.first?.text ?? "أضف نيّتك لليوم").font(DiaryType.writing).frame(maxWidth:.infinity,alignment:.leading).lineLimit(2);Image(systemName:"chevron.backward").font(.caption)}.padding(.horizontal,18).frame(minHeight:54).contentShape(.rect)
@@ -68,28 +95,40 @@ struct DiaryDayView: View {
                             context.stroke(margin, with: .color(theme.color("margin")), lineWidth: 1)
                         }
                     }
-                }
+                }.overlay(alignment:.topTrailing){if appearance?.friday == true,!typeSize.isAccessibilitySize {HStack(alignment:.top,spacing:5){ribbon("يوم الجمعة",color:theme.accent,height:88);if appearance?.weekAvailable == true {Button{weekOpen=true}label:{ribbon("صندوق الأسبوع",color:theme.color("ghad"),height:130).frame(width:44).contentShape(.rect)}.buttonStyle(.plain).accessibilityIdentifier("diary-week-open")}}.padding(.trailing,12)}}
                 }
             }.background(theme.background).foregroundStyle(theme.ink)
                 .safeAreaInset(edge: .bottom, spacing: 0) {
                     HStack(spacing:10){
-                        Button { writing = true } label: { Label(shownDay == today ? "اكتب" : "اكتب في هامشها", systemImage: "pencil").font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 54).foregroundStyle(service.intentionEvening(shownDay) && shownDay==today ? theme.ink:theme.background).background(service.intentionEvening(shownDay) && shownDay==today ? theme.surface:theme.ink,in:.capsule) }.buttonStyle(.plain).accessibilityIdentifier("diary-day-write")
-                        if shownDay==today,!intentions.isEmpty {Button{intentionsOpen=true}label:{Text("حصيلة النيّات").font(DiaryType.label).frame(minHeight:54).padding(.horizontal,16).foregroundStyle(service.intentionEvening(shownDay) ? theme.background:theme.ink).background(service.intentionEvening(shownDay) ? theme.ink:theme.surface,in:.capsule).overlay{Capsule().stroke(theme.line)}}.buttonStyle(.plain).accessibilityIdentifier("diary-niyya-evening")}
+                        Button { writing = true } label: { Label(shownDay == today ? "اكتب" : "اكتب في هامشها", systemImage: "pencil").font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 54).foregroundStyle(eveningPrimary ? theme.ink:theme.background).background(eveningPrimary ? theme.surface:(theme.dark ? theme.accent:theme.ink),in:.capsule) }.buttonStyle(.plain).accessibilityIdentifier("diary-day-write")
+                        if shownDay==today,!intentions.isEmpty {Button{intentionsOpen=true}label:{Text("حصيلة النيّات").font(DiaryType.label).frame(minHeight:54).padding(.horizontal,16).foregroundStyle(service.intentionEvening(shownDay) ? theme.background:theme.ink).background(service.intentionEvening(shownDay) ? (theme.dark ? theme.accent:theme.ink):theme.surface,in:.capsule).overlay{Capsule().stroke(theme.line)}}.buttonStyle(.plain).accessibilityIdentifier("diary-niyya-evening")}
                     }.padding(.horizontal,18).padding(.vertical,8).background(theme.background)
                 }
                 .toolbar {
+                    ToolbarItemGroup(placement:.topBarTrailing){Button{searchOpen=true}label:{Image(systemName:"magnifyingglass")}.accessibilityLabel("ابحث في مذكراتك");Button{archiveOpen=true}label:{Image(systemName:"book.closed")}.accessibilityLabel("أيامك")}
                     ToolbarItem(placement:.topBarTrailing){if niyyaSaved,app.undoToken != nil{Button("تراجع"){app.undo();niyyaSaved=false}.accessibilityIdentifier("diary-day-niyya-undo")}}
                     ToolbarItem(placement: .topBarLeading) { Button { dismiss() } label: { Label("المذكرات", systemImage: "chevron.backward") }.accessibilityIdentifier("diary-day-close") }
                 }
                 .toolbarBackground(theme.background, for: .navigationBar).tint(theme.accent)
+                .fullScreenCover(isPresented:$searchOpen){DiarySearchView(app:app).environment(\.roomTheme,theme)}
+                .fullScreenCover(isPresented:$archiveOpen){DiaryHubView(app:app).environment(\.roomTheme,theme)}
+                .sheet(isPresented:$weekOpen){DiaryWeekView(app:app,day:shownDay).environment(\.roomTheme,theme)}
                 .sheet(isPresented:$intentionsOpen){DiaryIntentionsView(app:app,day:shownDay,evening:service.intentionEvening(shownDay)).environment(\.roomTheme,theme)}
                 .sheet(isPresented: $writing) { DiaryTextEditor(app: app, margin: shownDay == today ? nil : shownDay).environment(\.roomTheme, theme) }
+                .task {while !Task.isCancelled {do{try await Task.sleep(for:.seconds(30));displayNow=service.clock();appearance=try service.appearance(shownDay)}catch{break}}}
                 .task(id: shownDay.description + ":" + String(app.prayerRevision) + ":" + String(retry)) {
-                    do { try await service.prepareClosedDay(shownDay); page = try service.day(shownDay); intentions=try service.intentions(shownDay); failure = nil }
+                    do { try await service.prepareClosedDay(shownDay); page = try service.day(shownDay); intentions=try service.intentions(shownDay); appearance=try service.appearance(shownDay);displayNow=service.clock();returnDay=try service.returnAfterAbsence(shownDay); failure = nil }
                     catch { page = nil; failure = error.localizedDescription }
                 }
         }
     }
+    private func ribbon(_ title:String,color:Color,height:CGFloat)->some View {Text(title).font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).foregroundStyle(theme.background).fixedSize().rotationEffect(.degrees(90)).frame(width:24,height:height-8).frame(height:height,alignment:.top).background(DiaryRibbonShape().fill(color)).accessibilityLabel(title)}
+    private func countdown(_ date:Date)->String {
+        let formatter=DateComponentsFormatter();formatter.unitsStyle = .full;formatter.allowedUnits=[.hour,.minute];formatter.maximumUnitCount=2
+        var calendar=Calendar(identifier:.gregorian);calendar.locale=Locale(identifier:app.string("core.numerals")=="western" ? "ar_SA@numbers=latn":"ar_SA@numbers=arab");formatter.calendar=calendar
+        return formatter.string(from:max(0,date.timeIntervalSince(displayNow))) ?? "أقل من دقيقة"
+    }
+
     private var aYearAgo: GregorianDay {
         var calendar = Calendar(identifier: .gregorian); calendar.timeZone = app.activePlace.timeZone
         return calendar.date(byAdding: .year, value: -1, to: today.date(in: app.activePlace.timeZone)).map { GregorianDay.containing($0, in: app.activePlace.timeZone) } ?? today.adding(days: -365)
