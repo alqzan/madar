@@ -74,6 +74,7 @@ struct QuranRoomState: Sendable {
     var coverageFraction: Double
     var percentageLabel: String
     var streakLabel: String
+    var hifzAmounts: [String: String] = [:]
     var streakDays = 0
     var balanceTitle: String
     var balanceExplanation: String

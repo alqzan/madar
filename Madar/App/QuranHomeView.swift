@@ -235,7 +235,7 @@ struct QuranHomeView: View {
         let size: CGFloat = isSelected ? 20 : 12
         let subtitle: String
         if kind == .review { subtitle = service.faceCount(QuranDayLevel(rawValue: selected.rawValue)!.reviewMinimum) }
-        else { subtitle = selected == .deep ? service.numerals.localized("×1½") : selected == .max ? service.numerals.localized("×2") : " " }
+        else { subtitle = state?.hifzAmounts[selected.rawValue] ?? "" }
         return Button {
             run { try await service.perform(.setTodayLevel(kind: kind, level: selected)); try await refresh() }
         } label: {
@@ -247,7 +247,7 @@ struct QuranHomeView: View {
                         .overlay { Circle().stroke(isSelected ? color : theme.color("track"), lineWidth: 2) }
                 }.frame(height: 22)
                 Text(selected.title).font(bodyFont(12, bold: isSelected)).foregroundStyle(isSelected ? theme.ink : theme.secondaryInk)
-                Text(subtitle).font(bodyFont(11)).foregroundStyle(text)
+                Text(subtitle).font(bodyFont(11)).foregroundStyle(text).lineLimit(2).multilineTextAlignment(.center).frame(minHeight: 28, alignment: .top)
             }.frame(maxWidth: .infinity).contentShape(Rectangle())
         }.buttonStyle(.plain).accessibilityIdentifier("quran-level-\(kind.rawValue)-\(selected.rawValue)")
             .accessibilityLabel((kind == .hifz ? "الحفظ" : "المراجعة") + "، " + selected.title + "، " + subtitle)

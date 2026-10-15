@@ -78,7 +78,7 @@ public struct QuranDataSnapshot: Sendable {
         return value
     }
     /// Rebuild the pre-day cache at the same evaluation day, without changing stored facts.
-    public func snapshot(at now: Date, excludingSessionDay: GregorianDay? = nil, sessionsThrough: Date? = nil) throws -> QuranDataSnapshot {
+    public func snapshot(at now: Date, excludingSessionDay: GregorianDay? = nil, sessionsThrough: Date? = nil, previewHifzLevel: QuranDayLevel? = nil) throws -> QuranDataSnapshot {
         let storedDay = try currentDay(at: now), today = storedDay.date
         let planRows = try context.fetch(FetchDescriptor<HifzPlan>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
         let active = planRows.filter { $0.activeFrom <= now && $0.supersededAt == nil }.max {
@@ -138,7 +138,7 @@ public struct QuranDataSnapshot: Sendable {
             pages.append(try QuranPlanningPage(page: page, lastReviewed: last, nextDue: last.adding(days: memory.intervalDays), grade: lastGrade, today: today))
         }
         let dayState = try context.fetch(FetchDescriptor<QuranDayState>()).filter { $0.dayKey == today.description && $0.deletedAt == nil && $0.mergedInto == nil }.max { $0.updatedAt < $1.updatedAt }
-        let hifzLevel = try QuranDayLevel(rawValue: dayState?.hifzLevel ?? settings.value(for: "quran.hifzLevel").string ?? "medium") ?? .medium
+        let hifzLevel = try previewHifzLevel ?? QuranDayLevel(rawValue: dayState?.hifzLevel ?? settings.value(for: "quran.hifzLevel").string ?? "medium") ?? .medium
         let reviewLevel = try QuranDayLevel(rawValue: dayState?.reviewLevel ?? settings.value(for: "quran.reviewLevel").string ?? "medium") ?? .medium
         let restDay = try QuranRestDay(rawValue: settings.value(for: "quran.restDay").string ?? "friday") ?? .friday
         let allotments = try context.fetch(FetchDescriptor<QuranAllotment>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }.map { row in

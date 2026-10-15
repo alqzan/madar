@@ -8,6 +8,11 @@ import XCTest
         app.launch()
         XCTAssertTrue(app.staticTexts["quran-coverage-title"].waitForExistence(timeout: 20), app.debugDescription)
         XCTAssertTrue(app.buttons["quran-begin"].exists)
+        for level in ["simple", "medium", "deep", "max"] {
+            let option = app.buttons["quran-level-hifz-" + level]
+            XCTAssertFalse(option.label.contains("×"), option.label)
+            XCTAssertTrue(option.label.contains("صفح") || option.label.contains("سطر") || option.label.contains("آي"), option.label)
+        }
         let coverageLabel = app.staticTexts["quran-coverage-label"]
         let hadith = app.buttons["quran-coverage-hadith"]
         XCTAssertLessThan(hadith.frame.maxY, coverageLabel.frame.minY)

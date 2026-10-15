@@ -49,7 +49,8 @@ import MadarPrayer
         return first.surahNameArabic + " " + numerals.string(first.ayahNumber) + "–" + (first.surahID == last.surahID ? "" : last.surahNameArabic + " ") + numerals.string(last.ayahNumber)
     }
     func load() async throws -> QuranRoomState {
-        let snapshot = try snapshot(), catalog = try QuranResources.catalog(), today = snapshot.day.date
+        let evaluatedAt = clock()
+        let snapshot = try repository().snapshot(at: evaluatedAt), catalog = try QuranResources.catalog(), today = snapshot.day.date
         let coverage = snapshot.coverage, completed = coverage.completedPages.count
         let juz = coverage.completedJuz.count, outside = coverage.pagesOutsideCompletedJuz.count
         let coverageTitle = completed == 0 ? "أول الطريق" : (juz == 0 ? faceCount(outside) : count(juz, singular: "جزء واحد", dual: "جزآن", plural: "أجزاء") + (outside > 0 ? " و" + faceCount(outside) : ""))
@@ -145,8 +146,16 @@ import MadarPrayer
         let errors = open.map { value in QuranUIErrorSpot(id: Self.spotID(value.key),
             title: catalog.ayah(id: value.key.ayahID).map { $0.surahNameArabic + " " + numerals.string($0.ayahNumber) } ?? "",
             detail: value.key.wordIndex == nil ? "الآية كاملة" : "موضع كلمة", isToday: todayKeys.contains(value.key), closed: !value.isOpen, canDrill: true) }
+        var amounts: [String: String] = [:]
+        if let plan = snapshot.plan {
+            let reader = try repository()
+            for level in QuranDayLevel.allCases {
+                let preview = try reader.snapshot(at: evaluatedAt, previewHifzLevel: level)
+                amounts[level.rawValue] = try memorizationAmount(preview.hifz, unit: plan.plan.unit, catalog: catalog)
+            }
+        }
         return QuranRoomState(coverageTitle: coverageTitle, coverageFraction: Double(completed) / 604,
-            percentageLabel: numerals.percent(coverage.percent), streakLabel: "سلسلة " + dayCount(streak.days), streakDays: streak.days, balanceTitle: balance,
+            percentageLabel: numerals.percent(coverage.percent), streakLabel: "سلسلة " + dayCount(streak.days), hifzAmounts: amounts, streakDays: streak.days, balanceTitle: balance,
             balanceExplanation: "تتبع الخطة حاجة المراجعة ومقدار حفظك", hifzLevel: QuranUILevel(rawValue: snapshot.hifzLevel.rawValue)!,
             reviewLevel: QuranUILevel(rawValue: snapshot.reviewLevel.rawValue)!, steps: steps, recentDays: heat, plan: plan, surahs: surahs, draft: draft,
             missedDayKey: missedDay?.description, missedDayTitle: missedDay.map { "لو فاتك يوم " + displayDate($0) },
