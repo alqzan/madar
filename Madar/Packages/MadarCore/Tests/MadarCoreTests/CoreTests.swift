@@ -189,7 +189,9 @@ func routes() throws {
     let context = RouteContext(trackingStart: try GregorianDay("2026-01-01"), today: try GregorianDay("2026-10-09"), settingsKeys: ["core.dayStart"], availability: .init(builtRooms: Set(Room.allCases)))
     let route = try RouteRegistry.parse(URL(string: "madar://mal/add?amount=1234&merchant=test")!, context: context)
     #expect(route.mode == .prefill)
-    #expect(try RouteRegistry.parse(URL(string: "madar://notes/write?day=yesterday")!, context: context).requiresUnlock)
+    #expect(try !RouteRegistry.parse(URL(string: "madar://notes/write?day=yesterday")!, context: context).requiresUnlock)
+    let locked = RouteContext(trackingStart: context.trackingStart, today: context.today, settingsKeys: context.settingsKeys, lock: .app, availability: context.availability)
+    #expect(try RouteRegistry.parse(URL(string: "madar://notes/write")!, context: locked).requiresUnlock)
     for input in ["madar://mal/add?amount=1.5", "madar://mal/add?amount=1&amount=2", "madar://notes/day/2026-02-30", "madar://quran/page/605", "madar://salah/log?prayer=sunrise", "madar://notes/write?save=true", "madar://settings/core/no.such.key"] {
         #expect(throws: (any Error).self) { try RouteRegistry.parse(URL(string: input)!, context: context) }
     }

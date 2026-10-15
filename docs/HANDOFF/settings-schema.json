@@ -387,16 +387,12 @@
    "section": "الخصوصية",
    "title": "القفل بالوجه",
    "type": "choice",
-   "default": "notesOnly",
+   "default": "none",
    "scope": "device",
    "options": [
     {
      "value": "app",
      "label": "مدار كله"
-    },
-    {
-     "value": "notesOnly",
-     "label": "المذكرات"
     },
     {
      "value": "none",

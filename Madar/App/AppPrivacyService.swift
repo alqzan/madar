@@ -37,6 +37,6 @@ import MadarData
         guard let scope = MadarLockScope(rawValue: session.string("core.faceIDLock")) else {
             throw DataError.invalidValue("privacy scope")
         }
-        return scope
+        return scope.effective
     }
 }

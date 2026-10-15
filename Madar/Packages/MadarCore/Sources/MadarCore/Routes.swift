@@ -16,7 +16,7 @@ public struct RouteContext: Sendable {
     public let lock: RouteLock
     public let unlocked: Bool
     public let availability: FeatureAvailability
-    public init(trackingStart: GregorianDay, today: GregorianDay, settingsKeys: Set<String>, lock: RouteLock = .notesOnly, unlocked: Bool = false, availability: FeatureAvailability = .m0) { self.trackingStart = trackingStart; self.today = today; self.settingsKeys = settingsKeys; self.lock = lock; self.unlocked = unlocked; self.availability = availability }
+    public init(trackingStart: GregorianDay, today: GregorianDay, settingsKeys: Set<String>, lock: RouteLock = .none, unlocked: Bool = false, availability: FeatureAvailability = .m0) { self.trackingStart = trackingStart; self.today = today; self.settingsKeys = settingsKeys; self.lock = lock; self.unlocked = unlocked; self.availability = availability }
 }
 public enum RouteRegistry {
     public static func parse(_ url: URL, context: RouteContext) throws -> Route {
@@ -73,7 +73,7 @@ public enum RouteRegistry {
         }
         guard Set(p.keys).isSubset(of: allowed), p.values.allSatisfy({ $0.utf8.count <= 4096 }) else { throw CoreError.invalidRoute }
         guard context.availability.isAvailable(room) else { throw CoreError.unavailableFeature }
-        let protected = context.lock == .app || (context.lock == .notesOnly && room == .notes)
+        let protected = context.lock == .app
         return .init(room: room, path: path, parameters: p, mode: mode, requiresUnlock: protected && !context.unlocked)
     }
 }

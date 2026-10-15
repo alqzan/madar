@@ -83,6 +83,8 @@ private struct UndoChange: Codable { let key: String; let before: JSONValue; let
         else if d.scope == "device" { data = try context.fetch(FetchDescriptor<DeviceSetting>()).filter { $0.key == key && $0.deletedAt == nil && $0.mergedInto == nil }.max { $0.updatedAt < $1.updatedAt }?.valueJSON }
         else { data = try context.fetch(FetchDescriptor<Setting>()).filter { $0.key == key && $0.deletedAt == nil && $0.mergedInto == nil }.max { $0.updatedAt < $1.updatedAt }?.valueJSON }
         guard let data else { return d.defaultValue }
+        // Compatibility read only; preserve the stored bytes and all owner records.
+        if key == "core.faceIDLock", (try? JSONDecoder().decode(JSONValue.self, from: data)) == .string("notesOnly") { return .string("none") }
         guard let value = try? JSONDecoder().decode(JSONValue.self,from:data), value == d.defaultValue || (try? schema.validate(value,for:key)) != nil else { if invalidReads.insert(key).inserted { logger.error("Invalid stored setting; using default for \(key,privacy:.public)") }; return d.defaultValue }
         return value
     }

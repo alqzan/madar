@@ -4,7 +4,10 @@ import Observation
 import SwiftUI
 import MadarDesign
 
-enum MadarLockScope: String, Sendable { case app, notesOnly, none }
+enum MadarLockScope: String, Sendable { case app, notesOnly, none
+    // Read compatibility only: the owner removed the diary-only lock on 15 October.
+    var effective: Self { self == .notesOnly ? .none : self }
+}
 enum MadarProtectedFeature: Hashable, Sendable { case app, notes, privateNote, export }
 
 /// The adapter purges protected view models before returning and regenerates redacted external surfaces.
@@ -66,13 +69,12 @@ struct PrivacyAuthorization {
     init(scope: MadarLockScope, service: any MadarLockService, clock: @escaping @MainActor () -> Date = Date.init,
          authenticator: @escaping @MainActor () -> any MadarDeviceAuthenticator = { SystemDeviceAuthenticator() },
          authorizationCommitBoundary: @escaping @MainActor () -> Void = {}) {
-        self.scope = scope; self.service = service; self.clock = clock; self.authenticator = authenticator
+        self.scope = scope.effective; self.service = service; self.clock = clock; self.authenticator = authenticator
         self.authorizationCommitBoundary = authorizationCommitBoundary
     }
     private func requiredFeature(for feature: MadarProtectedFeature) -> MadarProtectedFeature? {
         if feature == .privateNote { return .privateNote }
         if scope == .app { return .app }
-        if scope == .notesOnly && (feature == .notes || feature == .export) { return .notes }
         return nil
     }
     func requiresProtection(_ feature: MadarProtectedFeature) -> Bool { requiredFeature(for: feature) != nil }
@@ -135,7 +137,7 @@ struct PrivacyAuthorization {
         guard phase == .active, !disconnected, !scopeTransitionPending else { throw PrivacyAuthorizationError.stale }
         guard currentAuth == nil else { throw PrivacyAuthorizationError.busy }
         if scopeReconciliationRequired {
-            scope = try service.persistedPrivacyScope(); scopeReconciliationRequired = false
+            scope = try service.persistedPrivacyScope().effective; scopeReconciliationRequired = false
         }
         let id = UUID(), stamp = generation
         let needed = Set(features.compactMap { requiredFeature(for: $0) })
@@ -216,7 +218,7 @@ struct PrivacyAuthorization {
         do {
             try await redactionTask?.value
             try Task.checkCancellation()
-            try await service.privacyScopeDidChange(to: newScope)
+            try await service.privacyScopeDidChange(to: newScope.effective)
             let persisted = try service.persistedPrivacyScope()
             if scopeTransitionID == id {
                 finishScopeTransition(id, persisted: persisted, failed: false)
@@ -245,7 +247,7 @@ struct PrivacyAuthorization {
     func finishScopeTransition(_ id: UUID, persisted: MadarLockScope?, failed: Bool) {
         guard scopeTransitionID == id else { return }
         scopeTransitionID = nil; scopeReconciliationRequired = persisted == nil
-        if let persisted { scope = persisted }
+        if let persisted { scope = persisted.effective }
         covered = true; redactionFailed = failed || persisted == nil; notify()
     }
     func disconnect() { disconnected = true; epoch += 1; phase = .background; lock() }
@@ -320,7 +322,7 @@ struct MadarLockGate<Content: View>: View {
     private var lockedContent: some View {
         VStack(spacing: 20) {
             Image(systemName: "lock.closed").font(.largeTitle).accessibilityHidden(true)
-            Text(feature == .notes ? "المذكرات مقفلة" : "مدار مقفل").font(MadarTypography.title())
+            Text("مدار مقفل").font(MadarTypography.title())
             if let message = controller.statusMessage { Text(message).font(MadarTypography.caption()) }
             if controller.authenticating { ProgressView("يفتح القفل…") }
             else if !controller.covered {

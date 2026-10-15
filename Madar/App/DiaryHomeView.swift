@@ -16,7 +16,7 @@ struct DiaryRoomView: View {
         Group {
             if let lock = app.lockController {
                 MadarLockGate(controller: lock, feature: .notes) { DiaryLaunchView(app: app) }
-            } else { Text("المذكرات مقفلة").frame(maxWidth: .infinity, maxHeight: .infinity) }
+            } else { ProgressView("تُفتح صفحتك…").frame(maxWidth: .infinity, maxHeight: .infinity) }
         }
         .environment(\.roomTheme, RoomTheme(room: "notes", dark: outerTheme.dark, calmPaper: app.string("core.roomIdentity") == "calmPaper"))
     }
