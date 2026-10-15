@@ -42,7 +42,7 @@ struct PrayerTodayView: View {
                         riwaq(snapshot, now: instant)
                             .padding(.top, 18)
                         if snapshot.hasTimes {
-                            Text(todaySummary(snapshot))
+                            Text(todaySummary(snapshot, now: instant))
                                 .font(PrayerHomeType.body)
                                 .foregroundStyle(theme.secondaryInk)
                                 .multilineTextAlignment(.center)
@@ -304,11 +304,13 @@ struct PrayerTodayView: View {
     }
 
     /// «٣ من ٥ اليوم · بقيت صلاتان»: «·» sits between words only (RU1).
-    private func todaySummary(_ snapshot: PrayerSnapshot) -> String {
+    private func todaySummary(_ snapshot: PrayerSnapshot, now: Date) -> String {
         let cells = snapshot.today.cells.filter { $0.time != nil }
         let recorded = cells.filter { [.jamaah, .alone, .qada, .missed, .excused].contains($0.status) }.count
         let remaining = cells.count - recorded
-        return "\(digits.string(recorded)) من \(digits.string(cells.count)) اليوم · " + PrayerCopy.remaining(remaining, digits: digits)
+        let afterLastAdhan = cells.compactMap(\.prayerTime).max().map { now >= $0 } ?? false
+        let tail = afterLastAdhan && remaining > 0 ? PrayerCopy.pending(remaining, digits: digits) : PrayerCopy.remaining(remaining, digits: digits)
+        return "\(digits.string(recorded)) من \(digits.string(cells.count)) اليوم · " + tail
     }
 
     // MARK: Notices
@@ -328,11 +330,12 @@ struct PrayerTodayView: View {
                 detail: "تبقى معلّقة حتى تختار حالها.",
                 action: "سجِّلها", identifier: "prayer-pending-review") { choose(first) })
         }
+        let historical = gap.filter { $0.day < snapshot.today.day && $0.day >= snapshot.tracking.day }
         let fridays = snapshot.unconfirmedFridayNoon.union(closed.filter { $0.isFriday && $0.reference.prayer == .dhuhr }.map(\.reference))
         return AnyView(PrayerNoticeRow(
-            title: PrayerCopy.unconfirmed(gap.count, digits: digits),
+            title: historical.isEmpty ? PrayerCopy.pending(gap.count, digits: digits) : PrayerCopy.unconfirmed(historical.count, digits: digits),
             detail: "لا تُحسب فائتة إلا باختيارك.",
-            action: "سجِّلها", identifier: snapshot.unconfirmed.isEmpty ? "prayer-pending-review" : "prayer-recovery") {
+            action: "سجِّلها", identifier: historical.isEmpty ? "prayer-pending-review" : "prayer-recovery") {
                 selectedSheet = .recovery(gap, fridays, session.activePlace.timeZone)
             })
     }
