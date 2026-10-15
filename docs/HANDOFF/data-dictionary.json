@@ -5422,6 +5422,8 @@
     "kind": "upsert (habitID, periodKey); delta adds for measure = count",
     "auth": "blindWrite"
    },
+   "diary.addMargin": {"intent": null, "payload": "{text <= 2000, targetDayKey: YYYY-MM-DD}", "kind": "append", "auth": "app-only + diary unlocked"},
+   "diary.freezeDay": {"intent": null, "payload": "{dayKey: YYYY-MM-DD}", "kind": "upsert", "auth": "app-only + diary unlocked", "note": "RD1 closed-day auto-line snapshot; device-local sys.diaryAutoLines.<dayKey>, included by diary exports."},
    "diary.appendLine": {
     "intent": "AddDiaryLineIntent",
     "payload": "{text ≤ 2000, day: today|yesterday}",

@@ -5470,9 +5470,9 @@
         "auth": "same as the original command"
       },
       "prayer.addOldMissed": {
-       "payload": "{dayKey, prayer, fridayKind?, restoreDeleted?: Bool = false}",
-       "kind": "explicit old missed prayer before trackingStart; atomic PrayerLog + QadaItem and durable undo; restoration retains deletion barriers",
-       "auth": "app"
+        "payload": "{dayKey, prayer, fridayKind?, restoreDeleted?: Bool = false}",
+        "kind": "explicit old missed prayer before trackingStart; atomic PrayerLog + QadaItem and durable undo; restoration retains deletion barriers",
+        "auth": "app"
       },
       "prayer.logQiyam": {
         "payload": "{nightKey, rakaat: Int 0...99, witr: Bool, restoreDeleted?: Bool = false}",
@@ -5484,6 +5484,19 @@
         "payload": "{resolutions:[{dayKey, prayer, status: jamaah|alone|missed|unrecordedHistory|excused, fridayKind?}]}",
         "kind": "one transaction upsert of the selected PrayerLog rows and matching QadaItems; one inverse restores the whole gap",
         "auth": "app"
+      },
+      "diary.addMargin": {
+        "intent": null,
+        "payload": "{text <= 2000, targetDayKey: YYYY-MM-DD}",
+        "kind": "append",
+        "auth": "app-only + diary unlocked"
+      },
+      "diary.freezeDay": {
+        "intent": null,
+        "payload": "{dayKey: YYYY-MM-DD}",
+        "kind": "upsert",
+        "auth": "app-only + diary unlocked",
+        "note": "RD1 closed-day auto-line snapshot; device-local sys.diaryAutoLines.<dayKey>, included by diary exports."
       }
     },
     "undoPolicy": {

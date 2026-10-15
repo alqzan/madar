@@ -44,6 +44,8 @@ public enum CommandOperation: Codable, Equatable, Sendable {
     case savePreset(name: String, settings: [String: JSONValue], layouts: [String: JSONValue])
     case completeOnboarding
     case quran(name: String, payload: [String: JSONValue])
+    case diary(text: String, day: String, targetDay: String?)
+    case freezeDiaryDay(String)
     case logPrayer(dayKey: String, prayer: Prayer, status: String, heart: String?, shortened: Bool?, fridayKind: String?)
     case makeUpPrayer(dayKey: String, prayer: Prayer, at: Date, fridayKind: String?)
     case resolvePrayerGap([PrayerGapResolution])
@@ -113,8 +115,8 @@ public protocol CommandStoreAdapter: Sendable {
 public struct CommandBus: Sendable {
     // Names implemented by this milestone. Unknown and later-room names are invalid
     // before authorization, so they cannot become indefinitely recoverable needsApp work.
-    public static let appOnlyCommandNames: Set<String> = Set(["settings.set", "settings.applyPreset", "preset.save", "core.completeOnboarding", "system.undo", "prayer.makeUp", "prayer.resolveGap", "prayer.setHeart", "prayer.logQiyam", "prayer.addOldMissed", "prayer.editTrackingStart", "prayer.startTrip", "prayer.endTrip", "prayer.logPair"]).union(QuranCommandPayload.names)
-    public static let supportedCommandNames = appOnlyCommandNames.union(["prayer.log"])
+    public static let appOnlyCommandNames: Set<String> = Set(["settings.set", "settings.applyPreset", "preset.save", "core.completeOnboarding", "system.undo", "prayer.makeUp", "prayer.resolveGap", "prayer.setHeart", "prayer.logQiyam", "prayer.addOldMissed", "prayer.editTrackingStart", "prayer.startTrip", "prayer.endTrip", "prayer.logPair"]).union(QuranCommandPayload.names).union(["diary.appendLine", "diary.addMargin", "diary.freezeDay"])
+    public static let supportedCommandNames = appOnlyCommandNames.union(["prayer.log", "diary.appendLine", "diary.addMargin"])
     private let adapter: any CommandStoreAdapter
     public init(adapter: any CommandStoreAdapter) { self.adapter = adapter }
     public func execute(_ envelope: CommandEnvelope, now: Date = Date(), generationID: UUID? = nil) async throws -> CommandOutcome {
@@ -125,6 +127,21 @@ public struct CommandBus: Sendable {
         }
         let operation: CommandOperation; let semantics: CommandSemantics; let naturalKey: String?
         switch envelope.name {
+        case "diary.freezeDay":
+            guard Set(payload.keys) == ["dayKey"], case .string(let day) = payload["dayKey"], (try? GregorianDay(day)) != nil else { return .init(status: .rejected, reason: "invalidPayload") }
+            operation = .freezeDiaryDay(day); semantics = .upsert; naturalKey = day
+        case "diary.appendLine", "diary.addMargin":
+            guard Set(payload.keys).isSubset(of: envelope.name == "diary.appendLine" ? ["text", "day"] : ["text", "targetDayKey"]),
+                  case .string(let text) = payload["text"], !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  text.count <= 2000 else { return .init(status: .rejected, reason: "invalidPayload") }
+            if envelope.name == "diary.appendLine" {
+                guard case .string(let day) = payload["day"], ["today", "yesterday"].contains(day) else { return .init(status: .rejected, reason: "invalidPayload") }
+                operation = .diary(text: text, day: day, targetDay: nil)
+            } else {
+                guard envelope.source == .app, case .string(let target) = payload["targetDayKey"], (try? GregorianDay(target)) != nil else { return .init(status: .rejected, reason: "invalidPayload") }
+                operation = .diary(text: text, day: "today", targetDay: target)
+            }
+            semantics = .append; naturalKey = nil
         case let name where QuranCommandPayload.names.contains(name):
             guard QuranCommandPayload.validate(name: name, payload: payload) else { return .init(status: .rejected, reason: "invalidPayload") }
             operation = .quran(name: name, payload: payload)

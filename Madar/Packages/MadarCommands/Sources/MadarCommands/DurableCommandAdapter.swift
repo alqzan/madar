@@ -15,6 +15,7 @@ private struct SettingsInverse: Codable {
     var prayerAfter: DataRecord? = nil
     var quranMutation: Data? = nil
     var prayerMutation: Data? = nil
+    var diaryMutation: Data? = nil
 }
 private struct ReceiptNamespace: Codable {
     let version: Int
@@ -168,7 +169,20 @@ private struct ReceiptWire: Codable {
             }
             let writer = try store.writerIDForWrite(now: now)
             var inverse: SettingsInverse?
+            if !request.envelope.name.hasPrefix("settings.") && request.envelope.name != "core.completeOnboarding" {
+                try DiaryLineRenderer.freezeBeforeSourceChange(context: context, now: now, writer: writer)
+            }
             switch request.operation {
+            case .freezeDiaryDay(let day):
+                try DiaryLineRenderer.freeze(GregorianDay(day), context: context, now: now, writer: writer)
+            case .diary(let text, let day, let target):
+                if let undo = try DiaryMutationHandler.stage(text: text, day: day, targetDay: target, id: request.envelope.commandID, context: context, now: now, writer: writer) {
+                    inverse = SettingsInverse(settings: [:], afterSettings: [:], layouts: [:], afterLayouts: [:], diaryMutation: undo)
+                } else {
+                    let outcome = CommandOutcome(status: .duplicate)
+                    try saveReceipt(request, outcome: outcome, inverseJSON: nil, writer: writer, generationID: generationID, at: now, context: context)
+                    return outcome
+                }
             case .quran(let name, let payload):
                 let staged = try QuranMutationHandler.stage(name: name, payload: payload, in: context,
                     catalog: QuranResources.catalog(), now: now, writer: writer)
@@ -289,6 +303,8 @@ private struct ReceiptWire: Codable {
                 let state = try JSONDecoder().decode(SettingsInverse.self, from: data)
                 if let mutation = state.quranMutation {
                     try QuranMutationHandler.undo(mutation, in: context, catalog: QuranResources.catalog(), now: now, writer: writer)
+                } else if let mutation = state.diaryMutation {
+                    try DiaryMutationHandler.undo(mutation, context: context, now: now, writer: writer)
                 } else if let mutation = state.prayerMutation {
                     try PrayerMutationHandler.undo(mutation, in: context, now: now, writer: writer)
                 } else if let after = state.prayerAfter {
