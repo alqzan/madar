@@ -96,7 +96,7 @@ struct DiaryDayView: View {
                                     if line.kind == "late" { Text("كُتبت لاحقًا").font(MadarTypography.fine()) }
                                     if line.kind == "margin" { Text("هامش · " + AppDiaryService(app: app).time(line.at)).font(MadarTypography.fine()) }
                                     if ["salah", "quran"].contains(line.kind) { Text(line.kind == "salah" ? "الصلاة" : "القرآن").font(MadarTypography.fine()) }
-                                }.foregroundStyle(line.kind == "margin" ? theme.color("pencil") : line.kind == "late" ? theme.color("late") : line.kind == "normal" ? theme.ink : theme.color("autoInkText"))
+                                }.foregroundStyle(line.kind == "margin" ? (app.string("notes.secondInk") == "green" ? theme.color("ghad") : app.string("notes.secondInk") == "brown" ? theme.color("autoInkText") : theme.color("pencil")) : line.kind == "late" ? theme.color("late") : line.kind == "normal" ? theme.ink : theme.color("autoInkText"))
                             }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 10)
                             Divider().overlay(theme.line)
                         }

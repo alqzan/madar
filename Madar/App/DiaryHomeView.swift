@@ -32,7 +32,7 @@ struct DiaryHomeView: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var snapshot: DiaryHomeSnapshot?
     @State private var selected: GregorianDay?
-    @State private var match: FirstCalendar?
+    @State private var customizing = false
     @State private var editor: DiaryEditorTarget?
     @State private var reader: GregorianDay?
     @State private var failure: String?
@@ -51,7 +51,7 @@ struct DiaryHomeView: View {
                         DiaryEchoesView(snapshot: snapshot, service: service, open: { reader = $0 })
                         if !hidden("days") { recentDays(snapshot) }
                     } else if app.string("notes.homeShape") == "margin", let memory {
-                        DiaryMarginView(page: memory, snapshot: snapshot, service: service, showAuto: app.bool("notes.showAutoSections"), ink: secondInk,
+                        DiaryMarginView(page: memory, snapshot: snapshot, service: service, showAuto: app.bool("notes.showAutoSections"), showLines: !hidden("thatDay"), ink: secondInk,
                             another: snapshot.selection.days.count > 1 ? { nextMemory(snapshot) } : nil, open: { reader = memory.day })
                         if !memory.dayOne, !hidden("sinceThatDay") { since(memory) }
                         if !hidden("days") { recentDays(snapshot) }
@@ -97,8 +97,8 @@ struct DiaryHomeView: View {
                 }
             }
         }
-        .onChange(of: match) { _, _ in Task { await refresh() } }
         .onChange(of: selected) { _, day in if let day { Task { try? await service.prepareClosedDay(day); await refresh() } } }
+        .sheet(isPresented: $customizing, onDismiss: { selected = nil; Task { await refresh() } }) { DiaryCustomizeView(app: app).environment(\.roomTheme, theme) }
         .sheet(item: $editor) { target in DiaryTextEditor(app: app, margin: target.margin, initialDay: target.day).environment(\.roomTheme, theme) }
         .sheet(isPresented: Binding(get: { reader != nil }, set: { if !$0 { reader = nil } })) {
             if let reader { DiaryDayView(app: app, day: reader).environment(\.roomTheme, theme) }
@@ -111,20 +111,24 @@ struct DiaryHomeView: View {
         }
     }
     private var header: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text("المذكرات").font(DiaryType.title).accessibilityIdentifier("diary-home-title")
-            if let snapshot {
-                Text(service.dateTitle(snapshot.today, calendar: FirstCalendar(rawValue: app.string("core.firstCalendar")) ?? .hijri)
-                    + " · " + service.dateTitle(snapshot.today, calendar: app.string("core.firstCalendar") == "gregorian" ? .hijri : .gregorian))
-                    .font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
-            }
-        }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 4)
+        HStack(alignment: .center, spacing: 10) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text("المذكرات").font(DiaryType.title).accessibilityIdentifier("diary-home-title")
+                if let snapshot {
+                    Text(service.dateTitle(snapshot.today, calendar: FirstCalendar(rawValue: app.string("core.firstCalendar")) ?? .hijri)
+                        + " · " + service.dateTitle(snapshot.today, calendar: app.string("core.firstCalendar") == "gregorian" ? .hijri : .gregorian))
+                        .font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
+                }
+            }.frame(maxWidth: .infinity, alignment: .leading)
+            Button { customizing = true } label: { Image(systemName: "slider.horizontal.3").frame(width: 44, height: 44).overlay { Circle().stroke(theme.line) } }
+                .buttonStyle(.plain).accessibilityLabel("خصّص المذكرات").accessibilityIdentifier("diary-customize")
+        }.padding(.vertical, 4)
     }
     private func calendarButton(_ calendar: FirstCalendar, _ title: String) -> some View {
-        Button { app.set(.string(calendar.rawValue), key: "notes.match") { match = calendar; selected = nil } } label: {
+        Button { app.set(.string(calendar.rawValue), key: "notes.match") { selected = nil } } label: {
             Text(title).font(.custom("thmanyahsans-Bold", size: 12, relativeTo: .caption))
                 .padding(.horizontal, 10).frame(minHeight: 36)
-                .background((match ?? service.preferredMatch) == calendar ? theme.surface : .clear, in: .capsule)
+                .background(service.preferredMatch == calendar ? theme.surface : .clear, in: .capsule)
         }.buttonStyle(.plain).accessibilityIdentifier("diary-match-" + calendar.rawValue)
     }
     private func hero(_ snapshot: DiaryHomeSnapshot) -> some View {
@@ -169,7 +173,7 @@ struct DiaryHomeView: View {
                 Text(service.dateTitle(page.day, calendar: snapshot.selection.match == .hijri ? .gregorian : .hijri) + (page.place.map { " · " + $0 } ?? ""))
                     .font(DiaryType.label).opacity(hasPhoto ? 1 : 0.8)
                 Text(snapshot.selection.days.isEmpty && page.lines.isEmpty ? "اكتب ما تيسّر من يومك." : page.excerpt)
-                    .font(DiaryType.writing).lineSpacing(8).fixedSize(horizontal: false, vertical: true)
+                    .font(DiaryType.writing).lineSpacing(8).lineLimit(4).fixedSize(horizontal: false, vertical: true)
             }.padding(16)
         }
         .foregroundStyle(hasPhoto ? .white : theme.ink)
@@ -197,7 +201,7 @@ struct DiaryHomeView: View {
             }
             HStack(spacing: 8) {
                 pill("افتح اليوم كاملًا", id: "diary-open-memory") { reader = day.day }
-                pill("اكتب في هامشها", id: "diary-add-margin", ink: theme.color("pencil")) { editor = .init(margin: day.day) }
+                pill("اكتب في هامشها", id: "diary-add-margin", ink: secondInk) { editor = .init(margin: day.day) }
             }
         }.padding(16).background(theme.surface, in: .rect(cornerRadius: 22)).overlay { RoundedRectangle(cornerRadius: 22).stroke(theme.line, lineWidth: 1) }
     }
@@ -282,15 +286,15 @@ struct DiaryHomeView: View {
         Button(action: action) { Text(title).font(.custom("thmanyahsans-Bold", size: 13, relativeTo: .subheadline)).frame(maxWidth: .infinity, minHeight: 44).foregroundStyle(ink ?? theme.ink).overlay { Capsule().stroke(ink ?? theme.line, lineWidth: 1) } }
             .buttonStyle(.plain).accessibilityIdentifier(id)
     }
-    private var blocks: [String] { app.values["notes.layout"]?.object?["blocks"]?.array?.compactMap(\.string) ?? ["memory", "thatDay", "sinceThatDay", "days"] }
+    private var blocks: [String] { DiaryHomeLayout(app.values["notes.layout"]).order }
     private func hidden(_ block: String) -> Bool { app.values["notes.layout"]?.object?["hidden"]?.array?.contains(.string(block)) == true }
     private func yearTitle(_ day: GregorianDay, snapshot: DiaryHomeSnapshot) -> String { String(service.dateTitle(day, calendar: snapshot.selection.match == .hijri ? .hijri : .gregorian).split(separator: " ").last ?? "") }
     private func refresh() async {
         do {
-            var value = try service.home(match: match)
+            var value = try service.home()
             let displayed = app.string("notes.homeShape") == "echoes" ? value.echoes.compactMap(\.day) : [selected ?? value.selection.days.first].compactMap { $0 }
             for day in Set(displayed) { try await service.prepareClosedDay(day) }
-            value = try service.home(match: match)
+            value = try service.home()
             snapshot = value; failure = nil
         } catch { failure = error.localizedDescription }
     }

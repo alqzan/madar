@@ -7,6 +7,7 @@ struct DiaryMarginView: View {
     let snapshot: DiaryHomeSnapshot
     let service: AppDiaryService
     let showAuto: Bool
+    let showLines: Bool
     let ink: Color
     let another: (() -> Void)?
     let open: () -> Void
@@ -30,6 +31,7 @@ struct DiaryMarginView: View {
             }
             VStack(alignment: .leading, spacing: 20) {
                 header
+                if showLines {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(originals) { line in
                         HStack(alignment: .firstTextBaseline, spacing: 10) {
@@ -48,6 +50,7 @@ struct DiaryMarginView: View {
                             .overlay(alignment: .leading) { Rectangle().fill(ink).frame(width: 2) }
                             .padding(.vertical, 12).accessibilityIdentifier("diary-margin-reply")
                     }
+                }
                 }
                 Spacer(minLength: 30)
                 Button(action: open) { Label("افتح اليوم كاملًا", systemImage: "arrow.up.left").font(MadarTypography.caption()).frame(minHeight: 44) }
