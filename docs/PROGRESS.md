@@ -152,7 +152,7 @@ No ready screen card remains in the M2 queue; owner accepted the completed scree
 # Handovers
 ## Handover — M3-F01, V15 follow-up, M4-E01/V01 — 2026-10-15 — Claude
 Works now: diary edits/revisions, letters, projects, travel frames and return envelope (M3 has no ready card left); M4 opened: year/upcoming engines and the lobby with built blocks, room sheets and arranging saved in `bahw.layout`.
-Verified: Core `MadarYearTests` 6/6 and `BahwGridTests` 2/2; Commands 47; diary UI+integration regression 33 (one locator fixed); `BahwLobbyUITests` 1/1 and FoundationUITests M0-T10/M0-T17/M1-T08/M1-V10 on the lobby; full FoundationUITests run in progress: M0-S2 backup, M0-T08 export share and M1-F02 travel pill failed in it and are being checked; RU1 and git diff --check pass.
+Verified: Core `MadarYearTests` 6/6 and `BahwGridTests` 2/2; Commands 47; diary UI+integration regression 33 (one locator fixed); `BahwLobbyUITests` 1/1 and FoundationUITests M0-T10/M0-T17/M1-T08/M1-V10 on the lobby; full FoundationUITests 33 passed, 4 failed (M0-S2 backup, M0-T08 export share, M1-F02 travel pill, M1-T04 notification prompt); the same 4 also fail with the old home restored, so they predate M4-V01 and stay open; RU1 and git diff --check pass.
 Differences left: lobby without habits/money/Mihbara, prayer block wide by schema, large size reuses wide content, size by menu; letters/projects panels have no canonical board.
 Not verified: owner visual/iPhone; dark mode; foreground letter re-check (no UI test).
 Next: owner answers RL3 questions and gives RL2 (HabitEvent, schema V4) go for M4-E02; then M4-V03 «السنة وما يهمّك» (ready), V04, W01. Pause Codex automation (00:17).
