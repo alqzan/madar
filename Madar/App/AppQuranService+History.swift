@@ -1,0 +1,24 @@
+import Foundation
+import MadarQuran
+import MadarCommands
+
+struct QuranUILogRecord: Identifiable, Sendable {
+    var id: UUID; var day: String; var title: String; var detail: String; var kind: QuranUIKind
+    var grades: [QuranUIPageGrade]; var warning: String?
+}
+struct QuranUISessionLog: Sendable { var records: [QuranUILogRecord]; var coverage: String; var fraction: Double; var nextDue: [Int: String]; var gap: String? }
+extension AppQuranService {
+    func sessionLog() throws -> QuranUISessionLog {
+        let v = try snapshot(), catalog = try QuranResources.catalog()
+        let records = v.sessions.reversed().map { row in
+            let title = switch row.kind { case .hifz: "حفظ"; case .review: "مراجعة"; case .free: "مراجعة حرة"; case .qiyam: "ورد القيام"; case .drill: "مواضع الخطأ" }
+            return QuranUILogRecord(id: row.id, day: displayDate(row.dayKey), title: title + "، " + faceCount(row.pages.count), detail: portionTitle(row.ayahs, catalog: catalog), kind: QuranUIKind(rawValue: row.kind.rawValue)!,
+                grades: row.grades.map { QuranUIPageGrade(page: $0.page, title: "الوجه " + numerals.string($0.page), grade: QuranUIGrade(rawValue: $0.rating.storedRaw)!, explanation: "تقييمك") },
+                warning: row.kind == .hifz && row.grades.contains { $0.rating == .needsMastery } ? "يحتاج هذا الورد تثبيتًا؛ يتغيّر مسار الحفظ التالي بحسب تقييمك" : nil)
+        }
+        let frontier = try v.coverage.frontier(from: v.plan?.plan.startAyah ?? 1)
+        let gap = frontier.flatMap { first in v.coverage.coveredAyahs.contains(where: { $0 > first }) ? "في حفظك فجوة تبدأ من " + (catalog.ayah(id: first)?.surahNameArabic ?? "") + "؛ تُقدَّم في الورد القادم" : nil }
+        return QuranUISessionLog(records: records, coverage: faceCount(v.coverage.completedPages.count), fraction: Double(v.coverage.completedPages.count) / 604,
+            nextDue: v.pages.reduce(into: [:]) { $0[$1.page] = displayDate($1.nextDue) }, gap: gap)
+    }
+}
