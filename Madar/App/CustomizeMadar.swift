@@ -66,7 +66,7 @@ struct CustomizeMadar: View {
         }
     }
     private var sections: [String] { ["السنة", "الأيام القادمة", "اليوم والتقويم", "المظهر", "مدينتك", "الخصوصية", "الإشعارات", "الصلاة", "المواقيت"].filter { section in filtered.contains { sectionFor($0.key) == section } } }
-    private let symbols = ["السنة": "clock", "الأيام القادمة": "calendar.badge.clock", "اليوم والتقويم": "moon", "الصلاة": "building.columns", "المواقيت": "clock.arrow.circlepath", "الخصوصية": "lock", "المظهر": "paintpalette", "مدينتك": "location", "الإشعارات": "bell.badge"]
+    private let symbols = ["السنة": "MadarYear", "الأيام القادمة": "MadarUpcoming", "اليوم والتقويم": "moon", "الصلاة": "MadarPrayer", "المواقيت": "clock.arrow.circlepath", "الخصوصية": "lock", "المظهر": "paintpalette", "مدينتك": "location", "الإشعارات": "bell.badge"]
     private var changesLabel: String {
         let count = session.schema.settings.filter { (AppSession.supportedKeys + ["bahw.layout"]).contains($0.key) && session.values[$0.key] != $0.defaultValue }.count
         return CustomizationCopy.changes(count: count, formattedCount: session.digits(count))
@@ -131,7 +131,7 @@ struct SettingsSection: View {
                 }.padding(.top, 12)
             } label: {
                 HStack(spacing: 12) {
-                    Image(systemName: symbol).font(.system(size: 18)).foregroundStyle(theme.ink).frame(width: 48, height: 48).background(theme.background, in: .rect(cornerRadius: 14)).accessibilityHidden(true)
+                    MadarGlyph(symbol, size: 22).foregroundStyle(theme.ink).frame(width: 48, height: 48).background(theme.background, in: .rect(cornerRadius: 14)).accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 3) {
                         Text(title).font(MadarTypography.section()).foregroundStyle(theme.ink)
                         if !summary.isEmpty { Text(summary).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).lineLimit(1) }

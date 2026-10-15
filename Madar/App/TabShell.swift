@@ -18,8 +18,14 @@ struct TabShell<Content: View>: View {
     var body: some View {
         TabView(selection: $selection) {
             ForEach(tabs) { tab in
-                Tab(tab.title, systemImage: tab.symbol, value: tab.id) {
-                    content(tab.id).accessibilityIdentifier(tab.id == "customize" ? "settings-tab" : tab.id == "prayer" ? "prayer-tab" : tab.id == "quran" ? "quran-tab" : "foundation-tab")
+                if tab.symbol.hasPrefix("Madar") {
+                    Tab(tab.title, image: tab.symbol + (selection == tab.id ? "Selected" : ""), value: tab.id) {
+                        content(tab.id).accessibilityIdentifier(tab.id + "-tab")
+                    }
+                } else {
+                    Tab(tab.title, systemImage: tab.symbol, value: tab.id) {
+                        content(tab.id).accessibilityIdentifier(tab.id == "customize" ? "settings-tab" : tab.id + "-tab")
+                    }
                 }
             }
         }
@@ -37,7 +43,7 @@ struct MadarRootView: View {
     var body: some View {
         let dark = forcedColorScheme == .dark || (forcedColorScheme == nil && colorScheme == .dark)
         let theme = RoomTheme(dark: dark, calmPaper: false)
-        TabShell(selection: $session.selectedTab, tabs: [.init(id: "foundation", title: "مدار", symbol: "circle.hexagongrid"), .init(id: "prayer", title: "الصلاة", symbol: "moon.stars"), .init(id: "quran", title: "القرآن", symbol: "book.closed"), .init(id: "notes", title: "المذكرات", symbol: "text.book.closed"), .init(id: "customize", title: "خصّص", symbol: "slider.horizontal.3")]) { tab in
+        TabShell(selection: $session.selectedTab, tabs: [.init(id: "foundation", title: "مدار", symbol: "MadarOrbit"), .init(id: "prayer", title: "الصلاة", symbol: "MadarPrayer"), .init(id: "quran", title: "القرآن", symbol: "MadarQuran"), .init(id: "notes", title: "المذكرات", symbol: "MadarDiary"), .init(id: "customize", title: "خصّص", symbol: "slider.horizontal.3")]) { tab in
             NavigationStack {
                 if tab == "customize" { CustomizeMadar(session: session) }
                 else if tab == "prayer" { PrayerTodayView(session: session) }

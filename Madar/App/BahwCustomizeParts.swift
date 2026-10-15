@@ -128,7 +128,7 @@ struct BahwBlocksSection: View {
         let size = layout.size(block), shown = !layout.hidden.contains(block.rawValue)
         return HStack(spacing: 7) {
             Image(systemName: "circle.grid.2x3.fill").font(.system(size: 11)).foregroundStyle(lobby.secondaryInk).accessibilityHidden(true)
-            Image(systemName: block.symbol).font(.system(size: 13)).foregroundStyle(lobby.ink).frame(width: 30, height: 30).background(lobby.color(block.tone).opacity(0.16), in: .rect(cornerRadius: 9)).accessibilityHidden(true)
+            MadarGlyph(block.symbol, size: 17).foregroundStyle(lobby.ink).frame(width: 30, height: 30).background(lobby.color(block.tone).opacity(0.16), in: .rect(cornerRadius: 9)).accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(block.title).font(MadarTypography.section()).lineLimit(1)
                 Text(size.title + "، " + block.detail).font(MadarTypography.caption()).foregroundStyle(lobby.secondaryInk).lineLimit(1).minimumScaleFactor(0.75)

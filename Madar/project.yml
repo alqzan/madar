@@ -102,6 +102,7 @@ targets:
       - Intents/StartQuranSessionIntent.swift
       - Intents/StartPrayerActivityIntent.swift
       - App/QuranWidgetContent.swift
+      - App/Resources/RoomSymbols.xcassets
     dependencies:
       - package: MadarSnapshots
       - package: MadarInbox

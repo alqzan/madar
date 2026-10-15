@@ -38,7 +38,7 @@ struct BahwBlockView: View {
         }
     }
     private func title(_ color: Color) -> some View {
-        Label(block.title, systemImage: block.symbol).font(label).foregroundStyle(color).labelStyle(.titleAndIcon).lineLimit(1)
+        Label { Text(block.title) } icon: { MadarGlyph(block.symbol, size: 17) }.font(label).foregroundStyle(color).labelStyle(.titleAndIcon).lineLimit(1)
     }
 
     // MARK: prayer
@@ -85,7 +85,7 @@ struct BahwBlockView: View {
         let gold = room.color("gold"), on = room.color("onCover")
         if let model = service.quran() {
             if size == .icon {
-                VStack(spacing: 2) { Image(systemName: "book").foregroundStyle(gold); Text(model.coverage).font(small).foregroundStyle(on).multilineTextAlignment(.center).minimumScaleFactor(0.6) }.frame(maxWidth: .infinity, maxHeight: .infinity)
+                VStack(spacing: 2) { MadarGlyph("MadarQuran", size: 22).foregroundStyle(gold); Text(model.coverage).font(small).foregroundStyle(on).multilineTextAlignment(.center).minimumScaleFactor(0.6) }.frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 VStack(alignment: .leading, spacing: 8) {
                     title(gold)
@@ -108,7 +108,7 @@ struct BahwBlockView: View {
         let model = service.diary()
         let count = model?.count ?? 0
         if size == .icon {
-            VStack(spacing: 2) { Image(systemName: "pencil").foregroundStyle(room.accent); Text(count == 0 ? "اكتب" : service.lineCount(count)).font(small).multilineTextAlignment(.center).minimumScaleFactor(0.7) }.frame(maxWidth: .infinity, maxHeight: .infinity)
+            VStack(spacing: 2) { MadarGlyph("MadarDiary", size: 22).foregroundStyle(room.accent); Text(count == 0 ? "اكتب" : service.lineCount(count)).font(small).multilineTextAlignment(.center).minimumScaleFactor(0.7) }.frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             VStack(alignment: .leading, spacing: 0) {
                 if let data = model?.photo, let image = UIImage(data: data) {

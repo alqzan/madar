@@ -24,7 +24,7 @@ private struct FoundationWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: FoundationProvider()) { entry in
             VStack(alignment: .leading, spacing: 8) {
-                Image(systemName: "circle.circle").font(.title).widgetAccentable()
+                Image("MadarOrbit").renderingMode(.template).resizable().scaledToFit().frame(width: 28, height: 28).widgetAccentable()
                 Text("مدار").font(.title2.weight(.semibold))
                 Text("افتح مدار").font(.body)
             }
@@ -52,7 +52,7 @@ private struct PrayerCountdownActivityWidget: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: PrayerCountdownAttributes.self) { context in
             HStack(spacing: 12) {
-                Image(systemName: "moon.stars").font(.title2).accessibilityHidden(true)
+                Image("MadarPrayer").renderingMode(.template).resizable().scaledToFit().frame(width: 24, height: 24).accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("الصلاة القادمة").font(.caption)
                     Text(context.state.prayerName).font(.headline)
@@ -75,11 +75,11 @@ private struct PrayerCountdownActivityWidget: Widget {
                     .environment(\.layoutDirection, .rightToLeft)
                 }
             } compactLeading: {
-                Image(systemName: "moon.stars")
+                Image("MadarPrayer").renderingMode(.template).resizable().scaledToFit().frame(width: 18, height: 18)
             } compactTrailing: {
                 PrayerActivityTimer(start: context.attributes.scheduledStartAt, end: context.state.prayerAt, numerals: context.attributes.numerals)
             } minimal: {
-                Image(systemName: "moon.stars")
+                Image("MadarPrayer").renderingMode(.template).resizable().scaledToFit().frame(width: 18, height: 18)
             }
             .widgetURL(URL(string: "madar://prayer"))
             .keylineTint(.teal)

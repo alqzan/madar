@@ -12,7 +12,7 @@ enum BahwBlock: String, CaseIterable {
         switch self { case .habits: "عاداتك"; case .salah: "الصلاة"; case .quran: "القرآن"; case .mal: "المال"; case .year: "السنة"; case .upcoming: "الأيام القادمة"; case .notes: "المذكرات"; case .mihbara: "المحبرة" }
     }
     var symbol: String {
-        switch self { case .salah: "building.columns"; case .quran: "book"; case .year: "clock"; case .upcoming: "calendar"; case .notes: "pencil"; default: "circle" }
+        switch self { case .salah: "MadarPrayer"; case .quran: "MadarQuran"; case .year: "MadarYear"; case .upcoming: "MadarUpcoming"; case .notes: "MadarDiary"; default: "circle" }
     }
     var tab: String? { switch self { case .salah: "prayer"; case .quran: "quran"; case .notes: "notes"; default: nil } }
 }
@@ -178,7 +178,7 @@ struct BahwLobbyView: View {
     private var drawer: some View {
         NavigationStack {
             List(layout.hiddenBuilt, id: \.self) { block in
-                Button { update { $0.hidden.removeAll { $0 == block.rawValue } }; drawerOpen = layout.hiddenBuilt.count > 1 } label: { Label(block.title, systemImage: block.symbol) }
+                Button { update { $0.hidden.removeAll { $0 == block.rawValue } }; drawerOpen = layout.hiddenBuilt.count > 1 } label: { Label { Text(block.title) } icon: { MadarGlyph(block.symbol) } }
                     .accessibilityIdentifier("bahw-show-" + block.rawValue)
             }
             .scrollContentBackground(.hidden).background(theme.background)
