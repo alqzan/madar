@@ -14,6 +14,7 @@ struct DiaryHubView: View {
     @State private var reader: GregorianDay?
     @State private var searchOpen = false
     @State private var exportOpen = false
+    @State private var bookOpen = false
     @State private var failure: String?
     private var service: AppDiaryService { .init(app: app) }
     private var grid: DiaryCalendarGrid { service.diaryCalendar }
@@ -37,10 +38,12 @@ struct DiaryHubView: View {
                             }
                         } else if let failure { Text(failure).font(MadarTypography.body()) }
                         else { ProgressView("تُفتح أيامك…") }
+                        Button { bookOpen = true } label: { Label("كتاب السنة", systemImage: "book.closed").font(DiaryType.label).frame(minHeight: 44) }.accessibilityIdentifier("diary-yearbook")
                         Button { exportOpen = true } label: { Label("تصدير المذكرات", systemImage: "square.and.arrow.up").font(DiaryType.label).frame(minHeight: 44) }.accessibilityIdentifier("diary-export")
                     }.padding(18)
                 }
             }.background(theme.background).foregroundStyle(theme.ink)
+                .fullScreenCover(isPresented: $bookOpen) { DiaryYearbookView(app: app).environment(\.roomTheme, theme) }
                 .fullScreenCover(isPresented: $exportOpen) { DiaryExportView(app: app).environment(\.roomTheme, theme) }
                 .fullScreenCover(isPresented: $searchOpen) { DiarySearchView(app: app).environment(\.roomTheme, theme) }
                 .toolbar { ToolbarItem(placement: .topBarTrailing) { Button { searchOpen = true } label: { Image(systemName: "magnifyingglass") }.accessibilityLabel("ابحث في مذكراتك") }; ToolbarItem(placement: .topBarLeading) { Button { dismiss() } label: { Label("المذكرات", systemImage: "chevron.backward") }.accessibilityIdentifier("diary-hub-close") } }

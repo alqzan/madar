@@ -49,6 +49,7 @@ extension AppDiaryService {
             var media=page.media
             let key=date.description
             if let id=try context.fetch(FetchDescriptor<DayPage>(predicate:#Predicate{$0.dayKey == key && $0.deletedAt == nil && $0.mergedInto == nil})).first?.photoMediaID,!media.contains(where:{$0.id==id}),let row=try context.fetch(FetchDescriptor<Media>(predicate:#Predicate{$0.id == id && $0.deletedAt == nil && $0.mergedInto == nil})).first,let data=row.data {media.append(.init(id:id,entryID:"page",kind:"photo",contentType:row.contentType,data:data,duration:nil))}
+            lines=lines.filter{!$0.text.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty}
             guard !lines.isEmpty || !media.isEmpty else{return nil}
             return .init(day:date,title:dateTitle(date,calendar:FirstCalendar(rawValue:app.string("core.firstCalendar")) ?? .hijri),lines:lines.sorted{$0.at == $1.at ? $0.id<$1.id : $0.at<$1.at},media:media)
         }
@@ -101,21 +102,38 @@ extension AppDiaryService {
 }
 
 @MainActor enum DiaryPDF {
-    static func render(_ pages:[DiaryExportPage],digits:MadarNumberFormatter)->Data {
+    static func render(_ pages:[DiaryExportPage],digits:MadarNumberFormatter,coverYear:Int?=nil,index:Bool=false)->Data {
         let bounds=CGRect(x:0,y:0,width:595,height:842),paper=UIColor(red:0.96,green:0.94,blue:0.89,alpha:1),ink=UIColor(red:0.16,green:0.14,blue:0.11,alpha:1)
         var number=0
         return UIGraphicsPDFRenderer(bounds:bounds).pdfData { renderer in
             func begin(){renderer.beginPage();number+=1;paper.setFill();renderer.cgContext.fill(bounds);UIColor(white:0.5,alpha:0.14).setStroke();let path=UIBezierPath();for y in stride(from:CGFloat(80),through:780,by:28){path.move(to:CGPoint(x:40,y:y));path.addLine(to:CGPoint(x:555,y:y))};path.lineWidth=0.5;path.stroke();(digits.string(number) as NSString).draw(at:CGPoint(x:290,y:805),withAttributes:[.font:UIFont.systemFont(ofSize:10),.foregroundColor:ink])}
+            if let coverYear {
+                begin();UIColor(red:0.369,green:0.169,blue:0.106,alpha:1).setFill();renderer.cgContext.fill(bounds)
+                let style=NSMutableParagraphStyle();style.alignment = .center;style.baseWritingDirection = .rightToLeft
+                ("مذكرات\n"+digits.string(coverYear) as NSString).draw(in:CGRect(x:60,y:260,width:475,height:240),withAttributes:[.font:UIFont(name:"thmanyahserifdisplay-Bold",size:44) ?? UIFont.boldSystemFont(ofSize:44),.foregroundColor:UIColor(red:0.949,green:0.902,blue:0.827,alpha:1),.paragraphStyle:style])
+            }
+            var indexLines:[String]=[]
             for page in pages {
+                indexLines.append(page.title+" — "+digits.string(number+1))
                 let paragraph=NSMutableParagraphStyle();paragraph.baseWritingDirection = .rightToLeft;paragraph.alignment = .right;paragraph.minimumLineHeight=28;paragraph.paragraphSpacing=10
                 let text=NSMutableAttributedString(string:page.title+"\n\n",attributes:[.font:UIFont(name:"thmanyahserifdisplay-Bold",size:25) ?? UIFont.boldSystemFont(ofSize:25),.foregroundColor:ink,.paragraphStyle:paragraph])
                 for line in page.lines {text.append(NSAttributedString(string:AppDiaryService.exportLabel(line.kind)+line.text+"\n\n",attributes:[.font:UIFont(name:"thmanyahseriftext-Regular",size:17) ?? UIFont.systemFont(ofSize:17),.foregroundColor:line.kind=="margin" ? UIColor(red:0.18,green:0.32,blue:0.39,alpha:1):ink,.paragraphStyle:paragraph]))}
+                for item in page.media where item.kind != "photo" {
+                    let label=item.kind=="audio" ? "تسجيل صوتي محفوظ في هذا اليوم" : "مرفق محفوظ في هذا اليوم"
+                    text.append(NSAttributedString(string:label+"\n\n",attributes:[.font:UIFont.systemFont(ofSize:14),.foregroundColor:ink,.paragraphStyle:paragraph]))
+                }
                 let setter=CTFramesetterCreateWithAttributedString(text);var cursor=0
                 while cursor<text.length {
                     begin();let path=CGPath(rect:CGRect(x:40,y:50,width:515,height:742),transform:nil),frame=CTFramesetterCreateFrame(setter,CFRange(location:cursor,length:0),path,nil),visible=CTFrameGetVisibleStringRange(frame)
                     guard visible.length>0 else{break};let cg=renderer.cgContext;cg.saveGState();cg.translateBy(x:0,y:842);cg.scaleBy(x:1,y:-1);CTFrameDraw(frame,cg);cg.restoreGState();cursor+=visible.length
                 }
                 for item in page.media where item.kind=="photo" {if let image=UIImage(data:item.data){begin();(page.title as NSString).draw(in:CGRect(x:40,y:36,width:515,height:40),withAttributes:[.font:UIFont.systemFont(ofSize:18),.foregroundColor:ink,.paragraphStyle:paragraph]);let scale=min(515/image.size.width,690/image.size.height),size=CGSize(width:image.size.width*scale,height:image.size.height*scale);image.draw(in:CGRect(x:(595-size.width)/2,y:90,width:size.width,height:size.height))}}
+            }
+            if index {
+                let paragraph=NSMutableParagraphStyle();paragraph.alignment = .right;paragraph.baseWritingDirection = .rightToLeft;paragraph.minimumLineHeight=28
+                let text=NSAttributedString(string:"فهرس الأيام\n\n"+indexLines.joined(separator:"\n"),attributes:[.font:UIFont(name:"thmanyahseriftext-Regular",size:16) ?? UIFont.systemFont(ofSize:16),.foregroundColor:ink,.paragraphStyle:paragraph])
+                let setter=CTFramesetterCreateWithAttributedString(text);var cursor=0
+                while cursor<text.length {begin();let path=CGPath(rect:CGRect(x:40,y:50,width:515,height:742),transform:nil),frame=CTFramesetterCreateFrame(setter,CFRange(location:cursor,length:0),path,nil),visible=CTFrameGetVisibleStringRange(frame);guard visible.length>0 else{break};let cg=renderer.cgContext;cg.saveGState();cg.translateBy(x:0,y:842);cg.scaleBy(x:1,y:-1);CTFrameDraw(frame,cg);cg.restoreGState();cursor+=visible.length}
             }
         }
     }
