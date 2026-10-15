@@ -50,6 +50,11 @@ struct DiaryHomeView: View {
                     if app.string("notes.homeShape") == "echoes" {
                         DiaryEchoesView(snapshot: snapshot, service: service, open: { reader = $0 })
                         if !hidden("days") { recentDays(snapshot) }
+                    } else if app.string("notes.homeShape") == "margin", let memory {
+                        DiaryMarginView(page: memory, snapshot: snapshot, service: service, showAuto: app.bool("notes.showAutoSections"), ink: secondInk,
+                            another: snapshot.selection.days.count > 1 ? { nextMemory(snapshot) } : nil, open: { reader = memory.day })
+                        if !memory.dayOne, !hidden("sinceThatDay") { since(memory) }
+                        if !hidden("days") { recentDays(snapshot) }
                     } else {
                     HStack {
                         Text(snapshot.selection.match == .echo ? "أقرب صدى" : "في مثل هذا اليوم").font(DiaryType.heading)
@@ -75,7 +80,12 @@ struct DiaryHomeView: View {
             }
         }
         .background(theme.background).foregroundStyle(theme.ink)
-        .safeAreaInset(edge: .bottom, spacing: 0) { if let snapshot { todayBar(snapshot.todayPage) } }
+         .safeAreaInset(edge: .bottom, spacing: 0) {
+            if let snapshot {
+                if app.string("notes.homeShape") == "margin", let memory { marginBar(snapshot.todayPage, target: memory.day) }
+                else { todayBar(snapshot.todayPage) }
+            }
+        }
         .toolbarVisibility(.hidden, for: .navigationBar)
         .task(id: app.prayerRevision) { await refresh() }
         .task {
@@ -193,12 +203,21 @@ struct DiaryHomeView: View {
     }
     private func since(_ day: DiaryDisplayDay) -> some View {
         let metrics = (try? service.comparisons(since: day.day)) ?? []
-        return VStack(alignment: .leading, spacing: 12) {
-            if !metrics.isEmpty { Text("منذ ذاك اليوم").font(DiaryType.heading) }
-            ForEach(metrics, id: \.0) { title, value in
-                VStack(alignment: .leading, spacing: 4) { Text(title).font(MadarTypography.section()); Text(value).font(DiaryType.label) }
+        return Group {
+            if !metrics.isEmpty {
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack { Text("منذ ذاك اليوم").font(MadarTypography.section()); Text(service.distance(day.day, snapshot?.today ?? day.day)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text")) }
+                    ForEach(metrics, id: \.0) { title, value in
+                        Divider().overlay(theme.line)
+                        VStack(alignment: .leading, spacing: 7) {
+                            Text(title).font(MadarTypography.section())
+                            Text(value).font(DiaryType.label).foregroundStyle(theme.color("autoInkText")).fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }.padding(18).frame(maxWidth: .infinity, alignment: .leading)
+                    .background(theme.surface, in: .rect(cornerRadius: 24)).overlay { RoundedRectangle(cornerRadius: 24).stroke(theme.line) }
             }
-        }.padding(.horizontal, 8)
+        }
     }
     private func recentDays(_ snapshot: DiaryHomeSnapshot) -> some View {
         let days = snapshot.days.filter { $0.day < snapshot.today }.prefix(5)
@@ -225,6 +244,28 @@ struct DiaryHomeView: View {
                 if days.isEmpty { Text("أيامك تبدأ من هنا.").font(DiaryType.writing).padding(24) }
             }.background(theme.surface, in: .rect(cornerRadius: 22)).overlay { RoundedRectangle(cornerRadius: 22).stroke(theme.line, lineWidth: 1) }
         }.accessibilityElement(children: .contain).accessibilityIdentifier("diary-recent-days")
+    }
+    private var secondInk: Color {
+        switch app.string("notes.secondInk") { case "green": theme.color("ghad"); case "brown": theme.color("autoInkText"); default: theme.color("pencil") }
+    }
+    private func nextMemory(_ snapshot: DiaryHomeSnapshot) {
+        guard let memory, let index = snapshot.selection.days.firstIndex(of: memory.day) else { return }
+        selected = snapshot.selection.days[(index + 1) % snapshot.selection.days.count]
+    }
+    private func marginBar(_ day: DiaryDisplayDay, target: GregorianDay) -> some View {
+        HStack(spacing: 8) {
+            HStack(spacing: 0) {
+                Button { reader = day.day } label: {
+                    VStack(alignment: .leading, spacing: 3) { Text("صفحة اليوم").font(MadarTypography.section()); Text(day.excerpt).font(DiaryType.label).lineLimit(1) }
+                        .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading)
+                }.buttonStyle(.plain).accessibilityIdentifier("diary-today")
+                Button { editor = .init(margin: nil) } label: { Image(systemName: "plus").frame(width: 44, height: 44).overlay { Circle().stroke(theme.line) } }
+                    .buttonStyle(.plain).accessibilityLabel("اكتب في صفحة اليوم").accessibilityIdentifier("diary-write")
+            }.padding(.horizontal, 12).background(theme.surface, in: .capsule).overlay { Capsule().stroke(theme.line) }
+            Button { editor = .init(margin: target) } label: {
+                Label("اكتب في هامشها", systemImage: "pencil").font(MadarTypography.caption()).padding(.horizontal, 15).frame(minHeight: 54).foregroundStyle(theme.background).background(theme.ink, in: .capsule)
+            }.buttonStyle(.plain).accessibilityIdentifier("diary-add-margin")
+        }.padding(.horizontal, 14).padding(.vertical, 8).background(theme.background)
     }
     private func todayBar(_ day: DiaryDisplayDay) -> some View {
         HStack(spacing: 10) {

@@ -14,6 +14,7 @@ struct DiaryDisplayDay: Identifiable {
     let photo: Data?
     let place: String?
     let dayOne: Bool
+    var marginDays: [String: GregorianDay] = [:]
     var excerpt: String { lines.first(where: { $0.kind == "normal" || $0.kind == "late" })?.text ?? lines.first?.text ?? "صفحة بلا كتابة" }
 }
 struct DiaryHomeSnapshot {
@@ -100,7 +101,9 @@ struct DiaryHomeSnapshot {
             }
         }
         return .init(day: day, lines: lines.sorted { $0.at == $1.at ? $0.id < $1.id : $0.at < $1.at }, photo: photo,
-            place: app.bool("notes.showPlace") ? entries.compactMap(\.place).first : nil, dayOne: page?.origin == "dayOne")
+            place: app.bool("notes.showPlace") ? entries.compactMap(\.place).first : nil, dayOne: page?.origin == "dayOne", marginDays: Dictionary(uniqueKeysWithValues: margins.compactMap { margin in
+                guard let day = try? GregorianDay(margin.writtenDayKey) else { return nil }; return ("margin." + margin.id.uuidString, day)
+            }))
     }
     func dateTitle(_ day: GregorianDay, calendar: FirstCalendar) -> String {
         let formatter = DateFormatter(); formatter.locale = Locale(identifier: "ar_SA@numbers=" + (app.string("core.numerals") == "western" ? "latn" : "arab"))
@@ -147,13 +150,14 @@ struct DiaryHomeSnapshot {
         }
         if metrics.contains("fajrJamaah") {
             let first = try PrayerRepository(context: context).tracking(at: clock()).day
-            let logs = try context.fetch(FetchDescriptor<PrayerLog>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.prayer == "fajr" && $0.status == "jamaah" }
+            let logs = try context.fetch(FetchDescriptor<PrayerLog>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.prayer == "fajr" && ["jamaah", "alone", "qada", "missed"].contains($0.status) }
             func ratio(through end: GregorianDay) -> String {
                 guard end >= first else { return "لم يكن مدار يسجّل هذا بعد" }
-                let start = max(first, end.adding(days: -29)), keys = Set(logs.filter { $0.dayKey >= start.description && $0.dayKey <= end.description }.map(\.dayKey))
-                var count = 0, date = start
-                while date <= end { count += 1; date = date.adding(days: 1) }
-                return digits.string(keys.count) + " من " + digits.string(count) + " يومًا مسجّلًا"
+                let start = max(first, end.adding(days: -29))
+                let window = logs.filter { $0.dayKey >= start.description && $0.dayKey <= end.description }
+                let recorded = Set(window.map(\.dayKey)), jamaah = Set(window.filter { $0.status == "jamaah" }.map(\.dayKey))
+                guard !recorded.isEmpty else { return "لا تسجيل للفجر في هذه الفترة" }
+                return digits.string(jamaah.count) + " من " + digits.string(recorded.count) + " يومًا مسجّلًا"
             }
             result.append(("الفجر جماعة", ratio(through: day) + " ← " + ratio(through: today)))
         }

@@ -25,10 +25,10 @@ extension AppSession {
             }
             for age in 1...3 {
                 let day = try GregorianDay(year: today.year - age, month: today.month, day: today.day)
-                let page = DayPage(); page.dayKey = day.description; page.origin = "dayOne"
+                let page = DayPage(); page.dayKey = day.description; page.origin = variant == "margin" ? "native" : "dayOne"
                 let media = Media(); media.kind = "photo"; media.contentType = "image/jpeg"; media.data = Self.diaryFixturePhoto(variant: age)
                 media.sizeBytes = media.data?.count ?? 0; context.insert(media); page.photoMediaID = media.id; context.insert(page)
-                append(day, age == 1 ? "عشاء عند أهلي، وأمي سوّت المرقوق. ضحكنا على صور العيد القديمة." : age == 2 ? "مشينا بعد المغرب، والجو صار يحتمل." : "اتصلت على خالي، وطال الحديث.", hour: 20, imported: true)
+                append(day, age == 1 ? "عشاء عند أهلي، وأمي سوّت المرقوق. ضحكنا على صور العيد القديمة." : age == 2 ? "مشينا بعد المغرب، والجو صار يحتمل." : "اتصلت على خالي، وطال الحديث.", hour: 20, imported: variant != "margin")
                 if age == 1 {
                     let prayer = PrayerLog(); prayer.dayKey = day.description; prayer.prayer = "fajr"; prayer.status = "jamaah"; prayer.eventAt = day.date(in: .riyadh).addingTimeInterval(5*3600); context.insert(prayer)
                     let review = HifzSession(); review.dayKey = day.description; review.kind = "review"; review.fromAyah = 1; review.toAyah = 7; review.pages = [1]; review.endedAt = day.date(in: .riyadh).addingTimeInterval(16*3600); context.insert(review)
