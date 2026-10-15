@@ -11,7 +11,6 @@ import XCTest
         func element(_ id: String) -> XCUIElement { app.descendants(matching: .any).matching(identifier: id).firstMatch }
         XCTAssertTrue(element("bahw-block-year").waitForExistence(timeout: 15), app.debugDescription)
         element("bahw-block-year").tap()
-        let open = app.buttons["bahw-open-year"]; XCTAssertTrue(open.waitForExistence(timeout: 5)); open.tap()
         XCTAssertTrue(element("bahw-year-hero").waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(element("bahw-year-hero").label.contains("رمضان بعد ١٢٢"), element("bahw-year-hero").label)
         for id in ["bahw-year-strip", "bahw-strip-month", "bahw-strip-week", "bahw-strip-day"] { XCTAssertTrue(element(id).exists, id) }

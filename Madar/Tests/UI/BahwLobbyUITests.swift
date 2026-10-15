@@ -1,6 +1,6 @@
 import XCTest
 
-/// M4-V01 · bahw/02-W1-Bahw: the lobby shows built rooms only, arranges through settings, and opens a room from its sheet.
+/// M4-V01 · bahw/02-W1-Bahw: the lobby shows built rooms only, arranges through settings, and opens a room directly.
 @MainActor final class BahwLobbyUITests: XCTestCase {
     func testLobbyBuiltBlocksArrangeAndOpen() throws {
         continueAfterFailure = false
@@ -20,7 +20,7 @@ import XCTest
         app.swipeUp(); XCTAssertTrue(element("bahw-block-notes").waitForExistence(timeout: 5)); capture(app, "M4-V01-lobby-s1-L")
         app.swipeDown()
 
-        app.buttons["bahw-arrange"].tap()
+        element("bahw-block-salah").press(forDuration: 0.7)
         let hide = app.buttons["bahw-hide-year"]; XCTAssertTrue(hide.waitForExistence(timeout: 5)); hide.tap()
         XCTAssertTrue(element("bahw-block-year").waitForNonExistence(timeout: 5))
         app.swipeUp(); app.buttons["bahw-drawer"].tap()
@@ -29,8 +29,9 @@ import XCTest
         app.swipeDown(); app.buttons["bahw-arrange"].tap()
 
         element("bahw-block-salah").tap()
-        let open = app.buttons["bahw-open-prayer"]; XCTAssertTrue(open.waitForExistence(timeout: 5)); capture(app, "M4-V01-salah-sheet-L"); open.tap()
         XCTAssertTrue(element("prayer-today-header").waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(app.buttons["bahw-open-prayer"].exists)
+        capture(app, "UX-02-direct-prayer-L")
     }
     private func finishOnboarding(_ app: XCUIApplication) {
         if app.buttons["first-run-skip"].waitForExistence(timeout: 2) { app.buttons["first-run-skip"].tap() }

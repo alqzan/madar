@@ -60,7 +60,6 @@ struct BahwLobbyView: View {
     @Bindable var session: AppSession
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var arranging = false
-    @State private var opened: BahwBlock?
     @State private var drawerOpen = false
     @State private var wiggle = false
     private var theme: RoomTheme { RoomTheme(room: "bahw", dark: session.string("core.theme") == "dark") }
@@ -91,7 +90,6 @@ struct BahwLobbyView: View {
         .background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
         .environment(\.roomTheme, theme)
         .toolbarVisibility(.hidden, for: .navigationBar)
-        .sheet(item: Binding(get: { opened.map(BahwOpened.init) }, set: { opened = $0?.block })) { item in BahwBlockSheet(session: session, block: item.block) { opened = nil; if let tab = item.block.tab { session.selectedTab = tab } else { session.yearOpen = true } } }
         .navigationDestination(isPresented: $session.yearOpen) { BahwYearView(session: session) }
         .sheet(isPresented: $drawerOpen) { drawer.presentationDetents([.medium]) }
         .onChange(of: arranging) { _, on in wiggle = on && !reduceMotion }
@@ -127,7 +125,15 @@ struct BahwLobbyView: View {
     }
 
     @ViewBuilder private func tile(_ block: BahwBlock, size: BahwBlockSize) -> some View {
-        BahwBlockView(service: service, block: block, size: size)
+        if arranging {
+            tileContent(block, size: size)
+                .draggable(block.rawValue) { BahwBlockView(service: service, block: block, size: .icon).frame(width: 84, height: 84) }
+        } else { tileContent(block, size: size) }
+    }
+    private func tileContent(_ block: BahwBlock, size: BahwBlockSize) -> some View {
+        Button { open(block) } label: {
+            BahwBlockView(service: service, block: block, size: size).contentShape(.rect(cornerRadius: 22))
+        }.buttonStyle(.plain)
             .rotationEffect(.degrees(wiggle ? 0.7 : 0)).animation(wiggle ? .easeInOut(duration: 0.14).repeatForever(autoreverses: true) : .default, value: wiggle)
             .overlay(alignment: .topLeading) {
                 if arranging {
@@ -146,9 +152,7 @@ struct BahwLobbyView: View {
                 }
             }
             .contentShape(.rect(cornerRadius: 22))
-            .onTapGesture { if !arranging { opened = block } }
-            .onLongPressGesture(minimumDuration: 0.52) { withAnimation(.snappy) { arranging = true } }
-            .draggable(block.rawValue) { BahwBlockView(service: service, block: block, size: .icon).frame(width: 84, height: 84) }
+            .highPriorityGesture(LongPressGesture(minimumDuration: 0.52).onEnded { _ in withAnimation(.snappy) { arranging = true } })
             .dropDestination(for: String.self) { items, _ in
                 guard arranging, let moved = items.first, moved != block.rawValue else { return false }
                 update { value in
@@ -159,8 +163,13 @@ struct BahwLobbyView: View {
                 return true
             }
             .accessibilityElement(children: .contain)
-            .accessibilityAction(named: "افتح") { opened = block }
+            .accessibilityAction(named: "افتح") { open(block) }
             .accessibilityIdentifier("bahw-block-" + block.rawValue)
+    }
+    private func open(_ block: BahwBlock) {
+        guard !arranging else { return }
+        if let tab = block.tab { session.selectedTab = tab }
+        else if block == .year || block == .upcoming { session.yearOpen = true }
     }
     private func sizeTitle(_ size: BahwBlockSize) -> String {
         switch size { case .icon: "أيقونة"; case .small: "صغيرة"; case .wide: "عريضة"; case .large: "كبيرة" }
