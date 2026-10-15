@@ -23,7 +23,7 @@ extension AppDiaryService {
         var documents:[DiarySearchDocument]=[]
         for row in entries {
             guard let day=try? GregorianDay(row.dayKey) else { continue }
-            let place=row.place ?? trips.first { trip in trip.start.map{row.eventAt >= $0} == true && trip.end.map{row.eventAt <= $0} != false }?.city
+            let place=row.place ?? trips.first { trip in trip.start.map{row.eventAt >= $0} == true && trip.end.map{row.eventAt < $0} != false }?.city
             let kind=row.mediaID.flatMap{media[$0]} == "audio" ? "audio" : row.attachmentMediaIDs.contains{media[$0]=="photo"} ? "photo" : row.ink == "ghad" ? "tomorrow" : "writing"
             var kinds:Set<String>=[kind]
             if row.attachmentMediaIDs.contains(where:{media[$0]=="photo"}) {kinds.insert("photo")}

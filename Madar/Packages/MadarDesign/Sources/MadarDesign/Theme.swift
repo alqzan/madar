@@ -10,7 +10,9 @@ public struct RoomTheme: Sendable {
     public func color(_ role: String) -> Color {
         let coreRoles = ["bg", "surface", "card", "surface2", "ink", "ink2", "ink3", "line", "line2", "accent", "accentFill", "accentText", "onAccent"]
         let selected = calmPaper && coreRoles.contains(role) ? "bahw" : room
-        let normalized: String = selected == "bahw" ? ["card": "surface", "surface2": "surface", "ink3": "ink2", "line2": "line"][role] ?? role : role
+        let normalized: String = selected == "bahw" ? ["card": "surface", "surface2": "surface", "ink3": "ink2", "line2": "line"][role] ?? role
+            // Air-mail travel paper (§7.3) has a smaller palette; small text maps onto its listed contrast pairs.
+            : selected == "notes.travel" ? ["card": "surface", "accentText": "accent", "ink3": "ink2", "ink3Text": "ink2", "autoInkText": "ink2", "late": "accent", "pencil": "accent", "ghad": "accent", "highlight": "line", "seal": "accent"][role] ?? role : role
         let path = "rooms.\(selected).\(dark ? "dark" : "light").\(normalized)"
         return MadarToken.colors[path] ?? MadarToken.colors["rooms.\(selected).\(dark ? "dark" : "light").accent"] ?? .primary
     }

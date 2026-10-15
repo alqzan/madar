@@ -9,6 +9,8 @@ numeric = re.compile(r"\\\((?:arabicNumber|digits)\(")
 failures = []
 for path in sorted((root / "App").rglob("*.swift")):
     for number, line in enumerate(path.read_text().splitlines(), 1):
+        if line.lstrip().startswith("//"):
+            continue
         if literal.search(line) or ("·" in line and numeric.search(line)):
             failures.append(f"{path.relative_to(root)}:{number}: numeric middle dot")
 if failures:

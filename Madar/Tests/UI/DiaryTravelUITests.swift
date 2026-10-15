@@ -1,0 +1,18 @@
+import XCTest
+@MainActor final class DiaryTravelUITests:XCTestCase {
+    // M3-V15 · notes-app/21: a shared trip from yesterday shows the air-mail day two, stamp, route and «اكتب من إسطنبول».
+    func testTravelTodayPageAndStamps() throws {
+        continueAfterFailure=false
+        let app=XCUIApplication();app.launchEnvironment=["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_DIARY_FIXTURE":"travel","MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light","MADAR_UI_NOW":"2026-09-30T16:40:00+03:00"];app.launch()
+        XCTAssertTrue(app.buttons["diary-today"].waitForExistence(timeout:25));app.buttons["diary-today"].tap()
+        let title=app.staticTexts["diary-travel-title"];XCTAssertTrue(title.waitForExistence(timeout:10));XCTAssertEqual(title.label,"اليوم الثاني")
+        XCTAssertTrue(app.staticTexts["diary-travel-distance"].label.contains("كم عن الرياض"))
+        XCTAssertTrue(app.descendants(matching:.any).matching(identifier:"diary-travel-stamp").firstMatch.exists)
+        XCTAssertEqual(app.buttons["diary-day-write"].label,"اكتب من إسطنبول")
+        capture(app,"M3-V15-travel-L")
+        app.buttons["diary-stamps-open"].tap();XCTAssertTrue(app.buttons["diary-stamps-done"].waitForExistence(timeout:10))
+        XCTAssertTrue(app.descendants(matching:.any).matching(identifier:"diary-passport-stamp").firstMatch.exists);capture(app,"M3-V15-stamps-L")
+        app.buttons["diary-stamps-done"].tap();app.buttons["diary-day-write"].tap();XCTAssertTrue(app.textViews.firstMatch.waitForExistence(timeout:10))
+    }
+    private func capture(_ app:XCUIApplication,_ name:String){let a=XCTAttachment(screenshot:app.screenshot());a.name=name;a.lifetime = .keepAlways;add(a)}
+}

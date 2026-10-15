@@ -9,7 +9,7 @@ import MadarData
 extension AppSession {
     func prepareDiaryHomeFixture(group: URL) throws {
         let env = ProcessInfo.processInfo.environment
-        guard let variant = env["MADAR_UI_DIARY_FIXTURE"], ["home", "empty", "echoes", "margin", "welcome", "today", "editor", "return"].contains(variant), let id = env["MADAR_UI_STORE_ID"],
+        guard let variant = env["MADAR_UI_DIARY_FIXTURE"], ["home", "empty", "echoes", "margin", "welcome", "today", "editor", "return", "travel"].contains(variant), let id = env["MADAR_UI_STORE_ID"],
               group.lastPathComponent == id, group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         selectedTab = "notes"
         let context = ModelContext(container)
@@ -19,6 +19,19 @@ extension AppSession {
         for key in ["sys.onboardingCompleted", "sys.diaryFixture"] { let row = DeviceSetting(); row.key = key; row.valueJSON = Data("true".utf8); context.insert(row) }
         if variant != "welcome" { let marker = DeviceSetting(); marker.key = "sys.diaryWelcomeSeen"; marker.valueJSON = Data("true".utf8); context.insert(marker) }
         if variant == "echoes" || variant == "margin" { _ = try settings.stage(["notes.homeShape": .string(variant)]) }
+        if variant == "travel" {
+            // A shared Trip as Prayer's explicit arrival would store it: Istanbul since yesterday; no homeKm, so distance is derived.
+            let now=prayerUITestClock(.now),istanbul=TimeZone(identifier:"Europe/Istanbul")!,trip=Trip()
+            trip.city="إسطنبول";trip.country="TR";trip.lat=41.0082;trip.lon=28.9784;trip.tzID="Europe/Istanbul";trip.mode="manual";trip.start=now.addingTimeInterval(-26*3600);context.insert(trip)
+            let today=GregorianDay.containing(now,in:istanbul),base=today.date(in:istanbul)
+            let prayer=PrayerLog();prayer.dayKey=today.description;prayer.prayer="fajr";prayer.status="jamaah";prayer.eventAt=base.addingTimeInterval(5*3600+52*60);prayer.tzID="Europe/Istanbul";context.insert(prayer)
+            for (minutes,text) in [(370,"أول فجر في إسطنبول. الأذان من ثلاثة مساجد في وقت واحد."),(840,"الجو بارد، والشاي في كل زاوية. تعبنا من المشي وجلسنا عند البحر.")] {
+                let row=Entry();row.dayKey=today.description;row.text=text;row.eventAt=base.addingTimeInterval(Double(minutes)*60);row.tzID="Europe/Istanbul";row.dayPolicy="midnight@1";context.insert(row)
+            }
+            let media=Media();media.kind="photo";media.contentType="image/jpeg";media.data=Self.diaryFixturePhoto(variant:2);media.sizeBytes=media.data?.count ?? 0;context.insert(media)
+            let photo=Entry();photo.dayKey=today.description;photo.text="البحر من جسر غلطة.";photo.attachmentMediaIDs=[media.id];photo.eventAt=base.addingTimeInterval(870*60);photo.tzID="Europe/Istanbul";photo.dayPolicy="midnight@1";context.insert(photo)
+            try context.save();return
+        }
         if variant == "return" {
             let day=GregorianDay.containing(prayerUITestClock(.now),in:.riyadh).adding(days:-5),row=Entry();row.dayKey=day.description;row.text="آخر سطر محفوظ قبل الانقطاع";row.tzID="Asia/Riyadh";row.eventAt=day.date(in:.riyadh).addingTimeInterval(12*3600);context.insert(row);try context.save();return
         }
