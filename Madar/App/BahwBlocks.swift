@@ -185,18 +185,18 @@ struct BahwBlockView: View {
         } else if size == .small, let first = items.first {
             VStack(alignment: .leading, spacing: 6) {
                 title(lobby.accent)
-                HStack { ring(first, diameter: 66); VStack(alignment: .leading) { Text(first.title).font(label); Text(service.shortDate(first.day, hijri: first.hijri)).font(small).foregroundStyle(lobby.secondaryInk) } }
+                HStack { ring(first, diameter: 66); VStack(alignment: .leading) { Text(first.title).font(label); Text(service.shortDate(first.day, hijri: false)).font(small).foregroundStyle(lobby.secondaryInk) } }
                 ForEach(items.dropFirst()) { item in Text(item.title + " بعد " + digits.string(item.daysLeft) + " " + service.dayCount(item.daysLeft)).font(small).foregroundStyle(lobby.secondaryInk).lineLimit(1) }
             }
         } else {
             VStack(alignment: .leading, spacing: 10) {
-                HStack { title(lobby.accent); Spacer(); Text("كم بقي، بالأيام").font(small).foregroundStyle(lobby.secondaryInk) }
+                HStack { title(lobby.accent); Spacer(); Text("كل حلقة على مقياس سنة").font(small).foregroundStyle(lobby.secondaryInk) }
                 HStack(alignment: .top, spacing: 6) {
                     ForEach(items.prefix(4)) { item in
                         VStack(spacing: 6) {
                             ring(item, diameter: 64)
                             Text(item.title).font(label).lineLimit(1).minimumScaleFactor(0.75)
-                            Text(service.shortDate(item.day, hijri: item.hijri)).font(small).foregroundStyle(lobby.secondaryInk).lineLimit(1)
+                            Text(service.shortDate(item.day, hijri: false)).font(small).foregroundStyle(lobby.secondaryInk).lineLimit(1)
                         }.frame(maxWidth: .infinity).accessibilityElement(children: .ignore)
                             .accessibilityLabel(item.title + " بعد " + digits.string(item.daysLeft) + " " + service.dayCount(item.daysLeft)).accessibilityIdentifier("bahw-upcoming-item")
                     }
@@ -213,7 +213,7 @@ struct BahwBlockView: View {
     private func ring(_ item: BahwUpcomingItem, diameter: CGFloat) -> some View {
         ZStack {
             Circle().stroke(lobby.line, lineWidth: 5)
-            Circle().trim(from: 0, to: item.closed).stroke(lobby.color("clay"), style: .init(lineWidth: 5, lineCap: .round)).rotationEffect(.degrees(-90))
+            Circle().trim(from: 0, to: service.upcomingCloseness(daysLeft: item.daysLeft)).stroke(lobby.color("clay"), style: .init(lineWidth: 5, lineCap: .round)).rotationEffect(.degrees(-90))
             VStack(spacing: 0) {
                 Text(digits.string(item.daysLeft)).font(.custom("thmanyahserifdisplay-Bold", size: diameter * 0.34, relativeTo: .title2)).minimumScaleFactor(0.5)
                 Text(service.dayCount(item.daysLeft)).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(lobby.secondaryInk)

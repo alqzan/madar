@@ -3,6 +3,16 @@ import MadarData
 @testable import Madar
 
 @MainActor final class BahwPrayerIntegrationTests: XCTestCase {
+    func testUpcomingRingsUseOneYearScale() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "BahwRing-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root), app = try AppSession(container: container, groupDirectory: root)
+        let service = AppBahwService(session: app, evaluationDate: ISO8601DateFormatter().date(from: "2026-10-15T15:00:00+03:00")!)
+        XCTAssertEqual(service.upcomingCloseness(daysLeft: 116), 249.0 / 365, accuracy: 0.000001)
+        XCTAssertEqual(service.upcomingCloseness(daysLeft: 213), 152.0 / 365, accuracy: 0.000001)
+        XCTAssertEqual(service.upcomingCloseness(daysLeft: 0), 1)
+        XCTAssertEqual(service.upcomingCloseness(daysLeft: 700), 0)
+    }
     func testLobbyKeepsNextFajrAfterIsha() throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "BahwPrayer-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }

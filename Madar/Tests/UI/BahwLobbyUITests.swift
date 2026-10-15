@@ -79,6 +79,20 @@ import XCTest
         app.tabBars.buttons["خصّص"].tap()
         XCTAssertTrue(app.textFields["settings-search"].waitForExistence(timeout: 10))
     }
+    func testUpcomingShowsGregorianDatesAndComparableRings() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00"]
+        app.launch(); finishOnboarding(app)
+        let upcoming = app.descendants(matching: .any).matching(identifier: "bahw-block-upcoming").firstMatch
+        XCTAssertTrue(upcoming.waitForExistence(timeout: 15))
+        app.swipeUp(velocity: .slow)
+        XCTAssertTrue(upcoming.isHittable)
+        let dates = upcoming.staticTexts.allElementsBoundByIndex.map(\.label).joined(separator: " ")
+        XCTAssertTrue(dates.contains("فبراير"), dates)
+        XCTAssertFalse(dates.contains("شوال"), dates)
+        capture(app, "UX-06-upcoming-L")
+    }
     private func finishOnboarding(_ app: XCUIApplication) {
         if app.buttons["first-run-skip"].waitForExistence(timeout: 2) { app.buttons["first-run-skip"].tap() }
         let start = app.buttons["first-run-continue"]

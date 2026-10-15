@@ -116,6 +116,10 @@ struct BahwUpcomingItem: Identifiable, Equatable {
         return Array(items.sorted { $0.daysLeft == $1.daysLeft ? $0.title < $1.title : $0.daysLeft < $1.daysLeft }.prefix(limit))
     }
 
+    /// One visual scale for all lobby countdowns; recurrence-cycle progress stays unchanged in the year room.
+    func upcomingCloseness(daysLeft: Int) -> Double {
+        1 - min(1, max(0, Double(daysLeft) / Double(MadarYear.gregorianYear(today).length)))
+    }
     func dayCount(_ n: Int) -> String {
         if n == 1 { return "يوم" }; if n == 2 { return "يومان" }
         let r = n % 100; return (3...10).contains(r) ? "أيام" : (r <= 2 && n >= 100) ? "يوم" : "يومًا"
