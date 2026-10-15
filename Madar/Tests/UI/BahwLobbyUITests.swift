@@ -66,10 +66,10 @@ import XCTest
         XCTAssertTrue(greeting.waitForExistence(timeout: 15))
         XCTAssertFalse(app.buttons["bahw-arrange"].exists)
         XCTAssertFalse(app.buttons["settings-button"].exists)
-        capture(app, "UX-05-lobby-L")
+        capture(app, "UX-14-lobby-L")
         app.swipeUp(velocity: .slow); app.swipeUp(velocity: .slow)
         XCTAssertFalse(greeting.isHittable)
-        capture(app, "UX-05-lobby-s1-L")
+        capture(app, "UX-14-lobby-s1-L")
         app.swipeDown(velocity: .fast); app.swipeDown(velocity: .fast)
         let prayer = app.descendants(matching: .any).matching(identifier: "bahw-block-salah").firstMatch
         prayer.press(forDuration: 0.7)

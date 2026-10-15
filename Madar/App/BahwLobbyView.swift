@@ -83,6 +83,8 @@ struct BahwLobbyView: View {
                     }
                 }.padding(.horizontal, 14).padding(.top, 4).padding(.bottom, 24).frame(maxWidth: 620).frame(maxWidth: .infinity)
             }
+            // The hidden navigation bar must not let scrolling ink enter the status-bar safe area.
+            .clipped()
         }
         .safeAreaInset(edge: .top, spacing: 0) {
             if arranging {
