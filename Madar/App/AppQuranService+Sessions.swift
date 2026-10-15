@@ -173,13 +173,14 @@ extension AppQuranService {
                 }
                 }
                 value.revealedAyahs = []
-            } else if draft.kind == .review {
+            } else if draft.kind == .review || draft.kind == .free {
                 var seen = Set<Int>()
                 let pages = try draft.portions.flatMap { try QuranPortionEngine.pages(for: $0, catalog: catalog).map(\.page) }.filter { seen.insert($0).inserted }
                 if draft.coachStage == .blindRecitation {
                     let ayahs = Set(catalog.ayahs(on: draft.page).map(\.id)).intersection(planned)
                     let slips = draft.mistakes.filter { $0.kind == .mistake && ayahs.contains($0.key.ayahID) }.count
-                    if !draft.grades.contains(where: { $0.page == draft.page }) {
+                    let canGrade = draft.kind != .free ? true : try snapshot().coverage.completedPages.contains(draft.page)
+                    if canGrade && !draft.grades.contains(where: { $0.page == draft.page }) {
                         draft.grades.append(QuranDraftGrade(page: draft.page, rating: QuranMistakeEngine.gradeFromBlindSlips(slips, ayatCount: ayahs.count), isTest: value.testPages?.contains(draft.page) == true))
                     }
                     draft.coachStage = .rating
@@ -229,7 +230,7 @@ extension AppQuranService {
         let hifzComplete = draft.kind == .hifz && ids.isSubset(of: draft.blindPassedAyahs)
         var orderedSeen = Set<Int>()
         let orderedPages = try draft.portions.flatMap { try QuranPortionEngine.pages(for: $0, catalog: catalog).map(\.page) }.filter { orderedSeen.insert($0).inserted }
-        let finished = draft.coachStage == .rating && (draft.kind != .hifz || hifzComplete) && (draft.kind != .review || draft.page == orderedPages.last) || draft.kind == .drill && !draft.mistakes.isEmpty
+        let finished = draft.coachStage == .rating && (draft.kind != .hifz || hifzComplete) && (![.review, .free].contains(draft.kind) || draft.page == orderedPages.last) || draft.kind == .drill && !draft.mistakes.isEmpty
         let readOnlyFinished = finished && draft.kind == .free && draft.grades.isEmpty
         var state = QuranUISessionState(id: draft.id, title: draft.kind == .hifz ? "الورد" : "المراجعة", segmentTitle: "الوجه " + numerals.string(draft.page), stage: stage,
             progress: ids.isEmpty ? 0 : Double(draft.blindPassedAyahs.count) / Double(ids.count), prompt: "أكمل ثم سجّل ما تمّ", verses: verses,
@@ -290,7 +291,7 @@ extension AppQuranService {
             } }
             if value.method == "gradual", draft.coachStage == .repetition, coach.repetitions < 3 { state.primaryTitle = "أخفِ المزيد" }
         }
-        if draft.kind == .review {
+        if draft.kind == .review || draft.kind == .free {
             let sections = value.reviewSections ?? [QuranReviewSection(kind: .due, pages: orderedPages)]
             let sectionIndex = sections.firstIndex { $0.pages.contains(draft.page) } ?? 0
             let section = sections[sectionIndex]
@@ -298,10 +299,10 @@ extension AppQuranService {
             let revealed = value.revealedAyahs ?? []
             let next = currentAyahs.first { !revealed.contains($0.id) }
             let revealedCount = currentAyahs.filter { revealed.contains($0.id) }.count
-            state.title = "المراجعة · " + faceCount(orderedPages.count) + " في خطوة واحدة"
+            state.title = draft.kind == .free ? "مراجعة حرة" : "المراجعة · " + faceCount(orderedPages.count) + " في خطوة واحدة"
             let range = section.pages.first == section.pages.last ? numerals.string(section.pages.first ?? draft.page) : numerals.string(section.pages.first ?? draft.page) + "–" + numerals.string(section.pages.last ?? draft.page)
             state.segmentTitle = section.title + " " + range + "، الوجه " + numerals.string(draft.page)
-            let caption = stage == .grading ? "تقييم مقترح من تعثّرك؛ يمكنك تغييره" : "كشفت " + numerals.string(revealedCount) + " من " + numerals.string(currentAyahs.count)
+            let caption = draft.kind == .free && !canGrade ? "قراءة فقط؛ هذا الوجه غير مكتمل في صدرك" : stage == .grading ? "تقييم مقترح من تعثّرك؛ يمكنك تغييره" : "كشفت " + numerals.string(revealedCount) + " من " + numerals.string(currentAyahs.count)
             state.coach = QuranUICoach(activeAyahID: next?.id ?? currentAyahs.last?.id ?? draft.ayahID, activeAyahNumber: numerals.string(next?.ayahNumber ?? 0),
                 plannedAyahs: ids, revealedAyahs: revealed, repetition: 0, target: 0, bridge: false, method: "continuous", stageTitle: stage == .grading ? "تقييمك" : "المراجعة المستورة",
                 pageProgress: "المقطع " + numerals.string(sectionIndex + 1) + " من " + numerals.string(sections.count), caption: caption, pages: orderedPages, referenceText: nil,
