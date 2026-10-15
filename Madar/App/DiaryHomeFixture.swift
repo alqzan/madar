@@ -32,6 +32,9 @@ extension AppSession {
             // A shared Trip as Prayer's explicit arrival would store it: Istanbul since yesterday; no homeKm, so distance is derived.
             let now=prayerUITestClock(.now),istanbul=TimeZone(identifier:"Europe/Istanbul")!,trip=Trip()
             trip.city="إسطنبول";trip.country="TR";trip.lat=41.0082;trip.lon=28.9784;trip.tzID="Europe/Istanbul";trip.mode="manual";trip.start=now.addingTimeInterval(-26*3600);context.insert(trip)
+            // A past trip already returned from: five nights in Cairo, so the calendar frames them and the return day folds the envelope.
+            let cairo=Trip();cairo.city="القاهرة";cairo.country="EG";cairo.lat=30.0444;cairo.lon=31.2357;cairo.tzID="Africa/Cairo";cairo.mode="manual"
+            cairo.start=now.addingTimeInterval(-20*86400);cairo.end=now.addingTimeInterval(-15*86400);context.insert(cairo)
             let today=GregorianDay.containing(now,in:istanbul),base=today.date(in:istanbul)
             let prayer=PrayerLog();prayer.dayKey=today.description;prayer.prayer="fajr";prayer.status="jamaah";prayer.eventAt=base.addingTimeInterval(5*3600+52*60);prayer.tzID="Europe/Istanbul";context.insert(prayer)
             for (minutes,text) in [(370,"أول فجر في إسطنبول. الأذان من ثلاثة مساجد في وقت واحد."),(840,"الجو بارد، والشاي في كل زاوية. تعبنا من المشي وجلسنا عند البحر.")] {

@@ -24,6 +24,8 @@ struct DiaryDayView: View {
     @State private var searchOpen=false
     @State private var displayNow=Date()
     @State private var travel:DiaryTravelPage?
+    @State private var travelReturn:DiaryTravelReturn?
+    @Environment(\.scenePhase) private var scenePhase
     @State private var stampsOpen=false
     @State private var editing:DiaryLineEdit?
     @State private var original:DiaryLineEdit?
@@ -77,6 +79,9 @@ struct DiaryDayView: View {
                 }
                 if appearance?.weekAvailable == true,typeSize.isAccessibilitySize {
                     HStack{Button("صندوق الأسبوع"){weekOpen=true}.accessibilityIdentifier("diary-week-open");Spacer();Text("يوم الجمعة").foregroundStyle(theme.color("ghad"))}.font(DiaryType.label).frame(minHeight:44).padding(.horizontal,22)
+                }
+                if let travelReturn {
+                    DiaryTravelReturnCard(trip:travelReturn,days:dayCount(travelReturn.days),distance:service.kilometres(travelReturn.kilometres)){stampsOpen=true}.padding(.horizontal,18).padding(.vertical,6)
                 }
                 if shownDay == today,let waitingLetter {
                     DiaryLetterWaitingCard(letter:waitingLetter,digitsTitle:service.dateTitle(waitingLetter.writtenDay,calendar:.gregorian)){openingLetter=waitingLetter}.padding(.horizontal,18).padding(.vertical,6)
@@ -150,9 +155,11 @@ struct DiaryDayView: View {
                 .sheet(isPresented:$weekOpen){DiaryWeekView(app:app,day:shownDay).environment(\.roomTheme,theme)}
                 .sheet(isPresented:$intentionsOpen){DiaryIntentionsView(app:app,day:shownDay,evening:service.intentionEvening(shownDay)).environment(\.roomTheme,theme)}
                 .sheet(isPresented: $writing) { DiaryTextEditor(app: app, margin: shownDay == today ? nil : shownDay).environment(\.roomTheme, theme) }
+                // N04: letters are checked when the diary is open and the app comes to the foreground.
+                .onChange(of:scenePhase){_,phase in if phase == .active {retry+=1}}
                 .task {while !Task.isCancelled {do{try await Task.sleep(for:.seconds(30));displayNow=service.clock();appearance=try service.appearance(shownDay)}catch{break}}}
                 .task(id: shownDay.description + ":" + String(app.prayerRevision) + ":" + String(retry)) {
-                    do { try await service.prepareClosedDay(shownDay); page = try service.day(shownDay); intentions=try service.intentions(shownDay); appearance=try service.appearance(shownDay);displayNow=service.clock();returnDay=try service.returnAfterAbsence(shownDay);travel=try service.travel(shownDay)
+                    do { try await service.prepareClosedDay(shownDay); page = try service.day(shownDay); intentions=try service.intentions(shownDay); appearance=try service.appearance(shownDay);displayNow=service.clock();returnDay=try service.returnAfterAbsence(shownDay);travel=try service.travel(shownDay);travelReturn=travel == nil ? try service.travelReturn(shownDay):nil
                         if shownDay == today {try? await service.refreshLetters()}
                         let letters=try service.letters();waitingLetter=letters.first{$0.state == .eligible};sealedHere=letters.filter{$0.writtenDay==shownDay && $0.state != .opened}.count
                         (projectLinks,projectSuggestions)=try service.projectNotes(shownDay); failure = nil }
@@ -174,6 +181,11 @@ struct DiaryDayView: View {
     private func dateChoice(_ title: String, id: String, value: GregorianDay) -> some View {
         Button { selected = value } label: { Text(title).font(DiaryType.label).frame(minHeight: 44).padding(.horizontal, 12).background(shownDay == value ? theme.surface : .clear, in: .rect(topLeadingRadius: 10, topTrailingRadius: 10)).overlay { UnevenRoundedRectangle(topLeadingRadius: 10, topTrailingRadius: 10).stroke(shownDay == value ? theme.color("ink3Text") : theme.line) } }
             .buttonStyle(.plain).accessibilityIdentifier("diary-day-" + id).accessibilityAddTraits(shownDay == value ? .isSelected : [])
+    }
+    /// Arabic counted noun: يوم واحد، يومان، ٣–١٠ أيام، ١١–٩٩ يومًا، ١٠٠ يوم.
+    private func dayCount(_ n:Int)->String {
+        if n == 1 {return "يوم واحد"};if n == 2 {return "يومان"}
+        let r=n%100;return service.digits.string(n)+((3...10).contains(r) ? " أيام":r <= 2 ? " يوم":" يومًا")
     }
     private func lineRow(_ line: DiaryDisplayLine, page: DiaryDisplayDay) -> some View {
         let auto = ["salah", "quran"].contains(line.kind)

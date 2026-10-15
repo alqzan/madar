@@ -12,6 +12,7 @@ struct DiaryHubView: View {
     @State private var month: Int?
     @State private var tab = "calendar"
     @State private var reader: GregorianDay?
+    @State private var travelDays: Set<GregorianDay> = []
     @State private var searchOpen = false
     @State private var exportOpen = false
     @State private var bookOpen = false
@@ -51,7 +52,7 @@ struct DiaryHubView: View {
                 .toolbar { ToolbarItem(placement: .topBarTrailing) { Button { searchOpen = true } label: { Image(systemName: "magnifyingglass") }.accessibilityLabel("ابحث في مذكراتك") }; ToolbarItem(placement: .topBarLeading) { Button { dismiss() } label: { Label("المذكرات", systemImage: "chevron.backward") }.accessibilityIdentifier("diary-hub-close") } }
                 .toolbarBackground(theme.background, for: .navigationBar).tint(theme.accent)
                 .sheet(isPresented: Binding(get: { reader != nil }, set: { if !$0 { reader = nil } })) { if let reader { DiaryDayView(app: app, day: reader).environment(\.roomTheme, theme) } }
-                .task(id: app.prayerRevision) { do { archive = try service.archive(); failure = nil } catch { failure = error.localizedDescription } }
+                .task(id: app.prayerRevision) { do { archive = try service.archive(); travelDays = (try? service.travelDays()) ?? []; failure = nil } catch { failure = error.localizedDescription } }
         }
     }
     private func calendar(_ archive: DiaryArchiveSnapshot) -> some View {
@@ -69,6 +70,10 @@ struct DiaryHubView: View {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 3), spacing: 16) { ForEach(1...12, id: \.self) { month in miniMonth(archive, month: month) } }
             }
             Text("الأغمق = كتابات أكثر. اضغط أي شهر لفتح ورقته.").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
+            if travelDays.contains(where: { grid.parts($0).year == selectedYear }) {
+                HStack(spacing: 8) { DiaryAirmailFrame(lineWidth: 1.4, dash: 3).frame(width: 16, height: 16); Text("الإطار البريدي = أيام السفر").font(DiaryType.label).foregroundStyle(theme.color("ink3Text")) }
+                    .accessibilityElement(children: .combine).accessibilityIdentifier("diary-calendar-travel-legend")
+            }
             HStack(spacing: 8) {
                 Text("التقويم").font(DiaryType.label)
                 ForEach([FirstCalendar.gregorian, .hijri], id: \.rawValue) { value in
@@ -87,7 +92,7 @@ struct DiaryHubView: View {
                     ForEach(0..<grid.leading(days), id: \.self) { _ in Color.clear.aspectRatio(1, contentMode: .fit) }
                     ForEach(days, id: \.description) { day in
                         RoundedRectangle(cornerRadius: 1).fill(theme.ink.opacity(day > archive.today ? 0.015 : (counts[day] ?? 0) == 0 ? 0.06 : min(0.85, 0.25+Double(counts[day] ?? 0)*0.15)))
-                            .aspectRatio(1, contentMode: .fit).overlay { if day == archive.today { RoundedRectangle(cornerRadius: 1).stroke(theme.accent) } }
+                            .aspectRatio(1, contentMode: .fit).overlay { if day == archive.today { RoundedRectangle(cornerRadius: 1).stroke(theme.accent) } else if travelDays.contains(day) { DiaryAirmailFrame(lineWidth: 1, dash: 2) } }
                     }
                 }.frame(maxHeight: .infinity, alignment: .top)
             }.padding(4).frame(maxWidth: .infinity, minHeight: 96, alignment: .topLeading)
@@ -104,7 +109,8 @@ struct DiaryHubView: View {
                     Button { reader = day } label: {
                         VStack(spacing: 3) { Text(service.digits.string(grid.parts(day).day ?? day.day)).font(MadarTypography.body()); Circle().fill(written.contains(day) ? theme.accent : .clear).frame(width: 4,height: 4) }
                             .frame(maxWidth: .infinity, minHeight: 44).background(day == archive.today ? theme.surface : .clear, in: .rect(cornerRadius: 10))
-                    }.buttonStyle(.plain).disabled(day > archive.today).accessibilityLabel(service.dateTitle(day, calendar: grid.first)).accessibilityIdentifier("diary-calendar-day-" + day.description)
+                            .overlay { if travelDays.contains(day) { DiaryAirmailFrame(lineWidth: 1.6, dash: 4).padding(2) } }
+                    }.buttonStyle(.plain).disabled(day > archive.today).accessibilityLabel(service.dateTitle(day, calendar: grid.first) + (travelDays.contains(day) ? "، يوم سفر" : "")).accessibilityIdentifier("diary-calendar-day-" + day.description)
                 }
             }
             timeline(archive.days.filter { let parts = grid.parts($0.day); return parts.year == selectedYear && parts.month == month })

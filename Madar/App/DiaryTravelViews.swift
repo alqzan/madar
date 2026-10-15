@@ -18,6 +18,19 @@ struct DiaryAirmailStripe: View {
     }
 }
 
+/// «تقويم السفر · الإطار البريدي»: travel days wear an alternating red/blue dashed air-mail border in every calendar.
+struct DiaryAirmailFrame: View {
+    var lineWidth: CGFloat
+    var dash: CGFloat
+    var body: some View {
+        let red = MadarToken.colors["rooms.notes.travel.airmailStripe.0"] ?? .red, blue = MadarToken.colors["rooms.notes.travel.airmailStripe.2"] ?? .blue
+        ZStack {
+            RoundedRectangle(cornerRadius: 2).stroke(red, style: .init(lineWidth: lineWidth, dash: [dash, dash]))
+            RoundedRectangle(cornerRadius: 2).stroke(blue, style: .init(lineWidth: lineWidth, dash: [dash, dash], dashPhase: dash))
+        }.accessibilityHidden(true)
+    }
+}
+
 struct DiaryTravelHeader: View {
     let page: DiaryTravelPage
     let subtitle: String
@@ -136,6 +149,31 @@ struct DiaryPassportStamp: View {
         }.foregroundStyle(theme.accent).padding(10).frame(width: 84, height: 84)
             .overlay { Circle().stroke(theme.accent, lineWidth: 1.6).padding(2) }.overlay { Circle().stroke(theme.accent.opacity(0.5), lineWidth: 0.8).padding(7) }
             .rotationEffect(.degrees(-14)).accessibilityElement(children: .combine).accessibilityIdentifier("diary-passport-stamp")
+    }
+}
+
+/// §7.3 return moment: on the home page of the return day the trip is folded into an air-mail envelope.
+struct DiaryTravelReturnCard: View {
+    let trip: DiaryTravelReturn
+    let days: String
+    let distance: String
+    let open: () -> Void
+    @Environment(\.roomTheme) private var theme
+    var body: some View {
+        Button(action: open) {
+            VStack(spacing: 0) {
+                DiaryAirmailStripe()
+                HStack(alignment: .center, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("عدت من " + trip.city).font(DiaryType.heading).foregroundStyle(theme.ink)
+                        Text("طُويت الرحلة في ظرف: " + days + "، " + distance + " كم").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
+                        Text("الأختام").font(DiaryType.label).foregroundStyle(theme.accent).padding(.top, 2)
+                    }.frame(maxWidth: .infinity, alignment: .leading)
+                    DiaryEnvelope(sealed: true).frame(width: 64, height: 44).rotationEffect(.degrees(-4)).accessibilityHidden(true)
+                }.padding(.horizontal, 16).padding(.vertical, 12)
+                DiaryAirmailStripe()
+            }.background(theme.surface).clipShape(.rect(cornerRadius: 6)).overlay { RoundedRectangle(cornerRadius: 6).stroke(theme.line) }.contentShape(.rect)
+        }.buttonStyle(.plain).accessibilityElement(children: .combine).accessibilityIdentifier("diary-travel-return")
     }
 }
 
