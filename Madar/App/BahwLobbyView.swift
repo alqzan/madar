@@ -168,7 +168,8 @@ struct BahwLobbyView: View {
     }
     private func open(_ block: BahwBlock) {
         guard !arranging else { return }
-        if let tab = block.tab { session.selectedTab = tab }
+        if block == .notes, (service.diary()?.count ?? 0) == 0 { session.open(URL(string: "madar://notes/write")!) }
+        else if let tab = block.tab { session.selectedTab = tab }
         else if block == .year || block == .upcoming { session.yearOpen = true }
     }
     private func sizeTitle(_ size: BahwBlockSize) -> String {

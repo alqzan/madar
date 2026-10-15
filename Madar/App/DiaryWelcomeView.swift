@@ -4,17 +4,20 @@ import MadarDesign
 
 struct DiaryLaunchView: View {
     @Bindable var app: AppSession
+    @State private var writingDirectly = false
     @State private var welcomed: Bool?
     @State private var failure: String?
     var body: some View {
         Group {
-            if welcomed == true { DiaryHomeView(app: app) }
+            if welcomed == true || writingDirectly { DiaryHomeView(app: app) }
             else if welcomed == false { DiaryWelcomeView(app: app) { welcomed = true } }
             else if let failure { Text(failure).padding() }
             else { ProgressView("تُفتح صفحتك…") }
+        }.onChange(of: app.diaryRoute, initial: true) { _, route in
+            if route?.path.first == "write" { writingDirectly = true }
         }.task {
             do { welcomed = try AppDiaryService(app: app).hasWelcomed() } catch { failure = error.localizedDescription }
-        }.toolbarVisibility(welcomed == false ? .hidden : .automatic, for: .tabBar)
+        }.toolbarVisibility(welcomed == false && !writingDirectly ? .hidden : .automatic, for: .tabBar)
     }
 }
 struct DiaryWelcomeView: View {

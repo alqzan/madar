@@ -108,14 +108,14 @@ struct BahwBlockView: View {
         let model = service.diary()
         let count = model?.count ?? 0
         if size == .icon {
-            VStack(spacing: 2) { Image(systemName: "pencil").foregroundStyle(room.accent); Text(service.lineCount(count)).font(small).multilineTextAlignment(.center).minimumScaleFactor(0.7) }.frame(maxWidth: .infinity, maxHeight: .infinity)
+            VStack(spacing: 2) { Image(systemName: "pencil").foregroundStyle(room.accent); Text(count == 0 ? "اكتب" : service.lineCount(count)).font(small).multilineTextAlignment(.center).minimumScaleFactor(0.7) }.frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             VStack(alignment: .leading, spacing: 0) {
                 if let data = model?.photo, let image = UIImage(data: data) {
                     Color.clear.overlay { Image(uiImage: image).resizable().scaledToFill() }.clipShape(.rect(cornerRadius: 14)).padding(.bottom, 8).accessibilityHidden(true)
                 }
                 title(room.accent)
-                Text(service.lineCount(count)).font(.custom("thmanyahserifdisplay-Bold", size: 26, relativeTo: .title2)).lineLimit(1).minimumScaleFactor(0.7).accessibilityIdentifier("bahw-notes-count")
+                Text(count == 0 ? "اكتب سطر اليوم" : service.lineCount(count)).font(.custom("thmanyahserifdisplay-Bold", size: 26, relativeTo: .title2)).lineLimit(2).minimumScaleFactor(0.7).accessibilityIdentifier("bahw-notes-count")
                 if let last = model?.last { Text("آخرها " + service.time(last) + (model?.photo != nil ? "، وصورة" : "")).font(small).foregroundStyle(room.secondaryInk).lineLimit(1) }
                 if model?.photo == nil { Spacer(minLength: 0) }
             }

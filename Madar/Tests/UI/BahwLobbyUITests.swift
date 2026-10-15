@@ -93,6 +93,26 @@ import XCTest
         XCTAssertFalse(dates.contains("شوال"), dates)
         capture(app, "UX-06-upcoming-L")
     }
+    func testEmptyDiaryOpensWriterAndKeepsDraft() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
+        app.launch(); finishOnboarding(app)
+        let notes = app.descendants(matching: .any).matching(identifier: "bahw-block-notes").firstMatch
+        XCTAssertTrue(notes.waitForExistence(timeout: 15))
+        XCTAssertTrue(app.staticTexts["bahw-notes-count"].label.contains("اكتب سطر اليوم"))
+        capture(app, "UX-07-invitation-L")
+        notes.tap()
+        let writer = app.textViews["diary-editor-text"]
+        XCTAssertTrue(writer.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
+        writer.typeText("بداية هادئة من البهو")
+        capture(app, "UX-07-writer-L")
+        app.buttons["diary-editor-cancel"].tap()
+        app.buttons["diary-write"].tap()
+        XCTAssertTrue(writer.waitForExistence(timeout: 5))
+        XCTAssertEqual(writer.value as? String, "بداية هادئة من البهو")
+    }
     private func finishOnboarding(_ app: XCUIApplication) {
         if app.buttons["first-run-skip"].waitForExistence(timeout: 2) { app.buttons["first-run-skip"].tap() }
         let start = app.buttons["first-run-continue"]

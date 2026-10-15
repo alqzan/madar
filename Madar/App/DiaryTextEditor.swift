@@ -106,8 +106,14 @@ struct DiaryTextEditor: View {
             writingDay = (try? AppDiaryService(app: app).currentDay()).map { initialDay == "yesterday" ? $0.adding(days: -1) : $0 }
             do { if let draft = try AppDiaryService(app: app).draft(margin: margin) { draftID = draft.id; text = draft.text; day = draft.day; writingDay = draft.writingDay; draftStatus = "مسودة مستعادة" } }
             catch { failure = error.localizedDescription }
-            loaded = true; focused = !app.bool("notes.dictationFirst")
+            loaded = true
             if voice == nil { voice = DiaryVoiceController(app: app); await voice?.recoverRecordings() }
+            // A room-tab write link presents during the native sheet transition; an earlier
+            // focus request can be dropped before the text view joins its window.
+            if !app.bool("notes.dictationFirst") {
+                do { try await Task.sleep(for: .milliseconds(450)) } catch { return }
+                if !Task.isCancelled, voice?.recording != true { focused = true }
+            }
         }
         .onChange(of: text) { _, _ in scheduleDraft() }
         .onChange(of: day) { _, _ in scheduleDraft() }
