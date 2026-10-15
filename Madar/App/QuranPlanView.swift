@@ -8,6 +8,7 @@ struct QuranPlanView: View {
     @State private var overview: QuranUIPlanOverview?
     @State private var error: String?
     @State private var busy = false
+    @State private var showSetup = false
     private var app: AppSession { service.app }
     private let resetKeys = ["quran.hifzLevel", "quran.reviewLevel", "quran.restDay", "quran.wirdReminder", "quran.reviewSchedule"]
     var body: some View {
@@ -21,7 +22,7 @@ struct QuranPlanView: View {
                             line; levelRow("درجة المراجعة المعتادة", key: "quran.reviewLevel")
                             line
                             if let p = overview.input {
-                                row("وحدة خطة الحفظ", detail: service.numerals.localized(String(format: "%g", p.amount)) + " " + p.unit.title)
+                                row("وحدة خطة الحفظ", detail: QuranPlanCopy.amount(p, digits: service.numerals))
                                 line; row("وتيرة المراجعة المعتادة", detail: p.rhythm.title)
                                 line
                             }
@@ -30,6 +31,7 @@ struct QuranPlanView: View {
                             line; choiceRow("جدول المراجعة", key: "quran.reviewSchedule", options: [("spaced","متباعدة"),("fixedJuzDaily","جزء يوميًا"),("fixedManzilWeekly","المنازل الأسبوعية")])
                         }
                     }
+                    Button(overview.input == nil ? "ابدأ خطة الحفظ" : "عدّل خطة الحفظ") { showSetup = true }.font(quranFont(14, bold: true)).frame(maxWidth: .infinity, minHeight: 44).accessibilityIdentifier("quran-plan-edit")
                     QuranPaperCard {
                         VStack(alignment: .leading, spacing: 16) {
                             HStack { Text("موعد الختمة").font(quranFont(17, bold: true)); Spacer(); Text("تقدير لكل درجة").font(quranFont(11)).foregroundStyle(theme.secondaryInk) }
@@ -71,12 +73,13 @@ struct QuranPlanView: View {
                         }
                     }
                     Button("أعِد المتفق عليه") { app.reset(resetKeys) }.font(quranFont(14)).frame(maxWidth: .infinity, minHeight: 44).accessibilityIdentifier("quran-plan-reset")
-                    Text(overview.version).font(quranFont(11)).foregroundStyle(theme.secondaryInk)
+                    Text(overview.version).font(quranFont(11)).accessibilityIdentifier("quran-plan-version").foregroundStyle(theme.secondaryInk)
                 }
                 if let error { Text(error).font(quranFont(13)) }
             }.padding(16)
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.color("review")).disabled(busy || app.settingsWriteInProgress)
             .safeAreaInset(edge: .bottom) { if app.undoToken != nil { UndoToast(message: app.undoMessage, undo: app.undo).accessibilityIdentifier("quran-plan-undo") } }
+            .fullScreenCover(isPresented: $showSetup, onDismiss: load) { QuranPlanSetupView(service: service, close: { showSetup = false }) }
             .task { load() }.onChange(of: app.settingsWriteInProgress) { if !app.settingsWriteInProgress { load() } }.onChange(of: app.undoToken?.id) { load() }
             .alert("لم تكتمل العملية", isPresented: Binding(get: { app.errorMessage != nil }, set: { if !$0 { app.errorMessage = nil } })) { Button("تمّ") { app.errorMessage = nil } } message: { Text(app.errorMessage ?? "") }
     }

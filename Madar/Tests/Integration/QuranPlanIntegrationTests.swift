@@ -6,6 +6,13 @@ import MadarCommands
 @testable import Madar
 
 @MainActor final class QuranPlanIntegrationTests: XCTestCase {
+    func testUnitQuantityUsesArabicPluralCatalog() {
+        var p=QuranUIPlanInput(startAyah:1,unit:.quarter,amount:1,rhythm:.balanced,restDay:"friday",missPolicy:"ask")
+        XCTAssertEqual(QuranPlanCopy.amount(p,digits:.init()),"ربع وجه")
+        p.amount=2;XCTAssertEqual(QuranPlanCopy.amount(p,digits:.init()),"ربعان من وجه")
+        p.unit = .ayah;XCTAssertEqual(QuranPlanCopy.amount(p,digits:.init()),"آيتان")
+        p.unit = .page;p.amount=11;XCTAssertEqual(String(QuranPlanCopy.amount(p,digits:.init()).unicodeScalars.filter { !(0x2066...0x2069).contains($0.value) }),"١١ وجهًا")
+    }
     func testForecastCountsTodayUntilWholeWirdIsComplete() async throws {
         let root=FileManager.default.temporaryDirectory.appending(path:"QuranPlan-\(UUID())")
         let container=try MadarContainerFactory.makeLocal(at:root.appending(path:"Data")),context=ModelContext(container)

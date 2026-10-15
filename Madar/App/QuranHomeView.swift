@@ -17,6 +17,7 @@ struct QuranHomeView: View {
     @State private var showOutside = false
     @State private var showWeek = false
     @State private var showPlan = false
+    @State private var showSetup = false
     @State private var readerPage: Int?
     private enum HomeDetail: Identifiable {
         case step(QuranUIStep), hadith
@@ -46,6 +47,7 @@ struct QuranHomeView: View {
                             }
                         } }
                     }
+                    if state.plan == nil { Button("ابدأ خطة الحفظ") { showSetup = true }.font(bodyFont(16, bold: true)).frame(maxWidth: .infinity, minHeight: 50).foregroundStyle(theme.onAccent).background(theme.accent, in: Capsule()).accessibilityIdentifier("quran-start-plan") }
                     path(state)
                     log(state)
                     card {
@@ -114,6 +116,7 @@ struct QuranHomeView: View {
                 .environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft)
         }
         .fullScreenCover(isPresented: $showOutside) { QuranOutsideView(service: service, close: { showOutside = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
+        .fullScreenCover(isPresented: $showSetup, onDismiss: { run { try await refresh() } }) { QuranPlanSetupView(service: service, close: { showSetup = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
         .fullScreenCover(isPresented: $showPlan, onDismiss: { run { try await refresh() } }) { QuranPlanView(service: service, close: { showPlan = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
         .fullScreenCover(isPresented: $showWeek) { QuranLogView(service: service, close: { showWeek = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
         .alert("تعذّر إتمام العملية", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) { Button("تمّ") { error = nil } } message: { Text(error ?? "") }

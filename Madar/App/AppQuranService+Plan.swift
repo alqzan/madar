@@ -23,3 +23,20 @@ extension AppQuranService {
         return QuranUIPlanOverview(input: v.plan == nil ? nil : input, forecasts: forecasts, streak: dayCount(streak.days), days: Array(try yearLog().days.suffix(28)), version: v.plan.map { "نسخة الخطة " + numerals.string($0.version) } ?? "لا خطة حفظ بعد")
     }
 }
+
+/// Count grammar stays in the room's String Catalog, independent of the stored numeral preference.
+enum QuranPlanCopy {
+    static func amount(_ p: QuranUIPlanInput, digits: MadarNumberFormatter) -> String {
+        guard p.amount.rounded() == p.amount, p.amount >= 0, p.amount <= 6236 else {
+            return "المقدار " + digits.localized(String(format: "%g", p.amount).replacingOccurrences(of: ".", with: "٫")) + " من وحدة " + p.unit.title
+        }
+        let count = Int(p.amount), formatted = digits.string(count)
+        if p.unit == .page { return QuranDayCloseCopy.faces(count, digits: digits) }
+        switch p.unit {
+        case .ayah: return String(localized: "quran.planAyahs", defaultValue: "\(count) \(formatted)", table: "Quran", locale: Locale(identifier: "ar"))
+        case .quarter: return String(localized: "quran.quarters", defaultValue: "\(count) \(formatted)", table: "Quran", locale: Locale(identifier: "ar"))
+        case .half: return String(localized: "quran.halves", defaultValue: "\(count) \(formatted)", table: "Quran", locale: Locale(identifier: "ar"))
+        case .page: return QuranDayCloseCopy.faces(count, digits: digits)
+        }
+    }
+}
