@@ -5527,6 +5527,18 @@
         "payload": "{entryID: UUID, text: String}",
         "kind": "edit only an existing audio entry transcript; keep original Media and conditional undo",
         "auth": "app-only + diary unlocked"
+      },
+      "diary.setIntention": {
+        "intent": null,
+        "payload": "{id: UUID, dayKey: YYYY-MM-DD, text: String nonempty}",
+        "kind": "create/edit Niyya with immutable dayKey and order 0...9; conditional undo",
+        "auth": "app-only + diary unlocked"
+      },
+      "diary.setIntentionResult": {
+        "intent": null,
+        "payload": "{id: UUID, result: done|partial|notEasy|null}",
+        "kind": "explicit outcome only; preserve Niyya dayKey and text; conditional undo",
+        "auth": "app-only + diary unlocked"
       }
     },
     "undoPolicy": {

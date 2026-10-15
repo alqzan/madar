@@ -47,13 +47,17 @@ extension AppDiaryService {
         let margins = try context.fetch(FetchDescriptor<MarginNote>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil }))
         var descriptor = FetchDescriptor<Media>(predicate: #Predicate { $0.kind == "photo" && $0.deletedAt == nil && $0.mergedInto == nil }); descriptor.propertiesToFetch = [\.id]
         let photos = Set(try context.fetch(descriptor).map(\.id))
-        let grouped = Dictionary(grouping: entries, by: \.dayKey), keys = Set(entries.map(\.dayKey) + pages.map(\.dayKey) + margins.map(\.writtenDayKey))
+        let niyyas=try context.fetch(FetchDescriptor<Niyya>(predicate:#Predicate{$0.deletedAt==nil && $0.mergedInto==nil}))
+        let grouped = Dictionary(grouping: entries, by: \.dayKey), keys = Set(entries.map(\.dayKey) + pages.map(\.dayKey) + margins.map(\.writtenDayKey)+niyyas.map(\.dayKey))
         let days = keys.compactMap { key -> DiaryDaySummary? in
             guard let day = try? GregorianDay(key) else { return nil }
             let rows = grouped[key] ?? [], written = rows.filter { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
             let ids = Set(rows.flatMap(\.attachmentMediaIDs) + pages.filter { $0.dayKey == key }.compactMap(\.photoMediaID)).intersection(photos)
             let notes = margins.filter { $0.writtenDayKey == key }
-            return .init(day: day, excerpt: written.last?.text ?? notes.last?.text ?? (ids.isEmpty ? "صفحة من يومك" : "صورة من هذا اليوم"), writings: written.count + notes.count, photoIDs: ids.sorted { $0.uuidString < $1.uuidString }, places: Set(rows.compactMap(\.place)), projectIDs: Set(rows.compactMap(\.projectID)))
+            let intentions=niyyas.filter{$0.dayKey==key}
+            let fallback=ids.isEmpty ? "صفحة من يومك" : "صورة من هذا اليوم"
+            let excerpt:String=written.last?.text ?? intentions.last?.text ?? notes.last?.text ?? fallback
+            return DiaryDaySummary(day:day,excerpt:excerpt,writings:written.count+notes.count+intentions.count,photoIDs:ids.sorted{$0.uuidString<$1.uuidString},places:Set(rows.compactMap(\.place)),projectIDs:Set(rows.compactMap(\.projectID)))
         }.sorted { $0.day > $1.day }
         return try .init(today: currentDay(), days: days)
     }

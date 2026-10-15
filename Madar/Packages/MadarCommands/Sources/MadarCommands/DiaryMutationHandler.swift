@@ -48,6 +48,22 @@ private struct DiaryInverse: Codable {
         row.createdAt = now; row.updatedAt = now; row.writerID = writer; context.insert(row)
         return try JSONEncoder().encode(DiaryInverse(model: "Entry", after: row.record(), dayKey: key.description, previousOrigin: previousOrigin))
     }
+    static func setIntention(id:UUID,day:String,text:String,context:ModelContext,now:Date,writer:String) throws -> Data {
+        guard try GregorianDay(day) <= DiaryLineRenderer.today(context:context,now:now) else{throw DataError.invalidValue("future intention")}
+        let rows=try context.fetch(FetchDescriptor<Niyya>()),existing=rows.first{$0.id==id}
+        guard existing?.deletedAt == nil,existing?.mergedInto == nil,existing == nil || existing?.dayKey==day else{throw DataError.invalidValue("intention identity")}
+        let live=rows.filter{$0.dayKey==day && $0.deletedAt==nil && $0.mergedInto==nil}
+        guard existing != nil || live.count<10 else{throw DataError.invalidValue("تتّسع الصفحة لعشر نيّات؛ يمكنك تعديل نيّة موجودة")}
+        let before=try existing?.record(),row=existing ?? Niyya()
+        if existing==nil {row.id=id;row.dayKey=day;row.order=(0...9).first{n in !live.contains{$0.order==n}} ?? 0;row.createdAt=now;context.insert(row)}
+        row.text=text;row.updatedAt=StableIdentity.monotonic(now:now,previous:row.updatedAt);row.writerID=writer
+        return try JSONEncoder().encode(DiaryInverse(model:"Niyya",after:row.record(),dayKey:row.dayKey,previousOrigin:nil,before:before))
+    }
+    static func setIntentionResult(id:UUID,result:String?,context:ModelContext,now:Date,writer:String) throws -> Data {
+        guard let row=try context.fetch(FetchDescriptor<Niyya>()).first(where:{$0.id==id && $0.deletedAt==nil && $0.mergedInto==nil}) else{throw DataError.invalidValue("missing intention")}
+        let before=try row.record();row.result=result;row.updatedAt=StableIdentity.monotonic(now:now,previous:row.updatedAt);row.writerID=writer
+        return try JSONEncoder().encode(DiaryInverse(model:"Niyya",after:row.record(),dayKey:row.dayKey,previousOrigin:nil,before:before))
+    }
     static func setTranscript(entry: UUID, text: String, context: ModelContext, now: Date, writer: String) throws -> Data {
         guard let row = try context.fetch(FetchDescriptor<Entry>()).first(where: { $0.id == entry && $0.deletedAt == nil && $0.mergedInto == nil }), let media = row.mediaID,
             try context.fetch(FetchDescriptor<Media>()).contains(where: { $0.id == media && $0.kind == "audio" && $0.deletedAt == nil && $0.mergedInto == nil }) else { throw DataError.invalidValue("audio entry required") }
@@ -62,7 +78,11 @@ private struct DiaryInverse: Codable {
             try record.set(stamp, for: "deletedAt"); try record.set(stamp, for: "deletionBarrierAt")
             try record.set(stamp, for: "updatedAt"); try record.set(writer, for: "writerID"); try row.apply(record)
         }
-        if inverse.model == "Entry" {
+        if inverse.model == "Niyya" {
+            guard let row=try context.fetch(FetchDescriptor<Niyya>()).first(where:{$0.id==inverse.after.id && $0.mergedInto==nil}),try row.record()==inverse.after else{throw DataError.invalidValue("undo superseded: intention")}
+            if let before=inverse.before {row.text=try before.decode("text",as:String.self);row.result=try before.decode("result",as:String?.self);row.updatedAt=StableIdentity.monotonic(now:now,previous:row.updatedAt);row.writerID=writer}
+            else{try tombstone(row)}
+        } else if inverse.model == "Entry" {
             let rows = try context.fetch(FetchDescriptor<Entry>())
             guard let row = rows.first(where: { $0.id == inverse.after.id && $0.mergedInto == nil }) else { throw DataError.invalidValue("missing diary entry") }
             if let before = inverse.before {

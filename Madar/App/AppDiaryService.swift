@@ -62,12 +62,13 @@ struct DiaryHomeSnapshot {
         var photoDescriptor = FetchDescriptor<Media>(predicate: #Predicate { $0.kind == "photo" && $0.deletedAt == nil && $0.mergedInto == nil })
         photoDescriptor.propertiesToFetch = [\.id]
         let photos = Set(try context.fetch(photoDescriptor).map(\.id))
-        let keys = Set(pages.map(\.dayKey) + entries.map(\.dayKey))
+        let niyyas=try context.fetch(FetchDescriptor<Niyya>(predicate:#Predicate{$0.deletedAt==nil && $0.mergedInto==nil}))
+        let keys = Set(pages.map(\.dayKey) + entries.map(\.dayKey)+niyyas.map(\.dayKey))
         let facts = keys.compactMap { key -> DiaryMemoryDay? in
             guard let day = try? GregorianDay(key) else { return nil }
             let page = pages.filter { $0.dayKey == key }.max { $0.updatedAt < $1.updatedAt }
             let written = entries.filter { $0.dayKey == key }
-            return .init(day: day, hasWriting: written.contains { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty },
+            return .init(day: day, hasWriting: niyyas.contains{$0.dayKey==key} || written.contains { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty },
                 hasPhoto: page?.photoMediaID.map { photos.contains($0) } == true || written.contains { !photos.isDisjoint(with: $0.attachmentMediaIDs) }, dayOne: page?.origin == "dayOne", hidden: page?.hiddenFromMemories ?? false)
         }
         let selection = DiaryMemories.select(days: facts, today: today,
@@ -86,6 +87,7 @@ struct DiaryHomeSnapshot {
         let entries = try context.fetch(FetchDescriptor<Entry>(predicate: #Predicate { $0.dayKey == key && $0.deletedAt == nil && $0.mergedInto == nil }, sortBy: [SortDescriptor(\.eventAt)]))
         let page = try context.fetch(FetchDescriptor<DayPage>(predicate: #Predicate { $0.dayKey == key && $0.deletedAt == nil && $0.mergedInto == nil })).max { $0.updatedAt < $1.updatedAt }
         var lines = entries.map { DiaryDisplayLine(id: $0.id.uuidString, at: $0.eventAt, text: $0.text, kind: $0.ink) }
+        for niyya in try context.fetch(FetchDescriptor<Niyya>(predicate:#Predicate{$0.dayKey==key && $0.deletedAt==nil && $0.mergedInto==nil})) {lines.append(.init(id:niyya.id.uuidString,at:niyya.createdAt,text:niyya.text,kind:"intention"))}
         let margins = try context.fetch(FetchDescriptor<MarginNote>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
         for margin in margins where margin.targetDayKey == key || margin.writtenDayKey == key {
             let text = margin.targetDayKey == key ? margin.text : "كتبت في هامش " + dateTitle(try GregorianDay(margin.targetDayKey), calendar: .gregorian) + ": " + margin.text

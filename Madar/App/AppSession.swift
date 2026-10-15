@@ -555,7 +555,7 @@ final class AppSession {
         guard result.status == .applied || result.status == .duplicate else { throw DataError.invalidValue(result.reason ?? "diary command") }
         try reload(); try publishSnapshot()
         if let id = result.undoToken {
-            showUndo(AppUndoToken(id: id, expiresAt: now.addingTimeInterval(600)), message: "حُفظ السطر · التراجع متاح لعشر دقائق")
+            showUndo(AppUndoToken(id: id, expiresAt: now.addingTimeInterval(600)), message: name.contains("Intention") ? "حُفظت النيّة · التراجع متاح لعشر دقائق" : "حُفظ السطر · التراجع متاح لعشر دقائق")
         }
     }
 

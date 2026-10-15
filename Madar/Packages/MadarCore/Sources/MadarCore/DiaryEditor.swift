@@ -5,7 +5,9 @@ public enum DiaryEditorCommand: Codable, Equatable, Sendable {
     case commitDraft(UUID)
     case appendMedia(file: UUID, kind: String, type: String, caption: String, day: String, writingDay: String, duration: Int?)
     case transcript(entry: UUID, text: String)
-    public static let names: Set<String> = ["diary.saveDraft", "diary.commitDraft", "diary.appendMedia", "diary.setTranscript"]
+    case intention(id: UUID, day: String, text: String)
+    case intentionResult(id: UUID, result: String?)
+    public static let names: Set<String> = ["diary.saveDraft", "diary.commitDraft", "diary.appendMedia", "diary.setTranscript", "diary.setIntention", "diary.setIntentionResult"]
     public static func parse(_ name: String, _ value: [String: JSONValue]) -> Self? {
         func uuid(_ key: String) -> UUID? { value[key]?.string.flatMap(UUID.init(uuidString:)) }
         switch name {
@@ -24,6 +26,12 @@ public enum DiaryEditorCommand: Codable, Equatable, Sendable {
             let duration = value["durationS"]?.number
             guard value["durationS"] == nil || duration.map({ $0 >= 0 && $0 < Double(Int.max) && $0.rounded() == $0 }) == true else { return nil }
             return .appendMedia(file: id, kind: kind, type: type, caption: caption, day: day, writingDay: writingDay, duration: duration.map(Int.init))
+        case "diary.setIntention":
+            guard Set(value.keys) == ["id","dayKey","text"],let id=uuid("id"),let day=value["dayKey"]?.string,(try? GregorianDay(day)) != nil,let text=value["text"]?.string,!text.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty else{return nil}
+            return .intention(id:id,day:day,text:text)
+        case "diary.setIntentionResult":
+            guard Set(value.keys) == ["id","result"],let id=uuid("id"),value["result"] == .null || value["result"]?.string.map({["done","partial","notEasy"].contains($0)}) == true else{return nil}
+            return .intentionResult(id:id,result:value["result"]?.string)
         case "diary.setTranscript":
             guard Set(value.keys) == ["entryID", "text"], let id = uuid("entryID"), let text = value["text"]?.string else { return nil }; return .transcript(entry: id, text: text)
         default: return nil
