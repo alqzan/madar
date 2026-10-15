@@ -15,6 +15,7 @@ struct AppUndoToken { let id: UUID; let expiresAt: Date }
 
 @MainActor @Observable
 final class AppSession {
+    var diaryRoute: Route?
     var quranRoute: Route?
     private(set) var container: ModelContainer
     let managedStore: ManagedDataStore?
@@ -90,6 +91,7 @@ final class AppSession {
         try preparePrayerHomeShowcaseFixture()
         try preparePrayerStreakShowcaseFixture()
         try prepareQuranHomeFixture(group: group)
+        try prepareDiaryHomeFixture(group: group)
         #endif
         try reload()
         let devices = try container.mainContext.fetch(FetchDescriptor<DeviceSetting>())
@@ -356,11 +358,14 @@ final class AppSession {
     func number(_ key: String) -> Double { if case .number(let v) = values[key] { v } else { 0 } }
     func open(_ url: URL) {
         let today = GregorianDay.containing(.now, in: activePlace.timeZone)
-        let context = RouteContext(trackingStart: today.adding(days: -36500), today: today, settingsKeys: Set(Self.supportedKeys), availability: .init(builtRooms: [.core, .salah, .quran]))
+        let context = RouteContext(trackingStart: today.adding(days: -36500), today: today, settingsKeys: Set(Self.supportedKeys), availability: .init(builtRooms: [.core, .salah, .quran, .notes]))
         do {
             let route = try RouteRegistry.parse(url, context: context)
             if route.room == .quran, route.path.isEmpty || route.path.first == "session" || route.path.first == "page" {
                 quranRoute = route; selectedTab = "quran"; return
+            }
+            if route.room == .notes, route.path.isEmpty || ["today", "day", "write"].contains(route.path.first ?? "") {
+                diaryRoute = route; selectedTab = "notes"; return
             }
             guard url.host == "settings", route.room == .core else { throw CoreError.unavailableFeature }
             settingsQuery = try schema.definition(for: route.path[1]).title
@@ -537,6 +542,19 @@ final class AppSession {
             showUndo(AppUndoToken(id: id, expiresAt: deadline), message: "حُفظ التغيير · التراجع متاح لعشر دقائق")
         }
         return result
+    }
+
+    func executeDiaryCommand(_ name: String, payload: [String: MadarCore.JSONValue]) async throws {
+        guard lockController?.canPresent(.notes) ?? protectedDataAuthorized else { throw DataError.invalidValue("المذكرات مقفلة") }
+        guard beginWrite() else { throw BackupOperationError.busy }
+        defer { pendingWrites -= 1 }
+        let now = prayerNow()
+        let result = try await bus.execute(CommandEnvelope(name: name, payload: .object(payload), issuedAt: now), now: now)
+        guard result.status == .applied || result.status == .duplicate else { throw DataError.invalidValue(result.reason ?? "diary command") }
+        try reload(); try publishSnapshot()
+        if let id = result.undoToken {
+            showUndo(AppUndoToken(id: id, expiresAt: now.addingTimeInterval(600)), message: "حُفظ السطر · التراجع متاح لعشر دقائق")
+        }
     }
 
     func applySettingsAndWait(_ changes: [String: JSONValue]) async throws {

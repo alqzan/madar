@@ -1,10 +1,10 @@
 # Current milestone
 
-**M3 Diary — started by owner on 15 October.** M2-V01–V17 are approved; M1-F04 software is complete. Device/milestone gates stay deferred until the whole app is finished. RA1/RA2, RP1, RU1 and data preservation remain mandatory.
+**M3 Diary — E01/D01 done; V01 window home matched — awaiting owner.** M2-V01–V17 are approved; M1-F04 software is complete. Device/milestone gates stay deferred until the whole app is finished. RA1/RA2, RP1, RU1 and data preservation remain mandatory.
 
 # Last checked
 
-2026-10-15 — Owner: «وانا قابل كل شي سويته سابقا»; M2-V01–V17 and the added prayer/Quran qiyam link are visually approved. Owner selected M1-F04 before opening M3. Working tree was clean on main; baseline app/widget simulator build passed (`Artifacts/continuation-build.log`). Device and milestone gates remain deferred.
+2026-10-15 — Owner opened M3. Implemented the memory selector, app-only text/margin writes and closed-day source snapshots; window home, text composer and day reader now run in the simulator. Core 4/4, persistence 4/4, native diary service 1/1 and final UI 2/2 passed; default-size comparisons generated. Gallery: `Madar/Artifacts/diary-window.html`. M2 approval and deferred device/milestone gates unchanged.
 
 # Board
 
@@ -85,7 +85,7 @@ Read §7.3 `sections/10-r-notes.md`, §5 `05-ds.md`, §10/§11 for data; RD1–R
 |---|---|---|---|
 | M3-E01 | Pure memory selection — §7.3 N03: stored day keys, Gregorian/Hijri match, leap-day/month-end, other-calendar fallback, nearest echo ±3 days/older tie, hidden/Day One exclusion, first day. | done | `swift test --package-path Madar/Packages/MadarCore --filter DiaryMemoryTests`: 4/4 passed; pure Swift, no data writes; N03 fixtures. |
 | M3-D01 | App-only diary append/margin commands and read adapter — §7.3 N02/N04, §10/§11; existing Entry/DayPage/MarginNote, stamped day provenance, receipt/replay/undo and RD1 closed-day auto-line snapshots. | done | `swift test --package-path Madar/Packages/MadarCommands --filter DiaryPersistenceTests`: 4/4 passed. Receipt/replay/undo, stored-day provenance, late ink, one margin fact, source-before-correction freezing; tombstoned day containers require explicit restore. App read adapter/UI integrates in V01. Initial historical auto-lines get a baseline at first observation, then freeze; no schema migration or owner-store access. |
-| M3-V01 | Window home — `notes/01-N1-Nafidha.jpg`, `-s1`; §7.3 home/N03, §5; RD5/RD6/RD7. Includes the text composer/day reader this home needs, based on `notes-app/07-editor.jpg` and `05-today.jpg`. | in progress | Actual photos/text/years/dates; default memory match and source-derived comparisons. No moon, experience panel, fake photo, money metric before M5, search/customization routes before built; keyboard first. Existing lock gate wraps room before fetching. |
+| M3-V01 | Window home — `notes/01-N1-Nafidha.jpg`, `-s1`; §7.3 home/N03, §5; RD5/RD6/RD7. Supporting text/day routes use `notes-app/07-editor.jpg` / `05-today.jpg`. | matched — awaiting owner | Real-source calendar/year selection, missing-memory first day, fixed header, photo/that-day/recent-day blocks, stored layout order/hide, source-derived known/unknown comparisons (money omitted until M5), one-tap keyboard, today/yesterday text, margin in both days, original day reader, guarded deep links and 30-second boundary refresh. Reuses existing lock gate before fetching; no frozen lock changes. Final `xcodebuild … test`: service 1/1 + UI 2/2 passed (`M3-V01-delivery.xcresult`), app/widget build; `git diff --check` clean. L/light screenshots `Artifacts/m3-v01-delivery-shots/`; comparisons `Artifacts/compare/N1-Nafidha.html`, `editor.html`; gallery `Artifacts/diary-window.html` (6 captures). Differences: native safe areas/tab bar/minimization, current dates and source content, synthetic photo only in isolated DEBUG fixture; hidden search/customization/audio/attachment/future-message controls until their cards, no prototype moon/experience panel or money sample. Keyboard-first per RD5; full editor, diary page features, echoes/margin home shapes and customization remain on their cards. Owner visual/device acceptance pending. |
 | M3-V02 | Echoes home — `notes/02-N2-Asda.jpg`; §7.3/N03. | ready | Fixed approved echo distances; configurable distance list is v2. |
 | M3-V03 | Margin home — `notes/03-N3-Hamish.jpg`, `-s1`; §7.3/N03/N04. | ready | One original memory with dated second-ink reply, no duplicate fact. |
 | M3-V04 | Diary customization — `flex/09-K-Mudhakkirat.jpg`, `-s1`, shared flex template; §6/§7.3, RD7. | ready | no legacy N4/notes-app settings, smart suggestion controls or frozen lock changes. |
@@ -124,13 +124,22 @@ M0-T06 (device acceptance paperwork), M0-T09 (encrypted backup and privacy matri
 
 ## Waiting on the owner
 
-Owner visually approved M2-V01–V17 and the prayer/Quran link on 15 October. OS gallery/Control invocation, real notification delivery, named human resource release sample, owner-iPhone and milestone gates remain separately unverified/deferred.
+M3-V01 window home awaits owner visual acceptance. Owner visually approved M2-V01–V17 and the prayer/Quran link on 15 October. OS gallery/Control invocation, real notification delivery, named human resource release sample, owner-iPhone and milestone gates remain separately unverified/deferred.
 
 # Later
 
-No ready screen card remains in the M2 queue; owner accepted the completed screens and selected the M1-F04 blocker next. M1-G remains deferred until the whole app is finished. M1-F04 software blocker is resolved; its OS/device checks remain deferred. M3 opened by owner on 15 October; take the first ready card after current work. Keep tafsir off until its separate licence is verified. Do not claim an M1/M2 gate or iPhone pass.
+No ready screen card remains in the M2 queue; owner accepted the completed screens and selected the M1-F04 blocker next. M1-G remains deferred until the whole app is finished. M1-F04 software blocker is resolved; its OS/device checks remain deferred. M3 opened by owner on 15 October; E01/D01 are complete, V01 awaits owner visual acceptance, V02 echoes is the next ready card. Keep tafsir off until its separate licence is verified. Do not claim an M1/M2 gate or iPhone pass.
 
 # Handovers
+## Handover — M3-E01/D01/V01 diary window — 2026-10-15 — Codex
+Works now: calendar/year memory selection and first-day fallback; app-only today/yesterday text with durable day provenance, receipt/replay/undo; one margin fact in target/written days; fixed historical source snapshots; window home, keyboard-first composer/day reader behind existing lock gate. Gallery `Madar/Artifacts/diary-window.html`.
+Verified: `swift test --package-path Madar/Packages/MadarCore --filter DiaryMemoryTests` 4/4; `swift test --package-path Madar/Packages/MadarCommands --filter DiaryPersistenceTests` 4/4; scoped `xcodebuild … -only-testing:MadarTests/DiaryServiceIntegrationTests -only-testing:MadarUITests/DiaryWindowUITests … test` service 1/1 + UI 2/2 PASS (`M3-V01-delivery.xcresult`), app/widget build; `git diff --check` clean. N1 top/scrolled and editor comparisons generated/open queued; 6 actual default L/light captures.
+Differences left: current dates/content/photos, native safe areas/tab bar; prototype controls omitted; search/customization/audio/attachments/sealed letters await built routes. Full page/editor capabilities and alternate homes remain later cards. No money metric before M5. Initial historical auto-lines get a first-observation baseline, then freeze before source edits; diary exports must include their sys.diaryAutoLines records.
+Not verified: owner visual/device/milestone approval, real photo import/audio/dictation, Day One import/export, full diary revision editing, or frozen lock/backup/privacy matrix. No owner-store access, model migration, enlarged-text runs or reviewer agents.
+Next: M3-V02 echoes home is first ready; preserve N1, its locked fetch gate, stored day keys and one-margin identity. Day One parser stays blocked until a real anonymized export fixture exists.
+Model/effort: Codex GPT-6; exact variant/effort not exposed.
+Usage: 53% five-hour and 24% weekly at closing checkpoint; no reset used.
+
 ## Handover — M1-F04 shared device budget and external countdown — 2026-10-15 — Codex
 Works now: M2-V01–V17/prayer-Quran link approved by owner; M1-F04 software blocker resolved with atomic shared JSON budget, LiveActivityIntent, countdown Control/Shortcut, minute-only native countdown and legacy device-ledger seeding. No owner-store access/schema migration.
 Verified: `swift test --package-path Madar/Packages/MadarInbox --filter NotificationBudgetTests` 7/7; independent producer process scenario 42 clients/4 slots/no SwiftData; scoped `xcodebuild … test` activity data 4/4 + save/relaunch/undo UI 1/1 (`M1-F04-validation`); Quran outside 2/2 and ledger 1/1 in prior targeted run; final `xcodebuild … build` app/widget PASS (`M1-F04-final-build.log`); `git diff --check` clean.
@@ -148,12 +157,3 @@ Not verified: owner visual approval, owner-iPhone, WidgetKit gallery/Control inv
 Next: owner can inspect all nine pages together; M2 has no remaining ready screen card. Do not start another milestone without the active board/owner direction.
 Model/effort: Codex GPT-6; exact variant/effort not exposed.
 Usage: 92% five-hour and 14% weekly at closing checkpoint; no reset tool called.
-
-## Handover — M2-V06–V08 batch — 2026-10-15 — Codex
-Works now: original-glyph full-page Mushaf with tools/paging/zoom/semantic ayahs; configurable Quran WidgetKit templates backed by expiring JSON, guarded shared-budget reminders with save/reset/undo, session Intent/control route and durable review timer; weekly rings/comparisons/day details. Combined actual gallery `Madar/Artifacts/quran-pages-batch.html` includes the previous V05 too.
-Verified: scoped `xcodebuild -project Madar.xcodeproj -scheme Madar -destination 'platform=iOS Simulator,id=4E0D782E-5154-48C7-A327-3AFE61EA59DC' … test`: Mushaf UI 1/1 (`M2-V06.xcresult`); outside integration 2/2 (`M2-V07-boundary.xcresult`), activity-budget ledger regression 1/1 (`M2-V07-tests.xcresult`), final settings UI 1/1 (`M2-V07-final-ui.xcresult`) and control-route/timer UI 1/1 (`M2-V07-route.xcresult`); weekly integration 1/1 (`M2-V08-tests.xcresult`) and final weekly UI 1/1 (`M2-V08-final.xcresult`). App/widget build; `git diff --check` clean; all three L/light comparisons generated/open queued.
-Differences left: owner borderless/green/1405 palette, native safe area and live data; no moon/tafsir hint. V07 reference is OS-composited: the app previews actual shared templates on room paper, without a fake clock/wallpaper/arrival claim (DECISIONS). V08 uses the shared rest denominator and hides unbuilt log tabs. Shots `Artifacts/m2-v06-shots/`, `m2-v07-final-shots/`, `m2-v07-timer-shots/`, `m2-v08-final-shots/`; no scrolled Quran canonical supplied.
-Not verified: owner visual approval, actual WidgetKit gallery/Control invocation, OS notification delivery, owner-iPhone, release/human resource sample or milestone gate. No enlarged-text runs or frozen privacy/travel work; all fixtures isolated from owner data.
-Next: M2-V09 year log ready; V01–V08 matched — awaiting owner. Owner can inspect the batch together.
-Model/effort: Codex GPT-6; exact variant/effort not exposed.
-Usage: 5% five-hour and 1% weekly at closing checkpoint; no reset tool called (earlier checkpoint 51%/98%).
