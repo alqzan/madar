@@ -5,6 +5,7 @@ import MadarCommands
 struct QuranFreeView: View {
     let service: AppQuranService
     let close: () -> Void
+    var initialRange: QuranUIRange? = nil
     @Environment(\.roomTheme) private var theme
     @State private var pages: [QuranUIIndexItem] = []
     @State private var from = 1
@@ -59,7 +60,7 @@ struct QuranFreeView: View {
                     }
                 }.padding(16)
             }
-            .task { do { pages = try await service.index(.page); if let last = pages.last(where: \.memorized) { through = last.firstPage; from = max(1,through - 4) } } catch { self.error = quranUserMessage(error) } }
+            .task { do { pages = try await service.index(.page); if let initialRange { from = initialRange.fromPage; through = initialRange.toPage } else if let last = pages.last(where: \.memorized) { through = last.firstPage; from = max(1,through - 4) } } catch { self.error = quranUserMessage(error) } }
             .fullScreenCover(item: $session) { initial in QuranHomeSessionFlow(service: service, state: Binding(get: { session ?? initial }, set: { session = $0 }), close: { session = nil }) }
     }
     private var surahs: [(Int,String)] { guard let catalog = try? QuranResources.catalog() else { return [] }; return Dictionary(grouping:catalog.ayahs,by:\.surahID).sorted { $0.key < $1.key }.map { ($0.key,$0.value[0].surahNameArabic) } }

@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		043FC0C00F30B850EC288BE4 /* QuranStrengthUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCC1A35E2703C1EBE5AD46C5 /* QuranStrengthUITests.swift */; };
 		0721790A7CEACD240CBEF2A3 /* LogPrayerIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC96F32AC5E7E4164A325940 /* LogPrayerIntent.swift */; };
 		08926E5F2D719EB1CFA11605 /* thmanyahseriftext-Regular.otf in Resources */ = {isa = PBXBuildFile; fileRef = 1F9E40A347AD27478E3FA224 /* thmanyahseriftext-Regular.otf */; };
 		09B7F6B5A2AE9066EEA65DE5 /* QuranIndexIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7217E4A89A67BE8180F2C94B /* QuranIndexIntegrationTests.swift */; };
@@ -40,6 +41,7 @@
 		30DB8B597D38C0BC491F0F6B /* QuranWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D68DFEF63B65ADBC328CAAF /* QuranWidget.swift */; };
 		320323BDDB522460AD28B544 /* PrayerActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3883565EC8BCC1379DC30626 /* PrayerActivityAttributes.swift */; };
 		330FEECE1D89F18B01B139E5 /* MadarPrayer in Frameworks */ = {isa = PBXBuildFile; productRef = 4B178E72DCA1A5ADC7074FA0 /* MadarPrayer */; };
+		34A8242C2D6815FA68B8EF2B /* QuranStrengthIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18F8C79683F748F920849BFB /* QuranStrengthIntegrationTests.swift */; };
 		34C08CE848450C430D0DB1E4 /* MadarWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BF0DFC3D1738347A82224A8 /* MadarWidgets.swift */; };
 		351256E784C60D00BFDE590F /* QuranIndexView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E07F3CE68A98CD21F903FAC7 /* QuranIndexView.swift */; };
 		3569E12B3B88FBC2F39E62BE /* QuranWidgetContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1ACAD98A1AD83A235C1FCB7 /* QuranWidgetContent.swift */; };
@@ -74,6 +76,7 @@
 		640D1ED77F7D51F8BA530C0E /* QuranHomeSessionFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = F637551CAD826503A70B7CD8 /* QuranHomeSessionFlow.swift */; };
 		6719E30E96A27275B6352121 /* MadarSnapshots in Frameworks */ = {isa = PBXBuildFile; productRef = 8536634CB7C0A26F02B922D9 /* MadarSnapshots */; };
 		67F42646D352F586E7340024 /* MadarPrayerShortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C51B7F621FD8CA7685E7B45 /* MadarPrayerShortcuts.swift */; };
+		6848032F7AB5676357F8ECD0 /* QuranStrengthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E23AE45098632E509E9E5265 /* QuranStrengthView.swift */; };
 		68AE30DEA586D04016333FAD /* QuranPlanSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 933435BC609B423466B8B0D9 /* QuranPlanSetupView.swift */; };
 		69E2EDB77052A3EC02406C0F /* thmanyahseriftext-Bold.otf in Resources */ = {isa = PBXBuildFile; fileRef = 71314BC22D8E14936362031A /* thmanyahseriftext-Bold.otf */; };
 		6A0993283286BFD137A6421F /* PrayerNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D2B7534A65CA14B25771639 /* PrayerNotifications.swift */; };
@@ -126,6 +129,7 @@
 		D368F59501A24EEC8D475168 /* CustomizationCopy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68E6E87340ED90E80146719D /* CustomizationCopy.swift */; };
 		D42D965F67207DA336C2B9FD /* AppQuranService+History.swift in Sources */ = {isa = PBXBuildFile; fileRef = 536586BCDBC61C002DDD0579 /* AppQuranService+History.swift */; };
 		DA23D00C67DC70824DF82D13 /* FoundationUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE67096C4A1239F83DCD8EF6 /* FoundationUITests.swift */; };
+		DBEA06252F77587FD33FCD01 /* AppQuranService+Strength.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE46D844F82E2405427C712B /* AppQuranService+Strength.swift */; };
 		DC2B4184D75AEF4CD8E6B86F /* thmanyahsans-Medium.otf in Resources */ = {isa = PBXBuildFile; fileRef = 5DFE82C4D216FC9A003ED7A2 /* thmanyahsans-Medium.otf */; };
 		DD86CCD87BD8C1FB2214433D /* QuranYearView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5265ABF3C9DFCE44A071263 /* QuranYearView.swift */; };
 		DE3682F2E29C077BFD2D8940 /* QuranJourneyUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A985462627BB3887641D57F9 /* QuranJourneyUITests.swift */; };
@@ -190,6 +194,7 @@
 		0E84CCAE8F551CE20CBE2B23 /* CommandIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandIntegrationTests.swift; sourceTree = "<group>"; };
 		0FBE1448D1219609C2020B02 /* Prayer.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Prayer.xcstrings; sourceTree = "<group>"; };
 		11F123B2D3B43B936627F0D6 /* QuranWeekView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranWeekView.swift; sourceTree = "<group>"; };
+		18F8C79683F748F920849BFB /* QuranStrengthIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranStrengthIntegrationTests.swift; sourceTree = "<group>"; };
 		1A25447FB94716ACAAEB7433 /* thmanyahsans-Regular.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "thmanyahsans-Regular.otf"; sourceTree = "<group>"; };
 		1C903CE9D436A9E7A19EEE2C /* ExportPrivacyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportPrivacyTests.swift; sourceTree = "<group>"; };
 		1D2B7534A65CA14B25771639 /* PrayerNotifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrayerNotifications.swift; sourceTree = "<group>"; };
@@ -291,11 +296,13 @@
 		D8ED79E1BF1FE7815F8AD5BE /* AppQuranService+Outside.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppQuranService+Outside.swift"; sourceTree = "<group>"; };
 		D9A6C8348A8AC97D5CEB55B8 /* QuranJourneyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranJourneyView.swift; sourceTree = "<group>"; };
 		DC96F32AC5E7E4164A325940 /* LogPrayerIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogPrayerIntent.swift; sourceTree = "<group>"; };
+		DCC1A35E2703C1EBE5AD46C5 /* QuranStrengthUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranStrengthUITests.swift; sourceTree = "<group>"; };
 		DFA1650F886CEC29CF1CF3CC /* QuranFreeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranFreeView.swift; sourceTree = "<group>"; };
 		DFD07614868D2D4DAD54B46C /* QuranWeekIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranWeekIntegrationTests.swift; sourceTree = "<group>"; };
 		E07F3CE68A98CD21F903FAC7 /* QuranIndexView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranIndexView.swift; sourceTree = "<group>"; };
 		E1778D1A629B46A993E5E049 /* AppQuranService+Journey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppQuranService+Journey.swift"; sourceTree = "<group>"; };
 		E1ACAD98A1AD83A235C1FCB7 /* QuranWidgetContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranWidgetContent.swift; sourceTree = "<group>"; };
+		E23AE45098632E509E9E5265 /* QuranStrengthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranStrengthView.swift; sourceTree = "<group>"; };
 		E249F3B9FECA9C0E7D4FF8B8 /* QuranYearUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranYearUITests.swift; sourceTree = "<group>"; };
 		E4EABD6DD57A637E613F8174 /* AppQuranService+Year.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppQuranService+Year.swift"; sourceTree = "<group>"; };
 		E9A234078D9BE6530E46FC1E /* MadarWidgets.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = MadarWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -312,6 +319,7 @@
 		FB394D0AA548ADD478457293 /* QuranCoachUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranCoachUITests.swift; sourceTree = "<group>"; };
 		FCA6249CAB9BF7BB68654926 /* MadarUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MadarUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		FCC2F8AF04AA4AA760B02D82 /* OpenMadarIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenMadarIntent.swift; sourceTree = "<group>"; };
+		FE46D844F82E2405427C712B /* AppQuranService+Strength.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppQuranService+Strength.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -397,6 +405,7 @@
 				D8ED79E1BF1FE7815F8AD5BE /* AppQuranService+Outside.swift */,
 				837D9262A4DAB2682DCD37ED /* AppQuranService+Plan.swift */,
 				BD37167C8A2CCDCFFFDDDA94 /* AppQuranService+Sessions.swift */,
+				FE46D844F82E2405427C712B /* AppQuranService+Strength.swift */,
 				BF404D35EAC947A55FC89756 /* AppQuranService+Week.swift */,
 				E4EABD6DD57A637E613F8174 /* AppQuranService+Year.swift */,
 				1D5244CCC79BF2B66C486F51 /* AppSession.swift */,
@@ -439,6 +448,7 @@
 				F80AE9DE521AD1D793F3862E /* QuranPlanView.swift */,
 				B1E34FBC5423B6F976E10F02 /* QuranScreenComponents.swift */,
 				F69335E1B7F2C46C44FA077F /* QuranSessionLogView.swift */,
+				E23AE45098632E509E9E5265 /* QuranStrengthView.swift */,
 				C6808E6AD5E96444CBF214FE /* QuranUIModels.swift */,
 				11F123B2D3B43B936627F0D6 /* QuranWeekView.swift */,
 				E1ACAD98A1AD83A235C1FCB7 /* QuranWidgetContent.swift */,
@@ -484,6 +494,7 @@
 				705F1232750D5F205C9CF2B4 /* QuranPlanSetupUITests.swift */,
 				A7F9377CE9EE94387459ADAC /* QuranPlanUITests.swift */,
 				935C91C1DA3A1899374095B0 /* QuranReviewUITests.swift */,
+				DCC1A35E2703C1EBE5AD46C5 /* QuranStrengthUITests.swift */,
 				3237B7C9B144CCBD5293A068 /* QuranWeekUITests.swift */,
 				E249F3B9FECA9C0E7D4FF8B8 /* QuranYearUITests.swift */,
 			);
@@ -526,6 +537,7 @@
 				7148BAF2176DECBB5553CABC /* QuranOutsideIntegrationTests.swift */,
 				4BBEEEB96E365D639A1F8813 /* QuranPlanIntegrationTests.swift */,
 				5D97EA0A97206A62947BE14C /* QuranServiceIntegrationTests.swift */,
+				18F8C79683F748F920849BFB /* QuranStrengthIntegrationTests.swift */,
 				DFD07614868D2D4DAD54B46C /* QuranWeekIntegrationTests.swift */,
 			);
 			path = Integration;
@@ -773,6 +785,7 @@
 				275BBBA8D5A9450AC4D4610E /* QuranOutsideIntegrationTests.swift in Sources */,
 				CF8B79E967752766D1C65487 /* QuranPlanIntegrationTests.swift in Sources */,
 				5C634F41104C0074DBECD70E /* QuranServiceIntegrationTests.swift in Sources */,
+				34A8242C2D6815FA68B8EF2B /* QuranStrengthIntegrationTests.swift in Sources */,
 				F3A9B51C3458DD18D2C7199C /* QuranWeekIntegrationTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -795,6 +808,7 @@
 				21C2B80D9912FF503F768AFD /* QuranPlanSetupUITests.swift in Sources */,
 				D2110583298615E31B2522B4 /* QuranPlanUITests.swift in Sources */,
 				6C75F9ABC51016430A499F3A /* QuranReviewUITests.swift in Sources */,
+				043FC0C00F30B850EC288BE4 /* QuranStrengthUITests.swift in Sources */,
 				7530BFBEDEE8F704CABBABFB /* QuranWeekUITests.swift in Sources */,
 				3C36914064A316EAE1065E1C /* QuranYearUITests.swift in Sources */,
 			);
@@ -814,6 +828,7 @@
 				D19C52DC969FBE7ADF6AFF8C /* AppQuranService+Outside.swift in Sources */,
 				930A880FE05492EA00341004 /* AppQuranService+Plan.swift in Sources */,
 				CC016523289DC8ED355808DD /* AppQuranService+Sessions.swift in Sources */,
+				DBEA06252F77587FD33FCD01 /* AppQuranService+Strength.swift in Sources */,
 				19409A51DF63C644A973DDD8 /* AppQuranService+Week.swift in Sources */,
 				12F77A5D723E19178224B8C4 /* AppQuranService+Year.swift in Sources */,
 				3FEA8FB15F8EB51DEB9ADAA6 /* AppQuranService.swift in Sources */,
@@ -859,6 +874,7 @@
 				37405DEBDC776929F87E8C3C /* QuranPlanView.swift in Sources */,
 				294E3B8E7AB845E5D1F870A3 /* QuranScreenComponents.swift in Sources */,
 				925C876417B261CE10B0E682 /* QuranSessionLogView.swift in Sources */,
+				6848032F7AB5676357F8ECD0 /* QuranStrengthView.swift in Sources */,
 				42891AC896C217AA125577AC /* QuranUIModels.swift in Sources */,
 				6A2B6743E159A39E375E8C57 /* QuranWeekView.swift in Sources */,
 				F5D155DF7B5E00FBC3AB3D0B /* QuranWidgetContent.swift in Sources */,

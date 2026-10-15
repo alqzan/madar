@@ -20,6 +20,7 @@ struct QuranHomeView: View {
     @State private var showSetup = false
     @State private var showFree = false
     @State private var showIndex = false
+    @State private var showStrength = false
     @State private var readerPage: Int?
     private enum HomeDetail: Identifiable {
         case step(QuranUIStep), hadith
@@ -58,6 +59,7 @@ struct QuranHomeView: View {
                         }.buttonStyle(.plain).accessibilityIdentifier("quran-tool-mushaf")
                         Button { showIndex = true } label: { Label("الفهرس", systemImage: "line.3.horizontal.decrease").font(bodyFont(14)).frame(maxWidth: .infinity, minHeight: 44) }.buttonStyle(.plain).accessibilityIdentifier("quran-tool-index")
                         Button { showFree = true } label: { Label("مراجعة حرة", systemImage: "arrow.left.arrow.right").font(bodyFont(14)).frame(maxWidth: .infinity, minHeight: 44) }.buttonStyle(.plain).accessibilityIdentifier("quran-tool-free")
+                        Button { showStrength = true } label: { Label("منسوب الحفظ", systemImage: "chart.bar").font(bodyFont(14)).frame(maxWidth: .infinity, minHeight: 44) }.buttonStyle(.plain).accessibilityIdentifier("quran-tool-strength")
                         Button { showOutside = true } label: { Label("التذكير والودجات", systemImage: "bell").font(bodyFont(14)).frame(maxWidth: .infinity, minHeight: 44) }.buttonStyle(.plain).accessibilityIdentifier("quran-outside")
                     }
                 }.padding(.horizontal, 16).padding(.top, 20).padding(.bottom, 36)
@@ -120,6 +122,7 @@ struct QuranHomeView: View {
                 .environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft)
         }
         .fullScreenCover(isPresented: $showOutside) { QuranOutsideView(service: service, close: { showOutside = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
+        .fullScreenCover(isPresented: $showStrength, onDismiss: { run { try await refresh() } }) { QuranStrengthView(service: service, close: { showStrength = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
         .fullScreenCover(isPresented: $showIndex) { QuranIndexView(service: service, close: { showIndex = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
         .fullScreenCover(isPresented: $showFree, onDismiss: { run { try await refresh() } }) { QuranFreeView(service: service, close: { showFree = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
         .fullScreenCover(isPresented: $showSetup, onDismiss: { run { try await refresh() } }) { QuranPlanSetupView(service: service, close: { showSetup = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
