@@ -132,21 +132,14 @@ struct BahwBlockView: View {
                 title(lobby.accent)
                 Text(percent(model.hijri)).font(big)
                 strip(model.hijri, month: model.hijriMonthIndex, hijri: true)
-                if let ramadan = model.ramadanIn { Text("رمضان بعد " + digits.string(ramadan) + " " + service.dayCount(ramadan)).font(small).foregroundStyle(lobby.secondaryInk) }
             }
         } else {
             VStack(alignment: .leading, spacing: 10) {
-                HStack { title(lobby.accent); Spacer(); Text(service.shortDate(service.today, hijri: true) + "، " + service.shortDate(service.today, hijri: false)).font(small).foregroundStyle(lobby.secondaryInk) }
+                title(lobby.accent)
                 yearRow(digits.string(model.hijriYear) + "هـ", model.hijri, month: model.hijriMonthIndex, hijri: true)
                 yearRow(digits.string(model.gregorianYear) + "م", model.gregorian, month: model.gregorianMonthIndex, hijri: false)
                 Spacer(minLength: 0)
-                HStack(spacing: 8) {
-                    ForEach(model.landmarks.filter { [.ramadan, .eidAlFitr, .arafah].contains($0.name) }.sorted { $0.daysLeft < $1.daysLeft }, id: \.name) { mark in
-                        HStack(spacing: 4) { Text(markTitle(mark.name)).font(small); Text(digits.string(mark.daysLeft)).font(label).foregroundStyle(mark.name == .arafah ? lobby.ink : lobby.color("amberText")) }
-                            .frame(maxWidth: .infinity, minHeight: 34).background(lobby.background, in: .rect(cornerRadius: 10))
-                            .accessibilityElement(children: .ignore).accessibilityLabel(markTitle(mark.name) + " بعد " + digits.string(mark.daysLeft) + " " + service.dayCount(mark.daysLeft))
-                    }
-                }
+
             }
         }
     }

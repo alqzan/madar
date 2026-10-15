@@ -44,6 +44,19 @@ import XCTest
         XCTAssertTrue(next.label.contains("بعد"), next.label)
         capture(app, "UX-03-next-fajr-L")
     }
+    func testYearSummaryAvoidsDuplicateSeasonsAndDate() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
+        app.launch(); finishOnboarding(app)
+        let year = app.descendants(matching: .any).matching(identifier: "bahw-block-year").firstMatch
+        XCTAssertTrue(year.waitForExistence(timeout: 15))
+        let text = year.staticTexts.allElementsBoundByIndex.map(\.label).joined(separator: " ")
+        for duplicate in ["رمضان", "العيد", "عرفة", "أكتوبر", "ربيع"] { XCTAssertFalse(text.contains(duplicate), text) }
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "bahw-year-hijri").firstMatch.exists)
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "bahw-year-gregorian").firstMatch.exists)
+        capture(app, "UX-04-year-strips-L")
+    }
     private func finishOnboarding(_ app: XCUIApplication) {
         if app.buttons["first-run-skip"].waitForExistence(timeout: 2) { app.buttons["first-run-skip"].tap() }
         let start = app.buttons["first-run-continue"]
