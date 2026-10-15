@@ -67,7 +67,7 @@ struct DiaryMediaCard: View {
         } catch { self.error = "تعذّر فتح المرفق. يمكنك إعادة المحاولة." }
     }
 }
-private struct DiaryQuickLook: UIViewControllerRepresentable {
+struct DiaryQuickLook: UIViewControllerRepresentable {
     let url: URL
     @Environment(\.dismiss) private var dismiss
     func makeCoordinator() -> Coordinator { Coordinator(url: url, close: { dismiss() }) }
