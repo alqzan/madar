@@ -3694,6 +3694,12 @@
       "sha256": "264bb7c4d0db6f87efdb0ac6b2263b1a64c706673d436b5bf5b8fb5ed1d9d592",
       "edition": 1439,
       "role": "quranData"
+    },
+    {
+      "path": "Quran1439/hizb-starts.json",
+      "sha256": "b8ff878014afc4ba7f1c91d6d7d324edf71122999e9275c99272c98110967c73",
+      "edition": 1439,
+      "role": "quranData"
     }
   ],
   "printedFontSource": {
@@ -3707,5 +3713,12 @@
     "sha256": "c3d68d9a85e7ab8fea022da42b480e923b4f81f3e6d72d1d3cd6b8b778b26988",
     "edition": 1405,
     "sample": "printed page 604 (PDF page 607), body area excluding outer frame. Median palette: paper #F7F6DE, ink #3B3528, green #78B980, gold #917441. UI text shades retain required contrast."
+  },
+  "hizbSource": {
+    "version": 1,
+    "edition": 1439,
+    "source": "https://dm.qurancomplex.gov.sa/Download/1441-AI-hafs.zip",
+    "archiveSHA256": "280c5d71ca16aaeeb3a343be1b92c76fa6df71d0671e202c026fde12402d9eef",
+    "verification": "All 30 even hizb labels and their adjacent ayah starts visually checked in the official Hafs39 AI pages against the unchanged Hafs 2.0 surah/ayah/page/line records. Archive is a later digital distribution of Hafs39. Odd starts remain the existing official jozz field; no Quran.com metadata is imported. Named human release sample remains pending."
   }
 }

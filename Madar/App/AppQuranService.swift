@@ -199,17 +199,6 @@ import MadarPrayer
         return QuranUIForecast(title: title, assumptions: "تقدير بافتراض إتمام أيام الحفظ بلا فوت أو تثبيت، حُسب في " + displayDate(snapshot.day.date),
             warning: input.amount * unitFaces > 2 ? "المقدار يتجاوز وجهين في يوم الحفظ" : nil, portions: [], estimatedDays: estimatedDays)
     }
-    func index(_ unit: QuranUIIndexUnit) async throws -> [QuranUIIndexItem] {
-        let snapshot = try snapshot(), catalog = try QuranResources.catalog()
-        return (1...604).map { number in
-            let ids = Set(catalog.ayahs(on: number).map(\.id)), count = ids.intersection(snapshot.coverage.coveredAyahs).count
-            let page = snapshot.pages.first { $0.page == number }
-            return QuranUIIndexItem(id: String(number), title: "الوجه " + numerals.string(number), subtitle: "", firstPage: number,
-                fraction: ids.isEmpty ? 0 : Double(count) / Double(ids.count), memorized: snapshot.coverage.completedPages.contains(number),
-                reviewed: snapshot.sessions.contains { [.review, .free, .qiyam].contains($0.kind) && $0.pages.contains(number) }, due: page?.isDue ?? false,
-                isToday: snapshot.review.allPages.contains(number))
-        }
-    }
     func page(_ number: Int) async throws -> QuranUIPage {
         let catalog = try QuranResources.catalog()
         guard let layout = catalog.layout?.page(number), let fontURL = QuranResourceCatalog.bundledFontURL() else { throw QuranPlanError.invalidPages }

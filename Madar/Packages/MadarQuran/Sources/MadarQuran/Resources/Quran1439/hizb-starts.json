@@ -1,0 +1,249 @@
+{
+  "version": 1,
+  "edition": 1439,
+  "source": "https://dm.qurancomplex.gov.sa/Download/1441-AI-hafs.zip",
+  "archiveSHA256": "280c5d71ca16aaeeb3a343be1b92c76fa6df71d0671e202c026fde12402d9eef",
+  "verification": "All 30 even hizb labels and their adjacent ayah starts visually checked in the official Hafs39 AI pages against the unchanged Hafs 2.0 surah/ayah/page/line records. Archive is a later digital distribution of Hafs39. Odd starts remain the existing official jozz field; no Quran.com metadata is imported. Named human release sample remains pending.",
+  "evenStarts": [
+    {
+      "number": 2,
+      "ayahID": 82,
+      "surah": 2,
+      "ayah": 75,
+      "page": 11,
+      "line": 11
+    },
+    {
+      "number": 4,
+      "ayahID": 210,
+      "surah": 2,
+      "ayah": 203,
+      "page": 32,
+      "line": 1
+    },
+    {
+      "number": 6,
+      "ayahID": 308,
+      "surah": 3,
+      "ayah": 15,
+      "page": 51,
+      "line": 12
+    },
+    {
+      "number": 8,
+      "ayahID": 464,
+      "surah": 3,
+      "ayah": 171,
+      "page": 72,
+      "line": 10
+    },
+    {
+      "number": 10,
+      "ayahID": 581,
+      "surah": 4,
+      "ayah": 88,
+      "page": 92,
+      "line": 2
+    },
+    {
+      "number": 12,
+      "ayahID": 696,
+      "surah": 5,
+      "ayah": 27,
+      "page": 112,
+      "line": 6
+    },
+    {
+      "number": 14,
+      "ayahID": 825,
+      "surah": 6,
+      "ayah": 36,
+      "page": 132,
+      "line": 1
+    },
+    {
+      "number": 16,
+      "ayahID": 955,
+      "surah": 7,
+      "ayah": 1,
+      "page": 151,
+      "line": 3
+    },
+    {
+      "number": 18,
+      "ayahID": 1125,
+      "surah": 7,
+      "ayah": 171,
+      "page": 173,
+      "line": 1
+    },
+    {
+      "number": 20,
+      "ayahID": 1269,
+      "surah": 9,
+      "ayah": 34,
+      "page": 192,
+      "line": 4
+    },
+    {
+      "number": 22,
+      "ayahID": 1390,
+      "surah": 10,
+      "ayah": 26,
+      "page": 212,
+      "line": 1
+    },
+    {
+      "number": 24,
+      "ayahID": 1557,
+      "surah": 11,
+      "ayah": 84,
+      "page": 231,
+      "line": 3
+    },
+    {
+      "number": 26,
+      "ayahID": 1726,
+      "surah": 13,
+      "ayah": 19,
+      "page": 252,
+      "line": 1
+    },
+    {
+      "number": 28,
+      "ayahID": 1952,
+      "surah": 16,
+      "ayah": 51,
+      "page": 272,
+      "line": 11
+    },
+    {
+      "number": 30,
+      "ayahID": 2128,
+      "surah": 17,
+      "ayah": 99,
+      "page": 292,
+      "line": 5
+    },
+    {
+      "number": 32,
+      "ayahID": 2349,
+      "surah": 20,
+      "ayah": 1,
+      "page": 312,
+      "line": 7
+    },
+    {
+      "number": 34,
+      "ayahID": 2596,
+      "surah": 22,
+      "ayah": 1,
+      "page": 332,
+      "line": 3
+    },
+    {
+      "number": 36,
+      "ayahID": 2812,
+      "surah": 24,
+      "ayah": 21,
+      "page": 352,
+      "line": 1
+    },
+    {
+      "number": 38,
+      "ayahID": 3043,
+      "surah": 26,
+      "ayah": 111,
+      "page": 371,
+      "line": 15
+    },
+    {
+      "number": 40,
+      "ayahID": 3303,
+      "surah": 28,
+      "ayah": 51,
+      "page": 392,
+      "line": 1
+    },
+    {
+      "number": 42,
+      "ayahID": 3491,
+      "surah": 31,
+      "ayah": 22,
+      "page": 413,
+      "line": 5
+    },
+    {
+      "number": 44,
+      "ayahID": 3630,
+      "surah": 34,
+      "ayah": 24,
+      "page": 431,
+      "line": 3
+    },
+    {
+      "number": 46,
+      "ayahID": 3933,
+      "surah": 37,
+      "ayah": 145,
+      "page": 451,
+      "line": 10
+    },
+    {
+      "number": 48,
+      "ayahID": 4174,
+      "surah": 40,
+      "ayah": 41,
+      "page": 472,
+      "line": 1
+    },
+    {
+      "number": 50,
+      "ayahID": 4349,
+      "surah": 43,
+      "ayah": 24,
+      "page": 491,
+      "line": 3
+    },
+    {
+      "number": 52,
+      "ayahID": 4601,
+      "surah": 48,
+      "ayah": 18,
+      "page": 513,
+      "line": 6
+    },
+    {
+      "number": 54,
+      "ayahID": 4902,
+      "surah": 55,
+      "ayah": 1,
+      "page": 531,
+      "line": 7
+    },
+    {
+      "number": 56,
+      "ayahID": 5178,
+      "surah": 62,
+      "ayah": 1,
+      "page": 553,
+      "line": 3
+    },
+    {
+      "number": 58,
+      "ayahID": 5448,
+      "surah": 72,
+      "ayah": 1,
+      "page": 572,
+      "line": 3
+    },
+    {
+      "number": 60,
+      "ayahID": 5949,
+      "surah": 87,
+      "ayah": 1,
+      "page": 591,
+      "line": 12
+    }
+  ]
+}

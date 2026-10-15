@@ -495,6 +495,25 @@
         "date": null
       },
       "gateRule": "Automated resource checks before enabling; named human sample before external release. The owner-confirmed Mushaf licence is closed."
+    },
+    {
+      "id": "quran-1439-hizb",
+      "kind": "data asset",
+      "source": "https://dm.qurancomplex.gov.sa/Download/1441-AI-hafs.zip",
+      "version": "Hafs39 even hizb marginal starts v1",
+      "license": "Mushaf permission obtained by the owner for Madar",
+      "licenseStatus": "owner-confirmed",
+      "checksum": "b8ff878014afc4ba7f1c91d6d7d324edf71122999e9275c99272c98110967c73",
+      "archiveSHA256": "280c5d71ca16aaeeb3a343be1b92c76fa6df71d0671e202c026fde12402d9eef",
+      "edition": 1439,
+      "downloadDate": "2026-10-13",
+      "usedBy": "R18-Fihris hizb unit; QuranHizbMapTests; QuranResourceCatalogTests",
+      "note": "All 30 even hizb labels and their adjacent ayah starts visually checked in the official Hafs39 AI pages against the unchanged Hafs 2.0 surah/ayah/page/line records. Archive is a later digital distribution of Hafs39. Odd starts remain the existing official jozz field; no Quran.com metadata is imported. Named human release sample remains pending.",
+      "humanReview": {
+        "name": null,
+        "date": null
+      },
+      "gateRule": "Named human sample before external release remains pending."
     }
   ],
   "fonts": {
