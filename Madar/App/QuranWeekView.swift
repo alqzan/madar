@@ -4,6 +4,7 @@ import MadarDesign
 struct QuranWeekView: View {
     let service: AppQuranService
     let close: () -> Void
+    var selection: Binding<QuranLogTab>? = nil
     @Environment(\.roomTheme) private var theme
     @Environment(\.dynamicTypeSize) private var type
     @State private var week: QuranUIWeek?
@@ -16,8 +17,7 @@ struct QuranWeekView: View {
                     Button(action: close) { Image(systemName: "chevron.backward").frame(width: 44, height: 44) }.accessibilityLabel("رجوع").accessibilityIdentifier("quran-week-close")
                     Text("السجلّ").font(serif(28)); Spacer()
                 }.padding(.vertical, 4)
-                Text("الأسبوع").font(font(15, bold: true)).padding(.horizontal, 22).padding(.vertical, 10)
-                    .background(theme.surface, in: Capsule()).frame(maxWidth: .infinity, alignment: .leading)
+                if let selection { QuranLogTabs(selection: selection) }
                 if let week {
                     if service.app.string("quran.weekLogView") != "summary" { rings(week) }
                     summary(week)

@@ -113,7 +113,7 @@ struct QuranHomeView: View {
                 .environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft)
         }
         .fullScreenCover(isPresented: $showOutside) { QuranOutsideView(service: service, close: { showOutside = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
-        .fullScreenCover(isPresented: $showWeek) { QuranWeekView(service: service, close: { showWeek = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
+        .fullScreenCover(isPresented: $showWeek) { QuranLogView(service: service, close: { showWeek = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
         .alert("تعذّر إتمام العملية", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) { Button("تمّ") { error = nil } } message: { Text(error ?? "") }
     }
     private func serif(_ size: CGFloat) -> Font { .custom("Amiri-Bold", size: size, relativeTo: size > 26 ? .largeTitle : .title2) }

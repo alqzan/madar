@@ -34,6 +34,12 @@ import MadarCommands
         XCTAssertEqual(widget.hifzWeek, QuranDayCloseCopy.faces(week.hifz, digits: service.numerals))
         XCTAssertEqual(widget.reviewWeek, QuranDayCloseCopy.faces(week.review, digits: service.numerals))
         XCTAssertEqual(widget.days.map(\.review), week.days.map { Double($0.review) / 8 })
+        let year = try service.yearLog()
+        XCTAssertEqual(year.days.count, 371); XCTAssertEqual(year.months.count, 12)
+        XCTAssertEqual(year.days.reduce(0) { $0 + $1.hifz }, 2)
+        XCTAssertEqual(year.days.reduce(0) { $0 + $1.review }, 1)
+        XCTAssertEqual(year.activeDays, 3) // Actual rest-day work is activity; drill is not.
+        XCTAssertEqual(year.days.last?.id, "2026-10-15")
         _ = root // An isolated temporary store, never the owner's data.
     }
 }
