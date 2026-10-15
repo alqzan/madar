@@ -29,6 +29,13 @@ Found by Claude walking the app on the simulator as a user (15 Oct 23:40); the o
 | UX-09 | Quran home: hide the streak pill when the streak is 0 (Arabic zero reads like a dot); hide the «٠/٠» counters and the plan-depth controls until a plan exists. | ready | |
 | UX-10 | Tab bar: on the simulator each tab switch needed two taps after the bar minimised. Confirm on device or simulator; if real, fix (e.g. minimise behaviour). | ready | Record evidence either way. |
 
+## Ideas — for the owner
+
+Bigger improvement ideas from Claude or Codex (new features, rule or data-model changes, beyond v1). Not built until the owner says yes. One row per idea.
+
+| Idea | What and why | From | Owner |
+|---|---|---|---|
+
 ## Section M1-V — prayer screens match the design (do in this order)
 
 | Card | Screen | Canonical | Current code | Status | Do not copy (fixes and defaults win) | Notes |
