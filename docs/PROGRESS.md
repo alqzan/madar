@@ -1,6 +1,6 @@
 # Current milestone
 
-**M3 Diary — E01/D01 done; V01–V08, V10–V11, V13–V15 and F01 matched — awaiting owner; M4 opened 15 Oct: E01 done, V01 matched — awaiting owner, V03 next; habits blocked on RL3/RL2.** V09 blocked (Day One fixture), V12 blocked (frozen privacy cleanup). M2-V01–V17 are approved; M1-F04 software is complete. Device/milestone gates stay deferred until the whole app is finished. RA1/RA2, RP1, RU1 and data preservation remain mandatory.
+**Do the UX cards (owner trial, 15 Oct) first, then M4-E02.** **M3 Diary — E01/D01 done; V01–V08, V10–V11, V13–V15 and F01 matched — awaiting owner; M4 opened 15 Oct: E01 done, V01 matched — awaiting owner, V03 next; habits blocked on RL3/RL2.** V09 blocked (Day One fixture), V12 blocked (frozen privacy cleanup). M2-V01–V17 are approved; M1-F04 software is complete. Device/milestone gates stay deferred until the whole app is finished. RA1/RA2, RP1, RU1 and data preservation remain mandatory.
 
 # Last checked
 
@@ -11,6 +11,23 @@
 Status values: `ready` · `in progress` · `blocked: <reason>` · `matched — awaiting owner` · `approved` (owner only) · `done` (engines and flows without a screen).
 
 Every screen card follows protocol §2: canonical files → default-size screenshots → `python3 Madar/scripts/compare-screens.py <board> <shots>` → fix → `matched — awaiting owner` (default text size only; no enlarged-text testing, owner 13 October 2026). Spec for every prayer card: §7.2 `docs/HANDOFF/sections/09-r-salah.md` (the part for that screen), §5 shapes `05-ds.md`, and the fixes listed.
+
+## UX — owner app trial 15 Oct (do these first, in order)
+
+Found by Claude walking the app on the simulator as a user (15 Oct 23:40); the owner asked for all of them to be fixed. Each card keeps the room look and the fixes/schema; add or extend a UI test for the changed flow.
+
+| Card | What | Status | Notes |
+|---|---|---|---|
+| UX-01 | Remove the diary-only lock — owner decision 15 Oct (DECISIONS). `core.faceIDLock` options become `app` / `none`, default `none`; a stored `notesOnly` reads as `none`. Remove the «المذكرات مقفلة» gate and every notes-only lock path; the whole-app lock stays as an option in «خصّص». | ready | Unfreezes only this part of app lock/Face ID. Update settings-schema in its three copies with a DECISIONS row. Keeps the notes privacy cleanup for content-bearing notifications (M3-V12 decision). |
+| UX-02 | Lobby block tap opens the room directly (prayer, Quran, diary tabs; year/upcoming → «السنة وما يهمّك»), not a sheet that repeats the block with the open button below the fold. Avoid accidental opens while scrolling. | ready | Keep long-press for arranging. |
+| UX-03 | Lobby prayer block: fill the empty lower half with the next prayer and how long until it («الفجر بعد ٤ ساعات و٤٩ دقيقة»), including after Isha (next day's Fajr). | ready | Read from the prayer snapshot; no new number definitions. |
+| UX-04 | Remove repetition in the lobby: the year block repeats the season chips shown by the upcoming block (رمضان/العيد/عرفة) and the date already in the header. Year block keeps the two strips; seasons live in «الأيام القادمة». | ready | |
+| UX-05 | Lobby header: «رتّب» and the settings button are always visible and the fixed header takes about a quarter of the screen. Arrange by long press (and from «خصّص»), settings from the «خصّص» tab; let the greeting scroll away. | ready | Owner disliked the always-visible buttons. |
+| UX-06 | Upcoming rings are unclear (116 days and 213 days both look almost closed). Make the ring read as «how close» on one scale (e.g. share of a year left) or replace with a plain countdown; show the Gregorian date under the Hijri title, not the Hijri date again. | ready | |
+| UX-07 | Lobby diary block when empty: replace the large «لا سطور بعد» with a clear action «اكتب سطر اليوم» that opens the writer. | ready | |
+| UX-08 | Prayer: hide «N صلوات غير محسوبة من فترة سابقة» for a new user until the tracking start has real past days to resolve; after the last prayer time, say «لم تُسجَّل N» instead of «بقيت N صلوات». | ready | RP1 unchanged: nothing becomes missed automatically. |
+| UX-09 | Quran home: hide the streak pill when the streak is 0 (Arabic zero reads like a dot); hide the «٠/٠» counters and the plan-depth controls until a plan exists. | ready | |
+| UX-10 | Tab bar: on the simulator each tab switch needed two taps after the bar minimised. Confirm on device or simulator; if real, fix (e.g. minimise behaviour). | ready | Record evidence either way. |
 
 ## Section M1-V — prayer screens match the design (do in this order)
 
