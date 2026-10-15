@@ -32,6 +32,7 @@ struct DiaryCustomizeView: View {
     @State private var confirmReset = false
     private var layout: DiaryHomeLayout { .init(app.values["notes.layout"]) }
     private let groups: [(String, String, String, [String])] = [
+        ("calendar", "التقويم", "calendar", ["notes.calendarFirst"]),
         ("memory", "أي ذكرى تظهر", "clock", ["notes.match", "notes.noMemory", "notes.yearsBack", "notes.includeDayOne"]),
         ("display", "ما تعرضه الذكرى", "photo", ["notes.memorySize", "notes.showPhoto", "notes.showPlace", "notes.showAutoSections", "notes.sinceMetrics", "notes.autoLines"]),
         ("ink", "الكتابة والهامش", "pencil", ["notes.secondInk", "notes.dictationFirst", "notes.serverDictationConsent"])
