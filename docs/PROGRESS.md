@@ -28,6 +28,7 @@ Found by Claude walking the app on the simulator as a user (15 Oct 23:40); the o
 | UX-08 | Prayer: hide «N صلوات غير محسوبة من فترة سابقة» for a new user until the tracking start has real past days to resolve; after the last prayer time, say «لم تُسجَّل N» instead of «بقيت N صلوات». | ready | RP1 unchanged: nothing becomes missed automatically. |
 | UX-09 | Quran home: hide the streak pill when the streak is 0 (Arabic zero reads like a dot); hide the «٠/٠» counters and the plan-depth controls until a plan exists. | ready | |
 | UX-10 | Tab bar: on the simulator each tab switch needed two taps after the bar minimised. Confirm on device or simulator; if real, fix (e.g. minimise behaviour). | ready | Record evidence either way. |
+| UX-11 | Both dates everywhere — owner rule 15 Oct (AGENTS.md «Dates»). Audit every date the user sees in every built room (prayer, Quran incl. the plan's expected completion, diary, lobby, year, upcoming, settings, exports): primary calendar per `core.firstCalendar` (diary calendar per `notes.calendarFirst`) as the main text, the other smaller beneath or beside it. Use one shared formatter. | ready | Owner example: «الإتمام المتوقع» shows Hijri only; add the Gregorian date under it, small. |
 
 ## Ideas — for the owner
 
