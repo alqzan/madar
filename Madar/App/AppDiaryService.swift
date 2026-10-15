@@ -14,6 +14,8 @@ struct DiaryDisplayDay: Identifiable {
     let photo: Data?
     let place: String?
     let dayOne: Bool
+    var photoID: UUID? = nil
+    var media: [DiaryDisplayMedia] = []
     var marginDays: [String: GregorianDay] = [:]
     var excerpt: String { lines.first(where: { $0.kind == "normal" || $0.kind == "late" })?.text ?? lines.first?.text ?? "صفحة بلا كتابة" }
 }
@@ -97,16 +99,24 @@ struct DiaryHomeSnapshot {
             let enabled = app.values["notes.autoLines"]?.object ?? [:]
             lines += auto.filter { enabled[$0.kind] == .bool(true) }
         }
+        let mediaLinks = entries.flatMap { entry in (entry.attachmentMediaIDs + (entry.mediaID.map { [$0] } ?? [])).map { (entry.id.uuidString, $0) } }
+        var attachments: [DiaryDisplayMedia] = []
+        for (entry, id) in mediaLinks {
+            if let row = try context.fetch(FetchDescriptor<Media>(predicate: #Predicate { $0.id == id && $0.deletedAt == nil && $0.mergedInto == nil })).first, let data = row.data {
+                attachments.append(.init(id: row.id, entryID: entry, kind: row.kind, contentType: row.contentType, data: data, duration: row.durationS))
+            }
+        }
         var photo: Data?
+        var photoID: UUID?
         if app.bool("notes.showPhoto") {
             for id in (page?.photoMediaID.map { [$0] } ?? []) + entries.flatMap(\.attachmentMediaIDs) {
                 if let item = try context.fetch(FetchDescriptor<Media>(predicate: #Predicate { $0.id == id && $0.kind == "photo" && $0.deletedAt == nil && $0.mergedInto == nil })).first {
-                    photo = item.data; break
+                    photo = item.data; photoID = id; break
                 }
             }
         }
         return .init(day: day, lines: lines.sorted { $0.at == $1.at ? $0.id < $1.id : $0.at < $1.at }, photo: photo,
-            place: app.bool("notes.showPlace") ? entries.compactMap(\.place).first : nil, dayOne: page?.origin == "dayOne", marginDays: Dictionary(uniqueKeysWithValues: margins.compactMap { margin in
+            place: app.bool("notes.showPlace") ? entries.compactMap(\.place).first : nil, dayOne: page?.origin == "dayOne", photoID: photoID, media: attachments, marginDays: Dictionary(uniqueKeysWithValues: margins.compactMap { margin in
                 guard let day = try? GregorianDay(margin.writtenDayKey) else { return nil }; return ("margin." + margin.id.uuidString, day)
             }))
     }

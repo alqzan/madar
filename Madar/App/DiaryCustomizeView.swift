@@ -34,7 +34,7 @@ struct DiaryCustomizeView: View {
     private let groups: [(String, String, String, [String])] = [
         ("memory", "أي ذكرى تظهر", "clock", ["notes.match", "notes.noMemory", "notes.yearsBack", "notes.includeDayOne"]),
         ("display", "ما تعرضه الذكرى", "photo", ["notes.memorySize", "notes.showPhoto", "notes.showPlace", "notes.showAutoSections", "notes.sinceMetrics", "notes.autoLines"]),
-        ("ink", "الكتابة والهامش", "pencil", ["notes.secondInk"])
+        ("ink", "الكتابة والهامش", "pencil", ["notes.secondInk", "notes.dictationFirst", "notes.serverDictationConsent"])
     ]
     private var keys: [String] { ["notes.homeShape", "notes.layout"] + groups.flatMap(\.3) }
     private var changed: Int { app.schema.settings.filter { keys.contains($0.key) && app.values[$0.key] != $0.defaultValue }.count }
@@ -61,6 +61,13 @@ struct DiaryCustomizeView: View {
                                 Divider().overlay(theme.line)
                                 if definition.key == "notes.sinceMetrics" { metricControls }
                                 else if definition.key == "notes.autoLines" { autoControls }
+                                else if definition.key == "notes.serverDictationConsent" {
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        Text("تحويل الصوت عبر Apple").font(MadarTypography.section())
+                                        Text(app.bool("notes.serverDictationConsent") ? "مسموح على هذا الجهاز عند غياب التحويل المحلي" : "لا يُرسل الصوت دون سؤال صريح عند التحويل").font(DiaryType.label)
+                                        if app.bool("notes.serverDictationConsent") { Button("ألغِ الموافقة على إرسال الصوت") { app.set(.bool(false), key: "notes.serverDictationConsent") }.frame(minHeight: 44).accessibilityIdentifier("diary-revoke-speech-consent") }
+                                    }
+                                }
                                 else { SettingControl(definition: definition, session: app) }
                             }
                         }

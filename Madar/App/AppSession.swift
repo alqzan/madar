@@ -15,6 +15,7 @@ struct AppUndoToken { let id: UUID; let expiresAt: Date }
 
 @MainActor @Observable
 final class AppSession {
+    let diaryPlayback = DiaryPlayback()
     var diaryRoute: Route?
     var quranRoute: Route?
     private(set) var container: ModelContainer
@@ -544,12 +545,13 @@ final class AppSession {
         return result
     }
 
-    func executeDiaryCommand(_ name: String, payload: [String: MadarCore.JSONValue]) async throws {
+    var diaryStagingDirectory: URL { commandAdapter.diaryStagingDirectory }
+    func executeDiaryCommand(_ name: String, payload: [String: MadarCore.JSONValue], id: UUID = UUID()) async throws {
         guard lockController?.canPresent(.notes) ?? protectedDataAuthorized else { throw DataError.invalidValue("المذكرات مقفلة") }
         guard beginWrite() else { throw BackupOperationError.busy }
         defer { pendingWrites -= 1 }
         let now = prayerNow()
-        let result = try await bus.execute(CommandEnvelope(name: name, payload: .object(payload), issuedAt: now), now: now)
+        let result = try await bus.execute(CommandEnvelope(commandID: id, name: name, payload: .object(payload), issuedAt: now), now: now)
         guard result.status == .applied || result.status == .duplicate else { throw DataError.invalidValue(result.reason ?? "diary command") }
         try reload(); try publishSnapshot()
         if let id = result.undoToken {

@@ -73,6 +73,8 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         NSFaceIDUsageDescription: افتح بيانات مدار المحمية بمصادقة الجهاز.
         NSLocationWhenInUseUsageDescription: يعرف مدار أنك خارج مدينتك ليسألك عن السفر. لا يُحفظ موقعك ولا يغادر جهازك.
+        NSMicrophoneUsageDescription: سجّل صوتك واحفظه في صفحة يومك على هذا الجهاز.
+        NSSpeechRecognitionUsageDescription: حوّل التسجيل الذي تختاره إلى نص. لا يُرسل الصوت إلى Apple دون موافقتك داخل مدار.
         NSSupportsLiveActivities: true
         UIAppFonts:
           - thmanyahsans-Light.otf

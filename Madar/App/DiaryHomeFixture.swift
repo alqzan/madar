@@ -1,6 +1,7 @@
 #if DEBUG
 import Foundation
 import UIKit
+import AVFoundation
 import SwiftData
 import MadarCore
 import MadarData
@@ -8,7 +9,7 @@ import MadarData
 extension AppSession {
     func prepareDiaryHomeFixture(group: URL) throws {
         let env = ProcessInfo.processInfo.environment
-        guard let variant = env["MADAR_UI_DIARY_FIXTURE"], ["home", "empty", "echoes", "margin", "welcome", "today"].contains(variant), let id = env["MADAR_UI_STORE_ID"],
+        guard let variant = env["MADAR_UI_DIARY_FIXTURE"], ["home", "empty", "echoes", "margin", "welcome", "today", "editor"].contains(variant), let id = env["MADAR_UI_STORE_ID"],
               group.lastPathComponent == id, group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         selectedTab = "notes"
         let context = ModelContext(container)
@@ -48,6 +49,18 @@ extension AppSession {
                 }
             }
             append(today, "ما زال في اليوم متّسع.", hour: 12)
+            if variant == "editor" {
+                func attach(id: String, kind: String, type: String, data: Data, text: String, hour: Int) {
+                    let media = Media(); media.id = UUID(uuidString: id)!; media.kind = kind; media.contentType = type; media.data = data; media.sizeBytes = data.count; if kind == "audio" { media.durationS = 1 }; context.insert(media)
+                    let row = Entry(); row.dayKey = today.description; row.eventAt = today.date(in: .riyadh).addingTimeInterval(Double(hour)*3600); row.text = text
+                    if kind == "audio" { row.mediaID = media.id } else { row.attachmentMediaIDs = [media.id] }; context.insert(row)
+                }
+                attach(id: "33333333-3333-4333-8333-333333330001", kind: "photo", type: "image/jpeg", data: Self.diaryFixturePhoto(variant: 1)!, text: "صورة احتفظت بها اليوم.", hour: 8)
+                attach(id: "33333333-3333-4333-8333-333333330002", kind: "audio", type: "audio/mp4", data: try Self.diaryFixtureAudio(), text: "نص تسجيل محفوظ.", hour: 9)
+                let pdf = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 400, height: 500)).pdfData { canvas in canvas.beginPage(); ("مرفق تجريبي محفوظ" as NSString).draw(at: CGPoint(x: 40, y: 80), withAttributes: [.font: UIFont.systemFont(ofSize: 24)]) }
+                attach(id: "33333333-3333-4333-8333-333333330003", kind: "document", type: "application/pdf", data: pdf, text: "ورقة.pdf", hour: 10)
+            }
+
             if variant == "today" {
                 let page = DayPage(); page.dayKey = today.description
                 let media = Media(); media.kind = "photo"; media.contentType = "image/jpeg"; media.data = Self.diaryFixturePhoto(variant: 1); media.sizeBytes = media.data?.count ?? 0
@@ -58,6 +71,15 @@ extension AppSession {
 
         }
         try context.save()
+    }
+    private static func diaryFixtureAudio() throws -> Data {
+        let url = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString + ".m4a")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 44_100, channels: 1, interleaved: false)!
+        let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 44_100)!; buffer.frameLength = 44_100
+        buffer.floatChannelData![0].initialize(repeating: 0, count: 44_100)
+        do { let file = try AVAudioFile(forWriting: url, settings: [AVFormatIDKey: kAudioFormatMPEG4AAC, AVSampleRateKey: 44_100, AVNumberOfChannelsKey: 1]); try file.write(from: buffer) }
+        return try Data(contentsOf: url)
     }
     private static func diaryFixturePhoto(variant: Int) -> Data? {
         let renderer = UIGraphicsImageRenderer(size: CGSize(width: 720, height: 800))

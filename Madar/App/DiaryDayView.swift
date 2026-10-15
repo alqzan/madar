@@ -35,8 +35,11 @@ struct DiaryDayView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
                         if let page {
-                            ForEach(page.lines) { line in lineRow(line, page: page) }
-                            if let data = page.photo, let image = UIImage(data: data) {
+                            ForEach(page.lines) { line in
+                                lineRow(line, page: page)
+                                ForEach(page.media.filter { $0.entryID == line.id }) { media in DiaryMediaCard(app: app, media: media, transcript: line.text) }
+                            }
+                            if !page.media.contains(where: { $0.id == page.photoID }), let data = page.photo, let image = UIImage(data: data) {
                                 Image(uiImage: image).resizable().scaledToFit().frame(maxWidth: 150).padding(8).background(theme.surface)
                                     .overlay(alignment: .top) { Rectangle().fill(theme.line).frame(width: 48, height: 16).rotationEffect(.degrees(-5)).offset(y: -8) }
                                     .rotationEffect(.degrees(-2)).shadow(color: theme.ink.opacity(0.1), radius: 5, y: 5)

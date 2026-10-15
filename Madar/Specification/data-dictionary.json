@@ -5503,6 +5503,30 @@
         "payload": "{}",
         "kind": "upsert device-local sys.diaryWelcomeSeen after explicit diary welcome completion",
         "auth": "app-only + diary unlocked"
+      },
+      "diary.saveDraft": {
+        "intent": null,
+        "payload": "{id: UUID, text: String, day: today|yesterday, writingDayKey: YYYY-MM-DD, targetDayKey?: YYYY-MM-DD}",
+        "kind": "upsert app-only SessionDraft; chosen writing day remains explicit across day changes",
+        "auth": "app-only + diary unlocked"
+      },
+      "diary.commitDraft": {
+        "intent": null,
+        "payload": "{id: UUID}",
+        "kind": "atomically append the saved draft and tombstone its draft; receipt replay and durable undo",
+        "auth": "app-only + diary unlocked"
+      },
+      "diary.appendMedia": {
+        "intent": null,
+        "payload": "{fileID: UUID, kind: photo|audio|video|document, contentType: String, caption: String, day: today|yesterday, writingDayKey: YYYY-MM-DD, durationS?: Int >= 0}",
+        "kind": "append Entry and referenced Media from private staged UUID file; sha256; original audio before transcription",
+        "auth": "app-only + diary unlocked"
+      },
+      "diary.setTranscript": {
+        "intent": null,
+        "payload": "{entryID: UUID, text: String}",
+        "kind": "edit only an existing audio entry transcript; keep original Media and conditional undo",
+        "auth": "app-only + diary unlocked"
       }
     },
     "undoPolicy": {

@@ -51,6 +51,7 @@ private struct ReceiptWire: Codable {
     public init(containerProvider: @escaping @MainActor () throws -> ModelContainer, lockDirectory: URL, transactionClock: @escaping @Sendable (Date) -> Date = { _ in Date() }, generationProvider: @escaping @MainActor () throws -> UUID? = { nil }) {
         self.containerProvider = containerProvider; self.lockDirectory = lockDirectory; self.transactionClock = transactionClock; self.generationProvider = generationProvider
     }
+    public var diaryStagingDirectory: URL { lockDirectory.appending(path: "DiaryStaging", directoryHint: .isDirectory) }
     public func transact(_ request: CommandTransactionRequest, now arrivalDate: Date) async throws -> CommandOutcome {
         try FileManager.default.createDirectory(at: lockDirectory, withIntermediateDirectories: true)
         let lockURL = lockDirectory.appending(path: "CommandBus.lock")
@@ -173,6 +174,10 @@ private struct ReceiptWire: Codable {
                 try DiaryLineRenderer.freezeBeforeSourceChange(context: context, now: now, writer: writer)
             }
             switch request.operation {
+            case .diaryEditor(let operation):
+                if let undo = try DiaryEditorMutationHandler.stage(operation, id: request.envelope.commandID, root: diaryStagingDirectory, context: context, now: now, writer: writer) {
+                    inverse = SettingsInverse(settings: [:], afterSettings: [:], layouts: [:], afterLayouts: [:], diaryMutation: undo)
+                }
             case .freezeDiaryDay(let day):
                 try DiaryLineRenderer.freeze(GregorianDay(day), context: context, now: now, writer: writer)
             case .diary(let text, let day, let target):
