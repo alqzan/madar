@@ -16,6 +16,7 @@ struct QuranHomeView: View {
     @State private var showMushaf = false
     @State private var showOutside = false
     @State private var showWeek = false
+    @State private var showPlan = false
     @State private var readerPage: Int?
     private enum HomeDetail: Identifiable {
         case step(QuranUIStep), hadith
@@ -113,6 +114,7 @@ struct QuranHomeView: View {
                 .environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft)
         }
         .fullScreenCover(isPresented: $showOutside) { QuranOutsideView(service: service, close: { showOutside = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
+        .fullScreenCover(isPresented: $showPlan, onDismiss: { run { try await refresh() } }) { QuranPlanView(service: service, close: { showPlan = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
         .fullScreenCover(isPresented: $showWeek) { QuranLogView(service: service, close: { showWeek = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
         .alert("تعذّر إتمام العملية", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) { Button("تمّ") { error = nil } } message: { Text(error ?? "") }
     }
@@ -127,9 +129,9 @@ struct QuranHomeView: View {
         HStack(alignment: .center) {
             Text("القرآن").font(serif(28))
             Spacer()
-            HStack(spacing: 6) { Circle().fill(theme.color("hifz")).frame(width: 7, height: 7); Text(state.streakLabel).font(bodyFont(12, bold: true)) }
+            Button { showPlan = true } label: { HStack(spacing: 6) { Circle().fill(theme.color("hifz")).frame(width: 7, height: 7); Text(state.streakLabel).font(bodyFont(12, bold: true)) }
                 .padding(.horizontal, 13).padding(.vertical, 9).background(theme.color("hifzTint"), in: Capsule())
-                .accessibilityIdentifier("quran-streak")
+                }.buttonStyle(.plain).accessibilityIdentifier("quran-streak")
         }.padding(.horizontal, 8)
     }
     private func coverage(_ state: QuranRoomState) -> some View {

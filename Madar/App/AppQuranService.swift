@@ -171,22 +171,33 @@ import MadarPrayer
         }
     }
     func previewPlan(_ input: QuranUIPlanInput) async throws -> QuranUIForecast { try forecast(input, snapshot: snapshot()) }
-    func forecast(_ input: QuranUIPlanInput, snapshot: QuranDataSnapshot) throws -> QuranUIForecast {
+    func forecast(_ input: QuranUIPlanInput, snapshot: QuranDataSnapshot, using level: QuranDayLevel? = nil) throws -> QuranUIForecast {
         guard let unit = QuranHifzUnit(rawValue: input.unit.rawValue), let rest = QuranRestDay(rawValue: input.restDay), input.amount.isFinite, input.amount > 0, (1...6236).contains(input.startAyah) else { throw QuranPlanError.invalidAmount }
         let remainingAyahs = (input.startAyah...6236).filter { !snapshot.coverage.coveredAyahs.contains($0) }.count
         let catalog = try QuranResources.catalog()
         let remainingPages = Set(catalog.ayahs.filter { $0.id >= input.startAyah }.map(\.page)).subtracting(snapshot.coverage.completedPages).count
         let unitFaces = unit == .ayah ? (remainingAyahs == 0 ? 0 : Double(remainingPages) / Double(remainingAyahs)) : (unit == .half ? 0.5 : unit == .quarter ? 0.25 : 1)
-        let result = QuranProgressEngine.forecast(remainingPages: Double(remainingPages), dailyPages: input.amount * unitFaces * snapshot.habitualHifzLevel.hifzFactor,
-            startingOn: snapshot.day.date, restDay: rest, allotments: snapshot.allotments, pagesPerPlanUnit: unitFaces)
-        let title: String
-        switch result {
-        case .complete: title = snapshot.coverage.isKhatm ? "ختمت" : "اكتمل نطاق خطّتك"
-        case .unavailable: title = "لم تتضح الوتيرة بعد"
-        case .estimated(let day): title = DualDate(instant: day.date(in: .gmt).addingTimeInterval(43200), timeZone: .gmt).text(firstCalendar: .hijri, numerals: numerals.style)
+        var startingOn = snapshot.day.date
+        if snapshot.sessions.contains(where: { $0.kind == .hifz && $0.dayKey == snapshot.day.date }) {
+            let before = try repository().snapshot(at: clock(), excludingSessionDay: snapshot.day.date)
+            if let start = try before.coverage.frontier(from: input.startAyah) {
+                let limit = (start...6236).first { before.coverage.coveredAyahs.contains($0) }.map { $0 - 1 } ?? 6236
+                let target = try QuranPortionEngine.portion(from: start, through: limit, unit: unit, amount: input.amount,
+                    multiplier: (level ?? snapshot.habitualHifzLevel).hifzFactor, catalog: catalog)
+                if (target.first...target.last).allSatisfy({ snapshot.coverage.coveredAyahs.contains($0) }) { startingOn = startingOn.adding(days: 1) }
+            }
         }
-        return QuranUIForecast(title: title, assumptions: "تقدير بافتراض إتمام أيام الحفظ بلا فوت أو تثبيت، حُسب في " + numerals.localized(snapshot.day.dayKey),
-            warning: input.amount * unitFaces > 2 ? "المقدار يتجاوز وجهين في يوم الحفظ" : nil, portions: [])
+        let result = QuranProgressEngine.forecast(remainingPages: Double(remainingPages), dailyPages: input.amount * unitFaces * (level ?? snapshot.habitualHifzLevel).hifzFactor,
+            startingOn: startingOn, restDay: rest, allotments: snapshot.allotments, pagesPerPlanUnit: unitFaces)
+        let title: String
+        let estimatedDays: Int?
+        switch result {
+        case .complete: title = snapshot.coverage.isKhatm ? "ختمت" : "اكتمل نطاق خطّتك"; estimatedDays = nil
+        case .unavailable: title = "لم تتضح الوتيرة بعد"; estimatedDays = nil
+        case .estimated(let day): title = displayDate(day, hijriOnly: true); estimatedDays = startingOn.quranDistance(to: day) + 1
+        }
+        return QuranUIForecast(title: title, assumptions: "تقدير بافتراض إتمام أيام الحفظ بلا فوت أو تثبيت، حُسب في " + displayDate(snapshot.day.date),
+            warning: input.amount * unitFaces > 2 ? "المقدار يتجاوز وجهين في يوم الحفظ" : nil, portions: [], estimatedDays: estimatedDays)
     }
     func index(_ unit: QuranUIIndexUnit) async throws -> [QuranUIIndexItem] {
         let snapshot = try snapshot(), catalog = try QuranResources.catalog()

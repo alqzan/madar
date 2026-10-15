@@ -31,7 +31,7 @@ enum QuranUIMissChoice: String, CaseIterable, Identifiable, Sendable {
 struct QuranUIRange: Sendable { var fromPage: Int; var toPage: Int }
 struct QuranUISurah: Identifiable, Sendable { var id: Int; var title: String; var firstAyah: Int; var ayahCount: Int }
 struct QuranUIPlanInput: Sendable { var startAyah: Int; var unit: QuranUIUnit; var amount: Double; var rhythm: QuranUIRhythm; var restDay: String; var missPolicy: String }
-struct QuranUIForecast: Sendable { var title: String; var assumptions: String; var warning: String?; var portions: [String] }
+struct QuranUIForecast: Sendable { var title: String; var assumptions: String; var warning: String?; var portions: [String]; var estimatedDays: Int? = nil }
 struct QuranUIPlan: Sendable { var title: String; var input: QuranUIPlanInput; var forecast: QuranUIForecast; var nextAyah: Int; var versionLabel: String }
 struct QuranUIStep: Identifiable, Sendable { var id: String; var title: String; var detail: String; var kind: QuranUIKind; var completed: Bool; var available: Bool; var range: QuranUIRange? }
 struct QuranUIHeatDay: Identifiable, Sendable { var id: String; var title: String; var hifzFraction: Double; var reviewFraction: Double; var accessibilityLabel: String }
