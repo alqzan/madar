@@ -14,6 +14,61 @@ import MadarCommands
         let app = try AppSession(container: container, groupDirectory: root)
         return (app, AppQuranService(session: app), root)
     }
+    func testDayCloseArabicPluralsFollowNumeralPreference() {
+        let digits = MadarNumberFormatter(style: .hindi)
+        func plain(_ value: String) -> String { String(value.unicodeScalars.filter { !(0x2066...0x2069).contains($0.value) }) }
+        XCTAssertEqual(plain(QuranDayCloseCopy.faces(0, digits: digits)), "٠ أوجه")
+        XCTAssertEqual(QuranDayCloseCopy.faces(1, digits: digits), "وجه واحد")
+        XCTAssertEqual(QuranDayCloseCopy.faces(2, digits: digits), "وجهان")
+        XCTAssertEqual(plain(QuranDayCloseCopy.faces(3, digits: digits)), "٣ أوجه")
+        XCTAssertEqual(plain(QuranDayCloseCopy.faces(11, digits: digits)), "١١ وجهًا")
+        XCTAssertEqual(plain(QuranDayCloseCopy.faces(12, digits: MadarNumberFormatter(style: .western))), "12 وجهًا")
+        XCTAssertEqual(QuranDayCloseCopy.ayahs(2, digits: digits), "آيتان محفوظتان")
+    }
+    /// Q07 golden: mastered at its due date = 71; reviewed today = 100 (balanced initial interval: 3 days).
+    func testDayCloseReplaysBeforeAtSameDayDedupesReviewsAndPreviewsRestDay() throws {
+        let (app, _, root) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
+        let now = ISO8601DateFormatter().date(from: "2026-10-15T15:00:00+03:00")!
+        let service = AppQuranService(session: app, clock: { now })
+        let context = ModelContext(app.container), settings = try SettingsStore(context: context)
+        _ = try settings.stage(["quran.restDay": .string("friday")])
+        func append(_ kind: String, day: String, at: Date) {
+            let row = HifzSession(); row.kind = kind; row.fromAyah = 1; row.toAyah = 7; row.pages = [1]
+            row.dayKey = day; row.endedAt = at; context.insert(row)
+            let grade = PageGrade(); grade.sessionID = row.id; grade.page = 1; grade.grade = "mastered"; context.insert(grade)
+        }
+        append("hifz", day: "2026-10-12", at: now.addingTimeInterval(-3 * 86400))
+        append("review", day: "2026-10-15", at: now.addingTimeInterval(-3600))
+        append("free", day: "2026-10-15", at: now.addingTimeInterval(-1800))
+        try context.save()
+        let result = try service.dayClose()
+        XCTAssertEqual(result.beforeFaces, 1); XCTAssertEqual(result.afterFaces, 1)
+        XCTAssertEqual(result.addedFaces, 0); XCTAssertEqual(result.addedAyahs, 0)
+        XCTAssertEqual(result.reviewedFaces, 1, "a page reviewed twice counts once")
+        XCTAssertEqual(result.strengthBefore, 71); XCTAssertEqual(result.strengthAfter, 100)
+        XCTAssertEqual(result.strengths.first?.before, 71); XCTAssertEqual(result.strengths.first?.after, 100)
+        XCTAssertTrue(result.tomorrow.contains("يوم راحة، مراجعة فقط"), result.tomorrow)
+        XCTAssertFalse(result.isKhatm)
+        _ = try service.dayClose()
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<HifzSession>()), 3, "opening twice writes nothing")
+    }
+    func testDayClosePartialHifzAndEmptyStrengthNeverInventFullFacesOrKhatm() throws {
+        let (app, _, root) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
+        let now = ISO8601DateFormatter().date(from: "2026-10-15T15:00:00+03:00")!
+        let service = AppQuranService(session: app, clock: { now })
+        let empty = try service.dayClose()
+        XCTAssertEqual(empty.title, "حصيلة يومك"); XCTAssertNil(empty.strengthBefore); XCTAssertNil(empty.strengthAfter)
+        let context = ModelContext(app.container)
+        for _ in 0..<2 {
+            let row = HifzSession(); row.kind = "hifz"; row.fromAyah = 1; row.toAyah = 3; row.pages = [1]
+            row.dayKey = "2026-10-15"; row.endedAt = now.addingTimeInterval(-3600); context.insert(row)
+        }
+        try context.save()
+        let partial = try service.dayClose()
+        XCTAssertEqual(partial.addedFaces, 0); XCTAssertEqual(partial.addedAyahs, 3)
+        XCTAssertEqual(partial.beforeFaces, 0); XCTAssertEqual(partial.afterFaces, 0)
+        XCTAssertNil(partial.strengthBefore); XCTAssertNil(partial.strengthAfter); XCTAssertFalse(partial.isKhatm)
+    }
     func testEmptyThenRealPlanLevelsAndResourcesUseDomainValues() async throws {
         let (app, service, root) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
         let empty = try await service.load()

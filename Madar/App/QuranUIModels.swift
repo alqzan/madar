@@ -60,6 +60,15 @@ struct QuranUIDrillCard: Sendable {
     var fontName: String
 }
 struct QuranUIErrorSpot: Identifiable, Sendable { var id: String; var title: String; var detail: String; var isToday: Bool; var closed: Bool; var canDrill: Bool }
+struct QuranUIDayCloseStrength: Identifiable, Sendable {
+    var id: Int; var title: String; var before: Int?; var after: Int?
+}
+struct QuranUIDayClose: Sendable {
+    var title: String; var dateAndStreak: String
+    var beforeFaces: Int; var afterFaces: Int; var addedFaces: Int; var addedAyahs: Int
+    var reviewedFaces: Int; var strengthBefore: Int?; var strengthAfter: Int?
+    var strengths: [QuranUIDayCloseStrength]; var tomorrow: String; var isKhatm: Bool
+}
 struct QuranRoomState: Sendable {
     var coverageTitle: String
     var coverageFraction: Double
@@ -89,6 +98,7 @@ struct QuranRoomState: Sendable {
     var sessionUnavailableReason: String?
     var readerUnavailableReason: String?
     var numeralLocale: String
+    var dayCloseAvailable = false
 }
 enum QuranUICommand: Sendable {
     case setTodayLevel(kind: QuranUIKind, level: QuranUILevel)

@@ -10,9 +10,12 @@ struct QuranHomeSessionFlow: View {
     @State private var showExit = false
     @State private var busy = false
     @State private var error: String?
+    @State private var showDayClose = false
     var body: some View {
         Group {
-            if state.drill != nil {
+            if showDayClose {
+                QuranDayCloseView(service: service, close: close)
+            } else if state.drill != nil {
                 QuranDrillView(service: service, initial: state, close: close)
             } else if let coach = state.coach {
                 QuranHifzCoachView(state: state, coach: coach, busy: busy, action: perform)
@@ -58,7 +61,9 @@ struct QuranHomeSessionFlow: View {
         guard !busy else { return }; busy = true
         Task { defer { busy = false }; do { switch try await service.session(draftID: state.id, action: action) {
         case .active(let next): state = next
-        case .completed, .discarded: close()
+        case .completed:
+            if case .commit = action, state.coach?.pastDay != true { showDayClose = true } else { close() }
+        case .discarded: close()
         } } catch { self.error = quranUserMessage(error) } }
     }
 }

@@ -9,7 +9,7 @@ import MadarQuran
 extension AppSession {
     func prepareQuranHomeFixture(group: URL) throws {
         let env = ProcessInfo.processInfo.environment
-        guard let variant = env["MADAR_UI_QURAN_FIXTURE"], ["home", "drill"].contains(variant), let id = env["MADAR_UI_STORE_ID"],
+        guard let variant = env["MADAR_UI_QURAN_FIXTURE"], ["home", "drill", "dayClose", "dayCloseStart"].contains(variant), let id = env["MADAR_UI_STORE_ID"],
               group.lastPathComponent == id, group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         let context = ModelContext(container)
         selectedTab = "quran"
@@ -27,12 +27,29 @@ extension AppSession {
             for page in pages { let grade = PageGrade(); grade.sessionID = row.id; grade.page = page; grade.grade = "mastered"; context.insert(grade) }
             return row
         }
-        let baseEnd = catalog.ayahs(on: 270).last!.id
-        append(kind: "hifz", first: 1, last: baseEnd, pages: Array(1...270), offset: -70)
-        for offset in [-63, -49, -19, -1] { append(kind: "review", first: 1, last: baseEnd, pages: Array(1...270), offset: offset) }
-        for index in 0..<14 {
-            let page = 271 + index
-            append(kind: "hifz", first: catalog.ayahs(on: page).first!.id, last: catalog.ayahs(on: page).last!.id, pages: [page], offset: index - 14)
+        if variant == "dayCloseStart" {
+            plan.unit = "ayah"; plan.amount = 7; plan.rhythm = "light"; plan.activeFrom = now
+        } else {
+            let baseEnd = catalog.ayahs(on: 270).last!.id
+            append(kind: "hifz", first: 1, last: baseEnd, pages: Array(1...270), offset: -70)
+            for offset in [-63, -49, -19, -1] { append(kind: "review", first: 1, last: baseEnd, pages: Array(1...270), offset: offset) }
+            for index in 0..<14 {
+                let page = 271 + index
+                append(kind: "hifz", first: catalog.ayahs(on: page).first!.id, last: catalog.ayahs(on: page).last!.id, pages: [page], offset: index - 14)
+            }
+        }
+        if variant == "dayClose" {
+            let page = 285
+            let hifz = append(kind: "hifz", first: catalog.ayahs(on: page).first!.id, last: catalog.ayahs(on: page).last!.id, pages: [page], offset: 0)
+            hifz.endedAt = now.addingTimeInterval(-3600)
+            try context.save()
+            let snapshot = try QuranRepository(context: context, catalog: catalog).snapshot(at: now)
+            let pages = snapshot.review.allPages
+            let dayState = QuranDayState(); dayState.dayKey = today.description; dayState.testPages = snapshot.review.testPages; context.insert(dayState)
+            if let first = pages.min(), let last = pages.max() {
+                let review = append(kind: "review", first: catalog.ayahs(on: first).first!.id, last: catalog.ayahs(on: last).last!.id, pages: pages, offset: 0)
+                review.endedAt = now.addingTimeInterval(-1800)
+            }
         }
         if variant == "drill" {
             // M2-V04: a word spot (Al-An'am 114, «مفصّلا») slipped before and today, a whole-ayah spot today, and an older spot one success from closing.

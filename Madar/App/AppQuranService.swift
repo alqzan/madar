@@ -154,7 +154,8 @@ import MadarPrayer
             strengthTitle: "مؤشر وصفي من تقييمك ومواعيد المراجعة", strength: strength,
             recovery: QuranUIRecovery(distantLabel: faceCount(snapshot.pages.filter(\.isFar).count) + " بعيدة", activeTitle: snapshot.recovery == nil ? nil : "خطة استرداد", canCreate: snapshot.pages.contains(where: \.isFar), previews: [:]),
             errors: errors, toolsOrder: [], availableTools: [], blockOrder: ["sadr", "path", "log14", "tools"], hiddenBlocks: [],
-            sessionUnavailableReason: nil, readerUnavailableReason: nil, numeralLocale: app.values["core.numerals"]?.string == "western" ? "en" : "ar")
+            sessionUnavailableReason: nil, readerUnavailableReason: nil, numeralLocale: app.values["core.numerals"]?.string == "western" ? "en" : "ar",
+            dayCloseAvailable: snapshot.sessions.contains { $0.dayKey == today })
     }
     func perform(_ value: QuranUICommand) async throws {
         switch value {

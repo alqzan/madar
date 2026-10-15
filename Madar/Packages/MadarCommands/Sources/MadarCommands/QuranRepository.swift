@@ -77,7 +77,8 @@ public struct QuranDataSnapshot: Sendable {
         }
         return value
     }
-    public func snapshot(at now: Date) throws -> QuranDataSnapshot {
+    /// Rebuild the pre-day cache at the same evaluation day, without changing stored facts.
+    public func snapshot(at now: Date, excludingSessionDay: GregorianDay? = nil, sessionsThrough: Date? = nil) throws -> QuranDataSnapshot {
         let storedDay = try currentDay(at: now), today = storedDay.date
         let planRows = try context.fetch(FetchDescriptor<HifzPlan>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
         let active = planRows.filter { $0.activeFrom <= now && $0.supersededAt == nil }.max {
@@ -89,7 +90,10 @@ public struct QuranDataSnapshot: Sendable {
             return QuranPlanRecord(plan: try QuranPlan(id: row.id, startAyah: row.startAyah, unit: unit, amount: row.amount, intensity: rhythm),
                 version: row.version, missPolicy: row.missPolicy, activeFrom: row.activeFrom)
         }
-        let sessionRows = try context.fetch(FetchDescriptor<HifzSession>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.endedAt <= now }
+        let cutoff = min(now, sessionsThrough ?? now)
+        let sessionRows = try context.fetch(FetchDescriptor<HifzSession>()).filter {
+            $0.deletedAt == nil && $0.mergedInto == nil && $0.endedAt <= cutoff && $0.dayKey != excludingSessionDay?.description
+        }
         let gradeRows = try context.fetch(FetchDescriptor<PageGrade>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
         let gradesBySession = Dictionary(grouping: gradeRows.compactMap { row -> PageGrade? in row.sessionID == nil ? nil : row }, by: { $0.sessionID! })
         var sessions: [QuranSessionFact] = try sessionRows.map { row -> QuranSessionFact in

@@ -12,6 +12,7 @@ struct QuranHomeView: View {
     @State private var detail: HomeDetail?
     @State private var active: QuranUISessionState?
     @State private var busy = false
+    @State private var showDayClose = false
     private enum HomeDetail: Identifiable {
         case step(QuranUIStep), hadith
         var id: String { switch self { case .step(let step): "step-" + step.id; case .hadith: "hadith" } }
@@ -82,6 +83,10 @@ struct QuranHomeView: View {
             QuranHomeSessionFlow(service: service, state: Binding(get: { active ?? initial }, set: { active = $0 }), close: { active = nil })
                 .environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft)
         }
+        .fullScreenCover(isPresented: $showDayClose, onDismiss: { run { try await refresh() } }) {
+            QuranDayCloseView(service: service, close: { showDayClose = false })
+                .environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft)
+        }
         .alert("تعذّر إتمام العملية", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) { Button("تمّ") { error = nil } } message: { Text(error ?? "") }
     }
     private func serif(_ size: CGFloat) -> Font { .custom("Amiri-Bold", size: size, relativeTo: size > 26 ? .largeTitle : .title2) }
@@ -149,6 +154,12 @@ struct QuranHomeView: View {
                 let reviewSteps = state.steps.filter { $0.kind == .review || $0.kind == .drill }
                 VStack(spacing: 18) { ForEach(reviewSteps) { step in stepRow(step, color: theme.color("reviewText")) } }
                     .background(alignment: .leading) { if !reviewSteps.isEmpty { Rectangle().fill(theme.color("track")).frame(width: 1.5).padding(.vertical, 16).padding(.leading, 10) } }
+                if state.dayCloseAvailable {
+                    Button("ختام اليوم") { showDayClose = true }
+                        .font(bodyFont(14, bold: true)).foregroundStyle(theme.color("reviewText"))
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .accessibilityIdentifier("quran-day-close-open")
+                }
             }
         }
     }
