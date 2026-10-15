@@ -1,6 +1,6 @@
 # Current milestone
 
-**M3 Diary — E01/D01 done; V01–V08, V10–V11, V13–V15 and F01 matched — awaiting owner; no ready card left — M4 waits for the owner to open it.** V09 blocked (Day One fixture), V12 blocked (frozen privacy cleanup). M2-V01–V17 are approved; M1-F04 software is complete. Device/milestone gates stay deferred until the whole app is finished. RA1/RA2, RP1, RU1 and data preservation remain mandatory.
+**M3 Diary — E01/D01 done; V01–V08, V10–V11, V13–V15 and F01 matched — awaiting owner; M4 opened 15 Oct: E01 done, V01 next; habits blocked on RL3/RL2.** V09 blocked (Day One fixture), V12 blocked (frozen privacy cleanup). M2-V01–V17 are approved; M1-F04 software is complete. Device/milestone gates stay deferred until the whole app is finished. RA1/RA2, RP1, RU1 and data preservation remain mandatory.
 
 # Last checked
 
@@ -102,6 +102,25 @@ Read §7.3 `sections/10-r-notes.md`, §5 `05-ds.md`, §10/§11 for data; RD1–R
 | M3-V15 | Travel diary — `notes-app/21-today-travel.jpg`; §7.3/§8 shared trips. | matched — awaiting owner | Reads the shared Trip only (Prayer keeps the RP7 arrival question, end and undo). Air-mail stripes and paper, «بريد جوي», derived distance from home, city stamp, «اليوم الثاني» from stored arrival dayKey in the trip zone, drawn local route (no map tiles), passport-margin entry stamp, «اكتب من [المدينة]» and a stamps sheet of all trips; return day belongs to home. Core `DiaryTravelTests` 4/4; native `DiaryTravelIntegrationTests` 1/1 (trip-zone write stamps Asia/Tokyo, after end Asia/Riyadh); UI `DiaryTravelUITests` 1/1 plus `DiarySeasonUITests` 2/2, `DiaryTodayUITests` 2/2; compare `today-travel`. Not copied: trip name, «٢ من ٧», planned return date, mosque name, money line. Follow-up 15 Oct: travel days wear a red/blue air-mail frame on the year wall and month page (label «يوم سفر», legend), the return day's home page folds the trip into an envelope «عدت من [المدينة]» with days and km opening the stamps; UI `DiaryTravelUITests` 2/2, `DiaryHubUITests` 1/1, `DiarySeasonUITests` 2/2, `DiaryTodayUITests` 2/2. No canonical board for these two (built from the V15 air-mail parts). |
 | M3-F01 | Letters/projects and past-edit revisions — §7.3 N04/RD1. | matched — awaiting owner | Owner 15 Oct «اكمل وابنها كلها»: RD1 [DEFAULT] kept. Edits before the freeze change the line in place (undo); after it a new Entry row (source revision) names the replaced row and «عُدّل · الأصل» shows the original; no schema change. Letters: closed built triggers (date, Hijri date, trip start/end, project finished, next Ramadan), forward-only sealed→eligible/orphaned→opened, sealed text never displayed; mailbox, envelope moment, reschedule for orphaned. Projects: Entry.projectID link, keyword suggestion «يتعلّق بـ…؟» only, finish with reflection into «الفصول», tombstone delete. Verified: Core 55, Commands 47, Data 63; xcodebuild Diary UI+integration 33 (one locator fixed, DiaryEditorUITests 3/3 rerun). Not built: bookFinished/khatma triggers (M6/no stored event), return envelope. |
 | M3-G | Device acceptance — §12/§13; RD4 release dependency. | deferred: after the whole app is finished | No new encrypted-backup or frozen lock/privacy audit work. |
+
+## M4 Lobby + Habits + Widgets — owner opened 15 October («اكمل العمل»), approved-spec order
+
+Read §7.1 `sections/08-r-bahw.md`, §9 widgets, §5 for shared shapes; RL1–RL10 override the extract. Money and Mihbara blocks have no entry point until M5/M6 (the default order keeps their slots). Do not copy: «من منتصف الليل» (day follows `core.dayStart`, RL10), Sunday weeks (`core.weekStart` = saturday), "·" next to a digit (RU1), v2 alternatives (necklace/crescents, beads/axis, lamps/weave, widget identity, smart presence), sample numbers.
+
+| Card | Result / canonical | Status | Do not copy / Notes |
+|---|---|---|---|
+| M4-E01 | Year and upcoming-day engines — §7.1 «السنة وما يهمّك», B03, B04. | done | `MadarYear` (Gregorian/Hijri year and month, Saturday week, crescent, five landmarks, Ramadan countdown) and `MadarUpcomingRule` (rule stored, next/previous derived, short-month fallback, ring from countStart). `swift test --filter MadarYearTests` 6/6; expected values from §7.1/B03/B04/RL10. |
+| M4-E02 | Habit engine — §7.1, J08, RL2 HabitEvent, RL3 rules, RL4 one streak per fact. | blocked: owner rules (RL3) and schema go (RL2) | RL3 open: does «أقل القليل» count toward «٤ من ١٠»; HabitPolicy or the designated days as the target source; which period a frequency change applies to; target of the 7–13-day transitional week; freeze limits and backdating; keep `streakBreakAfter` fixed at 2 [DEFAULT]. RL2 adds an append-only `HabitEvent` model (schema V4): needs the owner's go before any store change. |
+| M4-V01 | Lobby — `bahw/02-W1-Bahw.jpg`, `-s1`; RL1 labelled rings. | ready | Blocks for built rooms (prayer, Quran, diary, year, upcoming); habits block waits for E02; no money/Mihbara entry. F1-Nihai orbit is not the lobby default (RL1). |
+| M4-V02 | Habits room — `bahw/03-W2-Adat.jpg`, `-s1`, `-s2`. | blocked: M4-E02 | Orbit with labels; no state by colour alone (RL1). |
+| M4-V03 | Year and what matters — `bahw/04-W3-Sana.jpg`, `-s1`, `-s2`. | ready | Strip only in v1 (`bahw.yearView` alternatives are v2); upcoming as rings; auto sources (seasons, next juz, trips) are read models, never rows; salary absent until M5. |
+| M4-V04 | Customise Madar — `bahw/05-W4-Takhsis.jpg`, `-s1`, `-s2`. | ready | RL9: hide `tabbar.openOn` byTime, `bahw.smartPresence` levels, `core.fontScale`, `core.motion` calm. |
+| M4-W01 | Home Screen widgets — `bahw/06-X1-Raisiya.jpg`. | ready | RL6: fixed widgets per built room configured by AppIntent; JSON snapshots only; the OS chooses the family. |
+| M4-W02 | Lock Screen, StandBy and Control Center — `bahw/07-X2-Qifl.jpg`. | ready | Controls for built rooms only; sanctity guard for any Live Activity. |
+| M4-F01 | Siri and capture — §9. | ready | Intents only for v1 actions of built rooms. |
+| M4-F02 | Notification budget — J10. | ready | Software only; the device week is part of M4-G. |
+| M4-X3 | Widget maker — `bahw/08-X3-Sani.jpg`. | deferred (RL6 [DEFAULT]) | Not built in v1. |
+| M4-G | Device acceptance — §12/§13, J09/J10. | deferred: after the whole app is finished | |
 
 ## Done — software (integrated on main, visual acceptance pending in M1-V)
 
