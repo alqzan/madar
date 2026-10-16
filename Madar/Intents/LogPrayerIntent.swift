@@ -32,40 +32,75 @@ enum PrayerIntentFridayKind: String, AppEnum {
     ]
 }
 
+enum PrayerIntentHeart: String, AppEnum {
+    case distracted, present, khashi
+
+    static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "حال القلب")
+    static let caseDisplayRepresentations: [Self: DisplayRepresentation] = [
+        .distracted: "شارد", .present: "حاضر", .khashi: "خاشع"
+    ]
+}
+
+/// §9 LogPrayerIntent(prayer, status, heart?): «صلّيت العصر جماعة». The prayer day is the current
+/// one (Fajr to the next Fajr) from the app's prayer snapshot; `dayKey` stays only for older Shortcuts.
 struct LogPrayerIntent: AppIntent {
     static let title: LocalizedStringResource = "سجّل صلاة"
-    static let description = IntentDescription("يسجّل صلاة الجماعة أو الصلاة منفردًا عبر صندوق أوامر مدار.")
+    static let description = IntentDescription("يسجّل صلاة اليوم في جماعة أو منفردًا، دون فتح مدار.")
     static let openAppWhenRun = false
 
-    @Parameter(title: "يوم الصلاة بصيغة YYYY-MM-DD") var dayKey: String
     @Parameter(title: "الصلاة") var prayer: PrayerIntentPrayer
     @Parameter(title: "الحالة") var status: PrayerIntentStatus
+    @Parameter(title: "حال القلب") var heart: PrayerIntentHeart?
     @Parameter(title: "قصراً") var shortened: Bool?
     @Parameter(title: "تصنيف ظهر الجمعة") var fridayKind: PrayerIntentFridayKind?
+    @Parameter(title: "يوم الصلاة بصيغة YYYY-MM-DD") var dayKey: String?
 
-    func perform() async throws -> some IntentResult {
+    static var parameterSummary: some ParameterSummary {
+        Summary("سجّل \(\.$prayer) \(\.$status)") {
+            \.$heart
+            \.$shortened
+            \.$fridayKind
+            \.$dayKey
+        }
+    }
+
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        let now = Date()
         guard let group = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.alqzan.madar2") else {
             throw LogPrayerIntentError.openMadar
         }
         let snapshotStore = SnapshotStore(directory: group.appending(path: "Snapshots", directoryHint: .isDirectory))
-        guard let snapshot = snapshotStore.read("prayerNext", as: PrayerNextSnapshot.self),
+        guard let snapshot = snapshotStore.read("prayerNext", as: PrayerNextSnapshot.self, now: now),
               let timeZone = TimeZone(identifier: snapshot.tzID) else {
             throw LogPrayerIntentError.refreshMadar
+        }
+        let day: String
+        if let dayKey, !dayKey.isEmpty { day = dayKey }
+        else {
+            do {
+                day = try PrayerInboxCommandWriter.currentPrayerDayKey(
+                    at: now, prayer: prayer.rawValue,
+                    prayerTimes: snapshot.payload.items.map { .init(prayer: $0.prayer, at: $0.at) }, timeZone: timeZone)
+            } catch PrayerInboxCommandError.prayerNotOccurred {
+                throw LogPrayerIntentError.prayerNotOccurred
+            } catch { throw LogPrayerIntentError.refreshMadar }
         }
         let inbox = PendingInbox(directory: group.appending(path: "PendingInbox", directoryHint: .isDirectory))
         do {
             _ = try PrayerInboxCommandWriter.logPrayer(
                 inbox: inbox,
-                dayKey: dayKey,
+                dayKey: day,
                 prayer: prayer.rawValue,
                 status: status.rawValue,
                 shortened: shortened,
                 fridayKind: fridayKind?.rawValue,
+                heart: heart?.rawValue,
                 timeZone: timeZone,
-                source: .shortcut
+                source: .siri,
+                issuedAt: now
             )
         } catch PrayerInboxCommandError.fridayKindRequired {
-            throw LogPrayerIntentError.fridayKindRequired
+            throw $fridayKind.needsValueError("الجمعة أم الظهر؟")
         } catch PrayerInboxCommandError.jumuahRequiresCongregation {
             throw LogPrayerIntentError.jumuahRequiresCongregation
         } catch PrayerInboxCommandError.invalidDayKey {
@@ -75,20 +110,21 @@ struct LogPrayerIntent: AppIntent {
         } catch {
             throw LogPrayerIntentError.refreshMadar
         }
+        await MainActor.run { NotificationCenter.default.post(name: Notification.Name("madar.inboxChanged"), object: nil) }
         WidgetCenter.shared.reloadAllTimelines()
         ControlCenter.shared.reloadAllControls()
-        return .result(dialog: "أُضيف طلب تسجيل الصلاة إلى الوارد؛ يطبّقه مدار عند فتح التطبيق.")
+        return .result(dialog: "سُجّلت.")
     }
 }
 
 private enum LogPrayerIntentError: LocalizedError {
-    case openMadar, refreshMadar, fridayKindRequired, jumuahRequiresCongregation, invalidDayKey, invalidSelection
+    case openMadar, refreshMadar, prayerNotOccurred, jumuahRequiresCongregation, invalidDayKey, invalidSelection
 
     var errorDescription: String? {
         switch self {
         case .openMadar: "افتح مدار أولًا ثم أعد المحاولة."
         case .refreshMadar: "حدّث مدار ثم أعد المحاولة."
-        case .fridayKindRequired: "اختر الجمعة أو الظهر تصنيفًا للصلاة."
+        case .prayerNotOccurred: "لم يدخل وقت هذه الصلاة بعد."
         case .jumuahRequiresCongregation: "الجمعة تُسجّل جماعة؛ اختر الظهر إذا صليت منفردًا."
         case .invalidDayKey: "أدخل يوم الصلاة بصيغة YYYY-MM-DD."
         case .invalidSelection: "راجع الصلاة والحالة والقصر وتصنيف الجمعة."

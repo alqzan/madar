@@ -338,4 +338,27 @@ import MadarInbox
         #expect(refreshes == 2)
     }
 
+    /// M4-F01: a Shortcut habit completion whose period closed before the drain is refused and
+    /// quarantined; it must not block the valid completion and the prayer queued after it.
+    @Test func test_M4F01_staleHabitCompletionDoesNotBlockLaterCommands() async throws {
+        let (container, adapter, inbox) = try fixture(), generation = UUID(), now = Date()
+        let bus = CommandBus(adapter: adapter), habit = UUID()
+        var rule = HabitRule(effectiveFrom: prayerDay(now)); rule.measure = .count; rule.target = 2
+        let ruleJSON = try JSONDecoder().decode(MadarCore.JSONValue.self, from: JSONEncoder().encode(rule))
+        #expect(try await bus.execute(.init(name: "habit.save", payload: .object(["id": .string(habit.uuidString), "name": .string("ماء"), "rule": ruleJSON]), issuedAt: now), now: now).status == .applied)
+        let period = try #require(try HabitRepository(context: ModelContext(container)).readings(at: now).first?.summary.current?.key)
+        try inbox.publishGeneration(.init(generationID: generation, acceptsUnstampedDeliveries: false))
+        try HabitInboxCommandWriter.complete(inbox: inbox, habitID: habit, delta: 1, periodKey: "2000-01-01", source: .shortcut, issuedAt: now.addingTimeInterval(-3))
+        try HabitInboxCommandWriter.complete(inbox: inbox, habitID: habit, delta: 1, periodKey: period, source: .shortcut, issuedAt: now.addingTimeInterval(-2))
+        _ = try inbox.enqueue(prayer(generation: generation, now: now))
+        // Without a period, an outside completion is refused before it can be credited to the drain day.
+        let unscoped = try await bus.execute(.init(name: "habit.complete", payload: .object(["id": .string(habit.uuidString)]), source: .widget, issuedAt: now), now: now)
+        #expect(unscoped.status == .rejected)
+        let drainer = InboxDrainer(inbox: inbox, bus: bus, generation: { .init(generationID: generation, acceptsUnstampedDeliveries: false) }, hasReceipt: { try adapter.hasReceipt(commandID: $0) }, refresh: {})
+        try await drainer.drain()
+        #expect(try inbox.claimBatch().isEmpty)
+        #expect(try HabitRepository(context: ModelContext(container)).readings(at: now).first?.summary.current?.value == 1)
+        #expect(try ModelContext(container).fetchCount(FetchDescriptor<PrayerLog>()) == 1)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: inbox.directory.appending(path: "quarantine").path).filter { $0.hasSuffix(".jsonl") }.count == 1)
+    }
 }

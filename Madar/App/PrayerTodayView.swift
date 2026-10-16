@@ -83,6 +83,12 @@ struct PrayerTodayView: View {
         .toolbarVisibility(.hidden, for: .navigationBar)
         .onAppear { detectTravel(); refreshTrip() }
         .onChange(of: selectedSheet == nil) { _, _ in refreshTrip() }
+        .onChange(of: session.prayerLogRequest, initial: true) { _, prayer in
+            // «صليت المغرب» from Capture: the state was not said, so its log sheet asks instead of guessing.
+            guard let prayer else { return }
+            session.prayerLogRequest = nil
+            if let cell = (try? session.prayerSnapshot(at: session.prayerNow()))?.today.cells.first(where: { $0.reference.prayer == prayer }) { choose(cell) }
+        }
         .onChange(of: scenePhase) { _, phase in if phase == .active { detectTravel() } }
         .sheet(item: $selectedSheet) { route in
             Group {

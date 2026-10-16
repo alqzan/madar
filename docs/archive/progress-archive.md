@@ -330,3 +330,12 @@ Not verified: owner iPhone, later screens, distribution or milestone gate; scree
 Next: M2-V02 ready; V01 remains matched — awaiting owner.
 Model/effort: Codex GPT-6; exact variant/effort not exposed.
 Usage: 77% five-hour and 71% weekly at closing checkpoint; no reset used.
+
+
+## Handover — M4-V03 year and what matters, M4-V04 customise — 2026-10-15 — Claude
+Works now: «السنة وما يهمّك» from the lobby year/upcoming sheet or `madar://bahw/year` (hero, year/month/week/day strips, seasons, year end and user days with add/edit/delete and undo through `bahw.saveUpcomingDay`/`bahw.deleteUpcomingDay`); «خصّص مدار» with the live lobby model, block sizes/visibility/order, year and upcoming settings, collapsed section cards.
+Verified: Commands `BahwUpcomingPersistenceTests` 1/1 and full Commands 48/48; `BahwYearUITests`, `BahwCustomizeUITests`, `BahwLobbyUITests` passed; regression FoundationUITests+Prayer/Diary/Quran customise suites 32 passed, 6 failed: the 4 known (M0-S2 backup, M0-T08 export share, M1-F02 travel pill, M1-T04 permission prompt), `testFirstRunAndSettingsRenderWithoutUnbuiltRooms` (stale: expects no «المذكرات» tab, built since M3; fails before customise opens), and M1-T04 quiet hours, fixed (preview hidden while searching) and rerun passed. MadarData `SchemaCompatibilityTests` interruption case is flaky (passed and failed on the same tree).
+Differences left: listed in the V03/V04 rows (no v2 switchers, no habit/salary/juz rows, native disclosure chevron, customise title leading).
+Not verified: owner visual/iPhone; dark mode.
+Next: M4-E02 habit engine (RL3 answered, RL2 go given, see DECISIONS), then W01 widgets, W02, F01, F02 (J10 engine exists; app wiring for room reminders). Pause Codex automation (00:17).
+Model/effort: Claude Opus 5.5; effort not exposed. Usage: 5-hour about 75% at stop (session tool), weekly 29%; stopped before 00:15 for Codex.

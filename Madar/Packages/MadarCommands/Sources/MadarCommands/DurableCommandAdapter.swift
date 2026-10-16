@@ -176,7 +176,13 @@ private struct ReceiptWire: Codable {
             }
             switch request.operation {
             case .habit(let operation):
-                if let undo = try HabitMutationHandler.stage(operation, id: request.envelope.commandID, context: context, now: now, writer: writer) {
+                // A completion refusal (closed period, paused, linked) is a final answer, not a retry:
+                // rethrowing would leave a queued completion blocking every later inbox record.
+                let undo: Data?, isCompletion: Bool
+                if case .complete = operation { isCompletion = true } else { isCompletion = false }
+                do { undo = try HabitMutationHandler.stage(operation, id: request.envelope.commandID, context: context, now: now, writer: writer) }
+                catch DataError.invalidValue(let reason) where isCompletion { context.rollback(); return .init(status: .rejected, reason: reason) }
+                if let undo {
                     inverse = SettingsInverse(settings: [:], afterSettings: [:], layouts: [:], afterLayouts: [:], habitMutation: undo)
                 }
             case .diaryEditor(let operation):

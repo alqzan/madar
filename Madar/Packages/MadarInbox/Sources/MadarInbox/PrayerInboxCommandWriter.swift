@@ -60,6 +60,7 @@ public enum PrayerInboxCommandWriter {
         status: String,
         shortened: Bool? = nil,
         fridayKind: String? = nil,
+        heart: String? = nil,
         timeZone: TimeZone,
         source: CommandSource,
         issuedAt: Date = .now
@@ -67,6 +68,7 @@ public enum PrayerInboxCommandWriter {
         guard let day = try? GregorianDay(dayKey) else { throw PrayerInboxCommandError.invalidDayKey }
         guard let prayer = Prayer(rawValue: rawPrayer) else { throw PrayerInboxCommandError.invalidPrayer }
         guard status == "jamaah" || status == "alone" else { throw PrayerInboxCommandError.unsupportedStatus }
+        guard heart == nil || ["distracted", "present", "khashi"].contains(heart!) else { throw PrayerInboxCommandError.unsupportedStatus }
         guard shortened != true || (prayer != .fajr && prayer != .maghrib) else {
             throw PrayerInboxCommandError.invalidShortening
         }
@@ -95,6 +97,7 @@ public enum PrayerInboxCommandWriter {
         ]
         if let shortened { payload["shortened"] = .bool(shortened) }
         if let fridayKind { payload["fridayKind"] = .string(fridayKind) }
+        if let heart { payload["heart"] = .string(heart) }
 
         let command = CommandEnvelope(name: "prayer.log", payload: .object(payload), source: source, issuedAt: issuedAt)
         let generation = try inbox.currentGeneration()

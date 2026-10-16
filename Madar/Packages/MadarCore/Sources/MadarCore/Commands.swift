@@ -118,8 +118,11 @@ public protocol CommandStoreAdapter: Sendable {
 public struct CommandBus: Sendable {
     // Names implemented by this milestone. Unknown and later-room names are invalid
     // before authorization, so they cannot become indefinitely recoverable needsApp work.
-    public static let appOnlyCommandNames: Set<String> = Set(["settings.set", "settings.applyPreset", "preset.save", "core.completeOnboarding", "system.undo", "prayer.makeUp", "prayer.resolveGap", "prayer.setHeart", "prayer.logQiyam", "prayer.addOldMissed", "prayer.editTrackingStart", "prayer.startTrip", "prayer.endTrip", "prayer.logPair"]).union(HabitCommand.names).union(QuranCommandPayload.names).union(DiaryEditorCommand.names).union(["diary.appendLine", "diary.addMargin", "diary.freezeDay", "diary.completeWelcome"])
-    public static let supportedCommandNames = appOnlyCommandNames.union(["prayer.log", "diary.appendLine", "diary.addMargin"])
+    public static let appOnlyCommandNames: Set<String> = Set(["settings.set", "settings.applyPreset", "preset.save", "core.completeOnboarding", "system.undo", "prayer.makeUp", "prayer.resolveGap", "prayer.setHeart", "prayer.logQiyam", "prayer.addOldMissed", "prayer.editTrackingStart", "prayer.startTrip", "prayer.endTrip", "prayer.logPair"]).union(HabitCommand.names.subtracting(transportBlindWriteNames)).union(QuranCommandPayload.names).union(DiaryEditorCommand.names).union(["diary.appendLine", "diary.addMargin", "diary.freezeDay", "diary.completeWelcome"])
+    /// §16 blindWrite commands that Shortcuts, widgets and Controls may queue through the inbox.
+    /// They reveal nothing and carry an explicit day or period, so a late drain cannot misdate them.
+    public static let transportBlindWriteNames: Set<String> = ["prayer.log", "habit.complete"]
+    public static let supportedCommandNames = appOnlyCommandNames.union(transportBlindWriteNames).union(["diary.appendLine", "diary.addMargin"])
     private let adapter: any CommandStoreAdapter
     public init(adapter: any CommandStoreAdapter) { self.adapter = adapter }
     public func execute(_ envelope: CommandEnvelope, now: Date = Date(), generationID: UUID? = nil) async throws -> CommandOutcome {
@@ -132,6 +135,8 @@ public struct CommandBus: Sendable {
         switch envelope.name {
         case let name where HabitCommand.names.contains(name):
             guard let parsed = HabitCommand.parse(name, payload) else { return .init(status: .rejected, reason: "invalidPayload") }
+            // A queued completion names its period; the transaction rejects it once that period has closed.
+            if envelope.source != .app, case .complete(_, _, nil) = parsed { return .init(status: .rejected, reason: "invalidPayload") }
             operation = .habit(parsed); semantics = .upsert; naturalKey = nil
         case let name where DiaryEditorCommand.names.contains(name):
             guard let parsed = DiaryEditorCommand.parse(name, payload) else { return .init(status: .rejected, reason: "invalidPayload") }

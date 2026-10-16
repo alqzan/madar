@@ -28,3 +28,22 @@ public struct RoomWidgetSnapshot:Codable,Sendable,Equatable {
     public var locked:Bool
     public init(datePrimary:String,dateSecondary:String,heading:String,emptyTitle:String,rows:[Row]=[],periods:[Row]=[],locked:Bool=false){self.datePrimary=datePrimary;self.dateSecondary=dateSecondary;self.heading=heading;self.emptyTitle=emptyTitle;self.rows=rows;self.periods=periods;self.locked=locked}
 }
+/// Habits a Shortcut or Siri may complete blindly (§16): custom habits only, never a linked or Health habit,
+/// with the in-app step and the period the completion belongs to. Empty under whole-app protection.
+public struct HabitShortcutSnapshot:Codable,Sendable,Equatable {
+    public static let name="habitShortcuts"
+    public struct Item:Codable,Sendable,Equatable,Identifiable {
+        public var id:UUID
+        public var title:String
+        /// What one tap adds, written as the user would say it («+١ كوب»، «+١٥ دقيقة»، «أتممتها»).
+        public var stepTitle:String
+        public var step:Int
+        public var periodKey:String
+        public var done:Bool
+        public init(id:UUID,title:String,stepTitle:String,step:Int,periodKey:String,done:Bool){self.id=id;self.title=title;self.stepTitle=stepTitle;self.step=step;self.periodKey=periodKey;self.done=done}
+    }
+    public var items:[Item]
+    /// Period keys hold until the current Madar day ends; after that only the app can resolve the period.
+    public var periodsValidUntil:Date
+    public init(items:[Item],periodsValidUntil:Date){self.items=items;self.periodsValidUntil=periodsValidUntil}
+}

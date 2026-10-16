@@ -59,5 +59,20 @@ extension AppSession {
             try snapshotStore.write(envelope)
             WidgetCenter.shared.reloadTimelines(ofKind:"MadarRoom-"+room.rawValue)
         }
+        // Names outlive the day so Siri can still find a habit; its period is only trusted until the day ends.
+        let periodsEnd=end ?? now.addingTimeInterval(900)
+        try snapshotStore.write(SnapshotEnvelope(name:HabitShortcutSnapshot.name,generatedAt:now,validUntil:now.addingTimeInterval(30*86400),dayKey:service.today.description,tzID:place.timeZoneID,privacy:SnapshotPrivacy(notesLocked:locked),payload:habitShortcutPayload(locked:locked,at:now,periodsValidUntil:periodsEnd)))
+    }
+    /// Same step as the lobby and habit card buttons, so «أتممت» from Siri means what a tap means.
+    func habitShortcutPayload(locked:Bool,at now:Date,periodsValidUntil:Date)->HabitShortcutSnapshot {
+        guard !locked else {return .init(items:[],periodsValidUntil:now)}
+        let digits=AppBahwService(session:self,evaluationDate:now).digits
+        let readings=(try? HabitRepository(context:ModelContext(container)).readings(at:now)) ?? []
+        return .init(items:readings.compactMap { r in
+            guard r.source == nil, !r.archived, !r.paused, let p=r.summary.current, p.target>0, p.rule.measure != .health else {return nil}
+            let step=p.rule.measure == .duration ? 15 : 1
+            let title=p.rule.measure == .once ? "أتممتها" : p.rule.measure == .duration ? "+"+digits.string(15)+" دقيقة" : "+"+digits.string(1)+" "+(p.rule.unit.map(habitUnitName) ?? "مرة")
+            return .init(id:r.id,title:r.name,stepTitle:title,step:step,periodKey:p.key,done:p.met)
+        },periodsValidUntil:periodsValidUntil)
     }
 }

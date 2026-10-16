@@ -33,7 +33,9 @@ import MadarData
         _ = try await run("habit.archive",["id":.string(habit.uuidString),"archived":.bool(false)])
         #expect(try HabitRepository(context:ModelContext(container)).readings(at:now).first?.summary.current?.value == 1)
         #expect(try ModelContext(container).fetchCount(FetchDescriptor<HabitLog>()) == 0)
-        await #expect(throws:(any Error).self) {try await run("habit.complete",p.merging(["periodKey":.string("2026-10-14")]){$1})}
+        // A closed period is a final refusal (not a throw), so a queued completion cannot block the inbox.
+        let stale = try await run("habit.complete",p.merging(["periodKey":.string("2026-10-14")]){$1})
+        #expect(stale.status == .rejected); #expect(stale.reason == "انتهت هذه الفترة؛ افتح العادات للتسجيل")
 
     }
     @Test func pauseResumeAndPolicyEditsAreDatedAndUndoable() async throws {

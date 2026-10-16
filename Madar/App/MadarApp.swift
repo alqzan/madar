@@ -35,8 +35,16 @@ private struct MadarSceneContent: View {
                     do { try await session.drainInbox() }
                     catch BackupOperationError.busy { }
                     catch { session.errorMessage = "لم يكتمل تحديث البيانات. \(error.localizedDescription)" }
+                    await MadarIntentHandoff.shared.flush()
                     await session.refreshPrayerNotifications()
                 }
+            }
+            // A diary line from Siri waits behind the diary lock and lands once it opens.
+            .onChange(of: session?.lockController?.unlocked) { _, _ in Task { await MadarIntentHandoff.shared.flush() } }
+            // A Shortcut ran in this process and queued a blind write: apply it now, not at the next launch.
+            .onReceive(NotificationCenter.default.publisher(for: .madarInboxChanged)) { _ in
+                guard let session else { return }
+                Task { do { try await session.drainInbox() } catch { } }
             }
             .onOpenURL { url in
                 if let session { session.open(url) }
@@ -110,6 +118,7 @@ private struct MadarSceneContent: View {
             catch BackupOperationError.busy { }
             catch { opened.errorMessage = "لم يكتمل تحديث البيانات. \(error.localizedDescription)" }
             if let pendingURL { opened.open(pendingURL); self.pendingURL = nil }
+            await MadarIntentHandoff.shared.attach { [weak opened] request in await opened?.handleIntentRequest(request) ?? false }
         } catch { startupError = error.localizedDescription }
     }
     @Environment(\.scenePhase) private var scenePhase

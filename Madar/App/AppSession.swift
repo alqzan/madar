@@ -21,6 +21,8 @@ final class AppSession {
     /// M4-V03: «السنة وما يهمّك» pushed from the lobby (`madar://bahw/year`).
     var yearOpen = false
     var habitsOpen = false
+    /// A capture named a prayer without its state; the prayer home opens that prayer's log sheet.
+    var prayerLogRequest: Prayer?
     var habitRouteID:UUID?
     private(set) var container: ModelContainer
     let managedStore: ManagedDataStore?
@@ -68,9 +70,9 @@ final class AppSession {
     }, authorization: { [weak self] command in
         guard let self, self.lockController != nil else { return .init(status: .needsApp) }
         guard UIApplication.shared.isProtectedDataAvailable else { return .init(status: .needsUnlock) }
-        // §16 authorize: prayer.log is blindWrite even with whole-app Face ID protection.
+        // §16 authorize: prayer.log and habit.complete are blindWrite even with whole-app Face ID protection.
         // App-only settings never enter via transport, even if it claims source: app.
-        if command.name == "prayer.log" { return nil }
+        if CommandBus.transportBlindWriteNames.contains(command.name) { return nil }
         return self.lockController?.canPresent(.app) == true ? nil : .init(status: .needsUnlock)
     })
     private var expiryTask: Task<Void, Never>?
@@ -197,6 +199,10 @@ final class AppSession {
         }
         sendPrayerCommand(name: "prayer.resolveGap", payload: .object(["resolutions": .array(values)]),
             undoMessage: "حُلّت الفترة · التراجع متاح لعشر دقائق")
+    }
+    /// Capture's prayer report uses the same command, undo and refresh as a tap on the arch.
+    func logCapturedPrayer(payload: MadarCore.JSONValue, undoMessage: String) {
+        sendPrayerCommand(name: "prayer.log", payload: payload, undoMessage: undoMessage)
     }
     private func sendPrayerCommand(name: String, payload: MadarCore.JSONValue, undoMessage: String, completion: ((Bool) -> Void)? = nil) {
         guard !prayerWriteInProgress, beginWrite() else { completion?(false); return }
@@ -370,6 +376,7 @@ final class AppSession {
             if components?.host == "prayer" {components?.host="salah"} // Existing placed widgets used this legacy alias.
             let route = try RouteRegistry.parse(components?.url ?? url, context: context)
             if route.room == .salah,route.path.isEmpty {selectedTab="prayer";return}
+            if route.room == .bahw,route.path.isEmpty {selectedTab="foundation";return}
             if route.room == .quran, route.path.isEmpty || route.path.first == "session" || route.path.first == "page" {
                 quranRoute = route; selectedTab = "quran"; return
             }
