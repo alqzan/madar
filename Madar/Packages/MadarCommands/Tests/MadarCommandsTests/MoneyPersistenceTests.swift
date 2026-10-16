@@ -440,6 +440,74 @@ import MadarInbox
         #expect(try f.transaction(second.id).categoryID == cafe.id)
         #expect(try ModelContext(f.container).fetch(FetchDescriptor<MerchantRule>()).filter { $0.deletedAt == nil }.isEmpty)
     }
+    /// M5-V08 «نزل الراتب»: one command closes the cycle (L02 offset), opens the next with a frozen policy, moves the
+    /// salary day's movement, fills the surplus to its cap then the reserve, and undo stands only until the new cycle is used.
+    @Test func confirmSalaryClosesOpensAndUndoesUntilTheNewCycleIsUsed() async throws {
+        let f = try MoneyFixture(); defer { f.clean() }; try await f.setup()
+        let c = ModelContext(f.container), zone = ActivePlace.riyadh.timeZone, start = try GregorianDay("2026-09-26")
+        _ = try SettingsStore(context: c).stage(["core.dayStart": .string("midnight")])
+        let old = Cycle(); old.start = start.date(in: zone); old.expectedEnd = start.adding(days: 30).date(in: zone); old.dailyAllowanceMinor = 20_000; c.insert(old)
+        let seed = Allocation(); seed.target = "surplus"; seed.amountMinor = 500_000; seed.idempotencyKey = "opening-surplus"; c.insert(seed); try c.save()
+        // 20 days × 20000 = 400000 accrued before the salary day; 4420.00 spent → «لك الآن» −42000 (L02).
+        _ = try await f.ingest("شراء مدى Apple Pay\nبطاقة *3333\n4420.00 SAR\nلدى: Furniture\n2026-10-01 10:00")
+        let expense = try #require(try ModelContext(f.container).fetch(FetchDescriptor<MoneyTransaction>()).first { $0.amountMinor == 442_000 })
+        #expect(try await f.run("money.confirmTransaction", ["id": .string(expense.id.uuidString)]).status == .applied)
+        _ = try await f.ingest("راتب\n*1111\n15000.00 SAR\n2026-10-16 12:00")
+        _ = try await f.ingest("شراء مدى Apple Pay\nبطاقة *3333\n50.00 SAR\nلدى: Bakery\n2026-10-16 13:00")
+        let rows = try ModelContext(f.container).fetch(FetchDescriptor<MoneyTransaction>())
+        let salary = try #require(rows.first { $0.kind == "salary" }), sameDay = try #require(rows.first { $0.amountMinor == 5_000 })
+        #expect(try await f.run("money.confirmTransaction", ["id": .string(sameDay.id.uuidString)]).status == .applied)
+        #expect(try f.transaction(sameDay.id).cycleID == old.id)
+
+        let preview = try MoneyRepository(context: ModelContext(f.container)).salaryOpening(salaryID: salary.id, newCycleID: UUID())
+        #expect(preview.input.closing?.availableNowMinor == -42_000)
+        #expect(preview.endDay == (try GregorianDay("2026-11-16")))
+        // New cycle: 1500000 − 31 × 20000 = 880000; the surplus (500000 − 42000 offset) fills to 1000000, 338000 to the reserve.
+        #expect(preview.plan.leftoverMinor == 880_000)
+
+        let command = UUID()
+        #expect(try await f.run("money.confirmSalary", ["id": .string(salary.id.uuidString)], id: command).status == .applied)
+        let read = ModelContext(f.container)
+        let cycles = try read.fetch(FetchDescriptor<Cycle>()).filter { $0.deletedAt == nil }
+        let closed = try #require(cycles.first { $0.id == old.id }), opened = try #require(cycles.first { $0.id == command })
+        #expect(closed.closedAt != nil); #expect(closed.end == salary.eventAt); #expect(closed.reportVersion == 1)
+        let report = try JSONDecoder().decode(SalaryCloseReport.self, from: try #require(closed.closedReportJSON))
+        #expect(report.carriedMinor == -42_000); #expect(report.offsetMinor == 42_000); #expect(report.carryMinor == 0)
+        #expect(opened.incomeMinor == 1_500_000); #expect(opened.carryAdjustMinor == 0); #expect(opened.salaryTransactionID == salary.id)
+        let policy = try #require(try read.fetch(FetchDescriptor<CyclePolicy>()).first { $0.cycleID == command })
+        #expect(policy.effectiveFromDayKey == "2026-10-16"); #expect(policy.dailyRateMinor == 20_000)
+        let allocations = try read.fetch(FetchDescriptor<Allocation>()).filter { $0.deletedAt == nil }
+        #expect(allocations.filter { $0.target == "surplus" }.reduce(0) { $0 + $1.amountMinor } == 1_000_000)
+        #expect(allocations.filter { $0.target == "reserve" }.reduce(0) { $0 + $1.amountMinor } == 338_000)
+        #expect(try f.transaction(salary.id).reviewState == "ok"); #expect(try f.transaction(salary.id).cycleID == command)
+        #expect(try f.transaction(sameDay.id).cycleID == command, "The salary day belongs to the new cycle")
+        #expect(try MoneyRepository(context: read).cycle(at: f.now)?.id == command)
+        #expect(try await f.run("money.confirmSalary", ["id": .string(salary.id.uuidString)]).status == .rejected)
+
+        // Undo returns the open cycle, the draft salary and the balances.
+        #expect(try await f.run("system.undo", ["undoToken": .string(command.uuidString)]).status == .applied)
+        let back = ModelContext(f.container)
+        #expect(try back.fetch(FetchDescriptor<Cycle>()).first { $0.id == old.id }?.closedAt == nil)
+        #expect(try back.fetch(FetchDescriptor<Cycle>()).first { $0.id == command }?.deletedAt != nil)
+        #expect(try f.transaction(salary.id).reviewState != "ok"); #expect(try f.transaction(sameDay.id).cycleID == old.id)
+        #expect(try back.fetch(FetchDescriptor<Allocation>()).filter { $0.deletedAt == nil && $0.target == "surplus" }.reduce(0) { $0 + $1.amountMinor } == 500_000)
+
+        // Once a movement is filed in the new cycle, its undo is refused.
+        let again = UUID()
+        #expect(try await f.run("money.confirmSalary", ["id": .string(salary.id.uuidString)], id: again).status == .applied)
+        _ = try await f.ingest("شراء مدى Apple Pay\nبطاقة *3333\n12.00 SAR\nلدى: Water\n2026-10-16 14:00")
+        let water = try #require(try ModelContext(f.container).fetch(FetchDescriptor<MoneyTransaction>()).first { $0.amountMinor == 1_200 })
+        #expect(try await f.run("money.confirmTransaction", ["id": .string(water.id.uuidString)]).status == .applied)
+        #expect(try f.transaction(water.id).cycleID == again)
+        await #expect(throws: MoneyCommandError.undoSuperseded) { try await f.run("system.undo", ["undoToken": .string(again.uuidString)]) }
+        #expect(try ModelContext(f.container).fetch(FetchDescriptor<Cycle>()).first { $0.id == again }?.deletedAt == nil)
+        // A salary dated before the open cycle never opens a second cycle beside it.
+        _ = try await f.ingest("راتب\n*1111\n15000.00 SAR\n2026-10-10 12:00")
+        let late = try #require(try ModelContext(f.container).fetch(FetchDescriptor<MoneyTransaction>()).first { $0.kind == "salary" && $0.reviewState != "ok" })
+        #expect(try await f.run("money.confirmSalary", ["id": .string(late.id.uuidString)]).status == .rejected)
+        #expect(try ModelContext(f.container).fetch(FetchDescriptor<Cycle>()).filter { $0.deletedAt == nil && $0.closedAt == nil }.count == 1)
+        #expect(!MoneyCommandPayload.validate(name: "money.confirmSalary", payload: ["id": .string(salary.id.uuidString), "remainderTo": .string("goal")]))
+    }
     /// «منذ آخر زيارة»: the visit marker is one device row, updated in place, with no undo.
     @Test func markVisitKeepsOneDeviceRowAtTheCommandTime() async throws {
         let f = try MoneyFixture(); defer { f.clean() }

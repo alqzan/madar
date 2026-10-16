@@ -18,6 +18,8 @@ struct MoneyMessagesView: View {
     @State private var note: String?
     @State private var categorizing: MoneyMessageDraft?
     @State private var rulesOpen = false
+    @State private var salary: SalaryRoute?
+    private struct SalaryRoute: Identifiable, Hashable { var id: UUID }
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
     private var service: AppMoneyService { .init(app: app) }
     private var visible: Bool { revealed || !app.bool("core.hideMoneyUntilTouch") }
@@ -54,6 +56,7 @@ struct MoneyMessagesView: View {
             .task { load() }.onChange(of: app.prayerRevision) { load() }
             .sheet(item: $categorizing) { MoneyCategorizeSheet(app: app, draft: $0).environment(\.roomTheme, theme) }
             .navigationDestination(isPresented: $rulesOpen) { MoneyRulesView(app: app) }
+            .navigationDestination(item: $salary) { MoneySalaryView(app: app, salaryID: $0.id) }
             .accessibilityIdentifier("money-messages")
     }
     private var header: some View {
@@ -195,7 +198,7 @@ struct MoneyMessagesView: View {
                 Text(visible ? sign + amount(d.amountMinor, currency: d.currency) : "•••").font(.custom("thmanyahserifdisplay-Bold", size: 22, relativeTo: .title3))
                     .foregroundStyle(tint).lineLimit(1).minimumScaleFactor(0.6)
                 HStack(spacing: 8) {
-                    Button { run("money.confirmTransaction", ["id": .string(d.id.uuidString)]) } label: {
+                    Button { if d.isSalary { salary = .init(id: d.id) } else { run("money.confirmTransaction", ["id": .string(d.id.uuidString)]) } } label: {
                         Image(systemName: "checkmark").font(.body.bold()).foregroundStyle(theme.background).frame(width: 52, height: 52).background(theme.ink, in: .circle)
                     }.buttonStyle(.plain).accessibilityLabel("اعتمد " + d.title).accessibilityIdentifier("money-draft-confirm")
                     Button { run("money.deleteTransaction", ["id": .string(d.id.uuidString)]) } label: {

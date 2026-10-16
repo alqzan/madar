@@ -569,15 +569,15 @@ final class AppSession {
     /// UI fixtures only: runs a command as its real producer (for example the Shortcut) would.
     func executeFixtureCommand(_ envelope: CommandEnvelope) async { _ = try? await bus.execute(envelope, now: prayerNow()) }
     #endif
-    func executeMoneyCommand(_ name: String, payload: [String: MadarCore.JSONValue] = [:]) async throws {
+    func executeMoneyCommand(_ name: String, payload: [String: MadarCore.JSONValue] = [:], id: UUID = UUID()) async throws {
         guard lockController?.canPresent(.app) ?? protectedDataAuthorized else { throw DataError.authenticationFailed }
         guard beginWrite() else { throw BackupOperationError.busy }
         defer { pendingWrites -= 1 }
         let now = prayerNow()
-        let result = try await bus.execute(.init(name: name, payload: .object(payload), issuedAt: now), now: now)
+        let result = try await bus.execute(.init(commandID: id, name: name, payload: .object(payload), issuedAt: now), now: now)
         guard result.status == .applied || result.status == .duplicate else { throw DataError.invalidValue(result.reason ?? "money command") }
         if result.status == .applied { try reload(); try publishSnapshot() }
-        if let token = result.undoToken { showUndo(.init(id: token, expiresAt: now.addingTimeInterval(600)), message: "حُفظ التغيير · التراجع متاح لعشر دقائق") }
+        if let token = result.undoToken { showUndo(.init(id: token, expiresAt: now.addingTimeInterval(600)), message: name == "money.confirmSalary" ? "فُتحت الدورة · التراجع متاح لعشر دقائق" : "حُفظ التغيير · التراجع متاح لعشر دقائق") }
     }
 
     var diaryStagingDirectory: URL { commandAdapter.diaryStagingDirectory }

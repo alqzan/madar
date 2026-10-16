@@ -3,18 +3,20 @@ import Foundation
 import SwiftData
 import MadarCore
 import MadarData
+import MadarCommands
 
 extension AppSession {
     /// Named synthetic stores only. Never reads or writes the owner's store.
     func prepareMoneyFixture(group: URL) throws {
-        guard let variant = ProcessInfo.processInfo.environment["MADAR_UI_MONEY_FIXTURE"], ["showcase", "empty", "hidden", "zero", "shortfall", "messages", "since", "rules"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
+        guard let variant = ProcessInfo.processInfo.environment["MADAR_UI_MONEY_FIXTURE"], ["showcase", "empty", "hidden", "zero", "shortfall", "messages", "since", "rules", "salary"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         let c = ModelContext(container)
         guard !(try c.fetch(FetchDescriptor<DeviceSetting>())).contains(where: { $0.key == "sys.moneyFixture" }) else { return }
         for key in ["sys.moneyFixture", "sys.onboardingCompleted"] { let marker = DeviceSetting(); marker.key = key; marker.valueJSON = Data("true".utf8); c.insert(marker) }
         _ = try SettingsStore(context: c).stage(["core.dayStart": .string("midnight"), "core.faceIDLock": .string("none"), "core.hideMoneyUntilTouch": .bool(variant == "hidden")])
         guard variant != "empty" else { try c.save(); return }
         let zone = ActivePlace.riyadh.timeZone, now = prayerNow(), today = GregorianDay.containing(prayerNow(), in: ActivePlace.riyadh.timeZone)
-        let start = today.adding(days: -5), end = start.adding(days: 30)
+        // «نزل الراتب» arrives at the end of a full cycle; the other variants sit five days into theirs.
+        let start = today.adding(days: variant == "salary" ? -31 : -5), end = start.adding(days: variant == "salary" ? 31 : 30)
         let account = Account(); account.name = "الحساب الجاري"; account.balanceMinor = variant == "shortfall" ? 50000 : 12_850_000; account.balanceAt = now; c.insert(account)
         let cycle = Cycle(); cycle.start = start.date(in: zone); cycle.expectedEnd = end.date(in: zone); cycle.incomeMinor = 1_500_000; cycle.dailyAllowanceMinor = variant == "zero" ? 0 : 41_300; cycle.createdAt = cycle.start; c.insert(cycle)
         let policy = CyclePolicy(); policy.cycleID = cycle.id; policy.effectiveFromDayKey = start.description; policy.allowanceMinor = cycle.dailyAllowanceMinor; policy.dailyRateMinor = cycle.dailyAllowanceMinor; c.insert(policy)
@@ -64,6 +66,25 @@ extension AppSession {
                 for n in 0..<times { spend(merchant, categories[index], n % 12, 1500 + n * 300) }
             }
             for n in 0..<5 { spend("متجر الكتب", categories[n < 3 ? 3 : 1], n, 4000) }
+        }
+        if variant == "salary" {
+            // Earlier closes carry their reports (Figure 1); salary plans fill «مظاريف هذه الدورة»; the salary arrives through the intake.
+            for (index, old) in try c.fetch(FetchDescriptor<Cycle>()).filter({ $0.closedAt != nil }).sorted(by: { $0.start < $1.start }).enumerated() {
+                let carried = [48_000, 124_000, -40_000, 128_000][index % 4]
+                old.closedReportJSON = try JSONEncoder().encode(SalaryCloseReport(start: old.start, end: old.end ?? old.start, carriedMinor: carried, offsetMinor: max(0, -carried), carryMinor: 0,
+                    toSurplusMinor: max(0, carried), toReserveMinor: 0, nextIncomeMinor: 4_000_000)); old.reportVersion = 1
+            }
+            for (name, amount) in [("الإيجار", 115_000), ("رحلة الشتاء", 195_000), ("الطوارئ", 40_000)] {
+                guard let envelope = try c.fetch(FetchDescriptor<Envelope>()).first(where: { $0.name == name }) else { continue }
+                let plan = EnvelopePlan(); plan.envelopeID = envelope.id; plan.source = "salary"; plan.kind = "fund"; plan.period = "perCycle"; plan.perPaycheckMinor = amount; plan.createdAt = now.addingTimeInterval(Double(amount)); c.insert(plan)
+            }
+            try c.save()
+            let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.timeZone = zone; f.dateFormat = "yyyy-MM-dd"
+            let at = today.date(in: zone).addingTimeInterval(60)
+            Task { @MainActor in
+                await executeFixtureCommand(.init(name: MoneyCommandPayload.intakeName, payload: .object(["text": .string("راتب\n*5512\n40000.00 SAR\n\(f.string(from: today.date(in: zone))) 00:01"), "sender": .string("بنك الاختبار"), "receivedAt": .string(ISO8601DateFormatter().string(from: at))]), source: .shortcut, issuedAt: at))
+                try? reload()
+            }
         }
         if variant == "since" {
             // Away since the evening before the salary: «منذ آخر زيارة» opens first.

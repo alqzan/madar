@@ -8,7 +8,7 @@ public enum MoneyCommandPayload {
     public static let names: Set<String> = [intakeName, "money.pasteBankMessages", "money.logExpense",
         "money.confirmTransaction", "money.deleteTransaction", "money.saveAccount", "money.saveCard", "money.accruePlans", "money.setReserveGoal", "money.repayEnvelopeNow", "money.setEnvelopeSaving", "money.adoptRepayment",
         "money.applyStatement", "money.ignoreMessage", "money.confirmClear", "money.markVisit",
-        "money.categorize", "money.saveMerchantRule", "money.forgetMerchantRule"]
+        "money.categorize", "money.saveMerchantRule", "money.forgetMerchantRule", "money.confirmSalary"]
     /// §7.5 maxRepayCycles: the longest salary repayment (the envelope sheet offers 1–6).
     public static let maxRepaySalaries = 12
 
@@ -54,6 +54,8 @@ public enum MoneyCommandPayload {
             return Set(p.keys) == ["id", "categoryID", "remember"] && id("id") && optionalID("categoryID") && (p["remember"] == .bool(true) || p["remember"] == .bool(false))
         case "money.saveMerchantRule":
             return Set(p.keys) == ["merchant", "categoryID", "ignore"] && text("merchant") && optionalID("categoryID") && (p["ignore"] == .bool(true) || p["ignore"] == .bool(false))
+        case "money.confirmSalary":
+            return Set(p.keys).isSubset(of: ["id", "remainderTo"]) && id("id") && (p["remainderTo"] == nil || choices("remainderTo", ["surplus", "reserve"]))
         case "money.forgetMerchantRule": return Set(p.keys) == ["id"] && id("id")
         case "money.setReserveGoal": return Set(p.keys) == ["targetMinor"] && (p["targetMinor"] == .null || positive("targetMinor"))
         case intakeName:

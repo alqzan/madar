@@ -161,6 +161,8 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             let row = try transaction(uuid(p, "id"), context)
             guard row.reviewState != "ok" else { throw MoneyCommandError.alreadyConfirmed }
             try confirm(row, payload: p, context: context, now: now, writer: writer)
+        case "money.confirmSalary":
+            try confirmSalary(p, command: id, context: context, now: now, writer: writer)
         case "money.confirmClear":
             // «اعتمد الواضح»: one receipt and one undo for every listed draft; any refusal rejects all (rollback).
             guard case .array(let values) = p["ids"] else { throw MoneyCommandError.invalidReference }
@@ -421,6 +423,47 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
 
     /// «الواضح»: the drafts the real confirmation accepts as read. Each runs in its own unsaved
     /// context that is rolled back, so the UI flag and money.confirmClear share one definition.
+    /// M5-V08 «نزل الراتب»: one write closes the open cycle (report once, offset or leftover rows), opens the new cycle
+    /// with its frozen policy, moves the salary day's movements into it, funds the plans and confirms the salary.
+    private static func confirmSalary(_ p: [String: MadarCore.JSONValue], command: UUID, context: ModelContext, now: Date, writer: String) throws {
+        guard let salaryID = uuid(p, "id") else { throw MoneyCommandError.missingRow }
+        let override: SalaryRemainder? = switch optionalText(p, "remainderTo") { case "surplus": .surplusThenReserve; case "reserve": .reserve; default: nil }
+        let reading = try MoneyRepository(context: context).salaryOpening(salaryID: salaryID, newCycleID: command, remainderOverride: override)
+        let plan = reading.plan
+        // With «اسألني», the report asks first; the command never leaves money waiting without a home.
+        guard plan.awaitingChoiceMinor == 0, plan.close?.awaitingChoiceMinor ?? 0 == 0 else { throw MoneyCommandError.invalidReference }
+        let salary = try transaction(salaryID, context)
+        if let oldID = reading.closingCycleID, let old = try context.fetch(FetchDescriptor<Cycle>()).first(where: { $0.id == oldID && live($0) }), let close = plan.close {
+            guard old.closedAt == nil, old.closedReportJSON == nil else { throw MoneyCommandError.alreadyConfirmed }
+            old.end = salary.eventAt; old.closedAt = now; old.reportVersion = 1
+            old.closedReportJSON = try JSONEncoder().encode(SalaryCloseReport(start: old.start, end: salary.eventAt, carriedMinor: reading.input.closing?.availableNowMinor ?? 0,
+                offsetMinor: close.offsetMinor, carryMinor: close.carryMinor, toSurplusMinor: close.toSurplusMinor, toReserveMinor: close.toReserveMinor, nextIncomeMinor: reading.salaryMinor))
+            try touch(old, now, writer)
+            // Cycle membership uses the salary day: movements already filed from that day on belong to the new cycle.
+            let first = reading.startDay.description
+            for row in try transactions(context) where row.cycleID == oldID && row.id != salaryID && row.dayKey >= first {
+                row.cycleID = command; try touch(row, now, writer)
+                for allocation in try context.fetch(FetchDescriptor<Allocation>()) where allocation.transactionID == row.id && allocation.cycleID == oldID && live(allocation) {
+                    allocation.cycleID = command; try touch(allocation, now, writer)
+                }
+            }
+        }
+        let zone = try PrayerRepository(context: context).place(at: salary.eventAt).timeZone
+        let cycle = Cycle(); cycle.id = command; cycle.start = salary.eventAt; cycle.expectedEnd = reading.endDay.date(in: zone)
+        cycle.salaryTransactionID = salaryID; cycle.incomeMinor = reading.salaryMinor; cycle.carryAdjustMinor = plan.carryMinor
+        let policy = CyclePolicy(); policy.id = StableIdentity.uuid(for: "CyclePolicy:\(command):\(reading.startDay)")
+        policy.cycleID = command; policy.effectiveFromDayKey = reading.startDay.description
+        policy.dailyRateMinor = plan.rate.dailyRateMinor; policy.lastDayRemainderMinor = plan.rate.lastDayRemainderMinor
+        switch reading.input.allowance {
+        case .fixed(let amount): cycle.mode = "fixed"; cycle.dailyAllowanceMinor = amount; policy.mode = "fixed"; policy.allowanceMinor = amount
+        case .percent(let bp, _): cycle.mode = "percent"; cycle.percentBp = bp; policy.mode = "percent"; policy.percentBp = bp
+        }
+        cycle.createdAt = now; policy.createdAt = now
+        context.insert(cycle); context.insert(policy); try touch(cycle, now, writer); try touch(policy, now, writer)
+        try writeAllocations(plan.rows, context: context, now: now, writer: writer)
+        salary.homeAmountMinor = reading.salaryMinor; salary.cycleID = command; salary.reviewState = "ok"; try touch(salary, now, writer)
+        for message in try messages(for: salary, context) { message.status = "ok"; try touch(message, now, writer) }
+    }
     public static func confirmableAsRead(_ ids: [UUID], container: ModelContainer, now: Date) -> Set<UUID> {
         Set(ids.filter { id in
             let context = ModelContext(container); context.autosaveEnabled = false
@@ -611,9 +654,10 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         for after in inverse.after {
             guard current.first(where: { recordKey($0) == recordKey(after) }) == after else { throw MoneyCommandError.undoSuperseded }
             // Never remove the account/card/original while a later live movement depends on it.
-            if !inverse.before.contains(where: { recordKey($0) == recordKey(after) }), ["Account", "Card", "MoneyTransaction"].contains(after.model) {
+            if !inverse.before.contains(where: { recordKey($0) == recordKey(after) }), ["Account", "Card", "MoneyTransaction", "Cycle"].contains(after.model) {
                 let dependencies = current.filter { $0.isLive && !changedIDs.contains($0.id) }
-                let referenceKeys = ["accountID", "fromAccountID", "toAccountID", "cardID", "relatedTransactionID"]
+                // A cycle opened by a salary stays once later movements or allocations were filed into it.
+                let referenceKeys = ["accountID", "fromAccountID", "toAccountID", "cardID", "relatedTransactionID", "cycleID"]
                 guard !dependencies.contains(where: { record in referenceKeys.contains { record.fields[$0]?.string == after.id.uuidString } }) else { throw MoneyCommandError.undoSuperseded }
             }
         }
@@ -643,6 +687,8 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         rows += try context.fetch(FetchDescriptor<InstallmentItem>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<Statement>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<MerchantRule>()).map { try $0.record() }
+        rows += try context.fetch(FetchDescriptor<Cycle>()).map { try $0.record() }
+        rows += try context.fetch(FetchDescriptor<CyclePolicy>()).map { try $0.record() }
         return rows
     }
     private static func rebuildEnvelopes(_ context: ModelContext, _ now: Date, _ writer: String) throws {

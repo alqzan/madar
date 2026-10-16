@@ -25,6 +25,8 @@ struct MoneyMessageDraft: Identifiable, Equatable {
     var categoryID: UUID? = nil
     var categoryName: String? = nil
     var canCategorize = false
+    /// A salary opens «نزل الراتب» instead of confirming in place (a salary closes and opens a cycle).
+    var isSalary = false
 }
 
 struct MoneyMessageStatement: Identifiable, Equatable {
@@ -119,7 +121,7 @@ extension AppMoneyService {
                 kindLabel: Self.kindLabels[row.kind] ?? "حركة", payment: cardName(row.cardID) ?? accountName(row.fromAccountID ?? row.toAccountID),
                 amountMinor: row.amountMinor, currency: row.currency, direction: dir, possibleDuplicate: row.reviewState == "possibleDuplicate",
                 note: note, clear: clear, at: row.eventAt, categoryID: row.categoryID, categoryName: categories.first { $0.id == row.categoryID }?.name,
-                canCategorize: ["expense", "fee", "withdrawal"].contains(row.kind) && !categories.isEmpty))
+                canCategorize: ["expense", "fee", "withdrawal"].contains(row.kind) && !categories.isEmpty, isSalary: row.kind == "salary"))
         }
         drafts.sort { $0.clear == $1.clear ? $0.at > $1.at : !$0.clear }
         var statementCards: [MoneyMessageStatement] = []

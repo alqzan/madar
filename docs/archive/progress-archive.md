@@ -373,3 +373,11 @@ Differences left: diary widgets with content wait for an owner opt-in key (Ideas
 Not verified: real notification delivery and lock-screen display (M4-G), owner iPhone.
 Next: no ready card remains; M5 needs the owner to open its cards (money engine first, highest effort). Continue the improvement share meanwhile.
 Model/effort: Claude Opus 5.5; effort not exposed. Usage: five-hour 55% at this update.
+
+## Handover — M5 money engine, schema V5 and its first review — 2026-10-16 — Claude
+Works now: `Packages/MadarMoney`, the pure-Swift money engine (no screens yet). It covers the daily, «لك الآن», today's «صرفت X من Y», the basis, the close and offsets, runway, limits, every movement's single effect (fees and reversals too), halala-exact allocations with undo, plans, reconciliation, FX, bank-message classes and dedupe, statements, and zakat (gold or silver, debts including the loan). Store schema V5 (owner go): card kind, wallets, plan period and start, nisab basis, salary day and cycle calendar settings. The owner's rule: money needs a review, not max effort; the first review's six findings are fixed.
+Verified: MadarMoney 78/78; MadarData 65/65 (V4→V5 synthetic store and receipt-decode tests); MadarCommands 57/57, MadarInbox 17/17, MadarSnapshots 10/10; make build succeeded (before the review fixes, which touch only MadarMoney, not linked into the app yet); git diff --check clean.
+Differences left: none visual. Parser tested on synthetic samples only. check-review-contracts.py fails on clean main at frozen sections/11-r-quran.md (not touched).
+Not verified: the real V4 store upgrading on the owner's iPhone; RM6 accuracy (needs anonymised messages).
+Next: M5-D02 money commands with undo and IngestBankMessageIntent/LogExpenseIntent, with a review pass, then M5-V01 home.
+Model/effort: Claude Opus 5.5; effort not exposed (E01–E04 commits say «max» on the owner's word). Usage: five-hour 83% at handover.
