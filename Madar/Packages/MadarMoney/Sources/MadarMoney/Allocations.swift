@@ -62,7 +62,12 @@ public enum AllocationEngine {
     public static func distribute(_ total: Int, weights: [Int]) -> [Int] {
         precondition(!weights.isEmpty && weights.allSatisfy { $0 >= 0 } && weights.reduce(0, +) > 0)
         let sum = weights.reduce(0, +), sign = total < 0 ? -1 : 1, magnitude = abs(total)
-        var parts = weights.dropLast().map { magnitude * $0 / sum }
+        // Full-width multiplication keeps valid Int amounts exact even when total × weight
+        // would overflow Int before division. Each result is bounded by magnitude.
+        var parts = weights.dropLast().map { weight in
+            let product = UInt(magnitude).multipliedFullWidth(by: UInt(weight))
+            return Int(UInt(sum).dividingFullWidth(product).quotient)
+        }
         parts.append(magnitude - parts.reduce(0, +))
         return parts.map { $0 * sign }
     }

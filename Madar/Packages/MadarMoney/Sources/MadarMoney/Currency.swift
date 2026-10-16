@@ -11,7 +11,7 @@ public struct CurrencyExponents: Sendable {
     public func exponent(_ code: String) -> Int? { exponents[code] }
 }
 
-public enum FXError: Error, Equatable { case unknownCurrency(String), invalidRate(String) }
+public enum FXError: Error, Equatable { case unknownCurrency(String), invalidRate(String), amountOverflow }
 
 public enum FX {
     /// A rate is a canonical decimal string (ASCII digits, "." separator), > 0, ≤ 12 fraction digits (§11 FX rate).
@@ -34,6 +34,7 @@ public enum FX {
         var rounded = Decimal(), source = value
         // .plain rounds a tie away from zero.
         NSDecimalRound(&rounded, &source, 0, .plain)
+        guard !rounded.isNaN, rounded <= Decimal(Int.max), rounded >= Decimal(Int.min) else { throw FXError.amountOverflow }
         return NSDecimalNumber(decimal: rounded).intValue
     }
 

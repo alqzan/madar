@@ -5,6 +5,7 @@ import MadarCore
 import MadarData
 import MadarPrayer
 import MadarQuran
+import MadarMoney
 
 private struct SettingsInverse: Codable {
     var settings: [String: MadarData.JSONValue]
@@ -17,6 +18,7 @@ private struct SettingsInverse: Codable {
     var prayerMutation: Data? = nil
     var diaryMutation: Data? = nil
     var habitMutation: Data? = nil
+    var moneyMutation: Data? = nil
 }
 private struct ReceiptNamespace: Codable {
     let version: Int
@@ -169,12 +171,30 @@ private struct ReceiptWire: Codable {
                 return outcome
             case .apply: break
             }
+            // Refuse sensitive non-financial messages before even a durable payload hash/receipt is written.
+            if case .money(let name, let payload) = request.operation,
+               MoneyMutationHandler.discards(name: name, payload: payload) { return .init(status: .applied) }
             let writer = try store.writerIDForWrite(now: now)
             var inverse: SettingsInverse?
             if !request.envelope.name.hasPrefix("settings.") && request.envelope.name != "core.completeOnboarding" {
                 try DiaryLineRenderer.freezeBeforeSourceChange(context: context, now: now, writer: writer)
             }
             switch request.operation {
+            case .money(let name, let payload):
+                do {
+                    let staged = try MoneyMutationHandler.stage(name: name, payload: payload, id: request.envelope.commandID,
+                        issuedAt: request.envelope.issuedAt, source: request.envelope.source, context: context, now: now, writer: writer)
+                    if staged.duplicate {
+                        let outcome = CommandOutcome(status: .duplicate)
+                        try saveReceipt(request, outcome: outcome, inverseJSON: nil, writer: writer, generationID: generationID, at: now, context: context)
+                        return outcome
+                    }
+                    if let undo = staged.inverse { inverse = SettingsInverse(settings: [:], afterSettings: [:], layouts: [:], afterLayouts: [:], moneyMutation: undo) }
+                } catch let error as MoneyCommandError {
+                    context.rollback(); return .init(status: .rejected, reason: error.rawValue)
+                } catch is FXError {
+                    context.rollback(); return .init(status: .rejected, reason: "invalidExchangeRate")
+                }
             case .habit(let operation):
                 // A completion refusal (closed period, paused, linked) is a final answer, not a retry:
                 // rethrowing would leave a queued completion blocking every later inbox record.
@@ -284,6 +304,8 @@ private struct ReceiptWire: Codable {
                     return .init(status: .rejected, reason: String(describing: error))
                 }
             case .replaceSettings(let values):
+                if let currency = values["core.currency"], currency != (try JSONDecoder().decode(MadarCore.JSONValue.self, from: store.value(for: "core.currency").canonicalData())),
+                   !(try context.fetch(FetchDescriptor<MoneyTransaction>())).isEmpty { return .init(status: .rejected, reason: "currencyRequiresMigration") }
                 let typed = try convert(values)
                 try HabitContextProvenance.recordSettingChange(typed, store: store, context: context, now: now, writer: writer)
                 try HabitWeekHistory.record(typed, store: store, context: context, now: now, writer: writer)
@@ -319,7 +341,9 @@ private struct ReceiptWire: Codable {
                     return .init(status: .rejected, reason: "undoExpired")
                 }
                 let state = try JSONDecoder().decode(SettingsInverse.self, from: data)
-                if let mutation = state.habitMutation {
+                if let mutation = state.moneyMutation {
+                    try MoneyMutationHandler.undo(mutation, context: context, now: now, writer: writer)
+                } else if let mutation = state.habitMutation {
                     try HabitMutationHandler.undo(mutation, context: context, now: now, writer: writer)
                 } else if let mutation = state.quranMutation {
                     try QuranMutationHandler.undo(mutation, in: context, catalog: QuranResources.catalog(), now: now, writer: writer)

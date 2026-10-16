@@ -54,9 +54,10 @@
 		2E95780F1D439BE926514901 /* PrayerTodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D813172B4A91DD6E0930EEA8 /* PrayerTodayView.swift */; };
 		304192FCF4EB03EDE72843A7 /* DiaryHomeFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78DF9E0AE0EB02B43233FDF3 /* DiaryHomeFixture.swift */; };
 		30DB8B597D38C0BC491F0F6B /* QuranWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D68DFEF63B65ADBC328CAAF /* QuranWidget.swift */; };
+		313053636CD46AD20B9BAEE5 /* MoneyIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8C58B5F78AEF2F2C4EB4F12 /* MoneyIntents.swift */; };
 		31EBC366B73ABD52E032CDD8 /* RoomGlyphUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6ED4EF15351D65F5D0541270 /* RoomGlyphUITests.swift */; };
 		320323BDDB522460AD28B544 /* PrayerActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3883565EC8BCC1379DC30626 /* PrayerActivityAttributes.swift */; };
-		330FEECE1D89F18B01B139E5 /* MadarPrayer in Frameworks */ = {isa = PBXBuildFile; productRef = 4B178E72DCA1A5ADC7074FA0 /* MadarPrayer */; };
+		330FEECE1D89F18B01B139E5 /* MadarMoney in Frameworks */ = {isa = PBXBuildFile; productRef = 4E71B0D079AB0D4935ECA7A6 /* MadarMoney */; };
 		34A8242C2D6815FA68B8EF2B /* QuranStrengthIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18F8C79683F748F920849BFB /* QuranStrengthIntegrationTests.swift */; };
 		34C08CE848450C430D0DB1E4 /* MadarWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BF0DFC3D1738347A82224A8 /* MadarWidgets.swift */; };
 		351256E784C60D00BFDE590F /* QuranIndexView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E07F3CE68A98CD21F903FAC7 /* QuranIndexView.swift */; };
@@ -76,7 +77,7 @@
 		3FEA8FB15F8EB51DEB9ADAA6 /* AppQuranService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD01076802F7C86446475EE9 /* AppQuranService.swift */; };
 		40AEC490ABF0A0DB6D7B4DDE /* QuranDayCloseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C83F53C2034722DE17B40FDF /* QuranDayCloseView.swift */; };
 		41A7643B253AFF8A7C6F7417 /* MadarWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = E9A234078D9BE6530E46FC1E /* MadarWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		426A98B3F16AF13682080B56 /* MadarInbox in Frameworks */ = {isa = PBXBuildFile; productRef = CD612AE668CD8323078B4B8B /* MadarInbox */; };
+		426A98B3F16AF13682080B56 /* MadarQuran in Frameworks */ = {isa = PBXBuildFile; productRef = 0A7A781426FCB0E78AFCDE6F /* MadarQuran */; };
 		42891AC896C217AA125577AC /* QuranUIModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6808E6AD5E96444CBF214FE /* QuranUIModels.swift */; };
 		43A6D81CDC95C8493C00F17E /* AppRoomWidgetSnapshots.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33D923E13971D0E7628E4EDC /* AppRoomWidgetSnapshots.swift */; };
 		4606DD88F796A7CF65FEF417 /* DiaryYearbookUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBA7E7E09F9656CD17FCEFFE /* DiaryYearbookUITests.swift */; };
@@ -100,7 +101,7 @@
 		56D09B30E80044902F44350D /* QuranCoachUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB394D0AA548ADD478457293 /* QuranCoachUITests.swift */; };
 		5896B12F88D3C188ABF089B8 /* DiarySeasonUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62A1A46778A8E38A5339986E /* DiarySeasonUITests.swift */; };
 		58B00A3B97C8E309BB6C9BB8 /* DiaryDayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEF0A8C7F2AE9F1C66E470CD /* DiaryDayView.swift */; };
-		59CFCB83C498D00A1C66BA5F /* MadarQuran in Frameworks */ = {isa = PBXBuildFile; productRef = 0A7A781426FCB0E78AFCDE6F /* MadarQuran */; };
+		59CFCB83C498D00A1C66BA5F /* MadarPrayer in Frameworks */ = {isa = PBXBuildFile; productRef = 4B178E72DCA1A5ADC7074FA0 /* MadarPrayer */; };
 		5A0E68C5D715CF3C44A6267C /* RoomWidgetsGallery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CF5E7B996A522A8D37486E4 /* RoomWidgetsGallery.swift */; };
 		5B165E70C47E69F2B521FAEF /* MadarDesign in Frameworks */ = {isa = PBXBuildFile; productRef = CA281BC496544A8E0A3B0F85 /* MadarDesign */; };
 		5C634F41104C0074DBECD70E /* QuranServiceIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D97EA0A97206A62947BE14C /* QuranServiceIntegrationTests.swift */; };
@@ -121,6 +122,7 @@
 		69E3D00BAA054BFFC4E07EE5 /* BahwLobbyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60F1C857764292ABD2F14C47 /* BahwLobbyView.swift */; };
 		6A0993283286BFD137A6421F /* PrayerNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D2B7534A65CA14B25771639 /* PrayerNotifications.swift */; };
 		6A2B6743E159A39E375E8C57 /* QuranWeekView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11F123B2D3B43B936627F0D6 /* QuranWeekView.swift */; };
+		6A893B368DB2A8C55215C261 /* MadarInbox in Frameworks */ = {isa = PBXBuildFile; productRef = 951241A7D8289BCE70C1F1EF /* MadarInbox */; };
 		6AD14D30F03BE6A37F6F1ACC /* CaptureIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1272CF3F9C22A2C5B4AABE76 /* CaptureIntent.swift */; };
 		6C20B5F11059503EA5B4876E /* BahwBlocks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FC02C42FB7004B6F30B7052 /* BahwBlocks.swift */; };
 		6C30416A0287E6C5B89852E7 /* FirstRunView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86377C72BA91AAD12F0EFD41 /* FirstRunView.swift */; };
@@ -142,7 +144,7 @@
 		7E85C9D2A873F8F790F68F66 /* thmanyahsans-Light.otf in Resources */ = {isa = PBXBuildFile; fileRef = F5C14B0401F68E78003D252D /* thmanyahsans-Light.otf */; };
 		7EF0148B1FC1018672F7B6EE /* DiarySearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4881D4D4F799E9A19EB4E38 /* DiarySearchView.swift */; };
 		7EF6115C0C2D03338D7B6AC6 /* HabitHealthStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01163278AE7300C6CD959552 /* HabitHealthStore.swift */; };
-		807172E4A031EA6E80A5CB4D /* MadarSync in Frameworks */ = {isa = PBXBuildFile; productRef = F56ABA17B98BBC295DED888C /* MadarSync */; };
+		807172E4A031EA6E80A5CB4D /* MadarInbox in Frameworks */ = {isa = PBXBuildFile; productRef = CD612AE668CD8323078B4B8B /* MadarInbox */; };
 		833AFB36B8326DC8803302DA /* AppDiaryYearbookService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04672B7B893D0B6547D3773 /* AppDiaryYearbookService.swift */; };
 		844E078C6513B6447D91C071 /* RoomGlyphTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 566844F2238653E3802E5D22 /* RoomGlyphTests.swift */; };
 		847CAFBC8C0A856177DA1BD1 /* AppSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7253DB8148176A664FA3CF89 /* AppSyncService.swift */; };
@@ -189,8 +191,9 @@
 		B1E0883905AB8A0BC6C0DF24 /* MadarGlyph.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA770813B3F76287BD061E21 /* MadarGlyph.swift */; };
 		B433AE4ADE8BD5F0610FDD1B /* DiaryProjectsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8493A65CE336D4438DE5400E /* DiaryProjectsView.swift */; };
 		B4C55712DB7D76B760E83541 /* QuranFreeUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2918732D66A498EA8AF9A92 /* QuranFreeUITests.swift */; };
+		B6EE8E827BE58948EBFBEAB5 /* MadarSync in Frameworks */ = {isa = PBXBuildFile; productRef = F56ABA17B98BBC295DED888C /* MadarSync */; };
 		BA161EEACE65443924885A48 /* FoundationHome.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C4E870846C8F0F11086BEB /* FoundationHome.swift */; };
-		BA97A7F98183C4ED46102954 /* MadarInbox in Frameworks */ = {isa = PBXBuildFile; productRef = 951241A7D8289BCE70C1F1EF /* MadarInbox */; };
+		BA97A7F98183C4ED46102954 /* MadarMoney in Frameworks */ = {isa = PBXBuildFile; productRef = 2D180BADD727996FC6142423 /* MadarMoney */; };
 		BAD375F78F641EF7AE27A7C1 /* thmanyahsans-Regular.otf in Resources */ = {isa = PBXBuildFile; fileRef = 1A25447FB94716ACAAEB7433 /* thmanyahsans-Regular.otf */; };
 		BB6BCE8F7D71255076789321 /* DiaryEditorIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E1F17572CD54A4B855DD164 /* DiaryEditorIntegrationTests.swift */; };
 		BE02C00CD8F58BFD8E1448E0 /* MadarCore in Frameworks */ = {isa = PBXBuildFile; productRef = C0F01EF9460620030E8156F6 /* MadarCore */; };
@@ -329,6 +332,7 @@
 		2293299667730AD8A0496EBC /* MadarCommands */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MadarCommands; path = Packages/MadarCommands; sourceTree = SOURCE_ROOT; };
 		24560E5969E823668449B1D8 /* MadarData */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MadarData; path = Packages/MadarData; sourceTree = SOURCE_ROOT; };
 		2564AF9C513786C475618420 /* DateLabelsIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateLabelsIntegrationTests.swift; sourceTree = "<group>"; };
+		25C24B34019B6C51AD62E9A4 /* MadarMoney */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MadarMoney; path = Packages/MadarMoney; sourceTree = SOURCE_ROOT; };
 		25C92B7A356AA41F0E88F770 /* OpenQuickRoomIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenQuickRoomIntent.swift; sourceTree = "<group>"; };
 		2B32E22D47EB8FE84B717D27 /* DiaryHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryHomeView.swift; sourceTree = "<group>"; };
 		2BF0DFC3D1738347A82224A8 /* MadarWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MadarWidgets.swift; sourceTree = "<group>"; };
@@ -517,6 +521,7 @@
 		E23AE45098632E509E9E5265 /* QuranStrengthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranStrengthView.swift; sourceTree = "<group>"; };
 		E249F3B9FECA9C0E7D4FF8B8 /* QuranYearUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranYearUITests.swift; sourceTree = "<group>"; };
 		E4EABD6DD57A637E613F8174 /* AppQuranService+Year.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppQuranService+Year.swift"; sourceTree = "<group>"; };
+		E8C58B5F78AEF2F2C4EB4F12 /* MoneyIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyIntents.swift; sourceTree = "<group>"; };
 		E9A234078D9BE6530E46FC1E /* MadarWidgets.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = MadarWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		EAFD1540BCC9EC975C48ABFA /* MadarInbox */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MadarInbox; path = Packages/MadarInbox; sourceTree = SOURCE_ROOT; };
 		EBA7E7E09F9656CD17FCEFFE /* DiaryYearbookUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryYearbookUITests.swift; sourceTree = "<group>"; };
@@ -553,10 +558,11 @@
 				188EE40FE4D74FF7D7738992 /* MadarDesign in Frameworks */,
 				48F35CA79681B1883AA6DE30 /* MadarSnapshots in Frameworks */,
 				F84D525E813550D298F3BA1F /* MadarCommands in Frameworks */,
-				330FEECE1D89F18B01B139E5 /* MadarPrayer in Frameworks */,
-				59CFCB83C498D00A1C66BA5F /* MadarQuran in Frameworks */,
-				426A98B3F16AF13682080B56 /* MadarInbox in Frameworks */,
-				807172E4A031EA6E80A5CB4D /* MadarSync in Frameworks */,
+				330FEECE1D89F18B01B139E5 /* MadarMoney in Frameworks */,
+				59CFCB83C498D00A1C66BA5F /* MadarPrayer in Frameworks */,
+				426A98B3F16AF13682080B56 /* MadarQuran in Frameworks */,
+				807172E4A031EA6E80A5CB4D /* MadarInbox in Frameworks */,
+				B6EE8E827BE58948EBFBEAB5 /* MadarSync in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -580,7 +586,8 @@
 				61008D4E1402C2503A5A3F54 /* MadarCore in Frameworks */,
 				2C8A090F231850A34A5F984E /* MadarSnapshots in Frameworks */,
 				4F3EF1691B6E6DF5CE28B9D2 /* MadarCommands in Frameworks */,
-				BA97A7F98183C4ED46102954 /* MadarInbox in Frameworks */,
+				BA97A7F98183C4ED46102954 /* MadarMoney in Frameworks */,
+				6A893B368DB2A8C55215C261 /* MadarInbox in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -748,6 +755,7 @@
 				24560E5969E823668449B1D8 /* MadarData */,
 				647A7301BEAB86DFF20A2A07 /* MadarDesign */,
 				EAFD1540BCC9EC975C48ABFA /* MadarInbox */,
+				25C24B34019B6C51AD62E9A4 /* MadarMoney */,
 				51A896BAAC402D5481449DB5 /* MadarPrayer */,
 				49443C53BC48AC114815D351 /* MadarQuran */,
 				AA5DF286ED4CF242BEF2D537 /* MadarSnapshots */,
@@ -813,6 +821,7 @@
 				66EDB55535EAFA21686E3D3E /* CompleteHabitIntent.swift */,
 				DC96F32AC5E7E4164A325940 /* LogPrayerIntent.swift */,
 				3C51B7F621FD8CA7685E7B45 /* MadarPrayerShortcuts.swift */,
+				E8C58B5F78AEF2F2C4EB4F12 /* MoneyIntents.swift */,
 				FCC2F8AF04AA4AA760B02D82 /* OpenMadarIntent.swift */,
 				25C92B7A356AA41F0E88F770 /* OpenQuickRoomIntent.swift */,
 				F641995C5E5E50050215DA42 /* PrayerControlIntent.swift */,
@@ -937,6 +946,7 @@
 				D7349BC32E9D9D10CE3C790A /* MadarDesign */,
 				D9E009A01CE49E91ECD42040 /* MadarSnapshots */,
 				33781F34CD5C1A71FC795FC2 /* MadarCommands */,
+				4E71B0D079AB0D4935ECA7A6 /* MadarMoney */,
 				4B178E72DCA1A5ADC7074FA0 /* MadarPrayer */,
 				0A7A781426FCB0E78AFCDE6F /* MadarQuran */,
 				CD612AE668CD8323078B4B8B /* MadarInbox */,
@@ -965,6 +975,7 @@
 				D04FCD79967981AED2E8C7FE /* MadarCore */,
 				84C88E462FB52C233E333734 /* MadarSnapshots */,
 				BB0D9BFDBBAFC58EE2999DE7 /* MadarCommands */,
+				2D180BADD727996FC6142423 /* MadarMoney */,
 				951241A7D8289BCE70C1F1EF /* MadarInbox */,
 			);
 			productName = MadarTests;
@@ -1055,6 +1066,7 @@
 				DD0C2693CA0DD2A83DF23DF2 /* XCLocalSwiftPackageReference "Packages/MadarData" */,
 				497B4A463A6ACD30713D8183 /* XCLocalSwiftPackageReference "Packages/MadarDesign" */,
 				FEE24431784F9102823C56FC /* XCLocalSwiftPackageReference "Packages/MadarInbox" */,
+				E828848FEDE5F264C3A96365 /* XCLocalSwiftPackageReference "Packages/MadarMoney" */,
 				CAFC085180C882ACA0FD8CC5 /* XCLocalSwiftPackageReference "Packages/MadarPrayer" */,
 				2A96B510AE29F10C2D4D5328 /* XCLocalSwiftPackageReference "Packages/MadarQuran" */,
 				4804E91219655B2AD56FF8DD /* XCLocalSwiftPackageReference "Packages/MadarSnapshots" */,
@@ -1281,6 +1293,7 @@
 				F590460A7B328F814D4F172F /* MadarIntentHandoff.swift in Sources */,
 				24595360D6161BE050ADEC31 /* MadarLock.swift in Sources */,
 				67F42646D352F586E7340024 /* MadarPrayerShortcuts.swift in Sources */,
+				313053636CD46AD20B9BAEE5 /* MoneyIntents.swift in Sources */,
 				1A9C1E8F02FAFFFC35FDFA29 /* NextPrayerWidget.swift in Sources */,
 				EA5164A4DA807C4F06A13120 /* OpenMadarIntent.swift in Sources */,
 				E801BD0C0938AA2DD95E5249 /* OpenQuickRoomIntent.swift in Sources */,
@@ -1733,6 +1746,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/MadarData;
 		};
+		E828848FEDE5F264C3A96365 /* XCLocalSwiftPackageReference "Packages/MadarMoney" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/MadarMoney;
+		};
 		FEE24431784F9102823C56FC /* XCLocalSwiftPackageReference "Packages/MadarInbox" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/MadarInbox;
@@ -1748,6 +1765,10 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = MadarQuran;
 		};
+		2D180BADD727996FC6142423 /* MadarMoney */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MadarMoney;
+		};
 		33781F34CD5C1A71FC795FC2 /* MadarCommands */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = MadarCommands;
@@ -1755,6 +1776,10 @@
 		4B178E72DCA1A5ADC7074FA0 /* MadarPrayer */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = MadarPrayer;
+		};
+		4E71B0D079AB0D4935ECA7A6 /* MadarMoney */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MadarMoney;
 		};
 		656749C563874CC2409C70BE /* MadarQuran */ = {
 			isa = XCSwiftPackageProductDependency;

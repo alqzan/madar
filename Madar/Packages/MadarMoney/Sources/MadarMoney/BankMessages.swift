@@ -141,7 +141,10 @@ public enum BankMessageParser {
         fraction = String(fraction.prefix(exponent)).padding(toLength: exponent, withPad: "0", startingAt: 0)
         var scale = 1
         for _ in 0..<exponent { scale *= 10 }
-        return whole * scale + (Int(fraction) ?? 0)
+        let product = whole.multipliedReportingOverflow(by: scale)
+        let sum = product.partialValue.addingReportingOverflow(Int(fraction) ?? 0)
+        guard !product.overflow, !sum.overflow else { return nil }
+        return sum.partialValue
     }
 
     static func firstAmount(_ text: String, _ exponents: CurrencyExponents) -> (minor: Int, currency: String)? {

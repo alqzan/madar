@@ -17,6 +17,8 @@ settings:
 packages:
   MadarCore:
     path: Packages/MadarCore
+  MadarMoney:
+    path: Packages/MadarMoney
   MadarData:
     path: Packages/MadarData
   MadarDesign:
@@ -49,6 +51,7 @@ targets:
       - package: MadarDesign
       - package: MadarSnapshots
       - package: MadarCommands
+      - package: MadarMoney
       - package: MadarPrayer
       - package: MadarQuran
       - package: MadarInbox
@@ -140,6 +143,7 @@ targets:
       - package: MadarCore
       - package: MadarSnapshots
       - package: MadarCommands
+      - package: MadarMoney
       - package: MadarInbox
   MadarUITests:
     type: bundle.ui-testing
