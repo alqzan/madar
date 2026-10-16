@@ -6,7 +6,7 @@ import XCTest
         let app = XCUIApplication()
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": "editor", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00"]
         app.launch(); XCTAssertTrue(app.buttons["diary-write"].waitForExistence(timeout: 20)); capture(app, "UX-11-diary-L")
-        app.tabBars.buttons["مدار"].tap()
+        app.tabBars.buttons["البهو"].tap()
         let date = app.descendants(matching: .any).matching(identifier: "bahw-date").firstMatch
         XCTAssertTrue(date.waitForExistence(timeout: 10)); XCTAssertTrue(date.label.contains("١٤٤٨")); XCTAssertTrue(date.label.contains("٢٠٢٦"))
         capture(app, "UX-11-lobby-L")
@@ -15,7 +15,7 @@ import XCTest
         app.tabBars.buttons["خصّص"].tap()
         let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("core.firstCalendar\n")
         let gregorian = app.buttons["option-core.firstCalendar-gregorian"]; XCTAssertTrue(gregorian.waitForExistence(timeout: 5)); gregorian.tap()
-        app.tabBars.buttons["مدار"].tap()
+        app.tabBars.buttons["البهو"].tap()
         XCTAssertTrue(date.waitForExistence(timeout: 10)); XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "label BEGINSWITH %@", "الخميس ١٥ أكتوبر"), object: date)], timeout: 8), .completed)
         capture(app, "UX-11-gregorian-first-L")
     }

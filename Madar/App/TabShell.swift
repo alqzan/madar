@@ -43,7 +43,7 @@ struct MadarRootView: View {
     var body: some View {
         let dark = forcedColorScheme == .dark || (forcedColorScheme == nil && colorScheme == .dark)
         let theme = RoomTheme(dark: dark, calmPaper: false)
-        TabShell(selection: $session.selectedTab, tabs: [.init(id: "foundation", title: "مدار", symbol: "MadarOrbit"), .init(id: "prayer", title: "الصلاة", symbol: "MadarPrayer"), .init(id: "quran", title: "القرآن", symbol: "MadarQuran"), .init(id: "notes", title: "المذكرات", symbol: "MadarDiary"), .init(id: "customize", title: "خصّص", symbol: "slider.horizontal.3")]) { tab in
+        TabShell(selection: $session.selectedTab, tabs: [.init(id: "foundation", title: "البهو", symbol: "MadarOrbit"), .init(id: "prayer", title: "الصلاة", symbol: "MadarPrayer"), .init(id: "quran", title: "القرآن", symbol: "MadarQuran"), .init(id: "notes", title: "المذكرات", symbol: "MadarDiary"), .init(id: "customize", title: "خصّص", symbol: "MadarCustomize")]) { tab in
             NavigationStack {
                 if tab == "customize" { CustomizeMadar(session: session) }
                 else if tab == "prayer" { PrayerTodayView(session: session) }

@@ -119,17 +119,17 @@ import XCTest
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": "empty", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
         app.launch()
         XCTAssertTrue(app.buttons["diary-write"].waitForExistence(timeout: 20))
-        app.tabBars.buttons["مدار"].tap()
+        app.tabBars.buttons["البهو"].tap()
         XCTAssertTrue(app.staticTexts["bahw-greeting"].waitForExistence(timeout: 10))
         app.swipeUp(velocity: .slow)
         capture(app, "UX-10-native-scrolled-L")
         let quran = app.tabBars.buttons["القرآن"]
         print("UX-10 collapsed Quran: exists=\(quran.exists), hittable=\(quran.isHittable)")
-        if !quran.isHittable { app.tabBars.buttons["مدار"].tap() }
+        if !quran.isHittable { app.tabBars.buttons["البهو"].tap() }
         XCTAssertTrue(quran.waitForExistence(timeout: 5)); quran.tap()
         XCTAssertTrue(app.staticTexts["quran-coverage-title"].waitForExistence(timeout: 10), app.debugDescription)
         capture(app, "UX-10-single-tap-quran-L")
-        for (tab, id) in [("الصلاة", "prayer-today-header"), ("خصّص", "settings-search"), ("المذكرات", "diary-home-title"), ("مدار", "bahw-block-salah")] {
+        for (tab, id) in [("الصلاة", "prayer-today-header"), ("خصّص", "settings-search"), ("المذكرات", "diary-home-title"), ("البهو", "bahw-block-salah")] {
             app.tabBars.buttons[tab].tap()
             XCTAssertTrue(app.descendants(matching: .any).matching(identifier: id).firstMatch.waitForExistence(timeout: 10), tab + app.debugDescription)
         }
