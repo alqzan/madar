@@ -13,6 +13,7 @@ enum SchemaCompatibility {
         switch version {
         case 1: MadarSchemaV1.syncedNames
         case 2: MadarSchemaV2.syncedNames
+        case 3: MadarSchemaV3.syncedNames
         case MadarSchema.version: MadarSchema.syncedNames
         default: throw version > MadarSchema.version ? DataError.newerStore : DataError.unsupportedBackup
         }
@@ -27,7 +28,7 @@ enum SchemaCompatibility {
                 // These are model-name discriminators. sourceModel is provenance and must stay unchanged.
                 for key in ["targetModel","pinnedEventKind","eventKind"] where row.fields[key] == .string("Transaction") { row.fields[key] = .string("MoneyTransaction") }
             }
-            if version < MadarSchema.version, row.model == "PrayerLog" {
+            if version < 3, row.model == "PrayerLog" {
                 row.fields["fridayKind"] = .null
             }
             return row

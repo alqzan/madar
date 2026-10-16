@@ -125,6 +125,7 @@
   "HabitPolicy",
   "HabitPause",
   "HabitLog",
+  "HabitEvent",
   "WidgetConfig"
  ],
  "models": [
@@ -4690,6 +4691,79 @@
    ]
   },
   {
+   "name": "HabitEvent",
+   "room": "habits",
+   "config": "synced",
+   "naturalKey": [
+    "id"
+   ],
+   "deletePolicy": "soft",
+   "invariants": [],
+   "merge": "row LWW by event identity; distinct events sum in HabitEngine",
+   "seed": null,
+   "note": "Append-only custom habit deltas. Undo appends an inverse event; dayKey and periodKey are frozen at write time. Linked owner-room habits write no events. Legacy HabitLog remains a read-only baseline; never rewrite or delete it in migration.",
+   "amendedBy": "RL2; owner approved schema V4 2026-10-15",
+   "relationships": [
+    {
+     "field": "habitID",
+     "to": "Habit",
+     "kind": "one"
+    }
+   ],
+   "eventProvenance": true,
+   "fields": [
+    {
+     "name": "habitID",
+     "type": "UUID?",
+     "optional": true,
+     "fk": "Habit"
+    },
+    {
+     "name": "periodKey",
+     "type": "String",
+     "optional": false,
+     "default": "",
+     "note": "day \"yyyy-MM-dd\"; week = dayKey of the week START per core.weekStart; month \"g:yyyy-MM\" / \"h:yyyy-MM\"; year \"g:yyyy\" / \"h:yyyy\""
+    },
+    {
+     "name": "eventAt",
+     "type": "Date",
+     "optional": false,
+     "default": "Date()",
+     "note": "event instant (dayKey provenance): time of the (last) log"
+    },
+    {
+     "name": "tzID",
+     "type": "String",
+     "optional": false,
+     "default": "",
+     "unit": "IANA time-zone id",
+     "note": "zone used to compute dayKey (active place at the event instant)"
+    },
+    {
+     "name": "dayPolicy",
+     "type": "String",
+     "optional": false,
+     "default": "",
+     "note": "\"<rule>@<version>\" used to compute dayKey, e.g. \"fajr@1\", \"prayerDay@1\", \"legacy@0\""
+    },
+    {
+     "name": "delta",
+     "type": "Int",
+     "optional": false,
+     "default": 0,
+     "unit": "HabitPolicy.unit in force (once: 1)"
+    },
+    {
+     "name": "dayKey",
+     "type": "String",
+     "optional": false,
+     "default": "",
+     "note": "day \"yyyy-MM-dd\"; week = dayKey of the week START per core.weekStart; month \"g:yyyy-MM\" / \"h:yyyy-MM\"; year \"g:yyyy\" / \"h:yyyy\""
+    }
+   ]
+  },
+  {
    "name": "WidgetConfig",
    "room": "habits",
    "config": "synced",
@@ -4975,6 +5049,16 @@
      "name": "memorizedAt",
      "type": "Date?",
      "optional": true
+    },
+    {
+     "name": "stage",
+     "type": "Int",
+     "optional": false,
+     "default": 0,
+     "range": [
+      0,
+      12
+     ]
     },
     {
      "name": "ease",
@@ -5423,8 +5507,19 @@
     "kind": "upsert (habitID, periodKey); delta adds for measure = count",
     "auth": "blindWrite"
    },
-   "diary.addMargin": {"intent": null, "payload": "{text <= 2000, targetDayKey: YYYY-MM-DD}", "kind": "append", "auth": "app-only + diary unlocked"},
-   "diary.freezeDay": {"intent": null, "payload": "{dayKey: YYYY-MM-DD}", "kind": "upsert", "auth": "app-only + diary unlocked", "note": "RD1 closed-day auto-line snapshot; device-local sys.diaryAutoLines.<dayKey>, included by diary exports."},
+   "diary.addMargin": {
+    "intent": null,
+    "payload": "{text <= 2000, targetDayKey: YYYY-MM-DD}",
+    "kind": "append",
+    "auth": "app-only + diary unlocked"
+   },
+   "diary.freezeDay": {
+    "intent": null,
+    "payload": "{dayKey: YYYY-MM-DD}",
+    "kind": "upsert",
+    "auth": "app-only + diary unlocked",
+    "note": "RD1 closed-day auto-line snapshot; device-local sys.diaryAutoLines.<dayKey>, included by diary exports."
+   },
    "diary.appendLine": {
     "intent": "AddDiaryLineIntent",
     "payload": "{text ≤ 2000, day: today|yesterday}",
@@ -5512,61 +5607,71 @@
     "kind": "append Entry and referenced Media from private staged UUID file; sha256; original audio before transcription",
     "auth": "app-only + diary unlocked"
    },
-   "bahw.saveUpcomingDay": {"intent": null, "payload": "{id: UUID, title: String, calendar: hijri|greg, year?: Int, month: Int, day: Int, repeats: none|yearly|monthly, countFromDayKey: yyyy-MM-dd}", "kind": "§7.1 B03: create or edit a user UpcomingDay rule with undo", "auth": "app-only"},
-   "bahw.deleteUpcomingDay": {"intent": null, "payload": "{id: UUID}", "kind": "§7.1 B03: tombstone a user UpcomingDay with undo", "auth": "app-only"},
+   "bahw.saveUpcomingDay": {
+    "intent": null,
+    "payload": "{id: UUID, title: String, calendar: hijri|greg, year?: Int, month: Int, day: Int, repeats: none|yearly|monthly, countFromDayKey: yyyy-MM-dd}",
+    "kind": "§7.1 B03: create or edit a user UpcomingDay rule with undo",
+    "auth": "app-only"
+   },
+   "bahw.deleteUpcomingDay": {
+    "intent": null,
+    "payload": "{id: UUID}",
+    "kind": "§7.1 B03: tombstone a user UpcomingDay with undo",
+    "auth": "app-only"
+   },
    "diary.sealLetter": {
-     "intent": null,
-     "payload": "{id: UUID, text: String, trigger: date|hijriDate|tripStart|tripEnd|projectFinished|ramadanStart, value?: String, targetID?: UUID}",
-     "kind": "N04: create a sealed Letter; bookFinished/khatma not offered in v1; undo tombstones",
-     "auth": "app-only + diary unlocked"
+    "intent": null,
+    "payload": "{id: UUID, text: String, trigger: date|hijriDate|tripStart|tripEnd|projectFinished|ramadanStart, value?: String, targetID?: UUID}",
+    "kind": "N04: create a sealed Letter; bookFinished/khatma not offered in v1; undo tombstones",
+    "auth": "app-only + diary unlocked"
    },
    "diary.refreshLetters": {
-     "intent": null,
-     "payload": "{}",
-     "kind": "N04: sealed → eligible/orphaned only forward; run on diary open and foreground; no undo",
-     "auth": "app-only + diary unlocked"
+    "intent": null,
+    "payload": "{}",
+    "kind": "N04: sealed → eligible/orphaned only forward; run on diary open and foreground; no undo",
+    "auth": "app-only + diary unlocked"
    },
    "diary.openLetter": {
-     "intent": null,
-     "payload": "{id: UUID}",
-     "kind": "N04: eligible/orphaned → opened; openedAt set once; re-reading changes nothing",
-     "auth": "app-only + diary unlocked"
+    "intent": null,
+    "payload": "{id: UUID}",
+    "kind": "N04: eligible/orphaned → opened; openedAt set once; re-reading changes nothing",
+    "auth": "app-only + diary unlocked"
    },
    "diary.rescheduleLetter": {
-     "intent": null,
-     "payload": "{id: UUID, dayKey: String}",
-     "kind": "N04: orphaned → sealed on a date trigger; undo restores",
-     "auth": "app-only + diary unlocked"
+    "intent": null,
+    "payload": "{id: UUID, dayKey: String}",
+    "kind": "N04: orphaned → sealed on a date trigger; undo restores",
+    "auth": "app-only + diary unlocked"
    },
    "diary.saveProject": {
-     "intent": null,
-     "payload": "{id: UUID, name: String, intention: String, keyword?: String}",
-     "kind": "N04: create or edit a Project with undo",
-     "auth": "app-only + diary unlocked"
+    "intent": null,
+    "payload": "{id: UUID, name: String, intention: String, keyword?: String}",
+    "kind": "N04: create or edit a Project with undo",
+    "auth": "app-only + diary unlocked"
    },
    "diary.finishProject": {
-     "intent": null,
-     "payload": "{id: UUID, reflection?: String}",
-     "kind": "N04: set finishedAt once; finished projects show under «الفصول»",
-     "auth": "app-only + diary unlocked"
+    "intent": null,
+    "payload": "{id: UUID, reflection?: String}",
+    "kind": "N04: set finishedAt once; finished projects show under «الفصول»",
+    "auth": "app-only + diary unlocked"
    },
    "diary.deleteProject": {
-     "intent": null,
-     "payload": "{id: UUID}",
-     "kind": "N04: tombstone the Project; entries keep text and projectID; undo restores the links",
-     "auth": "app-only + diary unlocked"
+    "intent": null,
+    "payload": "{id: UUID}",
+    "kind": "N04: tombstone the Project; entries keep text and projectID; undo restores the links",
+    "auth": "app-only + diary unlocked"
    },
    "diary.linkEntry": {
-     "intent": null,
-     "payload": "{entryID: UUID, projectID: UUID|null}",
-     "kind": "N04: set Entry.projectID by one tap from the suggestion; undo restores",
-     "auth": "app-only + diary unlocked"
+    "intent": null,
+    "payload": "{entryID: UUID, projectID: UUID|null}",
+    "kind": "N04: set Entry.projectID by one tap from the suggestion; undo restores",
+    "auth": "app-only + diary unlocked"
    },
    "diary.editEntry": {
-     "intent": null,
-     "payload": "{entryID: UUID, revisionID: UUID, text: String}",
-     "kind": "RD1: before the freeze edit the line in place with undo; after it insert a revision Entry (source revision, sourceID = replaced id) and never change the original",
-     "auth": "app-only + diary unlocked"
+    "intent": null,
+    "payload": "{entryID: UUID, revisionID: UUID, text: String}",
+    "kind": "RD1: before the freeze edit the line in place with undo; after it insert a revision Entry (source revision, sourceID = replaced id) and never change the original",
+    "auth": "app-only + diary unlocked"
    },
    "diary.setTranscript": {
     "intent": null,

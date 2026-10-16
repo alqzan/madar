@@ -12,7 +12,7 @@ def default(f):
  if d in ['UUID()','Date()','Data()']:return d
  if d is None: return '[]' if t.startswith('[') else {'String':'""','Bool':'false','Double':'0','Int':'0','Data':'Data()','Date':'Date()','UUID':'UUID()'}.get(t,'nil')
  return json.dumps(d,ensure_ascii=False)
-code=['import Foundation','import SwiftData','// Generated from Specification/data-dictionary.json v3. UUID foreign keys intentionally avoid ownership relationships.','@MainActor public protocol MadarRecordModel: PersistentModel { var id: UUID { get set }; func record() throws -> DataRecord; func apply(_ record: DataRecord) throws }']
+code=['import Foundation','import SwiftData','// Generated from Specification/data-dictionary.json (schema V4). UUID foreign keys intentionally avoid ownership relationships.','@MainActor public protocol MadarRecordModel: PersistentModel { var id: UUID { get set }; func record() throws -> DataRecord; func apply(_ record: DataRecord) throws }']
 for m in p['models']:
  fs=p['commonFields']+m['fields'];name=m['name']
  code += ['@Model public final class '+name+' {']
@@ -21,10 +21,10 @@ for m in p['models']:
  code += ['    public init() {}','}',f'extension {name}: MadarRecordModel {{','    public func record() throws -> DataRecord {',f'        try DataRecord(model: "{name}", fields: [']
  code += [f'            "{f["name"]}": JSONValue.encode({f["name"]}),' for f in fs]
  code += ['        ])','    }','    public func apply(_ record: DataRecord) throws {']
- code += [f'        {f["name"]} = try record.decode("{f["name"]}", as: {f["type"]}.self)' for f in fs]
+ code += [(f'        {f["name"]} = try record.fields["{f["name"]}"]?.decode({f["type"]}.self)' if name == 'PrayerLog' and f['name'] == 'fridayKind' else f'        {f["name"]} = try record.decode("{f["name"]}", as: {f["type"]}.self)') for f in fs]
  code += ['    }','}']
 (base/'Sources/MadarData/GeneratedModels.swift').write_text('\n'.join(code)+'\n')
-code=['import Foundation','import SwiftData','public enum MadarSchema: VersionedSchema {', '    public static let versionIdentifier = Schema.Version(3, 0, 0)', '    public static var models: [any PersistentModel.Type] { syncedTypes + deviceTypes }','    public static let version = 3','    public static let syncedTypes: [any PersistentModel.Type] = ['+', '.join(m['name']+'.self' for m in p['models'] if m['config']=='synced')+']','    public static let deviceTypes: [any PersistentModel.Type] = ['+', '.join(m['name']+'.self' for m in p['models'] if m['config']=='deviceOnly')+']','    public static let syncedNames: [String] = '+json.dumps([m['name'] for m in p['models'] if m['config']=='synced']),'    public static var schema: Schema { Schema(versionedSchema: Self.self) }','}','@MainActor public enum RecordBridge {','    public static func all(_ context: ModelContext, syncedOnly: Bool = true) throws -> [DataRecord] {','        var rows: [DataRecord] = []']
+code=['import Foundation','import SwiftData','public enum MadarSchema: VersionedSchema {', '    public static let versionIdentifier = Schema.Version(4, 0, 0)', '    public static var models: [any PersistentModel.Type] { syncedTypes + deviceTypes }','    public static let version = 4','    public static let syncedTypes: [any PersistentModel.Type] = ['+', '.join(m['name']+'.self' for m in p['models'] if m['config']=='synced')+']','    public static let deviceTypes: [any PersistentModel.Type] = ['+', '.join(m['name']+'.self' for m in p['models'] if m['config']=='deviceOnly')+']','    public static let syncedNames: [String] = '+json.dumps([m['name'] for m in p['models'] if m['config']=='synced']),'    public static var schema: Schema { Schema(versionedSchema: Self.self) }','}','@MainActor public enum RecordBridge {','    public static func all(_ context: ModelContext, syncedOnly: Bool = true) throws -> [DataRecord] {','        var rows: [DataRecord] = []']
 for m in p['models']:
  line=f'rows += try context.fetch(FetchDescriptor<{m["name"]}>()).map {{ try $0.record() }}'
  code += [('        '+line) if m['config']=='synced' else '        if !syncedOnly { '+line+' }']

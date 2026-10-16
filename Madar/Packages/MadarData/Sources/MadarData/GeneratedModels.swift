@@ -1,6 +1,6 @@
 import Foundation
 import SwiftData
-// Generated from Specification/data-dictionary.json v3. UUID foreign keys intentionally avoid ownership relationships.
+// Generated from Specification/data-dictionary.json (schema V4). UUID foreign keys intentionally avoid ownership relationships.
 @MainActor public protocol MadarRecordModel: PersistentModel { var id: UUID { get set }; func record() throws -> DataRecord; func apply(_ record: DataRecord) throws }
 @Model public final class Setting {
     public var id: UUID = UUID()
@@ -3222,6 +3222,62 @@ extension HabitLog: MadarRecordModel {
         eventAt = try record.decode("eventAt", as: Date.self)
         tzID = try record.decode("tzID", as: String.self)
         dayPolicy = try record.decode("dayPolicy", as: String.self)
+    }
+}
+@Model public final class HabitEvent {
+    public var id: UUID = UUID()
+    public var createdAt: Date = Date()
+    public var updatedAt: Date = Date()
+    public var deletedAt: Date? = nil
+    public var writerID: String = ""
+    public var mergedInto: UUID? = nil
+    public var deletionBarrierAt: Date? = nil
+    public var restoredAt: Date? = nil
+    public var habitID: UUID? = nil
+    public var periodKey: String = ""
+    public var eventAt: Date = Date()
+    public var tzID: String = ""
+    public var dayPolicy: String = ""
+    public var delta: Int = 0
+    public var dayKey: String = ""
+    public init() {}
+}
+extension HabitEvent: MadarRecordModel {
+    public func record() throws -> DataRecord {
+        try DataRecord(model: "HabitEvent", fields: [
+            "id": JSONValue.encode(id),
+            "createdAt": JSONValue.encode(createdAt),
+            "updatedAt": JSONValue.encode(updatedAt),
+            "deletedAt": JSONValue.encode(deletedAt),
+            "writerID": JSONValue.encode(writerID),
+            "mergedInto": JSONValue.encode(mergedInto),
+            "deletionBarrierAt": JSONValue.encode(deletionBarrierAt),
+            "restoredAt": JSONValue.encode(restoredAt),
+            "habitID": JSONValue.encode(habitID),
+            "periodKey": JSONValue.encode(periodKey),
+            "eventAt": JSONValue.encode(eventAt),
+            "tzID": JSONValue.encode(tzID),
+            "dayPolicy": JSONValue.encode(dayPolicy),
+            "delta": JSONValue.encode(delta),
+            "dayKey": JSONValue.encode(dayKey),
+        ])
+    }
+    public func apply(_ record: DataRecord) throws {
+        id = try record.decode("id", as: UUID.self)
+        createdAt = try record.decode("createdAt", as: Date.self)
+        updatedAt = try record.decode("updatedAt", as: Date.self)
+        deletedAt = try record.decode("deletedAt", as: Date?.self)
+        writerID = try record.decode("writerID", as: String.self)
+        mergedInto = try record.decode("mergedInto", as: UUID?.self)
+        deletionBarrierAt = try record.decode("deletionBarrierAt", as: Date?.self)
+        restoredAt = try record.decode("restoredAt", as: Date?.self)
+        habitID = try record.decode("habitID", as: UUID?.self)
+        periodKey = try record.decode("periodKey", as: String.self)
+        eventAt = try record.decode("eventAt", as: Date.self)
+        tzID = try record.decode("tzID", as: String.self)
+        dayPolicy = try record.decode("dayPolicy", as: String.self)
+        delta = try record.decode("delta", as: Int.self)
+        dayKey = try record.decode("dayKey", as: String.self)
     }
 }
 @Model public final class WidgetConfig {

@@ -25,7 +25,7 @@ public enum MadarContainerFactory {
     }
     private static func preflightVersion(at directory: URL) throws {
         let version = try storeVersion(at:directory)
-        guard version == MadarSchema.version || version == 2 else { throw DataError.legacyStoreRequiresAdoption }
+        guard version == MadarSchema.version || version == 2 || version == 3 else { throw DataError.legacyStoreRequiresAdoption }
     }
     public static func make(at syncedDirectory: URL, deviceStoreURL: URL, cloudKitContainerIdentifier: String? = nil) throws -> ModelContainer {
         try FileManager.default.createDirectory(at:syncedDirectory,withIntermediateDirectories:true)
@@ -41,7 +41,7 @@ public enum MadarContainerFactory {
         // can be paired with the unchanged V1 device entities: their original combined
         // metadata is not a version in that plan. Infer only that device metadata upgrade;
         // LegacyGenerationMigration validates it on an expendable clone before promotion.
-        let migrationPlan: (any SchemaMigrationPlan.Type)? = try storeVersion(at: syncedDirectory) == 2 ? MadarMigrationPlan.self : nil
+        let migrationPlan: (any SchemaMigrationPlan.Type)? = try storeVersion(at: syncedDirectory) < MadarSchema.version ? MadarMigrationPlan.self : nil
         let container = try ModelContainer(for:MadarSchema.schema,migrationPlan:migrationPlan,configurations:[
             ModelConfiguration("synced",schema:Schema(MadarSchema.syncedTypes),url:syncedDirectory.appendingPathComponent("Madar.store"),cloudKitDatabase:.none),
             ModelConfiguration("deviceOnly",schema:Schema(MadarSchema.deviceTypes),url:deviceStoreURL,cloudKitDatabase:.none)

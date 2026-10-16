@@ -125,6 +125,7 @@
     "HabitPolicy",
     "HabitPause",
     "HabitLog",
+    "HabitEvent",
     "WidgetConfig"
   ],
   "models": [
@@ -4686,6 +4687,79 @@
           "optional": false,
           "default": "",
           "note": "\"<rule>@<version>\" used to compute dayKey, e.g. \"fajr@1\", \"prayerDay@1\", \"legacy@0\""
+        }
+      ]
+    },
+    {
+      "name": "HabitEvent",
+      "room": "habits",
+      "config": "synced",
+      "naturalKey": [
+        "id"
+      ],
+      "deletePolicy": "soft",
+      "invariants": [],
+      "merge": "row LWW by event identity; distinct events sum in HabitEngine",
+      "seed": null,
+      "note": "Append-only custom habit deltas. Undo appends an inverse event; dayKey and periodKey are frozen at write time. Linked owner-room habits write no events. Legacy HabitLog remains a read-only baseline; never rewrite or delete it in migration.",
+      "amendedBy": "RL2; owner approved schema V4 2026-10-15",
+      "relationships": [
+        {
+          "field": "habitID",
+          "to": "Habit",
+          "kind": "one"
+        }
+      ],
+      "eventProvenance": true,
+      "fields": [
+        {
+          "name": "habitID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Habit"
+        },
+        {
+          "name": "periodKey",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "note": "day \"yyyy-MM-dd\"; week = dayKey of the week START per core.weekStart; month \"g:yyyy-MM\" / \"h:yyyy-MM\"; year \"g:yyyy\" / \"h:yyyy\""
+        },
+        {
+          "name": "eventAt",
+          "type": "Date",
+          "optional": false,
+          "default": "Date()",
+          "note": "event instant (dayKey provenance): time of the (last) log"
+        },
+        {
+          "name": "tzID",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "unit": "IANA time-zone id",
+          "note": "zone used to compute dayKey (active place at the event instant)"
+        },
+        {
+          "name": "dayPolicy",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "note": "\"<rule>@<version>\" used to compute dayKey, e.g. \"fajr@1\", \"prayerDay@1\", \"legacy@0\""
+        },
+        {
+          "name": "delta",
+          "type": "Int",
+          "optional": false,
+          "default": 0,
+          "unit": "HabitPolicy.unit in force (once: 1)"
+        },
+        {
+          "name": "dayKey",
+          "type": "String",
+          "optional": false,
+          "default": "",
+          "note": "day \"yyyy-MM-dd\"; week = dayKey of the week START per core.weekStart; month \"g:yyyy-MM\" / \"h:yyyy-MM\"; year \"g:yyyy\" / \"h:yyyy\""
         }
       ]
     },

@@ -22,7 +22,7 @@ import SwiftData
             }
             return pointer
         }
-        if version == 2 { return try migrateV2(pointer: pointer, root: root, interruption: interruption) }
+        if version == 2 || version == 3 { return try migrateV2(pointer: pointer, root: root, interruption: interruption) }
         guard version == 1 else { throw DataError.legacyStoreRequiresAdoption }
         guard FileManager.default.fileExists(atPath:originalDirectory.appendingPathComponent("GenerationReady.json").path) else { throw BackupOperationError.invalidManagedStore }
         try SchemaCompatibility.validateDeviceVersion(at: root)

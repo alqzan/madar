@@ -5,6 +5,48 @@ import Testing
 @testable import MadarData
 
 @Suite(.serialized) @MainActor struct SchemaCompatibilityTests {
+    @Test func schemaV3UpgradeRetainsEveryExistingFieldAndAddsOnlyHabitEvents() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("MadarV4-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let oldID = UUID(), generation = root.appendingPathComponent("Generations/\(oldID.uuidString)")
+        try FileManager.default.createDirectory(at: generation, withIntermediateDirectories: true)
+        var before: [DataRecord] = []
+        do {
+            let old = try ModelContainer(for: MadarSchemaV3.schema, configurations: [
+                ModelConfiguration("synced", schema: Schema(MadarSchemaV3.syncedTypes), url: generation.appendingPathComponent("Madar.store"), cloudKitDatabase: .none),
+                ModelConfiguration("deviceOnly", schema: Schema(MadarSchemaV3.deviceTypes), url: root.appendingPathComponent("Device.store"), cloudKitDatabase: .none)])
+            old.mainContext.autosaveEnabled = false
+            let prayer = PrayerLog(); prayer.dayKey = "2026-10-09"; prayer.prayer = "dhuhr"; prayer.fridayKind = "jumuah"
+            let entry = Entry(); entry.dayKey = "2026-10-08"; entry.text = "synthetic untouched diary"
+            let habit = Habit(); habit.name = "synthetic habit"
+            let log = HabitLog(); log.habitID = habit.id; log.periodKey = "2026-10-08"; log.value = 2
+            for row in [prayer as any MadarRecordModel, entry, habit, log] { old.mainContext.insert(row); before.append(try row.record()) }
+            let schedule = PageSchedule(); schedule.page = 2; schedule.stage = 7; old.mainContext.insert(schedule)
+            try old.mainContext.save()
+        }
+        try DurableFiles.encode(3, to: generation.appendingPathComponent("SchemaVersion.json"))
+        try DurableFiles.encode(1, to: root.appendingPathComponent("DeviceSchemaVersion.json"))
+        try DurableFiles.encode(GenerationReady(version: 1, generationID: oldID, recordsHash: RecordFingerprint.hash(before), createdAt: Date()), to: generation.appendingPathComponent("GenerationReady.json"))
+        try DurableFiles.encode(ManagedPointer(version: 1, generationID: oldID, previousGenerationID: nil, accountHash: nil, cloudKitContainerIdentifier: nil), to: root.appendingPathComponent("ActiveGeneration.json"))
+        let sourceHash = try stableGenerationHashes(generation)
+        let upgraded = try ManagedDataStore(root: root)
+        #expect(upgraded.binding.generationID != oldID)
+        #expect(try stableGenerationHashes(generation) == sourceHash)
+        #expect(try RecordFingerprint.hash(RecordBridge.all(upgraded.container.mainContext)) == RecordFingerprint.hash(before))
+        #expect(try upgraded.container.mainContext.fetch(FetchDescriptor<PageSchedule>()).first?.stage == 7)
+        #expect(try upgraded.container.mainContext.fetchCount(FetchDescriptor<HabitEvent>()) == 0)
+        #expect(try SchemaCompatibility.currentRecords(before, from: 3) == before)
+        let first = HabitEvent(); first.habitID = before.first { $0.model == "Habit" }!.id; first.dayKey = "2026-10-09"; first.periodKey = "2026-10-09"; first.delta = 1
+        let second = HabitEvent(); second.habitID = first.habitID; second.dayKey = first.dayKey; second.periodKey = first.periodKey; second.delta = 1
+        upgraded.container.mainContext.insert(first); upgraded.container.mainContext.insert(second); try upgraded.container.mainContext.save()
+        try RecordValidator.validate(RecordBridge.all(upgraded.container.mainContext))
+        try RowMerger(context: upgraded.container.mainContext).run()
+        #expect(try upgraded.container.mainContext.fetch(FetchDescriptor<HabitEvent>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }.reduce(0) { $0 + $1.delta } == 2)
+        let reopened = try ManagedDataStore(root: root)
+        #expect(reopened.binding.generationID == upgraded.binding.generationID)
+        #expect(try reopened.container.mainContext.fetchCount(FetchDescriptor<HabitEvent>()) == 2)
+        #expect(try reopened.container.mainContext.fetch(FetchDescriptor<PrayerLog>()).first?.fridayKind == "jumuah")
+    }
     private struct ReceiptScope: Codable { let version: Int; let generationID: UUID }
     private var resources: URL { Bundle.module.resourceURL!.appendingPathComponent("Resources/LegacyV1") }
     private func fixtureDirectory() throws -> URL {
@@ -29,7 +71,7 @@ import Testing
     @Test func test_M0S1_RA4_originalV1ArchiveMapsOnlyAfterAuthentication() throws {
         let bytes = try Data(contentsOf:resources.appendingPathComponent("source-v1.madarbackup"))
         let backup = try BackupCodec.validate(bytes,passphrase:"legacy fixture password")
-        #expect(MadarSchema.version == 3)
+        #expect(MadarSchema.version == 4)
         #expect(backup.records.contains { $0.model == "MoneyTransaction" })
         #expect(!backup.records.contains { $0.model == "Transaction" })
         let expected = try expectedRows().filter { MadarSchema.syncedNames.contains($0.model) }
@@ -46,13 +88,13 @@ import Testing
         #expect(try RecordFingerprint.hash(RecordBridge.all(target.mainContext)) == RecordFingerprint.hash(expected))
         let newBytes = try BackupCodec.export(records:backup.records,passphrase:"new fixture password")
         let current = try BackupCodec.validate(newBytes,passphrase:"new fixture password")
-        #expect(current.manifest.storeSchemaVersion == 3)
+        #expect(current.manifest.storeSchemaVersion == MadarSchema.version)
         #expect(current.manifest.counts["MoneyTransaction"] == 2 && current.manifest.counts["Transaction"] == nil)
     }
     @Test func test_M0S1_RA4_originalSQLiteIsAdoptedWithoutLosingAnyRow() throws {
         let base = try fixtureDirectory(); defer { try? FileManager.default.removeItem(at:base) }
         let managed = try ManagedDataStore.adoptLegacy(from:base.appendingPathComponent("Flat"),at:base.appendingPathComponent("Managed"))
-        #expect(MadarSchema.version == 3)
+        #expect(MadarSchema.version == 4)
         #expect(try RecordFingerprint.hash(RecordBridge.all(managed.container.mainContext,syncedOnly:false)) == RecordFingerprint.hash(expectedRows()))
         #expect(try managed.container.mainContext.fetchCount(FetchDescriptor<DeviceSetting>()) == 2)
         #expect(try managed.container.mainContext.fetchCount(FetchDescriptor<CommandReceipt>()) == 1)
@@ -67,7 +109,7 @@ import Testing
 
         let migrated = try ManagedDataStore(root: root)
         #expect(migrated.binding.generationID != oldID)
-        #expect(try MadarContainerFactory.storeVersionForAdoption(at: migrated.binding.syncedDirectory) == 3)
+        #expect(try MadarContainerFactory.storeVersionForAdoption(at: migrated.binding.syncedDirectory) == MadarSchema.version)
         #expect(try stableGenerationHashes(generation) == originalFiles)
         let migratedRows = try RecordBridge.all(migrated.container.mainContext)
         let expected = try SchemaCompatibility.currentRecords([oldRow], from: 2)
@@ -99,7 +141,7 @@ import Testing
 
         let recovered = try ManagedDataStore(root: root)
         #expect(recovered.binding.generationID != oldID)
-        #expect(try MadarContainerFactory.storeVersionForAdoption(at: recovered.binding.syncedDirectory) == 3)
+        #expect(try MadarContainerFactory.storeVersionForAdoption(at: recovered.binding.syncedDirectory) == MadarSchema.version)
         #expect(try stableGenerationHashes(generation) == sourceHashes)
         let expected = try SchemaCompatibility.currentRecords([oldRow], from: 2)
         #expect(try RecordFingerprint.hash(RecordBridge.all(recovered.container.mainContext)) == RecordFingerprint.hash(expected))
