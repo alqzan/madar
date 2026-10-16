@@ -30,6 +30,7 @@ struct DiaryCustomizeView: View {
     @State private var query = ""
     @State private var expanded: Set<String> = ["home"]
     @State private var confirmReset = false
+    @State private var transfer: String?
     private var layout: DiaryHomeLayout { .init(app.values["notes.layout"]) }
     private let groups: [(String, String, String, [String])] = [
         ("calendar", "التقويم", "calendar", ["notes.calendarFirst"]),
@@ -78,6 +79,7 @@ struct DiaryCustomizeView: View {
                 if !query.isEmpty && !matches("الرئيسية ترتيب الواجهة النافذة الأصداء الهامش") && !app.schema.settings.contains(where: { keys.contains($0.key) && matches($0.title) }) {
                     Text("لا إعداد بهذا الاسم. جرّب كلمة أقصر.").font(MadarTypography.body()).padding(16)
                 }
+                if matches("النقل استيراد داي ون تصدير كتاب السنة") { transferCard }
                 Text("بداية اليوم والمظهر والتقويم العام من «خصّص مدار». إخفاء الذكرى أو تغيير الشكل لا يغيّر كتابتك.")
                     .font(DiaryType.label).foregroundStyle(theme.color("ink3Text")).padding(.vertical, 12)
             }.padding(16).frame(maxWidth: 620).frame(maxWidth: .infinity)
@@ -86,6 +88,34 @@ struct DiaryCustomizeView: View {
             .confirmationDialog("أعِد إعدادات المذكرات؟", isPresented: $confirmReset, titleVisibility: .visible) {
                 Button("أعِد الافتراضي", role: .destructive) { app.reset(keys) }.accessibilityIdentifier("diary-customize-reset-confirm")
             } message: { Text("يعود الشكل والترتيب والإعدادات. البيانات لا تُمسّ.") }
+            .fullScreenCover(isPresented: Binding(get: { transfer != nil }, set: { if !$0 { transfer = nil } })) {
+                Group {
+                    switch transfer ?? "" {
+                    case "import": DiaryDayOneImportView(app: app)
+                    case "export": DiaryExportView(app: app)
+                    default: DiaryYearbookView(app: app)
+                    }
+                }.environment(\.roomTheme, theme)
+            }
+    }
+    /// notes-app/11-settings-s1 «النقل»: Day One import, export and the yearbook in one card.
+    private var transferCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("النقل").font(MadarTypography.fine()).foregroundStyle(theme.color("ink3Text")).padding(.bottom, 6)
+            ForEach([("import", "استيراد من داي ون", ""), ("export", "تصدير المذكرات", ""), ("yearbook", "كتاب السنة", "سنة كاملة في كتاب للطباعة")], id: \.0) { id, title, subtitle in
+                if id != "import" { Divider().overlay(theme.line) }
+                Button { transfer = id } label: {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(title).font(MadarTypography.body())
+                            if !subtitle.isEmpty { Text(subtitle).font(DiaryType.label).foregroundStyle(theme.color("ink3Text")) }
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.backward").font(.footnote).foregroundStyle(theme.secondaryInk)
+                    }.frame(minHeight: 56).contentShape(.rect)
+                }.buttonStyle(.plain).accessibilityIdentifier("diary-transfer-" + id)
+            }
+        }.padding(16).background(theme.surface, in: .rect(cornerRadius: 24)).overlay { RoundedRectangle(cornerRadius: 24).stroke(theme.line) }
     }
     private var preview: some View {
         HStack(alignment: .top, spacing: 14) {

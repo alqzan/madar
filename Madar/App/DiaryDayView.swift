@@ -190,9 +190,9 @@ struct DiaryDayView: View {
     private func lineRow(_ line: DiaryDisplayLine, page: DiaryDisplayDay) -> some View {
         let auto = ["salah", "quran"].contains(line.kind)
         return HStack(alignment: .firstTextBaseline, spacing: 12) {
-            Text(service.time(line.at)).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(theme.color("ink3Text")).frame(width: 38, alignment: .center)
+            Text(service.time(line.at, zone: line.tzID)).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(theme.color("ink3Text")).frame(width: 38, alignment: .center)
             VStack(alignment: .leading, spacing: 5) {
-                Text(line.text).font(.custom("thmanyahseriftext-Regular", size: auto ? 17 : 19, relativeTo: .body)).lineSpacing(11).italic(auto || line.kind == "margin")
+                Text(line.markdown == true ? ((try? AttributedString(markdown: line.text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(line.text)) : AttributedString(line.text)).font(.custom("thmanyahseriftext-Regular", size: auto ? 17 : 19, relativeTo: .body)).lineSpacing(11).italic(auto || line.kind == "margin")
                     .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
                     .contextMenu {
                         if page.editable.contains(line.id) {Button("عدّل السطر",systemImage:"pencil"){editing = .init(id:line.id,text:line.text)}}

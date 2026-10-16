@@ -197,8 +197,8 @@ struct DiaryHomeView: View {
             HStack { Text("ذاك اليوم").font(.custom("thmanyahsans-Bold", size: 13, relativeTo: .subheadline)); Text("كتبه مدار وكتبته أنت").font(DiaryType.label).foregroundStyle(theme.color("ink3Text")); Spacer() }
             ForEach(Array(day.lines.filter { app.bool("notes.showAutoSections") || !["salah", "quran"].contains($0.kind) }.prefix(3))) { line in
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    Text(service.time(line.at)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text")).frame(width: 48, alignment: .leading)
-                    Text(line.text).font(.custom("thmanyahseriftext-Regular", size: 16, relativeTo: .body)).italic().lineSpacing(5).fixedSize(horizontal: false, vertical: true)
+                    Text(service.time(line.at, zone: line.tzID)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text")).frame(width: 48, alignment: .leading)
+                    Text(line.markdown == true ? DayOneMarkdown.plain(line.text) : line.text).font(.custom("thmanyahseriftext-Regular", size: 16, relativeTo: .body)).italic().lineSpacing(5).fixedSize(horizontal: false, vertical: true)
                         .foregroundStyle(line.kind == "normal" || line.kind == "late" ? theme.ink : theme.color("autoInkText"))
                     Spacer(minLength: 0)
                 }

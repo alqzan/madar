@@ -9,7 +9,11 @@ public struct DiaryAutoLine: Identifiable, Codable, Equatable, Sendable {
     public let at: Date
     public let text: String
     public let kind: String
-    public init(id: String, at: Date, text: String, kind: String) { self.id = id; self.at = at; self.text = text; self.kind = kind }
+    /// Imported Day One lines show their time in the entry's own zone (N01/RD8); nil = the day's place.
+    public var tzID: String? = nil
+    /// Text is Markdown (Day One import) and is rendered formatted.
+    public var markdown: Bool? = nil
+    public init(id: String, at: Date, text: String, kind: String, tzID: String? = nil, markdown: Bool? = nil) { self.id = id; self.at = at; self.text = text; self.kind = kind; self.tzID = tzID; self.markdown = markdown }
 }
 @MainActor public enum DiaryLineRenderer {
     public static func today(context: ModelContext, now: Date) throws -> GregorianDay {

@@ -35,7 +35,7 @@ struct DiaryMarginView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(originals) { line in
                         HStack(alignment: .firstTextBaseline, spacing: 10) {
-                            Text(service.time(line.at)).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(theme.color("ink3Text")).frame(width: 42, alignment: .leading)
+                            Text(service.time(line.at, zone: line.tzID)).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(theme.color("ink3Text")).frame(width: 42, alignment: .leading)
                             Text(line.text).font(DiaryType.writing).lineSpacing(11).italic(line.kind != "normal")
                                 .foregroundStyle(line.kind == "normal" ? theme.ink : theme.color("autoInkText"))
                                 .frame(maxWidth: .infinity, alignment: .leading)

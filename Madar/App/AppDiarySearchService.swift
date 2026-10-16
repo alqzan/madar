@@ -28,7 +28,8 @@ extension AppDiaryService {
             var kinds:Set<String>=[kind]
             if row.attachmentMediaIDs.contains(where:{media[$0]=="photo"}) {kinds.insert("photo")}
             if row.ink == "ghad" {kinds.insert("tomorrow")}
-            documents.append(.init(id:row.id.uuidString,day:day,text:row.text.isEmpty ? (kind == "audio" ? "تسجيل صوتي" : kind == "photo" ? "صورة من يومك" : "مرفق من يومك") : row.text,kind:kind,kinds:kinds,place:place,projectID:row.projectID))
+            let text=row.textFormat == "markdown" ? DayOneMarkdown.plain(row.text) : row.text
+            documents.append(.init(id:row.id.uuidString,day:day,text:text.isEmpty ? (kind == "audio" ? "تسجيل صوتي" : kind == "photo" ? "صورة من يومك" : "مرفق من يومك") : text,kind:kind,kinds:kinds,place:place,projectID:row.projectID))
         }
         for row in try context.fetch(FetchDescriptor<MarginNote>(predicate:#Predicate { $0.deletedAt == nil && $0.mergedInto == nil })) {
             if let day=try? GregorianDay(row.writtenDayKey) { documents.append(.init(id:row.id.uuidString,day:day,text:row.text,kind:"margin")) }

@@ -102,7 +102,11 @@ struct DiaryHomeSnapshot {
         let all = try context.fetch(FetchDescriptor<Entry>(predicate: #Predicate { $0.dayKey == key && $0.deletedAt == nil && $0.mergedInto == nil }, sortBy: [SortDescriptor(\.eventAt)]))
         let chains = Self.revisionChains(all), entries = all.filter { chains.heads.contains($0.id) }
         let page = try context.fetch(FetchDescriptor<DayPage>(predicate: #Predicate { $0.dayKey == key && $0.deletedAt == nil && $0.mergedInto == nil })).max { $0.updatedAt < $1.updatedAt }
-        var lines = entries.map { DiaryDisplayLine(id: $0.id.uuidString, at: $0.eventAt, text: $0.text, kind: $0.ink) }
+        var lines = entries.map { row in
+            let markdown = row.textFormat == "markdown"
+            return DiaryDisplayLine(id: row.id.uuidString, at: row.eventAt, text: markdown ? DayOneMarkdown.readable(row.text) : row.text, kind: row.ink,
+                                    tzID: row.source == "dayOne" && !row.tzID.isEmpty ? row.tzID : nil, markdown: markdown ? true : nil)
+        }
         for niyya in try context.fetch(FetchDescriptor<Niyya>(predicate:#Predicate{$0.dayKey==key && $0.deletedAt==nil && $0.mergedInto==nil})) {lines.append(.init(id:niyya.id.uuidString,at:niyya.createdAt,text:niyya.text,kind:"intention"))}
         let margins = try context.fetch(FetchDescriptor<MarginNote>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
         for margin in margins where margin.targetDayKey == key || margin.writtenDayKey == key {
@@ -120,15 +124,17 @@ struct DiaryHomeSnapshot {
         let mediaLinks = entries.flatMap { entry in (entry.attachmentMediaIDs + (entry.mediaID.map { [$0] } ?? [])).map { (entry.id.uuidString, $0) } }
         var attachments: [DiaryDisplayMedia] = []
         for (entry, id) in mediaLinks {
-            if let row = try context.fetch(FetchDescriptor<Media>(predicate: #Predicate { $0.id == id && $0.deletedAt == nil && $0.mergedInto == nil })).first, let data = row.data {
-                attachments.append(.init(id: row.id, entryID: entry, kind: row.kind, contentType: row.contentType, data: data, duration: row.durationS))
+            if let row = try context.fetch(FetchDescriptor<Media>(predicate: #Predicate { $0.id == id && $0.deletedAt == nil && $0.mergedInto == nil })).first {
+                if let data = row.data { attachments.append(.init(id: row.id, entryID: entry, kind: row.kind, contentType: row.contentType, data: data, duration: row.durationS)) }
+                // N01: an attachment the export did not contain is shown as missing, never invented.
+                else if row.state == "missing" { attachments.append(.init(id: row.id, entryID: entry, kind: "missing", contentType: row.kind, data: Data(), duration: nil)) }
             }
         }
         var photo: Data?
         var photoID: UUID?
         if app.bool("notes.showPhoto") {
             for id in (page?.photoMediaID.map { [$0] } ?? []) + entries.flatMap(\.attachmentMediaIDs) {
-                if let item = try context.fetch(FetchDescriptor<Media>(predicate: #Predicate { $0.id == id && $0.kind == "photo" && $0.deletedAt == nil && $0.mergedInto == nil })).first {
+                if let item = try context.fetch(FetchDescriptor<Media>(predicate: #Predicate { $0.id == id && $0.kind == "photo" && $0.deletedAt == nil && $0.mergedInto == nil })).first, item.data != nil {
                     photo = item.data; photoID = id; break
                 }
             }
@@ -152,9 +158,9 @@ struct DiaryHomeSnapshot {
         let exists = try ModelContext(app.container).fetch(FetchDescriptor<DeviceSetting>(predicate: #Predicate { $0.key == key && $0.deletedAt == nil && $0.mergedInto == nil })).first != nil
         if !exists { try await app.executeDiaryCommand("diary.freezeDay", payload: ["dayKey": .string(day.description)]) }
     }
-    func time(_ at: Date) -> String {
+    func time(_ at: Date, zone: String? = nil) -> String {
         let formatter = DateFormatter(); formatter.locale = Locale(identifier: app.string("core.numerals") == "western" ? "ar_SA@numbers=latn" : "ar_SA@numbers=arab")
-        formatter.timeZone = app.activePlace.timeZone; formatter.dateFormat = "h:mm a"; return formatter.string(from: at)
+        formatter.timeZone = zone.flatMap(TimeZone.init(identifier:)) ?? app.activePlace.timeZone; formatter.dateFormat = "h:mm a"; return formatter.string(from: at)
     }
     func monthTitle(_ day: GregorianDay) -> String {
         let f = DateFormatter(); f.locale = Locale(identifier: app.string("core.numerals") == "western" ? "ar_SA@numbers=latn" : "ar_SA@numbers=arab")
