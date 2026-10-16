@@ -170,6 +170,21 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
                 guard row.reviewState == "needsLook" else { throw MoneyCommandError.alreadyConfirmed }
                 try confirm(row, payload: [:], context: context, now: now, writer: writer)
             }
+        case "money.categorize":
+            let row = try transaction(uuid(p, "id"), context), category = uuid(p, "categoryID")
+            if let category, !(try context.fetch(FetchDescriptor<MadarData.Category>())).contains(where: { $0.id == category && live($0) }) { throw MoneyCommandError.invalidReference }
+            row.categoryID = category; try touch(row, now, writer)
+            if p["remember"] == .bool(true) {
+                guard let merchant = row.merchant ?? row.counterparty, !merchant.isEmpty else { throw MoneyCommandError.invalidReference }
+                try saveRule(merchant: merchant, category: category, ignore: false, context: context, now: now, writer: writer)
+            }
+        case "money.saveMerchantRule":
+            let category = uuid(p, "categoryID")
+            if let category, !(try context.fetch(FetchDescriptor<MadarData.Category>())).contains(where: { $0.id == category && live($0) }) { throw MoneyCommandError.invalidReference }
+            try saveRule(merchant: text(p, "merchant"), category: category, ignore: p["ignore"] == .bool(true), context: context, now: now, writer: writer)
+        case "money.forgetMerchantRule":
+            guard let id = uuid(p, "id"), let rule = try context.fetch(FetchDescriptor<MerchantRule>()).first(where: { $0.id == id && live($0) }) else { throw MoneyCommandError.missingRow }
+            try touch(rule, now, writer, deleting: true)
         case "money.applyStatement":
             try applyStatement(uuid(p, "id"), context: context, now: now, writer: writer)
         case "money.ignoreMessage":
@@ -280,6 +295,10 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             row.reviewState = possibleDuplicate ? "possibleDuplicate" : "needsLook"; row.createdAt = now
             try stampDay(row, at: parsed.eventAt ?? received, context: context, now: now)
             try identify(row, parsed: parsed, sender: message.sender, context: context)
+            // A known merchant brings its category (or its «خارج الميزانية»); the draft still waits for the user.
+            if let rule = try rule(for: row.merchant ?? row.counterparty, in: context) {
+                if rule.ignore { row.ignoredFromBudget = true } else { row.categoryID = rule.categoryID }
+            }
             let accounts = try context.fetch(FetchDescriptor<Account>())
             let referenced = row.fromAccountID ?? row.toAccountID
             if let owner = accounts.first(where: { $0.id == referenced }), owner.ownership == "notMine" {
@@ -289,6 +308,21 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             try flagNearDuplicate(row, message: message, context: context, now: now, writer: writer)
         }
         try pairTransfers(context: context, now: now, writer: writer)
+    }
+
+    /// One rule per merchant: the pattern is the normalized merchant name (DECISIONS, M5-V07).
+    private static func saveRule(merchant: String, category: UUID?, ignore: Bool, context: ModelContext, now: Date, writer: String) throws {
+        let pattern = BankDedupe.normalize(merchant)
+        guard !pattern.isEmpty, category != nil || ignore else { throw MoneyCommandError.invalidReference }
+        let rules = try context.fetch(FetchDescriptor<MerchantRule>()).filter { live($0) && $0.pattern == pattern }
+        let rule = rules.first ?? { let r = MerchantRule(); r.pattern = pattern; r.createdAt = now; context.insert(r); return r }()
+        rule.categoryID = ignore ? nil : category; rule.ignore = ignore; try touch(rule, now, writer)
+        for extra in rules.dropFirst() { try touch(extra, now, writer, deleting: true) }
+    }
+    static func rule(for merchant: String?, in context: ModelContext) throws -> MerchantRule? {
+        guard let merchant, !merchant.isEmpty else { return nil }
+        let pattern = BankDedupe.normalize(merchant)
+        return try context.fetch(FetchDescriptor<MerchantRule>()).filter { live($0) && $0.pattern == pattern }.max { $0.updatedAt < $1.updatedAt }
     }
 
     /// F07: a statement message updates its card once. Natural key (card, close day); the close day is
@@ -608,6 +642,7 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         rows += try context.fetch(FetchDescriptor<EnvelopePlan>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<InstallmentItem>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<Statement>()).map { try $0.record() }
+        rows += try context.fetch(FetchDescriptor<MerchantRule>()).map { try $0.record() }
         return rows
     }
     private static func rebuildEnvelopes(_ context: ModelContext, _ now: Date, _ writer: String) throws {

@@ -7,7 +7,7 @@ import MadarData
 extension AppSession {
     /// Named synthetic stores only. Never reads or writes the owner's store.
     func prepareMoneyFixture(group: URL) throws {
-        guard let variant = ProcessInfo.processInfo.environment["MADAR_UI_MONEY_FIXTURE"], ["showcase", "empty", "hidden", "zero", "shortfall", "messages", "since"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
+        guard let variant = ProcessInfo.processInfo.environment["MADAR_UI_MONEY_FIXTURE"], ["showcase", "empty", "hidden", "zero", "shortfall", "messages", "since", "rules"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         let c = ModelContext(container)
         guard !(try c.fetch(FetchDescriptor<DeviceSetting>())).contains(where: { $0.key == "sys.moneyFixture" }) else { return }
         for key in ["sys.moneyFixture", "sys.onboardingCompleted"] { let marker = DeviceSetting(); marker.key = key; marker.valueJSON = Data("true".utf8); c.insert(marker) }
@@ -53,6 +53,18 @@ extension AppSession {
         for index in 1...3 { let item = InstallmentItem(); item.obligationID = bnpl.id; item.seq = index; item.amountMinor = 40000; item.dueDate = today.adding(days: index * 20).date(in: zone); c.insert(item) }
         try c.save()
         if variant == "messages" { seedMoneyMessages(today: today, zone: zone) }
+        if variant == "rules" {
+            // Merchants the user already filed: rules, their movements, and one merchant filed two ways.
+            func spend(_ merchant: String, _ category: MadarData.Category, _ days: Int, _ amount: Int) {
+                let tx = MoneyTransaction(); tx.merchant = merchant; tx.categoryID = category.id; tx.reviewState = "ok"; tx.source = "bank"; tx.method = "transfer"; tx.fromAccountID = account.id
+                tx.amountMinor = amount; tx.homeAmountMinor = amount; tx.dayKey = today.adding(days: -days).description; tx.eventAt = today.adding(days: -days).date(in: zone).addingTimeInterval(10 * 3600); tx.tzID = zone.identifier; tx.dayPolicy = "midnight@1"; tx.createdAt = tx.eventAt; c.insert(tx)
+            }
+            for (merchant, index, times) in [("مقهى الزاوية", 0, 9), ("مخبز الحي", 0, 6), ("مطعم الريف", 0, 4), ("سوق الحي", 1, 7), ("محطة الشمال", 2, 3)] {
+                let rule = MerchantRule(); rule.pattern = merchant; rule.categoryID = categories[index].id; rule.createdAt = today.adding(days: -40).date(in: zone); rule.updatedAt = rule.createdAt; c.insert(rule)
+                for n in 0..<times { spend(merchant, categories[index], n % 12, 1500 + n * 300) }
+            }
+            for n in 0..<5 { spend("متجر الكتب", categories[n < 3 ? 3 : 1], n, 4000) }
+        }
         if variant == "since" {
             // Away since the evening before the salary: «منذ آخر زيارة» opens first.
             let visit = DeviceSetting(); visit.key = "sys.moneyLastVisit"; visit.valueJSON = Data(("\"" + ISO8601DateFormatter().string(from: start.adding(days: -1).date(in: zone).addingTimeInterval(21 * 3600)) + "\"").utf8); c.insert(visit)

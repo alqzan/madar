@@ -22,6 +22,9 @@ struct MoneyMessageDraft: Identifiable, Equatable {
     /// «الواضح»: confirmable as read, with no choice left to the user (§7.5; DECISIONS 16 Oct).
     var clear: Bool
     var at: Date
+    var categoryID: UUID? = nil
+    var categoryName: String? = nil
+    var canCategorize = false
 }
 
 struct MoneyMessageStatement: Identifiable, Equatable {
@@ -74,6 +77,7 @@ extension AppMoneyService {
         let accounts = try context.fetch(FetchDescriptor<Account>()).filter(live)
         let obligations = try context.fetch(FetchDescriptor<Obligation>()).filter(live)
         let statements = try context.fetch(FetchDescriptor<Statement>()).filter(live)
+        let categories = try context.fetch(FetchDescriptor<MadarData.Category>()).filter(live)
         let home = app.string("core.currency")
         let open = ["needsLook", "possibleDuplicate"]
         let byMessage = Dictionary(rows.compactMap { row in row.messageID.map { ($0, row) } }, uniquingKeysWith: { first, _ in first })
@@ -114,7 +118,8 @@ extension AppMoneyService {
             drafts.append(.init(id: row.id, sender: message?.sender ?? "", title: row.merchant ?? row.counterparty ?? Self.kindLabels[row.kind] ?? "حركة",
                 kindLabel: Self.kindLabels[row.kind] ?? "حركة", payment: cardName(row.cardID) ?? accountName(row.fromAccountID ?? row.toAccountID),
                 amountMinor: row.amountMinor, currency: row.currency, direction: dir, possibleDuplicate: row.reviewState == "possibleDuplicate",
-                note: note, clear: clear, at: row.eventAt))
+                note: note, clear: clear, at: row.eventAt, categoryID: row.categoryID, categoryName: categories.first { $0.id == row.categoryID }?.name,
+                canCategorize: ["expense", "fee", "withdrawal"].contains(row.kind) && !categories.isEmpty))
         }
         drafts.sort { $0.clear == $1.clear ? $0.at > $1.at : !$0.clear }
         var statementCards: [MoneyMessageStatement] = []

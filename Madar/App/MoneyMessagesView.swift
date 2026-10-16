@@ -16,6 +16,8 @@ struct MoneyMessagesView: View {
     @State private var reading: MoneyMessagesReading?
     @State private var failure: String?
     @State private var note: String?
+    @State private var categorizing: MoneyMessageDraft?
+    @State private var rulesOpen = false
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
     private var service: AppMoneyService { .init(app: app) }
     private var visible: Bool { revealed || !app.bool("core.hideMoneyUntilTouch") }
@@ -50,6 +52,8 @@ struct MoneyMessagesView: View {
         }.clipped().background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
             .environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar)
             .task { load() }.onChange(of: app.prayerRevision) { load() }
+            .sheet(item: $categorizing) { MoneyCategorizeSheet(app: app, draft: $0).environment(\.roomTheme, theme) }
+            .navigationDestination(isPresented: $rulesOpen) { MoneyRulesView(app: app) }
             .accessibilityIdentifier("money-messages")
     }
     private var header: some View {
@@ -175,6 +179,12 @@ struct MoneyMessagesView: View {
                 }
                 (Text(d.kindLabel).bold().foregroundStyle(theme.color("accent")) + Text(d.payment.map { (d.kindLabel.last?.isNumber == true || $0.first?.isNumber == true ? "، " : " · ") + $0 } ?? "").foregroundStyle(theme.secondaryInk))
                     .font(MadarTypography.caption())
+                if d.canCategorize {
+                    Button { categorizing = d } label: {
+                        Label(d.categoryName ?? "صنّفها", systemImage: d.categoryName == nil ? "tag" : "arrow.triangle.2.circlepath").font(MadarTypography.fine()).padding(.horizontal, 8).padding(.vertical, 4)
+                            .overlay { Rectangle().stroke(theme.color("reserveText"), style: .init(lineWidth: 1, dash: [3, 2])) }
+                    }.buttonStyle(.plain).frame(minHeight: 32).accessibilityIdentifier("money-draft-category")
+                }
                 if let note = d.note {
                     Text(note).font(MadarTypography.fine()).padding(.horizontal, 8).padding(.vertical, 4)
                         .overlay { Rectangle().stroke(theme.color("reserveText"), style: .init(lineWidth: 1, dash: [3, 2])) }
@@ -234,6 +244,8 @@ struct MoneyMessagesView: View {
                     run("money.pasteBankMessages", ["messages": .array(texts.map { .object(["text": .string($0), "sender": .string("")]) })])
                 }
             }.labelStyle(.titleAndIcon).tint(theme.color("reserveText")).frame(minHeight: 44).accessibilityIdentifier("money-messages-paste")
+            Button { rulesOpen = true } label: { Label("قواعد التاجر", systemImage: "lamp.table").font(MadarTypography.caption()).frame(minHeight: 44) }
+                .buttonStyle(.plain).foregroundStyle(theme.color("reserveText")).accessibilityIdentifier("money-rules-open")
             Text("الصق رسائل البنك إن لم تصل عبر الاختصار؛ تُفصل الرسائل بسطر فارغ.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).multilineTextAlignment(.center)
         }.padding(.top, 8)
     }
