@@ -11,6 +11,10 @@ import XCTest
         app.buttons["diary-search-edit-العام الماضي"].tap();let edit=app.alerts.textFields.firstMatch;XCTAssertTrue(edit.waitForExistence(timeout:5));edit.tap();edit.typeText(String(repeating:XCUIKeyboardKey.delete.rawValue,count:30)+"2024");app.alerts.buttons["تطبيق"].tap()
         XCTAssertTrue(app.buttons["diary-search-remove-2024"].waitForExistence(timeout:5));app.buttons["diary-search-remove-2024"].tap()
         app.buttons["مسح البحث"].tap();field.tap();field.typeText("ما معنى حياتي؟\n");XCTAssertTrue(app.staticTexts["diary-search-empty"].waitForExistence(timeout:5));capture(app,"M3-V08-empty-L")
+        app.buttons["diary-search-restart"].tap()
+        XCTAssertEqual(field.value as? String, "ابحث في مذكراتك: كلمة، أو تاريخ")
+        field.typeText("العام الماضي\n")
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH 'diary-search-result-'")).firstMatch.waitForExistence(timeout:5))
     }
     private func capture(_ app:XCUIApplication,_ name:String){let a=XCTAttachment(screenshot:app.screenshot());a.name=name;a.lifetime = .keepAlways;add(a)}
 }

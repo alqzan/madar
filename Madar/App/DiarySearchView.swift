@@ -29,7 +29,16 @@ struct DiarySearchView: View {
                         }.font(DiaryType.label).padding(.horizontal,12).frame(minHeight:44).background(theme.surface,in:.capsule).overlay{Capsule().stroke(theme.line)} } }}.scrollIndicators(.hidden)
                         if chips.contains(where:{if case .words=$0.rule {true}else{false}}) { Text("بحثت عن الكلمات: "+chips.compactMap{if case .words(let words)=$0.rule {words}else{nil}}.joined(separator:"، ")).font(DiaryType.label).foregroundStyle(theme.color("ink3Text")) }
                         Text("النتائج: "+service.digits.string(results.count)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
-                        if results.isEmpty { Text("لا شيء").font(DiaryType.heading).padding(.vertical,24).accessibilityIdentifier("diary-search-empty") }
+                        if results.isEmpty {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("لا أيام تطابق هذا البحث").font(DiaryType.heading).accessibilityIdentifier("diary-search-empty")
+                                Text("جرّب كلمة أقصر، أو احذف أحد الفلاتر لتوسيع البحث.").font(DiaryType.writing).foregroundStyle(theme.color("ink3Text"))
+                                Button { query = ""; chips = []; focused = true } label: {
+                                    Label("ابدأ بحثًا جديدًا", systemImage: "arrow.counterclockwise").font(DiaryType.label).padding(.horizontal, 16).frame(minHeight: 44)
+                                        .background(theme.surface, in: Capsule()).overlay { Capsule().stroke(theme.line) }
+                                }.buttonStyle(.plain).accessibilityIdentifier("diary-search-restart")
+                            }.padding(.vertical, 24)
+                        }
                         ForEach(results) { row in Button { focused=false;reader=row.day } label: {
                             VStack(alignment:.leading,spacing:8) {Text(row.text).font(DiaryType.writing).lineLimit(4).multilineTextAlignment(.leading);Text(source(row.kind)+"، "+service.bothDates(row.day,calendar:FirstCalendar(rawValue:app.string("core.firstCalendar")) ?? .hijri)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))}.padding(16).frame(maxWidth:.infinity,alignment:.leading).background(theme.surface,in:.rect(cornerRadius:14)).overlay{RoundedRectangle(cornerRadius:14).stroke(theme.line)}
                         }.buttonStyle(.plain).accessibilityIdentifier("diary-search-result-"+row.id) }
