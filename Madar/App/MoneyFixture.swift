@@ -7,7 +7,7 @@ import MadarData
 extension AppSession {
     /// Named synthetic stores only. Never reads or writes the owner's store.
     func prepareMoneyFixture(group: URL) throws {
-        guard let variant = ProcessInfo.processInfo.environment["MADAR_UI_MONEY_FIXTURE"], ["showcase", "empty", "hidden", "zero", "shortfall", "messages"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
+        guard let variant = ProcessInfo.processInfo.environment["MADAR_UI_MONEY_FIXTURE"], ["showcase", "empty", "hidden", "zero", "shortfall", "messages", "since"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         let c = ModelContext(container)
         guard !(try c.fetch(FetchDescriptor<DeviceSetting>())).contains(where: { $0.key == "sys.moneyFixture" }) else { return }
         for key in ["sys.moneyFixture", "sys.onboardingCompleted"] { let marker = DeviceSetting(); marker.key = key; marker.valueJSON = Data("true".utf8); c.insert(marker) }
@@ -53,6 +53,16 @@ extension AppSession {
         for index in 1...3 { let item = InstallmentItem(); item.obligationID = bnpl.id; item.seq = index; item.amountMinor = 40000; item.dueDate = today.adding(days: index * 20).date(in: zone); c.insert(item) }
         try c.save()
         if variant == "messages" { seedMoneyMessages(today: today, zone: zone) }
+        if variant == "since" {
+            // Away since the evening before the salary: «منذ آخر زيارة» opens first.
+            let visit = DeviceSetting(); visit.key = "sys.moneyLastVisit"; visit.valueJSON = Data(("\"" + ISO8601DateFormatter().string(from: start.adding(days: -1).date(in: zone).addingTimeInterval(21 * 3600)) + "\"").utf8); c.insert(visit)
+            let salary = MoneyTransaction(); salary.kind = "salary"; salary.source = "bank"; salary.reviewState = "ok"; salary.toAccountID = account.id; salary.amountMinor = 1_500_000; salary.homeAmountMinor = 1_500_000
+            salary.dayKey = start.description; salary.eventAt = start.date(in: zone).addingTimeInterval(2 * 3600); salary.tzID = zone.identifier; salary.dayPolicy = "midnight@1"; salary.cycleID = cycle.id; c.insert(salary)
+            let old = BankMessage(); old.sender = "بنك الاختبار"; old.channel = "shortcut"; old.kind = "purchase"; old.status = "ok"; old.receivedAt = today.adding(days: -4).date(in: zone).addingTimeInterval(13 * 3600); c.insert(old)
+            let statement = BankMessage(); statement.sender = "بنك الاختبار"; statement.channel = "shortcut"; statement.kind = "statement"; statement.status = "needsLook"; statement.receivedAt = today.adding(days: -3).date(in: zone).addingTimeInterval(9 * 3600)
+            statement.parsedJSON = try JSONSerialization.data(withJSONObject: ["v": 1, "kind": "statement", "last4": "8844", "statementDueMinor": 425_000, "minimumDueMinor": 21_300, "dueDate": today.adding(days: 9).date(in: zone).timeIntervalSinceReferenceDate]); c.insert(statement)
+            try c.save()
+        }
     }
 
     /// Synthetic texts through the real intake (parser, dedupe, duplicate flag), as the Shortcut would send them.

@@ -7,7 +7,7 @@ public enum MoneyCommandPayload {
     public static let intakeName = "money.ingestBankMessage"
     public static let names: Set<String> = [intakeName, "money.pasteBankMessages", "money.logExpense",
         "money.confirmTransaction", "money.deleteTransaction", "money.saveAccount", "money.saveCard", "money.accruePlans", "money.setReserveGoal", "money.repayEnvelopeNow", "money.setEnvelopeSaving", "money.adoptRepayment",
-        "money.applyStatement", "money.ignoreMessage", "money.confirmClear"]
+        "money.applyStatement", "money.ignoreMessage", "money.confirmClear", "money.markVisit"]
     /// §7.5 maxRepayCycles: the longest salary repayment (the envelope sheet offers 1–6).
     public static let maxRepaySalaries = 12
 
@@ -48,7 +48,7 @@ public enum MoneyCommandPayload {
             guard Set(p.keys) == ["ids"], case .array(let rows) = p["ids"], !rows.isEmpty, rows.count <= 100 else { return false }
             let ids = rows.compactMap { if case .string(let raw) = $0 { UUID(uuidString: raw) } else { nil } }
             return ids.count == rows.count && Set(ids).count == ids.count
-        case "money.accruePlans": return p.isEmpty
+        case "money.accruePlans", "money.markVisit": return p.isEmpty
         case "money.setReserveGoal": return Set(p.keys) == ["targetMinor"] && (p["targetMinor"] == .null || positive("targetMinor"))
         case intakeName:
             return Set(p.keys).isSubset(of: ["text", "sender", "receivedAt"]) && text("text", max: 2000)

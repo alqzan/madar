@@ -17,6 +17,8 @@ struct MoneyHomeView: View {
     @State private var basisOpen = false
     @State private var envelopesOpen = false
     @State private var messagesOpen = false
+    @State private var sinceOpen = false
+    @State private var visitChecked = false
     private var service: AppMoneyService { .init(app: app) }
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
     private var amountsVisible: Bool { !app.bool("core.hideMoneyUntilTouch") || revealed }
@@ -45,10 +47,18 @@ struct MoneyHomeView: View {
         .environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar)
         .navigationDestination(isPresented: $envelopesOpen) { MoneyEnvelopesView(app: app, revealed: $revealed) }
         .navigationDestination(isPresented: $messagesOpen) { MoneyMessagesView(app: app, revealed: $revealed) }
+        .navigationDestination(isPresented: $sinceOpen) {
+            if let reading { MoneySinceView(app: app, home: reading, revealed: $revealed) { sinceOpen = false; messagesOpen = true; Task { try? await app.executeMoneyCommand("money.markVisit") } } }
+        }
         .sheet(isPresented: $basisOpen) { MoneyBasisView(app: app, revealed: $revealed) }
         .task {
             do { try await app.executeMoneyCommand("money.accruePlans") } catch { }
             load()
+            // §7.5 «بعد غياب»: «منذ آخر زيارة» opens first; otherwise this visit is the new mark.
+            guard !visitChecked, let reading else { return }
+            visitChecked = true
+            if service.sinceDue(today: reading.cycle?.today ?? GregorianDay.containing(app.prayerNow(), in: app.activePlace.timeZone)) { sinceOpen = true }
+            else { try? await app.executeMoneyCommand("money.markVisit") }
         }.onChange(of: app.prayerRevision) { load() }
         .onChange(of: messagesOpen) { if !messagesOpen { load() } }
         .onChange(of: app.bool("core.hideMoneyUntilTouch")) { revealed = false }

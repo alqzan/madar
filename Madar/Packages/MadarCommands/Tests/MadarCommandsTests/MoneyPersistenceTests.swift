@@ -410,6 +410,16 @@ import MadarInbox
         #expect(try await f.run("system.undo", ["undoToken": .string(ignore.uuidString)]).status == .applied)
         #expect(try message().first { $0.id == unknown.id }?.status == "needsLook")
     }
+    /// «منذ آخر زيارة»: the visit marker is one device row, updated in place, with no undo.
+    @Test func markVisitKeepsOneDeviceRowAtTheCommandTime() async throws {
+        let f = try MoneyFixture(); defer { f.clean() }
+        let first = try await f.run("money.markVisit", [:]); #expect(first.status == .applied); #expect(first.undoToken == nil)
+        #expect(try await f.run("money.markVisit", [:]).status == .applied)
+        let rows = try ModelContext(f.container).fetch(FetchDescriptor<DeviceSetting>()).filter { $0.key == "sys.moneyLastVisit" && $0.deletedAt == nil }
+        #expect(rows.count == 1)
+        #expect(try JSONDecoder().decode(String.self, from: try #require(rows.first).valueJSON) == ISO8601DateFormatter().string(from: f.now))
+        #expect(!MoneyCommandPayload.validate(name: "money.markVisit", payload: ["at": .string("x")]))
+    }
     /// «اعتمد الواضح»: one receipt confirms every listed draft and one undo returns all; one bad id rejects all.
     @Test func confirmClearIsAtomicWithOneUndo() async throws {
         let f = try MoneyFixture(); defer { f.clean() }; try await f.setup()

@@ -20,7 +20,7 @@ struct MoneyHomeLimit: Identifiable {
     var spentMinor: Int
     var limitMinor: Int
 }
-struct MoneyHomeObligation: Identifiable {
+struct MoneyHomeObligation: Identifiable, Equatable {
     var id: UUID
     var name: String
     var amountMinor: Int

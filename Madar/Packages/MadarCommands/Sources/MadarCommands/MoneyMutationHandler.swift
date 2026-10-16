@@ -54,6 +54,13 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
     }
     static func stage(name: String, payload p: [String: MadarCore.JSONValue], id: UUID, issuedAt: Date,
                       source: CommandSource, context: ModelContext, now: Date, writer: String) throws -> MoneyStagedResult {
+        if name == "money.markVisit" {
+            // «منذ آخر زيارة»: a per-device marker, never synced and never undone.
+            let key = "sys.moneyLastVisit", value = Data(("\"" + ISO8601DateFormatter().string(from: now) + "\"").utf8)
+            let row = try context.fetch(FetchDescriptor<DeviceSetting>()).first { $0.key == key && $0.deletedAt == nil } ?? { let r = DeviceSetting(); r.key = key; r.createdAt = now; context.insert(r); return r }()
+            row.valueJSON = value; try touch(row, now, writer)
+            return .init(inverse: nil, duplicate: false)
+        }
         let before = try records(context)
         switch name {
         case "money.accruePlans":
