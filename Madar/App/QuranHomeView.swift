@@ -165,7 +165,8 @@ struct QuranHomeView: View {
                 HStack(alignment: .firstTextBaseline, spacing: 12) {
                     Text(state.coverageTitle).font(serif(34)).fixedSize(horizontal: false, vertical: true).accessibilityIdentifier("quran-coverage-title")
                     Spacer(minLength: 0)
-                    Text(state.percentageLabel + " من القرآن").font(bodyFont(12)).foregroundStyle(theme.secondaryInk)
+                    // Improvement 16 Oct: «أول الطريق» already says nothing is memorized yet; «٪٠» beside it only repeated it as a zero.
+                    if state.coverageFraction > 0 { Text(state.percentageLabel + " من القرآن").font(bodyFont(12)).foregroundStyle(theme.secondaryInk) }
                 }
             }
             GeometryReader { proxy in
