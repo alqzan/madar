@@ -33,6 +33,10 @@ public enum Movement: Equatable, Sendable {
     case refund(RefundTo)
     case cashbackEarned
     case cashbackRedeemed(RefundTo)
+    /// A bank fee or interest: on the account (cash −) or on a credit card (debt +); charged to the budget like spending.
+    case fee(onCard: Bool)
+    /// A reversal behaves as a refund linked to the original; a declined message makes no movement at all.
+    case reversal(RefundTo)
     /// A reconciliation adjustment of `deltaMinor` (observed − expected).
     case adjustment(unrecordedSpend: Bool)
 }
@@ -80,6 +84,10 @@ public enum MovementEngine {
             effect = .init(cashMinor: -a, debtMinor: 0, budgetChargeMinor: notSpend ? 0 : a)
         case .income:
             effect = .init(cashMinor: a, debtMinor: 0, budgetChargeMinor: 0)
+        case .fee(let onCard):
+            effect = onCard ? .init(cashMinor: 0, debtMinor: a, budgetChargeMinor: a) : .init(cashMinor: -a, debtMinor: 0, budgetChargeMinor: a)
+        case .reversal(let to):
+            effect = MovementEngine.effect(.refund(to), amountMinor: a, settings: settings)
         case .refund(.account):
             effect = .init(cashMinor: a, debtMinor: 0, budgetChargeMinor: -a)
         case .refund(.creditCard):

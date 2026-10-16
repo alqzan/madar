@@ -68,12 +68,13 @@ public enum BankMessageParser {
         if has(t, ["سداد بطاقة", "سداد البطاقة", "card payment"]) { return .cardPayment }
         if has(t, ["سداد فاتورة", "سداد", "SADAD", "المفوتر"]) { return .billPayment }
         if has(t, ["استرداد", "refund", "مرتجع"]) { return .refund }
-        if has(t, ["رسوم", "عمولة", "fee"]) { return .fee }
         if has(t, ["راتب", "salary", "payroll"]) { return .salary }
         if has(t, ["سحب صراف", "سحب نقدي", "ATM", "cash withdrawal"]) { return .withdrawal }
         if has(t, ["حوالة صادرة", "تحويل صادر", "تحويل إلى", "outgoing transfer"]) { return .transferOut }
         if has(t, ["حوالة واردة", "تحويل وارد", "incoming transfer"]) { return .transferIn }
         if has(t, ["شراء", "purchase", "Apple Pay", "مدى", "POS"]) { return .purchase }
+        // After the movements: a transfer that mentions its fee is still the transfer.
+        if has(t, ["رسوم", "عمولة", "fee"]) { return .fee }
         if has(t, ["إيداع", "deposit", "credited"]) { return .income }
         if has(t, ["عرض", "خصم حصري", "اشترك", "offer", "promo", "لإلغاء الاشتراك"]) { return .marketing }
         return .unknown
@@ -252,23 +253,50 @@ public enum BankDedupe {
     public enum Placement: Equatable, Sendable {
         case insert(occurrence: Int, possibleDuplicate: Bool)
         case alreadyThere
+        /// F08: a pasted message without its own time matching one within ±3 days → «قد تكون موجودة», never an automatic skip.
+        case mayExist(occurrence: Int)
     }
 
-    /// A pasted file: copies inside the file count 1, 2, …; a (fingerprint, occurrence) already stored is skipped,
-    /// so the same file twice adds nothing, and a message that came by Shortcut is not added again.
-    public static func bulk(_ fingerprints: [String], existing: Set<Key>) -> [Placement] {
+    public struct Incoming: Equatable, Sendable {
+        public var fingerprint: String
+        /// The text carries its own time (the parser found eventAt).
+        public var hasOwnTime: Bool
+        /// That time, or the paste time when the text has none.
+        public var at: Date
+        public init(fingerprint: String, hasOwnTime: Bool, at: Date) { self.fingerprint = fingerprint; self.hasOwnTime = hasOwnTime; self.at = at }
+    }
+
+    public struct Stored: Equatable, Sendable {
+        public var key: Key
+        public var at: Date
+        public init(key: Key, at: Date) { self.key = key; self.at = at }
+    }
+
+    /// A pasted file. RM8 took the time out of the fingerprint, so only a text that carries its own time can be
+    /// skipped as already stored; copies inside the file count 1, 2, … so the same file twice adds nothing.
+    /// A timeless text gets a fresh occurrence and, when the same text is stored within ±3 days, a preview.
+    public static func bulk(_ incoming: [Incoming], existing: [Stored]) -> [Placement] {
         var seen: [String: Int] = [:]
-        return fingerprints.map { fp in
-            seen[fp, default: 0] += 1
-            return existing.contains(Key(fingerprint: fp, occurrence: seen[fp]!)) ? .alreadyThere : .insert(occurrence: seen[fp]!, possibleDuplicate: false)
+        let keys = Set(existing.map(\.key))
+        return incoming.map { item in
+            seen[item.fingerprint, default: 0] += 1
+            let n = seen[item.fingerprint]!
+            if item.hasOwnTime {
+                return keys.contains(Key(fingerprint: item.fingerprint, occurrence: n)) ? .alreadyThere : .insert(occurrence: n, possibleDuplicate: false)
+            }
+            let same = existing.filter { $0.key.fingerprint == item.fingerprint }
+            let occurrence = (same.map(\.key.occurrence).max() ?? 0) + n
+            return same.contains { abs($0.at.timeIntervalSince(item.at)) <= 3 * 86_400 } ? .mayExist(occurrence: occurrence) : .insert(occurrence: occurrence, possibleDuplicate: false)
         }
     }
 
-    /// The live Shortcut: a fingerprint that exists already arrives as the next occurrence, created and counted but
-    /// flagged «عمليتان أم تكرار؟» — nothing is dropped blind.
-    public static func live(_ fingerprint: String, existing: Set<Key>) -> Placement {
-        let last = existing.filter { $0.fingerprint == fingerprint }.map(\.occurrence).max() ?? 0
-        return .insert(occurrence: last + 1, possibleDuplicate: last > 0)
+    /// The live Shortcut: an existing fingerprint arrives as the next occurrence, created and counted; it is flagged
+    /// «عمليتان أم تكرار؟» only when the same text came within the near-duplicate window (RM8), so a daily coffee with
+    /// a timeless text is not questioned every day. Nothing is dropped blind.
+    public static func live(_ fingerprint: String, at: Date, existing: [Stored], window: TimeInterval = 600) -> Placement {
+        let same = existing.filter { $0.key.fingerprint == fingerprint }
+        let last = same.map(\.key.occurrence).max() ?? 0
+        return .insert(occurrence: last + 1, possibleDuplicate: same.contains { abs($0.at.timeIntervalSince(at)) <= window })
     }
 
     public struct Key: Hashable, Sendable {

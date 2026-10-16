@@ -67,22 +67,25 @@ public enum AllocationEngine {
         return parts.map { $0 * sign }
     }
 
-    /// A spend over several sources: Σ allocations = −home amount; by default all of it on «يومك».
-    public static func spend(transactionID: String, homeAmountMinor: Int, over sources: [(AllocationTarget, Int)] = [], cycleID: String? = nil) -> [AllocationRow] {
+    public enum SplitError: Error, Equatable { case partsDoNotAddUp, negativePart }
+
+    /// A spend over several sources: Σ allocations = −home amount exactly; by default all of it on «يومك».
+    /// Parts that do not add up to the amount, or a negative part, are refused rather than silently absorbed.
+    public static func spend(transactionID: String, homeAmountMinor: Int, over sources: [(AllocationTarget, Int)] = [], cycleID: String? = nil) throws -> [AllocationRow] {
         let plan = sources.isEmpty ? [(AllocationTarget.daily, homeAmountMinor)] : sources
-        let assigned = plan.dropLast().reduce(0) { $0 + $1.1 }
-        // The last source takes whatever makes the sum exact.
+        guard plan.allSatisfy({ $0.1 >= 0 }) else { throw SplitError.negativePart }
+        guard plan.reduce(0, { $0 + $1.1 }) == homeAmountMinor else { throw SplitError.partsDoNotAddUp }
         return plan.enumerated().map { i, source in
-            let amount = i == plan.count - 1 ? homeAmountMinor - assigned : source.1
+            let amount = source.1
             return AllocationRow(transactionID: transactionID, target: source.0, amountMinor: -amount, kind: .spend, cycleID: cycleID,
                                  idempotencyKey: AllocationKeys.split(transaction: transactionID, i))
         }
     }
 
     /// A spend split by weights (e.g. thirds), each part to the halala.
-    public static func spend(transactionID: String, homeAmountMinor: Int, weighted sources: [(AllocationTarget, Int)], cycleID: String? = nil) -> [AllocationRow] {
+    public static func spend(transactionID: String, homeAmountMinor: Int, weighted sources: [(AllocationTarget, Int)], cycleID: String? = nil) throws -> [AllocationRow] {
         let parts = distribute(homeAmountMinor, weights: sources.map(\.1))
-        return spend(transactionID: transactionID, homeAmountMinor: homeAmountMinor, over: zip(sources.map(\.0), parts).map { ($0, $1) }, cycleID: cycleID)
+        return try spend(transactionID: transactionID, homeAmountMinor: homeAmountMinor, over: zip(sources.map(\.0), parts).map { ($0, $1) }, cycleID: cycleID)
     }
 
     /// A refund returns to the original's allocations in proportion to its amount (F02).

@@ -39,10 +39,13 @@ public enum FX {
 
     /// A refund linked to its original uses the original rateAtTime, unless its own message states the home amount;
     /// a full refund returns the original home amount exactly.
+    /// Partial refunds that together complete the original return its home amount exactly: the completing one gets
+    /// home − Σ earlier refunds' home amounts, so no halala drifts.
     public static func refundHomeAmount(refundMinor: Int, original: (amountMinor: Int, homeAmountMinor: Int, currency: String, rate: String?),
+                                        priorRefundsMinor: Int = 0, priorRefundsHomeMinor: Int = 0,
                                         statedHomeMinor: Int? = nil, home: String = "SAR", exponents: CurrencyExponents = .specified) throws -> Int {
         if let statedHomeMinor { return statedHomeMinor }
-        if refundMinor == original.amountMinor { return original.homeAmountMinor }
+        if refundMinor + priorRefundsMinor == original.amountMinor { return original.homeAmountMinor - priorRefundsHomeMinor }
         guard let rate = original.rate else { return refundMinor }
         return try homeAmount(amountMinor: refundMinor, currency: original.currency, rate: rate, home: home, exponents: exponents)
     }

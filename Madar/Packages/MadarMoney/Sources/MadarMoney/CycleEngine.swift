@@ -78,15 +78,17 @@ public enum CycleEngine {
         policies.filter { $0.effectiveFromDay <= day }.max { $0.effectiveFromDay < $1.effectiveFromDay }
     }
 
-    /// A plan's wanted share on a day before the allowance cap. A per-cycle plan is spread over the expected length
-    /// from day 1 with its remainder on the last expected day, so the drops sum to the plan exactly (L06).
+    /// A plan's wanted share on a day before the allowance cap. A per-cycle plan is spread over the expected days from
+    /// its start with its remainder on the last expected day, so the drops sum to the plan exactly (L06, RM3 start).
     static func wanted(_ plan: DailyPlan, day: Int, length: Int) -> Int {
         guard day >= plan.startDay else { return 0 }
         switch plan.period {
         case .perDay: return plan.amountMinor
         case .perCycle:
-            guard day <= length else { return 0 }
-            let (each, remainder) = MoneyMath.split(plan.amountMinor, into: length)
+            // Spread over the days from its start to the expected end, so the drops still sum to the plan (L06).
+            let start = max(1, plan.startDay)
+            guard day <= length, start <= length else { return 0 }
+            let (each, remainder) = MoneyMath.split(plan.amountMinor, into: length - start + 1)
             return each + (day == length ? remainder : 0)
         }
     }

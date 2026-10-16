@@ -115,29 +115,46 @@ import Testing
     }
 
     @Test func shortcutThenPasteIsOneRow() {
-        let fp = BankDedupe.fingerprint(sender: "BANK", text: Self.samples[0].text)
-        var stored = Set<BankDedupe.Key>()
-        guard case .insert(let occ, false) = BankDedupe.live(fp, existing: stored) else { Issue.record("live should insert"); return }
-        stored.insert(.init(fingerprint: fp, occurrence: occ))
-        #expect(BankDedupe.bulk([fp], existing: stored) == [.alreadyThere])
+        // A text with its own time: pasted after the Shortcut stored it → nothing new.
+        let fp = BankDedupe.fingerprint(sender: "BANK", text: Self.samples[0].text), t = at(2026, 10, 15, 13, 5)
+        guard case .insert(let occ, false) = BankDedupe.live(fp, at: t, existing: []) else { Issue.record("live should insert"); return }
+        let stored = [BankDedupe.Stored(key: .init(fingerprint: fp, occurrence: occ), at: t)]
+        #expect(BankDedupe.bulk([.init(fingerprint: fp, hasOwnTime: true, at: t)], existing: stored) == [.alreadyThere])
     }
 
     @Test func pastedFileWithTwoIdenticalPurchasesTwiceIsTwoRowsNotFour() {
-        let fp = BankDedupe.fingerprint(sender: "BANK", text: "شراء 15 SAR لدى: كافتيريا")
-        var stored = Set<BankDedupe.Key>()
+        let fp = BankDedupe.fingerprint(sender: "BANK", text: "شراء 15 SAR لدى: كافتيريا 2026-10-15 09:00"), t = at(2026, 10, 15, 9, 0)
+        var stored: [BankDedupe.Stored] = []
         for _ in 0..<2 {
-            for placement in BankDedupe.bulk([fp, fp], existing: stored) {
-                if case .insert(let occ, _) = placement { stored.insert(.init(fingerprint: fp, occurrence: occ)) }
+            for placement in BankDedupe.bulk([.init(fingerprint: fp, hasOwnTime: true, at: t), .init(fingerprint: fp, hasOwnTime: true, at: t)], existing: stored) {
+                if case .insert(let occ, _) = placement { stored.append(.init(key: .init(fingerprint: fp, occurrence: occ), at: t)) }
             }
         }
         #expect(stored.count == 2)
     }
 
-    @Test func twoIdenticalShortcutMessagesAreTwoRowsAndTheSecondIsFlagged() {
+    @Test func timelessPastedMessageIsPreviewedNearbyAndNeverSkipped() {
+        // Review fix: RM8 removed the time from the fingerprint, so a timeless coffee on the 3rd and another on the 20th
+        // share it. The paste must not drop the second; within ±3 days it asks «قد تكون موجودة».
         let fp = BankDedupe.fingerprint(sender: "BANK", text: "شراء 15 SAR لدى: كافتيريا")
-        let first = BankDedupe.live(fp, existing: [])
-        #expect(first == .insert(occurrence: 1, possibleDuplicate: false))
-        #expect(BankDedupe.live(fp, existing: [.init(fingerprint: fp, occurrence: 1)]) == .insert(occurrence: 2, possibleDuplicate: true))
+        let stored = [BankDedupe.Stored(key: .init(fingerprint: fp, occurrence: 1), at: at(2026, 10, 3, 9, 0))]
+        #expect(BankDedupe.bulk([.init(fingerprint: fp, hasOwnTime: false, at: at(2026, 10, 20, 9, 0))], existing: stored) == [.insert(occurrence: 2, possibleDuplicate: false)])
+        #expect(BankDedupe.bulk([.init(fingerprint: fp, hasOwnTime: false, at: at(2026, 10, 4, 18, 0))], existing: stored) == [.mayExist(occurrence: 2)])
+    }
+
+    @Test func twoIdenticalShortcutMessagesAreTwoRowsAndTheSecondIsFlagged() {
+        let fp = BankDedupe.fingerprint(sender: "BANK", text: "شراء 15 SAR لدى: كافتيريا"), t = at(2026, 10, 15, 9, 0)
+        #expect(BankDedupe.live(fp, at: t, existing: []) == .insert(occurrence: 1, possibleDuplicate: false))
+        let first = [BankDedupe.Stored(key: .init(fingerprint: fp, occurrence: 1), at: t)]
+        #expect(BankDedupe.live(fp, at: t.addingTimeInterval(30), existing: first) == .insert(occurrence: 2, possibleDuplicate: true))
+        // The same timeless text the next day is a new purchase, not a question.
+        #expect(BankDedupe.live(fp, at: t.addingTimeInterval(86_400), existing: first) == .insert(occurrence: 2, possibleDuplicate: false))
+    }
+
+    @Test func transferThatMentionsItsFeeIsStillTheTransfer() {
+        let text = "حوالة صادرة\nمن: 5555*\nإلى: سالم\nمبلغ: 300.00 SAR\nالرسوم: 0.50 SAR"
+        #expect(BankMessageParser.classify(text) == .transferOut)
+        #expect(BankMessageParser.parse(text, timeZone: riyadh).amountMinor == 30_000)
     }
 
     @Test func rm8NearDuplicateAsksWithinTenMinutes() {

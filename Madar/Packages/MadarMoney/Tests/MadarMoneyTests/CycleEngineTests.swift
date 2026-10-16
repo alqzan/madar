@@ -111,4 +111,14 @@ import Testing
         #expect(CycleEngine.day(4, input).dailyMinor == 0)
         #expect(CycleEngine.accruedDaily(through: 7, input) == 2 * 40_000)
     }
+
+    @Test func perCyclePlanStartingLaterStillSumsExactly() {
+        // RM3 start: 300000 from day 3 of a 30-day cycle → spread over 28 days: 10714 each, 8 on the last; none on days 1–2.
+        let input = CycleInput(expectedLengthDays: 30, policies: [.init(mode: .fixed(allowanceMinor: 50_000))],
+                               plans: [.init(id: "plan", amountMinor: 300_000, period: .perCycle, startDay: 3)])
+        #expect(CycleEngine.day(2, input).dripsMinor["plan"] == 0)
+        #expect(CycleEngine.day(3, input).dripsMinor["plan"] == 10_714)
+        #expect(CycleEngine.day(30, input).dripsMinor["plan"] == 10_722)
+        #expect(CycleEngine.planFunding("plan", through: 30, input).depositedMinor == 300_000)
+    }
 }
