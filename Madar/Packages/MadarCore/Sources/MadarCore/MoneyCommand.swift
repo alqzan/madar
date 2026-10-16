@@ -8,7 +8,7 @@ public enum MoneyCommandPayload {
     public static let names: Set<String> = [intakeName, "money.pasteBankMessages", "money.logExpense",
         "money.confirmTransaction", "money.deleteTransaction", "money.saveAccount", "money.saveCard", "money.accruePlans", "money.setReserveGoal", "money.repayEnvelopeNow", "money.setEnvelopeSaving", "money.adoptRepayment",
         "money.applyStatement", "money.ignoreMessage", "money.confirmClear", "money.markVisit",
-        "money.categorize", "money.saveMerchantRule", "money.forgetMerchantRule", "money.confirmSalary", "money.saveObligation"]
+        "money.categorize", "money.saveMerchantRule", "money.forgetMerchantRule", "money.confirmSalary", "money.saveObligation", "money.setCategoryLimit"]
     /// §7.5 maxRepayCycles: the longest salary repayment (the envelope sheet offers 1–6).
     public static let maxRepaySalaries = 12
 
@@ -54,6 +54,12 @@ public enum MoneyCommandPayload {
             return Set(p.keys) == ["id", "categoryID", "remember"] && id("id") && optionalID("categoryID") && (p["remember"] == .bool(true) || p["remember"] == .bool(false))
         case "money.saveMerchantRule":
             return Set(p.keys) == ["merchant", "categoryID", "ignore"] && text("merchant") && optionalID("categoryID") && (p["ignore"] == .bool(true) || p["ignore"] == .bool(false))
+        case "money.setCategoryLimit":
+            // §7.5: none | fixed (minor units) | percent (basis points of the cycle's income or its dailies).
+            guard Set(p.keys).isSubset(of: ["categoryID", "mode", "limitMinor", "percentBp", "base"]), id("categoryID") else { return false }
+            if choices("mode", ["none"]) { return p["limitMinor"] == nil && p["percentBp"] == nil && p["base"] == nil }
+            if choices("mode", ["fixed"]) { return p["percentBp"] == nil && p["base"] == nil && (integer(p["limitMinor"]).map { $0 >= 0 } ?? false) }
+            return choices("mode", ["percent"]) && p["limitMinor"] == nil && choices("base", ["income", "allowance"]) && (integer(p["percentBp"]).map { (1...10_000).contains($0) } ?? false)
         case "money.saveObligation":
             // A monthly bill on a day, or a loan / instalment plan of equal monthly instalments from a first due day.
             guard Set(p.keys).isSubset(of: ["kind", "name", "amountMinor", "dueDay", "count", "firstDue"]), text("name", max: 60), positive("amountMinor") else { return false }

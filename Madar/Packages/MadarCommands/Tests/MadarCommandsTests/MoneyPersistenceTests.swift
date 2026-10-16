@@ -527,6 +527,30 @@ import MadarInbox
         #expect(!MoneyCommandPayload.validate(name: "money.saveObligation", payload: ["kind": .string("bill"), "name": .string("x"), "amountMinor": .string("1"), "dueDay": .number(32)]))
         #expect(!MoneyCommandPayload.validate(name: "money.saveObligation", payload: ["kind": .string("loan"), "name": .string("x"), "amountMinor": .string("1"), "count": .number(0), "firstDue": .string("2026-11-05")]))
     }
+    /// M5-V10: one live limit per category; fixed, percent and none round-trip, and undo restores the previous limit.
+    @Test func setCategoryLimitKeepsOneRowAndUndoes() async throws {
+        let f = try MoneyFixture(); defer { f.clean() }
+        let c = ModelContext(f.container), food = MadarData.Category(); food.name = "مطاعم"; c.insert(food); try c.save()
+        #expect(try await f.run("money.setCategoryLimit", ["categoryID": .string(food.id.uuidString), "mode": .string("fixed"), "limitMinor": .string("240000")]).status == .applied)
+        let change = UUID()
+        #expect(try await f.run("money.setCategoryLimit", ["categoryID": .string(food.id.uuidString), "mode": .string("percent"), "percentBp": .number(600), "base": .string("income")], id: change).status == .applied)
+        var limits = try ModelContext(f.container).fetch(FetchDescriptor<CategoryLimit>()).filter { $0.deletedAt == nil }
+        #expect(limits.count == 1); #expect(limits.first?.mode == "percent"); #expect(limits.first?.percentBp == 600); #expect(limits.first?.limitMinor == 0)
+        #expect(try await f.run("system.undo", ["undoToken": .string(change.uuidString)]).status == .applied)
+        limits = try ModelContext(f.container).fetch(FetchDescriptor<CategoryLimit>()).filter { $0.deletedAt == nil }
+        #expect(limits.first?.mode == "fixed"); #expect(limits.first?.limitMinor == 240_000)
+        #expect(!MoneyCommandPayload.validate(name: "money.setCategoryLimit", payload: ["categoryID": .string(food.id.uuidString), "mode": .string("percent"), "percentBp": .number(0), "base": .string("income")]))
+        #expect(try await f.run("money.setCategoryLimit", ["categoryID": .string(UUID().uuidString), "mode": .string("none")]).status == .rejected)
+        // Review: a first limit set, undone, then set again gets a new row; the next command still reads the store.
+        let fuel = MadarData.Category(); fuel.name = "بنزين"; let c2 = ModelContext(f.container); c2.insert(fuel); try c2.save()
+        let first = UUID()
+        #expect(try await f.run("money.setCategoryLimit", ["categoryID": .string(fuel.id.uuidString), "mode": .string("fixed"), "limitMinor": .string("100000")], id: first).status == .applied)
+        #expect(try await f.run("system.undo", ["undoToken": .string(first.uuidString)]).status == .applied)
+        #expect(try await f.run("money.setCategoryLimit", ["categoryID": .string(fuel.id.uuidString), "mode": .string("fixed"), "limitMinor": .string("120000")]).status == .applied)
+        #expect(try await f.run("money.setCategoryLimit", ["categoryID": .string(fuel.id.uuidString), "mode": .string("fixed"), "limitMinor": .string("130000")]).status == .applied)
+        let fuelLimits = try ModelContext(f.container).fetch(FetchDescriptor<CategoryLimit>()).filter { $0.categoryID == fuel.id && $0.deletedAt == nil }
+        #expect(fuelLimits.count == 1); #expect(fuelLimits.first?.limitMinor == 130_000)
+    }
     /// «منذ آخر زيارة»: the visit marker is one device row, updated in place, with no undo.
     @Test func markVisitKeepsOneDeviceRowAtTheCommandTime() async throws {
         let f = try MoneyFixture(); defer { f.clean() }

@@ -19,6 +19,7 @@ struct MoneyHomeView: View {
     @State private var messagesOpen = false
     @State private var sinceOpen = false
     @State private var obligationsOpen = false
+    @State private var categoriesOpen = false
     @State private var visitChecked = false
     private var service: AppMoneyService { .init(app: app) }
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
@@ -49,6 +50,7 @@ struct MoneyHomeView: View {
         .navigationDestination(isPresented: $envelopesOpen) { MoneyEnvelopesView(app: app, revealed: $revealed) }
         .navigationDestination(isPresented: $messagesOpen) { MoneyMessagesView(app: app, revealed: $revealed) }
         .navigationDestination(isPresented: $obligationsOpen) { MoneyObligationsView(app: app) }
+        .navigationDestination(isPresented: $categoriesOpen) { MoneyCategoriesView(app: app) }
         .navigationDestination(isPresented: $sinceOpen) {
             if let reading { MoneySinceView(app: app, home: reading, revealed: $revealed) { sinceOpen = false; messagesOpen = true; Task { try? await app.executeMoneyCommand("money.markVisit") } } }
         }
@@ -188,6 +190,10 @@ struct MoneyHomeView: View {
         }.padding(.top, 12).overlay(alignment: .top) { DoubleRule().stroke(theme.color("reserveText"), lineWidth: 0.8).frame(height: 3) }
     }
     private func limits(_ reading: MoneyHomeReading) -> some View {
+        Button { categoriesOpen = true } label: { limitsList(reading).contentShape(Rectangle()) }
+            .buttonStyle(.plain).accessibilityIdentifier("money-categories-open")
+    }
+    private func limitsList(_ reading: MoneyHomeReading) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("حدود الصرف").font(MadarTypography.cardTitle()).foregroundStyle(theme.color("surplusText"))
             if reading.limits.isEmpty { Text("لا حدود مضافة").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }

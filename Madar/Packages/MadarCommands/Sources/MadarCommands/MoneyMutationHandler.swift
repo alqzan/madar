@@ -161,6 +161,17 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             let row = try transaction(uuid(p, "id"), context)
             guard row.reviewState != "ok" else { throw MoneyCommandError.alreadyConfirmed }
             try confirm(row, payload: p, context: context, now: now, writer: writer)
+        case "money.setCategoryLimit":
+            guard let categoryID = uuid(p, "categoryID"), try context.fetch(FetchDescriptor<MadarData.Category>()).contains(where: { $0.id == categoryID && live($0) }) else { throw MoneyCommandError.invalidReference }
+            // One live limit per category (natural key); extra rows from a merge are tombstoned here.
+            let rows = try context.fetch(FetchDescriptor<CategoryLimit>()).filter { $0.categoryID == categoryID && live($0) }.sorted { $0.updatedAt > $1.updatedAt }
+            for extra in rows.dropFirst() { try touch(extra, now, writer, deleting: true) }
+            let limit = rows.first ?? { let row = CategoryLimit(); row.id = id; row.categoryID = categoryID; row.createdAt = now; context.insert(row); return row }()
+            limit.mode = text(p, "mode")
+            limit.limitMinor = limit.mode == "fixed" ? MoneyCommandPayload.integer(p["limitMinor"]) ?? 0 : 0
+            limit.percentBp = limit.mode == "percent" ? MoneyCommandPayload.integer(p["percentBp"]) : nil
+            limit.base = limit.mode == "percent" ? text(p, "base") : "income"
+            try touch(limit, now, writer)
         case "money.saveObligation":
             let obligation = Obligation(); obligation.id = id; obligation.kind = text(p, "kind"); obligation.name = text(p, "name").trimmingCharacters(in: .whitespacesAndNewlines)
             obligation.amountMinor = MoneyCommandPayload.integer(p["amountMinor"]) ?? 0
@@ -708,6 +719,7 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         rows += try context.fetch(FetchDescriptor<Statement>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<MerchantRule>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<Obligation>()).map { try $0.record() }
+        rows += try context.fetch(FetchDescriptor<CategoryLimit>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<Cycle>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<CyclePolicy>()).map { try $0.record() }
         return rows
