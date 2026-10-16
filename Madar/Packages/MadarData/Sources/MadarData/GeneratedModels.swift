@@ -3240,6 +3240,7 @@ extension HabitLog: MadarRecordModel {
     public var dayPolicy: String = ""
     public var delta: Int = 0
     public var dayKey: String = ""
+    public var unit: String? = nil
     public init() {}
 }
 extension HabitEvent: MadarRecordModel {
@@ -3260,6 +3261,7 @@ extension HabitEvent: MadarRecordModel {
             "dayPolicy": JSONValue.encode(dayPolicy),
             "delta": JSONValue.encode(delta),
             "dayKey": JSONValue.encode(dayKey),
+            "unit": JSONValue.encode(unit),
         ])
     }
     public func apply(_ record: DataRecord) throws {
@@ -3278,6 +3280,7 @@ extension HabitEvent: MadarRecordModel {
         dayPolicy = try record.decode("dayPolicy", as: String.self)
         delta = try record.decode("delta", as: Int.self)
         dayKey = try record.decode("dayKey", as: String.self)
+        unit = try record.decode("unit", as: String?.self)
     }
 }
 @Model public final class WidgetConfig {

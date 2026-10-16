@@ -39,6 +39,12 @@ struct HabitEngineTests {
         let changed = try HabitEngine.evaluate(rules: [old,weekly], facts: [fact("2026-10-01",2)], today: day("2026-10-02"), days: days)
         #expect(changed.current?.start == day("2026-10-02") && changed.streak == 0)
     }
+    @Test func changingToWeeklyOnFridayMakesOneDayFirstWeek() throws {
+        let old=rule("2026-10-01")
+        var weekly=rule("2026-10-02",frequency:.weekly);weekly.measure = .count;weekly.target=7
+        let a=try HabitEngine.evaluate(rules:[old,weekly],facts:[],today:day("2026-10-02"),days:days)
+        #expect(a.current?.end == day("2026-10-03") && a.current?.target == 1)
+    }
     @Test func designatedDaysShortFirstWeekAndExtraBonus() throws {
         var r = rule("2026-10-06", frequency: .weekly); r.measure = .count; r.target = 9; r.weekdays = [2,5]
         let a = try HabitEngine.evaluate(rules: [r], facts: [fact("2026-10-08"),fact("2026-10-09")], today: day("2026-10-09"), days: days)
@@ -69,6 +75,12 @@ struct HabitEngineTests {
         #expect(result.current?.value == 4)
         let undo = try HabitEngine.evaluate(rules: [r], facts: [baseline,a,b,fact("2026-10-01",-1)], today: day("2026-10-01"), days: days)
         #expect(undo.current?.value == 3)
+    }
+    @Test func quantityUnitsNeverMix() throws {
+        var r=rule("2026-10-01");r.measure = .duration;r.unit="minutes";r.target=30
+        let values=[HabitFact(id:UUID(),day:day("2026-10-01"),periodKey:"2026-10-01",delta:6000,unit:"steps"),HabitFact(id:UUID(),day:day("2026-10-01"),periodKey:"2026-10-01",delta:15,unit:"minutes")]
+        let a=try HabitEngine.evaluate(rules:[r],facts:values,today:day("2026-10-01"),days:days)
+        #expect(a.current?.value==15 && a.current?.outcome == .waiting)
     }
     @Test func ownerStreakAndUnitsRemainAuthoritative() throws {
         var r = rule("2026-10-01"); r.measure = .health; r.unit = "exerciseMinutes"; r.target = 30

@@ -7,7 +7,7 @@ import MadarDesign
 extension BahwBlock {
     var detail: String {
         switch self {
-        case .salah: "القادمة والفروض"; case .quran: "في صدرك والمراجعة"; case .notes: "صفحة اليوم وصورتها"
+        case .habits: "عاداتك اليوم وفتراتها"; case .salah: "القادمة والفروض"; case .quran: "في صدرك والمراجعة"; case .notes: "صفحة اليوم وصورتها"
         case .year: "كم مضى وكم بقي"; case .upcoming: "كم بقي على ما يهمّك"; default: ""
         }
     }

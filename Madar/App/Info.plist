@@ -33,6 +33,8 @@
 	<false/>
 	<key>NSFaceIDUsageDescription</key>
 	<string>افتح بيانات مدار المحمية بمصادقة الجهاز.</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>يقرأ مدار الخطوات أو دقائق الحركة التي تختارها لحساب عادة المشي؛ لا يكتب في تطبيق الصحة.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>يعرف مدار أنك خارج مدينتك ليسألك عن السفر. لا يُحفظ موقعك ولا يغادر جهازك.</string>
 	<key>NSMicrophoneUsageDescription</key>

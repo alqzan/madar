@@ -7,12 +7,12 @@ import MadarDesign
 /// habits, money and Mihbara keep their slots in `bahw.layout` but have no entry point until they are built.
 enum BahwBlock: String, CaseIterable {
     case habits, salah, quran, mal, year, upcoming, notes, mihbara
-    static let built: Set<BahwBlock> = [.salah, .quran, .year, .upcoming, .notes]
+    static let built: Set<BahwBlock> = [.habits, .salah, .quran, .year, .upcoming, .notes]
     var title: String {
         switch self { case .habits: "عاداتك"; case .salah: "الصلاة"; case .quran: "القرآن"; case .mal: "المال"; case .year: "السنة"; case .upcoming: "الأيام القادمة"; case .notes: "المذكرات"; case .mihbara: "المحبرة" }
     }
     var symbol: String {
-        switch self { case .salah: "MadarPrayer"; case .quran: "MadarQuran"; case .year: "MadarYear"; case .upcoming: "MadarUpcoming"; case .notes: "MadarDiary"; default: "circle" }
+        switch self { case .habits: "MadarHabits"; case .salah: "MadarPrayer"; case .quran: "MadarQuran"; case .year: "MadarYear"; case .upcoming: "MadarUpcoming"; case .notes: "MadarDiary"; default: "circle" }
     }
     var tab: String? { switch self { case .salah: "prayer"; case .quran: "quran"; case .notes: "notes"; default: nil } }
 }
@@ -101,6 +101,7 @@ struct BahwLobbyView: View {
         .background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
         .environment(\.roomTheme, theme)
         .toolbarVisibility(.hidden, for: .navigationBar)
+        .navigationDestination(isPresented: $session.habitsOpen) { HabitsRoomView(session: session) }
         .navigationDestination(isPresented: $session.yearOpen) { BahwYearView(session: session) }
         .sheet(isPresented: $drawerOpen) { drawer.presentationDetents([.medium]) }
         .onChange(of: arranging) { _, on in wiggle = on && !reduceMotion }
@@ -127,8 +128,9 @@ struct BahwLobbyView: View {
         } else { tileContent(block, size: size) }
     }
     private func tileContent(_ block: BahwBlock, size: BahwBlockSize) -> some View {
-        Button { open(block) } label: {
-            BahwBlockView(service: service, block: block, size: size).contentShape(.rect(cornerRadius: 22))
+        Group {
+            if block == .habits { BahwBlockView(service: service, block: block, size: size, interactive: !arranging).contentShape(.rect(cornerRadius:22)).onTapGesture { open(block) } }
+            else { Button { open(block) } label: { BahwBlockView(service: service, block: block, size: size, interactive: !arranging).contentShape(.rect(cornerRadius:22)) } }
         }.buttonStyle(.plain)
             .rotationEffect(.degrees(wiggle ? 0.7 : 0)).animation(wiggle ? .easeInOut(duration: 0.14).repeatForever(autoreverses: true) : .default, value: wiggle)
             .overlay(alignment: .topLeading) {
@@ -164,7 +166,8 @@ struct BahwLobbyView: View {
     }
     private func open(_ block: BahwBlock) {
         guard !arranging else { return }
-        if block == .notes, (service.diary()?.count ?? 0) == 0 { session.open(URL(string: "madar://notes/write")!) }
+        if block == .habits { session.habitsOpen = true }
+        else if block == .notes, (service.diary()?.count ?? 0) == 0 { session.open(URL(string: "madar://notes/write")!) }
         else if let tab = block.tab { session.selectedTab = tab }
         else if block == .year || block == .upcoming { session.yearOpen = true }
     }

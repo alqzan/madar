@@ -1,5 +1,7 @@
 import SwiftUI
 import MadarCore
+import SwiftData
+import MadarCommands
 import MadarDesign
 
 /// The five built lobby blocks at the four sizes (§7.1 «ما تعرضه كل ودجة»). Room identities: prayer warm paper with
@@ -8,6 +10,7 @@ struct BahwBlockView: View {
     let service: AppBahwService
     let block: BahwBlock
     let size: BahwBlockSize
+    var interactive = true
     @Environment(\.roomTheme) private var lobby
     private var dark: Bool { lobby.dark }
     private var room: RoomTheme {
@@ -29,6 +32,7 @@ struct BahwBlockView: View {
 
     @ViewBuilder private var content: some View {
         switch block {
+        case .habits: habits
         case .salah: salah
         case .quran: quran
         case .notes: notes
@@ -39,6 +43,25 @@ struct BahwBlockView: View {
     }
     private func title(_ color: Color) -> some View {
         Label { Text(block.title) } icon: { MadarGlyph(block.symbol, size: 17) }.font(label).foregroundStyle(color).labelStyle(.titleAndIcon).lineLimit(1)
+    }
+
+    private var habits: some View {
+        let rows = (try? HabitRepository(context: ModelContext(service.session.container)).readings(at:service.now)) ?? []
+        let met = rows.filter { $0.summary.current?.met == true }.count
+        return VStack(alignment:.leading,spacing:10) {
+            Button { service.session.habitsOpen = true } label: { HStack { title(room.accent); Spacer();Text(digits.string(met)+" من "+digits.string(rows.count)).font(label).foregroundStyle(room.accent) }.frame(minHeight:44) }.buttonStyle(.plain).accessibilityIdentifier("bahw-habits-open").disabled(!interactive)
+            if rows.isEmpty { Spacer(minLength:0);Text("عادة صغيرة تدوم").font(size == .icon ? small : big);Text("أضف أول عادة").font(small).foregroundStyle(room.secondaryInk);Spacer(minLength:0) }
+            else if size == .large {
+                HStack { ForEach([HabitFrequency.daily,.weekly,.monthly,.yearly],id:\.self){f in let group=rows.filter{$0.summary.current?.rule.frequency == f};VStack(spacing:4){HabitMiniRing(share:group.isEmpty ? 0 : Double(group.filter{$0.summary.current?.met == true}.count)/Double(group.count),theme:room).frame(width:24,height:24);Text(f.arabic).font(small)}.frame(maxWidth:.infinity)} }
+                LazyVGrid(columns:[GridItem(.flexible()),GridItem(.flexible())],spacing:8){ ForEach(Array(rows.prefix(6))){r in
+                    Button {
+                        if r.source == "walking" {service.session.habitsOpen=true}
+                        else if let source=r.source { service.session.selectedTab=source == "jamaah" ? "prayer" : source == "review" ? "quran" : "notes" }
+                        else { Task { do {try await service.session.executeDiaryCommand("habit.complete",payload:["id":.string(r.id.uuidString),"delta":.number(r.summary.current?.rule.measure == .duration ? 15 : 1)])}catch{service.session.errorMessage=error.localizedDescription} } }
+                    } label:{HStack(spacing:5){Image(systemName:r.paused ? "pause.circle" : r.summary.current?.met == true ? "checkmark.circle.fill" : "circle");Text(r.name).lineLimit(1)}.font(small).frame(maxWidth:.infinity,minHeight:44).background(room.background,in:.rect(cornerRadius:12))}.buttonStyle(.plain).disabled(!interactive || r.paused)
+                } }
+            } else { Spacer(minLength:0);HabitMiniRing(share:Double(met)/Double(max(1,rows.count)),theme:room).frame(width:34,height:34);if let next=rows.first(where:{$0.summary.current?.met != true}){Text(next.name).font(small)};Spacer(minLength:0) }
+        }
     }
 
     // MARK: prayer

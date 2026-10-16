@@ -20,6 +20,7 @@ final class AppSession {
     var quranRoute: Route?
     /// M4-V03: «السنة وما يهمّك» pushed from the lobby (`madar://bahw/year`).
     var yearOpen = false
+    var habitsOpen = false
     private(set) var container: ModelContainer
     let managedStore: ManagedDataStore?
     let snapshotStore: SnapshotStore
@@ -73,7 +74,7 @@ final class AppSession {
     })
     private var expiryTask: Task<Void, Never>?
 
-    static let supportedKeys = ["core.dayStart", "core.firstCalendar", "core.hijriSource", "core.hijriOffset", "core.weekStart", "core.theme", "core.numerals", "core.homeCity", "core.faceIDLock", "salah.askAfterAdhanMin", "salah.askReminder", "salah.liveActivity", "salah.showMosqueStreak", "salah.askHeart", "salah.method", "salah.asr", "salah.highLatitudeRule", "salah.offsets", "notif.thisDeviceReminders", "notif.quietAfterIsha", "notif.quietFrom", "bahw.yearWhich", "bahw.upcomingCount"]
+    static let supportedKeys = ["core.dayStart", "core.firstCalendar", "core.hijriSource", "core.hijriOffset", "core.weekStart", "core.theme", "core.numerals", "core.homeCity", "core.faceIDLock", "salah.askAfterAdhanMin", "salah.askReminder", "salah.liveActivity", "salah.showMosqueStreak", "salah.askHeart", "salah.method", "salah.asr", "salah.highLatitudeRule", "salah.offsets", "notif.thisDeviceReminders", "notif.quietAfterIsha", "notif.quietFrom", "bahw.yearWhich", "bahw.upcomingCount", "bahw.streakBreakAfter", "bahw.travelFreezesHome"]
 
     init(container: ModelContainer, managedStore: ManagedDataStore? = nil, groupDirectory: URL? = nil) throws {
         self.container = container
@@ -95,6 +96,7 @@ final class AppSession {
         try preparePrayerStreakShowcaseFixture()
         try prepareQuranHomeFixture(group: group)
         try prepareDiaryHomeFixture(group: group)
+        try prepareHabitFixture(group: group)
         #endif
         try reload()
         let devices = try container.mainContext.fetch(FetchDescriptor<DeviceSetting>())
@@ -361,7 +363,7 @@ final class AppSession {
     func number(_ key: String) -> Double { if case .number(let v) = values[key] { v } else { 0 } }
     func open(_ url: URL) {
         let today = GregorianDay.containing(.now, in: activePlace.timeZone)
-        let context = RouteContext(trackingStart: today.adding(days: -36500), today: today, settingsKeys: Set(Self.supportedKeys), availability: .init(builtRooms: [.core, .salah, .quran, .notes, .bahw, .year]))
+        let context = RouteContext(trackingStart: today.adding(days: -36500), today: today, settingsKeys: Set(Self.supportedKeys), availability: .init(builtRooms: [.core, .salah, .quran, .notes, .bahw, .year, .habits]))
         do {
             let route = try RouteRegistry.parse(url, context: context)
             if route.room == .quran, route.path.isEmpty || route.path.first == "session" || route.path.first == "page" {
@@ -370,6 +372,7 @@ final class AppSession {
             if route.room == .notes, route.path.isEmpty || ["today", "day", "write"].contains(route.path.first ?? "") {
                 diaryRoute = route; selectedTab = "notes"; return
             }
+            if route.room == .habits { selectedTab = "foundation"; habitsOpen = true; return }
             if route.room == .year, route.path == ["year"] { selectedTab = "foundation"; yearOpen = true; return }
             guard url.host == "settings", route.room == .core else { throw CoreError.unavailableFeature }
             settingsQuery = try schema.definition(for: route.path[1]).title
@@ -558,7 +561,7 @@ final class AppSession {
         guard result.status == .applied || result.status == .duplicate else { throw DataError.invalidValue(result.reason ?? "diary command") }
         try reload(); try publishSnapshot()
         if let id = result.undoToken {
-            showUndo(AppUndoToken(id: id, expiresAt: now.addingTimeInterval(600)), message: name == "bahw.saveUpcomingDay" ? "حُفظ اليوم · التراجع متاح لعشر دقائق" : name == "bahw.deleteUpcomingDay" ? "حُذف اليوم · التراجع متاح لعشر دقائق" : name.contains("Intention") ? "حُفظت النيّة · التراجع متاح لعشر دقائق" : "حُفظ السطر · التراجع متاح لعشر دقائق")
+            showUndo(AppUndoToken(id: id, expiresAt: now.addingTimeInterval(600)), message: name.hasPrefix("habit.") ? "حُفظت العادة · التراجع متاح لعشر دقائق" : name == "bahw.saveUpcomingDay" ? "حُفظ اليوم · التراجع متاح لعشر دقائق" : name == "bahw.deleteUpcomingDay" ? "حُذف اليوم · التراجع متاح لعشر دقائق" : name.contains("Intention") ? "حُفظت النيّة · التراجع متاح لعشر دقائق" : "حُفظ السطر · التراجع متاح لعشر دقائق")
         }
     }
 

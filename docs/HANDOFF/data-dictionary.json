@@ -66,9 +66,9 @@
   }
  ],
  "modelCount": {
-  "synced": 55,
+  "synced": 56,
   "deviceOnly": 6,
-  "total": 61
+  "total": 62
  },
  "reconcileOrder": [
   "Setting",
@@ -4760,6 +4760,12 @@
      "optional": false,
      "default": "",
      "note": "day \"yyyy-MM-dd\"; week = dayKey of the week START per core.weekStart; month \"g:yyyy-MM\" / \"h:yyyy-MM\"; year \"g:yyyy\" / \"h:yyyy\""
+    },
+    {
+     "name": "unit",
+     "type": "String?",
+     "optional": true,
+     "note": "Frozen quantity unit at the event; never add minutes to pages when policies change."
     }
    ]
   },
@@ -5503,9 +5509,9 @@
    },
    "habit.complete": {
     "intent": "CompleteHabitIntent",
-    "payload": "{habitID, periodKey?, delta: Int = 1}",
-    "kind": "upsert (habitID, periodKey); delta adds for measure = count",
-    "auth": "blindWrite"
+    "payload": "{habitID, periodKey?, delta: Int = 1}; id accepted by the app",
+    "kind": "append immutable HabitEvent; period is resolved at transaction time; explicit stale period rejected; undo appends inverse delta",
+    "auth": "app-only until M4 widgets/intents land"
    },
    "diary.addMargin": {
     "intent": null,
@@ -5690,6 +5696,42 @@
     "payload": "{id: UUID, result: done|partial|notEasy|null}",
     "kind": "explicit outcome only; preserve Niyya dayKey and text; conditional undo",
     "auth": "app-only + diary unlocked"
+   },
+   "habit.save": {
+    "intent": null,
+    "payload": "{id, name, source?, rule: HabitRule, homeOnly?, reminder?}",
+    "kind": "identity + dated policy version, undo",
+    "auth": "app-only"
+   },
+   "habit.pause": {
+    "intent": null,
+    "payload": "{id, from, until?, trip?}",
+    "kind": "persist [from, until), yesterday at most, undo",
+    "auth": "app-only"
+   },
+   "habit.resume": {
+    "intent": null,
+    "payload": "{id}",
+    "kind": "close pause without removing history, undo",
+    "auth": "app-only"
+   },
+   "habit.archive": {
+    "intent": null,
+    "payload": "{id, archived}",
+    "kind": "archivedAt only, restorable, undo",
+    "auth": "app-only"
+   },
+   "habit.refreshHealth": {
+    "intent": null,
+    "payload": "{id, unit, values: {dayKey: Int}}",
+    "kind": "read-only HealthKit closed-day totals; previous 7 days only; no health writes",
+    "auth": "app-only"
+   },
+   "habit.deleteArchived": {
+    "intent": null,
+    "payload": "{id}",
+    "kind": "tombstones an already archived habit and its policies, pauses, logs and events; inverse restores with a restoration barrier; owner-room records untouched",
+    "auth": "app-only"
    }
   },
   "undoPolicy": {

@@ -65,8 +65,8 @@ struct CustomizeMadar: View {
             return query.isEmpty || normalized(definition.title + " " + sectionFor(definition.key) + " " + definition.key).contains(normalized(query))
         }
     }
-    private var sections: [String] { ["السنة", "الأيام القادمة", "اليوم والتقويم", "المظهر", "مدينتك", "الخصوصية", "الإشعارات", "الصلاة", "المواقيت"].filter { section in filtered.contains { sectionFor($0.key) == section } } }
-    private let symbols = ["السنة": "MadarYear", "الأيام القادمة": "MadarUpcoming", "اليوم والتقويم": "moon", "الصلاة": "MadarPrayer", "المواقيت": "clock.arrow.circlepath", "الخصوصية": "lock", "المظهر": "paintpalette", "مدينتك": "location", "الإشعارات": "bell.badge"]
+    private var sections: [String] { ["العادات", "السنة", "الأيام القادمة", "اليوم والتقويم", "المظهر", "مدينتك", "الخصوصية", "الإشعارات", "الصلاة", "المواقيت"].filter { section in filtered.contains { sectionFor($0.key) == section } } }
+    private let symbols = ["العادات": "MadarHabits","السنة": "MadarYear", "الأيام القادمة": "MadarUpcoming", "اليوم والتقويم": "moon", "الصلاة": "MadarPrayer", "المواقيت": "clock.arrow.circlepath", "الخصوصية": "lock", "المظهر": "paintpalette", "مدينتك": "location", "الإشعارات": "bell.badge"]
     private var changesLabel: String {
         let count = session.schema.settings.filter { (AppSession.supportedKeys + ["bahw.layout"]).contains($0.key) && session.values[$0.key] != $0.defaultValue }.count
         return CustomizationCopy.changes(count: count, formattedCount: session.digits(count))
@@ -87,6 +87,7 @@ struct CustomizeMadar: View {
 }
 
 func sectionFor(_ key: String) -> String {
+    if ["bahw.reminder", "bahw.streakBreakAfter", "bahw.travelFreezesHome"].contains(key) { return "العادات" }
     if key == "bahw.yearWhich" { return "السنة" }
     if key == "bahw.upcomingCount" { return "الأيام القادمة" }
     if ["core.dayStart", "core.firstCalendar", "core.hijriSource", "core.hijriOffset", "core.weekStart"].contains(key) { return "اليوم والتقويم" }

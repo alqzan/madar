@@ -16,6 +16,7 @@ private struct SettingsInverse: Codable {
     var quranMutation: Data? = nil
     var prayerMutation: Data? = nil
     var diaryMutation: Data? = nil
+    var habitMutation: Data? = nil
 }
 private struct ReceiptNamespace: Codable {
     let version: Int
@@ -174,6 +175,10 @@ private struct ReceiptWire: Codable {
                 try DiaryLineRenderer.freezeBeforeSourceChange(context: context, now: now, writer: writer)
             }
             switch request.operation {
+            case .habit(let operation):
+                if let undo = try HabitMutationHandler.stage(operation, id: request.envelope.commandID, context: context, now: now, writer: writer) {
+                    inverse = SettingsInverse(settings: [:], afterSettings: [:], layouts: [:], afterLayouts: [:], habitMutation: undo)
+                }
             case .diaryEditor(let operation):
                 if let undo = try DiaryEditorMutationHandler.stage(operation, id: request.envelope.commandID, root: diaryStagingDirectory, context: context, now: now, writer: writer) {
                     inverse = SettingsInverse(settings: [:], afterSettings: [:], layouts: [:], afterLayouts: [:], diaryMutation: undo)
@@ -274,6 +279,7 @@ private struct ReceiptWire: Codable {
                 }
             case .replaceSettings(let values):
                 let typed = try convert(values)
+                try HabitWeekHistory.record(typed, store: store, context: context, now: now, writer: writer)
                 inverse = SettingsInverse(settings: try store.stage(typed, now: now), afterSettings: typed, layouts: [:], afterLayouts: [:])
             case .applyPreset(let values, let layouts):
                 let typed = try convert(values)
@@ -306,7 +312,9 @@ private struct ReceiptWire: Codable {
                     return .init(status: .rejected, reason: "undoExpired")
                 }
                 let state = try JSONDecoder().decode(SettingsInverse.self, from: data)
-                if let mutation = state.quranMutation {
+                if let mutation = state.habitMutation {
+                    try HabitMutationHandler.undo(mutation, context: context, now: now, writer: writer)
+                } else if let mutation = state.quranMutation {
                     try QuranMutationHandler.undo(mutation, in: context, catalog: QuranResources.catalog(), now: now, writer: writer)
                 } else if let mutation = state.diaryMutation {
                     try DiaryMutationHandler.undo(mutation, context: context, now: now, writer: writer)
@@ -329,6 +337,7 @@ private struct ReceiptWire: Codable {
                     let current = try store.value(for: room + ".layout").canonicalData()
                     guard current == after else { throw DataError.invalidValue("undo superseded: \(room).layout") }
                 }
+                try HabitWeekHistory.record(state.settings, store: store, context: context, now: now, writer: writer)
                 _ = try store.stage(state.settings, now: now)
                 for (room, old) in state.layouts {
                     let rows = try context.fetch(FetchDescriptor<LayoutState>()).filter { $0.room == room && $0.deletedAt == nil && $0.mergedInto == nil }
