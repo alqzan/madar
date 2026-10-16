@@ -1,6 +1,7 @@
 @preconcurrency import ActivityKit
 import Foundation
 import MadarCore
+import MadarCommands
 import MadarData
 import MadarPrayer
 import MadarInbox
@@ -113,7 +114,10 @@ final class PrayerNotificationCoordinator {
         }
 
         let globalEnabled = session.bool("notif.thisDeviceReminders") && Self.canSchedule(currentAuthorization)
-        if globalEnabled { candidates += try AppQuranService(session: session, clock: { now }).notificationCandidates(prayerDays: days, now: now) }
+        if globalEnabled {
+            candidates += try AppQuranService(session: session, clock: { now }).notificationCandidates(prayerDays: days, now: now)
+            candidates += try RoomNotificationContent.candidates(session: session, prayerDays: days, now: now)
+        }
         let externalPendingCount = existing.filter { !Self.manages($0.identifier) }.count
         let ledger = try ModelContext(session.container).fetch(FetchDescriptor<NotificationLedger>()).filter { $0.deletedAt == nil && ["submitted", "observed"].contains($0.state) && $0.requestClass != "prayer" }
         let consumed = ledger.filter { $0.scheduledFor <= now || $0.kind == "activityStart" }
@@ -130,14 +134,14 @@ final class PrayerNotificationCoordinator {
             now: now,
             timeZone: repository.place(at: now).timeZone,
             policy: .init(dailyBudget: Int(session.number("notif.dailyBudget")), priority: priority, quietFromMinutes: quietMinutes,
-                digestEnabled: session.bool("notif.digestOverflow"), thisDeviceRemindersEnabled: globalEnabled, staleNudgeEnabled: false,
+                digestEnabled: session.bool("notif.digestOverflow"), thisDeviceRemindersEnabled: globalEnabled, staleNudgeEnabled: session.bool("notif.staleNudge"),
                 dayBoundary: DayBoundary(rawValue: session.string("core.dayStart")) ?? .fajr),
             existingPendingCount: externalPendingCount, disabledIDs: Set(consumed.map(\.requestID)), submittedBudgetByDay: counts
         )
         try await reconcile(plan: plan, candidates: candidates,
                             current: existing.filter { $0.identifier.hasPrefix(Self.requestPrefix) },
                             prayerDays: days)
-        try await reconcileQuran(plan: plan, candidates: candidates, current: existing.filter { $0.identifier.hasPrefix("quran.") || $0.identifier.hasPrefix("digest.") }, timeZone: repository.place(at: now).timeZone, consumed: Set(consumed.map(\.requestID)), now: now)
+        try await reconcileRooms(plan: plan, candidates: candidates, current: existing.filter { RoomNotificationContent.isRoomRequest($0.identifier) }, timeZone: repository.place(at: now).timeZone, consumed: Set(consumed.map(\.requestID)), now: now)
         try await reconcilePrayerActivity(prayerDays: days, now: now, session: session)
     }
 
@@ -178,7 +182,9 @@ final class PrayerNotificationCoordinator {
                     session.recordPrayer(reference, status: alone ? .alone : .jamaah, fridayKind: friday ? .dhuhr : nil)
                 }
             } else if response.actionIdentifier == UNNotificationDefaultActionIdentifier {
-                session.selectedTab = response.notification.request.identifier.hasPrefix("quran.") || response.notification.request.identifier.hasPrefix("digest.") ? "quran" : "prayer"
+                let request = response.notification.request
+                if RoomNotificationContent.isRoomRequest(request.identifier) { RoomNotificationContent.open(request.identifier, userInfo: request.content.userInfo, session: session) }
+                else { session.selectedTab = "prayer" }
             }
         } catch { session.errorMessage = "تعذّر تنفيذ تذكير الصلاة. \(error.localizedDescription)" }
     }
@@ -192,13 +198,11 @@ final class PrayerNotificationCoordinator {
         do {
             try session.reload()
             let userInfo = notification.request.content.userInfo
-            if notification.request.identifier.hasPrefix("quran.") || notification.request.identifier.hasPrefix("digest.") {
+            if RoomNotificationContent.isRoomRequest(notification.request.identifier) {
                 guard session.bool("notif.thisDeviceReminders") else { return [] }
                 let repository = try PrayerRepository(context: ModelContext(session.container)), days = prayerDays(repository: repository, now: now)
-                guard SanctityGuard(prayerDays: days).clamp(now) == now else { return [] }
-                let value = try AppQuranService(session: session, clock: { now }).snapshot()
-                let late = notification.request.identifier.hasSuffix(".late")
-                guard late ? (session.bool("quran.lateReminder") && value.pages.contains { $0.isDue && !$0.isFar }) : (session.string("quran.wirdReminder") != "off" && AppQuranService.needsWird(value)) else { return [] }
+                guard SanctityGuard(prayerDays: days).clamp(now) == now,
+                      try RoomNotificationContent.stillRelevant(notification.request.identifier, session: session, now: now) else { return [] }
                 try updateLedger(requestID: notification.request.identifier, state: "observed")
                 return [.banner, .list, .sound]
             }
@@ -311,23 +315,23 @@ final class PrayerNotificationCoordinator {
         }
     }
 
-    private static func manages(_ id: String) -> Bool { id.hasPrefix(requestPrefix) || id.hasPrefix("quran.") || id.hasPrefix("digest.") }
-    private func reconcileQuran(plan: NotificationPlan, candidates: [NotificationCandidate], current: [UNNotificationRequest], timeZone: TimeZone, consumed: Set<String>, now: Date) async throws {
+    private static func manages(_ id: String) -> Bool { id.hasPrefix(requestPrefix) || RoomNotificationContent.isRoomRequest(id) }
+    /// Every non-prayer request (Quran, qada, habits, digest, nudge) through one path: a kind turned off
+    /// leaves nothing pending and is logged as cancelled; drops and digests are logged for every room.
+    private func reconcileRooms(plan: NotificationPlan, candidates: [NotificationCandidate], current: [UNNotificationRequest], timeZone: TimeZone, consumed: Set<String>, now: Date) async throws {
         guard let session else { return }
-        let targets = plan.scheduled.filter { ($0.room == .quran || $0.kind == .digest) && !consumed.contains($0.id) }
+        let targets = plan.scheduled.filter { $0.kind != .prayerAsk && !consumed.contains($0.id) }
         let ids = Set(targets.map(\.id)), obsolete = current.filter { !ids.contains($0.identifier) }.map(\.identifier)
         center.removePendingNotificationRequests(withIdentifiers: obsolete)
         for id in obsolete where !consumed.contains(id) {
             try session.notificationBudget.cancel(id: id, now: now)
             try updateLedger(requestID: id, state: "cancelled")
         }
+        let owed = targets.contains { $0.id.hasPrefix("qada.") } ? try session.prayerSnapshot(at: now).statistics.owed : 0
+        let habitNames = targets.contains { $0.id.hasPrefix("habits.") }
+            ? Dictionary(try HabitRepository(context: ModelContext(session.container)).readings(at: now).map { ($0.id.uuidString, $0.name) }, uniquingKeysWith: { first, _ in first }) : [:]
         for candidate in targets {
-            let content = UNMutableNotificationContent()
-            let late = candidate.id.hasSuffix(".late")
-            content.title = candidate.kind == .digest ? "ملخّص تذكيراتك" : late ? "القرآن، المراجعة" : "القرآن، وردك"
-            content.body = candidate.kind == .digest ? "لديك تذكيرات للورد والمراجعة" : late ? "راجع المستحق قبل أن يبعد" : "تابع وردك من الموضع الذي توقفت عنده"
-            content.threadIdentifier = "quran." + candidate.dayKey; content.sound = .default
-            content.userInfo = ["dayKey": candidate.dayKey, "room": "quran"]
+            let content = RoomNotificationContent.content(for: candidate, plan: plan, session: session, owed: owed, habitNames: habitNames)
             var calendar = Calendar(identifier: .gregorian); calendar.timeZone = timeZone
             var date = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: candidate.dueAt); date.timeZone = timeZone
             do {
@@ -338,20 +342,20 @@ final class PrayerNotificationCoordinator {
                 try updateLedger(requestID: candidate.id, dayKey: candidate.dayKey, dueAt: candidate.dueAt, state: "dropped", reason: "budget")
                 continue
             }
-            if !current.contains(where: { $0.identifier == candidate.id && Self.matches($0, dueAt: candidate.dueAt) && $0.content.body == content.body }) {
+            if !current.contains(where: { $0.identifier == candidate.id && Self.matches($0, dueAt: candidate.dueAt) && $0.content.title == content.title && $0.content.body == content.body }) {
                 do { try await center.add(UNNotificationRequest(identifier: candidate.id, content: content, trigger: UNCalendarNotificationTrigger(dateMatching: date, repeats: false))) }
                 catch {
                     try session.notificationBudget.cancel(id: candidate.id, now: now, requestFailed: true)
                     throw error
                 }
             }
-            try updateLedger(requestID: candidate.id, dayKey: candidate.dayKey, dueAt: candidate.dueAt, state: "submitted", kind: candidate.kind == .digest ? "digest" : late ? "late" : "wird")
+            try updateLedger(requestID: candidate.id, dayKey: candidate.dayKey, dueAt: candidate.dueAt, state: "submitted", kind: RoomNotificationContent.ledgerKind(candidate.id))
         }
-        for id in plan.digestedIDs where id.hasPrefix("quran.") && !consumed.contains(id) { try updateLedger(requestID: id, state: "digested") }
-        for id in plan.droppedIDs where id.hasPrefix("quran.") && !consumed.contains(id) {
+        for id in plan.digestedIDs where RoomNotificationContent.isRoomRequest(id) && !consumed.contains(id) { try updateLedger(requestID: id, state: "digested") }
+        for id in plan.droppedIDs where RoomNotificationContent.isRoomRequest(id) && !consumed.contains(id) {
             guard let candidate = candidates.first(where: { $0.id == id }) else { continue }
             let quiet = Self.isQuiet(candidate.dueAt, timeZone: timeZone, quietAfterIsha: session.bool("notif.quietAfterIsha"), quietFrom: session.string("notif.quietFrom"))
-            try updateLedger(requestID: id, dayKey: candidate.dayKey, dueAt: candidate.dueAt, state: "dropped", reason: quiet ? "quiet" : "budget", kind: id.hasSuffix(".late") ? "late" : "wird")
+            try updateLedger(requestID: id, dayKey: candidate.dayKey, dueAt: candidate.dueAt, state: "dropped", reason: quiet ? "quiet" : "budget", kind: RoomNotificationContent.ledgerKind(id))
         }
     }
     private func prayerDays(repository: PrayerRepository, now: Date) -> [PrayerDay] {

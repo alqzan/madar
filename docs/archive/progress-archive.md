@@ -339,3 +339,12 @@ Differences left: listed in the V03/V04 rows (no v2 switchers, no habit/salary/j
 Not verified: owner visual/iPhone; dark mode.
 Next: M4-E02 habit engine (RL3 answered, RL2 go given, see DECISIONS), then W01 widgets, W02, F01, F02 (J10 engine exists; app wiring for room reminders). Pause Codex automation (00:17).
 Model/effort: Claude Opus 5.5; effort not exposed. Usage: 5-hour about 75% at stop (session tool), weekly 29%; stopped before 00:15 for Codex.
+
+## Handover — UX-01–UX-14, owner trial improvements — 2026-10-16 — Codex
+Works now: direct lobby navigation, scrolling greeting/contextual arranging, correct next Fajr and prayer copy, comparable rings, direct empty-diary writer/draft, clearer Quran first use, paired calendars across built rooms/exports, real hifz amounts, six original room glyphs; status-bar scroll overlap fixed. Fourteen card commits on main preserve Claude’s work.
+Verified: focused xcodebuild test runs UX-01–UX-14 (per-card counts/results above), Core routes/date golden checks; app/widget builds. Final UX-13 glyph native 1/1 + six-room UI walk 1/1; UX-14 lobby contextual flow 1/1, zero failures; git diff --check. Default screenshots/comparisons opened; local gallery Madar/Artifacts/UX-delivery.html.
+Differences left: owner-directed copy/glyphs and paired dates intentionally differ from samples; native safe areas/bar remain. Earlier M4 canonical differences remain in V01/V03/V04 rows; no habits/money/Mihbara entry until built.
+Not verified: owner iPhone, distribution, real OS notification delivery, dark for all changes; no enlarged-text runs, no real diary read/import or stored-record migration.
+Next: M4-E02 (RL3/RL2 approved; migration test + one permitted data review required), M4-V02, remaining M4 ready cards; M3-V12 remains ready and V09 fixture-blocked. automation-2 is one-shot 16 Oct 05:22:05 Asia/Riyadh, exact original prompt (start + 5h05).
+Model/effort: GPT-6; effort not exposed.
+Usage: last exposed five-hour 91%; no reset invoked. Reserve retained for final commit/handover.

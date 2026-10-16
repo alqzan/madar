@@ -14,6 +14,8 @@ public struct NotificationPlan: Equatable, Sendable {
     public let scheduled: [NotificationCandidate]
     public let droppedIDs: [String]
     public let digestedIDs: [String]
+    /// Which requests each retained digest stands for, so its fixed text can name their kinds (§8 item 8).
+    public var digestMembers: [String: [String]] = [:]
 }
 public struct NotificationPolicy: Sendable {
     public let dailyBudget: Int
@@ -149,7 +151,8 @@ public enum NotificationArbiter {
         for (id, members) in digestMembers where !retainedDigestIDs.contains(id) {
             let removed = Set(members); digested.removeAll { removed.contains($0) }; dropped += members
         }
-        return .init(scheduled: scheduled.sorted { $0.dueAt == $1.dueAt ? $0.id < $1.id : $0.dueAt < $1.dueAt }, droppedIDs: dropped, digestedIDs: digested)
+        return .init(scheduled: scheduled.sorted { $0.dueAt == $1.dueAt ? $0.id < $1.id : $0.dueAt < $1.dueAt }, droppedIDs: dropped, digestedIDs: digested,
+                     digestMembers: digestMembers.filter { retainedDigestIDs.contains($0.key) })
     }
     private static func madarKey(at instant: Date, prayerDays: [PrayerDay], timeZone: TimeZone, boundary: DayBoundary) -> String {
         let civil = GregorianDay.containing(instant, in: timeZone)

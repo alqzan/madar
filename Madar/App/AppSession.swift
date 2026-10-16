@@ -568,9 +568,14 @@ final class AppSession {
         guard beginWrite() else { throw BackupOperationError.busy }
         defer { pendingWrites -= 1 }
         let now = prayerNow()
-        let result = try await bus.execute(CommandEnvelope(commandID: id, name: name, payload: .object(payload), issuedAt: now), now: now)
-        guard result.status == .applied || result.status == .duplicate else { throw DataError.invalidValue(result.reason ?? "diary command") }
-        try reload(); try publishSnapshot()
+        func run() async throws -> CommandOutcome {
+            let result = try await bus.execute(CommandEnvelope(commandID: id, name: name, payload: .object(payload), issuedAt: now), now: now)
+            guard result.status == .applied || result.status == .duplicate else { throw DataError.invalidValue(result.reason ?? "diary command") }
+            try reload(); try publishSnapshot()
+            return result
+        }
+        // F02: a habit change reschedules its window reminder (a met habit stops reminding).
+        let result = name.hasPrefix("habit.") ? try await withSerializedPrayerNotificationMutation { try await run() } : try await run()
         if let id = result.undoToken {
             showUndo(AppUndoToken(id: id, expiresAt: now.addingTimeInterval(600)), message: name.hasPrefix("habit.") ? "حُفظت العادة · التراجع متاح لعشر دقائق" : name == "bahw.saveUpcomingDay" ? "حُفظ اليوم · التراجع متاح لعشر دقائق" : name == "bahw.deleteUpcomingDay" ? "حُذف اليوم · التراجع متاح لعشر دقائق" : name.contains("Intention") ? "حُفظت النيّة · التراجع متاح لعشر دقائق" : "حُفظ السطر · التراجع متاح لعشر دقائق")
         }
