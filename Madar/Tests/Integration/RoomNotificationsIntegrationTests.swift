@@ -30,8 +30,8 @@ import MadarCore
         let qada = NotificationCandidate(id: "qada.2026-10-15", room: .salah, dueAt: day.fajr.addingTimeInterval(1800), dayKey: "2026-10-15")
         let reminder = NotificationCandidate(id: "habits.2026-10-15.\(habit.uuidString)", room: .habits, dueAt: day.asr.addingTimeInterval(1800), dayKey: "2026-10-15")
         let plan = NotificationArbiter.plan(candidates: [], prayerDays: [day], now: day.fajr, timeZone: ActivePlace.riyadh.timeZone, policy: .init(staleNudgeEnabled: false))
-        let q = RoomNotificationContent.content(for: qada, plan: plan, session: app, owed: 3, habitNames: [:])
-        let h = RoomNotificationContent.content(for: reminder, plan: plan, session: app, owed: 0, habitNames: [habit.uuidString: "المشي"])
+        let q = RoomNotificationContent.content(for: qada, plan: plan, session: app, habitNames: [:])
+        let h = RoomNotificationContent.content(for: reminder, plan: plan, session: app, habitNames: [habit.uuidString: "المشي"])
         XCTAssertFalse(q.body.contains("قضاء")); XCTAssertFalse(h.title.contains("المشي"))
         RoomNotificationContent.open(reminder.id, userInfo: h.userInfo, session: app)
         XCTAssertEqual(app.selectedTab, "foundation"); XCTAssertTrue(app.habitsOpen); XCTAssertEqual(app.habitRouteID, habit)
@@ -39,10 +39,18 @@ import MadarCore
         XCTAssertEqual(app.selectedTab, "prayer")
     }
 
-    func testOpenAppShowsTheCountAndTheHabitName() throws {
+    func testQadaCopyNeverCarriesTheDebtCount() throws {
         let (app, root, _, day) = try fixture([:]); defer { try? FileManager.default.removeItem(at: root) }
         let qada = NotificationCandidate(id: "qada.2026-10-15", room: .salah, dueAt: day.fajr.addingTimeInterval(1800), dayKey: "2026-10-15")
         let plan = NotificationArbiter.plan(candidates: [], prayerDays: [day], now: day.fajr, timeZone: ActivePlace.riyadh.timeZone, policy: .init(staleNudgeEnabled: false))
-        XCTAssertTrue(RoomNotificationContent.content(for: qada, plan: plan, session: app, owed: 3, habitNames: [:]).body.hasPrefix("عليك ٣ صلوات قضاءً."))
+        XCTAssertTrue(RoomNotificationContent.content(for: qada, plan: plan, session: app, habitNames: [:]).body.hasPrefix("حان وقت القضاء."))
+        let body = RoomNotificationContent.content(for: qada, plan: plan, session: app, habitNames: [:]).body
+        XCTAssertNil(body.rangeOfCharacter(from: .decimalDigits), "RU2: no prayer-debt count outside the app")
+    }
+
+    func testDigestCountUsesTheCatalogPlural() {
+        let digits = MadarNumberFormatter(style: .hindi)
+        XCTAssertEqual([1, 2, 3, 11, 100].map { RoomNotificationContent.reminderCount($0, digits) },
+                       ["تذكير واحد", "تذكيران", "٣ تذكيرات", "١١ تذكيرًا", "١٠٠ تذكير"])
     }
 }

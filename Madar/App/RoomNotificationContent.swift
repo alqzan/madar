@@ -30,8 +30,8 @@ import MadarPrayer
         return result
     }
 
-    /// Fixed copy chosen at scheduling time. Whole-app protection keeps every body generic (§8 item 10).
-    static func content(for candidate: NotificationCandidate, plan: NotificationPlan, session: AppSession, owed: Int, habitNames: [String: String]) -> UNMutableNotificationContent {
+    /// Fixed copy chosen at scheduling time. Whole-app protection keeps every body generic (§8 item 10); RU2: never a prayer-debt count.
+    static func content(for candidate: NotificationCandidate, plan: NotificationPlan, session: AppSession, habitNames: [String: String]) -> UNMutableNotificationContent {
         let content = UNMutableNotificationContent(), id = candidate.id, digits = MadarNumberFormatter(style: session.string("core.numerals") == "western" ? .western : .hindi)
         let protected = session.string("core.faceIDLock") == "app"
         content.sound = .default
@@ -43,11 +43,12 @@ import MadarPrayer
             content.userInfo = ["dayKey": candidate.dayKey, "room": "quran"]
         } else if id.hasPrefix("digest.") {
             content.title = "ملخّص تذكيراتك"
-            content.body = RoomReminders.digestBody(memberIDs: plan.digestMembers[id] ?? [], digits: { digits.string($0) })
+            let members = plan.digestMembers[id] ?? [], kinds = RoomReminders.digestKinds(memberIDs: members)
+            content.body = "لديك " + reminderCount(members.count, digits) + (kinds.isEmpty ? "" : ": " + kinds.joined(separator: "، "))
             content.userInfo = ["dayKey": candidate.dayKey, "room": "bahw"]
         } else if id.hasPrefix("qada.") {
             content.title = "القضاء"
-            content.body = protected ? "لديك تذكير في مدار" : "عليك " + qadaCount(owed, digits) + " قضاءً. «مَنْ نَسِيَ صَلَاةً فَلْيُصَلِّ إِذَا ذَكَرَهَا»"
+            content.body = protected ? "لديك تذكير في مدار" : "حان وقت القضاء. «مَنْ نَسِيَ صَلَاةً فَلْيُصَلِّ إِذَا ذَكَرَهَا»"
             content.userInfo = ["dayKey": candidate.dayKey, "room": "salah"]
         } else if id.hasPrefix("habits.") {
             let habitID = String(id.split(separator: ".").last ?? "")
@@ -99,12 +100,11 @@ import MadarPrayer
         } else { session.selectedTab = "foundation" }
     }
 
-    private static func qadaCount(_ n: Int, _ digits: MadarNumberFormatter) -> String {
-        switch n {
-        case 1: "صلاة واحدة"
-        case 2: "صلاتان"
-        case 3...10: digits.string(n) + " صلوات"
-        default: digits.string(n) + " صلاة"
-        }
+    /// RU3: the Arabic plural comes from the catalog, the digits from core.numerals.
+    static func reminderCount(_ count: Int, _ digits: MadarNumberFormatter) -> String {
+        let formatted = digits.string(count)
+        // Interpolation wraps the digits in bidi isolates; a notification body is plain Arabic text, so drop them.
+        return String(localized: "notif.reminders", defaultValue: "\(count) \(formatted)", table: "Prayer", locale: Locale(identifier: "ar"))
+            .replacingOccurrences(of: "\u{2068}", with: "").replacingOccurrences(of: "\u{2069}", with: "")
     }
 }

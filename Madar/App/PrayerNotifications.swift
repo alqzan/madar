@@ -327,11 +327,10 @@ final class PrayerNotificationCoordinator {
             try session.notificationBudget.cancel(id: id, now: now)
             try updateLedger(requestID: id, state: "cancelled")
         }
-        let owed = targets.contains { $0.id.hasPrefix("qada.") } ? try session.prayerSnapshot(at: now).statistics.owed : 0
         let habitNames = targets.contains { $0.id.hasPrefix("habits.") }
             ? Dictionary(try HabitRepository(context: ModelContext(session.container)).readings(at: now).map { ($0.id.uuidString, $0.name) }, uniquingKeysWith: { first, _ in first }) : [:]
         for candidate in targets {
-            let content = RoomNotificationContent.content(for: candidate, plan: plan, session: session, owed: owed, habitNames: habitNames)
+            let content = RoomNotificationContent.content(for: candidate, plan: plan, session: session, habitNames: habitNames)
             var calendar = Calendar(identifier: .gregorian); calendar.timeZone = timeZone
             var date = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: candidate.dueAt); date.timeZone = timeZone
             do {

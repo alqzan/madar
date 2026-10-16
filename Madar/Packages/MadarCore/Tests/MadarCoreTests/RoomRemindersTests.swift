@@ -7,7 +7,6 @@ import Testing
 @Suite struct RoomRemindersTests {
     let day = try! #require(PrayerTimesEngine.calculate(day: GregorianDay("2026-10-09"), place: .riyadh))
     var dawn: Date { day.fajr.addingTimeInterval(-3 * 3600) }
-    func arabic(_ n: Int) -> String { String(String(n).map { Array("٠١٢٣٤٥٦٧٨٩")[Int(String($0))!] }) }
 
     @Test func qadaFallsAtTheEndOfTheChosenPrayersSanctity() {
         let fajr = RoomReminders.qada(days: [day], time: .afterFajr, owed: 3, now: dawn)
@@ -31,9 +30,8 @@ import Testing
     }
 
     @Test func digestNamesKindsNeverContent() {
-        #expect(RoomReminders.digestBody(memberIDs: ["quran.2026-10-09.wird", "qada.2026-10-09", "habits.2026-10-09.\(UUID())"], digits: arabic) == "لديك ٣ تذكيرات: الورد، القضاء، عادة")
-        #expect(RoomReminders.digestBody(memberIDs: ["quran.2026-10-09.wird", "quran.2026-10-09.late"], digits: arabic) == "لديك تذكيران: الورد، المراجعة")
-        #expect(RoomReminders.digestBody(memberIDs: (0..<11).map { "habits.d.\($0)" }, digits: arabic) == "لديك ١١ تذكيرًا: عادة")
+        #expect(RoomReminders.digestKinds(memberIDs: ["quran.2026-10-09.wird", "qada.2026-10-09", "habits.2026-10-09.\(UUID())"]) == ["الورد", "القضاء", "عادة"])
+        #expect(RoomReminders.digestKinds(memberIDs: (0..<11).map { "habits.d.\($0)" }) == ["عادة"])
     }
 
     @Test func budgetOfFourSendsThreeAndOneDigestThatKnowsItsMembers() {

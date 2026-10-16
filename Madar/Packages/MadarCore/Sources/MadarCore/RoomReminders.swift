@@ -33,18 +33,11 @@ public enum RoomReminders {
         return nil
     }
 
-    /// «لديك ٣ تذكيرات: الورد، القضاء، عادة» — fixed when scheduled, kinds only (§8 item 8).
-    public static func digestBody(memberIDs: [String], digits: (Int) -> String) -> String {
+    /// The kinds a digest names, once each in arrival order — never their content (§8 item 8).
+    /// The count phrase is the app's catalog plural (RU3), so the engine returns kinds only.
+    public static func digestKinds(memberIDs: [String]) -> [String] {
         var labels: [String] = []
         for label in memberIDs.compactMap(kindLabel(for:)) where !labels.contains(label) { labels.append(label) }
-        let count = memberIDs.count
-        let total: String
-        switch count {
-        case 1: total = "تذكير واحد"
-        case 2: total = "تذكيران"
-        case 3...10: total = digits(count) + " تذكيرات"
-        default: total = digits(count) + " تذكيرًا"
-        }
-        return labels.isEmpty ? "لديك " + total : "لديك " + total + ": " + labels.joined(separator: "، ")
+        return labels
     }
 }
