@@ -34,7 +34,7 @@ public struct MoneyParsedFields: Codable, Sendable {
 }
 
 struct MoneyStagedResult { var inverse: Data?; var duplicate: Bool }
-private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var after: [DataRecord] }
+private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var after: [DataRecord]; var reserveGoalID: UUID? = nil }
 
 /// Stages only, under DurableCommandAdapter's lease. The receipt, movement, allocations and
 /// source messages are saved together. No producer/extension opens SwiftData.
@@ -72,6 +72,15 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
                     }
                 }
                 try writeAllocations(rows, context: context, now: now, writer: writer)
+            }
+        case "money.setReserveGoal":
+            let reserves = try context.fetch(FetchDescriptor<Envelope>()).filter { live($0) && $0.role == "reserve" }
+            guard reserves.count <= 1 else { throw MoneyCommandError.invalidReference }
+            let amount = MoneyCommandPayload.integer(p["targetMinor"])
+            if let row = reserves.first {
+                if row.targetMinor != amount { row.targetMinor = amount; try touch(row, now, writer) }
+            } else if let amount {
+                let row = Envelope(); row.name = "الاحتياطي"; row.role = "reserve"; row.targetMinor = amount; row.createdAt = now; context.insert(row); try touch(row, now, writer)
             }
         case "money.saveAccount": try saveAccount(p, context, now, writer)
         case "money.saveCard": try saveCard(p, context, now, writer)
@@ -130,7 +139,7 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         let changed = after.filter { old[recordKey($0)] != $0 }
         guard !changed.isEmpty else { return .init(inverse: nil, duplicate: true) }
         try RecordValidator.validate(changed)
-        return .init(inverse: name == "money.accruePlans" ? nil : try JSONEncoder().encode(MoneyInverse(before: before.filter { oldRow in changed.contains { recordKey($0) == recordKey(oldRow) } }, after: changed)), duplicate: false)
+        return .init(inverse: name == "money.accruePlans" ? nil : try JSONEncoder().encode(MoneyInverse(before: before.filter { oldRow in changed.contains { recordKey($0) == recordKey(oldRow) } }, after: changed, reserveGoalID: name == "money.setReserveGoal" ? changed.first(where: { $0.model == "Envelope" && $0.fields["role"]?.string == "reserve" })?.id : nil)), duplicate: false)
     }
 
     private static func saveAccount(_ p: [String: MadarCore.JSONValue], _ context: ModelContext, _ now: Date, _ writer: String) throws {
@@ -447,6 +456,15 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
     static func undo(_ data: Data, context: ModelContext, now: Date, writer: String) throws {
         let inverse = try JSONDecoder().decode(MoneyInverse.self, from: data)
         guard inverse.v == 1 else { throw MoneyCommandError.undoSuperseded }
+        if let id = inverse.reserveGoalID {
+            guard let after = inverse.after.first(where: { $0.model == "Envelope" && $0.id == id }),
+                  let row = try context.fetch(FetchDescriptor<Envelope>()).first(where: { $0.id == id && live($0) }),
+                  try row.record().fields["targetMinor"] == after.fields["targetMinor"] else { throw MoneyCommandError.undoSuperseded }
+            let before = inverse.before.first { $0.model == "Envelope" && $0.id == id }
+            row.targetMinor = try before?.fields["targetMinor"].flatMap { $0 == .null ? nil : try $0.decode(Int.self) }
+            try touch(row, now, writer)
+            return // Only the target changes; later allocations and their rebuilt balance stay intact.
+        }
         let current = try records(context), changedIDs = Set(inverse.after.map(\.id))
         for after in inverse.after {
             guard current.first(where: { recordKey($0) == recordKey(after) }) == after else { throw MoneyCommandError.undoSuperseded }

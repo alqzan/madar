@@ -15,6 +15,7 @@ struct MoneyHomeView: View {
     @State private var failure: String?
     @State private var revealed = false
     @State private var basisOpen = false
+    @State private var envelopesOpen = false
     private var service: AppMoneyService { .init(app: app) }
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
     private var amountsVisible: Bool { !app.bool("core.hideMoneyUntilTouch") || revealed }
@@ -41,6 +42,7 @@ struct MoneyHomeView: View {
         }
         .clipped().background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
         .environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar)
+        .navigationDestination(isPresented: $envelopesOpen) { MoneyEnvelopesView(app: app, revealed: $revealed) }
         .sheet(isPresented: $basisOpen) { MoneyBasisView(app: app, revealed: $revealed) }
         .task {
             do { try await app.executeMoneyCommand("money.accruePlans") } catch { }
@@ -65,7 +67,7 @@ struct MoneyHomeView: View {
                     .overlay { Capsule().stroke(theme.color("reserveText"), lineWidth: 1) }
                     .accessibilityElement(children: .ignore).accessibilityLabel(service.pending(count)).accessibilityIdentifier("money-pending")
             }
-            Button { dismiss() } label: { Image(systemName: "chevron.forward").font(.body).frame(width: 44, height: 44) }
+            Button { dismiss() } label: { Image(systemName: "chevron.backward").font(.body).frame(width: 44, height: 44) }
                 .buttonStyle(.plain).accessibilityLabel("العودة").accessibilityIdentifier("money-back")
         }.frame(minHeight: 48)
     }
@@ -125,19 +127,19 @@ struct MoneyHomeView: View {
     }
     private func envelopeSection(_ reading: MoneyHomeReading) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionTitle("المظاريف", color: theme.color("accent"))
+            Button { envelopesOpen = true } label: { HStack { sectionTitle("المظاريف", color: theme.color("accent")); Image(systemName: "chevron.left").font(.caption) }.frame(minHeight: 44) }.buttonStyle(.plain).accessibilityIdentifier("money-envelopes-open")
             HStack(alignment: .center, spacing: 14) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("الاحتياطي").font(.custom("thmanyahserifdisplay-Bold", size: 18, relativeTo: .headline)).foregroundStyle(theme.color("reserveText"))
                     HStack(alignment: .firstTextBaseline, spacing: 7) {
                         Text(amount(reading.reserveMinor)).font(MadarTypography.cardTitle()).accessibilityIdentifier("money-reserve")
-                        if let runway = reading.reserveRunway {
+                        if amountsVisible, let runway = reading.reserveRunway {
                             Text(service.days(runway.days)).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                         }
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading)
                 if !dynamicType.isAccessibilitySize && amountsVisible {
-                    MoneyReserveSquares(days: reading.reserveRunway?.days ?? 0).frame(width: 152, height: 42)
+                    MoneyReserveSquares(days: reading.reserveDailies ?? 0).frame(width: 152, height: 42)
                 }
             }
             HStack(spacing: 14) {

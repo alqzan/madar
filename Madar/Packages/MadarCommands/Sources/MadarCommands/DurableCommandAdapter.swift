@@ -104,7 +104,7 @@ private struct ReceiptWire: Codable {
                                        undoExpiresAt: row.undoExpiresAt ?? row.createdAt,
                                        undoJSON: row.undoJSON,
                                        outcome: .init(status: CommandStatus(rawValue: row.status) ?? .rejected,
-                                                      undoToken: row.status == "applied" && ["prayer.log", "prayer.makeUp", "prayer.resolveGap", "prayer.setHeart", "prayer.logQiyam", "prayer.addOldMissed", "prayer.editTrackingStart", "prayer.startTrip", "prayer.endTrip", "prayer.logPair", "settings.set", "settings.applyPreset"].contains(row.name) || row.status == "applied" && QuranCommandPayload.names.contains(row.name) && row.undoJSON != nil ? id : nil))
+                                                      undoToken: row.status == "applied" && ["prayer.log", "prayer.makeUp", "prayer.resolveGap", "prayer.setHeart", "prayer.logQiyam", "prayer.addOldMissed", "prayer.editTrackingStart", "prayer.startTrip", "prayer.endTrip", "prayer.logPair", "settings.set", "settings.applyPreset"].contains(row.name) || row.status == "applied" && QuranCommandPayload.names.contains(row.name) && row.undoJSON != nil || row.status == "applied" && MoneyCommandPayload.names.subtracting(["money.accruePlans"]).contains(row.name) ? id : nil))
                 return try JSONDecoder().decode(CoreCommandReceipt.self, from: JSONEncoder().encode(wire))
             }
             // Receipt identity is authoritative even after undo/deletion or retention expiry.

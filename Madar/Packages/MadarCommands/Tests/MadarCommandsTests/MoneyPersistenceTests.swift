@@ -288,4 +288,23 @@ import MadarInbox
         #expect(try repo.basis(at: f.now).owedMinor == 80000)
     }
 
+    @Test func reserveTargetUndoPreservesLaterSpendingAndNeverMovesMoney() async throws {
+        let f = try MoneyFixture(); defer { f.clean() }; try await f.setup()
+        let c = ModelContext(f.container), reserve = Envelope(); reserve.role = "reserve"; reserve.name = "احتياطي"; c.insert(reserve)
+        let funding = Allocation(); funding.target = "reserve"; funding.amountMinor = 100000; funding.idempotencyKey = "opening"; c.insert(funding); try c.save()
+        let goal = UUID(), p: [String: MadarCore.JSONValue] = ["targetMinor": .number(200000)]
+        let first = try await f.run("money.setReserveGoal", p, id: goal)
+        let replay = try await f.run("money.setReserveGoal", p, id: goal)
+        #expect(first.undoToken == goal); #expect(replay == first)
+        #expect(try ModelContext(f.container).fetchCount(FetchDescriptor<Allocation>()) == 1)
+        _ = try await f.ingest("شراء مدى\n*3333\n5.00 SAR\n2026-10-16 12:00")
+        let tx = try f.transaction()
+        _ = try await f.run("money.confirmTransaction", ["id": .string(tx.id.uuidString), "allocations": .array([.object(["target": .string("reserve"), "amountMinor": .number(500)])])])
+        _ = try await f.run("system.undo", ["undoToken": .string(goal.uuidString)])
+        let updated = try #require(try ModelContext(f.container).fetch(FetchDescriptor<Envelope>()).first { $0.id == reserve.id })
+        #expect(updated.targetMinor == nil); #expect(updated.balanceMinor == 99500)
+        #expect(try MoneyRepository(context: ModelContext(f.container)).allocationRows().count == 2)
+        #expect(try f.basis().inAccountMinor == 2_009_500)
+    }
+
 }

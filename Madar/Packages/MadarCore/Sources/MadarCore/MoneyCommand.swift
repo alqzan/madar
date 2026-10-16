@@ -6,7 +6,7 @@ import Foundation
 public enum MoneyCommandPayload {
     public static let intakeName = "money.ingestBankMessage"
     public static let names: Set<String> = [intakeName, "money.pasteBankMessages", "money.logExpense",
-        "money.confirmTransaction", "money.deleteTransaction", "money.saveAccount", "money.saveCard", "money.accruePlans"]
+        "money.confirmTransaction", "money.deleteTransaction", "money.saveAccount", "money.saveCard", "money.accruePlans", "money.setReserveGoal"]
 
     public static func integer(_ value: JSONValue?) -> Int? {
         switch value {
@@ -38,6 +38,7 @@ public enum MoneyCommandPayload {
         func optionalText(_ key: String, max: Int = 80) -> Bool { p[key] == nil || p[key] == .null || text(key, max: max, empty: true) }
         switch name {
         case "money.accruePlans": return p.isEmpty
+        case "money.setReserveGoal": return Set(p.keys) == ["targetMinor"] && (p["targetMinor"] == .null || positive("targetMinor"))
         case intakeName:
             return Set(p.keys).isSubset(of: ["text", "sender", "receivedAt"]) && text("text", max: 2000)
                 && optionalText("sender") && (p["receivedAt"] == nil || date(p["receivedAt"]) != nil)

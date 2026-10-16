@@ -21,7 +21,14 @@ extension AppSession {
         func allocation(_ amount: Int, _ target: String, id: UUID? = nil, tx: UUID? = nil, kind: String = "fund") {
             let a = Allocation(); a.amountMinor = amount; a.target = target; a.targetID = id; a.transactionID = tx; a.cycleID = cycle.id; a.kind = kind; a.idempotencyKey = UUID().uuidString; c.insert(a)
         }
-        for (role, title, balance) in [("reserve", "الاحتياطي", 10_000_000), ("surplus", "الفائض", 260_000)] { let e = Envelope(); e.role = role; e.name = title; c.insert(e); allocation(balance, role) }
+        for (role, title, balance) in [("reserve", "الاحتياطي", 10_000_000), ("surplus", "الفائض", 260_000)] { let e = Envelope(); e.role = role; e.name = title; c.insert(e); if role == "reserve" { allocation(balance, role) }
+            else {
+                for (index, delta) in [50000, 100000, -40000, 150000].enumerated() {
+                    let old = Cycle(); old.start = start.adding(days: -(4 - index) * 30).date(in: zone); old.end = start.adding(days: -(3 - index) * 30).date(in: zone); old.closedAt = old.end; c.insert(old)
+                    let a = Allocation(); a.target = "surplus"; a.amountMinor = delta; a.kind = delta < 0 ? "offset" : "fund"; a.cycleID = old.id; a.createdAt = old.start; a.idempotencyKey = UUID().uuidString; c.insert(a)
+                }
+            }
+        }
         for (index, title, balance, target) in [(0, "الإيجار", -90_000, 180_000), (1, "رحلة الشتاء", -40_000, 200_000), (2, "الطوارئ", 120_000, 180_000), (3, "هدية", 46_000, 60_000)] {
             let e = Envelope(); e.name = title; e.role = "goal"; e.targetMinor = target; e.due = end.adding(days: index * 10).date(in: zone); e.createdAt = now.addingTimeInterval(Double(index)); c.insert(e); allocation(balance, "envelope", id: e.id)
         }
