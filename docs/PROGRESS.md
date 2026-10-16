@@ -1,6 +1,6 @@
 # Current milestone
 
-**UX-01–UX-14 complete; M4-E02 and M4-V02 complete (owner trial pending); M4-W01/W02/F01/F02 and M3-V12 (notifications) complete; next: the improvement share, then M5 per its own protocol.** M3 E01/D01/F01 and built screens are integrated; M4 E01/V01/V03/V04 are integrated. RL3 habit rules and RL2 HabitEvent go are recorded in DECISIONS (15 Oct). M3-V09 remains blocked on a permitted Day One fixture/path; do not read real diaries. M3-V12 is ready under the owner’s generic-reminder decision, to follow the owner-prioritised M4 queue. M2-V01–V17 are approved; M1-F04 software is complete. Device/milestone gates remain deferred until the whole app is finished. Preserve RA1/RA2, RP1, RU1 and existing records.
+**M5 Money opened (owner, 16 Oct): engine cards E01–E04 first, then D01 (needs the owner's go for schema V5), then screens in §7.5 order.** UX-01–UX-14, M4 software and M3-V12 notifications are complete. M3-V09 remains blocked on a permitted Day One fixture/path; do not read real diaries. M2-V01–V17 are approved; M1-F04 software is complete. Device/milestone gates remain deferred until the whole app is finished. Preserve RA1/RA2, RP1, RU1 and existing records.
 
 # Last checked
 
@@ -153,6 +153,45 @@ Read §7.1 `sections/08-r-bahw.md`, §9 widgets, §5 for shared shapes; RL1–RL
 | M4-F02 | Notification budget — J10. | done — software | Qada (after Fajr/Isha sanctity, only while owed) and push-habit window reminders join Quran under one arbiter, per-device budget B−1 + one digest that names kinds, never content; whole-app lock keeps bodies generic; taps open the room; completing a habit reschedules. Verified: MadarCore 88/88 (RoomRemindersTests 5/5), xcodebuild RoomNotificationsIntegrationTests 4/4 (no debt count outside, catalog plurals), QuranOutside 2/2, AppService 7/7, CaptureIntent 3/3, make build. Device week is part of M4-G. |
 | M4-X3 | Widget maker — `bahw/08-X3-Sani.jpg`. | deferred (RL6 [DEFAULT]) | Not built in v1. |
 | M4-G | Device acceptance — §12/§13, J09/J10. | deferred: after the whole app is finished | |
+
+## M5 Money — owner opened 16 October («وابدا بالمال انت»), engine first at full strength
+
+Read before any card: §7.5 `sections/12-r-mal.md` end to end (numbers table, engine constants, L01–L14, F01–F11), §11 money models `17-data.md`, and RM1–RM10 in the fixes file (they override §7.5). Engines are pure Swift in `Packages/MadarMoney` (value types that mirror the dictionary fields, never SwiftData, never the name `Transaction`, RA4); every expected value comes from the spec, with hand arithmetic in the test. Every amount is `Int` minor units; every number has one definition in `MoneyEngine` (L09). Screens: canonical `docs/HANDOFF/screens/mal/NN-*.jpg`. Do not copy on any money screen (RM10, RL10): red for overspent days (clay `due` only, and only for debt envelopes), amounts on the lock screen or in notifications while `core.hideMoneyOutside`, receivables, a 78/100 score, an essential/luxury split, the travel button on home, «؟», «دخلت وحدها», «إشارات المال», dialect copy («يمديك»، «تجاهل هالمرة» → فصحى قريبة, RU4), sample numbers and names (يومية ٤٠٠، البلاتينيوم ٤٨٢١، هدية أمي…). The money lobby block, widget cells, Control Center «مصروف» and capture routing to money stay absent until M5-X01.
+
+| Card | Result / canonical | Status | Do not copy / Notes |
+|---|---|---|---|
+| M5-E01 | Cycle and headline numbers — §7.5 numbers table and constants, F05, L01–L09, L14; RM2 (today «صرفت X من Y» beside the cumulative «لك الآن», over-today vs over-cycle wording, «المتاح» → «غير مخصّص» on the basis screen, pending-decision count), RM9 (cycle starts at the salary's eventAt, early/late salary, runway subtracts obligations, loan stays out of «عليك» and sits in «المحجوز» as C0 shows). | done | `Packages/MadarMoney` (pure Swift, no SwiftData): CycleEngine (frozen rates, policy rows, plan drops capped by the day, carry, «لك الآن», RM2 headline, curve), CycleClose/OffsetEngine (L02, L14, surplus cap then reserve), BasisEngine (C0 from source rows; loan reserved not owed; debit stays out of «عليك»), RunwayEngine, LimitEngine, WithinDayEngine. Verified: `swift test` in MadarMoney, 24/24 passed. Definitions in DECISIONS (16 Oct). Golden fixture C0 built from source rows. Unset allowance (`amountMinor` null) ≠ 0 (L05). Offset cap 3 dailies per cycle (§15 #24, owner confirms). |
+| M5-E02 | Movements, allocations, reconciliation, instalments and FX — F01 table with RM1 debit/prepaid rows, F02 splits/idempotency/undo, F03, F04 (ISO 4217 exponents, half-away rounding, refund at the original rate), L10–L13, RM3 one funding path for plans, RM4 obligation-linked rows budget-neutral, RM5 own-transfer pairing and wallets. | in progress | Acceptance cases with no number test invariants: Σ allocations = −home amount; own-to-own transfer leaves «لك فعلًا» unchanged; replay writes nothing. RM5 pairing window N is not in the spec: pick conservatively, log it, list it for the owner. |
+| M5-E03 | Bank-message parser and dedupe — §7.5 «رسائل البنك», F07 card identity and statements, F08 as amended by RM8 (fingerprint = sender + normalised text + occurrence; near-duplicate same account/amount/merchant ±10 min → review), RM6 complete class list (purchase incl. mada/Apple Pay, withdrawal, transfer, card payment, statement, salary/income, refund linked to original, declined/reversed, SADAD bill payment, fees, Tamara/Tabby instalment, OTP/marketing dropped and OTP text never stored), eventAt from the text when it carries a time. | ready | Synthetic per-class samples written from the spec only. The ≥95% accuracy target needs the owner's anonymised messages (like M3-V09): never read real SMS. |
+| M5-E04 | Zakat — F11 as amended by RM7: gold 24K per-gram manual price with its date (stale after 30 days), «تقريبي» and «لو حال الحول اليوم» on every result, debts unset/none/dueNow/allOwed. | ready | Silver basis and a loan-inclusive debt option need the owner and a specialist (F11 pre-release review): ask, do not add. |
+| M5-D01 | Data-model and settings amendments — RM1 `Card.kind`, RM3 `EnvelopePlan.source` + `period` + `start`, RM4 `billPayment`, RM5 account last4/IBAN + `wallet` kind and policy, RM7 nisab basis, RM9 salary-day and cycle-calendar settings; additive schema V5. | blocked: owner go for an additive schema V5 (RP2/RL2 precedent) | Synthetic stores only; never open the owner's store. One review pass (store migration exception). |
+| M5-D02 | Money commands and intake — command bus money commands with undo, `IngestBankMessageIntent` (F09 contract, inbox when the store is closed, RA2), `LogExpenseIntent`, bulk paste batch. | ready after D01 | Intent writes the message and a draft only; salary, big expense and reconciliation are confirmed inside the app. |
+| M5-V01 | Home «الطومار والمكتب» — `mal/01-Z-R12-Home2.jpg`. | ready after D02 | RM2 top line; tap «لك الآن» → basis. |
+| M5-V02 | On what basis + cash vs accrual — `mal/02-Z-R12-Basis2.jpg`, `mal/03-Z-R16-K1.jpg`. | ready after V01 | «غير مخصّص» lives here (RM2). |
+| M5-V03 | Envelopes — `mal/04-Z-R12-Env.jpg`. | ready after V02 | Runway subtracts obligations (RM9). |
+| M5-V04 | Envelope detail and «سدّه على كم راتب» — `mal/05-Z-R14-EnvDetail.jpg`, `mal/06-Z-R12-EnvSheet.jpg`. | ready after V03 | |
+| M5-V05 | Bank messages, envelopes and baskets — `mal/07-Z-R18-msg-1.jpg`. | ready after V04 | |
+| M5-V06 | Since last visit — `mal/08-Z-R19-since.jpg`. | ready after V05 | «لم تصل رسائل منذ ٣ أيام — هل الاختصار يعمل؟» from data. |
+| M5-V07 | Merchant rules — `mal/09-Z-R19-mer.jpg`. | ready after V06 | |
+| M5-V08 | Salary arrived and cycle report — `mal/10-Z-R19-sal2.jpg`. | ready after V07 | |
+| M5-V09 | Obligations — `mal/11-Z-R19-obl.jpg`. | ready after V08 | |
+| M5-V10 | Categories and limits, 80% alert — `mal/12-Z-R18-cat-1.jpg`, `mal/13-Z-R18-a80-1.jpg`. | ready after V09 | Alert shows no amount while hidden (RM10). |
+| M5-V11 | Ignore from budgets — `mal/14-Z-R19-ign.jpg`, `mal/15-Z-R19-ign-b.jpg`. | ready after V10 | |
+| M5-V12 | Cards, four tabs — `mal/16`–`19-Z-R19-cards-*.jpg`. | ready after V11 | Estimated close dates read «تقريبًا»; interest is an estimate. |
+| M5-V13 | Log — `mal/20-Z-R18-log-4.jpg`, `mal/21-Z-R18-log-4x.jpg`. | ready after V12 | |
+| M5-V14 | Analysis — `mal/22-Z-R18-ana-1.jpg`, `mal/23-Z-R18-ana-1x.jpg`. | ready after V13 | |
+| M5-V15 | Reconciliation — `mal/24-Z-R19-rec.jpg`. | ready after V14 | |
+| M5-V16 | Cashback jar — `mal/25-Z-R18-cb-1.jpg`. | ready after V15 | |
+| M5-V17 | Record an expense — `mal/26-Z-R19-add.jpg`. | ready after V16 | |
+| M5-V18 | Big expense — `mal/27-Z-R19-big.jpg`. | ready after V17 | |
+| M5-V19 | Accounts — `mal/28-Z-R19-acc.jpg`. | ready after V18 | |
+| M5-V20 | Settings, daily and cycle — `mal/29-Z-R19-set.jpg`, `mal/30-Z-R19-set-b.jpg`. | ready after V19 | |
+| M5-V21 | Travel mode — `mal/31-Z-R19-trv.jpg`. | ready after V20 | Manual rate only in v1. |
+| M5-V22 | Zakat — `mal/32-Z-R19-zak.jpg`. | ready after V21 | RM7: no «يُحدَّث من مصدر». |
+| M5-V23 | Get ready for something coming — `mal/33`–`35-Z-R20-A-*.jpg`. | ready after V22 | |
+| M5-V24 | First run and the Shortcut guide — §7.5 states, F09. | ready after V23 | |
+| M5-X01 | Money outside the room — lobby block, widget cells (•••), Control Center «مصروف», capture routing, diary money lines. | ready after V24 | Privacy matrix §8 item 10. |
+| M5-G | Device acceptance — §12/§13, F09 device log. | deferred: after the whole app is finished | |
 
 ## Done — software (integrated on main, visual acceptance pending in M1-V)
 
