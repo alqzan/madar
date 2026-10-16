@@ -86,19 +86,28 @@ struct MoneyCardsView: View {
                 }
                 Spacer(minLength: 0)
                 HStack {
-                    RoundedRectangle(cornerRadius: 3).fill(theme.background.opacity(0.75)).frame(width: 22, height: 18).overlay { Rectangle().stroke(theme.background.opacity(0.5), lineWidth: 0.7).padding(5) }.accessibilityHidden(true)
+                    RoundedRectangle(cornerRadius: 4).fill(LinearGradient(colors: [theme.color("reserve").opacity(0.95), theme.background.opacity(0.9), theme.color("reserve")], startPoint: .topLeading, endPoint: .bottomTrailing)).frame(width: 26, height: 20).overlay { Rectangle().stroke(theme.background.opacity(0.5), lineWidth: 0.7).padding(5) }.accessibilityHidden(true)
                     Spacer()
                     Text(c.network.isEmpty ? c.bank : c.network).font(MadarTypography.fine()).lineLimit(1)
                     Text("•••• " + c.last4).font(MadarTypography.fine()).environment(\.layoutDirection, .leftToRight)
                 }
             }.padding(12).frame(width: dynamicType.isAccessibilitySize ? 280 : 171, height: dynamicType.isAccessibilitySize ? 160 : 106)
-                .foregroundStyle(theme.background).background(c.kind == "credit" ? (c.id == reading?.cards.first(where: { $0.kind == "credit" })?.id ? theme.ink : theme.color("accentText")) : theme.color("reserveText"), in: RoundedRectangle(cornerRadius: 13))
+                .foregroundStyle(theme.background).background(cardFill(c), in: RoundedRectangle(cornerRadius: 13))
                 .overlay { if !dynamicType.isAccessibilitySize { MoneyCardEtching().stroke(theme.background.opacity(0.16), lineWidth: 0.6).padding(6).clipShape(RoundedRectangle(cornerRadius: 9)).accessibilityHidden(true).allowsHitTesting(false) } }
-                .overlay { RoundedRectangle(cornerRadius: 13).stroke(active ? theme.color("reserveText") : theme.line, lineWidth: active ? 2 : 0.8) }
+                .overlay { RoundedRectangle(cornerRadius: 13).stroke(isPrimary(c) || active ? theme.color("reserve") : theme.background.opacity(0.28), lineWidth: active ? 2.2 : 1.4) }
                 .overlay { RoundedRectangle(cornerRadius: 9).stroke(theme.background.opacity(0.35), lineWidth: 0.6).padding(5) }
                 .shadow(color: theme.ink.opacity(0.14), radius: 5, y: 4)
         }.buttonStyle(.plain).accessibilityLabel(c.name + (c.kind == "credit" ? "، عليك " + amount(c.owedMinor) : "، ليست دينًا ائتمانيًا"))
             .accessibilityIdentifier("money-card-" + c.name)
+    }
+    private func isPrimary(_ c: MoneyCardReading) -> Bool { c.kind == "credit" && c.id == reading?.cards.first(where: { $0.kind == "credit" })?.id }
+    /// Gold-edged dark card for the main credit card, navy for the others, olive-gold for debit and prepaid (canonical 16-Z-R19-cards-1).
+    private func cardFill(_ c: MoneyCardReading) -> LinearGradient {
+        let colors: [Color]
+        if isPrimary(c) { colors = [theme.color("rod2"), theme.ink.opacity(0.92), theme.color("rod2").opacity(0.85)] }
+        else if c.kind == "credit" { colors = [theme.color("accent").opacity(0.78), theme.color("accentText"), theme.color("accent").opacity(0.7)] }
+        else { colors = [theme.color("reserveText"), theme.color("rod"), theme.color("reserveText")] }
+        return LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing)
     }
     private func overview(_ c: MoneyCardReading) -> some View {
         VStack(alignment: .leading, spacing: 22) {
@@ -110,7 +119,7 @@ struct MoneyCardsView: View {
                     VStack(alignment: .leading, spacing: 5) {
                         HStack { Text("الكشف المستحق").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk); Spacer(); if let due = c.due { Text(due == reading!.today ? "اليوم" : due < reading!.today ? "حلّ موعده" : "بعد " + service.days(MadarCalendarDays.distance(from: reading!.today, to: due))).font(MadarTypography.fine()).foregroundStyle(theme.color("reserveText")) } }
                         HStack(alignment: .lastTextBaseline) {
-                            Text(c.close == nil ? "لم يصل كشف" : amount(c.billedMinor)).font(.custom("thmanyahserifdisplay-Black", size: 40, relativeTo: .largeTitle)).accessibilityIdentifier("money-card-billed")
+                            Text(c.close == nil ? "لم يصل كشف" : amount(c.billedMinor)).font(.custom("thmanyahserifdisplay-Black", size: 40, relativeTo: .largeTitle)).foregroundStyle(c.close == nil ? theme.ink : theme.color("debt")).accessibilityIdentifier("money-card-billed")
                             Spacer()
                             if let due = c.due { dates(due) }
                         }
