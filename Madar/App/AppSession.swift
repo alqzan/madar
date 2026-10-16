@@ -574,8 +574,9 @@ final class AppSession {
             try reload(); try publishSnapshot()
             return result
         }
-        // F02: a habit change reschedules its window reminder (a met habit stops reminding).
-        let result = name.hasPrefix("habit.") ? try await withSerializedPrayerNotificationMutation { try await run() } : try await run()
+        // F02/V12: a habit change, an intention or a letter reschedules its reminder (a met habit or written intention stops reminding).
+        let reschedules = name.hasPrefix("habit.") || ["diary.setIntention", "diary.sealLetter", "diary.openLetter", "diary.rescheduleLetter", "diary.refreshLetters"].contains(name)
+        let result = reschedules ? try await withSerializedPrayerNotificationMutation { try await run() } : try await run()
         if let id = result.undoToken {
             showUndo(AppUndoToken(id: id, expiresAt: now.addingTimeInterval(600)), message: name.hasPrefix("habit.") ? "حُفظت العادة · التراجع متاح لعشر دقائق" : name == "bahw.saveUpcomingDay" ? "حُفظ اليوم · التراجع متاح لعشر دقائق" : name == "bahw.deleteUpcomingDay" ? "حُذف اليوم · التراجع متاح لعشر دقائق" : name.contains("Intention") ? "حُفظت النيّة · التراجع متاح لعشر دقائق" : "حُفظ السطر · التراجع متاح لعشر دقائق")
         }

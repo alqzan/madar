@@ -25,11 +25,22 @@ public enum RoomReminders {
         return .init(id: "habits.\(dayKey).\(id.uuidString)", room: .habits, dueAt: due, dayKey: dayKey)
     }
 
+    /// V12 diary kinds (§8 item 8 ids `notes.<dayKey>.<kind>`). Each falls when the anchor prayer's
+    /// sanctity ends; the arbiter applies the shared budget and `notes.dailyCap`. The copy never carries diary text.
+    public enum DiaryKind: String, Sendable { case niyya, onThisDay, letter }
+    public static func diary(_ kind: DiaryKind, day: PrayerDay, time: QadaTime, prayerDays: [PrayerDay], now: Date) -> NotificationCandidate? {
+        guard time != .off else { return nil }
+        let due = SanctityGuard(prayerDays: prayerDays).clamp(time == .afterIsha ? day.isha : day.fajr)
+        guard due > now, due <= now.addingTimeInterval(48 * 3600) else { return nil }
+        return .init(id: "notes.\(day.day).\(kind.rawValue)", room: .notes, dueAt: due, dayKey: day.day.description)
+    }
+
     /// The kind a request stands for in a digest: named, never its content.
     public static func kindLabel(for id: String) -> String? {
         if id.hasPrefix("quran.") { return id.hasSuffix(".late") ? "المراجعة" : "الورد" }
         if id.hasPrefix("qada.") { return "القضاء" }
         if id.hasPrefix("habits.") { return "عادة" }
+        if id.hasPrefix("notes.") { return id.hasSuffix(".niyya") ? "النيّة" : id.hasSuffix(".letter") ? "رسالة" : "ذكرى" }
         return nil
     }
 

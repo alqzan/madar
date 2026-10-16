@@ -53,6 +53,10 @@ struct DiaryHomeSnapshot {
     }
     func currentDay() throws -> GregorianDay {
         try authorizeRead()
+        return try diaryDay()
+    }
+    /// V12: the diary's day without a read authorization; reminder scheduling runs while the notes are locked.
+    func diaryDay() throws -> GregorianDay {
         let repository = try PrayerRepository(context: ModelContext(app.container)), now = clock(), place = repository.place(at: now)
         let civil = GregorianDay.containing(now, in: place.timeZone)
         let days = [civil.adding(days: -1), civil].compactMap { PrayerTimesEngine.calculate(day: $0, place: place, options: repository.options) }
@@ -60,7 +64,16 @@ struct DiaryHomeSnapshot {
     }
     func home(match: FirstCalendar? = nil) throws -> DiaryHomeSnapshot {
         try authorizeRead()
-        let today = try currentDay(), context = ModelContext(app.container)
+        let today = try currentDay(), facts = try memoryFacts()
+        let selection = memorySelection(facts: facts, today: today, match: match)
+        let recent = facts.map(\.day).filter { $0 < today }.sorted(by: >).prefix(5)
+        let echoes = DiaryMemories.echoes(days: facts, today: today, includeDayOne: app.bool("notes.includeDayOne"), zone: app.activePlace.timeZone)
+        let visible = Set(selection.days + Array(recent) + echoes.compactMap(\.day))
+        return try .init(today: today, selection: selection, days: visible.sorted(by: >).map { try self.day($0) }, echoes: echoes, todayPage: day(today))
+    }
+    /// Memory facts are day keys and booleans only (written, photo, Day One, hidden); no text leaves this function.
+    func memoryFacts() throws -> [DiaryMemoryDay] {
+        let context = ModelContext(app.container)
         let pages = try context.fetch(FetchDescriptor<DayPage>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
         let entries = Self.visible(try context.fetch(FetchDescriptor<Entry>()).filter { $0.deletedAt == nil && $0.mergedInto == nil })
         var photoDescriptor = FetchDescriptor<Media>(predicate: #Predicate { $0.kind == "photo" && $0.deletedAt == nil && $0.mergedInto == nil })
@@ -68,22 +81,20 @@ struct DiaryHomeSnapshot {
         let photos = Set(try context.fetch(photoDescriptor).map(\.id))
         let niyyas=try context.fetch(FetchDescriptor<Niyya>(predicate:#Predicate{$0.deletedAt==nil && $0.mergedInto==nil}))
         let keys = Set(pages.map(\.dayKey) + entries.map(\.dayKey)+niyyas.map(\.dayKey))
-        let facts = keys.compactMap { key -> DiaryMemoryDay? in
+        return keys.compactMap { key -> DiaryMemoryDay? in
             guard let day = try? GregorianDay(key) else { return nil }
             let page = pages.filter { $0.dayKey == key }.max { $0.updatedAt < $1.updatedAt }
             let written = entries.filter { $0.dayKey == key }
             return .init(day: day, hasWriting: niyyas.contains{$0.dayKey==key} || written.contains { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty },
                 hasPhoto: page?.photoMediaID.map { photos.contains($0) } == true || written.contains { !photos.isDisjoint(with: $0.attachmentMediaIDs) }, dayOne: page?.origin == "dayOne", hidden: page?.hiddenFromMemories ?? false)
         }
-        let selection = DiaryMemories.select(days: facts, today: today,
+    }
+    func memorySelection(facts: [DiaryMemoryDay], today: GregorianDay, match: FirstCalendar? = nil) -> DiaryMemorySelection {
+        DiaryMemories.select(days: facts, today: today,
             match: match ?? preferredMatch,
             includeDayOne: app.bool("notes.includeDayOne"), yearsBack: app.values["notes.yearsBack"]?.number.map(Int.init),
             noMemory: app.string("notes.noMemory"), zone: app.activePlace.timeZone,
             hijriSource: HijriSource(rawValue: app.string("core.hijriSource")) ?? .ummAlQura, sightingOffset: Int(app.number("core.hijriOffset")))
-        let recent = facts.map(\.day).filter { $0 < today }.sorted(by: >).prefix(5)
-        let echoes = DiaryMemories.echoes(days: facts, today: today, includeDayOne: app.bool("notes.includeDayOne"), zone: app.activePlace.timeZone)
-        let visible = Set(selection.days + Array(recent) + echoes.compactMap(\.day))
-        return try .init(today: today, selection: selection, days: visible.sorted(by: >).map { try self.day($0) }, echoes: echoes, todayPage: day(today))
     }
     func day(_ day: GregorianDay) throws -> DiaryDisplayDay {
         try authorizeRead()

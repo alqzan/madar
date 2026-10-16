@@ -53,4 +53,38 @@ import MadarCore
         XCTAssertEqual([1, 2, 3, 11, 100].map { RoomNotificationContent.reminderCount($0, digits) },
                        ["تذكير واحد", "تذكيران", "٣ تذكيرات", "١١ تذكيرًا", "١٠٠ تذكير"])
     }
+
+    /// M3-V12: the three diary kinds schedule from day keys and triggers; no title, body or userInfo ever carries diary text,
+    /// with or without the whole-app lock (§8 item 10, RU2, owner 15 Oct).
+    func testDiaryRemindersScheduleWithoutEverCarryingDiaryText() throws {
+        for lock in ["none", "app"] {
+            let (app, root, now, day) = try fixture(["core.dayStart": .string("midnight"), "core.faceIDLock": .string(lock)]); defer { try? FileManager.default.removeItem(at: root) }
+            let context = ModelContext(app.container), secret = "زعفرانيّة"
+            let entry = Entry(); entry.dayKey = "2025-10-15"; entry.text = "كتبت " + secret; entry.eventAt = now.addingTimeInterval(-365 * 86400); context.insert(entry)
+            let letter = Letter(); letter.text = secret; letter.triggerKind = "date"; letter.triggerValue = "2026-10-15"; context.insert(letter)
+            try context.save(); try app.reload()
+            let candidates = try RoomNotificationContent.candidates(session: app, prayerDays: [day], now: now).filter { $0.id.hasPrefix("notes.") }
+            XCTAssertEqual(Set(candidates.map(\.id)), ["notes.2026-10-15.niyya", "notes.2026-10-15.letter", "notes.2026-10-15.onThisDay"], lock)
+            XCTAssertEqual(candidates.first { $0.id.hasSuffix(".niyya") }?.dueAt, day.fajr.addingTimeInterval(1800))
+            XCTAssertEqual(candidates.first { $0.id.hasSuffix(".onThisDay") }?.dueAt, day.isha.addingTimeInterval(1800))
+            let plan = NotificationArbiter.plan(candidates: [], prayerDays: [day], now: now, timeZone: ActivePlace.riyadh.timeZone, policy: .init(staleNudgeEnabled: false))
+            for candidate in candidates {
+                let content = RoomNotificationContent.content(for: candidate, plan: plan, session: app, habitNames: [:])
+                let shown = content.title + content.body + content.userInfo.values.map { "\($0)" }.joined()
+                XCTAssertFalse(shown.contains(secret), "\(lock) \(candidate.id)")
+                if lock == "app" { XCTAssertEqual(content.body, "لديك رسالة في مدار") }
+            }
+            if lock == "none" {
+                XCTAssertEqual(candidates.map { RoomNotificationContent.content(for: $0, plan: plan, session: app, habitNames: [:]).body }.sorted(),
+                               ["عندك ذكرى من هذا اليوم", "ما نيّتك لهذا اليوم؟ سطر واحد يكفي", "وصلتك رسالة من ماضيك"].sorted())
+            }
+        }
+    }
+
+    func testDiaryCapZeroAndOffSettingsScheduleNoDiaryReminder() throws {
+        let (app, root, now, day) = try fixture(["core.dayStart": .string("midnight"), "notes.dailyCap": .number(0)]); defer { try? FileManager.default.removeItem(at: root) }
+        XCTAssertFalse(try RoomNotificationContent.candidates(session: app, prayerDays: [day], now: now).contains { $0.id.hasPrefix("notes.") })
+        let (quiet, root2, _, _) = try fixture(["core.dayStart": .string("midnight"), "notes.morningNiyya": .bool(false), "notes.onThisDay": .string("off")]); defer { try? FileManager.default.removeItem(at: root2) }
+        XCTAssertFalse(try RoomNotificationContent.candidates(session: quiet, prayerDays: [day], now: now).contains { $0.id.hasPrefix("notes.") }, "no letter, no intention, no memory")
+    }
 }

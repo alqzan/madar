@@ -348,3 +348,12 @@ Not verified: owner iPhone, distribution, real OS notification delivery, dark fo
 Next: M4-E02 (RL3/RL2 approved; migration test + one permitted data review required), M4-V02, remaining M4 ready cards; M3-V12 remains ready and V09 fixture-blocked. automation-2 is one-shot 16 Oct 05:22:05 Asia/Riyadh, exact original prompt (start + 5h05).
 Model/effort: GPT-6; effort not exposed.
 Usage: last exposed five-hour 91%; no reset invoked. Reserve retained for final commit/handover.
+
+## Handover — M4 habits, preserved periods and widgets — 2026-10-16 — Codex
+Works now: habit engine/schema V4, labelled habit room with reversible goals/logging/pause/archive, Health read flow, preserved historical period keys, Home/Lock/StandBy room widgets and navigation controls; five card commits preserve Claude’s work. Gallery: Madar/Artifacts/M4-delivery.html.
+Verified: swift test HabitEngineTests 13/13, habit persistence 8/8, V2/V3 migration 2/2; xcodebuild habits UI 2/2, native room snapshots/routes/privacy 4/4, final RoomWidgetsUITests 3/3; PrayerNextSnapshotTests 7/7. App/widget builds and git diff --check pass; default comparisons W2-Adat, X1-Raisiya, X2-Qifl opened.
+Differences left: no v2 lamps/weave/widget maker; real source numbers replace samples; OS wallpaper/clock/gallery placement are system-owned. RP9 removes prayer counts/arches outside. Blind habit actions remain F01.
+Not verified: real HealthKit data, owner store migration, OS widget/Control/StandBy invocation, owner iPhone, distribution, dark for all changes; no enlarged-text or frozen audits. One permitted data pass per record-affecting card, no remaining Critical/High findings.
+Next: M4-F01 Siri/capture, F02 shared reminders/budget, then M3-V12 generic locked reminders; V09 stays blocked on permitted fixture/path (never read real diaries). M5 requires money definitions/fixes and golden engine first, Sol highest effort as owner requested.
+Model/effort: GPT-6; effort not exposed.
+Usage: last exposed five-hour 93%, weekly 74%; reserve retained, no reset used. automation-2 one-shot 16 Oct 10:27:06 Asia/Riyadh (run start + 5h05), exact original prompt confirmed.

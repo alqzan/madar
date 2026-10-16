@@ -135,6 +135,7 @@ final class PrayerNotificationCoordinator {
             timeZone: repository.place(at: now).timeZone,
             policy: .init(dailyBudget: Int(session.number("notif.dailyBudget")), priority: priority, quietFromMinutes: quietMinutes,
                 digestEnabled: session.bool("notif.digestOverflow"), thisDeviceRemindersEnabled: globalEnabled, staleNudgeEnabled: session.bool("notif.staleNudge"),
+                notesDailyCap: Int(session.number("notes.dailyCap")),
                 dayBoundary: DayBoundary(rawValue: session.string("core.dayStart")) ?? .fajr),
             existingPendingCount: externalPendingCount, disabledIDs: Set(consumed.map(\.requestID)), submittedBudgetByDay: counts
         )

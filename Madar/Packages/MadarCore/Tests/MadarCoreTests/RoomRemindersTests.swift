@@ -50,4 +50,22 @@ import Testing
         #expect(plan.scheduled.filter { $0.kind == .digest }.map(\.id) == ["digest.2026-10-09"])
         #expect(plan.digestMembers["digest.2026-10-09"] == ["habits.2026-10-09.a", "habits.2026-10-09.b"])
     }
+
+    // §7.3: the intention card after Fajr, «في مثل هذا اليوم» after Isha by default; §8 item 8 ids and the notes cap of 2.
+    @Test func diaryKindsFallAfterTheirPrayerAndRespectTheNotesCap() {
+        let niyya = RoomReminders.diary(.niyya, day: day, time: .afterFajr, prayerDays: [day], now: dawn)
+        #expect(niyya == .init(id: "notes.2026-10-09.niyya", room: .notes, dueAt: day.fajr.addingTimeInterval(1800), dayKey: "2026-10-09"))
+        let memory = RoomReminders.diary(.onThisDay, day: day, time: .afterIsha, prayerDays: [day], now: dawn)
+        #expect(memory?.dueAt == day.isha.addingTimeInterval(1800))
+        #expect(RoomReminders.diary(.onThisDay, day: day, time: .off, prayerDays: [day], now: dawn) == nil)
+        let letter = RoomReminders.diary(.letter, day: day, time: .afterFajr, prayerDays: [day], now: dawn)!
+        #expect(RoomReminders.digestKinds(memberIDs: [niyya!.id, memory!.id, letter.id]) == ["النيّة", "ذكرى", "رسالة"])
+        let plan = NotificationArbiter.plan(candidates: [niyya!, memory!, letter], prayerDays: [day], now: dawn, timeZone: ActivePlace.riyadh.timeZone,
+                                            policy: .init(dailyBudget: 10, staleNudgeEnabled: false, notesDailyCap: 2))
+        #expect(plan.scheduled.map(\.id).sorted() == [letter.id, niyya!.id].sorted())
+        #expect(plan.droppedIDs == [memory!.id])
+        let none = NotificationArbiter.plan(candidates: [niyya!], prayerDays: [day], now: dawn, timeZone: ActivePlace.riyadh.timeZone,
+                                            policy: .init(staleNudgeEnabled: false, notesDailyCap: 0))
+        #expect(none.scheduled.isEmpty)
+    }
 }
