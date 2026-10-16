@@ -52,6 +52,10 @@ struct MoneyHomeReading {
         let showFractions = full || minor % scale != 0
         return digits.amount(minorUnits: Int64(showFractions ? minor : minor / scale), fractionDigits: showFractions ? exponent : 0, signed: false)
     }
+    func time(_ at: Date) -> String {
+        let formatter = DateFormatter(); formatter.locale = Locale(identifier: app.string("core.numerals") == "western" ? "ar_SA@numbers=latn" : "ar_SA@numbers=arab")
+        formatter.timeZone = app.activePlace.timeZone; formatter.dateFormat = "h:mm a"; return formatter.string(from: at)
+    }
     func days(_ count: Int) -> String { count == 0 ? "اليوم" : PrayerCopy.days(count, digits: digits) }
     func dailies(_ count: Int) -> String {
         let formatted = digits.string(count)

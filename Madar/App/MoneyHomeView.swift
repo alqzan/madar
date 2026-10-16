@@ -16,6 +16,7 @@ struct MoneyHomeView: View {
     @State private var revealed = false
     @State private var basisOpen = false
     @State private var envelopesOpen = false
+    @State private var messagesOpen = false
     private var service: AppMoneyService { .init(app: app) }
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
     private var amountsVisible: Bool { !app.bool("core.hideMoneyUntilTouch") || revealed }
@@ -43,11 +44,13 @@ struct MoneyHomeView: View {
         .clipped().background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
         .environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar)
         .navigationDestination(isPresented: $envelopesOpen) { MoneyEnvelopesView(app: app, revealed: $revealed) }
+        .navigationDestination(isPresented: $messagesOpen) { MoneyMessagesView(app: app, revealed: $revealed) }
         .sheet(isPresented: $basisOpen) { MoneyBasisView(app: app, revealed: $revealed) }
         .task {
             do { try await app.executeMoneyCommand("money.accruePlans") } catch { }
             load()
         }.onChange(of: app.prayerRevision) { load() }
+        .onChange(of: messagesOpen) { if !messagesOpen { load() } }
         .onChange(of: app.bool("core.hideMoneyUntilTouch")) { revealed = false }
         .onChange(of: app.selectedTab) { revealed = false }
         .onChange(of: scenePhase) { if scenePhase != .active { revealed = false } }
@@ -61,11 +64,15 @@ struct MoneyHomeView: View {
                 Text(left == 0 ? "موعد الراتب اليوم" : "بقي للراتب " + service.days(left)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
             }
             Spacer(minLength: 0)
-            if let count = reading?.pendingCount, count > 0 {
-                HStack(spacing: 5) { Image(systemName: "tray"); Text(service.digits.string(count)) }
-                    .font(MadarTypography.fine()).padding(.horizontal, 9).padding(.vertical, 7)
-                    .overlay { Capsule().stroke(theme.color("reserveText"), lineWidth: 1) }
-                    .accessibilityElement(children: .ignore).accessibilityLabel(service.pending(count)).accessibilityIdentifier("money-pending")
+            if let reading {
+                // Always reachable: «الصق رسائل» lives inside, for when the Shortcut has stopped.
+                let count = reading.pendingCount
+                Button { messagesOpen = true } label: {
+                    HStack(spacing: 5) { Image(systemName: "tray"); if count > 0 { Text(service.digits.string(count)) } }
+                        .font(MadarTypography.fine()).padding(.horizontal, 9).padding(.vertical, 7).frame(minHeight: 44)
+                        .overlay { Capsule().stroke(theme.color("reserveText"), lineWidth: 1).padding(.vertical, 6) }
+                }.buttonStyle(.plain).accessibilityElement(children: .ignore)
+                    .accessibilityLabel(count > 0 ? "رسائل البنك، " + service.pending(count) : "رسائل البنك").accessibilityAddTraits(.isButton).accessibilityIdentifier("money-pending")
             }
             Button { dismiss() } label: { Image(systemName: "chevron.backward").font(.body).frame(width: 44, height: 44) }
                 .buttonStyle(.plain).accessibilityLabel("العودة").accessibilityIdentifier("money-back")

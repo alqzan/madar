@@ -565,6 +565,10 @@ final class AppSession {
         return result
     }
 
+    #if DEBUG
+    /// UI fixtures only: runs a command as its real producer (for example the Shortcut) would.
+    func executeFixtureCommand(_ envelope: CommandEnvelope) async { _ = try? await bus.execute(envelope, now: prayerNow()) }
+    #endif
     func executeMoneyCommand(_ name: String, payload: [String: MadarCore.JSONValue] = [:]) async throws {
         guard lockController?.canPresent(.app) ?? protectedDataAuthorized else { throw DataError.authenticationFailed }
         guard beginWrite() else { throw BackupOperationError.busy }

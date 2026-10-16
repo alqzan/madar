@@ -38,7 +38,7 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
 
 /// Stages only, under DurableCommandAdapter's lease. The receipt, movement, allocations and
 /// source messages are saved together. No producer/extension opens SwiftData.
-@MainActor enum MoneyMutationHandler {
+@MainActor public enum MoneyMutationHandler {
     static func discards(name: String, payload: [String: MadarCore.JSONValue]) -> Bool {
         if name == MoneyCommandPayload.intakeName {
             return discard(text(payload, "text"))
@@ -154,6 +154,23 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             let row = try transaction(uuid(p, "id"), context)
             guard row.reviewState != "ok" else { throw MoneyCommandError.alreadyConfirmed }
             try confirm(row, payload: p, context: context, now: now, writer: writer)
+        case "money.confirmClear":
+            // «اعتمد الواضح»: one receipt and one undo for every listed draft; any refusal rejects all (rollback).
+            guard case .array(let values) = p["ids"] else { throw MoneyCommandError.invalidReference }
+            for value in values {
+                guard case .string(let raw) = value else { throw MoneyCommandError.invalidReference }
+                let row = try transaction(UUID(uuidString: raw), context)
+                guard row.reviewState == "needsLook" else { throw MoneyCommandError.alreadyConfirmed }
+                try confirm(row, payload: [:], context: context, now: now, writer: writer)
+            }
+        case "money.applyStatement":
+            try applyStatement(uuid(p, "id"), context: context, now: now, writer: writer)
+        case "money.ignoreMessage":
+            guard let id = uuid(p, "id"), let message = try context.fetch(FetchDescriptor<BankMessage>()).first(where: { $0.id == id && live($0) }),
+                  ["needsLook", "possibleDuplicate"].contains(message.status) else { throw MoneyCommandError.missingRow }
+            // A message with a live draft is dismissed by deleting the draft, which also ignores the message.
+            guard !(try transactions(context)).contains(where: { $0.messageID == id }) else { throw MoneyCommandError.invalidReference }
+            message.status = "ignored"; try touch(message, now, writer)
         case "money.deleteTransaction":
             let row = try transaction(uuid(p, "id"), context)
             guard !(try transactions(context)).contains(where: { $0.relatedTransactionID == row.id }) else { throw MoneyCommandError.invalidReference }
@@ -267,6 +284,37 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         try pairTransfers(context: context, now: now, writer: writer)
     }
 
+    /// F07: a statement message updates its card once. Natural key (card, close day); the close day is
+    /// estimated from the message's day. A second message within 5 days with the same amount updates the
+    /// same row; a different amount stays in review. An unknown card is never created here.
+    private static func applyStatement(_ id: UUID?, context: ModelContext, now: Date, writer: String) throws {
+        guard let id, let message = try context.fetch(FetchDescriptor<BankMessage>()).first(where: { $0.id == id && live($0) }),
+              message.kind == BankMessageKind.statement.rawValue, ["needsLook", "possibleDuplicate"].contains(message.status),
+              let bytes = message.parsedJSON, let parsed = try? JSONDecoder().decode(MoneyParsedFields.self, from: bytes),
+              let amount = parsed.statementDueMinor, amount >= 0, let last4 = parsed.last4 else { throw MoneyCommandError.missingRow }
+        let cards = try context.fetch(FetchDescriptor<Card>()).filter { live($0) && $0.kind == "credit" }
+        guard case .known(let raw) = CardStatements.identify(sender: message.sender, last4: last4, cards: cards.map { .init(id: $0.id.uuidString, bank: $0.bank, last4: $0.last4, aliases: $0.aliases) }),
+              let cardID = UUID(uuidString: raw) else { throw MoneyCommandError.invalidReference }
+        let zone = try PrayerRepository(context: context).place(at: message.receivedAt).timeZone
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = zone
+        let close = calendar.startOfDay(for: message.receivedAt)
+        let stored = try context.fetch(FetchDescriptor<Statement>()).filter { live($0) && $0.cardID == cardID }.sorted { $0.closeDate < $1.closeDate }
+        let row: Statement
+        switch CardStatements.place(closeDate: close, statementMinor: amount, existing: stored.map { .init(closeDate: $0.closeDate, statementMinor: $0.statementMinor, estimated: $0.closeDateSource == "estimated") }) {
+        case .needsLook: throw MoneyCommandError.invalidAmount
+        case .sameStatement(let index): row = stored[index]
+        case .new:
+            if let same = stored.first(where: { $0.closeDate == close }) { row = same } else {
+                row = Statement(); row.id = StableIdentity.uuid(for: "Statement:\(cardID):\(Int(close.timeIntervalSince1970))")
+                row.cardID = cardID; row.closeDate = close; row.closeDateSource = "estimated"; row.createdAt = now; context.insert(row)
+            }
+        }
+        row.statementMinor = amount; row.minimumDueMinor = parsed.minimumDueMinor ?? row.minimumDueMinor; row.dueDate = parsed.dueDate ?? row.dueDate
+        row.periodStart = stored.last(where: { $0.closeDate < close && $0.id != row.id })?.closeDate ?? row.periodStart
+        row.messageID = message.id; try touch(row, now, writer)
+        message.status = "ok"; try touch(message, now, writer)
+    }
+
     private static func identify(_ row: MoneyTransaction, parsed: ParsedBankMessage, sender: String, context: ModelContext) throws {
         let accounts = try context.fetch(FetchDescriptor<Account>()).filter { live($0) }
         let cards = try context.fetch(FetchDescriptor<Card>()).filter { live($0) }
@@ -330,6 +378,16 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         }
     }
 
+    /// «الواضح»: the drafts the real confirmation accepts as read. Each runs in its own unsaved
+    /// context that is rolled back, so the UI flag and money.confirmClear share one definition.
+    public static func confirmableAsRead(_ ids: [UUID], container: ModelContainer, now: Date) -> Set<UUID> {
+        Set(ids.filter { id in
+            let context = ModelContext(container); context.autosaveEnabled = false
+            defer { context.rollback() }
+            guard let row = try? transaction(id, context), row.reviewState == "needsLook" else { return false }
+            return (try? confirm(row, payload: [:], context: context, now: now, writer: "dryRun")) != nil
+        })
+    }
     private static func confirm(_ row: MoneyTransaction, payload p: [String: MadarCore.JSONValue], context: ModelContext, now: Date, writer: String) throws {
         guard row.kind != "salary" else { throw MoneyCommandError.salaryNeedsCycleConfirmation }
         for (key, setter) in [
@@ -542,6 +600,7 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         rows += try context.fetch(FetchDescriptor<Envelope>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<EnvelopePlan>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<InstallmentItem>()).map { try $0.record() }
+        rows += try context.fetch(FetchDescriptor<Statement>()).map { try $0.record() }
         return rows
     }
     private static func rebuildEnvelopes(_ context: ModelContext, _ now: Date, _ writer: String) throws {

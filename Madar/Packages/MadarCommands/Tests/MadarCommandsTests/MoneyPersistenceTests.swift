@@ -367,6 +367,74 @@ import MadarInbox
         #expect(try repo.basis(at: f.now).owedMinor == 80000)
     }
 
+    /// F07: a statement message updates its card once, keyed by (card, estimated close day); a second message within
+    /// five days with the same amount updates the same row, a different amount stays in review, an unknown card is refused.
+    @Test func statementMessageUpdatesItsCardOnceAndUndoReturnsItToReview() async throws {
+        let f = try MoneyFixture(); defer { f.clean() }; try await f.setup()
+        let text = "كشف حساب البطاقة *4444\nالمبلغ المستحق: 6,800.00 SAR\nالحد الأدنى: 340.00 SAR\nتاريخ الاستحقاق: 2026-11-05"
+        let earlier = f.now.addingTimeInterval(-3 * 86_400)
+        _ = try await f.run("money.ingestBankMessage", ["text": .string(text), "sender": .string("Bank")], source: .shortcut, at: earlier)
+        func message(_ kind: String = "statement", status: String? = nil) throws -> [BankMessage] {
+            try ModelContext(f.container).fetch(FetchDescriptor<BankMessage>()).filter { $0.kind == kind && (status == nil || $0.status == status) }.sorted { $0.receivedAt < $1.receivedAt }
+        }
+        let first = try #require(try message().first); #expect(first.status == "needsLook")
+        #expect(try ModelContext(f.container).fetchCount(FetchDescriptor<MoneyTransaction>()) == 0, "A statement is not a movement")
+        let apply = UUID()
+        #expect(try await f.run("money.applyStatement", ["id": .string(first.id.uuidString)], id: apply).status == .applied)
+        var statements = try ModelContext(f.container).fetch(FetchDescriptor<Statement>()).filter { $0.deletedAt == nil }
+        #expect(statements.count == 1); let row = try #require(statements.first)
+        #expect(row.cardID == f.credit); #expect(row.statementMinor == 680_000); #expect(row.minimumDueMinor == 34_000)
+        #expect(row.closeDateSource == "estimated"); #expect(row.closeDate == ISO8601DateFormatter().date(from: "2026-10-13T00:00:00+03:00"))
+        #expect(row.dueDate != nil); #expect(row.messageID == first.id)
+        #expect(try message(status: "ok").count == 1)
+        // Same amount three days later (within five of the estimated close): the same statement row, not a second.
+        _ = try await f.run("money.ingestBankMessage", ["text": .string(text + "\n "), "sender": .string("Bank")], source: .shortcut)
+        let second = try #require(try message(status: "needsLook").first)
+        #expect(try await f.run("money.applyStatement", ["id": .string(second.id.uuidString)]).status == .applied)
+        statements = try ModelContext(f.container).fetch(FetchDescriptor<Statement>()).filter { $0.deletedAt == nil }
+        #expect(statements.count == 1); #expect(statements.first?.messageID == second.id)
+        // A different amount inside the window stays for review.
+        _ = try await f.run("money.ingestBankMessage", ["text": .string(text.replacingOccurrences(of: "6,800.00", with: "6,900.00")), "sender": .string("Bank")], source: .shortcut)
+        let third = try #require(try message(status: "needsLook").first)
+        #expect(try await f.run("money.applyStatement", ["id": .string(third.id.uuidString)]).status == .rejected)
+        #expect(try message(status: "needsLook").count == 1)
+        // Unknown last four: never a silent card.
+        _ = try await f.run("money.ingestBankMessage", ["text": .string(text.replacingOccurrences(of: "*4444", with: "*9999")), "sender": .string("Bank")], source: .shortcut)
+        let unknown = try #require(try message(status: "needsLook").first { $0.text.contains("9999") })
+        #expect(try await f.run("money.applyStatement", ["id": .string(unknown.id.uuidString)]).status == .rejected)
+        #expect(try ModelContext(f.container).fetchCount(FetchDescriptor<Card>()) == 2)
+        // Ignore removes it from review; undo brings it back.
+        let ignore = UUID()
+        #expect(try await f.run("money.ignoreMessage", ["id": .string(unknown.id.uuidString)], id: ignore).status == .applied)
+        #expect(try message().first { $0.id == unknown.id }?.status == "ignored")
+        #expect(try await f.run("system.undo", ["undoToken": .string(ignore.uuidString)]).status == .applied)
+        #expect(try message().first { $0.id == unknown.id }?.status == "needsLook")
+    }
+    /// «اعتمد الواضح»: one receipt confirms every listed draft and one undo returns all; one bad id rejects all.
+    @Test func confirmClearIsAtomicWithOneUndo() async throws {
+        let f = try MoneyFixture(); defer { f.clean() }; try await f.setup()
+        _ = try await f.ingest("شراء مدى Apple Pay\nبطاقة *3333\n42.00 SAR\nلدى: Coffee\n2026-10-16 13:05")
+        _ = try await f.ingest("شراء مدى Apple Pay\nبطاقة *3333\n18.50 SAR\nلدى: Bakery\n2026-10-16 14:10")
+        _ = try await f.ingest("راتب\n*1111\n15000.00 SAR\n2026-10-16 12:00")
+        let rows = try ModelContext(f.container).fetch(FetchDescriptor<MoneyTransaction>())
+        let purchases = rows.filter { $0.kind == "expense" }.map { MadarCore.JSONValue.string($0.id.uuidString) }
+        let salary = try #require(rows.first { $0.kind == "salary" })
+        #expect(purchases.count == 2)
+        let ids = rows.map(\.id), dry = MoneyMutationHandler.confirmableAsRead(ids, container: f.container, now: f.now)
+        #expect(dry == Set(rows.filter { $0.kind == "expense" }.map(\.id)), "The dry run accepts the purchases, never the salary")
+        #expect(try ModelContext(f.container).fetch(FetchDescriptor<MoneyTransaction>()).allSatisfy { $0.reviewState != "ok" }, "The dry run writes nothing")
+        #expect(try await f.run("money.confirmClear", ["ids": .array(purchases + [.string(salary.id.uuidString)])]).status == .rejected)
+        #expect(try ModelContext(f.container).fetch(FetchDescriptor<MoneyTransaction>()).filter { $0.reviewState == "ok" }.isEmpty, "Atomic: nothing confirmed")
+        let command = UUID()
+        #expect(try await f.run("money.confirmClear", ["ids": .array(purchases)], id: command).status == .applied)
+        #expect(try f.basis().inAccountMinor == 2_010_000 - 4200 - 1850)
+        #expect(try ModelContext(f.container).fetch(FetchDescriptor<BankMessage>()).filter { $0.status == "ok" }.count == 2)
+        #expect(try await f.run("system.undo", ["undoToken": .string(command.uuidString)]).status == .applied)
+        #expect(try f.basis().inAccountMinor == 2_010_000)
+        #expect(try ModelContext(f.container).fetch(FetchDescriptor<MoneyTransaction>()).filter { $0.reviewState == "ok" }.isEmpty)
+        #expect(!MoneyCommandPayload.validate(name: "money.confirmClear", payload: ["ids": .array([.string(salary.id.uuidString), .string(salary.id.uuidString)])]))
+    }
+
     @Test func reserveTargetUndoPreservesLaterSpendingAndNeverMovesMoney() async throws {
         let f = try MoneyFixture(); defer { f.clean() }; try await f.setup()
         let c = ModelContext(f.container), reserve = Envelope(); reserve.role = "reserve"; reserve.name = "احتياطي"; c.insert(reserve)
