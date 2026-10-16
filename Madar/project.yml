@@ -42,6 +42,7 @@ targets:
         excludes:
           - QuranRoom.swift
       - Intents
+      - Widgets/NextPrayerWidget.swift
     dependencies:
       - package: MadarCore
       - package: MadarData
@@ -104,6 +105,7 @@ targets:
       - Intents/StartQuranSessionIntent.swift
       - Intents/StartPrayerActivityIntent.swift
       - App/QuranWidgetContent.swift
+      - App/RoomWidgetContent.swift
       - App/Resources/RoomSymbols.xcassets
     dependencies:
       - package: MadarSnapshots

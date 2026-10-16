@@ -21,6 +21,7 @@ final class AppSession {
     /// M4-V03: «السنة وما يهمّك» pushed from the lobby (`madar://bahw/year`).
     var yearOpen = false
     var habitsOpen = false
+    var habitRouteID:UUID?
     private(set) var container: ModelContainer
     let managedStore: ManagedDataStore?
     let snapshotStore: SnapshotStore
@@ -365,14 +366,17 @@ final class AppSession {
         let today = GregorianDay.containing(.now, in: activePlace.timeZone)
         let context = RouteContext(trackingStart: today.adding(days: -36500), today: today, settingsKeys: Set(Self.supportedKeys), availability: .init(builtRooms: [.core, .salah, .quran, .notes, .bahw, .year, .habits]))
         do {
-            let route = try RouteRegistry.parse(url, context: context)
+            var components=URLComponents(url:url,resolvingAgainstBaseURL:false)
+            if components?.host == "prayer" {components?.host="salah"} // Existing placed widgets used this legacy alias.
+            let route = try RouteRegistry.parse(components?.url ?? url, context: context)
+            if route.room == .salah,route.path.isEmpty {selectedTab="prayer";return}
             if route.room == .quran, route.path.isEmpty || route.path.first == "session" || route.path.first == "page" {
                 quranRoute = route; selectedTab = "quran"; return
             }
             if route.room == .notes, route.path.isEmpty || ["today", "day", "write"].contains(route.path.first ?? "") {
                 diaryRoute = route; selectedTab = "notes"; return
             }
-            if route.room == .habits { selectedTab = "foundation"; habitsOpen = true; return }
+            if route.room == .habits { habitRouteID=route.path.last.flatMap(UUID.init(uuidString:)) ?? route.parameters["habit"].flatMap(UUID.init(uuidString:)); selectedTab = "foundation"; habitsOpen = true; return }
             if route.room == .year, route.path == ["year"] { selectedTab = "foundation"; yearOpen = true; return }
             guard url.host == "settings", route.room == .core else { throw CoreError.unavailableFeature }
             settingsQuery = try schema.definition(for: route.path[1]).title
@@ -666,15 +670,18 @@ final class AppSession {
     func publishSnapshot() throws {
         try pendingInbox.publishGeneration(inboxGeneration())
         try publishNotificationBudget(at: Date())
-        let instant = Date(), place = activePlace, day = GregorianDay.containing(instant, in: place.timeZone)
-        let prayers = [day.adding(days: -1), day].compactMap { PrayerTimesEngine.calculate(day: $0, place: place) }
+        let instant = prayerNow(), place = activePlace, day = GregorianDay.containing(instant, in: place.timeZone)
+        let prayerSource=try PrayerRepository(context:ModelContext(container)),options=prayerSource.activeTrip(at:instant)==nil ? prayerSource.options : prayerSource.tripOptions
+        let prayers = [day.adding(days: -1), day].compactMap { PrayerTimesEngine.calculate(day: $0, place: place,options:options) }
         guard let key = try? MadarDay.resolve(instant: instant, place: place, boundary: DayBoundary(rawValue: string("core.dayStart")) ?? .fajr, prayerDays: prayers, hijriSource: HijriSource(rawValue: string("core.hijriSource")) ?? .ummAlQura, sightingOffset: Int(number("core.hijriOffset"))) else {
             try snapshotStore.remove("foundation")
             try? snapshotStore.remove("quran")
+            for room in BuiltRoomWidget.allCases {try? snapshotStore.remove(room.rawValue)}
             return
         }
         let snapshot = SnapshotEnvelope(name: "foundation", generatedAt: instant, validUntil: instant.addingTimeInterval(3600), dayKey: key.dayKey, tzID: place.timeZoneID, privacy: SnapshotPrivacy(), payload: FoundationSnapshot(firstCalendar: string("core.firstCalendar"), numerals: string("core.numerals")))
         try snapshotStore.write(snapshot)
+        try publishRoomWidgetSnapshots(at:instant)
         publishPrayerNextSnapshot(at: instant, tzID: place.timeZoneID, dayKey: key.dayKey)
         let quran = AppQuranService(session: self, clock: { instant })
         do { try snapshotStore.write(quran.widgetSnapshot()); WidgetCenter.shared.reloadTimelines(ofKind: "MadarQuran") }

@@ -41,6 +41,7 @@ private struct FoundationWidget: Widget {
         FoundationWidget()
         NextPrayerWidget()
         QuranWidget()
+        AdditionalRoomWidgets().body
         QuranReviewTimerControl()
         PrayerCountdownActivityWidget()
         PrayerLogControl()

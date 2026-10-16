@@ -7,6 +7,7 @@ struct CustomizeMadar: View {
     @Bindable var session: AppSession
     private var query: String { session.settingsQuery }
     @State private var confirmReset = false
+    @State private var widgetGallery = false
     @Environment(\.roomTheme) private var theme
     @Environment(\.dynamicTypeSize) private var dynamicType
     var body: some View {
@@ -22,7 +23,10 @@ struct CustomizeMadar: View {
                         .submitLabel(.search)
                 }.padding(16).background(theme.surface, in: .capsule)
                 if query.isEmpty || normalized("الودجات وأحجامها البهو الكتل").contains(normalized(query)) { BahwBlocksSection(session: session) }
-                if filtered.isEmpty {
+                if query.isEmpty || normalized("ودجات الشاشة الرئيسية خارج التطبيق").contains(normalized(query)) {
+                    Button {widgetGallery=true} label:{Label("ودجات الشاشة الرئيسية",systemImage:"square.grid.2x2").font(MadarTypography.section()).frame(maxWidth:.infinity,minHeight:50).background(theme.surface,in:.rect(cornerRadius:20))}.buttonStyle(.plain).accessibilityIdentifier("room-widgets-gallery")
+                }
+                if filtered.isEmpty && !(query.isEmpty || normalized("ودجات الشاشة الرئيسية خارج التطبيق").contains(normalized(query))) {
                     ContentUnavailableView.search(text: query)
                 } else {
                     ForEach(sections, id: \.self) { section in
@@ -52,6 +56,7 @@ struct CustomizeMadar: View {
                 }
             }
         }
+        .sheet(isPresented:$widgetGallery){RoomWidgetsGallery(session:session)}
         .toolbarVisibility(.hidden, for: .navigationBar)
         .confirmationDialog("أعِد الإعدادات المتفق عليها؟", isPresented: $confirmReset, titleVisibility: .visible) {
             Button("أعِد الافتراضي", role: .destructive) { session.reset(AppSession.supportedKeys + ["bahw.layout"]) }

@@ -1,0 +1,63 @@
+import Foundation
+import SwiftData
+import MadarCore
+import MadarData
+import MadarCommands
+import MadarPrayer
+import MadarSnapshots
+import WidgetKit
+
+extension AppSession {
+    /// Omits personal rows at construction time when whole-app protection is configured; a view mask is insufficient.
+    func roomWidgetPayloads(locked:Bool,at instant:Date?=nil)->[BuiltRoomWidget:RoomWidgetSnapshot] {
+        let now=instant ?? prayerNow(),service=AppBahwService(session:self,evaluationDate:now),today=service.today,date=dateLabels(today),digits=service.digits
+        var payloads:[BuiltRoomWidget:RoomWidgetSnapshot]=[:]
+        let readings=locked ? [] : ((try? HabitRepository(context:ModelContext(container)).readings(at:now)) ?? [])
+        let eligible=readings.filter{$0.summary.current?.dueDays.contains(today)==true || $0.paused}
+        let ordered=eligible.enumerated().sorted { left,right in
+            let a=left.element,b=right.element
+            func rank(_ r:HabitReading)->Int{(r.summary.current?.met == true ? 100 : 0)+(r.paused ? 50 : 0)+(r.isNow ? 0 : 10)+(r.summary.atRisk ? 0 : 1)}
+            return rank(a)==rank(b) ? left.offset<right.offset : rank(a)<rank(b)
+        }.map(\.element)
+        let rows=ordered.prefix(6).compactMap { r->RoomWidgetSnapshot.Row? in
+            guard let p=r.summary.current else{return nil}
+            let value=r.paused ? "مجمّدة" : p.target==0 ? "إجازتها اليوم" : r.source=="walking" ? "تُحدّث من الصحة" : digits.string(p.value)+" من "+digits.string(p.target)+(p.rule.unit.map{" "+habitUnitName($0)} ?? "")
+            return .init(id:r.id.uuidString,title:r.name,value:value,detail:r.summary.atRisk ? "القليل يحفظ سلسلتك" : r.isNow ? "وقتها الآن" : r.sourceTitle.map{"تُقرأ من "+$0} ?? "",share:Double(p.value)/Double(max(1,p.target)),route:"madar://bahw/habits/"+r.id.uuidString,done:p.met)
+        }
+        let periods=[HabitFrequency.daily,.weekly,.monthly,.yearly].map { f->RoomWidgetSnapshot.Row in
+            let group=readings.filter{$0.summary.current?.rule.frequency==f && !$0.paused && ($0.summary.current?.target ?? 0)>0},met=group.filter{$0.summary.current?.met==true}.count
+            return .init(id:f.rawValue,title:f.arabic,value:group.isEmpty ? "لا استحقاق" : digits.string(met)+" من "+digits.string(group.count),share:Double(met)/Double(max(1,group.count)),route:BuiltRoomWidget.habits.route)
+        }
+        payloads[.habits] = .init(datePrimary:date.primary,dateSecondary:date.secondary,heading:digits.string(readings.filter{$0.summary.current?.met==true}.count)+" تمّت",emptyTitle:"أضف أول عادة",rows:rows,periods:periods,locked:locked)
+        let year=service.year()
+        var yearRows:[RoomWidgetSnapshot.Row]=[
+            .init(id:"hijri",title:digits.string(year.hijriYear)+" هـ",value:digits.string(year.hijri.basisPoints/100)+"٪\u{061C}",detail:"بقي "+digits.string(year.hijri.remaining)+" "+service.dayCount(year.hijri.remaining),share:Double(year.hijri.basisPoints)/10000,route:BuiltRoomWidget.year.route),
+            .init(id:"gregorian",title:digits.string(year.gregorianYear)+" م",value:digits.string(year.gregorian.basisPoints/100)+"٪\u{061C}",detail:"بقي "+digits.string(year.gregorian.remaining)+" "+service.dayCount(year.gregorian.remaining),share:Double(year.gregorian.basisPoints)/10000,route:BuiltRoomWidget.year.route)]
+        if string("core.firstCalendar")=="gregorian"{yearRows.reverse()}
+        payloads[.year] = .init(datePrimary:date.primary,dateSecondary:date.secondary,heading:"عامك، يومًا بيوم",emptyTitle:"افتح السنة",rows:yearRows)
+        let upcoming=locked ? [] : service.upcoming(limit:7).map { item->RoomWidgetSnapshot.Row in
+            let labels=dateLabels(item.day)
+            return .init(id:item.id,title:item.title,value:digits.string(item.daysLeft)+" "+service.dayCount(item.daysLeft),detail:labels.primary,secondDate:labels.secondary,share:item.closed,route:BuiltRoomWidget.upcoming.route)
+        }
+        payloads[.upcoming] = .init(datePrimary:date.primary,dateSecondary:date.secondary,heading:"كم بقي",emptyTitle:"أضف يومًا تنتظره",rows:upcoming,locked:locked)
+        payloads[.diaryWrite] = .init(datePrimary:date.primary,dateSecondary:date.secondary,heading:"اكتب سطر اليوم",emptyTitle:"فكرة صغيرة تستحق أن تبقى")
+        return payloads
+    }
+    func publishRoomWidgetSnapshots(at now:Date) throws {
+        let service=AppBahwService(session:self,evaluationDate:now),next=service.today.adding(days:1),place=activePlace
+        let prayers=try PrayerRepository(context:ModelContext(container)),options=prayers.activeTrip(at:now)==nil ? prayers.options : prayers.tripOptions
+        let end:Date?
+        switch DayBoundary(rawValue:string("core.dayStart")) ?? .fajr {
+        case .midnight:end=next.date(in:place.timeZone)
+        case .fajr:end=PrayerTimesEngine.calculate(day:next,place:place,options:options)?.fajr
+        case .maghrib:end=PrayerTimesEngine.calculate(day:next,place:place,options:options)?.maghrib
+        }
+        let expiry=min(now.addingTimeInterval(3600),end ?? now.addingTimeInterval(900))
+        let locked=string("core.faceIDLock")=="app"
+        for (room,payload) in roomWidgetPayloads(locked:locked,at:now) {
+            let envelope=SnapshotEnvelope(name:room.rawValue,generatedAt:now,validUntil:expiry,dayKey:service.today.description,tzID:place.timeZoneID,privacy:SnapshotPrivacy(notesLocked:locked),payload:payload)
+            try snapshotStore.write(envelope)
+            WidgetCenter.shared.reloadTimelines(ofKind:"MadarRoom-"+room.rawValue)
+        }
+    }
+}

@@ -54,7 +54,9 @@ struct BahwUpcomingItem: Identifiable, Equatable {
     /// The Madar day under `core.dayStart` (RL10: never midnight unless chosen).
     var today: GregorianDay {
         let place = session.activePlace, civil = GregorianDay.containing(now, in: place.timeZone)
-        let days = [civil.adding(days: -1), civil].compactMap { PrayerTimesEngine.calculate(day: $0, place: place) }
+        let repo=try? PrayerRepository(context:ModelContext(session.container))
+        let options=repo?.activeTrip(at:now)==nil ? repo?.options : repo?.tripOptions
+        let days = [civil.adding(days: -1), civil].compactMap { PrayerTimesEngine.calculate(day: $0, place: place,options:options ?? .init()) }
         return (try? MadarDay.resolve(instant: now, place: place, boundary: DayBoundary(rawValue: session.string("core.dayStart")) ?? .fajr, prayerDays: days).date) ?? civil
     }
 

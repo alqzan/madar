@@ -112,7 +112,7 @@ struct HabitsRoomView: View {
         }.buttonStyle(.plain).accessibilityIdentifier("habit-row-"+row.id.uuidString).accessibilityLabel(row.name+"، "+progress(row)+"، "+row.statusTitle)
     }
     private func progress(_ row:HabitReading)->String { guard let p=row.summary.current else{return "لا فترة بعد"}; return (p.target == 0 ? "سجلك محفوظ" : digits.string(p.value)+" من "+digits.string(p.target)+(p.rule.unit.map { " "+habitUnitName($0) } ?? ""))+(row.sourceTitle.map { "، تُقرأ من "+$0 } ?? "") }
-    private func reload() { do { readings=try HabitRepository(context:ModelContext(session.container)).readings(at:session.prayerNow(),includeArchived:true,liveHealth:liveHealth) } catch { session.errorMessage=error.localizedDescription } }
+    private func reload() { do { readings=try HabitRepository(context:ModelContext(session.container)).readings(at:session.prayerNow(),includeArchived:true,liveHealth:liveHealth);if let id=session.habitRouteID {if let row=readings.first(where:{$0.id==id}) {if row.archived {showArchived=true}else{detail=row}};session.habitRouteID=nil} } catch { session.errorMessage=error.localizedDescription } }
     private func perform(_ name:String,_ payload:[String:MadarCore.JSONValue]) { Task { do {try await session.executeDiaryCommand(name,payload:payload);reload()}catch{session.errorMessage=error.localizedDescription} } }
 }
 struct HabitMiniRing:View {
