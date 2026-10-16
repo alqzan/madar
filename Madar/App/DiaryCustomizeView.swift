@@ -130,7 +130,7 @@ struct DiaryCustomizeView: View {
                     if ["memory", "todayBar"].contains(id) { Text("ثابت").font(DiaryType.label).foregroundStyle(theme.color("ink3Text")) }
                     else {
                         Toggle(DiaryHomeLayout.titles[id] ?? id, isOn: Binding(get: { !layout.hidden.contains(id) }, set: { _ in app.set(layout.toggle(id).payload, key: "notes.layout") }))
-                            .labelsHidden().tint(Color(.systemGreen)).accessibilityIdentifier("diary-block-" + id)
+                            .labelsHidden().tint(theme.color("ghad")).accessibilityIdentifier("diary-block-" + id)
                     }
                 }.frame(minHeight: 48)
             }
@@ -150,7 +150,7 @@ struct DiaryCustomizeView: View {
             ForEach([("sadr", "في صدرك"), ("fajrJamaah", "الفجر جماعة")], id: \.0) { id, title in
                 Toggle(title, isOn: Binding(get: { app.values["notes.sinceMetrics"]?.array?.contains(.string(id)) == true }, set: { on in
                     var values = app.values["notes.sinceMetrics"]?.array ?? []; values.removeAll { $0 == .string(id) }; if on { values.append(.string(id)) }; app.set(.array(values), key: "notes.sinceMetrics")
-                })).font(MadarTypography.body()).tint(Color(.systemGreen)).accessibilityIdentifier("diary-metric-" + id)
+                })).font(MadarTypography.body()).tint(theme.color("ghad")).accessibilityIdentifier("diary-metric-" + id)
             }
         }
     }
@@ -160,7 +160,7 @@ struct DiaryCustomizeView: View {
             ForEach([("salah", "الصلاة"), ("quran", "القرآن")], id: \.0) { id, title in
                 Toggle(title, isOn: Binding(get: { app.values["notes.autoLines"]?.object?[id] == .bool(true) }, set: { on in
                     var values = app.values["notes.autoLines"]?.object ?? [:]; values[id] = .bool(on); app.set(.object(values), key: "notes.autoLines")
-                })).font(MadarTypography.body()).tint(Color(.systemGreen)).accessibilityIdentifier("diary-auto-" + id)
+                })).font(MadarTypography.body()).tint(theme.color("ghad")).accessibilityIdentifier("diary-auto-" + id)
             }
         }
     }
@@ -179,5 +179,5 @@ struct DiaryCustomizeView: View {
     }
     private func label(_ key: String) -> String { app.schema.settings.first { $0.key == key }?.options.first { $0.value == app.values[key] }?.label ?? "" }
     private func matches(_ text: String) -> Bool { query.isEmpty || normalized(text).contains(normalized(query)) }
-    private func summary(_ id: String) -> String { switch id { case "memory": label("notes.match") + " · " + label("notes.noMemory"); case "ink": label("notes.secondInk"); default: app.bool("notes.showPhoto") ? "الصورة والمكان وسطـور مدار" : "سطور الذكرى" } }
+    private func summary(_ id: String) -> String { switch id { case "calendar": label("notes.calendarFirst") + " أولًا"; case "memory": label("notes.match") + " · " + label("notes.noMemory"); case "ink": label("notes.secondInk"); default: app.bool("notes.showPhoto") ? "الصورة والمكان وسطـور مدار" : "سطور الذكرى" } }
 }

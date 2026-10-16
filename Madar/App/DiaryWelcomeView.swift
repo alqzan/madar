@@ -48,7 +48,7 @@ struct DiaryWelcomeView: View {
                     } else if step == 1 {
                         Text("اختر ما يدخل صفحتك تلقائيًا. يمكنك تغييره لاحقًا، وتبقى كتابتك كما هي.").font(MadarTypography.body()).multilineTextAlignment(.center)
                         ForEach([("salah", "الصلاة"), ("quran", "القرآن")], id: \.0) { key, title in
-                            Toggle(title, isOn: Binding(get: { app.values["notes.autoLines"]?.object?[key] == .bool(true) }, set: { value in var map = app.values["notes.autoLines"]?.object ?? [:]; map[key] = .bool(value); app.set(.object(map), key: "notes.autoLines") })).font(MadarTypography.section()).tint(Color(.systemGreen)).padding(14).background(theme.surface, in: .rect(cornerRadius: 18))
+                            Toggle(title, isOn: Binding(get: { app.values["notes.autoLines"]?.object?[key] == .bool(true) }, set: { value in var map = app.values["notes.autoLines"]?.object ?? [:]; map[key] = .bool(value); app.set(.object(map), key: "notes.autoLines") })).font(MadarTypography.section()).tint(theme.color("ghad")).padding(14).background(theme.surface, in: .rect(cornerRadius: 18))
                         }
                     } else if step == 2 {
                         Text("المطابقة تغيّر الذكريات التي تراها، وتحافظ على التاريخ الأصلي لكل صفحة.").font(MadarTypography.body()).multilineTextAlignment(.center)
