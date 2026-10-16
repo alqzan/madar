@@ -1,6 +1,6 @@
 import Foundation
 import SwiftData
-// Generated from Specification/data-dictionary.json (schema V4). UUID foreign keys intentionally avoid ownership relationships.
+// Generated from Specification/data-dictionary.json (schema V5). UUID foreign keys intentionally avoid ownership relationships.
 @MainActor public protocol MadarRecordModel: PersistentModel { var id: UUID { get set }; func record() throws -> DataRecord; func apply(_ record: DataRecord) throws }
 @Model public final class Setting {
     public var id: UUID = UUID()
@@ -1478,6 +1478,8 @@ extension Media: MadarRecordModel {
     public var balanceAt: Date? = nil
     public var parentID: UUID? = nil
     public var senderIDs: [String] = []
+    public var last4: String? = nil
+    public var tracked: Bool = true
     public init() {}
 }
 extension Account: MadarRecordModel {
@@ -1502,6 +1504,8 @@ extension Account: MadarRecordModel {
             "balanceAt": JSONValue.encode(balanceAt),
             "parentID": JSONValue.encode(parentID),
             "senderIDs": JSONValue.encode(senderIDs),
+            "last4": JSONValue.encode(last4),
+            "tracked": JSONValue.encode(tracked),
         ])
     }
     public func apply(_ record: DataRecord) throws {
@@ -1524,6 +1528,8 @@ extension Account: MadarRecordModel {
         balanceAt = try record.decode("balanceAt", as: Date?.self)
         parentID = try record.decode("parentID", as: UUID?.self)
         senderIDs = try record.decode("senderIDs", as: [String].self)
+        last4 = try record.fields["last4"]?.decode(String?.self)
+        tracked = try record.fields["tracked"]?.decode(Bool.self) ?? true
     }
 }
 @Model public final class Card {
@@ -1546,6 +1552,7 @@ extension Account: MadarRecordModel {
     public var aprBp: Int? = nil
     public var accountID: UUID? = nil
     public var fieldSourcesJSON: Data = Data()
+    public var kind: String = "credit"
     public init() {}
 }
 extension Card: MadarRecordModel {
@@ -1570,6 +1577,7 @@ extension Card: MadarRecordModel {
             "aprBp": JSONValue.encode(aprBp),
             "accountID": JSONValue.encode(accountID),
             "fieldSourcesJSON": JSONValue.encode(fieldSourcesJSON),
+            "kind": JSONValue.encode(kind),
         ])
     }
     public func apply(_ record: DataRecord) throws {
@@ -1592,6 +1600,7 @@ extension Card: MadarRecordModel {
         aprBp = try record.decode("aprBp", as: Int?.self)
         accountID = try record.decode("accountID", as: UUID?.self)
         fieldSourcesJSON = try record.decode("fieldSourcesJSON", as: Data.self)
+        kind = try record.fields["kind"]?.decode(String.self) ?? "credit"
     }
 }
 @Model public final class Statement {
@@ -2211,6 +2220,8 @@ extension Envelope: MadarRecordModel {
     public var source: String = "salary"
     public var perPaycheckMinor: Int = 0
     public var untilDate: Date? = nil
+    public var period: String = "perCycle"
+    public var startDayKey: String? = nil
     public init() {}
 }
 extension EnvelopePlan: MadarRecordModel {
@@ -2229,6 +2240,8 @@ extension EnvelopePlan: MadarRecordModel {
             "source": JSONValue.encode(source),
             "perPaycheckMinor": JSONValue.encode(perPaycheckMinor),
             "untilDate": JSONValue.encode(untilDate),
+            "period": JSONValue.encode(period),
+            "startDayKey": JSONValue.encode(startDayKey),
         ])
     }
     public func apply(_ record: DataRecord) throws {
@@ -2245,6 +2258,8 @@ extension EnvelopePlan: MadarRecordModel {
         source = try record.decode("source", as: String.self)
         perPaycheckMinor = try record.decode("perPaycheckMinor", as: Int.self)
         untilDate = try record.decode("untilDate", as: Date?.self)
+        period = try record.fields["period"]?.decode(String.self) ?? "perCycle"
+        startDayKey = try record.fields["startDayKey"]?.decode(String?.self)
     }
 }
 @Model public final class Obligation {
@@ -2528,6 +2543,10 @@ extension MerchantRule: MadarRecordModel {
     public var debtsPolicy: String = "unset"
     public var otherAssetsMinor: Int = 0
     public var lastPaidAt: Date? = nil
+    public var nisabBasis: String = "gold"
+    public var nisabSilverMg: Int = 595000
+    public var silverPricePerGramMinor: Int? = nil
+    public var silverPriceSetAt: Date? = nil
     public init() {}
 }
 extension ZakatProfile: MadarRecordModel {
@@ -2548,6 +2567,10 @@ extension ZakatProfile: MadarRecordModel {
             "debtsPolicy": JSONValue.encode(debtsPolicy),
             "otherAssetsMinor": JSONValue.encode(otherAssetsMinor),
             "lastPaidAt": JSONValue.encode(lastPaidAt),
+            "nisabBasis": JSONValue.encode(nisabBasis),
+            "nisabSilverMg": JSONValue.encode(nisabSilverMg),
+            "silverPricePerGramMinor": JSONValue.encode(silverPricePerGramMinor),
+            "silverPriceSetAt": JSONValue.encode(silverPriceSetAt),
         ])
     }
     public func apply(_ record: DataRecord) throws {
@@ -2566,6 +2589,10 @@ extension ZakatProfile: MadarRecordModel {
         debtsPolicy = try record.decode("debtsPolicy", as: String.self)
         otherAssetsMinor = try record.decode("otherAssetsMinor", as: Int.self)
         lastPaidAt = try record.decode("lastPaidAt", as: Date?.self)
+        nisabBasis = try record.fields["nisabBasis"]?.decode(String.self) ?? "gold"
+        nisabSilverMg = try record.fields["nisabSilverMg"]?.decode(Int.self) ?? 595000
+        silverPricePerGramMinor = try record.fields["silverPricePerGramMinor"]?.decode(Int?.self)
+        silverPriceSetAt = try record.fields["silverPriceSetAt"]?.decode(Date?.self)
     }
 }
 @Model public final class Book {

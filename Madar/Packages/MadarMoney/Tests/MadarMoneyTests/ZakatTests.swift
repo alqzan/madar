@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import MadarMoney
 
-/// M5-E04: the F11 fixtures, as amended by RM7. Expected values from §7.5 «Fixtures».
+/// M5-E04: the F11 fixtures, as amended by RM7. Expected values from §7.5 «Fixtures» and RM7 (silver 595 g, the loan option).
 @Suite struct ZakatTests {
     let now = Date(timeIntervalSince1970: 1_800_000_000)
     /// Pool 12850000 from the C0 owned accounts; the mother's account is outside it.
@@ -56,7 +56,7 @@ import Testing
 
     @Test func noPriceMeansNoNisabAndNoGuess() {
         var input = c0; input.debtsPolicy = .none; input.goldPricePerGramMinor = nil
-        #expect(ZakatEngine.assess(input, now: now).outcome == .askGoldPrice)
+        #expect(ZakatEngine.assess(input, now: now).outcome == .askPrice)
     }
 
     @Test func dueNowDeductsOnlyWhatFellDue() {
@@ -70,5 +70,23 @@ import Testing
         input.accounts[1].include = false; input.otherAssetsMinor = 1_000_000
         // (9000000 + 1000000) × 2.5% = 250000.
         #expect(ZakatEngine.assess(input, now: now).outcome == .due(amountMinor: 250_000))
+    }
+
+    @Test func rm7SilverBasisUsesItsOwnWeightAndPrice() {
+        // 595 g × 400 (4 SAR per gram, a test price) = 238000; pool 3000000 is above it, unlike the gold nisab.
+        var input = ZakatInput(accounts: [.init(balanceMinor: 3_000_000)], debtsPolicy: .none, nisabBasis: .silver,
+                               goldPricePerGramMinor: 40_000, goldPriceSetAt: now, silverPricePerGramMinor: 400, silverPriceSetAt: now)
+        let result = ZakatEngine.assess(input, now: now)
+        #expect(result.nisabMinor == 238_000)
+        // 3000000 × 2.5% = 75000.
+        #expect(result.outcome == .due(amountMinor: 75_000))
+        input.silverPricePerGramMinor = nil
+        #expect(ZakatEngine.assess(input, now: now).outcome == .askPrice)
+    }
+
+    @Test func rm7DebtOptionWithTheLoanDeductsItToo() {
+        var input = c0; input.debtsPolicy = .allOwedAndLoan; input.loanRemainingMinor = 2_850_000
+        // (12850000 − 980000 − 2850000) × 2.5% = 9020000 × 2.5% = 225500.
+        #expect(ZakatEngine.assess(input, now: now).outcome == .due(amountMinor: 225_500))
     }
 }

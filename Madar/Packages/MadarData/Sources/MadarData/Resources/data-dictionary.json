@@ -2078,7 +2078,7 @@
       "merge": "row LWW, except (balanceMinor, balanceAt) taken together from the row with the latest balanceAt",
       "seed": null,
       "note": null,
-      "amendedBy": "D A9",
+      "amendedBy": "D A9 · RM5 (schema V5)",
       "relationships": [
         {
           "field": "parentID",
@@ -2108,7 +2108,8 @@
           "enum": [
             "current",
             "savings",
-            "cash"
+            "cash",
+            "wallet"
           ]
         },
         {
@@ -2163,6 +2164,19 @@
           "type": "[String]",
           "optional": false,
           "default": []
+        },
+        {
+          "name": "last4",
+          "type": "String?",
+          "optional": true,
+          "note": "RM5: last 4 digits of the account number or IBAN; tells accounts of one bank apart"
+        },
+        {
+          "name": "tracked",
+          "type": "Bool",
+          "optional": false,
+          "default": true,
+          "note": "RM5 wallets (STC Pay, urpay): tracked = owned balance, top-ups are own transfers; untracked = top-ups are spending"
         }
       ]
     },
@@ -2176,7 +2190,7 @@
       "merge": "row LWW (§11 merge)",
       "seed": null,
       "note": "identity = (bank, last4) + aliases",
-      "amendedBy": "D A10",
+      "amendedBy": "D A10 · RM1 (schema V5)",
       "relationships": [
         {
           "field": "accountID",
@@ -2260,6 +2274,18 @@
           "type": "Data",
           "optional": false,
           "default": "Data()"
+        },
+        {
+          "name": "kind",
+          "type": "String",
+          "optional": false,
+          "default": "credit",
+          "enum": [
+            "debit",
+            "credit",
+            "prepaid"
+          ],
+          "note": "RM1: a debit (mada) or prepaid purchase posts to the linked account; only credit builds «عليك». Default credit keeps the meaning of rows written before V5"
         }
       ]
     },
@@ -2423,7 +2449,7 @@
       "merge": "id-only; never merged by content (duplicates prevented by BankMessage (fingerprint, occurrence) and ImportLink)",
       "seed": null,
       "note": "two legs in one row; envelope/daily effects live in Allocation",
-      "amendedBy": "D A7",
+      "amendedBy": "D A7 · RM4/RM6 kinds (schema V5, no new field)",
       "relationships": [
         {
           "field": "categoryID",
@@ -2523,7 +2549,9 @@
             "cashback",
             "withdrawal",
             "repayment",
-            "adjustment"
+            "adjustment",
+            "billPayment",
+            "fee"
           ]
         },
         {
@@ -2950,7 +2978,8 @@
           "name": "fingerprint",
           "type": "String",
           "optional": false,
-          "default": ""
+          "default": "",
+          "note": "RM8: SHA-256 of sender + normalizedText; no time (occurrence counts repeats)"
         },
         {
           "name": "occurrence",
@@ -3262,7 +3291,7 @@
       "merge": "row LWW (§11 merge)",
       "seed": null,
       "note": null,
-      "amendedBy": null,
+      "amendedBy": "RM3 (schema V5)",
       "relationships": [
         {
           "field": "envelopeID",
@@ -3295,6 +3324,7 @@
           "default": "salary",
           "enum": [
             "salary",
+            "daily",
             "surplus",
             "reserve"
           ]
@@ -3304,12 +3334,30 @@
           "type": "Int",
           "optional": false,
           "default": 0,
-          "unit": "minor units of `currency` (exponent from currency-minor-units.json)"
+          "unit": "minor units of `currency` (exponent from currency-minor-units.json)",
+          "note": "RM3: the amount per period (per salary, or per day when period = perDay)"
         },
         {
           "name": "untilDate",
           "type": "Date?",
           "optional": true
+        },
+        {
+          "name": "period",
+          "type": "String",
+          "optional": false,
+          "default": "perCycle",
+          "enum": [
+            "perCycle",
+            "perDay"
+          ],
+          "note": "RM3: one funding model"
+        },
+        {
+          "name": "startDayKey",
+          "type": "String?",
+          "optional": true,
+          "note": "RM3: first money day the plan funds"
         }
       ]
     },
@@ -3661,7 +3709,7 @@
       "merge": "row LWW (§11 merge)",
       "seed": "UUIDv5(seedNS, \"ZakatProfile:singleton\")",
       "note": null,
-      "amendedBy": "D A20",
+      "amendedBy": "D A20 · RM7 (schema V5)",
       "relationships": [],
       "eventProvenance": false,
       "naturalKeyRule": "singleton (fixed id)",
@@ -3677,7 +3725,8 @@
           "name": "goldPricePerGramMinor",
           "type": "Int?",
           "optional": true,
-          "unit": "minor units per gram"
+          "unit": "minor units per gram",
+          "note": "RM7: per gram of 24K, entered by hand"
         },
         {
           "name": "goldPriceSetAt",
@@ -3700,7 +3749,8 @@
             "unset",
             "none",
             "dueNow",
-            "allOwed"
+            "allOwed",
+            "allOwedAndLoan"
           ]
         },
         {
@@ -3712,6 +3762,35 @@
         },
         {
           "name": "lastPaidAt",
+          "type": "Date?",
+          "optional": true
+        },
+        {
+          "name": "nisabBasis",
+          "type": "String",
+          "optional": false,
+          "default": "gold",
+          "enum": [
+            "gold",
+            "silver"
+          ],
+          "note": "RM7: the user's explicit choice"
+        },
+        {
+          "name": "nisabSilverMg",
+          "type": "Int",
+          "optional": false,
+          "default": 595000,
+          "unit": "milligrams of silver"
+        },
+        {
+          "name": "silverPricePerGramMinor",
+          "type": "Int?",
+          "optional": true,
+          "unit": "minor units per gram"
+        },
+        {
+          "name": "silverPriceSetAt",
           "type": "Date?",
           "optional": true
         }

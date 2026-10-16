@@ -14,6 +14,7 @@ enum SchemaCompatibility {
         case 1: MadarSchemaV1.syncedNames
         case 2: MadarSchemaV2.syncedNames
         case 3: MadarSchemaV3.syncedNames
+        case 4: MadarSchemaV4.syncedNames
         case MadarSchema.version: MadarSchema.syncedNames
         default: throw version > MadarSchema.version ? DataError.newerStore : DataError.unsupportedBackup
         }
@@ -30,6 +31,18 @@ enum SchemaCompatibility {
             }
             if version < 3, row.model == "PrayerLog" {
                 row.fields["fridayKind"] = .null
+            }
+            // V5 (M5-D01): the new money fields take their dictionary defaults; no existing value changes.
+            if version < 5 {
+                switch row.model {
+                case "Account": row.fields["last4"] = .null; row.fields["tracked"] = .bool(true)
+                case "Card": row.fields["kind"] = .string("credit")
+                case "EnvelopePlan": row.fields["period"] = .string("perCycle"); row.fields["startDayKey"] = .null
+                case "ZakatProfile":
+                    row.fields["nisabBasis"] = .string("gold"); row.fields["nisabSilverMg"] = .number(595_000)
+                    row.fields["silverPricePerGramMinor"] = .null; row.fields["silverPriceSetAt"] = .null
+                default: break
+                }
             }
             return row
         }

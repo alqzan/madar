@@ -1953,6 +1953,44 @@
    "preset": false
   },
   {
+   "key": "mal.salaryDay",
+   "owner": "mal",
+   "section": "يومك والراتب",
+   "title": "يوم الراتب",
+   "type": "int",
+   "default": 0,
+   "scope": "sync",
+   "range": [
+    0,
+    31
+   ],
+   "storage": "Setting (synced)",
+   "preset": false,
+   "note": "RM9: ٠ = يُعرف من رسالة الراتب؛ ١–٣١ يوم من الشهر بتقويم mal.cycleCalendar، ويحدد طول الدورة المتوقع"
+  },
+  {
+   "key": "mal.cycleCalendar",
+   "owner": "mal",
+   "section": "يومك والراتب",
+   "title": "تقويم الدورة",
+   "type": "choice",
+   "default": "gregorian",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "gregorian",
+     "label": "ميلادي"
+    },
+    {
+     "value": "hijri",
+     "label": "هجري"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": false,
+   "note": "RM9"
+  },
+  {
    "key": "mal.bigExpenseDays",
    "owner": "mal",
    "section": "يومك والراتب",

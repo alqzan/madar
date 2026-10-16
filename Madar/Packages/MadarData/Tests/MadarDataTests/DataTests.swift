@@ -5,9 +5,9 @@ import Testing
 
 @Suite(.serialized) @MainActor struct DataTests {
     @Test func schemaAndDefaultContainer() throws {
-        #expect(MadarSchema.syncedTypes.count == 55); #expect(MadarSchema.deviceTypes.count == 6)
+        #expect(MadarSchema.syncedTypes.count == 56); #expect(MadarSchema.deviceTypes.count == 6)
         let container = try MadarContainerFactory.makeInMemory(); try fixture(container.mainContext)
-        #expect(try Set(RecordBridge.all(container.mainContext).map(\.model)).count == 55)
+        #expect(try Set(RecordBridge.all(container.mainContext).map(\.model)).count == 55) // the fixture predates HabitEvent (V4)
     }
     @Test func diskPersistenceAndNewerVersionGuard() throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("MadarDataTest-\(UUID())")
@@ -101,7 +101,7 @@ import Testing
     }
     @Test func settingsDefaultsPersistenceAndInvalidRejection() throws {
         let c = try MadarContainerFactory.makeInMemory(); let store = try SettingsStore(context:c.mainContext)
-        #expect(store.schema.settings.count == 129); #expect(try store.value(for:"core.firstCalendar") == .string("hijri"))
+        #expect(store.schema.settings.count == 131); #expect(try store.value(for:"core.firstCalendar") == .string("hijri"))
         #expect(throws:DataError.invalidValue("core.hijriOffset")) { try store.set(.number(9),for:"core.hijriOffset") }
         let undo = try store.set(.number(1),for:"core.hijriOffset"); #expect(try store.value(for:"core.hijriOffset") == .number(1)); try store.undo(undo); #expect(try store.value(for:"core.hijriOffset") == .number(0))
         let bad = Setting(); bad.key = "core.firstCalendar"; bad.valueJSON = Data("\"garbage\"".utf8); c.mainContext.insert(bad); try c.mainContext.save(); #expect(try store.value(for:bad.key) == .string("hijri"))
@@ -146,7 +146,7 @@ import Testing
         let records = try RecordBridge.all(source.mainContext)
         let data = try BackupCodec.export(records:records,passphrase:"correct long password")
         let backup = try BackupCodec.validate(data,passphrase:"correct long password")
-        #expect(Set(backup.records) == Set(records)); #expect(backup.manifest.counts.count == 55)
+        #expect(Set(backup.records) == Set(records)); #expect(backup.manifest.counts.count == 56)
         let target = try MadarContainerFactory.makeInMemory(); #expect(try BackupRestore.merge(backup,into:target.mainContext) == records.count)
         #expect(try BackupRestore.merge(backup,into:target.mainContext) == 0)
     }

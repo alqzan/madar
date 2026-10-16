@@ -84,7 +84,7 @@ import Testing
         let source = try MadarContainerFactory.makeInMemory(); try fixture(source.mainContext); let expected = try RecordBridge.all(source.mainContext)
         let file = try backupFile(expected,base:base); let (store,coordinator,_) = try await makeCoordinator(base:base)
         let deviceURL = store.binding.deviceStoreURL; let preview = try await coordinator.preview(file:file,passphrase:"correct long password")
-        #expect(preview.counts.count == 55); #expect(preview.additions == expected.count)
+        #expect(preview.counts.count == 56); #expect(preview.additions == expected.count)
         let result = try await coordinator.restore(preview:preview,mode:.replace)
         #expect(result.warnings.isEmpty); #expect(try RecordFingerprint.hash(RecordBridge.all(result.container.mainContext)) == RecordFingerprint.hash(expected))
         #expect(store.binding.deviceStoreURL == deviceURL); #expect(FileManager.default.fileExists(atPath:result.automaticBackup.fileURL.path))

@@ -47,6 +47,72 @@ import Testing
         #expect(try reopened.container.mainContext.fetchCount(FetchDescriptor<HabitEvent>()) == 2)
         #expect(try reopened.container.mainContext.fetch(FetchDescriptor<PrayerLog>()).first?.fridayKind == "jumuah")
     }
+    /// M5-D01 (owner go, 16 Oct): V4 → V5 adds only defaulted or optional money fields. Synthetic store only.
+    @Test func schemaV4UpgradeKeepsEveryMoneyValueAndDefaultsOnlyTheNewFields() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("MadarV5-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let oldID = UUID(), generation = root.appendingPathComponent("Generations/\(oldID.uuidString)")
+        try FileManager.default.createDirectory(at: generation, withIntermediateDirectories: true)
+        let accountID = UUID(), cardID = UUID(), planID = UUID(), zakatID = UUID()
+        var before: [DataRecord] = []
+        do {
+            let old = try ModelContainer(for: MadarSchemaV4.schema, configurations: [
+                ModelConfiguration("synced", schema: Schema(MadarSchemaV4.syncedTypes), url: generation.appendingPathComponent("Madar.store"), cloudKitDatabase: .none),
+                ModelConfiguration("deviceOnly", schema: Schema(MadarSchemaV4.deviceTypes), url: root.appendingPathComponent("Device.store"), cloudKitDatabase: .none)])
+            old.mainContext.autosaveEnabled = false
+            let account = MadarFrozenMoneyV4.Account(); account.id = accountID; account.name = "synthetic current"; account.kind = "savings"; account.balanceMinor = 1_285_000; account.senderIDs = ["BANK"]
+            let card = MadarFrozenMoneyV4.Card(); card.id = cardID; card.bank = "BANK"; card.last4 = "3333"; card.limitMinor = 2_000_000; card.accountID = accountID
+            let plan = MadarFrozenMoneyV4.EnvelopePlan(); plan.id = planID; plan.kind = "repay"; plan.source = "surplus"; plan.perPaycheckMinor = 50_000
+            let zakat = MadarFrozenMoneyV4.ZakatProfile(); zakat.id = zakatID; zakat.goldPricePerGramMinor = 40_000; zakat.debtsPolicy = "allOwed"; zakat.otherAssetsMinor = 12
+            for row in [account as any PersistentModel, card, plan, zakat] { old.mainContext.insert(row) }
+            let money = MoneyTransaction(); money.amountMinor = 4_200; money.kind = "expense"; money.cardID = cardID
+            let entry = Entry(); entry.dayKey = "2026-10-08"; entry.text = "synthetic untouched diary"
+            for row in [money as any MadarRecordModel, entry] { old.mainContext.insert(row); before.append(try row.record()) }
+            try old.mainContext.save()
+        }
+        try DurableFiles.encode(4, to: generation.appendingPathComponent("SchemaVersion.json"))
+        try DurableFiles.encode(1, to: root.appendingPathComponent("DeviceSchemaVersion.json"))
+        try DurableFiles.encode(GenerationReady(version: 1, generationID: oldID, recordsHash: RecordFingerprint.hash(before), createdAt: Date()), to: generation.appendingPathComponent("GenerationReady.json"))
+        try DurableFiles.encode(ManagedPointer(version: 1, generationID: oldID, previousGenerationID: nil, accountHash: nil, cloudKitContainerIdentifier: nil), to: root.appendingPathComponent("ActiveGeneration.json"))
+        let sourceHash = try stableGenerationHashes(generation)
+        let upgraded = try ManagedDataStore(root: root)
+        #expect(upgraded.binding.generationID != oldID)
+        #expect(try stableGenerationHashes(generation) == sourceHash)
+        let context = upgraded.container.mainContext
+        let account = try #require(context.fetch(FetchDescriptor<Account>()).first)
+        #expect(account.id == accountID && account.name == "synthetic current" && account.kind == "savings" && account.balanceMinor == 1_285_000 && account.senderIDs == ["BANK"])
+        #expect(account.last4 == nil && account.tracked)
+        let card = try #require(context.fetch(FetchDescriptor<Card>()).first)
+        #expect(card.id == cardID && card.last4 == "3333" && card.limitMinor == 2_000_000 && card.accountID == accountID)
+        #expect(card.kind == "credit")
+        let plan = try #require(context.fetch(FetchDescriptor<EnvelopePlan>()).first)
+        #expect(plan.id == planID && plan.kind == "repay" && plan.source == "surplus" && plan.perPaycheckMinor == 50_000)
+        #expect(plan.period == "perCycle" && plan.startDayKey == nil)
+        let zakat = try #require(context.fetch(FetchDescriptor<ZakatProfile>()).first)
+        #expect(zakat.id == zakatID && zakat.goldPricePerGramMinor == 40_000 && zakat.debtsPolicy == "allOwed" && zakat.otherAssetsMinor == 12 && zakat.nisabMg == 85_000)
+        #expect(zakat.nisabBasis == "gold" && zakat.nisabSilverMg == 595_000 && zakat.silverPricePerGramMinor == nil)
+        let unchanged = try RecordBridge.all(context).filter { ["MoneyTransaction", "Entry"].contains($0.model) }
+        #expect(try RecordFingerprint.hash(unchanged) == RecordFingerprint.hash(before))
+        // A V4 backup row decodes into V5 with the same defaults.
+        let rows = try RecordBridge.all(context).filter { ["Account", "Card", "EnvelopePlan", "ZakatProfile"].contains($0.model) }
+        let v4Rows = rows.map { row -> DataRecord in
+            var old = row
+            for key in ["last4", "tracked", "kind", "period", "startDayKey", "nisabBasis", "nisabSilverMg", "silverPricePerGramMinor", "silverPriceSetAt"]
+                where !(row.model == "Account" && key == "kind") && !(row.model == "EnvelopePlan" && key == "kind") && !(row.model == "Card" && key == "last4") { old.fields[key] = nil }
+            return old
+        }
+        #expect(try SchemaCompatibility.currentRecords(v4Rows, from: 4) == rows)
+        // An undo receipt written before V5 applies without the new keys (the fridayKind precedent).
+        let fromReceipt = Card(); try fromReceipt.apply(try #require(v4Rows.first { $0.model == "Card" }))
+        #expect(fromReceipt.kind == "credit" && fromReceipt.last4 == "3333")
+        let zakatReceipt = ZakatProfile(); try zakatReceipt.apply(try #require(v4Rows.first { $0.model == "ZakatProfile" }))
+        #expect(zakatReceipt.nisabBasis == "gold" && zakatReceipt.nisabSilverMg == 595_000 && zakatReceipt.debtsPolicy == "allOwed")
+        try RecordValidator.validate(RecordBridge.all(context))
+        card.kind = "debit"; try context.save()
+        let reopened = try ManagedDataStore(root: root)
+        #expect(reopened.binding.generationID == upgraded.binding.generationID)
+        #expect(try reopened.container.mainContext.fetch(FetchDescriptor<Card>()).first?.kind == "debit")
+    }
     private struct ReceiptScope: Codable { let version: Int; let generationID: UUID }
     private var resources: URL { Bundle.module.resourceURL!.appendingPathComponent("Resources/LegacyV1") }
     private func fixtureDirectory() throws -> URL {
@@ -71,7 +137,7 @@ import Testing
     @Test func test_M0S1_RA4_originalV1ArchiveMapsOnlyAfterAuthentication() throws {
         let bytes = try Data(contentsOf:resources.appendingPathComponent("source-v1.madarbackup"))
         let backup = try BackupCodec.validate(bytes,passphrase:"legacy fixture password")
-        #expect(MadarSchema.version == 4)
+        #expect(MadarSchema.version == 5)
         #expect(backup.records.contains { $0.model == "MoneyTransaction" })
         #expect(!backup.records.contains { $0.model == "Transaction" })
         let expected = try expectedRows().filter { MadarSchema.syncedNames.contains($0.model) }
@@ -94,7 +160,7 @@ import Testing
     @Test func test_M0S1_RA4_originalSQLiteIsAdoptedWithoutLosingAnyRow() throws {
         let base = try fixtureDirectory(); defer { try? FileManager.default.removeItem(at:base) }
         let managed = try ManagedDataStore.adoptLegacy(from:base.appendingPathComponent("Flat"),at:base.appendingPathComponent("Managed"))
-        #expect(MadarSchema.version == 4)
+        #expect(MadarSchema.version == 5)
         #expect(try RecordFingerprint.hash(RecordBridge.all(managed.container.mainContext,syncedOnly:false)) == RecordFingerprint.hash(expectedRows()))
         #expect(try managed.container.mainContext.fetchCount(FetchDescriptor<DeviceSetting>()) == 2)
         #expect(try managed.container.mainContext.fetchCount(FetchDescriptor<CommandReceipt>()) == 1)
