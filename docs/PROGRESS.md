@@ -223,13 +223,13 @@ Owner standing rule (15 Oct): screens that match their design or better count as
 M2 screens are owner-approved; M1-F04 software blocker is resolved. M3 built screens/F01 are integrated and covered by the owner’s provisional acceptance rule. V09 needs a permitted Day One path or anonymized fixture; V12 has bounded approval for generic reminders while locked. UX-01–UX-14 are complete. M4-E02/V02, UX-15, W01/W02, F01, F02 and V12 notifications are complete; M5 follows M4 software. Keep tafsir off until its separate licence is verified. No owner-iPhone or milestone pass is claimed.
 
 # Handovers
-## Handover — M5 money engine E01–E04 — 2026-10-16 — Claude
-Works now: `Packages/MadarMoney`, the pure-Swift money engine (no screens yet). It covers the cycle's «يومك», «لك الآن», today's «صرفت X من Y», the basis (في حسابك، عليك، لك فعلًا، المحجوز، غير مخصّص), the close and offsets, runway after obligations, limits and the 80% alert, every movement's single effect, allocations to the halala with undo and refunds, plans and shortfalls, reconciliation, FX, bank-message classes and dedupe, card statements, and zakat. Every L01–L14 case and the C0/F11 fixtures come from the spec.
-Verified: `swift test` in Madar/Packages/MadarMoney, 70/70 passed; check-number-separators PASS; git diff --check clean.
-Differences left: none visual (engine only). The parser was tested on synthetic samples only; the ≥95% target waits for the owner's anonymised messages.
-Not verified: no app build needed (the package is not linked into the app until M5-D02); owner iPhone.
-Next: M5-D01 waits for the owner's go on an additive schema V5 (RM1/RM3/RM4/RM5/RM7/RM9 fields and settings). Then D02 commands and intake, then screens from V01.
-Model/effort: Claude Opus 5.5; effort max (set by the owner). Usage: five-hour 72% at handover.
+## Handover — M5 money engine E01–E04 and schema V5 (D01) — 2026-10-16 — Claude
+Works now: `Packages/MadarMoney`, the pure-Swift money engine (no screens yet). It covers the daily, «لك الآن», today's «صرفت X من Y», the basis, the close and offsets, runway, limits, every movement's single effect, halala-exact allocations with undo, plans, reconciliation, FX, bank-message classes and dedupe, statements, and zakat (gold or silver, debt options including the loan). Store schema V5 (owner go): card kind, wallets, plan period and start, nisab basis, salary day and cycle calendar settings; V4 stores upgrade with every value kept.
+Verified: MadarMoney 72/72; MadarData 65/65 (new V4→V5 synthetic store and receipt-decode tests; 5 count checks stale since V4 fixed); MadarCommands 57/57, MadarInbox 17/17, MadarSnapshots 10/10; make build succeeded; git diff --check clean.
+Differences left: none visual. The parser was tested on synthetic samples only. check-review-contracts.py fails on clean main at frozen sections/11-r-quran.md (not touched), so the later checks did not run.
+Not verified: the real V4 store upgrading on the owner's iPhone; RM6 accuracy (needs anonymised messages).
+Next: M5-D02 money commands with undo and IngestBankMessageIntent/LogExpenseIntent (cards set Card.kind from the message), then M5-V01 home.
+Model/effort: Claude Opus 5.5. E01–E04 commits say «max» on the owner's word; D01 says «not exposed». Usage: five-hour 80% at handover.
 
 ## Handover — M3-V12 diary reminders, then improvements — 2026-10-16 — Claude
 Works now: intention, «في مثل هذا اليوم» and due-letter reminders under the shared budget, sanctity and diary cap, with generic text that never carries the diary (also under the whole-app lock); qada reminders show no debt count (RU2), digest count from catalog plurals (RU3). Improvements: the lobby names Friday Dhuhr «الجمعة»; the empty habits card has the rings and an add button instead of «٠ من ٠»; Quran first use drops «٪٠»; the Friday pill reads «الكهف في قسم القرآن» and opens page ٢٩٣; mushaf page links no longer open page ١; diary toggles use the room olive; the first tab is «البهو» and the lobby, Quran, diary and customize icons are redrawn in the prayer arch’s language (owner feedback, awaiting their verdict).
