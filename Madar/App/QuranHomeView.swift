@@ -13,7 +13,8 @@ struct QuranHomeView: View {
     @State private var active: QuranUISessionState?
     @State private var busy = false
     @State private var showDayClose = false
-    @State private var showMushaf = false
+    /// The page travels with the presentation: an `isPresented` cover read `readerPage` stale, so links opened page 1.
+    @State private var mushaf: QuranMushafRequest?
     @State private var showOutside = false
     @State private var showWeek = false
     @State private var showPlan = false
@@ -22,7 +23,6 @@ struct QuranHomeView: View {
     @State private var showIndex = false
     @State private var showStrength = false
     @State private var showQiyam = false
-    @State private var readerPage: Int?
     private enum HomeDetail: Identifiable {
         case step(QuranUIStep), hadith
         var id: String { switch self { case .step(let step): "step-" + step.id; case .hadith: "hadith" } }
@@ -71,7 +71,7 @@ struct QuranHomeView: View {
             guard let route else { return }; service.app.quranRoute = nil
             run {
                 if state == nil { try await refresh() }
-                if route.path.first == "page", let number = Int(route.path.last ?? "") { readerPage = number; showMushaf = true }
+                if route.path.first == "page", let number = Int(route.path.last ?? "") { mushaf = .init(page: number) }
                 else if route.path.first == "session" {
                     if route.path.last == "qiyam" { showQiyam = true }
                     else if let draft = state?.draft { active = try await service.resume(draftID: draft.id) }
@@ -111,8 +111,8 @@ struct QuranHomeView: View {
             QuranDayCloseView(service: service, close: { showDayClose = false })
                 .environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft)
         }
-        .fullScreenCover(isPresented: $showMushaf) {
-            QuranMushafView(service: service, initialPage: readerPage ?? state?.steps.first(where: { $0.kind == .hifz })?.range?.fromPage ?? 1, close: { showMushaf = false })
+        .fullScreenCover(item: $mushaf) { request in
+            QuranMushafView(service: service, initialPage: request.page, close: { mushaf = nil })
                 .environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft)
         }
         .fullScreenCover(isPresented: $showOutside) { QuranOutsideView(service: service, close: { showOutside = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
@@ -317,7 +317,7 @@ struct QuranHomeView: View {
         card {
             VStack(spacing: 12) {
                 HStack(alignment: .top, spacing: 4) {
-                    tool("المصحف", icon: "book", id: "mushaf") { readerPage = nil; showMushaf = true }
+                    tool("المصحف", icon: "book", id: "mushaf") { mushaf = .init(page: state.steps.first(where: { $0.kind == .hifz })?.range?.fromPage ?? 1) }
                     tool("الفهرس", icon: "line.3.horizontal.decrease", id: "index") { showIndex = true }
                     tool("مراجعة حرة", icon: "arrow.left.arrow.right", id: "free") { showFree = true }
                     tool("منسوب الحفظ", icon: "chart.bar", id: "strength") { showStrength = true }
@@ -337,3 +337,5 @@ struct QuranHomeView: View {
         Task { defer { busy = false }; do { try await operation() } catch { self.error = quranUserMessage(error) } }
     }
 }
+
+struct QuranMushafRequest: Identifiable { let id = UUID(); let page: Int }

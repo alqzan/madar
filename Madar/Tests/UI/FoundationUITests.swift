@@ -68,6 +68,13 @@ import XCTest
         attachScreenshot(app, named: "M1-F01-friday-L")
         let qada = app.buttons["prayer-qada-makeup"]; scrollTo(qada, in: app)
         attachScreenshot(app, named: "M1-F01-friday-scrolled-L")
+        // §7.2 «سطر الكهف» leads to the Quran: the pill opens the mushaf where Al-Kahf begins.
+        let pill = app.descendants(matching: .any).matching(identifier: "prayer-friday-pill").firstMatch
+        for _ in 0..<6 where !pill.isHittable { app.swipeDown() }
+        pill.tap()
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "quran-mushaf-page").firstMatch.waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["٢٩٣"].waitForExistence(timeout: 5), app.debugDescription)
+        attachScreenshot(app, named: "IMPROVE-friday-kahf-L")
         app.terminate()
     }
 

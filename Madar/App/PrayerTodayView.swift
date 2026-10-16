@@ -183,16 +183,20 @@ struct PrayerTodayView: View {
     }
 
     /// Friday greeting. The Quran room has no entry point yet, so the pill carries no link and no Al-Kahf pointer.
+    /// §7.2 «سطر الكهف (يقود إلى القرآن)»: now that the Quran room is built, the pill opens the mushaf where Al-Kahf begins (page 293).
     private var fridayPill: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "diamond.fill").font(.system(size: 11))
-            Text("جمعة مباركة").font(PrayerHomeType.strong)
+        Button { session.open(URL(string: "madar://quran/page/293")!) } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "diamond.fill").font(.system(size: 11))
+                Text("جمعة مباركة · الكهف في قسم القرآن").font(PrayerHomeType.strong).lineLimit(1).minimumScaleFactor(0.8)
+            }
+            .foregroundStyle(theme.color("accentText"))
+            .padding(.horizontal, 22).frame(minHeight: 44)
+            .background(theme.color("goldSoft"), in: .capsule)
+            .overlay { Capsule().stroke(theme.line, lineWidth: 1) }
         }
-        .foregroundStyle(theme.color("accentText"))
-        .padding(.horizontal, 22).frame(minHeight: 44)
-        .background(theme.color("goldSoft"), in: .capsule)
-        .overlay { Capsule().stroke(theme.line, lineWidth: 1) }
-        .accessibilityElement(children: .combine)
+        .buttonStyle(.plain)
+        .accessibilityLabel("جمعة مباركة، افتح سورة الكهف")
         .accessibilityIdentifier("prayer-friday-pill")
     }
 
