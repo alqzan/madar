@@ -20,6 +20,7 @@ final class AppSession {
     var quranRoute: Route?
     /// M4-V03: «السنة وما يهمّك» pushed from the lobby (`madar://bahw/year`).
     var yearOpen = false
+    var moneyOpen = false
     var habitsOpen = false
     /// A capture named a prayer without its state; the prayer home opens that prayer's log sheet.
     var prayerLogRequest: Prayer?
@@ -100,6 +101,7 @@ final class AppSession {
         try prepareQuranHomeFixture(group: group)
         try prepareDiaryHomeFixture(group: group)
         try prepareHabitFixture(group: group)
+        try prepareMoneyFixture(group: group)
         #endif
         try reload()
         let devices = try container.mainContext.fetch(FetchDescriptor<DeviceSetting>())
@@ -370,11 +372,12 @@ final class AppSession {
     func number(_ key: String) -> Double { if case .number(let v) = values[key] { v } else { 0 } }
     func open(_ url: URL) {
         let today = GregorianDay.containing(.now, in: activePlace.timeZone)
-        let context = RouteContext(trackingStart: today.adding(days: -36500), today: today, settingsKeys: Set(Self.supportedKeys), availability: .init(builtRooms: [.core, .salah, .quran, .notes, .bahw, .year, .habits]))
+        let context = RouteContext(trackingStart: today.adding(days: -36500), today: today, settingsKeys: Set(Self.supportedKeys), availability: .init(builtRooms: [.core, .salah, .quran, .notes, .bahw, .year, .habits, .mal]))
         do {
             var components=URLComponents(url:url,resolvingAgainstBaseURL:false)
             if components?.host == "prayer" {components?.host="salah"} // Existing placed widgets used this legacy alias.
             let route = try RouteRegistry.parse(components?.url ?? url, context: context)
+            if route.room == .mal, route.path.isEmpty || route.path == ["now"] { selectedTab = "customize"; moneyOpen = true; return }
             if route.room == .salah,route.path.isEmpty {selectedTab="prayer";return}
             if route.room == .bahw,route.path.isEmpty {selectedTab="foundation";return}
             if route.room == .quran, route.path.isEmpty || route.path.first == "session" || route.path.first == "page" {
@@ -560,6 +563,17 @@ final class AppSession {
             showUndo(AppUndoToken(id: id, expiresAt: deadline), message: "حُفظ التغيير · التراجع متاح لعشر دقائق")
         }
         return result
+    }
+
+    func executeMoneyCommand(_ name: String, payload: [String: MadarCore.JSONValue] = [:]) async throws {
+        guard lockController?.canPresent(.app) ?? protectedDataAuthorized else { throw DataError.authenticationFailed }
+        guard beginWrite() else { throw BackupOperationError.busy }
+        defer { pendingWrites -= 1 }
+        let now = prayerNow()
+        let result = try await bus.execute(.init(name: name, payload: .object(payload), issuedAt: now), now: now)
+        guard result.status == .applied || result.status == .duplicate else { throw DataError.invalidValue(result.reason ?? "money command") }
+        if result.status == .applied { try reload(); try publishSnapshot() }
+        if let token = result.undoToken { showUndo(.init(id: token, expiresAt: now.addingTimeInterval(600)), message: "حُفظ التغيير · التراجع متاح لعشر دقائق") }
     }
 
     var diaryStagingDirectory: URL { commandAdapter.diaryStagingDirectory }

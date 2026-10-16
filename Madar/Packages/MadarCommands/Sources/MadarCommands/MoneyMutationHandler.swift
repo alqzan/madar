@@ -56,6 +56,23 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
                       source: CommandSource, context: ModelContext, now: Date, writer: String) throws -> MoneyStagedResult {
         let before = try records(context)
         switch name {
+        case "money.accruePlans":
+            if let cycle = try MoneyRepository(context: context).cycle(at: now) {
+                let existing = Set(try context.fetch(FetchDescriptor<Allocation>()).map(\.idempotencyKey))
+                var rows: [AllocationRow] = []
+                for day in CycleEngine.days(through: cycle.elapsedDays, cycle.input) {
+                    for (plan, amount) in day.dripsMinor where amount > 0 {
+                        guard let envelope = cycle.planEnvelopes[plan] else { throw MoneyCommandError.invalidReference }
+                        let key = "daily:\(cycle.id):\(plan):\(cycle.startDay.adding(days: day.day - 1))"
+                        let hasTo = existing.contains(key + ":to"), hasFrom = existing.contains(key + ":from")
+                        guard hasTo == hasFrom else { throw MoneyCommandError.invalidReference }
+                        if hasTo { continue }
+                        rows.append(.init(groupID: key, target: .daily, amountMinor: -amount, kind: .fund, cycleID: cycle.id.uuidString, idempotencyKey: key + ":from"))
+                        rows.append(.init(groupID: key, target: .envelope(envelope.uuidString), amountMinor: amount, kind: .fund, cycleID: cycle.id.uuidString, idempotencyKey: key + ":to"))
+                    }
+                }
+                try writeAllocations(rows, context: context, now: now, writer: writer)
+            }
         case "money.saveAccount": try saveAccount(p, context, now, writer)
         case "money.saveCard": try saveCard(p, context, now, writer)
         case MoneyCommandPayload.intakeName:
@@ -113,7 +130,7 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         let changed = after.filter { old[recordKey($0)] != $0 }
         guard !changed.isEmpty else { return .init(inverse: nil, duplicate: true) }
         try RecordValidator.validate(changed)
-        return .init(inverse: try JSONEncoder().encode(MoneyInverse(before: before.filter { oldRow in changed.contains { recordKey($0) == recordKey(oldRow) } }, after: changed)), duplicate: false)
+        return .init(inverse: name == "money.accruePlans" ? nil : try JSONEncoder().encode(MoneyInverse(before: before.filter { oldRow in changed.contains { recordKey($0) == recordKey(oldRow) } }, after: changed)), duplicate: false)
     }
 
     private static func saveAccount(_ p: [String: MadarCore.JSONValue], _ context: ModelContext, _ now: Date, _ writer: String) throws {

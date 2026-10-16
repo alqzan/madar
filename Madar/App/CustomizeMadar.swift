@@ -22,11 +22,17 @@ struct CustomizeMadar: View {
                     TextField("ابحث في إعدادات مدار…", text: $session.settingsQuery).accessibilityIdentifier("settings-search")
                         .submitLabel(.search)
                 }.padding(16).background(theme.surface, in: .capsule)
+                if query.isEmpty || normalized("المال").contains(normalized(query)) {
+                    Button { session.moneyOpen = true } label: {
+                        HStack { Text("افتح المال").font(MadarTypography.section()); Spacer(); Image(systemName: "chevron.left") }
+                            .padding(16).background(theme.surface, in: .rect(cornerRadius: 20))
+                    }.buttonStyle(.plain).accessibilityIdentifier("money-open")
+                }
                 if query.isEmpty || normalized("الودجات وأحجامها البهو الكتل").contains(normalized(query)) { BahwBlocksSection(session: session) }
                 if query.isEmpty || normalized("ودجات الشاشة الرئيسية خارج التطبيق").contains(normalized(query)) {
                     Button {widgetGallery=true} label:{Label("ودجات الشاشة الرئيسية",systemImage:"square.grid.2x2").font(MadarTypography.section()).frame(maxWidth:.infinity,minHeight:50).background(theme.surface,in:.rect(cornerRadius:20))}.buttonStyle(.plain).accessibilityIdentifier("room-widgets-gallery")
                 }
-                if filtered.isEmpty && !(query.isEmpty || normalized("ودجات الشاشة الرئيسية خارج التطبيق").contains(normalized(query))) {
+                if filtered.isEmpty && !(query.isEmpty || normalized("المال").contains(normalized(query)) || normalized("ودجات الشاشة الرئيسية خارج التطبيق").contains(normalized(query))) {
                     ContentUnavailableView.search(text: query)
                 } else {
                     ForEach(sections, id: \.self) { section in
@@ -56,6 +62,7 @@ struct CustomizeMadar: View {
                 }
             }
         }
+        .navigationDestination(isPresented: $session.moneyOpen) { MoneyHomeView(app: session) }
         .sheet(isPresented:$widgetGallery){NavigationStack{RoomWidgetsGallery(session:session)}}
         .toolbarVisibility(.hidden, for: .navigationBar)
         .confirmationDialog("أعِد الإعدادات المتفق عليها؟", isPresented: $confirmReset, titleVisibility: .visible) {

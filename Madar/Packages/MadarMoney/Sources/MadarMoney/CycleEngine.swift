@@ -12,7 +12,11 @@ public enum AllowanceMode: Equatable, Sendable {
 public struct CyclePolicySpec: Equatable, Sendable {
     public var effectiveFromDay: Int
     public var mode: AllowanceMode
-    public init(effectiveFromDay: Int = 1, mode: AllowanceMode) { self.effectiveFromDay = effectiveFromDay; self.mode = mode }
+    /// A persisted CyclePolicy's frozen rate is authoritative even after an early salary.
+    public var frozenRate: FrozenRate?
+    public init(effectiveFromDay: Int = 1, mode: AllowanceMode, frozenRate: FrozenRate? = nil) {
+        self.effectiveFromDay = effectiveFromDay; self.mode = mode; self.frozenRate = frozenRate
+    }
 }
 
 /// The rate frozen when a policy starts: dailyRateMinor, plus the remainder that lands on the last expected day.
@@ -29,8 +33,10 @@ public struct DailyPlan: Equatable, Sendable {
     public var amountMinor: Int
     public var period: Period
     public var startDay: Int
-    public init(id: String, amountMinor: Int, period: Period, startDay: Int = 1) {
+    public var endDay: Int?
+    public init(id: String, amountMinor: Int, period: Period, startDay: Int = 1, endDay: Int? = nil) {
         self.id = id; self.amountMinor = amountMinor; self.period = period; self.startDay = startDay
+        self.endDay = endDay
     }
 }
 
@@ -81,7 +87,7 @@ public enum CycleEngine {
     /// A plan's wanted share on a day before the allowance cap. A per-cycle plan is spread over the expected days from
     /// its start with its remainder on the last expected day, so the drops sum to the plan exactly (L06, RM3 start).
     static func wanted(_ plan: DailyPlan, day: Int, length: Int) -> Int {
-        guard day >= plan.startDay else { return 0 }
+        guard day >= plan.startDay, plan.endDay == nil || day <= plan.endDay! else { return 0 }
         switch plan.period {
         case .perDay: return plan.amountMinor
         case .perCycle:
@@ -97,7 +103,7 @@ public enum CycleEngine {
     public static func day(_ day: Int, _ input: CycleInput) -> CycleDay {
         var allowance = 0
         if !input.pausedDays.contains(day), let policy = policy(on: day, input.policies) {
-            let rate = freeze(policy.mode, expectedLengthDays: input.expectedLengthDays)
+            let rate = policy.frozenRate ?? freeze(policy.mode, expectedLengthDays: input.expectedLengthDays)
             allowance = rate.dailyRateMinor + (day == input.expectedLengthDays ? rate.lastDayRemainderMinor : 0)
         }
         // L08: plans take at most what the day has, in plan order; no money that the day did not have.
