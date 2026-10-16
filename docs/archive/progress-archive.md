@@ -357,3 +357,11 @@ Not verified: real HealthKit data, owner store migration, OS widget/Control/Stan
 Next: M4-F01 Siri/capture, F02 shared reminders/budget, then M3-V12 generic locked reminders; V09 stays blocked on permitted fixture/path (never read real diaries). M5 requires money definitions/fixes and golden engine first, Sol highest effort as owner requested.
 Model/effort: GPT-6; effort not exposed.
 Usage: last exposed five-hour 93%, weekly 74%; reserve retained, no reset used. automation-2 one-shot 16 Oct 10:27:06 Asia/Riyadh (run start + 5h05), exact original prompt confirmed.
+
+## Handover — M4-F01 Siri and capture — 2026-10-16 — Claude
+Works now: Siri/Shortcuts log a prayer for today («صلّيت العصر في مدار»), complete a habit without opening Madar, add a diary line, capture one sentence routed to its room with the room's undo, start a Quran step, open a built room. «صليت المغرب» opens that prayer's log sheet instead of guessing.
+Verified: swift test CaptureRouterTests 6/6, MadarCore 83/83, MadarInbox 17/17, MadarCommands 57/57 (stale habit completion no longer blocks later inbox records); xcodebuild CaptureIntentIntegrationTests 3/3 (Artifacts/M4-F01-capture-*.xcresult); make build succeeded; git diff --check clean.
+Differences left: none visual (no canonical screen); ToggleTravelIntent not built (needs city/distance).
+Not verified: real Siri/Shortcuts/Spotlight invocation and the background inbox path on a device (M4-G); owner iPhone. AppInboxLifecycleTests repaired (stale test date and new null field), 5/5 pass.
+Next: M4-F02 notification budget, then M3-V12.
+Model/effort: Claude Opus 5.5; effort not exposed. Usage: not exposed.
