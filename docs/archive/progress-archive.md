@@ -398,3 +398,11 @@ Differences left: V05 category chips wait for V07; V06 has no big-expense, alert
 Not verified: owner iPhone, real Shortcut messages, the V5→V6 upgrade on the real store, dark mode.
 Next: M5-V07 merchant rules (MerchantRule exists in the model: pattern, categoryID, ignore).
 Model/effort: Claude Opus 5.5; effort not exposed. Usage: five-hour 45% at this handover.
+
+## Handover — M5-V07 merchant rules, M5-V08 «نزل الراتب», M5-V09 obligations, M5-V10 categories — 2026-10-16 — Claude
+Works now: «قواعد التاجر» (learned from «تذكّر لهذا التاجر», applied at intake, moved or forgotten); ✓ on a salary draft opens «نزل الراتب», whose report and «اعتمد الراتب وافتح الدورة» share one planner: close once (offset L02/L14), new cycle with frozen daily, envelopes funded, leftover to the surplus up to its cap then the reserve, undo until the new cycle is used; «الالتزامات» (thread, ladder, shelves, add with ladder preview); «التصنيفات والحدود» (shelves, today line, limit editor) from the home's limits block, and the 80% alert planned through the one arbiter.
+Verified: MadarMoney 99/99, MadarCommands 88/88, MadarCore 90/90; UI MoneyRules, MoneyMessages, MoneySalary, MoneyObligations, MoneyHome, MoneyCategories passed (Artifacts/M5-V07-ui, M5-V08-ui, M5-V08-ui2, M5-V09-ui, M5-V10-ui4 .xcresult); one review pass per money card, High findings fixed.
+Differences left: V07 lanterns are capsules; V08 no «ليس راتبي» action or Figure 1 toggle; V09 no subscriptions shelf; V10 no «خيارات القسم» and no lock-screen actions on the 80% alert; compare pages Z-R19-mer, Z-R19-sal2, Z-R19-obl, Z-R18-cat-1.
+Not verified: owner iPhone, a delivered 80% alert, real salary SMS, dark mode, a Hijri `mal.cycleCalendar` cycle on device.
+Next: M5-V11 ignore from budgets.
+Model/effort: Claude Opus 5.5; effort not exposed. Usage: five-hour about 89% at this handover.

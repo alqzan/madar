@@ -123,7 +123,7 @@ extension AppDiaryService {
                 let headerParts = page.title.components(separatedBy: "، ")
                 let text=NSMutableAttributedString(string:(headerParts.first ?? page.title)+"\n",attributes:[.font:UIFont(name:"thmanyahserifdisplay-Bold",size:25) ?? UIFont.boldSystemFont(ofSize:25),.foregroundColor:ink,.paragraphStyle:paragraph])
                 if headerParts.count > 1 { text.append(NSAttributedString(string:headerParts.dropFirst().joined(separator: "، ")+"\n\n",attributes:[.font:UIFont.systemFont(ofSize:13),.foregroundColor:ink,.paragraphStyle:paragraph])) }
-                for line in page.lines {text.append(NSAttributedString(string:AppDiaryService.exportLabel(line.kind)+line.text+"\n\n",attributes:[.font:UIFont(name:"thmanyahseriftext-Regular",size:17) ?? UIFont.systemFont(ofSize:17),.foregroundColor:line.kind=="margin" ? UIColor(red:0.18,green:0.32,blue:0.39,alpha:1):ink,.paragraphStyle:paragraph]))}
+                for line in page.lines {text.append(NSAttributedString(string:AppDiaryService.exportLabel(line.kind)+(line.markdown == true ? DayOneMarkdown.plain(line.text) : line.text)+"\n\n",attributes:[.font:UIFont(name:"thmanyahseriftext-Regular",size:17) ?? UIFont.systemFont(ofSize:17),.foregroundColor:line.kind=="margin" ? UIColor(red:0.18,green:0.32,blue:0.39,alpha:1):ink,.paragraphStyle:paragraph]))}
                 for item in page.media where item.kind != "photo" {
                     let label=item.kind=="audio" ? "تسجيل صوتي محفوظ في هذا اليوم" : "مرفق محفوظ في هذا اليوم"
                     text.append(NSAttributedString(string:label+"\n\n",attributes:[.font:UIFont.systemFont(ofSize:14),.foregroundColor:ink,.paragraphStyle:paragraph]))

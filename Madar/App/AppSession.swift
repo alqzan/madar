@@ -603,6 +603,16 @@ final class AppSession {
             showUndo(AppUndoToken(id: id, expiresAt: now.addingTimeInterval(600)), message: name.hasPrefix("habit.") ? "حُفظت العادة · التراجع متاح لعشر دقائق" : name == "bahw.saveUpcomingDay" ? "حُفظ اليوم · التراجع متاح لعشر دقائق" : name == "bahw.deleteUpcomingDay" ? "حُذف اليوم · التراجع متاح لعشر دقائق" : name.contains("Intention") ? "حُفظت النيّة · التراجع متاح لعشر دقائق" : "حُفظ السطر · التراجع متاح لعشر دقائق")
         }
     }
+    /// M3-V09: a Day One import (or its undo) is one app-process write (RA2), gated like a diary command so
+    /// backup/restore can quiesce it and a locked diary refuses it.
+    func performDiaryImport<T>(_ body: (Date) async throws -> T) async throws -> T {
+        guard lockController?.canPresent(.notes) ?? protectedDataAuthorized else { throw DataError.invalidValue("المذكرات مقفلة") }
+        guard beginWrite() else { throw BackupOperationError.busy }
+        defer { pendingWrites -= 1 }
+        let result = try await body(prayerNow())
+        try reload(); try publishSnapshot(); WidgetCenter.shared.reloadAllTimelines()
+        return result
+    }
 
     func applySettingsAndWait(_ changes: [String: JSONValue]) async throws {
         guard beginWrite() else { throw BackupOperationError.busy }

@@ -56,7 +56,7 @@ extension AppDiaryService {
             let notes = margins.filter { $0.writtenDayKey == key }
             let intentions=niyyas.filter{$0.dayKey==key}
             let fallback=ids.isEmpty ? "صفحة من يومك" : "صورة من هذا اليوم"
-            let excerpt:String=written.last?.text ?? intentions.last?.text ?? notes.last?.text ?? fallback
+            let excerpt:String=written.last.map{ $0.textFormat == "markdown" ? DayOneMarkdown.plain($0.text) : $0.text } ?? intentions.last?.text ?? notes.last?.text ?? fallback
             return DiaryDaySummary(day:day,excerpt:excerpt,writings:written.count+notes.count+intentions.count,photoIDs:ids.sorted{$0.uuidString<$1.uuidString},places:Set(rows.compactMap(\.place)),projectIDs:Set(rows.compactMap(\.projectID)))
         }.sorted { $0.day > $1.day }
         return try .init(today: currentDay(), days: days)

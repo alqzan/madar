@@ -148,7 +148,10 @@ targets:
   MadarUITests:
     type: bundle.ui-testing
     platform: iOS
-    sources: [Tests/UI]
+    sources:
+      - Tests/UI
+      - path: Packages/MadarCore/Tests/MadarCoreTests/Fixtures/dayone-synthetic.zip
+        buildPhase: resources
     dependencies:
       - target: Madar
 schemes:

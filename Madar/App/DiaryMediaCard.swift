@@ -37,6 +37,12 @@ struct DiaryMediaCard: View {
                         Button("عدّل النص مع إبقاء الصوت") { editingTranscript = true }.frame(minHeight: 44).accessibilityIdentifier("diary-transcript-edit-" + media.id.uuidString)
                     }.font(MadarTypography.caption())
                 }
+            } else if media.kind == "missing" {
+                // N01: the export referenced this file but did not contain it; the entry keeps the marker.
+                Label("مرفق ناقص: " + (["photo": "صورة", "audio": "تسجيل صوتي", "video": "مقطع"][media.contentType] ?? "ملف") + " لم يكن في ملف داي ون", systemImage: "exclamationmark.circle")
+                    .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).padding(.horizontal, 14).frame(minHeight: 44)
+                    .overlay { RoundedRectangle(cornerRadius: 10).stroke(theme.line, style: StrokeStyle(lineWidth: 1, dash: [4, 3])) }
+                    .accessibilityIdentifier("diary-media-missing")
             } else {
                 Button { open() } label: { Label(media.kind == "video" ? "افتح المقطع" : "افتح المرفق", systemImage: media.kind == "video" ? "play.rectangle" : "doc").font(MadarTypography.caption()).padding(.horizontal, 14).frame(minHeight: 44).background(theme.surface, in: .rect(cornerRadius: 10)).overlay { RoundedRectangle(cornerRadius: 10).stroke(theme.line) } }
                     .buttonStyle(.plain).accessibilityIdentifier("diary-media-" + media.id.uuidString)
