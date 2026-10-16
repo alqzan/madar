@@ -22,8 +22,10 @@ public struct ZIPReader: Sendable {
     }
     private let data: Data
     public let members: [Member]
-    /// Largest single member Madar will inflate (a Day One video can be large; anything above is refused, never truncated).
-    public static let memberLimit = 2 * 1024 * 1024 * 1024
+    private let index: [String: Int]
+    /// Largest single member Madar will inflate into memory (one file at a time on a phone); anything above is
+    /// refused and reported, never truncated.
+    public static let memberLimit = 512 * 1024 * 1024
 
     public init(url: URL) throws {
         let mapped = try Data(contentsOf: url, options: .alwaysMapped)
@@ -85,9 +87,10 @@ public struct ZIPReader: Sendable {
             members.append(.init(path: path, size: size, compressedSize: compressed, method: method, crc: crc, localOffset: offset, flags: flags))
         }
         self.members = members
+        self.index = Dictionary(uniqueKeysWithValues: members.enumerated().map { ($1.path, $0) })
     }
 
-    public func member(_ path: String) -> Member? { members.first { $0.path == path } }
+    public func member(_ path: String) -> Member? { index[path].map { members[$0] } }
 
     /// Inflates one member and verifies its size and CRC-32. Never returns a partial file.
     public func read(_ member: Member) throws -> Data {

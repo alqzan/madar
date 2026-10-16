@@ -130,6 +130,8 @@ import MadarData
         try context.save()
         let again = try await run(zip, context, at: now.addingTimeInterval(60))
         #expect(again.summary.added == 5)
+        // Revived rows are recorded as created (undo tombstones them again); no row copy, so no media bytes, in the summary.
+        #expect(again.summary.before.isEmpty && again.summary.created["Entry"]?.count == 5 && again.summary.created["Media"]?.count == 6)
         let rows = try entries(context)
         #expect(rows.filter { $0.source == "dayOne" }.count == 5 && rows.filter { $0.source == "dayOne" }.allSatisfy { $0.restoredAt != nil } && rows.count == 6)
         #expect(try media(context).count == 6 && (try projects(context).count) == 2)
@@ -138,6 +140,47 @@ import MadarData
         #expect(origins["2025-07-14"] == "native" && origins["2025-03-01"] == "dayOne")
         _ = try RowMerger(context: context).run()
         #expect(try RowMerger(context: context).run() == 0)
+    }
+
+    @Test func entryOrProjectTheOwnerDeletedStaysDeletedOnReimport() async throws {
+        // §11: a duplicate of a tombstoned key stays deleted unless explicitly restored; only undo's own tombstones revive.
+        let (container, root) = try store(); defer { try? FileManager.default.removeItem(at: root) }
+        let context = ModelContext(container), zip = try archive()
+        let first = try await run(zip, context)
+        let allDay = try #require(try entries(context).first { $0.sourceID == "C3000000000000000000000000000003" })
+        allDay.deletedAt = now.addingTimeInterval(5); allDay.updatedAt = now.addingTimeInterval(5)
+        let home = try #require(try projects(context).first { $0.name == "بيت" })
+        home.deletedAt = now.addingTimeInterval(5); home.updatedAt = now.addingTimeInterval(5)
+        try context.save()
+        let preview = try DayOneImportHandler.preview(try DayOneParser.plan(zip), context: context)
+        #expect(preview.deletedHere == 1 && preview.add == 0 && preview.same == 4 && preview.writes == 0)
+        // Undo the first import, then import again: the four undone entries return, the deleted one does not.
+        try DayOneImportHandler.undo(batch: first.batchID, context: context, now: now.addingTimeInterval(10), writer: "test")
+        #expect(try context.fetch(FetchDescriptor<Entry>()).first { $0.id == allDay.id }?.deletedAt == now.addingTimeInterval(5))
+        let again = try await run(zip, context, at: now.addingTimeInterval(60))
+        #expect(again.summary.added == 4 && again.summary.deletedHere == 1)
+        let rows = try entries(context)
+        #expect(rows.count == 4 && !rows.contains { $0.sourceID == "C3000000000000000000000000000003" })
+        // «بيت» was only on the deleted entry, so it is not in this import; «سفر» returns.
+        #expect(try projects(context).map(\.name) == ["سفر"])
+        // The revived rows undo again in one step.
+        try DayOneImportHandler.undo(batch: again.batchID, context: context, now: now.addingTimeInterval(70), writer: "test")
+        #expect(try entries(context).isEmpty && (try media(context).isEmpty) && (try projects(context).isEmpty))
+    }
+
+    @Test func aDayWithTheOwnersIntentionOrPhotoStaysNative() async throws {
+        let (container, root) = try store(); defer { try? FileManager.default.removeItem(at: root) }
+        let context = ModelContext(container)
+        // 11 Jan: only an intention, no page row yet. 2 May: a native page with only a page photo. 1 Mar: a native page, empty.
+        let niyya = Niyya(); niyya.dayKey = "2025-01-11"; niyya.text = "أن أكتب"; context.insert(niyya)
+        let photoPage = DayPage(); photoPage.dayKey = "2025-05-02"; photoPage.origin = "native"; photoPage.photoMediaID = UUID(); context.insert(photoPage)
+        let empty = DayPage(); empty.dayKey = "2025-03-01"; empty.origin = "native"; context.insert(empty)
+        try context.save()
+        let receipt = try await run(try archive(), context)
+        let origins = Dictionary(try pages(context).map { ($0.dayKey, $0.origin) }, uniquingKeysWith: { a, _ in a })
+        #expect(origins["2025-01-11"] == "native" && origins["2025-05-02"] == "native" && origins["2025-03-01"] == "dayOne" && origins["2025-07-14"] == "dayOne")
+        try DayOneImportHandler.undo(batch: receipt.batchID, context: context, now: now.addingTimeInterval(10), writer: "test")
+        #expect(try pages(context).first { $0.id == empty.id }?.origin == "native")
     }
 
     @Test func madarsOwnJSONExportIsRecognisedAndSkipped() throws {

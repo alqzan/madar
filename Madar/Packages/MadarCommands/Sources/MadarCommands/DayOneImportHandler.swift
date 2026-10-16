@@ -13,7 +13,11 @@ public struct DayOnePreview: Equatable, Sendable {
     /// Distinct files for the entries that will be written, by Media.kind.
     public var mediaFound: [String: Int] = [:]
     public var mediaMissing: [String: Int] = [:]
+    /// Files present in the export but above `ZIPReader.memberLimit`: reported, never truncated.
+    public var mediaTooLarge: [String: Int] = [:]
     public var mediaBytes = 0
+    /// Entries the owner deleted in Madar after an earlier import: they stay deleted (§11).
+    public var deletedHere = 0
     /// RD8: each entry's first tag becomes (or joins) a diary project; every tag stays in the archived JSON.
     public var projects: [String] = []
     public var tags: [String] = []
@@ -26,9 +30,10 @@ public struct DayOnePreview: Equatable, Sendable {
 /// Stored in ImportBatch.summaryJSON: the counts the result screen shows, and what one undo needs.
 public struct DayOneBatchSummary: Codable, Equatable, Sendable {
     public struct Missing: Codable, Equatable, Sendable { public let kind: String; public let key: String; public let entry: String }
-    public var added = 0, updated = 0, keptBoth = 0, unchanged = 0, keptMine = 0, days = 0
+    public var added = 0, updated = 0, keptBoth = 0, unchanged = 0, keptMine = 0, days = 0, deletedHere = 0
     public var mediaFound: [String: Int] = [:]
     public var missing: [Missing] = []
+    public var tooLarge: [Missing] = []
     public var skipped: [DayOneSkip] = []
     public var projects: [String] = []
     public var firstDay: String?
@@ -60,6 +65,22 @@ public struct DayOneReceipt: Equatable, Sendable {
     }
     static func live<T: MadarRecordModel>(_ rows: [T], deleted: KeyPath<T, Date?>, merged: KeyPath<T, UUID?>) -> [T] { rows.filter { $0[keyPath: deleted] == nil && $0[keyPath: merged] == nil } }
 
+    /// Rows that an undone Day One import tombstoned, with the moment of that undo. Only these may be revived by a
+    /// re-import; a row the owner deleted in Madar stays deleted (§11 tombstones).
+    static func undoneRows(_ context: ModelContext) throws -> [UUID: Date] {
+        var result: [UUID: Date] = [:]
+        for batch in try context.fetch(FetchDescriptor<ImportBatch>()) where batch.kind == "dayOne" && batch.status == "cancelled" {
+            guard let summary = try? JSONDecoder().decode(DayOneBatchSummary.self, from: batch.summaryJSON), let at = summary.undoneAt else { continue }
+            for id in summary.created.values.joined() where (result[id] ?? .distantPast) < at { result[id] = at }
+        }
+        return result
+    }
+    /// The tombstone is the one that undo wrote (a later delete by the owner moves `deletedAt` past it).
+    static func revivable(_ deletedAt: Date?, _ undoneAt: Date?) -> Bool {
+        guard let deletedAt, let undoneAt else { return false }
+        return abs(deletedAt.timeIntervalSince(undoneAt)) < 0.001
+    }
+
     /// Primary (unbranched) Day One rows by sourceID, with whether the owner changed them in Madar after their last import.
     static func existingEntries(_ context: ModelContext) throws -> [String: (row: Entry, state: DayOneMerge.Existing)] {
         let entries = try context.fetch(FetchDescriptor<Entry>(predicate: #Predicate { $0.source == "dayOne" && $0.deletedAt == nil && $0.mergedInto == nil }))
@@ -80,11 +101,20 @@ public struct DayOneReceipt: Equatable, Sendable {
         // A keep-both branch is keyed by the incoming hash, so the same export never adds it twice.
         let branches = Set(try context.fetch(FetchDescriptor<Entry>(predicate: #Predicate { $0.source == "dayOne" && $0.deletedAt == nil && $0.mergedInto == nil }))
             .filter { !$0.sourceBranch.isEmpty }.compactMap { row in row.sourceID.map { $0 + ":" + row.sourceBranch } })
+        let undone = try undoneRows(context)
+        let tombstoned = Dictionary(try context.fetch(FetchDescriptor<Entry>(predicate: #Predicate { $0.source == "dayOne" && $0.deletedAt != nil })).map { ($0.id, $0.deletedAt) },
+                                    uniquingKeysWith: { first, _ in first })
         var preview = DayOnePreview(); preview.skipped = plan.skipped
         var days = Set<GregorianDay>(), media: [String: DayOneMediaRef] = [:], tags: [String] = [], firsts: [String] = []
         for entry in plan.entries {
             var action = DayOneMerge.action(hash: entry.hash, existing: existing[entry.sourceID]?.state, choice: choice)
             if action == .keepBoth, branches.contains(entry.sourceID + ":" + entry.hash) { action = .same }
+            if action == .add || action == .keepBoth {
+                let id = StableIdentity.uuid(for: "DayOneEntry:" + entry.sourceID + (action == .keepBoth ? ":" + entry.hash : ""))
+                if let deletedAt = tombstoned[id], !revivable(deletedAt, undone[id]) {
+                    preview.actions[entry.sourceID] = .same; preview.deletedHere += 1; continue // written nowhere, counted on its own
+                }
+            }
             preview.actions[entry.sourceID] = action
             switch action {
             case .add: preview.add += 1
@@ -101,7 +131,9 @@ public struct DayOneReceipt: Equatable, Sendable {
         }
         preview.days = days.sorted()
         for ref in media.values {
-            if ref.found { preview.mediaFound[ref.kind, default: 0] += 1; preview.mediaBytes += ref.size } else { preview.mediaMissing[ref.kind, default: 0] += 1 }
+            if !ref.found { preview.mediaMissing[ref.kind, default: 0] += 1 }
+            else if ref.size > ZIPReader.memberLimit { preview.mediaTooLarge[ref.kind, default: 0] += 1 }
+            else { preview.mediaFound[ref.kind, default: 0] += 1; preview.mediaBytes += ref.size }
         }
         preview.tags = tags; preview.projects = firsts
         return preview
@@ -117,34 +149,39 @@ public struct DayOneReceipt: Equatable, Sendable {
         let batch = ImportBatch(); batch.kind = "dayOne"; batch.fileName = fileName; batch.fileHash = fileHash
         batch.startedAt = now; batch.status = "running"; batch.createdAt = now; batch.updatedAt = now; batch.writerID = writer
         context.insert(batch); try context.save()
-        var summary = DayOneBatchSummary(); summary.skipped = plan.skipped; summary.unchanged = preview.same; summary.keptMine = preview.keepMine
+        var summary = DayOneBatchSummary(); summary.skipped = plan.skipped; summary.unchanged = preview.same; summary.keptMine = preview.keepMine; summary.deletedHere = preview.deletedHere
         func created(_ model: String, _ id: UUID) { summary.created[model, default: []].append(id) }
+        // Only rows an undone import tombstoned come back; a row the owner deleted stays deleted (§11).
+        let undone = try undoneRows(context)
         do {
             // Media: one row per file (natural key = md5), reused across entries and re-imports.
             let writing = plan.entries.filter { [.add, .update, .keepBoth].contains(preview.actions[$0.sourceID]) }
-            var mediaIDs: [String: UUID] = [:], pending = 0, done = 0
+            var mediaIDs: [String: UUID] = [:], owner: [String: String] = [:], pending = 0, done = 0
+            for entry in writing { for ref in entry.media where owner[ref.key] == nil { owner[ref.key] = entry.sourceID } }
             let refs: [DayOneMediaRef] = { var seen = Set<String>(); return writing.flatMap(\.media).filter { seen.insert($0.key).inserted } }()
             let allMedia = try context.fetch(FetchDescriptor<Media>())
+            let mediaByID = Dictionary(allMedia.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+            let liveMedia = Dictionary(allMedia.filter { $0.deletedAt == nil && $0.mergedInto == nil }.compactMap { row in row.sourceID.map { ($0, row) } }, uniquingKeysWith: { first, _ in first })
             for ref in refs {
                 let key = ref.key, id = StableIdentity.uuid(for: "DayOneMedia:" + key)
-                let current = allMedia.first { $0.sourceID == key && $0.deletedAt == nil && $0.mergedInto == nil }
-                if let current, current.state == "ok" || !ref.found {
+                let tooLarge = ref.found && ref.size > ZIPReader.memberLimit
+                let note = DayOneBatchSummary.Missing(kind: ref.kind, key: key, entry: owner[key] ?? "")
+                if let current = liveMedia[key], current.state == "ok" || !ref.found || tooLarge {
                     mediaIDs[key] = current.id
-                    if current.state == "ok" { summary.mediaFound[ref.kind, default: 0] += 1 }
-                    else { summary.missing.append(.init(kind: ref.kind, key: key, entry: writing.first { $0.media.contains(ref) }?.sourceID ?? "")) }
+                    if current.state == "ok" { summary.mediaFound[ref.kind, default: 0] += 1 } else if tooLarge { summary.tooLarge.append(note) } else { summary.missing.append(note) }
                     continue
                 }
+                if let old = mediaByID[id], old.deletedAt != nil, !revivable(old.deletedAt, undone[id]) { continue } // deleted by the owner: not linked again
                 var bytes: Data?
-                if let path = ref.path, let member = archive.member(path) { bytes = try? await Task.detached(priority: .userInitiated) { try archive.read(member) }.value }
+                if !tooLarge, let path = ref.path, let member = archive.member(path) { bytes = try? await Task.detached(priority: .userInitiated) { try archive.read(member) }.value }
                 let row: Media
-                if let current { summary.before.append(try current.record()); row = current }
-                else if let old = allMedia.first(where: { $0.id == id }) { summary.before.append(try old.record()); row = old; row.deletedAt = nil; row.restoredAt = now }
+                if let current = liveMedia[key] { summary.before.append(try current.record()); row = current } // a missing file now found: no bytes in the record
+                else if let old = mediaByID[id] { row = old; row.deletedAt = nil; row.restoredAt = now; created("Media", id) }
                 else { row = Media(); row.id = id; row.createdAt = now; row.updatedAt = now; context.insert(row); created("Media", id) }
                 row.kind = ref.kind; row.contentType = ref.contentType; row.sourceID = key; row.durationS = ref.durationS; row.importBatchID = batch.id
                 row.data = bytes; row.sizeBytes = bytes?.count ?? 0; row.sha256 = bytes.map { SHA256.hash(data: $0).map { String(format: "%02x", $0) }.joined() } ?? ""
                 row.state = bytes == nil ? "missing" : "ok"; row.updatedAt = StableIdentity.monotonic(now: now, previous: row.updatedAt); row.writerID = writer
-                if bytes == nil { summary.missing.append(.init(kind: ref.kind, key: key, entry: writing.first { $0.media.contains(ref) }?.sourceID ?? "")) }
-                else { summary.mediaFound[ref.kind, default: 0] += 1 }
+                if bytes != nil { summary.mediaFound[ref.kind, default: 0] += 1 } else if tooLarge { summary.tooLarge.append(note) } else { summary.missing.append(note) }
                 mediaIDs[key] = row.id
                 pending += bytes?.count ?? 0; done += 1; progress?(done, refs.count)
                 if pending > 64 * 1024 * 1024 { try context.save(); pending = 0 }
@@ -154,9 +191,9 @@ public struct DayOneReceipt: Equatable, Sendable {
                 guard let member = archive.member(journal.path) else { continue }
                 let bytes = try await Task.detached(priority: .userInitiated) { try archive.read(member) }.value
                 let sha = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined(), key = "dayOne.journal:" + sha
-                guard !allMedia.contains(where: { $0.sourceID == key && $0.deletedAt == nil && $0.mergedInto == nil }) else { continue }
+                guard liveMedia[key] == nil else { continue }
                 let id = StableIdentity.uuid(for: "DayOneMedia:" + key), row: Media
-                if let old = allMedia.first(where: { $0.id == id }) { summary.before.append(try old.record()); row = old; row.deletedAt = nil; row.restoredAt = now }
+                if let old = mediaByID[id] { guard revivable(old.deletedAt, undone[id]) else { continue }; row = old; row.deletedAt = nil; row.restoredAt = now; created("Media", id) }
                 else { row = Media(); row.id = id; row.createdAt = now; row.updatedAt = now; context.insert(row); created("Media", id) }
                 row.kind = "doc"; row.contentType = "application/json"; row.data = bytes; row.sizeBytes = bytes.count; row.sha256 = sha; row.sourceID = key
                 row.state = "ok"; row.importBatchID = batch.id; row.updatedAt = StableIdentity.monotonic(now: now, previous: row.updatedAt); row.writerID = writer
@@ -164,19 +201,25 @@ public struct DayOneReceipt: Equatable, Sendable {
             // RD8 tags: the first tag of an entry links it to a project of that name (an existing one, else a closed chapter).
             var projectIDs: [String: UUID] = [:]
             let projects = try context.fetch(FetchDescriptor<Project>())
+            let liveProjects = live(projects, deleted: \.deletedAt, merged: \.mergedInto)
+            var latestByTag: [String: Date] = [:]
+            for entry in writing { if let tag = entry.tags.first { latestByTag[tag] = max(latestByTag[tag] ?? entry.createdAt, entry.createdAt) } }
             for tag in preview.projects {
-                if let match = live(projects, deleted: \.deletedAt, merged: \.mergedInto).first(where: { normalized($0.name) == normalized(tag) }) { projectIDs[tag] = match.id; continue }
+                if let match = liveProjects.first(where: { normalized($0.name) == normalized(tag) }) { projectIDs[tag] = match.id; continue }
                 let id = StableIdentity.uuid(for: "DayOneTag:" + normalized(tag)), row: Project
-                if let old = projects.first(where: { $0.id == id }) { summary.before.append(try old.record()); row = old; row.deletedAt = nil; row.restoredAt = now }
-                else { row = Project(); row.id = id; row.createdAt = now; row.updatedAt = now; context.insert(row); created("Project", id) }
-                row.name = tag; row.intention = ""
-                row.finishedAt = writing.filter { $0.tags.first == tag }.map(\.createdAt).max()
+                if let old = projects.first(where: { $0.id == id }) {
+                    if old.deletedAt == nil && old.mergedInto == nil { projectIDs[tag] = old.id; continue } // renamed by the owner
+                    guard revivable(old.deletedAt, undone[id]) else { continue } // the owner deleted this project: entries stay unlinked
+                    row = old; row.deletedAt = nil; row.restoredAt = now; created("Project", id)
+                } else { row = Project(); row.id = id; row.createdAt = now; row.updatedAt = now; context.insert(row); created("Project", id) }
+                row.name = tag; row.intention = ""; row.finishedAt = latestByTag[tag]
                 row.updatedAt = StableIdentity.monotonic(now: now, previous: row.updatedAt); row.writerID = writer
                 projectIDs[tag] = row.id
             }
             summary.projects = preview.projects
             // Entries.
             let allEntries = try context.fetch(FetchDescriptor<Entry>())
+            let entriesByID = Dictionary(allEntries.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
             var days = Set<String>(), latest = now
             for entry in writing {
                 let action = preview.actions[entry.sourceID]!
@@ -198,9 +241,10 @@ public struct DayOneReceipt: Equatable, Sendable {
                     let branch = action == .keepBoth ? entry.hash : ""
                     let id = StableIdentity.uuid(for: "DayOneEntry:" + entry.sourceID + (branch.isEmpty ? "" : ":" + branch))
                     let row: Entry
-                    if let old = allEntries.first(where: { $0.id == id }) {
+                    if let old = entriesByID[id] {
                         if old.deletedAt == nil && old.mergedInto == nil { summary.unchanged += 1; continue }
-                        summary.before.append(try old.record()); row = old; row.deletedAt = nil; row.restoredAt = now
+                        guard revivable(old.deletedAt, undone[id]) else { continue } // deleted by the owner (counted in the preview)
+                        row = old; row.deletedAt = nil; row.restoredAt = now; created("Entry", id)
                     } else { row = Entry(); row.id = id; row.createdAt = now; row.updatedAt = now; context.insert(row); created("Entry", id) }
                     // The stored day is computed once at import and never recomputed.
                     row.dayKey = resolved.day.description; row.eventAt = entry.createdAt; row.tzID = resolved.timeZoneID; row.dayPolicy = resolved.policy
@@ -210,24 +254,28 @@ public struct DayOneReceipt: Equatable, Sendable {
                 default: continue
                 }
             }
-            // Day pages: origin = dayOne while the page has no native writing (N01).
+            // Day pages: origin = dayOne while the page has none of the owner's own content (N01): no native line,
+            // intention, margin note, page photo or answer.
             let pages = try context.fetch(FetchDescriptor<DayPage>())
-            let native = Set(live(allEntries, deleted: \.deletedAt, merged: \.mergedInto).filter { $0.source != "dayOne" }.map(\.dayKey))
+            var native = Set(live(allEntries, deleted: \.deletedAt, merged: \.mergedInto).filter { $0.source != "dayOne" }.map(\.dayKey))
+            native.formUnion(live(try context.fetch(FetchDescriptor<Niyya>()), deleted: \.deletedAt, merged: \.mergedInto).map(\.dayKey))
+            for margin in live(try context.fetch(FetchDescriptor<MarginNote>()), deleted: \.deletedAt, merged: \.mergedInto) { native.insert(margin.targetDayKey); native.insert(margin.writtenDayKey) }
+            let pagesByDay = Dictionary(grouping: pages.filter { $0.mergedInto == nil }, by: \.dayKey)
             for key in days.sorted() {
-                let keyed = pages.filter { $0.dayKey == key && $0.mergedInto == nil }
+                let keyed = pagesByDay[key] ?? []
                 if keyed.contains(where: { $0.deletedAt != nil }) && !keyed.contains(where: { $0.deletedAt == nil }) { continue } // a deleted day stays deleted
                 if let page = keyed.filter({ $0.deletedAt == nil }).max(by: { $0.updatedAt < $1.updatedAt }) {
-                    if page.origin != "dayOne", !native.contains(key), page.questionAnswer == nil {
+                    if page.origin != "dayOne", !native.contains(key), page.questionAnswer == nil, page.photoMediaID == nil {
                         summary.pageOrigins[page.id.uuidString] = page.origin; page.origin = "dayOne"
                         page.updatedAt = StableIdentity.monotonic(now: now, previous: page.updatedAt); page.writerID = writer
                     }
                 } else {
-                    let page = DayPage(); page.dayKey = key; page.origin = "dayOne"; page.createdAt = now; page.updatedAt = now; page.writerID = writer
+                    let page = DayPage(); page.dayKey = key; page.origin = native.contains(key) ? "native" : "dayOne"; page.createdAt = now; page.updatedAt = now; page.writerID = writer
                     context.insert(page); created("DayPage", page.id)
                 }
             }
             let keys = days.sorted(); summary.days = keys.count; summary.firstDay = keys.first; summary.lastDay = keys.last
-            batch.status = summary.missing.isEmpty ? "done" : "partial"
+            batch.status = summary.missing.isEmpty && summary.tooLarge.isEmpty ? "done" : "partial"
             batch.finishedAt = latest; batch.summaryJSON = try JSONEncoder().encode(summary); batch.updatedAt = StableIdentity.monotonic(now: now, previous: batch.updatedAt)
             try context.save()
             // Dedupe pass after every import (natural keys).
@@ -250,7 +298,8 @@ public struct DayOneReceipt: Equatable, Sendable {
         guard summary.undoneAt == nil else { return }
         func tombstone<T: MadarRecordModel>(_ type: T.Type, _ model: String, deleted: ReferenceWritableKeyPath<T, Date?>, updated: ReferenceWritableKeyPath<T, Date>) throws {
             let ids = Set(summary.created[model] ?? [])
-            for row in try context.fetch(FetchDescriptor<T>()) where ids.contains(row.id) {
+            // A row the owner already deleted keeps its own tombstone, so a re-import never revives it.
+            for row in try context.fetch(FetchDescriptor<T>()) where ids.contains(row.id) && row[keyPath: deleted] == nil {
                 row[keyPath: deleted] = now; row[keyPath: updated] = StableIdentity.monotonic(now: now, previous: row[keyPath: updated])
             }
         }

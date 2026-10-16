@@ -48,7 +48,7 @@ extension AppDiaryService {
         var descriptor = FetchDescriptor<Media>(predicate: #Predicate { $0.kind == "photo" && $0.deletedAt == nil && $0.mergedInto == nil }); descriptor.propertiesToFetch = [\.id]
         let photos = Set(try context.fetch(descriptor).map(\.id))
         let niyyas=try context.fetch(FetchDescriptor<Niyya>(predicate:#Predicate{$0.deletedAt==nil && $0.mergedInto==nil}))
-        let grouped = Dictionary(grouping: entries, by: \.dayKey), keys = Set(entries.map(\.dayKey) + pages.map(\.dayKey) + margins.map(\.writtenDayKey)+niyyas.map(\.dayKey))
+        let grouped = Dictionary(grouping: entries, by: \.dayKey), keys = Set(entries.map(\.dayKey) + pages.filter { $0.photoMediaID != nil || $0.questionAnswer != nil }.map(\.dayKey) + margins.map(\.writtenDayKey)+niyyas.map(\.dayKey))
         let days = keys.compactMap { key -> DiaryDaySummary? in
             guard let day = try? GregorianDay(key) else { return nil }
             let rows = grouped[key] ?? [], written = rows.filter { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }

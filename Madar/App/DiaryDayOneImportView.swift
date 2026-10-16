@@ -92,7 +92,7 @@ struct DiaryDayOneImportView: View {
                     }.accessibilityElement(children: .combine).accessibilityIdentifier("dayone-preview-range")
                 }
             }
-            if !p.mediaFound.isEmpty || !p.mediaMissing.isEmpty {
+            if !p.mediaFound.isEmpty || !p.mediaMissing.isEmpty || !p.mediaTooLarge.isEmpty {
                 card {
                     sectionTitle("المرفقات")
                     ForEach(["photo", "audio", "video", "doc"], id: \.self) { kind in
@@ -102,6 +102,13 @@ struct DiaryDayOneImportView: View {
                         Divider().overlay(theme.line)
                         Label { Text(missingSentence(p.mediaMissing)).font(MadarTypography.caption()) } icon: { Image(systemName: "exclamationmark.circle") }
                             .foregroundStyle(theme.color("accentText")).accessibilityIdentifier("dayone-preview-missing")
+                    }
+                    if !p.mediaTooLarge.isEmpty {
+                        Divider().overlay(theme.line)
+                        Label { Text(missingSentence(p.mediaTooLarge, lead: "أكبر من أن يُنقل: ")).font(MadarTypography.caption()) } icon: { Image(systemName: "externaldrive.badge.exclamationmark") }
+                            .foregroundStyle(theme.color("accentText")).accessibilityIdentifier("dayone-preview-too-large")
+                    }
+                    if !p.mediaMissing.isEmpty || !p.mediaTooLarge.isEmpty {
                         Text("تدخل المدخلة كما هي بعلامة «مرفق ناقص»، ولا يُختلق ملف.").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
                     }
                 }
@@ -164,6 +171,9 @@ struct DiaryDayOneImportView: View {
                     Divider().overlay(theme.line)
                     Text(missingSentence(Dictionary(grouping: r.summary.missing, by: \.kind).mapValues(\.count))).font(MadarTypography.caption()).foregroundStyle(theme.color("accentText"))
                 }
+                if !r.summary.tooLarge.isEmpty {
+                    Text(missingSentence(Dictionary(grouping: r.summary.tooLarge, by: \.kind).mapValues(\.count), lead: "أكبر من أن يُنقل: ")).font(MadarTypography.caption()).foregroundStyle(theme.color("accentText"))
+                }
                 if let last = r.summary.lastDay.flatMap({ try? GregorianDay($0) }) {
                     Divider().overlay(theme.line)
                     Button { openDay = last } label: {
@@ -198,16 +208,16 @@ struct DiaryDayOneImportView: View {
         HStack { Text(title).font(MadarTypography.body()); Spacer(); Text(value).font(MadarTypography.body()).monospacedDigit() }.frame(minHeight: 30)
     }
     private func kindName(_ kind: String) -> String { ["photo": "صور", "audio": "تسجيلات صوتية", "video": "مقاطع", "doc": "ملفات PDF"][kind] ?? "مرفقات" }
-    private func missingSentence(_ missing: [String: Int]) -> String {
+    private func missingSentence(_ missing: [String: Int], lead: String = "لم توجد في الملف: ") -> String {
         let parts = ["photo", "audio", "video", "doc"].compactMap { kind in missing[kind].map { kindName(kind) + ": " + digits.string($0) } }
-        return "لم توجد في الملف: " + parts.joined(separator: "، ")
+        return lead + parts.joined(separator: "، ")
     }
     private func journalsLabel(_ draft: DayOneImportDraft) -> String {
         draft.plan.journals.count == 1 ? "دفتر واحد" : "الدفاتر: " + digits.string(draft.plan.journals.count)
     }
     private func skipped(_ p: DayOnePreview) -> [(String, Int)] {
         let count = { (reason: DayOneSkip.Reason) in p.skipped.filter { $0.reason == reason }.count }
-        return [("موجودة في دفترك كما هي", p.same), ("أبقيت نسختك منها", p.keepMine), ("مكررة داخل الملف", count(.duplicateInFile)), ("من تصدير مدار نفسه", count(.madarExport)),
+        return [("موجودة في دفترك كما هي", p.same), ("أبقيت نسختك منها", p.keepMine), ("حذفتها من دفترك من قبل", p.deletedHere),("مكررة داخل الملف", count(.duplicateInFile)), ("من تصدير مدار نفسه", count(.madarExport)),
                 ("فارغة بلا نص ولا مرفق", count(.empty)), ("بلا معرّف أو تاريخ", count(.noIdentity) + count(.noDate))].filter { $0.1 > 0 }
     }
 
