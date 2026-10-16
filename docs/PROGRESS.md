@@ -182,13 +182,13 @@ Owner standing rule (15 Oct): screens that match their design or better count as
 M2 screens are owner-approved; M1-F04 software blocker is resolved. M3 built screens/F01 are integrated and covered by the owner’s provisional acceptance rule. V09 needs a permitted Day One path or anonymized fixture; V12 has bounded approval for generic reminders while locked. UX-01–UX-14 are complete. M4-E02/V02, UX-15, W01/W02, F01, F02 and V12 notifications are complete; M5 follows M4 software. Keep tafsir off until its separate licence is verified. No owner-iPhone or milestone pass is claimed.
 
 # Handovers
-## Handover — M3-V12 diary reminders outside the app — 2026-10-16 — Claude
-Works now: morning intention, «في مثل هذا اليوم» and a letter whose day came reach the user as reminders under the shared budget, sanctity and the two-a-day diary cap; text is generic and never diary content, even with the whole-app lock; a tap opens the diary; writing the intention cancels its reminder. Qada reminders no longer show the debt count (RU2) and the digest count uses catalog plurals (RU3).
-Verified: swift test MadarCore 89/89; xcodebuild RoomNotificationsIntegrationTests 6/6, Diary/Capture/Quran/AppService suites 17/17; make build succeeded; git diff --check clean.
-Differences left: diary widgets with content wait for an owner opt-in key (Ideas); no reply-from-notification action yet.
-Not verified: real delivery and lock-screen display (M4-G), owner iPhone.
-Improvement share: lobby names Friday Dhuhr «الجمعة» (arch and next line), and the empty habits card loses «٠ من ٠» and gains the rings and an add button, Quran first use drops «٪٠», the Friday pill points to Al-Kahf and opens page ٢٩٣, mushaf page links no longer open page ١; BahwPrayerIntegrationTests 3/3, BahwLobbyUITests repaired stale checks (habits built; both dates) and pass, HabitsUITests 2/2, QuranYearUITests 1/1, Friday UI 1/1, QuranMushaf/Index UI 2/2. Next: no ready card remains; M5 needs the owner to open its cards (money engine first, highest effort).
-Model/effort: Claude Opus 5.5; effort not exposed. Usage: five-hour about 40% at handover.
+## Handover — M3-V12 diary reminders, then improvements — 2026-10-16 — Claude
+Works now: intention, «في مثل هذا اليوم» and due-letter reminders under the shared budget, sanctity and diary cap, with generic text that never carries the diary (also under the whole-app lock); qada reminders show no debt count (RU2), digest count from catalog plurals (RU3). Improvements: the lobby names Friday Dhuhr «الجمعة»; the empty habits card has the rings and an add button instead of «٠ من ٠»; Quran first use drops «٪٠»; the Friday pill reads «الكهف في قسم القرآن» and opens page ٢٩٣; mushaf page links no longer open page ١.
+Verified: swift test MadarCore 89/89; xcodebuild RoomNotificationsIntegrationTests 6/6, Diary/Capture/Quran/AppService 17/17, BahwPrayerIntegrationTests 3/3, BahwLobbyUITests (two stale checks repaired) pass, HabitsUITests 2/2, QuranYear/Mushaf/Index UI 3/3, Friday UI 1/1; make build; git diff --check clean.
+Differences left: diary widgets with content wait for an owner opt-in key (Ideas); no reply-from-notification action; before/after shots in Madar/Artifacts/improve/.
+Not verified: real notification delivery and lock-screen display (M4-G), owner iPhone.
+Next: no ready card remains; M5 needs the owner to open its cards (money engine first, highest effort). Continue the improvement share meanwhile.
+Model/effort: Claude Opus 5.5; effort not exposed. Usage: five-hour 48% at this update.
 
 ## Handover — M4-F02 shared reminders and budget — 2026-10-16 — Claude
 Works now: qada reminder after the chosen prayer's sanctity while something is owed, push-habit reminders at their window start, Quran reminders, all under one per-device budget with a digest that names kinds only; the stale nudge follows its setting; whole-app lock keeps text generic; a tap opens the reminder's room; completing a habit cancels its reminder.
