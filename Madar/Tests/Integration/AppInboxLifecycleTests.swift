@@ -22,6 +22,10 @@ import MadarSnapshots
         // remain in the host's temporary directory until process exit.
         let root = FileManager.default.temporaryDirectory.appending(path: "MadarAppInbox-\(UUID())")
         let managed = try ManagedDataStore(root: root.appending(path: "Data"), commandLockURL: root.appending(path: "CommandBus.lock"))
+        // The fixed prayer day 2026-10-10 must fall inside tracking; a fresh store starts tracking today.
+        let settings = ModelContext(managed.container)
+        _ = try SettingsStore(context: settings).stage(["salah.trackingStart": .object(["dayKey": .string("2026-10-01"), "edits": .number(0)])])
+        try settings.save()
         let session = try AppSession(container: managed.container, managedStore: managed, groupDirectory: root)
         let privacy = AppPrivacyService(session: session)
         let lock = MadarLockController(scope: .app, service: privacy)
@@ -255,6 +259,9 @@ import MadarSnapshots
         let oldDelivery = InboxRecord(expectedGenerationID: oldID, command: command); try inbox.enqueue(oldDelivery)
         let managed = try ManagedDataStore(root: dataRoot, commandLockURL: root.appending(path: "CommandBus.lock"))
         XCTAssertNotEqual(managed.binding.generationID, oldID)
+        let settings = ModelContext(managed.container)
+        _ = try SettingsStore(context: settings).stage(["salah.trackingStart": .object(["dayKey": .string("2026-10-01"), "edits": .number(0)])])
+        try settings.save()
         let session = try AppSession(container: managed.container, managedStore: managed, groupDirectory: root)
         let lock = MadarLockController(scope: .app, service: AppPrivacyService(session: session)); session.lockController = lock
         let fixture = Fixture(root: root, managed: managed, session: session, lock: lock)
@@ -269,7 +276,11 @@ import MadarSnapshots
         XCTAssertTrue(try deliveries("processing", fixture: fixture).isEmpty)
         XCTAssertFalse(try inbox.wasCommitted(commandID: command.commandID, generationID: managed.binding.generationID))
         let rows = try RecordBridge.all(session.container.mainContext, syncedOnly: false)
-        for original in expected { XCTAssertEqual(rows.first { $0.model == original.model && $0.id == original.id }, original) }
+        // Later additive optional fields (e.g. PrayerLog.fridayKind) arrive as null; every V1 field must survive unchanged.
+        for original in expected {
+            let migrated = rows.first { $0.model == original.model && $0.id == original.id }
+            XCTAssertEqual(migrated?.fields.filter { original.fields[$0.key] != nil || $0.value != .null }, original.fields, original.model)
+        }
         XCTAssertEqual(try receipts(fixture).count, 1); XCTAssertEqual(try prayers(fixture).count, 1)
         let fresh = try record(prayerCommand(source: .widget, prayer: .dhuhr), fixture: fixture)
         try inbox.enqueue(fresh); try await session.drainInbox(); try assertAcknowledged(fresh, fixture: fixture)

@@ -16,10 +16,12 @@ struct CaptureIntent: AppIntent {
     init(text: String) { self.text = text }
 
     static var parameterSummary: some ParameterSummary { Summary("التقط \(\.$text)") }
+    /// Held behind the diary lock in this run of Madar only; the person finishes it by opening the diary.
+    static let heldDialog: IntentDialog = "افتح المذكرات ليُضاف السطر."
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        await MadarIntentHandoff.shared.submit(.capture(text: text, id: UUID()))
-        return .result(dialog: "أُضيف.")
+        let applied = await MadarIntentHandoff.shared.submit(.capture(text: text, id: UUID()))
+        return .result(dialog: applied ? "أُضيف." : Self.heldDialog)
     }
 }
 
@@ -47,8 +49,8 @@ struct AddDiaryLineIntent: AppIntent {
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let line = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !line.isEmpty, line.count <= 2000 else { throw AddDiaryLineIntentError.invalidLength }
-        await MadarIntentHandoff.shared.submit(.diaryLine(text: line, day: day.rawValue, id: UUID()))
-        return .result(dialog: "أُضيف.")
+        let applied = await MadarIntentHandoff.shared.submit(.diaryLine(text: line, day: day.rawValue, id: UUID()))
+        return .result(dialog: applied ? "أُضيف." : CaptureIntent.heldDialog)
     }
 }
 

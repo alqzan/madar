@@ -21,9 +21,13 @@ enum MadarIntentRequest: Equatable, Sendable {
     private var handler: ((MadarIntentRequest) async -> Bool)?
     private var flushing = false
 
-    func submit(_ request: MadarIntentRequest) async {
+    /// Returns false while the request is held (diary locked or Madar still loading), so the
+    /// Siri dialog never claims a line was added before it was.
+    @discardableResult
+    func submit(_ request: MadarIntentRequest) async -> Bool {
         pending.append(request)
         await flush()
+        return !pending.contains(request)
     }
     func attach(_ handler: @escaping (MadarIntentRequest) async -> Bool) async {
         self.handler = handler

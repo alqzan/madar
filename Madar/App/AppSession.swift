@@ -684,6 +684,7 @@ final class AppSession {
             try snapshotStore.remove("foundation")
             try? snapshotStore.remove("quran")
             for room in BuiltRoomWidget.allCases {try? snapshotStore.remove(room.rawValue)}
+            try? snapshotStore.remove(HabitShortcutSnapshot.name)
             return
         }
         let snapshot = SnapshotEnvelope(name: "foundation", generatedAt: instant, validUntil: instant.addingTimeInterval(3600), dayKey: key.dayKey, tzID: place.timeZoneID, privacy: SnapshotPrivacy(), payload: FoundationSnapshot(firstCalendar: string("core.firstCalendar"), numerals: string("core.numerals")))
