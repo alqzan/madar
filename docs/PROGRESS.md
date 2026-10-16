@@ -187,7 +187,8 @@ Works now: morning intention, «في مثل هذا اليوم» and a letter who
 Verified: swift test MadarCore 89/89; xcodebuild RoomNotificationsIntegrationTests 6/6, Diary/Capture/Quran/AppService suites 17/17; make build succeeded; git diff --check clean.
 Differences left: diary widgets with content wait for an owner opt-in key (Ideas); no reply-from-notification action yet.
 Not verified: real delivery and lock-screen display (M4-G), owner iPhone.
-Next: improvement share on an earlier room, then M5 (money engine first, highest effort).
+Improvement share: lobby names Friday Dhuhr «الجمعة» (arch and next line), and the empty habits card loses «٠ من ٠» and gains the rings and an add button; BahwPrayerIntegrationTests 3/3, BahwLobbyUITests repaired stale checks (habits built; both dates) and pass, HabitsUITests 2/2.
+Next: no ready card remains; M5 needs the owner to open its cards (money engine first, highest effort).
 Model/effort: Claude Opus 5.5; effort not exposed. Usage: five-hour about 40% at handover.
 
 ## Handover — M4-F02 shared reminders and budget — 2026-10-16 — Claude

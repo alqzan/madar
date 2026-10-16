@@ -49,8 +49,21 @@ struct BahwBlockView: View {
         let rows = (try? HabitRepository(context: ModelContext(service.session.container)).readings(at:service.now)) ?? []
         let met = rows.filter { $0.summary.current?.met == true }.count
         return VStack(alignment:.leading,spacing:10) {
-            Button { service.session.habitsOpen = true } label: { HStack { title(room.accent); Spacer();Text(digits.string(met)+" من "+digits.string(rows.count)).font(label).foregroundStyle(room.accent) }.frame(minHeight:44) }.buttonStyle(.plain).accessibilityIdentifier("bahw-habits-open").disabled(!interactive)
-            if rows.isEmpty { Spacer(minLength:0);Text("عادة صغيرة تدوم").font(size == .icon ? small : big);Text("أضف أول عادة").font(small).foregroundStyle(room.secondaryInk);Spacer(minLength:0) }
+            Button { service.session.habitsOpen = true } label: { HStack { title(room.accent); Spacer();if !rows.isEmpty {Text(digits.string(met)+" من "+digits.string(rows.count)).font(label).foregroundStyle(room.accent)} }.frame(minHeight:44) }.buttonStyle(.plain).accessibilityIdentifier("bahw-habits-open").disabled(!interactive)
+            if rows.isEmpty {
+                // Improvement 16 Oct: no «٠ من ٠»; the four period rings at rest show what a habit becomes, and the action is a real button.
+                Spacer(minLength:0)
+                if size == .large { HStack { ForEach([HabitFrequency.daily,.weekly,.monthly,.yearly],id:\.self){f in VStack(spacing:4){HabitMiniRing(share:0,theme:room).frame(width:24,height:24);Text(f.arabic).font(small).foregroundStyle(room.secondaryInk)}.frame(maxWidth:.infinity)} }.accessibilityHidden(true).padding(.bottom,12) }
+                Text("عادة صغيرة تدوم").font(size == .icon ? small : big)
+                if size == .icon { EmptyView() }
+                else if size == .small { Text("أضف أول عادة").font(small).foregroundStyle(room.secondaryInk) }
+                else {
+                    Text("أقلّ القليل كل يوم يصير سلسلة تراها هنا").font(small).foregroundStyle(room.secondaryInk)
+                    Button { service.session.habitsOpen = true } label: { Label("أضف أول عادة", systemImage: "plus").font(label).padding(.horizontal,18).frame(minHeight:44).foregroundStyle(room.onAccent).background(room.accentFill, in: .capsule) }
+                        .buttonStyle(.plain).disabled(!interactive).padding(.top,6).accessibilityIdentifier("bahw-habits-add-first")
+                }
+                Spacer(minLength:0)
+            }
             else if size == .large {
                 HStack { ForEach([HabitFrequency.daily,.weekly,.monthly,.yearly],id:\.self){f in let group=rows.filter{$0.summary.current?.rule.frequency == f};VStack(spacing:4){HabitMiniRing(share:group.isEmpty ? 0 : Double(group.filter{$0.summary.current?.met == true}.count)/Double(group.count),theme:room).frame(width:24,height:24);Text(f.arabic).font(small)}.frame(maxWidth:.infinity)} }
                 LazyVGrid(columns:[GridItem(.flexible()),GridItem(.flexible())],spacing:8){ ForEach(Array(rows.prefix(6))){r in

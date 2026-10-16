@@ -12,9 +12,9 @@ import XCTest
         XCTAssertTrue(element("bahw-greeting").waitForExistence(timeout: 15), app.debugDescription)
         XCTAssertEqual(element("bahw-greeting").label, "مساء الخير")
         XCTAssertFalse(element("bahw-date").label.contains("·"))
-        for block in ["salah", "quran", "year", "upcoming"] { XCTAssertTrue(element("bahw-block-" + block).exists, block) }
-        // Rooms not built yet have no entry point (habits wait for RL3; money and Mihbara for M5/M6).
-        for block in ["habits", "mal", "mihbara"] { XCTAssertFalse(element("bahw-block-" + block).exists, block) }
+        for block in ["habits", "salah", "quran", "year", "upcoming"] { XCTAssertTrue(element("bahw-block-" + block).exists, block) }
+        // Rooms not built yet have no entry point (money and Mihbara wait for M5/M6; habits shipped in M4).
+        for block in ["mal", "mihbara"] { XCTAssertFalse(element("bahw-block-" + block).exists, block) }
         XCTAssertTrue(element("bahw-salah-next").label.contains("المغرب"), element("bahw-salah-next").label)
         capture(app, "M4-V01-lobby-L")
         app.swipeUp(); XCTAssertTrue(element("bahw-block-notes").waitForExistence(timeout: 5)); capture(app, "M4-V01-lobby-s1-L")
@@ -90,7 +90,7 @@ import XCTest
         XCTAssertTrue(upcoming.isHittable)
         let dates = upcoming.staticTexts.allElementsBoundByIndex.map(\.label).joined(separator: " ")
         XCTAssertTrue(dates.contains("فبراير"), dates)
-        XCTAssertFalse(dates.contains("شوال"), dates)
+        // Both dates always (owner, 15 Oct): the Hijri date sits beside the Gregorian one.
         capture(app, "UX-06-upcoming-L")
     }
     func testEmptyDiaryOpensWriterAndKeepsDraft() throws {

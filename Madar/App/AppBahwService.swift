@@ -77,10 +77,14 @@ struct BahwUpcomingItem: Identifiable, Equatable {
             let parts = calendar.dateComponents([.hour, .minute], from: date)
             return digits.localized(String(format: "%02d:%02d", locale: Locale(identifier: "en_US_POSIX"), parts.hour ?? 0, parts.minute ?? 0))
         }
-        let arches = snapshot.today.cells.map { cell in
-            BahwPrayerModel.Arch(id: cell.reference.prayer.rawValue, name: names[cell.reference.prayer] ?? "", time: clock(cell.prayerTime), clock24: clock24(cell.prayerTime), done: [.jamaah, .alone].contains(cell.status), next: cell.reference == upcoming?.reference)
+        // §7.2: on Friday the Dhuhr arch reads «الجمعة» here as in the prayer room.
+        func name(_ reference: PrayerReference) -> String? {
+            snapshot.today.cells.contains { $0.reference == reference && $0.isFriday && reference.prayer == .dhuhr } ? "الجمعة" : names[reference.prayer]
         }
-        return .init(arches: arches, done: arches.filter(\.done).count, nextName: upcoming.flatMap { names[$0.reference.prayer] }, nextTime: clock(upcoming?.time),
+        let arches = snapshot.today.cells.map { cell in
+            BahwPrayerModel.Arch(id: cell.reference.prayer.rawValue, name: name(cell.reference) ?? "", time: clock(cell.prayerTime), clock24: clock24(cell.prayerTime), done: [.jamaah, .alone].contains(cell.status), next: cell.reference == upcoming?.reference)
+        }
+        return .init(arches: arches, done: arches.filter(\.done).count, nextName: upcoming.flatMap { name($0.reference) }, nextTime: clock(upcoming?.time),
                      nextAfter: upcoming.map { $0.time }.map { PrayerCopy.after(seconds: $0.timeIntervalSince(instant), digits: digits) })
     }
     func quran() -> BahwQuranModel? {

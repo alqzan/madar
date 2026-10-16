@@ -26,4 +26,15 @@ import MadarData
         // Tomorrow's Fajr must not be highlighted as an unlogged arch in today's five.
         XCTAssertFalse(model.arches.contains { $0.next })
     }
+    /// §7.2: on Friday the Dhuhr arch and the next-prayer line read «الجمعة» in the lobby too.
+    func testFridayDhuhrReadsJumuahInTheLobby() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "BahwFriday-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root), app = try AppSession(container: container, groupDirectory: root)
+        let friday = try XCTUnwrap(AppBahwService(session: app, evaluationDate: ISO8601DateFormatter().date(from: "2026-10-16T08:40:00+03:00")!).prayer())
+        XCTAssertEqual(friday.nextName, "الجمعة")
+        XCTAssertEqual(friday.arches.first { $0.id == "dhuhr" }?.name, "الجمعة")
+        let thursday = try XCTUnwrap(AppBahwService(session: app, evaluationDate: ISO8601DateFormatter().date(from: "2026-10-15T08:40:00+03:00")!).prayer())
+        XCTAssertEqual(thursday.nextName, "الظهر")
+    }
 }
