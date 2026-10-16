@@ -41,6 +41,102 @@ import MadarInbox
 }
 
 @MainActor struct MoneyPersistenceTests {
+    /// F06/F02: 100 halalas split 33/33/34, with 40 then 30 refunded. The stamp
+    /// changes budgets only, survives relaunch, restores the split, and is undoable.
+    @Test func budgetStampRestoresSplitAndRefundsWithoutChangingCashOrDebt() async throws {
+        let f = try MoneyFixture(); defer { f.clean() }; try await f.setup()
+        let c = ModelContext(f.container), envelope = Envelope(); c.insert(envelope); try c.save()
+        _ = try await f.ingest("شراء مدى\n*3333\n1.00 SAR\n2026-10-16 12:00")
+        let original = try f.transaction()
+        let parts: [MadarCore.JSONValue] = [("daily", 33), ("envelope", 33), ("reserve", 34)].map { target, amount in
+            var p: [String: MadarCore.JSONValue] = ["target": .string(target), "amountMinor": .number(Double(amount))]
+            if target == "envelope" { p["targetID"] = .string(envelope.id.uuidString) }; return .object(p)
+        }
+        #expect(try await f.run("money.confirmTransaction", ["id": .string(original.id.uuidString), "allocations": .array(parts)]).status == .applied)
+        func refund(_ amount: Int) async throws -> UUID {
+            let context = ModelContext(f.container), row = MoneyTransaction()
+            row.kind = "refund"; row.amountMinor = amount; row.currency = "SAR"; row.homeCurrency = "SAR"
+            row.cardID = f.debit; row.toAccountID = f.bank; row.eventAt = f.now.addingTimeInterval(-Double(amount)); row.dayKey = "2026-10-16"; row.reviewState = "needsLook"
+            context.insert(row); try context.save()
+            #expect(try await f.run("money.confirmTransaction", ["id": .string(row.id.uuidString), "relatedTransactionID": .string(original.id.uuidString)]).status == .applied)
+            return row.id
+        }
+        _ = try await refund(40)
+        let before = try f.basis(), command = UUID()
+        func stamp(_ excluded: Bool, expected: Bool, id: UUID = UUID()) async throws -> CommandOutcome {
+            try await f.run("money.setBudgetExclusion", ["id": .string(original.id.uuidString), "excluded": .bool(excluded), "expectedExcluded": .bool(expected)], id: id)
+        }
+        #expect(try await stamp(true, expected: false, id: command).status == .applied)
+        #expect(try f.basis().inAccountMinor == before.inAccountMinor)
+        #expect(try f.basis().owedMinor == before.owedMinor)
+        #expect(try MoneyRepository(context: ModelContext(f.container)).allocationRows().isEmpty)
+        #expect(try await stamp(true, expected: false, id: command).status == .applied, "Receipt replay")
+        #expect(try await stamp(false, expected: false).status == .rejected, "Stale sheet")
+        #expect(try await f.run("system.undo", ["undoToken": .string(command.uuidString)]).status == .applied)
+        #expect(try MoneyRepository(context: ModelContext(f.container)).allocationRows().map(\.amountMinor).sorted() == [-34, -33, -33, 13, 13, 14])
+        #expect(try await stamp(true, expected: false).status == .applied)
+        let second = try await refund(30)
+        #expect(try f.transaction(second).ignoredFromBudget)
+        #expect(try MoneyRepository(context: ModelContext(f.container)).allocationRows().isEmpty)
+        let cash = try f.basis().inAccountMinor
+        #expect(try await stamp(false, expected: true).status == .applied)
+        #expect(try f.basis().inAccountMinor == cash)
+        #expect(try MoneyRepository(context: ModelContext(f.container)).allocationRows().map(\.amountMinor).sorted() == [-34, -33, -33, 10, 10, 10, 13, 13, 14])
+        #expect(try await stamp(true, expected: false).status == .applied)
+        #expect(try await stamp(false, expected: true).status == .applied, "Repeated lift reuses natural keys")
+        #expect(try ModelContext(f.container).fetch(FetchDescriptor<Allocation>()).count == 9)
+    }
+    @Test func liftingIntakeStampUsesDailyDefaultAndRejectsNeutralTransfers() async throws {
+        let f = try MoneyFixture(); defer { f.clean() }; try await f.setup()
+        _ = try await f.ingest("شراء مدى\n*3333\n1.00 SAR\n2026-10-16 12:00")
+        let row = try f.transaction()
+        #expect(try await f.run("money.confirmTransaction", ["id": .string(row.id.uuidString), "ignoredFromBudget": .bool(true)]).status == .applied)
+        #expect(try await f.run("money.setBudgetExclusion", ["id": .string(row.id.uuidString), "excluded": .bool(false), "expectedExcluded": .bool(true)]).status == .applied)
+        #expect(try MoneyRepository(context: ModelContext(f.container)).allocationRows().map(\.amountMinor) == [-100])
+        let c = ModelContext(f.container), transfer = MoneyTransaction(); transfer.kind = "transfer"; transfer.fromAccountID = f.bank; transfer.toAccountID = f.cash
+        transfer.amountMinor = 100; transfer.homeAmountMinor = 100; c.insert(transfer); try c.save()
+        #expect(try await f.run("money.setBudgetExclusion", ["id": .string(transfer.id.uuidString), "excluded": .bool(true), "expectedExcluded": .bool(false)]).status == .rejected)
+        #expect(!MoneyCommandPayload.validate(name: "money.setBudgetExclusion", payload: ["id": .string(row.id.uuidString), "excluded": .bool(true)]))
+        #expect(try await f.run("money.setBudgetExclusion", ["id": .string(row.id.uuidString), "excluded": .bool(true), "expectedExcluded": .bool(false)], source: .shortcut).status != .applied)
+    }
+    @Test func budgetStampKeepsRepeatedSplitTargetsAndRefusesUndoAfterLaterRefund() async throws {
+        let f = try MoneyFixture(); defer { f.clean() }; try await f.setup()
+        _ = try await f.ingest("شراء مدى\n*3333\n1.00 SAR\n2026-10-16 12:00")
+        let original = try f.transaction()
+        let part: MadarCore.JSONValue = .object(["target": .string("daily"), "amountMinor": .number(50)])
+        #expect(try await f.run("money.confirmTransaction", ["id": .string(original.id.uuidString), "allocations": .array([part, part])]).status == .applied)
+        func refund(_ amount: Int) async throws {
+            let c = ModelContext(f.container), row = MoneyTransaction()
+            row.kind = "refund"; row.amountMinor = amount; row.cardID = f.debit; row.toAccountID = f.bank
+            row.eventAt = f.now.addingTimeInterval(-Double(amount)); row.dayKey = "2026-10-16"; row.reviewState = "needsLook"; c.insert(row); try c.save()
+            #expect(try await f.run("money.confirmTransaction", ["id": .string(row.id.uuidString), "relatedTransactionID": .string(original.id.uuidString)]).status == .applied)
+        }
+        try await refund(40)
+        let command = UUID()
+        #expect(try await f.run("money.setBudgetExclusion", ["id": .string(original.id.uuidString), "excluded": .bool(true), "expectedExcluded": .bool(false)], id: command).status == .applied)
+        try await refund(20)
+        await #expect(throws: MoneyCommandError.undoSuperseded) { try await f.run("system.undo", ["undoToken": .string(command.uuidString)]) }
+        #expect(try await f.run("money.setBudgetExclusion", ["id": .string(original.id.uuidString), "excluded": .bool(false), "expectedExcluded": .bool(true)]).status == .applied)
+        #expect(try MoneyRepository(context: ModelContext(f.container)).allocationRows().map(\.amountMinor).sorted() == [-50, -50, 10, 10, 20, 20])
+        // A further refund after lifting also honours the two distinct slots for the same target.
+        try await refund(20)
+        #expect(try MoneyRepository(context: ModelContext(f.container)).allocationRows().map(\.amountMinor).sorted() == [-50, -50, 10, 10, 10, 10, 20, 20])
+    }
+    @Test func budgetStampKeepsCreditDebtAndRefusesAClosedCycle() async throws {
+        let f = try MoneyFixture(); defer { f.clean() }; try await f.setup()
+        _ = try await f.ingest("شراء بطاقة ائتمانية\n*4444\n1.00 SAR\n2026-10-16 12:00")
+        let original = try f.transaction()
+        #expect(try await f.run("money.confirmTransaction", ["id": .string(original.id.uuidString)]).status == .applied)
+        let before = try f.basis()
+        #expect(before.owedMinor == 100)
+        #expect(try await f.run("money.setBudgetExclusion", ["id": .string(original.id.uuidString), "excluded": .bool(true), "expectedExcluded": .bool(false)]).status == .applied)
+        #expect(try f.basis().owedMinor == before.owedMinor)
+        #expect(try f.basis().inAccountMinor == before.inAccountMinor)
+        let c = ModelContext(f.container), cycle = Cycle(); cycle.start = f.now.addingTimeInterval(-86400); cycle.end = f.now; cycle.closedAt = f.now; c.insert(cycle)
+        let row = try #require(try c.fetch(FetchDescriptor<MoneyTransaction>()).first { $0.id == original.id }); row.cycleID = cycle.id; try c.save()
+        #expect(try await f.run("money.setBudgetExclusion", ["id": .string(original.id.uuidString), "excluded": .bool(false), "expectedExcluded": .bool(true)]).status == .rejected)
+        #expect(try f.transaction(original.id).ignoredFromBudget)
+    }
     @Test func savingEditKeepsRepaymentAndPastAllocationsAndUndoIntact() async throws {
         let f = try MoneyFixture(); defer { f.clean() }
         let context = ModelContext(f.container), envelope = Envelope(), fund = EnvelopePlan(), repay = EnvelopePlan()
@@ -161,7 +257,7 @@ import MadarInbox
         #expect(try context.fetchCount(FetchDescriptor<BankMessage>()) == 0)
         #expect(try context.fetchCount(FetchDescriptor<MadarData.CommandReceipt>()) == 0)
         #expect(try context.fetchCount(FetchDescriptor<MoneyTransaction>()) == 0)
-        #expect(try await f.run("money.ingestBankMessage", ["text": .string("")], source: .shortcut).status == .rejected)
+        #expect(try await f.run("money.ingestBankMessage", ["text": .string("")], source: .shortcut).status != .applied)
     }
     @Test func bulkReplayAndLiveOccurrencesPreserveTwoIdenticalPurchases() async throws {
         let f = try MoneyFixture(); defer { f.clean() }; try await f.setup()

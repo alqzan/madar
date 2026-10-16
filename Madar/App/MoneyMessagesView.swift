@@ -18,6 +18,7 @@ struct MoneyMessagesView: View {
     @State private var note: String?
     @State private var categorizing: MoneyMessageDraft?
     @State private var rulesOpen = false
+    @State private var budgetOpen = false
     @State private var salary: SalaryRoute?
     private struct SalaryRoute: Identifiable, Hashable { var id: UUID }
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
@@ -56,6 +57,7 @@ struct MoneyMessagesView: View {
             .task { load() }.onChange(of: app.prayerRevision) { load() }
             .sheet(item: $categorizing) { MoneyCategorizeSheet(app: app, draft: $0).environment(\.roomTheme, theme) }
             .navigationDestination(isPresented: $rulesOpen) { MoneyRulesView(app: app) }
+        .navigationDestination(isPresented: $budgetOpen) { MoneyBudgetView(app: app, revealed: $revealed) }
             .navigationDestination(item: $salary) { MoneySalaryView(app: app, salaryID: $0.id) }
             .accessibilityIdentifier("money-messages")
     }
@@ -247,6 +249,8 @@ struct MoneyMessagesView: View {
                     run("money.pasteBankMessages", ["messages": .array(texts.map { .object(["text": .string($0), "sender": .string("")]) })])
                 }
             }.labelStyle(.titleAndIcon).tint(theme.color("reserveText")).frame(minHeight: 44).accessibilityIdentifier("money-messages-paste")
+            Button { budgetOpen = true } label: { Label("تجاهله من الميزانيات", systemImage: "seal").font(MadarTypography.caption()).frame(minHeight: 44) }
+                .buttonStyle(.plain).foregroundStyle(theme.color("reserveText")).accessibilityIdentifier("money-budget-open")
             Button { rulesOpen = true } label: { Label("قواعد التاجر", systemImage: "lamp.table").font(MadarTypography.caption()).frame(minHeight: 44) }
                 .buttonStyle(.plain).foregroundStyle(theme.color("reserveText")).accessibilityIdentifier("money-rules-open")
             Text("الصق رسائل البنك إن لم تصل عبر الاختصار؛ تُفصل الرسائل بسطر فارغ.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).multilineTextAlignment(.center)

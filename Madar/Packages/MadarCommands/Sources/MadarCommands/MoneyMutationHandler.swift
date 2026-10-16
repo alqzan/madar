@@ -203,6 +203,8 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
                 guard row.reviewState == "needsLook" else { throw MoneyCommandError.alreadyConfirmed }
                 try confirm(row, payload: [:], context: context, now: now, writer: writer)
             }
+        case "money.setBudgetExclusion":
+            try setBudgetExclusion(p, context: context, now: now, writer: writer)
         case "money.categorize":
             let row = try transaction(uuid(p, "id"), context), category = uuid(p, "categoryID")
             if let category, !(try context.fetch(FetchDescriptor<MadarData.Category>())).contains(where: { $0.id == category && live($0) }) { throw MoneyCommandError.invalidReference }
@@ -530,6 +532,8 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
                 priorRefundsMinor: used, priorRefundsHomeMinor: usedHome, home: row.homeCurrency)
             row.rateAtTime = original.rateAtTime; row.rateSource = original.rateSource
             row.cycleID = original.cycleID // F06: a refund belongs to the original budget day.
+            row.ignoredFromBudget = original.ignoredFromBudget
+            row.categoryID = original.categoryID
         } else {
             original = nil
             if row.currency != row.homeCurrency && row.rateAtTime == nil { throw MoneyCommandError.missingRate }
@@ -551,9 +555,9 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             let priorRows = try context.fetch(FetchDescriptor<Allocation>()).filter { live($0) && $0.transactionID.map(priorIDs.contains) == true }
             let priorHome = try sum(priorRows.map(\.amountMinor))
             let cumulative = AllocationEngine.refund(refundTransactionID: row.id.uuidString, homeAmountMinor: priorHome + row.homeAmountMinor, original: originalRows)
-            allocations = try cumulative.map { value in
+            allocations = try cumulative.enumerated().map { index, value in
                 var result = value
-                let paid = try sum(priorRows.filter { allocationTarget($0) == value.target }.map(\.amountMinor))
+                let paid = try sum(priorRows.filter { $0.idempotencyKey.hasSuffix(":\(index)") }.map(\.amountMinor))
                 result.amountMinor -= paid; return result
             }
         } else if p["allocations"] != nil { throw MoneyCommandError.invalidSplit }
@@ -569,6 +573,70 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         for message in try messages(for: row, context) { message.status = "ok"; try touch(message, now, writer) }
     }
 
+    /// F06: remove only budget allocations; keep the movement and its cash/debt effect.
+    /// Tombstones retain the original split so lifting the stamp restores every minor unit.
+    private static func setBudgetExclusion(_ p: [String: MadarCore.JSONValue], context: ModelContext, now: Date, writer: String) throws {
+        let row = try transaction(uuid(p, "id"), context)
+        guard row.reviewState == "ok", row.obligationID == nil,
+              row.eventAt <= now,
+              ["expense", "fee", "withdrawal", "transfer"].contains(row.kind),
+              p["expectedExcluded"] == .bool(row.ignoredFromBudget) else { throw MoneyCommandError.invalidReference }
+        let excluded = p["excluded"] == .bool(true)
+        if let cycleID = row.cycleID {
+            guard try context.fetch(FetchDescriptor<Cycle>()).contains(where: { $0.id == cycleID && live($0) && $0.closedAt == nil && $0.start <= now && ($0.end == nil || now < $0.end!) }) else { throw MoneyCommandError.invalidReference }
+        }
+        if excluded == row.ignoredFromBudget { return }
+        let charge = try MoneyRepository(context: context).effect(of: row, includingExcluded: true).budgetChargeMinor
+        guard charge > 0 else { throw MoneyCommandError.invalidReference }
+        let refunds = try transactions(context).filter { $0.kind == "refund" && $0.relatedTransactionID == row.id && $0.reviewState == "ok" }
+            .sorted { $0.eventAt == $1.eventAt ? $0.id.uuidString < $1.id.uuidString : $0.eventAt < $1.eventAt }
+        let ids = Set(([row] + refunds).map(\.id))
+        let stored = try context.fetch(FetchDescriptor<Allocation>()).filter { $0.transactionID.map(ids.contains) == true && $0.mergedInto == nil }
+        guard stored.allSatisfy({ ["spend", "refund"].contains($0.kind) }) else { throw MoneyCommandError.invalidReference }
+        row.ignoredFromBudget = excluded; try touch(row, now, writer)
+        for refund in refunds { refund.ignoredFromBudget = excluded; try touch(refund, now, writer) }
+        if excluded {
+            for allocation in stored where live(allocation) { try touch(allocation, now, writer, deleting: true) }
+            return
+        }
+        // A purchase excluded at intake has no prior split: F02's default is the daily budget.
+        let originals = stored.filter { $0.transactionID == row.id && $0.kind == "spend" }
+        if originals.isEmpty {
+            try writeAllocations(AllocationEngine.spend(transactionID: row.id.uuidString, homeAmountMinor: charge, over: [], cycleID: row.cycleID?.uuidString), context: context, now: now, writer: writer)
+        } else {
+            guard try sum(originals.map(\.amountMinor)) == -charge else { throw MoneyCommandError.invalidSplit }
+            let envelopes = try context.fetch(FetchDescriptor<Envelope>()).filter { live($0) }
+            for allocation in originals {
+                if let target = allocation.targetID, !envelopes.contains(where: { $0.id == target }) { throw MoneyCommandError.invalidReference }
+                try restoreBudgetAllocation(allocation, now: now, writer: writer)
+            }
+        }
+        let source = try MoneyRepository(context: context).allocationRows(transactionID: row.id).sorted { $0.idempotencyKey < $1.idempotencyKey }
+        var cumulativeHome = 0
+        var paid: [Int: Int] = [:]
+        for refund in refunds {
+            cumulativeHome = try sum([cumulativeHome, refund.homeAmountMinor])
+            guard cumulativeHome <= charge else { throw MoneyCommandError.invalidAmount }
+            let values = AllocationEngine.refund(refundTransactionID: refund.id.uuidString, homeAmountMinor: cumulativeHome, original: source)
+            for (index, value) in values.enumerated() {
+                let amount = value.amountMinor - (paid[index] ?? 0)
+                paid[index] = value.amountMinor
+                if let old = stored.first(where: { $0.idempotencyKey == value.idempotencyKey }) {
+                    old.amountMinor = amount; try restoreBudgetAllocation(old, now: now, writer: writer)
+                } else {
+                    var next = value; next.amountMinor = amount
+                    try writeAllocations([next], context: context, now: now, writer: writer)
+                }
+            }
+        }
+    }
+    private static func restoreBudgetAllocation(_ row: Allocation, now: Date, writer: String) throws {
+        var record = try row.record()
+        let stamp = StableIdentity.monotonic(now: now, previous: record.date("updatedAt") ?? now)
+        try record.set(Optional<Date>.none, for: "deletedAt")
+        try record.set(stamp, for: "restoredAt"); try record.set(stamp, for: "updatedAt"); try record.set(writer, for: "writerID")
+        try row.apply(record)
+    }
     private static func resolvePayment(_ row: MoneyTransaction, context: ModelContext) throws {
         let accounts = try context.fetch(FetchDescriptor<Account>()).filter { live($0) }
         if let messageID = row.messageID, let message = try context.fetch(FetchDescriptor<BankMessage>()).first(where: { $0.id == messageID }),
@@ -684,6 +752,12 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         }
         for after in inverse.after {
             guard current.first(where: { recordKey($0) == recordKey(after) }) == after else { throw MoneyCommandError.undoSuperseded }
+            // A later refund must not be left excluded while this undo restores its purchase.
+            if after.model == "MoneyTransaction", let before = inverse.before.first(where: { recordKey($0) == recordKey(after) }),
+               before.fields["ignoredFromBudget"] != after.fields["ignoredFromBudget"],
+               current.contains(where: { $0.model == "MoneyTransaction" && $0.isLive && !changedIDs.contains($0.id) && $0.fields["relatedTransactionID"]?.string == after.id.uuidString }) {
+                throw MoneyCommandError.undoSuperseded
+            }
             // Never remove the account/card/original while a later live movement depends on it.
             if !inverse.before.contains(where: { recordKey($0) == recordKey(after) }), ["Account", "Card", "MoneyTransaction", "Cycle", "Obligation"].contains(after.model) {
                 let dependencies = current.filter { $0.isLive && !changedIDs.contains($0.id) }

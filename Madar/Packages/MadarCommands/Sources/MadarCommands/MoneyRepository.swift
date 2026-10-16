@@ -11,7 +11,7 @@ import MadarPrayer
     public let context: ModelContext
     public init(context: ModelContext) { self.context = context }
 
-    public func effect(of row: MoneyTransaction) throws -> MovementEffect {
+    public func effect(of row: MoneyTransaction, includingExcluded: Bool = false) throws -> MovementEffect {
         let settings = try SettingsStore(context: context)
         let cashAsSpend = try settings.value(for: "mal.cashWithdrawalAsSpend") == .bool(true)
         let accounts = try liveAccounts(), cards = try context.fetch(FetchDescriptor<Card>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
@@ -38,7 +38,7 @@ import MadarPrayer
             movement = obligation.kind == "loan" ? .loanInstalment : .bnplInstalment
         default: throw MoneyCommandError.invalidReference
         }
-        var effect = MovementEngine.effect(movement, amountMinor: row.homeAmountMinor, ignoredFromBudget: row.ignoredFromBudget,
+        var effect = MovementEngine.effect(movement, amountMinor: row.homeAmountMinor, ignoredFromBudget: row.ignoredFromBudget && !includingExcluded,
             settings: .init(cashWithdrawalAsSpend: cashAsSpend))
         // RM4: obligations are reserved once. The BNPL purchase route is introduced with its own envelope flow.
         if row.obligationID != nil { effect.budgetChargeMinor = 0 }

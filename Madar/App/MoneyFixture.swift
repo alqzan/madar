@@ -8,7 +8,7 @@ import MadarCommands
 extension AppSession {
     /// Named synthetic stores only. Never reads or writes the owner's store.
     func prepareMoneyFixture(group: URL) throws {
-        guard let variant = ProcessInfo.processInfo.environment["MADAR_UI_MONEY_FIXTURE"], ["showcase", "empty", "hidden", "zero", "shortfall", "messages", "since", "rules", "salary"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
+        guard let variant = ProcessInfo.processInfo.environment["MADAR_UI_MONEY_FIXTURE"], ["showcase", "empty", "hidden", "zero", "shortfall", "messages", "since", "rules", "salary", "budget"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         let c = ModelContext(container)
         guard !(try c.fetch(FetchDescriptor<DeviceSetting>())).contains(where: { $0.key == "sys.moneyFixture" }) else { return }
         for key in ["sys.moneyFixture", "sys.onboardingCompleted"] { let marker = DeviceSetting(); marker.key = key; marker.valueJSON = Data("true".utf8); c.insert(marker) }
@@ -54,6 +54,18 @@ extension AppSession {
         let bnpl = Obligation(); bnpl.name = "أقساط الشراء"; bnpl.provider = "Tamara"; bnpl.kind = "installment"; bnpl.totalMinor = 120000; c.insert(bnpl)
         for index in 1...3 { let item = InstallmentItem(); item.obligationID = bnpl.id; item.seq = index; item.amountMinor = 40000; item.dueDate = today.adding(days: index * 20).date(in: zone); c.insert(item) }
         try c.save()
+        if variant == "budget" {
+            let purchases = try c.fetch(FetchDescriptor<MoneyTransaction>()).filter { $0.cycleID == cycle.id }.sorted { $0.eventAt < $1.eventAt }
+            for (index, tx) in purchases.enumerated() {
+                tx.merchant = ["مطعم الريف", "سوق الحي", "محطة الشمال", "متجر الكتب", "مقهى الزاوية", "مخبز الحي"][index % 6]; tx.source = "bank"
+                tx.dayKey = today.adding(days: index < 3 ? -1 : 0).description
+                tx.eventAt = today.adding(days: index < 3 ? -1 : 0).date(in: zone).addingTimeInterval(Double(9 * 3600 + index * 1800))
+            }
+            let tx = MoneyTransaction(); tx.merchant = "متجر الأدوات"; tx.categoryID = categories[3].id; tx.fromAccountID = account.id
+            tx.amountMinor = 120_000; tx.homeAmountMinor = 120_000; tx.cycleID = cycle.id; tx.method = "transfer"; tx.reviewState = "ok"; tx.ignoredFromBudget = true
+            tx.dayKey = today.description; tx.eventAt = now.addingTimeInterval(-1200); tx.tzID = zone.identifier; tx.dayPolicy = "midnight@1"; c.insert(tx)
+            try c.save()
+        }
         if variant == "messages" { seedMoneyMessages(today: today, zone: zone) }
         if variant == "rules" {
             // Merchants the user already filed: rules, their movements, and one merchant filed two ways.
