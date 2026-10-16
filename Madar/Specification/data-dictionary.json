@@ -4701,7 +4701,7 @@
       "invariants": [],
       "merge": "row LWW by event identity; distinct events sum in HabitEngine",
       "seed": null,
-      "note": "Append-only custom habit deltas. Undo appends an inverse event; dayKey and periodKey are frozen at write time. Linked owner-room habits write no events. Legacy HabitLog remains a read-only baseline; never rewrite or delete it in migration.",
+      "note": "Append-only custom habit deltas. Undo appends an inverse event; dayKey and periodKey are frozen at write time. Linked owner-room habits write no events. Legacy HabitLog remains a read-only baseline; never rewrite or delete it in migration. A zero-delta context event binds calendar/week epochs to custom (or HealthKit) habits; it is policy provenance, never a completion. Owning-room linked habits write none.",
       "amendedBy": "RL2; owner approved schema V4 2026-10-15",
       "relationships": [
         {
@@ -4766,6 +4766,33 @@
           "type": "String?",
           "optional": true,
           "note": "Frozen quantity unit at the event; never add minutes to pages when policies change."
+        },
+        {
+          "name": "calendarSource",
+          "type": "String?",
+          "optional": true,
+          "enum": [
+            "ummAlQura",
+            "sighting"
+          ]
+        },
+        {
+          "name": "calendarOffset",
+          "type": "Int?",
+          "optional": true,
+          "range": [
+            -2,
+            2
+          ]
+        },
+        {
+          "name": "weekStart",
+          "type": "String?",
+          "optional": true,
+          "enum": [
+            "saturday",
+            "sunday"
+          ]
         }
       ]
     },

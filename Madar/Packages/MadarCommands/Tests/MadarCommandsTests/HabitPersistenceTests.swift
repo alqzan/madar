@@ -23,11 +23,11 @@ import MadarData
         #expect(try await run("habit.complete",p,b).status == .applied)
         _ = try await run("habit.complete",p,a)
         #expect(try HabitRepository(context:ModelContext(container)).readings(at:now).first?.summary.current?.value == 2)
-        #expect(try ModelContext(container).fetchCount(FetchDescriptor<HabitEvent>()) == 2)
+        #expect(try ModelContext(container).fetch(FetchDescriptor<HabitEvent>()).filter{$0.delta != 0}.count == 2)
         await #expect(throws:(any Error).self){try await run("system.undo",["undoToken":.string(creation.uuidString)])}
         _ = try await run("system.undo",["undoToken":.string(b.uuidString)])
         #expect(try HabitRepository(context:ModelContext(container)).readings(at:now).first?.summary.current?.value == 1)
-        #expect(try ModelContext(container).fetchCount(FetchDescriptor<HabitEvent>()) == 3)
+        #expect(try ModelContext(container).fetch(FetchDescriptor<HabitEvent>()).filter{$0.delta != 0}.count == 3)
         _ = try await run("habit.archive",["id":.string(habit.uuidString),"archived":.bool(true)])
         #expect(try HabitRepository(context:ModelContext(container)).readings(at:now).isEmpty)
         _ = try await run("habit.archive",["id":.string(habit.uuidString),"archived":.bool(false)])
@@ -54,6 +54,44 @@ import MadarData
         #expect(policies.map(\.target) == [2,4])
         #expect(HabitCommand.parse("habit.pause",["id":.string(id.uuidString),"from":.string("invalid")]) == nil)
     }
+    @Test func hijriPeriodKeysAndCalendarContextSurviveSettingsAndPortableRebuild() async throws {
+        let root=FileManager.default.temporaryDirectory.appendingPathComponent("HabitCalendar-\(UUID())");defer{try? FileManager.default.removeItem(at:root)}
+        let container=try MadarContainerFactory.makeLocal(at:root),bus=CommandBus(adapter:DurableCommandAdapter(container:container,lockDirectory:root,transactionClock:{$0}))
+        let start=ISO8601DateFormatter().date(from:"2027-03-08T12:00:00+03:00")!,id=UUID()
+        var rule=HabitRule(effectiveFrom:try GregorianDay("2027-03-08"));rule.frequency = .monthly;rule.hijri=true;rule.monthDays=[30]
+        _ = try await bus.execute(.init(name:"habit.save",payload:.object(payload(id,rule)),issuedAt:start),now:start)
+        _ = try await bus.execute(.init(name:"habit.complete",payload:.object(["id":.string(id.uuidString)]),issuedAt:start.addingTimeInterval(1)),now:start.addingTimeInterval(1))
+        let original=try #require(try ModelContext(container).fetch(FetchDescriptor<HabitEvent>()).first{$0.delta==1})
+        let saved=try original.record();#expect(original.periodKey=="h:1448-09")
+        // Same-day correction must not move the already recorded last day of Ramadan.
+        let changed=start.addingTimeInterval(2)
+        _ = try await bus.execute(.init(name:"settings.set",payload:.object(["settings":.object(["core.hijriSource":.string("sighting"),"core.hijriOffset":.number(1)])]),issuedAt:changed),now:changed)
+        let snapshot=try #require(try HabitRepository(context:ModelContext(container)).readings(at:start.addingTimeInterval(86400)).first)
+        #expect(snapshot.summary.periods.first?.key=="h:1448-09" && snapshot.summary.periods.first?.met==true)
+        #expect(try ModelContext(container).fetch(FetchDescriptor<HabitEvent>()).first{$0.delta==1}?.record()==saved)
+        let records=try RecordBridge.all(ModelContext(container))
+        let rebuilt=try MadarContainerFactory.makeInMemory(),context=ModelContext(rebuilt)
+        for record in records{try RecordBridge.insert(record,in:context)};try context.save()
+        let restored=try #require(try HabitRepository(context:ModelContext(rebuilt)).readings(at:start.addingTimeInterval(86400)).first)
+        #expect(restored.summary.periods.map(\.key)==snapshot.summary.periods.map(\.key))
+        #expect(restored.summary.streak==snapshot.summary.streak && restored.summary.periods.first?.met==true)
+        #expect(try ModelContext(rebuilt).fetchCount(FetchDescriptor<DeviceSetting>())==0)
+    }
+    @Test func weeklyContextSurvivesPortableRebuildWithoutDeviceCache() async throws {
+        let root=FileManager.default.temporaryDirectory.appendingPathComponent("HabitWeekRestore-\(UUID())");defer{try? FileManager.default.removeItem(at:root)}
+        let container=try MadarContainerFactory.makeLocal(at:root),bus=CommandBus(adapter:DurableCommandAdapter(container:container,lockDirectory:root,transactionClock:{$0}))
+        let id=UUID();var rule=HabitRule(effectiveFrom:try GregorianDay("2026-10-15"));rule.frequency = .weekly
+        _ = try await bus.execute(.init(name:"habit.save",payload:.object(payload(id,rule)),issuedAt:now),now:now)
+        _ = try await bus.execute(.init(name:"habit.complete",payload:.object(["id":.string(id.uuidString)]),issuedAt:now),now:now)
+        _ = try await bus.execute(.init(name:"settings.set",payload:.object(["settings":.object(["core.weekStart":.string("sunday")])]),issuedAt:now.addingTimeInterval(1)),now:now.addingTimeInterval(1))
+        let rows=try RecordBridge.all(ModelContext(container)),rebuilt=try MadarContainerFactory.makeInMemory(),context=ModelContext(rebuilt)
+        for row in rows{try RecordBridge.insert(row,in:context)};try context.save()
+        let later=now.addingTimeInterval(17*86400)
+        let reading=try #require(try HabitRepository(context:ModelContext(rebuilt)).readings(at:later).first)
+        #expect(reading.summary.periods.map(\.key)==["2026-10-10","2026-10-17","2026-10-25","2026-11-01"])
+        #expect(reading.summary.periods.first?.value==1 && reading.summary.periods.first?.met==true)
+        #expect(try ModelContext(rebuilt).fetchCount(FetchDescriptor<DeviceSetting>())==0)
+    }
     @Test func finalDeleteTombstonesOnlyArchivedHabitChildrenAndUndoRestoresThem() async throws {
         let root=FileManager.default.temporaryDirectory.appendingPathComponent("HabitDelete-\(UUID())");defer{try? FileManager.default.removeItem(at:root)}
         let container=try MadarContainerFactory.makeLocal(at:root),bus=CommandBus(adapter:DurableCommandAdapter(container:container,lockDirectory:root,transactionClock:{$0}))
@@ -64,12 +102,12 @@ import MadarData
         await #expect(throws:(any Error).self){try await run("habit.deleteArchived",["id":.string(identity.uuidString)])}
         _ = try await run("habit.archive",["id":.string(identity.uuidString),"archived":.bool(true)])
         let deletion=UUID();_ = try await run("habit.deleteArchived",["id":.string(identity.uuidString)],id:deletion)
-        let deleted=try ModelContext(container).fetch(FetchDescriptor<HabitEvent>()).first!.record()
+        let deleted=try ModelContext(container).fetch(FetchDescriptor<HabitEvent>()).first{$0.delta != 0}!.record()
         #expect(!deleted.isLive)
         #expect(try ModelContext(container).fetch(FetchDescriptor<HabitPolicy>()).allSatisfy{$0.deletedAt != nil})
         #expect(try ModelContext(container).fetch(FetchDescriptor<Entry>()).first?.record()==original)
         _ = try await run("system.undo",["undoToken":.string(deletion.uuidString)])
-        let restored=try ModelContext(container).fetch(FetchDescriptor<HabitEvent>()).first!.record()
+        let restored=try ModelContext(container).fetch(FetchDescriptor<HabitEvent>()).first{$0.delta != 0}!.record()
         #expect(restored.isLive)
         #expect(try RowMerger.mergeVersions(restored,deleted).isLive)
         #expect(try HabitRepository(context:ModelContext(container)).readings(at:now,includeArchived:true).first?.summary.current?.value==1)
@@ -87,7 +125,7 @@ import MadarData
         await #expect(throws: (any Error).self) {try await run(["2026-10-15":.number(6000)])}
         await #expect(throws: (any Error).self) {try await run(["2026-10-01":.number(6000)])}
         await #expect(throws: (any Error).self) {try await run(["2026-10-14":.number(30)],unit:"exerciseMinutes")}
-        #expect(try ModelContext(container).fetchCount(FetchDescriptor<HabitEvent>())==0)
+        #expect(try ModelContext(container).fetch(FetchDescriptor<HabitEvent>()).filter{$0.delta != 0}.count==0)
     }
     @Test func weekSettingAndUndoPreserveWeekEpochs() async throws {
         let root=FileManager.default.temporaryDirectory.appendingPathComponent("HabitWeeks-\(UUID())");defer{try? FileManager.default.removeItem(at:root)}

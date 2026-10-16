@@ -3241,6 +3241,9 @@ extension HabitLog: MadarRecordModel {
     public var delta: Int = 0
     public var dayKey: String = ""
     public var unit: String? = nil
+    public var calendarSource: String? = nil
+    public var calendarOffset: Int? = nil
+    public var weekStart: String? = nil
     public init() {}
 }
 extension HabitEvent: MadarRecordModel {
@@ -3262,6 +3265,9 @@ extension HabitEvent: MadarRecordModel {
             "delta": JSONValue.encode(delta),
             "dayKey": JSONValue.encode(dayKey),
             "unit": JSONValue.encode(unit),
+            "calendarSource": JSONValue.encode(calendarSource),
+            "calendarOffset": JSONValue.encode(calendarOffset),
+            "weekStart": JSONValue.encode(weekStart),
         ])
     }
     public func apply(_ record: DataRecord) throws {
@@ -3281,6 +3287,9 @@ extension HabitEvent: MadarRecordModel {
         delta = try record.decode("delta", as: Int.self)
         dayKey = try record.decode("dayKey", as: String.self)
         unit = try record.decode("unit", as: String?.self)
+        calendarSource = try record.decode("calendarSource", as: String?.self)
+        calendarOffset = try record.decode("calendarOffset", as: Int?.self)
+        weekStart = try record.decode("weekStart", as: String?.self)
     }
 }
 @Model public final class WidgetConfig {

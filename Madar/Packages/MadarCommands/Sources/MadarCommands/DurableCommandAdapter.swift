@@ -279,6 +279,7 @@ private struct ReceiptWire: Codable {
                 }
             case .replaceSettings(let values):
                 let typed = try convert(values)
+                try HabitContextProvenance.recordSettingChange(typed, store: store, context: context, now: now, writer: writer)
                 try HabitWeekHistory.record(typed, store: store, context: context, now: now, writer: writer)
                 inverse = SettingsInverse(settings: try store.stage(typed, now: now), afterSettings: typed, layouts: [:], afterLayouts: [:])
             case .applyPreset(let values, let layouts):
@@ -337,6 +338,7 @@ private struct ReceiptWire: Codable {
                     let current = try store.value(for: room + ".layout").canonicalData()
                     guard current == after else { throw DataError.invalidValue("undo superseded: \(room).layout") }
                 }
+                try HabitContextProvenance.recordSettingChange(state.settings, store: store, context: context, now: now, writer: writer)
                 try HabitWeekHistory.record(state.settings, store: store, context: context, now: now, writer: writer)
                 _ = try store.stage(state.settings, now: now)
                 for (room, old) in state.layouts {

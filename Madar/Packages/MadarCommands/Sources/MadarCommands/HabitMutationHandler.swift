@@ -34,6 +34,9 @@ private struct HabitUndo: Codable {
             if oldPolicy == nil { policy.id = StableIdentity.uuid(for: "habit-policy:\(identity):\(today)"); policy.habitID = identity; policy.createdAt = now; context.insert(policy) }
             HabitRepository.apply(rule, to: policy); try touch(policy)
             inverse.changes.append(.init(before: old, after: try policy.record()))
+            if let origin=try HabitContextProvenance.ensureOrigin(habit:row,context:context,now:now,writer:writer),existing==nil {
+                inverse.changes.append(.init(before:nil,after:try origin.record()))
+            }
         case .complete(let identity, let delta, let periodKey):
             let row = try habit(identity); guard row.archivedAt == nil, row.kind == "custom" else { throw DataError.invalidValue("العادة المربوطة تُسجّل في غرفتها") }
             let reading = try HabitRepository(context: context).readings(at: now).first { $0.id == identity }

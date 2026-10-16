@@ -5,7 +5,7 @@ import Testing
 struct HabitEngineTests {
     let days = MadarCalendarDays(zone: ActivePlace.riyadh.timeZone)
     func day(_ s: String) -> GregorianDay { try! GregorianDay(s) }
-    func fact(_ d: String, _ value: Int = 1, id: UUID = UUID()) -> HabitFact { .init(id: id, day: day(d), periodKey: d, delta: value) }
+    func fact(_ d: String, _ value: Int = 1, id: UUID = UUID(), key: String? = nil) -> HabitFact { .init(id: id, day: day(d), periodKey: key ?? d, delta: value) }
     func rule(_ start: String, frequency: HabitFrequency = .daily) -> HabitRule { var r = HabitRule(effectiveFrom: day(start)); r.frequency = frequency; return r }
     @Test func dailyMissesAndMinimumFollowOwnerRules() throws {
         var r = rule("2026-10-01"); r.measure = .count; r.target = 4; r.minimum = 1
@@ -19,7 +19,7 @@ struct HabitEngineTests {
     @Test(arguments: [HabitFrequency.weekly, .monthly, .yearly])
     func twoMissedPeriodsBreakEachFrequency(_ frequency: HabitFrequency) throws {
         let r = rule("2022-01-01", frequency: frequency)
-        let result = try HabitEngine.evaluate(rules: [r], facts: [fact("2022-01-01")], today: day("2026-01-01"), days: days)
+        let result = try HabitEngine.evaluate(rules: [r], facts: [fact("2022-01-01",key:frequency == .monthly ? "g:2022-01" : frequency == .yearly ? "g:2022" : "2022-01-01")], today: day("2026-01-01"), days: days)
         #expect(result.streak == 0 && result.consecutiveMisses >= 2)
     }
     @Test func freezePersistsAndDoesNotBreakStreak() throws {
@@ -47,7 +47,7 @@ struct HabitEngineTests {
     }
     @Test func designatedDaysShortFirstWeekAndExtraBonus() throws {
         var r = rule("2026-10-06", frequency: .weekly); r.measure = .count; r.target = 9; r.weekdays = [2,5]
-        let a = try HabitEngine.evaluate(rules: [r], facts: [fact("2026-10-08"),fact("2026-10-09")], today: day("2026-10-09"), days: days)
+        let a = try HabitEngine.evaluate(rules: [r], facts: [fact("2026-10-08",key:"2026-10-03"),fact("2026-10-09",key:"2026-10-03")], today: day("2026-10-09"), days: days)
         #expect(a.current?.target == 1 && a.current?.value == 2 && a.current?.met == true)
         #expect(a.current?.dueDays == [day("2026-10-08")])
         var count = rule("2026-10-07", frequency: .weekly); count.measure = .count; count.target = 7
@@ -75,6 +75,12 @@ struct HabitEngineTests {
         #expect(result.current?.value == 4)
         let undo = try HabitEngine.evaluate(rules: [r], facts: [baseline,a,b,fact("2026-10-01",-1)], today: day("2026-10-01"), days: days)
         #expect(undo.current?.value == 3)
+    }
+    @Test func hijriCorrectionDoesNotMoveARecordedRamadanPeriod() throws {
+        var r=rule("2027-03-08",frequency:.monthly);r.hijri=true;r.monthDays=[30]
+        let a=try HabitEngine.evaluate(rules:[r],facts:[fact("2027-03-08",key:"h:1448-09")],today:day("2027-03-09"),days:days,calendarChanges:[.init(day:day("2027-03-09"),source:.sighting,offset:1)])
+        #expect(a.periods.first?.key=="h:1448-09" && a.periods.first?.value==1 && a.periods.first?.met==true)
+        #expect(a.current?.key=="h:1448-10" && a.current?.value==0)
     }
     @Test func quantityUnitsNeverMix() throws {
         var r=rule("2026-10-01");r.measure = .duration;r.unit="minutes";r.target=30
