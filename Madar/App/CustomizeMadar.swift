@@ -20,7 +20,13 @@ struct CustomizeMadar: View {
                 HStack {
                     Image(systemName: "magnifyingglass").foregroundStyle(theme.secondaryInk)
                     TextField("ابحث في إعدادات مدار…", text: $session.settingsQuery).accessibilityIdentifier("settings-search")
-                        .submitLabel(.search)
+                        .submitLabel(.search).padding(.trailing, query.isEmpty ? 0 : 34)
+                        .overlay(alignment: .trailing) {
+                            if !query.isEmpty {
+                                Button { session.settingsQuery = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(theme.secondaryInk).frame(width: 44, height: 44) }
+                                    .buttonStyle(.plain).accessibilityLabel("امسح البحث").accessibilityIdentifier("settings-clear-search")
+                            }
+                        }
                 }.padding(16).background(theme.surface, in: .capsule)
                 if query.isEmpty || normalized("المال").contains(normalized(query)) {
                     Button { session.moneyOpen = true } label: {

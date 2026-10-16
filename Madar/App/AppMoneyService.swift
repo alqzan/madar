@@ -54,11 +54,11 @@ struct MoneyHomeReading {
         let formatted = digits.string(count)
         return String(localized: "money.pending", defaultValue: "\(count) \(formatted)", table: "Money", locale: Locale(identifier: "ar"))
     }
-    func load() throws -> MoneyHomeReading {
+    func load(at instant: Date? = nil) throws -> MoneyHomeReading {
         guard !app.maintenanceInProgress else { throw BackupOperationError.busy }
         guard app.lockController?.canPresent(.app) ?? app.protectedDataAuthorized else { throw DataError.authenticationFailed }
         _ = app.prayerRevision
-        let context = ModelContext(app.container), repo = MoneyRepository(context: context), now = app.prayerNow()
+        let context = ModelContext(app.container), repo = MoneyRepository(context: context), now = instant ?? app.prayerNow()
         let currency = app.string("core.currency"), cycle = try repo.cycle(at: now), basis = try repo.basis(at: now)
         let accounts = try context.fetch(FetchDescriptor<Account>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
         let allocations = try context.fetch(FetchDescriptor<Allocation>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }

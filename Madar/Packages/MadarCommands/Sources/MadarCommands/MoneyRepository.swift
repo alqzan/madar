@@ -96,18 +96,12 @@ import MadarPrayer
         }
     }
     public func basis(at now: Date = .now, rates: [String: String] = [:]) throws -> Basis {
+        BasisEngine.basis(try basisInput(at: now, rates: rates))
+    }
+    public func basisInput(at now: Date = .now, rates: [String: String] = [:]) throws -> BasisInput {
         let accounts = try homeAccountBalances(at: now, rates: rates).map { AccountState(balanceMinor: $0.homeMinor) }
         let transactions = try confirmedTransactions().filter { $0.eventAt <= now }
-        var cardStates: [CreditCardState] = []
-        let statements = try context.fetch(FetchDescriptor<Statement>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.closeDate <= now }
-        let ownedIDs = Set(try liveAccounts().filter { $0.ownership == "mine" && $0.tracked }.map(\.id))
-        for card in try context.fetch(FetchDescriptor<Card>()) where card.deletedAt == nil && card.mergedInto == nil && card.kind == "credit" {
-            if let account = card.accountID, !ownedIDs.contains(account) { continue }
-            let statement = statements.filter { $0.cardID == card.id }.max { $0.closeDate < $1.closeDate }
-            let movements = transactions.filter { $0.cardID == card.id && $0.eventAt > (statement?.closeDate ?? .distantPast) }
-            let debt = try MoneyMutationHandler.sum([statement?.statementMinor ?? 0] + movements.map { try effect(of: $0).debtMinor })
-            cardStates.append(.init(statementMinor: max(0, debt), unbilledMinor: 0))
-        }
+        let cardStates = try cardDebts(at: now).map { CreditCardState(statementMinor: $0.statementLeftMinor, unbilledMinor: $0.unbilledLeftMinor) }
         let obligations = try context.fetch(FetchDescriptor<Obligation>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
         let items = try context.fetch(FetchDescriptor<InstallmentItem>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
         let home = try SettingsStore(context: context).value(for: "core.currency").string ?? "SAR"
@@ -134,8 +128,8 @@ import MadarPrayer
             obligation.kind == "bill" && !transactions.contains(where: { $0.obligationID == obligation.id && $0.eventAt >= periodStart && $0.eventAt < periodEnd })
         }.map { try converted($0.amountMinor, currency: $0.currency) }
         let allocations = try allocationRows().filter { $0.target != .daily }.map(\.amountMinor)
-        return BasisEngine.basis(.init(accounts: accounts, creditCards: cardStates, installments: bnpl,
-            loanDueMinor: try MoneyMutationHandler.sum(loans), billsDueMinor: try MoneyMutationHandler.sum(bills), envelopeAllocationsMinor: allocations))
+        return BasisInput(accounts: accounts, creditCards: cardStates, installments: bnpl,
+            loanDueMinor: try MoneyMutationHandler.sum(loans), billsDueMinor: try MoneyMutationHandler.sum(bills), envelopeAllocationsMinor: allocations)
     }
     public func zakatAccounts(at now: Date = .now, rates: [String: String] = [:]) throws -> [ZakatAccount] {
         try homeAccountBalances(at: now, rates: rates).map { .init(balanceMinor: $0.homeMinor, include: $0.account.zakatInclude) }

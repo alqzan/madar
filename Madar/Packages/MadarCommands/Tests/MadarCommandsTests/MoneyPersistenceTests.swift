@@ -275,4 +275,17 @@ import MadarInbox
         #expect(basis.unallocatedMinor == 1_248_000)
     }
 
+    @Test func statementRefundAndExcessPaymentShareTheSameDebtSourceTotals() async throws {
+        let f = try MoneyFixture(); defer { f.clean() }; try await f.setup()
+        let c = ModelContext(f.container), statement = Statement()
+        statement.cardID = f.credit; statement.statementMinor = 680000; statement.closeDate = f.now.addingTimeInterval(-86400); statement.closeDateSource = "estimated"; c.insert(statement)
+        let original = MoneyTransaction(); original.cardID = f.credit; original.kind = "expense"; original.method = "card"; original.amountMinor = 180000; original.homeAmountMinor = 180000; original.eventAt = f.now.addingTimeInterval(-3600); c.insert(original)
+        let refund = MoneyTransaction(); refund.cardID = f.credit; refund.kind = "refund"; refund.method = "card"; refund.relatedTransactionID = original.id; refund.amountMinor = 80000; refund.homeAmountMinor = 80000; refund.eventAt = f.now.addingTimeInterval(-1800); c.insert(refund)
+        let payment = MoneyTransaction(); payment.cardID = f.credit; payment.kind = "cardPayment"; payment.fromAccountID = f.bank; payment.amountMinor = 700000; payment.homeAmountMinor = 700000; payment.eventAt = f.now; c.insert(payment); try c.save()
+        let repo = MoneyRepository(context: ModelContext(f.container)), card = try #require(try repo.cardDebts(at: f.now).first)
+        // Statement 680000 covered; overpayment 20000 lowers unbilled 180000 − refund 80000.
+        #expect(card.statementLeftMinor == 0); #expect(card.unbilledLeftMinor == 80000); #expect(card.estimatedClose)
+        #expect(try repo.basis(at: f.now).owedMinor == 80000)
+    }
+
 }

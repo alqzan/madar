@@ -7,7 +7,7 @@ import MadarData
 extension AppSession {
     /// Named synthetic stores only. Never reads or writes the owner's store.
     func prepareMoneyFixture(group: URL) throws {
-        guard let variant = ProcessInfo.processInfo.environment["MADAR_UI_MONEY_FIXTURE"], ["showcase", "empty", "hidden", "zero"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
+        guard let variant = ProcessInfo.processInfo.environment["MADAR_UI_MONEY_FIXTURE"], ["showcase", "empty", "hidden", "zero", "shortfall"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         let c = ModelContext(container)
         guard !(try c.fetch(FetchDescriptor<DeviceSetting>())).contains(where: { $0.key == "sys.moneyFixture" }) else { return }
         for key in ["sys.moneyFixture", "sys.onboardingCompleted"] { let marker = DeviceSetting(); marker.key = key; marker.valueJSON = Data("true".utf8); c.insert(marker) }
@@ -15,7 +15,7 @@ extension AppSession {
         guard variant != "empty" else { try c.save(); return }
         let zone = ActivePlace.riyadh.timeZone, now = prayerNow(), today = GregorianDay.containing(prayerNow(), in: ActivePlace.riyadh.timeZone)
         let start = today.adding(days: -5), end = start.adding(days: 30)
-        let account = Account(); account.name = "الحساب الجاري"; account.balanceMinor = 12_850_000; account.balanceAt = now; c.insert(account)
+        let account = Account(); account.name = "الحساب الجاري"; account.balanceMinor = variant == "shortfall" ? 50000 : 12_850_000; account.balanceAt = now; c.insert(account)
         let cycle = Cycle(); cycle.start = start.date(in: zone); cycle.expectedEnd = end.date(in: zone); cycle.incomeMinor = 1_500_000; cycle.dailyAllowanceMinor = variant == "zero" ? 0 : 41_300; cycle.createdAt = cycle.start; c.insert(cycle)
         let policy = CyclePolicy(); policy.cycleID = cycle.id; policy.effectiveFromDayKey = start.description; policy.allowanceMinor = cycle.dailyAllowanceMinor; policy.dailyRateMinor = cycle.dailyAllowanceMinor; c.insert(policy)
         func allocation(_ amount: Int, _ target: String, id: UUID? = nil, tx: UUID? = nil, kind: String = "fund") {
@@ -37,6 +37,11 @@ extension AppSession {
             if index == 0 { let item = InstallmentItem(); item.obligationID = o.id; item.amountMinor = amount; item.dueDate = today.adding(days: 2).date(in: zone); c.insert(item) }
         }
         let m = BankMessage(); m.text = "شراء اصطناعي ينتظر التوزيع"; m.kind = "purchase"; m.status = "needsLook"; m.receivedAt = now; c.insert(m)
+        let card = Card(); card.name = "بطاقة المشتريات"; card.kind = "credit"; card.bank = "بنك الاختبار"; card.last4 = "8844"; card.accountID = account.id; c.insert(card)
+        let statement = Statement(); statement.cardID = card.id; statement.statementMinor = 680000; statement.closeDate = start.date(in: zone).addingTimeInterval(-86400); statement.dueDate = today.adding(days: 4).date(in: zone); statement.closeDateSource = "estimated"; c.insert(statement)
+        let unbilled = MoneyTransaction(); unbilled.cardID = card.id; unbilled.method = "card"; unbilled.amountMinor = 180000; unbilled.homeAmountMinor = 180000; unbilled.dayKey = today.description; unbilled.eventAt = now; unbilled.ignoredFromBudget = true; c.insert(unbilled)
+        let bnpl = Obligation(); bnpl.name = "أقساط الشراء"; bnpl.provider = "Tamara"; bnpl.kind = "installment"; bnpl.totalMinor = 120000; c.insert(bnpl)
+        for index in 1...3 { let item = InstallmentItem(); item.obligationID = bnpl.id; item.seq = index; item.amountMinor = 40000; item.dueDate = today.adding(days: index * 20).date(in: zone); c.insert(item) }
         try c.save()
     }
 }

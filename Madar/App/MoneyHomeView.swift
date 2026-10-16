@@ -14,6 +14,7 @@ struct MoneyHomeView: View {
     @State private var reading: MoneyHomeReading?
     @State private var failure: String?
     @State private var revealed = false
+    @State private var basisOpen = false
     private var service: AppMoneyService { .init(app: app) }
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
     private var amountsVisible: Bool { !app.bool("core.hideMoneyUntilTouch") || revealed }
@@ -40,6 +41,7 @@ struct MoneyHomeView: View {
         }
         .clipped().background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
         .environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar)
+        .sheet(isPresented: $basisOpen) { MoneyBasisView(app: app, revealed: $revealed) }
         .task {
             do { try await app.executeMoneyCommand("money.accruePlans") } catch { }
             load()
@@ -76,11 +78,13 @@ struct MoneyHomeView: View {
                     .font(MadarTypography.body()).accessibilityIdentifier("money-today")
             }
             HStack(alignment: .center) {
+                Button { basisOpen = true } label: {
                 VStack(alignment: .leading, spacing: 1) {
                     Text("لك الآن").font(.custom("thmanyahserifdisplay-Bold", size: 18, relativeTo: .headline)).foregroundStyle(theme.color("reserveText"))
                     Text(amount(cycle.headline.availableNowMinor)).font(.custom("thmanyahserifdisplay-Black", size: 54, relativeTo: .largeTitle))
                         .contentTransition(.numericText()).minimumScaleFactor(0.55).lineLimit(1).accessibilityIdentifier("money-available")
                 }
+                }.buttonStyle(.plain).accessibilityIdentifier("money-basis-open")
                 Spacer(minLength: 12)
                 VStack(alignment: .trailing, spacing: 7) {
                     Text("لك فعلًا").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
@@ -112,7 +116,9 @@ struct MoneyHomeView: View {
                 Capsule().fill(theme.color("rod2")).frame(width: 14)
             }.accessibilityIdentifier("money-empty")
             if reading.hasAccounts {
-                HStack { Text("في حسابك"); Spacer(); Text(amount(reading.basis.inAccountMinor)).font(MadarTypography.cardTitle()) }
+                Button { basisOpen = true } label: {
+                    HStack { Text("في حسابك"); Spacer(); Text(amount(reading.basis.inAccountMinor)).font(MadarTypography.cardTitle()); Image(systemName: "chevron.left").font(.caption) }.frame(minHeight: 44)
+                }.buttonStyle(.plain).accessibilityLabel("على أي أساس، في حسابك " + amount(reading.basis.inAccountMinor))
                 if !amountsVisible { Button("أظهر الأرقام") { revealed = true }.frame(minHeight: 44).accessibilityIdentifier("money-reveal") }
             }
         }
