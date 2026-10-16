@@ -16,6 +16,16 @@ import XCTest
         XCTAssertTrue(write.exists);write.tap()
         XCTAssertTrue(app.textViews["diary-editor-text"].waitForExistence(timeout:10))
     }
+    func testLockStandByAndControlPreviewsOpenHabits() throws {
+        continueAfterFailure=false;let app=openGallery()
+        let link=app.buttons["room-widgets-lock"];XCTAssertTrue(link.waitForExistence(timeout:5));link.tap()
+        XCTAssertTrue(app.staticTexts["lock-widgets-title"].waitForExistence(timeout:5));shot(app,"M4-W02-X2-Qifl-L")
+        app.swipeUp(velocity:.slow);shot(app,"M4-W02-X2-Qifl-s1-L")
+        let habits=app.buttons["control-preview-habits"]
+        for _ in 0..<3 where !habits.isHittable{app.swipeUp(velocity:.slow)}
+        XCTAssertTrue(habits.exists);habits.tap()
+        XCTAssertTrue(app.staticTexts["habits-title"].waitForExistence(timeout:10))
+    }
     func testPrayerWidgetPreviewOpensPrayerDirectly() throws {
         continueAfterFailure=false;let app=openGallery();app.buttons["room-widget-prayer"].tap()
         XCTAssertTrue(app.staticTexts["room-widgets-title"].waitForNonExistence(timeout:5))

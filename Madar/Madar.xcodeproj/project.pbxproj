@@ -17,6 +17,7 @@
 		0A1D40D195DBF5CF0241021B /* StartQuranSessionIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FE9D9930E188F3E3EBDC70B /* StartQuranSessionIntent.swift */; };
 		0BC4E31C6272D51A91EDE0BF /* AppDiaryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9082571774B3B32E02553BD2 /* AppDiaryService.swift */; };
 		0C4900EEE3FEE3C3BD29427A /* QuranOutsideView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893BD1AF0CBA0B89DC7FBE2 /* QuranOutsideView.swift */; };
+		1086EA11FA1FAD2EACA0490F /* QuickRoomControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 594C5DE48240D569567EC201 /* QuickRoomControls.swift */; };
 		10BA9ACCEDE467D0114EF478 /* AppQuranService+Drill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52735133758CAE2D8945A464 /* AppQuranService+Drill.swift */; };
 		12F77A5D723E19178224B8C4 /* AppQuranService+Year.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4EABD6DD57A637E613F8174 /* AppQuranService+Year.swift */; };
 		14B1C4AEEC8258B6AECE7BBE /* thmanyahserifdisplay-Bold.otf in Resources */ = {isa = PBXBuildFile; fileRef = C6661268F5C60E85AA211014 /* thmanyahserifdisplay-Bold.otf */; };
@@ -135,6 +136,7 @@
 		7530BFBEDEE8F704CABBABFB /* QuranWeekUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3237B7C9B144CCBD5293A068 /* QuranWeekUITests.swift */; };
 		75CD3B631102D4F233C7A422 /* DateLabelsUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90F2DDC71492F91157099793 /* DateLabelsUITests.swift */; };
 		78E8D48DC47F5DEA058B6138 /* PresentationPrivacyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51D072137ACF840D7A277E1C /* PresentationPrivacyTests.swift */; };
+		78F3695639AC8F06DCD878F7 /* LockWidgetGallery.swift in Sources */ = {isa = PBXBuildFile; fileRef = B19809D08DBE59B8044905EC /* LockWidgetGallery.swift */; };
 		7C0AF343F838C67B15A0AB9C /* NextPrayerWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43A5C6A40CB96FDF39DD29CA /* NextPrayerWidget.swift */; };
 		7E85C9D2A873F8F790F68F66 /* thmanyahsans-Light.otf in Resources */ = {isa = PBXBuildFile; fileRef = F5C14B0401F68E78003D252D /* thmanyahsans-Light.otf */; };
 		7EF0148B1FC1018672F7B6EE /* DiarySearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4881D4D4F799E9A19EB4E38 /* DiarySearchView.swift */; };
@@ -178,6 +180,7 @@
 		A7B662A05B1F42A3ED1396F8 /* AppPrivacyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6987008C8E518D4E5ECE5A2E /* AppPrivacyService.swift */; };
 		ABA4E775EB715884E4B87770 /* PrayerActivityBudget.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC79AED1B314B7B8C603514A /* PrayerActivityBudget.swift */; };
 		ACF8D45E7B47DF98E40E506D /* DiaryYearbookIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D469796404360B49B02BC5E1 /* DiaryYearbookIntegrationTests.swift */; };
+		AE416B416D39D53C03743ED2 /* OpenQuickRoomIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25C92B7A356AA41F0E88F770 /* OpenQuickRoomIntent.swift */; };
 		AE4E3CECAA310E299D275D2C /* AppSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D5244CCC79BF2B66C486F51 /* AppSession.swift */; };
 		B11E82DD4DCE28EC375542B2 /* DiaryExportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 693A9339530A3EDDA16FBF05 /* DiaryExportView.swift */; };
 		B1E0883905AB8A0BC6C0DF24 /* MadarGlyph.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA770813B3F76287BD061E21 /* MadarGlyph.swift */; };
@@ -230,6 +233,7 @@
 		E606EBA914221E29811FC1F1 /* PrayerActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3883565EC8BCC1379DC30626 /* PrayerActivityAttributes.swift */; };
 		E609F5F990CFBF3DAD747493 /* DiaryVoiceController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AE413B952BDD91C8CFEB30A /* DiaryVoiceController.swift */; };
 		E6F9BA026BA3E9BF1696152F /* DiaryLockPreferenceUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 705FEF2367C33FE5747749F2 /* DiaryLockPreferenceUITests.swift */; };
+		E801BD0C0938AA2DD95E5249 /* OpenQuickRoomIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25C92B7A356AA41F0E88F770 /* OpenQuickRoomIntent.swift */; };
 		EA5164A4DA807C4F06A13120 /* OpenMadarIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCC2F8AF04AA4AA760B02D82 /* OpenMadarIntent.swift */; };
 		EA9C0274CD8227B8EE0ACC77 /* DiaryVoiceControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCEB9293DE2E579C487F98D6 /* DiaryVoiceControls.swift */; };
 		EEFB1D6DFBF9E0E4FA1C18B1 /* CustomizationCopyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C63BADA5C6BD423F06356E09 /* CustomizationCopyTests.swift */; };
@@ -318,6 +322,7 @@
 		2293299667730AD8A0496EBC /* MadarCommands */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MadarCommands; path = Packages/MadarCommands; sourceTree = SOURCE_ROOT; };
 		24560E5969E823668449B1D8 /* MadarData */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MadarData; path = Packages/MadarData; sourceTree = SOURCE_ROOT; };
 		2564AF9C513786C475618420 /* DateLabelsIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateLabelsIntegrationTests.swift; sourceTree = "<group>"; };
+		25C92B7A356AA41F0E88F770 /* OpenQuickRoomIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenQuickRoomIntent.swift; sourceTree = "<group>"; };
 		2B32E22D47EB8FE84B717D27 /* DiaryHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryHomeView.swift; sourceTree = "<group>"; };
 		2BF0DFC3D1738347A82224A8 /* MadarWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MadarWidgets.swift; sourceTree = "<group>"; };
 		2D6BDBE1B148E61E09296C50 /* DiaryLettersUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryLettersUITests.swift; sourceTree = "<group>"; };
@@ -360,6 +365,7 @@
 		56174C04CFE7BB474B46291C /* Amiri-OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Amiri-OFL.txt"; sourceTree = "<group>"; };
 		566844F2238653E3802E5D22 /* RoomGlyphTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomGlyphTests.swift; sourceTree = "<group>"; };
 		5893BD1AF0CBA0B89DC7FBE2 /* QuranOutsideView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranOutsideView.swift; sourceTree = "<group>"; };
+		594C5DE48240D569567EC201 /* QuickRoomControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickRoomControls.swift; sourceTree = "<group>"; };
 		5A316A2FA4DB98304D90414F /* AppDiaryEditorService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDiaryEditorService.swift; sourceTree = "<group>"; };
 		5D1D0B8393143F3C03CF8C19 /* PrayerCopyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrayerCopyTests.swift; sourceTree = "<group>"; };
 		5D3EC96D647534DFB18C29D1 /* PresetsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresetsView.swift; sourceTree = "<group>"; };
@@ -442,6 +448,7 @@
 		AF8A7C30B269E256AEFBD2ED /* QuranDrillView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranDrillView.swift; sourceTree = "<group>"; };
 		B09F2FE58FC465DA15CF67AF /* RoomWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomWidgets.swift; sourceTree = "<group>"; };
 		B14655A10844A4E39B5CA232 /* HabitEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HabitEditorView.swift; sourceTree = "<group>"; };
+		B19809D08DBE59B8044905EC /* LockWidgetGallery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LockWidgetGallery.swift; sourceTree = "<group>"; };
 		B1B18261A0086DB607A44381 /* QuranIndexUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranIndexUITests.swift; sourceTree = "<group>"; };
 		B1CD3D0D13859EF7127463D7 /* DiaryExportIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryExportIntegrationTests.swift; sourceTree = "<group>"; };
 		B1E34FBC5423B6F976E10F02 /* QuranScreenComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranScreenComponents.swift; sourceTree = "<group>"; };
@@ -590,6 +597,7 @@
 				43A5C6A40CB96FDF39DD29CA /* NextPrayerWidget.swift */,
 				CD025F7EBE03A4A9D7852DB4 /* PrayerCountdownControl.swift */,
 				C465C55A47592A6081EE8186 /* PrayerLogControl.swift */,
+				594C5DE48240D569567EC201 /* QuickRoomControls.swift */,
 				9D68DFEF63B65ADBC328CAAF /* QuranWidget.swift */,
 				B09F2FE58FC465DA15CF67AF /* RoomWidgets.swift */,
 			);
@@ -667,6 +675,7 @@
 				AB0D3AB1B017DF9DCC476EE7 /* HabitOrbitView.swift */,
 				CB82916E9FBF916E1E159EB6 /* HabitsRoomView.swift */,
 				22667A11D78A7887B0C70B39 /* Info.plist */,
+				B19809D08DBE59B8044905EC /* LockWidgetGallery.swift */,
 				D3146E3E67CC7456B5F8DDAD /* Madar.entitlements */,
 				52096FB2E7F5C96D70BD4B80 /* MadarApp.swift */,
 				7884A40C087DAC3CED8FC2B8 /* MadarComponentGallery.swift */,
@@ -789,6 +798,7 @@
 				DC96F32AC5E7E4164A325940 /* LogPrayerIntent.swift */,
 				3C51B7F621FD8CA7685E7B45 /* MadarPrayerShortcuts.swift */,
 				FCC2F8AF04AA4AA760B02D82 /* OpenMadarIntent.swift */,
+				25C92B7A356AA41F0E88F770 /* OpenQuickRoomIntent.swift */,
 				F641995C5E5E50050215DA42 /* PrayerControlIntent.swift */,
 				D8E97AEF232F2E84BCBB4F00 /* StartPrayerActivityIntent.swift */,
 				8FE9D9930E188F3E3EBDC70B /* StartQuranSessionIntent.swift */,
@@ -1240,6 +1250,7 @@
 				7EF6115C0C2D03338D7B6AC6 /* HabitHealthStore.swift in Sources */,
 				4D409F17A934DEE32E3291A1 /* HabitOrbitView.swift in Sources */,
 				FD7CC805380567C14C4980D7 /* HabitsRoomView.swift in Sources */,
+				78F3695639AC8F06DCD878F7 /* LockWidgetGallery.swift in Sources */,
 				5F19DF294D80C995740B397F /* LogPrayerIntent.swift in Sources */,
 				251712D13E1CB75A086AB762 /* MadarApp.swift in Sources */,
 				F31472686C4367E1119E8EC6 /* MadarComponentGallery.swift in Sources */,
@@ -1249,6 +1260,7 @@
 				67F42646D352F586E7340024 /* MadarPrayerShortcuts.swift in Sources */,
 				1A9C1E8F02FAFFFC35FDFA29 /* NextPrayerWidget.swift in Sources */,
 				EA5164A4DA807C4F06A13120 /* OpenMadarIntent.swift in Sources */,
+				E801BD0C0938AA2DD95E5249 /* OpenQuickRoomIntent.swift in Sources */,
 				E606EBA914221E29811FC1F1 /* PrayerActivityAttributes.swift in Sources */,
 				ABA4E775EB715884E4B87770 /* PrayerActivityBudget.swift in Sources */,
 				E5BDBCBE77D12CB97306AD51 /* PrayerControlIntent.swift in Sources */,
@@ -1301,10 +1313,12 @@
 				0721790A7CEACD240CBEF2A3 /* LogPrayerIntent.swift in Sources */,
 				34C08CE848450C430D0DB1E4 /* MadarWidgets.swift in Sources */,
 				7C0AF343F838C67B15A0AB9C /* NextPrayerWidget.swift in Sources */,
+				AE416B416D39D53C03743ED2 /* OpenQuickRoomIntent.swift in Sources */,
 				320323BDDB522460AD28B544 /* PrayerActivityAttributes.swift in Sources */,
 				2153D4C5E3F51F1189BBF582 /* PrayerControlIntent.swift in Sources */,
 				4E6288DB3DC0C7806D6E1815 /* PrayerCountdownControl.swift in Sources */,
 				8FE2463637B9421352B04668 /* PrayerLogControl.swift in Sources */,
+				1086EA11FA1FAD2EACA0490F /* QuickRoomControls.swift in Sources */,
 				30DB8B597D38C0BC491F0F6B /* QuranWidget.swift in Sources */,
 				3569E12B3B88FBC2F39E62BE /* QuranWidgetContent.swift in Sources */,
 				F787AD41340294E2F4115039 /* RoomWidgetContent.swift in Sources */,

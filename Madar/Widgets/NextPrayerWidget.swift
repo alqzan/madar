@@ -81,6 +81,7 @@ struct NextPrayerView: View {
     var body: some View {
         Group {
             switch family {
+            case .accessoryCircular: circular
             case .accessoryInline: inline
             case .accessoryRectangular: rectangular
             default: home
@@ -89,9 +90,16 @@ struct NextPrayerView: View {
         .environment(\.layoutDirection, .rightToLeft)
         .widgetURL(URL(string: "madar://salah"))
         .background(previewFamily == nil ? Color.clear : Salah.paper)
-        .containerBackground(for: .widget) { Salah.paper }
+        .containerBackground(for: .widget) {if [.accessoryCircular,.accessoryRectangular,.accessoryInline].contains(family){Color.clear}else{Salah.paper}}
     }
 
+    private var circular:some View {
+        VStack(spacing:3) {
+            Image("MadarPrayer").renderingMode(.template).resizable().scaledToFit().frame(width:16,height:16)
+            if let state {Text(entry.snapshot?.countdown(minutes:state.minutes) ?? "").font(.system(size:15,weight:.semibold)).monospacedDigit().minimumScaleFactor(0.7).lineLimit(1);Text(state.item.name).font(.system(size:11)).lineLimit(1)}
+            else{Text("افتح مدار").font(.system(size:11))}
+        }.foregroundStyle(.primary).frame(maxWidth:.infinity,maxHeight:.infinity)
+    }
     private var inline: some View {
         Text(state.map { $0.item.name + " " + clock($0.item.at) } ?? "افتح مدار")
     }
@@ -130,10 +138,11 @@ struct ConfiguredPrayerProvider:AppIntentTimelineProvider {
     func timeline(for configuration:PrayerWidgetConfiguration,in context:Context) async->Timeline<NextPrayerEntry>{
         let now=Date(),envelope=(try? SnapshotStore.appGroup("group.com.alqzan.madar2"))?.read("prayerNext",as:PrayerNextSnapshot.self,now:now)
         let expiry=envelope?.validUntil ?? now.addingTimeInterval(900),zone=envelope?.tzID ?? TimeZone.current.identifier
-        let dates=envelope?.payload.timelineDates(from:now).filter{$0<expiry} ?? [now]
+        let window=envelope?.payload.minuteWindow(from:now,validUntil:expiry)
+        let dates=window?.dates ?? [now],refresh=window?.refreshAt ?? expiry
         var entries=dates.map{NextPrayerEntry(date:$0,snapshot:envelope?.payload,tzID:zone,template:configuration.template)}
-        entries.append(.init(date:expiry,snapshot:nil,tzID:zone,template:configuration.template))
-        return Timeline(entries:entries,policy:.after(expiry))
+        entries.append(.init(date:refresh,snapshot:nil,tzID:zone,template:configuration.template))
+        return Timeline(entries:entries,policy:.after(refresh))
     }
     private func load(_ config:PrayerWidgetConfiguration)->NextPrayerEntry{
         let envelope=(try? SnapshotStore.appGroup("group.com.alqzan.madar2"))?.read("prayerNext",as:PrayerNextSnapshot.self)
@@ -146,6 +155,6 @@ struct NextPrayerWidget: Widget {
         AppIntentConfiguration(kind: kind, intent: PrayerWidgetConfiguration.self, provider: ConfiguredPrayerProvider()) { entry in NextPrayerView(entry: entry) }
             .configurationDisplayName("الصلاة القادمة")
             .description("اسم الصلاة القادمة ووقتها وكم بقي.")
-            .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .accessoryRectangular, .accessoryInline])
+            .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .accessoryCircular, .accessoryRectangular, .accessoryInline])
     }
 }

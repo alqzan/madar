@@ -40,6 +40,16 @@ struct SnapshotStoreTests {
 
 /// Expected values come from the S1/S7 canonical: at 16:20 the next prayer is Maghrib 17:34, «بعد ١:١٤».
 struct PrayerNextSnapshotTests {
+    @Test func configuredTimelineRefreshesAtMinuteHorizonOrEarlierExpiry() {
+        let start = Date(timeIntervalSince1970: 1_791_000_000)
+        let value = PrayerNextSnapshot(items: [.init(prayer: "fajr", name: "الفجر", at: start.addingTimeInterval(30 * 3600))], numerals: "hindi")
+        let window = value.minuteWindow(from: start, validUntil: start.addingTimeInterval(30 * 3600))
+        #expect(window.dates.count == 481)
+        #expect(window.refreshAt == start.addingTimeInterval(481 * 60))
+        let short = value.minuteWindow(from: start, validUntil: start.addingTimeInterval(90))
+        #expect(short.dates == [start, start.addingTimeInterval(60)])
+        #expect(short.refreshAt == start.addingTimeInterval(90))
+    }
     private let base = Date(timeIntervalSince1970: 1_791_000_000) // arbitrary instant; only differences matter
     private func snapshot(numerals: String = "hindi") -> PrayerNextSnapshot {
         PrayerNextSnapshot(items: [

@@ -15,6 +15,7 @@ struct RoomWidgetsGallery:View {
             ScrollView {
                 VStack(alignment:.leading,spacing:16) {
                     Text("أضفها من معرض الودجات في الآيفون، واختر الحجم هناك. اضغط مطوّلًا على الودجة لتختار قالبها.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    NavigationLink {LockWidgetGallery(session:session)} label:{Label("القفل والاستعداد ومركز التحكم",systemImage:"lock.rectangle").font(MadarTypography.section()).frame(maxWidth:.infinity,minHeight:44)}.buttonStyle(.plain).accessibilityIdentifier("room-widgets-lock")
                     Link(destination:URL(string:"madar://salah")!) {
                         let prayers=session.snapshotStore.read("prayerNext",as:PrayerNextSnapshot.self,now:now)
                         NextPrayerView(entry:.init(date:now,snapshot:prayers?.payload,tzID:prayers?.tzID ?? session.activePlace.timeZoneID),previewFamily:.systemMedium).padding(16).frame(height:160).background(theme.surface,in:.rect(cornerRadius:26))
@@ -30,7 +31,7 @@ struct RoomWidgetsGallery:View {
                     Text("ودجة «سطر سريع» تفتح الكتابة ولا تعرض نصًا أو صورة من مذكراتك.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                 }.padding(16)
             }.clipped()
-        }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.accent)
+        }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.accent).toolbarVisibility(.hidden,for:.navigationBar)
         .environment(\.openURL,OpenURLAction{url in session.open(url);dismiss();return .handled})
         .onAppear{do{try session.publishSnapshot()}catch{session.errorMessage=error.localizedDescription}}
     }

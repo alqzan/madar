@@ -101,6 +101,7 @@ targets:
       - Widgets
       - App/PrayerActivityAttributes.swift
       - Intents/LogPrayerIntent.swift
+      - Intents/OpenQuickRoomIntent.swift
       - Intents/PrayerControlIntent.swift
       - Intents/StartQuranSessionIntent.swift
       - Intents/StartPrayerActivityIntent.swift

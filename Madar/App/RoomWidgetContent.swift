@@ -18,11 +18,13 @@ struct RoomWidgetContent:View {
     private var rows:[RoomWidgetSnapshot.Row] {
         guard let snapshot else{return[]}
         if room == .habits && template == "periods"{return Array(snapshot.periods.prefix(capacity))}
-        if room == .year && template != "both"{return snapshot.rows.filter{$0.id==template}}
+        if room == .year && ["hijri","gregorian"].contains(template){return snapshot.rows.filter{$0.id==template}}
         let values=room == .upcoming && template == "nearest" ? Array(snapshot.rows.prefix(1)) : snapshot.rows
         return Array(values.prefix(capacity))
     }
-    var body:some View {
+    private var accessory:Bool{[WidgetFamily.accessoryInline,.accessoryCircular,.accessoryRectangular].contains(family)}
+    var body:some View {Group{if accessory{accessoryContent}else{home}}}
+    private var home:some View {
         VStack(alignment:.leading,spacing:8) {
             HStack(spacing:6) { Image(room.glyph).renderingMode(.template).resizable().scaledToFit().frame(width:16,height:16).widgetAccentable();Text(room.title).font(.custom("thmanyahsans-Bold",size:13,relativeTo:.caption));Spacer(minLength:0);if room == .habits && family == .systemMedium {Text(snapshot?.heading ?? "").font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).privacySensitive()} }.foregroundStyle(accent)
             if snapshot?.locked == true {
@@ -59,6 +61,47 @@ struct RoomWidgetContent:View {
         }.foregroundStyle(theme.ink).frame(maxWidth:.infinity,maxHeight:.infinity,alignment:.topLeading)
         .environment(\.layoutDirection,.rightToLeft)
         .accessibilityElement(children:.contain)
+    }
+    private var accessoryRow:RoomWidgetSnapshot.Row? {
+        room == .habits ? snapshot?.periods.first : rows.first
+    }
+    private var accessoryValue:String {
+        if snapshot?.locked==true{return "افتح مدار"}
+        if room == .diaryWrite{return "اكتب سطر اليوم"}
+        guard let row=accessoryRow else{return "افتح مدار"}
+        return room == .upcoming ? row.title+" "+row.value : row.value
+    }
+    @ViewBuilder private var accessoryContent:some View {
+        if family == .accessoryInline {
+            Text(room.title+"، "+accessoryValue).font(.caption).lineLimit(1).privacySensitive(room == .habits || room == .upcoming)
+        } else if family == .accessoryCircular {
+            ZStack {
+                Circle().stroke(.primary.opacity(0.25),lineWidth:3)
+                if snapshot?.locked != true {Circle().trim(from:0,to:min(1,max(0,accessoryRow?.share ?? 0))).stroke(.primary,style:.init(lineWidth:3,lineCap:.round)).rotationEffect(.degrees(-90))}
+                VStack(spacing:1) {
+                    if snapshot?.locked==true{Image(systemName:"lock");Text("افتح").font(.caption2)}
+                    else if room == .diaryWrite{Image(room.glyph).renderingMode(.template).resizable().scaledToFit().frame(width:24,height:24);Text("اكتب").font(.caption2)}
+                    else {
+                        let value=accessoryRow?.value ?? ""
+                        Text(value.contains(where:{$0.isNumber}) ? (room == .upcoming ? value.split(separator:" ").first.map(String.init) ?? value : value) : "افتح").font(.custom("thmanyahsans-Bold",size:15,relativeTo:.caption)).lineLimit(1).minimumScaleFactor(0.7)
+                        Text(room == .upcoming ? accessoryRow?.title ?? room.title : room == .habits ? "اليوم" : "السنة").font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).lineLimit(1)
+                    }
+                }.padding(7)
+            }.privacySensitive(room == .habits || room == .upcoming).foregroundStyle(.primary).accessibilityElement(children:.combine)
+        } else {
+            HStack(spacing:8) {
+                Image(room.glyph).renderingMode(.template).resizable().scaledToFit().frame(width:20,height:20)
+                VStack(alignment:.leading,spacing:3) {
+                    Text(room.title).font(.custom("thmanyahsans-Bold",size:11,relativeTo:.caption2))
+                    Text(accessoryValue).font(.custom("thmanyahsans-Bold",size:13,relativeTo:.caption)).lineLimit(1)
+                    if snapshot?.locked != true {
+                        if room == .year,!["hijri","gregorian"].contains(template),let second=snapshot?.rows.first(where:{$0.id != accessoryRow?.id}) {Text((accessoryRow?.title ?? "")+"، "+second.title+" "+second.value).font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).lineLimit(1)}
+                        else if room == .habits,let next=(template == "periods" ? rows.dropFirst().first : snapshot?.rows.first) {Text(next.title+"، "+next.value).font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).lineLimit(1)}
+                        else if room == .upcoming,let next=rows.dropFirst().first {Text(next.title+"، "+next.value).font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).lineLimit(1)}
+                    }
+                }
+            }.frame(maxWidth:.infinity,maxHeight:.infinity,alignment:.leading).privacySensitive(room == .habits || room == .upcoming).foregroundStyle(.primary)
+        }
     }
     private var dates:some View {
         VStack(alignment:.leading,spacing:2){Text(snapshot?.datePrimary ?? "");Text(snapshot?.dateSecondary ?? "")}.font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).foregroundStyle(theme.secondaryInk)

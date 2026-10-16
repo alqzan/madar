@@ -56,7 +56,7 @@ struct CustomizeMadar: View {
                 }
             }
         }
-        .sheet(isPresented:$widgetGallery){RoomWidgetsGallery(session:session)}
+        .sheet(isPresented:$widgetGallery){NavigationStack{RoomWidgetsGallery(session:session)}}
         .toolbarVisibility(.hidden, for: .navigationBar)
         .confirmationDialog("أعِد الإعدادات المتفق عليها؟", isPresented: $confirmReset, titleVisibility: .visible) {
             Button("أعِد الافتراضي", role: .destructive) { session.reset(AppSession.supportedKeys + ["bahw.layout"]) }

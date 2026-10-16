@@ -76,14 +76,14 @@ private struct FixedRoomWidgetView:View {
     let entry:FixedRoomEntry
     @Environment(\.widgetFamily)private var family
     @Environment(\.colorScheme)private var scheme
-    var body:some View{RoomWidgetContent(room:entry.room,snapshot:entry.value,template:entry.template,family:family).widgetURL(URL(string:entry.room.route)).containerBackground(for:.widget){RoomTheme(room:"bahw",dark:scheme == .dark).surface}}
+    var body:some View{RoomWidgetContent(room:entry.room,snapshot:entry.value,template:entry.template,family:family).widgetURL(URL(string:entry.room.route)).containerBackground(for:.widget){if [WidgetFamily.accessoryCircular,.accessoryRectangular,.accessoryInline].contains(family){Color.clear}else{RoomTheme(room:"bahw",dark:scheme == .dark).surface}}}
 }
 struct FixedRoomWidget<Config:FixedRoomConfiguration>:Widget {
     var body:some WidgetConfiguration {
         AppIntentConfiguration(kind:"MadarRoom-"+Config.room.rawValue,intent:Config.self,provider:FixedRoomProvider<Config>()){FixedRoomWidgetView(entry:$0)}
-            .configurationDisplayName(Config.room.title).description("ملخص من غرفتك، وفتح مباشر لها.").supportedFamilies([.systemSmall,.systemMedium,.systemLarge])
+            .configurationDisplayName(Config.room.title).description("ملخص من غرفتك، وفتح مباشر لها.").supportedFamilies([.systemSmall,.systemMedium,.systemLarge,.accessoryCircular,.accessoryRectangular,.accessoryInline])
     }
 }
 struct AdditionalRoomWidgets:WidgetBundle {
-    var body:some Widget{FixedRoomWidget<HabitWidgetConfiguration>();FixedRoomWidget<YearWidgetConfiguration>();FixedRoomWidget<UpcomingWidgetConfiguration>();FixedRoomWidget<DiaryWriteConfiguration>()}
+    var body:some Widget{FixedRoomWidget<HabitWidgetConfiguration>();FixedRoomWidget<YearWidgetConfiguration>();FixedRoomWidget<UpcomingWidgetConfiguration>();FixedRoomWidget<DiaryWriteConfiguration>();DiaryWriterControl();HabitsRoomControl()}
 }

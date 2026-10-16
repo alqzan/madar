@@ -44,6 +44,13 @@ public struct PrayerNextSnapshot: Codable, Sendable, Equatable {
         let map: [Character: Character] = ["0": "٠", "1": "١", "2": "٢", "3": "٣", "4": "٤", "5": "٥", "6": "٦", "7": "٧", "8": "٨", "9": "٩"]
         return String(String(value).map { map[$0] ?? $0 })
     }
+    /// Refresh at the end of the minute horizon, not at a much later source expiry.
+    /// Otherwise a configured widget would freeze on the eighth-hour entry for the rest of the day.
+    public func minuteWindow(from date:Date,validUntil:Date)->(dates:[Date],refreshAt:Date) {
+        let dates=timelineDates(from:date).filter{$0<validUntil}
+        let refresh=min(validUntil,dates.last?.addingTimeInterval(60) ?? date.addingTimeInterval(900))
+        return (dates,refresh)
+    }
     /// One entry per minute from `date`, so the countdown is exact without any refresh budget.
     public func timelineDates(from date: Date, horizonMinutes: Int = 480) -> [Date] {
         let start = Date(timeIntervalSince1970: (date.timeIntervalSince1970 / 60).rounded(.down) * 60)
