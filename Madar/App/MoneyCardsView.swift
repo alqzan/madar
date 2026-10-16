@@ -175,12 +175,7 @@ struct MoneyCardsView: View {
                     HStack { Text(c.name).font(MadarTypography.cardTitle()); Spacer(); if let grace = c.graceDays { Text(service.days(grace) + " تقريبًا").font(MadarTypography.caption()).foregroundStyle(theme.color("surplusText")) } }
                     if let due = c.purchaseDue, let close = c.nextClose {
                         if !dynamicType.isAccessibilitySize {
-                            VStack(alignment: .trailing, spacing: 14) {
-                                HStack { Text("الكشف الحالي " + amount(c.billedMinor)); Spacer(); if let day = c.due { inlineDates(day) } }.font(MadarTypography.caption()).foregroundStyle(theme.color("reserveText"))
-                                HStack { Text("يقفل تقريبًا"); Spacer(); inlineDates(close) }.font(MadarTypography.caption())
-                                Rectangle().fill(theme.color("surplusText")).frame(height: 3).overlay(alignment: .leading) { Circle().fill(theme.color("surplusText")).frame(width: 12, height: 12) }
-                                HStack { Text("شراء اليوم يُسدَّد تقريبًا"); Spacer(); inlineDates(due) }.font(MadarTypography.caption()).foregroundStyle(theme.color("surplusText"))
-                            }.padding(.trailing, 12).overlay(alignment: .trailing) { Rectangle().fill(theme.ink).frame(width: 1) }.padding(.top, 6)
+                            timeline(c, today: r.today, close: close, purchaseDue: due)
                         } else {
                             Text("يقفل تقريبًا").font(MadarTypography.body()); dates(close)
                             Text("يُسدّد شراء اليوم تقريبًا").font(MadarTypography.body()); dates(due)
@@ -287,6 +282,34 @@ struct MoneyCardsView: View {
             Text("الكشف الحالي: " + amount(c.billedMinor) + "؛ غير المفوتر: " + amount(c.unbilledMinor)).font(MadarTypography.caption())
             Text("إذا كان السداد أقل من الكشف يبقى الباقي ضمن «عليك». الفائدة تُقدّر من النسبة المدخلة؛ كشف البنك هو المرجع.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
         }.accessibilityElement(children: .contain).accessibilityIdentifier("money-card-match")
+    }
+    private func timeline(_ c: MoneyCardReading, today: GregorianDay, close: GregorianDay, purchaseDue: GregorianDay) -> some View {
+        let green = theme.color("surplusText"), red = theme.color("dueText"), gold = theme.color("reserveText")
+        let statementDays = c.due.map { max(0, MadarCalendarDays.distance(from: today, to: $0)) }
+        let closeDays = max(0, MadarCalendarDays.distance(from: today, to: close))
+        let endDays = max(1, MadarCalendarDays.distance(from: today, to: purchaseDue))
+        let span = Double(max(endDays, closeDays, statementDays ?? 0) + 8)
+        return GeometryReader { g in
+            let w = g.size.width
+            let x: (Int) -> CGFloat = { days in w * (1 - CGFloat(Double(days) / span)) }
+            ZStack(alignment: .topLeading) {
+                Rectangle().fill(theme.ink).frame(width: 1.5, height: 118).position(x: w - 1, y: 59)
+                if let sd = statementDays {
+                    Capsule().fill(red).frame(width: max(2, x(0) - x(sd)), height: 4).position(x: (x(0) + x(sd)) / 2, y: 22)
+                    Circle().fill(red).frame(width: 12, height: 12).position(x: x(sd), y: 22)
+                    Text("كشف " + amount(c.billedMinor)).font(MadarTypography.fine()).foregroundStyle(red).position(x: max(70, min(w - 70, x(sd) + 60)), y: 8)
+                }
+                Rectangle().fill(gold).frame(width: 1.5, height: 30).position(x: x(closeDays), y: 52)
+                Text("يقفل").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).position(x: x(closeDays), y: 36)
+                Capsule().fill(green).frame(width: x(0) - x(endDays), height: 3).position(x: (x(0) + x(endDays)) / 2, y: 70)
+                Circle().stroke(green, lineWidth: 2).background(Circle().fill(theme.background)).frame(width: 14, height: 14).position(x: x(closeDays), y: 70)
+                Circle().fill(green).frame(width: 14, height: 14).position(x: x(endDays), y: 70)
+                Text("شراء اليوم يُسدَّد").font(MadarTypography.fine()).foregroundStyle(green).position(x: max(60, min(w - 60, x(endDays) + 50)), y: 92)
+            }.environment(\.layoutDirection, .leftToRight)
+        }.frame(height: 118).overlay(alignment: .bottomLeading) {
+            HStack(spacing: 14) { inlineDates(purchaseDue).foregroundStyle(green); inlineDates(close) }.padding(.top, 4).offset(y: 22)
+        }.padding(.bottom, 28).accessibilityElement(children: .combine)
+            .accessibilityLabel("يقفل تقريبًا " + app.dateLabels(close, compact: true).primary + "، شراء اليوم يُسدَّد تقريبًا " + app.dateLabels(purchaseDue, compact: true).primary)
     }
     private func inlineDates(_ day: GregorianDay) -> some View {
         ViewThatFits(in: .horizontal) {

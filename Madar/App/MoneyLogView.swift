@@ -81,6 +81,7 @@ struct MoneyLogView: View {
         let scale = max(1, maximum + maximum / 2)
         return VStack(spacing: 10) {
             HStack(alignment: .bottom, spacing: 8) { ForEach(days) { day in dayButton(day, scale: scale, height: 124) } }
+            if visible, let daily = (days.first { $0.day == chosen?.day } ?? days.first)?.dailyMinor { Text("خط " + amount(daily)).font(MadarTypography.fine()).foregroundStyle(theme.color("reserveText")).frame(maxWidth: .infinity, alignment: .leading).accessibilityIdentifier("money-log-limit-label") }
             Text("الخط الذهبي يومك الفعلي؛ الرسم ليومك كاملًا، والتصفية للحركات أدناه.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
         }.padding(.top, 10).padding(.bottom, 6).accessibilityElement(children: .contain).accessibilityIdentifier("money-log-arcade")
     }
@@ -99,18 +100,24 @@ struct MoneyLogView: View {
     private func dayButton(_ d: MoneyLogDay, scale: Int, height: CGFloat) -> some View {
         let future = d.day > (reading?.today ?? d.day)
         let selected = chosen?.day == d.day
+        let over = visible && !future && d.within == .missed
         let pair = DualDate(instant: d.day.date(in: app.activePlace.timeZone).addingTimeInterval(43200), timeZone: app.activePlace.timeZone, source: HijriSource(rawValue: app.string("core.hijriSource")) ?? .ummAlQura, sightingOffset: Int(app.number("core.hijriOffset")))
         return Button { self.selected = d.day } label: {
             VStack(spacing: 5) {
+                if height > 60 {
+                    VStack(spacing: 0) {
+                        if over { Text(amount(d.spentMinor)).font(MadarTypography.fine()).foregroundStyle(theme.color("dueText")).lineLimit(1).minimumScaleFactor(0.7); Rectangle().fill(theme.color("due")).frame(width: 5, height: 14) }
+                    }.frame(height: 30, alignment: .bottom).accessibilityHidden(true)
+                }
                 GeometryReader { proxy in
-                    let fill = visible ? min(1, Double(max(0, d.spentMinor)) / Double(scale)) : 0
+                    let fill = over ? 1 : visible ? min(1, Double(max(0, d.spentMinor)) / Double(scale)) : 0
                     let arch = UnevenRoundedRectangle(topLeadingRadius: proxy.size.width / 2, topTrailingRadius: proxy.size.width / 2)
                     ZStack(alignment: .bottom) {
-                        Rectangle().fill(theme.color("surplus").opacity(0.62)).frame(height: height * fill)
+                        Rectangle().fill(over ? theme.color("due") : theme.color("surplus").opacity(0.62)).frame(height: height * fill)
                         if visible, let daily = d.dailyMinor {
                             Rectangle().fill(theme.color("reserveText")).frame(height: 0.7).offset(y: -height * min(1, Double(max(0, daily)) / Double(scale)))
                         }
-                        if !future { Text(amount(d.spentMinor)).font(MadarTypography.fine()).lineLimit(1).minimumScaleFactor(0.85).padding(.bottom, min(height - 15, height * fill + 2)) }
+                        if !future { Text(amount(d.spentMinor)).font(MadarTypography.fine()).foregroundStyle(over ? theme.onAccent : theme.ink).lineLimit(1).minimumScaleFactor(0.85).padding(.bottom, over ? height - 20 : min(height - 15, height * fill + 2)) }
                         if d.pending > 0 { Circle().stroke(theme.ink, lineWidth: 1.5).frame(width: 7, height: 7).padding(.bottom, 4) }
                     }.frame(width: proxy.size.width, height: height, alignment: .bottom).clipShape(arch).overlay { arch.stroke(selected ? theme.ink : theme.color("reserveText"), style: .init(lineWidth: selected ? 2 : 1, dash: future ? [3, 3] : [])) }
                 }.frame(height: height)
