@@ -35,11 +35,23 @@ public enum RoomReminders {
         return .init(id: "notes.\(day.day).\(kind.rawValue)", room: .notes, dueAt: due, dayKey: day.day.description)
     }
 
+    /// §7.5 «تنبيه ٨٠٪»: once spending in a category reaches 80% of its limit this cycle, one alert, at most once per
+    /// (category, cycle). The request id is stable for the pair, so once it has fallen the ledger keeps it from returning;
+    /// `categoryCycleKey` holds the arbiter's in-plan cap. It leaves sanctity like every other reminder (RP3).
+    /// `scheduledAt` is the time an earlier pass already planned; keeping it stops each refresh from pushing the alert later.
+    public static func limit80(categoryID: UUID, cycleID: UUID, spentMinor: Int, limitMinor: Int, dayKey: String, prayerDays: [PrayerDay], now: Date, scheduledAt: Date? = nil) -> NotificationCandidate? {
+        guard limitMinor > 0, spentMinor * 5 >= limitMinor * 4 else { return nil }
+        let due = SanctityGuard(prayerDays: prayerDays).clamp(scheduledAt.flatMap { $0 > now ? $0 : nil } ?? now.addingTimeInterval(60))
+        return .init(id: "mal.alert80.\(cycleID.uuidString).\(categoryID.uuidString)", room: .mal, dueAt: due, dayKey: dayKey,
+                     categoryCycleKey: "\(categoryID.uuidString):\(cycleID.uuidString)")
+    }
+
     /// The kind a request stands for in a digest: named, never its content.
     public static func kindLabel(for id: String) -> String? {
         if id.hasPrefix("quran.") { return id.hasSuffix(".late") ? "المراجعة" : "الورد" }
         if id.hasPrefix("qada.") { return "القضاء" }
         if id.hasPrefix("habits.") { return "عادة" }
+        if id.hasPrefix("mal.alert80.") { return "حدود الصرف" }
         if id.hasPrefix("notes.") { return id.hasSuffix(".niyya") ? "النيّة" : id.hasSuffix(".letter") ? "رسالة" : "ذكرى" }
         return nil
     }

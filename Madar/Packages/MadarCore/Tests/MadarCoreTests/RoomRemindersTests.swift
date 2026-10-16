@@ -29,6 +29,30 @@ import Testing
         #expect(RoomReminders.habit(id: id, windowStart: nil, dayKey: "2026-10-09", prayerDays: [day], now: dawn) == nil)
     }
 
+    /// §7.5: the 80% alert fires at 80% of the limit and not below, once per (category, cycle), and leaves sanctity (RP3).
+    @Test func limitAlertAtEightyPercentOncePerCategoryCycle() {
+        let category = UUID(), cycle = UUID(), next = UUID()
+        #expect(RoomReminders.limit80(categoryID: category, cycleID: cycle, spentMinor: 1_896, limitMinor: 2_400, dayKey: "2026-10-09", prayerDays: [day], now: dawn) == nil, "79%")
+        let at80 = RoomReminders.limit80(categoryID: category, cycleID: cycle, spentMinor: 1_920, limitMinor: 2_400, dayKey: "2026-10-09", prayerDays: [day], now: dawn)
+        #expect(at80?.id == "mal.alert80.\(cycle.uuidString).\(category.uuidString)")
+        #expect(at80?.room == .mal); #expect(at80?.dueAt == dawn.addingTimeInterval(60))
+        #expect(RoomReminders.limit80(categoryID: category, cycleID: cycle, spentMinor: 100, limitMinor: 0, dayKey: "2026-10-09", prayerDays: [day], now: dawn) == nil, "No limit, no alert")
+        // A later movement in the same cycle makes the same request; a new cycle makes a new one.
+        let again = RoomReminders.limit80(categoryID: category, cycleID: cycle, spentMinor: 2_300, limitMinor: 2_400, dayKey: "2026-10-10", prayerDays: [day], now: dawn)
+        #expect(again?.id == at80?.id)
+        // A later pass keeps the time already planned instead of pushing it another minute on.
+        #expect(RoomReminders.limit80(categoryID: category, cycleID: cycle, spentMinor: 2_300, limitMinor: 2_400, dayKey: "2026-10-09", prayerDays: [day], now: dawn.addingTimeInterval(30), scheduledAt: dawn.addingTimeInterval(60))?.dueAt == dawn.addingTimeInterval(60))
+        #expect(RoomReminders.limit80(categoryID: category, cycleID: next, spentMinor: 2_000, limitMinor: 2_400, dayKey: "2026-11-09", prayerDays: [day], now: dawn)?.id != at80?.id)
+        // Crossing 80% during Asr's sanctity waits until adhan + 30 minutes.
+        let inSanctity = RoomReminders.limit80(categoryID: category, cycleID: cycle, spentMinor: 2_000, limitMinor: 2_400, dayKey: "2026-10-09", prayerDays: [day], now: day.asr.addingTimeInterval(300))
+        #expect(inSanctity?.dueAt == day.asr.addingTimeInterval(1800))
+        // Two requests for the same pair in one plan: the arbiter keeps one.
+        let plan = NotificationArbiter.plan(candidates: [at80!, .init(id: "mal.alert80.dup", room: .mal, dueAt: dawn.addingTimeInterval(120), dayKey: "2026-10-09", categoryCycleKey: at80!.categoryCycleKey)],
+                                            prayerDays: [day], now: dawn, timeZone: TimeZone(identifier: "Asia/Riyadh")!)
+        #expect(plan.scheduled.filter { $0.room == .mal }.count == 1)
+        #expect(RoomReminders.kindLabel(for: at80!.id) == "حدود الصرف")
+    }
+
     @Test func digestNamesKindsNeverContent() {
         #expect(RoomReminders.digestKinds(memberIDs: ["quran.2026-10-09.wird", "qada.2026-10-09", "habits.2026-10-09.\(UUID())"]) == ["الورد", "القضاء", "عادة"])
         #expect(RoomReminders.digestKinds(memberIDs: (0..<11).map { "habits.d.\($0)" }) == ["عادة"])

@@ -28,6 +28,7 @@ struct MoneyCategoryShelf: Identifiable, Equatable {
 }
 
 struct MoneyCategoriesReading: Equatable {
+    var cycleID: UUID? = nil
     var shelves: [MoneyCategoryShelf]
     var totalLimitsMinor: Int
     var incomeMinor: Int
@@ -79,7 +80,7 @@ extension AppMoneyService {
             let key = BankDedupe.normalize(merchant)
             return rules.contains { $0.pattern == key && $0.categoryID == category && !$0.ignore }
         }.count
-        return .init(shelves: shelves, totalLimitsMinor: shelves.compactMap(\.limitMinor).reduce(0, +), incomeMinor: income, allowanceMinor: allowance,
+        return .init(cycleID: cycle?.id, shelves: shelves, totalLimitsMinor: shelves.compactMap(\.limitMinor).reduce(0, +), incomeMinor: income, allowanceMinor: allowance,
                      autoCategorized: auto, daysLeft: max(1, length - elapsed + 1))
     }
 }

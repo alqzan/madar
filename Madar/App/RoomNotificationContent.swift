@@ -10,7 +10,7 @@ import MadarPrayer
 /// M3-V12 adds the diary kinds (morning intention, «في مثل هذا اليوم», a letter whose day came) with fixed copy
 /// that never carries diary text, so they stand outside the lock cleanup of `madar.notes.` requests (owner, 15 Oct).
 @MainActor enum RoomNotificationContent {
-    static let roomPrefixes = ["quran.", "digest.", "qada.", "habits.", "notes.", "nudge."]
+    static let roomPrefixes = ["quran.", "digest.", "qada.", "habits.", "notes.", "nudge.", "mal.alert80."]
     static func isRoomRequest(_ id: String) -> Bool { roomPrefixes.contains { id.hasPrefix($0) } }
 
     /// Qada while something is owed, and each push habit's window start today (custom, due, unmet, not paused).
@@ -29,7 +29,20 @@ import MadarPrayer
                 result.append(candidate)
             }
         }
-        return result + (try diaryCandidates(session: session, prayerDays: prayerDays, now: now))
+        return result + (try diaryCandidates(session: session, prayerDays: prayerDays, now: now)) + limitCandidates(session: session, prayerDays: prayerDays, now: now)
+    }
+
+    /// M5-V10 «تنبيه ٨٠٪»: one request per category at 80% of its limit this cycle (`mal.alert80`, default on).
+    /// The money reading needs the store unlocked; while it is not, no alert is planned rather than a guessed one.
+    static func limitCandidates(session: AppSession, prayerDays: [PrayerDay], now: Date) -> [NotificationCandidate] {
+        guard session.bool("mal.alert80"), let reading = try? AppMoneyService(app: session).loadCategories(), let cycle = reading.cycleID else { return [] }
+        let dayKey = (try? DiaryLineRenderer.today(context: ModelContext(session.container), now: now))?.description ?? GregorianDay.containing(now, in: session.activePlace.timeZone).description
+        let planned = (try? ModelContext(session.container).fetch(FetchDescriptor<NotificationLedger>()))?.filter { $0.deletedAt == nil && $0.state == "submitted" && $0.requestID.hasPrefix("mal.alert80.") } ?? []
+        return reading.shelves.compactMap { shelf in
+            let id = "mal.alert80.\(cycle.uuidString).\(shelf.id.uuidString)"
+            return shelf.limitMinor.flatMap { RoomReminders.limit80(categoryID: shelf.id, cycleID: cycle, spentMinor: shelf.spentMinor, limitMinor: $0, dayKey: dayKey, prayerDays: prayerDays, now: now,
+                                                                     scheduledAt: planned.filter { $0.requestID == id }.map(\.scheduledFor).max()) }
+        }
     }
 
     /// Reads day keys, booleans and letter triggers only; no diary text is read for scheduling.
@@ -88,6 +101,17 @@ import MadarPrayer
                 : id.hasSuffix(".niyya") ? "ما نيّتك لهذا اليوم؟ سطر واحد يكفي"
                 : id.hasSuffix(".letter") ? "وصلتك رسالة من ماضيك" : "عندك ذكرى من هذا اليوم"
             content.userInfo = ["dayKey": candidate.dayKey, "room": "notes"]
+        } else if id.hasPrefix("mal.alert80.") {
+            // RM10: no amount on the lock screen while amounts hide until touch, nor under the whole-app lock.
+            let categoryID = String(id.split(separator: ".").last ?? "")
+            let shelf = protected ? nil : (try? AppMoneyService(app: session).loadCategories())?.shelves.first { $0.id.uuidString == categoryID }
+            content.title = protected ? "مدار" : "حدود الصرف"
+            if let shelf, let limit = shelf.limitMinor, let used = shelf.percentUsed {
+                let service = AppMoneyService(app: session)
+                content.body = session.bool("core.hideMoneyUntilTouch") ? "«" + shelf.name + "» اقترب من حدّه لهذه الدورة"
+                    : "«" + shelf.name + "» بلغ " + digits.string(used) + "٪ من حدّه، " + (limit > shelf.spentMinor ? "باقي " + service.amount(limit - shelf.spentMinor) : "تجاوزه")
+            } else { content.body = protected ? "لديك تنبيه في مدار" : "اقترب أحد تصنيفاتك من حدّه" }
+            content.userInfo = ["dayKey": candidate.dayKey, "room": "mal"]
         } else {
             content.title = "مدار"
             content.body = "افتح مدار ليحدّث تذكيراتك"
@@ -101,6 +125,7 @@ import MadarPrayer
         if id.hasPrefix("digest.") { return "digest" }
         if id.hasPrefix("qada.") { return "qada" }
         if id.hasPrefix("habits.") { return "habit" }
+        if id.hasPrefix("mal.alert80.") { return "alert80" }
         if id.hasPrefix("notes.") { return id.hasSuffix(".niyya") ? "niyya" : id.hasSuffix(".letter") ? "letter" : "onThisDay" }
         return "nudge"
     }
@@ -130,6 +155,7 @@ import MadarPrayer
             }
             return id.hasSuffix(".letter") || session.string("notes.onThisDay") != "off"
         }
+        if id.hasPrefix("mal.alert80.") { return session.bool("mal.alert80") }
         return false // «افتح مدار» while Madar is open says nothing.
     }
 
@@ -137,6 +163,7 @@ import MadarPrayer
     static func open(_ id: String, userInfo: [AnyHashable: Any], session: AppSession) {
         if id.hasPrefix("quran.") { session.selectedTab = "quran" }
         else if id.hasPrefix("qada.") { session.selectedTab = "prayer" }
+        else if id.hasPrefix("mal.alert80.") { session.selectedTab = "customize"; session.moneyOpen = true }
         else if id.hasPrefix("notes.") { session.open(URL(string: id.hasSuffix(".onThisDay") ? "madar://notes" : "madar://notes/today")!) }
         else if id.hasPrefix("habits.") {
             session.habitRouteID = (userInfo["habit"] as? String).flatMap(UUID.init(uuidString:))
