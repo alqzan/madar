@@ -381,3 +381,12 @@ Differences left: none visual. Parser tested on synthetic samples only. check-re
 Not verified: the real V4 store upgrading on the owner's iPhone; RM6 accuracy (needs anonymised messages).
 Next: M5-D02 money commands with undo and IngestBankMessageIntent/LogExpenseIntent, with a review pass, then M5-V01 home.
 Model/effort: Claude Opus 5.5; effort not exposed (E01–E04 commits say «max» on the owner's word). Usage: five-hour 83% at handover.
+
+
+## Handover — M5-D02 intake and V01–V03 money screens — 2026-10-16 — Codex
+Works now: main 75519e0 includes D02 intake and V01–V03 home/basis/cash/envelopes (four card commits). Uncommitted V04 on codex/money-detail adds detail ledger/road, exact 1–6-salary preview, immediate reserve/surplus repayment + undo, and existing saving-plan changes. Earlier-room improvement: one-tap settings search clear.
+Verified: swift test Money 86/86 (/tmp/madar-v04-money.log), Commands 80/80 (/tmp/madar-v04-command-disk-fixed.log); Inbox 17/17 at D02. UI home 4/4, envelopes 2/2, search 1/1, V04 preview/repay/undo 1/1 M5-V04-flow-verified; final app/widget build. diff --check clean. One money data review: exact transfers, stale debt/saving rejection, no fund/repay cross-write, undo/replay tests.
+Differences left: V01–V03 native safe areas/paired dates/real values; V04 is NOT matched: title/vertical spacing, road deadline/shortfall markers, saving controls and paper-sheet/button styling; salary-adoption absent pending fields. L/light m5-v04-flow-shots; EnvDetail/EnvSheet comparisons prepared/open requested.
+Not verified: saving-editor native UI, salary-plan adoption/migration, real SMS/Shortcut, owner iPhone. No schema/owner store changed. Disk filled (errno 28/signing internal error); removed only generated DerivedData/Build, final native UI passed after space freed and test removed number bidi isolates for equality.
+Next: preserve dirty codex/money-detail; resolve requested optional repaymentTotalMinor/repaymentPaychecks fields with owner, then finish V04 and visual comparison before its one commit/merge to main. No money lobby/widget/Capture until X01. Do not add duplicate plans via dates or overwrite fund to represent repayment.
+Model/effort: not exposed / not exposed. Usage: latest five-hour 95% used (5% left), weekly 89% used.

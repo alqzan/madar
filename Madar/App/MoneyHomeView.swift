@@ -21,6 +21,7 @@ struct MoneyHomeView: View {
     @State private var obligationsOpen = false
     @State private var categoriesOpen = false
     @State private var cardsOpen = false
+    @State private var logOpen = false
     @State private var visitChecked = false
     private var service: AppMoneyService { .init(app: app) }
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
@@ -39,6 +40,8 @@ struct MoneyHomeView: View {
                     lowerDesk(reading)
                     Button { cardsOpen = true } label: { Label("البطاقات", systemImage: "creditcard").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 48).overlay { Capsule().stroke(theme.color("reserveText"), lineWidth: 1) } }
                         .buttonStyle(.plain).accessibilityIdentifier("money-cards-open")
+                    Button { logOpen = true } label: { Label("السجل", systemImage: "book.pages").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 48).overlay { Capsule().stroke(theme.color("reserveText"), lineWidth: 1) } }
+                        .buttonStyle(.plain).accessibilityIdentifier("money-log-open")
                 } else if let failure {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("لم تكتمل قراءة المال").font(MadarTypography.cardTitle())
@@ -55,6 +58,7 @@ struct MoneyHomeView: View {
         .navigationDestination(isPresented: $obligationsOpen) { MoneyObligationsView(app: app) }
         .navigationDestination(isPresented: $categoriesOpen) { MoneyCategoriesView(app: app) }
         .navigationDestination(isPresented: $cardsOpen) { MoneyCardsView(app: app, revealed: $revealed) }
+        .navigationDestination(isPresented: $logOpen) { MoneyLogView(app: app, revealed: $revealed) }
         .navigationDestination(isPresented: $sinceOpen) {
             if let reading { MoneySinceView(app: app, home: reading, revealed: $revealed) { sinceOpen = false; messagesOpen = true; Task { try? await app.executeMoneyCommand("money.markVisit") } } }
         }
