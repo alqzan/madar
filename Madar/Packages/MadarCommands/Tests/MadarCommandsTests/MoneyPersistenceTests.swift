@@ -508,6 +508,25 @@ import MadarInbox
         #expect(try ModelContext(f.container).fetch(FetchDescriptor<Cycle>()).filter { $0.deletedAt == nil && $0.closedAt == nil }.count == 1)
         #expect(!MoneyCommandPayload.validate(name: "money.confirmSalary", payload: ["id": .string(salary.id.uuidString), "remainderTo": .string("goal")]))
     }
+    /// M5-V09: a bill is one row on its day; a loan writes its equal monthly instalments; undo removes both.
+    @Test func saveObligationWritesInstalmentsAndUndoesThem() async throws {
+        let f = try MoneyFixture(); defer { f.clean() }
+        #expect(try await f.run("money.saveObligation", ["kind": .string("bill"), "name": .string("الكهرباء"), "amountMinor": .string("22000"), "dueDay": .number(12)]).status == .applied)
+        let loan = UUID()
+        #expect(try await f.run("money.saveObligation", ["kind": .string("loan"), "name": .string("قسط القرض"), "amountMinor": .string("285000"), "count": .number(3), "firstDue": .string("2026-11-05")], id: loan).status == .applied)
+        let c = ModelContext(f.container)
+        let items = try c.fetch(FetchDescriptor<InstallmentItem>()).filter { $0.obligationID == loan && $0.deletedAt == nil }.sorted { $0.seq < $1.seq }
+        #expect(items.map(\.amountMinor) == [285_000, 285_000, 285_000])
+        let zone = ActivePlace.riyadh.timeZone
+        #expect(items.map { GregorianDay.containing($0.dueDate, in: zone).description } == ["2026-11-05", "2026-12-05", "2027-01-05"])
+        #expect(try c.fetch(FetchDescriptor<Obligation>()).first { $0.id == loan }?.totalMinor == 855_000)
+        #expect(try await f.run("system.undo", ["undoToken": .string(loan.uuidString)]).status == .applied)
+        let back = ModelContext(f.container)
+        #expect(try back.fetch(FetchDescriptor<InstallmentItem>()).filter { $0.obligationID == loan && $0.deletedAt == nil }.isEmpty)
+        #expect(try back.fetch(FetchDescriptor<Obligation>()).filter { $0.deletedAt == nil }.map(\.name) == ["الكهرباء"])
+        #expect(!MoneyCommandPayload.validate(name: "money.saveObligation", payload: ["kind": .string("bill"), "name": .string("x"), "amountMinor": .string("1"), "dueDay": .number(32)]))
+        #expect(!MoneyCommandPayload.validate(name: "money.saveObligation", payload: ["kind": .string("loan"), "name": .string("x"), "amountMinor": .string("1"), "count": .number(0), "firstDue": .string("2026-11-05")]))
+    }
     /// «منذ آخر زيارة»: the visit marker is one device row, updated in place, with no undo.
     @Test func markVisitKeepsOneDeviceRowAtTheCommandTime() async throws {
         let f = try MoneyFixture(); defer { f.clean() }

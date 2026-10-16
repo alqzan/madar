@@ -8,7 +8,7 @@ public enum MoneyCommandPayload {
     public static let names: Set<String> = [intakeName, "money.pasteBankMessages", "money.logExpense",
         "money.confirmTransaction", "money.deleteTransaction", "money.saveAccount", "money.saveCard", "money.accruePlans", "money.setReserveGoal", "money.repayEnvelopeNow", "money.setEnvelopeSaving", "money.adoptRepayment",
         "money.applyStatement", "money.ignoreMessage", "money.confirmClear", "money.markVisit",
-        "money.categorize", "money.saveMerchantRule", "money.forgetMerchantRule", "money.confirmSalary"]
+        "money.categorize", "money.saveMerchantRule", "money.forgetMerchantRule", "money.confirmSalary", "money.saveObligation"]
     /// §7.5 maxRepayCycles: the longest salary repayment (the envelope sheet offers 1–6).
     public static let maxRepaySalaries = 12
 
@@ -54,6 +54,13 @@ public enum MoneyCommandPayload {
             return Set(p.keys) == ["id", "categoryID", "remember"] && id("id") && optionalID("categoryID") && (p["remember"] == .bool(true) || p["remember"] == .bool(false))
         case "money.saveMerchantRule":
             return Set(p.keys) == ["merchant", "categoryID", "ignore"] && text("merchant") && optionalID("categoryID") && (p["ignore"] == .bool(true) || p["ignore"] == .bool(false))
+        case "money.saveObligation":
+            // A monthly bill on a day, or a loan / instalment plan of equal monthly instalments from a first due day.
+            guard Set(p.keys).isSubset(of: ["kind", "name", "amountMinor", "dueDay", "count", "firstDue"]), text("name", max: 60), positive("amountMinor") else { return false }
+            if choices("kind", ["bill"]) { return p["count"] == nil && p["firstDue"] == nil && (integer(p["dueDay"]).map { (1...31).contains($0) } ?? false) }
+            guard choices("kind", ["loan", "installment"]), p["dueDay"] == nil, (integer(p["count"]).map { (1...120).contains($0) } ?? false),
+                  case .string(let first) = p["firstDue"], (try? GregorianDay(first)) != nil else { return false }
+            return integer(p["amountMinor"]).map { $0 <= 9_007_199_254_740_991 / 120 } ?? false
         case "money.confirmSalary":
             return Set(p.keys).isSubset(of: ["id", "remainderTo"]) && id("id") && (p["remainderTo"] == nil || choices("remainderTo", ["surplus", "reserve"]))
         case "money.forgetMerchantRule": return Set(p.keys) == ["id"] && id("id")

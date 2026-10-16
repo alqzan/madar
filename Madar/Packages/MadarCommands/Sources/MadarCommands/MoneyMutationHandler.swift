@@ -161,6 +161,26 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             let row = try transaction(uuid(p, "id"), context)
             guard row.reviewState != "ok" else { throw MoneyCommandError.alreadyConfirmed }
             try confirm(row, payload: p, context: context, now: now, writer: writer)
+        case "money.saveObligation":
+            let obligation = Obligation(); obligation.id = id; obligation.kind = text(p, "kind"); obligation.name = text(p, "name").trimmingCharacters(in: .whitespacesAndNewlines)
+            obligation.amountMinor = MoneyCommandPayload.integer(p["amountMinor"]) ?? 0
+            obligation.currency = try SettingsStore(context: context).value(for: "core.currency").string ?? "SAR"
+            guard obligation.amountMinor > 0, !obligation.name.isEmpty else { throw MoneyCommandError.invalidAmount }
+            if obligation.kind == "bill" {
+                obligation.dueDay = MoneyCommandPayload.integer(p["dueDay"]); obligation.totalMinor = obligation.amountMinor
+            } else {
+                guard let count = MoneyCommandPayload.integer(p["count"]), (1...120).contains(count), let first = optionalText(p, "firstDue").flatMap({ try? GregorianDay($0) }) else { throw MoneyCommandError.invalidReference }
+                let zone = try PrayerRepository(context: context).place(at: now).timeZone
+                var calendar = Calendar(identifier: .gregorian); calendar.timeZone = zone
+                obligation.totalMinor = obligation.amountMinor * count; obligation.remainingCount = count; obligation.dueDay = first.day
+                for n in 1...count {
+                    guard let due = calendar.date(byAdding: .month, value: n - 1, to: first.date(in: zone)) else { throw MoneyCommandError.invalidReference }
+                    let item = InstallmentItem(); item.id = StableIdentity.uuid(for: "InstallmentItem:\(id):\(n)"); item.obligationID = id; item.seq = n
+                    item.dueDate = due; item.amountMinor = obligation.amountMinor; item.createdAt = now
+                    context.insert(item); try touch(item, now, writer)
+                }
+            }
+            obligation.createdAt = now; context.insert(obligation); try touch(obligation, now, writer)
         case "money.confirmSalary":
             try confirmSalary(p, command: id, context: context, now: now, writer: writer)
         case "money.confirmClear":
@@ -654,10 +674,10 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         for after in inverse.after {
             guard current.first(where: { recordKey($0) == recordKey(after) }) == after else { throw MoneyCommandError.undoSuperseded }
             // Never remove the account/card/original while a later live movement depends on it.
-            if !inverse.before.contains(where: { recordKey($0) == recordKey(after) }), ["Account", "Card", "MoneyTransaction", "Cycle"].contains(after.model) {
+            if !inverse.before.contains(where: { recordKey($0) == recordKey(after) }), ["Account", "Card", "MoneyTransaction", "Cycle", "Obligation"].contains(after.model) {
                 let dependencies = current.filter { $0.isLive && !changedIDs.contains($0.id) }
                 // A cycle opened by a salary stays once later movements or allocations were filed into it.
-                let referenceKeys = ["accountID", "fromAccountID", "toAccountID", "cardID", "relatedTransactionID", "cycleID"]
+                let referenceKeys = ["accountID", "fromAccountID", "toAccountID", "cardID", "relatedTransactionID", "cycleID", "obligationID"]
                 guard !dependencies.contains(where: { record in referenceKeys.contains { record.fields[$0]?.string == after.id.uuidString } }) else { throw MoneyCommandError.undoSuperseded }
             }
         }
@@ -687,6 +707,7 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         rows += try context.fetch(FetchDescriptor<InstallmentItem>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<Statement>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<MerchantRule>()).map { try $0.record() }
+        rows += try context.fetch(FetchDescriptor<Obligation>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<Cycle>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<CyclePolicy>()).map { try $0.record() }
         return rows
