@@ -390,3 +390,11 @@ Differences left: V01–V03 native safe areas/paired dates/real values; V04 is N
 Not verified: saving-editor native UI, salary-plan adoption/migration, real SMS/Shortcut, owner iPhone. No schema/owner store changed. Disk filled (errno 28/signing internal error); removed only generated DerivedData/Build, final native UI passed after space freed and test removed number bidi isolates for equality.
 Next: preserve dirty codex/money-detail; resolve requested optional repaymentTotalMinor/repaymentPaychecks fields with owner, then finish V04 and visual comparison before its one commit/merge to main. No money lobby/widget/Capture until X01. Do not add duplicate plans via dates or overwrite fund to represent repayment.
 Model/effort: not exposed / not exposed. Usage: latest five-hour 95% used (5% left), weekly 89% used.
+
+## Handover — M5-V04 to V06, diary widget content (RD7) — 2026-10-16 — Claude
+Works now: envelope detail and salary repayment adopted to the minor unit (schema V6, owner yes); diary widgets show the intention, that-day memory and last line only after `notes.widgetContent` (M3-V16); «رسائل البنك» with statement update, atomic «اعتمد الواضح» (dry run of the real confirm), «تحتاج نظرة» and paste; «منذ آخر زيارة» opens once per day after an absence.
+Verified: MadarData 66/66, MadarMoney 89/89, MadarCommands 84/84; UI MoneyEnvelopeDetail, RoomWidgets diary opt-in, MoneyMessages, MoneySince and MoneyHome passed (Artifacts/*.xcresult); make build succeeded; one review pass per money card, its High findings fixed.
+Differences left: V05 category chips wait for V07; V06 has no big-expense, alerts or Tamara cards (V18/V10/V09); no red per RM10; compare pages Z-R14-EnvDetail, Z-R18-msg-1, Z-R19-since.
+Not verified: owner iPhone, real Shortcut messages, the V5→V6 upgrade on the real store, dark mode.
+Next: M5-V07 merchant rules (MerchantRule exists in the model: pattern, categoryID, ignore).
+Model/effort: Claude Opus 5.5; effort not exposed. Usage: five-hour 45% at this handover.
