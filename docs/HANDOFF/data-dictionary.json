@@ -3291,7 +3291,7 @@
    "merge": "row LWW (§11 merge)",
    "seed": null,
    "note": null,
-   "amendedBy": "RM3 (schema V5)",
+   "amendedBy": "RM3 (schema V5); owner 16 Oct, M5-V04 (schema V6)",
    "relationships": [
     {
      "field": "envelopeID",
@@ -3358,6 +3358,19 @@
      "type": "String?",
      "optional": true,
      "note": "RM3: first money day the plan funds"
+    },
+    {
+     "name": "repaymentTotalMinor",
+     "type": "Int?",
+     "optional": true,
+     "unit": "minor units of `currency` (exponent from currency-minor-units.json)",
+     "note": "M5-V04 (owner 16 Oct): kind = repay only; the debt the plan was adopted for. The last salary pays total − paid, so early or late salaries keep it exact to the minor unit (L03)."
+    },
+    {
+     "name": "repaymentPaychecks",
+     "type": "Int?",
+     "optional": true,
+     "note": "M5-V04 (owner 16 Oct): kind = repay only; how many salaries the plan was adopted over (1…maxRepayCycles)."
     }
    ]
   },

@@ -1,6 +1,6 @@
 import Foundation
 import SwiftData
-// Generated from Specification/data-dictionary.json (schema V5). UUID foreign keys intentionally avoid ownership relationships.
+// Generated from Specification/data-dictionary.json (schema V6). UUID foreign keys intentionally avoid ownership relationships.
 @MainActor public protocol MadarRecordModel: PersistentModel { var id: UUID { get set }; func record() throws -> DataRecord; func apply(_ record: DataRecord) throws }
 @Model public final class Setting {
     public var id: UUID = UUID()
@@ -2222,6 +2222,8 @@ extension Envelope: MadarRecordModel {
     public var untilDate: Date? = nil
     public var period: String = "perCycle"
     public var startDayKey: String? = nil
+    public var repaymentTotalMinor: Int? = nil
+    public var repaymentPaychecks: Int? = nil
     public init() {}
 }
 extension EnvelopePlan: MadarRecordModel {
@@ -2242,6 +2244,8 @@ extension EnvelopePlan: MadarRecordModel {
             "untilDate": JSONValue.encode(untilDate),
             "period": JSONValue.encode(period),
             "startDayKey": JSONValue.encode(startDayKey),
+            "repaymentTotalMinor": JSONValue.encode(repaymentTotalMinor),
+            "repaymentPaychecks": JSONValue.encode(repaymentPaychecks),
         ])
     }
     public func apply(_ record: DataRecord) throws {
@@ -2260,6 +2264,8 @@ extension EnvelopePlan: MadarRecordModel {
         untilDate = try record.decode("untilDate", as: Date?.self)
         period = try record.fields["period"]?.decode(String.self) ?? "perCycle"
         startDayKey = try record.fields["startDayKey"]?.decode(String?.self)
+        repaymentTotalMinor = try record.fields["repaymentTotalMinor"]?.decode(Int?.self)
+        repaymentPaychecks = try record.fields["repaymentPaychecks"]?.decode(Int?.self)
     }
 }
 @Model public final class Obligation {

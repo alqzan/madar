@@ -16,6 +16,7 @@ struct MoneyEnvelopesView: View {
     @State private var previewMinor = 0
     @State private var targetOpen = false
     @State private var failure: String?
+    @State private var selectedEnvelope: UUID?
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
     private var service: AppMoneyService { .init(app: app) }
     private var visible: Bool { revealed || !app.bool("core.hideMoneyUntilTouch") }
@@ -44,7 +45,7 @@ struct MoneyEnvelopesView: View {
                         Text("لم تُضف مظاريف أهداف بعد").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk).padding(.vertical, 18)
                     }
                     ForEach(reading.home.envelopes) { envelope in
-                        MoneyGoalOverview(envelope: envelope, app: app, visible: visible)
+                        Button { selectedEnvelope = envelope.id } label: { MoneyGoalOverview(envelope: envelope, app: app, visible: visible).contentShape(.rect) }.buttonStyle(.plain).accessibilityIdentifier("money-envelope-" + envelope.name)
                     }
                 } else if let failure {
                     Text(failure).font(MadarTypography.body()); Button("أعِد المحاولة", action: load).frame(minHeight: 44)
@@ -54,6 +55,7 @@ struct MoneyEnvelopesView: View {
             .environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar)
             .task { load() }.onChange(of: app.prayerRevision) { load() }
             .sheet(isPresented: $targetOpen) { MoneyReserveTargetView(app: app, current: reading?.reserveTargetMinor) { load() }.environment(\.roomTheme, theme) }
+            .navigationDestination(item: $selectedEnvelope) { id in MoneyEnvelopeDetailView(app: app, id: id, revealed: $revealed).environment(\.roomTheme, theme) }
             .accessibilityIdentifier("money-envelopes")
     }
     private func dailySplit(_ cycle: MoneyCycleReading) -> some View {

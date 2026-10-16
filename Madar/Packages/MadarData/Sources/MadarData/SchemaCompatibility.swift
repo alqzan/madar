@@ -15,6 +15,7 @@ enum SchemaCompatibility {
         case 2: MadarSchemaV2.syncedNames
         case 3: MadarSchemaV3.syncedNames
         case 4: MadarSchemaV4.syncedNames
+        case 5: MadarSchemaV5.syncedNames
         case MadarSchema.version: MadarSchema.syncedNames
         default: throw version > MadarSchema.version ? DataError.newerStore : DataError.unsupportedBackup
         }
@@ -43,6 +44,10 @@ enum SchemaCompatibility {
                     row.fields["silverPricePerGramMinor"] = .null; row.fields["silverPriceSetAt"] = .null
                 default: break
                 }
+            }
+            // V6 (M5-V04): a plan written before the repayment fields has neither.
+            if version < 6, row.model == "EnvelopePlan" {
+                row.fields["repaymentTotalMinor"] = .null; row.fields["repaymentPaychecks"] = .null
             }
             return row
         }

@@ -6,7 +6,9 @@ import Foundation
 public enum MoneyCommandPayload {
     public static let intakeName = "money.ingestBankMessage"
     public static let names: Set<String> = [intakeName, "money.pasteBankMessages", "money.logExpense",
-        "money.confirmTransaction", "money.deleteTransaction", "money.saveAccount", "money.saveCard", "money.accruePlans", "money.setReserveGoal"]
+        "money.confirmTransaction", "money.deleteTransaction", "money.saveAccount", "money.saveCard", "money.accruePlans", "money.setReserveGoal", "money.repayEnvelopeNow", "money.setEnvelopeSaving", "money.adoptRepayment"]
+    /// §7.5 maxRepayCycles: the longest salary repayment (the envelope sheet offers 1–6).
+    public static let maxRepaySalaries = 12
 
     public static func integer(_ value: JSONValue?) -> Int? {
         switch value {
@@ -37,6 +39,9 @@ public enum MoneyCommandPayload {
         func choices(_ key: String, _ options: Set<String>) -> Bool { if case .string(let raw) = p[key] { options.contains(raw) } else { false } }
         func optionalText(_ key: String, max: Int = 80) -> Bool { p[key] == nil || p[key] == .null || text(key, max: max, empty: true) }
         switch name {
+        case "money.setEnvelopeSaving": return Set(p.keys) == ["id", "amountMinor", "expectedMinor"] && id("id") && integer(p["expectedMinor"]) != nil && (integer(p["amountMinor"]).map { $0 >= 0 } ?? false)
+        case "money.adoptRepayment": return Set(p.keys) == ["id", "debtMinor", "salaries"] && id("id") && positive("debtMinor") && (integer(p["salaries"]).map { (1...maxRepaySalaries).contains($0) } ?? false)
+        case "money.repayEnvelopeNow": return Set(p.keys) == ["id", "source", "debtMinor"] && id("id") && choices("source", ["surplus", "reserve"]) && positive("debtMinor")
         case "money.accruePlans": return p.isEmpty
         case "money.setReserveGoal": return Set(p.keys) == ["targetMinor"] && (p["targetMinor"] == .null || positive("targetMinor"))
         case intakeName:

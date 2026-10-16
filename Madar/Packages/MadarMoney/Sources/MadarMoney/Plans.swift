@@ -11,7 +11,9 @@ public struct EnvelopePlanSpec: Equatable, Sendable {
     public var kind: Kind
     public var source: Source
     public var perPaycheckMinor: Int
-    /// For a repayment: salaries left; nil = open-ended.
+    /// For a repayment: salaries left; nil = open-ended. An adopted repayment (schema V6 total and count) must be built
+    /// with `EnvelopePlanSpec.repayment` from what it has paid, never from the stored first share, so the last salary
+    /// pays total − paid exactly.
     public var remainingPaychecks: Int?
     public init(id: String, target: AllocationTarget, kind: Kind = .fund, source: Source, perPaycheckMinor: Int, remainingPaychecks: Int? = nil) {
         self.id = id; self.target = target; self.kind = kind; self.source = source

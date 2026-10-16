@@ -73,6 +73,44 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
                 }
                 try writeAllocations(rows, context: context, now: now, writer: writer)
             }
+        case "money.setEnvelopeSaving":
+            guard let planID = uuid(p, "id"), let amount = MoneyCommandPayload.integer(p["amountMinor"]), amount >= 0,
+                  let plan = try context.fetch(FetchDescriptor<EnvelopePlan>()).first(where: { $0.id == planID && live($0) }),
+                  plan.kind == "fund", plan.source == "salary", plan.period == "perCycle", plan.perPaycheckMinor == MoneyCommandPayload.integer(p["expectedMinor"]),
+                  let envelopeID = plan.envelopeID,
+                  try context.fetch(FetchDescriptor<Envelope>()).contains(where: { $0.id == envelopeID && live($0) && !["reserve", "surplus"].contains($0.role) }) else { throw MoneyCommandError.invalidReference }
+            if plan.perPaycheckMinor != amount { plan.perPaycheckMinor = amount; try touch(plan, now, writer) }
+        case "money.repayEnvelopeNow":
+            guard let envelopeID = uuid(p, "id"),
+                  let envelope = try context.fetch(FetchDescriptor<Envelope>()).first(where: { $0.id == envelopeID && live($0) }),
+                  !["reserve", "surplus"].contains(envelope.role), let debt = MoneyCommandPayload.integer(p["debtMinor"]) else { throw MoneyCommandError.invalidReference }
+            let allocations = try context.fetch(FetchDescriptor<Allocation>()).filter { live($0) }
+            let balance = try sum(allocations.filter { $0.targetID == envelopeID }.map(\.amountMinor))
+            guard balance < 0, -balance == debt else { throw MoneyCommandError.invalidAmount }
+            let role = text(p, "source"), roleIDs = Set(try context.fetch(FetchDescriptor<Envelope>()).filter { live($0) && $0.role == role }.map(\.id))
+            let available = try sum(allocations.filter { ($0.target == role && $0.targetID == nil) || $0.targetID.map(roleIDs.contains) == true }.map(\.amountMinor))
+            guard available >= debt else { throw MoneyCommandError.invalidAmount }
+            let key = "repay-now:" + id.uuidString, from: AllocationTarget = role == "reserve" ? .reserve : .surplus
+            try writeAllocations([
+                .init(groupID: key, target: from, amountMinor: -debt, kind: .repay, idempotencyKey: key + ":from"),
+                .init(groupID: key, target: .envelope(envelopeID.uuidString), amountMinor: debt, kind: .repay, idempotencyKey: key + ":to")
+            ], context: context, now: now, writer: writer)
+        case "money.adoptRepayment":
+            // M5-V04 / L03: a salary repayment separate from the saving plan. It replaces an earlier repayment of the
+            // same envelope (whose payments are already in the balance), never a fund plan; undo restores it.
+            guard let envelopeID = uuid(p, "id"),
+                  try context.fetch(FetchDescriptor<Envelope>()).contains(where: { $0.id == envelopeID && live($0) && !["reserve", "surplus"].contains($0.role) }),
+                  let debt = MoneyCommandPayload.integer(p["debtMinor"]), let salaries = MoneyCommandPayload.integer(p["salaries"]) else { throw MoneyCommandError.invalidReference }
+            let balance = try sum(context.fetch(FetchDescriptor<Allocation>()).filter { live($0) && $0.targetID == envelopeID }.map(\.amountMinor))
+            guard balance < 0, -balance == debt, (1...MoneyCommandPayload.maxRepaySalaries).contains(salaries),
+                  let first = RepaymentEngine.nextPayment(.init(totalMinor: debt, paychecks: salaries)) else { throw MoneyCommandError.invalidAmount }
+            for old in try context.fetch(FetchDescriptor<EnvelopePlan>()) where old.envelopeID == envelopeID && old.kind == "repay" && live(old) {
+                try touch(old, now, writer, deleting: true)
+            }
+            let plan = EnvelopePlan(); plan.id = id; plan.envelopeID = envelopeID; plan.kind = "repay"; plan.source = "salary"
+            plan.perPaycheckMinor = first; plan.repaymentTotalMinor = debt; plan.repaymentPaychecks = salaries
+            plan.createdAt = now; plan.updatedAt = now; plan.writerID = writer
+            context.insert(plan)
         case "money.setReserveGoal":
             let reserves = try context.fetch(FetchDescriptor<Envelope>()).filter { live($0) && $0.role == "reserve" }
             guard reserves.count <= 1 else { throw MoneyCommandError.invalidReference }
@@ -466,6 +504,11 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             return // Only the target changes; later allocations and their rebuilt balance stay intact.
         }
         let current = try records(context), changedIDs = Set(inverse.after.map(\.id))
+        // An adopted repayment that a salary already paid into stays: undoing it would orphan those payments.
+        for plan in inverse.after where plan.model == "EnvelopePlan" && plan.fields["kind"]?.string == "repay" && !inverse.before.contains(where: { recordKey($0) == recordKey(plan) }) {
+            let suffix = ":" + plan.id.uuidString
+            guard !current.contains(where: { $0.model == "Allocation" && $0.isLive && ($0.fields["idempotencyKey"]?.string).map { $0.hasPrefix("fund:") && $0.hasSuffix(suffix) } == true }) else { throw MoneyCommandError.undoSuperseded }
+        }
         for after in inverse.after {
             guard current.first(where: { recordKey($0) == recordKey(after) }) == after else { throw MoneyCommandError.undoSuperseded }
             // Never remove the account/card/original while a later live movement depends on it.
@@ -497,6 +540,7 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         rows += try context.fetch(FetchDescriptor<BankMessage>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<ImportBatch>()).filter { $0.kind == "bankBulk" }.map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<Envelope>()).map { try $0.record() }
+        rows += try context.fetch(FetchDescriptor<EnvelopePlan>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<InstallmentItem>()).map { try $0.record() }
         return rows
     }

@@ -41,6 +41,85 @@ import MadarInbox
 }
 
 @MainActor struct MoneyPersistenceTests {
+    @Test func savingEditKeepsRepaymentAndPastAllocationsAndUndoIntact() async throws {
+        let f = try MoneyFixture(); defer { f.clean() }
+        let context = ModelContext(f.container), envelope = Envelope(), fund = EnvelopePlan(), repay = EnvelopePlan()
+        context.insert(envelope)
+        fund.envelopeID = envelope.id; fund.perPaycheckMinor = 50_000; context.insert(fund)
+        repay.envelopeID = envelope.id; repay.kind = "repay"; repay.perPaycheckMinor = 50_000; context.insert(repay)
+        let allocation = Allocation(); allocation.target = "envelope"; allocation.targetID = envelope.id; allocation.amountMinor = -100_000; allocation.idempotencyKey = "opening"; context.insert(allocation)
+        try context.save()
+        let command = UUID()
+        #expect(try await f.run("money.setEnvelopeSaving", ["id": .string(fund.id.uuidString), "amountMinor": .string("70000"), "expectedMinor": .string("50000")], id: command).status == .applied)
+        #expect(try await f.run("money.setEnvelopeSaving", ["id": .string(fund.id.uuidString), "amountMinor": .string("80000"), "expectedMinor": .string("50000")]).status == .rejected)
+        let after = try ModelContext(f.container).fetch(FetchDescriptor<EnvelopePlan>())
+        #expect(after.first { $0.id == fund.id }?.perPaycheckMinor == 70_000)
+        #expect(after.first { $0.id == repay.id }?.perPaycheckMinor == 50_000)
+        #expect(try ModelContext(f.container).fetch(FetchDescriptor<Allocation>()).count == 1)
+        #expect(try await f.run("money.setEnvelopeSaving", ["id": .string(repay.id.uuidString), "amountMinor": .string("1"), "expectedMinor": .string("50000")]).status == .rejected)
+        #expect(try await f.run("system.undo", ["undoToken": .string(command.uuidString)]).status == .applied)
+        #expect(try ModelContext(f.container).fetch(FetchDescriptor<EnvelopePlan>()).first { $0.id == fund.id }?.perPaycheckMinor == 50_000)
+    }
+    /// L03 / M5-V04: adopting «سدّه على راتبين» stores the debt and count beside, never over, the saving plan.
+    @Test func adoptedRepaymentStoresTotalAndCountReplacesOnlyARepayPlanAndUndoes() async throws {
+        let f = try MoneyFixture(); defer { f.clean() }
+        let context = ModelContext(f.container), envelope = Envelope(), fund = EnvelopePlan(), oldRepay = EnvelopePlan()
+        envelope.name = "سفر"; context.insert(envelope)
+        fund.envelopeID = envelope.id; fund.perPaycheckMinor = 50_000; context.insert(fund)
+        oldRepay.envelopeID = envelope.id; oldRepay.kind = "repay"; oldRepay.perPaycheckMinor = 10_000; context.insert(oldRepay)
+        let allocation = Allocation(); allocation.target = "envelope"; allocation.targetID = envelope.id; allocation.amountMinor = -100_001; allocation.idempotencyKey = "opening"; context.insert(allocation)
+        try context.save()
+        let id = UUID()
+        func payload(_ debt: String, _ salaries: String) -> [String: MadarCore.JSONValue] { ["id": .string(envelope.id.uuidString), "debtMinor": .string(debt), "salaries": .string(salaries)] }
+        #expect(try await f.run("money.adoptRepayment", payload("100000", "3")).status == .rejected) // stale debt
+        #expect(try await f.run("money.adoptRepayment", payload("100001", "13")).status == .rejected) // beyond maxRepayCycles
+        #expect(try await f.run("money.adoptRepayment", payload("100001", "3"), id: id).status == .applied)
+        _ = try await f.run("money.adoptRepayment", payload("100001", "3"), id: id)
+        let plans = try ModelContext(f.container).fetch(FetchDescriptor<EnvelopePlan>())
+        let adopted = try #require(plans.first { $0.id == id })
+        // 100001 / 3 = 33333 each; the stored total lets the last salary pay 33335.
+        #expect(adopted.kind == "repay" && adopted.source == "salary" && adopted.envelopeID == envelope.id && adopted.deletedAt == nil)
+        #expect(adopted.perPaycheckMinor == 33_333 && adopted.repaymentTotalMinor == 100_001 && adopted.repaymentPaychecks == 3)
+        #expect(plans.first { $0.id == oldRepay.id }?.deletedAt != nil)
+        let savings = try #require(plans.first { $0.id == fund.id })
+        #expect(savings.deletedAt == nil && savings.perPaycheckMinor == 50_000 && savings.repaymentTotalMinor == nil)
+        #expect(plans.filter { $0.deletedAt == nil }.count == 2)
+        #expect(try ModelContext(f.container).fetch(FetchDescriptor<Allocation>()).filter { $0.deletedAt == nil }.count == 1)
+        #expect(try await f.run("system.undo", ["undoToken": .string(id.uuidString)]).status == .applied)
+        let undone = try ModelContext(f.container).fetch(FetchDescriptor<EnvelopePlan>())
+        #expect(undone.first { $0.id == id }?.deletedAt != nil)
+        #expect(undone.first { $0.id == oldRepay.id }?.deletedAt == nil && undone.first { $0.id == oldRepay.id }?.perPaycheckMinor == 10_000)
+        #expect(undone.first { $0.id == fund.id }?.perPaycheckMinor == 50_000)
+        // Once a salary paid into an adopted plan, undoing the adoption is refused rather than orphaning the payment.
+        let second = UUID()
+        #expect(try await f.run("money.adoptRepayment", payload("100001", "2"), id: second).status == .applied)
+        let paid = ModelContext(f.container), drop = Allocation(); drop.target = "envelope"; drop.targetID = envelope.id; drop.amountMinor = 50_000; drop.kind = "repay"; drop.idempotencyKey = "fund:c1:" + second.uuidString
+        paid.insert(drop); try paid.save()
+        let undoAfterSalary = try? await f.run("system.undo", ["undoToken": .string(second.uuidString)])
+        #expect(undoAfterSalary?.status != .applied)
+        #expect(try ModelContext(f.container).fetch(FetchDescriptor<EnvelopePlan>()).first { $0.id == second }?.deletedAt == nil)
+    }
+    @Test func debtMoveIsBalancedReplayableAndUndoableWithoutTouchingSavings() async throws {
+        let f = try MoneyFixture(); defer { f.clean() }
+        let context = ModelContext(f.container), envelope = Envelope(), plan = EnvelopePlan()
+        envelope.name = "سفر"; context.insert(envelope)
+        plan.envelopeID = envelope.id; plan.perPaycheckMinor = 50_000; context.insert(plan)
+        for (target, targetID, amount) in [("envelope", Optional(envelope.id), -100_000), ("surplus", nil, 200_000)] {
+            let row = Allocation(); row.target = target; row.targetID = targetID; row.amountMinor = amount; row.kind = "adjust"; row.idempotencyKey = UUID().uuidString; context.insert(row)
+        }
+        try context.save()
+        let id = UUID(), payload: [String: MadarCore.JSONValue] = ["id": .string(envelope.id.uuidString), "source": .string("surplus"), "debtMinor": .string("100000")]
+        #expect(try await f.run("money.repayEnvelopeNow", payload, id: id).status == .applied)
+        _ = try await f.run("money.repayEnvelopeNow", payload, id: id)
+        let read = ModelContext(f.container), rows = try read.fetch(FetchDescriptor<Allocation>()).filter { $0.deletedAt == nil }
+        #expect(rows.count == 4); #expect(rows.reduce(0) { $0 + $1.amountMinor } == 100_000)
+        #expect(rows.filter { $0.targetID == envelope.id }.reduce(0) { $0 + $1.amountMinor } == 0)
+        #expect(try read.fetch(FetchDescriptor<EnvelopePlan>()).first?.perPaycheckMinor == 50_000)
+        #expect(try await f.run("system.undo", ["undoToken": .string(id.uuidString)]).status == .applied)
+        let undone = try ModelContext(f.container).fetch(FetchDescriptor<Allocation>()).filter { $0.deletedAt == nil }
+        #expect(undone.count == 2); #expect(undone.filter { $0.targetID == envelope.id }.reduce(0) { $0 + $1.amountMinor } == -100_000)
+        #expect(try await f.run("money.repayEnvelopeNow", ["id": .string(envelope.id.uuidString), "source": .string("reserve"), "debtMinor": .string("100000")]).status == .rejected)
+    }
     @Test func madaDraftConfirmationReplayAndUndoKeepCashAndDebtSeparate() async throws {
         let f = try MoneyFixture(); defer { f.clean() }; try await f.setup()
         let intake = UUID(), confirm = UUID()
