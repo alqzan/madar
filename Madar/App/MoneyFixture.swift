@@ -8,11 +8,11 @@ import MadarCommands
 extension AppSession {
     /// Named synthetic stores only. Never reads or writes the owner's store.
     func prepareMoneyFixture(group: URL) throws {
-        guard let variant = ProcessInfo.processInfo.environment["MADAR_UI_MONEY_FIXTURE"], ["showcase", "empty", "hidden", "zero", "shortfall", "messages", "since", "rules", "salary", "budget"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
+        guard let variant = ProcessInfo.processInfo.environment["MADAR_UI_MONEY_FIXTURE"], ["showcase", "empty", "hidden", "zero", "shortfall", "messages", "since", "rules", "salary", "budget", "cards", "cardsHidden"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         let c = ModelContext(container)
         guard !(try c.fetch(FetchDescriptor<DeviceSetting>())).contains(where: { $0.key == "sys.moneyFixture" }) else { return }
         for key in ["sys.moneyFixture", "sys.onboardingCompleted"] { let marker = DeviceSetting(); marker.key = key; marker.valueJSON = Data("true".utf8); c.insert(marker) }
-        _ = try SettingsStore(context: c).stage(["core.dayStart": .string("midnight"), "core.faceIDLock": .string("none"), "core.hideMoneyUntilTouch": .bool(variant == "hidden")])
+        _ = try SettingsStore(context: c).stage(["core.dayStart": .string("midnight"), "core.faceIDLock": .string("none"), "core.hideMoneyUntilTouch": .bool(variant == "hidden" || variant == "cardsHidden")])
         guard variant != "empty" else { try c.save(); return }
         let zone = ActivePlace.riyadh.timeZone, now = prayerNow(), today = GregorianDay.containing(prayerNow(), in: ActivePlace.riyadh.timeZone)
         // «نزل الراتب» arrives at the end of a full cycle; the other variants sit five days into theirs.
@@ -54,6 +54,26 @@ extension AppSession {
         let bnpl = Obligation(); bnpl.name = "أقساط الشراء"; bnpl.provider = "Tamara"; bnpl.kind = "installment"; bnpl.totalMinor = 120000; c.insert(bnpl)
         for index in 1...3 { let item = InstallmentItem(); item.obligationID = bnpl.id; item.seq = index; item.amountMinor = 40000; item.dueDate = today.adding(days: index * 20).date(in: zone); c.insert(item) }
         try c.save()
+        if variant == "cards" || variant == "cardsHidden" {
+            var calendar = Calendar(identifier: .gregorian); calendar.timeZone = zone
+            card.name = "البطاقة الأساسية"; card.limitMinor = 2_000_000; card.cashbackBp = 50; card.aprBp = 2_400; card.network = "Visa"
+            card.fieldSourcesJSON = try JSONSerialization.data(withJSONObject: ["limitMinor": "entered", "cashbackBp": "entered", "aprBp": "entered"])
+            statement.minimumDueMinor = 21_300; statement.periodStart = calendar.date(byAdding: .month, value: -1, to: statement.closeDate)
+            let old = Statement(); old.cardID = card.id; old.closeDate = statement.periodStart!; old.periodStart = calendar.date(byAdding: .month, value: -1, to: old.closeDate); old.dueDate = today.adding(days: -26).date(in: zone); old.statementMinor = 425_000; old.minimumDueMinor = 21_300; c.insert(old)
+            let payment = MoneyTransaction(); payment.kind = "cardPayment"; payment.cardID = card.id; payment.fromAccountID = account.id; payment.amountMinor = 425_000; payment.homeAmountMinor = 425_000; payment.eventAt = old.closeDate.addingTimeInterval(86400); payment.dayKey = GregorianDay.containing(payment.eventAt, in: zone).description; payment.tzID = zone.identifier; payment.dayPolicy = "midnight@1"; c.insert(payment)
+            for (index, item) in [("متجر الأدوات", 230_000), ("مطعم الحي", 12_000), ("متجر الكتب", 98_000), ("محطة الشمال", 85_000)].enumerated() {
+                let row = MoneyTransaction(); row.cardID = card.id; row.method = "card"; row.merchant = item.0; row.amountMinor = item.1; row.homeAmountMinor = item.1
+                row.eventAt = old.closeDate.addingTimeInterval(-Double((index + 1) * 86400)); row.dayKey = GregorianDay.containing(row.eventAt, in: zone).description; row.tzID = zone.identifier; row.dayPolicy = "midnight@1"; c.insert(row)
+            }
+            unbilled.merchant = "متجر الأجهزة"
+            let second = Card(); second.name = "بطاقة السفر"; second.bank = "بنك الاختبار"; second.last4 = "7722"; second.kind = "credit"; second.accountID = account.id; second.limitMinor = 1_000_000; second.cashbackBp = 150; second.network = "Mastercard"
+            second.fieldSourcesJSON = try JSONSerialization.data(withJSONObject: ["limitMinor": "entered", "cashbackBp": "entered"]); c.insert(second)
+            for offset in [-1, 0] {
+                let s = Statement(); s.cardID = second.id; s.closeDate = calendar.date(byAdding: .month, value: offset, to: today.adding(days: -2).date(in: zone))!; s.periodStart = calendar.date(byAdding: .month, value: -1, to: s.closeDate); s.dueDate = calendar.date(byAdding: .month, value: offset, to: today.adding(days: 16).date(in: zone)); s.statementMinor = 180_000; s.minimumDueMinor = 9_000; s.closeDateSource = "message"; c.insert(s)
+            }
+            let message = BankMessage(); message.sender = "بنك الاختبار"; message.status = "ok"; message.text = "كشف تجريبي مجهّل: المبلغ المستحق 6800 SAR، الحد الأدنى 213 SAR"; message.kind = "statement"; message.receivedAt = statement.closeDate; c.insert(message); statement.messageID = message.id
+            try c.save()
+        }
         if variant == "budget" {
             let purchases = try c.fetch(FetchDescriptor<MoneyTransaction>()).filter { $0.cycleID == cycle.id }.sorted { $0.eventAt < $1.eventAt }
             for (index, tx) in purchases.enumerated() {

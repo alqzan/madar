@@ -7,6 +7,23 @@ import Testing
 @Suite struct RoomRemindersTests {
     let day = try! #require(PrayerTimesEngine.calculate(day: GregorianDay("2026-10-09"), place: .riyadh))
     var dawn: Date { day.fajr.addingTimeInterval(-3 * 3600) }
+    @Test func cardDueLeadDaysStableIdentityAndPaidSuppression() throws {
+        let card = UUID(), due = try GregorianDay("2026-10-12"), zone = ActivePlace.riyadh.timeZone
+        let reminder = try #require(RoomReminders.cardDue(cardID: card, dueDay: due, amountMinor: 425_000, daysBefore: 3, timeZone: zone, prayerDays: [day], now: dawn))
+        #expect(reminder.id == "mal.cardDue.\(card.uuidString).2026-10-12")
+        #expect(reminder.dayKey == "2026-10-09")
+        #expect(GregorianDay.containing(reminder.dueAt, in: zone).description == "2026-10-09")
+        #expect(SanctityGuard(prayerDays: [day]).clamp(reminder.dueAt) == reminder.dueAt)
+        #expect(RoomReminders.cardDue(cardID: card, dueDay: due, amountMinor: 1, daysBefore: 3, timeZone: zone, prayerDays: [day], now: dawn)?.id == reminder.id)
+        #expect(RoomReminders.cardDue(cardID: card, dueDay: due, amountMinor: 0, daysBefore: 3, timeZone: zone, prayerDays: [day], now: dawn) == nil)
+        #expect(RoomReminders.cardDue(cardID: card, dueDay: due, amountMinor: 1, daysBefore: 2, timeZone: zone, prayerDays: [day], now: dawn) == nil)
+        #expect(RoomReminders.cardDue(cardID: card, dueDay: due, amountMinor: 1, daysBefore: 3, timeZone: zone, prayerDays: [day], now: reminder.dueAt) == nil)
+        let oneDay = RoomReminders.cardDue(cardID: card, dueDay: day.day.adding(days: 1), amountMinor: 1, daysBefore: 1, timeZone: zone, prayerDays: [day], now: dawn)
+        #expect(oneDay?.dayKey == "2026-10-09")
+        let cash = RoomReminders.cardDue(cardID: card, dueDay: day.day, amountMinor: 1, daysBefore: 0, timeZone: zone, prayerDays: [day], now: dawn)
+        #expect(cash?.id == "mal.cardCash.\(card.uuidString).2026-10-09")
+        #expect(RoomReminders.digestKinds(memberIDs: [reminder.id, cash!.id]) == ["سداد البطاقة"])
+    }
 
     @Test func qadaFallsAtTheEndOfTheChosenPrayersSanctity() {
         let fajr = RoomReminders.qada(days: [day], time: .afterFajr, owed: 3, now: dawn)

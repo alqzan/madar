@@ -46,12 +46,26 @@ public enum RoomReminders {
                      categoryCycleKey: "\(categoryID.uuidString):\(cycleID.uuidString)")
     }
 
+    /// F07 / mal.cardDue: noon on the configured civil day, through the same sanctity guard.
+    /// Zero days is the due-day cash-shortfall alert; the app supplies only confirmed unpaid statements.
+    public static func cardDue(cardID: UUID, dueDay: GregorianDay, amountMinor: Int, daysBefore: Int, timeZone: TimeZone,
+                               prayerDays: [PrayerDay], now: Date) -> NotificationCandidate? {
+        guard amountMinor > 0, [0, 1, 3].contains(daysBefore) else { return nil }
+        let reminder = dueDay.adding(days: -daysBefore)
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = timeZone
+        guard let proposed = calendar.date(bySettingHour: 12, minute: 0, second: 0, of: reminder.date(in: timeZone)) else { return nil }
+        let due = SanctityGuard(prayerDays: prayerDays).clamp(proposed)
+        guard due > now, due <= now.addingTimeInterval(48 * 3600) else { return nil }
+        return .init(id: "mal.\(daysBefore == 0 ? "cardCash" : "cardDue").\(cardID.uuidString).\(dueDay)", room: .mal, dueAt: due, dayKey: reminder.description)
+    }
+
     /// The kind a request stands for in a digest: named, never its content.
     public static func kindLabel(for id: String) -> String? {
         if id.hasPrefix("quran.") { return id.hasSuffix(".late") ? "المراجعة" : "الورد" }
         if id.hasPrefix("qada.") { return "القضاء" }
         if id.hasPrefix("habits.") { return "عادة" }
         if id.hasPrefix("mal.alert80.") { return "حدود الصرف" }
+        if id.hasPrefix("mal.card") { return "سداد البطاقة" }
         if id.hasPrefix("notes.") { return id.hasSuffix(".niyya") ? "النيّة" : id.hasSuffix(".letter") ? "رسالة" : "ذكرى" }
         return nil
     }

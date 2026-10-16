@@ -553,7 +553,7 @@ final class PrayerNotificationCoordinator {
             row.requestID = requestID
             row.room = requestID.hasPrefix("quran.") ? "quran" : requestID.hasPrefix("digest.") ? "core" : requestID.hasPrefix("mal.") ? "mal" : "salah"
             row.kind = kind ?? (requestID.hasSuffix(".snooze") ? "snooze" : "ask")
-            row.requestClass = requestID.hasPrefix("digest.") ? "digest" : requestID.hasPrefix("quran.") || requestID.hasPrefix("mal.alert80.") || kind == "activityStart" ? "room" : "prayer"
+            row.requestClass = requestID.hasPrefix("digest.") ? "digest" : requestID.hasPrefix("quran.") || requestID.hasPrefix("mal.") || kind == "activityStart" ? "room" : "prayer"
             row.scheduledFor = dueAt ?? Date()
             row.state = state
             row.reason = reason
@@ -567,7 +567,7 @@ final class PrayerNotificationCoordinator {
                !rows.contains(where: { $0.state == "dropped" && $0.scheduledFor == dueAt && $0.reason == reason }) {
                 let row = NotificationLedger()
                 row.dayKey = dayKey ?? ""; row.requestID = requestID; row.room = requestID.hasPrefix("quran.") ? "quran" : "salah"
-                row.kind = kind ?? "ask"; row.requestClass = requestID.hasPrefix("quran.") || requestID.hasPrefix("mal.alert80.") ? "room" : "prayer"; row.scheduledFor = dueAt
+                row.kind = kind ?? "ask"; row.requestClass = requestID.hasPrefix("quran.") || requestID.hasPrefix("mal.") ? "room" : "prayer"; row.scheduledFor = dueAt
                 row.state = state; row.reason = reason; row.writerID = "madar.app.notifications"
                 context.insert(row)
             }

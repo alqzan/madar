@@ -6,6 +6,32 @@ import MadarCore
 
 /// M4-F02: built rooms share the arbiter; app protection hides content (§8 item 10); a tap opens the room it speaks for.
 @MainActor final class RoomNotificationsIntegrationTests: XCTestCase {
+    func testCardRemindersAreAmountFreeAndStopAfterPaymentOrOff() throws {
+        let (app, root, now, day) = try fixture(["core.faceIDLock": .string("none"), "core.dayStart": .string("midnight"), "mal.cardDue": .string("3days")]); defer { try? FileManager.default.removeItem(at: root) }
+        app.authorizeProtectedData()
+        let c = ModelContext(app.container), account = Account(); account.balanceMinor = 10_000; account.balanceAt = now; c.insert(account)
+        let card = Card(); card.name = "بطاقة سرية"; card.accountID = account.id; c.insert(card)
+        let statement = Statement(); statement.cardID = card.id; statement.closeDate = now.addingTimeInterval(-86400); statement.statementMinor = 50_000; statement.dueDate = day.day.adding(days: 3).date(in: day.place.timeZone); c.insert(statement); try c.save(); try app.reload()
+        let candidates = RoomNotificationContent.cardCandidates(session: app, prayerDays: [day], now: now)
+        XCTAssertEqual(candidates.count, 1)
+        let candidate = try XCTUnwrap(candidates.first)
+        XCTAssertTrue(candidate.id.hasPrefix("mal.cardDue.")); XCTAssertTrue(RoomNotificationContent.isRoomRequest(candidate.id))
+        let plan = NotificationArbiter.plan(candidates: [], prayerDays: [day], now: now, timeZone: day.place.timeZone, policy: .init(staleNudgeEnabled: false))
+        let content = RoomNotificationContent.content(for: candidate, plan: plan, session: app, habitNames: [:])
+        XCTAssertNil(content.body.rangeOfCharacter(from: .decimalDigits))
+        XCTAssertFalse(content.body.contains(card.name))
+        RoomNotificationContent.open(candidate.id, userInfo: content.userInfo, session: app); XCTAssertTrue(app.moneyOpen)
+        statement.dueDate = day.day.date(in: day.place.timeZone); try c.save()
+        let cash = try XCTUnwrap(RoomNotificationContent.cardCandidates(session: app, prayerDays: [day], now: now).first)
+        XCTAssertTrue(cash.id.hasPrefix("mal.cardCash."))
+        XCTAssertTrue(try RoomNotificationContent.stillRelevant(cash.id, session: app, now: now))
+        let payment = MoneyTransaction(); payment.kind = "cardPayment"; payment.cardID = card.id; payment.fromAccountID = account.id; payment.eventAt = now; payment.dayKey = day.day.description; payment.amountMinor = 50_000; payment.homeAmountMinor = 50_000; c.insert(payment); try c.save()
+        XCTAssertFalse(try RoomNotificationContent.stillRelevant(cash.id, session: app, now: now))
+        XCTAssertTrue(RoomNotificationContent.cardCandidates(session: app, prayerDays: [day], now: now).isEmpty)
+        _ = try SettingsStore(context: c).stage(["mal.cardDue": .string("off"), "core.faceIDLock": .string("app")]); try c.save(); try app.reload()
+        XCTAssertTrue(RoomNotificationContent.cardCandidates(session: app, prayerDays: [day], now: now).isEmpty)
+        XCTAssertEqual(RoomNotificationContent.content(for: candidate, plan: plan, session: app, habitNames: [:]).body, "لديك تنبيه في مدار")
+    }
     private func fixture(_ settings: [String: MadarData.JSONValue]) throws -> (AppSession, URL, Date, PrayerDay) {
         let root = FileManager.default.temporaryDirectory.appending(path: "MadarRoomNotifications-\(UUID())")
         let container = try MadarContainerFactory.makeLocal(at: root.appending(path: "Data"))

@@ -13,6 +13,7 @@ struct MoneySourceDetail: Identifiable {
     var message: String?
     var date: GregorianDay?
     var estimated: Bool = false
+    var valueText: String? = nil
 }
 struct MoneyBasisPiece: Identifiable {
     var id: String
