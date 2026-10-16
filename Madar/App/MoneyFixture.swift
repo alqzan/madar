@@ -8,15 +8,17 @@ import MadarCommands
 extension AppSession {
     /// Named synthetic stores only. Never reads or writes the owner's store.
     func prepareMoneyFixture(group: URL) throws {
-        guard let variant = ProcessInfo.processInfo.environment["MADAR_UI_MONEY_FIXTURE"], ["showcase", "empty", "hidden", "zero", "shortfall", "messages", "since", "rules", "salary", "budget", "cards", "cardsHidden"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
+        guard let variant = ProcessInfo.processInfo.environment["MADAR_UI_MONEY_FIXTURE"], ["showcase", "empty", "hidden", "zero", "shortfall", "messages", "since", "rules", "salary", "budget", "cards", "cardsHidden", "analysis", "analysisHidden"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         let c = ModelContext(container)
         guard !(try c.fetch(FetchDescriptor<DeviceSetting>())).contains(where: { $0.key == "sys.moneyFixture" }) else { return }
         for key in ["sys.moneyFixture", "sys.onboardingCompleted"] { let marker = DeviceSetting(); marker.key = key; marker.valueJSON = Data("true".utf8); c.insert(marker) }
-        _ = try SettingsStore(context: c).stage(["core.dayStart": .string("midnight"), "core.faceIDLock": .string("none"), "core.hideMoneyUntilTouch": .bool(variant == "hidden" || variant == "cardsHidden")])
+        _ = try SettingsStore(context: c).stage(["core.dayStart": .string("midnight"), "core.faceIDLock": .string("none"), "core.hideMoneyUntilTouch": .bool(["hidden", "cardsHidden", "analysisHidden"].contains(variant))])
         guard variant != "empty" else { try c.save(); return }
         let zone = ActivePlace.riyadh.timeZone, now = prayerNow(), today = GregorianDay.containing(prayerNow(), in: ActivePlace.riyadh.timeZone)
         // «نزل الراتب» arrives at the end of a full cycle; the other variants sit five days into theirs.
-        let start = today.adding(days: variant == "salary" ? -31 : -5), end = start.adding(days: variant == "salary" ? 31 : 30)
+        // «التحليل» sits 23 days into its cycle, after a full earlier cycle it can be compared with.
+        let analysis = variant.hasPrefix("analysis")
+        let start = today.adding(days: variant == "salary" ? -31 : analysis ? -23 : -5), end = start.adding(days: variant == "salary" ? 31 : 30)
         let account = Account(); account.name = "الحساب الجاري"; account.balanceMinor = variant == "shortfall" ? 50000 : 12_850_000; account.balanceAt = now; c.insert(account)
         let cycle = Cycle(); cycle.start = start.date(in: zone); cycle.expectedEnd = end.date(in: zone); cycle.incomeMinor = 1_500_000; cycle.dailyAllowanceMinor = variant == "zero" ? 0 : 41_300; cycle.createdAt = cycle.start; c.insert(cycle)
         let policy = CyclePolicy(); policy.cycleID = cycle.id; policy.effectiveFromDayKey = start.description; policy.allowanceMinor = cycle.dailyAllowanceMinor; policy.dailyRateMinor = cycle.dailyAllowanceMinor; c.insert(policy)
@@ -84,6 +86,36 @@ extension AppSession {
             let tx = MoneyTransaction(); tx.merchant = "متجر الأدوات"; tx.categoryID = categories[3].id; tx.fromAccountID = account.id
             tx.amountMinor = 120_000; tx.homeAmountMinor = 120_000; tx.cycleID = cycle.id; tx.method = "transfer"; tx.reviewState = "ok"; tx.ignoredFromBudget = true
             tx.dayKey = today.description; tx.eventAt = now.addingTimeInterval(-1200); tx.tzID = zone.identifier; tx.dayPolicy = "midnight@1"; c.insert(tx)
+            try c.save()
+        }
+        if analysis {
+            // The earlier cycle (start − 30 … start − 1) gets its policy and expected end; spending is synthetic and daily-only.
+            guard let previous = try c.fetch(FetchDescriptor<Cycle>()).first(where: { $0.closedAt != nil && $0.end == start.date(in: zone) }) else { try c.save(); return }
+            previous.expectedEnd = previous.end; previous.incomeMinor = 1_500_000
+            let earlier = CyclePolicy(); earlier.cycleID = previous.id; earlier.effectiveFromDayKey = start.adding(days: -30).description; earlier.allowanceMinor = 40_000; earlier.dailyRateMinor = 40_000; c.insert(earlier)
+            func spend(_ merchant: String, _ category: MadarData.Category, _ day: GregorianDay, _ amount: Int, cycle owner: Cycle, hour: Int) {
+                let tx = MoneyTransaction(); tx.merchant = merchant; tx.categoryID = category.id; tx.reviewState = "ok"; tx.source = "bank"; tx.method = "transfer"; tx.fromAccountID = account.id
+                tx.amountMinor = amount; tx.homeAmountMinor = amount; tx.cycleID = owner.id; tx.dayKey = day.description; tx.eventAt = day.date(in: zone).addingTimeInterval(Double(hour * 3600))
+                tx.tzID = zone.identifier; tx.dayPolicy = "midnight@1"; c.insert(tx)
+                let a = Allocation(); a.amountMinor = -amount; a.target = "daily"; a.transactionID = tx.id; a.cycleID = owner.id; a.kind = "spend"; a.idempotencyKey = UUID().uuidString; c.insert(a)
+            }
+            let shops: [(String, Int)] = [("بقالة الحي", 1), ("محطة الشمال", 2), ("مطعم الريف", 0), ("سوق المدينة", 3), ("بقالة الحي", 1), ("متجر الكتب", 3), ("مخبز الحي", 1)]
+            // The base fixture's six purchases (days 0–5) take merchants; days 6–23 follow, a coffee most days plus one shop.
+            for (index, tx) in try c.fetch(FetchDescriptor<MoneyTransaction>()).filter({ $0.cycleID == cycle.id }).sorted(by: { $0.dayKey < $1.dayKey }).enumerated() {
+                tx.merchant = shops[index % shops.count].0; tx.categoryID = categories[shops[index % shops.count].1].id; tx.source = "bank"
+            }
+            let current = [38_000, 26_000, 61_000, 33_000, 29_000, 45_000, 18_000, 34_000, 72_000, 31_000, 25_000, 39_000, 28_000, 36_000, 52_000, 30_000, 24_000, 18_000]
+            for (offset, total) in current.enumerated() {
+                let day = start.adding(days: 6 + offset), coffee = offset % 3 == 2 ? 0 : 2_200 + (offset % 4) * 300
+                if coffee > 0 { spend("مقهى الزاوية", categories[0], day, coffee, cycle: cycle, hour: 8) }
+                let shop = shops[offset % shops.count]; spend(shop.0, categories[shop.1], day, total - coffee, cycle: cycle, hour: 17)
+            }
+            let earlierDays = [42_000, 38_000, 30_000, 51_000, 36_000, 40_000, 29_000, 47_000, 39_000, 33_000]
+            for index in 0..<30 {
+                let day = start.adding(days: index - 30), total = earlierDays[index % earlierDays.count] + (index % 3) * 1_000
+                spend("مقهى الزاوية", categories[0], day, 2_500, cycle: previous, hour: 8)
+                let shop = shops[(index + 2) % shops.count]; spend(shop.0, categories[shop.1], day, total - 2_500, cycle: previous, hour: 18)
+            }
             try c.save()
         }
         if variant == "messages" { seedMoneyMessages(today: today, zone: zone) }

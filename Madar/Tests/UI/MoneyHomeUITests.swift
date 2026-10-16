@@ -20,7 +20,8 @@ import XCTest
         XCTAssertTrue(app.staticTexts["money-available"].label.contains("١٬٣٦٠"), app.staticTexts["money-available"].label)
         XCTAssertTrue(app.descendants(matching: .any)["money-scroll-chart"].exists)
         XCTAssertTrue(app.descendants(matching: .any)["money-pending"].exists)
-        XCTAssertFalse(app.buttons["سجّل مصروفًا"].exists); XCTAssertFalse(app.buttons["التحليل"].exists)
+        // «التحليل» is built (M5-V14), so its door is now expected; manual add still is not.
+        XCTAssertFalse(app.buttons["سجّل مصروفًا"].exists); XCTAssertTrue(app.buttons["money-analysis-open"].exists)
         shot(app, "M5-V01-home-L"); app.swipeUp(velocity: .slow); shot(app, "M5-V01-home-s1-L")
         XCTAssertTrue(app.staticTexts["الالتزامات"].exists)
         app.buttons["money-back"].tap(); XCTAssertTrue(app.buttons["money-open"].waitForExistence(timeout: 5))

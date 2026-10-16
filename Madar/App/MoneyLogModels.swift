@@ -31,6 +31,54 @@ struct MoneyLogDay: Identifiable {
     var pending: Int
     var within: WithinDay? { dailyMinor.map { WithinDayEngine.evaluate(dailySpentMinor: spentMinor, dailyMinor: $0, hasUnresolvedMessage: pending > 0) } }
 }
+/// The confirmed per-day budget ledger behind the log and the analysis: one definition of a day's
+/// «صرف من يومك» and «يومك». Read-only; nothing here writes.
+@MainActor final class MoneyLedger {
+    let now: Date
+    let today: GregorianDay
+    let repo: MoneyRepository
+    let movements: [MoneyLogMovement]
+    /// The rows the ledger kept (owned accounts and cards only), confirmed or not.
+    let transactions: [MoneyTransaction]
+    let allocations: [Allocation]
+    let categories: [MadarData.Category]
+    let cards: [Card]
+    let pending: [String: Int]
+    /// Cycles with a policy, by their first stored day (never recomputed).
+    let starts: [(Cycle, GregorianDay)]
+    private let spent: [String: Int], other: [String: Int], cashOut: [String: Int], unknownCash: Set<String>, drips: [String: Int]
+    private var cache: [UUID: MoneyCycleReading] = [:]
+    private var attempted: Set<UUID> = []
+    init(now: Date, today: GregorianDay, repo: MoneyRepository, movements: [MoneyLogMovement], transactions: [MoneyTransaction], allocations: [Allocation],
+         categories: [MadarData.Category], cards: [Card], pending: [String: Int], starts: [(Cycle, GregorianDay)],
+         spent: [String: Int], other: [String: Int], cashOut: [String: Int], unknownCash: Set<String>, drips: [String: Int]) {
+        self.now = now; self.today = today; self.repo = repo; self.movements = movements; self.transactions = transactions; self.allocations = allocations
+        self.categories = categories; self.cards = cards; self.pending = pending; self.starts = starts
+        self.spent = spent; self.other = other; self.cashOut = cashOut; self.unknownCash = unknownCash; self.drips = drips
+    }
+    /// The cycle reading as it stood on its last day, or now for the open cycle.
+    func reading(of cycle: Cycle) -> MoneyCycleReading? {
+        if !attempted.contains(cycle.id) {
+            attempted.insert(cycle.id)
+            let sample = cycle.end.map { min(now, $0.addingTimeInterval(-1)) } ?? now
+            cache[cycle.id] = try? repo.cycle(at: sample)
+        }
+        return cache[cycle.id]
+    }
+    func days(_ list: [GregorianDay]) -> [MoneyLogDay] {
+        list.map { day in
+            var allowance: Int?
+            if day <= today, let (cycle, first) = starts.last(where: { $0.1 <= day }) {
+                if let reading = reading(of: cycle), cycle.end == nil || day <= reading.today {
+                    let index = MadarCalendarDays.distance(from: first, to: day) + 1
+                    allowance = max(0, CycleEngine.day(index, reading.input).allowanceMinor - (drips[cycle.id.uuidString + ":" + day.description] ?? 0))
+                }
+            }
+            return .init(day: day, dailyMinor: allowance, spentMinor: spent[day.description] ?? 0, otherMinor: other[day.description] ?? 0,
+                cashOutMinor: unknownCash.contains(day.description) ? nil : cashOut[day.description] ?? 0, pending: pending[day.description] ?? 0)
+        }
+    }
+}
 struct MoneyLogFilter: Identifiable {
     var id: String
     var title: String
@@ -67,10 +115,24 @@ extension AppMoneyService {
         return .init(primary: primary, secondary: a == b ? a : a + " – " + b)
     }
     func loadLog(month: GregorianDay? = nil, at instant: Date? = nil) throws -> MoneyLogReading {
-        let now = instant ?? app.prayerNow()
+        let ledger = try moneyLedger(at: instant ?? app.prayerNow()), today = ledger.today, movements = ledger.movements
+        let start = logMonthStart(month ?? today), days = logMonthDays(start)
+        let readings = ledger.days((-6..<(days.count + 6)).map { start.adding(days: $0) })
+        var months = Set(movements.map { logMonthStart($0.day) }); months.insert(logMonthStart(today)); months.insert(logMonthStart(logMonthStart(today).adding(days: -1)))
+        for key in ledger.pending.keys { if let day = try? GregorianDay(key) { months.insert(logMonthStart(day)) } }
+        var filters = [MoneyLogFilter(id: "all", title: "الكل")]
+        if movements.contains(where: \.cash) { filters.append(.init(id: "cash", title: "النقد")) }
+        for card in ledger.cards where movements.contains(where: { $0.cardID == card.id }) { filters.append(.init(id: card.id.uuidString, title: card.name)) }
+        if movements.contains(where: \.bnpl) { filters.append(.init(id: "bnpl", title: "الأقساط")) }
+        if movements.contains(where: { ["transfer", "cardPayment"].contains($0.kind) }) { filters.append(.init(id: "transfers", title: "تحويلات")) }
+        let monthDays = readings.filter { $0.day >= start && $0.day <= days.last! }
+        let neutral = movements.filter { $0.confirmed && $0.day >= start && $0.day <= days.last! && $0.budgetLabel == "محايد لليومية" && ["transfer", "cardPayment", "repayment"].contains($0.kind) }.reduce(0) { $0 + $1.amountMinor }
+        return .init(today: today, monthStart: start, days: monthDays, arcadeDays: readings, monthStarts: months.sorted(by: >), movements: movements.sorted { $0.at > $1.at }, filters: filters, neutralTransfersMinor: neutral)
+    }
+    func moneyLedger(at now: Date) throws -> MoneyLedger {
         _ = try load(at: now) // same store/authentication boundary as the home
-        let context = ModelContext(app.container), repo = MoneyRepository(context: context), zone = app.activePlace.timeZone
-        let today = try DiaryLineRenderer.today(context: context, now: now), start = logMonthStart(month ?? today), days = logMonthDays(start)
+        let context = ModelContext(app.container), repo = MoneyRepository(context: context)
+        let today = try DiaryLineRenderer.today(context: context, now: now)
         let tx = try context.fetch(FetchDescriptor<MoneyTransaction>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
         let byID = Dictionary(tx.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         let allocations = try context.fetch(FetchDescriptor<Allocation>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
@@ -80,13 +142,14 @@ extension AppMoneyService {
         let categories = try context.fetch(FetchDescriptor<MadarData.Category>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
         let messages = try context.fetch(FetchDescriptor<BankMessage>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
         var spent: [String: Int] = [:], other: [String: Int] = [:], cashOut: [String: Int] = [:], unknownCash: Set<String> = [], pending: [String: Int] = [:]
-        var movements: [MoneyLogMovement] = []
+        var movements: [MoneyLogMovement] = [], kept: [MoneyTransaction] = []
         let owned = Set(accounts.filter { $0.ownership == "mine" && $0.tracked }.map(\.id))
         for row in tx {
             if let card = cards.first(where: { $0.id == row.cardID }), let account = card.accountID, !owned.contains(account) { continue }
             let linked = [row.fromAccountID, row.toAccountID].compactMap { $0 }
             if !linked.isEmpty && !linked.contains(where: owned.contains) { continue }
             guard let day = try? GregorianDay(row.dayKey) else { continue }
+            kept.append(row)
             let confirmed = row.reviewState == "ok", effect = try? repo.effect(of: row)
             let original = row.kind == "refund" ? row.relatedTransactionID.flatMap { byID[$0] } : nil
             let budgetDay = original?.dayKey ?? row.dayKey
@@ -123,40 +186,13 @@ extension AppMoneyService {
         let starts = cycles.compactMap { cycle -> (Cycle, GregorianDay)? in
             guard let first = policies.filter({ $0.cycleID == cycle.id }).map(\.effectiveFromDayKey).min(), let day = try? GregorianDay(first) else { return nil }; return (cycle, day)
         }.sorted { $0.1 == $1.1 ? $0.0.start < $1.0.start : $0.1 < $1.1 }
-        var cache: [UUID: MoneyCycleReading] = [:]
-        var attempted: Set<UUID> = []
         var drips: [String: Int] = [:]
         for allocation in allocations where allocation.target == "daily" && allocation.kind == "fund" && allocation.amountMinor < 0 && allocation.idempotencyKey.hasPrefix("daily:") {
             let bits = allocation.idempotencyKey.split(separator: ":")
             if bits.count == 5, let cycle = allocation.cycleID { drips[cycle.uuidString + ":" + String(bits[3]), default: 0] -= allocation.amountMinor }
         }
-        let allDays = (-6..<(days.count + 6)).map { start.adding(days: $0) }
-        let readings = allDays.map { day -> MoneyLogDay in
-            var allowance: Int?
-            if day <= today, let (cycle, first) = starts.last(where: { $0.1 <= day }) {
-                if !attempted.contains(cycle.id) {
-                    attempted.insert(cycle.id)
-                    let sample = cycle.end.map { min(now, $0.addingTimeInterval(-1)) } ?? now
-                    cache[cycle.id] = try? repo.cycle(at: sample)
-                }
-                if let reading = cache[cycle.id], cycle.end == nil || day <= reading.today {
-                    let index = MadarCalendarDays.distance(from: first, to: day) + 1
-                    allowance = max(0, CycleEngine.day(index, reading.input).allowanceMinor - (drips[cycle.id.uuidString + ":" + day.description] ?? 0))
-                }
-            }
-            return .init(day: day, dailyMinor: allowance, spentMinor: spent[day.description] ?? 0, otherMinor: other[day.description] ?? 0,
-                cashOutMinor: unknownCash.contains(day.description) ? nil : cashOut[day.description] ?? 0, pending: pending[day.description] ?? 0)
-        }
-        var months = Set(movements.map { logMonthStart($0.day) }); months.insert(logMonthStart(today)); months.insert(logMonthStart(logMonthStart(today).adding(days: -1)))
-        for key in pending.keys { if let day = try? GregorianDay(key) { months.insert(logMonthStart(day)) } }
-        var filters = [MoneyLogFilter(id: "all", title: "الكل")]
-        if movements.contains(where: \.cash) { filters.append(.init(id: "cash", title: "النقد")) }
-        for card in cards where movements.contains(where: { $0.cardID == card.id }) { filters.append(.init(id: card.id.uuidString, title: card.name)) }
-        if movements.contains(where: \.bnpl) { filters.append(.init(id: "bnpl", title: "الأقساط")) }
-        if movements.contains(where: { ["transfer", "cardPayment"].contains($0.kind) }) { filters.append(.init(id: "transfers", title: "تحويلات")) }
-        let monthDays = readings.filter { $0.day >= start && $0.day <= days.last! }
-        let neutral = movements.filter { $0.confirmed && $0.day >= start && $0.day <= days.last! && $0.budgetLabel == "محايد لليومية" && ["transfer", "cardPayment", "repayment"].contains($0.kind) }.reduce(0) { $0 + $1.amountMinor }
-        return .init(today: today, monthStart: start, days: monthDays, arcadeDays: readings, monthStarts: months.sorted(by: >), movements: movements.sorted { $0.at > $1.at }, filters: filters, neutralTransfersMinor: neutral)
+        return MoneyLedger(now: now, today: today, repo: repo, movements: movements, transactions: kept, allocations: allocations, categories: categories, cards: cards,
+                           pending: pending, starts: starts, spent: spent, other: other, cashOut: cashOut, unknownCash: unknownCash, drips: drips)
     }
     func moneyKindLabel(_ kind: String) -> String {
         ["expense": "مصروف", "fee": "رسوم", "withdrawal": "سحب نقدي", "transfer": "تحويل", "income": "دخل", "salary": "راتب", "refund": "ردّ", "cashback": "استرداد نقدي", "cardPayment": "سداد بطاقة", "billPayment": "سداد فاتورة", "repayment": "سداد قسط", "adjustment": "تسوية"][kind] ?? "حركة مالية"
