@@ -38,7 +38,7 @@ extension AppSession {
         let plan = EnvelopePlan(); plan.envelopeID = planEnvelope.id; plan.source = "daily"; plan.period = "perDay"; plan.perPaycheckMinor = variant == "zero" ? 0 : 1300; plan.startDayKey = start.description; c.insert(plan)
         var categories: [MadarData.Category] = []
         for (index, title) in ["مطاعم", "بقالة", "بنزين", "أخرى"].enumerated() { let category = MadarData.Category(); category.name = title; category.order = index; c.insert(category); categories.append(category); let limit = CategoryLimit(); limit.categoryID = category.id; limit.limitMinor = [300_000, 400_000, 200_000, 500_000][index]; c.insert(limit) }
-        for (index, spent) in [30_000, 12_000, 15_000, 22_000, 11_000, 14_000].enumerated() {
+        for (index, spent) in [30_000, 12_000, 15_000, variant == "cards" ? 52_000 : 22_000, 11_000, 14_000].enumerated() { // «cards»: day 4 passes the 413 limit so the log shows a red arch
             let tx = MoneyTransaction(); tx.dayKey = start.adding(days: index).description; tx.eventAt = start.adding(days: index).date(in: zone).addingTimeInterval(9 * 3600); tx.cycleID = cycle.id; tx.fromAccountID = account.id; tx.amountMinor = spent; tx.homeAmountMinor = spent; tx.categoryID = categories[index % categories.count].id; tx.method = "transfer"; tx.source = "manual"; tx.reviewState = "ok"; tx.tzID = zone.identifier; tx.dayPolicy = "midnight@1"; c.insert(tx); allocation(-spent, "daily", tx: tx.id, kind: "spend")
         }
         for (index, title, amount) in [(0, "قسط القرض", 285_000), (1, "الكهرباء", 22_000), (2, "الاتصال", 19_000)] {
