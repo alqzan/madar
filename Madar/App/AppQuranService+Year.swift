@@ -12,7 +12,7 @@ struct QuranUIYear: Sendable {
     var days: [QuranUIYearDay]; var months: [QuranUIYearMonth]; var activeDays: Int; var title: String
 }
 extension AppQuranService {
-    func displayDate(_ day: GregorianDay) -> String { app.dateLabels(day).combined }
+    func displayDate(_ day: GregorianDay) -> String { app.dateLabels(day, first: .hijri).combined }
     func yearLog() throws -> QuranUIYear {
         let value = try snapshot(), today = value.day.date
         let zone = TimeZone(identifier: value.day.timeZoneID) ?? .gmt

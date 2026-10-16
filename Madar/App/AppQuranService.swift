@@ -205,7 +205,7 @@ import MadarPrayer
         case .complete: title = snapshot.coverage.isKhatm ? "ختمت" : "اكتمل نطاق خطّتك"; estimatedDays = nil
         case .unavailable: title = "لم تتضح الوتيرة بعد"; estimatedDays = nil
         case .estimated(let day):
-            let dates = app.dateLabels(day); title = dates.primary; secondaryDate = dates.secondary
+            let dates = app.dateLabels(day, first: .hijri); title = dates.primary; secondaryDate = dates.secondary
             estimatedDays = startingOn.quranDistance(to: day) + 1
         }
         return QuranUIForecast(title: title, assumptions: "تقدير بافتراض إتمام أيام الحفظ بلا فوت أو تثبيت، حُسب في " + displayDate(snapshot.day.date),
