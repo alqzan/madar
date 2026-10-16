@@ -365,3 +365,11 @@ Differences left: none visual (no canonical screen); ToggleTravelIntent not buil
 Not verified: real Siri/Shortcuts/Spotlight invocation and the background inbox path on a device (M4-G); owner iPhone. AppInboxLifecycleTests repaired (stale test date and new null field), 5/5 pass.
 Next: M4-F02 notification budget, then M3-V12.
 Model/effort: Claude Opus 5.5; effort not exposed. Usage: not exposed.
+
+## Handover — M3-V12 diary reminders, then improvements — 2026-10-16 — Claude
+Works now: intention, «في مثل هذا اليوم» and due-letter reminders under the shared budget, sanctity and diary cap, with generic text that never carries the diary (also under the whole-app lock); qada reminders show no debt count (RU2), digest count from catalog plurals (RU3). Improvements: the lobby names Friday Dhuhr «الجمعة»; the empty habits card has the rings and an add button instead of «٠ من ٠»; Quran first use drops «٪٠»; the Friday pill reads «الكهف في قسم القرآن» and opens page ٢٩٣; mushaf page links no longer open page ١; diary toggles use the room olive; the first tab is «البهو» and the lobby, Quran, diary and customize icons are redrawn in the prayer arch’s language (owner feedback, awaiting their verdict).
+Verified: swift test MadarCore 89/89; xcodebuild RoomNotificationsIntegrationTests 6/6, Diary/Capture/Quran/AppService 17/17, BahwPrayerIntegrationTests 3/3, BahwLobbyUITests (two stale checks repaired) pass, HabitsUITests 2/2, QuranYear/Mushaf/Index UI 3/3, Friday UI 1/1, DiaryCustomizeUITests 1/1, RoomGlyph/DateLabels/tab-switch UI 3/3; make build; git diff --check clean.
+Differences left: diary widgets with content wait for an owner opt-in key (Ideas); no reply-from-notification action; before/after shots in Madar/Artifacts/improve/.
+Not verified: real notification delivery and lock-screen display (M4-G), owner iPhone.
+Next: no ready card remains; M5 needs the owner to open its cards (money engine first, highest effort). Continue the improvement share meanwhile.
+Model/effort: Claude Opus 5.5; effort not exposed. Usage: five-hour 55% at this update.

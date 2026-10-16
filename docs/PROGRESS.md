@@ -225,6 +225,14 @@ Owner standing rule (15 Oct): screens that match their design or better count as
 M2 screens are owner-approved; M1-F04 software blocker is resolved. M3 built screens/F01 are integrated and covered by the owner’s provisional acceptance rule. V09 needs a permitted Day One path or anonymized fixture; V12 has bounded approval for generic reminders while locked. UX-01–UX-14 are complete. M4-E02/V02, UX-15, W01/W02, F01, F02 and V12 notifications are complete; M5 follows M4 software. Keep tafsir off until its separate licence is verified. No owner-iPhone or milestone pass is claimed.
 
 # Handovers
+## Handover — M5-V04 to V06, diary widget content (RD7) — 2026-10-16 — Claude
+Works now: envelope detail and salary repayment adopted to the minor unit (schema V6, owner yes); diary widgets show the intention, that-day memory and last line only after `notes.widgetContent` (M3-V16); «رسائل البنك» with statement update, atomic «اعتمد الواضح» (dry run of the real confirm), «تحتاج نظرة» and paste; «منذ آخر زيارة» opens once per day after an absence.
+Verified: MadarData 66/66, MadarMoney 89/89, MadarCommands 84/84; UI MoneyEnvelopeDetail, RoomWidgets diary opt-in, MoneyMessages, MoneySince and MoneyHome passed (Artifacts/*.xcresult); make build succeeded; one review pass per money card, its High findings fixed.
+Differences left: V05 category chips wait for V07; V06 has no big-expense, alerts or Tamara cards (V18/V10/V09); no red per RM10; compare pages Z-R14-EnvDetail, Z-R18-msg-1, Z-R19-since.
+Not verified: owner iPhone, real Shortcut messages, the V5→V6 upgrade on the real store, dark mode.
+Next: M5-V07 merchant rules (MerchantRule exists in the model: pattern, categoryID, ignore).
+Model/effort: Claude Opus 5.5; effort not exposed. Usage: five-hour 45% at this handover.
+
 ## Handover — M5-D02 intake and V01–V03 money screens — 2026-10-16 — Codex
 Works now: main 75519e0 includes D02 intake and V01–V03 home/basis/cash/envelopes (four card commits). Uncommitted V04 on codex/money-detail adds detail ledger/road, exact 1–6-salary preview, immediate reserve/surplus repayment + undo, and existing saving-plan changes. Earlier-room improvement: one-tap settings search clear.
 Verified: swift test Money 86/86 (/tmp/madar-v04-money.log), Commands 80/80 (/tmp/madar-v04-command-disk-fixed.log); Inbox 17/17 at D02. UI home 4/4, envelopes 2/2, search 1/1, V04 preview/repay/undo 1/1 M5-V04-flow-verified; final app/widget build. diff --check clean. One money data review: exact transfers, stale debt/saving rejection, no fund/repay cross-write, undo/replay tests.
@@ -240,12 +248,3 @@ Differences left: none visual. Parser tested on synthetic samples only. check-re
 Not verified: the real V4 store upgrading on the owner's iPhone; RM6 accuracy (needs anonymised messages).
 Next: M5-D02 money commands with undo and IngestBankMessageIntent/LogExpenseIntent, with a review pass, then M5-V01 home.
 Model/effort: Claude Opus 5.5; effort not exposed (E01–E04 commits say «max» on the owner's word). Usage: five-hour 83% at handover.
-
-
-## Handover — M3-V12 diary reminders, then improvements — 2026-10-16 — Claude
-Works now: intention, «في مثل هذا اليوم» and due-letter reminders under the shared budget, sanctity and diary cap, with generic text that never carries the diary (also under the whole-app lock); qada reminders show no debt count (RU2), digest count from catalog plurals (RU3). Improvements: the lobby names Friday Dhuhr «الجمعة»; the empty habits card has the rings and an add button instead of «٠ من ٠»; Quran first use drops «٪٠»; the Friday pill reads «الكهف في قسم القرآن» and opens page ٢٩٣; mushaf page links no longer open page ١; diary toggles use the room olive; the first tab is «البهو» and the lobby, Quran, diary and customize icons are redrawn in the prayer arch’s language (owner feedback, awaiting their verdict).
-Verified: swift test MadarCore 89/89; xcodebuild RoomNotificationsIntegrationTests 6/6, Diary/Capture/Quran/AppService 17/17, BahwPrayerIntegrationTests 3/3, BahwLobbyUITests (two stale checks repaired) pass, HabitsUITests 2/2, QuranYear/Mushaf/Index UI 3/3, Friday UI 1/1, DiaryCustomizeUITests 1/1, RoomGlyph/DateLabels/tab-switch UI 3/3; make build; git diff --check clean.
-Differences left: diary widgets with content wait for an owner opt-in key (Ideas); no reply-from-notification action; before/after shots in Madar/Artifacts/improve/.
-Not verified: real notification delivery and lock-screen display (M4-G), owner iPhone.
-Next: no ready card remains; M5 needs the owner to open its cards (money engine first, highest effort). Continue the improvement share meanwhile.
-Model/effort: Claude Opus 5.5; effort not exposed. Usage: five-hour 55% at this update.
