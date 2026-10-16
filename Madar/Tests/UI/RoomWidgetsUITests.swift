@@ -16,6 +16,26 @@ import XCTest
         XCTAssertTrue(write.exists);write.tap()
         XCTAssertTrue(app.textViews["diary-editor-text"].waitForExistence(timeout:10))
     }
+    /// RD7: turning on «محتوى المذكرات في الودجات» adds the memory and last-line templates.
+    func testDiaryContentWidgetsAppearOnlyAfterTheOptIn() throws {
+        continueAfterFailure=false
+        let app=XCUIApplication();app.launchEnvironment=["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_DIARY_FIXTURE":"home","MADAR_UI_NOW":"2026-10-15T20:00:00+03:00","MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light"];app.launch()
+        // The opt-in lives in the diary's own «خصّص المذكرات», section «خارج التطبيق»; the off-by-default gallery is covered by RoomWidgetSnapshotTests.
+        let customize=app.buttons["diary-customize"];XCTAssertTrue(customize.waitForExistence(timeout:25));customize.tap()
+        let diarySearch=app.textFields["diary-customize-search"];XCTAssertTrue(diarySearch.waitForExistence(timeout:10));diarySearch.tap();diarySearch.typeText("الودجات")
+        let toggle=app.switches["setting-notes.widgetContent"];XCTAssertTrue(toggle.waitForExistence(timeout:10))
+        if toggle.switches.firstMatch.exists{toggle.switches.firstMatch.tap()}else{toggle.tap()}
+        XCTAssertEqual(toggle.value as? String,"1")
+        shot(app,"M3-V16-diary-setting-L")
+        app.buttons["diary-customize-back"].tap()
+        XCTAssertTrue(app.tabBars.buttons["خصّص"].waitForExistence(timeout:10));app.tabBars.buttons["خصّص"].tap()
+        let search=app.textFields["settings-search"];XCTAssertTrue(search.waitForExistence(timeout:10));search.tap();search.typeText("خارج التطبيق")
+        let gallery=app.buttons["room-widgets-gallery"];XCTAssertTrue(gallery.waitForExistence(timeout:10));gallery.tap();XCTAssertTrue(app.staticTexts["room-widgets-title"].waitForExistence(timeout:10))
+        let last=app.buttons["room-widget-diary-lastLine"]
+        for _ in 0..<4 where !last.isHittable{app.swipeUp(velocity:.slow)}
+        XCTAssertTrue(last.exists);XCTAssertTrue(app.buttons["room-widget-diary-thatDay"].exists)
+        shot(app,"M3-V16-diary-widgets-L")
+    }
     func testLockStandByAndControlPreviewsOpenHabits() throws {
         continueAfterFailure=false;let app=openGallery()
         let link=app.buttons["room-widgets-lock"];XCTAssertTrue(link.waitForExistence(timeout:5));link.tap()

@@ -2568,6 +2568,18 @@
    "preset": false
   },
   {
+   "key": "notes.widgetContent",
+   "owner": "notes",
+   "section": "خارج التطبيق",
+   "title": "محتوى المذكرات في الودجات",
+   "type": "bool",
+   "default": false,
+   "scope": "device",
+   "storage": "DeviceSetting (deviceOnly configuration, never synced)",
+   "preset": false,
+   "note": "RD7 (owner 16 Oct): opt-in; diary widgets show the intention, «في مثل هذا اليوم» and the last line, marked privacySensitive. Off, or under the whole-app lock, they show no diary text."
+  },
+  {
    "key": "mihbara.layout",
    "owner": "mihbara",
    "section": "أجزاء الغرفة",

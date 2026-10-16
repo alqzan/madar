@@ -26,9 +26,11 @@ struct RoomWidgetContent:View {
     var body:some View {Group{if accessory{accessoryContent}else{home}}}
     private var home:some View {
         VStack(alignment:.leading,spacing:8) {
-            HStack(spacing:6) { Image(room.glyph).renderingMode(.template).resizable().scaledToFit().frame(width:16,height:16).widgetAccentable();Text(room.title).font(.custom("thmanyahsans-Bold",size:13,relativeTo:.caption));Spacer(minLength:0);if room == .habits && family == .systemMedium {Text(snapshot?.heading ?? "").font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).privacySensitive()} }.foregroundStyle(accent)
+            HStack(spacing:6) { Image(room.glyph).renderingMode(.template).resizable().scaledToFit().frame(width:16,height:16).widgetAccentable();Text(diaryRow?.title ?? room.title).font(.custom("thmanyahsans-Bold",size:13,relativeTo:.caption));Spacer(minLength:0);if room == .habits && family == .systemMedium {Text(snapshot?.heading ?? "").font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).privacySensitive()} }.foregroundStyle(accent)
             if snapshot?.locked == true {
                 Spacer(minLength:0);Label("افتح مدار",systemImage:"lock").font(MadarTypography.section());Text("المحتوى محمي").font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).foregroundStyle(theme.secondaryInk);Spacer(minLength:0)
+            } else if let row = diaryRow {
+                diaryContent(row)
             } else if room == .diaryWrite {
                 dates
                 Spacer(minLength:0)
@@ -101,6 +103,17 @@ struct RoomWidgetContent:View {
                     }
                 }
             }.frame(maxWidth:.infinity,maxHeight:.infinity,alignment:.leading).privacySensitive(room == .habits || room == .upcoming).foregroundStyle(.primary)
+        }
+    }
+    /// RD7: the chosen diary template's row, present only when the owner opted in and nothing is locked.
+    private var diaryRow:RoomWidgetSnapshot.Row? { room == .diaryWrite && snapshot?.locked != true ? snapshot?.rows.first { $0.id == template } : nil }
+    @ViewBuilder private func diaryContent(_ row:RoomWidgetSnapshot.Row)->some View {
+        Text(row.value).font(.custom("thmanyahseriftext-Regular",size:family == .systemSmall ? 17 : 19,relativeTo:.body)).lineLimit(family == .systemLarge ? 8 : 4).lineSpacing(3).privacySensitive()
+        Spacer(minLength:0)
+        if row.id == "intention" {
+            Link(destination:URL(string:room.route)!) {Text("اكتب").font(.custom("thmanyahsans-Bold",size:15,relativeTo:.body)).frame(maxWidth:.infinity,minHeight:40).foregroundStyle(theme.surface).background(theme.ink,in:.capsule)}.buttonStyle(.plain)
+        } else if !row.detail.isEmpty {
+            HStack(spacing:6){Text(row.detail);Text(row.secondDate)}.font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).foregroundStyle(theme.secondaryInk).lineLimit(1).privacySensitive()
         }
     }
     private var dates:some View {

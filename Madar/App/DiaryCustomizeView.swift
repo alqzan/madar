@@ -35,7 +35,8 @@ struct DiaryCustomizeView: View {
         ("calendar", "التقويم", "calendar", ["notes.calendarFirst"]),
         ("memory", "أي ذكرى تظهر", "clock", ["notes.match", "notes.noMemory", "notes.yearsBack", "notes.includeDayOne"]),
         ("display", "ما تعرضه الذكرى", "photo", ["notes.memorySize", "notes.showPhoto", "notes.showPlace", "notes.showAutoSections", "notes.sinceMetrics", "notes.autoLines"]),
-        ("ink", "الكتابة والهامش", "pencil", ["notes.secondInk", "notes.dictationFirst", "notes.serverDictationConsent"])
+        ("ink", "الكتابة والهامش", "pencil", ["notes.secondInk", "notes.dictationFirst", "notes.serverDictationConsent"]),
+        ("outside", "خارج التطبيق", "rectangle.on.rectangle", ["notes.widgetContent"])
     ]
     private var keys: [String] { ["notes.homeShape", "notes.layout"] + groups.flatMap(\.3) }
     private var changed: Int { app.schema.settings.filter { keys.contains($0.key) && app.values[$0.key] != $0.defaultValue }.count }
@@ -179,5 +180,5 @@ struct DiaryCustomizeView: View {
     }
     private func label(_ key: String) -> String { app.schema.settings.first { $0.key == key }?.options.first { $0.value == app.values[key] }?.label ?? "" }
     private func matches(_ text: String) -> Bool { query.isEmpty || normalized(text).contains(normalized(query)) }
-    private func summary(_ id: String) -> String { switch id { case "calendar": label("notes.calendarFirst") + " أولًا"; case "memory": label("notes.match") + " · " + label("notes.noMemory"); case "ink": label("notes.secondInk"); default: app.bool("notes.showPhoto") ? "الصورة والمكان وسطـور مدار" : "سطور الذكرى" } }
+    private func summary(_ id: String) -> String { switch id { case "calendar": label("notes.calendarFirst") + " أولًا"; case "memory": label("notes.match") + " · " + label("notes.noMemory"); case "ink": label("notes.secondInk"); case "outside": app.bool("notes.widgetContent") ? "الودجات تعرض النيّة والذكرى وآخر سطر" : "الودجات بلا نص من مذكراتك"; default: app.bool("notes.showPhoto") ? "الصورة والمكان وسطـور مدار" : "سطور الذكرى" } }
 }

@@ -46,9 +46,10 @@ struct UpcomingWidgetConfiguration:FixedRoomConfiguration {
     var templateName:String{template.rawValue}
 }
 enum DiaryWriteTemplate:String,AppEnum {
-    case write
+    case write,intention,thatDay,lastLine
     static let typeDisplayRepresentation=TypeDisplayRepresentation(name:"قالب المذكرات")
-    static let caseDisplayRepresentations:[Self:DisplayRepresentation]=[.write:"سطر سريع بلا محتوى شخصي"]
+    // The three content templates show diary text only when «محتوى المذكرات في الودجات» is on (RD7); otherwise «اكتب».
+    static let caseDisplayRepresentations:[Self:DisplayRepresentation]=[.write:"سطر سريع بلا محتوى شخصي",.intention:"النيّة و«اكتب»",.thatDay:"في مثل هذا اليوم",.lastLine:"آخر سطر"]
 }
 struct DiaryWriteConfiguration:FixedRoomConfiguration {
     static let title:LocalizedStringResource="سطر سريع"

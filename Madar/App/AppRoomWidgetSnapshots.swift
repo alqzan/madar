@@ -40,7 +40,8 @@ extension AppSession {
             return .init(id:item.id,title:item.title,value:digits.string(item.daysLeft)+" "+service.dayCount(item.daysLeft),detail:labels.primary,secondDate:labels.secondary,share:item.closed,route:BuiltRoomWidget.upcoming.route)
         }
         payloads[.upcoming] = .init(datePrimary:date.primary,dateSecondary:date.secondary,heading:"كم بقي",emptyTitle:"أضف يومًا تنتظره",rows:upcoming,locked:locked)
-        payloads[.diaryWrite] = .init(datePrimary:date.primary,dateSecondary:date.secondary,heading:"اكتب سطر اليوم",emptyTitle:"فكرة صغيرة تستحق أن تبقى")
+        let diaryRows=locked || !bool("notes.widgetContent") ? [] : diaryWidgetRows(today:today)
+        payloads[.diaryWrite] = .init(datePrimary:date.primary,dateSecondary:date.secondary,heading:"اكتب سطر اليوم",emptyTitle:"فكرة صغيرة تستحق أن تبقى",rows:diaryRows)
         return payloads
     }
     func publishRoomWidgetSnapshots(at now:Date) throws {

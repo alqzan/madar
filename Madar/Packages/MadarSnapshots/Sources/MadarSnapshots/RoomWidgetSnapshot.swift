@@ -6,7 +6,7 @@ public enum BuiltRoomWidget:String,CaseIterable,Codable,Sendable {
     public var glyph:String {switch self{case .habits:"MadarHabits";case .year:"MadarYear";case .upcoming:"MadarUpcoming";case .diaryWrite:"MadarDiary"}}
     public var route:String {switch self{case .habits:"madar://bahw/habits";case .year,.upcoming:"madar://bahw/year";case .diaryWrite:"madar://notes/write"}}
 }
-/// Fixed room templates, never a maker configuration or a store handle. Diary writing carries no diary content.
+/// Fixed room templates, never a maker configuration or a store handle. Diary rows exist only with the RD7 opt-in.
 public struct RoomWidgetSnapshot:Codable,Sendable,Equatable {
     public struct Row:Codable,Sendable,Equatable,Identifiable {
         public var id:String

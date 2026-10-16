@@ -28,7 +28,21 @@ struct RoomWidgetsGallery:View {
                     Text("السنة وسطر اليوم").font(MadarTypography.section())
                     preview(.year,family:.systemMedium,template:"both").frame(height:185)
                     Link(destination:URL(string:BuiltRoomWidget.diaryWrite.route)!) {previewContent(.diaryWrite,family:.systemSmall,template:"write")}.buttonStyle(.plain).frame(height:170).accessibilityIdentifier("room-widget-diaryWrite")
-                    Text("ودجة «سطر سريع» تفتح الكتابة ولا تعرض نصًا أو صورة من مذكراتك.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                    let diaryRows=Set((snapshot(.diaryWrite)?.rows ?? []).map(\.id))
+                    if diaryRows.isEmpty {
+                        Text("ودجة «سطر سريع» تفتح الكتابة ولا تعرض نصًا أو صورة من مذكراتك.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                    } else {
+                        // RD7: shown only after the owner turned on «محتوى المذكرات في الودجات».
+                        HStack(spacing:12) {
+                            ForEach(["intention","lastLine"].filter(diaryRows.contains),id:\.self) { template in
+                                Link(destination:URL(string:BuiltRoomWidget.diaryWrite.route)!) {previewContent(.diaryWrite,family:.systemSmall,template:template)}.buttonStyle(.plain).frame(height:170).accessibilityIdentifier("room-widget-diary-"+template)
+                            }
+                        }
+                        if diaryRows.contains("thatDay") {
+                            Link(destination:URL(string:"madar://notes")!) {previewContent(.diaryWrite,family:.systemMedium,template:"thatDay")}.buttonStyle(.plain).frame(height:170).accessibilityIdentifier("room-widget-diary-thatDay")
+                        }
+                        Text("هذه الودجات تعرض نصًا من مذكراتك لأنك فعّلت «محتوى المذكرات في الودجات»، ويحجبه iOS حين يكون الجهاز مقفلًا.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                    }
                 }.padding(16)
             }.clipped()
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.accent).toolbarVisibility(.hidden,for:.navigationBar)

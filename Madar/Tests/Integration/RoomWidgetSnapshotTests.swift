@@ -48,6 +48,25 @@ import MadarPrayer
         XCTAssertFalse(text.contains("SECRET"));XCTAssertTrue(diary.rows.isEmpty)
         XCTAssertFalse(diary.datePrimary.isEmpty);XCTAssertFalse(diary.dateSecondary.isEmpty)
     }
+    /// RD7 (owner, 16 Oct): diary text reaches the widget payload only with the opt-in, and never under the app lock.
+    func testDiaryContentRowsNeedTheOptInAndNeverCrossTheLock() async throws {
+        let root=FileManager.default.temporaryDirectory.appendingPathComponent("RoomWidgetDiary-\(UUID())");defer{try? FileManager.default.removeItem(at:root)}
+        let container=try MadarContainerFactory.makeLocal(at:root),app=try AppSession(container:container,groupDirectory:root),context=ModelContext(container)
+        let today=AppBahwService(session:app).today
+        let entry=Entry();entry.dayKey=today.description;entry.text="سطر اصطناعي للودجة\nسطر ثانٍ لا يظهر";entry.eventAt=app.prayerNow();context.insert(entry)
+        let niyya=Niyya();niyya.dayKey=today.description;niyya.text="نيّة اصطناعية";context.insert(niyya)
+        let letter=Letter();letter.text="SECRET-SEALED-LETTER";context.insert(letter);try context.save()
+        XCTAssertEqual(app.schema.settings.first{$0.key=="notes.widgetContent"}?.defaultValue,.bool(false))
+        XCTAssertEqual(app.roomWidgetPayloads(locked:false)[.diaryWrite]?.rows,[],"Off by default: no diary text")
+        try await app.applySettingsAndWait(["notes.widgetContent":.bool(true)])
+        let rows=try XCTUnwrap(app.roomWidgetPayloads(locked:false)[.diaryWrite]).rows
+        XCTAssertEqual(rows.first{$0.id=="intention"}?.value,"نيّة اصطناعية")
+        XCTAssertEqual(rows.first{$0.id=="lastLine"}?.value,"سطر اصطناعي للودجة")
+        XCTAssertFalse(rows.first{$0.id=="lastLine"}?.secondDate.isEmpty ?? true,"Both calendars")
+        let text=try XCTUnwrap(String(data:JSONEncoder().encode(rows),encoding:.utf8))
+        XCTAssertFalse(text.contains("SECRET"));XCTAssertFalse(text.contains("سطر ثانٍ"))
+        XCTAssertEqual(app.roomWidgetPayloads(locked:true)[.diaryWrite]?.rows,[],"The whole-app lock wins over the opt-in")
+    }
     func testDefaultWidgetRoutesAndExistingPrayerAliasReachBuiltRooms() throws {
         let root=FileManager.default.temporaryDirectory.appendingPathComponent("RoomWidgetRoutes-\(UUID())");defer{try? FileManager.default.removeItem(at:root)}
         let app=try AppSession(container:MadarContainerFactory.makeLocal(at:root),groupDirectory:root)
