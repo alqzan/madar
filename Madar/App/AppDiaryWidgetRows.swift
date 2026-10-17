@@ -13,6 +13,7 @@ extension AppSession {
             let line = text.split(whereSeparator: \.isNewline).first.map(String.init)?.trimmingCharacters(in: .whitespaces) ?? ""
             return line.count > 140 ? String(line.prefix(139)) + "…" : line
         }
+        let moneyEntries = bool("core.hideMoneyOutside") ? Set(((try? context.fetch(FetchDescriptor<Entry>())) ?? []).filter { $0.pinnedEventKind == "mal" }.map { $0.id.uuidString }) : []
         var rows: [RoomWidgetSnapshot.Row] = []
         let key = today.description
         if let niyya = (try? context.fetch(FetchDescriptor<Niyya>(predicate: #Predicate { $0.dayKey == key && $0.deletedAt == nil && $0.mergedInto == nil }, sortBy: [SortDescriptor(\.order), SortDescriptor(\.createdAt)])))?.first(where: { !excerpt($0.text).isEmpty }) {
@@ -20,12 +21,12 @@ extension AppSession {
         }
         let diary = AppDiaryService(app: self)
         if let facts = try? diary.memoryFacts(), let day = diary.memorySelection(facts: facts, today: today).days.first,
-           let page = try? diary.day(day), let line = page.lines.first(where: { ["normal", "late", "intention"].contains($0.kind) && !excerpt($0.text).isEmpty }) {
+           let page = try? diary.day(day), let line = page.lines.first(where: { ["normal", "late", "intention"].contains($0.kind) && !moneyEntries.contains($0.id) && !excerpt($0.text).isEmpty }) {
             let labels = dateLabels(day)
             rows.append(.init(id: "thatDay", title: "في مثل هذا اليوم", value: excerpt(line.text), detail: labels.primary, secondDate: labels.secondary, route: "madar://notes"))
         }
         let entries = AppDiaryService.visible((try? context.fetch(FetchDescriptor<Entry>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil }))) ?? [])
-        if let last = entries.filter({ !excerpt($0.text).isEmpty }).max(by: { $0.eventAt < $1.eventAt }), let day = try? GregorianDay(last.dayKey) {
+        if let last = entries.filter({ !moneyEntries.contains($0.id.uuidString) && !excerpt($0.text).isEmpty }).max(by: { $0.eventAt < $1.eventAt }), let day = try? GregorianDay(last.dayKey) {
             let labels = dateLabels(day)
             rows.append(.init(id: "lastLine", title: "آخر سطر", value: excerpt(last.text), detail: labels.primary, secondDate: labels.secondary, route: route))
         }

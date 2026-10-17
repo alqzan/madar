@@ -42,6 +42,7 @@ extension AppSession {
         payloads[.upcoming] = .init(datePrimary:date.primary,dateSecondary:date.secondary,heading:"كم بقي",emptyTitle:"أضف يومًا تنتظره",rows:upcoming,locked:locked)
         let diaryRows=locked || !bool("notes.widgetContent") ? [] : diaryWidgetRows(today:today)
         payloads[.diaryWrite] = .init(datePrimary:date.primary,dateSecondary:date.secondary,heading:"اكتب سطر اليوم",emptyTitle:"فكرة صغيرة تستحق أن تبقى",rows:diaryRows)
+        payloads[.money] = moneyWidgetPayload(hidden: locked || bool("core.hideMoneyOutside"), locked: locked, at: now)
         return payloads
     }
     func publishRoomWidgetSnapshots(at now:Date) throws {
@@ -56,7 +57,7 @@ extension AppSession {
         let expiry=min(now.addingTimeInterval(3600),end ?? now.addingTimeInterval(900))
         let locked=string("core.faceIDLock")=="app"
         for (room,payload) in roomWidgetPayloads(locked:locked,at:now) {
-            let envelope=SnapshotEnvelope(name:room.rawValue,generatedAt:now,validUntil:expiry,dayKey:service.today.description,tzID:place.timeZoneID,privacy:SnapshotPrivacy(notesLocked:locked),payload:payload)
+            let envelope=SnapshotEnvelope(name:room.rawValue,generatedAt:now,validUntil:expiry,dayKey:service.today.description,tzID:place.timeZoneID,privacy:SnapshotPrivacy(moneyHidden:room == .money ? locked || bool("core.hideMoneyOutside") : true,notesLocked:locked),payload:payload)
             try snapshotStore.write(envelope)
             WidgetCenter.shared.reloadTimelines(ofKind:"MadarRoom-"+room.rawValue)
         }

@@ -311,14 +311,20 @@ def scan_source(text, path, definitions):
         if re.search(r'\bColor\(\.sRGB,\s*red:|\.(?:foregroundStyle|foregroundColor|background|tint)\(\.(?:red|green|blue|white|black|yellow|orange|pink|purple|gray)\b', line):
             failures.append(f'{spot}: handwritten colour value')
         for match in re.finditer(r'\b(?:Font\.)?(?:system|custom)\([^\n]*?size:\s*(\d+(?:\.\d+)?)', line):
-            if float(match[1]) < 11: failures.append(f'{spot}: explicit font size below 11')
+            # SF Symbols are drawings, not sub-11 pt text. Keep the text rule intact.
+            symbol_font = re.search(r'Image\([^)]*\)\.font\(\.$', line[:match.start()])
+            if float(match[1]) < 11 and not symbol_font: failures.append(f'{spot}: explicit font size below 11')
         for match in re.finditer(r'\b(?:session\.)?(string|bool|number)\("([\w.]+)"\)', line):
             kind, key = match.groups()
             # Only session or unqualified AppSession convenience functions are setting reads.
             if 'session.' not in match[0] and not path.endswith('/AppSession.swift'): continue
             keys.add(key)
             if key not in definitions: failures.append(f'{spot}: unknown setting {key}')
-            elif definitions[key]['type'] not in {'string': {'choice', 'string', 'time'}, 'bool': {'bool'}, 'number': {'int', 'money'}}[kind]:
+            elif (definitions[key]['type'] not in {'string': {'choice', 'string', 'time'}, 'bool': {'bool'}, 'number': {'int', 'money'}}[kind]
+                  and not (kind == 'number' and definitions[key]['type'] == 'choice'
+                           and definitions[key].get('options')
+                           and all(isinstance(option.get('value'), (int, float)) and not isinstance(option.get('value'), bool)
+                                   for option in definitions[key]['options']))):
                 failures.append(f'{spot}: {kind} read conflicts with {key} type {definitions[key]["type"]}')
         for key in re.findall(r'\b(?:key|for):\s*"([\w.]+)"|\bvalues\["([\w.]+)"\]', line):
             name = key[0] or key[1]
@@ -389,7 +395,10 @@ def run(root):
     customization = (app/'App/CustomizeMadar.swift').read_text()
     if 'guard AppSession.supportedKeys.contains(definition.key)' not in customization:
         failures.append('reachable settings no longer guarded by supportedKeys')
-    if 'settingsKeys: Set(Self.supportedKeys), availability: .m0' not in session:
+    route_proof = re.search(r'settingsKeys: Set\(Self.supportedKeys\), availability: \.init\(builtRooms: \[(.*?)\]\)', session)
+    built_rooms = set(re.findall(r'\.(\w+)', route_proof[1])) if route_proof else set()
+    # M5 boundary: each built room is explicit; Mihbara stays out until its own milestone.
+    if built_rooms != {'core', 'salah', 'quran', 'notes', 'bahw', 'year', 'habits', 'mal'}:
         failures.append('settings/room deep-link availability proof changed')
     return dict(scope='M0 static shipping checks; NOT complete acceptance', targets=targets,
                 packages=[dict(path=p, product=n) for p,n in packages], sources=source_inventory,

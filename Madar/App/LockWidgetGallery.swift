@@ -27,6 +27,7 @@ struct LockWidgetGallery:View {
                         Link(destination:URL(string:"madar://bahw/habits")!){Label("عاداتك",image:"MadarHabits").font(MadarTypography.section()).frame(maxWidth:.infinity,minHeight:56).background(theme.surface,in:.rect(cornerRadius:20))}.accessibilityIdentifier("control-preview-habits")
                     }.buttonStyle(.plain)
                     Text("«سطر سريع» يفتح المحرر مباشرة، و«عاداتك» يفتح الغرفة لاختيار ما تسجّله. تسجيل الصلاة ومؤقّت المراجعة متاحان أيضًا في المعرض.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    Link(destination:URL(string:"madar://mal/add")!){Label("مصروف",systemImage:"plus.circle").font(MadarTypography.section()).frame(maxWidth:.infinity,minHeight:56).background(theme.surface,in:.rect(cornerRadius:20))}.buttonStyle(.plain).accessibilityIdentifier("control-preview-money")
                     Text("وضع الاستعداد").font(MadarTypography.section())
                     HStack(spacing:12){RoomWidgetContent(room:.habits,snapshot:value(.habits),family:.systemSmall).padding(14).background(theme.surface,in:.rect(cornerRadius:24));RoomWidgetContent(room:.upcoming,snapshot:value(.upcoming),template:"nearest",family:.systemSmall).padding(14).background(theme.surface,in:.rect(cornerRadius:24))}.frame(height:180)
                 }.padding(16)

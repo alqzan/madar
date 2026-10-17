@@ -77,7 +77,7 @@ private struct FixedRoomWidgetView:View {
     let entry:FixedRoomEntry
     @Environment(\.widgetFamily)private var family
     @Environment(\.colorScheme)private var scheme
-    var body:some View{RoomWidgetContent(room:entry.room,snapshot:entry.value,template:entry.template,family:family).widgetURL(URL(string:entry.room.route)).containerBackground(for:.widget){if [WidgetFamily.accessoryCircular,.accessoryRectangular,.accessoryInline].contains(family){Color.clear}else{RoomTheme(room:"bahw",dark:scheme == .dark).surface}}}
+    var body:some View{RoomWidgetContent(room:entry.room,snapshot:entry.value,template:entry.template,family:family).widgetURL(URL(string:entry.room.route)).containerBackground(for:.widget){if [WidgetFamily.accessoryCircular,.accessoryRectangular,.accessoryInline].contains(family){Color.clear}else{entry.room == .money ? (MadarToken.colors["widgetIdentity.room.mal.\(scheme == .dark ? "dark" : "light").bg"] ?? .clear) : RoomTheme(room:"bahw",dark:scheme == .dark).surface}}}
 }
 struct FixedRoomWidget<Config:FixedRoomConfiguration>:Widget {
     var body:some WidgetConfiguration {
@@ -86,5 +86,18 @@ struct FixedRoomWidget<Config:FixedRoomConfiguration>:Widget {
     }
 }
 struct AdditionalRoomWidgets:WidgetBundle {
-    var body:some Widget{FixedRoomWidget<HabitWidgetConfiguration>();FixedRoomWidget<YearWidgetConfiguration>();FixedRoomWidget<UpcomingWidgetConfiguration>();FixedRoomWidget<DiaryWriteConfiguration>();DiaryWriterControl();HabitsRoomControl()}
+    var body:some Widget{FixedRoomWidget<HabitWidgetConfiguration>();FixedRoomWidget<YearWidgetConfiguration>();FixedRoomWidget<UpcomingWidgetConfiguration>();FixedRoomWidget<DiaryWriteConfiguration>();DiaryWriterControl();HabitsRoomControl();MoneyExpenseControl();FixedRoomWidget<MoneyWidgetConfiguration>()}
+}
+
+struct MoneyWidgetConfiguration: FixedRoomConfiguration {
+    static let title: LocalizedStringResource = "المال"
+    static let room = BuiltRoomWidget.money
+    static let defaultTemplate = "now"
+    @Parameter(title: "القالب", default: .now) var template: MoneyWidgetTemplate
+    var templateName: String { template.rawValue }
+}
+enum MoneyWidgetTemplate: String, AppEnum {
+    case now, basis
+    static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "قالب المال")
+    static let caseDisplayRepresentations: [Self: DisplayRepresentation] = [.now:"لك الآن ويومك", .basis:"لك فعلًا والمحجوز ودخل الدورة"]
 }

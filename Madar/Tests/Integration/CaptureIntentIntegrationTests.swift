@@ -3,6 +3,7 @@ import SwiftData
 import MadarCore
 import MadarData
 import MadarCommands
+import MadarMoney
 @testable import Madar
 
 /// M4-F01: Siri/Shortcuts requests that need the app run through the app's own command path,
@@ -20,21 +21,32 @@ import MadarCommands
     func testCaptureWaitsForTheDiaryLockAndWritesOnce() async throws {
         let (app, container) = try session()
         let id = UUID()
-        let held = await app.handleIntentRequest(.capture(text: "قهوة ١٨", id: id))
+        let held = await app.handleIntentRequest(.capture(text: "اتصلت بخالتي", id: id))
         XCTAssertFalse(held, "A diary line waits while the diary is locked")
         XCTAssertEqual(try ModelContext(container).fetchCount(FetchDescriptor<Entry>()), 0)
         app.authorizeProtectedData()
-        let applied = await app.handleIntentRequest(.capture(text: "قهوة ١٨", id: id))
+        let applied = await app.handleIntentRequest(.capture(text: "اتصلت بخالتي", id: id))
         XCTAssertTrue(applied)
-        let again = await app.handleIntentRequest(.capture(text: "قهوة ١٨", id: id))
+        let again = await app.handleIntentRequest(.capture(text: "اتصلت بخالتي", id: id))
         XCTAssertTrue(again)
         let lines = try AppDiaryService(app: app, clock: { .now }).home().todayPage.lines.filter { $0.kind == "normal" }.map(\.text)
-        XCTAssertEqual(lines, ["قهوة ١٨"], "Before M5 money text is a line on today's page, written once per request")
+        XCTAssertEqual(lines, ["اتصلت بخالتي"], "Unclassified text is a diary line, written once per request")
         XCTAssertEqual(app.selectedTab, "notes")
         _ = await app.handleIntentRequest(.diaryLine(text: "فكرة: كتاب عن الجيران", day: "today", id: UUID()))
         XCTAssertTrue(try AppDiaryService(app: app, clock: { .now }).home().todayPage.lines.contains { $0.text == "فكرة: كتاب عن الجيران" })
     }
 
+    func testMoneyCaptureOpensConfirmationWithoutWritingOrRequiringDiaryUnlock() async throws {
+        let (app, container) = try session(), id = UUID()
+        let applied = await app.handleIntentRequest(.capture(text: "قهوة ١٨", id: id)); XCTAssertTrue(applied)
+        XCTAssertEqual(app.moneyExpenseSeed?.amount, "١٨"); XCTAssertEqual(app.moneyExpenseSeed?.merchant, "قهوة"); XCTAssertEqual(app.moneyExpenseSeed?.id, id)
+        XCTAssertEqual(try ModelContext(container).fetchCount(FetchDescriptor<MoneyTransaction>()), 0)
+        XCTAssertEqual(try ModelContext(container).fetchCount(FetchDescriptor<Entry>()), 0)
+        app.moneyExpenseSeed = nil
+        app.open(URL(string: "madar://mal/add?amount=1800&merchant=coffee")!)
+        XCTAssertEqual(MoneyAmountInput.minor(app.moneyExpenseSeed?.amount ?? "", exponent: 2), 1800)
+        XCTAssertEqual(try ModelContext(container).fetchCount(FetchDescriptor<MoneyTransaction>()), 0, "A public link can prefill but never write")
+    }
     func testPrayerReportLogsAndAMissingStateOpensTheLogSheet() async throws {
         let (app, container) = try session()
         // Fajr of the current prayer day has always begun, whatever the hour the test runs.

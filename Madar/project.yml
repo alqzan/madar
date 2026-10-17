@@ -110,6 +110,7 @@ targets:
       - Intents/StartPrayerActivityIntent.swift
       - App/QuranWidgetContent.swift
       - App/RoomWidgetContent.swift
+      - App/MoneyWidgetContent.swift
       - App/Resources/RoomSymbols.xcassets
     dependencies:
       - package: MadarSnapshots

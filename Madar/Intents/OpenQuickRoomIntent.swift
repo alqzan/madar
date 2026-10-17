@@ -18,13 +18,14 @@ struct OpenHabitsRoomIntent:AppIntent {
 
 /// §9 OpenRoomIntent(room): built rooms only (no money or Mihbara before M5/M6).
 enum MadarRoomDestination: String, AppEnum {
-    case lobby, salah, quran, notes, habits, year
+    case lobby, salah, quran, notes, habits, year, money
     static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "الغرفة")
     static let caseDisplayRepresentations: [Self: DisplayRepresentation] = [
-        .lobby: "البهو", .salah: "الصلاة", .quran: "القرآن", .notes: "المذكرات", .habits: "العادات", .year: "السنة وما يهمّك"
+        .money: "المال", .lobby: "البهو", .salah: "الصلاة", .quran: "القرآن", .notes: "المذكرات", .habits: "العادات", .year: "السنة وما يهمّك"
     ]
     var url: URL {
         switch self {
+        case .money: URL(string: "madar://mal")!
         case .lobby: URL(string: "madar://bahw")!
         case .salah: URL(string: "madar://salah")!
         case .quran: URL(string: "madar://quran")!
@@ -44,4 +45,10 @@ struct OpenRoomIntent: AppIntent {
     func perform() async throws -> some IntentResult & OpensIntent {
         .result(opensIntent: OpenURLIntent(room.url))
     }
+}
+
+struct OpenMoneyExpenseIntent: AppIntent {
+    static let title: LocalizedStringResource = "سجّل مصروفًا"
+    static let supportedModes: IntentModes = .foreground
+    func perform() async throws -> some IntentResult & OpensIntent { .result(opensIntent: OpenURLIntent(URL(string: "madar://mal/add")!)) }
 }

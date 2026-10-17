@@ -13,6 +13,11 @@ extension AppSession {
         guard !(try c.fetch(FetchDescriptor<DeviceSetting>())).contains(where: { $0.key == "sys.moneyFixture" }) else { return }
         for key in ["sys.moneyFixture", "sys.onboardingCompleted"] { let marker = DeviceSetting(); marker.key = key; marker.valueJSON = Data("true".utf8); c.insert(marker) }
         _ = try SettingsStore(context: c).stage(["core.dayStart": .string("midnight"), "core.faceIDLock": .string("none"), "core.hideMoneyUntilTouch": .bool(["zakatHidden", "travelHidden", "hidden", "cardsHidden", "analysisHidden", "reconcileHidden", "cashbackHidden"].contains(variant))])
+        if ProcessInfo.processInfo.environment["MADAR_UI_MONEY_BLOCK_SIZE"] == "4x4" {
+            let store = try SettingsStore(context: c)
+            var layout = try store.value(for: "bahw.layout").object ?? [:], sizes = layout["sizes"]?.object ?? [:]
+            sizes["mal"] = .string("4x4"); layout["sizes"] = .object(sizes); _ = try store.stage(["bahw.layout": .object(layout)])
+        }
         guard variant != "empty" else { try c.save(); return }
         let zone = ActivePlace.riyadh.timeZone, now = prayerNow(), today = GregorianDay.containing(prayerNow(), in: ActivePlace.riyadh.timeZone)
         // «نزل الراتب» arrives at the end of a full cycle; the other variants sit five days into theirs.

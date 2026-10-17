@@ -5,8 +5,8 @@ enum QuranNightColors {
     static let background = MadarToken.colors["rooms.quran.qiyam.bg"] ?? .black
     static let during = MadarToken.colors["rooms.quran.qiyam.duringPrayer"] ?? .black
     static let text = MadarToken.colors["rooms.quran.qiyam.text"] ?? .white
-    static let gold = Color(red:226.0/255,green:201.0/255,blue:120.0/255)
-    static let ink = Color(red:31.0/255,green:42.0/255,blue:23.0/255)
+    static let gold = MadarToken.colors["rooms.quran.light.gold"] ?? .primary
+    static let ink = MadarToken.colors["widgetIdentity.room.quran.light.ink"] ?? .primary
 }
 struct QuranQiyamView:View {
     let service:AppQuranService

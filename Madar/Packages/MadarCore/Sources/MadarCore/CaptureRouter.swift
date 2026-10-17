@@ -1,7 +1,7 @@
 import Foundation
 
 /// §9 single capture: one free sentence goes to the room that owns it. Routing follows the
-/// built rooms only: before M5 there is no money branch and before M6 «فكرة:» stays in the diary.
+/// built rooms only: M5 money opens its confirmation sheet; before M6 «فكرة:» stays in the diary.
 public enum CaptureRoute: Equatable, Sendable {
     public enum LineKind: String, Sendable { case line, idea }
     /// A complete prayer report: prayer and congregation state were both said.
@@ -10,6 +10,8 @@ public enum CaptureRoute: Equatable, Sendable {
     case choosePrayerStatus(prayer: Prayer, fridayKind: FridayPrayerKind?)
     /// Anything else is a line on today's diary page, kept exactly as written.
     case diaryLine(text: String, kind: LineKind)
+    /// Amount is a decimal major-unit string; the app applies its chosen home currency.
+    case moneyExpense(amount: String, merchant: String)
     case empty
     case tooLong
 }
@@ -22,9 +24,22 @@ public enum CaptureRouter {
         guard !text.isEmpty else { return .empty }
         guard text.count <= maximumLength else { return .tooLong }
         if let prayer = prayerReport(text) { return prayer }
+        if let expense = moneyReport(text) { return expense }
         let folded = fold(text)
         let isIdea = folded.hasPrefix("فكره:") || folded.hasPrefix("فكره :")
         return .diaryLine(text: text, kind: isIdea ? .idea : .line)
+    }
+
+    private static func moneyReport(_ text: String) -> CaptureRoute? {
+        guard let regex = try? NSRegularExpression(pattern: #"^(.{1,80}?)\s+([0-9٠-٩۰-۹]+(?:[٫.][0-9٠-٩۰-۹]+)?)$"#),
+              let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+              let merchantRange = Range(match.range(at: 1), in: text), let amountRange = Range(match.range(at: 2), in: text) else { return nil }
+        var merchant = String(text[merchantRange]), folded = fold(merchant)
+        let explicit = folded.hasPrefix("مصروف:") || folded.hasPrefix("مصروف ")
+        if explicit { merchant = String(merchant.dropFirst(6)).trimmingCharacters(in: .whitespacesAndNewlines); folded = fold(merchant) }
+        let names = ["قهوه", "بقاله", "بنزين", "مطعم", "مواقف", "مواصلات", "فطور", "غداء", "عشاء", "صيدليه", "مشتريات"]
+        guard !merchant.isEmpty, explicit || names.contains(where: { folded == $0 || folded.hasPrefix($0 + " ") }) else { return nil }
+        return .moneyExpense(amount: String(text[amountRange]), merchant: merchant)
     }
 
     /// Strict on purpose: a sentence with words beyond the prayer report («مع أبي») keeps its

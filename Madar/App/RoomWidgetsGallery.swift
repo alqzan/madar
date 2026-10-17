@@ -25,6 +25,7 @@ struct RoomWidgetsGallery:View {
                         preview(.habits,family:.systemSmall,template:"today").frame(height:170)
                     }
                     preview(.upcoming,family:.systemMedium,template:"upcoming").frame(height:180)
+                    Link(destination:URL(string:"madar://mal")!){previewContent(.money,family:.systemMedium,template:"now")}.buttonStyle(.plain).frame(height:180).accessibilityIdentifier("room-widget-money")
                     Text("السنة وسطر اليوم").font(MadarTypography.section())
                     preview(.year,family:.systemMedium,template:"both").frame(height:185)
                     Link(destination:URL(string:BuiltRoomWidget.diaryWrite.route)!) {previewContent(.diaryWrite,family:.systemSmall,template:"write")}.buttonStyle(.plain).frame(height:170).accessibilityIdentifier("room-widget-diaryWrite")
@@ -51,6 +52,6 @@ struct RoomWidgetsGallery:View {
     }
     private func preview(_ room:BuiltRoomWidget,family:WidgetFamily,template:String)->some View {previewContent(room,family:family,template:template).accessibilityIdentifier("room-widget-"+room.rawValue)}
     private func previewContent(_ room:BuiltRoomWidget,family:WidgetFamily,template:String)->some View {
-        RoomWidgetContent(room:room,snapshot:snapshot(room),template:template,family:family).padding(14).frame(maxWidth:.infinity,maxHeight:.infinity).background(theme.surface,in:.rect(cornerRadius:24))
+        RoomWidgetContent(room:room,snapshot:snapshot(room),template:template,family:family).padding(14).frame(maxWidth:.infinity,maxHeight:.infinity).background(room == .money ? (MadarToken.colors["widgetIdentity.room.mal.\(session.string("core.theme") == "dark" ? "dark" : "light").bg"] ?? theme.surface) : theme.surface,in:.rect(cornerRadius:24))
     }
 }

@@ -53,6 +53,7 @@ struct MadarRootView: View {
                 else { BahwLobbyView(session: session) }
             }
         }
+        .fullScreenCover(item: $session.moneyExpenseSeed) { seed in MoneyQuickExpense(app: session, seed: seed) }
         .font(MadarTypography.body())
         .environment(\.roomTheme, theme)
         .dynamicTypeSize(effectiveType)

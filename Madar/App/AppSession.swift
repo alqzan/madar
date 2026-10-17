@@ -21,6 +21,7 @@ final class AppSession {
     /// M4-V03: «السنة وما يهمّك» pushed from the lobby (`madar://bahw/year`).
     var yearOpen = false
     var moneyOpen = false
+    var moneyExpenseSeed: MoneyExpenseSeed?
     var habitsOpen = false
     /// A capture named a prayer without its state; the prayer home opens that prayer's log sheet.
     var prayerLogRequest: Prayer?
@@ -377,6 +378,10 @@ final class AppSession {
             var components=URLComponents(url:url,resolvingAgainstBaseURL:false)
             if components?.host == "prayer" {components?.host="salah"} // Existing placed widgets used this legacy alias.
             let route = try RouteRegistry.parse(components?.url ?? url, context: context)
+            if route.room == .mal, route.path == ["add"] {
+                let raw = route.parameters["amount"].flatMap(Int.init).map { AppMoneyService(app: self).moneyInput($0) } ?? ""
+                moneyExpenseSeed = .init(amount: raw, merchant: String((route.parameters["merchant"] ?? "").prefix(80)), homeCurrency: true); return
+            }
             if route.room == .mal, route.path.isEmpty || route.path == ["now"] { selectedTab = "customize"; moneyOpen = true; return }
             if route.room == .salah,route.path.isEmpty {selectedTab="prayer";return}
             if route.room == .bahw,route.path.isEmpty {selectedTab="foundation";return}

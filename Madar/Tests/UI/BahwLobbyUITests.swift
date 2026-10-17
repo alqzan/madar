@@ -12,9 +12,9 @@ import XCTest
         XCTAssertTrue(element("bahw-greeting").waitForExistence(timeout: 15), app.debugDescription)
         XCTAssertEqual(element("bahw-greeting").label, "مساء الخير")
         XCTAssertFalse(element("bahw-date").label.contains("·"))
-        for block in ["habits", "salah", "quran", "year", "upcoming"] { XCTAssertTrue(element("bahw-block-" + block).exists, block) }
-        // Rooms not built yet have no entry point (money and Mihbara wait for M5/M6; habits shipped in M4).
-        for block in ["mal", "mihbara"] { XCTAssertFalse(element("bahw-block-" + block).exists, block) }
+        for block in ["habits", "salah", "quran", "mal", "year", "upcoming"] { XCTAssertTrue(element("bahw-block-" + block).exists, block) }
+        // Mihbara waits for M6; money is now built in M5.
+        for block in ["mihbara"] { XCTAssertFalse(element("bahw-block-" + block).exists, block) }
         XCTAssertTrue(element("bahw-salah-next").label.contains("المغرب"), element("bahw-salah-next").label)
         capture(app, "M4-V01-lobby-L")
         app.swipeUp(); XCTAssertTrue(element("bahw-block-notes").waitForExistence(timeout: 5)); capture(app, "M4-V01-lobby-s1-L")

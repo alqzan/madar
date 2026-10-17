@@ -2,6 +2,7 @@ import Foundation
 import MadarCore
 import MadarPrayer
 import MadarCommands
+import MadarMoney
 import SwiftData
 
 /// A Siri/Shortcuts request that needs the app's own command path (RA2) and its lock gate.
@@ -62,6 +63,9 @@ extension AppSession {
             return true
         case .capture(let text, let id):
             switch CaptureRouter.route(text) {
+            case .moneyExpense(let amount, let merchant):
+                guard let exp = CurrencyExponents.specified.exponent(string("core.currency")), let n = MoneyAmountInput.minor(amount, exponent: exp), n > 0 else { errorMessage = "راجع مبلغ المصروف وعملته."; return true }
+                moneyExpenseSeed = .init(id: id, amount: amount, merchant: merchant, homeCurrency: true); return true
             case .empty: errorMessage = "لم يصل نص لالتقاطه."; return true
             case .tooLong: errorMessage = "النص أطول من سطر واحد في صفحة اليوم (٢٠٠٠ حرف)."; return true
             case .diaryLine(let line, _): return await addDiaryLineFromIntent(text: line, day: "today", id: id)

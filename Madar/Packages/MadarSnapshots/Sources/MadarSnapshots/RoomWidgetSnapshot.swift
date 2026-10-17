@@ -1,10 +1,10 @@
 import Foundation
 
 public enum BuiltRoomWidget:String,CaseIterable,Codable,Sendable {
-    case habits, year, upcoming, diaryWrite
-    public var title:String {switch self{case .habits:"العادات";case .year:"السنة";case .upcoming:"الأيام القادمة";case .diaryWrite:"سطر سريع"}}
-    public var glyph:String {switch self{case .habits:"MadarHabits";case .year:"MadarYear";case .upcoming:"MadarUpcoming";case .diaryWrite:"MadarDiary"}}
-    public var route:String {switch self{case .habits:"madar://bahw/habits";case .year,.upcoming:"madar://bahw/year";case .diaryWrite:"madar://notes/write"}}
+    case habits, year, upcoming, diaryWrite, money
+    public var title:String {switch self{case .money:"المال";case .habits:"العادات";case .year:"السنة";case .upcoming:"الأيام القادمة";case .diaryWrite:"سطر سريع"}}
+    public var glyph:String {switch self{case .money:"MadarMoney";case .habits:"MadarHabits";case .year:"MadarYear";case .upcoming:"MadarUpcoming";case .diaryWrite:"MadarDiary"}}
+    public var route:String {switch self{case .money:"madar://mal";case .habits:"madar://bahw/habits";case .year,.upcoming:"madar://bahw/year";case .diaryWrite:"madar://notes/write"}}
 }
 /// Fixed room templates, never a maker configuration or a store handle. Diary rows exist only with the RD7 opt-in.
 public struct RoomWidgetSnapshot:Codable,Sendable,Equatable {

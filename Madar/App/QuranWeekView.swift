@@ -58,7 +58,7 @@ struct QuranWeekView: View {
                                         Circle().trim(from: 0, to: min(1, Double(day.hifz))).stroke(theme.color("gold"), lineWidth: 4).rotationEffect(.degrees(-90)).scaleEffect(x: -1, y: 1)
                                         Circle().stroke(theme.color("track"), lineWidth: 3).padding(7)
                                         Circle().trim(from: 0, to: min(1, Double(day.review) / 8)).stroke(theme.color("review"), lineWidth: 3).padding(7).rotationEffect(.degrees(-90)).scaleEffect(x: -1, y: 1)
-                                        if day.closed { Image(systemName: "checkmark").font(.system(size: 10, weight: .bold)).foregroundStyle(theme.color("reviewText")) }
+                                        if day.closed { Image(systemName: "checkmark").font(.system(size: 11, weight: .bold)).foregroundStyle(theme.color("reviewText")) }
                                     }.frame(width: 38, height: 38)
                                     Text(day.label).font(font(11, bold: day.today)).foregroundStyle(theme.secondaryInk)
                                 }.frame(maxWidth: .infinity, minHeight: 62)

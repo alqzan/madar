@@ -16,3 +16,11 @@ struct HabitsRoomControl:ControlWidget {
         }.displayName("عاداتك").description("يفتح عاداتك لتختار ما تسجّله.")
     }
 }
+
+struct MoneyExpenseControl: ControlWidget {
+    var body: some ControlWidgetConfiguration {
+        StaticControlConfiguration(kind: "com.alqzan.madar2.money-expense") {
+            ControlWidgetButton(action: OpenMoneyExpenseIntent()) { Label("مصروف", systemImage: "plus.circle") }
+        }.displayName("مصروف").description("يفتح تسجيل مصروف، دون عرض رصيدك.")
+    }
+}

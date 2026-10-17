@@ -42,7 +42,7 @@ struct LogExpenseIntent: AppIntent {
     static let description = IntentDescription("يحفظ مصروفًا للمراجعة، وتختار حسابه وتوزيعه داخل مدار.")
     static let openAppWhenRun = false
     static let authenticationPolicy: IntentAuthenticationPolicy = .requiresAuthentication
-    static let isDiscoverable = false
+    static let isDiscoverable = true
     @Parameter(title: "المبلغ") var amount: String
     @Parameter(title: "العملة", default: "SAR") var currency: String
     @Parameter(title: "التاجر") var merchant: String?

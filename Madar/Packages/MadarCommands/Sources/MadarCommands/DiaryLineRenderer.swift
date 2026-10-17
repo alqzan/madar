@@ -3,6 +3,7 @@ import SwiftData
 import MadarCore
 import MadarData
 import MadarPrayer
+import MadarMoney
 
 public struct DiaryAutoLine: Identifiable, Codable, Equatable, Sendable {
     public let id: String
@@ -39,6 +40,16 @@ public struct DiaryAutoLine: Identifiable, Codable, Equatable, Sendable {
             guard row.kind != "drill" else { continue }
             let text = row.kind == "hifz" ? "حفظت من القرآن" : row.kind == "qiyam" ? "راجعت من محفوظي في القيام" : "راجعت من محفوظي"
             lines.append(.init(id: "quran." + row.id.uuidString, at: row.endedAt, text: text, kind: "quran"))
+        }
+        let money = MoneyRepository(context: context)
+        let settings = try SettingsStore(context: context)
+        let digits = MadarNumberFormatter(style: try settings.value(for: "core.numerals") == .string("western") ? .western : .hindi)
+        for row in try money.confirmedTransactions() where row.dayKey == day.description && row.showInDiary && visible("mal", row.id) {
+            let charge = try money.effect(of: row, includingExcluded: true).budgetChargeMinor
+            guard charge != 0, let exponent = CurrencyExponents.specified.exponent(row.homeCurrency) else { continue }
+            let amount = digits.amount(minorUnits: Int64(abs(charge)), fractionDigits: exponent, signed: false)
+            let currency = row.homeCurrency == "SAR" ? "ر.س" : row.homeCurrency
+            lines.append(.init(id: "mal." + row.id.uuidString, at: row.eventAt, text: (charge > 0 ? "صرفت " : "استعدت ") + amount + " " + currency, kind: "mal"))
         }
         return lines.sorted { $0.at == $1.at ? $0.id < $1.id : $0.at < $1.at }
     }

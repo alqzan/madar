@@ -3,6 +3,8 @@ import MadarCore
 import SwiftData
 import MadarCommands
 import MadarDesign
+import MadarSnapshots
+import WidgetKit
 
 /// The five built lobby blocks at the four sizes (§7.1 «ما تعرضه كل ودجة»). Room identities: prayer warm paper with
 /// gold arches, Quran green cover with gold, diary the day's photo, year and upcoming on lobby paper.
@@ -24,7 +26,7 @@ struct BahwBlockView: View {
             .overlay { RoundedRectangle(cornerRadius: 22).stroke(block == .quran ? room.color("gold").opacity(0.35) : room.line) }
             .clipShape(.rect(cornerRadius: 22))
     }
-    private var background: Color { block == .quran ? room.color("cover") : room.surface }
+    private var background: Color { if block == .mal { return MadarToken.colors["widgetIdentity.room.mal.\(dark ? "dark" : "light").bg"] ?? lobby.surface }; return block == .quran ? room.color("cover") : room.surface }
     private var digits: MadarNumberFormatter { service.digits }
     private var big: Font { .custom("thmanyahserifdisplay-Bold", size: size == .icon ? 22 : 40, relativeTo: .largeTitle) }
     private var label: Font { .custom("thmanyahsans-Bold", size: 14, relativeTo: .footnote) }
@@ -32,6 +34,7 @@ struct BahwBlockView: View {
 
     @ViewBuilder private var content: some View {
         switch block {
+        case .mal: money
         case .habits: habits
         case .salah: salah
         case .quran: quran
@@ -43,6 +46,13 @@ struct BahwBlockView: View {
     }
     private func title(_ color: Color) -> some View {
         Label { Text(block.title) } icon: { MadarGlyph(block.symbol, size: 17) }.font(label).foregroundStyle(color).labelStyle(.titleAndIcon).lineLimit(1)
+    }
+
+    @ViewBuilder private var money: some View {
+        if size == .icon {
+            let payload = service.session.moneyWidgetPayload(hidden: service.session.bool("core.hideMoneyUntilTouch"), at: service.now)
+            VStack(spacing: 2) { Text("لك الآن").font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)); Text(payload.rows.first?.value ?? "افتح").font(big).lineLimit(1).minimumScaleFactor(0.7) }.frame(maxWidth: .infinity, maxHeight: .infinity).foregroundStyle(MadarToken.colors["widgetIdentity.room.mal.\(dark ? "dark" : "light").ink"] ?? lobby.ink)
+        } else { MoneyWidgetContent(snapshot: service.session.moneyWidgetPayload(hidden: service.session.bool("core.hideMoneyUntilTouch"), at: service.now), family: size == .icon ? .accessoryCircular : size == .small ? .systemSmall : size == .wide ? .systemMedium : .systemLarge, template: size == .wide ? "basis" : "now") }
     }
 
     private var habits: some View {

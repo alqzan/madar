@@ -7,6 +7,7 @@ import MadarMoney
 struct MoneyExpenseView: View {
     let app: AppSession
     @Binding var revealed: Bool
+    var seed: MoneyExpenseSeed? = nil
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -84,7 +85,7 @@ struct MoneyExpenseView: View {
             .environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar, .tabBar)
             .scrollDismissesKeyboard(.interactively)
             .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تم") { editing = false } } }
-            .task { load() }.accessibilityIdentifier("money-expense")
+            .task { load(); if let seed { raw = seed.amount; merchant = seed.merchant; commandID = seed.id; if seed.homeCurrency { foreign = false } } }.accessibilityIdentifier("money-expense")
             .fullScreenCover(item: $bigRoute) { route in
                 MoneyBigExpenseView(app: app, route: route, revealed: $revealed) { bigRoute = nil; dismiss() }
             }

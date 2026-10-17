@@ -7,7 +7,7 @@ import MadarDesign
 /// habits, money and Mihbara keep their slots in `bahw.layout` but have no entry point until they are built.
 enum BahwBlock: String, CaseIterable {
     case habits, salah, quran, mal, year, upcoming, notes, mihbara
-    static let built: Set<BahwBlock> = [.habits, .salah, .quran, .year, .upcoming, .notes]
+    static let built: Set<BahwBlock> = [.habits, .salah, .quran, .mal, .year, .upcoming, .notes]
     var title: String {
         switch self { case .habits: "عاداتك"; case .salah: "الصلاة"; case .quran: "القرآن"; case .mal: "المال"; case .year: "السنة"; case .upcoming: "الأيام القادمة"; case .notes: "المذكرات"; case .mihbara: "المحبرة" }
     }
@@ -167,6 +167,7 @@ struct BahwLobbyView: View {
     private func open(_ block: BahwBlock) {
         guard !arranging else { return }
         if block == .habits { session.habitsOpen = true }
+        else if block == .mal { session.open(URL(string: "madar://mal")!) }
         else if block == .notes, (service.diary()?.count ?? 0) == 0 { session.open(URL(string: "madar://notes/write")!) }
         else if let tab = block.tab { session.selectedTab = tab }
         else if block == .year || block == .upcoming { session.yearOpen = true }

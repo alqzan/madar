@@ -23,7 +23,7 @@ struct RoomWidgetContent:View {
         return Array(values.prefix(capacity))
     }
     private var accessory:Bool{[WidgetFamily.accessoryInline,.accessoryCircular,.accessoryRectangular].contains(family)}
-    var body:some View {Group{if accessory{accessoryContent}else{home}}}
+    var body:some View {Group{if room == .money { MoneyWidgetContent(snapshot: snapshot, family: family, template: template) } else if accessory{accessoryContent}else{home}}}
     private var home:some View {
         VStack(alignment:.leading,spacing:8) {
             HStack(spacing:6) { Image(room.glyph).renderingMode(.template).resizable().scaledToFit().frame(width:16,height:16).widgetAccentable();Text(diaryRow?.title ?? room.title).font(.custom("thmanyahsans-Bold",size:13,relativeTo:.caption));Spacer(minLength:0);if room == .habits && family == .systemMedium {Text(snapshot?.heading ?? "").font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).privacySensitive()} }.foregroundStyle(accent)

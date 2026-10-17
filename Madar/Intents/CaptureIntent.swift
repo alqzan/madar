@@ -1,12 +1,12 @@
 import AppIntents
 import Foundation
+import MadarCore
 
 /// §9 single capture. Runs in the app process (RA2) through an in-process handoff, never a public
-/// link, and lands with the room's own confirmation and 10-minute undo. Before M5/M6 «قهوة ١٨» and
-/// «فكرة: …» become lines on today's page. The dialog never repeats the text (§14).
+/// link, and lands with the room's own confirmation and 10-minute undo. Money opens its confirmation sheet; before M6 «فكرة: …» becomes a diary line. The dialog never repeats the text (§14).
 struct CaptureIntent: AppIntent {
     static let title: LocalizedStringResource = "التقط في مدار"
-    static let description = IntentDescription("جملة واحدة تذهب إلى غرفتها: «صليت العصر جماعة» إلى الصلاة، وغيرها سطرًا في صفحة اليوم.")
+    static let description = IntentDescription("جملة واحدة تذهب إلى غرفتها: «صليت العصر جماعة» إلى الصلاة، «قهوة ١٨» إلى تأكيد المصروف، وغيرها سطرًا في صفحة اليوم.")
     static let supportedModes: IntentModes = .foreground
     static let authenticationPolicy: IntentAuthenticationPolicy = .requiresAuthentication
 
@@ -21,6 +21,7 @@ struct CaptureIntent: AppIntent {
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let applied = await MadarIntentHandoff.shared.submit(.capture(text: text, id: UUID()))
+        if case .moneyExpense = CaptureRouter.route(text) { return .result(dialog: "راجع المصروف واعتمده في مدار.") }
         return .result(dialog: applied ? "أُضيف." : Self.heldDialog)
     }
 }
