@@ -1,0 +1,38 @@
+import Foundation
+import SwiftData
+import MadarCore
+import MadarData
+import MadarMoney
+
+/// M5-V19 / RM5: the account rules the intake, `money.saveAccount`, «الحسابات» share.
+@MainActor public enum MoneyAccountRules {
+    /// RM5: a message belongs to an account when its sender is the account's bank (or one of its sender names) and the
+    /// message names the account's last 4 digits.
+    public static func matches(_ account: Account, sender: String, last4: String?) -> Bool {
+        guard let last4, account.last4 == last4 else { return false }
+        let name = BankDedupe.normalize(sender)
+        return BankDedupe.normalize(account.bank) == name || account.senderIDs.map(BankDedupe.normalize).contains(name)
+    }
+
+    /// A movement, including an undoable tombstone, refers to the account, directly or through a card linked to it. Its opening balance, currency,
+    /// ownership, tracking and kind are then fixed: changing them would rewrite numbers already shown; reconciliation
+    /// owns later corrections.
+    public static func hasMovements(_ id: UUID, in context: ModelContext) throws -> Bool {
+        if try context.fetch(FetchDescriptor<Reconciliation>()).contains(where: { $0.accountID == id }) { return true }
+        let cards = Set(try context.fetch(FetchDescriptor<Card>()).filter { $0.accountID == id }.map(\.id))
+        return try context.fetch(FetchDescriptor<MoneyTransaction>()).contains { row in
+            row.fromAccountID == id || row.toAccountID == id || row.cardID.map(cards.contains) == true
+        }
+    }
+
+    /// Two live accounts at one bank with the same last 4 would both stop matching their messages (intake needs one match).
+    public static func duplicateLast4(_ last4: String?, bank: String, excluding id: UUID, in context: ModelContext) throws -> Bool {
+        guard let last4, !last4.isEmpty else { return false }
+        let name = BankDedupe.normalize(bank)
+        return try context.fetch(FetchDescriptor<Account>()).contains { other in
+            other.id != id && live(other) && other.last4 == last4 && BankDedupe.normalize(other.bank) == name
+        }
+    }
+
+    private static func live<T: MadarRecordModel>(_ row: T) -> Bool { (try? row.record().isLive) == true }
+}

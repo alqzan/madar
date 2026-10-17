@@ -8,7 +8,7 @@ import MadarCommands
 extension AppSession {
     /// Named synthetic stores only. Never reads or writes the owner's store.
     func prepareMoneyFixture(group: URL) throws {
-        guard let variant = ProcessInfo.processInfo.environment["MADAR_UI_MONEY_FIXTURE"], ["expense", "showcase", "empty", "hidden", "zero", "shortfall", "messages", "since", "rules", "salary", "budget", "cards", "cardsHidden", "analysis", "analysisHidden", "reconcile", "reconcileHidden", "cashback", "cashbackHidden"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
+        guard let variant = ProcessInfo.processInfo.environment["MADAR_UI_MONEY_FIXTURE"], ["accounts", "expense", "showcase", "empty", "hidden", "zero", "shortfall", "messages", "since", "rules", "salary", "budget", "cards", "cardsHidden", "analysis", "analysisHidden", "reconcile", "reconcileHidden", "cashback", "cashbackHidden"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         let c = ModelContext(container)
         guard !(try c.fetch(FetchDescriptor<DeviceSetting>())).contains(where: { $0.key == "sys.moneyFixture" }) else { return }
         for key in ["sys.moneyFixture", "sys.onboardingCompleted"] { let marker = DeviceSetting(); marker.key = key; marker.valueJSON = Data("true".utf8); c.insert(marker) }
@@ -57,7 +57,7 @@ extension AppSession {
         for index in 1...3 { let item = InstallmentItem(); item.obligationID = bnpl.id; item.seq = index; item.amountMinor = 40000; item.dueDate = today.adding(days: index * 20).date(in: zone); c.insert(item) }
         try c.save()
         let cashback = variant.hasPrefix("cashback")
-        if variant == "cards" || variant == "cardsHidden" || cashback {
+        if variant == "cards" || variant == "cardsHidden" || variant == "accounts" || cashback {
             var calendar = Calendar(identifier: .gregorian); calendar.timeZone = zone
             card.name = "البطاقة الأساسية"; card.limitMinor = 2_000_000; card.cashbackBp = 50; card.aprBp = 2_400; card.network = "Visa"
             card.fieldSourcesJSON = try JSONSerialization.data(withJSONObject: ["limitMinor": "entered", "cashbackBp": "entered", "aprBp": "entered"])
@@ -195,6 +195,10 @@ extension AppSession {
                 await executeFixtureCommand(.init(name: MoneyCommandPayload.intakeName, payload: .object(["text": .string("راتب\n*5512\n40000.00 SAR\n\(f.string(from: today.date(in: zone))) 00:01"), "sender": .string("بنك الاختبار"), "receivedAt": .string(ISO8601DateFormatter().string(from: at))]), source: .shortcut, issuedAt: at))
                 try? reload()
             }
+        }
+        if variant == "accounts" {
+            let wallet = Account(); wallet.name = "المحفظة الرقمية"; wallet.kind = "wallet"; wallet.balanceAt = cycle.start; c.insert(wallet)
+            let other = Account(); other.name = "حساب آخر"; other.bank = "بنك الاختبار"; other.last4 = "9999"; other.ownership = "notMine"; other.balanceMinor = 1_420_000; other.balanceAt = cycle.start; c.insert(other); try c.save()
         }
         if variant == "expense" {
             let cash = Account(); cash.name = "محفظة النقد"; cash.kind = "cash"; cash.balanceMinor = 30_000; cash.balanceAt = cycle.start; c.insert(cash)

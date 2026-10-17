@@ -864,4 +864,57 @@ import MadarInbox
         #expect(!MoneyCommandPayload.validate(name: "money.reconcile", payload: ["rows": .array([.object(["accountID": .string(f.bank.uuidString), "cardID": .string(f.credit.uuidString), "expectedMinor": .string("1"), "observedMinor": .string("1")])])]))
         #expect(!MoneyCommandPayload.validate(name: "money.reconcile", payload: ["rows": .array([line("accountID", f.bank, 1, -1)])]))
     }
+    /// M5-V19 «الحسابات»: F06 (an account that is not mine stays out of «لك فعلًا», its messages kept as ignored), RM5
+    /// (last 4 tells accounts of one bank apart) and the frozen checkpoint once movements refer to an account.
+    @Test func accountsOwnershipLast4AndCheckpoint() async throws {
+        let f = try MoneyFixture(); defer { f.clean() }; try await f.setup()
+        func account(_ id: UUID, name: String = "حساب الوالدة", bank: String = "Bank", kind: String = "current", ownership: String = "notMine", last4: String = "9999",
+                     balance: Int = 1_420_000, at: String = "2026-10-14T00:00:00Z") -> [String: MadarCore.JSONValue] {
+            ["id": .string(id.uuidString), "name": .string(name), "bank": .string(bank), "kind": .string(kind), "ownership": .string(ownership),
+             "currency": .string("SAR"), "balanceMinor": .string(String(balance)), "balanceAt": .string(at), "last4": .string(last4)]
+        }
+        let mother = UUID(), before = try f.basis()
+        #expect(try await f.run("money.saveAccount", account(mother)).status == .applied)
+        #expect(try f.basis() == before, "Not mine: out of cash and «لك فعلًا»")
+        // Its message is kept as ignored and writes no movement; the shared rule still attributes it to the account.
+        _ = try await f.ingest("حوالة واردة\nإلى: 9999*\nمن: سالم\nمبلغ: 120 SAR\n2026-10-16 11:40")
+        let c = ModelContext(f.container)
+        let message = try #require(try c.fetch(FetchDescriptor<BankMessage>()).first { $0.text.contains("9999") })
+        #expect(message.status == "ignored"); #expect(try c.fetch(FetchDescriptor<MoneyTransaction>()).isEmpty)
+        let parsed = try JSONDecoder().decode(MoneyParsedFields.self, from: try #require(message.parsedJSON))
+        let row = try #require(try c.fetch(FetchDescriptor<Account>()).first { $0.id == mother })
+        #expect(MoneyAccountRules.matches(row, sender: message.sender, last4: parsed.last4))
+        #expect(!MoneyAccountRules.matches(row, sender: "Other bank", last4: parsed.last4))
+        // No movement refers to it, so it may become mine (earlier ignored messages stay ignored).
+        #expect(try await f.run("money.saveAccount", account(mother, ownership: "mine")).status == .applied)
+        #expect(try f.basis().inAccountMinor == before.inAccountMinor + 1_420_000)
+        #expect(try c.fetch(FetchDescriptor<BankMessage>()).first { $0.id == message.id }?.status == "ignored")
+
+        // RM5: the same last 4 at the same bank is refused; at another bank it is a different account.
+        #expect(try await f.run("money.saveAccount", account(UUID(), name: "نسخة", last4: "9999")).status == .rejected)
+        #expect(try await f.run("money.saveAccount", account(UUID(), name: "بنك آخر", bank: "Other", last4: "9999")).status == .applied)
+
+        // The current account has movements through its cards: ownership, kind and the opening balance are fixed; a new name is fine.
+        _ = try await f.ingest("شراء مدى Apple Pay\nبطاقة *3333\n42.00 SAR\nلدى: مقهى\n2026-10-16 09:05")
+        let current = account(f.bank, name: "current", ownership: "mine", last4: "1111", balance: 2_000_000)
+        #expect(try MoneyAccountRules.hasMovements(f.bank, in: ModelContext(f.container)))
+        var flip = current; flip["ownership"] = .string("notMine")
+        var kind = current; kind["kind"] = .string("savings")
+        var rebased = current; rebased["balanceMinor"] = .string("1")
+        for payload in [flip, kind, rebased] { #expect(try await f.run("money.saveAccount", payload).status == .rejected) }
+        var renamed = current; renamed["name"] = .string("الراجحي الجاري")
+        #expect(try await f.run("money.saveAccount", renamed).status == .applied)
+        let referenced = try #require(try ModelContext(f.container).fetch(FetchDescriptor<MoneyTransaction>()).first)
+        #expect(try await f.run("money.deleteTransaction", ["id": .string(referenced.id.uuidString)]).status == .applied)
+        #expect(try MoneyAccountRules.hasMovements(f.bank, in: ModelContext(f.container)), "An undoable tombstone still fixes the checkpoint")
+        #expect(try await f.run("money.saveAccount", kind).status == .rejected)
+        let legacyContext = ModelContext(f.container)
+        let legacy = try #require(try legacyContext.fetch(FetchDescriptor<Account>()).first { $0.id == f.bank })
+        legacy.balanceAt = nil; try legacyContext.save()
+        #expect(try await f.run("money.saveAccount", renamed).status == .applied)
+        #expect(try ModelContext(f.container).fetch(FetchDescriptor<Account>()).first { $0.id == f.bank }?.balanceAt == nil, "Renaming a legacy account never invents a checkpoint")
+
+
+
+    }
 }

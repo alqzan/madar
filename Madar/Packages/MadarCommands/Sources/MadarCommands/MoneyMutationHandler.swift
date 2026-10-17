@@ -272,19 +272,29 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
 
     private static func saveAccount(_ p: [String: MadarCore.JSONValue], _ context: ModelContext, _ now: Date, _ writer: String) throws {
         guard let id = uuid(p, "id"), let amount = MoneyCommandPayload.integer(p["balanceMinor"]),
-              let at = MoneyCommandPayload.date(p["balanceAt"]), at <= now else { throw MoneyCommandError.invalidAmount }
+              var at = MoneyCommandPayload.date(p["balanceAt"]), at <= now else { throw MoneyCommandError.invalidAmount }
         try currency(text(p, "currency"))
         let existing = try context.fetch(FetchDescriptor<Account>()).first { $0.id == id }
         guard existing == nil || live(existing!) else { throw MoneyCommandError.invalidReference }
         let row = existing ?? Account()
         if let last4 = optionalText(p, "last4"), !last4.isEmpty, !fourDigits(last4) { throw MoneyCommandError.invalidReference }
+        // M5-V19: one bank cannot hold two live accounts with the same last 4 (intake needs exactly one match).
+        if try MoneyAccountRules.duplicateLast4(optionalText(p, "last4"), bank: text(p, "bank"), excluding: id, in: context) { throw MoneyCommandError.invalidReference }
         // The initial checkpoint is immutable once movements refer to it; reconciliation owns later corrections.
-        if existing != nil, try transactions(context).contains(where: { $0.fromAccountID == id || $0.toAccountID == id || $0.cardID.flatMap { card in try? context.fetch(FetchDescriptor<Card>()).first { $0.id == card }?.accountID } == id }) {
-            guard row.currency == text(p, "currency"), row.balanceMinor == amount, row.balanceAt == at,
-                  row.ownership == text(p, "ownership"), row.tracked == (p["tracked"] != .bool(false)) else { throw MoneyCommandError.invalidReference }
+        // M5-V19: the kind too (a cash wallet's purchases are read differently). The stored instant is kept: an ISO
+        // string cannot carry its sub-second part back.
+        let fixedCheckpoint = try existing != nil && MoneyAccountRules.hasMovements(id, in: context)
+        let originalAt = row.balanceAt
+        if fixedCheckpoint {
+            guard row.currency == text(p, "currency"), row.balanceMinor == amount,
+                  row.kind == text(p, "kind"), row.ownership == text(p, "ownership"), row.tracked == (p["tracked"] != .bool(false)) else { throw MoneyCommandError.invalidReference }
+            if let stored = row.balanceAt {
+                guard abs(stored.timeIntervalSince(at)) < 1 else { throw MoneyCommandError.invalidReference }
+                at = stored
+            }
         }
         row.id = id; row.name = text(p, "name"); row.bank = text(p, "bank"); row.kind = text(p, "kind"); row.ownership = text(p, "ownership")
-        row.currency = text(p, "currency"); row.balanceMinor = amount; row.balanceAt = at; row.last4 = optionalText(p, "last4")
+        row.currency = text(p, "currency"); row.balanceMinor = amount; row.balanceAt = fixedCheckpoint ? originalAt : at; row.last4 = optionalText(p, "last4")
         row.senderIDs = strings(p["senderIDs"]); row.tracked = p["tracked"] != .bool(false); row.zakatInclude = p["zakatInclude"] != .bool(false)
         if existing == nil { row.createdAt = now; context.insert(row) }; try touch(row, now, writer)
     }
@@ -476,11 +486,7 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
                 else { row.fromAccountID = card.accountID }
             }
         } else {
-            let matching = accounts.filter { account in
-                let bank = BankDedupe.normalize(account.bank) == BankDedupe.normalize(sender)
-                    || account.senderIDs.map(BankDedupe.normalize).contains(BankDedupe.normalize(sender))
-                return bank && parsed.last4 != nil && account.last4 == parsed.last4
-            }
+            let matching = accounts.filter { MoneyAccountRules.matches($0, sender: sender, last4: parsed.last4) }
             if matching.count == 1, let account = matching.first {
                 if [.salary, .income, .transferIn, .refund, .reversal].contains(parsed.kind) { row.toAccountID = account.id }
                 else { row.fromAccountID = account.id }
