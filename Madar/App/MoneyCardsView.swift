@@ -17,6 +17,7 @@ struct MoneyCardsView: View {
     @State private var selectedDue: String?
     @State private var source: MoneySourceDetail?
     @State private var failure: String?
+    @State private var jarOpen = false
     private let tabs = ["نظرة", "متى يخرج النقد", "تقويم السداد", "المطابقة"]
     private var service: AppMoneyService { .init(app: app) }
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
@@ -61,6 +62,7 @@ struct MoneyCardsView: View {
             .toolbarVisibility(.hidden, for: .navigationBar).accessibilityIdentifier("money-cards")
             .task { load() }.onChange(of: app.prayerRevision) { load() }
             .sheet(item: $source) { MoneySourceView(app: app, detail: $0, visible: visible).environment(\.roomTheme, theme) }
+            .navigationDestination(isPresented: $jarOpen) { MoneyCashbackView(app: app, revealed: $revealed) }
     }
     private var tabStrip: some View {
         HStack(spacing: 0) {
@@ -131,6 +133,8 @@ struct MoneyCardsView: View {
                     tile("الحد الأدنى", value: c.minimumMinor.map(amount) ?? "غير معروف", secondary: "لا تكتفِ به", key: "minimum", card: c)
                     tile("الاسترداد", value: c.cashbackBp.map { service.digits.amount(minorUnits: Int64($0), fractionDigits: 2, signed: false) + "٪" } ?? "غير معروف", secondary: "تقدير الشراء", key: "cashbackBp", card: c)
                 }
+                Button { jarOpen = true } label: { HStack { Image(systemName: "drop"); Text("جرّة الاسترداد"); Spacer(); Image(systemName: "chevron.left").font(.caption) }.font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) }
+                    .buttonStyle(.plain).foregroundStyle(theme.color("reserveText")).accessibilityIdentifier("money-cards-cashback-open")
                 HStack { Text("كيف تسدّد").font(MadarTypography.cardTitle()); Spacer(); Picker("كيف تسدّد", selection: $minimum) { Text("كامل").tag(false); Text("الحد الأدنى").tag(true) }.pickerStyle(.segmented).frame(maxWidth: 180).accessibilityIdentifier("money-card-payment-choice") }
                 if minimum {
                     let unpaid = max(0, c.billedMinor - (c.minimumMinor ?? 0))

@@ -8,7 +8,7 @@ public enum MoneyCommandPayload {
     public static let names: Set<String> = [intakeName, "money.pasteBankMessages", "money.logExpense",
         "money.confirmTransaction", "money.deleteTransaction", "money.saveAccount", "money.saveCard", "money.accruePlans", "money.setReserveGoal", "money.repayEnvelopeNow", "money.setEnvelopeSaving", "money.adoptRepayment",
         "money.applyStatement", "money.ignoreMessage", "money.confirmClear", "money.markVisit",
-        "money.categorize", "money.saveMerchantRule", "money.forgetMerchantRule", "money.confirmSalary", "money.saveObligation", "money.setCategoryLimit", "money.setBudgetExclusion", "money.reconcile"]
+        "money.categorize", "money.saveMerchantRule", "money.forgetMerchantRule", "money.confirmSalary", "money.saveObligation", "money.setCategoryLimit", "money.setBudgetExclusion", "money.reconcile", "money.setCardCashback"]
     /// §7.5 maxRepayCycles: the longest salary repayment (the envelope sheet offers 1–6).
     public static let maxRepaySalaries = 12
     /// M5-X00: the budget-ignore stamp's optional reason.
@@ -48,6 +48,9 @@ public enum MoneyCommandPayload {
             return Set(p.keys).subtracting(["reason"]) == ["id", "excluded", "expectedExcluded"] && id("id")
                 && ["excluded", "expectedExcluded"].allSatisfy { p[$0] == .bool(true) || p[$0] == .bool(false) }
                 && (p["reason"] == nil || (p["excluded"] == .bool(true) && text("reason", max: maxReasonLength, empty: true)))
+        case "money.setCardCashback":
+            // §7.5 «يدخل يدويًا مرة: نسبة الاسترداد»: basis points 0…10 000, or null to make it unknown again.
+            return Set(p.keys) == ["id", "cashbackBp"] && id("id") && (p["cashbackBp"] == .null || (integer(p["cashbackBp"]).map { (0...10_000).contains($0) } ?? false))
         case "money.setEnvelopeSaving": return Set(p.keys) == ["id", "amountMinor", "expectedMinor"] && id("id") && integer(p["expectedMinor"]) != nil && (integer(p["amountMinor"]).map { $0 >= 0 } ?? false)
         case "money.adoptRepayment": return Set(p.keys) == ["id", "debtMinor", "salaries"] && id("id") && positive("debtMinor") && (integer(p["salaries"]).map { (1...maxRepaySalaries).contains($0) } ?? false)
         case "money.repayEnvelopeNow": return Set(p.keys) == ["id", "source", "debtMinor"] && id("id") && choices("source", ["surplus", "reserve"]) && positive("debtMinor")

@@ -8,11 +8,11 @@ import MadarCommands
 extension AppSession {
     /// Named synthetic stores only. Never reads or writes the owner's store.
     func prepareMoneyFixture(group: URL) throws {
-        guard let variant = ProcessInfo.processInfo.environment["MADAR_UI_MONEY_FIXTURE"], ["showcase", "empty", "hidden", "zero", "shortfall", "messages", "since", "rules", "salary", "budget", "cards", "cardsHidden", "analysis", "analysisHidden", "reconcile", "reconcileHidden"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
+        guard let variant = ProcessInfo.processInfo.environment["MADAR_UI_MONEY_FIXTURE"], ["showcase", "empty", "hidden", "zero", "shortfall", "messages", "since", "rules", "salary", "budget", "cards", "cardsHidden", "analysis", "analysisHidden", "reconcile", "reconcileHidden", "cashback", "cashbackHidden"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         let c = ModelContext(container)
         guard !(try c.fetch(FetchDescriptor<DeviceSetting>())).contains(where: { $0.key == "sys.moneyFixture" }) else { return }
         for key in ["sys.moneyFixture", "sys.onboardingCompleted"] { let marker = DeviceSetting(); marker.key = key; marker.valueJSON = Data("true".utf8); c.insert(marker) }
-        _ = try SettingsStore(context: c).stage(["core.dayStart": .string("midnight"), "core.faceIDLock": .string("none"), "core.hideMoneyUntilTouch": .bool(["hidden", "cardsHidden", "analysisHidden", "reconcileHidden"].contains(variant))])
+        _ = try SettingsStore(context: c).stage(["core.dayStart": .string("midnight"), "core.faceIDLock": .string("none"), "core.hideMoneyUntilTouch": .bool(["hidden", "cardsHidden", "analysisHidden", "reconcileHidden", "cashbackHidden"].contains(variant))])
         guard variant != "empty" else { try c.save(); return }
         let zone = ActivePlace.riyadh.timeZone, now = prayerNow(), today = GregorianDay.containing(prayerNow(), in: ActivePlace.riyadh.timeZone)
         // «نزل الراتب» arrives at the end of a full cycle; the other variants sit five days into theirs.
@@ -56,7 +56,8 @@ extension AppSession {
         let bnpl = Obligation(); bnpl.name = "أقساط الشراء"; bnpl.provider = "Tamara"; bnpl.kind = "installment"; bnpl.totalMinor = 120000; c.insert(bnpl)
         for index in 1...3 { let item = InstallmentItem(); item.obligationID = bnpl.id; item.seq = index; item.amountMinor = 40000; item.dueDate = today.adding(days: index * 20).date(in: zone); c.insert(item) }
         try c.save()
-        if variant == "cards" || variant == "cardsHidden" {
+        let cashback = variant.hasPrefix("cashback")
+        if variant == "cards" || variant == "cardsHidden" || cashback {
             var calendar = Calendar(identifier: .gregorian); calendar.timeZone = zone
             card.name = "البطاقة الأساسية"; card.limitMinor = 2_000_000; card.cashbackBp = 50; card.aprBp = 2_400; card.network = "Visa"
             card.fieldSourcesJSON = try JSONSerialization.data(withJSONObject: ["limitMinor": "entered", "cashbackBp": "entered", "aprBp": "entered"])
@@ -74,6 +75,32 @@ extension AppSession {
                 let s = Statement(); s.cardID = second.id; s.closeDate = calendar.date(byAdding: .month, value: offset, to: today.adding(days: -2).date(in: zone))!; s.periodStart = calendar.date(byAdding: .month, value: -1, to: s.closeDate); s.dueDate = calendar.date(byAdding: .month, value: offset, to: today.adding(days: 16).date(in: zone)); s.statementMinor = 180_000; s.minimumDueMinor = 9_000; s.closeDateSource = "message"; c.insert(s)
             }
             let message = BankMessage(); message.sender = "بنك الاختبار"; message.status = "ok"; message.text = "كشف تجريبي مجهّل: المبلغ المستحق 6800 SAR، الحد الأدنى 213 SAR"; message.kind = "statement"; message.receivedAt = statement.closeDate; c.insert(message); statement.messageID = message.id
+            try c.save()
+        }
+        if cashback, let travel = try c.fetch(FetchDescriptor<Card>()).first(where: { $0.name == "بطاقة السفر" }) {
+            // About four months of card purchases: everyday shops on the 0.5% card, online and travel on the 1.5% one, two
+            // purchases on the debit card whose rate is unknown, one linked refund, one landed cashback (a movement with its
+            // redeemed row, counted once) and one month the bank recorded as earned.
+            func buy(_ card: Card, _ merchant: String, _ category: MadarData.Category?, _ daysAgo: Int, _ amount: Int, kind: String = "expense", related: UUID? = nil) -> MoneyTransaction {
+                let day = today.adding(days: -daysAgo), tx = MoneyTransaction(); tx.kind = kind; tx.cardID = card.id; tx.method = "card"; tx.merchant = merchant; tx.categoryID = category?.id
+                tx.amountMinor = amount; tx.homeAmountMinor = amount; tx.dayKey = day.description; tx.eventAt = day.date(in: zone).addingTimeInterval(13 * 3600); tx.tzID = zone.identifier
+                tx.dayPolicy = "midnight@1"; tx.source = "bank"; tx.ignoredFromBudget = true; tx.relatedTransactionID = related; c.insert(tx); return tx
+            }
+            for n in 0..<30 {
+                let ago = 118 - n * 4
+                _ = buy(card, ["سوق الحي", "مطعم الريف", "محطة الشمال", "سوق المدينة"][n % 4], categories[[1, 0, 2, 1][n % 4]], ago, [42_000, 18_500, 14_000, 61_000][n % 4] + (n % 5) * 1_500)
+                if n % 3 == 0 { _ = buy(travel, ["متجر إلكتروني", "حجز فندق", "تذاكر الطيران"][n % 9 / 3], categories[3], ago - 1, [38_000, 96_000, 152_000][n % 9 / 3]) }
+            }
+            let returned = buy(card, "متجر الأجهزة", categories[3], 60, 90_000)
+            _ = buy(card, "متجر الأجهزة", categories[3], 52, 30_000, kind: "refund", related: returned.id)
+            _ = buy(debit, "مخبز الحي", categories[1], 20, 4_500); _ = buy(debit, "مقهى الزاوية", categories[0], 9, 2_300)
+            // «cashbackHidden» keeps the owner's realistic state: rates and purchases, nothing landed yet.
+            if variant == "cashback" {
+            let landed = MoneyTransaction(); landed.kind = "cashback"; landed.cardID = card.id; landed.method = "card"; landed.merchant = "استرداد نقدي"; landed.amountMinor = 3_500; landed.homeAmountMinor = 3_500
+            landed.dayKey = today.adding(days: -34).description; landed.eventAt = today.adding(days: -34).date(in: zone).addingTimeInterval(10 * 3600); landed.tzID = zone.identifier; landed.dayPolicy = "midnight@1"; landed.source = "bank"; c.insert(landed)
+            let redeemed = CashbackEntry(); redeemed.cardID = card.id; redeemed.kind = "redeemed"; redeemed.amountMinor = 3_500; redeemed.eventAt = landed.eventAt; redeemed.transactionID = landed.id; c.insert(redeemed)
+            }
+            let recorded = CashbackEntry(); recorded.cardID = travel.id; recorded.kind = "earned"; recorded.amountMinor = 4_200; recorded.eventAt = today.adding(days: -100).date(in: zone).addingTimeInterval(9 * 3600); c.insert(recorded)
             try c.save()
         }
         if variant == "budget" {

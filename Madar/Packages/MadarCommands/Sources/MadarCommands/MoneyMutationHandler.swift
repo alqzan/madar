@@ -129,6 +129,14 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             }
         case "money.saveAccount": try saveAccount(p, context, now, writer)
         case "money.saveCard": try saveCard(p, context, now, writer)
+        case "money.setCardCashback":
+            // M5-V16: the cashback rate entered by hand; its source becomes «entered» (Card.fieldSourcesJSON).
+            guard let cardID = uuid(p, "id"), let card = try context.fetch(FetchDescriptor<Card>()).first(where: { $0.id == cardID && live($0) }) else { throw MoneyCommandError.invalidReference }
+            let rate = MoneyCommandPayload.integer(p["cashbackBp"])
+            var sources = (try? JSONSerialization.jsonObject(with: card.fieldSourcesJSON)) as? [String: Any] ?? [:]
+            if let rate { sources["cashbackBp"] = "entered" } else { sources.removeValue(forKey: "cashbackBp") }
+            card.cashbackBp = rate; card.fieldSourcesJSON = try JSONSerialization.data(withJSONObject: sources, options: [.sortedKeys])
+            try touch(card, now, writer)
         case MoneyCommandPayload.intakeName:
             try ingest([p], batch: nil, command: id, issuedAt: issuedAt, context: context, now: now, writer: writer)
         case "money.pasteBankMessages":
