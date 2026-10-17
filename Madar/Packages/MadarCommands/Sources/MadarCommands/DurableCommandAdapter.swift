@@ -19,6 +19,7 @@ private struct SettingsInverse: Codable {
     var diaryMutation: Data? = nil
     var habitMutation: Data? = nil
     var moneyMutation: Data? = nil
+    var bookMutation: Data? = nil
 }
 private struct ReceiptNamespace: Codable {
     let version: Int
@@ -104,7 +105,7 @@ private struct ReceiptWire: Codable {
                                        undoExpiresAt: row.undoExpiresAt ?? row.createdAt,
                                        undoJSON: row.undoJSON,
                                        outcome: .init(status: CommandStatus(rawValue: row.status) ?? .rejected,
-                                                      undoToken: row.status == "applied" && ["prayer.log", "prayer.makeUp", "prayer.resolveGap", "prayer.setHeart", "prayer.logQiyam", "prayer.addOldMissed", "prayer.editTrackingStart", "prayer.startTrip", "prayer.endTrip", "prayer.logPair", "settings.set", "settings.applyPreset"].contains(row.name) || row.status == "applied" && QuranCommandPayload.names.contains(row.name) && row.undoJSON != nil || row.status == "applied" && MoneyCommandPayload.names.subtracting(["money.accruePlans"]).contains(row.name) ? id : nil))
+                                                      undoToken: row.status == "applied" && ["prayer.log", "prayer.makeUp", "prayer.resolveGap", "prayer.setHeart", "prayer.logQiyam", "prayer.addOldMissed", "prayer.editTrackingStart", "prayer.startTrip", "prayer.endTrip", "prayer.logPair", "settings.set", "settings.applyPreset"].contains(row.name) || row.status == "applied" && QuranCommandPayload.names.contains(row.name) && row.undoJSON != nil || row.status == "applied" && MoneyCommandPayload.names.subtracting(["money.accruePlans"]).contains(row.name) || row.status == "applied" && BookCommand.names.contains(row.name) && row.undoJSON != nil ? id : nil))
                 return try JSONDecoder().decode(CoreCommandReceipt.self, from: JSONEncoder().encode(wire))
             }
             // Receipt identity is authoritative even after undo/deletion or retention expiry.
@@ -180,6 +181,11 @@ private struct ReceiptWire: Codable {
                 try DiaryLineRenderer.freezeBeforeSourceChange(context: context, now: now, writer: writer)
             }
             switch request.operation {
+            case .book(let command):
+                do {
+                    let undo = try BookMutationHandler.stage(command, context: context, now: now, writer: writer)
+                    inverse = SettingsInverse(settings: [:], afterSettings: [:], layouts: [:], afterLayouts: [:], bookMutation: undo)
+                } catch DataError.invalidValue(let reason) { context.rollback(); return .init(status: .rejected, reason: reason) }
             case .money(let name, let payload):
                 do {
                     let staged = try MoneyMutationHandler.stage(name: name, payload: payload, id: request.envelope.commandID,
@@ -345,7 +351,9 @@ private struct ReceiptWire: Codable {
                     return .init(status: .rejected, reason: "undoExpired")
                 }
                 let state = try JSONDecoder().decode(SettingsInverse.self, from: data)
-                if let mutation = state.moneyMutation {
+                if let mutation = state.bookMutation {
+                    try BookMutationHandler.undo(mutation, context: context, now: now, writer: writer)
+                } else if let mutation = state.moneyMutation {
                     try MoneyMutationHandler.undo(mutation, context: context, now: now, writer: writer)
                 } else if let mutation = state.habitMutation {
                     try HabitMutationHandler.undo(mutation, context: context, now: now, writer: writer)

@@ -312,16 +312,16 @@
   {
    "id": "forty-nawawi-text",
    "kind": "text asset",
-   "source": "public-domain numbered text; edition not chosen",
-   "version": null,
+   "source": "https://ar.wikisource.org/w/index.php?title=الأربعون_النووية&oldid=500107",
+   "version": "wikisource-ar-500107",
    "commit": null,
-   "license": "public domain (text); the digital edition used needs its own terms",
-   "licenseStatus": "decision-needed",
-   "checksum": null,
-   "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
+   "license": "Nawawi matn: public domain; digital transcription attributed to Wikisource contributors, CC BY-SA 4.0; owner-confirmed permission",
+   "licenseStatus": "confirmed",
+   "checksum": "0927a9cd7c6a567cdef6507b5648e90b372151648add62a00a8122bc78065abe",
+   "checksumNote": "SHA-256 Madar/App/MihbaraResources/nawawi40.json; 42 stable numbered matn entries, including the second paragraphs in 19 and 27; commentary excluded",
    "gate": "M6",
    "usedBy": "Sunnah drawer",
-   "note": "Owner decision #13 (§15)."
+   "note": "Owner 17 Oct 2026: «ماخذ الترخيص انا»; do not ask again. Digital edition is pinned by revision, not claimed to match a scanned print edition. Source/edition/license links ship in the reader. Scientific text/source review is still required before distribution."
   },
   {
    "id": "arabic-dictionary",

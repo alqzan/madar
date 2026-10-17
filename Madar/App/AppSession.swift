@@ -103,6 +103,7 @@ final class AppSession {
         try prepareDiaryHomeFixture(group: group)
         try prepareHabitFixture(group: group)
         try prepareMoneyFixture(group: group)
+        try prepareMihbaraFixture(group: group)
         #endif
         try reload()
         let devices = try container.mainContext.fetch(FetchDescriptor<DeviceSetting>())
@@ -587,6 +588,17 @@ final class AppSession {
             Task { await refreshPrayerNotifications() }
         }
         if let token = result.undoToken { showUndo(.init(id: token, expiresAt: now.addingTimeInterval(600)), message: name == "money.confirmSalary" ? "فُتحت الدورة · التراجع متاح لعشر دقائق" : name == "money.logExpense" ? "سُجّل المصروف · التراجع متاح لعشر دقائق" : "حُفظ التغيير · التراجع متاح لعشر دقائق") }
+    }
+
+    func executeBookCommand(_ name: String, payload: [String: MadarCore.JSONValue], id: UUID = UUID()) async throws {
+        guard lockController?.canPresent(.app) ?? protectedDataAuthorized else { throw DataError.authenticationFailed }
+        guard beginWrite() else { throw BackupOperationError.busy }
+        defer { pendingWrites -= 1 }
+        let now = prayerNow()
+        let result = try await bus.execute(.init(commandID: id, name: name, payload: .object(payload), issuedAt: now), now: now)
+        guard result.status == .applied || result.status == .duplicate else { throw DataError.invalidValue(result.reason ?? "تعذّر حفظ الكتاب") }
+        try reload(); try publishSnapshot()
+        if let token = result.undoToken { showUndo(.init(id: token, expiresAt: now.addingTimeInterval(600)), message: "حُفظ في المحبرة، والتراجع متاح") }
     }
 
     var diaryStagingDirectory: URL { commandAdapter.diaryStagingDirectory }
