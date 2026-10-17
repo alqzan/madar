@@ -230,6 +230,14 @@ Owner standing rule (15 Oct): screens that match their design or better count as
 M2 screens are owner-approved; M1-F04 software blocker is resolved. M3 built screens/F01 are integrated and covered by the owner’s provisional acceptance rule. V09 is built on a synthetic export (real round-trip unverified); V12 has bounded approval for generic reminders while locked. UX-01–UX-14 are complete. M4-E02/V02, UX-15, W01/W02, F01, F02 and V12 notifications are complete; M5 follows M4 software. Keep tafsir off until its separate licence is verified. No owner-iPhone or milestone pass is claimed.
 
 # Handovers
+## Handover — M5 X00 flexible schedules, V14 analysis, M3-V09 Day One, card art, Quran Hijri-first — 2026-10-17 — Claude
+Works now: obligations repeat every N days/weeks/months/years from a free first date (schema V7), subscriptions shelf, optional reason on the budget stamp; «التحليل» screen; Day One JSON-ZIP import with preview and undo; gold/navy card art; the Quran room is Hijri first; log over-limit red arch in a shot.
+Verified: packages on merged main — MadarCore 108, MadarData 67, MadarCommands 104, MadarMoney 106 passed; make build succeeded; X00/V14/V09 UI tests passed in their worktrees (agent reports). Migration and Day One reviewed read-only: no Critical/High.
+Differences left: V11 digits/«ينتظر يرجع لك» unreviewed; V12 dates under the cash axis are one row; no owner-iPhone, dark mode or compare-screens run for the card art.
+Not verified: UI tests on merged main; a real Day One export; owner iPhone. In flight (worktree branches, not merged): V15 reconciliation, V16 cashback jar.
+Next: merge V15/V16, then V17 record an expense → V24, X01; Opus UX review of M5; apply owner's Day One review mediums (undo→re-import duplicate, wrong failure message).
+Model/effort: Claude Sonnet 5.5 + Opus 5.5 agents / not exposed. Usage: not exposed.
+
 ## Handover — M3-V09 Day One import — 2026-10-16 — Claude
 Works now: diary settings «النقل» → «من داي ون» → choose the JSON ZIP → preview (counts, both-calendar range, media, missing, tags, skipped) → «استورد» → result, open the last day, one undo; nothing written before «استورد». Imported lines keep their Markdown, original-zone time, inline media order, «مرفق ناقص»; first tag becomes a closed project.
 Verified: swift test MadarCore 99/99; MadarCommands Diary|DayOne|Replay 37/37; xcodebuild UI DiaryDayOneImportUITests 1/1 + DiaryService/Export/Search/Archive integration 6/6 on iPhone Air sim (Artifacts/M3-V09-fix.xcresult); compare-screens import → Artifacts/compare/import.html.
