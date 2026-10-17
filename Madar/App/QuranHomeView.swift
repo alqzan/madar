@@ -278,10 +278,10 @@ struct QuranHomeView: View {
             if step.id == next?.id, state?.draft == nil {
                 Button("ابدأ") { run { active = try await service.start(kind: step.kind, stepID: step.id, range: step.range, rakaat: nil, spotID: nil) } }
                     .font(bodyFont(14, bold: true)).foregroundStyle(theme.onAccent).padding(.horizontal, 20).frame(minHeight: 44)
-                    .background(theme.color("accent"), in: Capsule()).accessibilityIdentifier("quran-begin")
+                    .background(theme.color("accent"), in: Capsule()).contentShape(.capsule).disabled(busy).accessibilityIdentifier("quran-begin")
             }
             }.padding(.horizontal, step.id == next?.id ? 10 : 0).padding(.vertical, step.id == next?.id ? 6 : 0)
-                .overlay { if step.id == next?.id { RoundedRectangle(cornerRadius: 24).stroke(color.opacity(0.65), lineWidth: 1) } }
+                .overlay { if step.id == next?.id { RoundedRectangle(cornerRadius: 24).stroke(color.opacity(0.65), lineWidth: 1).allowsHitTesting(false) } }
         }
     }
     private func log(_ state: QuranRoomState) -> some View {

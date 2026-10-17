@@ -8,7 +8,7 @@ public enum MoneyCommandPayload {
     public static let names: Set<String> = [intakeName, "money.pasteBankMessages", "money.logExpense",
         "money.confirmTransaction", "money.deleteTransaction", "money.saveAccount", "money.saveCard", "money.accruePlans", "money.setReserveGoal", "money.repayEnvelopeNow", "money.setEnvelopeSaving", "money.adoptRepayment",
         "money.applyStatement", "money.ignoreMessage", "money.confirmClear", "money.markVisit",
-        "money.categorize", "money.saveMerchantRule", "money.forgetMerchantRule", "money.confirmSalary", "money.saveObligation", "money.setCategoryLimit", "money.setBudgetExclusion", "money.reconcile", "money.setCardCashback", "money.distributeBigExpense", "money.configureTrip", "money.fundTrip", "money.repriceTrip"]
+        "money.categorize", "money.saveMerchantRule", "money.forgetMerchantRule", "money.confirmSalary", "money.saveObligation", "money.setCategoryLimit", "money.setBudgetExclusion", "money.reconcile", "money.setCardCashback", "money.distributeBigExpense", "money.configureTrip", "money.fundTrip", "money.repriceTrip", "money.saveZakat"]
     /// §7.5 maxRepayCycles: the longest salary repayment (the envelope sheet offers 1–6).
     public static let maxRepaySalaries = 12
     /// M5-X00: the budget-ignore stamp's optional reason.
@@ -57,6 +57,12 @@ public enum MoneyCommandPayload {
         func choices(_ key: String, _ options: Set<String>) -> Bool { if case .string(let raw) = p[key] { options.contains(raw) } else { false } }
         func optionalText(_ key: String, max: Int = 80) -> Bool { p[key] == nil || p[key] == .null || text(key, max: max, empty: true) }
         switch name {
+        case "money.saveZakat":
+            return Set(p.keys) == ["signature", "basis", "debts", "goldPriceMinor", "silverPriceMinor", "goldMg", "silverMg", "otherMinor", "hawl"]
+                && text("signature", max: 64) && choices("basis", ["gold", "silver"])
+                && choices("debts", ["unset", "none", "dueNow", "allOwed", "allOwedAndLoan"])
+                && ["goldPriceMinor", "silverPriceMinor"].allSatisfy { p[$0] == .null || positive($0) }
+                && positive("goldMg") && positive("silverMg") && integer(p["otherMinor"]).map { $0 >= 0 } == true && text("hawl", max: 13, empty: true)
         case "money.repriceTrip":
             return Set(p.keys) == ["id", "rate", "signature"] && id("id") && text("rate", max: 40) && text("signature", max: 64)
         case "money.configureTrip":

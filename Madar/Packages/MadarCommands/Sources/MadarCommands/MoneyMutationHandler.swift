@@ -64,6 +64,33 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         }
         let before = try records(context)
         switch name {
+        case "money.saveZakat":
+            let profiles = try context.fetch(FetchDescriptor<ZakatProfile>()).filter { live($0) }
+            guard profiles.count <= 1, try MoneyRepository.zakatSignature(profiles.first) == text(p, "signature") else { throw MoneyCommandError.invalidReference }
+            let hawl = text(p, "hawl")
+            if !hawl.isEmpty {
+                let parts = hawl.hasPrefix("h:") ? String(hawl.dropFirst(2)).split(separator: "-").compactMap { Int($0) } : []
+                guard parts.count == 3, (1...9999).contains(parts[0]), (1...12).contains(parts[1]), (1...30).contains(parts[2]) else { throw MoneyCommandError.invalidReference }
+                var calendar = Calendar(identifier: .islamicUmmAlQura); calendar.timeZone = .gmt
+                guard let date = calendar.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2])), calendar.component(.day, from: date) == parts[2] else { throw MoneyCommandError.invalidReference }
+            }
+            let row: ZakatProfile
+            if let old = profiles.first { row = old }
+            else {
+                let all = try context.fetch(FetchDescriptor<ZakatProfile>())
+                guard all.count <= 1, all.first?.mergedInto == nil else { throw MoneyCommandError.invalidReference }
+                if let old = all.first {
+                    row = old; var record = try old.record()
+                    let stamp = StableIdentity.monotonic(now: now, previous: record.date("updatedAt") ?? now)
+                    try record.set(Optional<Date>.none, for: "deletedAt"); try record.set(stamp, for: "restoredAt"); try record.set(stamp, for: "updatedAt"); try record.set(writer, for: "writerID"); try old.apply(record)
+                } else { row = ZakatProfile(); row.id = StableIdentity.uuid(for: "ZakatProfile:singleton"); row.createdAt = now; context.insert(row) }
+            }
+            let gold = MoneyCommandPayload.integer(p["goldPriceMinor"]), silver = MoneyCommandPayload.integer(p["silverPriceMinor"])
+            if gold != row.goldPricePerGramMinor || profiles.isEmpty { row.goldPricePerGramMinor = gold; row.goldPriceSetAt = gold == nil ? nil : now }
+            if silver != row.silverPricePerGramMinor || profiles.isEmpty { row.silverPricePerGramMinor = silver; row.silverPriceSetAt = silver == nil ? nil : now }
+            row.nisabBasis = text(p, "basis"); row.debtsPolicy = text(p, "debts"); row.nisabMg = MoneyCommandPayload.integer(p["goldMg"]) ?? 85000; row.nisabSilverMg = MoneyCommandPayload.integer(p["silverMg"]) ?? 595000
+            row.otherAssetsMinor = MoneyCommandPayload.integer(p["otherMinor"]) ?? 0; row.hawlStartHijri = hawl
+            try touch(row, now, writer)
         case "money.repriceTrip":
             guard let tripID = uuid(p, "id"), let trip = try context.fetch(FetchDescriptor<Trip>()).first(where: { $0.id == tripID && live($0) }), trip.fxRateToHome == text(p, "rate") else { throw MoneyCommandError.invalidReference }
             let preview = try MoneyRepository(context: context).previewTripReprice(id: tripID, rate: text(p, "rate"), at: now)
@@ -979,6 +1006,7 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
     private static func records(_ context: ModelContext) throws -> [DataRecord] {
         var rows = try context.fetch(FetchDescriptor<Account>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<Trip>()).map { try $0.record() }
+        rows += try context.fetch(FetchDescriptor<ZakatProfile>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<Card>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<MoneyTransaction>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<Allocation>()).map { try $0.record() }

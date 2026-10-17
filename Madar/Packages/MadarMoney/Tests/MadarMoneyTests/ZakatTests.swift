@@ -90,3 +90,13 @@ import Testing
         #expect(ZakatEngine.assess(input, now: now).outcome == .due(amountMinor: 225_500))
     }
 }
+
+struct ZakatBoundaryTests {
+    @Test func largePricesAndWeightsCannotOverflowTheCalculation() {
+        let now=Date(timeIntervalSince1970:0)
+        let input=ZakatInput(accounts:[.init(balanceMinor:12850000)],debtsPolicy:.none,goldPricePerGramMinor:Int.max,nisabMg:Int.max)
+        #expect(ZakatEngine.assess(input,now:now).outcome == .invalidAmounts)
+        let overflow=ZakatInput(accounts:[.init(balanceMinor:Int.max),.init(balanceMinor:Int.max)],debtsPolicy:.none,goldPricePerGramMinor:40000)
+        #expect(ZakatEngine.assess(overflow,now:now).outcome == .invalidAmounts)
+    }
+}

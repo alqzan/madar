@@ -8,11 +8,11 @@ import MadarCommands
 extension AppSession {
     /// Named synthetic stores only. Never reads or writes the owner's store.
     func prepareMoneyFixture(group: URL) throws {
-        guard let variant = ProcessInfo.processInfo.environment["MADAR_UI_MONEY_FIXTURE"], ["travel", "travelMissing", "travelHidden", "accounts", "expense", "showcase", "empty", "hidden", "zero", "shortfall", "messages", "since", "rules", "salary", "budget", "cards", "cardsHidden", "analysis", "analysisHidden", "reconcile", "reconcileHidden", "cashback", "cashbackHidden"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
+        guard let variant = ProcessInfo.processInfo.environment["MADAR_UI_MONEY_FIXTURE"], ["zakat", "zakatHidden", "travel", "travelMissing", "travelHidden", "accounts", "expense", "showcase", "empty", "hidden", "zero", "shortfall", "messages", "since", "rules", "salary", "budget", "cards", "cardsHidden", "analysis", "analysisHidden", "reconcile", "reconcileHidden", "cashback", "cashbackHidden"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         let c = ModelContext(container)
         guard !(try c.fetch(FetchDescriptor<DeviceSetting>())).contains(where: { $0.key == "sys.moneyFixture" }) else { return }
         for key in ["sys.moneyFixture", "sys.onboardingCompleted"] { let marker = DeviceSetting(); marker.key = key; marker.valueJSON = Data("true".utf8); c.insert(marker) }
-        _ = try SettingsStore(context: c).stage(["core.dayStart": .string("midnight"), "core.faceIDLock": .string("none"), "core.hideMoneyUntilTouch": .bool(["travelHidden", "hidden", "cardsHidden", "analysisHidden", "reconcileHidden", "cashbackHidden"].contains(variant))])
+        _ = try SettingsStore(context: c).stage(["core.dayStart": .string("midnight"), "core.faceIDLock": .string("none"), "core.hideMoneyUntilTouch": .bool(["zakatHidden", "travelHidden", "hidden", "cardsHidden", "analysisHidden", "reconcileHidden", "cashbackHidden"].contains(variant))])
         guard variant != "empty" else { try c.save(); return }
         let zone = ActivePlace.riyadh.timeZone, now = prayerNow(), today = GregorianDay.containing(prayerNow(), in: ActivePlace.riyadh.timeZone)
         // «نزل الراتب» arrives at the end of a full cycle; the other variants sit five days into theirs.
@@ -206,6 +206,9 @@ extension AppSession {
                 let row = MoneyTransaction(); row.source = "manual"; row.reviewState = "ok"; row.method = "card"; row.cardID = debit.id; row.fromAccountID = account.id; row.merchant = name; row.categoryID = categories[index].id; row.amountMinor = 2_000; row.homeAmountMinor = 2_000; row.dayKey = today.adding(days: -1).description; row.eventAt = now.addingTimeInterval(-86_400 - Double(index)); c.insert(row)
             }
             try c.save()
+        }
+        if variant.hasPrefix("zakat") {
+            let profile = ZakatProfile(); profile.goldPricePerGramMinor = 40000; profile.goldPriceSetAt = now.addingTimeInterval(-40*86400); profile.debtsPolicy = "none"; profile.hawlStartHijri = "h:1447-09-01"; c.insert(profile); try c.save()
         }
         if variant.hasPrefix("travel") {
             let trip = Trip(); trip.city = "إسطنبول"; trip.country = "تركيا"; trip.currency = variant == "travelMissing" ? nil : "TRY"; trip.fxRateToHome = variant == "travelMissing" ? nil : "0.1"; trip.fxSetAt = now.addingTimeInterval(-86400); trip.lat = 41.0082; trip.lon = 28.9784; trip.tzID = "Europe/Istanbul"; trip.start = today.adding(days: -3).date(in: zone); trip.mode = "auto"; trip.homeKm = 2450; c.insert(trip)

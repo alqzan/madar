@@ -42,11 +42,16 @@ import XCTest
         app.terminate(); app.launch()
         XCTAssertTrue(app.buttons["quran-level-hifz-deep"].waitForExistence(timeout: 20)); waitSelected(app.buttons["quran-level-hifz-deep"])
         app.buttons["quran-level-hifz-medium"].tap()
-        app.buttons["quran-begin"].tap()
+        let begin = app.buttons["quran-begin"]
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: begin)
+        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 20), .completed)
+        begin.tap()
         XCTAssertTrue(app.buttons["quran-session-advance"].waitForExistence(timeout: 15), app.debugDescription)
         app.terminate(); app.launch()
         let resume = app.buttons["quran-resume"]
-        XCTAssertTrue(resume.waitForExistence(timeout: 20), app.debugDescription); resume.tap()
+        XCTAssertTrue(resume.waitForExistence(timeout: 20), app.debugDescription)
+        let capture = XCTAttachment(screenshot: app.screenshot()); capture.name = "M2-improve-resume-L"; capture.lifetime = .keepAlways; add(capture)
+        resume.tap()
         XCTAssertTrue(app.buttons["quran-session-advance"].waitForExistence(timeout: 15))
         app.terminate()
     }

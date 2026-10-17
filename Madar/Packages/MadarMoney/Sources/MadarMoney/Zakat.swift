@@ -47,6 +47,7 @@ public struct ZakatInput: Equatable, Sendable {
 public struct ZakatAssessment: Equatable, Sendable {
     public enum Outcome: Equatable, Sendable {
         /// debtsPolicy = unset: the screen asks before showing any number.
+        case invalidAmounts
         case askDebts
         /// No price for the chosen basis yet: the nisab cannot be known.
         case askPrice
@@ -73,14 +74,23 @@ public enum ZakatEngine {
     public static let staleAfterDays = 30
 
     public static func assess(_ input: ZakatInput, now: Date) -> ZakatAssessment {
-        let pool = input.accounts.filter { $0.owned && $0.include }.reduce(0) { $0 + $1.balanceMinor } + input.otherAssetsMinor
+        func integer(_ value: Decimal) -> Int? {
+            var source = value, rounded = Decimal(); NSDecimalRound(&rounded, &source, 0, .plain)
+            guard !rounded.isNaN, rounded >= Decimal(Int.min), rounded <= Decimal(Int.max) else { return nil }
+            return NSDecimalNumber(decimal: rounded).intValue
+        }
+        let total = input.accounts.filter { $0.owned && $0.include }.reduce(Decimal(input.otherAssetsMinor)) { $0 + Decimal($1.balanceMinor) }
+        guard let pool = integer(total), input.otherAssetsMinor >= 0, input.owedAllMinor >= 0, input.dueNowMinor >= 0, input.loanRemainingMinor >= 0,
+              input.nisabMg > 0, input.nisabSilverMg > 0 else {
+            return .init(outcome: .invalidAmounts, poolMinor: 0, deductedMinor: 0, nisabMinor: nil, goldPriceStale: false, hawlUnknown: true)
+        }
         let gold = input.nisabBasis == .gold
         let price = gold ? input.goldPricePerGramMinor : input.silverPricePerGramMinor
         let setAt = gold ? input.goldPriceSetAt : input.silverPriceSetAt
         let stale = setAt.map { now.timeIntervalSince($0) > Double(staleAfterDays) * 86_400 } ?? false
         let hawlUnknown = (input.hawlStartHijri ?? "").isEmpty
         // nisab = milligrams ÷ 1000 × price per gram (gold 24K: 85 g; silver: 595 g).
-        let nisab = price.map { MoneyMath.divideRounded((gold ? input.nisabMg : input.nisabSilverMg) * $0, by: 1_000) }
+        let nisab = price.flatMap { $0 > 0 ? integer(Decimal(gold ? input.nisabMg : input.nisabSilverMg) * Decimal($0) / 1000) : nil }
         var assessment = ZakatAssessment(outcome: .askDebts, poolMinor: pool, deductedMinor: 0, nisabMinor: nisab, goldPriceStale: stale, hawlUnknown: hawlUnknown)
         let deducted: Int
         switch input.debtsPolicy {
@@ -88,12 +98,15 @@ public enum ZakatEngine {
         case .none: deducted = 0
         case .dueNow: deducted = input.dueNowMinor
         case .allOwed: deducted = input.owedAllMinor
-        case .allOwedAndLoan: deducted = input.owedAllMinor + input.loanRemainingMinor
+        case .allOwedAndLoan:
+            guard let n = integer(Decimal(input.owedAllMinor) + Decimal(input.loanRemainingMinor)) else { assessment.outcome = .invalidAmounts; return assessment }; deducted = n
         }
         assessment.deductedMinor = deducted
-        guard let nisab else { assessment.outcome = .askPrice; return assessment }
-        let base = pool - deducted
-        assessment.outcome = base < nisab ? .belowNisab : .due(amountMinor: MoneyMath.applying(basisPoints: rateBasisPoints, to: base))
+        guard let nisab else { assessment.outcome = price == nil ? .askPrice : .invalidAmounts; return assessment }
+        let base = Decimal(pool) - Decimal(deducted)
+        if base < Decimal(nisab) { assessment.outcome = .belowNisab }
+        else if let due = integer(base * Decimal(rateBasisPoints) / 10000) { assessment.outcome = .due(amountMinor: due) }
+        else { assessment.outcome = .invalidAmounts }
         return assessment
     }
 }
