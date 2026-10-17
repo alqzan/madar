@@ -32,6 +32,20 @@ public enum MoneyCommandPayload {
         return formatter.date(from: raw)
     }
 
+    /// A split's rows: 1–50 targets, each a non-negative amount; an envelope or goal names its envelope.
+    static func allocationRows(_ value: JSONValue?) -> Bool {
+        guard case .array(let rows) = value, !rows.isEmpty, rows.count <= 50 else { return false }
+        return rows.allSatisfy { item in
+            guard case .object(let row) = item, Set(row.keys).isSubset(of: ["target", "targetID", "amountMinor"]),
+                  case .string(let target) = row["target"], ["daily", "envelope", "reserve", "surplus", "goal"].contains(target),
+                  let amount = integer(row["amountMinor"]), amount >= 0 else { return false }
+            if target == "envelope" || target == "goal" {
+                guard case .string(let raw) = row["targetID"], UUID(uuidString: raw) != nil else { return false }
+            } else if row["targetID"] != nil && row["targetID"] != .null { return false }
+            return true
+        }
+    }
+
     public static func validate(name: String, payload p: [String: JSONValue]) -> Bool {
         func text(_ key: String, max: Int = 80, empty: Bool = false) -> Bool {
             guard case .string(let raw) = p[key] else { return false }
@@ -101,7 +115,9 @@ public enum MoneyCommandPayload {
                   case .array(let rows) = p["messages"], !rows.isEmpty, rows.count <= 500 else { return false }
             return rows.allSatisfy { if case .object(let item) = $0 { validate(name: intakeName, payload: item) } else { false } }
         case "money.logExpense":
-            return Set(p.keys).isSubset(of: ["amountMinor", "currency", "merchant", "method", "categoryID", "fromAccountID", "cardID", "eventAt", "rateAtTime", "showInDiary"])
+            // M5-V17: the sheet may split the charge over an envelope and «يومك» (F02); rows as in confirmTransaction.
+            return Set(p.keys).isSubset(of: ["amountMinor", "currency", "merchant", "method", "categoryID", "fromAccountID", "cardID", "eventAt", "rateAtTime", "showInDiary", "allocations"])
+                && (p["allocations"] == nil || allocationRows(p["allocations"]))
                 && positive("amountMinor") && text("currency", max: 3) && optionalText("merchant")
                 && (p["method"] == nil || choices("method", ["cash", "card", "transfer"]))
                 && ["categoryID", "fromAccountID", "cardID"].allSatisfy(optionalID)
@@ -112,16 +128,7 @@ public enum MoneyCommandPayload {
                   ["fromAccountID", "toAccountID", "cardID", "relatedTransactionID", "obligationID", "installmentID"].allSatisfy(optionalID), optionalText("rateAtTime", max: 40),
                   p["ignoredFromBudget"] == nil || p["ignoredFromBudget"] == .bool(true) || p["ignoredFromBudget"] == .bool(false) else { return false }
             guard let splits = p["allocations"] else { return true }
-            guard case .array(let rows) = splits, !rows.isEmpty, rows.count <= 50 else { return false }
-            return rows.allSatisfy { item in
-                guard case .object(let row) = item, Set(row.keys).isSubset(of: ["target", "targetID", "amountMinor"]),
-                      case .string(let target) = row["target"], ["daily", "envelope", "reserve", "surplus", "goal"].contains(target),
-                      let amount = integer(row["amountMinor"]), amount >= 0 else { return false }
-                if target == "envelope" || target == "goal" {
-                    guard case .string(let raw) = row["targetID"], UUID(uuidString: raw) != nil else { return false }
-                } else if row["targetID"] != nil && row["targetID"] != .null { return false }
-                return true
-            }
+            return allocationRows(splits)
         case "money.deleteTransaction": return Set(p.keys) == ["id"] && id("id")
         case "money.reconcile":
             // M5-V15: every line of one «محضر» in one command and one undo. Each line names one account or one card,

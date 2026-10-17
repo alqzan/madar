@@ -8,7 +8,7 @@ import MadarCommands
 extension AppSession {
     /// Named synthetic stores only. Never reads or writes the owner's store.
     func prepareMoneyFixture(group: URL) throws {
-        guard let variant = ProcessInfo.processInfo.environment["MADAR_UI_MONEY_FIXTURE"], ["showcase", "empty", "hidden", "zero", "shortfall", "messages", "since", "rules", "salary", "budget", "cards", "cardsHidden", "analysis", "analysisHidden", "reconcile", "reconcileHidden", "cashback", "cashbackHidden"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
+        guard let variant = ProcessInfo.processInfo.environment["MADAR_UI_MONEY_FIXTURE"], ["expense", "showcase", "empty", "hidden", "zero", "shortfall", "messages", "since", "rules", "salary", "budget", "cards", "cardsHidden", "analysis", "analysisHidden", "reconcile", "reconcileHidden", "cashback", "cashbackHidden"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         let c = ModelContext(container)
         guard !(try c.fetch(FetchDescriptor<DeviceSetting>())).contains(where: { $0.key == "sys.moneyFixture" }) else { return }
         for key in ["sys.moneyFixture", "sys.onboardingCompleted"] { let marker = DeviceSetting(); marker.key = key; marker.valueJSON = Data("true".utf8); c.insert(marker) }
@@ -195,6 +195,13 @@ extension AppSession {
                 await executeFixtureCommand(.init(name: MoneyCommandPayload.intakeName, payload: .object(["text": .string("راتب\n*5512\n40000.00 SAR\n\(f.string(from: today.date(in: zone))) 00:01"), "sender": .string("بنك الاختبار"), "receivedAt": .string(ISO8601DateFormatter().string(from: at))]), source: .shortcut, issuedAt: at))
                 try? reload()
             }
+        }
+        if variant == "expense" {
+            let cash = Account(); cash.name = "محفظة النقد"; cash.kind = "cash"; cash.balanceMinor = 30_000; cash.balanceAt = cycle.start; c.insert(cash)
+            for (index, name) in ["مقهى الزاوية", "متجر الحي", "محطة الشمال"].enumerated() {
+                let row = MoneyTransaction(); row.source = "manual"; row.reviewState = "ok"; row.method = "card"; row.cardID = debit.id; row.fromAccountID = account.id; row.merchant = name; row.categoryID = categories[index].id; row.amountMinor = 2_000; row.homeAmountMinor = 2_000; row.dayKey = today.adding(days: -1).description; row.eventAt = now.addingTimeInterval(-86_400 - Double(index)); c.insert(row)
+            }
+            try c.save()
         }
         if variant == "since" {
             // Away since the evening before the salary: «منذ آخر زيارة» opens first.

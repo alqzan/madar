@@ -163,8 +163,13 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             row.reviewState = "needsLook"; row.createdAt = now; context.insert(row)
             if source == .app {
                 try resolvePayment(row, context: context)
-                try confirm(row, payload: [:], context: context, now: now, writer: writer)
-            } else { try touch(row, now, writer) }
+                // M5-V17: the sheet's split (envelope first, «يومك» last) must add up to the charge, as in a confirmation.
+                try confirm(row, payload: p["allocations"].map { ["allocations": $0] } ?? [:], context: context, now: now, writer: writer)
+            } else {
+                // A draft from outside the app waits for review; a split is only decided in the app.
+                guard p["allocations"] == nil else { throw MoneyCommandError.invalidSplit }
+                try touch(row, now, writer)
+            }
         case "money.confirmTransaction":
             let row = try transaction(uuid(p, "id"), context)
             guard row.reviewState != "ok" else { throw MoneyCommandError.alreadyConfirmed }
@@ -508,8 +513,10 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         guard let key = row.cardID ?? row.fromAccountID ?? row.toAccountID else { return }
         let rows = try transactions(context), messages = try context.fetch(FetchDescriptor<BankMessage>())
         let existing = rows.filter { $0.id != row.id && ($0.cardID ?? $0.fromAccountID ?? $0.toAccountID) == key }.compactMap { old -> BankDedupe.Movement? in
-            guard let source = messages.first(where: { $0.id == old.messageID }) else { return nil }
-            return .init(accountKey: key.uuidString, amountMinor: old.amountMinor, merchant: old.merchant, at: old.eventAt, fingerprint: source.fingerprint)
+            // M5-V17: an expense recorded by hand has no message; it still counts, so its bank message waits for a decision.
+            let fingerprint = messages.first(where: { $0.id == old.messageID })?.fingerprint ?? (old.messageID == nil && old.source == "manual" && old.kind == "expense" ? "manual:" + old.id.uuidString : nil)
+            guard let fingerprint else { return nil }
+            return .init(accountKey: key.uuidString, amountMinor: old.amountMinor, merchant: old.merchant, at: old.eventAt, fingerprint: fingerprint)
         }
         if BankDedupe.nearDuplicate(.init(accountKey: key.uuidString, amountMinor: row.amountMinor, merchant: row.merchant, at: row.eventAt, fingerprint: message.fingerprint), among: existing) {
             row.reviewState = "possibleDuplicate"; message.status = "possibleDuplicate"; try touch(row, now, writer); try touch(message, now, writer)

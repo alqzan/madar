@@ -73,6 +73,9 @@ import MadarPrayer
         }
     }
 
+    /// The merchant's live rule, by the same normalized pattern the intake uses (M5-V07).
+    public func merchantRule(for merchant: String?) throws -> MerchantRule? { try MoneyMutationHandler.rule(for: merchant, in: context) }
+
     public func confirmedTransactions() throws -> [MoneyTransaction] {
         try context.fetch(FetchDescriptor<MoneyTransaction>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.reviewState == "ok" }
     }

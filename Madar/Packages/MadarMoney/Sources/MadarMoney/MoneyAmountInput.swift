@@ -4,7 +4,13 @@ import Foundation
 public enum MoneyAmountInput {
     public static func minor(_ raw: String, exponent: Int) -> Int? {
         guard (0...3).contains(exponent) else { return nil }
-        let parts = raw.split(separator: ".", omittingEmptySubsequences: false)
+        // Arabic decimal keyboards emit Arabic-Indic digits and the Arabic decimal separator.
+        let normalized = raw.trimmingCharacters(in: .whitespacesAndNewlines).map { c -> String in
+            if let n = c.wholeNumberValue, n < 10 { return String(n) }
+            if c == "٫" { return "." }
+            return String(c)
+        }.joined()
+        let parts = normalized.split(separator: ".", omittingEmptySubsequences: false)
         guard (1...2).contains(parts.count), !parts[0].isEmpty,
               parts.allSatisfy({ $0.allSatisfy { ("0"..."9").contains($0) } }),
               let whole = Int(parts[0]) else { return nil }

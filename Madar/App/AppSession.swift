@@ -581,7 +581,7 @@ final class AppSession {
             // A confirmed spend can cross a category's 80% line (M5-V10); re-plan room reminders through the one arbiter.
             Task { await refreshPrayerNotifications() }
         }
-        if let token = result.undoToken { showUndo(.init(id: token, expiresAt: now.addingTimeInterval(600)), message: name == "money.confirmSalary" ? "فُتحت الدورة · التراجع متاح لعشر دقائق" : "حُفظ التغيير · التراجع متاح لعشر دقائق") }
+        if let token = result.undoToken { showUndo(.init(id: token, expiresAt: now.addingTimeInterval(600)), message: name == "money.confirmSalary" ? "فُتحت الدورة · التراجع متاح لعشر دقائق" : name == "money.logExpense" ? "سُجّل المصروف · التراجع متاح لعشر دقائق" : "حُفظ التغيير · التراجع متاح لعشر دقائق") }
     }
 
     var diaryStagingDirectory: URL { commandAdapter.diaryStagingDirectory }

@@ -25,6 +25,7 @@ struct MoneyHomeView: View {
     @State private var analysisOpen = false
     @State private var reconcileOpen = false
     @State private var cashbackOpen = false
+    @State private var expenseOpen = false
     @State private var visitChecked = false
     private var service: AppMoneyService { .init(app: app) }
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
@@ -49,6 +50,7 @@ struct MoneyHomeView: View {
                         .buttonStyle(.plain).accessibilityIdentifier("money-analysis-open")
                     Button { reconcileOpen = true } label: { Label("المطابقة مع البنك", systemImage: "checkmark.seal").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 48).overlay { Capsule().stroke(theme.color("reserveText"), lineWidth: 1) } }
                         .buttonStyle(.plain).accessibilityIdentifier("money-reconcile-open")
+                    Button { expenseOpen = true } label: { Label("سجّل مصروفًا", systemImage: "plus").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 48).overlay { Capsule().stroke(theme.color("reserveText"), lineWidth: 1) } }.buttonStyle(.plain).accessibilityIdentifier("money-expense-open")
                     Button { cashbackOpen = true } label: { Label("الاسترداد النقدي", systemImage: "drop").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 48).overlay { Capsule().stroke(theme.color("reserveText"), lineWidth: 1) } }
                         .buttonStyle(.plain).accessibilityIdentifier("money-cashback-open")
                 } else if let failure {
@@ -75,6 +77,8 @@ struct MoneyHomeView: View {
         .navigationDestination(isPresented: $sinceOpen) {
             if let reading { MoneySinceView(app: app, home: reading, revealed: $revealed) { sinceOpen = false; messagesOpen = true; Task { try? await app.executeMoneyCommand("money.markVisit") } } }
         }
+        .navigationDestination(isPresented: $expenseOpen) { MoneyExpenseView(app: app, revealed: $revealed) }
+        .onChange(of: expenseOpen) { if !expenseOpen { load() } }
         .sheet(isPresented: $basisOpen) { MoneyBasisView(app: app, revealed: $revealed) }
         .task {
             do { try await app.executeMoneyCommand("money.accruePlans") } catch { }
