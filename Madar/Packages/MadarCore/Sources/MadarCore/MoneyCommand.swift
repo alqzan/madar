@@ -8,7 +8,7 @@ public enum MoneyCommandPayload {
     public static let names: Set<String> = [intakeName, "money.pasteBankMessages", "money.logExpense",
         "money.confirmTransaction", "money.deleteTransaction", "money.saveAccount", "money.saveCard", "money.accruePlans", "money.setReserveGoal", "money.repayEnvelopeNow", "money.setEnvelopeSaving", "money.adoptRepayment",
         "money.applyStatement", "money.ignoreMessage", "money.confirmClear", "money.markVisit",
-        "money.categorize", "money.saveMerchantRule", "money.forgetMerchantRule", "money.confirmSalary", "money.saveObligation", "money.setCategoryLimit", "money.setBudgetExclusion", "money.reconcile", "money.setCardCashback", "money.distributeBigExpense"]
+        "money.categorize", "money.saveMerchantRule", "money.forgetMerchantRule", "money.confirmSalary", "money.saveObligation", "money.setCategoryLimit", "money.setBudgetExclusion", "money.reconcile", "money.setCardCashback", "money.distributeBigExpense", "money.configureTrip", "money.fundTrip", "money.repriceTrip"]
     /// §7.5 maxRepayCycles: the longest salary repayment (the envelope sheet offers 1–6).
     public static let maxRepaySalaries = 12
     /// M5-X00: the budget-ignore stamp's optional reason.
@@ -57,6 +57,14 @@ public enum MoneyCommandPayload {
         func choices(_ key: String, _ options: Set<String>) -> Bool { if case .string(let raw) = p[key] { options.contains(raw) } else { false } }
         func optionalText(_ key: String, max: Int = 80) -> Bool { p[key] == nil || p[key] == .null || text(key, max: max, empty: true) }
         switch name {
+        case "money.repriceTrip":
+            return Set(p.keys) == ["id", "rate", "signature"] && id("id") && text("rate", max: 40) && text("signature", max: 64)
+        case "money.configureTrip":
+            return Set(p.keys) == ["id", "currency", "rate", "expectedRate", "expectedCurrency"] && id("id") && text("currency", max: 3)
+                && optionalText("rate", max: 40) && optionalText("expectedRate", max: 40) && optionalText("expectedCurrency", max: 3)
+        case "money.fundTrip":
+            return Set(p.keys) == ["id", "amountMinor", "source", "due", "expectedBalanceMinor"] && id("id") && positive("amountMinor")
+                && choices("source", ["reserve", "surplus"]) && integer(p["expectedBalanceMinor"]) != nil && date(p["due"]) != nil
         case "money.setBudgetExclusion":
             // M5-X00 (owner 16 Oct): an optional free-text reason, only when stamping.
             return Set(p.keys).subtracting(["reason"]) == ["id", "excluded", "expectedExcluded"] && id("id")

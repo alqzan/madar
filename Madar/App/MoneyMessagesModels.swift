@@ -114,8 +114,9 @@ extension AppMoneyService {
             if let obligation = obligations.first(where: { $0.id == row.obligationID }) { note = "مرتبطة بـ" + obligation.name }
             else if row.kind == "transfer" && dir == .neutral { note = "تحويل بين حساباتك، لا مصروف" }
             else if row.kind == "cardPayment" { note = "سداد بطاقة، لا مصروف" }
+            if row.tripID != nil { note = (note.map { $0 + "، " } ?? "") + "من مظروف الرحلة" }
             let resolvable = ["expense", "fee", "withdrawal", "income", "transfer", "cardPayment"].contains(row.kind) && confirmable.contains(row.id)
-            let big = dir == .out && bigFrom.map { $0 > 0 && row.homeAmountMinor >= $0 } == true
+            let big = row.tripID == nil && dir == .out && bigFrom.map { $0 > 0 && row.homeAmountMinor >= $0 } == true
             let clear = row.reviewState == "needsLook" && resolvable && !big && (row.kind != "expense" || bigFrom != nil) && row.currency == home
             drafts.append(.init(id: row.id, sender: message?.sender ?? "", title: row.merchant ?? row.counterparty ?? Self.kindLabels[row.kind] ?? "حركة",
                 kindLabel: Self.kindLabels[row.kind] ?? "حركة", payment: cardName(row.cardID) ?? accountName(row.fromAccountID ?? row.toAccountID),

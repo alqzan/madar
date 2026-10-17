@@ -406,3 +406,11 @@ Differences left: V07 lanterns are capsules; V08 no «ليس راتبي» action
 Not verified: owner iPhone, a delivered 80% alert, real salary SMS, dark mode, a Hijri `mal.cycleCalendar` cycle on device.
 Next: M5-V11 ignore from budgets.
 Model/effort: Claude Opus 5.5; effort not exposed. Usage: five-hour about 89% at this handover.
+
+## Handover — M3-V09 Day One import — 2026-10-16 — Claude
+Works now: diary settings «النقل» → «من داي ون» → choose the JSON ZIP → preview (counts, both-calendar range, media, missing, tags, skipped) → «استورد» → result, open the last day, one undo; nothing written before «استورد». Imported lines keep their Markdown, original-zone time, inline media order, «مرفق ناقص»; first tag becomes a closed project.
+Verified: swift test MadarCore 99/99; MadarCommands Diary|DayOne|Replay 37/37; xcodebuild UI DiaryDayOneImportUITests 1/1 + DiaryService/Export/Search/Archive integration 6/6 on iPhone Air sim (Artifacts/M3-V09-fix.xcresult); compare-screens import → Artifacts/compare/import.html.
+Differences left: native glass back capsule; description wraps one word earlier; preview/result screens have no canonical (built in room cards).
+Not verified: a real Day One export round-trip (owner's step; never read here), multi-GB export memory on device, owner iPhone, dark mode.
+Next: owner round-trip with a real export; M5-V14.
+Model/effort: Claude Opus 5.5 / not exposed. Usage: not exposed.

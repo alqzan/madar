@@ -12,6 +12,7 @@ struct MoneyExpenseView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var reading: MoneyExpenseReading?
     @State private var raw = ""
+    @State private var foreign = true
     @State private var merchant = ""
     @State private var methodID = ""
     @State private var categoryID: UUID?
@@ -27,11 +28,13 @@ struct MoneyExpenseView: View {
     @State private var bigRoute: MoneyBigExpenseRoute?
     private var service: AppMoneyService { .init(app: app) }
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
-    private var minor: Int { MoneyAmountInput.minor(raw, exponent: CurrencyExponents.specified.exponent(reading?.currency ?? "SAR") ?? 2) ?? 0 }
+    private var minor: Int { MoneyAmountInput.minor(raw, exponent: CurrencyExponents.specified.exponent(inputCurrency) ?? 2) ?? 0 }
+    private var inputCurrency: String { foreign ? reading?.tripCurrency ?? reading?.currency ?? "SAR" : reading?.currency ?? "SAR" }
+    private var homeMinor: Int { guard let r = reading else { return minor }; return (try? FX.homeAmount(amountMinor: minor, currency: inputCurrency, rate: r.tripRate ?? "1", home: r.currency)) ?? 0 }
     private var method: MoneyPaymentChoice? { reading?.methods.first { $0.id == methodID } }
     private var visible: Bool { revealed || !app.bool("core.hideMoneyUntilTouch") }
     private func amount(_ value: Int) -> String { visible ? service.amount(value) : "•••" }
-    private var split: ExpenseEntry.Split { ExpenseEntry.split(chargeMinor: method?.kind == .cash && reading?.cashCountedAtWithdrawal == true ? 0 : minor, share: share) }
+    private var split: ExpenseEntry.Split { ExpenseEntry.split(chargeMinor: method?.kind == .cash && reading?.cashCountedAtWithdrawal == true ? 0 : homeMinor, share: share) }
     private var nextHeadline: Headline? {
         guard let cycle = reading?.cycle else { return nil }
         guard let day = try? service.expenseDay(at: date) else { return nil }
@@ -51,6 +54,10 @@ struct MoneyExpenseView: View {
                 if let reading {
                     amountHeading(reading)
                     if !visible { Button("أظهر الأرقام") { revealed = true }.font(MadarTypography.caption()).frame(minHeight: 44).accessibilityIdentifier("money-expense-reveal") }
+                    if let code = reading.tripCurrency, code != reading.currency {
+                        Picker("عملة المصروف", selection: $foreign) { Text(service.currencyName(code)).tag(true); Text(service.currencyName(reading.currency)).tag(false) }.pickerStyle(.segmented).accessibilityIdentifier("money-expense-currency")
+                        if foreign { Text(reading.tripRate == nil ? "أدخل سعر الرحلة أولًا" : "بعملة البيت " + service.amount(homeMinor)).font(MadarTypography.caption()) }
+                    }
                     merchantChips(reading)
                     categorySuggestion(reading)
                     shares(reading)
@@ -69,7 +76,7 @@ struct MoneyExpenseView: View {
                     }
                     Button(action: save) {
                         Text(saving ? "جارٍ التسجيل…" : duplicate ? "سجّل عملية أخرى" : "سجّل").font(.custom("thmanyahserifdisplay-Bold", size: 19, relativeTo: .headline)).frame(maxWidth: .infinity, minHeight: 50).background(theme.ink).foregroundStyle(theme.background)
-                    }.disabled(saving || minor <= 0 || method == nil || (share != .daily && envelopeID == nil)).accessibilityIdentifier("money-expense-save")
+                    }.disabled(saving || homeMinor <= 0 || (foreign && inputCurrency != reading.currency && reading.tripRate == nil) || method == nil || (method?.kind != .credit && method?.currency != reading.currency && method?.currency != inputCurrency) || (share != .daily && envelopeID == nil)).accessibilityIdentifier("money-expense-save")
                 } else if let failure { Text(failure); Button("أعِد المحاولة", action: load) }
                 else { ProgressView().frame(height: 250) }
             }.padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 20).frame(maxWidth: 620).frame(maxWidth: .infinity)
@@ -84,12 +91,12 @@ struct MoneyExpenseView: View {
     }
     private func amountHeading(_ r: MoneyExpenseReading) -> some View {
         VStack(spacing: 0) {
-            Text(service.amount(minor)).font(.custom("thmanyahserifdisplay-Black", size: 60, relativeTo: .largeTitle)).contentTransition(.numericText()).accessibilityIdentifier("money-expense-amount")
-            Text((r.currency == "SAR" ? "ريال" : r.currency) + dailyDescription).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+            Text(service.amount(minor, currency: inputCurrency)).font(.custom("thmanyahserifdisplay-Black", size: 60, relativeTo: .largeTitle)).contentTransition(.numericText()).accessibilityIdentifier("money-expense-amount")
+            Text((inputCurrency == "SAR" ? "ريال" : service.currencyName(inputCurrency)) + dailyDescription).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
         }.frame(maxWidth: .infinity).frame(minHeight: 94)
     }
     private var dailyDescription: String {
-        guard visible, let part = ExpenseEntry.dailyPart(amountMinor: minor, dailyMinor: reading?.cycle?.headline.todayAllowanceMinor) else { return "" }
+        guard visible, let part = ExpenseEntry.dailyPart(amountMinor: homeMinor, dailyMinor: reading?.cycle?.headline.todayAllowanceMinor) else { return "" }
         let label: String
         switch part {
         case .lessThanTenth: label = "أقل من عُشر يومك"
@@ -121,8 +128,10 @@ struct MoneyExpenseView: View {
             Spacer()
         }.padding(11).frame(minHeight: 44).overlay { Rectangle().stroke(theme.color("reserveText"), style: StrokeStyle(lineWidth: 1, dash: [3, 2])) }
     }
-    private func shares(_ r: MoneyExpenseReading) -> some View {
-        VStack(spacing: 5) {
+    @ViewBuilder private func shares(_ r: MoneyExpenseReading) -> some View {
+        if r.tripEnvelopeID != nil {
+            Label("كله من مظروف الرحلة", systemImage: "envelope").font(MadarTypography.caption()).foregroundStyle(theme.color("accentText")).frame(minHeight: 40)
+        } else { VStack(spacing: 5) {
             HStack(spacing: 5) {
                 ForEach(ExpenseEntry.Share.allCases, id: \.rawValue) { s in
                     Button { share = s; if envelopeID == nil { envelopeID = r.envelopes.first?.id } } label: {
@@ -136,6 +145,7 @@ struct MoneyExpenseView: View {
                 }.accessibilityIdentifier("money-expense-envelope")
             }
         }
+    }
     }
     private func shareTitle(_ share: ExpenseEntry.Share) -> String {
         switch share { case .daily: "كله من يومي"; case .quarter: "٢٥٪ مظروف"; case .half: "٥٠٪ مظروف"; case .envelope: "كله من مظروف" }
@@ -168,7 +178,7 @@ struct MoneyExpenseView: View {
     }
     private func payment(_ r: MoneyExpenseReading) -> some View {
         VStack(spacing: 7) {
-            ScrollView(.horizontal) { HStack(spacing: 7) { ForEach(r.methods) { m in Button { methodID = m.id; if m.kind == .cash && r.cashCountedAtWithdrawal { share = .daily } } label: { chip(m.title, selected: methodID == m.id) }.accessibilityIdentifier("money-expense-method-" + m.title) } } }.scrollIndicators(.hidden)
+            ScrollView(.horizontal) { HStack(spacing: 7) { ForEach(r.methods) { m in Button { methodID = m.id; if m.kind == .cash && r.cashCountedAtWithdrawal { share = .daily } } label: { chip(m.title, selected: methodID == m.id) }.disabled(m.kind != .credit && m.currency != r.currency && m.currency != inputCurrency).accessibilityIdentifier("money-expense-method-" + m.title) } } }.scrollIndicators(.hidden)
             if r.methods.isEmpty { Text("أضف حسابًا أو بطاقة من رسائل البنك أولًا.").font(MadarTypography.body()) }
             else if let m = method {
                 if m.kind == .credit {
@@ -188,22 +198,22 @@ struct MoneyExpenseView: View {
         }.padding(12).background(theme.surface)
     }
     private func load() {
-        do { let r = try service.loadExpense(); reading = r; methodID = r.defaultMethodID ?? ""; date = app.prayerNow(); failure = nil }
+        do { let r = try service.loadExpense(); reading = r; methodID = r.defaultMethodID ?? ""; date = app.prayerNow(); failure = nil; if let id = r.tripEnvelopeID { envelopeID = id; share = .envelope } }
         catch { failure = "لم تكتمل قراءة مصادر الدفع. حاول مرة أخرى." }
     }
     private func save() {
         guard !saving, minor > 0, let m = method, let r = reading else { return }
-        var p: [String: MadarCore.JSONValue] = ["amountMinor": .string(String(minor)), "currency": .string(r.currency), "merchant": .string(merchant), "method": .string(m.kind == .cash ? "cash" : m.cardID == nil ? "transfer" : "card"), "eventAt": .string(ISO8601DateFormatter().string(from: date)), "showInDiary": .bool(showInDiary)]
+        var p: [String: MadarCore.JSONValue] = ["amountMinor": .string(String(minor)), "currency": .string(inputCurrency), "merchant": .string(merchant), "method": .string(m.kind == .cash ? "cash" : m.cardID == nil ? "transfer" : "card"), "eventAt": .string(ISO8601DateFormatter().string(from: date)), "showInDiary": .bool(showInDiary)]
         if let id = m.cardID { p["cardID"] = .string(id.uuidString) } else if let id = m.accountID { p["fromAccountID"] = .string(id.uuidString) }
         if let id = categoryID { p["categoryID"] = .string(id.uuidString) }
-        if share != .daily, let id = envelopeID {
+        if r.tripEnvelopeID == nil, share != .daily, let id = envelopeID {
             p["allocations"] = .array(ExpenseEntry.sources(split, envelopeID: id.uuidString).map { target, amount in
                 var row: [String: MadarCore.JSONValue] = ["target": .string("daily"), "amountMinor": .string(String(amount))]
                 if case .envelope(let id) = target { row["target"] = .string("envelope"); row["targetID"] = .string(id) }
                 return .object(row)
             })
         }
-        if let threshold = service.bigExpenseThreshold(cycle: r.cycle), minor >= threshold,
+        if r.tripCurrency == nil, let threshold = service.bigExpenseThreshold(cycle: r.cycle), homeMinor >= threshold,
            !(m.kind == .cash && r.cashCountedAtWithdrawal) {
             p.removeValue(forKey: "allocations")
             bigRoute = .init(expense: p); return

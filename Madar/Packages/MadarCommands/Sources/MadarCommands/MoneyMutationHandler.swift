@@ -25,10 +25,11 @@ public struct MoneyParsedFields: Codable, Sendable {
     public var minimumDueMinor: Int?
     public var dueDate: Date?
     public var balanceMinor: Int?
+    public var statedHomeMinor: Int?
     init(_ p: ParsedBankMessage) {
         kind = p.kind.rawValue; amountMinor = p.amountMinor; currency = p.currency; last4 = p.last4
         cardKind = p.cardKind?.rawValue; merchant = p.merchant; biller = p.biller; provider = p.provider
-        eventAt = p.eventAt; statementDueMinor = p.statementDueMinor; minimumDueMinor = p.minimumDueMinor
+        eventAt = p.eventAt; statedHomeMinor = p.statedHomeMinor; statementDueMinor = p.statementDueMinor; minimumDueMinor = p.minimumDueMinor
         dueDate = p.dueDate; balanceMinor = p.balanceMinor
     }
 }
@@ -63,6 +64,20 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         }
         let before = try records(context)
         switch name {
+        case "money.repriceTrip":
+            guard let tripID = uuid(p, "id"), let trip = try context.fetch(FetchDescriptor<Trip>()).first(where: { $0.id == tripID && live($0) }), trip.fxRateToHome == text(p, "rate") else { throw MoneyCommandError.invalidReference }
+            let preview = try MoneyRepository(context: context).previewTripReprice(id: tripID, rate: text(p, "rate"), at: now)
+            guard preview.signature == text(p, "signature"), !preview.lines.isEmpty else { throw MoneyCommandError.invalidReference }
+            for line in preview.lines {
+                let row = try transaction(line.id, context); row.homeAmountMinor = line.afterMinor; row.rateAtTime = text(p, "rate"); row.rateSource = "trip"; try touch(row, now, writer)
+            }
+            for row in try context.fetch(FetchDescriptor<Allocation>()) {
+                if let value = preview.allocations[row.id] { row.amountMinor = value; try touch(row, now, writer) }
+            }
+        case "money.configureTrip":
+            try configureTrip(p, context: context, now: now, writer: writer)
+        case "money.fundTrip":
+            try fundTrip(p, commandID: id, context: context, now: now, writer: writer)
         case "money.distributeBigExpense":
             try distributeBigExpense(p, id: id, issuedAt: issuedAt, context: context, now: now, writer: writer)
         case "money.accruePlans":
@@ -377,9 +392,10 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
                                context: ModelContext, now: Date, writer: String) throws {
         let all = try context.fetch(FetchDescriptor<BankMessage>()).filter { $0.mergedInto == nil }
         let prayer = try PrayerRepository(context: context)
+        let homeCurrency = try SettingsStore(context: context).value(for: "core.currency").string ?? "SAR"
         let items = raw.filter { !discard(text($0, "text")) }.map { p in
             let at = MoneyCommandPayload.date(p["receivedAt"]) ?? issuedAt
-            let parsed = BankMessageParser.parse(text(p, "text"), timeZone: prayer.place(at: at).timeZone)
+            let parsed = BankMessageParser.parse(text(p, "text"), timeZone: prayer.place(at: at).timeZone, homeCurrency: homeCurrency)
             return (p, at, parsed, BankDedupe.fingerprint(sender: text(p, "sender"), text: text(p, "text")))
         }
         let existing = all.map { message -> BankDedupe.Stored in
@@ -414,6 +430,12 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             row.reviewState = possibleDuplicate ? "possibleDuplicate" : "needsLook"; row.createdAt = now
             try stampDay(row, at: parsed.eventAt ?? received, context: context, now: now)
             try identify(row, parsed: parsed, sender: message.sender, context: context)
+            if row.currency != row.homeCurrency, let stated = parsed.statedHomeMinor, stated > 0 {
+                row.homeAmountMinor = stated; row.rateAtTime = try FX.impliedRate(amountMinor: row.amountMinor, currency: row.currency, homeMinor: stated, home: row.homeCurrency); row.rateSource = "message"
+            } else if row.currency != row.homeCurrency, let trip = try MoneyRepository(context: context).trip(at: row.eventAt), trip.currency == row.currency, let rate = trip.fxRateToHome {
+                row.rateAtTime = rate; row.rateSource = "trip"
+                row.homeAmountMinor = try FX.homeAmount(amountMinor: row.amountMinor, currency: row.currency, rate: rate, home: row.homeCurrency)
+            }
             // A known merchant brings its category (or its «خارج الميزانية»); the draft still waits for the user.
             if let rule = try rule(for: row.merchant ?? row.counterparty, in: context) {
                 if rule.ignore { row.ignoredFromBudget = true } else { row.categoryID = rule.categoryID }
@@ -613,24 +635,36 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             let previous = try transactions(context).filter { $0.kind == "refund" && $0.reviewState == "ok" && $0.relatedTransactionID == original.id }
             let used = try sum(previous.map(\.amountMinor)), usedHome = try sum(previous.map(\.homeAmountMinor))
             guard row.amountMinor <= original.amountMinor - used else { throw MoneyCommandError.invalidAmount }
+            let statedHome = row.rateSource == "message" ? row.homeAmountMinor : nil
             row.homeAmountMinor = try FX.refundHomeAmount(refundMinor: row.amountMinor,
                 original: (original.amountMinor, original.homeAmountMinor, original.currency, original.rateAtTime),
-                priorRefundsMinor: used, priorRefundsHomeMinor: usedHome, home: row.homeCurrency)
-            row.rateAtTime = original.rateAtTime; row.rateSource = original.rateSource
+                priorRefundsMinor: used, priorRefundsHomeMinor: usedHome, statedHomeMinor: statedHome, home: row.homeCurrency)
+            if statedHome == nil { row.rateAtTime = original.rateAtTime; row.rateSource = original.rateSource }; row.tripID = original.tripID
             row.cycleID = original.cycleID // F06: a refund belongs to the original budget day.
             row.ignoredFromBudget = original.ignoredFromBudget
             row.categoryID = original.categoryID
         } else {
             original = nil
-            if row.currency != row.homeCurrency && row.rateAtTime == nil { throw MoneyCommandError.missingRate }
-            row.homeAmountMinor = try FX.homeAmount(amountMinor: row.amountMinor, currency: row.currency, rate: row.rateAtTime ?? "1", home: row.homeCurrency)
+            if row.currency != row.homeCurrency && row.rateAtTime == nil {
+                if let trip = try MoneyRepository(context: context).trip(at: row.eventAt), trip.currency == row.currency, let rate = trip.fxRateToHome {
+                    row.rateAtTime = rate; row.rateSource = "trip"
+                } else { throw MoneyCommandError.missingRate }
+            }
+            if row.rateSource != "message" { row.homeAmountMinor = try FX.homeAmount(amountMinor: row.amountMinor, currency: row.currency, rate: row.rateAtTime ?? "1", home: row.homeCurrency) }
             row.cycleID = try context.fetch(FetchDescriptor<Cycle>()).filter { live($0) && $0.start <= row.eventAt && ($0.end == nil || row.eventAt < $0.end!) }.max { $0.start < $1.start }?.id
         }
         guard row.homeAmountMinor > 0 && row.homeAmountMinor <= 9_007_199_254_740_991 else { throw MoneyCommandError.invalidAmount }
         let effect = try MoneyRepository(context: context).effect(of: row)
         var allocations: [AllocationRow] = []
         if effect.budgetChargeMinor > 0 {
-            let sources = try splitSources(p["allocations"], context)
+            var sources = try splitSources(p["allocations"], context)
+            if sources.isEmpty, let tripID = row.tripID,
+               let trip = try context.fetch(FetchDescriptor<Trip>()).first(where: { $0.id == tripID && live($0) && !$0.dismissed }) {
+                let envelope: Envelope
+                if let old = try MoneyRepository(context: context).tripEnvelope(trip) { envelope = old }
+                else { envelope = try restoreTripEnvelope(trip, context, now, writer) }
+                sources = [(.envelope(envelope.id.uuidString), effect.budgetChargeMinor)]
+            }
             if try !sources.isEmpty && sum(sources.map(\.1)) != effect.budgetChargeMinor { throw MoneyCommandError.invalidSplit }
             do { allocations = try AllocationEngine.spend(transactionID: row.id.uuidString, homeAmountMinor: effect.budgetChargeMinor, over: sources, cycleID: row.cycleID?.uuidString) }
             catch { throw MoneyCommandError.invalidSplit }
@@ -754,7 +788,10 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             guard candidates.count == 1, let candidate = candidates.first else { throw MoneyCommandError.ambiguousAccount }
             if isIncoming { row.toAccountID = candidate.id } else { row.fromAccountID = candidate.id }
         }
-        for id in [row.fromAccountID, row.toAccountID].compactMap({ $0 }) { _ = try account(id, context) }
+        for id in [row.fromAccountID, row.toAccountID].compactMap({ $0 }) {
+            let owner = try account(id, context)
+            guard owner.currency == row.currency || owner.currency == row.homeCurrency else { throw MoneyCommandError.invalidCurrency }
+        }
         if ["expense", "fee", "withdrawal", "cardPayment", "billPayment", "repayment"].contains(row.kind), row.fromAccountID == nil && row.cardID == nil { throw MoneyCommandError.ambiguousAccount }
         if let id = isIncoming ? row.toAccountID : row.fromAccountID {
             let owner = try account(id, context)
@@ -897,8 +934,51 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         return try JSONEncoder().encode(MoneyInverse(before: before.map { [$0] } ?? [], after: [try policy.record()]))
     }
 
+    private static func restoreTripEnvelope(_ trip: Trip, _ context: ModelContext, _ now: Date, _ writer: String) throws -> Envelope {
+        let existing = try context.fetch(FetchDescriptor<Envelope>()).filter { $0.id == trip.id }
+        guard existing.count <= 1 else { throw MoneyCommandError.invalidReference }
+        if let old = existing.first {
+            guard old.role == "trip", old.mergedInto == nil else { throw MoneyCommandError.invalidReference }
+            var record = try old.record()
+            let stamp = StableIdentity.monotonic(now: now, previous: record.date("updatedAt") ?? now)
+            try record.set(Optional<Date>.none, for: "deletedAt"); try record.set(stamp, for: "restoredAt"); try record.set(stamp, for: "updatedAt"); try record.set(writer, for: "writerID")
+            try old.apply(record); return old
+        }
+        let row = Envelope(); row.id = trip.id; row.role = "trip"; row.name = "رحلة " + trip.city; row.createdAt = now; context.insert(row); try touch(row, now, writer); return row
+    }
+    private static func configureTrip(_ p: [String: MadarCore.JSONValue], context: ModelContext, now: Date, writer: String) throws {
+        guard let id = uuid(p, "id"), let trip = try context.fetch(FetchDescriptor<Trip>()).first(where: { $0.id == id && live($0) && !$0.dismissed }),
+              trip.currency == optionalText(p, "expectedCurrency"), trip.fxRateToHome == optionalText(p, "expectedRate") else { throw MoneyCommandError.invalidReference }
+        let code = text(p, "currency"), home = try SettingsStore(context: context).value(for: "core.currency").string ?? "SAR"
+        try currency(code)
+        let rate = code == home ? nil : optionalText(p, "rate")
+        if code != home { guard let rate else { throw MoneyCommandError.missingRate }; _ = try FX.parseRate(rate) }
+        trip.currency = code; trip.fxRateToHome = rate; trip.fxSetAt = now; try touch(trip, now, writer)
+    }
+    private static func fundTrip(_ p: [String: MadarCore.JSONValue], commandID: UUID, context: ModelContext, now: Date, writer: String) throws {
+        let repo = MoneyRepository(context: context)
+        guard let trip = try repo.trip(at: now), trip.id == uuid(p, "id"), let amount = MoneyCommandPayload.integer(p["amountMinor"]), amount > 0,
+              let due = MoneyCommandPayload.date(p["due"]), trip.start != nil, due >= now else { throw MoneyCommandError.invalidReference }
+        let all = try context.fetch(FetchDescriptor<Allocation>()).filter { live($0) }, role = text(p, "source")
+        let envelopes = try context.fetch(FetchDescriptor<Envelope>()).filter { live($0) }
+        let balance = try sum(all.filter { $0.targetID == trip.id }.map(\.amountMinor))
+        guard balance == MoneyCommandPayload.integer(p["expectedBalanceMinor"]) else { throw MoneyCommandError.invalidReference }
+        let sourceIDs = Set(envelopes.filter { $0.role == role }.map(\.id))
+        let available = try sum(all.filter { ($0.target == role && $0.targetID == nil) || $0.targetID.map(sourceIDs.contains) == true }.map(\.amountMinor))
+        guard available >= amount else { throw MoneyCommandError.invalidAmount }
+        let envelope: Envelope
+        if let old = try repo.tripEnvelope(trip) { envelope = old }
+        else { envelope = try restoreTripEnvelope(trip, context, now, writer) }
+        envelope.targetMinor = try sum([envelope.targetMinor ?? 0, amount]); envelope.due = due; try touch(envelope, now, writer)
+        let key = "trip-fund:" + commandID.uuidString
+        try writeAllocations([
+            .init(groupID: key, target: role == "reserve" ? .reserve : .surplus, amountMinor: -amount, kind: .fund, idempotencyKey: key + ":from"),
+            .init(groupID: key, target: .envelope(envelope.id.uuidString), amountMinor: amount, kind: .fund, idempotencyKey: key + ":to")
+        ], context: context, now: now, writer: writer)
+    }
     private static func records(_ context: ModelContext) throws -> [DataRecord] {
         var rows = try context.fetch(FetchDescriptor<Account>()).map { try $0.record() }
+        rows += try context.fetch(FetchDescriptor<Trip>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<Card>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<MoneyTransaction>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<Allocation>()).map { try $0.record() }
@@ -930,6 +1010,7 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         let boundary = DayBoundary(rawValue: try SettingsStore(context: context).value(for: "core.dayStart").string ?? "fajr") ?? .fajr
         let days = [civil.adding(days: -1), civil].compactMap { PrayerTimesEngine.calculate(day: $0, place: place, options: prayer.options) }
         let stored = try MadarDay.resolve(instant: at, place: place, boundary: boundary, prayerDays: days)
+        row.tripID = try MoneyRepository(context: context).trip(at: at)?.id
         row.eventAt = at; row.dayKey = stored.dayKey; row.tzID = place.timeZoneID; row.dayPolicy = boundary.rawValue + "@1"
     }
     private static func messages(for row: MoneyTransaction, _ context: ModelContext) throws -> [BankMessage] {

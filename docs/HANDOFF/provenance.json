@@ -424,18 +424,19 @@
    "usedBy": "manual city picker, Trip"
   },
   {
-   "version": null,
+   "version": "2026-09-17",
    "commit": null,
-   "license": "to verify",
-   "licenseStatus": "decision-needed",
-   "checksum": null,
-   "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
-   "note": "currency-minor-units.json; record the ISO list date it was taken from (D A22)",
+   "license": "ISO permits free use of ISO 4217 codes; numeric minor-unit facts only",
+   "licenseStatus": "owner-confirmed",
+   "checksum": "9271b1d59d67475b76f2c96d233061fe986d1eb3d1c753ffd7617549b4867104",
+   "checksumNote": "SHA-256 of MadarMoney/Resources/currency-minor-units.json",
+   "note": "Derived code-to-exponent facts only; no publication prose/names. ISO use terms: https://www.iso.org/iso-4217-currency-codes.html; source XML SHA-256 33139b438657d1cee116ba737807ea71d19d6de4b90f799a09c56f0cc6a1b0ff",
    "id": "currency-minor-units",
    "kind": "data asset",
-   "source": "ISO 4217 currency list (maintenance agency publication) — exact file not yet chosen",
+   "source": "https://www.six-group.com/dam/download/financial-information/data-center/iso-currrency/lists/list-one.xml",
    "gate": "M5",
-   "usedBy": "money minor-unit exponents (SAR 2, JPY 0, KWD/BHD/OMR 3)"
+   "usedBy": "money minor-unit exponents (SAR 2, JPY 0, KWD/BHD/OMR 3)",
+   "licenseDecision": "Owner 2026-10-17; docs/DECISIONS.md"
   },
   {
    "license": "Mushaf permission obtained by the owner for Madar",

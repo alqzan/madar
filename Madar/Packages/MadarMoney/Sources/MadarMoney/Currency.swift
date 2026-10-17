@@ -1,13 +1,17 @@
 import Foundation
 
-/// F04: minor-unit exponents and conversion to the home currency. The full ISO 4217 table is a data asset whose licence
-/// waits for the owner (provenance `currency-minor-units`); until then the table is injected, and only the values §7.5
-/// itself states are built in.
+/// F04: pinned ISO 4217 minor-unit facts from SIX List One (publication 2026-09-17).
 public struct CurrencyExponents: Sendable {
     public var exponents: [String: Int]
     public init(_ exponents: [String: Int]) { self.exponents = exponents }
-    /// The values §7.5 states: SAR and USD 2, JPY 0, KWD, BHD and OMR 3.
-    public static let specified = CurrencyExponents(["SAR": 2, "USD": 2, "JPY": 0, "KWD": 3, "BHD": 3, "OMR": 3])
+    /// Bundled facts only; no network request or exchange rate is implied by this table.
+    public static let specified: CurrencyExponents = {
+        guard let url = Bundle.module.url(forResource: "currency-minor-units", withExtension: "json"),
+              let data = try? Data(contentsOf: url), let table = try? JSONDecoder().decode([String: Int].self, from: data) else {
+            preconditionFailure("Missing pinned ISO currency table")
+        }
+        return .init(table)
+    }()
     public func exponent(_ code: String) -> Int? { exponents[code] }
 }
 
@@ -38,6 +42,16 @@ public enum FX {
         return NSDecimalNumber(decimal: rounded).intValue
     }
 
+    /// The bank's exact home amount wins; the saved ratio is for linked partial refunds and provenance.
+    public static func impliedRate(amountMinor: Int, currency: String, homeMinor: Int, home: String, exponents: CurrencyExponents = .specified) throws -> String {
+        guard amountMinor > 0, homeMinor > 0, let foreignExp = exponents.exponent(currency), let homeExp = exponents.exponent(home) else { throw FXError.invalidRate("") }
+        var value = Decimal(homeMinor) / Decimal(amountMinor)
+        let shift = foreignExp - homeExp
+        if shift >= 0 { for _ in 0..<shift { value *= 10 } } else { for _ in 0..<(-shift) { value /= 10 } }
+        var rounded = Decimal(); NSDecimalRound(&rounded, &value, 12, .plain)
+        let raw = NSDecimalNumber(decimal: rounded).stringValue
+        _ = try parseRate(raw); return raw
+    }
     /// A refund linked to its original uses the original rateAtTime, unless its own message states the home amount;
     /// a full refund returns the original home amount exactly.
     /// Partial refunds that together complete the original return its home amount exactly: the completing one gets

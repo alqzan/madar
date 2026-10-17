@@ -21,6 +21,7 @@ struct MoneyPaymentChoice: Identifiable, Equatable {
     var owedMinor: Int = 0
     var limitMinor: Int?
     var purchaseDue: GregorianDay?
+    var currency: String = "SAR"
 }
 struct MoneyExpenseMerchant: Identifiable, Equatable {
     var id: String { name }
@@ -60,6 +61,9 @@ struct MoneyExpenseReading {
     var cashCountedAtWithdrawal: Bool
     var diaryOn: Bool
     var nearby: [MoneyExpenseNearby]
+    var tripCurrency: String? = nil
+    var tripRate: String? = nil
+    var tripEnvelopeID: UUID? = nil
 }
 
 extension AppMoneyService {
@@ -68,32 +72,34 @@ extension AppMoneyService {
         let now = instant ?? app.prayerNow(), zone = app.activePlace.timeZone
         let home = try load(at: now), context = ModelContext(app.container), repo = MoneyRepository(context: context)
         let today = try DiaryLineRenderer.today(context: context, now: now)
-        let accounts = try context.fetch(FetchDescriptor<Account>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.ownership == "mine" && $0.tracked && $0.currency == home.currency }
+        let trip = try repo.trip(at: now)
+        let accounts = try context.fetch(FetchDescriptor<Account>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.ownership == "mine" && $0.tracked && ($0.currency == home.currency || $0.currency == trip?.currency) }
         let cards = try context.fetch(FetchDescriptor<Card>()).filter { card in card.deletedAt == nil && card.mergedInto == nil && (card.accountID == nil || accounts.contains { $0.id == card.accountID }) }
         let cardReadings = try loadCards(at: now).cards
         let confirmed = try repo.confirmedTransactions()
         let used = confirmed.filter { $0.kind == "expense" }.sorted { $0.eventAt > $1.eventAt }
         func methodID(_ row: MoneyTransaction) -> String? {
             if let card = row.cardID { return "card:" + card.uuidString }
-            if let account = row.fromAccountID { return accounts.first { $0.id == account }?.kind == "cash" ? "cash" : "account:" + account.uuidString }
+            if let account = row.fromAccountID { return accounts.first { $0.id == account }.map { $0.kind == "cash" ? ($0.currency == home.currency ? "cash" : "cash:" + $0.id.uuidString) : "account:" + $0.id.uuidString } }
             return nil
         }
         var methods: [MoneyPaymentChoice] = []
-        // RM: a manual cash spend comes from the one cash wallet; with two or none, «كاش» is not offered.
+        // An explicit wallet per currency; never guess between two cash wallets in the same currency.
         let wallets = accounts.filter { $0.kind == "cash" }
-        if wallets.count == 1, let wallet = wallets.first {
-            methods.append(.init(id: "cash", title: "كاش", kind: .cash, accountID: wallet.id, balanceMinor: try? repo.accountBalance(wallet, at: now), accountName: wallet.name))
+        for wallet in wallets where wallets.filter({ $0.currency == wallet.currency }).count == 1 {
+            let key = wallet.currency == home.currency ? "cash" : "cash:" + wallet.id.uuidString
+            methods.append(.init(id: key, title: wallet.currency == home.currency ? "كاش" : "نقد، " + currencyName(wallet.currency), kind: .cash, accountID: wallet.id, balanceMinor: try? repo.accountBalance(wallet, at: now), accountName: wallet.name, currency: wallet.currency))
         }
         for card in cards {
             let reading = cardReadings.first { $0.id == card.id }, owner = accounts.first { $0.id == card.accountID }
             let kind: MoneyPaymentChoice.Kind = card.kind == "credit" ? .credit : card.kind == "prepaid" ? .prepaid : .debit
             methods.append(.init(id: "card:" + card.id.uuidString, title: card.name, kind: kind, cardID: card.id, accountID: card.accountID,
                 balanceMinor: kind == .credit ? nil : owner.flatMap { try? repo.accountBalance($0, at: now) }, accountName: owner?.name,
-                owedMinor: reading?.owedMinor ?? 0, limitMinor: card.limitMinor, purchaseDue: kind == .credit ? reading?.purchaseDue : nil))
+                owedMinor: reading?.owedMinor ?? 0, limitMinor: card.limitMinor, purchaseDue: kind == .credit ? reading?.purchaseDue : nil, currency: owner?.currency ?? home.currency))
         }
         for account in accounts where ["current", "savings", "wallet"].contains(account.kind) {
             methods.append(.init(id: "account:" + account.id.uuidString, title: account.name, kind: .account, accountID: account.id,
-                balanceMinor: try? repo.accountBalance(account, at: now), accountName: account.name))
+                balanceMinor: try? repo.accountBalance(account, at: now), accountName: account.name, currency: account.currency))
         }
         // The way of paying used most recently comes first among equals; otherwise the order above.
         let recentMethod = used.lazy.compactMap(methodID).first { id in methods.contains { $0.id == id } }
@@ -125,6 +131,6 @@ extension AppMoneyService {
             defaultMethodID: recentMethod ?? methods.first(where: { $0.kind != .cash })?.id ?? methods.first?.id,
             merchants: merchants, categories: categories, envelopes: home.envelopes,
             cashCountedAtWithdrawal: try settings.value(for: "mal.cashWithdrawalAsSpend") == .bool(true),
-            diaryOn: app.values["notes.autoLines"]?.object?["mal"] != .bool(false), nearby: nearby)
+            diaryOn: app.values["notes.autoLines"]?.object?["mal"] != .bool(false), nearby: nearby, tripCurrency: trip?.currency, tripRate: trip?.fxRateToHome, tripEnvelopeID: trip?.id)
     }
 }

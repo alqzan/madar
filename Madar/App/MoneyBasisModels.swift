@@ -39,7 +39,7 @@ extension AppMoneyService {
         let zone = app.activePlace.timeZone
         let accountRows = try repo.homeAccountBalances(at: now).map { item in
             MoneySourceDetail(id: "account:" + item.account.id.uuidString, title: item.account.name, amountMinor: item.homeMinor,
-                explanation: "آخر رصيد أكّدته، مضافًا إليه الداخل ومطروحًا منه الخارج المسجّل بعده. لا تنقص مشتريات الائتمان الكاش قبل السداد.",
+                explanation: "آخر رصيد أكّدته، مضافًا إليه الداخل ومطروحًا منه الخارج المسجّل بعده. لا تنقص مشتريات الائتمان الكاش قبل السداد." + (item.account.currency != home.currency ? " حُوّل من " + currencyName(item.account.currency) + " بسعر يدوي " + localizedRate((try? repo.manualRates(at: now)[item.account.currency]) ?? "—") + " لكل وحدة؛ يمكنك تحديثه من الرحلة." : ""),
                 date: item.account.balanceAt.map { .containing($0, in: zone) })
         }
         let messages = try context.fetch(FetchDescriptor<BankMessage>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }

@@ -27,6 +27,7 @@ public struct ParsedBankMessage: Equatable, Sendable {
     public var minimumDueMinor: Int?
     public var dueDate: Date?
     public var balanceMinor: Int?
+    public var statedHomeMinor: Int?
 }
 
 public enum BankMessageParser {
@@ -80,7 +81,7 @@ public enum BankMessageParser {
         return .unknown
     }
 
-    public static func parse(_ text: String, timeZone: TimeZone, exponents: CurrencyExponents = .specified) -> ParsedBankMessage {
+    public static func parse(_ text: String, timeZone: TimeZone, exponents: CurrencyExponents = .specified, homeCurrency: String = "SAR") -> ParsedBankMessage {
         let t = clean(text), kind = classify(text)
         var result = ParsedBankMessage(kind: kind)
         // OTP and marketing: nothing is read out of them.
@@ -92,6 +93,9 @@ public enum BankMessageParser {
             result.currency = labelledAmount(t, ["المبلغ المستحق", "مبلغ الكشف", "Statement balance"], exponents)?.currency
         } else if let amount = firstAmount(t, exponents) {
             result.amountMinor = amount.minor; result.currency = amount.currency
+        }
+        if let stated = labelledAmount(t, ["بما يعادل", "ما يعادل", "equivalent", "المبلغ بالريال"], exponents), stated.currency == homeCurrency, result.currency != homeCurrency {
+            result.statedHomeMinor = stated.minor
         }
         result.balanceMinor = labelledAmount(t, ["الرصيد", "Balance"], exponents)?.minor
         result.last4 = first(#"\*\s?(\d{4})\b|\b(\d{4})\s?\*"#, in: t)
@@ -117,14 +121,16 @@ public enum BankMessageParser {
     /// "42.00 SAR", "SAR 42", "بـ 18.50 ر.س", "15,000.00 ريال" → minor units by the currency's exponent.
     static func amounts(_ text: String, _ exponents: CurrencyExponents) -> [(minor: Int, currency: String, range: Range<String.Index>)] {
         let number = #"(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)"#
-        let codes = currencyWords.map { NSRegularExpression.escapedPattern(for: $0.0) }.joined(separator: "|")
+        let knownWords = Set(currencyWords.map(\.0))
+        let words = currencyWords + exponents.exponents.keys.sorted().filter { !knownWords.contains($0) }.map { ($0, $0) }
+        let codes = words.map { NSRegularExpression.escapedPattern(for: $0.0) }.joined(separator: "|")
         let pattern = "(?:\(number)\\s*(\(codes)))|(?:(\(codes))\\s*\(number))"
         guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { return [] }
         let ns = text as NSString
         return regex.matches(in: text, range: NSRange(location: 0, length: ns.length)).compactMap { match in
             func group(_ i: Int) -> String? { match.range(at: i).location == NSNotFound ? nil : ns.substring(with: match.range(at: i)) }
             guard let raw = group(1) ?? group(4), let word = group(2) ?? group(3),
-                  let code = currencyWords.first(where: { $0.0.caseInsensitiveCompare(word) == .orderedSame })?.1,
+                  let code = words.first(where: { $0.0.caseInsensitiveCompare(word) == .orderedSame })?.1,
                   let exp = exponents.exponent(code), let minor = minorUnits(raw, exponent: exp),
                   let range = Range(match.range, in: text) else { return nil }
             return (minor, code, range)

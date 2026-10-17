@@ -68,7 +68,7 @@ struct CustomizeMadar: View {
                 }
             }
         }
-        .navigationDestination(isPresented: $session.moneyOpen) { MoneyHomeView(app: session) }
+        .navigationDestination(isPresented: $session.moneyOpen) { MoneyRoomView(app: session) }
         .sheet(isPresented:$widgetGallery){NavigationStack{RoomWidgetsGallery(session:session)}}
         .toolbarVisibility(.hidden, for: .navigationBar)
         .confirmationDialog("أعِد الإعدادات المتفق عليها؟", isPresented: $confirmReset, titleVisibility: .visible) {

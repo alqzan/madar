@@ -102,6 +102,7 @@ import MadarPrayer
     }
     public func homeAccountBalances(at now: Date = .now, rates: [String: String] = [:]) throws -> [(account: Account, homeMinor: Int)] {
         let home = try SettingsStore(context: context).value(for: "core.currency").string ?? "SAR"
+        let rates = try manualRates(at: now).merging(rates) { _, explicit in explicit }
         return try liveAccounts().filter { $0.ownership == "mine" && $0.tracked }.map { account in
             let amount = try accountBalance(account, at: now)
             if account.currency == home { return (account, amount) }
@@ -113,6 +114,7 @@ import MadarPrayer
         BasisEngine.basis(try basisInput(at: now, rates: rates))
     }
     public func basisInput(at now: Date = .now, rates: [String: String] = [:]) throws -> BasisInput {
+        let rates = try manualRates(at: now).merging(rates) { _, explicit in explicit }
         let accounts = try homeAccountBalances(at: now, rates: rates).map { AccountState(balanceMinor: $0.homeMinor) }
         let transactions = try confirmedTransactions().filter { $0.eventAt <= now }
         let cardStates = try cardDebts(at: now).map { CreditCardState(statementMinor: $0.statementLeftMinor, unbilledMinor: $0.unbilledLeftMinor) }

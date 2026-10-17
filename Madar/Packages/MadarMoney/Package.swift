@@ -7,7 +7,7 @@ let package = Package(
     platforms: [.iOS(.v26), .macOS(.v26)],
     products: [.library(name: "MadarMoney", targets: ["MadarMoney"])],
     targets: [
-        .target(name: "MadarMoney"),
+        .target(name: "MadarMoney", resources: [.process("Resources")]),
         .testTarget(name: "MadarMoneyTests", dependencies: ["MadarMoney"])
     ],
     swiftLanguageModes: [.v6]
