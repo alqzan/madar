@@ -17,6 +17,8 @@ struct MoneyBudgetRow: Identifiable {
     var dailyMinor: Int
     var categoryMinor: Int
     var excluded: Bool
+    /// M5-X00: the stamp's optional reason, while stamped.
+    var reason: String? = nil
 }
 struct MoneyBudgetReading {
     var rows: [MoneyBudgetRow]
@@ -45,7 +47,7 @@ extension AppMoneyService {
             return .init(id: row.id, merchant: row.merchant ?? row.counterparty ?? "حركة بلا اسم", category: categories.first { $0.id == row.categoryID }?.name ?? "بلا تصنيف",
                 payment: cards.first { $0.id == row.cardID }?.name ?? accounts.first { $0.id == row.fromAccountID }?.name ?? "",
                 day: try GregorianDay(row.dayKey), at: row.eventAt, amountMinor: row.homeAmountMinor, netMinor: net, dailyMinor: daily,
-                categoryMinor: row.categoryID == nil ? 0 : net, excluded: excluded)
+                categoryMinor: row.categoryID == nil ? 0 : net, excluded: excluded, reason: excluded ? row.budgetIgnoreReason : nil)
         }.sorted { $0.at == $1.at ? $0.id.uuidString < $1.id.uuidString : $0.at > $1.at }
         return .init(rows: rows, excludedMinor: rows.filter(\.excluded).reduce(0) { $0 + $1.netMinor }, dailyMinor: rows.filter { !$0.excluded }.reduce(0) { $0 + $1.dailyMinor })
     }

@@ -124,9 +124,19 @@ import MadarPrayer
             return try converted(max(0, item.amountMinor - item.paidMinor), currency: obligation.currency)
         }
         // All bills in this cycle are reserved, including a bill whose due day is still ahead.
-        let bills = try obligations.filter { obligation in
-            obligation.kind == "bill" && !transactions.contains(where: { $0.obligationID == obligation.id && $0.eventAt >= periodStart && $0.eventAt < periodEnd })
-        }.map { try converted($0.amountMinor, currency: $0.currency) }
+        // M5-X00: a bill or subscription on a free schedule is reserved once per unpaid due day inside the period, so a
+        // six-month rent is not reserved every cycle.
+        let firstDay = GregorianDay.containing(periodStart, in: place.timeZone), endDay = GregorianDay.containing(periodEnd, in: place.timeZone)
+        var bills: [Int] = []
+        for obligation in obligations where obligation.isRecurring {
+            if let schedule = obligation.recurrence {
+                let payments = transactions.filter { $0.obligationID == obligation.id }.map(\.eventAt)
+                let count = ObligationSchedule.unpaid(schedule, from: firstDay, before: endDay, payments: payments, zone: place.timeZone).count
+                if count > 0 { bills.append(try converted(obligation.amountMinor, currency: obligation.currency) * count) }
+            } else if obligation.kind == "bill", !transactions.contains(where: { $0.obligationID == obligation.id && $0.eventAt >= periodStart && $0.eventAt < periodEnd }) {
+                bills.append(try converted(obligation.amountMinor, currency: obligation.currency))
+            }
+        }
         let allocations = try allocationRows().filter { $0.target != .daily }.map(\.amountMinor)
         return BasisInput(accounts: accounts, creditCards: cardStates, installments: bnpl,
             loanDueMinor: try MoneyMutationHandler.sum(loans), billsDueMinor: try MoneyMutationHandler.sum(bills), envelopeAllocationsMinor: allocations)

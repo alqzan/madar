@@ -1,6 +1,6 @@
 import Foundation
 import SwiftData
-// Generated from Specification/data-dictionary.json (schema V6). UUID foreign keys intentionally avoid ownership relationships.
+// Generated from Specification/data-dictionary.json (schema V7). UUID foreign keys intentionally avoid ownership relationships.
 @MainActor public protocol MadarRecordModel: PersistentModel { var id: UUID { get set }; func record() throws -> DataRecord; func apply(_ record: DataRecord) throws }
 @Model public final class Setting {
     public var id: UUID = UUID()
@@ -1749,6 +1749,7 @@ extension CashbackEntry: MadarRecordModel {
     public var tripID: UUID? = nil
     public var showInDiary: Bool = true
     public var reviewState: String = "ok"
+    public var budgetIgnoreReason: String? = nil
     public init() {}
 }
 extension MoneyTransaction: MadarRecordModel {
@@ -1790,6 +1791,7 @@ extension MoneyTransaction: MadarRecordModel {
             "tripID": JSONValue.encode(tripID),
             "showInDiary": JSONValue.encode(showInDiary),
             "reviewState": JSONValue.encode(reviewState),
+            "budgetIgnoreReason": JSONValue.encode(budgetIgnoreReason),
         ])
     }
     public func apply(_ record: DataRecord) throws {
@@ -1829,6 +1831,7 @@ extension MoneyTransaction: MadarRecordModel {
         tripID = try record.decode("tripID", as: UUID?.self)
         showInDiary = try record.decode("showInDiary", as: Bool.self)
         reviewState = try record.decode("reviewState", as: String.self)
+        budgetIgnoreReason = try record.fields["budgetIgnoreReason"]?.decode(String?.self)
     }
 }
 @Model public final class Allocation {
@@ -2287,6 +2290,9 @@ extension EnvelopePlan: MadarRecordModel {
     public var remainingCount: Int? = nil
     public var purchaseTransactionID: UUID? = nil
     public var sourceMessageID: UUID? = nil
+    public var repeatEvery: Int? = nil
+    public var repeatUnit: String? = nil
+    public var firstDueDayKey: String? = nil
     public init() {}
 }
 extension Obligation: MadarRecordModel {
@@ -2310,6 +2316,9 @@ extension Obligation: MadarRecordModel {
             "remainingCount": JSONValue.encode(remainingCount),
             "purchaseTransactionID": JSONValue.encode(purchaseTransactionID),
             "sourceMessageID": JSONValue.encode(sourceMessageID),
+            "repeatEvery": JSONValue.encode(repeatEvery),
+            "repeatUnit": JSONValue.encode(repeatUnit),
+            "firstDueDayKey": JSONValue.encode(firstDueDayKey),
         ])
     }
     public func apply(_ record: DataRecord) throws {
@@ -2331,6 +2340,9 @@ extension Obligation: MadarRecordModel {
         remainingCount = try record.decode("remainingCount", as: Int?.self)
         purchaseTransactionID = try record.decode("purchaseTransactionID", as: UUID?.self)
         sourceMessageID = try record.decode("sourceMessageID", as: UUID?.self)
+        repeatEvery = try record.fields["repeatEvery"]?.decode(Int?.self)
+        repeatUnit = try record.fields["repeatUnit"]?.decode(String?.self)
+        firstDueDayKey = try record.fields["firstDueDayKey"]?.decode(String?.self)
     }
 }
 @Model public final class InstallmentItem {

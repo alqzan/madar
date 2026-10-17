@@ -11,6 +11,8 @@ public enum MoneyCommandPayload {
         "money.categorize", "money.saveMerchantRule", "money.forgetMerchantRule", "money.confirmSalary", "money.saveObligation", "money.setCategoryLimit", "money.setBudgetExclusion"]
     /// §7.5 maxRepayCycles: the longest salary repayment (the envelope sheet offers 1–6).
     public static let maxRepaySalaries = 12
+    /// M5-X00: the budget-ignore stamp's optional reason.
+    public static let maxReasonLength = 120
 
     public static func integer(_ value: JSONValue?) -> Int? {
         switch value {
@@ -42,8 +44,10 @@ public enum MoneyCommandPayload {
         func optionalText(_ key: String, max: Int = 80) -> Bool { p[key] == nil || p[key] == .null || text(key, max: max, empty: true) }
         switch name {
         case "money.setBudgetExclusion":
-            return Set(p.keys) == ["id", "excluded", "expectedExcluded"] && id("id")
+            // M5-X00 (owner 16 Oct): an optional free-text reason, only when stamping.
+            return Set(p.keys).subtracting(["reason"]) == ["id", "excluded", "expectedExcluded"] && id("id")
                 && ["excluded", "expectedExcluded"].allSatisfy { p[$0] == .bool(true) || p[$0] == .bool(false) }
+                && (p["reason"] == nil || (p["excluded"] == .bool(true) && text("reason", max: maxReasonLength, empty: true)))
         case "money.setEnvelopeSaving": return Set(p.keys) == ["id", "amountMinor", "expectedMinor"] && id("id") && integer(p["expectedMinor"]) != nil && (integer(p["amountMinor"]).map { $0 >= 0 } ?? false)
         case "money.adoptRepayment": return Set(p.keys) == ["id", "debtMinor", "salaries"] && id("id") && positive("debtMinor") && (integer(p["salaries"]).map { (1...maxRepaySalaries).contains($0) } ?? false)
         case "money.repayEnvelopeNow": return Set(p.keys) == ["id", "source", "debtMinor"] && id("id") && choices("source", ["surplus", "reserve"]) && positive("debtMinor")
@@ -64,11 +68,23 @@ public enum MoneyCommandPayload {
             if choices("mode", ["fixed"]) { return p["percentBp"] == nil && p["base"] == nil && (integer(p["limitMinor"]).map { $0 >= 0 } ?? false) }
             return choices("mode", ["percent"]) && p["limitMinor"] == nil && choices("base", ["income", "allowance"]) && (integer(p["percentBp"]).map { (1...10_000).contains($0) } ?? false)
         case "money.saveObligation":
-            // A monthly bill on a day, or a loan / instalment plan of equal monthly instalments from a first due day.
-            guard Set(p.keys).isSubset(of: ["kind", "name", "amountMinor", "dueDay", "count", "firstDue"]), text("name", max: 60), positive("amountMinor") else { return false }
-            if choices("kind", ["bill"]) { return p["count"] == nil && p["firstDue"] == nil && (integer(p["dueDay"]).map { (1...31).contains($0) } ?? false) }
-            guard choices("kind", ["loan", "installment"]), p["dueDay"] == nil, (integer(p["count"]).map { (1...120).contains($0) } ?? false),
-                  case .string(let first) = p["firstDue"], (try? GregorianDay(first)) != nil else { return false }
+            // A bill or subscription repeating every N days/weeks/months/years from a free first due day (M5-X00), or the
+            // older monthly bill on a day; a loan / instalment plan of equal instalments from a first due day, monthly
+            // unless an interval is given.
+            guard Set(p.keys).isSubset(of: ["kind", "name", "amountMinor", "dueDay", "count", "firstDue", "repeatEvery", "repeatUnit"]), text("name", max: 60), positive("amountMinor") else { return false }
+            let hasFirst: Bool = { if case .string(let first) = p["firstDue"] { (try? GregorianDay(first)) != nil } else { false } }()
+            let interval: Bool? = {
+                if p["repeatEvery"] == nil && p["repeatUnit"] == nil { return nil }
+                guard case .string(let raw) = p["repeatUnit"], let unit = RecurrenceUnit(rawValue: raw), let every = integer(p["repeatEvery"]) else { return false }
+                return (1...unit.maxEvery).contains(every)
+            }()
+            if interval == false { return false }
+            if choices("kind", ["bill", "subscription"]) {
+                guard p["count"] == nil else { return false }
+                if interval == true { return p["dueDay"] == nil && hasFirst }
+                return choices("kind", ["bill"]) && p["firstDue"] == nil && (integer(p["dueDay"]).map { (1...31).contains($0) } ?? false)
+            }
+            guard choices("kind", ["loan", "installment"]), p["dueDay"] == nil, (integer(p["count"]).map { (1...120).contains($0) } ?? false), hasFirst else { return false }
             return integer(p["amountMinor"]).map { $0 <= 9_007_199_254_740_991 / 120 } ?? false
         case "money.confirmSalary":
             return Set(p.keys).isSubset(of: ["id", "remainderTo"]) && id("id") && (p["remainderTo"] == nil || choices("remainderTo", ["surplus", "reserve"]))

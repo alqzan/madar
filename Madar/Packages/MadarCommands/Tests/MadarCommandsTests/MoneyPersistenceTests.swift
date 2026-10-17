@@ -623,6 +623,85 @@ import MadarInbox
         #expect(!MoneyCommandPayload.validate(name: "money.saveObligation", payload: ["kind": .string("bill"), "name": .string("x"), "amountMinor": .string("1"), "dueDay": .number(32)]))
         #expect(!MoneyCommandPayload.validate(name: "money.saveObligation", payload: ["kind": .string("loan"), "name": .string("x"), "amountMinor": .string("1"), "count": .number(0), "firstDue": .string("2026-11-05")]))
     }
+    /// M5-X00 (owner 16 Oct): a subscription on a free interval and first due day; the owner's rent every 6 months, first
+    /// due 18 Feb 2027, is not reserved in October 2026, while a monthly one due on 20 Oct is. Undo removes it.
+    @Test func flexibleSubscriptionStoresItsScheduleReservesOnlyItsDueDaysAndUndoes() async throws {
+        let f = try MoneyFixture(); defer { f.clean() }
+        let rent = UUID()
+        #expect(try await f.run("money.saveObligation", ["kind": .string("subscription"), "name": .string("الإيجار"), "amountMinor": .string("1500000"),
+            "repeatEvery": .number(6), "repeatUnit": .string("month"), "firstDue": .string("2027-02-18")], id: rent).status == .applied)
+        let stored = try #require(try ModelContext(f.container).fetch(FetchDescriptor<Obligation>()).first { $0.id == rent })
+        #expect(stored.kind == "subscription" && stored.repeatEvery == 6 && stored.repeatUnit == "month" && stored.firstDueDayKey == "2027-02-18")
+        #expect(stored.dueDay == nil && stored.totalMinor == 1_500_000 && stored.amountMinor == 1_500_000)
+        #expect(stored.recurrence?.preview(from: try GregorianDay("2026-10-16")).map(\.description) == ["2027-02-18", "2027-08-18", "2028-02-18"])
+        #expect(try MoneyRepository(context: ModelContext(f.container)).basisInput(at: f.now).billsDueMinor == 0)
+        #expect(try await f.run("money.saveObligation", ["kind": .string("subscription"), "name": .string("النادي"), "amountMinor": .string("15000"),
+            "repeatEvery": .number(1), "repeatUnit": .string("month"), "firstDue": .string("2026-10-20")]).status == .applied)
+        #expect(try MoneyRepository(context: ModelContext(f.container)).basisInput(at: f.now).billsDueMinor == 15_000)
+        #expect(try await f.run("system.undo", ["undoToken": .string(rent.uuidString)]).status == .applied)
+        #expect(try ModelContext(f.container).fetch(FetchDescriptor<Obligation>()).filter { $0.deletedAt == nil }.map(\.name) == ["النادي"])
+        // Validation: a subscription needs its interval; units, limits and mixed shapes are refused.
+        let base: [String: MadarCore.JSONValue] = ["kind": .string("subscription"), "name": .string("x"), "amountMinor": .string("1")]
+        func valid(_ extra: [String: MadarCore.JSONValue]) -> Bool { MoneyCommandPayload.validate(name: "money.saveObligation", payload: base.merging(extra) { $1 }) }
+        #expect(valid(["repeatEvery": .number(2), "repeatUnit": .string("week"), "firstDue": .string("2026-10-01")]))
+        #expect(!valid([:]))
+        #expect(!valid(["dueDay": .number(5)]))
+        #expect(!valid(["repeatEvery": .number(0), "repeatUnit": .string("month"), "firstDue": .string("2026-10-01")]))
+        #expect(!valid(["repeatEvery": .number(11), "repeatUnit": .string("year"), "firstDue": .string("2026-10-01")]))
+        #expect(!valid(["repeatEvery": .number(1), "repeatUnit": .string("fortnight"), "firstDue": .string("2026-10-01")]))
+        #expect(!valid(["repeatEvery": .number(1), "firstDue": .string("2026-10-01")]))
+        #expect(!valid(["repeatEvery": .number(1), "repeatUnit": .string("month"), "firstDue": .string("2026-10-01"), "dueDay": .number(1)]))
+        #expect(!valid(["repeatEvery": .number(1), "repeatUnit": .string("month"), "firstDue": .string("2026-10-01"), "count": .number(3)]))
+        #expect(MoneyCommandPayload.validate(name: "money.saveObligation", payload: ["kind": .string("bill"), "name": .string("x"), "amountMinor": .string("1"),
+            "repeatEvery": .number(3), "repeatUnit": .string("month"), "firstDue": .string("2026-12-31")]))
+    }
+    /// M5-X00: instalments every two weeks from a first day; the first is on that day and each next one 14 days on.
+    @Test func instalmentsTakeAFreeInterval() async throws {
+        let f = try MoneyFixture(); defer { f.clean() }
+        let plan = UUID()
+        #expect(try await f.run("money.saveObligation", ["kind": .string("installment"), "name": .string("تقسيط الجوال"), "amountMinor": .string("25000"), "count": .number(3),
+            "firstDue": .string("2026-11-01"), "repeatEvery": .number(2), "repeatUnit": .string("week")], id: plan).status == .applied)
+        let c = ModelContext(f.container), zone = ActivePlace.riyadh.timeZone
+        let items = try c.fetch(FetchDescriptor<InstallmentItem>()).filter { $0.obligationID == plan && $0.deletedAt == nil }.sorted { $0.seq < $1.seq }
+        #expect(items.map { GregorianDay.containing($0.dueDate, in: zone).description } == ["2026-11-01", "2026-11-15", "2026-11-29"])
+        let row = try #require(try c.fetch(FetchDescriptor<Obligation>()).first { $0.id == plan })
+        #expect(row.dueDay == nil && row.repeatUnit == "week" && row.repeatEvery == 2 && row.totalMinor == 75_000)
+    }
+    /// M5-X00: a new cycle counts each flexible due day inside it once; a six-month rent outside it counts nothing.
+    @Test func salaryOpeningCountsFlexibleDueDaysInsideTheNewCycle() async throws {
+        let f = try MoneyFixture(); defer { f.clean() }; try await f.setup()
+        let c = ModelContext(f.container)
+        _ = try SettingsStore(context: c).stage(["core.dayStart": .string("midnight"), "mal.dailyAllowance": .object(["mode": .string("fixed"), "amountMinor": .number(20_000), "percentBp": .null])])
+        try c.save()
+        for (name, amount, every, unit, first) in [("الإيجار", "1500000", 6, "month", "2027-02-18"), ("النادي", "15000", 2, "week", "2026-10-10"), ("الماء", "8000", 1, "month", "2026-10-16")] {
+            #expect(try await f.run("money.saveObligation", ["kind": .string("subscription"), "name": .string(name), "amountMinor": .string(amount),
+                "repeatEvery": .number(Double(every)), "repeatUnit": .string(unit), "firstDue": .string(first)]).status == .applied)
+        }
+        _ = try await f.ingest("راتب\n*1111\n15000.00 SAR\n2026-10-16 12:00")
+        let salary = try #require(try ModelContext(f.container).fetch(FetchDescriptor<MoneyTransaction>()).first { $0.kind == "salary" })
+        let preview = try MoneyRepository(context: ModelContext(f.container)).salaryOpening(salaryID: salary.id, newCycleID: UUID())
+        #expect(preview.startDay.description == "2026-10-16" && preview.endDay.description == "2026-11-16")
+        // النادي on 24 Oct and 7 Nov (2 × 15000) and الماء on 16 Oct (8000); the rent's first due day is in February.
+        #expect(preview.input.obligationsMinor == 38_000)
+    }
+    /// M5-X00 (owner 16 Oct): the stamp keeps an optional reason; lifting clears it and undo of the lift brings it back.
+    @Test func budgetStampKeepsAnOptionalReason() async throws {
+        let f = try MoneyFixture(); defer { f.clean() }; try await f.setup()
+        _ = try await f.ingest("شراء مدى\n*3333\n120.00 SAR\n2026-10-16 12:00")
+        let row = try f.transaction()
+        #expect(try await f.run("money.confirmTransaction", ["id": .string(row.id.uuidString)]).status == .applied)
+        #expect(try await f.run("money.setBudgetExclusion", ["id": .string(row.id.uuidString), "excluded": .bool(true), "expectedExcluded": .bool(false), "reason": .string("  هدية لأخي ")]).status == .applied)
+        #expect(try f.transaction(row.id).budgetIgnoreReason == "هدية لأخي")
+        let lift = UUID()
+        #expect(try await f.run("money.setBudgetExclusion", ["id": .string(row.id.uuidString), "excluded": .bool(false), "expectedExcluded": .bool(true)], id: lift).status == .applied)
+        let lifted = try f.transaction(row.id); #expect(lifted.budgetIgnoreReason == nil && !lifted.ignoredFromBudget)
+        #expect(try await f.run("system.undo", ["undoToken": .string(lift.uuidString)]).status == .applied)
+        let restored = try f.transaction(row.id); #expect(restored.budgetIgnoreReason == "هدية لأخي" && restored.ignoredFromBudget)
+        let id: MadarCore.JSONValue = .string(row.id.uuidString)
+        #expect(!MoneyCommandPayload.validate(name: "money.setBudgetExclusion", payload: ["id": id, "excluded": .bool(false), "expectedExcluded": .bool(true), "reason": .string("x")]))
+        #expect(!MoneyCommandPayload.validate(name: "money.setBudgetExclusion", payload: ["id": id, "excluded": .bool(true), "expectedExcluded": .bool(false), "reason": .string(String(repeating: "س", count: 121))]))
+        #expect(MoneyCommandPayload.validate(name: "money.setBudgetExclusion", payload: ["id": id, "excluded": .bool(true), "expectedExcluded": .bool(false), "reason": .string("")]))
+    }
     /// M5-V10: one live limit per category; fixed, percent and none round-trip, and undo restores the previous limit.
     @Test func setCategoryLimitKeepsOneRowAndUndoes() async throws {
         let f = try MoneyFixture(); defer { f.clean() }
