@@ -30,6 +30,7 @@ struct MoneyHomeView: View {
     @State private var expenseOpen = false
     @State private var zakatOpen = false
     @State private var goalOpen = false
+    @State private var guideOpen = false
     @State private var visitChecked = false
     private var service: AppMoneyService { .init(app: app) }
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
@@ -86,6 +87,7 @@ struct MoneyHomeView: View {
         .navigationDestination(isPresented: $sinceOpen) {
             if let reading { MoneySinceView(app: app, home: reading, revealed: $revealed) { sinceOpen = false; messagesOpen = true; Task { try? await app.executeMoneyCommand("money.markVisit") } } }
         }
+        .navigationDestination(isPresented: $guideOpen) { MoneyShortcutGuideView(app: app) }
         .navigationDestination(isPresented: $goalOpen) { MoneyGoalView(app: app, revealed: $revealed) }
         .onChange(of: goalOpen) { if !goalOpen { load() } }
         .navigationDestination(isPresented: $zakatOpen) { MoneyZakatView(app: app, revealed: $revealed) }
@@ -178,6 +180,9 @@ struct MoneyHomeView: View {
                 }.padding(22).frame(maxWidth: .infinity, minHeight: 200).background(theme.surface)
                 Capsule().fill(theme.color("rod2")).frame(width: 14)
             }.accessibilityIdentifier("money-empty")
+            Button("إعداد استقبال رسائل البنك") { guideOpen = true }.font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 48).background(theme.ink, in: Capsule()).foregroundStyle(theme.background).accessibilityIdentifier("money-guide-open")
+            Button("أضف حسابك يدويًا") { accountsOpen = true }.font(MadarTypography.body()).frame(minHeight: 44).accessibilityIdentifier("money-first-account")
+            Button("ابدأ برسالة الراتب") { messagesOpen = true }.font(MadarTypography.body()).frame(minHeight: 44).accessibilityIdentifier("money-first-salary")
             if reading.hasAccounts {
                 Button { basisOpen = true } label: {
                     HStack { Text("في حسابك"); Spacer(); Text(amount(reading.basis.inAccountMinor)).font(MadarTypography.cardTitle()); Image(systemName: "chevron.left").font(.caption) }.frame(minHeight: 44)

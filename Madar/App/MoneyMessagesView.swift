@@ -18,6 +18,7 @@ struct MoneyMessagesView: View {
     @State private var note: String?
     @State private var categorizing: MoneyMessageDraft?
     @State private var rulesOpen = false
+    @State private var guideOpen = false
     @State private var budgetOpen = false
     @State private var salary: SalaryRoute?
     private struct SalaryRoute: Identifiable, Hashable { var id: UUID }
@@ -48,6 +49,7 @@ struct MoneyMessagesView: View {
                             Text("كل رسالة وصلت حُسمت. ما يصل عبر الاختصار يظهر هنا للمراجعة.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
                         }.padding(.vertical, 24).accessibilityIdentifier("money-messages-empty")
                     }
+                    Button("دليل إعداد الاختصار وفحص الوصول") { guideOpen = true }.font(MadarTypography.caption()).frame(minHeight: 44).accessibilityIdentifier("money-guide-open")
                     footer(reading)
                 } else if let failure {
                     Text(failure).font(MadarTypography.body()); Button("أعِد المحاولة", action: load).frame(minHeight: 44)
@@ -58,6 +60,7 @@ struct MoneyMessagesView: View {
             .task { load() }.onChange(of: app.prayerRevision) { load() }
             .sheet(item: $categorizing) { MoneyCategorizeSheet(app: app, draft: $0).environment(\.roomTheme, theme) }
             .fullScreenCover(item: $bigExpense) { route in MoneyBigExpenseView(app: app, route: route, revealed: $revealed) { bigExpense = nil; load() } }
+            .navigationDestination(isPresented: $guideOpen) { MoneyShortcutGuideView(app: app) }
             .navigationDestination(isPresented: $rulesOpen) { MoneyRulesView(app: app) }
         .navigationDestination(isPresented: $budgetOpen) { MoneyBudgetView(app: app, revealed: $revealed) }
             .navigationDestination(item: $salary) { MoneySalaryView(app: app, salaryID: $0.id) }

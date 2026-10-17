@@ -11,8 +11,8 @@ struct IngestBankMessageIntent: AppIntent {
     static let description = IntentDescription("يحفظ رسالة البنك للمراجعة في مدار، من أتمتة تختارها في الاختصارات.")
     static let openAppWhenRun = false
     static let authenticationPolicy: IntentAuthenticationPolicy = .requiresAuthentication
-    // Enabled with the built money room. D02 plumbing is not a premature room entry point.
-    static let isDiscoverable = false
+    // F09 guide exposes bank intake once the money room is built.
+    static let isDiscoverable = true
     @Parameter(title: "نص الرسالة", inputOptions: .init(multiline: true)) var text: String
     @Parameter(title: "المرسل") var sender: String?
     @Parameter(title: "وقت الورود") var receivedAt: Date?
