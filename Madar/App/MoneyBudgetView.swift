@@ -93,6 +93,7 @@ struct MoneyBudgetView: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(row.merchant).font(MadarTypography.cardTitle()).foregroundStyle(row.excluded ? theme.secondaryInk : theme.ink)
                     Text(row.category).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                    if let reason = row.reason { Text("لأن: " + reason).font(MadarTypography.fine()).foregroundStyle(theme.color("reserveText")).lineLimit(1) }
                 }
                 Spacer(minLength: 4)
                 if row.excluded {
@@ -103,7 +104,7 @@ struct MoneyBudgetView: View {
             }.padding(.vertical, 11).frame(minHeight: 58)
                 .overlay { if row.excluded { MoneyStrike().stroke(theme.color("reserveText"), lineWidth: 1).frame(height: 6).allowsHitTesting(false) } }
                 .overlay(alignment: .top) { Rectangle().fill(theme.line).frame(height: 0.7) }.contentShape(Rectangle())
-        }.buttonStyle(.plain).accessibilityLabel(row.merchant + "، " + amount(row.netMinor) + (row.excluded ? "، خارج الميزانية" : "، داخل الميزانية"))
+        }.buttonStyle(.plain).accessibilityLabel(row.merchant + "، " + amount(row.netMinor) + (row.excluded ? "، خارج الميزانية" + (row.reason.map { "، لأن " + $0 } ?? "") : "، داخل الميزانية"))
             .accessibilityIdentifier("money-budget-row-" + row.merchant)
     }
     private func load() {
@@ -120,6 +121,7 @@ private struct MoneyBudgetReceipt: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var saving = false
     @State private var failure: String?
+    @State private var reason = ""
     private var service: AppMoneyService { .init(app: app) }
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
     private var visible: Bool { revealed || !app.bool("core.hideMoneyUntilTouch") }
@@ -149,6 +151,18 @@ private struct MoneyBudgetReceipt: View {
                     if row.categoryMinor > 0 { effect("من حدّ «" + row.category + "»", value: row.categoryMinor) }
                     HStack { Text("في السجل"); Spacer(); Text("يبقى دائمًا").bold() }.font(MadarTypography.body())
                     if row.netMinor != row.amountMinor { Text("بعد الردود: " + amount(row.netMinor)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
+                    // M5-X00 (owner 16 Oct): an optional reason, written on the receipt while the stamp stays.
+                    if let stamped = row.reason {
+                        HStack(alignment: .firstTextBaseline) { Text("السبب"); Spacer(); Text(stamped).bold().multilineTextAlignment(.trailing) }
+                            .font(MadarTypography.body()).foregroundStyle(theme.color("reserveText")).accessibilityIdentifier("money-budget-reason")
+                    } else if !row.excluded {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("السبب، إن أردت").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                            TextField("مثل: هدية، أو مصروف عمل يُعوَّض", text: $reason).font(MadarTypography.body()).padding(10)
+                                .overlay { Rectangle().stroke(theme.line, lineWidth: 1) }.accessibilityIdentifier("money-budget-reason-field")
+                                .onChange(of: reason) { if reason.count > MoneyCommandPayload.maxReasonLength { reason = String(reason.prefix(MoneyCommandPayload.maxReasonLength)) } }
+                        }
+                    }
                 }.padding(20).background(theme.background).clipShape(BudgetReceiptPaper())
                     .overlay { BudgetReceiptPaper().stroke(theme.line, lineWidth: 1) }.shadow(color: theme.ink.opacity(0.08), radius: 9, y: 4)
                 Text(row.excluded ? "تعود الحركة إلى توزيعها الأصلي؛ النقد والدين يبقيان كما هما." : "الختم لهذه الحركة فقط. تخرج من يومك والمظاريف وحدود التصنيفات، وتبقى في حسابك والسجل.")
@@ -171,7 +185,10 @@ private struct MoneyBudgetReceipt: View {
         guard !saving else { return }; saving = true
         Task {
             do {
-                try await app.executeMoneyCommand("money.setBudgetExclusion", payload: ["id": .string(row.id.uuidString), "excluded": .bool(!row.excluded), "expectedExcluded": .bool(row.excluded)])
+                var payload: [String: MadarCore.JSONValue] = ["id": .string(row.id.uuidString), "excluded": .bool(!row.excluded), "expectedExcluded": .bool(row.excluded)]
+                let note = reason.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !row.excluded && !note.isEmpty { payload["reason"] = .string(note) }
+                try await app.executeMoneyCommand("money.setBudgetExclusion", payload: payload)
                 dismiss()
             } catch { failure = "تغيّرت الحركة أو تعذّر حفظها. أغلق الإيصال وافتحه من جديد."; saving = false }
         }

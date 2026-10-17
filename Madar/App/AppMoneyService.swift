@@ -115,8 +115,22 @@ struct MoneyHomeReading {
             due.append(.init(id: item.id, name: obligation.name, amountMinor: item.amountMinor - item.paidMinor, due: .containing(item.dueDate, in: zone)))
         }
         var calendar = Calendar(identifier: .gregorian); calendar.timeZone = zone
-        for bill in obligations where bill.kind == "bill" && bill.currency == currency {
-            guard let day = bill.dueDay else { continue }
+        let linked = try repo.confirmedTransactions().filter { $0.obligationID != nil }
+        var flexibleExtraMinor = 0
+        for bill in obligations where bill.isRecurring && bill.currency == currency {
+            // M5-X00: a free schedule shows its next unpaid due day (from this cycle's start), the same rule as the obligations room.
+            // The list shows the next one; a schedule due several times this cycle (weekly) adds the others to the cycle total.
+            if let schedule = bill.recurrence {
+                let payments = linked.filter { $0.obligationID == bill.id }.map(\.eventAt)
+                let from = cycle?.startDay ?? today, cycleEnd = cycle?.expectedEndDay ?? today.adding(days: cycle?.input.expectedLengthDays ?? 30)
+                let unpaid = ObligationSchedule.unpaid(schedule, from: from, before: max(today, from).adding(days: 400), payments: payments, zone: zone)
+                if let next = unpaid.first {
+                    due.append(.init(id: bill.id, name: bill.name, amountMinor: bill.amountMinor, due: next))
+                    flexibleExtraMinor += bill.amountMinor * unpaid.dropFirst().filter { $0 >= from && $0 < cycleEnd }.count
+                }
+                continue
+            }
+            guard bill.kind == "bill", let day = bill.dueDay else { continue }
             var parts = calendar.dateComponents([.year, .month], from: now)
             let range = calendar.range(of: .day, in: .month, for: now)!
             parts.day = min(day, range.count)
@@ -126,7 +140,7 @@ struct MoneyHomeReading {
         }
         due.sort { $0.due == $1.due ? $0.id.uuidString < $1.id.uuidString : $0.due < $1.due }
         let length = cycle?.input.expectedLengthDays ?? 30
-        let cycleObligations = due.filter { $0.due >= (cycle?.startDay ?? today) && $0.due < (cycle?.expectedEndDay ?? today.adding(days: length)) }.reduce(0) { $0 + $1.amountMinor }
+        let cycleObligations = due.filter { $0.due >= (cycle?.startDay ?? today) && $0.due < (cycle?.expectedEndDay ?? today.adding(days: length)) }.reduce(0) { $0 + $1.amountMinor } + flexibleExtraMinor
         let history = Dictionary(grouping: allocations.filter { $0.target == "surplus" || $0.targetID.map { id in envelopes.contains { $0.id == id && $0.role == "surplus" } } == true }, by: { $0.cycleID })
             .sorted { ($0.value.map(\.createdAt).min() ?? .distantPast) < ($1.value.map(\.createdAt).min() ?? .distantPast) }.suffix(6).map { $0.value.reduce(0) { $0 + $1.amountMinor } }
         let reserveReading = ReserveEngine.read(balanceMinor: reserve, dailyMinor: cycle?.headline.todayAllowanceMinor, cycleLengthDays: length, obligationsPerCycleMinor: cycleObligations)

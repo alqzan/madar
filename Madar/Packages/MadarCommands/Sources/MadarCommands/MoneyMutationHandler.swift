@@ -177,15 +177,27 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             obligation.amountMinor = MoneyCommandPayload.integer(p["amountMinor"]) ?? 0
             obligation.currency = try SettingsStore(context: context).value(for: "core.currency").string ?? "SAR"
             guard obligation.amountMinor > 0, !obligation.name.isEmpty else { throw MoneyCommandError.invalidAmount }
-            if obligation.kind == "bill" {
-                obligation.dueDay = MoneyCommandPayload.integer(p["dueDay"]); obligation.totalMinor = obligation.amountMinor
+            // M5-X00: a free interval and first due day; without one, a loan/instalment plan is monthly from its first day.
+            let interval = p["repeatUnit"] == nil ? nil : Recurrence(every: MoneyCommandPayload.integer(p["repeatEvery"]), unit: optionalText(p, "repeatUnit"), firstDayKey: optionalText(p, "firstDue"))
+            if p["repeatUnit"] != nil && interval == nil { throw MoneyCommandError.invalidReference }
+            if let interval {
+                obligation.repeatEvery = interval.every; obligation.repeatUnit = interval.unit.rawValue; obligation.firstDueDayKey = interval.first.description
+            }
+            if obligation.isRecurring {
+                obligation.totalMinor = obligation.amountMinor
+                if interval == nil {
+                    guard obligation.kind == "bill" else { throw MoneyCommandError.invalidReference }
+                    obligation.dueDay = MoneyCommandPayload.integer(p["dueDay"])
+                }
             } else {
-                guard let count = MoneyCommandPayload.integer(p["count"]), (1...120).contains(count), let first = optionalText(p, "firstDue").flatMap({ try? GregorianDay($0) }) else { throw MoneyCommandError.invalidReference }
+                guard let count = MoneyCommandPayload.integer(p["count"]), (1...120).contains(count), let first = optionalText(p, "firstDue").flatMap({ try? GregorianDay($0) }),
+                      let schedule = interval ?? Recurrence(every: 1, unit: .month, first: first) else { throw MoneyCommandError.invalidReference }
                 let zone = try PrayerRepository(context: context).place(at: now).timeZone
-                var calendar = Calendar(identifier: .gregorian); calendar.timeZone = zone
-                obligation.totalMinor = obligation.amountMinor * count; obligation.remainingCount = count; obligation.dueDay = first.day
+                obligation.totalMinor = obligation.amountMinor * count; obligation.remainingCount = count
+                // The ladder and «يوم N من كل شهر» read dueDay only for a monthly plan.
+                obligation.dueDay = schedule.unit == .month && schedule.every == 1 ? first.day : nil
                 for n in 1...count {
-                    guard let due = calendar.date(byAdding: .month, value: n - 1, to: first.date(in: zone)) else { throw MoneyCommandError.invalidReference }
+                    guard let due = schedule.occurrence(n - 1)?.date(in: zone) else { throw MoneyCommandError.invalidReference }
                     let item = InstallmentItem(); item.id = StableIdentity.uuid(for: "InstallmentItem:\(id):\(n)"); item.obligationID = id; item.seq = n
                     item.dueDate = due; item.amountMinor = obligation.amountMinor; item.createdAt = now
                     context.insert(item); try touch(item, now, writer)
@@ -593,7 +605,10 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         let ids = Set(([row] + refunds).map(\.id))
         let stored = try context.fetch(FetchDescriptor<Allocation>()).filter { $0.transactionID.map(ids.contains) == true && $0.mergedInto == nil }
         guard stored.allSatisfy({ ["spend", "refund"].contains($0.kind) }) else { throw MoneyCommandError.invalidReference }
-        row.ignoredFromBudget = excluded; try touch(row, now, writer)
+        // M5-X00: the stamp's optional reason lives on the movement only, and leaves with the stamp.
+        let reason = optionalText(p, "reason")?.trimmingCharacters(in: .whitespacesAndNewlines)
+        row.ignoredFromBudget = excluded; row.budgetIgnoreReason = excluded && reason?.isEmpty == false ? reason.map { String($0.prefix(MoneyCommandPayload.maxReasonLength)) } : nil
+        try touch(row, now, writer)
         for refund in refunds { refund.ignoredFromBudget = excluded; try touch(refund, now, writer) }
         if excluded {
             for allocation in stored where live(allocation) { try touch(allocation, now, writer, deleting: true) }

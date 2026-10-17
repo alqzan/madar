@@ -2449,7 +2449,7 @@
       "merge": "id-only; never merged by content (duplicates prevented by BankMessage (fingerprint, occurrence) and ImportLink)",
       "seed": null,
       "note": "two legs in one row; envelope/daily effects live in Allocation",
-      "amendedBy": "D A7 · RM4/RM6 kinds (schema V5, no new field)",
+      "amendedBy": "D A7 · RM4/RM6 kinds (schema V5, no new field); owner 16 Oct, M5-X00 (schema V7)",
       "relationships": [
         {
           "field": "categoryID",
@@ -2717,6 +2717,12 @@
             "needsLook",
             "possibleDuplicate"
           ]
+        },
+        {
+          "name": "budgetIgnoreReason",
+          "type": "String?",
+          "optional": true,
+          "note": "M5-X00 (owner 16 Oct): optional free text (≤ 120 characters) on the «تجاهله من الميزانيات» stamp; cleared when the stamp is lifted. Only meaningful while ignoredFromBudget is true."
         }
       ]
     },
@@ -3384,7 +3390,7 @@
       "merge": "row LWW (§11 merge)",
       "seed": null,
       "note": null,
-      "amendedBy": "D A13",
+      "amendedBy": "D A13; owner 16 Oct, M5-X00 (schema V7)",
       "relationships": [
         {
           "field": "purchaseTransactionID",
@@ -3407,7 +3413,8 @@
           "enum": [
             "loan",
             "bill",
-            "installment"
+            "installment",
+            "subscription"
           ]
         },
         {
@@ -3471,6 +3478,35 @@
           "type": "UUID?",
           "optional": true,
           "fk": "BankMessage"
+        },
+        {
+          "name": "repeatEvery",
+          "type": "Int?",
+          "optional": true,
+          "range": [
+            1,
+            365
+          ],
+          "note": "M5-X00 (owner 16 Oct): the interval count; with repeatUnit and firstDueDayKey it replaces dueDay. Limits per unit: day 365, week 104, month 120, year 10. nil = the older monthly bill on dueDay, or a monthly loan/instalment plan."
+        },
+        {
+          "name": "repeatUnit",
+          "type": "String?",
+          "optional": true,
+          "enum": [
+            "day",
+            "week",
+            "month",
+            "year"
+          ],
+          "note": "M5-X00: the interval unit. Month and year steps are counted from firstDueDayKey and clamp to the month's last day (31 Jan → 28/29 Feb), never chained."
+        },
+        {
+          "name": "firstDueDayKey",
+          "type": "String?",
+          "optional": true,
+          "unit": "yyyy-MM-dd (ASCII, Gregorian)",
+          "note": "M5-X00: the first due day, free (it may lie in the past); never recomputed. A linked confirmed movement settles the due day nearest its own day."
         }
       ]
     },

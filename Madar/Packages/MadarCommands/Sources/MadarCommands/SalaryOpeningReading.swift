@@ -123,8 +123,14 @@ extension MoneyRepository {
             live(item) && item.paidMinor < item.amountMinor && window.contains(item.dueDate) && obligations.contains { $0.id == item.obligationID }
         }.reduce(0) { $0 + $1.amountMinor - $1.paidMinor }
         var calendar = Calendar(identifier: .gregorian); calendar.timeZone = zone
-        for bill in obligations where bill.kind == "bill" {
-            guard let day = bill.dueDay else { continue }
+        // M5-X00: a bill or subscription on a free schedule counts each unpaid due day inside the new cycle.
+        let linked = try context.fetch(FetchDescriptor<MoneyTransaction>()).filter { live($0) && $0.reviewState == "ok" && $0.obligationID != nil }
+        for bill in obligations where bill.isRecurring {
+            if let schedule = bill.recurrence {
+                due += bill.amountMinor * ObligationSchedule.unpaid(schedule, from: startDay, before: endDay, payments: linked.filter { $0.obligationID == bill.id }.map(\.eventAt), zone: zone).count
+                continue
+            }
+            guard bill.kind == "bill", let day = bill.dueDay else { continue }
             for offset in 0...2 {
                 guard let month = calendar.date(byAdding: .month, value: offset, to: window.lowerBound), let range = calendar.range(of: .day, in: .month, for: month) else { continue }
                 var parts = calendar.dateComponents([.year, .month], from: month); parts.day = min(day, range.count)

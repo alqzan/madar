@@ -65,9 +65,13 @@ import Testing
             let plan = MadarFrozenMoneyV4.EnvelopePlan(); plan.id = planID; plan.kind = "repay"; plan.source = "surplus"; plan.perPaycheckMinor = 50_000
             let zakat = MadarFrozenMoneyV4.ZakatProfile(); zakat.id = zakatID; zakat.goldPricePerGramMinor = 40_000; zakat.debtsPolicy = "allOwed"; zakat.otherAssetsMinor = 12
             for row in [account as any PersistentModel, card, plan, zakat] { old.mainContext.insert(row) }
-            let money = MoneyTransaction(); money.amountMinor = 4_200; money.kind = "expense"; money.cardID = cardID
+            // V7 pinned MoneyTransaction's V2–V6 shape; the expected row is the same values read through the current model.
+            let money = MadarFrozenMoneyV6.MoneyTransaction(); money.amountMinor = 4_200; money.kind = "expense"; money.cardID = cardID
+            old.mainContext.insert(money)
+            let expected = MoneyTransaction(); expected.id = money.id; expected.createdAt = money.createdAt; expected.updatedAt = money.updatedAt; expected.eventAt = money.eventAt
+            expected.amountMinor = 4_200; expected.kind = "expense"; expected.cardID = cardID; before.append(try expected.record())
             let entry = Entry(); entry.dayKey = "2026-10-08"; entry.text = "synthetic untouched diary"
-            for row in [money as any MadarRecordModel, entry] { old.mainContext.insert(row); before.append(try row.record()) }
+            for row in [entry as any MadarRecordModel] { old.mainContext.insert(row); before.append(try row.record()) }
             try old.mainContext.save()
         }
         try DurableFiles.encode(4, to: generation.appendingPathComponent("SchemaVersion.json"))
@@ -163,6 +167,75 @@ import Testing
         let stored = try #require(reopened.container.mainContext.fetch(FetchDescriptor<EnvelopePlan>()).first { $0.id == repayID })
         #expect(stored.repaymentTotalMinor == 100_000 && stored.repaymentPaychecks == 3)
     }
+    /// M5-X00 (owner go, 16 Oct): V6 → V7 adds only Obligation's free interval and first due day and the stamp's reason.
+    /// Synthetic store only; every old value stays and the new fields stay empty.
+    @Test func schemaV6UpgradeKeepsEveryObligationAndMovementValueAndLeavesTheNewFieldsEmpty() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("MadarV7-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let oldID = UUID(), generation = root.appendingPathComponent("Generations/\(oldID.uuidString)")
+        try FileManager.default.createDirectory(at: generation, withIntermediateDirectories: true)
+        let billID = UUID(), loanID = UUID(), movementID = UUID(), purchaseID = UUID(), eventAt = Date(timeIntervalSince1970: 1_800_000_000)
+        var before: [DataRecord] = []
+        do {
+            let old = try ModelContainer(for: MadarSchemaV6.schema, configurations: [
+                ModelConfiguration("synced", schema: Schema(MadarSchemaV6.syncedTypes), url: generation.appendingPathComponent("Madar.store"), cloudKitDatabase: .none),
+                ModelConfiguration("deviceOnly", schema: Schema(MadarSchemaV6.deviceTypes), url: root.appendingPathComponent("Device.store"), cloudKitDatabase: .none)])
+            old.mainContext.autosaveEnabled = false
+            let bill = MadarFrozenMoneyV6.Obligation(); bill.id = billID; bill.kind = "bill"; bill.name = "synthetic power"; bill.amountMinor = 22_000; bill.totalMinor = 22_000; bill.dueDay = 25; bill.provider = "001"
+            let loan = MadarFrozenMoneyV6.Obligation(); loan.id = loanID; loan.kind = "loan"; loan.name = "synthetic loan"; loan.amountMinor = 95_000; loan.totalMinor = 855_000; loan.dueDay = 27; loan.remainingCount = 9
+            let movement = MadarFrozenMoneyV6.MoneyTransaction(); movement.id = movementID; movement.kind = "expense"; movement.amountMinor = 4_550; movement.homeAmountMinor = 4_550
+            movement.dayKey = "2027-01-15"; movement.eventAt = eventAt; movement.ignoredFromBudget = true; movement.merchant = "synthetic shop"; movement.obligationID = nil; movement.relatedTransactionID = purchaseID
+            old.mainContext.insert(bill); old.mainContext.insert(loan); old.mainContext.insert(movement)
+            let item = InstallmentItem(); item.obligationID = loanID; item.seq = 1; item.amountMinor = 95_000; item.dueDate = eventAt
+            let envelope = Envelope(); envelope.name = "synthetic trip"
+            for row in [item as any MadarRecordModel, envelope] { old.mainContext.insert(row); before.append(try row.record()) }
+            try old.mainContext.save()
+        }
+        try DurableFiles.encode(6, to: generation.appendingPathComponent("SchemaVersion.json"))
+        try DurableFiles.encode(1, to: root.appendingPathComponent("DeviceSchemaVersion.json"))
+        try DurableFiles.encode(GenerationReady(version: 1, generationID: oldID, recordsHash: RecordFingerprint.hash(before), createdAt: Date()), to: generation.appendingPathComponent("GenerationReady.json"))
+        try DurableFiles.encode(ManagedPointer(version: 1, generationID: oldID, previousGenerationID: nil, accountHash: nil, cloudKitContainerIdentifier: nil), to: root.appendingPathComponent("ActiveGeneration.json"))
+        let sourceHash = try stableGenerationHashes(generation)
+        let upgraded = try ManagedDataStore(root: root)
+        #expect(upgraded.binding.generationID != oldID)
+        #expect(try stableGenerationHashes(generation) == sourceHash)
+        let context = upgraded.container.mainContext
+        let obligations = try context.fetch(FetchDescriptor<Obligation>())
+        let bill = try #require(obligations.first { $0.id == billID }), loan = try #require(obligations.first { $0.id == loanID })
+        #expect(bill.kind == "bill" && bill.name == "synthetic power" && bill.amountMinor == 22_000 && bill.totalMinor == 22_000 && bill.dueDay == 25 && bill.provider == "001" && bill.remainingCount == nil)
+        #expect(loan.kind == "loan" && loan.amountMinor == 95_000 && loan.totalMinor == 855_000 && loan.dueDay == 27 && loan.remainingCount == 9)
+        #expect(obligations.allSatisfy { $0.repeatEvery == nil && $0.repeatUnit == nil && $0.firstDueDayKey == nil })
+        let movement = try #require(context.fetch(FetchDescriptor<MoneyTransaction>()).first { $0.id == movementID })
+        #expect(movement.kind == "expense" && movement.amountMinor == 4_550 && movement.homeAmountMinor == 4_550 && movement.dayKey == "2027-01-15" && movement.eventAt == eventAt)
+        #expect(movement.ignoredFromBudget && movement.merchant == "synthetic shop" && movement.relatedTransactionID == purchaseID && movement.budgetIgnoreReason == nil)
+        let unchanged = try RecordBridge.all(context).filter { ["Envelope", "InstallmentItem"].contains($0.model) }
+        #expect(try RecordFingerprint.hash(unchanged) == RecordFingerprint.hash(before))
+        // A V6 backup row and a pre-V7 undo receipt decode without the new keys.
+        let rows = try RecordBridge.all(context).filter { ["Obligation", "MoneyTransaction"].contains($0.model) }
+        let v6Rows = rows.map { row -> DataRecord in
+            var old = row
+            for key in ["repeatEvery", "repeatUnit", "firstDueDayKey", "budgetIgnoreReason"] { old.fields[key] = nil }
+            return old
+        }
+        #expect(try SchemaCompatibility.currentRecords(v6Rows, from: 6) == rows)
+        let fromReceipt = Obligation(); try fromReceipt.apply(try #require(v6Rows.first { $0.id == billID }))
+        #expect(fromReceipt.dueDay == 25 && fromReceipt.amountMinor == 22_000 && fromReceipt.repeatEvery == nil && fromReceipt.firstDueDayKey == nil)
+        let movementReceipt = MoneyTransaction(); try movementReceipt.apply(try #require(v6Rows.first { $0.id == movementID }))
+        #expect(movementReceipt.ignoredFromBudget && movementReceipt.budgetIgnoreReason == nil)
+        try RecordValidator.validate(RecordBridge.all(context))
+        // The new values persist across a reopen and pass the dictionary's enum and range.
+        bill.kind = "subscription"; bill.repeatEvery = 6; bill.repeatUnit = "month"; bill.firstDueDayKey = "2027-02-18"; bill.dueDay = nil
+        movement.budgetIgnoreReason = "synthetic gift"; try context.save()
+        try RecordValidator.validate(RecordBridge.all(context))
+        let reopened = try ManagedDataStore(root: root)
+        #expect(reopened.binding.generationID == upgraded.binding.generationID)
+        let stored = try #require(reopened.container.mainContext.fetch(FetchDescriptor<Obligation>()).first { $0.id == billID })
+        #expect(stored.kind == "subscription" && stored.repeatEvery == 6 && stored.repeatUnit == "month" && stored.firstDueDayKey == "2027-02-18")
+        #expect(try reopened.container.mainContext.fetch(FetchDescriptor<MoneyTransaction>()).first { $0.id == movementID }?.budgetIgnoreReason == "synthetic gift")
+        var bad = try #require(RecordBridge.all(reopened.container.mainContext).first { $0.id == billID })
+        bad.fields["repeatUnit"] = .string("fortnight")
+        #expect(throws: (any Error).self) { try RecordValidator.validate([bad]) }
+    }
     private struct ReceiptScope: Codable { let version: Int; let generationID: UUID }
     private var resources: URL { Bundle.module.resourceURL!.appendingPathComponent("Resources/LegacyV1") }
     private func fixtureDirectory() throws -> URL {
@@ -187,7 +260,7 @@ import Testing
     @Test func test_M0S1_RA4_originalV1ArchiveMapsOnlyAfterAuthentication() throws {
         let bytes = try Data(contentsOf:resources.appendingPathComponent("source-v1.madarbackup"))
         let backup = try BackupCodec.validate(bytes,passphrase:"legacy fixture password")
-        #expect(MadarSchema.version == 6)
+        #expect(MadarSchema.version == 7)
         #expect(backup.records.contains { $0.model == "MoneyTransaction" })
         #expect(!backup.records.contains { $0.model == "Transaction" })
         let expected = try expectedRows().filter { MadarSchema.syncedNames.contains($0.model) }
@@ -210,7 +283,7 @@ import Testing
     @Test func test_M0S1_RA4_originalSQLiteIsAdoptedWithoutLosingAnyRow() throws {
         let base = try fixtureDirectory(); defer { try? FileManager.default.removeItem(at:base) }
         let managed = try ManagedDataStore.adoptLegacy(from:base.appendingPathComponent("Flat"),at:base.appendingPathComponent("Managed"))
-        #expect(MadarSchema.version == 6)
+        #expect(MadarSchema.version == 7)
         #expect(try RecordFingerprint.hash(RecordBridge.all(managed.container.mainContext,syncedOnly:false)) == RecordFingerprint.hash(expectedRows()))
         #expect(try managed.container.mainContext.fetchCount(FetchDescriptor<DeviceSetting>()) == 2)
         #expect(try managed.container.mainContext.fetchCount(FetchDescriptor<CommandReceipt>()) == 1)

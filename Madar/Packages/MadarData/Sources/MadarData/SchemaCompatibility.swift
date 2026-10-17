@@ -16,6 +16,7 @@ enum SchemaCompatibility {
         case 3: MadarSchemaV3.syncedNames
         case 4: MadarSchemaV4.syncedNames
         case 5: MadarSchemaV5.syncedNames
+        case 6: MadarSchemaV6.syncedNames
         case MadarSchema.version: MadarSchema.syncedNames
         default: throw version > MadarSchema.version ? DataError.newerStore : DataError.unsupportedBackup
         }
@@ -48,6 +49,14 @@ enum SchemaCompatibility {
             // V6 (M5-V04): a plan written before the repayment fields has neither.
             if version < 6, row.model == "EnvelopePlan" {
                 row.fields["repaymentTotalMinor"] = .null; row.fields["repaymentPaychecks"] = .null
+            }
+            // V7 (M5-X00): rows written before the flexible schedule and the stamp's reason have none of them.
+            if version < 7 {
+                switch row.model {
+                case "Obligation": row.fields["repeatEvery"] = .null; row.fields["repeatUnit"] = .null; row.fields["firstDueDayKey"] = .null
+                case "MoneyTransaction": row.fields["budgetIgnoreReason"] = .null
+                default: break
+                }
             }
             return row
         }

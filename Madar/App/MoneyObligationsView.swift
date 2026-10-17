@@ -22,7 +22,7 @@ struct MoneyObligationsView: View {
     private var visible: Bool { revealed || !app.bool("core.hideMoneyUntilTouch") }
     private func amount(_ minor: Int) -> String { visible ? service.amount(minor) : "•••" }
     private func color(_ group: MoneyObligationDue.Group) -> Color {
-        switch group { case .loan: theme.color("accent"); case .installment: theme.color("bills"); case .bill: theme.color("surplus"); case .statement: theme.color("due") }
+        switch group { case .loan: theme.color("accent"); case .installment: theme.color("bills"); case .bill: theme.color("surplus"); case .subscription: theme.color("reserve"); case .statement: theme.color("due") }
     }
 
     var body: some View {
@@ -57,8 +57,8 @@ struct MoneyObligationsView: View {
     }
 
     private func current(_ r: MoneyObligationsReading) -> MoneyObligationDue? {
-        let all = r.cycle + r.installments + r.bills + r.statements
-        return all.first { $0.id == selected } ?? r.cycle.first { $0.due >= r.today } ?? r.installments.first ?? r.bills.first
+        let all = r.cycle + r.installments + r.bills + r.subscriptions + r.statements
+        return all.first { $0.id == selected } ?? r.cycle.first { $0.due >= r.today } ?? r.installments.first ?? r.bills.first ?? r.subscriptions.first
     }
 
     private func summary(_ r: MoneyObligationsReading) -> some View {
@@ -182,6 +182,9 @@ struct MoneyObligationsView: View {
                     Text("دفعت " + service.digits.string(paid) + " من " + service.digits.string(total) + "، يبقى " + amount(due.remainingMinor ?? 0) + (due.lastDue == nil ? "" : "، آخره"))
                     if let last = due.lastDue { MadarDateLabel(app.dateLabels(last, compact: true), primaryFont: MadarTypography.fine(), secondaryFont: MadarTypography.fine()) }
                 }.font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-obligation-progress")
+            } else if let schedule = due.schedule {
+                Text((due.group == .subscription ? "اشتراك يتكرر " : "فاتورة تتكرر ") + schedule).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                    .accessibilityIdentifier("money-obligation-schedule")
             } else if let day = due.dueDay {
                 Text("فاتورة شهرية يوم " + service.digits.string(day) + " من كل شهر").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
             } else if let minimum = due.minimumMinor, minimum > 0 {
@@ -204,6 +207,7 @@ struct MoneyObligationsView: View {
             }
             HStack(spacing: 12) {
                 key("القرض", theme.color("accent")); key("التقسيط", theme.color("bills")); key("الفواتير", theme.color("surplus"))
+                if r.ladder.contains(where: { $0.subscriptionMinor > 0 }) { key("الاشتراكات", theme.color("reserve")) }
             }.font(MadarTypography.fine())
             ForEach(r.endings) { ending in
                 Label(ending.name + " آخره " + app.dateLabels(ending.lastDue, compact: true).combined + "، فيعود لك " + amount(ending.returnsMinor) + " كل شهر", systemImage: "arrow.down")
@@ -217,6 +221,7 @@ struct MoneyObligationsView: View {
                         VStack(spacing: 0) {
                             Spacer(minLength: 0)
                             segment(month.installmentMinor, peak, theme.color("bills"))
+                            segment(month.subscriptionMinor, peak, theme.color("reserve"))
                             segment(month.billMinor, peak, theme.color("surplus"))
                             segment(month.loanMinor, peak, theme.color("accent"))
                         }.frame(maxWidth: .infinity).frame(height: 130)
@@ -253,6 +258,7 @@ struct MoneyObligationsView: View {
             }
             shelf("الأقساط", r.installments, r)
             shelf("الفواتير", r.bills, r)
+            shelf("الاشتراكات", r.subscriptions, r)
             shelf("كشوف البطاقات", r.statements, r)
         }
     }
@@ -306,103 +312,5 @@ struct LanternShape: Shape {
         p.addQuadCurve(to: CGPoint(x: 0, y: h * 0.5), control: CGPoint(x: 0, y: h * 0.9))
         p.addQuadCurve(to: CGPoint(x: w * 0.3, y: 0), control: CGPoint(x: 0, y: h * 0.1))
         return p
-    }
-}
-
-/// Adds a bill, loan or instalment plan, with the ladder's next months before and after it.
-struct MoneyObligationSheet: View {
-    let app: AppSession
-    let ladder: [MoneyLadderMonth]
-    let visible: Bool
-    @Environment(\.dismiss) private var dismiss
-    @State private var saving = false
-    @Environment(\.roomTheme) private var theme
-    @State private var kind = "bill"
-    @State private var name = ""
-    @State private var rawAmount = ""
-    @State private var dueDay = 1
-    @State private var count = 12
-    @State private var firstDue = Date()
-    @State private var errorMessage: String?
-    private var service: AppMoneyService { .init(app: app) }
-    private var amountMinor: Int? {
-        CurrencyExponents.specified.exponent(app.string("core.currency")).flatMap { MoneyAmountInput.minor(rawAmount, exponent: $0) }.flatMap { $0 > 0 ? $0 : nil }
-    }
-    /// What each of the next months adds once this obligation is saved.
-    private func added(_ index: Int) -> Int {
-        guard let amount = amountMinor else { return 0 }
-        if kind == "bill" { return amount }
-        let zone = app.activePlace.timeZone
-        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = zone
-        let months = calendar.dateComponents([.month], from: calendar.startOfDay(for: app.prayerNow()), to: firstDue).month ?? 0
-        return index >= months && index < months + count ? amount : 0
-    }
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack {
-                    Text("التزام جديد").font(.custom("thmanyahserifdisplay-Bold", size: 24, relativeTo: .title2))
-                    Spacer()
-                    Button("إلغاء") { dismiss() }.frame(minHeight: 44)
-                }
-                Picker("النوع", selection: $kind) {
-                    Text("فاتورة شهرية").tag("bill"); Text("قرض").tag("loan"); Text("تقسيط").tag("installment")
-                }.pickerStyle(.segmented).accessibilityIdentifier("money-obligation-kind")
-                field("الاسم") { TextField("مثل: الكهرباء", text: $name).accessibilityIdentifier("money-obligation-name") }
-                field(kind == "bill" ? "المبلغ كل شهر" : "القسط الشهري") {
-                    TextField("٠", text: $rawAmount).keyboardType(.decimalPad).accessibilityIdentifier("money-obligation-amount")
-                }
-                if kind == "bill" {
-                    Stepper("يوم " + service.digits.string(dueDay) + " من كل شهر", value: $dueDay, in: 1...31).font(MadarTypography.body())
-                } else {
-                    Stepper(service.digits.string(count) + " قسطًا شهريًا", value: $count, in: 1...120).font(MadarTypography.body())
-                    DatePicker("أول قسط", selection: $firstDue, displayedComponents: .date).font(MadarTypography.body())
-                    Text(app.dateLabels(.containing(firstDue, in: app.activePlace.timeZone), compact: true).combined).font(MadarTypography.caption())
-                        .foregroundStyle(theme.secondaryInk)
-                }
-                if amountMinor != nil, !ladder.isEmpty {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("أثره على السلّم").font(MadarTypography.cardTitle())
-                        let peak = max(1, ladder.enumerated().map { $0.element.total + added($0.offset) }.max() ?? 1)
-                        HStack(alignment: .bottom, spacing: 3) {
-                            ForEach(Array(ladder.enumerated()), id: \.element.id) { index, month in
-                                VStack(spacing: 0) {
-                                    Spacer(minLength: 0)
-                                    Rectangle().fill(theme.color("reserve")).frame(height: 70 * CGFloat(added(index)) / CGFloat(peak))
-                                    Rectangle().fill(theme.secondaryInk.opacity(0.35)).frame(height: 70 * CGFloat(month.total) / CGFloat(peak))
-                                }.frame(maxWidth: .infinity).frame(height: 70)
-                            }
-                        }.environment(\.layoutDirection, .rightToLeft)
-                        Text("الشهر الأثقل بعده " + (visible ? service.amount(ladder.enumerated().map { $0.element.total + added($0.offset) }.max() ?? 0) : "•••"))
-                            .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
-                    }.accessibilityIdentifier("money-obligation-preview")
-                }
-                if let errorMessage { Text(errorMessage).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")) }
-                Button(action: save) {
-                    Text("احفظ الالتزام").font(.custom("thmanyahsans-Bold", size: 18, relativeTo: .headline)).foregroundStyle(theme.background)
-                        .frame(maxWidth: .infinity, minHeight: 54).background(theme.ink)
-                }.buttonStyle(.plain).disabled(saving).accessibilityIdentifier("money-obligation-save")
-            }.padding(16)
-        }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).presentationDetents([.large])
-    }
-    private func field<Content: View>(_ title: String, @ViewBuilder _ content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
-            content().font(MadarTypography.body()).padding(10).overlay { Rectangle().stroke(theme.line, lineWidth: 1) }
-        }
-    }
-    private func save() {
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { errorMessage = "اكتب اسم الالتزام."; return }
-        guard let amount = amountMinor else { errorMessage = "أدخل مبلغًا موجبًا."; return }
-        var payload: [String: MadarCore.JSONValue] = ["kind": .string(kind), "name": .string(String(trimmed.prefix(60))), "amountMinor": .string(String(amount))]
-        if kind == "bill" { payload["dueDay"] = .number(Double(dueDay)) }
-        else { payload["count"] = .number(Double(count)); payload["firstDue"] = .string(GregorianDay.containing(firstDue, in: app.activePlace.timeZone).description) }
-        guard !saving else { return }
-        saving = true
-        Task {
-            do { try await app.executeMoneyCommand("money.saveObligation", payload: payload); dismiss() }
-            catch { errorMessage = "لم يُحفظ الالتزام."; saving = false }
-        }
     }
 }

@@ -5,9 +5,9 @@ import MadarData
 import MadarMoney
 import MadarCommands
 
-/// One due amount: an unpaid instalment, a bill's next occurrence, or a card statement.
+/// One due amount: an unpaid instalment, a bill's or subscription's next occurrence, or a card statement.
 struct MoneyObligationDue: Identifiable, Equatable {
-    enum Group: String { case loan, installment, bill, statement }
+    enum Group: String { case loan, installment, bill, subscription, statement }
     var id: String
     var obligationID: UUID?
     var group: Group
@@ -22,6 +22,8 @@ struct MoneyObligationDue: Identifiable, Equatable {
     var dueDay: Int? = nil
     var minimumMinor: Int? = nil
     var estimated = false
+    /// M5-X00: a free schedule in words («كل ٦ أشهر»).
+    var schedule: String? = nil
 }
 
 struct MoneyLadderMonth: Identifiable, Equatable {
@@ -32,7 +34,8 @@ struct MoneyLadderMonth: Identifiable, Equatable {
     var loanMinor: Int
     var installmentMinor: Int
     var billMinor: Int
-    var total: Int { loanMinor + installmentMinor + billMinor }
+    var subscriptionMinor: Int = 0
+    var total: Int { loanMinor + installmentMinor + billMinor + subscriptionMinor }
 }
 
 struct MoneyLadderEnding: Identifiable, Equatable {
@@ -55,6 +58,7 @@ struct MoneyObligationsReading: Equatable {
     var endings: [MoneyLadderEnding]
     var installments: [MoneyObligationDue]
     var bills: [MoneyObligationDue]
+    var subscriptions: [MoneyObligationDue]
     var statements: [MoneyObligationDue]
 }
 
@@ -85,7 +89,7 @@ extension AppMoneyService {
 
         // Every unpaid instalment, with its plan's progress.
         var instalments: [MoneyObligationDue] = []
-        for obligation in obligations where obligation.kind != "bill" {
+        for obligation in obligations where !obligation.isRecurring {
             let mine = items.filter { $0.obligationID == obligation.id }.sorted { $0.seq == $1.seq ? $0.dueDate < $1.dueDate : $0.seq < $1.seq }
             let unpaid = mine.filter { $0.paidMinor < $0.amountMinor }
             let last = mine.map(\.dueDate).max().map { GregorianDay.containing($0, in: zone) }
@@ -97,8 +101,18 @@ extension AppMoneyService {
             }
         }
         // A bill falls once a month on its day (clamped); a month already paid by a linked movement is skipped.
+        // M5-X00: a free schedule (bill or subscription) lists every unpaid due day the engine gives over the same months.
+        let digits = MadarNumberFormatter(style: app.string("core.numerals") == "western" ? .western : .hindi)
         func occurrences(_ bill: Obligation, months: Int) -> [MoneyObligationDue] {
-            guard let day = bill.dueDay else { return [] }
+            if let schedule = bill.recurrence {
+                guard let horizon = calendar.date(byAdding: .month, value: months, to: start.date(in: zone)) else { return [] }
+                let payments = paidBills.filter { $0.obligationID == bill.id }.map(\.eventAt)
+                return ObligationSchedule.unpaid(schedule, from: start, before: .containing(horizon, in: zone), payments: payments, zone: zone).map { day in
+                    .init(id: bill.id.uuidString + ":" + day.description, obligationID: bill.id, group: bill.kind == "subscription" ? .subscription : .bill, name: bill.name,
+                          amountMinor: bill.amountMinor, due: day, schedule: RecurrencePhrase.every(schedule, digits: digits))
+                }
+            }
+            guard bill.kind == "bill", let day = bill.dueDay else { return [] }
             return (0..<months).compactMap { offset in
                 guard let month = calendar.date(byAdding: .month, value: offset, to: start.date(in: zone)), let range = calendar.range(of: .day, in: .month, for: month) else { return nil }
                 var parts = calendar.dateComponents([.year, .month], from: month); parts.day = min(day, range.count)
@@ -107,8 +121,8 @@ extension AppMoneyService {
                 return .init(id: bill.id.uuidString + ":\(offset)", obligationID: bill.id, group: .bill, name: bill.name, amountMinor: bill.amountMinor, due: .containing(date, in: zone), dueDay: day)
             }
         }
-        let bills = obligations.filter { $0.kind == "bill" }
-        let billDues = bills.flatMap { occurrences($0, months: 13) }
+        let bills = obligations.filter { $0.kind == "bill" }, subscriptions = obligations.filter { $0.kind == "subscription" }
+        let billDues = (bills + subscriptions).flatMap { occurrences($0, months: 13) }
         let cards = try context.fetch(FetchDescriptor<Card>()).filter(live)
         let statements: [MoneyObligationDue] = try context.fetch(FetchDescriptor<Statement>()).filter { live($0) && $0.dueDate != nil && $0.statementMinor > 0 }.compactMap { s in
             let due = GregorianDay.containing(s.dueDate!, in: zone)
@@ -132,7 +146,8 @@ extension AppMoneyService {
             return .init(id: key, label: formatter.string(from: month), hijri: hijri.string(from: calendar.date(from: middle) ?? month),
                 loanMinor: these.filter { $0.group == .loan }.reduce(0) { $0 + $1.amountMinor },
                 installmentMinor: these.filter { $0.group == .installment }.reduce(0) { $0 + $1.amountMinor },
-                billMinor: billDues.filter { monthKey($0.due) == key && $0.due >= today }.reduce(0) { $0 + $1.amountMinor })
+                billMinor: billDues.filter { $0.group == .bill && monthKey($0.due) == key && $0.due >= today }.reduce(0) { $0 + $1.amountMinor },
+                subscriptionMinor: billDues.filter { $0.group == .subscription && monthKey($0.due) == key && $0.due >= today }.reduce(0) { $0 + $1.amountMinor })
         }
         let horizon = ladder.last?.id ?? ""
         let endings: [MoneyLadderEnding] = Dictionary(grouping: instalments, by: { $0.obligationID! }).compactMap { _, dues in
@@ -141,10 +156,12 @@ extension AppMoneyService {
         }.sorted { $0.id < $1.id }
 
         let nextInstalments = Dictionary(grouping: instalments, by: { $0.obligationID! }).compactMap { $0.value.min { $0.due < $1.due } }.sorted { $0.due < $1.due }
-        let nextBills = bills.compactMap { bill in billDues.filter { $0.obligationID == bill.id && $0.due >= today }.min { $0.due < $1.due } }.sorted { $0.due < $1.due }
+        let next: ([Obligation]) -> [MoneyObligationDue] = { rows in
+            rows.compactMap { bill in billDues.filter { $0.obligationID == bill.id && $0.due >= today }.min { $0.due < $1.due } }.sorted { $0.due < $1.due }
+        }
         return .init(today: today, cycleStart: start, cycleEnd: end, cycle: cycleDues,
                      fromSalaryMinor: cycleDues.filter { $0.group != .statement }.reduce(0) { $0 + $1.amountMinor },
                      cardsMinor: cycleDues.filter { $0.group == .statement }.reduce(0) { $0 + $1.amountMinor },
-                     ladder: ladder, endings: endings, installments: nextInstalments, bills: nextBills, statements: statements.sorted { $0.due < $1.due })
+                     ladder: ladder, endings: endings, installments: nextInstalments, bills: next(bills), subscriptions: next(subscriptions), statements: statements.sorted { $0.due < $1.due })
     }
 }
