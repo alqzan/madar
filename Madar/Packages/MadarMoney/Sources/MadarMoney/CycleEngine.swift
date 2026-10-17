@@ -34,9 +34,11 @@ public struct DailyPlan: Equatable, Sendable {
     public var period: Period
     public var startDay: Int
     public var endDay: Int?
-    public init(id: String, amountMinor: Int, period: Period, startDay: Int = 1, endDay: Int? = nil) {
+    /// New goal plans stop at their remaining funding target, including a partial last drop.
+    public var maximumMinorPerCycle: Int?
+    public init(id: String, amountMinor: Int, period: Period, startDay: Int = 1, endDay: Int? = nil, maximumMinorPerCycle: Int? = nil) {
         self.id = id; self.amountMinor = amountMinor; self.period = period; self.startDay = startDay
-        self.endDay = endDay
+        self.endDay = endDay; self.maximumMinorPerCycle = maximumMinorPerCycle
     }
 }
 
@@ -101,6 +103,11 @@ public enum CycleEngine {
 
     /// Day `day` of the cycle. Days past the expected end (a late salary) accrue at the same rate (F05).
     public static func day(_ day: Int, _ input: CycleInput) -> CycleDay {
+        if input.plans.contains(where: { $0.maximumMinorPerCycle != nil }) { return days(through: day, input).last ?? CycleDay(day: day, allowanceMinor: 0, dripsMinor: [:]) }
+        return uncappedDay(day, input)
+    }
+
+    private static func uncappedDay(_ day: Int, _ input: CycleInput, funded: [String: Int] = [:]) -> CycleDay {
         var allowance = 0
         if !input.pausedDays.contains(day), let policy = policy(on: day, input.policies) {
             let rate = policy.frozenRate ?? freeze(policy.mode, expectedLengthDays: input.expectedLengthDays)
@@ -109,14 +116,21 @@ public enum CycleEngine {
         // L08: plans take at most what the day has, in plan order; no money that the day did not have.
         var left = allowance, drips: [String: Int] = [:]
         for plan in input.plans {
-            let take = min(left, wanted(plan, day: day, length: input.expectedLengthDays))
+            let remaining = plan.maximumMinorPerCycle.map { max(0, $0 - (funded[plan.id] ?? 0)) } ?? Int.max
+            let take = min(left, max(0, wanted(plan, day: day, length: input.expectedLengthDays)), remaining)
             drips[plan.id, default: 0] += take; left -= take
         }
         return CycleDay(day: day, allowanceMinor: allowance, dripsMinor: drips)
     }
 
     public static func days(through last: Int, _ input: CycleInput) -> [CycleDay] {
-        last < 1 ? [] : (1...last).map { day($0, input) }
+        guard last >= 1 else { return [] }
+        var funded: [String: Int] = [:]
+        return (1...last).map { index in
+            let result = uncappedDay(index, input, funded: funded)
+            for (id, amount) in result.dripsMinor { funded[id, default: 0] += amount }
+            return result
+        }
     }
 
     /// Σ «يومك» from day 1 through `elapsedDays` inclusive.
@@ -129,7 +143,7 @@ public enum CycleEngine {
         guard let plan = input.plans.first(where: { $0.id == planID }) else { return (0, 0) }
         let deposited = days(through: last, input).reduce(0) { $0 + ($1.dripsMinor[planID] ?? 0) }
         let wanted = last < 1 ? 0 : (1...last).reduce(0) { $0 + wanted(plan, day: $1, length: input.expectedLengthDays) }
-        return (deposited, wanted - deposited)
+        return (deposited, min(wanted, plan.maximumMinorPerCycle ?? Int.max) - deposited)
     }
 
     /// «لك الآن» = Σ يومك through today + carry − Σ the day's spending through today.

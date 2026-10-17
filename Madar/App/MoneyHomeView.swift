@@ -29,6 +29,7 @@ struct MoneyHomeView: View {
     @State private var accountsOpen = false
     @State private var expenseOpen = false
     @State private var zakatOpen = false
+    @State private var goalOpen = false
     @State private var visitChecked = false
     private var service: AppMoneyService { .init(app: app) }
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
@@ -53,6 +54,7 @@ struct MoneyHomeView: View {
                         .buttonStyle(.plain).accessibilityIdentifier("money-analysis-open")
                     Button { reconcileOpen = true } label: { Label("المطابقة مع البنك", systemImage: "checkmark.seal").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 48).overlay { Capsule().stroke(theme.color("reserveText"), lineWidth: 1) } }
                         .buttonStyle(.plain).accessibilityIdentifier("money-reconcile-open")
+                    Button { goalOpen = true } label: { Label("جهّز لشيء قادم", systemImage: "sparkles").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 48).overlay { Capsule().stroke(theme.color("reserveText")) } }.buttonStyle(.plain).accessibilityIdentifier("money-goal-open")
                     Button { zakatOpen = true } label: { Label("الزكاة", systemImage: "scalemass").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 48).overlay { Capsule().stroke(theme.color("reserveText"), lineWidth: 1) } }.buttonStyle(.plain).accessibilityIdentifier("money-zakat-open")
                     Button { settingsOpen = true } label: { Label("إعدادات المال", systemImage: "slider.horizontal.3").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 48).overlay { Capsule().stroke(theme.color("reserveText"), lineWidth: 1) } }.buttonStyle(.plain).accessibilityIdentifier("money-settings-open")
                     Button { accountsOpen = true } label: { Label("الحسابات", systemImage: "tree").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 48).overlay { Capsule().stroke(theme.color("reserveText"), lineWidth: 1) } }.buttonStyle(.plain).accessibilityIdentifier("money-accounts-open")
@@ -84,6 +86,8 @@ struct MoneyHomeView: View {
         .navigationDestination(isPresented: $sinceOpen) {
             if let reading { MoneySinceView(app: app, home: reading, revealed: $revealed) { sinceOpen = false; messagesOpen = true; Task { try? await app.executeMoneyCommand("money.markVisit") } } }
         }
+        .navigationDestination(isPresented: $goalOpen) { MoneyGoalView(app: app, revealed: $revealed) }
+        .onChange(of: goalOpen) { if !goalOpen { load() } }
         .navigationDestination(isPresented: $zakatOpen) { MoneyZakatView(app: app, revealed: $revealed) }
         .navigationDestination(isPresented: $settingsOpen) { MoneySettingsView(app: app, revealed: $revealed) }
         .navigationDestination(isPresented: $accountsOpen) { MoneyAccountsView(app: app, revealed: $revealed) }

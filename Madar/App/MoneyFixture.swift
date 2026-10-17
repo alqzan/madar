@@ -8,7 +8,7 @@ import MadarCommands
 extension AppSession {
     /// Named synthetic stores only. Never reads or writes the owner's store.
     func prepareMoneyFixture(group: URL) throws {
-        guard let variant = ProcessInfo.processInfo.environment["MADAR_UI_MONEY_FIXTURE"], ["zakat", "zakatHidden", "travel", "travelMissing", "travelHidden", "accounts", "expense", "showcase", "empty", "hidden", "zero", "shortfall", "messages", "since", "rules", "salary", "budget", "cards", "cardsHidden", "analysis", "analysisHidden", "reconcile", "reconcileHidden", "cashback", "cashbackHidden"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
+        guard let variant = ProcessInfo.processInfo.environment["MADAR_UI_MONEY_FIXTURE"], ["goal", "zakat", "zakatHidden", "travel", "travelMissing", "travelHidden", "accounts", "expense", "showcase", "empty", "hidden", "zero", "shortfall", "messages", "since", "rules", "salary", "budget", "cards", "cardsHidden", "analysis", "analysisHidden", "reconcile", "reconcileHidden", "cashback", "cashbackHidden"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         let c = ModelContext(container)
         guard !(try c.fetch(FetchDescriptor<DeviceSetting>())).contains(where: { $0.key == "sys.moneyFixture" }) else { return }
         for key in ["sys.moneyFixture", "sys.onboardingCompleted"] { let marker = DeviceSetting(); marker.key = key; marker.valueJSON = Data("true".utf8); c.insert(marker) }

@@ -64,6 +64,30 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         }
         let before = try records(context)
         switch name {
+        case "money.prepareGoal":
+            let reading = try MoneyRepository(context: context).goalPreparation(at: now)
+            guard reading.signature == text(p, "signature"), let total = MoneyCommandPayload.integer(p["totalMinor"]),
+                  let upfront = MoneyCommandPayload.integer(p["upfrontMinor"]), let daily = MoneyCommandPayload.integer(p["dailyMinor"]),
+                  let due = MoneyCommandPayload.date(p["due"]), due >= now, case .array(let rawIDs) = p["paidIDs"] else { throw MoneyCommandError.invalidReference }
+            let ids = Set(rawIDs.compactMap { value -> UUID? in if case .string(let raw) = value { UUID(uuidString: raw) } else { nil } })
+            let paid = reading.paid.filter { ids.contains($0.id) }
+            guard paid.count == ids.count else { throw MoneyCommandError.invalidReference }
+            let already = try sum(paid.map(\.amountMinor))
+            guard total > already else { throw MoneyCommandError.invalidAmount }
+            let target = total - already, source = text(p, "source")
+            guard upfront <= target, upfront <= max(0, source == "surplus" ? reading.surplusMinor : reading.reserveMinor),
+                  daily <= reading.dailyMinor, upfront == target || daily > 0, reading.cycleID != nil || upfront == target else { throw MoneyCommandError.invalidAmount }
+            let envelope = Envelope(); envelope.id = id; envelope.name = text(p, "name"); envelope.role = "goal"; envelope.targetMinor = target; envelope.due = due; envelope.createdAt = now; envelope.updatedAt = now; envelope.writerID = writer; context.insert(envelope)
+            if daily > 0 && upfront < target {
+                let plan = EnvelopePlan(); plan.id = id; plan.envelopeID = id; plan.source = "daily"; plan.period = "perDay"; plan.perPaycheckMinor = daily; plan.startDayKey = reading.today.adding(days: 1).description; plan.createdAt = now; plan.updatedAt = now; plan.writerID = writer; context.insert(plan)
+            }
+            if upfront > 0 {
+                let key = "goal-fund:" + id.uuidString
+                try writeAllocations([
+                    .init(groupID: key, target: source == "reserve" ? .reserve : .surplus, amountMinor: -upfront, kind: .fund, idempotencyKey: key + ":from"),
+                    .init(groupID: key, target: .envelope(id.uuidString), amountMinor: upfront, kind: .fund, idempotencyKey: key + ":to")
+                ], context: context, now: now, writer: writer)
+            }
         case "money.saveZakat":
             let profiles = try context.fetch(FetchDescriptor<ZakatProfile>()).filter { live($0) }
             guard profiles.count <= 1, try MoneyRepository.zakatSignature(profiles.first) == text(p, "signature") else { throw MoneyCommandError.invalidReference }

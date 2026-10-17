@@ -52,6 +52,7 @@ extension MoneyRepository {
         let plans = try context.fetch(FetchDescriptor<EnvelopePlan>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.source == "daily" && ($0.untilDate == nil || $0.untilDate! >= cycle.start) }.sorted { $0.createdAt == $1.createdAt ? $0.id.uuidString < $1.id.uuidString : $0.createdAt < $1.createdAt }
         let allAllocations = try context.fetch(FetchDescriptor<Allocation>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
         let allMovements = try confirmedTransactions()
+        let goalEnvelopes = try context.fetch(FetchDescriptor<Envelope>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.role == "goal" }
         let planSpecs = plans.compactMap { plan -> DailyPlan? in
             if plan.kind == "repay", let total = plan.repaymentTotalMinor, let count = plan.repaymentPaychecks,
                let purchase = allMovements.first(where: { $0.id == plan.id }) {
@@ -66,7 +67,11 @@ extension MoneyRepository {
             guard let envelope = plan.envelopeID else { return nil }; planEnvelopes[plan.id.uuidString] = envelope
             return .init(id: plan.id.uuidString, amountMinor: plan.perPaycheckMinor, period: plan.period == "perDay" ? .perDay : .perCycle,
                 startDay: max(1, plan.startDayKey.flatMap { try? GregorianDay($0) }.map { MadarCalendarDays.distance(from: start, to: $0) + 1 } ?? 1),
-                endDay: plan.untilDate.map { MadarCalendarDays.distance(from: start, to: .containing($0, in: place.timeZone)) + 1 })
+                endDay: plan.untilDate.map { MadarCalendarDays.distance(from: start, to: .containing($0, in: place.timeZone)) + 1 },
+                maximumMinorPerCycle: goalEnvelopes.first(where: { $0.id == plan.id && $0.id == envelope })?.targetMinor.map { target in
+                    let alreadyFunded = allAllocations.filter { $0.targetID == envelope && $0.kind == "fund" && $0.amountMinor > 0 && !($0.cycleID == cycle.id && $0.idempotencyKey.hasPrefix("daily:")) }.reduce(0) { $0 + $1.amountMinor }
+                    return max(0, target - alreadyFunded)
+                })
         }
         var paused: Set<Int> = []
         let settings = try SettingsStore(context: context)

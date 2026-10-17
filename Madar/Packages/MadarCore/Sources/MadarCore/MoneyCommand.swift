@@ -8,7 +8,7 @@ public enum MoneyCommandPayload {
     public static let names: Set<String> = [intakeName, "money.pasteBankMessages", "money.logExpense",
         "money.confirmTransaction", "money.deleteTransaction", "money.saveAccount", "money.saveCard", "money.accruePlans", "money.setReserveGoal", "money.repayEnvelopeNow", "money.setEnvelopeSaving", "money.adoptRepayment",
         "money.applyStatement", "money.ignoreMessage", "money.confirmClear", "money.markVisit",
-        "money.categorize", "money.saveMerchantRule", "money.forgetMerchantRule", "money.confirmSalary", "money.saveObligation", "money.setCategoryLimit", "money.setBudgetExclusion", "money.reconcile", "money.setCardCashback", "money.distributeBigExpense", "money.configureTrip", "money.fundTrip", "money.repriceTrip", "money.saveZakat"]
+        "money.categorize", "money.saveMerchantRule", "money.forgetMerchantRule", "money.confirmSalary", "money.saveObligation", "money.setCategoryLimit", "money.setBudgetExclusion", "money.reconcile", "money.setCardCashback", "money.distributeBigExpense", "money.configureTrip", "money.fundTrip", "money.repriceTrip", "money.saveZakat", "money.prepareGoal"]
     /// §7.5 maxRepayCycles: the longest salary repayment (the envelope sheet offers 1–6).
     public static let maxRepaySalaries = 12
     /// M5-X00: the budget-ignore stamp's optional reason.
@@ -57,6 +57,12 @@ public enum MoneyCommandPayload {
         func choices(_ key: String, _ options: Set<String>) -> Bool { if case .string(let raw) = p[key] { options.contains(raw) } else { false } }
         func optionalText(_ key: String, max: Int = 80) -> Bool { p[key] == nil || p[key] == .null || text(key, max: max, empty: true) }
         switch name {
+        case "money.prepareGoal":
+            guard Set(p.keys) == ["name", "totalMinor", "paidIDs", "upfrontMinor", "dailyMinor", "source", "due", "signature"],
+                  text("name"), positive("totalMinor"), text("signature", max: 64), choices("source", ["surplus", "reserve"]), date(p["due"]) != nil,
+                  ["upfrontMinor", "dailyMinor"].allSatisfy({ integer(p[$0]).map { $0 >= 0 } == true }), case .array(let ids) = p["paidIDs"], ids.count <= 100 else { return false }
+            let values = ids.compactMap { if case .string(let raw) = $0 { UUID(uuidString: raw) } else { nil } }
+            return values.count == ids.count && Set(values).count == values.count
         case "money.saveZakat":
             return Set(p.keys) == ["signature", "basis", "debts", "goldPriceMinor", "silverPriceMinor", "goldMg", "silverMg", "otherMinor", "hawl"]
                 && text("signature", max: 64) && choices("basis", ["gold", "silver"])
