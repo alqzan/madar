@@ -726,6 +726,30 @@ import MadarInbox
         let fuelLimits = try ModelContext(f.container).fetch(FetchDescriptor<CategoryLimit>()).filter { $0.categoryID == fuel.id && $0.deletedAt == nil }
         #expect(fuelLimits.count == 1); #expect(fuelLimits.first?.limitMinor == 130_000)
     }
+    /// M5-V16: the cashback rate entered by hand, marked «entered», back to unknown with null, and undone.
+    @Test func setCardCashbackEntersTheRateAndUndoes() async throws {
+        let f = try MoneyFixture(); defer { f.clean() }
+        let c = ModelContext(f.container), card = Card(); card.name = "بطاقة"; card.last4 = "1111"
+        card.fieldSourcesJSON = try JSONSerialization.data(withJSONObject: ["limitMinor": "message"]); c.insert(card); try c.save()
+        let id: MadarCore.JSONValue = .string(card.id.uuidString), change = UUID()
+        #expect(try await f.run("money.setCardCashback", ["id": id, "cashbackBp": .number(125)], id: change).status == .applied)
+        var row = try #require(try ModelContext(f.container).fetch(FetchDescriptor<Card>()).first { $0.id == card.id })
+        var sources = try #require(try JSONSerialization.jsonObject(with: row.fieldSourcesJSON) as? [String: String])
+        #expect(row.cashbackBp == 125); #expect(sources == ["limitMinor": "message", "cashbackBp": "entered"])
+        #expect(try await f.run("money.setCardCashback", ["id": id, "cashbackBp": .null]).status == .applied)
+        row = try #require(try ModelContext(f.container).fetch(FetchDescriptor<Card>()).first { $0.id == card.id })
+        sources = try #require(try JSONSerialization.jsonObject(with: row.fieldSourcesJSON) as? [String: String])
+        #expect(row.cashbackBp == nil); #expect(sources == ["limitMinor": "message"])
+        #expect(!MoneyCommandPayload.validate(name: "money.setCardCashback", payload: ["id": id, "cashbackBp": .number(10_001)]))
+        #expect(!MoneyCommandPayload.validate(name: "money.setCardCashback", payload: ["id": id]))
+        #expect(try await f.run("money.setCardCashback", ["id": .string(UUID().uuidString), "cashbackBp": .number(50)]).status == .rejected)
+        // Undo of the first change restores the rate the card had before it: unknown.
+        #expect(try await f.run("money.setCardCashback", ["id": id, "cashbackBp": .number(200)]).status == .applied)
+        let third = UUID()
+        #expect(try await f.run("money.setCardCashback", ["id": id, "cashbackBp": .number(300)], id: third).status == .applied)
+        #expect(try await f.run("system.undo", ["undoToken": .string(third.uuidString)]).status == .applied)
+        #expect(try ModelContext(f.container).fetch(FetchDescriptor<Card>()).first { $0.id == card.id }?.cashbackBp == 200)
+    }
     /// «منذ آخر زيارة»: the visit marker is one device row, updated in place, with no undo.
     @Test func markVisitKeepsOneDeviceRowAtTheCommandTime() async throws {
         let f = try MoneyFixture(); defer { f.clean() }
