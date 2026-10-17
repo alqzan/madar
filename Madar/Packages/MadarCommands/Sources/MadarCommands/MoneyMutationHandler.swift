@@ -63,22 +63,11 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         }
         let before = try records(context)
         switch name {
+        case "money.distributeBigExpense":
+            try distributeBigExpense(p, id: id, issuedAt: issuedAt, context: context, now: now, writer: writer)
         case "money.accruePlans":
             if let cycle = try MoneyRepository(context: context).cycle(at: now) {
-                let existing = Set(try context.fetch(FetchDescriptor<Allocation>()).map(\.idempotencyKey))
-                var rows: [AllocationRow] = []
-                for day in CycleEngine.days(through: cycle.elapsedDays, cycle.input) {
-                    for (plan, amount) in day.dripsMinor where amount > 0 {
-                        guard let envelope = cycle.planEnvelopes[plan] else { throw MoneyCommandError.invalidReference }
-                        let key = "daily:\(cycle.id):\(plan):\(cycle.startDay.adding(days: day.day - 1))"
-                        let hasTo = existing.contains(key + ":to"), hasFrom = existing.contains(key + ":from")
-                        guard hasTo == hasFrom else { throw MoneyCommandError.invalidReference }
-                        if hasTo { continue }
-                        rows.append(.init(groupID: key, target: .daily, amountMinor: -amount, kind: .fund, cycleID: cycle.id.uuidString, idempotencyKey: key + ":from"))
-                        rows.append(.init(groupID: key, target: .envelope(envelope.uuidString), amountMinor: amount, kind: .fund, cycleID: cycle.id.uuidString, idempotencyKey: key + ":to"))
-                    }
-                }
-                try writeAllocations(rows, context: context, now: now, writer: writer)
+                try accrueDailyPlans(cycle, through: cycle.elapsedDays, context: context, now: now, writer: writer)
             }
         case "money.setEnvelopeSaving":
             guard let planID = uuid(p, "id"), let amount = MoneyCommandPayload.integer(p["amountMinor"]), amount >= 0,
@@ -548,7 +537,11 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
     private static func confirmSalary(_ p: [String: MadarCore.JSONValue], command: UUID, context: ModelContext, now: Date, writer: String) throws {
         guard let salaryID = uuid(p, "id") else { throw MoneyCommandError.missingRow }
         let override: SalaryRemainder? = switch optionalText(p, "remainderTo") { case "surplus": .surplusThenReserve; case "reserve": .reserve; default: nil }
-        let reading = try MoneyRepository(context: context).salaryOpening(salaryID: salaryID, newCycleID: command, remainderOverride: override)
+        var reading = try MoneyRepository(context: context).salaryOpening(salaryID: salaryID, newCycleID: command, remainderOverride: override)
+        if let oldID = reading.closingCycleID, let old = try MoneyRepository(context: context).cycle(at: reading.salaryAt.addingTimeInterval(-0.001)), old.id == oldID {
+            try accrueDailyPlans(old, through: max(0, MadarCalendarDays.distance(from: old.startDay, to: reading.startDay)), context: context, now: now, writer: writer)
+            reading = try MoneyRepository(context: context).salaryOpening(salaryID: salaryID, newCycleID: command, remainderOverride: override)
+        }
         let plan = reading.plan
         // With «اسألني», the report asks first; the command never leaves money waiting without a home.
         guard plan.awaitingChoiceMinor == 0, plan.close?.awaitingChoiceMinor ?? 0 == 0 else { throw MoneyCommandError.invalidReference }
@@ -920,6 +913,83 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
     private static func fourDigits(_ raw: String) -> Bool { raw.count == 4 && raw.allSatisfy { ("0"..."9").contains($0) } }
     private static func live<T: MadarRecordModel>(_ row: T) -> Bool { (try? row.record().isLive) == true }
     private static func text(_ p: [String: MadarCore.JSONValue], _ key: String) -> String { optionalText(p, key) ?? "" }
+    private static func accrueDailyPlans(_ cycle: MoneyCycleReading, through: Int, context: ModelContext, now: Date, writer: String) throws {
+        let existing = Set(try context.fetch(FetchDescriptor<Allocation>()).map(\.idempotencyKey))
+        var rows: [AllocationRow] = []
+        for day in CycleEngine.days(through: through, cycle.input) {
+            for (plan, amount) in day.dripsMinor where amount > 0 {
+                guard let envelope = cycle.planEnvelopes[plan] else { throw MoneyCommandError.invalidReference }
+                let key = "daily:\(cycle.id):\(plan):\(cycle.startDay.adding(days: day.day - 1))"
+                let hasTo = existing.contains(key + ":to"), hasFrom = existing.contains(key + ":from")
+                guard hasTo == hasFrom else { throw MoneyCommandError.invalidReference }
+                if hasTo { continue }
+                rows.append(.init(groupID: key, target: .daily, amountMinor: -amount, kind: try dailyPlanKind(plan, context), cycleID: cycle.id.uuidString, idempotencyKey: key + ":from"))
+                rows.append(.init(groupID: key, target: .envelope(envelope.uuidString), amountMinor: amount, kind: try dailyPlanKind(plan, context), cycleID: cycle.id.uuidString, idempotencyKey: key + ":to"))
+            }
+        }
+        try writeAllocations(rows, context: context, now: now, writer: writer)
+    }
+
+    private static func dailyPlanKind(_ id: String, _ context: ModelContext) throws -> AllocationRow.Kind {
+        try context.fetch(FetchDescriptor<EnvelopePlan>()).contains { $0.id.uuidString == id && $0.kind == "repay" } ? .repay : .fund
+    }
+
+    private static func distributeBigExpense(_ p: [String: MadarCore.JSONValue], id: UUID, issuedAt: Date,
+                                             context: ModelContext, now: Date, writer: String) throws {
+        let repo = MoneyRepository(context: context)
+        guard let cycle = try repo.cycle(at: now), let mode = BigExpense.Mode(rawValue: text(p, "mode")) else { throw MoneyCommandError.invalidReference }
+        let allocations = try context.fetch(FetchDescriptor<Allocation>()).filter { live($0) }
+        let envelopes = try context.fetch(FetchDescriptor<Envelope>()).filter { live($0) }
+        func balance(_ role: String) -> Int {
+            let ids = Set(envelopes.filter { $0.role == role }.map(\.id))
+            return allocations.filter { ($0.target == role && $0.targetID == nil) || $0.targetID.map(ids.contains) == true }.reduce(0) { $0 + $1.amountMinor }
+        }
+        let surplus = balance("surplus"), reserve = balance("reserve")
+        guard cycle.headline.availableNowMinor == MoneyCommandPayload.integer(p["availableMinor"]),
+              surplus == MoneyCommandPayload.integer(p["surplusMinor"]), reserve == MoneyCommandPayload.integer(p["reserveMinor"]) else { throw MoneyCommandError.invalidAmount }
+        let row: MoneyTransaction
+        if let transactionID = uuid(p, "transactionID") { row = try transaction(transactionID, context) }
+        else {
+            guard case .object(let expense) = p["expense"] else { throw MoneyCommandError.invalidReference }
+            _ = try stage(name: "money.logExpense", payload: expense, id: id, issuedAt: issuedAt, source: .shortcut, context: context, now: now, writer: writer)
+            row = try transaction(id, context)
+        }
+        guard row.kind == "expense", row.reviewState != "ok", !row.ignoredFromBudget, row.obligationID == nil,
+              row.eventAt >= (try context.fetch(FetchDescriptor<Cycle>()).first { $0.id == cycle.id }?.start ?? .distantFuture) else { throw MoneyCommandError.invalidReference }
+        try resolvePayment(row, context: context)
+        row.homeAmountMinor = try FX.homeAmount(amountMinor: row.amountMinor, currency: row.currency, rate: row.rateAtTime ?? (row.currency == row.homeCurrency ? "1" : ""), home: row.homeCurrency)
+        guard try repo.effect(of: row).budgetChargeMinor == row.homeAmountMinor,
+              let plan = BigExpense.plan(amountMinor: row.homeAmountMinor, mode: mode, availableMinor: cycle.headline.availableNowMinor,
+                  surplusMinor: surplus, reserveMinor: reserve, dailyMinor: cycle.headline.todayAllowanceMinor,
+                  cycleDays: cycle.input.expectedLengthDays, cycles: MoneyCommandPayload.integer(p["cycles"]),
+                  envelopeBalanceMinor: allocations.filter { $0.targetID == uuid(p, "envelopeID") && $0.targetID != nil }.reduce(0) { $0 + $1.amountMinor }) else { throw MoneyCommandError.invalidAmount }
+        var splits: [MadarCore.JSONValue] = []
+        func part(_ target: String, _ amount: Int, targetID: UUID? = nil) {
+            guard amount > 0 else { return }
+            var item: [String: MadarCore.JSONValue] = ["target": .string(target), "amountMinor": .string(String(amount))]
+            if let targetID { item["targetID"] = .string(targetID.uuidString) }
+            splits.append(.object(item))
+        }
+        part("daily", plan.dailyMinor); part("surplus", plan.surplusMinor); part("reserve", plan.reserveMinor)
+        if plan.futureMinor > 0 {
+            guard let envelopeID = uuid(p, "envelopeID") else { throw MoneyCommandError.invalidReference }
+            if let existing = envelopes.first(where: { $0.id == envelopeID }) {
+                guard !["reserve", "surplus"].contains(existing.role) else { throw MoneyCommandError.invalidReference }
+            } else {
+                guard let name = optionalText(p, "envelopeName"), !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw MoneyCommandError.invalidReference }
+                let e = Envelope(); e.id = envelopeID; e.name = name; e.createdAt = now; context.insert(e); try touch(e, now, writer)
+            }
+            part("envelope", plan.futureMinor, targetID: envelopeID)
+            // Its id names the original purchase. The next actual cycle starts its daily repayment, not a predicted date.
+            if plan.repaymentMinor > 0 {
+            let repayment = EnvelopePlan(); repayment.id = row.id; repayment.envelopeID = envelopeID; repayment.kind = "repay"; repayment.source = "daily"; repayment.period = "perCycle"
+            repayment.perPaycheckMinor = plan.paymentsMinor.first ?? 0; repayment.repaymentTotalMinor = plan.repaymentMinor; repayment.repaymentPaychecks = plan.cycles
+            repayment.createdAt = now; context.insert(repayment); try touch(repayment, now, writer)
+            }
+        }
+        try confirm(row, payload: ["allocations": .array(splits)], context: context, now: now, writer: writer)
+    }
+
     private static func optionalText(_ p: [String: MadarCore.JSONValue], _ key: String) -> String? { if case .string(let s) = p[key] { s } else { nil } }
     private static func uuid(_ p: [String: MadarCore.JSONValue], _ key: String) -> UUID? { optionalText(p, key).flatMap(UUID.init(uuidString:)) }
     private static func strings(_ value: MadarCore.JSONValue?) -> [String] { if case .array(let list) = value { list.compactMap { if case .string(let s) = $0 { s } else { nil } } } else { [] } }

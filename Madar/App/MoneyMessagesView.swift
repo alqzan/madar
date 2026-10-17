@@ -21,6 +21,7 @@ struct MoneyMessagesView: View {
     @State private var budgetOpen = false
     @State private var salary: SalaryRoute?
     private struct SalaryRoute: Identifiable, Hashable { var id: UUID }
+    @State private var bigExpense: MoneyBigExpenseRoute?
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
     private var service: AppMoneyService { .init(app: app) }
     private var visible: Bool { revealed || !app.bool("core.hideMoneyUntilTouch") }
@@ -56,6 +57,7 @@ struct MoneyMessagesView: View {
             .environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar)
             .task { load() }.onChange(of: app.prayerRevision) { load() }
             .sheet(item: $categorizing) { MoneyCategorizeSheet(app: app, draft: $0).environment(\.roomTheme, theme) }
+            .fullScreenCover(item: $bigExpense) { route in MoneyBigExpenseView(app: app, route: route, revealed: $revealed) { bigExpense = nil; load() } }
             .navigationDestination(isPresented: $rulesOpen) { MoneyRulesView(app: app) }
         .navigationDestination(isPresented: $budgetOpen) { MoneyBudgetView(app: app, revealed: $revealed) }
             .navigationDestination(item: $salary) { MoneySalaryView(app: app, salaryID: $0.id) }
@@ -200,7 +202,7 @@ struct MoneyMessagesView: View {
                 Text(visible ? sign + amount(d.amountMinor, currency: d.currency) : "•••").font(.custom("thmanyahserifdisplay-Bold", size: 22, relativeTo: .title3))
                     .foregroundStyle(tint).lineLimit(1).minimumScaleFactor(0.6)
                 HStack(spacing: 8) {
-                    Button { if d.isSalary { salary = .init(id: d.id) } else { run("money.confirmTransaction", ["id": .string(d.id.uuidString)]) } } label: {
+                    Button { if d.isSalary { salary = .init(id: d.id) } else if d.isBigExpense { bigExpense = .init(transactionID: d.id) } else { run("money.confirmTransaction", ["id": .string(d.id.uuidString)]) } } label: {
                         Image(systemName: "checkmark").font(.body.bold()).foregroundStyle(theme.background).frame(width: 52, height: 52).background(theme.ink, in: .circle)
                     }.buttonStyle(.plain).accessibilityLabel("اعتمد " + d.title).accessibilityIdentifier("money-draft-confirm")
                     Button { run("money.deleteTransaction", ["id": .string(d.id.uuidString)]) } label: {

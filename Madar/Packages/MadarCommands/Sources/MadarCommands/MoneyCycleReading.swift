@@ -49,7 +49,19 @@ extension MoneyRepository {
         }
         var planEnvelopes: [String: UUID] = [:]
         let plans = try context.fetch(FetchDescriptor<EnvelopePlan>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.source == "daily" && ($0.untilDate == nil || $0.untilDate! >= cycle.start) }.sorted { $0.createdAt == $1.createdAt ? $0.id.uuidString < $1.id.uuidString : $0.createdAt < $1.createdAt }
+        let allAllocations = try context.fetch(FetchDescriptor<Allocation>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
+        let allMovements = try confirmedTransactions()
         let planSpecs = plans.compactMap { plan -> DailyPlan? in
+            if plan.kind == "repay", let total = plan.repaymentTotalMinor, let count = plan.repaymentPaychecks,
+               let purchase = allMovements.first(where: { $0.id == plan.id }) {
+                guard purchase.cycleID != cycle.id, purchase.eventAt < cycle.start, let envelope = plan.envelopeID else { return nil }
+                let paid = allAllocations.filter { $0.cycleID != cycle.id && $0.targetID == envelope && $0.amountMinor > 0 && $0.kind == "repay" && $0.idempotencyKey.hasPrefix("daily:") && $0.idempotencyKey.contains(":" + plan.id.uuidString + ":") }
+                let refunds = Set(allMovements.filter { $0.kind == "refund" && $0.relatedTransactionID == purchase.id }.map(\.id))
+                let returned = allAllocations.filter { $0.targetID == envelope && $0.transactionID.map(refunds.contains) == true && $0.kind == "refund" }.reduce(0) { $0 + $1.amountMinor }
+                guard let amount = RepaymentEngine.nextPayment(.init(totalMinor: max(0, total - returned), paychecks: count, paidMinor: paid.reduce(0) { $0 + $1.amountMinor }, paidCount: Set(paid.compactMap(\.cycleID)).count)) else { return nil }
+                planEnvelopes[plan.id.uuidString] = envelope
+                return .init(id: plan.id.uuidString, amountMinor: amount, period: .perCycle)
+            }
             guard let envelope = plan.envelopeID else { return nil }; planEnvelopes[plan.id.uuidString] = envelope
             return .init(id: plan.id.uuidString, amountMinor: plan.perPaycheckMinor, period: plan.period == "perDay" ? .perDay : .perCycle,
                 startDay: max(1, plan.startDayKey.flatMap { try? GregorianDay($0) }.map { MadarCalendarDays.distance(from: start, to: $0) + 1 } ?? 1),

@@ -8,7 +8,7 @@ public enum MoneyCommandPayload {
     public static let names: Set<String> = [intakeName, "money.pasteBankMessages", "money.logExpense",
         "money.confirmTransaction", "money.deleteTransaction", "money.saveAccount", "money.saveCard", "money.accruePlans", "money.setReserveGoal", "money.repayEnvelopeNow", "money.setEnvelopeSaving", "money.adoptRepayment",
         "money.applyStatement", "money.ignoreMessage", "money.confirmClear", "money.markVisit",
-        "money.categorize", "money.saveMerchantRule", "money.forgetMerchantRule", "money.confirmSalary", "money.saveObligation", "money.setCategoryLimit", "money.setBudgetExclusion", "money.reconcile", "money.setCardCashback"]
+        "money.categorize", "money.saveMerchantRule", "money.forgetMerchantRule", "money.confirmSalary", "money.saveObligation", "money.setCategoryLimit", "money.setBudgetExclusion", "money.reconcile", "money.setCardCashback", "money.distributeBigExpense"]
     /// §7.5 maxRepayCycles: the longest salary repayment (the envelope sheet offers 1–6).
     public static let maxRepaySalaries = 12
     /// M5-X00: the budget-ignore stamp's optional reason.
@@ -114,6 +114,14 @@ public enum MoneyCommandPayload {
             guard Set(p.keys).isSubset(of: ["messages", "batchID"]), optionalID("batchID"),
                   case .array(let rows) = p["messages"], !rows.isEmpty, rows.count <= 500 else { return false }
             return rows.allSatisfy { if case .object(let item) = $0 { validate(name: intakeName, payload: item) } else { false } }
+        case "money.distributeBigExpense":
+            guard Set(p.keys).isSubset(of: ["transactionID", "expense", "mode", "cycles", "envelopeID", "envelopeName", "availableMinor", "surplusMinor", "reserveMinor"]),
+                  choices("mode", ["mixed", "installments", "daily", "reserve"]), optionalID("envelopeID"), optionalText("envelopeName"),
+                  ["availableMinor", "surplusMinor", "reserveMinor"].allSatisfy({ integer(p[$0]) != nil }),
+                  p["cycles"] == nil || integer(p["cycles"]).map({ (1...12).contains($0) }) == true else { return false }
+            if p["transactionID"] != nil { return id("transactionID") && p["expense"] == nil }
+            guard case .object(let expense) = p["expense"], expense["allocations"] == nil else { return false }
+            return validate(name: "money.logExpense", payload: expense)
         case "money.logExpense":
             // M5-V17: the sheet may split the charge over an envelope and «يومك» (F02); rows as in confirmTransaction.
             return Set(p.keys).isSubset(of: ["amountMinor", "currency", "merchant", "method", "categoryID", "fromAccountID", "cardID", "eventAt", "rateAtTime", "showInDiary", "allocations"])

@@ -94,6 +94,71 @@ import MadarMoney
         #expect(try s.cycle().headline.todaySpentMinor == 12_000 + 3_750)
     }
 
+    @Test func bigExpenseIsAtomicStartsAtTheNextActualCycleAndStopsAfterRepayment() async throws {
+        let s = try Store(), before = try s.cycle(), envelopeID = UUID(), commandID = UUID()
+        let payload: [String: MadarCore.JSONValue] = ["mode": .string("mixed"), "availableMinor": .string("108000"), "surplusMinor": .string("0"), "reserveMinor": .string("0"), "envelopeID": .string(envelopeID.uuidString), "envelopeName": .string("Computer"),
+            "expense": .object(["amountMinor": .string("300001"), "currency": .string("SAR"), "method": .string("card"), "cardID": .string(s.credit.uuidString)])]
+        #expect(try await s.run("money.distributeBigExpense", payload, id: commandID).status == .applied)
+        // 300001 = 108000 from this cycle + 192001 debt; next 30 days: 6400 with 1 on the last day.
+        #expect(try s.cycle().headline.availableNowMinor == 0)
+        #expect(try s.cycle().headline.todayAllowanceMinor == 40000, "The current frozen daily is unchanged")
+        let c = ModelContext(s.container), plan = try #require(try c.fetch(FetchDescriptor<EnvelopePlan>()).first { $0.id == commandID })
+        #expect(plan.source == "daily"); #expect(plan.repaymentTotalMinor == 192001); #expect(plan.repaymentPaychecks == 1)
+        #expect(try c.fetch(FetchDescriptor<Allocation>()).filter { $0.transactionID == commandID }.reduce(0) { $0 + $1.amountMinor } == -300001)
+        let old = try #require(try c.fetch(FetchDescriptor<Cycle>()).first)
+        let nextDay = s.start.adding(days: 35), nextInstant = nextDay.date(in: s.zone)
+        old.end = nextInstant; old.closedAt = nextInstant
+        let next = Cycle(); next.start = nextInstant; next.expectedEnd = nextDay.adding(days: 30).date(in: s.zone); next.dailyAllowanceMinor = 40000; c.insert(next); try c.save()
+        let repo = MoneyRepository(context: ModelContext(s.container))
+        let day1 = try #require(try repo.cycle(at: nextInstant.addingTimeInterval(43200)))
+        #expect(day1.headline.todayAllowanceMinor == 33600, "A late salary, not the estimated date, starts the drops")
+        let last = nextDay.adding(days: 29).date(in: s.zone).addingTimeInterval(43200)
+        let result = try await s.bus.execute(.init(name: "money.accruePlans", payload: .object([:]), source: .app, issuedAt: last), now: last)
+        #expect(result.status == .applied)
+        let paid = try ModelContext(s.container).fetch(FetchDescriptor<Allocation>()).filter { $0.kind == "repay" && $0.targetID == envelopeID }
+        #expect(paid.reduce(0) { $0 + $1.amountMinor } == 192001)
+        let thirdContext = ModelContext(s.container), thirdDay = nextDay.adding(days: 30)
+        let previous = try #require(try thirdContext.fetch(FetchDescriptor<Cycle>()).first { $0.id == next.id }); previous.end = thirdDay.date(in: s.zone)
+        let third = Cycle(); third.start = thirdDay.date(in: s.zone); third.expectedEnd = thirdDay.adding(days: 30).date(in: s.zone); third.dailyAllowanceMinor = 40000; thirdContext.insert(third); try thirdContext.save()
+        #expect(try MoneyRepository(context: ModelContext(s.container)).cycle(at: third.start.addingTimeInterval(43200))?.headline.todayAllowanceMinor == 40000)
+        #expect(before.headline.availableNowMinor == 108000)
+    }
+
+    @Test func bigExpenseUndoRestoresAllAndAStalePreviewWritesNothing() async throws {
+        let s = try Store(), id = UUID(), envelope = UUID()
+        var payload: [String: MadarCore.JSONValue] = ["mode": .string("installments"), "cycles": .number(2), "availableMinor": .string("999"), "surplusMinor": .string("0"), "reserveMinor": .string("0"), "envelopeID": .string(envelope.uuidString), "envelopeName": .string("Computer"),
+            "expense": .object(["amountMinor": .string("300001"), "currency": .string("SAR"), "method": .string("card"), "cardID": .string(s.credit.uuidString)])]
+        #expect(try await s.run("money.distributeBigExpense", payload).status == .rejected)
+        payload["availableMinor"] = .string("108000")
+        #expect(try await s.run("money.distributeBigExpense", payload, id: id).status == .applied)
+        #expect(try await s.run("system.undo", ["undoToken": .string(id.uuidString)]).status == .applied)
+        let context = ModelContext(s.container)
+        #expect(try !context.fetch(FetchDescriptor<MoneyTransaction>()).contains { $0.id == id && $0.deletedAt == nil })
+        #expect(try !context.fetch(FetchDescriptor<EnvelopePlan>()).contains { $0.id == id && $0.deletedAt == nil })
+        #expect(try !context.fetch(FetchDescriptor<Envelope>()).contains { $0.id == envelope && $0.deletedAt == nil })
+        #expect(try s.cycle().headline.availableNowMinor == 108000)
+    }
+
+    @Test func bankDraftIsDistributedOnceAndUndoRestoresItsReviewState() async throws {
+        let s = try Store()
+        let intake: [String: MadarCore.JSONValue] = ["text": .string("Purchase mada\nCard *3333\n4800.00 SAR\nMerchant: Computer\n2026-10-03 12:00"), "sender": .string("Bank")]
+        #expect(try await s.run("money.ingestBankMessage", intake, source: .shortcut).status == .applied)
+        let c = ModelContext(s.container)
+        let row = try #require(try c.fetch(FetchDescriptor<MoneyTransaction>()).first { $0.messageID != nil })
+        let saving = EnvelopePlan(); saving.envelopeID = s.envelope; saving.source = "salary"; saving.perPaycheckMinor = 50000; c.insert(saving); try c.save()
+        let command = UUID()
+        let payload: [String: MadarCore.JSONValue] = ["transactionID": .string(row.id.uuidString), "mode": .string("installments"), "cycles": .number(2), "availableMinor": .string("108000"), "surplusMinor": .string("0"), "reserveMinor": .string("0"), "envelopeID": .string(s.envelope.uuidString)]
+        #expect(try await s.run("money.distributeBigExpense", payload, id: command).status == .applied)
+        let after = ModelContext(s.container)
+        #expect(try after.fetch(FetchDescriptor<MoneyTransaction>()).filter { $0.messageID == row.messageID && $0.deletedAt == nil }.count == 1)
+        let plans = try after.fetch(FetchDescriptor<EnvelopePlan>()).filter { $0.envelopeID == s.envelope && $0.deletedAt == nil }
+        #expect(plans.count == 2); #expect(plans.first { $0.kind == "fund" }?.perPaycheckMinor == 50000)
+        #expect(plans.first { $0.kind == "repay" }?.repaymentTotalMinor == 380000, "480000 minus the existing 100000; not the whole purchase")
+        #expect(try await s.run("system.undo", ["undoToken": .string(command.uuidString)]).status == .applied)
+        #expect(try ModelContext(s.container).fetch(FetchDescriptor<MoneyTransaction>()).first { $0.id == row.id }?.reviewState == "needsLook")
+        #expect(try s.envelopeBalance() == 100000)
+    }
+
     @Test func aBankMessageForAPurchaseRecordedByHandWaitsForADecision() async throws {
         let s = try Store()
         let at = ISO8601DateFormatter().date(from: "2026-10-03T11:57:00+03:00")!

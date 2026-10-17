@@ -24,6 +24,7 @@ struct MoneyExpenseView: View {
     @State private var failure: String?
     @FocusState private var editing: Bool
     @State private var commandID = UUID()
+    @State private var bigRoute: MoneyBigExpenseRoute?
     private var service: AppMoneyService { .init(app: app) }
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
     private var minor: Int { MoneyAmountInput.minor(raw, exponent: CurrencyExponents.specified.exponent(reading?.currency ?? "SAR") ?? 2) ?? 0 }
@@ -77,6 +78,9 @@ struct MoneyExpenseView: View {
             .scrollDismissesKeyboard(.interactively)
             .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تم") { editing = false } } }
             .task { load() }.accessibilityIdentifier("money-expense")
+            .fullScreenCover(item: $bigRoute) { route in
+                MoneyBigExpenseView(app: app, route: route, revealed: $revealed) { bigRoute = nil; dismiss() }
+            }
     }
     private func amountHeading(_ r: MoneyExpenseReading) -> some View {
         VStack(spacing: 0) {
@@ -198,6 +202,12 @@ struct MoneyExpenseView: View {
                 if case .envelope(let id) = target { row["target"] = .string("envelope"); row["targetID"] = .string(id) }
                 return .object(row)
             })
+        }
+        let thresholdDays = app.values["mal.bigExpenseDays"].flatMap { if case .number(let n) = $0 { Int(n) } else { nil } } ?? 3
+        if let daily = r.cycle?.headline.todayAllowanceMinor, daily > 0, minor >= daily * thresholdDays,
+           !(m.kind == .cash && r.cashCountedAtWithdrawal) {
+            p.removeValue(forKey: "allocations")
+            bigRoute = .init(expense: p); return
         }
         saving = true
         Task { do { try await app.executeMoneyCommand("money.logExpense", payload: p, id: commandID); dismiss() } catch { failure = "لم يُسجَّل المصروف. راجع مصدر الدفع والمبلغ ثم حاول مرة أخرى."; saving = false; commandID = UUID() } }
