@@ -203,8 +203,7 @@ struct MoneyExpenseView: View {
                 return .object(row)
             })
         }
-        let thresholdDays = app.values["mal.bigExpenseDays"].flatMap { if case .number(let n) = $0 { Int(n) } else { nil } } ?? 3
-        if let daily = r.cycle?.headline.todayAllowanceMinor, daily > 0, minor >= daily * thresholdDays,
+        if let threshold = service.bigExpenseThreshold(cycle: r.cycle), minor >= threshold,
            !(m.kind == .cash && r.cashCountedAtWithdrawal) {
             p.removeValue(forKey: "allocations")
             bigRoute = .init(expense: p); return

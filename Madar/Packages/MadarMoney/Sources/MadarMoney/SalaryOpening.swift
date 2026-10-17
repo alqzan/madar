@@ -14,6 +14,7 @@ public struct SalaryOpeningInput: Equatable, Sendable {
     public var reserveMinor: Int
     public var surplusCapMinor: Int
     public var autoOffset: Bool
+    public var offsetCapDailies: Int
     public var remainder: SalaryRemainder
     /// Obligations due inside the new cycle (bills and instalments), in home minor units.
     public var obligationsMinor: Int
@@ -29,11 +30,11 @@ public struct SalaryOpeningInput: Equatable, Sendable {
     }
     public init(newCycleID: String, salaryTransactionID: String, salaryMinor: Int, expectedLengthDays: Int, allowance: AllowanceMode,
                 closing: Closing?, surplusMinor: Int, reserveMinor: Int, surplusCapMinor: Int = 1_000_000, autoOffset: Bool = true,
-                remainder: SalaryRemainder = .surplusThenReserve, obligationsMinor: Int = 0, plans: [EnvelopePlanSpec] = []) {
+                remainder: SalaryRemainder = .surplusThenReserve, obligationsMinor: Int = 0, plans: [EnvelopePlanSpec] = [], offsetCapDailies: Int = 3) {
         self.newCycleID = newCycleID; self.salaryTransactionID = salaryTransactionID; self.salaryMinor = salaryMinor
         self.expectedLengthDays = expectedLengthDays; self.allowance = allowance; self.closing = closing
         self.surplusMinor = surplusMinor; self.reserveMinor = reserveMinor; self.surplusCapMinor = surplusCapMinor
-        self.autoOffset = autoOffset; self.remainder = remainder; self.obligationsMinor = obligationsMinor; self.plans = plans
+        self.offsetCapDailies = offsetCapDailies; self.autoOffset = autoOffset; self.remainder = remainder; self.obligationsMinor = obligationsMinor; self.plans = plans
     }
 }
 
@@ -63,7 +64,7 @@ public enum SalaryOpening {
         var close: CycleCloseResult?
         if let closing = input.closing {
             let result = CycleClose.close(.init(availableNowMinor: closing.availableNowMinor, dailyMinor: closing.dailyMinor, surplusMinor: surplus,
-                surplusCapMinor: input.surplusCapMinor, alreadyOffsetThisCycleMinor: closing.offsetThisCycleMinor, autoOffset: input.autoOffset, remainder: input.remainder))
+                surplusCapMinor: input.surplusCapMinor, alreadyOffsetThisCycleMinor: closing.offsetThisCycleMinor, autoOffset: input.autoOffset, remainder: input.remainder, offsetCapDailies: input.offsetCapDailies))
             // Keyed by both cycles: an undone salary can be confirmed again (old.closedAt guards a second close).
             let key = "close:" + closing.cycleID + ":" + input.newCycleID
             if result.offsetMinor > 0 {

@@ -309,7 +309,11 @@ private struct ReceiptWire: Codable {
                 let typed = try convert(values)
                 try HabitContextProvenance.recordSettingChange(typed, store: store, context: context, now: now, writer: writer)
                 try HabitWeekHistory.record(typed, store: store, context: context, now: now, writer: writer)
-                inverse = SettingsInverse(settings: try store.stage(typed, now: now), afterSettings: typed, layouts: [:], afterLayouts: [:])
+                let moneyPolicy: Data?
+                if let allowance = typed["mal.dailyAllowance"], allowance != (try store.value(for: "mal.dailyAllowance")) {
+                    moneyPolicy = try MoneyMutationHandler.stageDailyAllowanceChange(allowance, context: context, now: now, writer: writer)
+                } else { moneyPolicy = nil }
+                inverse = SettingsInverse(settings: try store.stage(typed, now: now), afterSettings: typed, layouts: [:], afterLayouts: [:], moneyMutation: moneyPolicy)
             case .applyPreset(let values, let layouts):
                 let typed = try convert(values)
                 // Validate all layouts before touching any setting.

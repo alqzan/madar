@@ -869,6 +869,34 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         try rebuildEnvelopes(context, now, writer)
     }
 
+    /// Settings and their next-day policy share one receipt and one undo; the current policy, carry and plans stay.
+    static func stageDailyAllowanceChange(_ value: MadarData.JSONValue, context: ModelContext, now: Date, writer: String) throws -> Data? {
+        let schema = try SettingsSchema.bundled()
+        if value != (try schema.definition(for: "mal.dailyAllowance").defaultValue) { try schema.validate(value, for: "mal.dailyAllowance") }
+        guard let object = value.object, let cycle = try MoneyRepository(context: context).cycle(at: now),
+              let storedCycle = try context.fetch(FetchDescriptor<Cycle>()).first(where: { $0.id == cycle.id }) else { return nil }
+        let amount = object["amountMinor"]?.number.map(Int.init), bp = object["percentBp"]?.number.map(Int.init)
+        let percent = object["mode"]?.string == "percent"
+        let day = cycle.today.adding(days: 1).description
+        let existing = try context.fetch(FetchDescriptor<CyclePolicy>()).first { $0.cycleID == cycle.id && $0.effectiveFromDayKey == day }
+        let before = try existing.map { try $0.record() }
+        if percent ? bp == nil : amount == nil {
+            guard let existing, existing.deletedAt == nil else { return nil }
+            try touch(existing, now, writer, deleting: true) // reset cancels tomorrow's draft policy, never an elapsed day.
+            return try JSONEncoder().encode(MoneyInverse(before: before.map { [$0] } ?? [], after: [try existing.record()]))
+        }
+
+        let policy = existing ?? CyclePolicy(); policy.id = existing?.id ?? StableIdentity.uuid(for: "CyclePolicy:\(cycle.id):\(day)")
+        policy.cycleID = cycle.id; policy.effectiveFromDayKey = day; policy.mode = percent ? "percent" : "fixed"; policy.allowanceMinor = amount ?? 0; policy.percentBp = percent ? bp : nil
+        let mode: AllowanceMode = percent ? .percent(basisPoints: bp ?? 0, incomeMinor: storedCycle.incomeMinor) : .fixed(allowanceMinor: amount ?? 0)
+        let rate = CycleEngine.freeze(mode, expectedLengthDays: cycle.input.expectedLengthDays)
+        policy.dailyRateMinor = rate.dailyRateMinor; policy.lastDayRemainderMinor = rate.lastDayRemainderMinor
+        if policy.deletedAt != nil { policy.restoredAt = StableIdentity.monotonic(now: now, previous: policy.deletionBarrierAt ?? now); policy.deletedAt = nil }
+        if existing == nil { policy.createdAt = now; context.insert(policy) }
+        try touch(policy, now, writer)
+        return try JSONEncoder().encode(MoneyInverse(before: before.map { [$0] } ?? [], after: [try policy.record()]))
+    }
+
     private static func records(_ context: ModelContext) throws -> [DataRecord] {
         var rows = try context.fetch(FetchDescriptor<Account>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<Card>()).map { try $0.record() }

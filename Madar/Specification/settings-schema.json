@@ -2944,6 +2944,98 @@
    ],
    "storage": "Setting (synced)",
    "preset": false
+  },
+  {
+   "owner": "mal",
+   "section": "يومك والراتب",
+   "scope": "sync",
+   "storage": "Setting (local-only in v1)",
+   "preset": false,
+   "key": "mal.offsetCapDailies",
+   "title": "سقف المقاصة باليوميات",
+   "type": "int",
+   "default": 3,
+   "range": [
+    0,
+    365
+   ]
+  },
+  {
+   "owner": "mal",
+   "section": "يومك والراتب",
+   "scope": "sync",
+   "storage": "Setting (local-only in v1)",
+   "preset": false,
+   "key": "mal.bigExpenseRule",
+   "title": "حد المصروف الكبير",
+   "type": "choice",
+   "default": "dailies",
+   "options": [
+    {
+     "value": "dailies",
+     "label": "من اليومية"
+    },
+    {
+     "value": "salaryPercent",
+     "label": "نسبة من الراتب"
+    },
+    {
+     "value": "amount",
+     "label": "مبلغ أحدده"
+    }
+   ]
+  },
+  {
+   "owner": "mal",
+   "section": "يومك والراتب",
+   "scope": "sync",
+   "storage": "Setting (local-only in v1)",
+   "preset": false,
+   "key": "mal.bigExpenseSalaryBp",
+   "title": "نسبة المصروف الكبير من الراتب",
+   "type": "int",
+   "default": 1000,
+   "range": [
+    1,
+    10000
+   ]
+  },
+  {
+   "owner": "mal",
+   "section": "يومك والراتب",
+   "scope": "sync",
+   "storage": "Setting (local-only in v1)",
+   "preset": false,
+   "key": "mal.bigExpenseMinor",
+   "title": "مبلغ المصروف الكبير",
+   "type": "money",
+   "default": 100000,
+   "contract": {
+    "value": "Int minor units",
+    "range": [
+     1,
+     10000000000000
+    ]
+   }
+  },
+  {
+   "owner": "mal",
+   "section": "يومك والراتب",
+   "scope": "sync",
+   "storage": "Setting (local-only in v1)",
+   "preset": false,
+   "key": "mal.salarySchedule",
+   "title": "موعد الراتب المرن",
+   "type": "object",
+   "default": {
+    "enabled": false,
+    "every": 1,
+    "unit": "month",
+    "firstDayKey": null
+   },
+   "contract": {
+    "note": "Owner-approved free interval and first due day. cycleCalendar governs months/years. Existing cycle policies remain frozen."
+   }
   }
  ],
  "reviewAmendment": {

@@ -69,6 +69,15 @@ struct MoneyHomeReading {
         let formatted = digits.string(count)
         return String(localized: "money.pending", defaultValue: "\(count) \(formatted)", table: "Money", locale: Locale(identifier: "ar"))
     }
+    func bigExpenseThreshold(cycle: MoneyCycleReading?) -> Int? {
+        let rule: ExpenseThreshold.Rule
+        switch app.string("mal.bigExpenseRule") {
+        case "salaryPercent": rule = .salaryPercent(basisPoints: Int(app.number("mal.bigExpenseSalaryBp")))
+        case "amount": rule = .amount(Int(app.number("mal.bigExpenseMinor")))
+        default: rule = .dailies(Int(app.number("mal.bigExpenseDays")))
+        }
+        return ExpenseThreshold.amount(rule, dailyMinor: cycle?.headline.todayAllowanceMinor, salaryMinor: cycle?.incomeMinor)
+    }
     func load(at instant: Date? = nil) throws -> MoneyHomeReading {
         guard !app.maintenanceInProgress else { throw BackupOperationError.busy }
         guard app.lockController?.canPresent(.app) ?? app.protectedDataAuthorized else { throw DataError.authenticationFailed }
@@ -122,11 +131,11 @@ struct MoneyHomeReading {
             // The list shows the next one; a schedule due several times this cycle (weekly) adds the others to the cycle total.
             if let schedule = bill.recurrence {
                 let payments = linked.filter { $0.obligationID == bill.id }.map(\.eventAt)
-                let from = cycle?.startDay ?? today, cycleEnd = cycle?.expectedEndDay ?? today.adding(days: cycle?.input.expectedLengthDays ?? 30)
-                let unpaid = ObligationSchedule.unpaid(schedule, from: from, before: max(today, from).adding(days: 400), payments: payments, zone: zone)
+                let from = cycle?.startDay ?? today, cycleEnd = max(cycle?.expectedEndDay ?? today.adding(days: cycle?.input.expectedLengthDays ?? 30), today.adding(days: 1))
+                let unpaid = try repo.unpaidRecurring(schedule, from: from, before: max(today, from).adding(days: 400), payments: payments, zone: zone)
                 if let next = unpaid.first {
                     due.append(.init(id: bill.id, name: bill.name, amountMinor: bill.amountMinor, due: next))
-                    flexibleExtraMinor += bill.amountMinor * unpaid.dropFirst().filter { $0 >= from && $0 < cycleEnd }.count
+                    flexibleExtraMinor += bill.amountMinor * unpaid.dropFirst().filter { $0 < cycleEnd }.count
                 }
                 continue
             }
@@ -140,7 +149,7 @@ struct MoneyHomeReading {
         }
         due.sort { $0.due == $1.due ? $0.id.uuidString < $1.id.uuidString : $0.due < $1.due }
         let length = cycle?.input.expectedLengthDays ?? 30
-        let cycleObligations = due.filter { $0.due >= (cycle?.startDay ?? today) && $0.due < (cycle?.expectedEndDay ?? today.adding(days: length)) }.reduce(0) { $0 + $1.amountMinor } + flexibleExtraMinor
+        let cycleObligations = due.filter { $0.due < max(cycle?.expectedEndDay ?? today.adding(days: length), today.adding(days: 1)) }.reduce(0) { $0 + $1.amountMinor } + flexibleExtraMinor
         let history = Dictionary(grouping: allocations.filter { $0.target == "surplus" || $0.targetID.map { id in envelopes.contains { $0.id == id && $0.role == "surplus" } } == true }, by: { $0.cycleID })
             .sorted { ($0.value.map(\.createdAt).min() ?? .distantPast) < ($1.value.map(\.createdAt).min() ?? .distantPast) }.suffix(6).map { $0.value.reduce(0) { $0 + $1.amountMinor } }
         let reserveReading = ReserveEngine.read(balanceMinor: reserve, dailyMinor: cycle?.headline.todayAllowanceMinor, cycleLengthDays: length, obligationsPerCycleMinor: cycleObligations)

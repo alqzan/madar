@@ -159,6 +159,38 @@ import MadarMoney
         #expect(try s.envelopeBalance() == 100000)
     }
 
+    @Test func allowanceSettingAddsTomorrowPolicyAndUndoRestoresItTogether() async throws {
+        let s = try Store(), before = try s.cycle(), id = UUID()
+        let value: MadarCore.JSONValue = .object(["mode": .string("fixed"), "amountMinor": .number(45000), "percentBp": .null])
+        #expect(try await s.run("settings.set", ["settings": .object(["mal.dailyAllowance": value])], id: id).status == .applied)
+        let reading = try s.cycle()
+        #expect(reading.headline == before.headline, "Today and its carry never change (L01)")
+        #expect(CycleEngine.day(4, reading.input).allowanceMinor == 45000)
+        #expect(CycleEngine.day(3, reading.input).allowanceMinor == 40000)
+        #expect(try await s.run("system.undo", ["undoToken": .string(id.uuidString)]).status == .applied)
+        #expect(CycleEngine.day(4, try s.cycle().input).allowanceMinor == 40000)
+        // Reapplying after undo revives the same natural-key policy, rather than creating a duplicate.
+        #expect(try await s.run("settings.set", ["settings": .object(["mal.dailyAllowance": value])]).status == .applied)
+        #expect(try ModelContext(s.container).fetch(FetchDescriptor<CyclePolicy>()).filter { $0.effectiveFromDayKey == "2026-10-04" && $0.deletedAt == nil }.count == 1)
+        let resetID = UUID(), unset: MadarCore.JSONValue = .object(["mode": .string("fixed"), "amountMinor": .null, "percentBp": .null])
+        #expect(try await s.run("settings.set", ["settings": .object(["mal.dailyAllowance": unset])], id: resetID).status == .applied)
+        #expect(CycleEngine.day(4, try s.cycle().input).allowanceMinor == 40000)
+        #expect(try await s.run("system.undo", ["undoToken": .string(resetID.uuidString)]).status == .applied)
+        #expect(CycleEngine.day(4, try s.cycle().input).allowanceMinor == 45000)
+
+    }
+
+    @Test func freeScheduleInLateSalaryGapStaysReservedAfterTheNextSalary() throws {
+        let s = try Store(), c = ModelContext(s.container), old = try #require(try c.fetch(FetchDescriptor<Cycle>()).first)
+        let actual = try GregorianDay("2026-11-05"), due = try GregorianDay("2026-11-02")
+        old.end = actual.date(in: s.zone); old.closedAt = old.end
+        let next = Cycle(); next.start = actual.date(in: s.zone); next.expectedEnd = actual.adding(days: 30).date(in: s.zone); c.insert(next); try c.save()
+        let schedule = try #require(Recurrence(every: 1, unit: .month, first: due))
+        let repo = MoneyRepository(context: ModelContext(s.container))
+        #expect(try repo.unpaidRecurring(schedule, from: actual, before: actual.adding(days: 30), payments: [], zone: s.zone) == [due, try GregorianDay("2026-12-02")])
+        #expect(try repo.unpaidRecurring(schedule, from: actual, before: actual.adding(days: 30), payments: [due.date(in: s.zone)], zone: s.zone) == [try GregorianDay("2026-12-02")])
+    }
+
     @Test func aBankMessageForAPurchaseRecordedByHandWaitsForADecision() async throws {
         let s = try Store()
         let at = ISO8601DateFormatter().date(from: "2026-10-03T11:57:00+03:00")!

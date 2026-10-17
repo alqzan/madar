@@ -25,6 +25,7 @@ struct MoneyHomeView: View {
     @State private var analysisOpen = false
     @State private var reconcileOpen = false
     @State private var cashbackOpen = false
+    @State private var settingsOpen = false
     @State private var accountsOpen = false
     @State private var expenseOpen = false
     @State private var visitChecked = false
@@ -51,6 +52,7 @@ struct MoneyHomeView: View {
                         .buttonStyle(.plain).accessibilityIdentifier("money-analysis-open")
                     Button { reconcileOpen = true } label: { Label("المطابقة مع البنك", systemImage: "checkmark.seal").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 48).overlay { Capsule().stroke(theme.color("reserveText"), lineWidth: 1) } }
                         .buttonStyle(.plain).accessibilityIdentifier("money-reconcile-open")
+                    Button { settingsOpen = true } label: { Label("إعدادات المال", systemImage: "slider.horizontal.3").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 48).overlay { Capsule().stroke(theme.color("reserveText"), lineWidth: 1) } }.buttonStyle(.plain).accessibilityIdentifier("money-settings-open")
                     Button { accountsOpen = true } label: { Label("الحسابات", systemImage: "tree").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 48).overlay { Capsule().stroke(theme.color("reserveText"), lineWidth: 1) } }.buttonStyle(.plain).accessibilityIdentifier("money-accounts-open")
                     Button { expenseOpen = true } label: { Label("سجّل مصروفًا", systemImage: "plus").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 48).overlay { Capsule().stroke(theme.color("reserveText"), lineWidth: 1) } }.buttonStyle(.plain).accessibilityIdentifier("money-expense-open")
                     Button { cashbackOpen = true } label: { Label("الاسترداد النقدي", systemImage: "drop").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 48).overlay { Capsule().stroke(theme.color("reserveText"), lineWidth: 1) } }
@@ -80,6 +82,7 @@ struct MoneyHomeView: View {
         .navigationDestination(isPresented: $sinceOpen) {
             if let reading { MoneySinceView(app: app, home: reading, revealed: $revealed) { sinceOpen = false; messagesOpen = true; Task { try? await app.executeMoneyCommand("money.markVisit") } } }
         }
+        .navigationDestination(isPresented: $settingsOpen) { MoneySettingsView(app: app, revealed: $revealed) }
         .navigationDestination(isPresented: $accountsOpen) { MoneyAccountsView(app: app, revealed: $revealed) }
         .onChange(of: accountsOpen) { if !accountsOpen { load() } }
         .navigationDestination(isPresented: $expenseOpen) { MoneyExpenseView(app: app, revealed: $revealed) }

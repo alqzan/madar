@@ -1,11 +1,11 @@
 /// Offsets and the salary close (§7.5 rules, L02, L13, L14, `mal.autoOffset`, `mal.surplusCap`, `mal.salaryRemainder`).
 public enum OffsetEngine {
-    /// §15 #24: the per-cycle offset cap is 3 dailies until the owner decides otherwise.
+    /// §15 #24: the agreed default is 3 dailies; the owner can configure the per-cycle cap.
     public static let capPerCycleInDailies = 3
 
     public enum Shortfall: Equatable, Sendable {
         case disabled
-        /// The deficit is more than 3 × «يومك»: it is not offset, it stays visible.
+        /// The deficit is larger than the configured cap × «يومك»: it is not offset, it stays visible.
         case tooLarge
         /// «بلغت المقاصة سقف الدورة» (L14).
         case cycleCapReached
@@ -20,8 +20,9 @@ public enum OffsetEngine {
     }
 
     /// Offsets each deficit in order from the surplus. The cap is checked against Σ offsets in the cycle (L14), not per event.
-    public static func offset(deficitsMinor: [Int], dailyMinor: Int, surplusMinor: Int, alreadyOffsetThisCycleMinor: Int = 0, enabled: Bool) -> [Outcome] {
-        let cap = capPerCycleInDailies * dailyMinor
+    public static func offset(deficitsMinor: [Int], dailyMinor: Int, surplusMinor: Int, alreadyOffsetThisCycleMinor: Int = 0, enabled: Bool, capDailies: Int = 3) -> [Outcome] {
+        let product = max(0, capDailies).multipliedReportingOverflow(by: max(0, dailyMinor))
+        let cap = product.overflow ? Int.max : product.partialValue
         var used = alreadyOffsetThisCycleMinor, surplus = surplusMinor
         return deficitsMinor.map { deficit in
             guard enabled else { return Outcome(offsetMinor: 0, remainingDeficitMinor: deficit, shortfall: .disabled) }
@@ -44,12 +45,13 @@ public struct CycleCloseInput: Equatable, Sendable {
     public var surplusCapMinor: Int
     public var alreadyOffsetThisCycleMinor: Int
     public var autoOffset: Bool
+    public var offsetCapDailies: Int
     public var remainder: SalaryRemainder
     public init(availableNowMinor: Int, dailyMinor: Int, surplusMinor: Int, surplusCapMinor: Int = 1_000_000,
-                alreadyOffsetThisCycleMinor: Int = 0, autoOffset: Bool = true, remainder: SalaryRemainder = .surplusThenReserve) {
+                alreadyOffsetThisCycleMinor: Int = 0, autoOffset: Bool = true, remainder: SalaryRemainder = .surplusThenReserve, offsetCapDailies: Int = 3) {
         self.availableNowMinor = availableNowMinor; self.dailyMinor = dailyMinor; self.surplusMinor = surplusMinor
         self.surplusCapMinor = surplusCapMinor; self.alreadyOffsetThisCycleMinor = alreadyOffsetThisCycleMinor
-        self.autoOffset = autoOffset; self.remainder = remainder
+        self.autoOffset = autoOffset; self.remainder = remainder; self.offsetCapDailies = offsetCapDailies
     }
 }
 
@@ -70,7 +72,7 @@ public enum CycleClose {
     public static func close(_ input: CycleCloseInput) -> CycleCloseResult {
         if input.availableNowMinor < 0 {
             let outcome = OffsetEngine.offset(deficitsMinor: [-input.availableNowMinor], dailyMinor: input.dailyMinor, surplusMinor: input.surplusMinor,
-                                              alreadyOffsetThisCycleMinor: input.alreadyOffsetThisCycleMinor, enabled: input.autoOffset)[0]
+                                              alreadyOffsetThisCycleMinor: input.alreadyOffsetThisCycleMinor, enabled: input.autoOffset, capDailies: input.offsetCapDailies)[0]
             return CycleCloseResult(offsetMinor: outcome.offsetMinor, carryMinor: -outcome.remainingDeficitMinor, toSurplusMinor: 0, toReserveMinor: 0,
                                     awaitingChoiceMinor: 0, surplusAfterMinor: input.surplusMinor - outcome.offsetMinor, offsetShortfall: outcome.shortfall)
         }

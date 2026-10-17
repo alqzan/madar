@@ -131,9 +131,11 @@ import MadarPrayer
         var calendar = Calendar(identifier: .gregorian); calendar.timeZone = place.timeZone
         let active = try context.fetch(FetchDescriptor<Cycle>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.start <= now && ($0.end == nil || now < $0.end!) }.max { $0.start < $1.start }
         let month = calendar.dateInterval(of: .month, for: now)!
-        let periodStart = active?.start ?? month.start, periodEnd = active?.expectedEnd ?? month.end
+        let periodStart = active?.start ?? month.start
+        let tomorrow = GregorianDay.containing(now, in: place.timeZone).adding(days: 1).date(in: place.timeZone)
+        let periodEnd = active.map { max($0.expectedEnd ?? month.end, tomorrow) } ?? month.end
         let loans = try items.compactMap { item -> Int? in
-            guard item.dueDate >= periodStart && item.dueDate < periodEnd,
+            guard item.dueDate < periodEnd,
                   let obligation = obligations.first(where: { $0.id == item.obligationID && $0.kind == "loan" }) else { return nil }
             return try converted(max(0, item.amountMinor - item.paidMinor), currency: obligation.currency)
         }
@@ -145,7 +147,7 @@ import MadarPrayer
         for obligation in obligations where obligation.isRecurring {
             if let schedule = obligation.recurrence {
                 let payments = transactions.filter { $0.obligationID == obligation.id }.map(\.eventAt)
-                let count = ObligationSchedule.unpaid(schedule, from: firstDay, before: endDay, payments: payments, zone: place.timeZone).count
+                let count = try unpaidRecurring(schedule, from: firstDay, before: endDay, payments: payments, zone: place.timeZone).count
                 if count > 0 { bills.append(try converted(obligation.amountMinor, currency: obligation.currency) * count) }
             } else if obligation.kind == "bill", !transactions.contains(where: { $0.obligationID == obligation.id && $0.eventAt >= periodStart && $0.eventAt < periodEnd }) {
                 bills.append(try converted(obligation.amountMinor, currency: obligation.currency))
@@ -155,6 +157,18 @@ import MadarPrayer
         return BasisInput(accounts: accounts, creditCards: cardStates, installments: bnpl,
             loanDueMinor: try MoneyMutationHandler.sum(loans), billsDueMinor: try MoneyMutationHandler.sum(bills), envelopeAllocationsMinor: allocations)
     }
+    /// Free due dates in a late cycle's gap belong to that cycle, and stay reserved until paid after it closes.
+    public func unpaidRecurring(_ schedule: Recurrence, from: GregorianDay, before: GregorianDay, payments: [Date], zone: TimeZone) throws -> [GregorianDay] {
+        var days = Set(ObligationSchedule.unpaid(schedule, from: from, before: before, payments: payments, zone: zone))
+        for cycle in try context.fetch(FetchDescriptor<Cycle>()) where cycle.deletedAt == nil && cycle.mergedInto == nil {
+            guard let expected = cycle.expectedEnd else { continue }
+            let end = cycle.end ?? (cycle.start < from.date(in: zone) ? from.date(in: zone) : expected)
+            guard end > expected else { continue }
+            days.formUnion(ObligationSchedule.unpaid(schedule, from: .containing(expected, in: zone), before: .containing(end, in: zone), payments: payments, zone: zone))
+        }
+        return days.sorted()
+    }
+
     public func zakatAccounts(at now: Date = .now, rates: [String: String] = [:]) throws -> [ZakatAccount] {
         try homeAccountBalances(at: now, rates: rates).map { .init(balanceMinor: $0.homeMinor, include: $0.account.zakatInclude) }
     }

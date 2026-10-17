@@ -10,6 +10,7 @@ public struct MoneyCycleReading {
     public var startDay: GregorianDay
     public var today: GregorianDay
     public var expectedEndDay: GregorianDay
+    public var incomeMinor: Int
     public var elapsedDays: Int
     public var input: CycleInput
     public var spent: [Int: Int]
@@ -102,7 +103,7 @@ extension MoneyRepository {
             spent[index, default: 0] -= allocation.amountMinor
         }
         let headline = CycleEngine.headline(elapsedDays: elapsed, input, dailySpentMinor: spent, pendingDecisions: try pendingDecisionCount())
-        return .init(id: cycle.id, startDay: start, today: today, expectedEndDay: end, elapsedDays: elapsed, input: input, spent: spent,
+        return .init(id: cycle.id, startDay: start, today: today, expectedEndDay: end, incomeMinor: cycle.incomeMinor, elapsedDays: elapsed, input: input, spent: spent,
             headline: headline, curve: CycleEngine.curve(through: max(length, elapsed), input, dailySpentMinor: spent), planEnvelopes: planEnvelopes)
     }
 }

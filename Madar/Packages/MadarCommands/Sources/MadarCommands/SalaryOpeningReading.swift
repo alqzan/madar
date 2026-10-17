@@ -96,7 +96,14 @@ extension MoneyRepository {
         if open != nil && closing == nil { throw MoneyCommandError.salaryNeedsCycleConfirmation }
 
         let salaryDay = whole(try settings.value(for: "mal.salaryDay").number) ?? 0, hijri = try settings.value(for: "mal.cycleCalendar").string == "hijri"
-        let endDay = Self.expectedEnd(after: startDay, salaryDay: salaryDay, hijri: hijri, zone: zone)
+        let schedule = try settings.value(for: "mal.salarySchedule").object ?? [:]
+        let flexible: SalaryRecurrence? = {
+            guard schedule["enabled"] == .bool(true), let every = schedule["every"]?.number.map(Int.init),
+                  let raw = schedule["unit"]?.string, let unit = RecurrenceUnit(rawValue: raw), let firstRaw = schedule["firstDayKey"]?.string,
+                  let first = try? GregorianDay(firstRaw) else { return nil }
+            return .init(every: every, unit: unit, first: first, hijri: hijri)
+        }()
+        let endDay = flexible?.expectedEnd(after: startDay) ?? Self.expectedEnd(after: startDay, salaryDay: salaryDay, hijri: hijri, zone: zone)
         let length = max(1, MadarCalendarDays.distance(from: startDay, to: endDay))
 
         // «يومك» for the new cycle: the setting, else the closing cycle's mode; never an invented 0 (schema: null = not set).
@@ -120,14 +127,14 @@ extension MoneyRepository {
         let obligations = try context.fetch(FetchDescriptor<Obligation>()).filter { live($0) && $0.currency == salary.homeCurrency }
         let window = startDay.date(in: zone)..<endDay.date(in: zone)
         var due = try context.fetch(FetchDescriptor<InstallmentItem>()).filter { item in
-            live(item) && item.paidMinor < item.amountMinor && window.contains(item.dueDate) && obligations.contains { $0.id == item.obligationID }
+            live(item) && item.paidMinor < item.amountMinor && item.dueDate < window.upperBound && obligations.contains { $0.id == item.obligationID }
         }.reduce(0) { $0 + $1.amountMinor - $1.paidMinor }
         var calendar = Calendar(identifier: .gregorian); calendar.timeZone = zone
         // M5-X00: a bill or subscription on a free schedule counts each unpaid due day inside the new cycle.
         let linked = try context.fetch(FetchDescriptor<MoneyTransaction>()).filter { live($0) && $0.reviewState == "ok" && $0.obligationID != nil }
         for bill in obligations where bill.isRecurring {
             if let schedule = bill.recurrence {
-                due += bill.amountMinor * ObligationSchedule.unpaid(schedule, from: startDay, before: endDay, payments: linked.filter { $0.obligationID == bill.id }.map(\.eventAt), zone: zone).count
+                due += bill.amountMinor * (try unpaidRecurring(schedule, from: startDay, before: endDay, payments: linked.filter { $0.obligationID == bill.id }.map(\.eventAt), zone: zone)).count
                 continue
             }
             guard bill.kind == "bill", let day = bill.dueDay else { continue }
@@ -167,7 +174,7 @@ extension MoneyRepository {
         let input = SalaryOpeningInput(newCycleID: newCycleID.uuidString, salaryTransactionID: salary.id.uuidString, salaryMinor: salaryMinor,
             expectedLengthDays: length, allowance: allowance, closing: closing, surplusMinor: surplus, reserveMinor: reserve,
             surplusCapMinor: cap, autoOffset: autoOffset,
-            remainder: remainder, obligationsMinor: due, plans: specs)
+            remainder: remainder, obligationsMinor: due, plans: specs, offsetCapDailies: whole(try settings.value(for: "mal.offsetCapDailies").number) ?? 3)
         let history: [(start: Date, carriedMinor: Int)] = try context.fetch(FetchDescriptor<Cycle>()).filter { live($0) && $0.closedAt != nil }.sorted { $0.start < $1.start }.compactMap { cycle in
             guard let data = cycle.closedReportJSON, let report = try? JSONDecoder().decode(SalaryCloseReport.self, from: data) else { return nil }
             return (cycle.start, report.carriedMinor)

@@ -102,8 +102,7 @@ extension AppMoneyService {
         let confirmedToday = rows.filter { $0.reviewState == "ok" && $0.source == "bank" && $0.dayKey == today.description && !$0.ignoredFromBudget }
         let spent = confirmedToday.filter { direction($0) == .out }, incoming = confirmedToday.filter { direction($0) == .incoming }
         // A big expense waits for its own flow (mal.bigExpenseDays × today's allowance), so it is never «واضح».
-        let daily = try repo.cycle(at: now)?.headline.todayAllowanceMinor
-        let bigFrom = daily.map { $0 * max(2, Int(app.values["mal.bigExpenseDays"].flatMap { if case .number(let n) = $0 { Int(n) } else { nil } } ?? 3)) }
+        let bigFrom = bigExpenseThreshold(cycle: try repo.cycle(at: now))
         func cardName(_ id: UUID?) -> String? { cards.first { $0.id == id }?.name }
         func accountName(_ id: UUID?) -> String? { accounts.first { $0.id == id }?.name }
         let confirmable = MoneyMutationHandler.confirmableAsRead(rows.filter { $0.reviewState == "needsLook" && $0.messageID != nil }.map(\.id), container: app.container, now: now)
@@ -117,7 +116,7 @@ extension AppMoneyService {
             else if row.kind == "cardPayment" { note = "سداد بطاقة، لا مصروف" }
             let resolvable = ["expense", "fee", "withdrawal", "income", "transfer", "cardPayment"].contains(row.kind) && confirmable.contains(row.id)
             let big = dir == .out && bigFrom.map { $0 > 0 && row.homeAmountMinor >= $0 } == true
-            let clear = row.reviewState == "needsLook" && resolvable && !big && row.currency == home
+            let clear = row.reviewState == "needsLook" && resolvable && !big && (row.kind != "expense" || bigFrom != nil) && row.currency == home
             drafts.append(.init(id: row.id, sender: message?.sender ?? "", title: row.merchant ?? row.counterparty ?? Self.kindLabels[row.kind] ?? "حركة",
                 kindLabel: Self.kindLabels[row.kind] ?? "حركة", payment: cardName(row.cardID) ?? accountName(row.fromAccountID ?? row.toAccountID),
                 amountMinor: row.amountMinor, currency: row.currency, direction: dir, possibleDuplicate: row.reviewState == "possibleDuplicate",

@@ -50,6 +50,15 @@ public struct SettingsSchema: Decodable, Sendable {
                 guard ["fixed","percent"].contains(object["mode"]?.string ?? "") else { try reject() }
                 for field in ["amountMinor","percentBp"] where object[field] != .null { guard let n = object[field]?.number, inRange(n,field == "percentBp" ? [0,10000] : [0,1e13]) else { try reject() } }
                 guard object[object["mode"] == .string("fixed") ? "amountMinor" : "percentBp"] != .null else { try reject() }
+            case "mal.salarySchedule":
+                guard case .bool = object["enabled"], let unit = object["unit"]?.string,
+                      let maximum = ["day": 365.0, "week": 104.0, "month": 120.0, "year": 10.0][unit],
+                      let n = object["every"]?.number, inRange(n, [1, maximum]) else { try reject() }
+                if object["firstDayKey"] != .null {
+                    guard let raw = object["firstDayKey"]?.string, raw.range(of: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$", options: .regularExpression) != nil else { try reject() }
+                    let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.calendar = Calendar(identifier: .gregorian); f.timeZone = .gmt; f.dateFormat = "yyyy-MM-dd"; f.isLenient = false
+                    guard let date = f.date(from: raw), f.string(from: date) == raw else { try reject() }
+                } else if object["enabled"] == .bool(true) { try reject() }
             case "salah.trackingStart": guard let edits = object["edits"]?.number, inRange(edits,[0,1]), object["dayKey"] == .null || object["dayKey"]?.string?.range(of:"^[0-9]{4}-[0-9]{2}-[0-9]{2}$",options:.regularExpression) != nil else { try reject() }
             case "mihbara.readerAr", "mihbara.readerEn":
                 guard let size = object["size"]?.number, inRange(size,[1,7]), ["auto","paper","warm","calm","night","black"].contains(object["theme"]?.string ?? ""), ["pages","scroll","focus"].contains(object["mode"]?.string ?? "") else { try reject() }
