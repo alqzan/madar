@@ -19,6 +19,7 @@ import MadarPrayer
         let from = accounts.first { $0.id == row.fromAccountID }, to = accounts.first { $0.id == row.toAccountID }
         func owned(_ account: Account?) -> Bool { account?.ownership == "mine" && account?.tracked == true }
         let movement: Movement
+        var amount = row.homeAmountMinor
         switch row.kind {
         case "expense":
             let method: Movement.PayFrom = card?.kind == "credit" ? .creditCard : card?.kind == "debit" ? .debitCard
@@ -36,9 +37,19 @@ import MadarPrayer
             let obligation = try context.fetch(FetchDescriptor<Obligation>()).first { $0.id == row.obligationID && $0.deletedAt == nil && $0.mergedInto == nil }
             guard let obligation else { throw MoneyCommandError.invalidReference }
             movement = obligation.kind == "loan" ? .loanInstalment : .bnplInstalment
+        case "adjustment":
+            // M5-V15 / F03: the reconciliation record holds the signed difference and its name; the movement is linked
+            // from `Reconciliation.adjustmentTransactionID` (the dictionary's relation). Accounts also carry the sign in from/to.
+            let record = try context.fetch(FetchDescriptor<Reconciliation>()).first { $0.adjustmentTransactionID == row.id && $0.deletedAt == nil && $0.mergedInto == nil }
+            let spend = record?.resolution == "unrecordedSpend"
+            if row.cardID != nil {
+                movement = .cardAdjustment(unrecordedSpend: spend); amount = record?.deltaMinor ?? 0
+            } else {
+                movement = .adjustment(unrecordedSpend: spend); amount = record?.deltaMinor ?? (row.toAccountID != nil ? row.homeAmountMinor : -row.homeAmountMinor)
+            }
         default: throw MoneyCommandError.invalidReference
         }
-        var effect = MovementEngine.effect(movement, amountMinor: row.homeAmountMinor, ignoredFromBudget: row.ignoredFromBudget && !includingExcluded,
+        var effect = MovementEngine.effect(movement, amountMinor: amount, ignoredFromBudget: row.ignoredFromBudget && !includingExcluded,
             settings: .init(cashWithdrawalAsSpend: cashAsSpend))
         // RM4: obligations are reserved once. The BNPL purchase route is introduced with its own envelope flow.
         if row.obligationID != nil { effect.budgetChargeMinor = 0 }

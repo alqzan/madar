@@ -701,4 +701,64 @@ import MadarInbox
         #expect(try f.basis().inAccountMinor == 2_009_500)
     }
 
+
+    /// M5-V15 / F03: one «محضر» of three lines in one command — a missed spend on the account, an unexplained card
+    /// difference and a match — then a stale replay, one undo, a left difference and a refused surplus «spend».
+    @Test func reconciliationWritesOneAdjustmentPerNamedDifferenceWithOneUndo() async throws {
+        let f = try MoneyFixture(); defer { f.clean() }; try await f.setup()
+        _ = try await f.ingest("شراء بطاقة ائتمان\n*4444\n100.00 SAR\n2026-10-16 12:00")
+        _ = try await f.run("money.confirmTransaction", ["id": .string(try f.transaction().id.uuidString)])
+        let c = ModelContext(f.container), cycle = Cycle(); cycle.start = f.now.addingTimeInterval(-2 * 86400); cycle.expectedEnd = f.now.addingTimeInterval(28 * 86400); cycle.dailyAllowanceMinor = 40_000; c.insert(cycle)
+        let other = MadarData.Category(); other.name = "أخرى"; c.insert(other); try c.save()
+        #expect(try f.basis().inAccountMinor == 2_010_000); #expect(try f.basis().owedMinor == 10_000); #expect(try f.basis().netMinor == 2_000_000)
+        func line(_ key: String, _ id: UUID, _ expected: Int, _ observed: Int, _ name: String? = nil) -> MadarCore.JSONValue {
+            var row: [String: MadarCore.JSONValue] = [key: .string(id.uuidString), "expectedMinor": .string(String(expected)), "observedMinor": .string(String(observed))]
+            if let name { row["name"] = .string(name) }
+            return .object(row)
+        }
+        let rows: MadarCore.JSONValue = .array([line("accountID", f.bank, 2_000_000, 1_968_000, "missedSpend"), line("cardID", f.credit, 10_000, 22_000, "unexplained"), line("accountID", f.cash, 10_000, 10_000)])
+        let command = UUID()
+        let first = try await f.run("money.reconcile", ["rows": rows], id: command)
+        #expect(first.status == .applied); #expect(first.undoToken == command)
+        #expect(try await f.run("money.reconcile", ["rows": rows], id: command) == first, "A replay writes nothing")
+        // Cash −320.00, debt +120.00: «لك فعلًا» falls by 440.00 (2000000 − 44000).
+        #expect(try f.basis().inAccountMinor == 1_978_000); #expect(try f.basis().owedMinor == 22_000); #expect(try f.basis().netMinor == 1_956_000)
+        let read = ModelContext(f.container)
+        let records = try read.fetch(FetchDescriptor<Reconciliation>()).filter { $0.deletedAt == nil }
+        #expect(records.count == 3)
+        let bankRecord = try #require(records.first { $0.accountID == f.bank })
+        #expect(bankRecord.expectedMinor == 2_000_000); #expect(bankRecord.observedMinor == 1_968_000); #expect(bankRecord.deltaMinor == -32_000)
+        #expect(bankRecord.resolution == "unrecordedSpend")
+        #expect(records.first { $0.cardID == f.credit }?.resolution == "adjust")
+        let cashRecord = try #require(records.first { $0.accountID == f.cash })
+        #expect(cashRecord.resolution == "adjust" && cashRecord.adjustmentTransactionID == nil, "A match is recorded without a movement")
+        let adjustments = try read.fetch(FetchDescriptor<MoneyTransaction>()).filter { $0.deletedAt == nil && $0.kind == "adjustment" }
+        #expect(adjustments.count == 2)
+        let missed = try #require(adjustments.first { $0.fromAccountID == f.bank })
+        #expect(missed.amountMinor == 32_000); #expect(missed.categoryID == other.id); #expect(missed.cycleID == cycle.id)
+        let repo = MoneyRepository(context: read)
+        let missedEffect = try repo.effect(of: missed), cardEffect = try repo.effect(of: try #require(adjustments.first { $0.cardID == f.credit }))
+        #expect(missedEffect.cashMinor == -32_000); #expect(missedEffect.debtMinor == 0); #expect(missedEffect.budgetChargeMinor == 32_000)
+        #expect(cardEffect.cashMinor == 0); #expect(cardEffect.debtMinor == 12_000); #expect(cardEffect.budgetChargeMinor == 0)
+        // «مصروف لم يُسجَّل» is one daily spend allocation in the open cycle; the unexplained card difference has none.
+        let spend = try repo.allocationRows(transactionID: missed.id)
+        #expect(spend.count == 1); #expect(spend.first?.target == .daily); #expect(spend.first?.amountMinor == -32_000); #expect(spend.first?.cycleID == cycle.id.uuidString)
+        #expect(try repo.cycle(at: f.now)?.headline.todaySpentMinor == 32_000)
+        // The book moved: the same lines again are stale and write nothing.
+        #expect(try await f.run("money.reconcile", ["rows": rows]).status == .rejected)
+        // One undo returns the cash, the debt and every record.
+        #expect(try await f.run("system.undo", ["undoToken": .string(command.uuidString)]).status == .applied)
+        #expect(try f.basis().inAccountMinor == 2_010_000); #expect(try f.basis().owedMinor == 10_000)
+        #expect(try ModelContext(f.container).fetch(FetchDescriptor<Reconciliation>()).allSatisfy { $0.deletedAt != nil })
+        #expect(try ModelContext(f.container).fetch(FetchDescriptor<MoneyTransaction>()).filter { $0.kind == "adjustment" }.allSatisfy { $0.deletedAt != nil })
+        // No name leaves the difference open: a record, no movement, the book unchanged.
+        #expect(try await f.run("money.reconcile", ["rows": .array([line("accountID", f.bank, 2_000_000, 1_990_000)])]).status == .applied)
+        #expect(try f.basis().inAccountMinor == 2_010_000)
+        #expect(try ModelContext(f.container).fetch(FetchDescriptor<Reconciliation>()).first { $0.deletedAt == nil }?.resolution == "leave")
+        // A surplus is never spending; one bad line rejects the whole command.
+        #expect(try await f.run("money.reconcile", ["rows": .array([line("accountID", f.bank, 2_000_000, 2_100_000, "missedSpend")])]).status == .rejected)
+        #expect(!MoneyCommandPayload.validate(name: "money.reconcile", payload: ["rows": .array([line("accountID", f.bank, 1, 1), line("accountID", f.bank, 1, 2)])]))
+        #expect(!MoneyCommandPayload.validate(name: "money.reconcile", payload: ["rows": .array([.object(["accountID": .string(f.bank.uuidString), "cardID": .string(f.credit.uuidString), "expectedMinor": .string("1"), "observedMinor": .string("1")])])]))
+        #expect(!MoneyCommandPayload.validate(name: "money.reconcile", payload: ["rows": .array([line("accountID", f.bank, 1, -1)])]))
+    }
 }

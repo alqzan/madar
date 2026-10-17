@@ -8,7 +8,7 @@ public enum MoneyCommandPayload {
     public static let names: Set<String> = [intakeName, "money.pasteBankMessages", "money.logExpense",
         "money.confirmTransaction", "money.deleteTransaction", "money.saveAccount", "money.saveCard", "money.accruePlans", "money.setReserveGoal", "money.repayEnvelopeNow", "money.setEnvelopeSaving", "money.adoptRepayment",
         "money.applyStatement", "money.ignoreMessage", "money.confirmClear", "money.markVisit",
-        "money.categorize", "money.saveMerchantRule", "money.forgetMerchantRule", "money.confirmSalary", "money.saveObligation", "money.setCategoryLimit", "money.setBudgetExclusion"]
+        "money.categorize", "money.saveMerchantRule", "money.forgetMerchantRule", "money.confirmSalary", "money.saveObligation", "money.setCategoryLimit", "money.setBudgetExclusion", "money.reconcile"]
     /// §7.5 maxRepayCycles: the longest salary repayment (the envelope sheet offers 1–6).
     public static let maxRepaySalaries = 12
 
@@ -104,6 +104,22 @@ public enum MoneyCommandPayload {
                 return true
             }
         case "money.deleteTransaction": return Set(p.keys) == ["id"] && id("id")
+        case "money.reconcile":
+            // M5-V15: every line of one «محضر» in one command and one undo. Each line names one account or one card,
+            // the book the screen showed (re-checked by the handler), what the bank says and an optional name.
+            guard Set(p.keys) == ["rows"], case .array(let rows) = p["rows"], !rows.isEmpty, rows.count <= 60 else { return false }
+            var targets = Set<String>()
+            for value in rows {
+                guard case .object(let row) = value, Set(row.keys).isSubset(of: ["accountID", "cardID", "expectedMinor", "observedMinor", "name", "at"]),
+                      integer(row["expectedMinor"]) != nil, let observed = integer(row["observedMinor"]), observed >= 0,
+                      row["name"] == nil || { if case .string(let raw) = row["name"] { ["missedSpend", "bankFee", "unexplained"].contains(raw) } else { false } }(),
+                      row["at"] == nil || date(row["at"]) != nil else { return false }
+                func rowID(_ key: String) -> UUID? { if case .string(let raw) = row[key] { UUID(uuidString: raw) } else { nil } }
+                let account = rowID("accountID"), card = rowID("cardID")
+                guard (account == nil) != (card == nil), row.keys.contains("accountID") == (account != nil), row.keys.contains("cardID") == (card != nil),
+                      targets.insert((account ?? card)!.uuidString).inserted else { return false }
+            }
+            return true
         case "money.saveAccount":
             return Set(p.keys).isSubset(of: ["id", "name", "bank", "kind", "ownership", "currency", "balanceMinor", "balanceAt", "last4", "senderIDs", "tracked", "zakatInclude"])
                 && id("id") && text("name") && optionalText("bank") && choices("kind", ["current", "savings", "cash", "wallet"])

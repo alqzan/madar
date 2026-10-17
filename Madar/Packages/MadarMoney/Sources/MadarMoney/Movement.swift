@@ -39,6 +39,9 @@ public enum Movement: Equatable, Sendable {
     case reversal(RefundTo)
     /// A reconciliation adjustment of `deltaMinor` (observed − expected).
     case adjustment(unrecordedSpend: Bool)
+    /// M5-V15: a reconciliation adjustment on a credit card of `deltaMinor` (the bank's debt − Madar's debt); F01 lets
+    /// an adjustment land on the account or the card. Neutral unless «مصروف لم يُسجَّل» for a card that owes more.
+    case cardAdjustment(unrecordedSpend: Bool)
 }
 
 public struct MovementEffect: Equatable, Sendable {
@@ -101,6 +104,8 @@ public enum MovementEngine {
         case .adjustment(let unrecordedSpend):
             // ± the delta on cash; neutral unless the user chose «مصروف لم يُسجَّل» for a shortfall.
             effect = .init(cashMinor: a, debtMinor: 0, budgetChargeMinor: unrecordedSpend && a < 0 ? -a : 0)
+        case .cardAdjustment(let unrecordedSpend):
+            effect = .init(cashMinor: 0, debtMinor: a, budgetChargeMinor: unrecordedSpend && a > 0 ? a : 0)
         }
         if ignoredFromBudget { effect.budgetChargeMinor = 0 }
         return effect
