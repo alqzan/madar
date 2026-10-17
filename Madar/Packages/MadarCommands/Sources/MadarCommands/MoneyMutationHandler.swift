@@ -234,6 +234,8 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             try touch(rule, now, writer, deleting: true)
         case "money.applyStatement":
             try applyStatement(uuid(p, "id"), context: context, now: now, writer: writer)
+        case "money.reconcile":
+            try reconcile(p, command: id, context: context, now: now, writer: writer)
         case "money.ignoreMessage":
             guard let id = uuid(p, "id"), let message = try context.fetch(FetchDescriptor<BankMessage>()).first(where: { $0.id == id && live($0) }),
                   ["needsLook", "possibleDuplicate"].contains(message.status) else { throw MoneyCommandError.missingRow }
@@ -299,6 +301,64 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         row.id = id; row.name = text(p, "name"); row.bank = text(p, "bank"); row.last4 = text(p, "last4"); row.kind = kind
         row.accountID = accountID; row.aliases = strings(p["aliases"])
         if existing == nil { row.createdAt = now; context.insert(row) }; try touch(row, now, writer)
+    }
+
+    /// M5-V15 / F03 «المحضر»: one Reconciliation per line. expected is the book at the line's time (the same
+    /// `accountBalance` / `cardDebts` the basis reads), re-checked against what the screen showed; a stale line rejects
+    /// the whole command. A named difference writes one adjustment movement — budget-neutral, or «مصروف لم يُسجَّل»
+    /// charged to today's «يومك» — and no name leaves it open. Undo tombstones the movement and the record together.
+    private static func reconcile(_ p: [String: MadarCore.JSONValue], command: UUID, context: ModelContext, now: Date, writer: String) throws {
+        guard case .array(let rows) = p["rows"] else { throw MoneyCommandError.invalidReference }
+        let repo = MoneyRepository(context: context)
+        let home = try SettingsStore(context: context).value(for: "core.currency").string ?? "SAR"
+        let basis = try repo.basis(at: now), available = try repo.cycle(at: now)?.headline.availableNowMinor
+        let other = try context.fetch(FetchDescriptor<MadarData.Category>()).first { live($0) && $0.name == "أخرى" }
+        let cycleID = try context.fetch(FetchDescriptor<Cycle>()).filter { live($0) && $0.start <= now && ($0.end == nil || now < $0.end!) }.max { $0.start < $1.start }?.id
+        for (index, value) in rows.enumerated() {
+            guard case .object(let r) = value, let observed = MoneyCommandPayload.integer(r["observedMinor"]), observed >= 0,
+                  let shown = MoneyCommandPayload.integer(r["expectedMinor"]) else { throw MoneyCommandError.invalidAmount }
+            let at = MoneyCommandPayload.date(r["at"]) ?? now
+            guard at <= now else { throw MoneyCommandError.invalidReference }
+            let name: ReconcileName?
+            if let raw = optionalText(r, "name") { guard let parsed = ReconcileName(rawValue: raw) else { throw MoneyCommandError.invalidReference }; name = parsed } else { name = nil }
+            let line: ReconcileLine, accountID = uuid(r, "accountID"), cardID = uuid(r, "cardID")
+            if let accountID {
+                let owned = try account(accountID, context)
+                guard owned.ownership == "mine", owned.tracked, owned.currency == home else { throw MoneyCommandError.invalidReference }
+                line = .init(side: .account, expectedMinor: try repo.accountBalance(owned, at: at), observedMinor: observed)
+            } else if let cardID, let debt = try repo.cardDebts(at: at).first(where: { $0.cardID == cardID }) {
+                line = .init(side: .creditCard, expectedMinor: debt.totalMinor, observedMinor: observed)
+            } else { throw MoneyCommandError.invalidReference }
+            // The screen showed another book (a movement arrived meanwhile): nothing is written.
+            guard line.expectedMinor == shown else { throw MoneyCommandError.invalidAmount }
+            guard let resolution = ReconcileEngine.resolution(name, for: line) else { throw MoneyCommandError.invalidReference }
+            let record = Reconciliation(); record.id = StableIdentity.uuid(for: "Reconciliation:\(command):\(index)")
+            record.accountID = accountID; record.cardID = cardID; record.at = at
+            record.expectedMinor = line.expectedMinor; record.observedMinor = observed; record.deltaMinor = line.deltaMinor
+            record.resolution = resolution; record.note = name == .bankFee ? "رسوم بنكية" : nil
+            var snapshot: [String: Any] = ["v": 1, "balanceMinor": line.expectedMinor, "inAccountMinor": basis.inAccountMinor, "netMinor": basis.netMinor]
+            if let available { snapshot["availableNowMinor"] = available }
+            record.beforeJSON = try JSONSerialization.data(withJSONObject: snapshot, options: [.sortedKeys])
+            record.createdAt = now; context.insert(record)
+            if let effect = ReconcileEngine.effect(line, resolution: resolution) {
+                let row = MoneyTransaction(); row.id = StableIdentity.uuid(for: "MoneyTransaction:reconcile:\(record.id)")
+                row.kind = "adjustment"; row.source = "manual"; row.method = cardID == nil ? "transfer" : "card"
+                row.amountMinor = abs(line.deltaMinor); row.homeAmountMinor = row.amountMinor; row.currency = home; row.homeCurrency = home
+                if let accountID { if line.deltaMinor < 0 { row.fromAccountID = accountID } else { row.toAccountID = accountID } }
+                row.cardID = cardID
+                row.merchant = name == .missedSpend ? "مصاريف فاتتني" : name == .bankFee ? "رسوم بنكية" : "تسوية مطابقة"
+                row.categoryID = resolution == "unrecordedSpend" ? other?.id : nil
+                try stampDay(row, at: now, context: context, now: now)
+                row.cycleID = cycleID; row.reviewState = "ok"; row.showInDiary = false; row.createdAt = now
+                context.insert(row); try touch(row, now, writer)
+                record.adjustmentTransactionID = row.id
+                if effect.budgetChargeMinor > 0 {
+                    try writeAllocations(try AllocationEngine.spend(transactionID: row.id.uuidString, homeAmountMinor: effect.budgetChargeMinor, cycleID: cycleID?.uuidString),
+                                         context: context, now: now, writer: writer)
+                }
+            }
+            try touch(record, now, writer)
+        }
     }
 
     private static func ingest(_ raw: [[String: MadarCore.JSONValue]], batch: UUID?, command: UUID, issuedAt: Date,
@@ -811,6 +871,7 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         rows += try context.fetch(FetchDescriptor<CategoryLimit>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<Cycle>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<CyclePolicy>()).map { try $0.record() }
+        rows += try context.fetch(FetchDescriptor<Reconciliation>()).map { try $0.record() }
         return rows
     }
     private static func rebuildEnvelopes(_ context: ModelContext, _ now: Date, _ writer: String) throws {

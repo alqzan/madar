@@ -23,6 +23,7 @@ struct MoneyHomeView: View {
     @State private var cardsOpen = false
     @State private var logOpen = false
     @State private var analysisOpen = false
+    @State private var reconcileOpen = false
     @State private var visitChecked = false
     private var service: AppMoneyService { .init(app: app) }
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
@@ -45,6 +46,8 @@ struct MoneyHomeView: View {
                         .buttonStyle(.plain).accessibilityIdentifier("money-log-open")
                     Button { analysisOpen = true } label: { Label("التحليل", systemImage: "chart.bar.xaxis").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 48).overlay { Capsule().stroke(theme.color("reserveText"), lineWidth: 1) } }
                         .buttonStyle(.plain).accessibilityIdentifier("money-analysis-open")
+                    Button { reconcileOpen = true } label: { Label("المطابقة مع البنك", systemImage: "checkmark.seal").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 48).overlay { Capsule().stroke(theme.color("reserveText"), lineWidth: 1) } }
+                        .buttonStyle(.plain).accessibilityIdentifier("money-reconcile-open")
                 } else if let failure {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("لم تكتمل قراءة المال").font(MadarTypography.cardTitle())
@@ -63,6 +66,8 @@ struct MoneyHomeView: View {
         .navigationDestination(isPresented: $cardsOpen) { MoneyCardsView(app: app, revealed: $revealed) }
         .navigationDestination(isPresented: $logOpen) { MoneyLogView(app: app, revealed: $revealed) }
         .navigationDestination(isPresented: $analysisOpen) { MoneyAnalysisView(app: app, revealed: $revealed) }
+        .navigationDestination(isPresented: $reconcileOpen) { MoneyReconcileView(app: app, revealed: $revealed) }
+        .onChange(of: reconcileOpen) { if !reconcileOpen { load() } }
         .navigationDestination(isPresented: $sinceOpen) {
             if let reading { MoneySinceView(app: app, home: reading, revealed: $revealed) { sinceOpen = false; messagesOpen = true; Task { try? await app.executeMoneyCommand("money.markVisit") } } }
         }

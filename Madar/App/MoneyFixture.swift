@@ -8,11 +8,11 @@ import MadarCommands
 extension AppSession {
     /// Named synthetic stores only. Never reads or writes the owner's store.
     func prepareMoneyFixture(group: URL) throws {
-        guard let variant = ProcessInfo.processInfo.environment["MADAR_UI_MONEY_FIXTURE"], ["showcase", "empty", "hidden", "zero", "shortfall", "messages", "since", "rules", "salary", "budget", "cards", "cardsHidden", "analysis", "analysisHidden"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
+        guard let variant = ProcessInfo.processInfo.environment["MADAR_UI_MONEY_FIXTURE"], ["showcase", "empty", "hidden", "zero", "shortfall", "messages", "since", "rules", "salary", "budget", "cards", "cardsHidden", "analysis", "analysisHidden", "reconcile", "reconcileHidden"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         let c = ModelContext(container)
         guard !(try c.fetch(FetchDescriptor<DeviceSetting>())).contains(where: { $0.key == "sys.moneyFixture" }) else { return }
         for key in ["sys.moneyFixture", "sys.onboardingCompleted"] { let marker = DeviceSetting(); marker.key = key; marker.valueJSON = Data("true".utf8); c.insert(marker) }
-        _ = try SettingsStore(context: c).stage(["core.dayStart": .string("midnight"), "core.faceIDLock": .string("none"), "core.hideMoneyUntilTouch": .bool(["hidden", "cardsHidden", "analysisHidden"].contains(variant))])
+        _ = try SettingsStore(context: c).stage(["core.dayStart": .string("midnight"), "core.faceIDLock": .string("none"), "core.hideMoneyUntilTouch": .bool(["hidden", "cardsHidden", "analysisHidden", "reconcileHidden"].contains(variant))])
         guard variant != "empty" else { try c.save(); return }
         let zone = ActivePlace.riyadh.timeZone, now = prayerNow(), today = GregorianDay.containing(prayerNow(), in: ActivePlace.riyadh.timeZone)
         // «نزل الراتب» arrives at the end of a full cycle; the other variants sit five days into theirs.
@@ -116,6 +116,25 @@ extension AppSession {
                 spend("مقهى الزاوية", categories[0], day, 2_500, cycle: previous, hour: 8)
                 let shop = shops[(index + 2) % shops.count]; spend(shop.0, categories[shop.1], day, total - 2_500, cycle: previous, hour: 18)
             }
+            try c.save()
+        }
+        if variant.hasPrefix("reconcile") {
+            // «المطابقة»: the account was last reconciled 40 days ago; the newest bank message printed a balance 320 below
+            // Madar's book, and a 320 draft still waits. A wallet and a second credit card complete the record.
+            let checked = today.adding(days: -40).date(in: zone).addingTimeInterval(10 * 3600)
+            account.balanceAt = checked; account.balanceMinor = 12_995_000
+            let last = Reconciliation(); last.accountID = account.id; last.at = checked; last.expectedMinor = 12_995_000; last.observedMinor = 12_995_000; last.resolution = "adjust"; c.insert(last)
+            let message = BankMessage(); message.sender = "بنك الاختبار"; message.kind = "purchase"; message.status = "ok"; message.receivedAt = now.addingTimeInterval(-3600)
+            message.text = "شراء مدى اصطناعي\nبطاقة *3317\n90.00 SAR\nلدى: مخبز الحي\nالرصيد: 128500.00 SAR"
+            message.parsedJSON = try JSONSerialization.data(withJSONObject: ["v": 1, "kind": "purchase", "amountMinor": 9_000, "balanceMinor": 12_850_000]); c.insert(message)
+            let bread = MoneyTransaction(); bread.merchant = "مخبز الحي"; bread.messageID = message.id; bread.cardID = debit.id; bread.fromAccountID = account.id; bread.method = "card"; bread.source = "bank"; bread.reviewState = "ok"
+            bread.amountMinor = 9_000; bread.homeAmountMinor = 9_000; bread.cycleID = cycle.id; bread.dayKey = today.description; bread.eventAt = now.addingTimeInterval(-3600); bread.tzID = zone.identifier; bread.dayPolicy = "midnight@1"; c.insert(bread)
+            allocation(-9_000, "daily", tx: bread.id, kind: "spend")
+            let waiting = MoneyTransaction(); waiting.merchant = "صيدلية الحي"; waiting.fromAccountID = account.id; waiting.method = "transfer"; waiting.source = "bank"; waiting.reviewState = "needsLook"
+            waiting.amountMinor = 32_000; waiting.homeAmountMinor = 32_000; waiting.dayKey = today.adding(days: -1).description; waiting.eventAt = today.adding(days: -1).date(in: zone).addingTimeInterval(17 * 3600); waiting.tzID = zone.identifier; waiting.dayPolicy = "midnight@1"; c.insert(waiting)
+            let wallet = Account(); wallet.name = "المحفظة الرقمية"; wallet.kind = "wallet"; wallet.ownership = "mine"; wallet.bank = "محفظة الاختبار"; wallet.balanceMinor = 134_000; wallet.balanceAt = today.adding(days: -12).date(in: zone); c.insert(wallet)
+            let travel = Card(); travel.name = "بطاقة السفر"; travel.kind = "credit"; travel.bank = "بنك الاختبار"; travel.last4 = "7722"; travel.accountID = account.id; c.insert(travel)
+            let travelStatement = Statement(); travelStatement.cardID = travel.id; travelStatement.statementMinor = 115_000; travelStatement.closeDate = today.adding(days: -3).date(in: zone); travelStatement.dueDate = today.adding(days: 18).date(in: zone); c.insert(travelStatement)
             try c.save()
         }
         if variant == "messages" { seedMoneyMessages(today: today, zone: zone) }
