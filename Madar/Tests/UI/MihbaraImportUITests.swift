@@ -103,6 +103,56 @@ import UIKit
         app.buttons["mihbara-pdf-close"].tap()
     }
 
+    func testTextPDFImportsAndOpensWithItsStoredPageCount() {
+        continueAfterFailure = false
+        let format = UIGraphicsPDFRendererFormat()
+        format.documentInfo = [kCGPDFContextTitle as String: "كتاب رقمي", kCGPDFContextAuthor as String: "قارئ الاختبار"]
+        let pdf = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 300, height: 400), format: format).pdfData { canvas in
+            let paragraph = NSMutableParagraphStyle(); paragraph.alignment = .right
+            for page in 1...2 {
+                canvas.beginPage()
+                let text = "الصفحة رقم \(page)\n\nهذا نص عربي موجود داخل ملف PDF، وليس صورة ممسوحة. يبقى النص والصفحات كما حفظها الملف الأصلي."
+                (text as NSString).draw(in: CGRect(x: 20, y: 35, width: 260, height: 320), withAttributes: [
+                    .font: UIFont.systemFont(ofSize: 21), .foregroundColor: UIColor.darkText, .paragraphStyle: paragraph
+                ])
+            }
+        }
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MIHBARA_FIXTURE": "empty",
+            "MADAR_UI_NOW": "2026-10-18T12:00:00+03:00", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
+            "MADAR_UI_MIHBARA_IMPORT_PDF_NAME": "كتاب رقمي",
+            "MADAR_UI_MIHBARA_IMPORT_PDF": pdf.base64EncodedString()]
+        app.launch()
+        let customize = app.tabBars.buttons["خصّص"]; XCTAssertTrue(customize.waitForExistence(timeout: 20)); customize.tap()
+        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 8)); search.tap(); search.typeText("المحبرة")
+        let door = app.buttons["mihbara-open"]; XCTAssertTrue(door.waitForExistence(timeout: 8)); door.tap()
+        let add = app.buttons["mihbara-add-paper"]; XCTAssertTrue(add.waitForExistence(timeout: 8)); add.tap()
+        let confirm = app.buttons["mihbara-import-confirm"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 20), app.debugDescription)
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "PDF بطبقة نص في")).firstMatch.exists, app.debugDescription)
+        XCTAssertEqual(app.textFields["mihbara-import-title"].value as? String, "كتاب رقمي")
+        attach(app, "M6-PDF-text-preview-L")
+        for _ in 0..<6 where !confirm.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(confirm.isHittable)
+        confirm.tap()
+
+        let addBook = app.buttons["mihbara-add-paper"]
+        let visible = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: addBook)
+        XCTAssertEqual(XCTWaiter.wait(for: [visible], timeout: 15), .completed, app.debugDescription)
+        addBook.tap()
+        XCTAssertTrue(app.staticTexts["لا يوجد ملف وصل مؤخرًا"].waitForExistence(timeout: 8))
+        app.buttons["mihbara-add-back"].tap()
+        app.buttons["mihbara-shelf-want"].tap()
+        let imported = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "كتاب رقمي")).firstMatch
+        XCTAssertTrue(imported.waitForExistence(timeout: 8), app.debugDescription); imported.tap()
+        XCTAssertTrue(app.buttons["mihbara-pdf-next"].waitForExistence(timeout: 12), app.debugDescription)
+        let page = app.descendants(matching: .any)["mihbara-pdf-page"]
+        XCTAssertTrue(page.label.replacingOccurrences(of: "\u{2068}", with: "").replacingOccurrences(of: "\u{2069}", with: "").contains("١ من ٢"), app.debugDescription)
+        attach(app, "M6-PDF-text-reader-L")
+        app.buttons["mihbara-pdf-next"].tap()
+        XCTAssertTrue(page.label.replacingOccurrences(of: "\u{2068}", with: "").replacingOccurrences(of: "\u{2069}", with: "").contains("٢ من ٢"), app.debugDescription)
+    }
+
     func testEPUBPreviewUsesFileMetadataAndAddsAnOfflineBook() throws {
         continueAfterFailure = false
         let fixture = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "english-import-poc", withExtension: "epub"))

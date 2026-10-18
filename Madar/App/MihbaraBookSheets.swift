@@ -180,7 +180,9 @@ struct MihbaraAddBookView: View {
             if root.deletingLastPathComponent().deletingLastPathComponent().lastPathComponent == "UITestStores",
                let encoded = ProcessInfo.processInfo.environment["MADAR_UI_MIHBARA_IMPORT_PDF"], let bytes = Data(base64Encoded: encoded),
                bytes.count < 1024 * 1024, pendingBookFile == nil {
-                let file = root.deletingLastPathComponent().appendingPathComponent("ملف اختبار مصوّر.pdf")
+                let fixtureName = ProcessInfo.processInfo.environment["MADAR_UI_MIHBARA_IMPORT_PDF_NAME"] ?? "ملف اختبار مصوّر"
+                let safeName = String(fixtureName.prefix(80)).replacingOccurrences(of: "/", with: "-")
+                let file = root.deletingLastPathComponent().appendingPathComponent("\(safeName).pdf")
                 do {
                     // Simulate one file arrival. Reopening Add Book must not inject the
                     // already-confirmed fixture again after the production binding is cleared.
