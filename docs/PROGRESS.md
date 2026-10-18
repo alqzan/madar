@@ -38,6 +38,8 @@ Found by Claude walking the app on the simulator as a user (15 Oct 23:40); the o
 
 ## Ideas — for the owner
 
+**Owner, 18 Oct: every idea below is approved («كلها»).** Build them as additive, optional fields or settings, with defaults, a reset and undo. Test any migration on synthetic stores only, with one review pass (store-migration exception). Order: finish the M6 cards first, then these ideas inside their rooms, then M7. M7 starts straight away when they are done; there is no wait for an owner trial. New idea, also approved: a Mihbara quote card as an image (text, book, author, volume/page, source) to save or share. Turath quotes carry the source link.
+
 Bigger improvement ideas from Claude or Codex (new features, rule or data-model changes, beyond v1). Not built until the owner says yes. One row per idea.
 
 | Idea | What and why | From | Owner |
