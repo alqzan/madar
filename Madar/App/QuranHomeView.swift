@@ -61,6 +61,7 @@ struct QuranHomeView: View {
                     .padding(24).foregroundStyle(theme.ink)
             } else { ProgressView().frame(maxWidth: .infinity).padding(60) }
         }
+        .clipped()
         .background(theme.background.ignoresSafeArea())
         .foregroundStyle(theme.ink)
         .toolbarVisibility(.hidden, for: .navigationBar)
