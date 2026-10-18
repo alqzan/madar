@@ -35,6 +35,9 @@ packages:
     path: Packages/MadarInbox
   MadarSync:
     path: Packages/MadarSync
+  Readium:
+    url: https://github.com/readium/swift-toolkit.git
+    version: 3.11.1
 targets:
   Madar:
     type: application
@@ -56,6 +59,12 @@ targets:
       - package: MadarQuran
       - package: MadarInbox
       - package: MadarSync
+      - package: Readium
+        product: ReadiumNavigator
+      - package: Readium
+        product: ReadiumShared
+      - package: Readium
+        product: ReadiumStreamer
       - target: MadarWidgets
         embed: true
     settings:
@@ -152,6 +161,8 @@ targets:
     sources:
       - Tests/UI
       - path: Packages/MadarCore/Tests/MadarCoreTests/Fixtures/dayone-synthetic.zip
+        buildPhase: resources
+      - path: Tests/Fixtures/Mihbara/arabic-reader-poc.epub
         buildPhase: resources
     dependencies:
       - target: Madar

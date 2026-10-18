@@ -31,6 +31,7 @@
 		10BA9ACCEDE467D0114EF478 /* AppQuranService+Drill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52735133758CAE2D8945A464 /* AppQuranService+Drill.swift */; };
 		12F77A5D723E19178224B8C4 /* AppQuranService+Year.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4EABD6DD57A637E613F8174 /* AppQuranService+Year.swift */; };
 		13D02594BC0853EEDBD5F57D /* MoneyAnalysisIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3A1EE2CAC2998D3F4B62E24 /* MoneyAnalysisIntegrationTests.swift */; };
+		1440A0ECB247647341D7C97B /* arabic-reader-poc.epub in Resources */ = {isa = PBXBuildFile; fileRef = 8FD6BC425BFCE32221434C0C /* arabic-reader-poc.epub */; };
 		146E42A851F6F3A7E153D5C2 /* MihbaraPDFImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C7701301D14E577EA61ECA5 /* MihbaraPDFImportView.swift */; };
 		14B1C4AEEC8258B6AECE7BBE /* thmanyahserifdisplay-Bold.otf in Resources */ = {isa = PBXBuildFile; fileRef = C6661268F5C60E85AA211014 /* thmanyahserifdisplay-Bold.otf */; };
 		1568A1568FDC897B19DC9694 /* MadarData in Frameworks */ = {isa = PBXBuildFile; productRef = 9596E50BAF7470B464E4BDF0 /* MadarData */; };
@@ -128,6 +129,7 @@
 		4E6288DB3DC0C7806D6E1815 /* PrayerCountdownControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD025F7EBE03A4A9D7852DB4 /* PrayerCountdownControl.swift */; };
 		4F3EF1691B6E6DF5CE28B9D2 /* MadarCommands in Frameworks */ = {isa = PBXBuildFile; productRef = BB0D9BFDBBAFC58EE2999DE7 /* MadarCommands */; };
 		515BF7C677ACA9EA442A84EC /* MadarData in Frameworks */ = {isa = PBXBuildFile; productRef = 6F1DD2A72ECE897173614EA7 /* MadarData */; };
+		51AF280129EFDF070064BF16 /* Readium-BSD-3-Clause.txt in Resources */ = {isa = PBXBuildFile; fileRef = 254F1C2DCD1E4E39D9EFEC55 /* Readium-BSD-3-Clause.txt */; };
 		51B2678A2958EEE856D3B7E2 /* HabitsUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 422D5DF771CC4FB56EC5F357 /* HabitsUITests.swift */; };
 		53397AE2B8209205824276BA /* QuranIndexUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1B18261A0086DB607A44381 /* QuranIndexUITests.swift */; };
 		537DB9EFDA549FAA9716CAE8 /* DiaryExportIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1CD3D0D13859EF7127463D7 /* DiaryExportIntegrationTests.swift */; };
@@ -326,7 +328,9 @@
 		E03A78428D46E5D69571788C /* DiaryWeekView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36B407352AE296507D2EA417 /* DiaryWeekView.swift */; };
 		E089AD457E3A758A6FC4C936 /* MoneyCategoriesUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEBF30618C1A87475207FB1B /* MoneyCategoriesUITests.swift */; };
 		E0989BDCE688F14971015AC0 /* AppMoneyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0720BEE085D59A80D5BCD99 /* AppMoneyService.swift */; };
+		E0ED25867D213234AE63930C /* ReadiumStreamer in Frameworks */ = {isa = PBXBuildFile; productRef = 92BC72E60ECC5D517F5E4243 /* ReadiumStreamer */; };
 		E22DD3F7C11BF0CB7D575A9F /* QuranDrillUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 698F695ACB91C7284480267F /* QuranDrillUITests.swift */; };
+		E2F052CDDC36B8452E4833F0 /* MihbaraReaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61502A92C935793E29B5D9BD /* MihbaraReaderView.swift */; };
 		E39098AF2817AAE1C9916E34 /* DiaryCustomizeUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 156373CD20DDBC2829A5AED5 /* DiaryCustomizeUITests.swift */; };
 		E513AF7DCE60BD50CCD1E0ED /* MoneyExpenseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1B67DBE20E858334AF888A2 /* MoneyExpenseView.swift */; };
 		E54CDC268D4A484E1FA4F78C /* CustomizeMadar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 722D1062D9A8B6E0872B2931 /* CustomizeMadar.swift */; };
@@ -341,11 +345,13 @@
 		EA5164A4DA807C4F06A13120 /* OpenMadarIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCC2F8AF04AA4AA760B02D82 /* OpenMadarIntent.swift */; };
 		EA9C0274CD8227B8EE0ACC77 /* DiaryVoiceControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCEB9293DE2E579C487F98D6 /* DiaryVoiceControls.swift */; };
 		EC0CA4865861DA502438DA84 /* MihbaraHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 569CDB63CF5C9A6B8C736149 /* MihbaraHomeView.swift */; };
+		EEEBE18293EEF2E520250B80 /* ReadiumShared in Frameworks */ = {isa = PBXBuildFile; productRef = E87752E9691BA9D50DB38F3B /* ReadiumShared */; };
 		EEFB1D6DFBF9E0E4FA1C18B1 /* CustomizationCopyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C63BADA5C6BD423F06356E09 /* CustomizationCopyTests.swift */; };
 		F057B7AF2041B31DCA597E1F /* AppBackupService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E6EB1F3F05F6A4C2B4D1002 /* AppBackupService.swift */; };
 		F06811C94AFAB53F8E8F8A3D /* AppQuranService+Journey.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1778D1A629B46A993E5E049 /* AppQuranService+Journey.swift */; };
 		F13B4F45487252CB1DAF833A /* DiaryDayOneImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5DC3D2395EF3C228E3454A0 /* DiaryDayOneImportView.swift */; };
 		F31472686C4367E1119E8EC6 /* MadarComponentGallery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7884A40C087DAC3CED8FC2B8 /* MadarComponentGallery.swift */; };
+		F325125EAD4DA42B4F827D1D /* ReadiumNavigator in Frameworks */ = {isa = PBXBuildFile; productRef = D4078EBCD8A831E3041E0F28 /* ReadiumNavigator */; };
 		F3A9B51C3458DD18D2C7199C /* QuranWeekIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFD07614868D2D4DAD54B46C /* QuranWeekIntegrationTests.swift */; };
 		F53D20CC48364DF385160E05 /* DiaryHubUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78ED38B6659E8BFBD97E22AB /* DiaryHubUITests.swift */; };
 		F590460A7B328F814D4F172F /* MadarIntentHandoff.swift in Sources */ = {isa = PBXBuildFile; fileRef = 966B3399E746D6C594A7B7BF /* MadarIntentHandoff.swift */; };
@@ -447,6 +453,7 @@
 		2293299667730AD8A0496EBC /* MadarCommands */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MadarCommands; path = Packages/MadarCommands; sourceTree = SOURCE_ROOT; };
 		24560E5969E823668449B1D8 /* MadarData */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MadarData; path = Packages/MadarData; sourceTree = SOURCE_ROOT; };
 		249A748FAA0C40882A8F1B35 /* CustomizeSearchUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomizeSearchUITests.swift; sourceTree = "<group>"; };
+		254F1C2DCD1E4E39D9EFEC55 /* Readium-BSD-3-Clause.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Readium-BSD-3-Clause.txt"; sourceTree = "<group>"; };
 		2564AF9C513786C475618420 /* DateLabelsIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateLabelsIntegrationTests.swift; sourceTree = "<group>"; };
 		25C24B34019B6C51AD62E9A4 /* MadarMoney */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MadarMoney; path = Packages/MadarMoney; sourceTree = SOURCE_ROOT; };
 		25C92B7A356AA41F0E88F770 /* OpenQuickRoomIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenQuickRoomIntent.swift; sourceTree = "<group>"; };
@@ -527,6 +534,7 @@
 		5FF3A5ABCDDB3153D93E2D90 /* MoneyAccountsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyAccountsView.swift; sourceTree = "<group>"; };
 		60F1C857764292ABD2F14C47 /* BahwLobbyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BahwLobbyView.swift; sourceTree = "<group>"; };
 		613F23E7A67DB5AF1B342B4A /* AppMihbaraService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppMihbaraService.swift; sourceTree = "<group>"; };
+		61502A92C935793E29B5D9BD /* MihbaraReaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MihbaraReaderView.swift; sourceTree = "<group>"; };
 		62A1A46778A8E38A5339986E /* DiarySeasonUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiarySeasonUITests.swift; sourceTree = "<group>"; };
 		6315081179D81A3DD8BF942A /* AppQuranService+Index.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppQuranService+Index.swift"; sourceTree = "<group>"; };
 		631CC93A3ECB0A77AB05DAD1 /* MoneyLogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyLogView.swift; sourceTree = "<group>"; };
@@ -587,6 +595,7 @@
 		8CF5E7B996A522A8D37486E4 /* RoomWidgetsGallery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomWidgetsGallery.swift; sourceTree = "<group>"; };
 		8D5DA39DDD31B6E747BE357E /* MoneyAnalysisModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyAnalysisModels.swift; sourceTree = "<group>"; };
 		8ECD1459603F766B11AD3B64 /* MoneyMessagesUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyMessagesUITests.swift; sourceTree = "<group>"; };
+		8FD6BC425BFCE32221434C0C /* arabic-reader-poc.epub */ = {isa = PBXFileReference; path = "arabic-reader-poc.epub"; sourceTree = "<group>"; };
 		8FE9D9930E188F3E3EBDC70B /* StartQuranSessionIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartQuranSessionIntent.swift; sourceTree = "<group>"; };
 		9082571774B3B32E02553BD2 /* AppDiaryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDiaryService.swift; sourceTree = "<group>"; };
 		90F2DDC71492F91157099793 /* DateLabelsUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateLabelsUITests.swift; sourceTree = "<group>"; };
@@ -768,6 +777,9 @@
 				426A98B3F16AF13682080B56 /* MadarQuran in Frameworks */,
 				807172E4A031EA6E80A5CB4D /* MadarInbox in Frameworks */,
 				B6EE8E827BE58948EBFBEAB5 /* MadarSync in Frameworks */,
+				F325125EAD4DA42B4F827D1D /* ReadiumNavigator in Frameworks */,
+				EEEBE18293EEF2E520250B80 /* ReadiumShared in Frameworks */,
+				E0ED25867D213234AE63930C /* ReadiumStreamer in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -809,6 +821,7 @@
 				36D212F344657400F67CA5EB /* Quran.xcstrings */,
 				EF38D2DD4E05D7F8F402281E /* RoomSymbols.xcassets */,
 				EF3621350EEAB780369C802E /* Fonts */,
+				8433C202D2428EFD6FABCEA7 /* Licenses */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -827,6 +840,14 @@
 				B09F2FE58FC465DA15CF67AF /* RoomWidgets.swift */,
 			);
 			path = Widgets;
+			sourceTree = "<group>";
+		};
+		551CDBB662A70CEF9111AFC6 /* Mihbara */ = {
+			isa = PBXGroup;
+			children = (
+				8FD6BC425BFCE32221434C0C /* arabic-reader-poc.epub */,
+			);
+			path = Mihbara;
 			sourceTree = "<group>";
 		};
 		60989DF5A40FA101598B9292 /* Fixtures */ = {
@@ -926,6 +947,7 @@
 				F4A55221B883574B87CDF5CF /* MihbaraFixture.swift */,
 				569CDB63CF5C9A6B8C736149 /* MihbaraHomeView.swift */,
 				4C7701301D14E577EA61ECA5 /* MihbaraPDFImportView.swift */,
+				61502A92C935793E29B5D9BD /* MihbaraReaderView.swift */,
 				188FF264A10C74C606DA9049 /* MoneyAccountSheet.swift */,
 				1B351D7CF47341AB376DB1F0 /* MoneyAccountsModels.swift */,
 				5FF3A5ABCDDB3153D93E2D90 /* MoneyAccountsView.swift */,
@@ -1045,6 +1067,14 @@
 			path = Packages;
 			sourceTree = "<group>";
 		};
+		6CC4A8064A70C8BD9877CBFB /* Fixtures */ = {
+			isa = PBXGroup;
+			children = (
+				551CDBB662A70CEF9111AFC6 /* Mihbara */,
+			);
+			path = Fixtures;
+			sourceTree = "<group>";
+		};
 		6DAB36BB6DB887E468958868 /* UI */ = {
 			isa = PBXGroup;
 			children = (
@@ -1151,10 +1181,19 @@
 		7940294CED731A501714366D /* Tests */ = {
 			isa = PBXGroup;
 			children = (
+				6CC4A8064A70C8BD9877CBFB /* Fixtures */,
 				C6258E4346F4E79D69895104 /* Integration */,
 				6DAB36BB6DB887E468958868 /* UI */,
 			);
 			path = Tests;
+			sourceTree = "<group>";
+		};
+		8433C202D2428EFD6FABCEA7 /* Licenses */ = {
+			isa = PBXGroup;
+			children = (
+				254F1C2DCD1E4E39D9EFEC55 /* Readium-BSD-3-Clause.txt */,
+			);
+			path = Licenses;
 			sourceTree = "<group>";
 		};
 		A7DEE17CA6656BF5F1749D48 /* MadarCore */ = {
@@ -1298,6 +1337,9 @@
 				0A7A781426FCB0E78AFCDE6F /* MadarQuran */,
 				CD612AE668CD8323078B4B8B /* MadarInbox */,
 				F56ABA17B98BBC295DED888C /* MadarSync */,
+				D4078EBCD8A831E3041E0F28 /* ReadiumNavigator */,
+				E87752E9691BA9D50DB38F3B /* ReadiumShared */,
+				92BC72E60ECC5D517F5E4243 /* ReadiumStreamer */,
 			);
 			productName = Madar;
 			productReference = ACA285A1762593401A2BBEBA /* Madar.app */;
@@ -1409,6 +1451,7 @@
 			mainGroup = E4241E60B05D993FDE76E23A;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				ECFD4F48E6B72BB1E4A034F1 /* XCRemoteSwiftPackageReference "swift-toolkit" */,
 				758543B59038BDD76BFB52E7 /* XCLocalSwiftPackageReference "Packages/MadarCommands" */,
 				70BB261FC2095D04C91097F9 /* XCLocalSwiftPackageReference "Packages/MadarCore" */,
 				DD0C2693CA0DD2A83DF23DF2 /* XCLocalSwiftPackageReference "Packages/MadarData" */,
@@ -1446,6 +1489,7 @@
 				3A9F9660D5D5E9652BAB562A /* Money.xcstrings in Resources */,
 				8FFF486523975BCDF3051D4B /* Prayer.xcstrings in Resources */,
 				BEED6CC8E57DA6E7D0C33937 /* Quran.xcstrings in Resources */,
+				51AF280129EFDF070064BF16 /* Readium-BSD-3-Clause.txt in Resources */,
 				8EA81EF21026EB5F56098887 /* RoomSymbols.xcassets in Resources */,
 				763B4BEF1A5318C221B24852 /* nawawi40.json in Resources */,
 				93A8C28498B8EE4F17A57C1E /* thmanyahsans-Bold.otf in Resources */,
@@ -1463,6 +1507,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1440A0ECB247647341D7C97B /* arabic-reader-poc.epub in Resources */,
 				9718E129D0BA1C83119E3CA6 /* dayone-synthetic.zip in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -1695,6 +1740,7 @@
 				D8F98F014EC441B2917DE1CB /* MihbaraFixture.swift in Sources */,
 				EC0CA4865861DA502438DA84 /* MihbaraHomeView.swift in Sources */,
 				146E42A851F6F3A7E153D5C2 /* MihbaraPDFImportView.swift in Sources */,
+				E2F052CDDC36B8452E4833F0 /* MihbaraReaderView.swift in Sources */,
 				D3ECDCC4985EE35691FB5ACF /* MoneyAccountSheet.swift in Sources */,
 				06AB1F5BB5F8C476ACC773E0 /* MoneyAccountsModels.swift in Sources */,
 				D6E9021FF34A9148836244D4 /* MoneyAccountsView.swift in Sources */,
@@ -2214,6 +2260,17 @@
 		};
 /* End XCLocalSwiftPackageReference section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		ECFD4F48E6B72BB1E4A034F1 /* XCRemoteSwiftPackageReference "swift-toolkit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/readium/swift-toolkit.git";
+			requirement = {
+				kind = exactVersion;
+				version = 3.11.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
 		03F58B856BEE05E94A1DE946 /* MadarInbox */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -2255,6 +2312,11 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = MadarSnapshots;
 		};
+		92BC72E60ECC5D517F5E4243 /* ReadiumStreamer */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = ECFD4F48E6B72BB1E4A034F1 /* XCRemoteSwiftPackageReference "swift-toolkit" */;
+			productName = ReadiumStreamer;
+		};
 		951241A7D8289BCE70C1F1EF /* MadarInbox */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = MadarInbox;
@@ -2287,6 +2349,11 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = MadarCore;
 		};
+		D4078EBCD8A831E3041E0F28 /* ReadiumNavigator */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = ECFD4F48E6B72BB1E4A034F1 /* XCRemoteSwiftPackageReference "swift-toolkit" */;
+			productName = ReadiumNavigator;
+		};
 		D7349BC32E9D9D10CE3C790A /* MadarDesign */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = MadarDesign;
@@ -2294,6 +2361,11 @@
 		D9E009A01CE49E91ECD42040 /* MadarSnapshots */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = MadarSnapshots;
+		};
+		E87752E9691BA9D50DB38F3B /* ReadiumShared */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = ECFD4F48E6B72BB1E4A034F1 /* XCRemoteSwiftPackageReference "swift-toolkit" */;
+			productName = ReadiumShared;
 		};
 		F56ABA17B98BBC295DED888C /* MadarSync */ = {
 			isa = XCSwiftPackageProductDependency;

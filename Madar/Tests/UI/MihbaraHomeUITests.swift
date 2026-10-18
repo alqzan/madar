@@ -1,8 +1,10 @@
 import XCTest
 
 @MainActor final class MihbaraHomeUITests: XCTestCase {
-    private func app(_ fixture: String) -> XCUIApplication {
-        let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_MIHBARA_FIXTURE":fixture,"MADAR_UI_NOW":"2026-10-17T12:00:00+03:00","MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light"]; return app
+    private func app(_ fixture: String, epub: Data? = nil) -> XCUIApplication {
+        let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_MIHBARA_FIXTURE":fixture,"MADAR_UI_NOW":"2026-10-17T12:00:00+03:00","MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light"]
+        if let epub { app.launchEnvironment["MADAR_UI_MIHBARA_EPUB_BASE64"] = epub.base64EncodedString() }
+        return app
     }
     private func open(_ app: XCUIApplication) {
         let customize = app.tabBars.buttons["خصّص"]; XCTAssertTrue(customize.waitForExistence(timeout:20)); customize.tap()
@@ -97,5 +99,40 @@ import XCTest
         app.buttons["mihbara-rahlOpens-close"].tap(); app.terminate(); app.launch(); open(app)
         reach(app, preferences); preferences.tap()
         XCTAssertEqual(app.buttons["mihbara-rahlOpens-manual"].value as? String, "محدد")
+    }
+
+    func testLocalEPUBOpensInArabicReaderAndClosesBackToItsShelf() throws {
+        continueAfterFailure = false
+        let fixtureURL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "arabic-reader-poc", withExtension: "epub"))
+        let app = app("reader", epub: try Data(contentsOf: fixtureURL)); app.launch(); open(app)
+        let book = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "كتاب اختبار القارئ")).firstMatch
+        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); book.tap()
+        XCTAssertTrue(app.buttons["mihbara-reader-close"].waitForExistence(timeout: 20), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["كتاب اختبار القارئ"].exists)
+        XCTAssertTrue(app.staticTexts["تأمل في القراءة"].firstMatch.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "القراءة باب يدخل")).firstMatch.waitForExistence(timeout: 12), app.debugDescription)
+        let printPage = app.staticTexts["mihbara-reader-print-page"]
+        XCTAssertTrue(printPage.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(printPage.label.contains("في المطبوع"), printPage.label)
+        XCTAssertTrue(printPage.label.contains("٤٥٣"), printPage.label)
+        XCTAssertTrue(app.descendants(matching: .any)["mihbara-reader-progress"].exists)
+        XCTAssertTrue(app.buttons["mihbara-reader-settings"].exists)
+        XCTAssertTrue(app.buttons["mihbara-reader-contents"].exists)
+        XCTAssertTrue(app.buttons["mihbara-reader-listen"].exists)
+        shot(app, "M6-V06-reader-L")
+        app.buttons["mihbara-reader-settings"].tap()
+        let defaultSize = app.buttons["mihbara-reader-size-4"]
+        XCTAssertTrue(defaultSize.waitForExistence(timeout: 5))
+        XCTAssertTrue(defaultSize.isSelected)
+        app.buttons["mihbara-reader-size-5"].tap()
+        XCTAssertTrue(app.buttons["mihbara-reader-settings-close"].isHittable)
+        app.buttons["mihbara-reader-settings-close"].tap()
+        app.buttons["mihbara-reader-contents"].tap()
+        XCTAssertTrue(app.staticTexts["فهرس الكتاب"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["mihbara-reader-contents-close"].isHittable)
+        app.buttons["mihbara-reader-contents-close"].tap()
+        app.buttons["mihbara-reader-close"].tap()
+        XCTAssertTrue(app.buttons["mihbara-add-paper"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "كتاب اختبار القارئ")).firstMatch.exists)
     }
 }

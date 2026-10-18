@@ -185,7 +185,9 @@ private struct ReceiptWire: Codable {
             case .book(let command):
                 do {
                     let undo = try BookMutationHandler.stage(command, context: context, now: now, writer: writer, stagingDirectory: bookStagingDirectory)
-                    inverse = SettingsInverse(settings: [:], afterSettings: [:], layouts: [:], afterLayouts: [:], bookMutation: undo)
+                    if command.isUndoable {
+                        inverse = SettingsInverse(settings: [:], afterSettings: [:], layouts: [:], afterLayouts: [:], bookMutation: undo)
+                    }
                 } catch DataError.invalidValue(let reason) { context.rollback(); return .init(status: .rejected, reason: reason) }
             case .money(let name, let payload):
                 do {

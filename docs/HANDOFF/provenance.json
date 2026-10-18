@@ -283,17 +283,17 @@
   },
   {
    "id": "readium-swift-toolkit",
-   "kind": "Swift package (recommended, not decided)",
+  "kind": "Swift package (EPUB reader engine)",
    "source": "https://github.com/readium/swift-toolkit",
-   "version": null,
-   "commit": null,
-   "license": "to verify",
-   "licenseStatus": "decision-needed",
+  "version": "3.11.1",
+  "commit": "9a8c094b72245fd27043c9d298005e5c78b32a01",
+  "license": "BSD-3-Clause",
+  "licenseStatus": "verified",
    "checksum": null,
    "checksumNote": "fill with SHA-256 of each file when it enters the repo; CI verifies",
    "gate": "M6",
    "usedBy": "EPUB/PDF reader",
-   "note": "Pin version + commit when R01 is decided; record the license from its LICENSE file."
+  "note": "Readium 3.11.1 selected after the Arabic EPUB proof of concept; exact release commit and LICENSE are pinned. The license text ships in App/Resources/Licenses/Readium-BSD-3-Clause.txt."
   },
   {
    "id": "swift-snapshot-testing",

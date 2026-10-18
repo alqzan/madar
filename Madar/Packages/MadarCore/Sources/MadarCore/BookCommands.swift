@@ -6,13 +6,39 @@ public enum BookCommand: Codable, Equatable, Sendable {
     case importPDF(id: UUID, fileID: UUID, sha256: String, title: String, author: String, language: String)
     case shelf(id: UUID, shelf: String, replacing: UUID?)
     case position(id: UUID, page: Int, finished: Bool)
+    case readerLocator(id: UUID, locatorJSON: Data)
+    case readingSession(id: UUID, bookID: UUID, start: Date, end: Date, activeSeconds: Int, fromPage: Int, toPage: Int, startLocatorJSON: Data, endLocatorJSON: Data, startProgression: Double, endProgression: Double, pagesCounted: Int)
     case hadith(number: Int, edition: String, understood: Bool, day: GregorianDay)
     case savePrivateNote(id: UUID, text: String)
     case deletePrivateNote(id: UUID)
-    public static let names: Set<String> = ["book.savePaper", "book.importPDF", "book.moveShelf", "book.setPosition", "hadith.mark", "notebook.savePrivate", "notebook.deletePrivate"]
+    public static let names: Set<String> = ["book.savePaper", "book.importPDF", "book.moveShelf", "book.setPosition", "book.setLocator", "reading.saveSession", "hadith.mark", "notebook.savePrivate", "notebook.deletePrivate"]
+    public var isUndoable: Bool {
+        if case .readingSession = self { return false }
+        return true
+    }
     public static func parse(_ name: String, _ p: [String: JSONValue]) -> Self? {
         func text(_ key: String) -> String? { if case .string(let s) = p[key] { s } else { nil } }
-        func integer(_ key: String) -> Int? { if case .number(let n) = p[key], n.isFinite, n.rounded() == n, n >= 0, n <= 100000 { Int(n) } else { nil } }
+        func integer(_ key: String, max: Double = 100000) -> Int? { if case .number(let n) = p[key], n.isFinite, n.rounded() == n, n >= 0, n <= max { Int(n) } else { nil } }
+        func progression(_ key: String) -> Double? { if case .number(let n) = p[key], n.isFinite, (0...1).contains(n) { n } else { nil } }
+        func date(_ key: String) -> Date? {
+            guard let value = text(key) else { return nil }
+            let formats: [ISO8601DateFormatter.Options] = [.withInternetDateTime, [.withInternetDateTime, .withFractionalSeconds]]
+            for format in formats {
+                let formatter = ISO8601DateFormatter(); formatter.formatOptions = format
+                if let result = formatter.date(from: value) { return result }
+            }
+            return nil
+        }
+        func locatorData(_ key: String) -> Data? {
+            guard let value = text(key), value.utf8.count <= 16_384,
+                  let data = value.data(using: .utf8),
+                  case .object(let object)? = try? JSONDecoder().decode(JSONValue.self, from: data),
+                  case .string(let href)? = object["href"], !href.isEmpty, href.utf8.count <= 1024,
+                  !href.hasPrefix("/"), !href.contains(":"), !href.contains("\\"),
+                  !href.split(separator: "/").contains(".."),
+                  case .string(let type)? = object["type"], !type.isEmpty, type.utf8.count <= 128 else { return nil }
+            return data
+        }
         if name == "notebook.savePrivate" {
             guard Set(p.keys) == ["id", "text"], let id = text("id").flatMap(UUID.init(uuidString:)), let value = text("text"), !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, value.count <= 2000 else { return nil }
             return .savePrivateNote(id: id, text: value)
@@ -45,6 +71,21 @@ public enum BookCommand: Codable, Equatable, Sendable {
         case "book.setPosition":
             guard Set(p.keys) == ["id","page","finished"], let page = integer("page"), case .bool(let finished) = p["finished"] else { return nil }
             return .position(id: id, page: page, finished: finished)
+        case "book.setLocator":
+            guard Set(p.keys) == ["id", "locator"], let locator = locatorData("locator") else { return nil }
+            return .readerLocator(id: id, locatorJSON: locator)
+        case "reading.saveSession":
+            let required: Set<String> = ["id", "bookID", "start", "end", "activeSeconds", "fromPage", "toPage", "startLocator", "endLocator", "startProgression", "endProgression", "pagesCounted"]
+            guard Set(p.keys) == required,
+                  let sessionBookID = text("bookID").flatMap(UUID.init(uuidString:)),
+                  let start = date("start"), let end = date("end"), end >= start,
+                  let activeSeconds = integer("activeSeconds", max: 86_400), activeSeconds >= 60,
+                  let fromPage = integer("fromPage"), let toPage = integer("toPage"),
+                  toPage >= fromPage,
+                  let startLocator = locatorData("startLocator"), let endLocator = locatorData("endLocator"),
+                  let startProgression = progression("startProgression"), let endProgression = progression("endProgression"),
+                  let pagesCounted = integer("pagesCounted") else { return nil }
+            return .readingSession(id: id, bookID: sessionBookID, start: start, end: end, activeSeconds: activeSeconds, fromPage: fromPage, toPage: toPage, startLocatorJSON: startLocator, endLocatorJSON: endLocator, startProgression: startProgression, endProgression: endProgression, pagesCounted: pagesCounted)
         default: return nil
         }
     }

@@ -80,7 +80,12 @@ extension AppMoneyService {
         let used = confirmed.filter { $0.kind == "expense" }.sorted { $0.eventAt > $1.eventAt }
         func methodID(_ row: MoneyTransaction) -> String? {
             if let card = row.cardID { return "card:" + card.uuidString }
-            if let account = row.fromAccountID { return accounts.first { $0.id == account }.map { $0.kind == "cash" ? ($0.currency == home.currency ? "cash" : "cash:" + $0.id.uuidString) : "account:" + $0.id.uuidString } }
+            if let accountID = row.fromAccountID, let account = accounts.first(where: { $0.id == accountID }) {
+                if account.kind == "cash" {
+                    return account.currency == home.currency ? "cash" : "cash:" + account.id.uuidString
+                }
+                return "account:" + account.id.uuidString
+            }
             return nil
         }
         var methods: [MoneyPaymentChoice] = []

@@ -3,6 +3,7 @@ import CryptoKit
 import SwiftData
 import MadarCore
 import MadarData
+import MadarPrayer
 
 private struct BookUndo: Codable {
     struct Change: Codable { var before: DataRecord?; var after: DataRecord }
@@ -22,6 +23,16 @@ private struct BookUndo: Codable {
         }
         func book(_ id: UUID) throws -> Book {
             guard let row = books.first(where: { $0.id == id && $0.deletedAt == nil && $0.mergedInto == nil }) else { throw DataError.invalidValue("الكتاب غير موجود") }; return row
+        }
+        func fileBook(_ id: UUID) throws -> Book {
+            let row = try book(id)
+            guard row.kind == "file", row.format == "epub", let mediaID = row.mediaID,
+                  let fileHash = row.fileHash, !fileHash.isEmpty else { throw DataError.invalidValue("هذا الكتاب لا يملك ملف EPUB صالحًا") }
+            let mediaRows = try context.fetch(FetchDescriptor<Media>())
+            guard let media = mediaRows.first(where: { $0.id == mediaID && $0.deletedAt == nil && $0.mergedInto == nil }),
+                  media.kind == "doc", media.state == "ok", let data = media.data,
+                  data.count == media.sizeBytes, media.sha256 == fileHash else { throw DataError.invalidValue("ملف الكتاب مفقود أو تغيّرت بصمته") }
+            return row
         }
         func slot(_ id: UUID, replacing: UUID? = nil) throws {
             let reading = Set(books.filter { $0.shelf == "reading" && $0.deletedAt == nil && $0.mergedInto == nil }.map(\.id))
@@ -67,6 +78,36 @@ private struct BookUndo: Codable {
             row.locatorJSON = try JSONEncoder().encode(PaperBookPosition(page: page)); row.currentPage = page
             if finished, row.shelf != "finished" { row.shelf = "finished"; row.finishedAt = now; row.readCount += 1 }
             try touch(row, before: before)
+        case .readerLocator(let id, let locatorJSON):
+            let row = try fileBook(id), before = try row.record()
+            row.locatorJSON = locatorJSON
+            try touch(row, before: before)
+        case .readingSession(let id, let bookID, let start, let end, let activeSeconds, let fromPage, let toPage, let startLocatorJSON, let endLocatorJSON, let startProgression, let endProgression, let pagesCounted):
+            _ = try fileBook(bookID)
+            guard end >= start, activeSeconds >= 60, fromPage <= toPage, pagesCounted >= 0,
+                  (0...1).contains(startProgression), (0...1).contains(endProgression) else { throw DataError.invalidValue("بيانات جلسة القراءة غير صالحة") }
+            let sessions = try context.fetch(FetchDescriptor<ReadingSession>())
+            let row: ReadingSession
+            let isNew: Bool
+            if let existing = sessions.first(where: { $0.id == id }) {
+                guard existing.deletedAt == nil, existing.mergedInto == nil, existing.bookID == bookID else { throw DataError.invalidValue("جلسة القراءة موجودة لكتاب آخر أو محذوفة") }
+                row = existing
+                isNew = false
+            } else {
+                row = ReadingSession(); row.id = id; row.createdAt = now; context.insert(row)
+                isNew = true
+            }
+            row.bookID = bookID; row.start = start; row.end = end; row.activeSeconds = activeSeconds
+            row.fromPage = fromPage; row.toPage = toPage; row.startLocatorJSON = startLocatorJSON; row.endLocatorJSON = endLocatorJSON
+            row.startProgression = startProgression; row.endProgression = endProgression; row.pagesCounted = pagesCounted; row.source = "reader"
+            if isNew {
+                let prayers = try PrayerRepository(context: context), place = prayers.place(at: end)
+                let settings = try SettingsStore(context: context)
+                let boundary = DayBoundary(rawValue: try settings.value(for: "core.dayStart").string ?? "") ?? .fajr
+                row.dayKey = try DiaryLineRenderer.today(context: context, now: end).description
+                row.tzID = place.timeZoneID; row.dayPolicy = boundary.rawValue + "@1"
+            }
+            try touch(row, before: nil)
         case .hadith(let number, let edition, let understood, let day):
             guard day == (try DiaryLineRenderer.today(context: context, now: now)) else { throw DataError.invalidValue("تغيّر اليوم؛ افتح ورد اليوم مجددًا") }
             let rows = try context.fetch(FetchDescriptor<HadithProgress>())
@@ -104,10 +145,11 @@ private struct BookUndo: Codable {
             let before = try row.record(); row.deletedAt = now; row.deletionBarrierAt = now
             try touch(row, before: before)
         }
-        return try JSONEncoder().encode(BookUndo(changes: changes, importedMediaIDs: importedMediaIDs.isEmpty ? nil : importedMediaIDs))
+        return command.isUndoable ? try JSONEncoder().encode(BookUndo(changes: changes, importedMediaIDs: importedMediaIDs.isEmpty ? nil : importedMediaIDs)) : Data()
     }
     static func undo(_ data: Data, context: ModelContext, now: Date, writer: String) throws {
         let state = try JSONDecoder().decode(BookUndo.self, from: data)
+        // Book undo never needs binary Media records or other rooms' data.
         var records = try context.fetch(FetchDescriptor<Book>()).map { try $0.record() }
         records += try context.fetch(FetchDescriptor<HadithProgress>()).map { try $0.record() }
         records += try context.fetch(FetchDescriptor<NotebookNote>()).map { try $0.record() }
@@ -115,7 +157,8 @@ private struct BookUndo: Codable {
         for id in state.importedMediaIDs ?? [] {
             let rows = try context.fetch(FetchDescriptor<Media>())
             guard let media = rows.first(where: { $0.id == id && $0.deletedAt == nil && $0.mergedInto == nil }) else { throw DataError.invalidValue("تغيّر ملف الكتاب بعد إضافته.") }
-            media.deletedAt = now; media.deletionBarrierAt = now; media.data = nil
+            media.deletedAt = now; media.deletionBarrierAt = now
+            media.data = nil
             media.updatedAt = StableIdentity.monotonic(now: now, previous: media.updatedAt); media.writerID = writer
         }
         for change in state.changes.reversed() {

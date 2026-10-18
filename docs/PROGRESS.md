@@ -4,7 +4,7 @@
 
 # Last checked
 
-2026-10-18 — Codex / gpt-6.1-sol High: M6-V17 PDF import preview builds and focused UI flow passes 1/1; focused Commands suites pass 12/12. Default L/light captures and `compare-screens.py R10-Milaf-Yafham` generated. Visual differences remain; V17 is in progress and V18 waits.
+2026-10-18 — M6-V17 PDF import preview UI passed 1/1 and focused Commands suites passed 12/12; M6-V06 reader queue Core tests passed 15/15. Combined native build/UI run succeeds, but V06 still renders a blank EPUB body and V17 has named visual differences. M5 model edits are included in the final checkpoint; no focused Money tests ran here.
 
 # Board
 
@@ -237,7 +237,7 @@ Owner: «اعتمد ترتيب المحبرة وواصل». Each row includes it
 | M6-V03 | Modern desk — `03-R8-Hadith.jpg` | blocked: `mihbara.shape=modern` is v2 under RA8 | No v1 entry point for this alternate desk. Revisit when v2 settings are in scope. |
 | M6-V04 | Manuscript desk — `04-R8-Makhtut.jpg` | blocked: `mihbara.shape=manuscript` is v2 under RA8 | No v1 entry point for this alternate desk. Revisit when v2 settings are in scope. |
 | M6-V05 | Focused desk — `05-R8-Murakkaz.jpg` | blocked: `mihbara.shape=focused` is v2 under RA8 | No v1 entry point for this alternate desk. Revisit when v2 settings are in scope. |
-| M6-V06 | Arabic file reader — `06-R9-Qari-Turath.jpg` | blocked: default L/light simulator screenshot renders a blank EPUB body, although XCTest finds the text; two bounded repairs did not restore drawing | Build and focused reader UI test pass; screenshot comparison shows a major content gap. Do not mark matched until the EPUB body is visible and the canonical comparison is reviewed. Real user data; 11 pt minimum, listed wood contrast pairs; no prototype moon/sample numbers, copyrighted modern snippets, unavailable bundled commentary, v2 Arabic hints or unavailable translation/dictionary. |
+| M6-V06 | Arabic file reader — `06-R9-Qari-Turath.jpg` | blocked: default L/light simulator screenshot renders a blank EPUB body, although XCTest finds the text; two bounded renderer repairs did not restore drawing | A newer locator snapshot is queued while the same-session write is in flight; Core tests passed 15/15. Build and focused reader UI test pass, but the screenshot still has a major content gap. Queue survives while the process is alive; process-termination durability is not verified. Do not mark matched until the EPUB body is visible and the canonical comparison is reviewed. Real user data; 11 pt minimum, listed wood contrast pairs; no prototype moon/sample numbers, copyrighted modern snippets, unavailable bundled commentary, v2 Arabic hints or unavailable translation/dictionary. |
 | M6-V07 | Arabic reader settings — `07-R9-Qari-Aa.jpg` | blocked: the canonical's persistent line spacing, margins, alignment, weight and footer choices are absent from the closed `mihbara.readerAr` contract; owner decision needed | Schema permits only theme, size, font, mode, tashkil and footnotes, and rejects unknown keys. See «Expanded Arabic reader settings» in Ideas. The blank V06 EPUB body also prevents the canonical comparison. |
 | M6-V08 | Word and highlight — `08-R9-Qari-Kalima.jpg` | blocked: shared EPUB body is blank in the default L/light simulator capture | Accessibility sees the words, but the body must draw before word selection and highlight can be visually accepted. Revisit after V06. |
 | M6-V09 | Arabic verses and footnotes — `09-R9-Qari-Riyad.jpg` | blocked: shared EPUB body is blank in the default L/light simulator capture | Requires visible source text before checking verse colour, footnote markers and navigation. Revisit after V06. |
@@ -268,14 +268,14 @@ Owner standing rule (15 Oct): screens that match their design or better count as
 M2 screens are owner-approved; M1-F04 software blocker is resolved. M3 built screens/F01 are integrated and covered by the owner’s provisional acceptance rule. V09 is built on a synthetic export (real round-trip unverified); V12 has bounded approval for generic reminders while locked. UX-01–UX-14 are complete. M4-E02/V02, UX-15, W01/W02, F01, F02 and V12 notifications are complete; M5 follows M4 software. Keep tafsir off until its separate licence is verified. No owner-iPhone or milestone pass is claimed.
 
 # Handovers
-## Handover — M6-V17 PDF import preview — 2026-10-18 — Codex
-Works now: PDF-only local preview reports detected facts, waits for explicit add, stores Book/Media together, and undo tombstones both while clearing the file blob.
-Verified: focused Commands suites 12/12; `xcodebuild test` UI flow 1/1 (`M6-V17-preview-verified.xcresult`); `python3 Madar/scripts/compare-screens.py R10-Milaf-Yafham <top.png> <scroll.png>` generated; `git diff --check` clean. Selective staged snapshot not independently rebuilt.
-Differences left: paper palette, typography/row rhythm, and metadata/confirmation content below canonical; no visual acceptance. Unknown language/no OCR/no TOC/no print labels/no footnotes are truthful fixture results.
-Not verified: other user PDFs, OCR, PDF reader V18, owner iPhone; reopening the successful recent file still reaches duplicate rejection. Existing V06 and Money work remains preserved outside this commit.
-Next: resolve V17 visual differences, then return to V18 without reordering. Keep reader queue and unrelated Money changes intact.
-Model/effort: gpt-6.1-sol / high.
-Usage: 95% used / 5% remaining at final check; stopped new work; no reset used.
+## Handover — M6 reader and PDF checkpoint — 2026-10-18 — Codex
+Works now: PDF preview confirms only detected metadata and adds Book/Media together with blob-clearing undo; reader queues newer same-session locators during an in-flight write.
+Verified: focused Commands suites 12/12; `MihbaraReadingTests` 15/15; combined native UI flow 1/1 (`M6-V17-preview-verified.xcresult`) and build succeeded; `compare-screens.py R10-Milaf-Yafham` generated; `git diff --check` clean.
+Differences left: V17 paper palette/type rhythm and content below canonical; V06 EPUB body is blank. Neither screen is visually accepted.
+Not verified: Money behavior tests, V06 process-termination recovery, other user PDFs, OCR, V18 reader, owner iPhone; reopening a successful recent PDF reaches duplicate rejection.
+Next: refine V17 to canonical, then continue in board order; keep V06 blocked until its body renders.
+Model/effort: not exposed / not exposed.
+Usage: 95% used / 5% remaining at final check; no reset used.
 
 ## Handover — M6-V06 reader rendering blocker — 2026-10-18 — Codex
 Works now: local EPUB opens; locator, printed page label and session tracking are wired. The reader shows its header and footer; contents and size settings open, and the shelf return works.

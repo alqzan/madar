@@ -16,6 +16,7 @@ struct MihbaraHomeView: View {
     @State private var tableID: UUID?
     @State private var sheet: MihbaraSheet?
     @State private var showingAddBook = false
+    @State private var readerRoute: MihbaraReaderRoute?
     @State private var manuallyOpen = false
     @State private var libraryQuery = ""
     @State private var libraryShelf = "all"
@@ -64,6 +65,17 @@ struct MihbaraHomeView: View {
                 }
             }.environment(\.roomTheme, theme).presentationDragIndicator(.visible)
         }
+        .fullScreenCover(item: $readerRoute, onDismiss: load) { route in
+            if let book = reading?.books.first(where: { $0.id == route.bookID && $0.isReadableEPUB }) {
+                MihbaraReaderView(app: app, book: book) { readerRoute = nil }
+                    .environment(\.roomTheme, theme)
+            } else {
+                VStack(spacing: 16) {
+                    Text("ملف الكتاب غير متاح الآن").font(MadarTypography.body())
+                    Button("العودة إلى المحبرة") { readerRoute = nil }.buttonStyle(MadarPrimaryButton())
+                }.frame(maxWidth: .infinity, maxHeight: .infinity).background(theme.background).foregroundStyle(theme.ink)
+            }
+        }
         .fullScreenCover(isPresented: $showingAddBook) {
             if let reading {
                 NavigationStack {
@@ -95,7 +107,7 @@ struct MihbaraHomeView: View {
                 ScrollView(.horizontal) {
                     HStack(alignment: .bottom, spacing: 12) {
                         ForEach(books) { b in
-                            Button { sheet = .book(b.id) } label: {
+                            Button { openBook(b) } label: {
                                 VStack(spacing: 8) {
                                     if b.id == tableBook?.id {
                                         VStack(spacing: 10) { Text(b.title).font(MadarTypography.caption()); Text("على الطاولة").font(MadarTypography.fine()) }.padding(12).frame(width: 110, height: 145).foregroundStyle(theme.secondaryInk).overlay { RoundedRectangle(cornerRadius: 5).stroke(theme.line, style: .init(lineWidth: 1, dash: [4,4])) }
@@ -111,7 +123,9 @@ struct MihbaraHomeView: View {
             }
             Rectangle().fill(theme.color("wood").gradient).frame(height: 9).shadow(color: theme.ink.opacity(0.14), radius: 5, y: 5)
             HStack { Button("كل كتبي ‹") { sheet = .library }.accessibilityIdentifier("mihbara-library"); Spacer(); Text(service.digits.string(r.books.count) + " على رفوفك").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
-            MihbaraOldBooksCabinet(books: r.books.filter { $0.shelf == "old" }, theme: theme) { sheet = .book($0) }
+            MihbaraOldBooksCabinet(books: r.books.filter { $0.shelf == "old" }, theme: theme) { id in
+                if let book = r.books.first(where: { $0.id == id }) { openBook(book) }
+            }
         }
     }
     private func desk(_ r: MihbaraHomeReading) -> some View {
@@ -156,6 +170,15 @@ struct MihbaraHomeView: View {
             }
             HStack { deskLabel("كتاب القراءة"); Spacer(); deskLabel("موضعك محفوظ") }
             if let b = tableBook {
+                if b.isReadableEPUB {
+                    let position = b.progress.map { service.digits.string(Int(($0 * 100).rounded())) + "٪" } ?? "موضع محفوظ"
+                    MihbaraOpenBook(
+                        theme: theme, sunnah: false,
+                        rightHeader: b.author, rightTitle: b.title, rightText: "كتاب من ملفك",
+                        rightFooter: position, leftHeader: "موضعك", leftTitle: "قرأت منه",
+                        leftText: position, leftFooter: "", action: "أكمل القراءة"
+                    ) { openBook(b) }
+                } else {
                 let currentPage = b.page.flatMap { $0 > 0 ? $0 : nil }
                 let nextPage: Int? = currentPage.flatMap { page -> Int? in
                     guard b.pages.map({ page < $0 }) ?? true else { return nil }
@@ -167,7 +190,8 @@ struct MihbaraHomeView: View {
                     rightFooter: currentPage.map(service.digits.string) ?? "",
                     leftHeader: "موضعك", leftTitle: "وصلت إلى", leftText: currentPage.map { "صفحة " + service.digits.string($0) } ?? "بداية الكتاب",
                     leftFooter: nextPage.map(service.digits.string) ?? "", action: "أكمل"
-                ) { sheet = .book(b.id) }
+                ) { openBook(b) }
+                }
             } else {
                 Button { showingAddBook = true } label: { VStack(spacing: 12) { Image(systemName: "book.pages").font(.largeTitle); Text("مكان كتابك").font(MadarTypography.cardTitle()); Text("أضف كتابًا وابدأ من موضعك").font(MadarTypography.caption()) }.frame(maxWidth: .infinity, minHeight: 210).background(theme.surface, in: .rect(cornerRadius: 5)).overlay { RoundedRectangle(cornerRadius: 5).stroke(theme.line, style: .init(lineWidth: 1, dash: [4,4])) } }.buttonStyle(.plain).foregroundStyle(theme.ink)
             }
@@ -201,7 +225,7 @@ struct MihbaraHomeView: View {
                 Text("البحث يُبرز المطابق، وكل كتبك تبقى في مكانها.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                 ForEach(r.books) { b in
                     let queryMatches = libraryQuery.isEmpty || (b.title + " " + b.author).folding(options: [.diacriticInsensitive,.caseInsensitive], locale: Locale(identifier: "ar")).contains(libraryQuery.folding(options: [.diacriticInsensitive,.caseInsensitive], locale: Locale(identifier: "ar")))
-                    Button { sheet = .book(b.id) } label: {
+                    Button { openBook(b) } label: {
                         HStack { Image(systemName: "book.closed"); VStack(alignment: .leading) { Text(b.title).font(MadarTypography.cardTitle()); Text(b.author).font(MadarTypography.caption()) }; Spacer(); Text(b.shelf == "reading" ? "أقرؤه" : b.shelf == "want" ? "أبي أقرأه" : "أنهيته").font(MadarTypography.fine()) }.padding(16).background(theme.surface, in: .rect(cornerRadius: 14))
                     }.buttonStyle(.plain).opacity(queryMatches && (libraryShelf == "all" || libraryShelf == b.shelf) ? 1 : 0.3)
                 }
@@ -209,8 +233,14 @@ struct MihbaraHomeView: View {
         }.background(theme.background).foregroundStyle(theme.ink)
     }
 
+    private func openBook(_ book: MihbaraBook) {
+        if book.isReadableEPUB { readerRoute = MihbaraReaderRoute(bookID: book.id) }
+        else { sheet = .book(book.id) }
+    }
+
 }
 private enum MihbaraSheet: Identifiable { case library, book(UUID), hadith(Int), opening, notebook; var id: String { String(describing: self) } }
+private struct MihbaraReaderRoute: Identifiable { let bookID: UUID; var id: String { bookID.uuidString } }
 
 private struct MihbaraRahlOpeningView: View {
     let app: AppSession
