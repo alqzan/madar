@@ -66,7 +66,7 @@ import MadarData
         let presented: PresentationProbe
     }
     private final class PresentationProbe { var files: [URL] = [] }
-    private func fixture(scope: MadarLockScope = .notesOnly, privateRow: Bool = false, tombstone: Bool = false,
+    private func fixture(scope: MadarLockScope = .app, privateRow: Bool = false, tombstone: Bool = false,
                          deriveCredential: @escaping @Sendable (String) async throws -> BackupCredential = { passphrase in
                              try await Task.detached { try BackupCredential.derive(passphrase: passphrase) }.value
                          }) throws -> Fixture {
@@ -138,7 +138,7 @@ import MadarData
                 let fixture = try fixture(scope: scope, privateRow: privateRow, tombstone: privateRow)
                 let file = try await fixture.backup.exportPlain(progress: { _ in })
                 try fixture.backup.validateExport(file: file)
-                XCTAssertEqual(fixture.auth.calls, scope == .none && !privateRow ? 0 : 1)
+                XCTAssertEqual(fixture.auth.calls, scope.effective == .app ? 1 : 0)
                 XCTAssertEqual(Set(fixture.privacy.bindings), privateRow ? [.export, .privateNote] : [.export])
                 let payload = try PortableExportCodec.validate(Data(contentsOf: file))
                 XCTAssertEqual(payload.records.contains { $0.model == "NotebookNote" && $0.fields["isPrivate"] == .bool(true) }, privateRow)
@@ -147,10 +147,21 @@ import MadarData
         }
     }
 
-    func test_M0P1b_privatePayloadRefusesEvenWhenAppScopeIsNone() async throws {
-        let fixture = try fixture(scope: .none, privateRow: true); fixture.auth.allowed = false
-        do { _ = try await fixture.backup.exportPlain(progress: { _ in }); XCTFail("Private export bypassed device authentication") } catch { }
-        XCTAssertEqual(fixture.auth.calls, 1); try assertNoOutput(fixture)
+    func testPrivatePayloadSharesWholeAppLockWithoutAnotherPrompt() async throws {
+        let unlocked = try fixture(scope: .none, privateRow: true)
+        _ = try await unlocked.backup.exportPlain(progress: { _ in })
+        XCTAssertEqual(unlocked.auth.calls, 0)
+        XCTAssertEqual(Set(unlocked.privacy.bindings), [.export, .privateNote])
+
+        let locked = try fixture(scope: .app, privateRow: true); locked.auth.allowed = false
+        do { _ = try await locked.backup.exportPlain(progress: { _ in }); XCTFail("Locked app exported private data") } catch { }
+        XCTAssertEqual(locked.auth.calls, 1); try assertNoOutput(locked)
+
+        let alreadyUnlocked = try fixture(scope: .app, privateRow: true)
+        _ = try await alreadyUnlocked.lock.authorize([.app])
+        _ = try await alreadyUnlocked.backup.exportPlain(progress: { _ in })
+        XCTAssertEqual(alreadyUnlocked.auth.calls, 1, "The app gate must authorize private export without another prompt")
+        XCTAssertEqual(Set(alreadyUnlocked.privacy.bindings), [.app, .export, .privateNote])
     }
 
     func test_M0P1b_staleKeyDerivationCannotSaveKeyOrCreateFile() async throws {
@@ -177,18 +188,16 @@ import MadarData
         return try await fixture.backup.previewRestore(file: receipt.fileURL, passphrase: "test-only-passphrase", progress: { _ in })
     }
     func test_M0P1b_01_restoreFirstKeyRefusalCreatesNoSafetyOrPromotion() async throws {
-        for scope: MadarLockScope in [.notesOnly, .none] {
-            let fixture = try fixture(scope: scope, privateRow: scope == .none)
-            let preview = try await importedPreview(fixture), generation = fixture.store.binding.generationID
-            fixture.auth.allowed = false
-            do { _ = try await fixture.backup.restore(previewID: preview.id, mode: .replace, progress: { _ in }); XCTFail("Refused safety-key setup succeeded") } catch { }
-            XCTAssertEqual(fixture.auth.calls, 1)
-            XCTAssertEqual(fixture.store.binding.generationID, generation)
-            try assertNoOutput(fixture)
-        }
+        let fixture = try fixture(scope: .app, privateRow: true)
+        let preview = try await importedPreview(fixture), generation = fixture.store.binding.generationID
+        fixture.auth.allowed = false
+        do { _ = try await fixture.backup.restore(previewID: preview.id, mode: .replace, progress: { _ in }); XCTFail("Refused safety-key setup succeeded") } catch { }
+        XCTAssertEqual(fixture.auth.calls, 1)
+        XCTAssertEqual(fixture.store.binding.generationID, generation)
+        try assertNoOutput(fixture)
     }
     func test_M0P1b_01_authorizedFirstKeyRestoreCreatesSafetyAndPromotes() async throws {
-        let fixture = try fixture(scope: .none, privateRow: true)
+        let fixture = try fixture(scope: .app, privateRow: true)
         let preview = try await importedPreview(fixture), generation = fixture.store.binding.generationID
         _ = try await fixture.backup.restore(previewID: preview.id, mode: .replace, progress: { _ in })
         XCTAssertEqual(fixture.auth.calls, 1)
@@ -221,7 +230,7 @@ import MadarData
         }
     }
     func test_M0P1b_02_settingsConfiguredStatusDoesNotLoadOrSaveCredential() async throws {
-        let fixture = try fixture()
+        let fixture = try fixture(scope: .none)
         let model = BackupSettingsModel(service: fixture.backup)
         await model.refresh()
         XCTAssertEqual(model.status?.keyConfigured, false)
@@ -240,7 +249,7 @@ import MadarData
     }
 
     func test_M0P1b_cachedShareReauthorizesOriginalPrivatePayloadAndRetainsFile() async throws {
-        let fixture = try fixture(scope: .none, privateRow: true)
+        let fixture = try fixture(scope: .app, privateRow: true)
         let file = try await fixture.backup.exportPlain(progress: { _ in })
         // The cached file still contains private text even if live metadata changes.
         let notes = try fixture.store.container.mainContext.fetch(FetchDescriptor<NotebookNote>())

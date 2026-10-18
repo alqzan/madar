@@ -26,10 +26,10 @@ enum MadarProtectedFeature: Hashable, Sendable { case app, notes, privateNote, e
 @MainActor final class SystemDeviceAuthenticator: MadarDeviceAuthenticator {
     private let context = LAContext()
     func verify() async throws -> Bool {
-        context.localizedCancelTitle = "إلغاء"; context.localizedFallbackTitle = "رمز الجهاز"
+        context.localizedCancelTitle = "إلغاء"; context.localizedFallbackTitle = ""
         var error: NSError?
-        guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) else { throw PrivacyAuthorizationError.refused }
-        return try await context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: "افتح بيانات مدار المحمية")
+        guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) else { throw PrivacyAuthorizationError.refused }
+        return try await context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: "افتح مدار")
     }
     func invalidate() { context.invalidate() }
 }
@@ -56,6 +56,7 @@ struct PrivacyAuthorization {
     private var generation = 0
     private var epoch = 0
     private var phase: ScenePhase = .active
+    var isSceneActive: Bool { phase == .active }
     private var disconnected = false
     private static var activeScopeRequest: UUID?
     private var scopeTransitionID: UUID?
@@ -63,6 +64,8 @@ struct PrivacyAuthorization {
     private var scopeReconciliationRequired = false
     private var scopePresentationRevoked = false
     private var redactionTask: Task<Void, Error>?
+    private var activeRecoveryID: UUID?
+    private var activeRecovery: Task<Void, Never>?
     private var activeWaiters: [UUID: CheckedContinuation<Void, Never>] = [:]
     private var stateObservers: [UUID: @MainActor () -> Void] = [:]
     private var revokeObservers: [UUID: @MainActor (Bool) -> Void] = [:]
@@ -72,8 +75,7 @@ struct PrivacyAuthorization {
         self.scope = scope.effective; self.service = service; self.clock = clock; self.authenticator = authenticator
         self.authorizationCommitBoundary = authorizationCommitBoundary
     }
-    private func requiredFeature(for feature: MadarProtectedFeature) -> MadarProtectedFeature? {
-        if feature == .privateNote { return .privateNote }
+    private func requiredFeature(for _: MadarProtectedFeature) -> MadarProtectedFeature? {
         if scope == .app { return .app }
         return nil
     }
@@ -135,6 +137,8 @@ struct PrivacyAuthorization {
     }
     func authorize(_ features: Set<MadarProtectedFeature>) async throws -> PrivacyAuthorization {
         guard phase == .active, !disconnected, !scopeTransitionPending else { throw PrivacyAuthorizationError.stale }
+        if let activeRecovery { await activeRecovery.value }
+        guard phase == .active, !disconnected, !scopeTransitionPending else { throw PrivacyAuthorizationError.stale }
         guard currentAuth == nil else { throw PrivacyAuthorizationError.busy }
         if scopeReconciliationRequired {
             scope = try service.persistedPrivacyScope().effective; scopeReconciliationRequired = false
@@ -189,15 +193,16 @@ struct PrivacyAuthorization {
             return .init(owner: identity, generation: generation, epoch: epoch, features: features)
         } catch {
             if currentAuth?.0 == id {
-                statusMessage = "لم يُفتح القفل. يمكنك المحاولة مرة أخرى."
+                statusMessage = "لم يفتح Face ID. حاول مرة ثانية."
                 if !(error is PrivacyAuthorizationError) && !(error is CancellationError) { redactionFailed = true; covered = true; notify() }
             }
             throw error
         }
     }
-    func authenticate(for feature: MadarProtectedFeature) {
-        guard phase == .active, currentAuth == nil else { return }
+    @discardableResult func authenticate(for feature: MadarProtectedFeature) -> Bool {
+        guard phase == .active, currentAuth == nil else { return false }
         Task { [self] in _ = try? await authorize([feature]) }
+        return true
     }
     func lock() {
         generation += 1; invalidateAuth(); unlocked.removeAll(); authorizedFeatures.removeAll(); covered = true
@@ -269,9 +274,14 @@ struct PrivacyAuthorization {
         }
     }
     private func recoverActive() {
-        guard phase == .active, !disconnected, !scopeTransitionPending, !scopeReconciliationRequired, !scopePresentationRevoked else { return }
+        guard phase == .active, !disconnected, !scopeTransitionPending, !scopeReconciliationRequired,
+              !scopePresentationRevoked, currentAuth == nil, activeRecovery == nil else { return }
         let stamp = generation, activeEpoch = epoch
-        Task { [self] in
+        let id = UUID(); activeRecoveryID = id
+        activeRecovery = Task { [self] in
+            defer {
+                if activeRecoveryID == id { activeRecoveryID = nil; activeRecovery = nil }
+            }
             do {
                 try await redactionTask?.value
                 guard generation == stamp, epoch == activeEpoch, phase == .active, !disconnected, !scopeTransitionPending else { return }
@@ -283,7 +293,7 @@ struct PrivacyAuthorization {
                 guard generation == stamp, epoch == activeEpoch, phase == .active, !disconnected else { return }
                 redactionFailed = false; covered = false; notify()
             } catch {
-                guard generation == stamp, epoch == activeEpoch else { return }
+                guard generation == stamp, epoch == activeEpoch, currentAuth == nil else { return }
                 unlocked.removeAll(); authorizedFeatures.removeAll(); redactionFailed = true; covered = true; notify()
             }
         }
@@ -301,6 +311,7 @@ struct MadarLockGate<Content: View>: View {
     let feature: MadarProtectedFeature
     @ViewBuilder let content: () -> Content
     @Environment(\.roomTheme) private var theme
+    @State private var promptedAtStartup = false
     var body: some View {
         Group {
             if !controller.requiresProtection(feature) {
@@ -313,6 +324,20 @@ struct MadarLockGate<Content: View>: View {
             } else if controller.canPresent(feature) { content() }
             else { lockedContent }
         }
+        .task {
+            attemptStartupAuthentication()
+        }
+        .onChange(of: controller.isSceneActive) { _, isActive in
+            guard isActive, !promptedAtStartup else { return }
+            attemptStartupAuthentication()
+        }
+    }
+    private func attemptStartupAuthentication() {
+        guard !promptedAtStartup,
+              controller.requiresProtection(feature),
+              !controller.canPresent(feature),
+              !controller.authenticating else { return }
+        promptedAtStartup = controller.authenticate(for: feature)
     }
     private var privacyCover: some View {
         ZStack { theme.background.ignoresSafeArea(); Image(systemName: "lock.closed").font(.largeTitle).foregroundStyle(theme.ink) }
@@ -324,9 +349,9 @@ struct MadarLockGate<Content: View>: View {
             Image(systemName: "lock.closed").font(.largeTitle).accessibilityHidden(true)
             Text("مدار مقفل").font(MadarTypography.title())
             if let message = controller.statusMessage { Text(message).font(MadarTypography.caption()) }
-            if controller.authenticating { ProgressView("يفتح القفل…") }
+            if controller.authenticating { ProgressView("يتحقق Face ID…") }
             else if !controller.covered {
-                Button("افتح القفل") { controller.authenticate(for: feature) }
+                Button("افتح مدار") { controller.authenticate(for: feature) }
                     .buttonStyle(MadarPrimaryButton()).accessibilityIdentifier("lock-authenticate")
             }
         }.padding(24).frame(maxWidth: .infinity, maxHeight: .infinity)

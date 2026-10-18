@@ -104,11 +104,19 @@ private struct MadarSceneContent: View {
                 }
             } else { managed = try ManagedDataStore(root: root, commandLockURL: lockURL) }
             let opened = try AppSession(container: managed.container, managedStore: managed, groupDirectory: group)
+#if DEBUG
+            if ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"] != nil,
+               ProcessInfo.processInfo.environment["MADAR_UI_PRESERVE_FACE_ID_DEFAULT"] != "1" {
+                let storedPrivacyChoice = (try? managed.container.mainContext.fetch(FetchDescriptor<DeviceSetting>()))?
+                    .contains(where: { $0.key == "core.faceIDLock" }) ?? false
+                if !storedPrivacyChoice { try await opened.applySettingsAndWait(["core.faceIDLock": .string("none")]) }
+            }
+#endif
             await opened.attachPrayerNotifications(prayerNotifications)
             let backup = AppBackupService(session: opened, store: managed, backupDirectory: group.appending(path: "Backups", directoryHint: .isDirectory), keyStore: KeychainBackupKeyStore(service: backupKeyService))
             opened.backupService = backup
             opened.syncService = AppSyncService(session: opened, store: managed, backup: backup)
-            opened.lockController = MadarLockController(scope: MadarLockScope(rawValue: opened.string("core.faceIDLock")) ?? .none, service: AppPrivacyService(session: opened))
+            opened.lockController = MadarLockController(scope: MadarLockScope(rawValue: opened.string("core.faceIDLock")) ?? .app, service: AppPrivacyService(session: opened))
             if managed.recoveryRequiresRefresh {
                 let warnings = try await backup.coordinator.recoverPendingLifecycle()
                 guard warnings.isEmpty else { throw DataError.invalidValue(warnings.joined(separator: "\n")) }

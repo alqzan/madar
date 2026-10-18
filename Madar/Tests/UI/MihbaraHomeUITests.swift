@@ -165,11 +165,12 @@ import XCTest
         app.descendants(matching: .any)["mihbara-add-source-paper"].tap()
         XCTAssertTrue(app.textFields["mihbara-paper-title"].waitForExistence(timeout:8), app.debugDescription)
     }
-    func testPrivateNotebookHidesNoteTextUntilDeviceAuthentication() {
+    func testPrivateNotebookOpensWithTheAlreadyUnlockedApp() {
         continueAfterFailure = false; let app = app("home"); app.launch(); open(app)
         let notebook = app.buttons["mihbara-notebook"]; reach(app, notebook); notebook.tap()
-        XCTAssertTrue(app.buttons["mihbara-notebook-unlock"].waitForExistence(timeout:8), app.debugDescription)
-        XCTAssertFalse(app.staticTexts["سر لا يظهر قبل المصادقة"].exists)
+        XCTAssertTrue(app.staticTexts["سر لا يظهر قبل المصادقة"].waitForExistence(timeout:8), app.debugDescription)
+        XCTAssertFalse(app.buttons["mihbara-notebook-unlock"].exists)
+        shot(app, "UX-01-private-notebook-L")
         app.buttons["mihbara-notebook-close"].tap()
     }
     func testRahlOpeningChoiceResetUndoAndRelaunch() {

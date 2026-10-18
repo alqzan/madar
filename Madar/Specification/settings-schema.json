@@ -387,7 +387,7 @@
    "section": "الخصوصية",
    "title": "القفل بالوجه",
    "type": "choice",
-   "default": "none",
+   "default": "app",
    "scope": "device",
    "options": [
     {

@@ -108,7 +108,11 @@ import UIKit
         if let ticket = activityAuthorization, (try? controller.validate(ticket)) == nil {
             coverNow(); dismissActivity()
         }
-        if retiringActivityID != nil || controller.covered || !controller.canPresent(.app) { coverNow() }
+        // When the app-level lock is active, MadarLockGate already replaces every
+        // protected route with its safe unlock screen. Keep that branded screen
+        // visible; reserve the system-window cover for inactive or failed-redaction states.
+        let safeAppGate = controller.isSceneActive && controller.requiresProtection(.app) && !controller.covered
+        if retiringActivityID != nil || controller.covered || (!controller.canPresent(.app) && !safeAppGate) { coverNow() }
         else {
             coverWindow?.isHidden = true
             for (window, previous) in hiddenAccessibility { window.accessibilityElementsHidden = previous }

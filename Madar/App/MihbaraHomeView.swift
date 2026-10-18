@@ -1,6 +1,5 @@
 import SwiftUI
 import SwiftData
-import LocalAuthentication
 import MadarCore
 import MadarDesign
 import MadarData
@@ -70,9 +69,7 @@ struct MihbaraHomeView: View {
                     }
                     case .hadith(let n): if let h = r.collection.hadiths.first(where: { $0.number == n }) { MihbaraHadithView(app: app, hadith: h, collection: r.collection, day: r.day) }
                     case .opening: MihbaraRahlOpeningView(app: app).presentationDetents([.large])
-                    case .notebook:
-                        if let lock = app.lockController { MadarLockGate(controller: lock, feature: .app) { MihbaraNotebookView(app: app) } }
-                        else { ProgressView("تُفتح بيانات المحبرة…") }
+                    case .notebook: MihbaraNotebookContent(app: app)
                     }
                 }
             }.environment(\.roomTheme, theme).presentationDragIndicator(.visible)
@@ -162,7 +159,7 @@ struct MihbaraHomeView: View {
                         .background(theme.color("notebookYellow"), in: .rect(topLeadingRadius: 2, bottomLeadingRadius: 10, bottomTrailingRadius: 2, topTrailingRadius: 2))
                         .overlay(alignment: .top) { Rectangle().fill(theme.color("goldUnderstandText").opacity(0.7)).frame(height: 3).padding(.horizontal, 5) }
                         .shadow(color: theme.ink.opacity(0.18), radius: 5, y: 4).rotationEffect(.degrees(-3))
-                }.buttonStyle(.plain).accessibilityLabel("الدفتر الخاص").accessibilityHint("يتطلب فتحه مصادقة الجهاز").accessibilityIdentifier("mihbara-notebook")
+                }.buttonStyle(.plain).accessibilityLabel("الدفتر الخاص").accessibilityHint("ملاحظاتك الخاصة تبقى داخل المحبرة").accessibilityIdentifier("mihbara-notebook")
             }
             if open, let h = hadith {
                 HStack { deskLabel("على الرَّحل، ورد اليوم أولًا"); Spacer(); Button("اطوه ⌃") { manuallyOpen = false; folded = true }.font(MadarTypography.caption()).padding(9).background(theme.color("desk"), in: .capsule).foregroundStyle(theme.color("onDesk")) }
@@ -376,79 +373,27 @@ private struct MihbaraRahlOpeningView: View {
     }
 }
 
-private struct MihbaraNotebookView: View {
-    let app: AppSession
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.scenePhase) private var scenePhase
-    @Environment(\.roomTheme) private var theme
-    @State private var unlocked = false
-    @State private var authenticating = false
-    @State private var failed = false
-    @State private var authGeneration = 0
-
-    var body: some View {
-        Group {
-            if unlocked {
-                MihbaraNotebookContent(app: app) { lock() }
-            } else {
-                VStack(spacing: 18) {
-                    Image(systemName: "lock.doc").font(.system(size: 34)).accessibilityHidden(true)
-                    Text("الدفتر الخاص").font(MadarTypography.title())
-                    Text("ملاحظاتك لا تظهر قبل مصادقة الجهاز.").font(MadarTypography.body()).multilineTextAlignment(.center).foregroundStyle(theme.secondaryInk)
-                    if failed { Text("لم يُفتح الدفتر. جرّب مرة أخرى.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
-                    Button(authenticating ? "يفتح الدفتر…" : "افتح الدفتر") { Task { await authenticate() } }
-                        .buttonStyle(MadarPrimaryButton()).disabled(authenticating).accessibilityIdentifier("mihbara-notebook-unlock")
-                }.padding(24).frame(maxWidth: .infinity, maxHeight: .infinity).background(theme.background)
-            }
-        }
-        .foregroundStyle(theme.ink).toolbar {
-            ToolbarItem(placement: .principal) { Text("دفتر المحبرة").font(MadarTypography.section()) }
-            ToolbarItem(placement: .topBarTrailing) { Button("تمّ") { lock(); dismiss() }.accessibilityIdentifier("mihbara-notebook-close") }
-        }
-        .onChange(of: scenePhase) { _, phase in if phase != .active { lock() } }
-        .onDisappear { lock() }
-    }
-
-    @MainActor private func authenticate() async {
-        guard !authenticating else { return }
-        authenticating = true; failed = false
-        let generation = authGeneration, context = LAContext()
-        context.localizedCancelTitle = "إلغاء"; context.localizedFallbackTitle = "رمز الجهاز"
-        defer { context.invalidate(); authenticating = false }
-        do {
-            guard try await context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: "افتح ملاحظات المحبرة الخاصة") else { throw PrivacyAuthorizationError.refused }
-            guard generation == authGeneration, scenePhase == .active else { return }
-            unlocked = true
-        } catch {
-            if generation == authGeneration, scenePhase == .active { failed = true }
-        }
-    }
-
-    private func lock() { authGeneration += 1; unlocked = false; failed = false }
-}
-
 private struct MihbaraNotebookContent: View {
     struct Note: Identifiable { let id: UUID; let text: String; let updatedAt: Date }
     struct Editor: Identifiable { let id: UUID; let text: String }
     let app: AppSession
-    let lock: () -> Void
     @Environment(\.roomTheme) private var theme
+    @Environment(\.dismiss) private var dismiss
     @State private var notes: [Note] = []
     @State private var editor: Editor?
     @State private var failure: String?
-    @State private var idleTask: Task<Void, Never>?
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                HStack { Text("ملاحظاتك الخاصة").font(MadarTypography.title()); Spacer(); Button { activity(); editor = .init(id: UUID(), text: "") } label: { Label("ملاحظة جديدة", systemImage: "plus") }.accessibilityIdentifier("mihbara-note-add") }
+                HStack { Text("ملاحظاتك الخاصة").font(MadarTypography.title()); Spacer(); Button { editor = .init(id: UUID(), text: "") } label: { Label("ملاحظة جديدة", systemImage: "plus") }.accessibilityIdentifier("mihbara-note-add") }
                 Text("تبقى هنا في دفتر المحبرة.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                 if let failure { Text(failure).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
                 if notes.isEmpty {
                     Text("ابدأ بملاحظة صغيرة؛ ستجدها هنا حين تعود.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk).frame(maxWidth: .infinity, minHeight: 110, alignment: .leading)
                 } else {
                     ForEach(notes) { note in
-                        Button { activity(); editor = .init(id: note.id, text: note.text) } label: {
+                        Button { editor = .init(id: note.id, text: note.text) } label: {
                             VStack(alignment: .leading, spacing: 10) { Text(note.text).font(MadarTypography.body()).lineLimit(5).multilineTextAlignment(.leading); Text("ملاحظة خاصة").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
                                 .frame(maxWidth: .infinity, alignment: .leading).padding(16).background(theme.surface, in: .rect(cornerRadius: 14))
                         }.buttonStyle(.plain).accessibilityIdentifier("mihbara-note-" + note.id.uuidString)
@@ -457,15 +402,18 @@ private struct MihbaraNotebookContent: View {
             }.padding(18)
         }
         .background(theme.background)
-        .onScrollPhaseChange { _, phase in if phase == .interacting { activity() } }
         .sheet(item: $editor) { current in
-            MihbaraNotebookEditor(note: current, save: save, delete: delete, activity: activity)
+            MihbaraNotebookEditor(note: current, save: save, delete: delete)
                 .environment(\.roomTheme, theme).presentationDragIndicator(.visible)
         }
+        .toolbar {
+            ToolbarItem(placement: .principal) { Text("دفتر المحبرة").font(MadarTypography.section()) }
+            ToolbarItem(placement: .topBarTrailing) { Button("تمّ") { dismiss() }.accessibilityIdentifier("mihbara-notebook-close") }
+        }
         .safeAreaInset(edge: .bottom) { if app.undoToken != nil { UndoToast(message: app.undoMessage, undo: { app.undo(); load() }).accessibilityIdentifier("mihbara-undo") } }
-        .task { load(); activity() }
+        .task { load() }
         .onChange(of: app.undoToken?.id) { load() }
-        .onDisappear { idleTask?.cancel(); notes.removeAll(); editor = nil; lock() }
+        .onDisappear { notes.removeAll(); editor = nil }
     }
 
     private func load() {
@@ -477,13 +425,7 @@ private struct MihbaraNotebookContent: View {
         } catch { notes.removeAll(); failure = "تعذّر فتح الملاحظات المحفوظة." }
     }
 
-    private func activity() {
-        idleTask?.cancel()
-        idleTask = Task { try? await Task.sleep(for: .seconds(300)); guard !Task.isCancelled else { return }; lock() }
-    }
-
     private func save(_ note: Editor, text: String) {
-        activity()
         Task {
             do { try await app.executeBookCommand("notebook.savePrivate", payload: ["id": .string(note.id.uuidString), "text": .string(text)]); load() }
             catch { failure = "لم تُحفظ الملاحظة. أعد المحاولة." }
@@ -491,7 +433,6 @@ private struct MihbaraNotebookContent: View {
     }
 
     private func delete(_ note: Editor) {
-        activity()
         Task {
             do { try await app.executeBookCommand("notebook.deletePrivate", payload: ["id": .string(note.id.uuidString)]); load() }
             catch { failure = "لم تُحذف الملاحظة. أعد المحاولة." }
@@ -503,18 +444,16 @@ private struct MihbaraNotebookEditor: View {
     let note: MihbaraNotebookContent.Editor
     let save: (MihbaraNotebookContent.Editor, String) -> Void
     let delete: (MihbaraNotebookContent.Editor) -> Void
-    let activity: () -> Void
     @Environment(\.dismiss) private var dismiss
     @Environment(\.roomTheme) private var theme
     @State private var text: String
-    init(note: MihbaraNotebookContent.Editor, save: @escaping (MihbaraNotebookContent.Editor, String) -> Void, delete: @escaping (MihbaraNotebookContent.Editor) -> Void, activity: @escaping () -> Void) {
-        self.note = note; self.save = save; self.delete = delete; self.activity = activity; _text = State(initialValue: note.text)
+    init(note: MihbaraNotebookContent.Editor, save: @escaping (MihbaraNotebookContent.Editor, String) -> Void, delete: @escaping (MihbaraNotebookContent.Editor) -> Void) {
+        self.note = note; self.save = save; self.delete = delete; _text = State(initialValue: note.text)
     }
     var body: some View {
         NavigationStack {
             TextEditor(text: $text).font(MadarTypography.body()).scrollContentBackground(.hidden).padding(12).background(theme.background)
                 .accessibilityIdentifier("mihbara-note-text")
-                .onChange(of: text) { activity() }
                 .toolbar {
                     ToolbarItem(placement: .principal) { Text("ملاحظة خاصة").font(MadarTypography.section()) }
                     ToolbarItem(placement: .topBarLeading) { if !note.text.isEmpty { Button("حذف", role: .destructive) { delete(note); dismiss() }.accessibilityIdentifier("mihbara-note-delete") } }

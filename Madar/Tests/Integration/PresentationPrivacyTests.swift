@@ -93,7 +93,7 @@ import UIKit
         if outcome == 0 && !cancel { try await request.value }
         else { do { try await request.value; XCTFail("Expected persistence failure") } catch { } }
         await settle()
-        let expected: MadarLockScope = outcome == 1 ? .app : .notesOnly
+        let expected: MadarLockScope = outcome == 1 ? .app : .none
         XCTAssertEqual(service.persistedScope, expected); XCTAssertEqual(origin.scope, expected); XCTAssertEqual(peer.scope, expected)
         XCTAssertTrue(peer.covered, "Scope completion must not reopen a revoked presentation")
         XCTAssertThrowsError(try peer.validate(oldTicket)); XCTAssertFalse(peer.canPresent(.notes))
@@ -118,7 +118,7 @@ import UIKit
         let controller = MadarLockController(scope: .app, service: Service(), authenticator: { Authenticator() })
         let old = UUID(), newer = UUID()
         controller.receiveScopeRevocation(old); controller.receiveScopeRevocation(newer)
-        controller.finishScopeTransition(old, persisted: .none, failed: false)
+        controller.finishScopeTransition(old, persisted: MadarLockScope.none, failed: false)
         XCTAssertEqual(controller.scope, .app); XCTAssertTrue(controller.covered)
         do { _ = try await controller.authorize([.app]); XCTFail("Older completion cleared newer pending scope") } catch { }
         controller.finishScopeTransition(newer, persisted: .app, failed: true)
@@ -287,18 +287,29 @@ import UIKit
         XCTAssertNoThrow(try lock.validate(ticket)); XCTAssertGreaterThan(service.purges, 0)
     }
 
-    func testPrivateNoteAlwaysRequiresDeviceAuthenticationAndTicketHasSceneOwner() async throws {
+    func testPrivateNoteFollowsWholeAppLockAndTicketHasSceneOwner() async throws {
         let auth = Authenticator(), service = Service()
         let first = MadarLockController(scope: .none, service: service, authenticator: { auth })
         let second = MadarLockController(scope: .none, service: Service())
-        XCTAssertTrue(first.canPresent(.app)); XCTAssertFalse(first.canPresent(.privateNote))
+        XCTAssertTrue(first.canPresent(.app)); XCTAssertTrue(first.canPresent(.privateNote))
         let ticket = try await first.authorize([.privateNote])
-        XCTAssertEqual(auth.calls, 1); XCTAssertEqual(service.bindings, [.privateNote])
+        XCTAssertEqual(auth.calls, 0); XCTAssertEqual(service.bindings, [.privateNote])
         XCTAssertNoThrow(try first.validate(ticket))
         XCTAssertThrowsError(try second.validate(ticket))
         first.sceneChanged(.inactive)
         XCTAssertTrue(first.covered); XCTAssertThrowsError(try first.validate(ticket))
         XCTAssertTrue(second.canPresent(.app), "One controller cannot cover another scene")
+    }
+
+    func testPrivateNoteSharesTheWholeAppUnlock() async throws {
+        let auth = Authenticator(), service = Service()
+        let lock = MadarLockController(scope: .app, service: service, authenticator: { auth })
+        XCTAssertFalse(lock.canPresent(.privateNote))
+        _ = try await lock.authorize([.app])
+        XCTAssertTrue(lock.canPresent(.privateNote))
+        _ = try await lock.authorize([.privateNote])
+        XCTAssertEqual(auth.calls, 1)
+        XCTAssertEqual(service.bindings, [.app, .privateNote])
     }
 
     func testBackgroundLeaseUsesFirstTimestampAndExpiresAtSixtySeconds() async throws {
