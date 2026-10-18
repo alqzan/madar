@@ -256,6 +256,45 @@ import XCTest
         XCTAssertTrue(app.buttons["mihbara-reader-font-thmanyahSerif"].waitForSelection(timeout: 5))
         app.buttons["mihbara-reader-settings-close"].tap()
         sleep(2); shot(app, "M6-V07-font-serif-L")
+        // Page options: change each, undo the last, then reset to the agreed defaults.
+        app.buttons["mihbara-reader-settings"].tap()
+        let more = app.buttons["mihbara-reader-more"]; XCTAssertTrue(more.waitForExistence(timeout: 5)); more.tap()
+        let footerBar = app.buttons["mihbara-reader-footer-bar"]
+        for _ in 0..<4 where !footerBar.isHittable { app.swipeUp(velocity: .slow) }
+        app.buttons["mihbara-reader-lineSpacing-3"].tap()
+        XCTAssertTrue(app.buttons["mihbara-reader-lineSpacing-3"].waitForSelection(timeout: 5))
+        app.buttons["mihbara-reader-margins-1"].tap()
+        XCTAssertTrue(app.buttons["mihbara-reader-margins-1"].waitForSelection(timeout: 5))
+        let justify = app.switches["mihbara-reader-justify"], heavier = app.switches["mihbara-reader-heavier"]
+        XCTAssertEqual(justify.value as? String, "1"); XCTAssertEqual(heavier.value as? String, "0")
+        heavier.coordinate(withNormalizedOffset: CGVector(dx: 0.06, dy: 0.5)).tap()
+        XCTAssertTrue(heavier.waitForValue("1", timeout: 5))
+        footerBar.tap()
+        XCTAssertTrue(footerBar.waitForSelection(timeout: 5))
+        shot(app, "M6-V07-options-changed-L")
+        let undo = app.descendants(matching: .any)["mihbara-reader-undo"].buttons["undo-button"]; XCTAssertTrue(undo.waitForExistence(timeout: 5)); undo.tap()
+        XCTAssertTrue(app.buttons["mihbara-reader-footer-full"].waitForSelection(timeout: 5))
+        XCTAssertTrue(app.buttons["mihbara-reader-lineSpacing-3"].isSelected)
+        footerBar.tap(); XCTAssertTrue(footerBar.waitForSelection(timeout: 5))
+        app.buttons["mihbara-reader-settings-close"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["mihbara-reader-progress"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["mihbara-reader-print-page"].exists)
+        sleep(2); shot(app, "M6-V07-options-reader-L")
+        app.buttons["mihbara-reader-settings"].tap()
+        if !app.buttons["mihbara-reader-reset"].exists { app.buttons["mihbara-reader-more"].tap() }
+        let reset = app.buttons["mihbara-reader-reset"]
+        for _ in 0..<4 where !reset.isHittable { app.swipeUp(velocity: .slow) }
+        reset.tap()
+        XCTAssertTrue(app.buttons["mihbara-reader-footer-full"].waitForSelection(timeout: 5))
+        XCTAssertTrue(app.buttons["mihbara-reader-lineSpacing-2"].isSelected)
+        XCTAssertTrue(app.buttons["mihbara-reader-margins-2"].isSelected)
+        XCTAssertEqual(app.switches["mihbara-reader-heavier"].value as? String, "0")
+        for _ in 0..<4 { app.swipeDown(velocity: .slow); if app.buttons["mihbara-reader-size-4"].isHittable { break } }
+        XCTAssertTrue(app.buttons["mihbara-reader-size-4"].isSelected)
+        XCTAssertTrue(app.buttons["mihbara-reader-font-amiri"].isSelected)
+        shot(app, "M6-V07-sheet-L")
+        app.buttons["mihbara-reader-settings-close"].tap()
+        XCTAssertTrue(app.staticTexts["mihbara-reader-print-page"].waitForExistence(timeout: 5))
         app.buttons["mihbara-reader-contents"].tap()
         XCTAssertTrue(app.staticTexts["فهرس الكتاب"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["mihbara-reader-contents-close"].isHittable)
@@ -267,6 +306,9 @@ import XCTest
 }
 
 private extension XCUIElement {
+    func waitForValue(_ value: String, timeout: TimeInterval) -> Bool {
+        XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", value), object: self)], timeout: timeout) == .completed
+    }
     func waitForSelection(timeout: TimeInterval) -> Bool {
         XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "selected == true"), object: self)], timeout: timeout) == .completed
     }

@@ -12,6 +12,22 @@ import Testing
         #expect(throws: (any Error).self) { try store.validate(reader("thmanyahSans"), for: "mihbara.readerEn") }
     }
 
+    @Test func arabicReaderPageOptionsAreOptionalAndBounded() throws {
+        let schema = try SettingsSchema.bundled()
+        let base = try #require(schema.definition(for: "mihbara.readerAr").defaultValue.object)
+        #expect(base["lineSpacing"] == .number(2)); #expect(base["margins"] == .number(2))
+        #expect(base["justify"] == .bool(true)); #expect(base["heavier"] == .bool(false)); #expect(base["footer"] == .string("full"))
+        try schema.validate(.object(base), for: "mihbara.readerAr")
+        var older = base; for field in ["lineSpacing", "margins", "justify", "heavier", "footer"] { older[field] = nil }
+        try schema.validate(.object(older), for: "mihbara.readerAr")
+        func with(_ field: String, _ value: JSONValue) -> JSONValue { var o = base; o[field] = value; return .object(o) }
+        for bad in [with("lineSpacing", .number(5)), with("margins", .number(0)), with("justify", .string("yes")), with("footer", .string("clock")), with("unknown", .bool(true))] {
+            #expect(throws: (any Error).self) { try schema.validate(bad, for: "mihbara.readerAr") }
+        }
+        var missingCore = base; missingCore["size"] = nil
+        #expect(throws: (any Error).self) { try schema.validate(.object(missingCore), for: "mihbara.readerAr") }
+    }
+
     @Test func schemaAndDefaultContainer() throws {
         #expect(MadarSchema.syncedTypes.count == 56); #expect(MadarSchema.deviceTypes.count == 6)
         let container = try MadarContainerFactory.makeInMemory(); try fixture(container.mainContext)

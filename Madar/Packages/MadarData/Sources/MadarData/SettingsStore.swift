@@ -44,7 +44,11 @@ public struct SettingsSchema: Decodable, Sendable {
             else { guard object.values.allSatisfy({ v in v.number.map { inRange($0,c["range"]?.array?.compactMap(\.number)) } ?? false }) else { try reject() } }
         case "layout": try validateLayout(value, definition: d)
         case "object":
-            guard let object = value.object, let defaults = d.defaultValue.object, Set(object.keys) == Set(defaults.keys) else { try reject() }
+            guard let object = value.object, let defaults = d.defaultValue.object else { try reject() }
+            // The Arabic reader's page options were added on 18 Oct (owner); values and presets
+            // saved before then omit them and read as their defaults.
+            let optional: Set<String> = key == "mihbara.readerAr" ? ["lineSpacing", "margins", "justify", "heavier", "footer"] : []
+            guard Set(object.keys).isSubset(of: Set(defaults.keys)), Set(defaults.keys).subtracting(optional).isSubset(of: Set(object.keys)) else { try reject() }
             switch key {
             case "mal.dailyAllowance":
                 guard ["fixed","percent"].contains(object["mode"]?.string ?? "") else { try reject() }
@@ -65,6 +69,11 @@ public struct SettingsSchema: Decodable, Sendable {
                 let ar = key.hasSuffix("Ar")
                 guard (ar ? ["amiri","notoNaskh","system","thmanyahSerif","thmanyahSans"] : ["literata","system","georgia"]).contains(object["font"]?.string ?? ""), ["tap","inline","hidden"].contains(object[ar ? "footnotes" : "arabicHints"]?.string ?? "") || (!ar && ["hard","all","none"].contains(object["arabicHints"]?.string ?? "")) else { try reject() }
                 guard case .bool = object[ar ? "tashkil" : "hyphenation"] else { try reject() }
+                if ar {
+                    for field in ["lineSpacing", "margins"] { if let raw = object[field] { guard let n = raw.number, inRange(n, [1, 4]) else { try reject() } } }
+                    for field in ["justify", "heavier"] { if let raw = object[field] { guard case .bool = raw else { try reject() } } }
+                    if let raw = object["footer"] { guard ["full", "page", "bar", "none"].contains(raw.string ?? "") else { try reject() } }
+                }
             default: try reject()
             }
         default: try reject()

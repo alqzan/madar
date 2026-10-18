@@ -2869,7 +2869,12 @@
     "font": "amiri",
     "mode": "pages",
     "tashkil": true,
-    "footnotes": "tap"
+    "footnotes": "tap",
+    "lineSpacing": 2,
+    "margins": 2,
+    "justify": true,
+    "heavier": false,
+    "footer": "full"
    },
    "scope": "sync",
    "note": "تُحفظ لكل لغة",
@@ -2879,10 +2884,15 @@
     "fields": {
      "theme": "auto|paper|warm|calm|night|black",
      "size": "Int 1…7",
-     "font": "id from the Arabic reader font list (§7.6)",
+     "font": "id from the Arabic reader font list (§7.6): amiri|notoNaskh|system, plus thmanyahSerif|thmanyahSans (owner, 18 Oct)",
      "mode": "pages|scroll|focus",
      "tashkil": "Bool",
-     "footnotes": "String (values owned by §7.6)"
+     "footnotes": "String (values owned by §7.6)",
+     "lineSpacing": "Int 1…4 (owner, 18 Oct; missing = 2)",
+     "margins": "Int 1…4 (owner, 18 Oct; missing = 2)",
+     "justify": "Bool (owner, 18 Oct; missing = true)",
+     "heavier": "Bool (owner, 18 Oct; missing = false)",
+     "footer": "full|page|bar|none (owner, 18 Oct; missing = full)"
     },
     "unknownKeys": "dropped on read, rejected on write"
    }
