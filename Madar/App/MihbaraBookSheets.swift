@@ -1,11 +1,204 @@
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
 import MadarCore
 import MadarDesign
+
+struct MihbaraAddBookView: View {
+    let app: AppSession
+    let readingBooks: [MihbaraBook]
+    let onPaperBookSaved: () -> Void
+    @Binding var pendingBookFile: URL?
+    @Binding var pendingGoodreadsFile: URL?
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.roomTheme) private var theme
+    @State private var importingBook = false
+    @State private var importingGoodreads = false
+
+    private var bookTypes: [UTType] {
+        var types: [UTType] = [.pdf, .plainText, .html]
+        if let epub = UTType(filenameExtension: "epub") { types.insert(epub, at: 0) }
+        return types
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 22) {
+                HStack {
+                    Button { dismiss() } label: {
+                        Label("رجوع", systemImage: "chevron.right")
+                            .font(MadarTypography.caption())
+                            .frame(minHeight: 44)
+                    }
+                    Spacer()
+                    Text("أضف كتابًا").font(.custom("thmanyahserifdisplay-Bold", size: 24, relativeTo: .title2))
+                    Spacer().frame(width: 48)
+                }
+
+                VStack(spacing: 12) {
+                    Button { importingBook = true } label: {
+                        MihbaraAddBookSourceCard(
+                            title: "من ملف",
+                            subtitle: "ePub · PDF · نص · HTML؛ شاركه إلى مدار من أي تطبيق",
+                            symbol: "square.and.arrow.down.fill",
+                            color: theme.color("navy"),
+                            foreground: theme.color("onNavy")
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("mihbara-add-source-file")
+
+                    NavigationLink {
+                        MihbaraPaperEditor(app: app, readingBooks: readingBooks, onSaved: onPaperBookSaved)
+                            .toolbarVisibility(.hidden, for: .navigationBar)
+                    } label: {
+                        MihbaraAddBookSourceCard(
+                            title: "كتاب ورقي",
+                            subtitle: "اكتب عنوانه، وابدأ من الصفحة التي وصلت إليها",
+                            symbol: "barcode.viewfinder",
+                            color: theme.color("wood"),
+                            foreground: theme.background
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("mihbara-add-source-paper")
+
+                    Button { importingGoodreads = true } label: {
+                        MihbaraAddBookSourceCard(
+                            title: "من Goodreads",
+                            subtitle: "استورد مكتبتك من ملف CSV",
+                            symbol: "g.circle.fill",
+                            color: theme.color("sunnahLeather"),
+                            foreground: theme.color("onAccent")
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("mihbara-add-source-goodreads")
+                }
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("وصل مؤخرًا").font(MadarTypography.section())
+                    if let pendingGoodreadsFile {
+                        MihbaraRecentImportRow(name: pendingGoodreadsFile.lastPathComponent, kind: "CSV", theme: theme)
+                    }
+                    if let pendingBookFile {
+                        MihbaraRecentImportRow(name: pendingBookFile.lastPathComponent, kind: pendingBookFile.pathExtension.uppercased(), theme: theme)
+                    }
+                    if pendingBookFile == nil && pendingGoodreadsFile == nil {
+                        HStack(spacing: 12) {
+                            Image(systemName: "tray").font(.title3).foregroundStyle(theme.secondaryInk)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("لا يوجد ملف وصل مؤخرًا").font(MadarTypography.caption())
+                                Text("اختر ملفًا من جهازك أو شاركه إلى مدار.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                            }
+                            Spacer(minLength: 0)
+                        }
+                        .padding(16)
+                        .frame(maxWidth: .infinity, minHeight: 68, alignment: .leading)
+                        .background(theme.surface, in: .rect(cornerRadius: 20))
+                        .overlay { RoundedRectangle(cornerRadius: 20).stroke(theme.line.opacity(0.7), lineWidth: 1) }
+                        .accessibilityIdentifier("mihbara-no-recent-import")
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("يقرأ مدار").font(MadarTypography.section())
+                    HStack(spacing: 8) {
+                        ForEach(["ePub", "PDF", "PDF مصوّر", "نص", "HTML"], id: \.self) { value in
+                            Text(value)
+                                .font(MadarTypography.fine())
+                                .padding(.horizontal, 11).padding(.vertical, 8)
+                                .background(theme.surface, in: .capsule)
+                                .overlay { Capsule().stroke(theme.line, lineWidth: 1) }
+                        }
+                    }
+                    Text("كل ملف يبقى على جهازك. راجع معاينته قبل إضافته إلى رفّك.")
+                        .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                }
+            }
+            .padding(.horizontal, 22).padding(.top, 16).padding(.bottom, 32)
+            .frame(maxWidth: 650).frame(maxWidth: .infinity)
+        }
+        .background(theme.background.ignoresSafeArea())
+        .foregroundStyle(theme.ink)
+        .environment(\.layoutDirection, .rightToLeft)
+        .toolbarVisibility(.hidden, for: .navigationBar)
+        .statusBarHidden(true)
+        .fileImporter(isPresented: $importingBook, allowedContentTypes: bookTypes, allowsMultipleSelection: false) { result in
+            handle(result, assign: { pendingBookFile = $0 })
+        }
+        .fileImporter(isPresented: $importingGoodreads, allowedContentTypes: [.commaSeparatedText], allowsMultipleSelection: false) { result in
+            handle(result, assign: { pendingGoodreadsFile = $0 })
+        }
+    }
+
+    private func handle(_ result: Result<[URL], Error>, assign: (URL) -> Void) {
+        switch result {
+        case .success(let urls):
+            if let url = urls.first { assign(url) }
+        case .failure(let error):
+            let nsError = error as NSError
+            if nsError.domain != NSCocoaErrorDomain || nsError.code != NSUserCancelledError {
+                app.errorMessage = "لم يُفتح الملف. \(error.localizedDescription)"
+            }
+        }
+    }
+}
+
+private struct MihbaraAddBookSourceCard: View {
+    let title: String
+    let subtitle: String
+    let symbol: String
+    let color: Color
+    let foreground: Color
+    @Environment(\.roomTheme) private var theme
+
+    var body: some View {
+        HStack(spacing: 14) {
+            Image(systemName: symbol)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(foreground)
+                .frame(width: 48, height: 48)
+                .background(color, in: .rect(cornerRadius: 15))
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title).font(.custom("thmanyahserifdisplay-Bold", size: 19, relativeTo: .headline)).foregroundStyle(theme.ink)
+                Text(subtitle).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+            Image(systemName: "chevron.left").font(.system(size: 13, weight: .medium)).foregroundStyle(theme.secondaryInk.opacity(0.72))
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, minHeight: 78, alignment: .leading)
+        .background(theme.surface, in: .rect(cornerRadius: 20))
+        .overlay { RoundedRectangle(cornerRadius: 20).stroke(theme.line.opacity(0.72), lineWidth: 1) }
+        .contentShape(RoundedRectangle(cornerRadius: 20))
+    }
+}
+
+private struct MihbaraRecentImportRow: View {
+    let name: String
+    let kind: String
+    let theme: RoomTheme
+
+    var body: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(name).font(MadarTypography.caption()).lineLimit(1)
+                Text("جاهز للمراجعة قبل الإضافة").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+            }
+            Spacer(minLength: 8)
+            Text(kind).font(MadarTypography.fine()).foregroundStyle(theme.background).padding(.horizontal, 9).padding(.vertical, 6).background(theme.color("sunnahLeather"), in: .capsule)
+        }
+        .padding(15)
+        .background(theme.surface, in: .rect(cornerRadius: 18))
+        .overlay { RoundedRectangle(cornerRadius: 18).stroke(theme.line.opacity(0.72), style: StrokeStyle(lineWidth: 1, dash: [4, 4])) }
+    }
+}
 
 struct MihbaraPaperEditor: View {
     let app: AppSession
     let readingBooks: [MihbaraBook]
+    let onSaved: () -> Void
     @Environment(\.dismiss) private var dismiss
     @Environment(\.roomTheme) private var theme
     @State private var title = ""
@@ -40,7 +233,7 @@ struct MihbaraPaperEditor: View {
         }
         if let replacing { p["replacing"] = .string(replacing.uuidString) }
         saving = true
-        Task { do { try await app.executeBookCommand("book.savePaper", payload: p); dismiss() } catch { app.errorMessage = error.localizedDescription }; saving = false }
+        Task { do { try await app.executeBookCommand("book.savePaper", payload: p); onSaved() } catch { app.errorMessage = error.localizedDescription }; saving = false }
     }
 }
 struct MihbaraBookCard: View {

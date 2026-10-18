@@ -15,9 +15,12 @@ struct MihbaraHomeView: View {
     @State private var shelf = "reading"
     @State private var tableID: UUID?
     @State private var sheet: MihbaraSheet?
+    @State private var showingAddBook = false
     @State private var manuallyOpen = false
     @State private var libraryQuery = ""
     @State private var libraryShelf = "all"
+    @State private var pendingBookFile: URL?
+    @State private var pendingGoodreadsFile: URL?
     private var theme: RoomTheme { .init(room: "mihbara", dark: colorScheme == .dark) }
     private var service: AppMihbaraService { .init(app: app) }
     private var tableBook: MihbaraBook? { reading?.books.first { $0.id == tableID } ?? reading?.books.first { $0.shelf == "reading" } }
@@ -47,7 +50,6 @@ struct MihbaraHomeView: View {
             NavigationStack {
                 if let r = reading {
                     switch target {
-                    case .add: MihbaraPaperEditor(app: app, readingBooks: r.books.filter { $0.shelf == "reading" })
                     case .library: library(r)
                     case .book(let id): if let b = r.books.first(where: { $0.id == id }) { MihbaraBookCard(app: app, book: b, books: r.books) { tableID = id; sheet = nil } }
                     case .hadith(let n): if let h = r.collection.hadiths.first(where: { $0.number == n }) { MihbaraHadithView(app: app, hadith: h, collection: r.collection, day: r.day) }
@@ -59,11 +61,25 @@ struct MihbaraHomeView: View {
                 }
             }.environment(\.roomTheme, theme).presentationDragIndicator(.visible)
         }
+        .fullScreenCover(isPresented: $showingAddBook) {
+            if let reading {
+                NavigationStack {
+                    MihbaraAddBookView(
+                        app: app,
+                        readingBooks: reading.books.filter { $0.shelf == "reading" },
+                        onPaperBookSaved: { showingAddBook = false; load() },
+                        pendingBookFile: $pendingBookFile,
+                        pendingGoodreadsFile: $pendingGoodreadsFile
+                    )
+                }
+                .environment(\.roomTheme, theme)
+            }
+        }
     }
     private func load() { do { reading = try service.load() } catch { app.errorMessage = error.localizedDescription } }
     private func shelfView(_ r: MihbaraHomeReading) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack { Text("رفّك").font(MadarTypography.cardTitle()); Spacer(); Button { sheet = .add } label: { Label("كتاب ورقي", systemImage: "plus") }.accessibilityIdentifier("mihbara-add-paper") }
+            HStack { Text("رفّك").font(MadarTypography.cardTitle()); Spacer(); Button { showingAddBook = true } label: { Label("أضف كتابًا", systemImage: "plus") }.accessibilityIdentifier("mihbara-add-paper") }
             HStack(spacing: 8) {
                 ForEach([("reading","أقرؤها الآن"),("want","أبي أقرأها"),("finished","أنهيتها")], id: \.0) { value in
                     Button { shelf = value.0 } label: { Text(value.1).font(MadarTypography.caption()).padding(.horizontal, 10).frame(minHeight: 44).background(shelf == value.0 ? theme.ink : .clear, in: .capsule).foregroundStyle(shelf == value.0 ? theme.background : theme.ink) }.accessibilityIdentifier("mihbara-shelf-" + value.0)
@@ -150,7 +166,7 @@ struct MihbaraHomeView: View {
                     leftFooter: nextPage.map(service.digits.string) ?? "", action: "أكمل"
                 ) { sheet = .book(b.id) }
             } else {
-                Button { sheet = .add } label: { VStack(spacing: 12) { Image(systemName: "book.pages").font(.largeTitle); Text("مكان كتابك").font(MadarTypography.cardTitle()); Text("أضف كتابًا ورقيًا وابدأ من موضعك").font(MadarTypography.caption()) }.frame(maxWidth: .infinity, minHeight: 210).background(theme.surface, in: .rect(cornerRadius: 5)).overlay { RoundedRectangle(cornerRadius: 5).stroke(theme.line, style: .init(lineWidth: 1, dash: [4,4])) } }.buttonStyle(.plain).foregroundStyle(theme.ink)
+                Button { showingAddBook = true } label: { VStack(spacing: 12) { Image(systemName: "book.pages").font(.largeTitle); Text("مكان كتابك").font(MadarTypography.cardTitle()); Text("أضف كتابًا وابدأ من موضعك").font(MadarTypography.caption()) }.frame(maxWidth: .infinity, minHeight: 210).background(theme.surface, in: .rect(cornerRadius: 5)).overlay { RoundedRectangle(cornerRadius: 5).stroke(theme.line, style: .init(lineWidth: 1, dash: [4,4])) } }.buttonStyle(.plain).foregroundStyle(theme.ink)
             }
         }.padding(18).padding(.vertical, 8).background(LinearGradient(colors: [theme.color("wood").opacity(0.78), theme.color("wood")], startPoint: .top, endPoint: .bottom), in: .rect(topLeadingRadius: 26, bottomLeadingRadius: 12, bottomTrailingRadius: 12, topTrailingRadius: 26)).animation(reduceMotion ? nil : .smooth(duration: 0.35), value: open && !folded)
     }
@@ -191,7 +207,7 @@ struct MihbaraHomeView: View {
     }
 
 }
-private enum MihbaraSheet: Identifiable { case add, library, book(UUID), hadith(Int), opening, notebook; var id: String { String(describing: self) } }
+private enum MihbaraSheet: Identifiable { case library, book(UUID), hadith(Int), opening, notebook; var id: String { String(describing: self) } }
 
 private struct MihbaraRahlOpeningView: View {
     let app: AppSession

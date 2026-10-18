@@ -1,5 +1,13 @@
 # Archived handovers
 
+## Handover — M5 X00 flexible schedules, V14 analysis, M3-V09 Day One, card art, Quran Hijri-first — 2026-10-17 — Claude
+Works now: obligations repeat every N days/weeks/months/years from a free first date (schema V7), subscriptions shelf, optional reason on the budget stamp; «التحليل» screen; Day One JSON-ZIP import with preview and undo; gold/navy card art; the Quran room is Hijri first; log over-limit red arch in a shot.
+Verified: packages on merged main — MadarCore 108, MadarData 67, MadarCommands 104, MadarMoney 106 passed; make build succeeded; X00/V14/V09 UI tests passed in their worktrees (agent reports). Migration and Day One reviewed read-only: no Critical/High.
+Differences left: V11 digits/«ينتظر يرجع لك» unreviewed; V12 dates under the cash axis are one row; no owner-iPhone, dark mode or compare-screens run for the card art.
+Not verified: UI tests on merged main; a real Day One export; owner iPhone. In flight (worktree branches, not merged): V15 reconciliation, V16 cashback jar.
+Next: merge V15/V16, then V17 record an expense → V24, X01; Opus UX review of M5; apply owner's Day One review mediums (undo→re-import duplicate, wrong failure message).
+Model/effort: Claude Sonnet 5.5 + Opus 5.5 agents / not exposed. Usage: not exposed.
+
 ## Handover — M5 V11–V13 visual review and fixes — 2026-10-16 — Claude
 Works now: log arches turn red with an amount spike when the day passes its limit, plus a «خط <limit>» label; cards «متى يخرج النقد» is a real axis (today line, red statement dot, «يقفل» tick, green line to the purchase-due date).
 Verified: UI MoneyLogUITests 1/1 (M5-V13-fix2.xcresult) and MoneyCardsUITests testFourTabsSourcesAndDebit 1/1 (M5-V12-fix.xcresult); commit 84ec026. Native build succeeded.

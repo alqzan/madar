@@ -47,12 +47,31 @@ import XCTest
     }
     func testEmptyShelfPaperAddAndUndo() {
         continueAfterFailure = false; let app = app("empty"); app.launch(); open(app); shot(app,"M6-V01-empty-L")
-        app.buttons["mihbara-add-paper"].tap(); let title = app.textFields["mihbara-paper-title"]; XCTAssertTrue(title.waitForExistence(timeout:8)); title.tap(); title.typeText("كتابي الأول")
+        app.buttons["mihbara-add-paper"].tap()
+        let paperSource = app.descendants(matching: .any)["mihbara-add-source-paper"]
+        XCTAssertTrue(paperSource.waitForExistence(timeout:5)); paperSource.tap()
+        let title = app.textFields["mihbara-paper-title"]; XCTAssertTrue(title.waitForExistence(timeout:8)); title.tap(); title.typeText("كتابي الأول")
         let author = app.textFields["mihbara-paper-author"]; author.tap(); author.typeText("من مكتبتي")
         let pages = app.textFields["mihbara-paper-pages"]; pages.tap(); pages.typeText("٢٥٠"); if app.toolbars.buttons["تمّ"].exists { app.toolbars.buttons["تمّ"].tap() }
         let save = app.buttons["mihbara-paper-save"]; reach(app,save); shot(app,"M6-V01-add-paper-L"); save.tap()
         XCTAssertTrue(app.staticTexts["كتابي الأول"].firstMatch.waitForExistence(timeout:8)); undo(app)
         XCTAssertTrue(app.staticTexts["أضف كتابك الأول"].waitForExistence(timeout:8))
+    }
+    func testAddBookSourcesShowsV1FormatsAndHonestEmptyState() {
+        continueAfterFailure = false; let app = app("home"); app.launch(); open(app)
+        let addBook = app.buttons["mihbara-add-paper"]
+        XCTAssertTrue(addBook.label.contains("أضف كتابًا"))
+        addBook.tap()
+        XCTAssertTrue(app.staticTexts["أضف كتابًا"].waitForExistence(timeout:8), app.debugDescription)
+        XCTAssertTrue(app.buttons["mihbara-add-source-file"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["mihbara-add-source-paper"].exists)
+        XCTAssertTrue(app.buttons["mihbara-add-source-goodreads"].exists)
+        XCTAssertTrue(app.staticTexts["PDF مصوّر"].exists)
+        XCTAssertTrue(app.staticTexts["لا يوجد ملف وصل مؤخرًا"].exists)
+        XCTAssertFalse(app.staticTexts["تصدير الشاملة"].exists)
+        shot(app, "M6-V16-add-L")
+        app.descendants(matching: .any)["mihbara-add-source-paper"].tap()
+        XCTAssertTrue(app.textFields["mihbara-paper-title"].waitForExistence(timeout:8), app.debugDescription)
     }
     func testPrivateNotebookHidesNoteTextUntilDeviceAuthentication() {
         continueAfterFailure = false; let app = app("home"); app.launch(); open(app)
