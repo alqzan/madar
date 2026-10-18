@@ -144,6 +144,49 @@ import UIKit
         app.buttons["mihbara-reader-close"].tap()
     }
 
+    /// M6-T01: search Turath's catalogue, download a book (fixture data, no network), review it and read it.
+    func testTurathSearchDownloadsABookIntoTheLibrary() throws {
+        continueAfterFailure = false
+        let catalogue = #"{"cats":{"23":{"id":23,"name":"الرقاق والآداب","books":[12028]}},"authors":{"51":{"id":51,"name":"ابن الجوزي","death":597,"books":[12028,7]}},"books":{"12028":{"id":12028,"name":"صيد الخاطر","author_id":51,"cat_id":23,"size":1480554,"page_count":893},"7":{"id":7,"name":"تلبيس إبليس","author_id":51,"cat_id":23,"size":3000000,"page_count":420}},"books_changed":[],"date":"2026-02-03","version":1}"#
+        let book = #"{"ً":{"ٌ":12028,"ّ":"الكتاب: صيد الخاطر\nالناشر: دار القلم","ٖ":1770153735},"٘":{"ٚ":[{"title":"مقدمة","level":1,"page":1},{"title":"علو الهمة","level":1,"page":2}]},"pages":[{"text":"<span data-type=\"title\" id=toc-1>مقدمة</span>\nالحمد لله الذي جعل للعقل نورًا.","vol":"1","page":1},{"text":"٧- فصل:<span data-type=\"title\" id=toc-2> علو الهمة</span>\nمن علامة كمال العقل علو الهمة، والراضي بالدون١ دني.\n_________\n١ الدون: الأمر الخسيس الحقير.","vol":"1","page":28}]}"#
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MIHBARA_FIXTURE": "empty",
+            "MADAR_UI_NOW": "2026-10-18T12:00:00+03:00", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
+            "MADAR_UI_TURATH_CATALOGUE_BASE64": Data(catalogue.utf8).base64EncodedString(), "MADAR_UI_TURATH_BOOK_BASE64": Data(book.utf8).base64EncodedString()]
+        app.launch()
+        let customize = app.tabBars.buttons["خصّص"]; XCTAssertTrue(customize.waitForExistence(timeout: 20)); customize.tap()
+        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 8)); search.tap(); search.typeText("المحبرة")
+        let door = app.buttons["mihbara-open"]; XCTAssertTrue(door.waitForExistence(timeout: 8)); door.tap()
+        let add = app.buttons["mihbara-add-paper"]; XCTAssertTrue(add.waitForExistence(timeout: 8)); add.tap()
+        let turath = app.buttons["mihbara-add-source-turath"]; XCTAssertTrue(turath.waitForExistence(timeout: 8), app.debugDescription)
+        attach(app, "M6-T01-add-sources-L")
+        turath.tap()
+        let suggestion = app.buttons["mihbara-turath-suggestion-صيد الخاطر"]; XCTAssertTrue(suggestion.waitForExistence(timeout: 10), app.debugDescription)
+        attach(app, "M6-T01-turath-start-L")
+        let field = app.textFields["mihbara-turath-search"]; field.tap(); field.typeText("الجوزى")
+        let result = app.buttons["mihbara-turath-book-12028"]; XCTAssertTrue(result.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(app.buttons["mihbara-turath-book-7"].exists)
+        attach(app, "M6-T01-turath-results-L")
+        result.tap()
+        let confirm = app.buttons["mihbara-epub-import-confirm"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 25), app.debugDescription)
+        XCTAssertEqual(app.textFields["mihbara-epub-import-title"].value as? String, "صيد الخاطر")
+        XCTAssertEqual(app.textFields["mihbara-epub-import-author"].value as? String, "ابن الجوزي")
+        XCTAssertTrue(app.descendants(matching: .any)["mihbara-epub-import-toc-3"].exists, app.debugDescription)
+        attach(app, "M6-T01-turath-preview-L")
+        for _ in 0..<8 where !confirm.isHittable { app.swipeUp(velocity: .slow) }
+        confirm.tap()
+        let wantShelf = app.buttons["mihbara-shelf-want"]
+        XCTAssertTrue(wantShelf.waitForExistence(timeout: 15), app.debugDescription)
+        wantShelf.tap()
+        let imported = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "صيد الخاطر")).firstMatch
+        XCTAssertTrue(imported.waitForExistence(timeout: 8), app.debugDescription)
+        imported.tap()
+        XCTAssertTrue(app.buttons["mihbara-reader-close"].waitForExistence(timeout: 15), app.debugDescription)
+        sleep(2)
+        attach(app, "M6-T01-turath-reader-L")
+    }
+
     private func attach(_ app: XCUIApplication, _ name: String) {
         let attachment = XCTAttachment(screenshot: app.screenshot()); attachment.name = name; attachment.lifetime = .keepAlways; add(attachment)
     }

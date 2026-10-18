@@ -61,3 +61,11 @@ Differences left: V06 sample text, paragraph and chapter numbers come from the f
 Not verified: owner iPhone; anchor resolution across multi-page RTL chapters; EPUB reopen position; real large EPUB/PDF files; dark reader.
 Next: M6-V08 (word and highlight) is the first ready card. V07 Aa sheet is built with the owner-approved page options. MadarData `settingsDefaultsPersistenceAndInvalidRejection` still expects 132 settings while the schema has 137 (stale since M5, untouched).
 Model/effort: Claude Opus 5.5 / not exposed. Usage: not exposed.
+
+## Handover — M6-V08 word and highlight — 2026-10-18 — Claude
+Works now: in the Arabic reader a long press on a word opens the word card (system dictionary, three-colour paragraph highlight, page note, copy with citation). Highlights draw as an opaque band behind the text, reopen on tap, and undo repaints the page.
+Verified: `swift test --filter "HighlightCommandTests|BookCommand"` 5/5; UI word-card flow 1/1 (`M6-V08-*.xcresult`, shots in `Artifacts/M6-V08-shots`); V06 reader UI 1/1 regression; `compare-screens.py R9-Qari-Kalima`; `git diff --check` clean. A no-op type annotation in `PrayerStreaksView` unblocked a compiler type-check timeout.
+Differences left: reader header/footer stay visible under the card; dictionary button in place of the sample gloss; token colours for the circles.
+Not verified: dark reader, Look Up sheet content, highlights across several pages/resources, owner iPhone.
+Next: M6-V09 (verses and footnotes) is the next ready card; it owns «حاشيتها» on word touch.
+Model/effort: Claude Opus 5.5 / not exposed. Usage: not exposed.

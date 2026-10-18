@@ -48,6 +48,7 @@
 		1F59790F471AA612E893D832 /* QuranHomeUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBD6281E275A0464F067271E /* QuranHomeUITests.swift */; };
 		1F6725D4AA749A526B4DE664 /* BahwYearView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9586F680008485EF08F16C54 /* BahwYearView.swift */; };
 		1FB325B489D915F2912F57FC /* PrayerCustomizeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E82713EFD04D42E929BB0F7 /* PrayerCustomizeView.swift */; };
+		20A1D4AB43B752721792187E /* MihbaraTurathView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13DABB3B29EC87D4BECDD9D6 /* MihbaraTurathView.swift */; };
 		211E823EE865926858A063DD /* QuranHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03DE6A691DDAF38C2D4B00AA /* QuranHomeView.swift */; };
 		2153D4C5E3F51F1189BBF582 /* PrayerControlIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = F641995C5E5E50050215DA42 /* PrayerControlIntent.swift */; };
 		21C2B80D9912FF503F768AFD /* QuranPlanSetupUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 705F1232750D5F205C9CF2B4 /* QuranPlanSetupUITests.swift */; };
@@ -439,6 +440,7 @@
 		0FBE1448D1219609C2020B02 /* Prayer.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Prayer.xcstrings; sourceTree = "<group>"; };
 		11F123B2D3B43B936627F0D6 /* QuranWeekView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranWeekView.swift; sourceTree = "<group>"; };
 		1272CF3F9C22A2C5B4AABE76 /* CaptureIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureIntent.swift; sourceTree = "<group>"; };
+		13DABB3B29EC87D4BECDD9D6 /* MihbaraTurathView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MihbaraTurathView.swift; sourceTree = "<group>"; };
 		1408B5D8D099411FD502A871 /* MoneyGoalUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyGoalUITests.swift; sourceTree = "<group>"; };
 		156373CD20DDBC2829A5AED5 /* DiaryCustomizeUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryCustomizeUITests.swift; sourceTree = "<group>"; };
 		169422FA3D388450CA8DA3DD /* DiarySearchIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiarySearchIntegrationTests.swift; sourceTree = "<group>"; };
@@ -966,6 +968,7 @@
 				4C7701301D14E577EA61ECA5 /* MihbaraPDFImportView.swift */,
 				7B9ACE8CD0ACA2E8F081BA36 /* MihbaraPDFReaderView.swift */,
 				61502A92C935793E29B5D9BD /* MihbaraReaderView.swift */,
+				13DABB3B29EC87D4BECDD9D6 /* MihbaraTurathView.swift */,
 				188FF264A10C74C606DA9049 /* MoneyAccountSheet.swift */,
 				1B351D7CF47341AB376DB1F0 /* MoneyAccountsModels.swift */,
 				5FF3A5ABCDDB3153D93E2D90 /* MoneyAccountsView.swift */,
@@ -1765,6 +1768,7 @@
 				69E47582BD363B1553C07132 /* MihbaraPaperCapture.swift in Sources */,
 				3A4186587335738C06BE4F42 /* MihbaraPaperIndexEditor.swift in Sources */,
 				E2F052CDDC36B8452E4833F0 /* MihbaraReaderView.swift in Sources */,
+				20A1D4AB43B752721792187E /* MihbaraTurathView.swift in Sources */,
 				D3ECDCC4985EE35691FB5ACF /* MoneyAccountSheet.swift in Sources */,
 				06AB1F5BB5F8C476ACC773E0 /* MoneyAccountsModels.swift in Sources */,
 				D6E9021FF34A9148836244D4 /* MoneyAccountsView.swift in Sources */,

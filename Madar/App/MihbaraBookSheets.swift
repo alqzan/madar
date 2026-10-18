@@ -52,6 +52,20 @@ struct MihbaraAddBookView: View {
                     .accessibilityIdentifier("mihbara-add-source-file")
 
                     NavigationLink {
+                        MihbaraTurathView(app: app, onImported: onEPUBImported)
+                    } label: {
+                        MihbaraAddBookSourceCard(
+                            title: "من تراث · المكتبة الشاملة",
+                            subtitle: "ابحث عن كتاب ونزّله إلى جهازك",
+                            symbol: "books.vertical.fill",
+                            color: theme.color("desk"),
+                            foreground: theme.color("onDesk")
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("mihbara-add-source-turath")
+
+                    NavigationLink {
                         MihbaraPaperIndexEditor(app: app, readingBooks: readingBooks, onSaved: onPaperBookSaved)
                             .toolbarVisibility(.hidden, for: .navigationBar)
                     } label: {
@@ -120,7 +134,7 @@ struct MihbaraAddBookView: View {
                                 .overlay { Capsule().stroke(theme.line, lineWidth: 1) }
                         }
                     }
-                    Text("كل ملف يبقى على جهازك. راجع معاينته قبل إضافته إلى رفّك.")
+                    Text("كل كتاب يبقى على جهازك ويُقرأ بلا إنترنت؛ البحث في تراث وحده يحتاج الاتصال. راجع معاينته قبل إضافته إلى رفّك.")
                         .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                 }
             }
