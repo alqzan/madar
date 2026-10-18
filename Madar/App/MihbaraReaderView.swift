@@ -134,11 +134,14 @@ struct MihbaraReaderView: View {
 
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var publication: Publication?
     @State private var localURL: URL?
     @State private var initialLocator: Locator?
     @State private var currentLocator: Locator?
     @State private var navigatorController: EPUBNavigatorViewController?
+    @State private var focusPositionLabel: String?
+    @State private var focusChromeVisible = false
     @State private var printPages: [MihbaraPrintPage] = []
     @State private var printMarkedLocator: Locator?
     @State private var positionCount = 0
@@ -215,7 +218,12 @@ struct MihbaraReaderView: View {
     private var readerMargins: Int { readerInt("margins", 1...4, 2) }
     private var readerJustify: Bool { readerBool("justify", true) }
     private var readerHeavier: Bool { readerBool("heavier", false) }
-    private var readerScroll: Bool { readerSettings["mode"]?.string == "scroll" }
+    private var readerMode: String {
+        guard let mode = readerSettings["mode"]?.string, ["pages", "scroll", "focus"].contains(mode) else { return "pages" }
+        return mode
+    }
+    private var readerFocus: Bool { readerMode == "focus" }
+    private var readerScroll: Bool { readerMode != "pages" }
     private var readerFooter: MihbaraReaderFooter { readerSettings["footer"]?.string.flatMap(MihbaraReaderFooter.init(rawValue:)) ?? .full }
     private var readerFont: MihbaraReaderFont {
         guard case .string(let id)? = readerSettings["font"] else { return .amiri }
@@ -248,8 +256,10 @@ struct MihbaraReaderView: View {
         // A fixed origin: `.now` would restart the timeline on every redraw.
         TimelineView(.periodic(from: Date(timeIntervalSinceReferenceDate: 0), by: 5)) { tick in
             VStack(spacing: 0) {
-                header
-                Rectangle().fill(palette.line).frame(height: 1)
+                if !readerFocus || focusChromeVisible {
+                    header
+                    Rectangle().fill(palette.line).frame(height: 1)
+                }
                 if let publication {
                     MihbaraEPUBNavigator(
                         publication: publication,
@@ -259,6 +269,7 @@ struct MihbaraReaderView: View {
                         onLocation: locationChanged,
                         onInteraction: readerTapped,
                         onSelection: selectionChanged,
+                        onDocumentReady: { applyFocusMode() },
                         onFootnote: { note in
                             recordInteraction()
                             lastDecorationTap = Date()
@@ -267,6 +278,7 @@ struct MihbaraReaderView: View {
                         },
                         onReady: { navigator in
                             navigatorController = navigator
+                            applyFocusMode()
                             if let currentLocator { resolvePrintPageMarker(for: currentLocator) }
                             navigator.observeDecorationInteractions(inGroup: MihbaraHighlight.group) { event in
                                 highlightTapped(event.decoration.id)
@@ -291,9 +303,15 @@ struct MihbaraReaderView: View {
                         }
                     }.frame(maxWidth: .infinity, maxHeight: .infinity).padding(28)
                 }
-                footer
+                if readerFocus { focusFooter } else { footer }
             }
-            .overlay(alignment: .bottom) { readerOverlay }
+            .overlay(alignment: .bottom) {
+                VStack(spacing: 8) {
+                    if readerFocus && wordCard == nil && footnote == nil { focusControls }
+                    readerOverlay
+                }
+                .padding(.bottom, readerFocus && wordCard == nil && footnote == nil ? 45 : 0)
+            }
             .background(paper.ignoresSafeArea())
         .foregroundStyle(palette.ink)
             .environment(\.layoutDirection, .rightToLeft)
@@ -303,7 +321,14 @@ struct MihbaraReaderView: View {
             }
         }
         .task { await openPublication() }
-        .onChange(of: app.values[settingsKey]) { navigatorController?.submitPreferences(readerPreferences) }
+        .onChange(of: app.values[settingsKey]) {
+            navigatorController?.submitPreferences(readerPreferences)
+            applyFocusMode()
+        }
+        .onChange(of: readerFocus) { _, isFocused in
+            if isFocused { focusChromeVisible = false }
+            applyFocusMode()
+        }
         // An undo from the toast, or anywhere else, repaints the page from the store.
         .onChange(of: app.undoToken?.id) { reloadHighlights() }
         .onChange(of: palette) { applyHighlights() }
@@ -342,7 +367,7 @@ struct MihbaraReaderView: View {
         .sheet(isPresented: $showingReaderSettings) {
             MihbaraReaderSettingsSheet(
                 app: app, paper: paper, palette: palette, english: isEnglish,
-                options: .init(theme: readerSettings["theme"]?.string.flatMap(MihbaraReaderTheme.init(rawValue:)) ?? .auto, size: readerSize, font: readerFont, scroll: readerScroll, lineSpacing: readerLineSpacing,
+                options: .init(theme: readerSettings["theme"]?.string.flatMap(MihbaraReaderTheme.init(rawValue:)) ?? .auto, size: readerSize, font: readerFont, mode: readerMode, lineSpacing: readerLineSpacing,
                                margins: readerMargins, justify: readerJustify, heavier: readerHeavier, footer: readerFooter),
                 set: updateReaderSetting,
                 reset: { app.reset([settingsKey]) }
@@ -413,6 +438,60 @@ struct MihbaraReaderView: View {
 
     @ViewBuilder private var footer: some View {
         if readerFooter != .none { footerContent }
+    }
+
+    private var focusFooter: some View {
+        Text(printPageLabel)
+            .font(MadarTypography.caption())
+            .foregroundStyle(palette.ink2)
+            .lineLimit(1)
+            .minimumScaleFactor(0.85)
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 18)
+            .padding(.top, 8)
+            .padding(.bottom, 11)
+            .background(paper)
+            .accessibilityIdentifier("mihbara-focus-print-page")
+    }
+
+    private var focusControls: some View {
+        GlassEffectContainer(spacing: 8) {
+            HStack(spacing: 12) {
+                Button { stepFocus(-1) } label: {
+                    Image(systemName: "chevron.up")
+                        .font(.system(size: 13, weight: .semibold))
+                        .frame(width: 36, height: 34)
+                        .contentShape(.capsule)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("الفقرة السابقة")
+                .accessibilityValue(focusPositionLabel ?? "")
+                .accessibilityIdentifier("mihbara-focus-previous")
+
+                Text("وضع التركيز")
+                    .font(MadarTypography.caption().weight(.semibold))
+                    .fixedSize()
+
+                Button { stepFocus(1) } label: {
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 13, weight: .semibold))
+                        .frame(width: 36, height: 34)
+                        .contentShape(.capsule)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("الفقرة التالية")
+                .accessibilityValue(focusPositionLabel ?? "")
+                .accessibilityIdentifier("mihbara-focus-next")
+            }
+            .foregroundStyle(palette.ink)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 5)
+            .glassEffect(.regular.interactive(), in: Capsule())
+            .overlay { Capsule().stroke(palette.line.opacity(0.8), lineWidth: 0.7) }
+            .shadow(color: .black.opacity(palette.isDark ? 0.22 : 0.12), radius: 15, y: 5)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("mihbara-focus-controls")
+        }
     }
 
     private var footerContent: some View {
@@ -520,6 +599,7 @@ struct MihbaraReaderView: View {
         if !explicitJump, wordCard == nil { readerUndoID = nil }
         scheduleLocatorSave(locator)
         resolvePrintPageMarker(for: locator)
+        if readerFocus { applyFocusMode() }
     }
 
     /// Readium's reflowable locators carry a progression, not the page-break anchor, so a
@@ -584,8 +664,44 @@ struct MihbaraReaderView: View {
         }
     }
 
+    @MainActor private func applyFocusMode() {
+        guard let navigatorController else { return }
+        let enabled = readerFocus
+        let script = "window.madarReaderSetFocusMode ? window.madarReaderSetFocusMode(\(enabled ? "true" : "false")) : ''"
+        Task { @MainActor in
+            guard case .success(let value) = await navigatorController.evaluateJavaScript(script),
+                  self.navigatorController === navigatorController,
+                  readerFocus == enabled else { return }
+            focusPositionLabel = focusPositionLabel(from: value)
+        }
+    }
+
+    @MainActor private func stepFocus(_ direction: Int) {
+        guard let navigatorController else { return }
+        // A scroll-mode preference change can reload the same locator without a location callback.
+        // Re-enable focus in the current document before stepping so its per-document state is restored.
+        let script = "if (window.madarReaderSetFocusMode) window.madarReaderSetFocusMode(true); window.madarReaderStepFocus ? window.madarReaderStepFocus(\(direction)) : ''"
+        Task { @MainActor in
+            guard case .success(let value) = await navigatorController.evaluateJavaScript(script),
+                  self.navigatorController === navigatorController,
+                  readerFocus else { return }
+            focusPositionLabel = focusPositionLabel(from: value)
+        }
+    }
+
+    private func focusPositionLabel(from value: Any) -> String? {
+        guard let raw = value as? String else { return nil }
+        let parts = raw.split(separator: "/", maxSplits: 1)
+        guard parts.count == 2, let index = Int(parts[0]), let total = Int(parts[1]), index > 0, total > 0 else { return nil }
+        return "الفقرة \(digits.string(index)) من \(digits.string(total))"
+    }
+
     @MainActor private func readerTapped() {
         recordInteraction()
+        if readerFocus {
+            if reduceMotion { focusChromeVisible.toggle() }
+            else { withAnimation(.easeInOut(duration: 0.18)) { focusChromeVisible.toggle() } }
+        }
         guard wordCard != nil || footnote != nil else { return }
         let tapped = Date()
         Task { @MainActor in
@@ -1076,7 +1192,7 @@ enum MihbaraReaderFooter: String, CaseIterable, Identifiable {
 
 struct MihbaraReaderOptions: Equatable {
     var theme: MihbaraReaderTheme
-    var size: Int, font: MihbaraReaderFont, scroll: Bool, lineSpacing: Int, margins: Int, justify: Bool, heavier: Bool, footer: MihbaraReaderFooter
+    var size: Int, font: MihbaraReaderFont, mode: String, lineSpacing: Int, margins: Int, justify: Bool, heavier: Bool, footer: MihbaraReaderFooter
 }
 
 /// «عرض الصفحة»: every choice is saved to `mihbara.readerAr` at once and applied live.
@@ -1215,9 +1331,8 @@ private struct MihbaraReaderSettingsSheet: View {
     }
 
     private var modeRow: some View {
-        // Focus mode is a later task (RMI2), so only pages and scroll are offered.
-        segmented([("صفحات", "pages"), ("تمرير", "scroll")],
-                  selected: options.scroll ? "scroll" : "pages", id: "mode") { set("mode", .string($0)) }
+        segmented([("صفحات", "pages"), ("تمرير", "scroll"), ("تركيز", "focus")],
+                  selected: options.mode, id: "mode") { set("mode", .string($0)) }
     }
 
     private var moreOptions: some View {
@@ -1305,6 +1420,7 @@ private struct MihbaraEPUBNavigator: UIViewControllerRepresentable {
     let onLocation: (Locator, Bool) -> Void
     let onInteraction: () -> Void
     let onSelection: (Selection) -> Void
+    let onDocumentReady: () -> Void
     let onFootnote: (MihbaraFootnote) -> Void
     let onReady: (EPUBNavigatorViewController) -> Void
     let onError: (NavigatorError) -> Void
@@ -1336,7 +1452,7 @@ private struct MihbaraEPUBNavigator: UIViewControllerRepresentable {
     }
 
     func makeCoordinator() -> Coordinator {
-        let coordinator = Coordinator(onLocation: onLocation, onInteraction: onInteraction, onSelection: onSelection, onReady: onReady, onError: onError)
+        let coordinator = Coordinator(onLocation: onLocation, onInteraction: onInteraction, onSelection: onSelection, onDocumentReady: onDocumentReady, onReady: onReady, onError: onError)
         coordinator.onFootnote = onFootnote
         return coordinator
     }
@@ -1387,25 +1503,28 @@ private struct MihbaraEPUBNavigator: UIViewControllerRepresentable {
         context.coordinator.onLocation = onLocation
         context.coordinator.onInteraction = onInteraction
         context.coordinator.onSelection = onSelection
+        context.coordinator.onDocumentReady = onDocumentReady
         context.coordinator.onFootnote = onFootnote
         context.coordinator.onReady = onReady
         context.coordinator.onError = onError
         (controller as? EPUBNavigatorViewController)?.delegate = context.coordinator
     }
 
-    final class Coordinator: NSObject, EPUBNavigatorDelegate {
+    final class Coordinator: NSObject, EPUBNavigatorDelegate, WKScriptMessageHandler {
         var onLocation: (Locator, Bool) -> Void
         var onInteraction: () -> Void
         var onSelection: (Selection) -> Void
+        var onDocumentReady: () -> Void
         var onFootnote: (MihbaraFootnote) -> Void = { _ in }
         var background = ""
         var onReady: (EPUBNavigatorViewController) -> Void
         var onError: (NavigatorError) -> Void
 
-        init(onLocation: @escaping (Locator, Bool) -> Void, onInteraction: @escaping () -> Void, onSelection: @escaping (Selection) -> Void, onReady: @escaping (EPUBNavigatorViewController) -> Void, onError: @escaping (NavigatorError) -> Void) {
+        init(onLocation: @escaping (Locator, Bool) -> Void, onInteraction: @escaping () -> Void, onSelection: @escaping (Selection) -> Void, onDocumentReady: @escaping () -> Void, onReady: @escaping (EPUBNavigatorViewController) -> Void, onError: @escaping (NavigatorError) -> Void) {
             self.onLocation = onLocation
             self.onInteraction = onInteraction
             self.onSelection = onSelection
+            self.onDocumentReady = onDocumentReady
             self.onReady = onReady
             self.onError = onError
         }
@@ -1413,6 +1532,10 @@ private struct MihbaraEPUBNavigator: UIViewControllerRepresentable {
         func navigator(_ navigator: Navigator, locationDidChange locator: Locator) { onLocation(locator, false) }
         func navigator(_ navigator: Navigator, didJumpTo locator: Locator) { onLocation(locator, true) }
         func navigator(_ navigator: Navigator, presentError error: NavigatorError) { onError(error) }
+        func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+            guard message.name == "madarReaderDocumentReady" else { return }
+            onDocumentReady()
+        }
         func navigator(_ navigator: VisualNavigator, didTapAt point: CGPoint) { onInteraction() }
         func navigator(_ navigator: Navigator, presentExternalURL url: URL) { onInteraction() }
         /// A note reference opens Madar's footnote card instead of jumping to the notes file.
@@ -1427,6 +1550,7 @@ private struct MihbaraEPUBNavigator: UIViewControllerRepresentable {
             return false
         }
         func navigator(_ navigator: EPUBNavigatorViewController, setupUserScripts userContentController: WKUserContentController) {
+            userContentController.add(self, name: "madarReaderDocumentReady")
             let source = """
             (() => {
               const apply = () => {
@@ -1483,6 +1607,90 @@ private struct MihbaraEPUBNavigator: UIViewControllerRepresentable {
                 }
               };
               if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', verses); else verses();
+
+              const focusBlocks = () => Array.from(document.body?.querySelectorAll('p, li, blockquote') ?? [])
+                // Empty page-break paragraphs still receive a line box in some EPUBs. Treating
+                // one as a reading paragraph leaves every visible line dimmed at that boundary.
+                .filter(block => !block.closest('[hidden], [aria-hidden="true"]')
+                  && block.getBoundingClientRect().height > 0
+                  && (block.innerText || '').trim().length > 0);
+              const focusDescription = (block, blocks) => {
+                if (!block || !blocks.length) return '';
+                const index = blocks.indexOf(block);
+                return index < 0 ? '' : `${index + 1}/${blocks.length}`;
+              };
+              const setFocusBlock = (block, blocks = focusBlocks()) => {
+                for (const candidate of blocks) {
+                  const active = candidate === block;
+                  candidate.classList.toggle('madar-focus-active', active);
+                  if (active) candidate.setAttribute('aria-current', 'location');
+                  else candidate.removeAttribute('aria-current');
+                }
+                return focusDescription(block, blocks);
+              };
+              const nearestFocusBlock = (blocks) => {
+                if (!blocks.length) return null;
+                const visible = blocks.filter(block => {
+                  const rect = block.getBoundingClientRect();
+                  return rect.bottom > 0 && rect.top < window.innerHeight;
+                });
+                const candidates = visible.length ? visible : blocks;
+                const center = window.innerHeight / 2;
+                return candidates.reduce((best, block) => {
+                  if (!best) return block;
+                  const rect = block.getBoundingClientRect();
+                  const bestRect = best.getBoundingClientRect();
+                  return Math.abs(rect.top + rect.height / 2 - center) < Math.abs(bestRect.top + bestRect.height / 2 - center) ? block : best;
+                }, null);
+              };
+              let focusTargetSequence = 0;
+              const scrollFocusBlock = (block, behavior) => {
+                if (!block.id) block.id = 'madar-focus-target-' + (++focusTargetSequence);
+                // Readium owns the EPUB scroll surface. Its locator helper reaches the right
+                // vertical offset when DOM scrollIntoView cannot move the navigator's container.
+                if (window.readium?.scrollToId) window.readium.scrollToId(block.id, behavior === 'smooth');
+                else block.scrollIntoView({ behavior, block: 'center', inline: 'nearest' });
+              };
+              window.madarReaderSetFocusMode = (enabled) => {
+                const body = document.body;
+                if (!body) return '';
+                if (!enabled) {
+                  delete body.dataset.madarFocus;
+                  for (const block of focusBlocks()) {
+                    block.classList.remove('madar-focus-active');
+                    block.removeAttribute('aria-current');
+                  }
+                  return '';
+                }
+                body.dataset.madarFocus = 'true';
+                const blocks = focusBlocks();
+                const active = blocks.find(block => block.classList.contains('madar-focus-active')) || nearestFocusBlock(blocks);
+                return setFocusBlock(active, blocks);
+              };
+              window.madarReaderStepFocus = (direction) => {
+                if (!document.body?.dataset.madarFocus) return '';
+                const blocks = focusBlocks();
+                if (!blocks.length) return '';
+                const active = blocks.find(block => block.classList.contains('madar-focus-active')) || nearestFocusBlock(blocks);
+                const index = blocks.indexOf(active);
+                const next = blocks[index + direction];
+                if (!next) return focusDescription(active, blocks);
+                const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+                scrollFocusBlock(next, behavior);
+                return setFocusBlock(next, blocks);
+              };
+              let focusFrame = 0;
+              document.addEventListener('scroll', () => {
+                if (!document.body?.dataset.madarFocus || focusFrame) return;
+                focusFrame = requestAnimationFrame(() => {
+                  focusFrame = 0;
+                  const blocks = focusBlocks();
+                  setFocusBlock(nearestFocusBlock(blocks), blocks);
+                });
+              }, true);
+              const notifyDocumentReady = () => window.webkit.messageHandlers.madarReaderDocumentReady.postMessage(true);
+              if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', notifyDocumentReady, { once: true });
+              else queueMicrotask(notifyDocumentReady);
             })();
             """
             userContentController.addUserScript(WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true))
@@ -1783,6 +1991,10 @@ enum MihbaraReaderTheme: String, CaseIterable, Identifiable {
             let h = theme.hex, root = ":root[style*=\"\(h.bg)\"]"
             return "\(root) body span.madar-ayah.madar-ayah.madar-ayah { color: \(h.verse) !important; } "
                 + "\(root) body a[role~='doc-noteref'][role~='doc-noteref'] { background: \(h.accent) !important; color: \(h.onAccent) !important; }"
+                + "\(root) body[data-madar-focus='true'] :is(p, li, blockquote) { color: \(h.ink2) !important; } "
+                + "\(root) body[data-madar-focus='true'] :is(p, li, blockquote).madar-focus-active { color: \(h.ink) !important; }"
+                + "\(root) body[data-madar-focus='true'] { padding-bottom: 8rem !important; } "
+                + "@media (prefers-reduced-motion: no-preference) { \(root) body[data-madar-focus='true'] :is(p, li, blockquote) { transition: color .18s ease; } }"
         }.joined(separator: "\n")
     }
 }

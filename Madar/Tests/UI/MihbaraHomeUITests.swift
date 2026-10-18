@@ -65,7 +65,7 @@ import XCTest
         let author = app.textFields["mihbara-paper-author"]; author.tap(); author.typeText("من مكتبتي")
         let pages = app.textFields["mihbara-paper-pages"]; pages.tap(); pages.typeText("٢٥٠"); if app.toolbars.buttons["تمّ"].exists { app.toolbars.buttons["تمّ"].tap() }
         let save = app.buttons["mihbara-paper-save"]; reach(app,save); shot(app,"M6-V01-add-paper-L"); save.tap()
-        XCTAssertTrue(app.staticTexts["كتابي الأول"].firstMatch.waitForExistence(timeout:8)); undo(app)
+        XCTAssertTrue(app.staticTexts["كتابي الأول"].firstMatch.waitForExistence(timeout:8)); shot(app, "M6-shared-undo-glass-L"); undo(app)
         XCTAssertTrue(app.staticTexts["أضف كتابك الأول"].waitForExistence(timeout:8))
     }
     func testPaperIndexUsesEditableChapterRowsAndOneUndoableSave() {
@@ -409,6 +409,49 @@ import XCTest
         for _ in 0..<4 { app.swipeDown(velocity: .slow); if app.buttons["mihbara-reader-theme-auto"].isHittable { break } }
         XCTAssertTrue(app.buttons["mihbara-reader-theme-auto"].waitForSelection(timeout: 5))
         XCTAssertTrue(app.buttons["mihbara-reader-mode-pages"].isSelected)
+    }
+
+    func testFocusReaderAdvancesOneParagraphAndKeepsReadingChromeOutOfSight() throws {
+        continueAfterFailure = false
+        let fixtureURL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "arabic-reader-poc", withExtension: "epub"))
+        let app = app("reader", epub: try Data(contentsOf: fixtureURL)); app.launch(); open(app)
+        let book = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "كتاب اختبار القارئ")).firstMatch
+        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); book.tap()
+        let paragraph = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "القراءة باب يدخل")).firstMatch
+        XCTAssertTrue(paragraph.waitForExistence(timeout: 20), app.debugDescription)
+        app.buttons["mihbara-reader-settings"].tap()
+        let calm = app.buttons["mihbara-reader-theme-calm"]
+        XCTAssertTrue(calm.waitForExistence(timeout: 5), app.debugDescription); calm.tap()
+        XCTAssertTrue(calm.waitForSelection(timeout: 5), app.debugDescription)
+        let focus = app.buttons["mihbara-reader-mode-focus"]
+        XCTAssertTrue(focus.waitForExistence(timeout: 5), app.debugDescription); focus.tap()
+        XCTAssertTrue(focus.waitForSelection(timeout: 5), app.debugDescription)
+        app.buttons["mihbara-reader-settings-close"].tap()
+
+        let previous = app.buttons["mihbara-focus-previous"]
+        let next = app.buttons["mihbara-focus-next"]
+        XCTAssertTrue(next.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["mihbara-focus-print-page"].waitForExistence(timeout: 5), app.debugDescription)
+        next.tap()
+        let positionReady = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value != ''"), object: next)
+        XCTAssertEqual(XCTWaiter.wait(for: [positionReady], timeout: 8), .completed, app.debugDescription)
+        let initialPosition = next.value as? String ?? ""
+        XCTAssertFalse(initialPosition.isEmpty, "Advancing focus should expose its paragraph position\n\(app.debugDescription)")
+        XCTAssertTrue(previous.exists)
+        XCTAssertFalse(app.buttons["mihbara-reader-settings"].exists, "Focus mode should hide its reading chrome")
+        shot(app, "M6-V11-focus-L")
+
+        next.tap()
+        let moved = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value != %@", initialPosition), object: next)
+        XCTAssertEqual(XCTWaiter.wait(for: [moved], timeout: 8), .completed, app.debugDescription)
+        shot(app, "M6-V11-focus-s1-L")
+
+        let nextMove = next.value as? String ?? ""
+        next.tap()
+        let movedAgain = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value != %@", nextMove), object: next)
+        XCTAssertEqual(XCTWaiter.wait(for: [movedAgain], timeout: 8), .completed, app.debugDescription)
+        sleep(1)
+        shot(app, "M6-V11-focus-s2-L")
     }
 
     func testEnglishEPUBReadsLeftToRightWithItsOwnSettings() throws {

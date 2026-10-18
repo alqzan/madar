@@ -20,8 +20,8 @@ public struct UndoToast: View {
             } }
         }
         .foregroundStyle(theme.ink).padding(.horizontal, 16).padding(.vertical, 4)
-        .background(theme.surface, in: .rect(cornerRadius: 16))
-        .overlay { RoundedRectangle(cornerRadius: 16).stroke(theme.accent, lineWidth: 1) }
+        .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 16))
+        .overlay { RoundedRectangle(cornerRadius: 16).stroke(theme.accent.opacity(0.62), lineWidth: 0.8) }
         .padding(.horizontal, 16).accessibilityElement(children: .contain)
     }
 }
