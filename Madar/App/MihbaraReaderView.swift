@@ -149,6 +149,10 @@ struct MihbaraReaderView: View {
     @State private var showingContents = false
     @State private var showingReaderSettings = false
     @State private var speechController = MihbaraSpeechController()
+    @State private var autoScrollTask: Task<Void, Never>?
+    @State private var autoScrollRunID = UUID()
+    @State private var autoScrollPaused = false
+    @State private var autoScrollPositionLabel: String?
     @State private var readingClock: ActiveReadingClock?
     @State private var positionProgress = ReadingPositionProgress()
     @State private var sessionStart: Date?
@@ -226,6 +230,9 @@ struct MihbaraReaderView: View {
         guard let mode = readerSettings["mode"]?.string, ["pages", "scroll", "focus"].contains(mode) else { return "pages" }
         return mode
     }
+    private var autoScrollSpeed: MihbaraAutoScrollSpeed {
+        MihbaraAutoScrollSpeed(rawValue: readerSettings["autoScroll"]?.string ?? "off") ?? .off
+    }
     private var readerFocus: Bool { readerMode == "focus" }
     private var readerScroll: Bool { readerMode != "pages" }
     private var readerFooter: MihbaraReaderFooter { readerSettings["footer"]?.string.flatMap(MihbaraReaderFooter.init(rawValue:)) ?? .full }
@@ -275,7 +282,7 @@ struct MihbaraReaderView: View {
                         onLocation: locationChanged,
                         onInteraction: readerTapped,
                         onSelection: selectionChanged,
-                        onDocumentReady: { applyFocusMode() },
+                        onDocumentReady: { applyFocusMode(); synchronizeAutoScroll() },
                         onFootnote: { note in
                             recordInteraction()
                             lastDecorationTap = Date()
@@ -285,6 +292,7 @@ struct MihbaraReaderView: View {
                         onReady: { navigator in
                             navigatorController = navigator
                             applyFocusMode()
+                            synchronizeAutoScroll()
                             if let currentLocator { resolvePrintPageMarker(for: currentLocator) }
                             navigator.observeDecorationInteractions(inGroup: MihbaraHighlight.group) { event in
                                 highlightTapped(event.decoration.id)
@@ -330,6 +338,22 @@ struct MihbaraReaderView: View {
             navigatorController?.submitPreferences(readerPreferences)
             applyFocusMode()
         }
+        .onChange(of: autoScrollSpeed) { _, speed in
+            if speed == .off {
+                cancelAutoScroll(clearActive: true)
+            } else {
+                autoScrollPaused = false
+                cancelAutoScroll(clearActive: false)
+                synchronizeAutoScroll()
+            }
+        }
+        .onChange(of: readerMode) { _, mode in
+            if mode != "scroll" {
+                cancelAutoScroll(clearActive: true)
+            } else {
+                synchronizeAutoScroll()
+            }
+        }
         .onChange(of: readerFocus) { _, isFocused in
             if isFocused { focusChromeVisible = false }
             applyFocusMode()
@@ -340,22 +364,29 @@ struct MihbaraReaderView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 resumeReader(at: Date())
+                synchronizeAutoScroll()
             } else {
                 pauseReader(at: Date())
                 stopNarration()
+                cancelAutoScroll(clearActive: false)
             }
         }
         .onChange(of: saveCoordinator.canWrite) { _, authorized in
-            if authorized, scenePhase == .active { resumeReader(at: Date()) }
-            else if !authorized { pauseReader(at: Date()); stopNarration() }
+            if authorized, scenePhase == .active { resumeReader(at: Date()); synchronizeAutoScroll() }
+            else if !authorized { pauseReader(at: Date()); stopNarration(); cancelAutoScroll(clearActive: false) }
         }
         .onChange(of: showingContents || showingReaderSettings || noteDraft != nil || lookupTerm != nil || translationRequest != nil || wordCard != nil || footnote != nil) { _, covered in
-            if covered { pauseReader(at: Date()); stopNarration() }
-            else if scenePhase == .active { resumeReader(at: Date()) }
+            if covered { pauseReader(at: Date()); stopNarration(); cancelAutoScroll(clearActive: false) }
+            else if scenePhase == .active { resumeReader(at: Date()); synchronizeAutoScroll() }
+        }
+        .onChange(of: speechController.isActive) { _, isActive in
+            if isActive { cancelAutoScroll(clearActive: false) }
+            else { synchronizeAutoScroll() }
         }
         .onDisappear {
             pauseReader(at: Date())
             stopNarration()
+            cancelAutoScroll(clearActive: true)
             pendingLocatorSave?.cancel()
             if let localURL { try? FileManager.default.removeItem(at: localURL) }
         }
@@ -375,7 +406,8 @@ struct MihbaraReaderView: View {
                 app: app, paper: paper, palette: palette, english: isEnglish,
                 options: .init(theme: readerSettings["theme"]?.string.flatMap(MihbaraReaderTheme.init(rawValue:)) ?? .auto, size: readerSize, font: readerFont, mode: readerMode, lineSpacing: readerLineSpacing,
                                margins: readerMargins, justify: readerJustify, heavier: readerHeavier, footer: readerFooter,
-                               englishFont: englishReaderFont, englishFooter: englishReaderFooter, hyphenation: readerHyphenation, wordSpacing: readerWordSpacing),
+                               englishFont: englishReaderFont, englishFooter: englishReaderFooter, hyphenation: readerHyphenation, wordSpacing: readerWordSpacing,
+                               autoScroll: autoScrollSpeed),
                 set: updateReaderSetting,
                 reset: { app.reset([settingsKey]) }
             )
@@ -713,11 +745,74 @@ struct MihbaraReaderView: View {
             .transition(.move(edge: .bottom).combined(with: .opacity))
         } else if speechController.isActive {
             listeningPlayer
+        } else if shouldShowAutoScrollPlayer {
+            autoScrollPlayer
         } else if let token = app.undoToken, token.id == readerUndoID, !showingReaderSettings {
             UndoToast(message: app.undoMessage, undo: app.undo)
                 .accessibilityIdentifier("mihbara-reader-toast")
                 .padding(.bottom, 64)
         }
+    }
+
+    private var shouldShowAutoScrollPlayer: Bool {
+        autoScrollSpeed != .off && readerMode == "scroll" && !showingReaderSettings
+            && !showingContents && noteDraft == nil && lookupTerm == nil
+            && translationRequest == nil && wordCard == nil && footnote == nil
+    }
+
+    private var autoScrollPlayer: some View {
+        GlassEffectContainer(spacing: 10) {
+            HStack(spacing: 12) {
+                Button {
+                    if autoScrollPaused {
+                        autoScrollPaused = false
+                        synchronizeAutoScroll()
+                    } else {
+                        autoScrollPaused = true
+                        cancelAutoScroll(clearActive: false)
+                    }
+                } label: {
+                    Image(systemName: autoScrollPaused ? "play.fill" : "pause.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(palette.bg)
+                        .frame(width: 42, height: 42)
+                        .background(palette.accent, in: Circle())
+                }
+                .glassEffect(.regular.interactive(), in: Circle())
+                .accessibilityLabel(autoScrollPaused ? "متابعة التمرير التلقائي" : "إيقاف التمرير مؤقتًا")
+                .accessibilityIdentifier("mihbara-auto-scroll-play-pause")
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(autoScrollPaused ? "التمرير متوقف مؤقتًا" : "تمرير تلقائي · \(autoScrollSpeed.title)")
+                        .font(MadarTypography.caption().weight(.semibold))
+                        .lineLimit(1)
+                    Text(autoScrollPositionLabel ?? "يتابع الفقرة الحالية")
+                        .font(MadarTypography.fine()).foregroundStyle(palette.ink2).lineLimit(1)
+                        .accessibilityIdentifier("mihbara-auto-scroll-position")
+                }
+                Spacer(minLength: 4)
+
+                Button { updateReaderSetting("autoScroll", .string("off")) } label: {
+                    Image(systemName: "stop.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                        .frame(width: 38, height: 38)
+                        .contentShape(Circle())
+                }
+                .glassEffect(.regular.interactive(), in: Circle())
+                .accessibilityLabel("إيقاف التمرير التلقائي")
+                .accessibilityIdentifier("mihbara-auto-scroll-stop")
+            }
+            .foregroundStyle(palette.ink)
+            .padding(.horizontal, 13).padding(.vertical, 9)
+            .background(paper.opacity(palette.isDark ? 0.72 : 0.82), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .overlay { RoundedRectangle(cornerRadius: 24, style: .continuous).stroke(palette.line, lineWidth: 0.8) }
+            .shadow(color: .black.opacity(palette.isDark ? 0.22 : 0.12), radius: 15, y: 5)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("mihbara-auto-scroll-player")
+        }
+        .padding(.horizontal, 12).padding(.bottom, 10)
+        .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
     }
 
     private var listeningPlayer: some View {
@@ -805,6 +900,71 @@ struct MihbaraReaderView: View {
                   readerFocus == enabled else { return }
             focusPositionLabel = focusPositionLabel(from: value)
         }
+    }
+
+    @MainActor private func synchronizeAutoScroll() {
+        let shouldRun = autoScrollSpeed != .off && readerMode == "scroll"
+            && scenePhase == .active && !showingContents && !showingReaderSettings
+            && noteDraft == nil && lookupTerm == nil && translationRequest == nil
+            && wordCard == nil && footnote == nil && !speechController.isActive
+            && !isClosing && saveCoordinator.canWrite
+        guard shouldRun else {
+            cancelAutoScroll(clearActive: autoScrollSpeed == .off || readerMode != "scroll")
+            return
+        }
+        guard !autoScrollPaused, autoScrollTask == nil, let navigatorController else { return }
+        let runID = UUID()
+        autoScrollRunID = runID
+        let speed = autoScrollSpeed
+        autoScrollTask = Task { @MainActor in
+            await runAutoScroll(on: navigatorController, speed: speed, runID: runID)
+        }
+    }
+
+    @MainActor private func cancelAutoScroll(clearActive: Bool) {
+        autoScrollRunID = UUID()
+        autoScrollTask?.cancel()
+        autoScrollTask = nil
+        if clearActive {
+            autoScrollPositionLabel = nil
+            guard let navigatorController else { return }
+            Task { @MainActor in
+                _ = await navigatorController.evaluateJavaScript("window.madarReaderAutoScrollClear ? window.madarReaderAutoScrollClear() : ''")
+            }
+        }
+    }
+
+    @MainActor private func runAutoScroll(on navigator: EPUBNavigatorViewController, speed: MihbaraAutoScrollSpeed, runID: UUID) async {
+        defer {
+            if autoScrollRunID == runID { autoScrollTask = nil }
+        }
+        let start = await navigator.evaluateJavaScript("window.madarReaderAutoScrollStart ? window.madarReaderAutoScrollStart() : ''")
+        guard autoScrollRunID == runID, !Task.isCancelled,
+              case .success(let startValue) = start,
+              let position = autoScrollPosition(from: startValue) else { return }
+        autoScrollPositionLabel = position.label(digits: digits)
+        var words = position.wordCount
+
+        while autoScrollRunID == runID, !Task.isCancelled {
+            let seconds = min(32, max(2.5, Double(words) / speed.wordsPerMinute * 60))
+            do { try await Task.sleep(for: .seconds(seconds)) } catch { return }
+            guard autoScrollRunID == runID, !Task.isCancelled else { return }
+            let result = await navigator.evaluateJavaScript("window.madarReaderAutoScrollStep ? window.madarReaderAutoScrollStep() : ''")
+            guard autoScrollRunID == runID, !Task.isCancelled, case .success(let value) = result,
+                  let raw = value as? String else { return }
+            if raw == "end" {
+                autoScrollPaused = true
+                return
+            }
+            guard let next = autoScrollPosition(from: raw) else { return }
+            autoScrollPositionLabel = next.label(digits: digits)
+            words = next.wordCount
+        }
+    }
+
+    private func autoScrollPosition(from value: Any) -> MihbaraAutoScrollPosition? {
+        guard let raw = value as? String, let data = raw.data(using: .utf8) else { return nil }
+        return try? JSONDecoder().decode(MihbaraAutoScrollPosition.self, from: data)
     }
 
     @MainActor private func stepFocus(_ direction: Int) {
@@ -1235,6 +1395,12 @@ struct MihbaraReaderView: View {
     @MainActor private func updateReaderSetting(_ key: String, _ value: MadarData.JSONValue) {
         var settings = readerSettings
         settings[key] = value
+        if key == "autoScroll", value.string != "off" {
+            settings["mode"] = .string("scroll")
+        }
+        if key == "mode", value.string != "scroll" {
+            settings["autoScroll"] = .string("off")
+        }
         app.set(.object(settings), key: settingsKey)
     }
 
@@ -1438,6 +1604,27 @@ struct MihbaraReaderOptions: Equatable {
     var theme: MihbaraReaderTheme
     var size: Int, font: MihbaraReaderFont, mode: String, lineSpacing: Int, margins: Int, justify: Bool, heavier: Bool, footer: MihbaraReaderFooter
     var englishFont: MihbaraEnglishReaderFont, englishFooter: MihbaraEnglishReaderFooter, hyphenation: Bool, wordSpacing: Bool
+    var autoScroll: MihbaraAutoScrollSpeed
+}
+
+enum MihbaraAutoScrollSpeed: String, CaseIterable, Identifiable {
+    case off, slow, medium, fast
+    var id: String { rawValue }
+    var title: String {
+        switch self { case .off: "إيقاف"; case .slow: "بطيء"; case .medium: "متوسط"; case .fast: "سريع" }
+    }
+    var wordsPerMinute: Double {
+        switch self { case .off: 170; case .slow: 110; case .medium: 175; case .fast: 260 }
+    }
+}
+
+private struct MihbaraAutoScrollPosition: Decodable {
+    let index: Int
+    let total: Int
+    let wordCount: Int
+    func label(digits: MadarNumberFormatter) -> String {
+        "الفقرة \(digits.string(index)) من \(digits.string(total))"
+    }
 }
 
 /// «عرض الصفحة»: every choice is saved to `mihbara.readerAr` at once and applied live.
@@ -1459,15 +1646,13 @@ private struct MihbaraReaderSettingsSheet: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 9) {
                 header
                 themeRow
                 sizeRow
                 fontRow
                 modeRow
-                if english {
-                    moreOptions
-                } else {
+                autoScrollRow
                 Button { withAnimation(.smooth(duration: 0.25)) { more.toggle() } } label: {
                     Text(more ? "خيارات أقل" : "خيارات أكثر").font(MadarTypography.caption().weight(.semibold))
                         .frame(maxWidth: .infinity, minHeight: 32)
@@ -1475,9 +1660,8 @@ private struct MihbaraReaderSettingsSheet: View {
                 }
                 .buttonStyle(.plain).accessibilityIdentifier("mihbara-reader-more")
                 if more { moreOptions }
-                }
             }
-            .padding(22)
+            .padding(.horizontal, 18).padding(.vertical, 12)
         }
         .scrollBounceBehavior(.basedOnSize)
         .foregroundStyle(ink)
@@ -1521,7 +1705,7 @@ private struct MihbaraReaderSettingsSheet: View {
                 Text("+").font(MadarTypography.body())
             }
         }
-        .padding(.horizontal, 16).frame(minHeight: 64).background(well, in: .rect(cornerRadius: 16))
+        .padding(.horizontal, 16).frame(minHeight: 58).background(well, in: .rect(cornerRadius: 16))
         .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16))
     }
 
@@ -1537,7 +1721,7 @@ private struct MihbaraReaderSettingsSheet: View {
                                     Text("Book").font(.custom(option.previewName, size: 22, relativeTo: .title3)).lineLimit(1).minimumScaleFactor(0.75)
                                     Text(option.title).font(MadarTypography.fine()).foregroundStyle(ink.opacity(0.72)).lineLimit(1).minimumScaleFactor(0.75)
                                 }
-                                .frame(maxWidth: .infinity, minHeight: 84)
+                                .frame(maxWidth: .infinity, minHeight: 76)
                                 .background(SwiftUI.Color.white.opacity(0.26), in: .rect(cornerRadius: 16))
                                 .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 16))
                                 .overlay { RoundedRectangle(cornerRadius: 16).stroke(ink.opacity(selected ? 0.88 : 0.12), lineWidth: selected ? 2.5 : 1) }
@@ -1557,7 +1741,7 @@ private struct MihbaraReaderSettingsSheet: View {
                             Text("كتاب").font(.custom(option.previewName, size: 24, relativeTo: .title3))
                             Text(option.title).font(MadarTypography.fine()).foregroundStyle(ink.opacity(0.7))
                         }
-                        .frame(maxWidth: .infinity, minHeight: 84)
+                        .frame(maxWidth: .infinity, minHeight: 76)
                         .background(SwiftUI.Color.white.opacity(0.26), in: .rect(cornerRadius: 16))
                         .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 16))
                         .overlay { RoundedRectangle(cornerRadius: 16).stroke(ink.opacity(selected ? 0.88 : 0.12), lineWidth: selected ? 2.5 : 1) }
@@ -1606,6 +1790,16 @@ private struct MihbaraReaderSettingsSheet: View {
     private var modeRow: some View {
         segmented([("صفحات", "pages"), ("تمرير", "scroll"), ("تركيز", "focus")],
                   selected: options.mode, id: "mode") { set("mode", .string($0)) }
+    }
+
+    private var autoScrollRow: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text("تمرير تلقائي").font(MadarTypography.fine()).foregroundStyle(ink.opacity(0.72))
+            segmented(MihbaraAutoScrollSpeed.allCases.map { ($0.title, $0.rawValue) },
+                      selected: options.autoScroll.rawValue, id: "autoScroll") {
+                set("autoScroll", .string($0))
+            }
+        }
     }
 
     private var moreOptions: some View {
@@ -1999,6 +2193,51 @@ private struct MihbaraEPUBNavigator: UIViewControllerRepresentable {
                 for (const block of focusBlocks()) {
                   block.classList.remove('madar-speech-active');
                   if (!block.classList.contains('madar-focus-active')) block.removeAttribute('aria-current');
+                }
+                return '';
+              };
+              const autoScrollInfo = (block, blocks) => {
+                const words = (block?.innerText || '').trim().split(/\\s+/).filter(Boolean).length;
+                return JSON.stringify({ index: blocks.indexOf(block) + 1, total: blocks.length, wordCount: Math.max(1, words) });
+              };
+              const setAutoScrollBlock = (block, blocks) => {
+                for (const candidate of blocks) {
+                  const active = candidate === block;
+                  candidate.classList.toggle('madar-auto-scroll-active', active);
+                  if (active) candidate.setAttribute('aria-current', 'location');
+                  else if (!candidate.classList.contains('madar-focus-active') && !candidate.classList.contains('madar-speech-active')) candidate.removeAttribute('aria-current');
+                }
+                return autoScrollInfo(block, blocks);
+              };
+              const visibleFocusBlock = (block) => {
+                if (!block) return false;
+                const rect = block.getBoundingClientRect();
+                return rect.bottom > 0 && rect.top < window.innerHeight;
+              };
+              window.madarReaderAutoScrollStart = () => {
+                const blocks = focusBlocks();
+                if (!blocks.length) return '';
+                const marked = blocks.find(block => block.classList.contains('madar-auto-scroll-active'));
+                const active = marked && visibleFocusBlock(marked) ? marked : nearestFocusBlock(blocks);
+                return setAutoScrollBlock(active, blocks);
+              };
+              window.madarReaderAutoScrollStep = () => {
+                const blocks = focusBlocks();
+                if (!blocks.length) return 'end';
+                const marked = blocks.find(block => block.classList.contains('madar-auto-scroll-active'));
+                // A manual swipe becomes the new starting point on the next tick.
+                const active = marked && visibleFocusBlock(marked) ? marked : nearestFocusBlock(blocks);
+                const next = blocks[blocks.indexOf(active) + 1];
+                if (!next) return 'end';
+                if (!next.id) next.id = 'madar-auto-scroll-target-' + (blocks.indexOf(next) + 1);
+                const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+                scrollFocusBlock(next, behavior);
+                return setAutoScrollBlock(next, blocks);
+              };
+              window.madarReaderAutoScrollClear = () => {
+                for (const block of focusBlocks()) {
+                  block.classList.remove('madar-auto-scroll-active');
+                  if (!block.classList.contains('madar-focus-active') && !block.classList.contains('madar-speech-active')) block.removeAttribute('aria-current');
                 }
                 return '';
               };
@@ -2448,6 +2687,7 @@ enum MihbaraReaderTheme: String, CaseIterable, Identifiable {
                 + "\(root) body[data-madar-focus='true'] :is(p, li, blockquote).madar-focus-active { color: \(h.ink) !important; }"
                 + "\(root) body[data-madar-focus='true'] { padding-bottom: 8rem !important; } "
                 + "\(root) body :is(p, li, blockquote).madar-speech-active { background-color: \(h.highlight[1]) !important; border-radius: .32em; box-decoration-break: clone; -webkit-box-decoration-break: clone; } "
+                + "\(root) body :is(p, li, blockquote).madar-auto-scroll-active { background-color: \(h.highlight[1]) !important; border-radius: .32em; box-decoration-break: clone; -webkit-box-decoration-break: clone; } "
                 + "@media (prefers-reduced-motion: no-preference) { \(root) body[data-madar-focus='true'] :is(p, li, blockquote) { transition: color .18s ease; } }"
         }.joined(separator: "\n")
     }

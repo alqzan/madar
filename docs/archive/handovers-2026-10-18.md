@@ -1,5 +1,13 @@
 # Archived handovers — 2026-10-18
 
+## Handover — M6-T01 Turath / Shamela — 2026-10-18 — Claude
+- **Works now:** Mihbara › أضف كتابًا › «من تراث · المكتبة الشاملة»: search 8,593 books by title or author, tap to download, the book becomes a local EPUB (page numbers, index, notes, edition page) and goes through the normal review into the library.
+- **Verified:** `swift test --filter TurathBookTests` 3/3; a throwaway run on the real صيد الخاطر JSON passed inspection (395 index entries); UI `testTurathSearchDownloadsABookIntoTheLibrary` passed twice (32 s) on the iPhone 17 Pro simulator. Regression `testEPUBPreviewUsesFileMetadataAndAddsAnOfflineBook` is unconfirmed: one run hung at launch on the Quran tab spinner (main thread idle) before reaching Mihbara; rerun it first.
+- **Differences left:** no canonical screen (new feature); the reader opens on the edition page first.
+- **Not verified:** live network download inside the app; owner iPhone.
+- **Next:** a live download on the owner's iPhone; V11/V22 wait for RMI2.
+- **Model/effort:** claude-opus-5-5, effort not exposed. **Usage:** five-hour ≈75%, weekly ≈91%.
+
 ## M6 reader and PDF checkpoint — Codex
 Works now: V17 import clears its arrival; V15 Sunnah drawer and status-bar clipping are committed; X01 reading arc uses real book progress. PDF reader work is preserved uncommitted.
 Verified: swift test package checks Money145, Quran76, Prayer25, selected Core102 and Commands122 passed; final Core filter MihbaraReadingTests15/15 and Commands PDFBookImportTests|BookMutationTests14/14; native V17 UI2/2, V15 UI1/1, X01 integration/widget14/14; git diff --check clean.

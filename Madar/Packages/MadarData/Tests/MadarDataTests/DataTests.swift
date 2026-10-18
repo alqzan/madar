@@ -23,11 +23,12 @@ import Testing
         let base = try #require(schema.definition(for: "mihbara.readerAr").defaultValue.object)
         #expect(base["lineSpacing"] == .number(2)); #expect(base["margins"] == .number(2))
         #expect(base["justify"] == .bool(true)); #expect(base["heavier"] == .bool(false)); #expect(base["footer"] == .string("full"))
+        #expect(base["autoScroll"] == .string("off"))
         try schema.validate(.object(base), for: "mihbara.readerAr")
-        var older = base; for field in ["lineSpacing", "margins", "justify", "heavier", "footer"] { older[field] = nil }
+        var older = base; for field in ["lineSpacing", "margins", "justify", "heavier", "footer", "autoScroll"] { older[field] = nil }
         try schema.validate(.object(older), for: "mihbara.readerAr")
         func with(_ field: String, _ value: JSONValue) -> JSONValue { var o = base; o[field] = value; return .object(o) }
-        for bad in [with("lineSpacing", .number(5)), with("margins", .number(0)), with("justify", .string("yes")), with("footer", .string("clock")), with("unknown", .bool(true))] {
+        for bad in [with("lineSpacing", .number(5)), with("margins", .number(0)), with("justify", .string("yes")), with("footer", .string("clock")), with("autoScroll", .string("turbo")), with("unknown", .bool(true))] {
             #expect(throws: (any Error).self) { try schema.validate(bad, for: "mihbara.readerAr") }
         }
         var missingCore = base; missingCore["size"] = nil
@@ -40,12 +41,13 @@ import Testing
         #expect(settings["lineSpacing"] == .number(2)); #expect(settings["margins"] == .number(2))
         #expect(settings["justify"] == .bool(true)); #expect(settings["heavier"] == .bool(false))
         #expect(settings["wordSpacing"] == .bool(false)); #expect(settings["footer"] == .string("remaining"))
+        #expect(settings["autoScroll"] == .string("off"))
         try schema.validate(.object(settings), for: "mihbara.readerEn")
         var older = settings
-        for field in ["lineSpacing", "margins", "justify", "heavier", "wordSpacing", "footer"] { older[field] = nil }
+        for field in ["lineSpacing", "margins", "justify", "heavier", "wordSpacing", "footer", "autoScroll"] { older[field] = nil }
         try schema.validate(.object(older), for: "mihbara.readerEn")
         func with(_ field: String, _ value: JSONValue) -> JSONValue { var copy = settings; copy[field] = value; return .object(copy) }
-        for bad in [with("lineSpacing", .number(5)), with("margins", .number(0)), with("justify", .string("yes")), with("heavier", .number(1)), with("wordSpacing", .string("wide")), with("footer", .string("full"))] {
+        for bad in [with("lineSpacing", .number(5)), with("margins", .number(0)), with("justify", .string("yes")), with("heavier", .number(1)), with("wordSpacing", .string("wide")), with("footer", .string("full")), with("autoScroll", .number(1))] {
             #expect(throws: (any Error).self) { try schema.validate(bad, for: "mihbara.readerEn") }
         }
     }

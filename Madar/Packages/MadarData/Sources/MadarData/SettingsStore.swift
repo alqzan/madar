@@ -48,8 +48,8 @@ public struct SettingsSchema: Decodable, Sendable {
             // The Arabic reader's page options were added on 18 Oct (owner); values and presets
             // saved before then omit them and read as their defaults.
             let optional: Set<String> = switch key {
-            case "mihbara.readerAr": ["lineSpacing", "margins", "justify", "heavier", "footer"]
-            case "mihbara.readerEn": ["lineSpacing", "margins", "justify", "heavier", "wordSpacing", "footer"]
+            case "mihbara.readerAr": ["lineSpacing", "margins", "justify", "heavier", "footer", "autoScroll"]
+            case "mihbara.readerEn": ["lineSpacing", "margins", "justify", "heavier", "wordSpacing", "footer", "autoScroll"]
             default: []
             }
             guard Set(object.keys).isSubset(of: Set(defaults.keys)), Set(defaults.keys).subtracting(optional).isSubset(of: Set(object.keys)) else { try reject() }
@@ -76,6 +76,7 @@ public struct SettingsSchema: Decodable, Sendable {
                 for field in ["lineSpacing", "margins"] { if let raw = object[field] { guard let n = raw.number, inRange(n, [1, 4]) else { try reject() } } }
                 for field in ["justify", "heavier"] + (ar ? [] : ["wordSpacing"]) { if let raw = object[field] { guard case .bool = raw else { try reject() } } }
                 if let raw = object["footer"] { guard (ar ? ["full", "page", "bar", "none"] : ["remaining", "percentage", "page"]).contains(raw.string ?? "") else { try reject() } }
+                if let raw = object["autoScroll"] { guard ["off", "slow", "medium", "fast"].contains(raw.string ?? "") else { try reject() } }
             default: try reject()
             }
         default: try reject()

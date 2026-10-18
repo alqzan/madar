@@ -2874,7 +2874,8 @@
     "margins": 2,
     "justify": true,
     "heavier": false,
-    "footer": "full"
+    "footer": "full",
+    "autoScroll": "off"
    },
    "scope": "sync",
    "note": "تُحفظ لكل لغة",
@@ -2892,7 +2893,8 @@
      "margins": "Int 1…4 (owner, 18 Oct; missing = 2)",
      "justify": "Bool (owner, 18 Oct; missing = true)",
      "heavier": "Bool (owner, 18 Oct; missing = false)",
-     "footer": "full|page|bar|none (owner, 18 Oct; missing = full)"
+     "footer": "full|page|bar|none (owner, 18 Oct; missing = full)",
+     "autoScroll": "off|slow|medium|fast (owner-approved M6-V22; missing = off)"
     },
     "unknownKeys": "dropped on read, rejected on write"
    }
@@ -2915,7 +2917,8 @@
     "justify": true,
     "heavier": false,
     "wordSpacing": false,
-    "footer": "remaining"
+    "footer": "remaining",
+    "autoScroll": "off"
    },
    "scope": "sync",
    "storage": "Setting (synced)",
@@ -2933,7 +2936,8 @@
      "justify": "Bool (default true)",
      "heavier": "Bool (default false)",
      "wordSpacing": "Bool (default false; widens word gaps by 0.1em)",
-     "footer": "remaining|percentage|page (default remaining)"
+     "footer": "remaining|percentage|page (default remaining)",
+     "autoScroll": "off|slow|medium|fast (owner-approved M6-V22; missing = off)"
     },
     "unknownKeys": "dropped on read, rejected on write",
     "fieldAvailability": {

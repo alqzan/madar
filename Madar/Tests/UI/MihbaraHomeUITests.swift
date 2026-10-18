@@ -413,6 +413,51 @@ import XCTest
         XCTAssertTrue(app.buttons["mihbara-reader-mode-pages"].isSelected)
     }
 
+    func testEnglishReaderAutoScrollAdvancesAndStopsFromGlassControls() throws {
+        continueAfterFailure = false
+        let fixtureURL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "english-import-poc", withExtension: "epub"))
+        let app = app("reader", epub: try Data(contentsOf: fixtureURL)); app.launch(); open(app)
+        let book = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "كتاب اختبار القارئ")).firstMatch
+        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); book.tap()
+        let paragraph = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "This is original synthetic fixture text")).firstMatch
+        XCTAssertTrue(paragraph.waitForExistence(timeout: 20), app.debugDescription)
+
+        app.buttons["mihbara-reader-settings"].tap()
+        let slow = app.buttons["mihbara-reader-autoScroll-slow"]
+        XCTAssertTrue(slow.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(app.buttons["mihbara-reader-autoScroll-off"].isSelected)
+        slow.tap()
+        XCTAssertTrue(slow.waitForSelection(timeout: 5), app.debugDescription)
+        shot(app, "M6-V22-auto-scroll-sheet-L")
+
+        let fast = app.buttons["mihbara-reader-autoScroll-fast"]
+        for _ in 0..<4 where !fast.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(fast.waitForExistence(timeout: 5), app.debugDescription); fast.tap()
+        XCTAssertTrue(fast.waitForSelection(timeout: 5), app.debugDescription)
+        XCTAssertTrue(app.buttons["mihbara-reader-mode-scroll"].isSelected, app.debugDescription)
+        app.buttons["mihbara-reader-settings-close"].tap()
+
+        let player = app.descendants(matching: .any)["mihbara-auto-scroll-player"]
+        let position = app.staticTexts["mihbara-auto-scroll-position"]
+        XCTAssertTrue(player.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(position.waitForExistence(timeout: 5), app.debugDescription)
+        let firstPosition = position.label
+        let advanced = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label != %@", firstPosition), object: position)
+        XCTAssertEqual(XCTWaiter.wait(for: [advanced], timeout: 14), .completed, app.debugDescription)
+
+        let pause = app.buttons["mihbara-auto-scroll-play-pause"]
+        pause.tap()
+        XCTAssertTrue(app.staticTexts["التمرير متوقف مؤقتًا"].waitForExistence(timeout: 4), app.debugDescription)
+        pause.tap()
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "تمرير تلقائي")).firstMatch.waitForExistence(timeout: 4), app.debugDescription)
+        app.buttons["mihbara-auto-scroll-stop"].tap()
+        XCTAssertTrue(player.waitForNonExistence(timeout: 5), app.debugDescription)
+
+        app.buttons["mihbara-reader-settings"].tap()
+        XCTAssertTrue(app.buttons["mihbara-reader-autoScroll-off"].waitForSelection(timeout: 5), app.debugDescription)
+        app.buttons["mihbara-reader-settings-close"].tap()
+    }
+
     func testFocusReaderAdvancesOneParagraphAndKeepsReadingChromeOutOfSight() throws {
         continueAfterFailure = false
         let fixtureURL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "arabic-reader-poc", withExtension: "epub"))
@@ -554,6 +599,8 @@ import XCTest
         XCTAssertTrue(literata.isSelected)
         XCTAssertFalse(app.buttons["mihbara-reader-font-amiri"].exists)
         shot(app, "M6-V13-sheet-L")
+        let more = app.buttons["mihbara-reader-more"]
+        XCTAssertTrue(more.waitForExistence(timeout: 5), app.debugDescription); more.tap()
         atkinson.tap()
         XCTAssertTrue(atkinson.waitForSelection(timeout: 5), app.debugDescription)
         app.buttons["mihbara-reader-size-6"].tap()
@@ -567,12 +614,14 @@ import XCTest
         let wordSpacing = app.switches["mihbara-reader-wordSpacing"]
         XCTAssertTrue(justify.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertEqual(hyphenation.value as? String, "1")
+        for _ in 0..<5 where !wordSpacing.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(wordSpacing.isHittable, app.debugDescription)
         hyphenation.tap()
+        XCTAssertTrue(hyphenation.waitForValue("0", timeout: 5), app.debugDescription)
         wordSpacing.tap()
+        XCTAssertTrue(wordSpacing.waitForValue("1", timeout: 5), app.debugDescription)
         heavier.tap()
-        XCTAssertEqual(hyphenation.value as? String, "0")
-        XCTAssertEqual(wordSpacing.value as? String, "1")
-        XCTAssertEqual(heavier.value as? String, "1")
+        XCTAssertTrue(heavier.waitForValue("1", timeout: 5), app.debugDescription)
         let percentage = app.buttons["mihbara-reader-footer-percentage"]
         XCTAssertTrue(percentage.waitForExistence(timeout: 5), app.debugDescription)
         percentage.tap()
