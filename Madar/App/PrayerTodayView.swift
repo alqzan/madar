@@ -837,6 +837,13 @@ private struct PrayerTodayArch: View {
                 .overlay {
                     VStack(spacing: 5) { ForEach(0..<8, id: \.self) { _ in Rectangle().fill(theme.background.opacity(0.7)).frame(height: 1) } }
                 }
+                .overlay(alignment: .top) {
+                    // A still pool glint grounds the mirrored arch at the waterline.
+                    Capsule()
+                        .fill(theme.color("goldMid").opacity(isNext ? 0.48 : 0.08))
+                        .frame(width: isNext ? 40 : 22, height: isNext ? 2.5 : 2)
+                        .blur(radius: isNext ? 2.5 : 2)
+                }
                 .mask(LinearGradient(colors: [.black, .black.opacity(0)], startPoint: .top, endPoint: .bottom))
                 .accessibilityHidden(true)
         } else {
