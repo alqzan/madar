@@ -83,6 +83,7 @@ struct MihbaraHomeView: View {
                         app: app,
                         readingBooks: reading.books.filter { $0.shelf == "reading" },
                         onPaperBookSaved: { showingAddBook = false; load() },
+                        onEPUBImported: { pendingBookFile = nil; showingAddBook = false; load() },
                         pendingBookFile: $pendingBookFile,
                         pendingGoodreadsFile: $pendingGoodreadsFile
                     )

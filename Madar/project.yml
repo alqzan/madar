@@ -164,6 +164,8 @@ targets:
         buildPhase: resources
       - path: Tests/Fixtures/Mihbara/arabic-reader-poc.epub
         buildPhase: resources
+      - path: Tests/Fixtures/Mihbara/english-import-poc.epub
+        buildPhase: resources
     dependencies:
       - target: Madar
 schemes:

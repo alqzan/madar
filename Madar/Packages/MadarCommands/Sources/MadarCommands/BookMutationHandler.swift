@@ -60,6 +60,25 @@ private struct BookUndo: Codable {
             row.shelf = "want"; row.mediaID = fileID; row.fileHash = sha256; row.createdAt = now
             if !inspection.outline.isEmpty { row.tocJSON = try JSONEncoder().encode(inspection.outline) }
             context.insert(row); try touch(row, before: nil)
+        case .importEPUB(let id, let fileID, let sha256, let title, let author, let language, let shelf):
+            guard let stagingDirectory else { throw DataError.invalidValue("ملف المعاينة غير موجود.") }
+            guard !books.contains(where: { $0.id == id }) else { throw DataError.invalidValue("هذا الكتاب موجود بالفعل.") }
+            guard !books.contains(where: { $0.fileHash == sha256 && $0.mergedInto == nil }) else { throw DataError.invalidValue("هذا الكتاب عندك بالفعل، أو أُزيل سابقًا؛ لن يُضاف مكررًا.") }
+            let inspection = try EPUBBookFiles.inspect(id: fileID, root: stagingDirectory)
+            guard inspection.sha256 == sha256 else { throw DataError.invalidValue("تغيّر الملف بعد معاينته؛ اختره مرة أخرى.") }
+            guard try context.fetch(FetchDescriptor<Media>()).allSatisfy({ $0.id != fileID }) else { throw DataError.invalidValue("معرّف الملف مستخدم بالفعل.") }
+            if shelf == "reading" { try slot(id) }
+            let data = try Data(contentsOf: EPUBBookFiles.stagedURL(id: fileID, root: stagingDirectory), options: .mappedIfSafe)
+            guard data.count == inspection.sizeBytes, SHA256.hash(data: data).map({ String(format: "%02x", $0) }).joined() == sha256 else { throw DataError.invalidValue("تغيّر الملف بعد المعاينة.") }
+            let media = Media(); media.id = fileID; media.kind = "doc"; media.contentType = "org.idpf.epub-container"
+            media.data = data; media.sha256 = sha256; media.sizeBytes = data.count
+            media.createdAt = now; media.updatedAt = now; media.writerID = writer; context.insert(media)
+            importedMediaIDs.append(fileID)
+            let row = Book(); row.id = id; row.title = title; row.author = author; row.language = language
+            row.kind = "file"; row.format = "epub"; row.shelf = shelf; row.mediaID = fileID; row.fileHash = sha256; row.createdAt = now
+            if shelf == "finished" { row.finishedAt = now; row.readCount = 1 }
+            if !inspection.outline.isEmpty { row.tocJSON = try JSONEncoder().encode(inspection.outline) }
+            context.insert(row); try touch(row, before: nil)
         case .savePaper(let id, let title, let author, let pages, let shelf, let replacing):
             guard !books.contains(where: { $0.id == id }) else { throw DataError.invalidValue("الكتاب موجود؛ عدّله من بطاقته") }
             if shelf == "reading" { try slot(id, replacing: replacing) }

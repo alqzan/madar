@@ -4,6 +4,7 @@ import Foundation
 public enum BookCommand: Codable, Equatable, Sendable {
     case savePaper(id: UUID, title: String, author: String, pages: Int?, shelf: String, replacing: UUID?)
     case importPDF(id: UUID, fileID: UUID, sha256: String, title: String, author: String, language: String)
+    case importEPUB(id: UUID, fileID: UUID, sha256: String, title: String, author: String, language: String, shelf: String)
     case shelf(id: UUID, shelf: String, replacing: UUID?)
     case position(id: UUID, page: Int, finished: Bool)
     case readerLocator(id: UUID, locatorJSON: Data)
@@ -11,7 +12,7 @@ public enum BookCommand: Codable, Equatable, Sendable {
     case hadith(number: Int, edition: String, understood: Bool, day: GregorianDay)
     case savePrivateNote(id: UUID, text: String)
     case deletePrivateNote(id: UUID)
-    public static let names: Set<String> = ["book.savePaper", "book.importPDF", "book.moveShelf", "book.setPosition", "book.setLocator", "reading.saveSession", "hadith.mark", "notebook.savePrivate", "notebook.deletePrivate"]
+    public static let names: Set<String> = ["book.savePaper", "book.importPDF", "book.importEPUB", "book.moveShelf", "book.setPosition", "book.setLocator", "reading.saveSession", "hadith.mark", "notebook.savePrivate", "notebook.deletePrivate"]
     public var isUndoable: Bool {
         if case .readingSession = self { return false }
         return true
@@ -61,6 +62,15 @@ public enum BookCommand: Codable, Equatable, Sendable {
                   let author = text("author"), author.count <= 300,
                   let language = text("language"), ["ar", "en"].contains(language) else { return nil }
             return .importPDF(id: id, fileID: fileID, sha256: hash, title: title, author: author, language: language)
+        case "book.importEPUB":
+            guard Set(p.keys) == ["id", "fileID", "sha256", "title", "author", "language", "shelf"],
+                  let fileID = text("fileID").flatMap(UUID.init(uuidString:)),
+                  let hash = text("sha256"), hash.count == 64, hash.allSatisfy({ "0123456789abcdef".contains($0) }),
+                  let title = text("title")?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty, title.count <= 300,
+                  let author = text("author"), author.count <= 300,
+                  let language = text("language"), ["ar", "en"].contains(language),
+                  let shelf = text("shelf"), ["reading", "want", "finished"].contains(shelf) else { return nil }
+            return .importEPUB(id: id, fileID: fileID, sha256: hash, title: title, author: author, language: language, shelf: shelf)
         case "book.savePaper":
             guard Set(p.keys).isSubset(of: ["id","title","author","pages","shelf","replacing"]), let title = text("title")?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty, title.count <= 300, let author = text("author"), author.count <= 300, let shelf = text("shelf"), ["reading","want","finished"].contains(shelf), p["pages"] == nil || integer("pages").map({ (1...100000).contains($0) }) == true else { return nil }
             guard p["replacing"] == nil || text("replacing").flatMap(UUID.init(uuidString:)) != nil else { return nil }

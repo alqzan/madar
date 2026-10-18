@@ -8,6 +8,7 @@ struct MihbaraAddBookView: View {
     let app: AppSession
     let readingBooks: [MihbaraBook]
     let onPaperBookSaved: () -> Void
+    let onEPUBImported: () -> Void
     @Binding var pendingBookFile: URL?
     @Binding var pendingGoodreadsFile: URL?
     @Environment(\.dismiss) private var dismiss
@@ -15,9 +16,10 @@ struct MihbaraAddBookView: View {
     @State private var importingBook = false
     @State private var importingGoodreads = false
     @State private var previewingPDF = false
+    @State private var previewingEPUB = false
 
     private var bookTypes: [UTType] {
-        [.pdf]
+        [.pdf, UTType("org.idpf.epub-container")!]
     }
 
     var body: some View {
@@ -38,7 +40,7 @@ struct MihbaraAddBookView: View {
                     Button { importingBook = true } label: {
                         MihbaraAddBookSourceCard(
                             title: "من ملف",
-                            subtitle: "PDF نصّي أو مصوّر من تطبيق الملفات",
+                            subtitle: "EPUB أو PDF من تطبيق الملفات",
                             symbol: "square.and.arrow.down.fill",
                             color: theme.color("navy"),
                             foreground: theme.color("onNavy")
@@ -81,8 +83,11 @@ struct MihbaraAddBookView: View {
                         MihbaraRecentImportRow(name: pendingGoodreadsFile.lastPathComponent, kind: "CSV", theme: theme)
                     }
                     if let pendingBookFile {
-                        Button { previewingPDF = true } label: {
-                            MihbaraRecentImportRow(name: pendingBookFile.lastPathComponent, kind: "PDF", theme: theme)
+                        Button {
+                            if pendingBookFile.pathExtension.lowercased() == "epub" { previewingEPUB = true }
+                            else { previewingPDF = true }
+                        } label: {
+                            MihbaraRecentImportRow(name: pendingBookFile.lastPathComponent, kind: pendingBookFile.pathExtension.lowercased() == "epub" ? "EPUB" : "PDF", theme: theme)
                         }.buttonStyle(.plain).accessibilityIdentifier("mihbara-import-reopen")
                     }
                     if pendingBookFile == nil && pendingGoodreadsFile == nil {
@@ -90,7 +95,7 @@ struct MihbaraAddBookView: View {
                             Image(systemName: "tray").font(.title3).foregroundStyle(theme.secondaryInk)
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("لا يوجد ملف وصل مؤخرًا").font(MadarTypography.caption())
-                                Text("اختر ملف PDF من تطبيق الملفات.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                                Text("اختر ملف EPUB أو PDF من تطبيق الملفات.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                             }
                             Spacer(minLength: 0)
                         }
@@ -105,7 +110,7 @@ struct MihbaraAddBookView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("يقرأ مدار").font(MadarTypography.section())
                     HStack(spacing: 8) {
-                        ForEach(["PDF", "PDF مصوّر"], id: \.self) { value in
+                        ForEach(["EPUB", "PDF", "PDF مصوّر"], id: \.self) { value in
                             Text(value)
                                 .font(MadarTypography.fine())
                                 .padding(.horizontal, 11).padding(.vertical, 8)
@@ -126,7 +131,11 @@ struct MihbaraAddBookView: View {
         .toolbarVisibility(.hidden, for: .navigationBar)
         .statusBarHidden(true)
         .fileImporter(isPresented: $importingBook, allowedContentTypes: bookTypes, allowsMultipleSelection: false) { result in
-            handle(result, assign: { pendingBookFile = $0; previewingPDF = true })
+            handle(result, assign: {
+                pendingBookFile = $0
+                if $0.pathExtension.lowercased() == "epub" { previewingEPUB = true }
+                else { previewingPDF = true }
+            })
         }
         .fileImporter(isPresented: $importingGoodreads, allowedContentTypes: [.commaSeparatedText], allowsMultipleSelection: false) { result in
             handle(result, assign: { pendingGoodreadsFile = $0 })
@@ -134,6 +143,15 @@ struct MihbaraAddBookView: View {
         .navigationDestination(isPresented: $previewingPDF) {
             if let pendingBookFile {
                 MihbaraPDFImportView(app: app, source: pendingBookFile) { onPaperBookSaved() }
+            }
+        }
+        .navigationDestination(isPresented: $previewingEPUB) {
+            if let pendingBookFile {
+                MihbaraEPUBImportView(app: app, source: pendingBookFile) {
+                    self.pendingBookFile = nil
+                    previewingEPUB = false
+                    onEPUBImported()
+                }
             }
         }
         .task {
@@ -144,6 +162,13 @@ struct MihbaraAddBookView: View {
                bytes.count < 1024 * 1024, pendingBookFile == nil {
                 let file = root.deletingLastPathComponent().appendingPathComponent("ملف اختبار مصوّر.pdf")
                 do { try bytes.write(to: file, options: .atomic); pendingBookFile = file; previewingPDF = true }
+                catch { app.errorMessage = "لم تُجهز عينة الاستيراد." }
+            }
+            if root.deletingLastPathComponent().deletingLastPathComponent().lastPathComponent == "UITestStores",
+               let encoded = ProcessInfo.processInfo.environment["MADAR_UI_MIHBARA_IMPORT_EPUB"], let bytes = Data(base64Encoded: encoded),
+               bytes.count < 2 * 1024 * 1024, pendingBookFile == nil {
+                let file = root.deletingLastPathComponent().appendingPathComponent("كتاب اختبار.epub")
+                do { try bytes.write(to: file, options: .atomic); pendingBookFile = file; previewingEPUB = true }
                 catch { app.errorMessage = "لم تُجهز عينة الاستيراد." }
             }
             #endif

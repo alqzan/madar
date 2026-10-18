@@ -13,11 +13,14 @@ public struct ZIPReader: Sendable {
     public struct Member: Equatable, Sendable {
         public let path: String
         public let size: Int
-        let compressedSize: Int
-        let method: UInt16
+        public let compressedSize: Int
+        public let method: UInt16
         let crc: UInt32
         let localOffset: Int
-        let flags: UInt16
+        public let flags: UInt16
+        public let externalAttributes: UInt32
+        public let isSymbolicLink: Bool
+        public var isEncrypted: Bool { flags & (0x0001 | 0x0040 | 0x2000) != 0 }
         public var isDirectory: Bool { path.hasSuffix("/") }
     }
     private let data: Data
@@ -59,7 +62,9 @@ public struct ZIPReader: Sendable {
         var seen = Set<String>()
         for _ in 0..<count {
             guard at + 46 <= data.count, Self.u32(data, at) == 0x02014b50 else { throw ZIPReaderError.corrupt }
+            let madeBy = Self.u16(data, at + 4)
             let flags = Self.u16(data, at + 8), method = Self.u16(data, at + 10), crc = Self.u32(data, at + 16)
+            let externalAttributes = Self.u32(data, at + 38)
             var compressed = Int(Self.u32(data, at + 20)), size = Int(Self.u32(data, at + 24))
             let nameLength = Int(Self.u16(data, at + 28)), extraLength = Int(Self.u16(data, at + 30)), commentLength = Int(Self.u16(data, at + 32))
             var offset = Int(Self.u32(data, at + 42))
@@ -84,7 +89,11 @@ public struct ZIPReader: Sendable {
             at = extraEnd + commentLength
             guard Self.safe(path) else { throw ZIPReaderError.unsafePath }
             guard size >= 0, compressed >= 0, offset >= 0, offset < data.count, seen.insert(path).inserted else { throw ZIPReaderError.corrupt }
-            members.append(.init(path: path, size: size, compressedSize: compressed, method: method, crc: crc, localOffset: offset, flags: flags))
+            let host = madeBy >> 8
+            let unixMode = UInt16((externalAttributes >> 16) & 0xFFFF)
+            let isSymbolicLink = (host == 3 || host == 19) && unixMode & 0xF000 == 0xA000
+            members.append(.init(path: path, size: size, compressedSize: compressed, method: method, crc: crc,
+                                 localOffset: offset, flags: flags, externalAttributes: externalAttributes, isSymbolicLink: isSymbolicLink))
         }
         self.members = members
         self.index = Dictionary(uniqueKeysWithValues: members.enumerated().map { ($1.path, $0) })
@@ -94,11 +103,18 @@ public struct ZIPReader: Sendable {
 
     /// Inflates one member and verifies its size and CRC-32. Never returns a partial file.
     public func read(_ member: Member) throws -> Data {
-        guard member.flags & 0x1 == 0 else { throw ZIPReaderError.encrypted }
+        guard !member.isEncrypted else { throw ZIPReaderError.encrypted }
         guard member.size <= Self.memberLimit, member.compressedSize <= data.count else { throw ZIPReaderError.tooLarge }
         let local = member.localOffset
         guard local + 30 <= data.count, Self.u32(data, local) == 0x04034b50 else { throw ZIPReaderError.corrupt }
-        let start = local + 30 + Int(Self.u16(data, local + 26)) + Int(Self.u16(data, local + 28))
+        let localFlags = Self.u16(data, local + 6), localMethod = Self.u16(data, local + 8)
+        let nameLength = Int(Self.u16(data, local + 26)), extraLength = Int(Self.u16(data, local + 28))
+        guard localFlags == member.flags, localMethod == member.method,
+              local + 30 + nameLength + extraLength <= data.count else { throw ZIPReaderError.corrupt }
+        let localName = data.subdata(in: (local + 30)..<(local + 30 + nameLength))
+        let localPath = String(data: localName, encoding: .utf8) ?? String(data: localName, encoding: .isoLatin1) ?? ""
+        guard localPath == member.path else { throw ZIPReaderError.corrupt }
+        let start = local + 30 + nameLength + extraLength
         guard start + member.compressedSize <= data.count else { throw ZIPReaderError.corrupt }
         let output: Data
         switch member.method {
@@ -144,7 +160,7 @@ public struct ZIPReader: Sendable {
     }
 
     static func safe(_ path: String) -> Bool {
-        !path.isEmpty && !path.hasPrefix("/") && !path.contains("\\") && !path.contains("\0")
+        !path.isEmpty && !path.hasPrefix("/") && !path.contains("\\") && !path.contains("\0") && !path.contains(":")
             && !path.split(separator: "/", omittingEmptySubsequences: false).contains("..")
     }
     private static func u16(_ d: Data, _ i: Int) -> UInt16 { guard i + 2 <= d.count else { return 0 }; return UInt16(d[i]) | UInt16(d[i + 1]) << 8 }
