@@ -107,7 +107,21 @@ import XCTest
         XCTAssertTrue(prompt.waitForExistence(timeout: 8), app.debugDescription)
         XCTAssertTrue(app.buttons["mihbara-paper-start"].exists)
         XCTAssertTrue(app.buttons["mihbara-paper-index-details"].exists)
-        shot(app, "M6-V23-paper-card-L")
+        app.buttons["mihbara-paper-index-details"].tap()
+        let savedPosition = app.textFields["mihbara-paper-position"]
+        XCTAssertTrue(savedPosition.waitForExistence(timeout: 8), app.debugDescription)
+        reach(app, savedPosition); savedPosition.tap(); savedPosition.press(forDuration: 1.1)
+        if app.menuItems["تحديد الكل"].waitForExistence(timeout: 2) { app.menuItems["تحديد الكل"].tap() }
+        else { savedPosition.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 8)) }
+        savedPosition.typeText("٤٧")
+        if app.toolbars.buttons["تمّ"].exists { app.toolbars.buttons["تمّ"].tap() }
+        let savePosition = app.buttons["mihbara-paper-save"]; reach(app, savePosition); savePosition.tap()
+        XCTAssertTrue(app.buttons["mihbara-paper-index-prompt"].waitForExistence(timeout: 8), app.debugDescription)
+        let positionSummary = app.staticTexts["mihbara-paper-position-summary"]
+        XCTAssertTrue(positionSummary.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(positionSummary.label.contains("٤٧"), positionSummary.label)
+        XCTAssertTrue(app.buttons["mihbara-paper-start"].label.contains("واصل القراءة"))
+        shot(app, "M6-V23-page-progress-after-L")
         app.buttons["mihbara-paper-start"].tap()
         let continueBook = app.buttons["mihbara-book-continue"]
         reach(app, continueBook); continueBook.tap()

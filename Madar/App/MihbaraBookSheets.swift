@@ -315,6 +315,11 @@ struct MihbaraBookCard: View {
     private var shelfTitle: String {
         switch book.shelf { case "want": "أبي أقرأها"; case "finished": "أنهيتها"; default: "أقرؤها الآن" }
     }
+    private var paperBookPrimaryAction: String {
+        if book.shelf == "finished" { return "أعد قراءته" }
+        if let page = book.page, page > 0 { return "واصل القراءة" }
+        return "ابدأه"
+    }
     private var paperIndexEditor: some View {
         MihbaraPaperIndexEditor(
             app: app,
@@ -362,6 +367,14 @@ struct MihbaraBookCard: View {
                     Text(book.author).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                     Text("على رف «\(shelfTitle)»، " + (book.pages.map { digits.string($0) + " صفحة" } ?? "عدد الصفحات غير محدد"))
                         .font(MadarTypography.caption())
+                    if let page = book.page, page > 0 {
+                        let total = book.pages.flatMap { $0 >= page ? digits.string($0) : nil }
+                        Text("وصلت إلى الصفحة " + digits.string(page) + (total.map { " من " + $0 } ?? ""))
+                            .font(MadarTypography.fine())
+                            .foregroundStyle(theme.secondaryInk)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("mihbara-paper-position-summary")
+                    }
                 }
                 Spacer(minLength: 0)
             }
@@ -401,7 +414,7 @@ struct MihbaraBookCard: View {
             }
 
             Button { startPaperBook() } label: {
-                Text("ابدأه · ضعه على الطاولة")
+                Text(paperBookPrimaryAction + " · ضعه على الطاولة")
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(theme.background)
                     .frame(maxWidth: .infinity).frame(height: 52)
