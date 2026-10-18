@@ -47,7 +47,7 @@ struct DiaryWelcomeView: View {
                         Text("تكتب ما تيسّر، ومدار يكمل من صلواتك وحفظك ومراجعتك. كل سطر بوقته، وكل ذكرى بتاريخها.").font(DiaryType.writing).lineSpacing(8).multilineTextAlignment(.center).foregroundStyle(theme.color("ink3Text"))
                     } else if step == 1 {
                         Text("اختر ما يدخل صفحتك تلقائيًا. يمكنك تغييره لاحقًا، وتبقى كتابتك كما هي.").font(MadarTypography.body()).multilineTextAlignment(.center)
-                        ForEach([("salah", "الصلاة"), ("quran", "القرآن")], id: \.0) { key, title in
+                        ForEach([("salah", "الصلاة"), ("quran", "القرآن"), ("mihbara", "المحبرة")], id: \.0) { key, title in
                             Toggle(title, isOn: Binding(get: { app.values["notes.autoLines"]?.object?[key] == .bool(true) }, set: { value in var map = app.values["notes.autoLines"]?.object ?? [:]; map[key] = .bool(value); app.set(.object(map), key: "notes.autoLines") })).font(MadarTypography.section()).tint(theme.color("ghad")).padding(14).background(theme.surface, in: .rect(cornerRadius: 18))
                         }
                     } else if step == 2 {

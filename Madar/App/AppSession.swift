@@ -21,6 +21,7 @@ final class AppSession {
     /// M4-V03: «السنة وما يهمّك» pushed from the lobby (`madar://bahw/year`).
     var yearOpen = false
     var moneyOpen = false
+    var mihbaraOpen = false
     var moneyExpenseSeed: MoneyExpenseSeed?
     var habitsOpen = false
     /// A capture named a prayer without its state; the prayer home opens that prayer's log sheet.
@@ -374,7 +375,7 @@ final class AppSession {
     func number(_ key: String) -> Double { if case .number(let v) = values[key] { v } else { 0 } }
     func open(_ url: URL) {
         let today = GregorianDay.containing(.now, in: activePlace.timeZone)
-        let context = RouteContext(trackingStart: today.adding(days: -36500), today: today, settingsKeys: Set(Self.supportedKeys), availability: .init(builtRooms: [.core, .salah, .quran, .notes, .bahw, .year, .habits, .mal]))
+        let context = RouteContext(trackingStart: today.adding(days: -36500), today: today, settingsKeys: Set(Self.supportedKeys), availability: .init(builtRooms: [.core, .salah, .quran, .notes, .bahw, .year, .habits, .mal, .mihbara]))
         do {
             var components=URLComponents(url:url,resolvingAgainstBaseURL:false)
             if components?.host == "prayer" {components?.host="salah"} // Existing placed widgets used this legacy alias.
@@ -394,6 +395,7 @@ final class AppSession {
             }
             if route.room == .habits { habitRouteID=route.path.last.flatMap(UUID.init(uuidString:)) ?? route.parameters["habit"].flatMap(UUID.init(uuidString:)); selectedTab = "foundation"; habitsOpen = true; return }
             if route.room == .year, route.path == ["year"] { selectedTab = "foundation"; yearOpen = true; return }
+            if route.room == .mihbara { selectedTab = "customize"; mihbaraOpen = true; return }
             guard url.host == "settings", route.room == .core else { throw CoreError.unavailableFeature }
             settingsQuery = try schema.definition(for: route.path[1]).title
             selectedTab = "customize"

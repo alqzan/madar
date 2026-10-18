@@ -58,26 +58,58 @@ struct DiaryWriteConfiguration:FixedRoomConfiguration {
     @Parameter(title:"القالب",default:.write)var template:DiaryWriteTemplate
     var templateName:String{template.rawValue}
 }
+enum MihbaraWidgetTemplate:String,AppEnum {
+    case summary
+    static let typeDisplayRepresentation=TypeDisplayRepresentation(name:"قالب المحبرة")
+    static let caseDisplayRepresentations:[Self:DisplayRepresentation]=[.summary:"ملخص رفّك"]
+}
+struct MihbaraWidgetConfiguration:FixedRoomConfiguration {
+    static let title:LocalizedStringResource="المحبرة"
+    static let room=BuiltRoomWidget.mihbara
+    static let defaultTemplate="summary"
+    @Parameter(title:"القالب",default:.summary)var template:MihbaraWidgetTemplate
+    var templateName:String{template.rawValue}
+}
 struct FixedRoomEntry:TimelineEntry {
     let date:Date;let room:BuiltRoomWidget;let value:RoomWidgetSnapshot?;let template:String
-    var relevance:TimelineEntryRelevance?{.init(score:value == nil || value?.locked == true || value?.rows.isEmpty == true ? 0 : 1)}
+    var mihbara:MihbaraSnapshot?=nil
+    var mihbaraLocked=false
+    var numerals="arabicIndic"
+    var relevance:TimelineEntryRelevance?{
+        let empty = room == .mihbara
+            ? mihbara?.currentBook == nil && mihbara?.hadithToday == nil && mihbara?.lastNotebookLine == nil && (mihbara?.shelfCount ?? 0) == 0
+            : value == nil || value?.rows.isEmpty == true
+        return .init(score:empty || value?.locked == true || mihbaraLocked ? 0 : 1)
+    }
 }
 struct FixedRoomProvider<Config:FixedRoomConfiguration>:AppIntentTimelineProvider {
     typealias Intent=Config
     func placeholder(in context:Context)->FixedRoomEntry{.init(date:.now,room:Config.room,value:nil,template:Config.defaultTemplate)}
     func snapshot(for configuration:Config,in context:Context) async->FixedRoomEntry{load(configuration)}
     func timeline(for configuration:Config,in context:Context) async->Timeline<FixedRoomEntry>{
-        let now=Date(),envelope=(try? SnapshotStore.appGroup("group.com.alqzan.madar2"))?.read(Config.room.rawValue,as:RoomWidgetSnapshot.self,now:now)
-        let expiry=envelope?.validUntil ?? now.addingTimeInterval(900)
-        return Timeline(entries:[.init(date:now,room:Config.room,value:envelope?.payload,template:configuration.templateName),.init(date:expiry,room:Config.room,value:nil,template:configuration.templateName)],policy:.after(expiry))
+        let now=Date(),store=try? SnapshotStore.appGroup("group.com.alqzan.madar2")
+        let expiry:Date
+        if Config.room == .mihbara {expiry=store?.read(Config.room.rawValue,as:MihbaraSnapshot.self,now:now)?.validUntil ?? now.addingTimeInterval(900)}
+        else {expiry=store?.read(Config.room.rawValue,as:RoomWidgetSnapshot.self,now:now)?.validUntil ?? now.addingTimeInterval(900)}
+        let fresh=load(configuration,at:now)
+        let stale=FixedRoomEntry(date:expiry,room:Config.room,value:nil,template:configuration.templateName,numerals:fresh.numerals)
+        return Timeline(entries:[fresh,stale],policy:.after(expiry))
     }
-    private func load(_ config:Config)->FixedRoomEntry{.init(date:.now,room:Config.room,value:(try? SnapshotStore.appGroup("group.com.alqzan.madar2"))?.read(Config.room.rawValue,as:RoomWidgetSnapshot.self)?.payload,template:config.templateName)}
+    private func load(_ config:Config,at now:Date = .now)->FixedRoomEntry {
+        let store=try? SnapshotStore.appGroup("group.com.alqzan.madar2"),foundation=store?.read("foundation",as:FoundationSnapshot.self,now:now)?.payload
+        if Config.room == .mihbara {
+            let envelope=store?.read(Config.room.rawValue,as:MihbaraSnapshot.self,now:now)
+            return .init(date:now,room:Config.room,value:nil,template:config.templateName,mihbara:envelope?.payload,mihbaraLocked:envelope?.privacy.notesLocked == true,numerals:foundation?.numerals ?? "arabicIndic")
+        }
+        let envelope=store?.read(Config.room.rawValue,as:RoomWidgetSnapshot.self,now:now)
+        return .init(date:now,room:Config.room,value:envelope?.payload,template:config.templateName,numerals:foundation?.numerals ?? "arabicIndic")
+    }
 }
 private struct FixedRoomWidgetView:View {
     let entry:FixedRoomEntry
     @Environment(\.widgetFamily)private var family
     @Environment(\.colorScheme)private var scheme
-    var body:some View{RoomWidgetContent(room:entry.room,snapshot:entry.value,template:entry.template,family:family).widgetURL(URL(string:entry.room.route)).containerBackground(for:.widget){if [WidgetFamily.accessoryCircular,.accessoryRectangular,.accessoryInline].contains(family){Color.clear}else{entry.room == .money ? (MadarToken.colors["widgetIdentity.room.mal.\(scheme == .dark ? "dark" : "light").bg"] ?? .clear) : RoomTheme(room:"bahw",dark:scheme == .dark).surface}}}
+    var body:some View{RoomWidgetContent(room:entry.room,snapshot:entry.value,template:entry.template,family:family,mihbaraSnapshot:entry.mihbara,mihbaraLocked:entry.mihbaraLocked,numerals:entry.numerals).widgetURL(URL(string:entry.room.route)).containerBackground(for:.widget){if [WidgetFamily.accessoryCircular,.accessoryRectangular,.accessoryInline].contains(family){Color.clear}else if entry.room == .money{MadarToken.colors["widgetIdentity.room.mal.\(scheme == .dark ? "dark" : "light").bg"] ?? .clear}else{RoomTheme(room:entry.room == .mihbara ? "mihbara" : "bahw",dark:scheme == .dark).surface}}}
 }
 struct FixedRoomWidget<Config:FixedRoomConfiguration>:Widget {
     var body:some WidgetConfiguration {
@@ -86,7 +118,7 @@ struct FixedRoomWidget<Config:FixedRoomConfiguration>:Widget {
     }
 }
 struct AdditionalRoomWidgets:WidgetBundle {
-    var body:some Widget{FixedRoomWidget<HabitWidgetConfiguration>();FixedRoomWidget<YearWidgetConfiguration>();FixedRoomWidget<UpcomingWidgetConfiguration>();FixedRoomWidget<DiaryWriteConfiguration>();DiaryWriterControl();HabitsRoomControl();MoneyExpenseControl();FixedRoomWidget<MoneyWidgetConfiguration>()}
+    var body:some Widget{FixedRoomWidget<HabitWidgetConfiguration>();FixedRoomWidget<YearWidgetConfiguration>();FixedRoomWidget<UpcomingWidgetConfiguration>();FixedRoomWidget<DiaryWriteConfiguration>();FixedRoomWidget<MihbaraWidgetConfiguration>();DiaryWriterControl();HabitsRoomControl();MoneyExpenseControl();MihbaraRoomControl();FixedRoomWidget<MoneyWidgetConfiguration>()}
 }
 
 struct MoneyWidgetConfiguration: FixedRoomConfiguration {

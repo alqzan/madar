@@ -51,4 +51,31 @@ import XCTest
         XCTAssertTrue(app.staticTexts["room-widgets-title"].waitForNonExistence(timeout:5))
         XCTAssertTrue(app.tabBars.buttons["الصلاة"].isSelected)
     }
+    func testMihbaraWidgetPreviewOpensRoomDirectly() throws {
+        continueAfterFailure=false;let app=openGallery(),mihbara=app.buttons["room-widget-mihbara"]
+        for _ in 0..<5 where !mihbara.isHittable{app.swipeUp(velocity:.slow)}
+        XCTAssertTrue(mihbara.waitForExistence(timeout:10));shot(app,"M6-X01-mihbara-widget-L");mihbara.tap()
+        XCTAssertTrue(app.buttons["mihbara-add-paper"].waitForExistence(timeout:10),app.debugDescription)
+        shot(app,"M6-X01-mihbara-open-L")
+    }
+    func testMihbaraControlPreviewOpensRoom() throws {
+        continueAfterFailure=false;let app=openGallery()
+        app.buttons["room-widgets-lock"].tap();XCTAssertTrue(app.staticTexts["lock-widgets-title"].waitForExistence(timeout:8))
+        let control=app.buttons["control-preview-mihbara"]
+        for _ in 0..<5 where !control.isHittable{app.swipeUp(velocity:.slow)}
+        XCTAssertTrue(control.waitForExistence(timeout:10));shot(app,"M6-X01-control-preview-L");control.tap()
+        XCTAssertTrue(app.buttons["mihbara-add-paper"].waitForExistence(timeout:10),app.debugDescription)
+        shot(app,"M6-X01-mihbara-from-control-L")
+    }
+    func testMihbaraDiaryLineTogglePersists() throws {
+        continueAfterFailure=false
+        let app=XCUIApplication();app.launchEnvironment=["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_DIARY_FIXTURE":"home","MADAR_UI_NOW":"2026-10-15T20:00:00+03:00","MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light"];app.launch()
+        let customize=app.buttons["diary-customize"];XCTAssertTrue(customize.waitForExistence(timeout:25));customize.tap()
+        let search=app.textFields["diary-customize-search"];XCTAssertTrue(search.waitForExistence(timeout:10));search.tap();search.typeText("سطور الأقسام")
+        let toggle=app.switches["diary-auto-mihbara"];XCTAssertTrue(toggle.waitForExistence(timeout:10));XCTAssertEqual(toggle.value as? String,"1")
+        toggle.tap();XCTAssertEqual(toggle.value as? String,"0");shot(app,"M6-X01-diary-auto-line-L")
+        app.buttons["diary-customize-back"].tap();XCTAssertTrue(app.buttons["diary-customize"].waitForExistence(timeout:10));app.buttons["diary-customize"].tap()
+        let reopenedSearch=app.textFields["diary-customize-search"];XCTAssertTrue(reopenedSearch.waitForExistence(timeout:10));reopenedSearch.tap();reopenedSearch.typeText("سطور الأقسام")
+        XCTAssertEqual(app.switches["diary-auto-mihbara"].value as? String,"0")
+    }
 }

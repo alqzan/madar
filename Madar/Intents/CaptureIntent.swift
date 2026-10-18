@@ -6,7 +6,7 @@ import MadarCore
 /// link, and lands with the room's own confirmation and 10-minute undo. Money opens its confirmation sheet; before M6 «فكرة: …» becomes a diary line. The dialog never repeats the text (§14).
 struct CaptureIntent: AppIntent {
     static let title: LocalizedStringResource = "التقط في مدار"
-    static let description = IntentDescription("جملة واحدة تذهب إلى غرفتها: «صليت العصر جماعة» إلى الصلاة، «قهوة ١٨» إلى تأكيد المصروف، وغيرها سطرًا في صفحة اليوم.")
+    static let description = IntentDescription("جملة واحدة تذهب إلى غرفتها: «صليت العصر جماعة» إلى الصلاة، «قهوة ١٨» إلى تأكيد المصروف، «فكرة: …» إلى دفتر المحبرة، وغيرها إلى صفحة اليوم.")
     static let supportedModes: IntentModes = .foreground
     static let authenticationPolicy: IntentAuthenticationPolicy = .requiresAuthentication
 
@@ -16,13 +16,19 @@ struct CaptureIntent: AppIntent {
     init(text: String) { self.text = text }
 
     static var parameterSummary: some ParameterSummary { Summary("التقط \(\.$text)") }
-    /// Held behind the diary lock in this run of Madar only; the person finishes it by opening the diary.
+    /// Unclassified capture waits behind the diary gate; an explicit idea waits for Mihbara.
     static let heldDialog: IntentDialog = "افتح المذكرات ليُضاف السطر."
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let applied = await MadarIntentHandoff.shared.submit(.capture(text: text, id: UUID()))
-        if case .moneyExpense = CaptureRouter.route(text) { return .result(dialog: "راجع المصروف واعتمده في مدار.") }
-        return .result(dialog: applied ? "أُضيف." : Self.heldDialog)
+        switch CaptureRouter.route(text) {
+        case .moneyExpense: return .result(dialog: "راجع المصروف واعتمده في مدار.")
+        case .mihbaraIdea: return .result(dialog: applied ? "حُفظت الفكرة في دفتر المحبرة." : "افتح المحبرة ليُضاف السطر إلى الدفتر.")
+        case .empty: return .result(dialog: "اكتب شيئًا لالتقاطه في مدار.")
+        case .tooLong: return .result(dialog: "النص أطول من سطر واحد في صفحة اليوم.")
+        case .logPrayer, .choosePrayerStatus: return .result(dialog: applied ? "أُضيف." : Self.heldDialog)
+        case .diaryLine: return .result(dialog: applied ? "أُضيف." : Self.heldDialog)
+        }
     }
 }
 

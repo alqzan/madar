@@ -9,6 +9,7 @@ struct RoomWidgetsGallery:View {
     private var theme:RoomTheme{.init(room:"bahw",dark:session.string("core.theme")=="dark")}
     private var now:Date{session.prayerNow()}
     private func snapshot(_ room:BuiltRoomWidget)->RoomWidgetSnapshot?{session.snapshotStore.read(room.rawValue,as:RoomWidgetSnapshot.self,now:now)?.payload}
+    private func mihbaraSnapshot()->(MihbaraSnapshot?,Bool){let value=session.snapshotStore.read(BuiltRoomWidget.mihbara.rawValue,as:MihbaraSnapshot.self,now:now);return(value?.payload,value?.privacy.notesLocked == true)}
     var body:some View {
         VStack(spacing:0) {
             HStack {Text("ودجات مدار").font(MadarTypography.title()).accessibilityIdentifier("room-widgets-title");Spacer();Button("تمّ"){dismiss()}.frame(minHeight:44)}.padding(.horizontal,20).padding(.top,12)
@@ -26,6 +27,7 @@ struct RoomWidgetsGallery:View {
                     }
                     preview(.upcoming,family:.systemMedium,template:"upcoming").frame(height:180)
                     Link(destination:URL(string:"madar://mal")!){previewContent(.money,family:.systemMedium,template:"now")}.buttonStyle(.plain).frame(height:180).accessibilityIdentifier("room-widget-money")
+                    Link(destination:URL(string:BuiltRoomWidget.mihbara.route)!){preview(.mihbara,family:.systemMedium,template:"summary").frame(height:190)}.buttonStyle(.plain).accessibilityIdentifier("room-widget-mihbara")
                     Text("السنة وسطر اليوم").font(MadarTypography.section())
                     preview(.year,family:.systemMedium,template:"both").frame(height:185)
                     Link(destination:URL(string:BuiltRoomWidget.diaryWrite.route)!) {previewContent(.diaryWrite,family:.systemSmall,template:"write")}.buttonStyle(.plain).frame(height:170).accessibilityIdentifier("room-widget-diaryWrite")
@@ -52,6 +54,7 @@ struct RoomWidgetsGallery:View {
     }
     private func preview(_ room:BuiltRoomWidget,family:WidgetFamily,template:String)->some View {previewContent(room,family:family,template:template).accessibilityIdentifier("room-widget-"+room.rawValue)}
     private func previewContent(_ room:BuiltRoomWidget,family:WidgetFamily,template:String)->some View {
-        RoomWidgetContent(room:room,snapshot:snapshot(room),template:template,family:family).padding(14).frame(maxWidth:.infinity,maxHeight:.infinity).background(room == .money ? (MadarToken.colors["widgetIdentity.room.mal.\(session.string("core.theme") == "dark" ? "dark" : "light").bg"] ?? theme.surface) : theme.surface,in:.rect(cornerRadius:24))
+        let mihbara=mihbaraSnapshot()
+        return RoomWidgetContent(room:room,snapshot:snapshot(room),template:template,family:family,mihbaraSnapshot:room == .mihbara ? mihbara.0 : nil,mihbaraLocked:room == .mihbara && mihbara.1,numerals:session.string("core.numerals")).padding(14).frame(maxWidth:.infinity,maxHeight:.infinity).background(room == .money ? (MadarToken.colors["widgetIdentity.room.mal.\(session.string("core.theme") == "dark" ? "dark" : "light").bg"] ?? theme.surface) : room == .mihbara ? RoomTheme(room:"mihbara",dark:session.string("core.theme")=="dark").surface : theme.surface,in:.rect(cornerRadius:24))
     }
 }

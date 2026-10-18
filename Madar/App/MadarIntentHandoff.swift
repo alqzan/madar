@@ -68,7 +68,10 @@ extension AppSession {
                 moneyExpenseSeed = .init(id: id, amount: amount, merchant: merchant, homeCurrency: true); return true
             case .empty: errorMessage = "لم يصل نص لالتقاطه."; return true
             case .tooLong: errorMessage = "النص أطول من سطر واحد في صفحة اليوم (٢٠٠٠ حرف)."; return true
-            case .diaryLine(let line, _): return await addDiaryLineFromIntent(text: line, day: "today", id: id)
+            case .diaryLine(let line, let kind):
+                if kind == .idea { return await saveMihbaraIdeaFromIntent(text: line, id: id) }
+                return await addDiaryLineFromIntent(text: line, day: "today", id: id)
+            case .mihbaraIdea(let idea): return await saveMihbaraIdeaFromIntent(text: idea, id: id)
             case .logPrayer(let prayer, let status, let shortened, let fridayKind):
                 logPrayerFromCapture(prayer, status: status, shortened: shortened, fridayKind: fridayKind); return true
             case .choosePrayerStatus(let prayer, _):
@@ -84,6 +87,20 @@ extension AppSession {
         do { try await executeDiaryCommand("diary.appendLine", payload: ["text": .string(text), "day": .string(day)], id: id) }
         catch { errorMessage = "لم يُضف السطر. \(error.localizedDescription)" }
         return true
+    }
+
+    /// CaptureIntent requires device authentication; whole-app protection is still checked here
+    /// before the private note is written through Mihbara's owning command and undo receipt.
+    private func saveMihbaraIdeaFromIntent(text: String, id: UUID) async -> Bool {
+        open(URL(string:"madar://mihbara")!)
+        guard lockController?.canPresent(.app) ?? protectedDataAuthorized else { return false }
+        do {
+            try await executeBookCommand("notebook.savePrivate", payload:["id":.string(id.uuidString),"text":.string(text)], id:id)
+            return true
+        } catch {
+            errorMessage = "لم تُحفظ الفكرة في دفتر المحبرة. أعد المحاولة."
+            return false
+        }
     }
 
     /// The prayer day comes from the same snapshot as the prayer home (Fajr to the next Fajr).

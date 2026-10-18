@@ -36,6 +36,20 @@ import MadarMoney
         XCTAssertTrue(try AppDiaryService(app: app, clock: { .now }).home().todayPage.lines.contains { $0.text == "فكرة: كتاب عن الجيران" })
     }
 
+    func testMihbaraIdeaCaptureWritesOnePrivateNoteAndOpensItsRoom() async throws {
+        let (app,container)=try session(),id=UUID()
+        app.authorizeProtectedData()
+        let applied=await app.handleIntentRequest(.capture(text:"فكرة: خطة قراءة جديدة",id:id))
+        XCTAssertTrue(applied)
+        XCTAssertEqual(app.selectedTab,"customize");XCTAssertTrue(app.mihbaraOpen);XCTAssertNotNil(app.undoToken)
+        let rows=try ModelContext(container).fetch(FetchDescriptor<NotebookNote>()),note=try XCTUnwrap(rows.first{$0.id==id})
+        XCTAssertTrue(note.isPrivate);XCTAssertEqual(note.link,"general");XCTAssertEqual(note.text,"خطة قراءة جديدة")
+        XCTAssertEqual(try ModelContext(container).fetchCount(FetchDescriptor<Entry>()),0)
+        let replayed=await app.handleIntentRequest(.capture(text:"فكرة: خطة قراءة جديدة",id:id))
+        XCTAssertTrue(replayed)
+        XCTAssertEqual(try ModelContext(container).fetchCount(FetchDescriptor<NotebookNote>()),1)
+    }
+
     func testMoneyCaptureOpensConfirmationWithoutWritingOrRequiringDiaryUnlock() async throws {
         let (app, container) = try session(), id = UUID()
         let applied = await app.handleIntentRequest(.capture(text: "قهوة ١٨", id: id)); XCTAssertTrue(applied)

@@ -1,7 +1,6 @@
 import Foundation
 
-/// §9 single capture: one free sentence goes to the room that owns it. Routing follows the
-/// built rooms only: M5 money opens its confirmation sheet; before M6 «فكرة:» stays in the diary.
+/// §9 single capture: one free sentence goes to the room that owns it. Routing follows the built rooms only.
 public enum CaptureRoute: Equatable, Sendable {
     public enum LineKind: String, Sendable { case line, idea }
     /// A complete prayer report: prayer and congregation state were both said.
@@ -10,6 +9,8 @@ public enum CaptureRoute: Equatable, Sendable {
     case choosePrayerStatus(prayer: Prayer, fridayKind: FridayPrayerKind?)
     /// Anything else is a line on today's diary page, kept exactly as written.
     case diaryLine(text: String, kind: LineKind)
+    /// An explicit «فكرة:» goes to Mihbara's private notebook after the foreground app gate.
+    case mihbaraIdea(text: String)
     /// Amount is a decimal major-unit string; the app applies its chosen home currency.
     case moneyExpense(amount: String, merchant: String)
     case empty
@@ -25,9 +26,11 @@ public enum CaptureRouter {
         guard text.count <= maximumLength else { return .tooLong }
         if let prayer = prayerReport(text) { return prayer }
         if let expense = moneyReport(text) { return expense }
-        let folded = fold(text)
-        let isIdea = folded.hasPrefix("فكره:") || folded.hasPrefix("فكره :")
-        return .diaryLine(text: text, kind: isIdea ? .idea : .line)
+        if let colon = text.firstIndex(of: ":"), fold(String(text[..<colon])).trimmingCharacters(in: .whitespacesAndNewlines) == "فكره" {
+            let idea = String(text[text.index(after: colon)...]).trimmingCharacters(in: .whitespacesAndNewlines)
+            return idea.isEmpty ? .empty : .mihbaraIdea(text: idea)
+        }
+        return .diaryLine(text: text, kind: .line)
     }
 
     private static func moneyReport(_ text: String) -> CaptureRoute? {

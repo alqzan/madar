@@ -17,7 +17,8 @@ import MadarPrayer
         let now=app.prayerNow(),envelope=try XCTUnwrap(app.snapshotStore.read("habits",as:RoomWidgetSnapshot.self,now:now))
         XCTAssertEqual(envelope.payload.rows.count,1);XCTAssertEqual(envelope.payload.rows.first?.value,"٢ من ٢ كوب");XCTAssertEqual(envelope.payload.rows.first?.done,true)
         XCTAssertNil(app.snapshotStore.read("habits",as:RoomWidgetSnapshot.self,now:now.addingTimeInterval(4000)))
-        for room in BuiltRoomWidget.allCases{XCTAssertNotNil(app.snapshotStore.read(room.rawValue,as:RoomWidgetSnapshot.self,now:now))}
+        for room in BuiltRoomWidget.allCases where room != .mihbara{XCTAssertNotNil(app.snapshotStore.read(room.rawValue,as:RoomWidgetSnapshot.self,now:now))}
+        XCTAssertNotNil(app.snapshotStore.read(BuiltRoomWidget.mihbara.rawValue,as:MihbaraSnapshot.self,now:now))
         let year=try XCTUnwrap(app.snapshotStore.read("year",as:RoomWidgetSnapshot.self,now:now))
         XCTAssertTrue(year.payload.rows.allSatisfy{$0.detail.contains(where:{$0.isNumber})})
         let upcoming=try XCTUnwrap(app.snapshotStore.read("upcoming",as:RoomWidgetSnapshot.self,now:now))
@@ -47,6 +48,28 @@ import MadarPrayer
         let diary=try XCTUnwrap(payloads[.diaryWrite]),data=try JSONEncoder().encode(diary),text=try XCTUnwrap(String(data:data,encoding:.utf8))
         XCTAssertFalse(text.contains("SECRET"));XCTAssertTrue(diary.rows.isEmpty)
         XCTAssertFalse(diary.datePrimary.isEmpty);XCTAssertFalse(diary.dateSecondary.isEmpty)
+        let mihbara=app.mihbaraWidgetSnapshot(locked:true)
+        XCTAssertNil(mihbara.currentBook);XCTAssertNil(mihbara.hadithToday);XCTAssertEqual(mihbara.shelfCount,0);XCTAssertNil(mihbara.lastNotebookLine)
+    }
+    func testMihbaraSnapshotUsesOnlyEligibleBooksAndNotebookLines() async throws {
+        let root=FileManager.default.temporaryDirectory.appendingPathComponent("RoomWidgetMihbara-\(UUID())");defer{try? FileManager.default.removeItem(at:root)}
+        let container=try MadarContainerFactory.makeLocal(at:root),app=try AppSession(container:container,groupDirectory:root),context=ModelContext(container),now=app.prayerNow()
+        app.authorizeProtectedData()
+        try await app.applySettingsAndWait(["core.faceIDLock":.string("none")])
+        let book=Book();book.id=UUID();book.title="على رف القراءة";book.author="مؤلف";book.kind="paper";book.shelf="reading";book.currentPage=14;book.pages=240;book.updatedAt=now;context.insert(book)
+        let privateNote=NotebookNote();privateNote.text="SECRET-PRIVATE-NOTE";privateNote.isPrivate=true;privateNote.link="general";privateNote.updatedAt=now.addingTimeInterval(2);context.insert(privateNote)
+        let diaryNote=NotebookNote();diaryNote.text="SECRET-DIARY-LINE";diaryNote.isPrivate=false;diaryNote.link="fromDiary";diaryNote.targetID=UUID();diaryNote.updatedAt=now.addingTimeInterval(3);context.insert(diaryNote)
+        let publicNote=NotebookNote();publicNote.text=String(repeating:"م",count:100);publicNote.isPrivate=false;publicNote.link="idea";publicNote.updatedAt=now.addingTimeInterval(4);context.insert(publicNote)
+        try context.save();try app.publishRoomWidgetSnapshots(at:now)
+
+        let envelope=try XCTUnwrap(app.snapshotStore.read(BuiltRoomWidget.mihbara.rawValue,as:MihbaraSnapshot.self,now:now))
+        XCTAssertEqual(envelope.payload.currentBook?.id,book.id);XCTAssertEqual(envelope.payload.currentBook?.currentPage,14);XCTAssertEqual(envelope.payload.currentBook?.pages,240)
+        XCTAssertEqual(envelope.payload.shelfCount,1);XCTAssertEqual(envelope.payload.lastNotebookLine?.count,80)
+        let encoded=try JSONEncoder().encode(envelope.payload),json=String(decoding:encoded,as:UTF8.self)
+        XCTAssertFalse(json.contains("SECRET-PRIVATE-NOTE"));XCTAssertFalse(json.contains("SECRET-DIARY-LINE"))
+        XCTAssertEqual(envelope.privacy.notesLocked,false)
+        let locked=app.mihbaraWidgetSnapshot(locked:true,at:now)
+        XCTAssertNil(locked.currentBook);XCTAssertNil(locked.hadithToday);XCTAssertEqual(locked.shelfCount,0);XCTAssertNil(locked.lastNotebookLine)
     }
     /// RD7 (owner, 16 Oct): diary text reaches the widget payload only with the opt-in, and never under the app lock.
     func testDiaryContentRowsNeedTheOptInAndNeverCrossTheLock() async throws {

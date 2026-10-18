@@ -24,3 +24,17 @@ struct MoneyExpenseControl: ControlWidget {
         }.displayName("مصروف").description("يفتح تسجيل مصروف، دون عرض رصيدك.")
     }
 }
+struct OpenMihbaraRoomIntent:AppIntent {
+    static let title:LocalizedStringResource="افتح المحبرة"
+    static let supportedModes:IntentModes = .foreground
+    func perform() async throws->some IntentResult & OpensIntent {
+        .result(opensIntent:OpenURLIntent(URL(string:"madar://mihbara")!))
+    }
+}
+struct MihbaraRoomControl:ControlWidget {
+    var body:some ControlWidgetConfiguration {
+        StaticControlConfiguration(kind:"com.alqzan.madar2.mihbara-open") {
+            ControlWidgetButton(action:OpenMihbaraRoomIntent()){Label("المحبرة",systemImage:"book.closed")}
+        }.displayName("المحبرة").description("يفتح رفّك ومكتبك في المحبرة.")
+    }
+}

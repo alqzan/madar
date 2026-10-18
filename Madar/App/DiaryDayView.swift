@@ -188,7 +188,7 @@ struct DiaryDayView: View {
         let r=n%100;return service.digits.string(n)+((3...10).contains(r) ? " أيام":r <= 2 ? " يوم":" يومًا")
     }
     private func lineRow(_ line: DiaryDisplayLine, page: DiaryDisplayDay) -> some View {
-        let auto = ["salah", "quran"].contains(line.kind)
+        let auto = ["salah", "quran", "mihbara"].contains(line.kind)
         return HStack(alignment: .firstTextBaseline, spacing: 12) {
             Text(service.time(line.at, zone: line.tzID)).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(theme.color("ink3Text")).frame(width: 38, alignment: .center)
             VStack(alignment: .leading, spacing: 5) {
@@ -209,7 +209,7 @@ struct DiaryDayView: View {
                 if line.kind == "margin" {
                     Text("هامش · " + (page.marginDays[line.id].map { service.bothDates($0) } ?? "تاريخ الكتابة غير متاح")).font(DiaryType.label)
                 }
-                if auto { Text(line.kind == "salah" ? "الصلاة" : "القرآن").font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)) }
+                if auto { Text(line.kind == "salah" ? "الصلاة" : line.kind == "quran" ? "القرآن" : "المحبرة").font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)) }
             }.foregroundStyle(line.kind == "margin" ? secondInk : line.kind == "late" ? theme.color("late") : auto ? theme.color("autoInkText") : theme.ink)
         }.padding(.leading, 6).padding(.trailing, travel == nil || typeSize.isAccessibilitySize ? 18 : 92).padding(.vertical, 10).frame(minHeight: 34)
     }

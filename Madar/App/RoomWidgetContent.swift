@@ -2,6 +2,7 @@ import SwiftUI
 import WidgetKit
 import MadarDesign
 import MadarSnapshots
+import MadarCore
 
 /// The same content is rendered by WidgetKit and the in-app previews. No store access or prototype controls.
 struct RoomWidgetContent:View {
@@ -9,10 +10,13 @@ struct RoomWidgetContent:View {
     let snapshot:RoomWidgetSnapshot?
     var template="summary"
     var family:WidgetFamily = .systemSmall
+    var mihbaraSnapshot:MihbaraSnapshot?=nil
+    var mihbaraLocked=false
+    var numerals="arabicIndic"
     @Environment(\.colorScheme) private var scheme
     @Environment(\.dynamicTypeSize) private var type
     @Environment(\.widgetRenderingMode) private var rendering
-    private var theme:RoomTheme{.init(room:"bahw",dark:scheme == .dark)}
+    private var theme:RoomTheme{.init(room:room == .mihbara ? "mihbara" : "bahw",dark:scheme == .dark)}
     private var accent:Color{rendering == .fullColor ? theme.accent : .primary}
     private var capacity:Int {let n=family == .systemLarge ? 5 : family == .systemMedium ? 3 : 2;return type.isAccessibilitySize ? (n+1)/2 : n}
     private var rows:[RoomWidgetSnapshot.Row] {
@@ -23,7 +27,7 @@ struct RoomWidgetContent:View {
         return Array(values.prefix(capacity))
     }
     private var accessory:Bool{[WidgetFamily.accessoryInline,.accessoryCircular,.accessoryRectangular].contains(family)}
-    var body:some View {Group{if room == .money { MoneyWidgetContent(snapshot: snapshot, family: family, template: template) } else if accessory{accessoryContent}else{home}}}
+    var body:some View {Group{if room == .mihbara{MihbaraRoomWidgetContent(snapshot:mihbaraSnapshot,locked:mihbaraLocked,family:family,numerals:numerals)}else if room == .money { MoneyWidgetContent(snapshot: snapshot, family: family, template: template) } else if accessory{accessoryContent}else{home}}}
     private var home:some View {
         VStack(alignment:.leading,spacing:8) {
             HStack(spacing:6) { Image(room.glyph).renderingMode(.template).resizable().scaledToFit().frame(width:16,height:16).widgetAccentable();Text(diaryRow?.title ?? room.title).font(.custom("thmanyahsans-Bold",size:13,relativeTo:.caption));Spacer(minLength:0);if room == .habits && family == .systemMedium {Text(snapshot?.heading ?? "").font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).privacySensitive()} }.foregroundStyle(accent)
@@ -125,4 +129,90 @@ struct RoomWidgetContent:View {
             VStack(spacing:5){ZStack{donut(row.share);VStack(spacing:0){Text(row.value.split(separator:" ").first.map(String.init) ?? row.value).font(.custom("thmanyahserifdisplay-Bold",size:26,relativeTo:.title2)).minimumScaleFactor(0.7).lineLimit(1);Text(row.value.split(separator:" ").dropFirst().joined(separator:" ")).font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2))}.multilineTextAlignment(.center).padding(7)}.aspectRatio(1,contentMode:.fit);Text(row.title).font(.custom("thmanyahsans-Bold",size:11,relativeTo:.caption2)).lineLimit(2).multilineTextAlignment(.center)}.frame(maxWidth:.infinity)
         }.buttonStyle(.plain).privacySensitive()
     }
+}
+
+private struct MihbaraRoomWidgetContent:View {
+    let snapshot:MihbaraSnapshot?
+    let locked:Bool
+    let family:WidgetFamily
+    let numerals:String
+    @Environment(\.colorScheme) private var scheme
+    private var theme:RoomTheme{.init(room:"mihbara",dark:scheme == .dark)}
+    private var digits:MadarNumberFormatter{.init(style:numerals == "western" ? .western : .hindi)}
+    private var bookTitle:String?{snapshot?.currentBook?.title.trimmingCharacters(in:.whitespacesAndNewlines).nonEmpty}
+    private var fallbackTitle:String?{bookTitle ?? snapshot?.hadithToday?.title}
+    private var pageLine:String? {
+        guard let book=snapshot?.currentBook else{return nil}
+        if let page=book.currentPage,let pages=book.pages{return digits.string(page)+" من "+digits.string(pages)+" صفحة"}
+        if let page=book.currentPage{return "صفحة "+digits.string(page)}
+        if let pages=book.pages{return digits.string(pages)+" صفحة"}
+        return nil
+    }
+    var body:some View {
+        Group {
+            if [WidgetFamily.accessoryInline,.accessoryCircular,.accessoryRectangular].contains(family) { accessory }
+            else { home }
+        }
+        .foregroundStyle(family == .accessoryInline || family == .accessoryCircular || family == .accessoryRectangular ? Color.primary : theme.ink)
+        .environment(\.layoutDirection,.rightToLeft)
+        .privacySensitive()
+    }
+    private var home:some View {
+        VStack(alignment:.leading,spacing:8) {
+            HStack(spacing:7) {
+                Image(systemName:"book.closed.fill").font(.system(size:15,weight:.semibold)).widgetAccentable()
+                Text("المحبرة").font(.custom("thmanyahsans-Bold",size:13,relativeTo:.caption))
+                Spacer(minLength:0)
+                if let count=snapshot?.shelfCount,count>0 {Text(digits.string(count)+" كتابًا").font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).foregroundStyle(theme.secondaryInk).lineLimit(1)}
+            }.foregroundStyle(theme.accent)
+            if locked {
+                Spacer(minLength:0);Label("افتح مدار",systemImage:"lock").font(MadarTypography.section());Text("المحتوى محمي").font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).foregroundStyle(theme.secondaryInk);Spacer(minLength:0)
+            } else if snapshot?.currentBook == nil && snapshot?.hadithToday == nil && snapshot?.lastNotebookLine == nil {
+                Spacer(minLength:0);Text("ضع كتابًا على الطاولة").font(.custom("thmanyahserifdisplay-Bold",size:20,relativeTo:.title3));Text("أو اقرأ حديث اليوم").font(.custom("thmanyahsans-Regular",size:12,relativeTo:.caption)).foregroundStyle(theme.secondaryInk);Spacer(minLength:0)
+            } else {
+                if let book=snapshot?.currentBook {
+                    VStack(alignment:.leading,spacing:3) {
+                        Text(book.title).font(.custom("thmanyahserifdisplay-Bold",size:family == .systemSmall ? 20 : 22,relativeTo:.title2)).lineLimit(family == .systemSmall ? 2 : 2)
+                        if !book.author.isEmpty {Text(book.author).font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).foregroundStyle(theme.secondaryInk).lineLimit(1)}
+                        if let pageLine {Text(pageLine).font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).foregroundStyle(theme.secondaryInk).lineLimit(1)}
+                    }
+                } else if let hadith=snapshot?.hadithToday {
+                    Text(hadith.title).font(.custom("thmanyahserifdisplay-Bold",size:20,relativeTo:.title3)).lineLimit(3)
+                }
+                if family != .systemSmall,let hadith=snapshot?.hadithToday,snapshot?.currentBook != nil {
+                    Rectangle().fill(theme.line).frame(height:1)
+                    VStack(alignment:.leading,spacing:3){Text("حديث اليوم · "+digits.string(hadith.number)).font(.custom("thmanyahsans-Bold",size:11,relativeTo:.caption2)).foregroundStyle(theme.accent);Text(hadith.title).font(.custom("thmanyahsans-Regular",size:12,relativeTo:.caption)).lineLimit(2)}
+                }
+                if family == .systemLarge,let line=snapshot?.lastNotebookLine {
+                    Rectangle().fill(theme.line).frame(height:1)
+                    Text(line).font(.custom("thmanyahseriftext-Regular",size:15,relativeTo:.body)).lineLimit(3)
+                }
+                Spacer(minLength:0)
+            }
+        }.frame(maxWidth:.infinity,maxHeight:.infinity,alignment:.topLeading)
+    }
+    @ViewBuilder private var accessory:some View {
+        if family == .accessoryInline {
+            Text("المحبرة، "+(locked ? "افتح مدار" : fallbackTitle ?? "رفّك")).font(.caption).lineLimit(1)
+        } else if family == .accessoryCircular {
+            ZStack {
+                Circle().stroke(.primary.opacity(0.25),lineWidth:3)
+                if !locked,let page=snapshot?.currentBook?.currentPage {Circle().trim(from:0,to:0.72).stroke(.primary,style:.init(lineWidth:3,lineCap:.round)).rotationEffect(.degrees(-90));Text(digits.string(page)).font(.custom("thmanyahsans-Bold",size:14,relativeTo:.caption)).lineLimit(1).minimumScaleFactor(0.7)}
+                else {Image(systemName:locked ? "lock.fill" : "book.closed").font(.system(size:17,weight:.medium))}
+            }.accessibilityElement(children:.ignore).accessibilityLabel(locked ? "المحبرة مقفلة" : "المحبرة")
+        } else {
+            HStack(spacing:8) {
+                Image(systemName:locked ? "lock.fill" : "book.closed.fill").font(.system(size:18,weight:.semibold))
+                VStack(alignment:.leading,spacing:3) {
+                    Text("المحبرة").font(.custom("thmanyahsans-Bold",size:11,relativeTo:.caption2))
+                    Text(locked ? "افتح مدار" : fallbackTitle ?? "رفّك ينتظرك").font(.custom("thmanyahsans-Bold",size:13,relativeTo:.caption)).lineLimit(1)
+                    if !locked,let pageLine {Text(pageLine).font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).lineLimit(1)}
+                }
+            }.frame(maxWidth:.infinity,maxHeight:.infinity,alignment:.leading)
+        }
+    }
+}
+
+private extension String {
+    var nonEmpty:String? { isEmpty ? nil : self }
 }

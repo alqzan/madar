@@ -45,6 +45,24 @@ extension AppSession {
         payloads[.money] = moneyWidgetPayload(hidden: locked || bool("core.hideMoneyOutside"), locked: locked, at: now)
         return payloads
     }
+    /// Build the data-dictionary MihbaraSnapshot in the app process. A private note or a
+    /// diary-linked note never enters an App Group file, even when the rest of Mihbara is visible.
+    func mihbaraWidgetSnapshot(locked:Bool,at instant:Date?=nil)->MihbaraSnapshot {
+        guard !locked else { return .init() }
+        let now=instant ?? prayerNow(),context=ModelContext(container)
+        do {
+            let reading=try AppMihbaraService(app:self).load(at:now)
+            let current=reading.books.first{$0.shelf=="reading"}
+            let book=current.map { MihbaraSnapshot.BookSummary(id:$0.id,title:$0.title,author:$0.author,currentPage:$0.page.flatMap{$0>0 ? $0 : nil},pages:$0.pages) }
+            let hadith=reading.todayHadiths.first.map { MihbaraSnapshot.HadithSummary(collectionID:reading.collection.collectionID,number:$0.number,title:$0.title) }
+            let notes=try context.fetch(FetchDescriptor<NotebookNote>())
+            let lastLine=notes.filter{$0.deletedAt==nil && $0.mergedInto==nil && !$0.isPrivate && $0.link != "fromDiary"}
+                .sorted{$0.updatedAt>$1.updatedAt}
+                .compactMap{$0.text.trimmingCharacters(in:.whitespacesAndNewlines)}
+                .first{$0.isEmpty == false}
+            return .init(currentBook:book,hadithToday:hadith,shelfCount:reading.books.count,lastNotebookLine:lastLine)
+        } catch { return .init() }
+    }
     func publishRoomWidgetSnapshots(at now:Date) throws {
         let service=AppBahwService(session:self,evaluationDate:now),next=service.today.adding(days:1),place=activePlace
         let prayers=try PrayerRepository(context:ModelContext(container)),options=prayers.activeTrip(at:now)==nil ? prayers.options : prayers.tripOptions
@@ -61,6 +79,9 @@ extension AppSession {
             try snapshotStore.write(envelope)
             WidgetCenter.shared.reloadTimelines(ofKind:"MadarRoom-"+room.rawValue)
         }
+        let mihbara=SnapshotEnvelope(name:BuiltRoomWidget.mihbara.rawValue,generatedAt:now,validUntil:expiry,dayKey:service.today.description,tzID:place.timeZoneID,privacy:SnapshotPrivacy(notesLocked:locked),payload:mihbaraWidgetSnapshot(locked:locked,at:now))
+        try snapshotStore.write(mihbara)
+        WidgetCenter.shared.reloadTimelines(ofKind:"MadarRoom-"+BuiltRoomWidget.mihbara.rawValue)
         // Names outlive the day so Siri can still find a habit; its period is only trusted until the day ends.
         let periodsEnd=end ?? now.addingTimeInterval(900)
         try snapshotStore.write(SnapshotEnvelope(name:HabitShortcutSnapshot.name,generatedAt:now,validUntil:now.addingTimeInterval(30*86400),dayKey:service.today.description,tzID:place.timeZoneID,privacy:SnapshotPrivacy(notesLocked:locked),payload:habitShortcutPayload(locked:locked,at:now,periodsValidUntil:periodsEnd)))

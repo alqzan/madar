@@ -30,12 +30,14 @@ import Testing
         #expect(CaptureRouter.route("صليت المغرب قصرا جماعة") == .diaryLine(text: "صليت المغرب قصرا جماعة", kind: .line))
     }
 
-    @Test func moneyOpensItsRoomAndIdeasBeforeM6GoToTodaysPage() {
-        // §9: قبل M5 يصير «قهوة ١٨» سطرًا في صفحة اليوم، وقبل M6 تذهب «فكرة:» إلى المذكرات.
+    @Test func moneyOpensItsRoomAndMihbaraIdeasLeaveTheDiary() {
+        // §9: «قهوة ١٨» goes to Money and, once M6 is built, «فكرة:» goes to Mihbara.
         #expect(CaptureRouter.route("قهوة ١٨") == .moneyExpense(amount: "١٨", merchant: "قهوة"))
         #expect(CaptureRouter.route("مصروف: مكتبة الحي ١٨٫٥٠") == .moneyExpense(amount: "١٨٫٥٠", merchant: "مكتبة الحي"))
         #expect(CaptureRouter.route("قرأت صفحة ١٨") == .diaryLine(text: "قرأت صفحة ١٨", kind: .line))
-        #expect(CaptureRouter.route("  فكرة: كتاب عن الجيران ") == .diaryLine(text: "فكرة: كتاب عن الجيران", kind: .idea))
+        #expect(CaptureRouter.route("  فكرة: كتاب عن الجيران ") == .mihbaraIdea(text: "كتاب عن الجيران"))
+        #expect(CaptureRouter.route("فِكرة : عنوانٌ مهم") == .mihbaraIdea(text: "عنوانٌ مهم"))
+        #expect(CaptureRouter.route("فكرة:") == .empty)
         #expect(CaptureRouter.route("اتصلت بخالتي") == .diaryLine(text: "اتصلت بخالتي", kind: .line))
     }
 

@@ -41,9 +41,30 @@ public struct DiaryAutoLine: Identifiable, Codable, Equatable, Sendable {
             let text = row.kind == "hifz" ? "حفظت من القرآن" : row.kind == "qiyam" ? "راجعت من محفوظي في القيام" : "راجعت من محفوظي"
             lines.append(.init(id: "quran." + row.id.uuidString, at: row.endedAt, text: text, kind: "quran"))
         }
-        let money = MoneyRepository(context: context)
+        let books=try context.fetch(FetchDescriptor<Book>()).sorted{$0.updatedAt>$1.updatedAt}
         let settings = try SettingsStore(context: context)
         let digits = MadarNumberFormatter(style: try settings.value(for: "core.numerals") == .string("western") ? .western : .hindi)
+        var bookTitles:[UUID:String]=[:]
+        for book in books where bookTitles[book.id] == nil {
+            let title=book.title.trimmingCharacters(in:.whitespacesAndNewlines)
+            if !title.isEmpty {bookTitles[book.id]=title}
+        }
+        let readingSessions=try context.fetch(FetchDescriptor<ReadingSession>())
+        for row in readingSessions where row.dayKey == day.description && row.activeSeconds >= 60 && row.deletedAt == nil && row.mergedInto == nil && visible("mihbara",row.id) {
+            let title=row.bookID.flatMap{bookTitles[$0]} ?? "كتابك"
+            let text:String
+            if row.pagesCounted > 0 {
+                let count=row.pagesCounted,remainder=count%100
+                let unit=count == 1 ? "صفحة واحدة" : count == 2 ? "صفحتين" : (3...10).contains(remainder) ? digits.string(count)+" صفحات" : digits.string(count)+" صفحة"
+                text="قرأت "+unit+" من "+title
+            } else {
+                let minutes=max(1,row.activeSeconds / 60 + (row.activeSeconds % 60 == 0 ? 0 : 1)),remainder=minutes%100
+                let unit=minutes == 1 ? "دقيقة واحدة" : minutes == 2 ? "دقيقتين" : (3...10).contains(remainder) ? digits.string(minutes)+" دقائق" : digits.string(minutes)+" دقيقة"
+                text="قرأت "+unit+" من "+title
+            }
+            lines.append(.init(id:"mihbara."+row.id.uuidString,at:row.end ?? row.updatedAt,text:text,kind:"mihbara"))
+        }
+        let money = MoneyRepository(context: context)
         for row in try money.confirmedTransactions() where row.dayKey == day.description && row.showInDiary && visible("mal", row.id) {
             let charge = try money.effect(of: row, includingExcluded: true).budgetChargeMinor
             guard charge != 0, let exponent = CurrencyExponents.specified.exponent(row.homeCurrency) else { continue }

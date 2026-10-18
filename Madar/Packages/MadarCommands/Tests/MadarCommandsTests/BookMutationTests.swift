@@ -137,4 +137,22 @@ import MadarData
         #expect(BookCommand.parse("notebook.deletePrivate", ["id": .string(id.uuidString)]) == .deletePrivateNote(id: id))
         #expect(BookCommand.parse("notebook.savePrivate", ["id": .string(id.uuidString), "text": .string("فكرة"), "isPrivate": .bool(false)]) == nil)
     }
+
+    @Test func diaryReadingLinesComeFromSavedSessionsAndRespectHide() throws {
+        let root=FileManager.default.temporaryDirectory.appending(path:"MihbaraDiary-\(UUID())");defer{try? FileManager.default.removeItem(at:root)}
+        let container=try MadarContainerFactory.makeLocal(at:root),context=ModelContext(container),day=try GregorianDay("2026-10-17")
+        let book=Book();book.id=UUID();book.title="كتاب الاختبار";book.deletedAt=now
+        let session=ReadingSession();session.id=UUID();session.bookID=book.id;session.dayKey=day.description;session.start=now.addingTimeInterval(-300);session.end=now;session.activeSeconds=300;session.pagesCounted=12
+        let tooShort=ReadingSession();tooShort.bookID=book.id;tooShort.dayKey=day.description;tooShort.start=now.addingTimeInterval(-59);tooShort.end=now;tooShort.activeSeconds=59;tooShort.pagesCounted=4
+        context.insert(book);context.insert(session);context.insert(tooShort);try context.save()
+
+        var lines=try DiaryLineRenderer.live(day:day,context:context).filter{$0.kind=="mihbara"}
+        #expect(lines.map(\.text)==["قرأت ١٢ صفحة من كتاب الاختبار"])
+        #expect(lines.first?.id=="mihbara."+session.id.uuidString)
+
+        let hidden=HiddenAutoLine();hidden.eventKind="mihbara";hidden.eventID=session.id;hidden.dayKey=day.description;context.insert(hidden);try context.save()
+        lines=try DiaryLineRenderer.live(day:day,context:context).filter{$0.kind=="mihbara"}
+        #expect(lines.isEmpty,"Hiding the diary line does not delete the saved reading session")
+        #expect(try context.fetch(FetchDescriptor<ReadingSession>()).count==2)
+    }
 }
