@@ -165,6 +165,7 @@ struct MihbaraReaderView: View {
     @State private var lastDecorationTap = Date.distantPast
     @State private var readerUndoID: UUID?
     @State private var copiedAt: Date?
+    @State private var footnote: MihbaraFootnote?
 
     private var paper: SwiftUI.Color {
         colorScheme == .dark
@@ -241,6 +242,12 @@ struct MihbaraReaderView: View {
                         onLocation: locationChanged,
                         onInteraction: readerTapped,
                         onSelection: selectionChanged,
+                        onFootnote: { note in
+                            recordInteraction()
+                            lastDecorationTap = Date()
+                            if wordCard != nil { closeWordCard() }
+                            withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) { footnote = note }
+                        },
                         onReady: { navigator in
                             navigatorController = navigator
                             if let currentLocator { resolvePrintPageMarker(for: currentLocator) }
@@ -535,7 +542,13 @@ struct MihbaraReaderView: View {
     // MARK: - M6-V08 word card, paragraph highlights and page notes
 
     @ViewBuilder private var readerOverlay: some View {
-        if let wordCard {
+        if let footnote {
+            MihbaraFootnoteCard(note: footnote, dark: colorScheme == .dark, number: digits.localized(footnote.number)) {
+                withAnimation(.easeOut(duration: 0.2)) { self.footnote = nil }
+            }
+            .padding(.horizontal, 12).padding(.bottom, 10)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+        } else if let wordCard {
             MihbaraWordCard(
                 state: wordCard, dark: colorScheme == .dark, copied: copiedAt != nil,
                 lookUp: { lookupTerm = .init(word: wordCard.word) },
@@ -555,12 +568,14 @@ struct MihbaraReaderView: View {
 
     @MainActor private func readerTapped() {
         recordInteraction()
-        guard wordCard != nil else { return }
+        guard wordCard != nil || footnote != nil else { return }
         let tapped = Date()
         Task { @MainActor in
-            // A tap on a highlight reports both the tap and the decoration; the decoration wins.
+            // A tap on a highlight or a note marker reports both the tap and its target; the target wins.
             try? await Task.sleep(for: .milliseconds(300))
-            if lastDecorationTap < tapped.addingTimeInterval(-0.05) { closeWordCard() }
+            guard lastDecorationTap < tapped.addingTimeInterval(-0.05) else { return }
+            if wordCard != nil { closeWordCard() }
+            if footnote != nil { withAnimation(.easeOut(duration: 0.2)) { footnote = nil } }
         }
     }
 
@@ -1228,18 +1243,21 @@ private struct MihbaraEPUBNavigator: UIViewControllerRepresentable {
     let onLocation: (Locator, Bool) -> Void
     let onInteraction: () -> Void
     let onSelection: (Selection) -> Void
+    let onFootnote: (MihbaraFootnote) -> Void
     let onReady: (EPUBNavigatorViewController) -> Void
     let onError: (NavigatorError) -> Void
 
     /// One opaque band behind the whole paragraph, across the page width (design tokens: never alpha over ink).
     private static var highlightTemplates: [Decoration.Style.Id: HTMLDecorationTemplate] {
         [.highlight: HTMLDecorationTemplate(
-            layout: .bounds, width: .viewport,
+            // Per line, so a paragraph that crosses a page break is drawn on each page; the boxes grow
+            // by the line gap so the lines join into one band.
+            layout: .boxes, width: .viewport,
             element: { decoration in
                 let tint = (decoration.style.config as? Decoration.Style.HighlightConfig)?.tint ?? .yellow
                 return "<div class=\"madar-highlight\" style=\"background-color: \(tint.madarCSS) !important;\"/>"
             },
-            stylesheet: ".madar-highlight { z-index: -1; margin: -0.3em 0 0 0; padding: 0 0 0.6em 0; box-sizing: content-box; }"
+            stylesheet: ".madar-highlight { z-index: -1; margin: calc(-0.5em * var(--USER__lineHeight, 2) + 0.5em - 1px) 0 0 0; padding: 0 0 calc(1em * var(--USER__lineHeight, 2) - 1em + 2px) 0; box-sizing: content-box; }"
         )]
     }
 
@@ -1255,7 +1273,11 @@ private struct MihbaraEPUBNavigator: UIViewControllerRepresentable {
         }
     }
 
-    func makeCoordinator() -> Coordinator { Coordinator(onLocation: onLocation, onInteraction: onInteraction, onSelection: onSelection, onReady: onReady, onError: onError) }
+    func makeCoordinator() -> Coordinator {
+        let coordinator = Coordinator(onLocation: onLocation, onInteraction: onInteraction, onSelection: onSelection, onReady: onReady, onError: onError)
+        coordinator.onFootnote = onFootnote
+        return coordinator
+    }
 
     func makeUIViewController(context: Context) -> UIViewController {
         let configuration = EPUBNavigatorViewController.Configuration(
@@ -1298,6 +1320,7 @@ private struct MihbaraEPUBNavigator: UIViewControllerRepresentable {
         context.coordinator.onLocation = onLocation
         context.coordinator.onInteraction = onInteraction
         context.coordinator.onSelection = onSelection
+        context.coordinator.onFootnote = onFootnote
         context.coordinator.onReady = onReady
         context.coordinator.onError = onError
         (controller as? EPUBNavigatorViewController)?.delegate = context.coordinator
@@ -1307,6 +1330,7 @@ private struct MihbaraEPUBNavigator: UIViewControllerRepresentable {
         var onLocation: (Locator, Bool) -> Void
         var onInteraction: () -> Void
         var onSelection: (Selection) -> Void
+        var onFootnote: (MihbaraFootnote) -> Void = { _ in }
         var onReady: (EPUBNavigatorViewController) -> Void
         var onError: (NavigatorError) -> Void
 
@@ -1323,6 +1347,12 @@ private struct MihbaraEPUBNavigator: UIViewControllerRepresentable {
         func navigator(_ navigator: Navigator, presentError error: NavigatorError) { onError(error) }
         func navigator(_ navigator: VisualNavigator, didTapAt point: CGPoint) { onInteraction() }
         func navigator(_ navigator: Navigator, presentExternalURL url: URL) { onInteraction() }
+        /// A note reference opens Madar's footnote card instead of jumping to the notes file.
+        func navigator(_ navigator: Navigator, shouldNavigateToNoteAt link: ReadiumShared.Link, content: String, referrer: String?) -> Bool {
+            guard let note = MihbaraFootnote(html: content, referrer: referrer) else { return true }
+            onFootnote(note)
+            return false
+        }
         /// Madar's word card replaces the system edit menu (RMI1: meaning through the system Look Up only).
         func navigator(_ navigator: SelectableNavigator, shouldShowMenuForSelection selection: Selection) -> Bool {
             onSelection(selection)
@@ -1344,13 +1374,49 @@ private struct MihbaraEPUBNavigator: UIViewControllerRepresentable {
                     h1::before { content: 'فصل'; display: block; color: #6A6052; font-size: .56em; font-weight: 400; margin-bottom: .32em; }
                     h1::after { content: ''; display: block; width: 3.8em; border-top: 1px solid #B7AA95; margin: .58em auto 0; }
                     p { margin-block: .7em !important; }
-                    a[role~='doc-noteref'] { display: inline-block; min-width: 1.25em; padding: .02em .18em; border-radius: 50%; background: #9E2F25 !important; color: #FAF6EA !important; font-size: .74em; font-weight: 600; line-height: 1.25; text-align: center; text-decoration: none !important; }
+                    :root[style] body span.madar-ayah.madar-ayah.madar-ayah { color: #24412F !important; }
+                    :root[style*="readium-night-on"] body span.madar-ayah.madar-ayah.madar-ayah { color: #E2C27A !important; }
+                    a[role~='doc-noteref'] { display: inline-flex !important; align-items: center; justify-content: center; box-sizing: border-box; width: 1.45em; height: 1.45em; padding: 0 0 .12em 0 !important; margin-inline: .12em; border-radius: 50%; background: #9E2F25 !important; color: #FAF6EA !important; font-size: .7em; font-weight: 700; line-height: 1 !important; text-indent: 0 !important; vertical-align: .35em; text-decoration: none !important; }
+                    html[style*="readium-night-on"] a[role~='doc-noteref'] { background: #DCA564 !important; color: #1F1C17 !important; }
                   `;
                   head.appendChild(style);
                 }
                 return true;
               };
               if (!apply()) new MutationObserver((_, observer) => { if (apply()) observer.disconnect(); }).observe(document, {childList:true, subtree:true});
+              // Qur'an quotations: every run from ﴿ to ﴾, even across inline tags, takes the verse colour.
+              const verses = () => {
+                if (!document.body || document.body.dataset.madarAyah) return;
+                document.body.dataset.madarAyah = '1';
+                const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+                  acceptNode: (node) => node.parentElement && node.parentElement.closest('script, style, .madar-ayah') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT
+                });
+                const nodes = [];
+                while (walker.nextNode()) nodes.push(walker.currentNode);
+                let inside = false;
+                for (const node of nodes) {
+                  const text = node.nodeValue;
+                  if (!inside && !text.includes('﴿')) continue;
+                  const parts = [];
+                  let start = 0;
+                  for (let i = 0; i < text.length; i++) {
+                    if (!inside && text[i] === '﴿') { if (i > start) parts.push([text.slice(start, i), false]); start = i; inside = true; }
+                    else if (inside && text[i] === '﴾') { parts.push([text.slice(start, i + 1), true]); start = i + 1; inside = false; }
+                  }
+                  if (start < text.length) parts.push([text.slice(start), inside]);
+                  if (!parts.some(([, verse]) => verse)) continue;
+                  const fragment = document.createDocumentFragment();
+                  for (const [value, verse] of parts) {
+                    if (!verse) { fragment.appendChild(document.createTextNode(value)); continue; }
+                    const span = document.createElement('span');
+                    span.className = 'madar-ayah';
+                    span.textContent = value;
+                    fragment.appendChild(span);
+                  }
+                  node.parentNode.replaceChild(fragment, node);
+                }
+              };
+              if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', verses); else verses();
             })();
             """
             userContentController.addUserScript(WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true))
@@ -1544,4 +1610,79 @@ private struct MihbaraDictionaryView: UIViewControllerRepresentable {
     let term: String
     func makeUIViewController(context: Context) -> UIReferenceLibraryViewController { UIReferenceLibraryViewController(term: term) }
     func updateUIViewController(_ controller: UIReferenceLibraryViewController, context: Context) {}
+}
+
+// MARK: - M6-V09 footnotes
+
+/// A book's own footnote, as plain text: the back link to the text is dropped.
+struct MihbaraFootnote: Equatable {
+    var number: String
+    var text: String
+
+    init?(html: String, referrer: String?) {
+        func plain(_ value: String) -> String {
+            var text = value.replacingOccurrences(of: "<br\\s*/?>", with: "\n", options: .regularExpression)
+            text = text.replacingOccurrences(of: "</p>\\s*<p[^>]*>", with: "\n", options: .regularExpression)
+            text = text.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+            for (entity, character) in [("&nbsp;", " "), ("&lt;", "<"), ("&gt;", ">"), ("&quot;", "\""), ("&#39;", "'"), ("&amp;", "&")] {
+                text = text.replacingOccurrences(of: entity, with: character)
+            }
+            return text.replacingOccurrences(of: "[ \\t]+", with: " ", options: .regularExpression).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        // Back links point to the reference in the text (role doc-backlink, or an anchor into the body).
+        let body = html.replacingOccurrences(of: "<a[^>]*(doc-backlink|href=\"[^\"]*#ref[^\"]*\")[^>]*>.*?</a>", with: "", options: [.regularExpression, .caseInsensitive])
+        let text = plain(body)
+        guard !text.isEmpty else { return nil }
+        self.text = String(text.prefix(4000))
+        self.number = plain(referrer ?? "")
+    }
+}
+
+private struct MihbaraFootnoteCard: View {
+    let note: MihbaraFootnote
+    let dark: Bool
+    let number: String
+    let close: () -> Void
+
+    private var ink: SwiftUI.Color { dark ? SwiftUI.Color(red: 233 / 255, green: 225 / 255, blue: 210 / 255) : SwiftUI.Color(red: 42 / 255, green: 33 / 255, blue: 24 / 255) }
+    private var ink2: SwiftUI.Color { dark ? SwiftUI.Color(red: 171 / 255, green: 161 / 255, blue: 146 / 255) : SwiftUI.Color(red: 106 / 255, green: 96 / 255, blue: 82 / 255) }
+    private var accent: SwiftUI.Color { dark ? SwiftUI.Color(red: 220 / 255, green: 165 / 255, blue: 100 / 255) : SwiftUI.Color(red: 158 / 255, green: 47 / 255, blue: 37 / 255) }
+    private var onAccent: SwiftUI.Color { dark ? SwiftUI.Color(red: 31 / 255, green: 28 / 255, blue: 23 / 255) : SwiftUI.Color(red: 250 / 255, green: 246 / 255, blue: 234 / 255) }
+    private var surface: SwiftUI.Color { dark ? SwiftUI.Color(red: 42 / 255, green: 38 / 255, blue: 31 / 255) : SwiftUI.Color(red: 255 / 255, green: 253 / 255, blue: 248 / 255) }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            if !number.isEmpty {
+                Text(number).font(.custom("thmanyahsans-Bold", size: 15, relativeTo: .subheadline)).foregroundStyle(onAccent)
+                    .frame(minWidth: 32, minHeight: 32).background(Circle().fill(accent))
+                    .accessibilityHidden(true)
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                Text("حاشية الكتاب").font(MadarTypography.fine()).foregroundStyle(ink2)
+                ScrollView {
+                    Text(note.text).font(.custom("Amiri-Regular", size: 19, relativeTo: .body)).foregroundStyle(ink)
+                        .lineSpacing(5).frame(maxWidth: .infinity, alignment: .leading)
+                        .textSelection(.enabled)
+                        .accessibilityIdentifier("mihbara-footnote-text")
+                }
+                .frame(maxHeight: 220).fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Button(action: close) {
+                Image(systemName: "xmark").font(.system(size: 13, weight: .semibold)).foregroundStyle(ink2)
+                    .frame(width: 44, height: 44).background(Circle().fill(ink.opacity(dark ? 0.10 : 0.05)).padding(4)).contentShape(Circle())
+            }
+            .accessibilityLabel("إغلاق الحاشية")
+            .accessibilityIdentifier("mihbara-footnote-close")
+        }
+        .padding(.leading, 18).padding(.trailing, 10).padding(.top, 18).padding(.bottom, 16)
+        .background(surface)
+        .overlay(alignment: .top) { Rectangle().fill(accent).frame(height: 3) }
+        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .background(RoundedRectangle(cornerRadius: 26, style: .continuous).fill(surface)
+            .shadow(color: .black.opacity(dark ? 0.45 : 0.14), radius: 20, y: 6))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(number.isEmpty ? "حاشية" : "الحاشية \(number)")
+        .accessibilityIdentifier("mihbara-footnote-card")
+    }
 }

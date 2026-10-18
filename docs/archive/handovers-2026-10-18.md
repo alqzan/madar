@@ -44,3 +44,12 @@ Not verified: OCR accuracy against a gold transcript, in-app grounded summaries/
 Next: No M6 card is `ready`; preserve V18's uncommitted work. The output choice (written result, video, or both) determines the UI.
 Model/effort: not exposed / not exposed.
 Usage: 34% five-hour used / 36% weekly at latest check; no reset or credits used.
+
+## Handover — M4-V01 and M6-V06 — 2026-10-18 — Codex
+Works now: M4-V01 wide/small habit blocks show real period counts, next steps and missed-period warnings; commit `7a34592`. A signed app-group-only run displayed Arabic text from a synthetic EPUB; conversion research is recorded for Claude.
+Verified: `testLobbyBuiltBlocksArrangeAndOpen` 1/1 and `testHabitWideAndSmallBlocksShowAtRisk` 1/1; `compare-screens.py R9-Qari-Turath` generated (1 canonical/1 actual); `git diff --check` clean.
+Differences left: M4 large habit view still differs from its canonical orbit. V06's last visual assertion still fails (14/15 bundle); synthetic run's printed page is unknown, so V06 remains blocked.
+Not verified: no new V06 UI test; root cause remains unknown. One simulator app launch without fixture was immediately terminated; no evidence of owner-store read/write, and no further store inspection was made.
+Next: no card is ready. Keep V06 blocked pending a signed isolated UI proof; solve PDF-to-EPUB with Claude as a separate scoped topic. Preserve all dirty PDF work.
+Model/effort: Codex not exposed; Sol `gpt-6-sol` / high.
+Usage: 91% five-hour used / 9% remaining at latest check; no reset or credits used. Stopped simulator work and retained the 5% reserve.

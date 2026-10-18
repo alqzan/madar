@@ -334,7 +334,8 @@ import XCTest
         XCTAssertTrue(undo.waitForExistence(timeout: 5), app.debugDescription); undo.tap()
         XCTAssertTrue(undo.waitForNonExistence(timeout: 8))
         // Tapping the highlighted paragraph reopens its card with the restored colour.
-        paragraph.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        paragraph.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.12)).tap()
+        sleep(1); shot(app, "M6-V08-retap-L")
         XCTAssertTrue(card.waitForExistence(timeout: 8), app.debugDescription)
         XCTAssertTrue(app.buttons["mihbara-highlight-yellow"].waitForSelection(timeout: 5), app.debugDescription)
         XCTAssertFalse(app.buttons["mihbara-word-lookup"].exists)
@@ -350,6 +351,29 @@ import XCTest
         XCTAssertFalse(card.exists)
         XCTAssertTrue(app.descendants(matching: .any)["mihbara-reader-toast"].waitForExistence(timeout: 5), app.debugDescription)
         sleep(1); shot(app, "M6-V08-saved-L")
+    }
+
+    func testReaderColoursVersesAndOpensFootnoteInPlace() throws {
+        continueAfterFailure = false
+        let fixtureURL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "arabic-reader-poc", withExtension: "epub"))
+        let app = app("reader", epub: try Data(contentsOf: fixtureURL)); app.launch(); open(app)
+        let book = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "كتاب اختبار القارئ")).firstMatch
+        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); book.tap()
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "اقْرَأْ")).firstMatch.waitForExistence(timeout: 20), app.debugDescription)
+        sleep(1); shot(app, "M6-V09-verse-L")
+        let marker = app.links["١"].firstMatch
+        XCTAssertTrue(marker.waitForExistence(timeout: 5), app.debugDescription)
+        marker.tap()
+        let card = app.descendants(matching: .any)["mihbara-footnote-card"]
+        XCTAssertTrue(card.waitForExistence(timeout: 8), app.debugDescription)
+        let text = app.staticTexts["mihbara-footnote-text"]
+        XCTAssertTrue(text.label.contains("هامش تجريبي"), text.label)
+        XCTAssertFalse(text.label.contains("عودة إلى المتن"), text.label)
+        // The reader stayed on the chapter rather than jumping to the notes file.
+        XCTAssertTrue(app.staticTexts["mihbara-reader-print-page"].label.contains("٤٥٣"))
+        sleep(1); shot(app, "M6-V09-footnote-L")
+        app.buttons["mihbara-footnote-close"].tap()
+        XCTAssertTrue(card.waitForNonExistence(timeout: 5))
     }
 }
 
