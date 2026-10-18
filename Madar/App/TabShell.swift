@@ -63,30 +63,35 @@ struct TabShell<Content: View>: View {
     }
 
     private var bottomAccessory: some View {
-        GlassRoomShortcuts(tabs: tabs.filter { bottomShortcuts.contains($0.id) }, selection: $selection,
+        GlassRoomShortcuts(tabs: tabs, persistentShortcutIDs: bottomShortcuts, selection: $selection,
                            accent: theme.accent, secondaryInk: theme.secondaryInk)
     }
 }
 
 private struct GlassRoomShortcuts: View {
     let tabs: [FoundationTab]
+    let persistentShortcutIDs: Set<String>
     @Binding var selection: String
     let accent: Color
     let secondaryInk: Color
     @Environment(\.tabViewBottomAccessoryPlacement) private var placement
 
     private var isInline: Bool { placement == .inline }
+    private var visibleTabs: [FoundationTab] {
+        if isInline { return tabs.filter { $0.id != selection } }
+        return tabs.filter { persistentShortcutIDs.contains($0.id) }
+    }
 
     var body: some View {
         GlassEffectContainer(spacing: isInline ? 8 : 6) {
             HStack(spacing: isInline ? 8 : 10) {
-                ForEach(tabs) { tab in
+                ForEach(visibleTabs) { tab in
                     Button { selection = tab.id } label: {
                         Group {
                             if isInline {
                                 roomIcon(tab)
                                     .frame(width: 22, height: 22)
-                                    .frame(maxWidth: .infinity, minHeight: 38)
+                                    .frame(maxWidth: .infinity, minHeight: 44)
                             } else {
                                 Label {
                                     Text(tab.title).lineLimit(1).minimumScaleFactor(0.8)
@@ -94,7 +99,7 @@ private struct GlassRoomShortcuts: View {
                                     roomIcon(tab).frame(width: 18, height: 18)
                                 }
                                 .font(MadarTypography.caption())
-                                .frame(maxWidth: .infinity, minHeight: 38)
+                                .frame(maxWidth: .infinity, minHeight: 44)
                             }
                         }
                         .contentShape(.capsule)

@@ -159,24 +159,27 @@ import XCTest
         app.tabBars.buttons["البهو"].tap()
         XCTAssertTrue(app.staticTexts["bahw-greeting"].waitForExistence(timeout: 10))
         app.swipeUp(velocity: .slow)
-        capture(app, "UX-10-native-scrolled-L")
-        let quran = app.tabBars.buttons["القرآن"]
-        print("UX-10 collapsed Quran: exists=\(quran.exists), hittable=\(quran.isHittable)")
-        if !quran.isHittable { app.tabBars.buttons["البهو"].tap() }
-        XCTAssertTrue(quran.waitForExistence(timeout: 5)); quran.tap()
-        XCTAssertTrue(app.staticTexts["quran-coverage-title"].waitForExistence(timeout: 10), app.debugDescription)
-        capture(app, "UX-10-single-tap-quran-L")
-        for (tab, id, shortcutID) in [
-            ("الصلاة", "prayer-today-header", ""),
-            ("خصّص", "settings-search", ""),
-            ("المذكرات", "diary-home-title", "notes"),
-            ("المال", "money-home", "money"),
-            ("المحبرة", "mihbara-add-paper", "mihbara"),
-            ("البهو", "bahw-block-salah", "")
+        capture(app, "UX-10-inline-all-rooms-L")
+        for room in ["prayer", "quran", "customize", "notes", "money", "mihbara"] {
+            let shortcut = app.buttons["tab-\(room)"]
+            XCTAssertTrue(shortcut.waitForExistence(timeout: 5), "Missing minimized glass shortcut: \(room)\n\(app.debugDescription)")
+            XCTAssertTrue(shortcut.isHittable, "Minimized glass shortcut is not tappable: \(room)")
+        }
+        for (room, destination) in [
+            ("quran", "quran-coverage-title"),
+            ("prayer", "prayer-today-header"),
+            ("customize", "settings-search"),
+            ("notes", "diary-home-title"),
+            ("money", "money-home"),
+            ("mihbara", "mihbara-add-paper"),
+            ("foundation", "bahw-block-salah")
         ] {
-            if shortcutID.isEmpty { app.tabBars.buttons[tab].tap() }
-            else { app.buttons["tab-\(shortcutID)"].tap() }
-            XCTAssertTrue(app.descendants(matching: .any).matching(identifier: id).firstMatch.waitForExistence(timeout: 10), tab + app.debugDescription)
+            let shortcut = app.buttons["tab-\(room)"]
+            XCTAssertTrue(shortcut.waitForExistence(timeout: 5), "Missing minimized glass shortcut: \(room)\n\(app.debugDescription)")
+            XCTAssertTrue(shortcut.isHittable, "Minimized glass shortcut is not tappable: \(room)")
+            shortcut.tap()
+            XCTAssertTrue(app.descendants(matching: .any).matching(identifier: destination).firstMatch.waitForExistence(timeout: 10), room + app.debugDescription)
+            if room == "quran" { capture(app, "UX-10-single-tap-quran-L") }
         }
     }
     private func finishOnboarding(_ app: XCUIApplication) {
