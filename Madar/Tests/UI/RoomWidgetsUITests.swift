@@ -1,7 +1,7 @@
 import XCTest
 @MainActor final class RoomWidgetsUITests:XCTestCase {
     private func openGallery()->XCUIApplication {
-        let app=XCUIApplication();app.launchEnvironment=["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_HABIT_FIXTURE":"showcase","MADAR_UI_NOW":"2026-10-15T20:00:00+03:00","MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light"];app.launch()
+        let app=XCUIApplication();app.launchEnvironment=["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_HABIT_FIXTURE":"showcase","MADAR_UI_MIHBARA_FIXTURE":"home","MADAR_UI_NOW":"2026-10-15T20:00:00+03:00","MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light"];app.launch()
         XCTAssertTrue(app.tabBars.buttons["خصّص"].waitForExistence(timeout:20));app.tabBars.buttons["خصّص"].tap()
         let search=app.textFields["settings-search"];XCTAssertTrue(search.waitForExistence(timeout:10));search.tap();search.typeText("خارج التطبيق")
         let gallery=app.buttons["room-widgets-gallery"];XCTAssertTrue(gallery.waitForExistence(timeout:10));gallery.tap()

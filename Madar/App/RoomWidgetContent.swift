@@ -141,6 +141,10 @@ private struct MihbaraRoomWidgetContent:View {
     private var digits:MadarNumberFormatter{.init(style:numerals == "western" ? .western : .hindi)}
     private var bookTitle:String?{snapshot?.currentBook?.title.trimmingCharacters(in:.whitespacesAndNewlines).nonEmpty}
     private var fallbackTitle:String?{bookTitle ?? snapshot?.hadithToday?.title}
+    private var bookProgress:Double? {
+        guard let page=snapshot?.currentBook?.currentPage,let pages=snapshot?.currentBook?.pages,pages>0 else{return nil}
+        return min(1,max(0,Double(page)/Double(pages)))
+    }
     private var pageLine:String? {
         guard let book=snapshot?.currentBook else{return nil}
         if let page=book.currentPage,let pages=book.pages{return digits.string(page)+" من "+digits.string(pages)+" صفحة"}
@@ -181,7 +185,7 @@ private struct MihbaraRoomWidgetContent:View {
                 }
                 if family != .systemSmall,let hadith=snapshot?.hadithToday,snapshot?.currentBook != nil {
                     Rectangle().fill(theme.line).frame(height:1)
-                    VStack(alignment:.leading,spacing:3){Text("حديث اليوم · "+digits.string(hadith.number)).font(.custom("thmanyahsans-Bold",size:11,relativeTo:.caption2)).foregroundStyle(theme.accent);Text(hadith.title).font(.custom("thmanyahsans-Regular",size:12,relativeTo:.caption)).lineLimit(2)}
+                    VStack(alignment:.leading,spacing:3){Text("حديث اليوم، "+digits.string(hadith.number)).font(.custom("thmanyahsans-Bold",size:11,relativeTo:.caption2)).foregroundStyle(theme.accent);Text(hadith.title).font(.custom("thmanyahsans-Regular",size:12,relativeTo:.caption)).lineLimit(2)}
                 }
                 if family == .systemLarge,let line=snapshot?.lastNotebookLine {
                     Rectangle().fill(theme.line).frame(height:1)
@@ -197,9 +201,12 @@ private struct MihbaraRoomWidgetContent:View {
         } else if family == .accessoryCircular {
             ZStack {
                 Circle().stroke(.primary.opacity(0.25),lineWidth:3)
-                if !locked,let page=snapshot?.currentBook?.currentPage {Circle().trim(from:0,to:0.72).stroke(.primary,style:.init(lineWidth:3,lineCap:.round)).rotationEffect(.degrees(-90));Text(digits.string(page)).font(.custom("thmanyahsans-Bold",size:14,relativeTo:.caption)).lineLimit(1).minimumScaleFactor(0.7)}
+                if !locked,let page=snapshot?.currentBook?.currentPage {
+                    if let bookProgress {Circle().trim(from:0,to:bookProgress).stroke(.primary,style:.init(lineWidth:3,lineCap:.round)).rotationEffect(.degrees(-90))}
+                    Text(digits.string(page)).font(.custom("thmanyahsans-Bold",size:14,relativeTo:.caption)).lineLimit(1).minimumScaleFactor(0.7)
+                }
                 else {Image(systemName:locked ? "lock.fill" : "book.closed").font(.system(size:17,weight:.medium))}
-            }.accessibilityElement(children:.ignore).accessibilityLabel(locked ? "المحبرة مقفلة" : "المحبرة")
+            }.accessibilityElement(children:.ignore).accessibilityLabel(locked ? "المحبرة مقفلة" : "المحبرة، "+(bookTitle ?? "رفّك")).accessibilityValue(locked ? "" : pageLine ?? "")
         } else {
             HStack(spacing:8) {
                 Image(systemName:locked ? "lock.fill" : "book.closed.fill").font(.system(size:18,weight:.semibold))
