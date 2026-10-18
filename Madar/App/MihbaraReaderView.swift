@@ -181,10 +181,15 @@ struct MihbaraReaderView: View {
               case .number(let size)? = settings["size"] else { return 4 }
         return min(7, max(1, Int(size)))
     }
+    private var readerFont: MihbaraReaderFont {
+        guard case .object(let settings)? = app.values["mihbara.readerAr"],
+              case .string(let id)? = settings["font"] else { return .amiri }
+        return MihbaraReaderFont(rawValue: id) ?? .amiri
+    }
     private var readerFontPercent: Double { Double(95 + (readerSize - 1) * 10) }
     private var readerPreferences: EPUBPreferences {
         EPUBPreferences(
-            fontFamily: MihbaraEPUBNavigator.amiri,
+            fontFamily: readerFont.family,
             // Readium's fontSize is a multiplier: 1.0 is the publisher's 100%.
             fontSize: readerFontPercent / 100,
             ligatures: true,
@@ -273,9 +278,9 @@ struct MihbaraReaderView: View {
             .environment(\.layoutDirection, .rightToLeft)
         }
         .sheet(isPresented: $showingReaderSettings) {
-            MihbaraReaderSizeSheet(size: readerSize, paper: paper) { size in
-                updateReaderSize(size)
-            }
+            MihbaraReaderSizeSheet(size: readerSize, font: readerFont, paper: paper,
+                                   select: { updateReaderSetting("size", .number(Double($0))) },
+                                   selectFont: { updateReaderSetting("font", .string($0.rawValue)) })
             .environment(\.layoutDirection, .rightToLeft)
         }
         .alert("القارئ", isPresented: Binding(get: { readerAlert != nil }, set: { if !$0 { readerAlert = nil } })) {
@@ -622,13 +627,12 @@ struct MihbaraReaderView: View {
         return locator
     }
 
-    @MainActor private func updateReaderSize(_ size: Int) {
-        guard (1...7).contains(size) else { return }
+    @MainActor private func updateReaderSetting(_ key: String, _ value: MadarData.JSONValue) {
         var settings = app.values["mihbara.readerAr"]?.object ?? [
             "theme": .string("auto"), "size": .number(4), "font": .string("amiri"),
             "mode": .string("pages"), "tashkil": .bool(true), "footnotes": .string("tap")
         ]
-        settings["size"] = .number(Double(size))
+        settings[key] = value
         app.set(.object(settings), key: "mihbara.readerAr") {
             navigatorController?.submitPreferences(readerPreferences)
         }
@@ -728,18 +732,44 @@ private struct MihbaraTOCItem: Identifiable {
     var id: String { "\(depth)-\(link.href)" }
 }
 
+/// `mihbara.readerAr.font` ids. Amiri (OFL) is the schema default; the Thmanyah faces are the
+/// owner's request (18 Oct) and are embedded in the app under their licence.
+enum MihbaraReaderFont: String, CaseIterable, Identifiable {
+    case amiri, thmanyahSerif, thmanyahSans
+    var id: String { rawValue }
+    var title: String {
+        switch self { case .amiri: "أميري"; case .thmanyahSerif: "ثمانية نسخ"; case .thmanyahSans: "ثمانية حديث" }
+    }
+    var family: FontFamily {
+        switch self { case .amiri: FontFamily(rawValue: "Amiri"); case .thmanyahSerif: FontFamily(rawValue: "Thmanyah Serif Text"); case .thmanyahSans: FontFamily(rawValue: "Thmanyah Sans") }
+    }
+    /// PostScript name used to preview the face in the sheet.
+    var previewName: String {
+        switch self { case .amiri: "Amiri-Regular"; case .thmanyahSerif: "thmanyahseriftext-Regular"; case .thmanyahSans: "thmanyahsans-Regular" }
+    }
+    var files: [(name: String, ext: String, weight: CSSStandardFontWeight)] {
+        switch self {
+        case .amiri: [("Amiri-Regular", "ttf", .normal), ("Amiri-Bold", "ttf", .bold)]
+        case .thmanyahSerif: [("thmanyahseriftext-Regular", "otf", .normal), ("thmanyahseriftext-Bold", "otf", .bold)]
+        case .thmanyahSans: [("thmanyahsans-Regular", "otf", .normal), ("thmanyahsans-Bold", "otf", .bold)]
+        }
+    }
+}
+
 private struct MihbaraReaderSizeSheet: View {
     @Environment(\.dismiss) private var dismiss
     let size: Int
+    let font: MihbaraReaderFont
     let paper: SwiftUI.Color
     let select: (Int) -> Void
+    let selectFont: (MihbaraReaderFont) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("إعدادات القراءة").font(.custom("thmanyahserifdisplay-Bold", size: 22, relativeTo: .title2))
-                    Text("حجم الخط العربي").font(MadarTypography.caption()).foregroundStyle(.secondary)
+                    Text("الخط وحجمه").font(MadarTypography.caption()).foregroundStyle(.secondary)
                 }
                 Spacer()
                 Button("تمّ") { dismiss() }.font(MadarTypography.caption()).accessibilityIdentifier("mihbara-reader-settings-close")
@@ -760,11 +790,30 @@ private struct MihbaraReaderSizeSheet: View {
                 }
             }
             .accessibilityElement(children: .contain)
+            HStack(spacing: 8) {
+                ForEach(MihbaraReaderFont.allCases) { option in
+                    let selected = option == font
+                    Button { selectFont(option) } label: {
+                        VStack(spacing: 2) {
+                            Text("بسم الله").font(.custom(option.previewName, size: 19, relativeTo: .body))
+                            Text(option.title).font(MadarTypography.fine())
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 64)
+                        .foregroundStyle(selected ? SwiftUI.Color.white : SwiftUI.Color(red: 42 / 255, green: 33 / 255, blue: 24 / 255))
+                        .background(selected ? SwiftUI.Color(red: 158 / 255, green: 47 / 255, blue: 37 / 255) : paper, in: .rect(cornerRadius: 14))
+                        .overlay { RoundedRectangle(cornerRadius: 14).stroke(SwiftUI.Color.black.opacity(selected ? 0 : 0.12), lineWidth: 1) }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("الخط \(option.title)")
+                    .accessibilityAddTraits(selected ? .isSelected : [])
+                    .accessibilityIdentifier("mihbara-reader-font-\(option.rawValue)")
+                }
+            }
         }
         .padding(22)
         .foregroundStyle(SwiftUI.Color(red: 42 / 255, green: 33 / 255, blue: 24 / 255))
         .background(paper.ignoresSafeArea())
-        .presentationDetents([.height(190)])
+        .presentationDetents([.height(290)])
     }
 }
 
@@ -777,15 +826,16 @@ private struct MihbaraEPUBNavigator: UIViewControllerRepresentable {
     let onReady: (EPUBNavigatorViewController) -> Void
     let onError: (NavigatorError) -> Void
 
-    /// Amiri (OFL, bundled) is the schema default `mihbara.readerAr.font` (§7.6).
-    static let amiri = FontFamily(rawValue: "Amiri")
+    /// Every bundled reader font is declared once, so switching in the Aa sheet applies live.
     private static var fontDeclarations: [AnyHTMLFontFamilyDeclaration] {
-        guard let regular = Bundle.main.url(forResource: "Amiri-Regular", withExtension: "ttf").flatMap(FileURL.init(url:)) else { return [] }
-        var faces = [CSSFontFace(file: regular, preload: true, style: .normal, weight: .standard(.normal))]
-        if let bold = Bundle.main.url(forResource: "Amiri-Bold", withExtension: "ttf").flatMap(FileURL.init(url:)) {
-            faces.append(CSSFontFace(file: bold, style: .normal, weight: .standard(.bold)))
+        MihbaraReaderFont.allCases.compactMap { font in
+            let faces = font.files.compactMap { file -> CSSFontFace? in
+                guard let url = Bundle.main.url(forResource: file.name, withExtension: file.ext).flatMap(FileURL.init(url:)) else { return nil }
+                return CSSFontFace(file: url, preload: font == .amiri && file.weight == .normal, style: .normal, weight: .standard(file.weight))
+            }
+            guard !faces.isEmpty else { return nil }
+            return CSSFontFamilyDeclaration(fontFamily: font.family, fontFaces: faces).eraseToAnyHTMLFontFamilyDeclaration()
         }
-        return [CSSFontFamilyDeclaration(fontFamily: amiri, fontFaces: faces).eraseToAnyHTMLFontFamilyDeclaration()]
     }
 
     func makeCoordinator() -> Coordinator { Coordinator(onLocation: onLocation, onInteraction: onInteraction, onReady: onReady, onError: onError) }

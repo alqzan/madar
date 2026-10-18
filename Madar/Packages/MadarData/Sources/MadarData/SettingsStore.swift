@@ -63,7 +63,7 @@ public struct SettingsSchema: Decodable, Sendable {
             case "mihbara.readerAr", "mihbara.readerEn":
                 guard let size = object["size"]?.number, inRange(size,[1,7]), ["auto","paper","warm","calm","night","black"].contains(object["theme"]?.string ?? ""), ["pages","scroll","focus"].contains(object["mode"]?.string ?? "") else { try reject() }
                 let ar = key.hasSuffix("Ar")
-                guard (ar ? ["amiri","notoNaskh","system"] : ["literata","system","georgia"]).contains(object["font"]?.string ?? ""), ["tap","inline","hidden"].contains(object[ar ? "footnotes" : "arabicHints"]?.string ?? "") || (!ar && ["hard","all","none"].contains(object["arabicHints"]?.string ?? "")) else { try reject() }
+                guard (ar ? ["amiri","notoNaskh","system","thmanyahSerif","thmanyahSans"] : ["literata","system","georgia"]).contains(object["font"]?.string ?? ""), ["tap","inline","hidden"].contains(object[ar ? "footnotes" : "arabicHints"]?.string ?? "") || (!ar && ["hard","all","none"].contains(object["arabicHints"]?.string ?? "")) else { try reject() }
                 guard case .bool = object[ar ? "tashkil" : "hyphenation"] else { try reject() }
             default: try reject()
             }

@@ -4,6 +4,14 @@ import Testing
 @testable import MadarData
 
 @Suite(.serialized) @MainActor struct DataTests {
+    @Test func arabicReaderAcceptsTheBundledFontsOnly() throws {
+        let store = try SettingsSchema.bundled()
+        func reader(_ font: String) -> JSONValue { .object(["theme": .string("auto"), "size": .number(4), "font": .string(font), "mode": .string("pages"), "tashkil": .bool(true), "footnotes": .string("tap")]) }
+        for font in ["amiri", "thmanyahSerif", "thmanyahSans"] { try store.validate(reader(font), for: "mihbara.readerAr") }
+        #expect(throws: (any Error).self) { try store.validate(reader("comicSans"), for: "mihbara.readerAr") }
+        #expect(throws: (any Error).self) { try store.validate(reader("thmanyahSans"), for: "mihbara.readerEn") }
+    }
+
     @Test func schemaAndDefaultContainer() throws {
         #expect(MadarSchema.syncedTypes.count == 56); #expect(MadarSchema.deviceTypes.count == 6)
         let container = try MadarContainerFactory.makeInMemory(); try fixture(container.mainContext)

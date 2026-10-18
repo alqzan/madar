@@ -242,8 +242,20 @@ import XCTest
         XCTAssertTrue(defaultSize.waitForExistence(timeout: 5))
         XCTAssertTrue(defaultSize.isSelected)
         app.buttons["mihbara-reader-size-5"].tap()
+        XCTAssertTrue(app.buttons["mihbara-reader-font-amiri"].isSelected)
+        app.buttons["mihbara-reader-font-thmanyahSans"].tap()
+        XCTAssertTrue(app.buttons["mihbara-reader-font-thmanyahSans"].waitForSelection(timeout: 5))
+        shot(app, "M6-V07-font-sheet-L")
         XCTAssertTrue(app.buttons["mihbara-reader-settings-close"].isHittable)
         app.buttons["mihbara-reader-settings-close"].tap()
+        sleep(2); shot(app, "M6-V07-font-sans-L")
+        app.buttons["mihbara-reader-settings"].tap()
+        XCTAssertTrue(app.buttons["mihbara-reader-font-thmanyahSans"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["mihbara-reader-font-thmanyahSans"].isSelected)
+        app.buttons["mihbara-reader-font-thmanyahSerif"].tap()
+        XCTAssertTrue(app.buttons["mihbara-reader-font-thmanyahSerif"].waitForSelection(timeout: 5))
+        app.buttons["mihbara-reader-settings-close"].tap()
+        sleep(2); shot(app, "M6-V07-font-serif-L")
         app.buttons["mihbara-reader-contents"].tap()
         XCTAssertTrue(app.staticTexts["فهرس الكتاب"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["mihbara-reader-contents-close"].isHittable)
@@ -251,5 +263,11 @@ import XCTest
         app.buttons["mihbara-reader-close"].tap()
         XCTAssertTrue(app.buttons["mihbara-add-paper"].waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "كتاب اختبار القارئ")).firstMatch.exists)
+    }
+}
+
+private extension XCUIElement {
+    func waitForSelection(timeout: TimeInterval) -> Bool {
+        XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "selected == true"), object: self)], timeout: timeout) == .completed
     }
 }
