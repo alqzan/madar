@@ -53,3 +53,11 @@ Not verified: no new V06 UI test; root cause remains unknown. One simulator app 
 Next: no card is ready. Keep V06 blocked pending a signed isolated UI proof; solve PDF-to-EPUB with Claude as a separate scoped topic. Preserve all dirty PDF work.
 Model/effort: Codex not exposed; Sol `gpt-6-sol` / high.
 Usage: 91% five-hour used / 9% remaining at latest check; no reset or credits used. Stopped simulator work and retained the 5% reserve.
+
+## Handover — M6-V06, M6-V18 unblocked — 2026-10-18 — Claude
+Works now: Arabic EPUB reader shows its text in the chosen font (Amiri default, Thmanyah Naskh/Sans by owner request) at the canonical size with «ص ٤٥٣ من ٤٥٤ في المطبوع»; scanned PDFs reopen at the saved page. Fixed: percent passed as Readium multiplier; book CSP blocking `readium://assets` CSS/fonts (why no reader setting applied); PDFKit's startup page-1 notification overwriting the locator. Codex's earlier blank state was not isolated.
+Verified: reader font choice UI 1/1 (`M6-reader-font-*`), MadarData reader-font test 1/1; EPUB reader UI 3/3 iterations (`M6-V06-x3-*`, each shot shows text); Mihbara Home+Import UI 11/12 then the stale wird test updated for V23's card and passed 1/1; PDF resume 1/1 (`M6-V18-final-*`); MihbaraReadingTests 16/16; PDF/Book Commands 14/14; `compare-screens.py R9-Qari-Turath`; `git diff --check` clean.
+Differences left: V06 sample text, paragraph and chapter numbers come from the fixture; thinner progress bar. V18 has no active-reader canonical.
+Not verified: owner iPhone; anchor resolution across multi-page RTL chapters; EPUB reopen position; real large EPUB/PDF files; dark reader.
+Next: M6-V08 (word and highlight) is the first ready card. V07 Aa sheet is built with the owner-approved page options. MadarData `settingsDefaultsPersistenceAndInvalidRejection` still expects 132 settings while the schema has 137 (stale since M5, untouched).
+Model/effort: Claude Opus 5.5 / not exposed. Usage: not exposed.

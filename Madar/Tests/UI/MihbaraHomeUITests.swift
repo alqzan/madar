@@ -375,6 +375,41 @@ import XCTest
         app.buttons["mihbara-footnote-close"].tap()
         XCTAssertTrue(card.waitForNonExistence(timeout: 5))
     }
+
+    func testReaderNightThemeScrollKeepsPlaceAndResets() throws {
+        continueAfterFailure = false
+        let fixtureURL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "arabic-reader-poc", withExtension: "epub"))
+        let app = app("reader", epub: try Data(contentsOf: fixtureURL)); app.launch(); open(app)
+        let book = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "كتاب اختبار القارئ")).firstMatch
+        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); book.tap()
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "القراءة باب يدخل")).firstMatch.waitForExistence(timeout: 20), app.debugDescription)
+        sleep(3); shot(app, "M6-V10-open-L")
+        app.buttons["mihbara-reader-settings"].tap()
+        let auto = app.buttons["mihbara-reader-theme-auto"]
+        XCTAssertTrue(auto.waitForExistence(timeout: 5)); XCTAssertTrue(auto.isSelected)
+        for theme in ["paper", "warm", "calm", "black"] { XCTAssertTrue(app.buttons["mihbara-reader-theme-\(theme)"].exists, theme) }
+        app.buttons["mihbara-reader-theme-night"].tap()
+        XCTAssertTrue(app.buttons["mihbara-reader-theme-night"].waitForSelection(timeout: 5))
+        app.buttons["mihbara-reader-mode-scroll"].tap()
+        XCTAssertTrue(app.buttons["mihbara-reader-mode-scroll"].waitForSelection(timeout: 5))
+        shot(app, "M6-V10-sheet-night-L")
+        app.buttons["mihbara-reader-settings-close"].tap()
+        let printPage = app.staticTexts["mihbara-reader-print-page"]
+        XCTAssertTrue(printPage.waitForExistence(timeout: 8))
+        sleep(2)
+        XCTAssertTrue(printPage.label.contains("٤٥٣"), printPage.label)
+        shot(app, "M6-V10-night-scroll-L")
+        app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "القراءة باب يدخل")).firstMatch.swipeUp(velocity: .slow)
+        sleep(2); shot(app, "M6-V10-night-scroll-s1-L")
+        app.buttons["mihbara-reader-settings"].tap()
+        if !app.buttons["mihbara-reader-reset"].exists { app.buttons["mihbara-reader-more"].tap() }
+        let reset = app.buttons["mihbara-reader-reset"]
+        for _ in 0..<4 where !reset.isHittable { app.swipeUp(velocity: .slow) }
+        reset.tap()
+        for _ in 0..<4 { app.swipeDown(velocity: .slow); if app.buttons["mihbara-reader-theme-auto"].isHittable { break } }
+        XCTAssertTrue(app.buttons["mihbara-reader-theme-auto"].waitForSelection(timeout: 5))
+        XCTAssertTrue(app.buttons["mihbara-reader-mode-pages"].isSelected)
+    }
 }
 
 private extension XCUIElement {

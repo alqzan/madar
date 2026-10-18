@@ -167,14 +167,15 @@ struct MihbaraReaderView: View {
     @State private var copiedAt: Date?
     @State private var footnote: MihbaraFootnote?
 
-    private var paper: SwiftUI.Color {
-        colorScheme == .dark
-            ? SwiftUI.Color(red: 31 / 255, green: 28 / 255, blue: 23 / 255)
-            : SwiftUI.Color(red: 250 / 255, green: 246 / 255, blue: 234 / 255)
+    /// `mihbara.readerAr.theme`; «تلقائي» is paper by day and night after dark.
+    private var palette: MihbaraReaderPalette {
+        let chosen = readerSettings["theme"]?.string.flatMap(MihbaraReaderTheme.init(rawValue:)) ?? .auto
+        return chosen.palette(dark: colorScheme == .dark)
     }
+    private var paper: SwiftUI.Color { palette.bg }
     private var saveCoordinator: MihbaraReadingSaveCoordinator { .forSession(app) }
     private var digits: MadarNumberFormatter { AppMihbaraService(app: app).digits }
-    private var readerTheme: ReadiumNavigator.Theme { colorScheme == .dark ? .dark : .sepia }
+    private var readerTheme: ReadiumNavigator.Theme { palette.isDark ? .dark : .light }
     private var readerProgress: Double? {
         if let progression = currentLocator?.locations.totalProgression {
             return min(1, max(0, progression))
@@ -212,6 +213,7 @@ struct MihbaraReaderView: View {
     private var readerFontPercent: Double { Double(95 + (readerSize - 1) * 10) }
     private var readerPreferences: EPUBPreferences {
         EPUBPreferences(
+            backgroundColor: ReadiumNavigator.Color(hex: palette.hex.bg),
             fontFamily: readerFont.family,
             // Readium's fontSize is a multiplier: 1.0 is the publisher's 100%.
             fontSize: readerFontPercent / 100,
@@ -225,20 +227,23 @@ struct MihbaraReaderView: View {
             readingProgression: .rtl,
             scroll: readerScroll,
             textAlign: readerJustify ? .justify : .start,
+            textColor: ReadiumNavigator.Color(hex: palette.hex.ink),
             theme: readerTheme
         )
     }
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 5)) { tick in
+        // A fixed origin: `.now` would restart the timeline on every redraw.
+        TimelineView(.periodic(from: Date(timeIntervalSinceReferenceDate: 0), by: 5)) { tick in
             VStack(spacing: 0) {
                 header
-                Rectangle().fill(SwiftUI.Color.black.opacity(0.08)).frame(height: 1)
+                Rectangle().fill(palette.line).frame(height: 1)
                 if let publication {
                     MihbaraEPUBNavigator(
                         publication: publication,
                         initialLocation: initialLocator,
                         preferences: readerPreferences,
+                        background: palette.hex.bg,
                         onLocation: locationChanged,
                         onInteraction: readerTapped,
                         onSelection: selectionChanged,
@@ -278,7 +283,7 @@ struct MihbaraReaderView: View {
             }
             .overlay(alignment: .bottom) { readerOverlay }
             .background(paper.ignoresSafeArea())
-        .foregroundStyle(colorScheme == .dark ? SwiftUI.Color(red: 233 / 255, green: 225 / 255, blue: 210 / 255) : SwiftUI.Color(red: 42 / 255, green: 33 / 255, blue: 24 / 255))
+        .foregroundStyle(palette.ink)
             .environment(\.layoutDirection, .rightToLeft)
             .onChange(of: tick.date) { _, date in
                 advanceClock(to: date)
@@ -289,7 +294,7 @@ struct MihbaraReaderView: View {
         .onChange(of: app.values["mihbara.readerAr"]) { navigatorController?.submitPreferences(readerPreferences) }
         // An undo from the toast, or anywhere else, repaints the page from the store.
         .onChange(of: app.undoToken?.id) { reloadHighlights() }
-        .onChange(of: colorScheme) { applyHighlights() }
+        .onChange(of: palette) { applyHighlights() }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 resumeReader(at: Date())
@@ -324,8 +329,8 @@ struct MihbaraReaderView: View {
         }
         .sheet(isPresented: $showingReaderSettings) {
             MihbaraReaderSettingsSheet(
-                app: app, paper: paper,
-                options: .init(size: readerSize, font: readerFont, scroll: readerScroll, lineSpacing: readerLineSpacing,
+                app: app, paper: paper, palette: palette,
+                options: .init(theme: readerSettings["theme"]?.string.flatMap(MihbaraReaderTheme.init(rawValue:)) ?? .auto, size: readerSize, font: readerFont, scroll: readerScroll, lineSpacing: readerLineSpacing,
                                margins: readerMargins, justify: readerJustify, heavier: readerHeavier, footer: readerFooter),
                 set: updateReaderSetting,
                 reset: { app.reset(["mihbara.readerAr"]) }
@@ -352,7 +357,7 @@ struct MihbaraReaderView: View {
                 Text(book.title).font(.custom("thmanyahserifdisplay-Bold", size: 17, relativeTo: .headline)).lineLimit(1)
                 Text(currentLocator?.title ?? book.author)
                     .font(MadarTypography.fine())
-                    .foregroundStyle(colorScheme == .dark ? SwiftUI.Color.white.opacity(0.68) : SwiftUI.Color(red: 106 / 255, green: 96 / 255, blue: 82 / 255))
+                    .foregroundStyle(palette.ink2)
                     .lineLimit(1)
             }
             .frame(maxWidth: .infinity)
@@ -402,12 +407,12 @@ struct MihbaraReaderView: View {
         VStack(spacing: 7) {
             if let readerProgress {
                 ProgressView(value: readerProgress)
-                    .tint(SwiftUI.Color(red: 158 / 255, green: 47 / 255, blue: 37 / 255))
+                    .tint(palette.accent)
                     .accessibilityLabel("تقدّم الكتاب")
                     .accessibilityValue(digits.string(Int((readerProgress * 100).rounded())) + "٪")
                     .accessibilityIdentifier("mihbara-reader-progress")
             } else {
-                Rectangle().fill(SwiftUI.Color.black.opacity(0.10)).frame(height: 3)
+                Rectangle().fill(palette.line).frame(height: 3)
             }
             if readerFooter != .bar {
             HStack(alignment: .center, spacing: 12) {
@@ -416,14 +421,14 @@ struct MihbaraReaderView: View {
                     .accessibilityIdentifier("mihbara-reader-print-page")
                 Spacer(minLength: 4)
                 if readerFooter == .full || isSpeaking {
-                    Text(isSpeaking ? "تُقرأ الصفحة بصوت عربي" : "تُسجَّل الجلسة بعد دقيقة نشاط")
-                        .font(MadarTypography.fine()).foregroundStyle(.secondary)
+                    Text(isSpeaking ? "تُقرأ الصفحة بصوت عربي" : (readingClock?.activeSeconds ?? 0) >= 60 ? "الجلسة بدأت · تُسجَّل وحدها" : "تُسجَّل الجلسة بعد دقيقة نشاط")
+                        .font(MadarTypography.fine()).foregroundStyle(palette.ink2)
                 }
             }
             }
         }
         .padding(.horizontal, 18).padding(.top, 9).padding(.bottom, 11)
-        .overlay(alignment: .top) { Rectangle().fill(SwiftUI.Color.black.opacity(colorScheme == .dark ? 0.22 : 0.08)).frame(height: 1) }
+        .overlay(alignment: .top) { Rectangle().fill(palette.line).frame(height: 1) }
         .background(paper)
     }
 
@@ -543,14 +548,14 @@ struct MihbaraReaderView: View {
 
     @ViewBuilder private var readerOverlay: some View {
         if let footnote {
-            MihbaraFootnoteCard(note: footnote, dark: colorScheme == .dark, number: digits.localized(footnote.number)) {
+            MihbaraFootnoteCard(note: footnote, dark: palette.isDark, number: digits.localized(footnote.number)) {
                 withAnimation(.easeOut(duration: 0.2)) { self.footnote = nil }
             }
             .padding(.horizontal, 12).padding(.bottom, 10)
             .transition(.move(edge: .bottom).combined(with: .opacity))
         } else if let wordCard {
             MihbaraWordCard(
-                state: wordCard, dark: colorScheme == .dark, copied: copiedAt != nil,
+                state: wordCard, dark: palette.isDark, swatches: palette.hex.highlight, copied: copiedAt != nil,
                 lookUp: { lookupTerm = .init(word: wordCard.word) },
                 choose: { color in Task { await chooseHighlight(color, for: wordCard) } },
                 note: { noteDraft = wordCard },
@@ -697,7 +702,7 @@ struct MihbaraReaderView: View {
 
     @MainActor private func applyHighlights() {
         guard let navigatorController else { return }
-        let palette = colorScheme == .dark ? MihbaraHighlight.night : MihbaraHighlight.paper
+        let palette = palette.hex.highlight
         let decorations = highlights.compactMap { highlight -> Decoration? in
             guard let locator = readiumLocator(highlight.locatorJSON),
                   let index = MihbaraHighlight.colors.firstIndex(of: highlight.color) else { return nil }
@@ -1057,6 +1062,7 @@ enum MihbaraReaderFooter: String, CaseIterable, Identifiable {
 }
 
 struct MihbaraReaderOptions: Equatable {
+    var theme: MihbaraReaderTheme
     var size: Int, font: MihbaraReaderFont, scroll: Bool, lineSpacing: Int, margins: Int, justify: Bool, heavier: Bool, footer: MihbaraReaderFooter
 }
 
@@ -1065,13 +1071,14 @@ private struct MihbaraReaderSettingsSheet: View {
     @Environment(\.dismiss) private var dismiss
     let app: AppSession
     let paper: SwiftUI.Color
+    let palette: MihbaraReaderPalette
     let options: MihbaraReaderOptions
     let set: (String, MadarData.JSONValue) -> Void
     let reset: () -> Void
     @State private var more = false
 
-    private let ink = SwiftUI.Color(red: 42 / 255, green: 33 / 255, blue: 24 / 255)
-    private let accent = SwiftUI.Color(red: 158 / 255, green: 47 / 255, blue: 37 / 255)
+    private var ink: SwiftUI.Color { palette.ink }
+    private var accent: SwiftUI.Color { palette.accent }
     private var well: SwiftUI.Color { ink.opacity(0.06) }
     private var digits: MadarNumberFormatter { AppMihbaraService(app: app).digits }
 
@@ -1079,6 +1086,7 @@ private struct MihbaraReaderSettingsSheet: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 header
+                themeRow
                 sizeRow
                 fontRow
                 modeRow
@@ -1149,6 +1157,38 @@ private struct MihbaraReaderSettingsSheet: View {
                 .accessibilityLabel("الخط \(option.title)")
                 .accessibilityAddTraits(selected ? .isSelected : [])
                 .accessibilityIdentifier("mihbara-reader-font-\(option.rawValue)")
+            }
+        }
+    }
+
+    /// Six palettes (§7.6): each swatch is the page itself, a line of ink on its own paper.
+    private var themeRow: some View {
+        HStack(spacing: 0) {
+            ForEach(MihbaraReaderTheme.allCases) { theme in
+                let selected = theme == options.theme
+                Button { set("theme", .string(theme.rawValue)) } label: {
+                    VStack(spacing: 6) {
+                        ZStack {
+                            if theme == .auto {
+                                Circle().fill(SwiftUI.Color(uiColor: UIColor(madarHex: MihbaraReaderTheme.paper.hex.bg)))
+                                Circle().trim(from: 0.25, to: 0.75).fill(SwiftUI.Color(uiColor: UIColor(madarHex: MihbaraReaderTheme.night.hex.bg)))
+                            } else {
+                                Circle().fill(SwiftUI.Color(uiColor: UIColor(madarHex: theme.hex.bg)))
+                            }
+                            Text("أ").font(.custom("Amiri-Bold", size: 17, relativeTo: .body))
+                                .foregroundStyle(SwiftUI.Color(uiColor: UIColor(madarHex: (theme == .auto ? MihbaraReaderTheme.paper : theme).hex.ink)))
+                                .opacity(theme == .auto ? 0 : 1)
+                            Circle().strokeBorder(selected ? accent : ink.opacity(0.22), lineWidth: selected ? 2.5 : 1)
+                        }
+                        .frame(width: 44, height: 44)
+                        Text(theme.title).font(MadarTypography.fine()).foregroundStyle(selected ? ink : palette.ink2)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 64).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("ثيم " + theme.title)
+                .accessibilityAddTraits(selected ? .isSelected : [])
+                .accessibilityIdentifier("mihbara-reader-theme-\(theme.rawValue)")
             }
         }
     }
@@ -1240,6 +1280,7 @@ private struct MihbaraEPUBNavigator: UIViewControllerRepresentable {
     let publication: Publication
     let initialLocation: Locator?
     let preferences: EPUBPreferences
+    let background: String
     let onLocation: (Locator, Bool) -> Void
     let onInteraction: () -> Void
     let onSelection: (Selection) -> Void
@@ -1289,7 +1330,8 @@ private struct MihbaraEPUBNavigator: UIViewControllerRepresentable {
         do {
             let navigator = try EPUBNavigatorViewController(publication: publication, initialLocation: initialLocation, config: configuration)
             navigator.delegate = context.coordinator
-            navigator.view.backgroundColor = UIColor(red: 250 / 255, green: 246 / 255, blue: 234 / 255, alpha: 1)
+            navigator.view.backgroundColor = UIColor(madarHex: background)
+            context.coordinator.background = background
             let coordinator = context.coordinator
             Task { @MainActor in
                 await Task.yield()
@@ -1317,6 +1359,10 @@ private struct MihbaraEPUBNavigator: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(_ controller: UIViewController, context: Context) {
+        if context.coordinator.background != background {
+            context.coordinator.background = background
+            controller.view.backgroundColor = UIColor(madarHex: background)
+        }
         context.coordinator.onLocation = onLocation
         context.coordinator.onInteraction = onInteraction
         context.coordinator.onSelection = onSelection
@@ -1331,6 +1377,7 @@ private struct MihbaraEPUBNavigator: UIViewControllerRepresentable {
         var onInteraction: () -> Void
         var onSelection: (Selection) -> Void
         var onFootnote: (MihbaraFootnote) -> Void = { _ in }
+        var background = ""
         var onReady: (EPUBNavigatorViewController) -> Void
         var onError: (NavigatorError) -> Void
 
@@ -1374,10 +1421,8 @@ private struct MihbaraEPUBNavigator: UIViewControllerRepresentable {
                     h1::before { content: 'فصل'; display: block; color: #6A6052; font-size: .56em; font-weight: 400; margin-bottom: .32em; }
                     h1::after { content: ''; display: block; width: 3.8em; border-top: 1px solid #B7AA95; margin: .58em auto 0; }
                     p { margin-block: .7em !important; }
-                    :root[style] body span.madar-ayah.madar-ayah.madar-ayah { color: #24412F !important; }
-                    :root[style*="readium-night-on"] body span.madar-ayah.madar-ayah.madar-ayah { color: #E2C27A !important; }
+                    \(MihbaraReaderTheme.pageCSS)
                     a[role~='doc-noteref'] { display: inline-flex !important; align-items: center; justify-content: center; box-sizing: border-box; width: 1.45em; height: 1.45em; padding: 0 0 .12em 0 !important; margin-inline: .12em; border-radius: 50%; background: #9E2F25 !important; color: #FAF6EA !important; font-size: .7em; font-weight: 700; line-height: 1 !important; text-indent: 0 !important; vertical-align: .35em; text-decoration: none !important; }
-                    html[style*="readium-night-on"] a[role~='doc-noteref'] { background: #DCA564 !important; color: #1F1C17 !important; }
                   `;
                   head.appendChild(style);
                 }
@@ -1469,6 +1514,7 @@ extension UIColor {
 private struct MihbaraWordCard: View {
     let state: MihbaraWordCardState
     let dark: Bool
+    let swatches: [String]
     let copied: Bool
     let lookUp: () -> Void
     let choose: (String) -> Void
@@ -1516,7 +1562,7 @@ private struct MihbaraWordCard: View {
                 ForEach(Array(MihbaraHighlight.colors.enumerated()), id: \.element) { index, color in
                     let selected = state.color == color
                     Button { choose(color) } label: {
-                        Circle().fill(SwiftUI.Color(uiColor: UIColor(madarHex: (dark ? MihbaraHighlight.night : MihbaraHighlight.paper)[index])))
+                        Circle().fill(SwiftUI.Color(uiColor: UIColor(madarHex: swatches[index])))
                             .overlay(Circle().strokeBorder(selected ? ink : ink2.opacity(0.35), lineWidth: selected ? 2.5 : 1))
                             .overlay { if selected { Image(systemName: "checkmark").font(.system(size: 15, weight: .bold)).foregroundStyle(ink) } }
                             .frame(width: 44, height: 44).contentShape(Circle())
@@ -1685,4 +1731,48 @@ private struct MihbaraFootnoteCard: View {
         .accessibilityLabel(number.isEmpty ? "حاشية" : "الحاشية \(number)")
         .accessibilityIdentifier("mihbara-footnote-card")
     }
+}
+
+// MARK: - M6-V10 reader themes
+
+/// `mihbara.readerAr.theme`. Colours are `rooms.mihbara.readerThemes` (calm = the `quiet` palette).
+enum MihbaraReaderTheme: String, CaseIterable, Identifiable {
+    case auto, paper, warm, calm, night, black
+    var id: String { rawValue }
+    var title: String {
+        switch self { case .auto: "تلقائي"; case .paper: "ورق"; case .warm: "دافئ"; case .calm: "هادئ"; case .night: "ليل"; case .black: "أسود" }
+    }
+    struct Hex: Equatable { var bg, ink, ink2, accent, onAccent: String; var highlight: [String]; var verse: String }
+    var hex: Hex {
+        switch self {
+        case .auto, .paper: Hex(bg: "#FAF6EA", ink: "#2A2118", ink2: "#6A6052", accent: "#9E2F25", onAccent: "#FAF6EA", highlight: ["#F3E3A0", "#D5E5C3", "#F1D0C8"], verse: "#24412F")
+        case .warm: Hex(bg: "#F3E7CF", ink: "#2E2216", ink2: "#6A573F", accent: "#8E3F22", onAccent: "#F3E7CF", highlight: ["#EDD58E", "#D2DDB4", "#EBC6B6"], verse: "#24412F")
+        case .calm: Hex(bg: "#E5E4DF", ink: "#1F1E1B", ink2: "#58564F", accent: "#3F5A73", onAccent: "#E5E4DF", highlight: ["#E6D894", "#C9D8BE", "#E2C3BD"], verse: "#24412F")
+        case .night: Hex(bg: "#1F1C17", ink: "#E9E1D2", ink2: "#ABA192", accent: "#DCA564", onAccent: "#1F1C17", highlight: ["#5A4A1F", "#2F4A2C", "#5A2F2A"], verse: "#E2C27A")
+        case .black: Hex(bg: "#000000", ink: "#D9D3C7", ink2: "#9A9387", accent: "#D9B25F", onAccent: "#000000", highlight: ["#4A3D14", "#233A21", "#4A2420"], verse: "#E2C27A")
+        }
+    }
+    func palette(dark: Bool) -> MihbaraReaderPalette {
+        let resolved: MihbaraReaderTheme = self == .auto ? (dark ? .night : .paper) : self
+        return MihbaraReaderPalette(theme: resolved, hex: resolved.hex)
+    }
+    /// The page knows its theme only by the background Readium writes on `:root`, so each palette keys on it.
+    static var pageCSS: String {
+        [MihbaraReaderTheme.paper, .warm, .calm, .night, .black].map { theme in
+            let h = theme.hex, root = ":root[style*=\"\(h.bg)\"]"
+            return "\(root) body span.madar-ayah.madar-ayah.madar-ayah { color: \(h.verse) !important; } "
+                + "\(root) body a[role~='doc-noteref'][role~='doc-noteref'] { background: \(h.accent) !important; color: \(h.onAccent) !important; }"
+        }.joined(separator: "\n")
+    }
+}
+
+struct MihbaraReaderPalette: Equatable {
+    var theme: MihbaraReaderTheme
+    var hex: MihbaraReaderTheme.Hex
+    var isDark: Bool { theme == .night || theme == .black }
+    var bg: SwiftUI.Color { .init(uiColor: UIColor(madarHex: hex.bg)) }
+    var ink: SwiftUI.Color { .init(uiColor: UIColor(madarHex: hex.ink)) }
+    var ink2: SwiftUI.Color { .init(uiColor: UIColor(madarHex: hex.ink2)) }
+    var accent: SwiftUI.Color { .init(uiColor: UIColor(madarHex: hex.accent)) }
+    var line: SwiftUI.Color { ink.opacity(isDark ? 0.16 : 0.10) }
 }
