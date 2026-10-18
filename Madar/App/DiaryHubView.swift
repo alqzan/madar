@@ -62,7 +62,16 @@ struct DiaryHubView: View {
                 VStack(alignment: .leading, spacing: 3) { Text(service.digits.string(selectedYear)).font(DiaryType.title).accessibilityIdentifier("diary-hub-year"); Text(alternateYearTitle).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
                 Button { year = selectedYear+1 } label: { Image(systemName: "chevron.backward").frame(width: 44, height: 44) }.accessibilityLabel("السنة التالية")
                 Spacer()
-                Button { month = month == nil ? grid.parts(archive.today).month : nil } label: { Text(month == nil ? "ورقة الشهر" : "السنة").font(DiaryType.label).padding(.horizontal, 12).frame(minHeight: 44).overlay { Capsule().stroke(theme.line) } }.accessibilityIdentifier("diary-calendar-scale")
+                HStack(spacing: 0) {
+                    scaleButton(title: "السنة", accessibilityLabel: "السنة على الجدار", selected: month == nil, identifier: "diary-calendar-scale-year") {
+                        month = nil
+                    }
+                    scaleButton(title: "الشهر", accessibilityLabel: "ورقة الشهر", selected: month != nil, identifier: "diary-calendar-scale") {
+                        if month == nil { month = grid.parts(archive.today).month }
+                    }
+                }
+                .padding(2)
+                .overlay { Capsule().stroke(theme.line) }
             }.buttonStyle(.plain)
             if let month { monthPage(archive, month: month) }
             else if typeSize.isAccessibilitySize { ForEach(1...12, id: \.self) { month in Button(grid.monthName(year: selectedYear, month: month)) { self.month = month }.font(DiaryType.heading).frame(minHeight: 44) } }
@@ -81,6 +90,22 @@ struct DiaryHubView: View {
                 }
             }
         }
+    }
+    private func scaleButton(title: String, accessibilityLabel: String, selected: Bool, identifier: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(DiaryType.label)
+                .foregroundStyle(selected ? theme.onAccent : theme.secondaryInk)
+                .padding(.horizontal, 10)
+                .frame(minWidth: 54, minHeight: 40)
+                .background { if selected { Capsule().fill(theme.accent) } }
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityValue(selected ? "محدد" : "غير محدد")
+        .accessibilityAddTraits(selected ? .isSelected : [])
+        .accessibilityIdentifier(identifier)
     }
     private var alternateYearTitle: String {
         guard let first = grid.days(year: selectedYear, month: 1).first, let last = grid.days(year: selectedYear, month: 12).last else { return "" }
