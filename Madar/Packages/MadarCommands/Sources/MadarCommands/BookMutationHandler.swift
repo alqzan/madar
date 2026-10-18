@@ -50,11 +50,37 @@ private struct BookUndo: Codable {
             guard day == (try DiaryLineRenderer.today(context: context, now: now)) else { throw DataError.invalidValue("تغيّر اليوم؛ افتح ورد اليوم مجددًا") }
             let rows = try context.fetch(FetchDescriptor<HadithProgress>())
             let old = rows.first { $0.collectionID == "nawawi40" && $0.number == number && $0.mergedInto == nil }
-            guard old?.deletedAt == nil else { throw DataError.invalidValue("استعادة صريحة مطلوبة") }
             let before = try old?.record(), row = old ?? HadithProgress()
             if old == nil { row.id = StableIdentity.uuid(for: "hadith:nawawi40:\(number)"); row.createdAt = now; context.insert(row) }
+            else if row.deletedAt != nil {
+                // Pressing either hadith action again is an explicit restore of this stable hadith identity.
+                let barrier = row.deletionBarrierAt ?? row.deletedAt ?? .distantPast
+                row.restoredAt = max(now, barrier.addingTimeInterval(0.001))
+                row.deletedAt = nil
+            }
             row.collectionID = "nawawi40"; row.number = number; row.editionID = edition
             row.readAt = row.readAt ?? now; row.understood = understood; row.returnTo = !understood; row.understoodDayKey = understood ? day.description : nil
+            try touch(row, before: before)
+        case .savePrivateNote(let id, let text):
+            guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, text.count <= 2000 else { throw DataError.invalidValue("نص الملاحظة غير صالح") }
+            let notes = try context.fetch(FetchDescriptor<NotebookNote>())
+            if let row = notes.filter({ $0.id == id && $0.mergedInto == nil }).max(by: { $0.updatedAt < $1.updatedAt }) {
+                guard row.isPrivate, row.link == "general", row.targetID == nil else { throw DataError.invalidValue("هذه الملاحظة مرتبطة بمكان آخر") }
+                let before = try row.record()
+                if row.deletedAt != nil {
+                    let barrier = row.deletionBarrierAt ?? row.deletedAt ?? .distantPast
+                    row.restoredAt = max(now, barrier.addingTimeInterval(0.001)); row.deletedAt = nil
+                }
+                row.text = text
+                try touch(row, before: before)
+            } else {
+                let row = NotebookNote(); row.id = id; row.createdAt = now; row.link = "general"; row.isPrivate = true; row.text = text
+                context.insert(row); try touch(row, before: nil)
+            }
+        case .deletePrivateNote(let id):
+            let notes = try context.fetch(FetchDescriptor<NotebookNote>())
+            guard let row = notes.first(where: { $0.id == id && $0.deletedAt == nil && $0.mergedInto == nil && $0.isPrivate && $0.link == "general" && $0.targetID == nil }) else { throw DataError.invalidValue("الملاحظة الخاصة غير موجودة") }
+            let before = try row.record(); row.deletedAt = now; row.deletionBarrierAt = now
             try touch(row, before: before)
         }
         return try JSONEncoder().encode(BookUndo(changes: changes))

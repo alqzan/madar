@@ -47,4 +47,44 @@ import MadarData
         #expect(h.returnTo); #expect(!h.understood); #expect(h.understoodDayKey == nil)
         #expect(throws: (any Error).self) { _ = try BookMutationHandler.stage(.hadith(number: 14, edition: "wikisource-ar-500107", understood: true, day: day.adding(days: -1)), context: c, now: now, writer: "fixture") }
     }
+    @Test func explicitHadithActionRestoresItsUndoneStableIdentity() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "Mihbara-\(UUID())"); defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root), c = ModelContext(container)
+        let day = try DiaryLineRenderer.today(context: c, now: now)
+        let inserted = try BookMutationHandler.stage(.hadith(number: 13, edition: "wikisource-ar-500107", understood: false, day: day), context: c, now: now, writer: "fixture"); try c.save()
+        try BookMutationHandler.undo(inserted, context: c, now: now.addingTimeInterval(1), writer: "fixture"); try c.save()
+        let row = try #require(c.fetch(FetchDescriptor<HadithProgress>()).first)
+        let barrier = try #require(row.deletionBarrierAt)
+        #expect(row.deletedAt != nil)
+
+        _ = try BookMutationHandler.stage(.hadith(number: 13, edition: "wikisource-ar-500107", understood: true, day: day), context: c, now: now.addingTimeInterval(2), writer: "fixture"); try c.save()
+        #expect(row.deletedAt == nil)
+        #expect(try #require(row.restoredAt) > barrier)
+        #expect(row.understood)
+        #expect(!row.returnTo)
+        #expect(row.understoodDayKey == day.description)
+    }
+    @Test func privateNotebookNotesSaveEditDeleteAndUndoAsTombstones() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "Mihbara-\(UUID())"); defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root), c = ModelContext(container), id = UUID(), firstID = UUID()
+        let created = try BookMutationHandler.stage(.savePrivateNote(id: firstID, text: "ملاحظة مؤقتة"), context: c, now: now, writer: "fixture"); try c.save()
+        let first = try #require(c.fetch(FetchDescriptor<NotebookNote>()).first { $0.id == firstID })
+        try BookMutationHandler.undo(created, context: c, now: now.addingTimeInterval(1), writer: "fixture"); try c.save()
+        #expect(first.deletedAt != nil)
+
+        _ = try BookMutationHandler.stage(.savePrivateNote(id: id, text: "فكرة خاصة"), context: c, now: now.addingTimeInterval(2), writer: "fixture"); try c.save()
+        let note = try #require(c.fetch(FetchDescriptor<NotebookNote>()).first { $0.id == id })
+        #expect(note.isPrivate); #expect(note.link == "general"); #expect(note.text == "فكرة خاصة")
+        let edited = try BookMutationHandler.stage(.savePrivateNote(id: id, text: "فكرة محدثة"), context: c, now: now.addingTimeInterval(3), writer: "fixture"); try c.save()
+        #expect(note.text == "فكرة محدثة")
+        try BookMutationHandler.undo(edited, context: c, now: now.addingTimeInterval(4), writer: "fixture"); try c.save()
+        #expect(note.text == "فكرة خاصة")
+        let deleted = try BookMutationHandler.stage(.deletePrivateNote(id: id), context: c, now: now.addingTimeInterval(5), writer: "fixture"); try c.save()
+        #expect(note.deletedAt != nil)
+        try BookMutationHandler.undo(deleted, context: c, now: now.addingTimeInterval(6), writer: "fixture"); try c.save()
+        #expect(note.deletedAt == nil); #expect(note.text == "فكرة خاصة")
+        #expect(BookCommand.parse("notebook.savePrivate", ["id": .string(id.uuidString), "text": .string("فكرة")]) == .savePrivateNote(id: id, text: "فكرة"))
+        #expect(BookCommand.parse("notebook.deletePrivate", ["id": .string(id.uuidString)]) == .deletePrivateNote(id: id))
+        #expect(BookCommand.parse("notebook.savePrivate", ["id": .string(id.uuidString), "text": .string("فكرة"), "isPrivate": .bool(false)]) == nil)
+    }
 }

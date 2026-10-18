@@ -8,6 +8,7 @@ struct CustomizeMadar: View {
     private var query: String { session.settingsQuery }
     @State private var confirmReset = false
     @State private var widgetGallery = false
+    @State private var mihbaraOpen = false
     @Environment(\.roomTheme) private var theme
     @Environment(\.dynamicTypeSize) private var dynamicType
     var body: some View {
@@ -29,9 +30,10 @@ struct CustomizeMadar: View {
                         }
                 }.padding(16).background(theme.surface, in: .capsule)
                 if query.isEmpty || normalized("المحبرة").contains(normalized(query)) {
-                    NavigationLink { MihbaraHomeView(app: session) } label: {
+                    Button { mihbaraOpen = true } label: {
                         HStack { Text("افتح المحبرة").font(MadarTypography.section()); Spacer(); Image(systemName: "chevron.left") }.padding(16).background(theme.surface, in: .rect(cornerRadius: 20))
                     }.buttonStyle(.plain).accessibilityIdentifier("mihbara-open")
+                        .fullScreenCover(isPresented: $mihbaraOpen) { MihbaraHomeView(app: session) }
                 }
                 if query.isEmpty || normalized("المال").contains(normalized(query)) {
                     Button { session.moneyOpen = true } label: {

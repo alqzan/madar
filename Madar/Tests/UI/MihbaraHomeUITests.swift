@@ -10,15 +10,33 @@ import XCTest
         let door = app.buttons["mihbara-open"]; XCTAssertTrue(door.waitForExistence(timeout:5)); door.tap()
         XCTAssertTrue(app.buttons["mihbara-add-paper"].waitForExistence(timeout:10), app.debugDescription)
     }
+    private func undo(_ app: XCUIApplication) {
+        let button = app.descendants(matching: .any)["mihbara-undo"].buttons["undo-button"]
+        XCTAssertTrue(button.waitForExistence(timeout:8), app.debugDescription)
+        XCTAssertTrue(button.isHittable, app.debugDescription)
+        button.tap()
+    }
     private func shot(_ app: XCUIApplication, _ name: String) { let a = XCTAttachment(screenshot:app.screenshot()); a.name = name; a.lifetime = .keepAlways; add(a) }
     private func reach(_ app: XCUIApplication, _ button: XCUIElement) { for _ in 0..<7 where !button.isHittable { app.swipeUp(velocity:.slow) }; XCTAssertTrue(button.isHittable) }
     func testHomeWirdExplicitUnderstandingUndoAndRelaunch() {
         continueAfterFailure = false; let app = app("home"); app.launch(); open(app)
+        XCTAssertFalse(app.tabBars.buttons["خصّص"].isHittable)
+        XCTAssertTrue(app.staticTexts["خزانة «قديمًا»"].waitForExistence(timeout:8))
         shot(app,"M6-V01-home-L")
-        let wird = app.buttons["mihbara-wird-open"]; reach(app,wird); shot(app,"M6-V01-desk-L"); wird.tap()
+        var wird = app.buttons["mihbara-wird-open"]; reach(app,wird)
+        XCTAssertTrue(app.staticTexts["بقي ٣٠ حديثًا"].exists)
+        XCTAssertTrue(app.staticTexts["١٢ من ٤٢"].exists)
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format:"label CONTAINS %@","لا يؤمن أحدكم")).firstMatch.exists)
+        app.coordinate(withNormalizedOffset: CGVector(dx:0.5,dy:0.66)).press(forDuration:0.1,thenDragTo:app.coordinate(withNormalizedOffset: CGVector(dx:0.5,dy:0.637)))
+        XCTAssertTrue(wird.isHittable)
+        shot(app,"M6-V01-desk-L"); wird.tap()
         XCTAssertTrue(app.textViews["mihbara-hadith-text"].waitForExistence(timeout:8)); XCTAssertTrue(String(describing: app.textViews["mihbara-hadith-text"].value).contains("لا يؤمن أحدكم")); shot(app,"M6-V01-hadith-L")
+        let returnTo = app.buttons["mihbara-hadith-return"]; reach(app,returnTo); returnTo.tap()
+        undo(app)
+        shot(app,"M6-V01-return-undone-L")
+        wird = app.buttons["mihbara-wird-open"]; XCTAssertTrue(wird.waitForExistence(timeout:8)); wird.tap()
         let understood = app.buttons["mihbara-hadith-understood"]; reach(app,understood); understood.tap()
-        XCTAssertTrue(app.buttons["mihbara-wird-closed"].waitForExistence(timeout:8)); XCTAssertTrue(app.buttons["تراجع"].waitForExistence(timeout:8)); app.buttons["تراجع"].tap()
+        XCTAssertTrue(app.buttons["mihbara-wird-closed"].waitForExistence(timeout:8)); shot(app,"M6-V01-understood-L"); undo(app)
         XCTAssertTrue(app.buttons["mihbara-wird-open"].waitForExistence(timeout:8)); app.terminate(); app.launch(); open(app)
         reach(app,app.buttons["mihbara-book-continue"]); app.buttons["mihbara-book-continue"].tap()
         let page = app.textFields["mihbara-book-page"]; XCTAssertTrue(page.waitForExistence(timeout:8)); page.tap(); page.press(forDuration:1.1)
@@ -33,7 +51,14 @@ import XCTest
         let author = app.textFields["mihbara-paper-author"]; author.tap(); author.typeText("من مكتبتي")
         let pages = app.textFields["mihbara-paper-pages"]; pages.tap(); pages.typeText("٢٥٠"); if app.toolbars.buttons["تمّ"].exists { app.toolbars.buttons["تمّ"].tap() }
         let save = app.buttons["mihbara-paper-save"]; reach(app,save); shot(app,"M6-V01-add-paper-L"); save.tap()
-        XCTAssertTrue(app.staticTexts["كتابي الأول"].firstMatch.waitForExistence(timeout:8)); XCTAssertTrue(app.buttons["تراجع"].waitForExistence(timeout:8)); app.buttons["تراجع"].tap()
+        XCTAssertTrue(app.staticTexts["كتابي الأول"].firstMatch.waitForExistence(timeout:8)); undo(app)
         XCTAssertTrue(app.staticTexts["أضف كتابك الأول"].waitForExistence(timeout:8))
+    }
+    func testPrivateNotebookHidesNoteTextUntilDeviceAuthentication() {
+        continueAfterFailure = false; let app = app("home"); app.launch(); open(app)
+        let notebook = app.buttons["mihbara-notebook"]; reach(app, notebook); notebook.tap()
+        XCTAssertTrue(app.buttons["mihbara-notebook-unlock"].waitForExistence(timeout:8), app.debugDescription)
+        XCTAssertFalse(app.staticTexts["سر لا يظهر قبل المصادقة"].exists)
+        app.buttons["mihbara-notebook-close"].tap()
     }
 }

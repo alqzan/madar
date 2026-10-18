@@ -6,10 +6,20 @@ public enum BookCommand: Codable, Equatable, Sendable {
     case shelf(id: UUID, shelf: String, replacing: UUID?)
     case position(id: UUID, page: Int, finished: Bool)
     case hadith(number: Int, edition: String, understood: Bool, day: GregorianDay)
-    public static let names: Set<String> = ["book.savePaper", "book.moveShelf", "book.setPosition", "hadith.mark"]
+    case savePrivateNote(id: UUID, text: String)
+    case deletePrivateNote(id: UUID)
+    public static let names: Set<String> = ["book.savePaper", "book.moveShelf", "book.setPosition", "hadith.mark", "notebook.savePrivate", "notebook.deletePrivate"]
     public static func parse(_ name: String, _ p: [String: JSONValue]) -> Self? {
         func text(_ key: String) -> String? { if case .string(let s) = p[key] { s } else { nil } }
         func integer(_ key: String) -> Int? { if case .number(let n) = p[key], n.isFinite, n.rounded() == n, n >= 0, n <= 100000 { Int(n) } else { nil } }
+        if name == "notebook.savePrivate" {
+            guard Set(p.keys) == ["id", "text"], let id = text("id").flatMap(UUID.init(uuidString:)), let value = text("text"), !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, value.count <= 2000 else { return nil }
+            return .savePrivateNote(id: id, text: value)
+        }
+        if name == "notebook.deletePrivate" {
+            guard Set(p.keys) == ["id"], let id = text("id").flatMap(UUID.init(uuidString:)) else { return nil }
+            return .deletePrivateNote(id: id)
+        }
         if name == "hadith.mark" {
             guard Set(p.keys) == ["number","edition","understood","day"], let n = integer("number"), (1...42).contains(n), let edition = text("edition"), !edition.isEmpty, edition.count <= 120, case .bool(let understood) = p["understood"], let day = text("day").flatMap({ try? GregorianDay($0) }) else { return nil }
             return .hadith(number: n, edition: edition, understood: understood, day: day)
