@@ -16,6 +16,7 @@ struct MihbaraHomeView: View {
     @State private var tableID: UUID?
     @State private var sheet: MihbaraSheet?
     @State private var showingAddBook = false
+    @State private var sunnahDrawerOpen = false
     @State private var readerRoute: MihbaraReaderRoute?
     @State private var manuallyOpen = false
     @State private var libraryQuery = ""
@@ -33,10 +34,13 @@ struct MihbaraHomeView: View {
                     if let r = reading {
                         MadarDateLabel(app.dateLabels(r.day)).foregroundStyle(theme.secondaryInk)
                         shelfView(r)
-                        desk(r)
+                        VStack(spacing: 0) {
+                            desk(r)
+                            sunnahDrawer(r).padding(.horizontal, 8).padding(.bottom, 12)
+                        }.background(theme.color("wood"), in: .rect(topLeadingRadius: 26, bottomLeadingRadius: 12, bottomTrailingRadius: 12, topTrailingRadius: 26))
                     }
                 }.padding(.horizontal, 16).padding(.top, 10).padding(.bottom, 28).frame(maxWidth: 650).frame(maxWidth: .infinity)
-            }.onChange(of: tick.date) { load() }
+            }.clipped().onChange(of: tick.date) { load() }
         }
         .background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
         .environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar)
@@ -206,6 +210,64 @@ struct MihbaraHomeView: View {
                 Button { showingAddBook = true } label: { VStack(spacing: 12) { Image(systemName: "book.pages").font(.largeTitle); Text("مكان كتابك").font(MadarTypography.cardTitle()); Text("أضف كتابًا وابدأ من موضعك").font(MadarTypography.caption()) }.frame(maxWidth: .infinity, minHeight: 210).background(theme.surface, in: .rect(cornerRadius: 5)).overlay { RoundedRectangle(cornerRadius: 5).stroke(theme.line, style: .init(lineWidth: 1, dash: [4,4])) } }.buttonStyle(.plain).foregroundStyle(theme.ink)
             }
         }.padding(18).padding(.vertical, 8).background(LinearGradient(colors: [theme.color("wood").opacity(0.78), theme.color("wood")], startPoint: .top, endPoint: .bottom), in: .rect(topLeadingRadius: 26, bottomLeadingRadius: 12, bottomTrailingRadius: 12, topTrailingRadius: 26)).animation(reduceMotion ? nil : .smooth(duration: 0.35), value: open && !folded)
+    }
+    private func sunnahDrawer(_ r: MihbaraHomeReading) -> some View {
+        let count = r.collection.hadiths.count
+        let nextHadith = r.todayHadiths.first ?? r.collection.hadiths.first
+        return VStack(spacing: 0) {
+            Button {
+                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) { sunnahDrawerOpen.toggle() }
+            } label: {
+                HStack(spacing: 12) {
+                    Text("درج كتب السنّة، كتاب واحد")
+                        .font(MadarTypography.caption()).padding(.horizontal, 12).padding(.vertical, 9)
+                        .foregroundStyle(RoomTheme(room: "mihbara", dark: false).ink).background(theme.color("goldUnderstand"), in: .rect(cornerRadius: 5))
+                    Spacer(minLength: 0)
+                    Capsule().fill(theme.color("goldUnderstand")).frame(width: 58, height: 10)
+                        .shadow(color: .black.opacity(0.2), radius: 2, y: 2)
+                    Spacer(minLength: 0)
+                    Text(sunnahDrawerOpen ? "أغلقه" : "اسحبه").font(MadarTypography.fine()).foregroundStyle(theme.color("onDesk")).padding(7).background(theme.color("desk"), in: .capsule)
+                }
+                .padding(12).frame(minHeight: 64)
+                .background(LinearGradient(colors: [theme.color("wood"), theme.color("desk")], startPoint: .top, endPoint: .bottom), in: .rect(cornerRadius: 9))
+                .overlay { RoundedRectangle(cornerRadius: 9).stroke(theme.color("onDesk").opacity(0.12), lineWidth: 1) }
+                .shadow(color: theme.ink.opacity(0.22), radius: 4, y: 4)
+            }.buttonStyle(.plain)
+                .accessibilityIdentifier("mihbara-sunnah-drawer")
+                .accessibilityValue(sunnahDrawerOpen ? "مفتوح" : "مغلق")
+                .accessibilityHint("كتب السنّة وتقدمك فيها")
+            if sunnahDrawerOpen {
+                VStack(spacing: 14) {
+                    HStack(spacing: 12) {
+                        RoundedRectangle(cornerRadius: 4).fill(theme.color("sunnahLeather").gradient)
+                            .frame(width: 31, height: 53)
+                            .overlay(alignment: .leading) { Rectangle().fill(theme.color("goldUnderstand").opacity(0.45)).frame(width: 2).padding(.vertical, 7) }
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(r.collection.title).font(.custom("thmanyahserifdisplay-Bold", size: 17, relativeTo: .headline)).foregroundStyle(theme.color("onDesk"))
+                            Text(service.digits.string(r.readCount) + " من " + service.digits.string(count) + " فهمتها")
+                                .font(MadarTypography.fine()).foregroundStyle(theme.color("onDesk"))
+                        }
+                        Spacer(minLength: 0)
+                        Text("على المكتب").font(MadarTypography.fine()).padding(.horizontal, 9).padding(.vertical, 7)
+                            .foregroundStyle(RoomTheme(room: "mihbara", dark: false).ink).background(theme.color("goldUnderstand"), in: .rect(cornerRadius: 7))
+                        if let nextHadith {
+                            Button(r.todayHadiths.isEmpty ? "اقرأ" : "الورد") { sheet = .hadith(nextHadith.number) }
+                                .font(MadarTypography.caption()).frame(minWidth: 48, minHeight: 44)
+                                .foregroundStyle(RoomTheme(room: "mihbara", dark: false).ink).background(theme.color("goldUnderstand"), in: .capsule)
+                                .accessibilityIdentifier("mihbara-sunnah-drawer-read")
+                        }
+                    }.padding(8)
+                    Button { showingAddBook = true } label: {
+                        Label("أضف كتابًا من ملف", systemImage: "plus")
+                            .font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 48)
+                            .foregroundStyle(theme.color("onDesk"))
+                            .overlay { RoundedRectangle(cornerRadius: 10).stroke(theme.color("onDesk").opacity(0.6), style: .init(lineWidth: 1, dash: [4, 3])) }
+                    }.buttonStyle(.plain).accessibilityIdentifier("mihbara-sunnah-drawer-add")
+                }.padding(12).background(theme.color("desk"), in: .rect(bottomLeadingRadius: 12, bottomTrailingRadius: 12))
+                    .padding(.horizontal, 8).transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
     }
     @State private var folded = false
     private func deskLabel(_ text: String, title: Bool = false) -> some View {
