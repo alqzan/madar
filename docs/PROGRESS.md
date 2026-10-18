@@ -261,6 +261,14 @@ Owner: «اعتمد ترتيب المحبرة وواصل». Each row includes it
 
 ## Waiting on the owner
 
+**Owner rule (18 Oct): «اي شي ينتظر قراري جمعهن كلهن اخر شي لكن مهب شي يوقف عليه التطوير».** A pending owner decision never stops development. Do the safe default, or skip that one item and take the next ready card. Add the question to this list, and the owner answers them all together at the end.
+
+Collected so far (M6, 18 Oct):
+1. M6-T01: Turath data terms were not found (the SDK is MIT); some modern editions say «حقوق الطبع محفوظة». Current default: personal reading on the owner's device only.
+2. M6-V12: may Literata (OFL) be downloaded and bundled for English books? Current default: Georgia.
+3. M6-V11 focus reader and M6-V22 auto-scroll: are they v1 (RMI2 [DEFAULT] lists them as later)? Current default: not built, no entry point.
+4. M6-V13/V14: English settings contract and English word translation/dictionary scope. Current default: unchanged.
+
 M5 (16 Oct): (1) the zakat screen copy and options (silver basis, the debt options) need a specialist the owner chooses before any external tester (F11, RM7); (2) RM5 pairing window set at 10 minutes; (3) RM6 accuracy needs anonymised bank messages.
 
 Owner standing rule (15 Oct): screens that match their design or better count as approved pending the owner's app trial (M3 matched screens included). Owner visually approved M2-V01–V17 and the prayer/Quran link on 15 October. OS gallery/Control invocation, real notification delivery, named human resource release sample, owner-iPhone and milestone gates remain separately unverified/deferred.
