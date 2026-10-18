@@ -462,17 +462,56 @@ import XCTest
         let book = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "كتاب اختبار القارئ")).firstMatch
         XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); book.tap()
         XCTAssertTrue(app.buttons["mihbara-reader-close"].waitForExistence(timeout: 20), app.debugDescription)
-        sleep(4); shot(app, "M6-V12-reader-L")
+        sleep(4); shot(app, "M6-V13-reader-L")
         app.buttons["mihbara-reader-settings"].tap()
         XCTAssertTrue(app.staticTexts["كتاب إنجليزي · إعداداتك للإنجليزي"].waitForExistence(timeout: 5), app.debugDescription)
+        let literata = app.buttons["mihbara-reader-font-literata"]
+        let atkinson = app.buttons["mihbara-reader-font-atkinsonHyperlegible"]
+        XCTAssertTrue(literata.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(app.buttons["mihbara-reader-font-sourceSerif"].exists)
+        XCTAssertTrue(atkinson.exists)
+        XCTAssertTrue(app.buttons["mihbara-reader-font-ibmPlexSerif"].exists)
+        XCTAssertTrue(literata.isSelected)
         XCTAssertFalse(app.buttons["mihbara-reader-font-amiri"].exists)
-        XCTAssertFalse(app.buttons["mihbara-reader-more"].exists)
+        shot(app, "M6-V13-sheet-L")
+        atkinson.tap()
+        XCTAssertTrue(atkinson.waitForSelection(timeout: 5), app.debugDescription)
         app.buttons["mihbara-reader-size-6"].tap()
         XCTAssertTrue(app.buttons["mihbara-reader-size-6"].waitForSelection(timeout: 5))
-        shot(app, "M6-V12-sheet-L")
-        app.buttons["mihbara-reader-reset"].tap()
+        for _ in 0..<5 where !app.buttons["mihbara-reader-lineSpacing-4"].isHittable { app.swipeUp(velocity: .slow) }
+        app.buttons["mihbara-reader-lineSpacing-4"].tap()
+        app.buttons["mihbara-reader-margins-1"].tap()
+        let justify = app.switches["mihbara-reader-justify"]
+        let heavier = app.switches["mihbara-reader-heavier"]
+        let hyphenation = app.switches["mihbara-reader-hyphenation"]
+        let wordSpacing = app.switches["mihbara-reader-wordSpacing"]
+        XCTAssertTrue(justify.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertEqual(hyphenation.value as? String, "1")
+        hyphenation.tap()
+        wordSpacing.tap()
+        heavier.tap()
+        XCTAssertEqual(hyphenation.value as? String, "0")
+        XCTAssertEqual(wordSpacing.value as? String, "1")
+        XCTAssertEqual(heavier.value as? String, "1")
+        let percentage = app.buttons["mihbara-reader-footer-percentage"]
+        XCTAssertTrue(percentage.waitForExistence(timeout: 5), app.debugDescription)
+        percentage.tap()
+        XCTAssertTrue(percentage.waitForSelection(timeout: 5))
+        shot(app, "M6-V13-sheet-s1-L")
+        let reset = app.buttons["mihbara-reader-reset"]
+        for _ in 0..<5 where !reset.isHittable { app.swipeUp(velocity: .slow) }
+        reset.tap()
+        XCTAssertTrue(literata.waitForSelection(timeout: 5))
         XCTAssertTrue(app.buttons["mihbara-reader-size-4"].waitForSelection(timeout: 5))
+        XCTAssertTrue(app.buttons["mihbara-reader-lineSpacing-2"].isSelected)
+        XCTAssertTrue(app.buttons["mihbara-reader-margins-2"].isSelected)
+        XCTAssertTrue(app.buttons["mihbara-reader-footer-remaining"].isSelected)
+        XCTAssertEqual(justify.value as? String, "1")
+        XCTAssertEqual(heavier.value as? String, "0")
+        XCTAssertEqual(hyphenation.value as? String, "1")
+        XCTAssertEqual(wordSpacing.value as? String, "0")
         app.buttons["mihbara-reader-settings-close"].tap()
+        XCTAssertTrue(app.staticTexts["mihbara-reader-footer-value"].waitForExistence(timeout: 5))
         app.buttons["mihbara-reader-close"].tap()
         XCTAssertTrue(app.buttons["mihbara-add-paper"].waitForExistence(timeout: 10), app.debugDescription)
     }

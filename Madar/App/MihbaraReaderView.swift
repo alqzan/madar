@@ -171,14 +171,12 @@ struct MihbaraReaderView: View {
     @State private var footnote: MihbaraFootnote?
     /// M6-V12: an English book reads left to right with its own settings (`mihbara.readerEn`).
     @State private var isEnglish = false
+    @State private var readingHistorySeconds = 0
+    @State private var readingHistoryProgression = 0.0
     private var settingsKey: String { isEnglish ? "mihbara.readerEn" : "mihbara.readerAr" }
-    /// §7.6 English faces; only system fonts ship until Literata's OFL file is bundled.
-    private var englishFamily: FontFamily {
-        switch readerSettings["font"]?.string {
-        case "system": FontFamily(rawValue: "-apple-system")
-        case "georgia": FontFamily(rawValue: "Georgia")
-        default: FontFamily(rawValue: "Literata, Georgia")
-        }
+    private var englishReaderFont: MihbaraEnglishReaderFont {
+        guard let value = readerSettings["font"]?.string else { return .literata }
+        return MihbaraEnglishReaderFont(rawValue: value) ?? .literata
     }
 
     /// `mihbara.readerAr.theme`; «تلقائي» is paper by day and night after dark.
@@ -218,6 +216,8 @@ struct MihbaraReaderView: View {
     private var readerMargins: Int { readerInt("margins", 1...4, 2) }
     private var readerJustify: Bool { readerBool("justify", true) }
     private var readerHeavier: Bool { readerBool("heavier", false) }
+    private var readerWordSpacing: Bool { readerBool("wordSpacing", false) }
+    private var readerHyphenation: Bool { readerBool("hyphenation", true) }
     private var readerMode: String {
         guard let mode = readerSettings["mode"]?.string, ["pages", "scroll", "focus"].contains(mode) else { return "pages" }
         return mode
@@ -225,6 +225,7 @@ struct MihbaraReaderView: View {
     private var readerFocus: Bool { readerMode == "focus" }
     private var readerScroll: Bool { readerMode != "pages" }
     private var readerFooter: MihbaraReaderFooter { readerSettings["footer"]?.string.flatMap(MihbaraReaderFooter.init(rawValue:)) ?? .full }
+    private var englishReaderFooter: MihbaraEnglishReaderFooter { readerSettings["footer"]?.string.flatMap(MihbaraEnglishReaderFooter.init(rawValue:)) ?? .remaining }
     private var readerFont: MihbaraReaderFont {
         guard case .string(let id)? = readerSettings["font"] else { return .amiri }
         return MihbaraReaderFont(rawValue: id) ?? .amiri
@@ -233,12 +234,12 @@ struct MihbaraReaderView: View {
     private var readerPreferences: EPUBPreferences {
         EPUBPreferences(
             backgroundColor: ReadiumNavigator.Color(hex: palette.hex.bg),
-            fontFamily: isEnglish ? englishFamily : readerFont.family,
+            fontFamily: isEnglish ? englishReaderFont.family : readerFont.family,
             // Readium's fontSize is a multiplier: 1.0 is the publisher's 100%.
             fontSize: readerFontPercent / 100,
             // A multiplier of the regular 400 weight, landing on a face the font really has.
-            fontWeight: readerHeavier && !isEnglish ? readerFont.heavierWeight : nil,
-            hyphens: isEnglish ? readerBool("hyphenation", true) : nil,
+            fontWeight: readerHeavier ? (isEnglish ? englishReaderFont.heavierWeight : readerFont.heavierWeight) : nil,
+            hyphens: isEnglish ? readerHyphenation : nil,
             ligatures: true,
             lineHeight: [1.6, 1.95, 2.25, 2.6][readerLineSpacing - 1],
             pageMargins: [0.6, 1.0, 1.5, 2.0][readerMargins - 1],
@@ -248,7 +249,8 @@ struct MihbaraReaderView: View {
             scroll: readerScroll,
             textAlign: readerJustify ? .justify : .start,
             textColor: ReadiumNavigator.Color(hex: palette.hex.ink),
-            theme: readerTheme
+            theme: readerTheme,
+            wordSpacing: isEnglish && readerWordSpacing ? 0.1 : 0.0
         )
     }
 
@@ -368,7 +370,8 @@ struct MihbaraReaderView: View {
             MihbaraReaderSettingsSheet(
                 app: app, paper: paper, palette: palette, english: isEnglish,
                 options: .init(theme: readerSettings["theme"]?.string.flatMap(MihbaraReaderTheme.init(rawValue:)) ?? .auto, size: readerSize, font: readerFont, mode: readerMode, lineSpacing: readerLineSpacing,
-                               margins: readerMargins, justify: readerJustify, heavier: readerHeavier, footer: readerFooter),
+                               margins: readerMargins, justify: readerJustify, heavier: readerHeavier, footer: readerFooter,
+                               englishFont: englishReaderFont, englishFooter: englishReaderFooter, hyphenation: readerHyphenation, wordSpacing: readerWordSpacing),
                 set: updateReaderSetting,
                 reset: { app.reset([settingsKey]) }
             )
@@ -437,11 +440,11 @@ struct MihbaraReaderView: View {
     }
 
     @ViewBuilder private var footer: some View {
-        if readerFooter != .none { footerContent }
+        if isEnglish || readerFooter != .none { footerContent }
     }
 
     private var focusFooter: some View {
-        Text(printPageLabel)
+        Text(footerLabel)
             .font(MadarTypography.caption())
             .foregroundStyle(palette.ink2)
             .lineLimit(1)
@@ -451,7 +454,7 @@ struct MihbaraReaderView: View {
             .padding(.top, 8)
             .padding(.bottom, 11)
             .background(paper)
-            .accessibilityIdentifier("mihbara-focus-print-page")
+            .accessibilityIdentifier("mihbara-reader-footer-value")
     }
 
     private var focusControls: some View {
@@ -505,22 +508,51 @@ struct MihbaraReaderView: View {
             } else {
                 Rectangle().fill(palette.line).frame(height: 3)
             }
-            if readerFooter != .bar {
-            HStack(alignment: .center, spacing: 12) {
-                Text(printPageLabel)
-                    .font(MadarTypography.caption()).lineLimit(1).minimumScaleFactor(0.8)
-                    .accessibilityIdentifier("mihbara-reader-print-page")
-                Spacer(minLength: 4)
-                if readerFooter == .full || isSpeaking {
-                    Text(isSpeaking ? "تُقرأ الصفحة بصوت عربي" : (readingClock?.activeSeconds ?? 0) >= 60 ? "الجلسة بدأت · تُسجَّل وحدها" : "تُسجَّل الجلسة بعد دقيقة نشاط")
-                        .font(MadarTypography.fine()).foregroundStyle(palette.ink2)
+            if isEnglish {
+                HStack(alignment: .center) {
+                    Text(footerLabel)
+                        .font(MadarTypography.caption()).lineLimit(1).minimumScaleFactor(0.8)
+                        .accessibilityIdentifier("mihbara-reader-footer-value")
+                    Spacer(minLength: 4)
                 }
-            }
+            } else if readerFooter != .bar {
+                HStack(alignment: .center, spacing: 12) {
+                    Text(printPageLabel)
+                        .font(MadarTypography.caption()).lineLimit(1).minimumScaleFactor(0.8)
+                        .accessibilityIdentifier("mihbara-reader-print-page")
+                    Spacer(minLength: 4)
+                    if readerFooter == .full || isSpeaking {
+                        Text(isSpeaking ? "تُقرأ الصفحة بصوت عربي" : (readingClock?.activeSeconds ?? 0) >= 60 ? "الجلسة بدأت · تُسجَّل وحدها" : "تُسجَّل الجلسة بعد دقيقة نشاط")
+                            .font(MadarTypography.fine()).foregroundStyle(palette.ink2)
+                    }
+                }
             }
         }
         .padding(.horizontal, 18).padding(.top, 9).padding(.bottom, 11)
         .overlay(alignment: .top) { Rectangle().fill(palette.line).frame(height: 1) }
         .background(paper)
+    }
+
+    private var footerLabel: String {
+        guard isEnglish else { return printPageLabel }
+        switch englishReaderFooter {
+        case .page:
+            if !printPages.isEmpty { return printPageLabel }
+            if let position = currentLocator?.locations.position, positionCount > 0 {
+                return "الموضع \(digits.string(position)) من \(digits.string(positionCount))"
+            }
+            return "موضع القراءة يتضح بعد فتح الصفحة"
+        case .percentage:
+            guard let readerProgress else { return "النسبة غير متاحة في هذا الملف" }
+            return "تقدّم \(digits.string(Int((readerProgress * 100).rounded())))٪"
+        case .remaining:
+            guard let readerProgress, readerProgress < 0.99 else { return readerProgress == nil ? "نحسب الوقت مع تقدّم القراءة" : "بقي أقل من دقيقة" }
+            let activeSeconds = readingHistorySeconds + Int(readingClock?.activeSeconds ?? 0)
+            let measuredProgress = max(readerProgress, readingHistoryProgression)
+            guard activeSeconds >= 60, measuredProgress > 0 else { return "نقدّر الوقت بعد دقيقة قراءة" }
+            let minutes = max(0, Int(ceil(Double(activeSeconds) * (1 - readerProgress) / measuredProgress / 60)))
+            return minutes == 0 ? "بقي أقل من دقيقة" : "نحو \(digits.string(minutes)) دقيقة متبقية"
+        }
     }
 
     /// The current locator, with its printed-page anchor when the visible document supplied one.
@@ -560,6 +592,12 @@ struct MihbaraReaderView: View {
             let startLocator = saved ?? firstLocator
             initialLocator = startLocator
             currentLocator = startLocator
+            let context = ModelContext(app.container)
+            let sessions = (try? context.fetch(FetchDescriptor<ReadingSession>()))?.filter {
+                $0.bookID == book.id && $0.deletedAt == nil && $0.mergedInto == nil
+            } ?? []
+            readingHistorySeconds = sessions.reduce(0) { $0 + max(0, $1.activeSeconds) }
+            readingHistoryProgression = sessions.reduce(0.0) { max($0, $1.endProgression) }
             sessionStartLocator = startLocator
             sessionStart = now
             readerIsRunning = saveCoordinator.canWrite && scenePhase == .active
@@ -1018,6 +1056,8 @@ struct MihbaraReaderView: View {
         pendingLocatorSave?.cancel()
         if let payload = sessionPayload(at: date) {
             saveCoordinator.enqueue(sessionID: sessionID, payload: payload)
+            readingHistorySeconds += readingClock?.activeSeconds ?? 0
+            readingHistoryProgression = max(readingHistoryProgression, currentLocator?.locations.totalProgression ?? 0)
         }
         if let currentLocator { saveCoordinator.enqueueLocator(currentLocator, bookID: book.id) }
     }
@@ -1190,9 +1230,60 @@ enum MihbaraReaderFooter: String, CaseIterable, Identifiable {
     }
 }
 
+enum MihbaraEnglishReaderFont: String, CaseIterable, Identifiable {
+    case literata, sourceSerif, atkinsonHyperlegible, ibmPlexSerif
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .literata: "Literata"
+        case .sourceSerif: "Source Serif"
+        case .atkinsonHyperlegible: "Atkinson"
+        case .ibmPlexSerif: "Plex Serif"
+        }
+    }
+    var family: FontFamily {
+        switch self {
+        case .literata: FontFamily(rawValue: "Literata")
+        case .sourceSerif: FontFamily(rawValue: "Source Serif 4")
+        case .atkinsonHyperlegible: FontFamily(rawValue: "Atkinson Hyperlegible")
+        case .ibmPlexSerif: FontFamily(rawValue: "IBM Plex Serif")
+        }
+    }
+    var previewName: String {
+        switch self {
+        case .literata: "Literata-Regular"
+        case .sourceSerif: "SourceSerif4Roman-Regular"
+        case .atkinsonHyperlegible: "AtkinsonHyperlegible-Regular"
+        case .ibmPlexSerif: "IBMPlexSerif-Regular"
+        }
+    }
+    var files: [(name: String, ext: String, weight: CSSFontWeight)] {
+        switch self {
+        case .literata: [("Literata-Variable", "ttf", .variable(100...900))]
+        case .sourceSerif: [("SourceSerif4-Variable", "ttf", .variable(200...900))]
+        case .atkinsonHyperlegible: [("AtkinsonHyperlegible-Regular", "ttf", .standard(.normal)), ("AtkinsonHyperlegible-Bold", "ttf", .standard(.bold))]
+        case .ibmPlexSerif: [("IBMPlexSerif-Regular", "ttf", .standard(.normal)), ("IBMPlexSerif-Bold", "ttf", .standard(.bold))]
+        }
+    }
+    var heavierWeight: Double { self == .literata || self == .sourceSerif ? 600.0 / 400 : 700.0 / 400 }
+}
+
+enum MihbaraEnglishReaderFooter: String, CaseIterable, Identifiable {
+    case remaining, percentage, page
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .remaining: "الوقت المتبقي"
+        case .percentage: "النسبة"
+        case .page: "رقم الصفحة"
+        }
+    }
+}
+
 struct MihbaraReaderOptions: Equatable {
     var theme: MihbaraReaderTheme
     var size: Int, font: MihbaraReaderFont, mode: String, lineSpacing: Int, margins: Int, justify: Bool, heavier: Bool, footer: MihbaraReaderFooter
+    var englishFont: MihbaraEnglishReaderFont, englishFooter: MihbaraEnglishReaderFooter, hyphenation: Bool, wordSpacing: Bool
 }
 
 /// «عرض الصفحة»: every choice is saved to `mihbara.readerAr` at once and applied live.
@@ -1218,20 +1309,18 @@ private struct MihbaraReaderSettingsSheet: View {
                 header
                 themeRow
                 sizeRow
-                // English fonts, spacing and hyphenation are M6-V13; an English book offers only what `readerEn` holds.
-                if !english { fontRow }
+                fontRow
                 modeRow
-                if !english {
+                if english {
+                    moreOptions
+                } else {
                 Button { withAnimation(.smooth(duration: 0.25)) { more.toggle() } } label: {
                     Text(more ? "خيارات أقل" : "خيارات أكثر").font(MadarTypography.caption().weight(.semibold))
-                        .frame(maxWidth: .infinity, minHeight: 32).background(well, in: .capsule)
+                        .frame(maxWidth: .infinity, minHeight: 32)
+                        .glassEffect(.regular.interactive(), in: Capsule())
                 }
                 .buttonStyle(.plain).accessibilityIdentifier("mihbara-reader-more")
                 if more { moreOptions }
-                } else {
-                    Button("العودة إلى الإعدادات الافتراضية", action: reset)
-                        .font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 44)
-                        .accessibilityIdentifier("mihbara-reader-reset")
                 }
             }
             .padding(22)
@@ -1239,9 +1328,6 @@ private struct MihbaraReaderSettingsSheet: View {
         .scrollBounceBehavior(.basedOnSize)
         .foregroundStyle(ink)
         .background(paper.ignoresSafeArea())
-        .safeAreaInset(edge: .bottom) {
-            if app.undoToken != nil { UndoToast(message: app.undoMessage, undo: app.undo).accessibilityIdentifier("mihbara-reader-undo") }
-        }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
     }
@@ -1251,6 +1337,7 @@ private struct MihbaraReaderSettingsSheet: View {
             Text("عرض الصفحة").font(.custom("thmanyahserifdisplay-Bold", size: 22, relativeTo: .title2))
             Spacer(minLength: 8)
             Text(english ? "كتاب إنجليزي · إعداداتك للإنجليزي" : "كتاب عربي · إعداداتك للعربي").font(MadarTypography.fine().weight(.semibold))
+                .lineLimit(1).minimumScaleFactor(0.8)
                 .padding(.horizontal, 12).padding(.vertical, 6).background(well, in: .capsule)
             Button("تمّ") { dismiss() }.font(MadarTypography.caption()).frame(minWidth: 44, minHeight: 44)
                 .accessibilityIdentifier("mihbara-reader-settings-close")
@@ -1259,7 +1346,10 @@ private struct MihbaraReaderSettingsSheet: View {
 
     private var sizeRow: some View {
         HStack(spacing: 0) {
-            Text("أ").font(.custom(options.font.previewName, size: 15, relativeTo: .body)) + Text("−").font(MadarTypography.caption())
+            HStack(spacing: 2) {
+                Text(english ? "A" : "أ").font(.custom(english ? options.englishFont.previewName : options.font.previewName, size: 15, relativeTo: .body))
+                Text("−").font(MadarTypography.caption())
+            }
             ForEach(1...7, id: \.self) { value in
                 Button { set("size", .number(Double(value))) } label: {
                     Circle().fill(ink.opacity(value == options.size ? 1 : 0.35))
@@ -1272,28 +1362,57 @@ private struct MihbaraReaderSettingsSheet: View {
                 .accessibilityAddTraits(value == options.size ? .isSelected : [])
                 .accessibilityIdentifier("mihbara-reader-size-\(value)")
             }
-            Text("أ").font(.custom(options.font.previewName, size: 26, relativeTo: .title)) + Text("+").font(MadarTypography.body())
+            HStack(spacing: 2) {
+                Text(english ? "A" : "أ").font(.custom(english ? options.englishFont.previewName : options.font.previewName, size: 26, relativeTo: .title))
+                Text("+").font(MadarTypography.body())
+            }
         }
         .padding(.horizontal, 16).frame(minHeight: 64).background(well, in: .rect(cornerRadius: 16))
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16))
     }
 
     private var fontRow: some View {
         HStack(spacing: 8) {
-            ForEach(MihbaraReaderFont.allCases) { option in
-                let selected = option == options.font
-                Button { set("font", .string(option.rawValue)) } label: {
-                    VStack(spacing: 2) {
-                        Text("كتاب").font(.custom(option.previewName, size: 24, relativeTo: .title3))
-                        Text(option.title).font(MadarTypography.fine()).foregroundStyle(ink.opacity(0.7))
+            if english {
+                GlassEffectContainer(spacing: 8) {
+                    HStack(spacing: 8) {
+                        ForEach(MihbaraEnglishReaderFont.allCases) { option in
+                            let selected = option == options.englishFont
+                            Button { set("font", .string(option.rawValue)) } label: {
+                                VStack(spacing: 3) {
+                                    Text("Book").font(.custom(option.previewName, size: 22, relativeTo: .title3)).lineLimit(1).minimumScaleFactor(0.75)
+                                    Text(option.title).font(MadarTypography.fine()).foregroundStyle(ink.opacity(0.72)).lineLimit(1).minimumScaleFactor(0.75)
+                                }
+                                .frame(maxWidth: .infinity, minHeight: 84)
+                                .background(SwiftUI.Color.white.opacity(0.26), in: .rect(cornerRadius: 16))
+                                .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 16))
+                                .overlay { RoundedRectangle(cornerRadius: 16).stroke(ink.opacity(selected ? 0.88 : 0.12), lineWidth: selected ? 2.5 : 1) }
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("الخط \(option.title)")
+                            .accessibilityAddTraits(selected ? .isSelected : [])
+                            .accessibilityIdentifier("mihbara-reader-font-\(option.rawValue)")
+                        }
                     }
-                    .frame(maxWidth: .infinity, minHeight: 84)
-                    .background(SwiftUI.Color.white.opacity(0.55), in: .rect(cornerRadius: 16))
-                    .overlay { RoundedRectangle(cornerRadius: 16).stroke(ink.opacity(selected ? 1 : 0.15), lineWidth: selected ? 2.5 : 1) }
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("الخط \(option.title)")
-                .accessibilityAddTraits(selected ? .isSelected : [])
-                .accessibilityIdentifier("mihbara-reader-font-\(option.rawValue)")
+            } else {
+                ForEach(MihbaraReaderFont.allCases) { option in
+                    let selected = option == options.font
+                    Button { set("font", .string(option.rawValue)) } label: {
+                        VStack(spacing: 2) {
+                            Text("كتاب").font(.custom(option.previewName, size: 24, relativeTo: .title3))
+                            Text(option.title).font(MadarTypography.fine()).foregroundStyle(ink.opacity(0.7))
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 84)
+                        .background(SwiftUI.Color.white.opacity(0.26), in: .rect(cornerRadius: 16))
+                        .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 16))
+                        .overlay { RoundedRectangle(cornerRadius: 16).stroke(ink.opacity(selected ? 0.88 : 0.12), lineWidth: selected ? 2.5 : 1) }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("الخط \(option.title)")
+                    .accessibilityAddTraits(selected ? .isSelected : [])
+                    .accessibilityIdentifier("mihbara-reader-font-\(option.rawValue)")
+                }
             }
         }
     }
@@ -1312,7 +1431,7 @@ private struct MihbaraReaderSettingsSheet: View {
                             } else {
                                 Circle().fill(SwiftUI.Color(uiColor: UIColor(madarHex: theme.hex.bg)))
                             }
-                            Text("أ").font(.custom("Amiri-Bold", size: 17, relativeTo: .body))
+                            Text(english ? "A" : "أ").font(.custom(english ? options.englishFont.previewName : "Amiri-Bold", size: 17, relativeTo: .body))
                                 .foregroundStyle(SwiftUI.Color(uiColor: UIColor(madarHex: (theme == .auto ? MihbaraReaderTheme.paper : theme).hex.ink)))
                                 .opacity(theme == .auto ? 0 : 1)
                             Circle().strokeBorder(selected ? accent : ink.opacity(0.22), lineWidth: selected ? 2.5 : 1)
@@ -1350,12 +1469,23 @@ private struct MihbaraReaderSettingsSheet: View {
             Divider()
             toggle("خط أثقل", "أوضح على الشاشة", isOn: options.heavier, id: "heavier")
             Divider()
+            if english {
+                toggle("تقسيم الكلمات", "يلائم الكلمات الطويلة داخل السطر", isOn: options.hyphenation, id: "hyphenation")
+                Divider()
+                toggle("مسافة أوسع بين الكلمات", nil, isOn: options.wordSpacing, id: "wordSpacing")
+                Divider()
+            }
             VStack(alignment: .leading, spacing: 8) {
                 Text("أسفل الصفحة").font(MadarTypography.caption()).foregroundStyle(ink.opacity(0.7))
-                segmented(MihbaraReaderFooter.allCases.map { ($0.title, $0.rawValue) }, selected: options.footer.rawValue, id: "footer") { set("footer", .string($0)) }
+                if english {
+                    segmented(MihbaraEnglishReaderFooter.allCases.map { ($0.title, $0.rawValue) }, selected: options.englishFooter.rawValue, id: "footer") { set("footer", .string($0)) }
+                } else {
+                    segmented(MihbaraReaderFooter.allCases.map { ($0.title, $0.rawValue) }, selected: options.footer.rawValue, id: "footer") { set("footer", .string($0)) }
+                }
             }
             Button("العودة إلى الإعدادات الافتراضية", action: reset)
                 .font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 44)
+                .glassEffect(.regular.interactive(), in: Capsule())
                 .accessibilityIdentifier("mihbara-reader-reset")
         }
     }
@@ -1376,6 +1506,7 @@ private struct MihbaraReaderSettingsSheet: View {
             }
         }
         .padding(4).background(well, in: .rect(cornerRadius: 15))
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 15))
     }
 
     private func iconGroup<Icon: View>(title: String, id: String, selected: Int, @ViewBuilder icon: @escaping (Int) -> Icon) -> some View {
@@ -1441,7 +1572,7 @@ private struct MihbaraEPUBNavigator: UIViewControllerRepresentable {
 
     /// Every bundled reader font is declared once, so switching in the Aa sheet applies live.
     private static var fontDeclarations: [AnyHTMLFontFamilyDeclaration] {
-        MihbaraReaderFont.allCases.compactMap { font in
+        let arabic: [AnyHTMLFontFamilyDeclaration] = MihbaraReaderFont.allCases.compactMap { font -> AnyHTMLFontFamilyDeclaration? in
             let faces = font.files.compactMap { file -> CSSFontFace? in
                 guard let url = Bundle.main.url(forResource: file.name, withExtension: file.ext).flatMap(FileURL.init(url:)) else { return nil }
                 return CSSFontFace(file: url, preload: font == .amiri && file.weight == .normal, style: .normal, weight: .standard(file.weight))
@@ -1449,6 +1580,15 @@ private struct MihbaraEPUBNavigator: UIViewControllerRepresentable {
             guard !faces.isEmpty else { return nil }
             return CSSFontFamilyDeclaration(fontFamily: font.family, fontFaces: faces).eraseToAnyHTMLFontFamilyDeclaration()
         }
+        let english: [AnyHTMLFontFamilyDeclaration] = MihbaraEnglishReaderFont.allCases.compactMap { font -> AnyHTMLFontFamilyDeclaration? in
+            let faces = font.files.compactMap { file -> CSSFontFace? in
+                guard let url = Bundle.main.url(forResource: file.name, withExtension: file.ext).flatMap(FileURL.init(url:)) else { return nil }
+                return CSSFontFace(file: url, preload: font == .literata, style: .normal, weight: file.weight)
+            }
+            guard !faces.isEmpty else { return nil }
+            return CSSFontFamilyDeclaration(fontFamily: font.family, fontFaces: faces).eraseToAnyHTMLFontFamilyDeclaration()
+        }
+        return arabic + english
     }
 
     func makeCoordinator() -> Coordinator {

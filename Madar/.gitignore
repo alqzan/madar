@@ -7,3 +7,9 @@ xcuserdata/
 .DS_Store
 App/Resources/Fonts/*.otf
 App/Resources/Fonts/*.ttf
+!App/Resources/Fonts/AtkinsonHyperlegible-Regular.ttf
+!App/Resources/Fonts/AtkinsonHyperlegible-Bold.ttf
+!App/Resources/Fonts/IBMPlexSerif-Regular.ttf
+!App/Resources/Fonts/IBMPlexSerif-Bold.ttf
+!App/Resources/Fonts/Literata-Variable.ttf
+!App/Resources/Fonts/SourceSerif4-Variable.ttf

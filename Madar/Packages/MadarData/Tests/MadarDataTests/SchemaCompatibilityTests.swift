@@ -325,13 +325,15 @@ import Testing
         #expect(throws: BackupOperationError.simulatedInterruption("schema-2 migration \(checkpoint.rawValue)")) {
             try ManagedDataStore(root: root, migrationInterruption: checkpoint)
         }
-        #expect(try stableGenerationHashes(generation) == sourceHashes)
+        let afterInterruption = try stableGenerationHashes(generation)
+        #expect(afterInterruption == sourceHashes)
         if checkpoint != .afterPointer { #expect(try Data(contentsOf: pointerURL) == pointerBytes) }
 
         let recovered = try ManagedDataStore(root: root)
         #expect(recovered.binding.generationID != oldID)
         #expect(try MadarContainerFactory.storeVersionForAdoption(at: recovered.binding.syncedDirectory) == MadarSchema.version)
-        #expect(try stableGenerationHashes(generation) == sourceHashes)
+        let afterRecovery = try stableGenerationHashes(generation)
+        #expect(afterRecovery == sourceHashes)
         let expected = try SchemaCompatibility.currentRecords([oldRow], from: 2)
         #expect(try RecordFingerprint.hash(RecordBridge.all(recovered.container.mainContext)) == RecordFingerprint.hash(expected))
         let prayer = try #require(recovered.container.mainContext.fetch(FetchDescriptor<PrayerLog>()).first)
@@ -387,7 +389,7 @@ import Testing
         try FileManager.default.createDirectory(at: generation, withIntermediateDirectories: true)
         let eventAt = Date(timeIntervalSince1970: 1_797_000_000)
         let oldRow = try schemaV2PrayerRow(at: eventAt)
-        do {
+        try autoreleasepool {
             let oldContainer = try ModelContainer(for: MadarSchemaV2.schema, configurations: [
                 ModelConfiguration("synced", schema: Schema(MadarSchemaV2.syncedTypes),
                     url: generation.appendingPathComponent("Madar.store"), cloudKitDatabase: .none),

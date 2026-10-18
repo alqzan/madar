@@ -2909,7 +2909,13 @@
     "font": "literata",
     "mode": "pages",
     "hyphenation": true,
-    "arabicHints": "none"
+    "arabicHints": "none",
+    "lineSpacing": 2,
+    "margins": 2,
+    "justify": true,
+    "heavier": false,
+    "wordSpacing": false,
+    "footer": "remaining"
    },
    "scope": "sync",
    "storage": "Setting (synced)",
@@ -2918,10 +2924,16 @@
     "fields": {
      "theme": "auto|paper|warm|calm|night|black",
      "size": "Int 1…7",
-     "font": "id from the English reader font list (§7.6)",
+     "font": "literata|sourceSerif|atkinsonHyperlegible|ibmPlexSerif",
      "mode": "pages|scroll|focus",
      "hyphenation": "Bool",
-     "arabicHints": "String (values owned by §7.6)"
+     "arabicHints": "String (values owned by §7.6)",
+     "lineSpacing": "Int 1…4 (default 2)",
+     "margins": "Int 1…4 (default 2)",
+     "justify": "Bool (default true)",
+     "heavier": "Bool (default false)",
+     "wordSpacing": "Bool (default false; widens word gaps by 0.1em)",
+     "footer": "remaining|percentage|page (default remaining)"
     },
     "unknownKeys": "dropped on read, rejected on write",
     "fieldAvailability": {

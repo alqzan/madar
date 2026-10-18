@@ -47,7 +47,11 @@ public struct SettingsSchema: Decodable, Sendable {
             guard let object = value.object, let defaults = d.defaultValue.object else { try reject() }
             // The Arabic reader's page options were added on 18 Oct (owner); values and presets
             // saved before then omit them and read as their defaults.
-            let optional: Set<String> = key == "mihbara.readerAr" ? ["lineSpacing", "margins", "justify", "heavier", "footer"] : []
+            let optional: Set<String> = switch key {
+            case "mihbara.readerAr": ["lineSpacing", "margins", "justify", "heavier", "footer"]
+            case "mihbara.readerEn": ["lineSpacing", "margins", "justify", "heavier", "wordSpacing", "footer"]
+            default: []
+            }
             guard Set(object.keys).isSubset(of: Set(defaults.keys)), Set(defaults.keys).subtracting(optional).isSubset(of: Set(object.keys)) else { try reject() }
             switch key {
             case "mal.dailyAllowance":
@@ -67,13 +71,11 @@ public struct SettingsSchema: Decodable, Sendable {
             case "mihbara.readerAr", "mihbara.readerEn":
                 guard let size = object["size"]?.number, inRange(size,[1,7]), ["auto","paper","warm","calm","night","black"].contains(object["theme"]?.string ?? ""), ["pages","scroll","focus"].contains(object["mode"]?.string ?? "") else { try reject() }
                 let ar = key.hasSuffix("Ar")
-                guard (ar ? ["amiri","notoNaskh","system","thmanyahSerif","thmanyahSans"] : ["literata","system","georgia"]).contains(object["font"]?.string ?? ""), ["tap","inline","hidden"].contains(object[ar ? "footnotes" : "arabicHints"]?.string ?? "") || (!ar && ["hard","all","none"].contains(object["arabicHints"]?.string ?? "")) else { try reject() }
+                guard (ar ? ["amiri","notoNaskh","system","thmanyahSerif","thmanyahSans"] : ["literata","sourceSerif","atkinsonHyperlegible","ibmPlexSerif"]).contains(object["font"]?.string ?? ""), ["tap","inline","hidden"].contains(object[ar ? "footnotes" : "arabicHints"]?.string ?? "") || (!ar && ["hard","all","none"].contains(object["arabicHints"]?.string ?? "")) else { try reject() }
                 guard case .bool = object[ar ? "tashkil" : "hyphenation"] else { try reject() }
-                if ar {
-                    for field in ["lineSpacing", "margins"] { if let raw = object[field] { guard let n = raw.number, inRange(n, [1, 4]) else { try reject() } } }
-                    for field in ["justify", "heavier"] { if let raw = object[field] { guard case .bool = raw else { try reject() } } }
-                    if let raw = object["footer"] { guard ["full", "page", "bar", "none"].contains(raw.string ?? "") else { try reject() } }
-                }
+                for field in ["lineSpacing", "margins"] { if let raw = object[field] { guard let n = raw.number, inRange(n, [1, 4]) else { try reject() } } }
+                for field in ["justify", "heavier"] + (ar ? [] : ["wordSpacing"]) { if let raw = object[field] { guard case .bool = raw else { try reject() } } }
+                if let raw = object["footer"] { guard (ar ? ["full", "page", "bar", "none"] : ["remaining", "percentage", "page"]).contains(raw.string ?? "") else { try reject() } }
             default: try reject()
             }
         default: try reject()

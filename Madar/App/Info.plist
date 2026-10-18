@@ -57,6 +57,12 @@
 		<string>thmanyahseriftext-Bold.otf</string>
 		<string>Amiri-Regular.ttf</string>
 		<string>Amiri-Bold.ttf</string>
+		<string>Literata-Variable.ttf</string>
+		<string>SourceSerif4-Variable.ttf</string>
+		<string>AtkinsonHyperlegible-Regular.ttf</string>
+		<string>AtkinsonHyperlegible-Bold.ttf</string>
+		<string>IBMPlexSerif-Regular.ttf</string>
+		<string>IBMPlexSerif-Bold.ttf</string>
 	</array>
 </dict>
 </plist>

@@ -4,12 +4,18 @@ import Testing
 @testable import MadarData
 
 @Suite(.serialized) @MainActor struct DataTests {
-    @Test func arabicReaderAcceptsTheBundledFontsOnly() throws {
+    @Test func readerAcceptsOnlyItsBundledLanguageFonts() throws {
         let store = try SettingsSchema.bundled()
         func reader(_ font: String) -> JSONValue { .object(["theme": .string("auto"), "size": .number(4), "font": .string(font), "mode": .string("pages"), "tashkil": .bool(true), "footnotes": .string("tap")]) }
         for font in ["amiri", "thmanyahSerif", "thmanyahSans"] { try store.validate(reader(font), for: "mihbara.readerAr") }
         #expect(throws: (any Error).self) { try store.validate(reader("comicSans"), for: "mihbara.readerAr") }
-        #expect(throws: (any Error).self) { try store.validate(reader("thmanyahSans"), for: "mihbara.readerEn") }
+        let english = try #require(store.definition(for: "mihbara.readerEn").defaultValue.object)
+        for font in ["literata", "sourceSerif", "atkinsonHyperlegible", "ibmPlexSerif"] {
+            var settings = english; settings["font"] = .string(font)
+            try store.validate(.object(settings), for: "mihbara.readerEn")
+        }
+        var invalidEnglish = english; invalidEnglish["font"] = .string("thmanyahSans")
+        #expect(throws: (any Error).self) { try store.validate(.object(invalidEnglish), for: "mihbara.readerEn") }
     }
 
     @Test func arabicReaderPageOptionsAreOptionalAndBounded() throws {
@@ -26,6 +32,22 @@ import Testing
         }
         var missingCore = base; missingCore["size"] = nil
         #expect(throws: (any Error).self) { try schema.validate(.object(missingCore), for: "mihbara.readerAr") }
+    }
+
+    @Test func englishReaderSettingsHaveRestorableDefaultsAndBoundedOptions() throws {
+        let schema = try SettingsSchema.bundled()
+        let settings = try #require(schema.definition(for: "mihbara.readerEn").defaultValue.object)
+        #expect(settings["lineSpacing"] == .number(2)); #expect(settings["margins"] == .number(2))
+        #expect(settings["justify"] == .bool(true)); #expect(settings["heavier"] == .bool(false))
+        #expect(settings["wordSpacing"] == .bool(false)); #expect(settings["footer"] == .string("remaining"))
+        try schema.validate(.object(settings), for: "mihbara.readerEn")
+        var older = settings
+        for field in ["lineSpacing", "margins", "justify", "heavier", "wordSpacing", "footer"] { older[field] = nil }
+        try schema.validate(.object(older), for: "mihbara.readerEn")
+        func with(_ field: String, _ value: JSONValue) -> JSONValue { var copy = settings; copy[field] = value; return .object(copy) }
+        for bad in [with("lineSpacing", .number(5)), with("margins", .number(0)), with("justify", .string("yes")), with("heavier", .number(1)), with("wordSpacing", .string("wide")), with("footer", .string("full"))] {
+            #expect(throws: (any Error).self) { try schema.validate(bad, for: "mihbara.readerEn") }
+        }
     }
 
     @Test func schemaAndDefaultContainer() throws {
@@ -125,7 +147,7 @@ import Testing
     }
     @Test func settingsDefaultsPersistenceAndInvalidRejection() throws {
         let c = try MadarContainerFactory.makeInMemory(); let store = try SettingsStore(context:c.mainContext)
-        #expect(store.schema.settings.count == 132); #expect(try store.value(for:"core.firstCalendar") == .string("hijri"))
+        #expect(store.schema.settings.count == 137); #expect(try store.value(for:"core.firstCalendar") == .string("hijri"))
         #expect(throws:DataError.invalidValue("core.hijriOffset")) { try store.set(.number(9),for:"core.hijriOffset") }
         let undo = try store.set(.number(1),for:"core.hijriOffset"); #expect(try store.value(for:"core.hijriOffset") == .number(1)); try store.undo(undo); #expect(try store.value(for:"core.hijriOffset") == .number(0))
         let bad = Setting(); bad.key = "core.firstCalendar"; bad.valueJSON = Data("\"garbage\"".utf8); c.mainContext.insert(bad); try c.mainContext.save(); #expect(try store.value(for:bad.key) == .string("hijri"))

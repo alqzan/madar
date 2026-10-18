@@ -743,72 +743,112 @@
         }
       },
       {
-        "family": "Literata",
-        "file": null,
-        "version": null,
-        "sha256": null,
-        "licence": "OFL-1.1",
-        "licenceFile": null,
-        "licenceSha256": null,
-        "licenceURL": null,
-        "retrieved": null,
-        "allowedUses": {
-          "appBundle": true,
-          "widgetBundle": false,
-          "exportEmbed": false,
-          "publicHosting": false
-        }
+       "family": "Literata",
+       "file": "Madar/App/Resources/Fonts/Literata-Variable.ttf",
+       "version": "47d54ca1ebb14fd864695f1d39dc734f39017c33",
+       "sha256": "b41138c9373112f32abb589cc22e8674b06ed4048b0c513be922bdd26f274440",
+       "source": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/literata/Literata[opsz,wght].ttf",
+       "licence": "OFL-1.1",
+       "licenceFile": "Madar/App/Resources/Fonts/Literata-OFL.txt",
+       "licenceSha256": "8742963604cd89dc81437811a850018fc03b2bfad686d7422c8235967c87614e",
+       "licenceURL": "https://github.com/google/fonts/blob/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/literata/OFL.txt",
+       "retrieved": "2026-10-18",
+       "allowedUses": {
+        "appBundle": true,
+        "widgetBundle": false,
+        "exportEmbed": false,
+        "publicHosting": false
+       }
       },
       {
-        "family": "Source Serif 4",
-        "file": null,
-        "version": null,
-        "sha256": null,
-        "licence": "OFL-1.1",
-        "licenceFile": null,
-        "licenceSha256": null,
-        "licenceURL": null,
-        "retrieved": null,
-        "allowedUses": {
-          "appBundle": true,
-          "widgetBundle": false,
-          "exportEmbed": false,
-          "publicHosting": false
-        }
+       "family": "Source Serif 4",
+       "file": "Madar/App/Resources/Fonts/SourceSerif4-Variable.ttf",
+       "version": "47d54ca1ebb14fd864695f1d39dc734f39017c33",
+       "sha256": "97b2d4da6e3cb494b5a1e66ae176914d852ccabef49e0c02c0df25f3e39aca0b",
+       "source": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/sourceserif4/SourceSerif4[opsz,wght].ttf",
+       "licence": "OFL-1.1",
+       "licenceFile": "Madar/App/Resources/Fonts/SourceSerif4-OFL.txt",
+       "licenceSha256": "5f94c3fd3a23131a417ab5a0c8452de57e70c3cfb9f604d88241f7065ebf9fd9",
+       "licenceURL": "https://github.com/google/fonts/blob/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/sourceserif4/OFL.txt",
+       "retrieved": "2026-10-18",
+       "allowedUses": {
+        "appBundle": true,
+        "widgetBundle": false,
+        "exportEmbed": false,
+        "publicHosting": false
+       }
       },
       {
-        "family": "Atkinson Hyperlegible",
-        "file": null,
-        "version": null,
-        "sha256": null,
-        "licence": "OFL-1.1",
-        "licenceFile": null,
-        "licenceSha256": null,
-        "licenceURL": null,
-        "retrieved": null,
-        "allowedUses": {
-          "appBundle": true,
-          "widgetBundle": false,
-          "exportEmbed": false,
-          "publicHosting": false
-        }
+       "family": "Atkinson Hyperlegible",
+       "file": "Madar/App/Resources/Fonts/AtkinsonHyperlegible-Regular.ttf",
+       "version": "47d54ca1ebb14fd864695f1d39dc734f39017c33",
+       "sha256": "7fb917c89019896d0b52ee84b7cbb3304c18cb90b19a62f5e32712bd23e97669",
+       "source": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/atkinsonhyperlegible/AtkinsonHyperlegible-Regular.ttf",
+       "licence": "OFL-1.1",
+       "licenceFile": "Madar/App/Resources/Fonts/AtkinsonHyperlegible-OFL.txt",
+       "licenceSha256": "f32d22b3908fcad2c86a74000614ec22e6a7f66ea7e867e616026a27aebdc143",
+       "licenceURL": "https://github.com/google/fonts/blob/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/atkinsonhyperlegible/OFL.txt",
+       "retrieved": "2026-10-18",
+       "allowedUses": {
+        "appBundle": true,
+        "widgetBundle": false,
+        "exportEmbed": false,
+        "publicHosting": false
+       }
       },
       {
-        "family": "IBM Plex Serif",
-        "file": null,
-        "version": null,
-        "sha256": null,
-        "licence": "OFL-1.1",
-        "licenceFile": null,
-        "licenceSha256": null,
-        "licenceURL": null,
-        "retrieved": null,
-        "allowedUses": {
-          "appBundle": true,
-          "widgetBundle": false,
-          "exportEmbed": false,
-          "publicHosting": false
-        }
+       "family": "Atkinson Hyperlegible",
+       "file": "Madar/App/Resources/Fonts/AtkinsonHyperlegible-Bold.ttf",
+       "version": "47d54ca1ebb14fd864695f1d39dc734f39017c33",
+       "sha256": "5a3b0c8cc8ca545155150b4512a1fa248298df121c50d6557e651e61fbdab92f",
+       "source": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/atkinsonhyperlegible/AtkinsonHyperlegible-Bold.ttf",
+       "licence": "OFL-1.1",
+       "licenceFile": "Madar/App/Resources/Fonts/AtkinsonHyperlegible-OFL.txt",
+       "licenceSha256": "f32d22b3908fcad2c86a74000614ec22e6a7f66ea7e867e616026a27aebdc143",
+       "licenceURL": "https://github.com/google/fonts/blob/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/atkinsonhyperlegible/OFL.txt",
+       "retrieved": "2026-10-18",
+       "allowedUses": {
+        "appBundle": true,
+        "widgetBundle": false,
+        "exportEmbed": false,
+        "publicHosting": false
+       }
+      },
+      {
+       "family": "IBM Plex Serif",
+       "file": "Madar/App/Resources/Fonts/IBMPlexSerif-Regular.ttf",
+       "version": "47d54ca1ebb14fd864695f1d39dc734f39017c33",
+       "sha256": "e882efa9c41949a528ac2369079ec5ef050c1c996bbd0bacce3c3326d44cf80d",
+       "source": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/ibmplexserif/IBMPlexSerif-Regular.ttf",
+       "licence": "OFL-1.1",
+       "licenceFile": "Madar/App/Resources/Fonts/IBMPlexSerif-OFL.txt",
+       "licenceSha256": "7e6b2818edbd8f6a01ae80641cc8f16a51080d08fb4e532be3a0b6f74adb07da",
+       "licenceURL": "https://github.com/google/fonts/blob/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/ibmplexserif/OFL.txt",
+       "retrieved": "2026-10-18",
+       "allowedUses": {
+        "appBundle": true,
+        "widgetBundle": false,
+        "exportEmbed": false,
+        "publicHosting": false
+       }
+      },
+      {
+       "family": "IBM Plex Serif",
+       "file": "Madar/App/Resources/Fonts/IBMPlexSerif-Bold.ttf",
+       "version": "47d54ca1ebb14fd864695f1d39dc734f39017c33",
+       "sha256": "534c02c295999dd86e770457ece1d43db0de9256dd98bf741426f63ae904209e",
+       "source": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/ibmplexserif/IBMPlexSerif-Bold.ttf",
+       "licence": "OFL-1.1",
+       "licenceFile": "Madar/App/Resources/Fonts/IBMPlexSerif-OFL.txt",
+       "licenceSha256": "7e6b2818edbd8f6a01ae80641cc8f16a51080d08fb4e532be3a0b6f74adb07da",
+       "licenceURL": "https://github.com/google/fonts/blob/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/ibmplexserif/OFL.txt",
+       "retrieved": "2026-10-18",
+       "allowedUses": {
+        "appBundle": true,
+        "widgetBundle": false,
+        "exportEmbed": false,
+        "publicHosting": false
+       }
       },
       {
         "family": "Scheherazade New",

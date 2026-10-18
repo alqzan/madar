@@ -379,6 +379,16 @@
 		FF6E9D468522401B05A26B16 /* MoneyFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63A5DC2FA7D87C7F52AC36F7 /* MoneyFixture.swift */; };
 		FF96CFADCF4C0757B4085CC0 /* BahwCustomizeParts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20304C3F7DCC7BAAB0C5632E /* BahwCustomizeParts.swift */; };
 		FFBDD80B72B60213D08D2685 /* DiaryEditorUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C9F3310DE33902199BFE97A /* DiaryEditorUITests.swift */; };
+		19434B7D04914038631E3D4A /* AtkinsonHyperlegible-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = BD231D60F290055ECB345ABE /* AtkinsonHyperlegible-Bold.ttf */; };
+		B5C735760EBB282208F94ABD /* AtkinsonHyperlegible-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 2FA045D8578C975476B55132 /* AtkinsonHyperlegible-Regular.ttf */; };
+		0F21CF4A1DBDDF5469CFCCFF /* AtkinsonHyperlegible-OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = E388476210D61D2673E55B77 /* AtkinsonHyperlegible-OFL.txt */; };
+		F005436FEB07601340B40BCD /* IBMPlexSerif-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 84EFFCBC219C5713AA9BD592 /* IBMPlexSerif-Bold.ttf */; };
+		3D5EEE51E700145F2FEAF387 /* IBMPlexSerif-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B8972C65ECFA3763A12DF9FD /* IBMPlexSerif-Regular.ttf */; };
+		B2D039E4BB64443797B0D206 /* IBMPlexSerif-OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = D71A76E845A1D67386BE01F2 /* IBMPlexSerif-OFL.txt */; };
+		55095EF4014DBEF3D510366B /* Literata-Variable.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 2A46F7746F500B0C3484EBB6 /* Literata-Variable.ttf */; };
+		2C770AD3EA6F601ABBABB77B /* Literata-OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = D993CA141B5535AE798020FF /* Literata-OFL.txt */; };
+		F5EB78F5771659A82855745F /* SourceSerif4-Variable.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 4AEF90B9992C98DB554CCE87 /* SourceSerif4-Variable.ttf */; };
+		BDDA037F52A56EEE46F51351 /* SourceSerif4-OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = 84E548873B956FFA1D69E25C /* SourceSerif4-OFL.txt */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -774,6 +784,16 @@
 		FEC512B2A14C24C781301195 /* DiaryExportUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryExportUITests.swift; sourceTree = "<group>"; };
 		FEEEEE01FACAB930747207AE /* MoneyEnvelopeDetailUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyEnvelopeDetailUITests.swift; sourceTree = "<group>"; };
 		FEF0A8C7F2AE9F1C66E470CD /* DiaryDayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryDayView.swift; sourceTree = "<group>"; };
+		BD231D60F290055ECB345ABE /* AtkinsonHyperlegible-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "AtkinsonHyperlegible-Bold.ttf"; sourceTree = "<group>"; };
+		2FA045D8578C975476B55132 /* AtkinsonHyperlegible-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "AtkinsonHyperlegible-Regular.ttf"; sourceTree = "<group>"; };
+		E388476210D61D2673E55B77 /* AtkinsonHyperlegible-OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "AtkinsonHyperlegible-OFL.txt"; sourceTree = "<group>"; };
+		84EFFCBC219C5713AA9BD592 /* IBMPlexSerif-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "IBMPlexSerif-Bold.ttf"; sourceTree = "<group>"; };
+		B8972C65ECFA3763A12DF9FD /* IBMPlexSerif-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "IBMPlexSerif-Regular.ttf"; sourceTree = "<group>"; };
+		D71A76E845A1D67386BE01F2 /* IBMPlexSerif-OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "IBMPlexSerif-OFL.txt"; sourceTree = "<group>"; };
+		2A46F7746F500B0C3484EBB6 /* Literata-Variable.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Literata-Variable.ttf"; sourceTree = "<group>"; };
+		D993CA141B5535AE798020FF /* Literata-OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Literata-OFL.txt"; sourceTree = "<group>"; };
+		4AEF90B9992C98DB554CCE87 /* SourceSerif4-Variable.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SourceSerif4-Variable.ttf"; sourceTree = "<group>"; };
+		84E548873B956FFA1D69E25C /* SourceSerif4-OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "SourceSerif4-OFL.txt"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1306,9 +1326,19 @@
 		EF3621350EEAB780369C802E /* Fonts */ = {
 			isa = PBXGroup;
 			children = (
+				BD231D60F290055ECB345ABE /* AtkinsonHyperlegible-Bold.ttf */,
+				2FA045D8578C975476B55132 /* AtkinsonHyperlegible-Regular.ttf */,
+				E388476210D61D2673E55B77 /* AtkinsonHyperlegible-OFL.txt */,
 				95E7A16CBC55D306C7FDC034 /* Amiri-Bold.ttf */,
 				56174C04CFE7BB474B46291C /* Amiri-OFL.txt */,
 				7A9F1BF70DE8302BBA45121C /* Amiri-Regular.ttf */,
+				84EFFCBC219C5713AA9BD592 /* IBMPlexSerif-Bold.ttf */,
+				B8972C65ECFA3763A12DF9FD /* IBMPlexSerif-Regular.ttf */,
+				D71A76E845A1D67386BE01F2 /* IBMPlexSerif-OFL.txt */,
+				2A46F7746F500B0C3484EBB6 /* Literata-Variable.ttf */,
+				D993CA141B5535AE798020FF /* Literata-OFL.txt */,
+				4AEF90B9992C98DB554CCE87 /* SourceSerif4-Variable.ttf */,
+				84E548873B956FFA1D69E25C /* SourceSerif4-OFL.txt */,
 				5E6D8632065B521B685FADB6 /* thmanyahsans-Bold.otf */,
 				F5C14B0401F68E78003D252D /* thmanyahsans-Light.otf */,
 				5DFE82C4D216FC9A003ED7A2 /* thmanyahsans-Medium.otf */,
@@ -1502,9 +1532,17 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				19434B7D04914038631E3D4A /* AtkinsonHyperlegible-Bold.ttf in Resources */,
+				B5C735760EBB282208F94ABD /* AtkinsonHyperlegible-Regular.ttf in Resources */,
+				0F21CF4A1DBDDF5469CFCCFF /* AtkinsonHyperlegible-OFL.txt in Resources */,
 				19324DE7D0A3DB449A018ACD /* Amiri-Bold.ttf in Resources */,
 				63381DAA1409F348D6E16B85 /* Amiri-OFL.txt in Resources */,
 				9B8F8A8B3DCA10ED2ACBB78B /* Amiri-Regular.ttf in Resources */,
+				F005436FEB07601340B40BCD /* IBMPlexSerif-Bold.ttf in Resources */,
+				3D5EEE51E700145F2FEAF387 /* IBMPlexSerif-Regular.ttf in Resources */,
+				B2D039E4BB64443797B0D206 /* IBMPlexSerif-OFL.txt in Resources */,
+				55095EF4014DBEF3D510366B /* Literata-Variable.ttf in Resources */,
+				2C770AD3EA6F601ABBABB77B /* Literata-OFL.txt in Resources */,
 				9A0377D130B6D4ED10A27543 /* Assets.xcassets in Resources */,
 				4D3FC3E040C28A7BAB5D77F1 /* Customization.xcstrings in Resources */,
 				3A9F9660D5D5E9652BAB562A /* Money.xcstrings in Resources */,
@@ -1513,6 +1551,8 @@
 				51AF280129EFDF070064BF16 /* Readium-BSD-3-Clause.txt in Resources */,
 				8EA81EF21026EB5F56098887 /* RoomSymbols.xcassets in Resources */,
 				763B4BEF1A5318C221B24852 /* nawawi40.json in Resources */,
+				F5EB78F5771659A82855745F /* SourceSerif4-Variable.ttf in Resources */,
+				BDDA037F52A56EEE46F51351 /* SourceSerif4-OFL.txt in Resources */,
 				93A8C28498B8EE4F17A57C1E /* thmanyahsans-Bold.otf in Resources */,
 				7E85C9D2A873F8F790F68F66 /* thmanyahsans-Light.otf in Resources */,
 				DC2B4184D75AEF4CD8E6B86F /* thmanyahsans-Medium.otf in Resources */,
