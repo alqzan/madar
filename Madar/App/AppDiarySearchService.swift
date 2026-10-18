@@ -9,7 +9,10 @@ struct DiarySearchIndex {
     var terms: [(String, String, Int)] {
         let places = parser.places.map { place in (place,"في " + place,Set(documents.filter { $0.place == place }.map(\.day)).count) }
         let projects = parser.projects.map { name,id in (name,"⌗" + name,Set(documents.filter { $0.projectID == id }.map(\.day)).count) }
-        return (places+projects).sorted { $0.0 < $1.0 }
+        let allTags = Set(documents.flatMap(\.tags)).sorted()
+        var seenTags=Set<String>()
+        let tags = allTags.filter { seenTags.insert(DiarySearchParser.normalize($0)).inserted }.map { tag in ("#" + tag,"#" + tag,Set(documents.filter { doc in doc.tags.contains { DiarySearchParser.normalize($0)==DiarySearchParser.normalize(tag) } }.map(\.day)).count) }
+        return (places+projects+tags).sorted { $0.0 < $1.0 }
     }
 }
 extension AppDiaryService {
@@ -29,7 +32,7 @@ extension AppDiaryService {
             if row.attachmentMediaIDs.contains(where:{media[$0]=="photo"}) {kinds.insert("photo")}
             if row.ink == "ghad" {kinds.insert("tomorrow")}
             let text=row.textFormat == "markdown" ? DayOneMarkdown.plain(row.text) : row.text
-            documents.append(.init(id:row.id.uuidString,day:day,text:text.isEmpty ? (kind == "audio" ? "تسجيل صوتي" : kind == "photo" ? "صورة من يومك" : "مرفق من يومك") : text,kind:kind,kinds:kinds,place:place,projectID:row.projectID))
+            documents.append(.init(id:row.id.uuidString,day:day,text:text.isEmpty ? (kind == "audio" ? "تسجيل صوتي" : kind == "photo" ? "صورة من يومك" : "مرفق من يومك") : text,kind:kind,kinds:kinds,place:place,projectID:row.projectID,tags:row.tags ?? []))
         }
         for row in try context.fetch(FetchDescriptor<MarginNote>(predicate:#Predicate { $0.deletedAt == nil && $0.mergedInto == nil })) {
             if let day=try? GregorianDay(row.writtenDayKey) { documents.append(.init(id:row.id.uuidString,day:day,text:row.text,kind:"margin")) }
@@ -48,6 +51,6 @@ extension AppDiaryService {
         var projects:[String:UUID]=[:]
         for row in try context.fetch(FetchDescriptor<Project>(predicate:#Predicate { $0.deletedAt == nil && $0.mergedInto == nil },sortBy:[SortDescriptor(\.createdAt)])) where !row.name.isEmpty { projects[row.name]=row.id }
         let grid=diaryCalendar
-        return try .init(documents:documents.sorted{$0.day > $1.day},parser:.init(today:currentDay(),zone:app.activePlace.timeZone,weekStart:grid.weekStart,sightingOffset:grid.offset,places:Set(documents.compactMap(\.place)).sorted(),projects:projects))
+        return try .init(documents:documents.sorted{$0.day > $1.day},parser:.init(today:currentDay(),zone:app.activePlace.timeZone,weekStart:grid.weekStart,sightingOffset:grid.offset,places:Set(documents.compactMap(\.place)).sorted(),projects:projects,tags:Set(documents.flatMap(\.tags)).sorted()))
     }
 }

@@ -17,6 +17,7 @@ enum SchemaCompatibility {
         case 4: MadarSchemaV4.syncedNames
         case 5: MadarSchemaV5.syncedNames
         case 6: MadarSchemaV6.syncedNames
+        case 7: MadarSchemaV7.syncedNames
         case MadarSchema.version: MadarSchema.syncedNames
         default: throw version > MadarSchema.version ? DataError.newerStore : DataError.unsupportedBackup
         }
@@ -58,6 +59,8 @@ enum SchemaCompatibility {
                 default: break
                 }
             }
+            // V8 (M3-V09): older entries have no dedicated tag field; archived Day One JSON remains intact.
+            if version < 8, row.model == "Entry" { row.fields["tags"] = .null }
             return row
         }
     }

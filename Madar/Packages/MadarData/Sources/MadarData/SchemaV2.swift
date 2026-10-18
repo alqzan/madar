@@ -9,7 +9,7 @@ public enum MadarSchemaV2: VersionedSchema {
         Setting.self, LayoutState.self, Preset.self, Trip.self, UpcomingDay.self, ImportBatch.self, ImportLink.self,
         PrayerLog.self, QadaItem.self, QiyamNight.self, HifzPlan.self, HifzSession.self, PageGrade.self,
         MistakeSpot.self, MistakeEvent.self, QuranDayState.self, QuranAllotment.self, RecoveryPlan.self,
-        DayPage.self, Niyya.self, Entry.self, HiddenAutoLine.self, MarginNote.self, Letter.self, Project.self,
+        DayPage.self, Niyya.self, MadarFrozenDiaryV7.Entry.self, HiddenAutoLine.self, MarginNote.self, Letter.self, Project.self,
         Media.self, MadarFrozenMoneyV4.Account.self, MadarFrozenMoneyV4.Card.self, Statement.self, CashbackEntry.self, MadarFrozenMoneyV6.MoneyTransaction.self,
         Allocation.self, Reconciliation.self, BankMessage.self, Cycle.self, CyclePolicy.self, Envelope.self,
         MadarFrozenMoneyV4.EnvelopePlan.self, MadarFrozenMoneyV6.Obligation.self, InstallmentItem.self, Category.self, CategoryLimit.self,

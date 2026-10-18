@@ -8,10 +8,11 @@ public struct DiarySearchDocument: Sendable, Identifiable {
     public let kinds: Set<String>
     public let place: String?
     public let projectID: UUID?
-    public init(id: String, day: GregorianDay, text: String, kind: String = "writing", kinds: Set<String>? = nil, place: String? = nil, projectID: UUID? = nil) { self.id=id; self.day=day; self.text=text; self.kind=kind; self.kinds=kinds ?? [kind]; self.place=place; self.projectID=projectID }
+    public let tags: [String]
+    public init(id: String, day: GregorianDay, text: String, kind: String = "writing", kinds: Set<String>? = nil, place: String? = nil, projectID: UUID? = nil, tags: [String] = []) { self.id=id; self.day=day; self.text=text; self.kind=kind; self.kinds=kinds ?? [kind]; self.place=place; self.projectID=projectID; self.tags=tags }
 }
 public enum DiarySearchRule: Sendable, Equatable {
-    case range(GregorianDay, GregorianDay), month(Int, Int?, FirstCalendar), year(Int, FirstCalendar), weekday(Int), kind(String), place(String), project(UUID), words(String)
+    case range(GregorianDay, GregorianDay), month(Int, Int?, FirstCalendar), year(Int, FirstCalendar), weekday(Int), kind(String), place(String), project(UUID), tag(String), words(String)
 }
 public struct DiarySearchChip: Sendable, Equatable, Identifiable {
     public let id: UUID
@@ -26,7 +27,8 @@ public struct DiarySearchParser: Sendable {
     public let sightingOffset: Int
     public let places: [String]
     public let projects: [String: UUID]
-    public init(today: GregorianDay, zone: TimeZone, weekStart: Int = 7, sightingOffset: Int = 0, places: [String] = [], projects: [String: UUID] = [:]) { self.today=today; self.zone=zone; self.weekStart=weekStart; self.sightingOffset=sightingOffset; self.places=places; self.projects=projects }
+    public let tags: [String]
+    public init(today: GregorianDay, zone: TimeZone, weekStart: Int = 7, sightingOffset: Int = 0, places: [String] = [], projects: [String: UUID] = [:], tags: [String] = []) { self.today=today; self.zone=zone; self.weekStart=weekStart; self.sightingOffset=sightingOffset; self.places=places; self.projects=projects; self.tags=tags }
     public static func normalize(_ value: String) -> String {
         let digits = Array("٠١٢٣٤٥٦٧٨٩"), western = Array("0123456789")
         var result = value.lowercased()
@@ -82,7 +84,10 @@ public struct DiarySearchParser: Sendable {
                 return .month(m,Int(v[1]),first)
             }
         }
-        for (name,id) in projects.sorted(by:{$0.key.count>$1.key.count}) { take("(?:مشروع |⌗|#)"+NSRegularExpression.escapedPattern(for:Self.normalize(name))+"(?= |$)") { _ in .project(id) } }
+        for tag in tags.sorted(by: { $0.count > $1.count }) {
+            take("#" + NSRegularExpression.escapedPattern(for: Self.normalize(tag))) { _ in .tag(tag) }
+        }
+        for (name,id) in projects.sorted(by:{$0.key.count>$1.key.count}) { take("(?:مشروع |⌗)"+NSRegularExpression.escapedPattern(for:Self.normalize(name))+"(?= |$)") { _ in .project(id) } }
         for place in places.sorted(by:{$0.count>$1.count}) { take("في "+NSRegularExpression.escapedPattern(for:Self.normalize(place))+"(?= |$)") { _ in .place(place) } }
         let weekdays=[("الاحد",1),("الاثنين",2),("الثلاثاء",3),("الاربعاء",4),("الخميس",5),("الجمعه",6),("السبت",7),("الجمعات",6)]
         for (name,n) in weekdays { take("(?:يوم |في )?"+name) { _ in .weekday(n) } }
@@ -102,6 +107,7 @@ public struct DiarySearchParser: Sendable {
         case .kind(let kind): document.kinds.contains(kind)
         case .place(let place): Self.normalize(document.place ?? "")==Self.normalize(place)
         case .project(let id): document.projectID==id
+        case .tag(let tag): document.tags.contains { Self.normalize($0)==Self.normalize(tag) }
         case .words(let words): Self.contains(document.text,words:words)
         } }
     }

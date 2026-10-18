@@ -93,6 +93,8 @@ struct DayOneImportTests {
         #expect(DayOneMerge.action(hash: "h1", existing: nil) == .add)
         #expect(DayOneMerge.action(hash: "h1", existing: clean) == .same)
         #expect(DayOneMerge.action(hash: "h1", existing: mine) == .same)
+        #expect(DayOneMerge.action(hash: "h1", existing: .init(hash: "h1", editedInMadar: true, tags: nil), incomingTags: ["سفر"]) == .backfillTags)
+        #expect(DayOneMerge.action(hash: "h1", existing: .init(hash: "h1", editedInMadar: false, tags: []), incomingTags: ["سفر"]) == .same)
         #expect(DayOneMerge.action(hash: "h2", existing: clean) == .update)
         #expect(DayOneMerge.action(hash: "h2", existing: mine) == .keepBoth)
         #expect(DayOneMerge.action(hash: "h2", existing: clean, choice: .keepMine) == .keepMine)

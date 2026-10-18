@@ -215,15 +215,20 @@ public enum DayOneDayKey {
 /// update by default unless the entry was changed in Madar since import, then keep both.
 public enum DayOneMerge {
     public enum Choice: String, Codable, CaseIterable, Sendable { case automatic, update, keepMine, keepBoth }
-    public enum Action: String, Codable, Sendable { case add, same, update, keepMine, keepBoth }
+    public enum Action: String, Codable, Sendable { case add, same, update, keepMine, keepBoth, backfillTags }
     public struct Existing: Equatable, Sendable {
         public let hash: String?
         public let editedInMadar: Bool
-        public init(hash: String?, editedInMadar: Bool) { self.hash = hash; self.editedInMadar = editedInMadar }
+        public let tags: [String]?
+        public init(hash: String?, editedInMadar: Bool, tags: [String]? = nil) { self.hash = hash; self.editedInMadar = editedInMadar; self.tags = tags }
     }
-    public static func action(hash: String, existing: Existing?, choice: Choice = .automatic) -> Action {
+    public static func action(hash: String, existing: Existing?, choice: Choice = .automatic, incomingTags: [String] = []) -> Action {
         guard let existing else { return .add }
-        if existing.hash == hash { return .same }
+        if existing.hash == hash {
+            // V7 Entry rows archived the complete Day One JSON but had no dedicated tag field.
+            // Let a user re-import the same export to restore tags without replacing local text edits.
+            return existing.tags == nil && !incomingTags.isEmpty ? .backfillTags : .same
+        }
         switch choice {
         case .automatic: return existing.editedInMadar ? .keepBoth : .update
         case .update: return .update

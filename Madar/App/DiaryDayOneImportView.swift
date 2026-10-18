@@ -117,8 +117,17 @@ struct DiaryDayOneImportView: View {
                 card {
                     sectionTitle("الوسوم")
                     Text(p.tags.map { "#" + $0 }.joined(separator: "  ")).font(MadarTypography.body()).fixedSize(horizontal: false, vertical: true).accessibilityIdentifier("dayone-preview-tags")
-                    Text("أول وسم في كل مدخلة يصير فصلًا في «المشاريع» (" + p.projects.joined(separator: "، ") + ")، وتبقى كل الوسوم مع النجمة والطقس في ملف داي ون الأصلي المحفوظ معها.")
+                    Text(p.tagBackfill > 0 ? "تُستعاد وسوم المدخلات القديمة من الملف الأصلي، وتبقى كتاباتك ومشاريعك كما هي." : "أول وسم في كل مدخلة يصير فصلًا في «المشاريع» (" + p.projects.joined(separator: "، ") + ")، وتبقى كل الوسوم مع النجمة والطقس في ملف داي ون الأصلي المحفوظ معها.")
                         .font(DiaryType.label).foregroundStyle(theme.color("ink3Text")).fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            if p.tagBackfill > 0 {
+                card {
+                    sectionTitle("استعادة الوسوم المحفوظة")
+                    row("مدخلات", digits.string(p.tagBackfill))
+                    Text("سيُضاف حقل الوسوم فقط؛ نصوصك ومرفقاتك تبقى كما هي، ويمكنك التراجع عن الاستعادة.")
+                        .font(DiaryType.label).foregroundStyle(theme.color("ink3Text")).fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("dayone-preview-tag-backfill")
                 }
             }
             let skippedRows = skipped(p)
@@ -160,12 +169,21 @@ struct DiaryDayOneImportView: View {
     private func result(_ r: DayOneReceipt) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             card {
-                HStack(spacing: 10) { Image(systemName: "checkmark.seal"); Text(r.status == "partial" ? "دخلت صفحاتك، وبعض المرفقات ناقصة" : "دخلت صفحاتك دفترك").font(MadarTypography.section()) }.accessibilityIdentifier("dayone-done")
+                let restoredTags = r.summary.restoredTags ?? 0
+                let importedEntries = r.summary.added + r.summary.keptBoth + r.summary.updated
+                let title = r.status == "partial" ? "دخلت صفحاتك، وبعض المرفقات ناقصة" : restoredTags > 0 && importedEntries == 0 ? "استُعيدت وسوم يومياتك" : "دخلت صفحاتك دفترك"
+                HStack(spacing: 10) { Image(systemName: "checkmark.seal"); Text(title).font(MadarTypography.section()) }.accessibilityIdentifier("dayone-done")
                 Divider().overlay(theme.line)
-                HStack(alignment: .firstTextBaseline, spacing: 26) {
-                    metric(r.summary.added + r.summary.keptBoth, "الجديدة", id: "dayone-done-added")
-                    metric(r.summary.updated, "المحدَّثة", id: "dayone-done-updated")
-                    metric(r.summary.days, "الأيام", id: "dayone-done-days")
+                if importedEntries > 0 || r.summary.days > 0 {
+                    HStack(alignment: .firstTextBaseline, spacing: 26) {
+                        if r.summary.added + r.summary.keptBoth > 0 { metric(r.summary.added + r.summary.keptBoth, "الجديدة", id: "dayone-done-added") }
+                        if r.summary.updated > 0 { metric(r.summary.updated, "المحدَّثة", id: "dayone-done-updated") }
+                        if r.summary.days > 0 { metric(r.summary.days, "الأيام", id: "dayone-done-days") }
+                    }
+                }
+                if restoredTags > 0 {
+                    Divider().overlay(theme.line)
+                    metric(restoredTags, "استُعيدت وسومها", id: "dayone-done-tags-restored")
                 }
                 if !r.summary.missing.isEmpty {
                     Divider().overlay(theme.line)

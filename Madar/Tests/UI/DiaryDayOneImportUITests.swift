@@ -8,7 +8,10 @@ import XCTest
         let app = XCUIApplication()
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": "editor", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
                                  "MADAR_UI_NOW": "2026-10-16T15:00:00+03:00", "MADAR_UI_DAYONE_ZIP_B64": try Data(contentsOf: zip).base64EncodedString()]
-        app.launch(); XCTAssertTrue(app.buttons["diary-customize"].waitForExistence(timeout: 25)); app.buttons["diary-customize"].tap()
+        app.launch()
+        let startupAlert = app.alerts["لم تكتمل العملية"]
+        XCTAssertFalse(startupAlert.waitForExistence(timeout: 2), "Startup should not show a notification setup error.")
+        XCTAssertTrue(app.buttons["diary-customize"].waitForExistence(timeout: 25)); app.buttons["diary-customize"].tap()
         let entry = app.buttons["diary-transfer-import"]; XCTAssertTrue(entry.waitForExistence(timeout: 10)); reveal(entry, app); capture(app, "M3-V09-settings-transfer-L"); entry.tap()
         let choose = app.buttons["dayone-choose"]; XCTAssertTrue(choose.waitForExistence(timeout: 10)); capture(app, "M3-V09-import-L")
         choose.tap()

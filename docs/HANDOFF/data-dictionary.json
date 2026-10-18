@@ -1551,7 +1551,7 @@
    "merge": "row LWW (§11 merge)",
    "seed": null,
    "note": null,
-   "amendedBy": "D A1, A2",
+   "amendedBy": "RD8; owner-approved idea 2026-10-18",
    "relationships": [
     {
      "field": "mediaID",
@@ -1657,6 +1657,12 @@
      "type": "UUID?",
      "optional": true,
      "fk": "Project"
+    },
+    {
+     "name": "tags",
+     "type": "[String]?",
+     "optional": true,
+     "note": "M3-V09 / RD8 owner-approved improvement: retains every imported Day One tag and supports #tag search; nil for older and native entries."
     },
     {
      "name": "place",
@@ -5914,5 +5920,6 @@
    "receiptRetentionDays": 7,
    "execution": "Immediately on press, within undo window"
   }
- }
+ },
+ "storeSchemaVersion": 8
 }

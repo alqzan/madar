@@ -78,12 +78,12 @@ extension AppSession {
             }
             append(today, "ما زال في اليوم متّسع.", hour: 12)
             if variant == "editor" {
-                func attach(id: String, kind: String, type: String, data: Data, text: String, hour: Int) {
+                func attach(id: String, kind: String, type: String, data: Data, text: String, hour: Int, tags: [String] = []) {
                     let media = Media(); media.id = UUID(uuidString: id)!; media.kind = kind; media.contentType = type; media.data = data; media.sizeBytes = data.count; if kind == "audio" { media.durationS = 1 }; context.insert(media)
-                    let row = Entry(); row.dayKey = today.description; row.eventAt = today.date(in: .riyadh).addingTimeInterval(Double(hour)*3600); row.text = text
+                    let row = Entry(); row.dayKey = today.description; row.eventAt = today.date(in: .riyadh).addingTimeInterval(Double(hour)*3600); row.text = text; row.tags = tags.isEmpty ? nil : tags
                     if kind == "audio" { row.mediaID = media.id } else { row.attachmentMediaIDs = [media.id] }; context.insert(row)
                 }
-                attach(id: "33333333-3333-4333-8333-333333330001", kind: "photo", type: "image/jpeg", data: Self.diaryFixturePhoto(variant: 1)!, text: "صورة احتفظت بها اليوم.", hour: 8)
+                attach(id: "33333333-3333-4333-8333-333333330001", kind: "photo", type: "image/jpeg", data: Self.diaryFixturePhoto(variant: 1)!, text: "صورة احتفظت بها اليوم.", hour: 8, tags: ["سفر", "عائلة"])
                 attach(id: "33333333-3333-4333-8333-333333330002", kind: "audio", type: "audio/mp4", data: try Self.diaryFixtureAudio(), text: "نص تسجيل محفوظ.", hour: 9)
                 let pdf = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 400, height: 500)).pdfData { canvas in canvas.beginPage(); ("مرفق تجريبي محفوظ" as NSString).draw(at: CGPoint(x: 40, y: 80), withAttributes: [.font: UIFont.systemFont(ofSize: 24)]) }
                 attach(id: "33333333-3333-4333-8333-333333330003", kind: "document", type: "application/pdf", data: pdf, text: "ورقة.pdf", hour: 10)

@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import MadarCore
 struct DiarySearchTests {
-    private func parser(_ week:Int=7) throws -> DiarySearchParser { try .init(today:GregorianDay("2026-10-15"),zone:TimeZone(identifier:"Asia/Riyadh")!,weekStart:week) }
+    private func parser(_ week:Int=7,tags:[String]=[]) throws -> DiarySearchParser { try .init(today:GregorianDay("2026-10-15"),zone:TimeZone(identifier:"Asia/Riyadh")!,weekStart:week,tags:tags) }
     @Test func previousCalendarPeriodsAndAgoWindow() throws {
         let p=try parser()
         #expect(p.parse("ماذا كتبت العام الماضي؟").map(\.rule)==[.year(2025,.gregorian)])
@@ -27,6 +27,15 @@ struct DiarySearchTests {
         #expect(p.parse("مشروع البيت في جدة").map(\.rule).contains(.place("جدة")))
         #expect(p.parse("في الجمعات صور").map(\.rule)==[.weekday(6),.kind("photo")])
         #expect(p.parse("تسجيلات هوامش نيّات لِغد رسائل").count==5)
+    }
+    @Test func hashtagsFilterTagsIndependentlyFromProjects() throws {
+        let p=try parser(tags:["سفر","سفر حول العالم","عائلة"]), document=DiarySearchDocument(id:"day-one",day:try GregorianDay("2025-10-15"),text:"مساء في لندن",tags:["سَفَر","عائلة","سفر حول العالم"])
+        #expect(p.parse("#سفر").map(\.rule)==[.tag("سفر")])
+        #expect(p.parse("#سفر حول العالم").map(\.rule)==[.tag("سفر حول العالم")])
+        #expect(p.matches(document,chips:p.parse("#سفر")))
+        #expect(p.matches(document,chips:p.parse("#سفر حول العالم")))
+        #expect(p.matches(document,chips:p.parse("#عائلة")))
+        #expect(!p.matches(document,chips:p.parse("#بيت")))
     }
     @Test func ArabicNormalizationAndNoInventedAnswer() throws {
         #expect(DiarySearchParser.contains("بالصبر والصلاة",words:"الصَّبر الصلاة"))

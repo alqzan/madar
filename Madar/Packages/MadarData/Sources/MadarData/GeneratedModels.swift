@@ -1,6 +1,6 @@
 import Foundation
 import SwiftData
-// Generated from Specification/data-dictionary.json (schema V7). UUID foreign keys intentionally avoid ownership relationships.
+// Generated from Specification/data-dictionary.json (schema V8). UUID foreign keys intentionally avoid ownership relationships.
 @MainActor public protocol MadarRecordModel: PersistentModel { var id: UUID { get set }; func record() throws -> DataRecord; func apply(_ record: DataRecord) throws }
 @Model public final class Setting {
     public var id: UUID = UUID()
@@ -1102,6 +1102,7 @@ extension Niyya: MadarRecordModel {
     public var mediaID: UUID? = nil
     public var attachmentMediaIDs: [UUID] = []
     public var projectID: UUID? = nil
+    public var tags: [String]? = nil
     public var place: String? = nil
     public var lat: Double? = nil
     public var lon: Double? = nil
@@ -1138,6 +1139,7 @@ extension Entry: MadarRecordModel {
             "mediaID": JSONValue.encode(mediaID),
             "attachmentMediaIDs": JSONValue.encode(attachmentMediaIDs),
             "projectID": JSONValue.encode(projectID),
+            "tags": JSONValue.encode(tags),
             "place": JSONValue.encode(place),
             "lat": JSONValue.encode(lat),
             "lon": JSONValue.encode(lon),
@@ -1172,6 +1174,7 @@ extension Entry: MadarRecordModel {
         mediaID = try record.decode("mediaID", as: UUID?.self)
         attachmentMediaIDs = try record.decode("attachmentMediaIDs", as: [UUID].self)
         projectID = try record.decode("projectID", as: UUID?.self)
+        tags = try record.fields["tags"]?.decode([String]?.self)
         place = try record.decode("place", as: String?.self)
         lat = try record.decode("lat", as: Double?.self)
         lon = try record.decode("lon", as: Double?.self)

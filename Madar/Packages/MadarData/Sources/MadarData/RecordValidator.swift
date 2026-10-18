@@ -19,6 +19,7 @@ public enum RecordValidator {
                 if let range = field.range, let number = value.number, (range[0].map { number < $0 } ?? false) || (range[1].map { number > $0 } ?? false) { throw DataError.invalidValue(field.name) }
                 if let values = field.values, !values.contains(value.string ?? "") { throw DataError.invalidValue(field.name) }
                 if field.type == "String" || field.type == "String?" { guard value.string != nil else { throw DataError.invalidValue(field.name) } }
+                if field.type == "[String]" || field.type == "[String]?" { guard value.array?.allSatisfy({ $0.string != nil }) == true else { throw DataError.invalidValue(field.name) } }
                 if field.type == "Int" || field.type == "Int?" { guard let n = value.number, n.isFinite, n.rounded() == n, n >= Double(Int.min), n < Double(Int.max) else { throw DataError.invalidValue(field.name) } }
                 if field.type == "UUID" || field.type == "UUID?" { guard UUID(uuidString:value.string ?? "") != nil else { throw DataError.invalidValue(field.name) } }
                 if field.name == "dayKey", let text = value.string, !text.isEmpty, text.range(of:"^[0-9]{4}-[0-9]{2}-[0-9]{2}$",options:.regularExpression) == nil { throw DataError.invalidValue(field.name) }

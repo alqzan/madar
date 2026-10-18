@@ -733,9 +733,10 @@ final class AppSession {
         return place
     }
     func publishSnapshot() throws {
+        let instant = prayerNow()
         try pendingInbox.publishGeneration(inboxGeneration())
-        try publishNotificationBudget(at: Date())
-        let instant = prayerNow(), place = activePlace, day = GregorianDay.containing(instant, in: place.timeZone)
+        try publishNotificationBudget(at: instant)
+        let place = activePlace, day = GregorianDay.containing(instant, in: place.timeZone)
         let prayerSource=try PrayerRepository(context:ModelContext(container)),options=prayerSource.activeTrip(at:instant)==nil ? prayerSource.options : prayerSource.tripOptions
         let prayers = [day.adding(days: -1), day].compactMap { PrayerTimesEngine.calculate(day: $0, place: place,options:options) }
         guard let key = try? MadarDay.resolve(instant: instant, place: place, boundary: DayBoundary(rawValue: string("core.dayStart")) ?? .fajr, prayerDays: prayers, hijriSource: HijriSource(rawValue: string("core.hijriSource")) ?? .ummAlQura, sightingOffset: Int(number("core.hijriOffset"))) else {

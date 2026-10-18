@@ -8,7 +8,7 @@ import MadarPrayer
 /// What an import would do, computed before any row is written (N01 «المعاينة قبل الحفظ»).
 public struct DayOnePreview: Equatable, Sendable {
     public var actions: [String: DayOneMerge.Action] = [:]
-    public var add = 0, update = 0, keepBoth = 0, same = 0, keepMine = 0
+    public var add = 0, update = 0, keepBoth = 0, same = 0, keepMine = 0, tagBackfill = 0
     public var days: [GregorianDay] = []
     /// Distinct files for the entries that will be written, by Media.kind.
     public var mediaFound: [String: Int] = [:]
@@ -22,7 +22,7 @@ public struct DayOnePreview: Equatable, Sendable {
     public var projects: [String] = []
     public var tags: [String] = []
     public var skipped: [DayOneSkip] = []
-    public var writes: Int { add + update + keepBoth }
+    public var writes: Int { add + update + keepBoth + tagBackfill }
     public var changed: Int { update + keepBoth + keepMine }
     public var duplicates: Int { same + skipped.filter { $0.reason == .duplicateInFile || $0.reason == .madarExport }.count }
 }
@@ -30,12 +30,26 @@ public struct DayOnePreview: Equatable, Sendable {
 /// Stored in ImportBatch.summaryJSON: the counts the result screen shows, and what one undo needs.
 public struct DayOneBatchSummary: Codable, Equatable, Sendable {
     public struct Missing: Codable, Equatable, Sendable { public let kind: String; public let key: String; public let entry: String }
+    public struct TagBackfill: Codable, Equatable, Sendable {
+        public let entryID: UUID
+        public let previousTags: [String]?
+        public let appliedTags: [String]
+        public let editedInMadar: Bool
+        public init(entryID: UUID, previousTags: [String]?, appliedTags: [String], editedInMadar: Bool) {
+            self.entryID = entryID; self.previousTags = previousTags; self.appliedTags = appliedTags; self.editedInMadar = editedInMadar
+        }
+    }
     public var added = 0, updated = 0, keptBoth = 0, unchanged = 0, keptMine = 0, days = 0, deletedHere = 0
     public var mediaFound: [String: Int] = [:]
     public var missing: [Missing] = []
     public var tooLarge: [Missing] = []
     public var skipped: [DayOneSkip] = []
     public var projects: [String] = []
+    /// Optional so undo receipts written before the tag field can still be decoded.
+    public var restoredTags: Int? = nil
+    /// Optional so existing import receipts remain decodable. A backfill changes tags only, and stores the edit
+    /// status that was in effect before its updatedAt/import batch metadata was advanced.
+    public var tagBackfills: [TagBackfill]? = nil
     public var firstDay: String?
     public var lastDay: String?
     var created: [String: [UUID]] = [:]
@@ -85,13 +99,19 @@ public struct DayOneReceipt: Equatable, Sendable {
     static func existingEntries(_ context: ModelContext) throws -> [String: (row: Entry, state: DayOneMerge.Existing)] {
         let entries = try context.fetch(FetchDescriptor<Entry>(predicate: #Predicate { $0.source == "dayOne" && $0.deletedAt == nil && $0.mergedInto == nil }))
         let revised = Set(try context.fetch(FetchDescriptor<Entry>(predicate: #Predicate { $0.source == "revision" && $0.deletedAt == nil })).compactMap(\.sourceID))
-        let batches = Dictionary(uniqueKeysWithValues: try context.fetch(FetchDescriptor<ImportBatch>()).map { ($0.id, $0) })
+        let importedBatches = try context.fetch(FetchDescriptor<ImportBatch>())
+        let batches = Dictionary(uniqueKeysWithValues: importedBatches.map { ($0.id, $0) })
+        let summaries = Dictionary(uniqueKeysWithValues: importedBatches.compactMap { batch in
+            (try? JSONDecoder().decode(DayOneBatchSummary.self, from: batch.summaryJSON)).map { (batch.id, $0) }
+        })
         var result: [String: (Entry, DayOneMerge.Existing)] = [:]
         for row in entries where row.sourceBranch.isEmpty {
             guard let id = row.sourceID else { continue }
-            let importedAt = row.importBatchID.flatMap { batches[$0]?.finishedAt } ?? row.createdAt
-            let edited = revised.contains(row.id.uuidString) || row.updatedAt > importedAt.addingTimeInterval(1)
-            result[id] = (row, .init(hash: row.sourceHash, editedInMadar: edited))
+            let batchID = row.importBatchID
+            let importedAt = batchID.flatMap { summaries[$0]?.undoneAt } ?? batchID.flatMap { batches[$0]?.finishedAt } ?? row.createdAt
+            let backfillEditState = batchID.flatMap { summaries[$0]?.tagBackfills?.first(where: { $0.entryID == row.id })?.editedInMadar }
+            let edited = revised.contains(row.id.uuidString) || backfillEditState == true || row.updatedAt > importedAt.addingTimeInterval(1)
+            result[id] = (row, .init(hash: row.sourceHash, editedInMadar: edited, tags: row.tags))
         }
         return result
     }
@@ -107,7 +127,7 @@ public struct DayOneReceipt: Equatable, Sendable {
         var preview = DayOnePreview(); preview.skipped = plan.skipped
         var days = Set<GregorianDay>(), media: [String: DayOneMediaRef] = [:], tags: [String] = [], firsts: [String] = []
         for entry in plan.entries {
-            var action = DayOneMerge.action(hash: entry.hash, existing: existing[entry.sourceID]?.state, choice: choice)
+            var action = DayOneMerge.action(hash: entry.hash, existing: existing[entry.sourceID]?.state, choice: choice, incomingTags: entry.tags)
             if action == .keepBoth, branches.contains(entry.sourceID + ":" + entry.hash) { action = .same }
             if action == .add || action == .keepBoth {
                 let id = StableIdentity.uuid(for: "DayOneEntry:" + entry.sourceID + (action == .keepBoth ? ":" + entry.hash : ""))
@@ -120,14 +140,18 @@ public struct DayOneReceipt: Equatable, Sendable {
             case .add: preview.add += 1
             case .update: preview.update += 1
             case .keepBoth: preview.keepBoth += 1
+            case .backfillTags: preview.tagBackfill += 1
             case .same: preview.same += 1
             case .keepMine: preview.keepMine += 1
             }
-            guard [.add, .update, .keepBoth].contains(action) else { continue }
-            days.insert(action == .update ? ((try? GregorianDay(existing[entry.sourceID]?.row.dayKey ?? "")) ?? env.key(entry).day) : env.key(entry).day)
-            for ref in entry.media { media[ref.key] = ref }
+            guard [.add, .update, .keepBoth, .backfillTags].contains(action) else { continue }
+            let day = [.update, .backfillTags].contains(action)
+                ? ((try? GregorianDay(existing[entry.sourceID]?.row.dayKey ?? "")) ?? env.key(entry).day)
+                : env.key(entry).day
+            days.insert(day)
+            if action != .backfillTags { for ref in entry.media { media[ref.key] = ref } }
             for tag in entry.tags where !tags.contains(tag) { tags.append(tag) }
-            if let first = entry.tags.first, !firsts.contains(first) { firsts.append(first) }
+            if action != .backfillTags, let first = entry.tags.first, !firsts.contains(first) { firsts.append(first) }
         }
         preview.days = days.sorted()
         for ref in media.values {
@@ -155,10 +179,11 @@ public struct DayOneReceipt: Equatable, Sendable {
         let undone = try undoneRows(context)
         do {
             // Media: one row per file (natural key = md5), reused across entries and re-imports.
-            let writing = plan.entries.filter { [.add, .update, .keepBoth].contains(preview.actions[$0.sourceID]) }
+            let writing = plan.entries.filter { [.add, .update, .keepBoth, .backfillTags].contains(preview.actions[$0.sourceID]) }
+            let contentWriting = writing.filter { preview.actions[$0.sourceID] != .backfillTags }
             var mediaIDs: [String: UUID] = [:], owner: [String: String] = [:], pending = 0, done = 0
-            for entry in writing { for ref in entry.media where owner[ref.key] == nil { owner[ref.key] = entry.sourceID } }
-            let refs: [DayOneMediaRef] = { var seen = Set<String>(); return writing.flatMap(\.media).filter { seen.insert($0.key).inserted } }()
+            for entry in contentWriting { for ref in entry.media where owner[ref.key] == nil { owner[ref.key] = entry.sourceID } }
+            let refs: [DayOneMediaRef] = { var seen = Set<String>(); return contentWriting.flatMap(\.media).filter { seen.insert($0.key).inserted } }()
             let allMedia = try context.fetch(FetchDescriptor<Media>())
             let mediaByID = Dictionary(allMedia.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
             let liveMedia = Dictionary(allMedia.filter { $0.deletedAt == nil && $0.mergedInto == nil }.compactMap { row in row.sourceID.map { ($0, row) } }, uniquingKeysWith: { first, _ in first })
@@ -203,7 +228,7 @@ public struct DayOneReceipt: Equatable, Sendable {
             let projects = try context.fetch(FetchDescriptor<Project>())
             let liveProjects = live(projects, deleted: \.deletedAt, merged: \.mergedInto)
             var latestByTag: [String: Date] = [:]
-            for entry in writing { if let tag = entry.tags.first { latestByTag[tag] = max(latestByTag[tag] ?? entry.createdAt, entry.createdAt) } }
+            for entry in contentWriting { if let tag = entry.tags.first { latestByTag[tag] = max(latestByTag[tag] ?? entry.createdAt, entry.createdAt) } }
             for tag in preview.projects {
                 if let match = liveProjects.first(where: { normalized($0.name) == normalized(tag) }) { projectIDs[tag] = match.id; continue }
                 let id = StableIdentity.uuid(for: "DayOneTag:" + normalized(tag)), row: Project
@@ -226,6 +251,7 @@ public struct DayOneReceipt: Equatable, Sendable {
                 let resolved = env.key(entry)
                 func fill(_ row: Entry) {
                     row.text = entry.text; row.textFormat = "markdown"; row.attachmentMediaIDs = entry.media.compactMap { mediaIDs[$0.key] }
+                    row.tags = entry.tags
                     row.projectID = entry.tags.first.flatMap { projectIDs[$0] } ?? row.projectID
                     row.place = entry.place; row.lat = entry.latitude; row.lon = entry.longitude
                     row.source = "dayOne"; row.sourceID = entry.sourceID; row.sourceJournal = entry.journal; row.sourceTimeZone = entry.timeZoneID
@@ -237,6 +263,15 @@ public struct DayOneReceipt: Equatable, Sendable {
                 case .update:
                     guard let row = existing[entry.sourceID]?.row else { continue }
                     summary.before.append(try row.record()); fill(row); summary.updated += 1; days.insert(row.dayKey)
+                case .backfillTags:
+                    guard let row = existing[entry.sourceID]?.row else { continue }
+                    summary.tagBackfills = (summary.tagBackfills ?? []) + [
+                        .init(entryID: row.id, previousTags: row.tags, appliedTags: entry.tags,
+                              editedInMadar: existing[entry.sourceID]?.state.editedInMadar ?? false)
+                    ]
+                    row.tags = entry.tags; row.importBatchID = batch.id
+                    row.updatedAt = StableIdentity.monotonic(now: now, previous: row.updatedAt); row.writerID = writer
+                    latest = max(latest, row.updatedAt); summary.restoredTags = (summary.restoredTags ?? 0) + 1
                 case .add, .keepBoth:
                     let branch = action == .keepBoth ? entry.hash : ""
                     let id = StableIdentity.uuid(for: "DayOneEntry:" + entry.sourceID + (branch.isEmpty ? "" : ":" + branch))
@@ -313,6 +348,17 @@ public struct DayOneReceipt: Equatable, Sendable {
         try restore(Entry.self, "Entry", updated: \.updatedAt)
         try restore(Media.self, "Media", updated: \.updatedAt)
         try restore(Project.self, "Project", updated: \.updatedAt)
+        if let tagBackfills = summary.tagBackfills, !tagBackfills.isEmpty {
+            let entries = Dictionary(uniqueKeysWithValues: try context.fetch(FetchDescriptor<Entry>()).map { ($0.id, $0) })
+            for backfill in tagBackfills {
+                // Restore only the field this action changed, and only if it still contains our imported value.
+                // Later text edits and later tag edits both remain intact.
+                guard let row = entries[backfill.entryID], row.tags == backfill.appliedTags else { continue }
+                row.tags = backfill.previousTags
+                row.updatedAt = StableIdentity.monotonic(now: now, previous: row.updatedAt)
+                row.writerID = writer
+            }
+        }
         let createdPages = Set(summary.created["DayPage"] ?? [])
         for page in try context.fetch(FetchDescriptor<DayPage>()) {
             if let origin = summary.pageOrigins[page.id.uuidString] { page.origin = origin } else if createdPages.contains(page.id) { page.origin = "native" } else { continue }

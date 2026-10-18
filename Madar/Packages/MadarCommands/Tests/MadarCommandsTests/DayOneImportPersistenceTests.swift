@@ -62,6 +62,9 @@ import MadarData
         #expect(london.text.hasPrefix("# مساء في لندن") && london.text.contains("dayone-moment://P1"))
         #expect(london.place == "Hyde Park" && london.lat == 51.5073 && london.sourceJournal == "Journal" && london.sourceTimeZone == "Europe/London")
         #expect(london.sourceModifiedAt == iso("2025-07-20T09:00:00Z") && london.sourceHash?.count == 64 && london.ink == "normal")
+        #expect(london.tags == ["سفر", "عائلة"])
+        #expect(rows.first { $0.sourceID == "C3000000000000000000000000000003" }?.tags == ["بيت"])
+        #expect(rows.allSatisfy { $0.tags != nil })
         let all = try media(context), byID = Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0) })
         // Inline order resolved to real rows: the photo, then the rain recording.
         #expect(london.attachmentMediaIDs.compactMap { byID[$0]?.kind } == ["photo", "audio"])
@@ -95,23 +98,76 @@ import MadarData
         #expect(try RowMerger(context: context).run() == 0)
     }
 
+    @Test func tagBackfillKeepsEditProvenanceAndUndoPreservesLaterTextEdits() async throws {
+        let (container, root) = try store(); defer { try? FileManager.default.removeItem(at: root) }
+        let context = ModelContext(container), zip = try archive()
+        _ = try await run(zip, context)
+        let row = try #require(try entries(context).first { $0.sourceID == "C3000000000000000000000000000003" })
+        row.tags = nil // Simulate a V7 imported row after its additive V8 migration.
+        row.text = "تعديل محلي محفوظ"
+        row.updatedAt = now.addingTimeInterval(3600)
+        try context.save()
+
+        let preview = try DayOneImportHandler.preview(try DayOneParser.plan(zip), context: context)
+        #expect(preview.tagBackfill == 1 && preview.update == 0 && preview.same == 4 && preview.writes == 1)
+        #expect(preview.actions["C3000000000000000000000000000003"] == .backfillTags)
+        let restored = try await run(zip, context, at: now.addingTimeInterval(7200))
+        #expect(restored.summary.restoredTags == 1 && restored.summary.updated == 0 && restored.summary.unchanged == 4)
+        #expect(row.tags == ["بيت"] && row.text == "تعديل محلي محفوظ" && row.importBatchID == restored.batchID)
+
+        let changed = try archive { $0[2]["text"] = "نسخة جديدة من داي ون." }
+        let changedPreview = try DayOneImportHandler.preview(try DayOneParser.plan(changed), context: context)
+        #expect(changedPreview.actions["C3000000000000000000000000000003"] == .keepBoth)
+        let branched = try await run(changed, context, at: now.addingTimeInterval(7300))
+        #expect(branched.summary.keptBoth == 1)
+        let copies = try entries(context).filter { $0.sourceID == "C3000000000000000000000000000003" }
+        #expect(copies.count == 2 && copies.contains { $0.text == "تعديل محلي محفوظ" } && copies.contains { $0.text == "نسخة جديدة من داي ون." })
+
+        try DayOneImportHandler.undo(batch: branched.batchID, context: context, now: now.addingTimeInterval(7400), writer: "test")
+        row.text = "تعديل بعد استعادة الوسوم"; row.updatedAt = now.addingTimeInterval(7500); try context.save()
+        try DayOneImportHandler.undo(batch: restored.batchID, context: context, now: now.addingTimeInterval(7600), writer: "test")
+        #expect(row.tags == nil && row.text == "تعديل بعد استعادة الوسوم" && row.importBatchID == restored.batchID)
+    }
+
+    @Test func tagBackfillDoesNotMakeAnUneditedEntryLookLocallyEdited() async throws {
+        let (container, root) = try store(); defer { try? FileManager.default.removeItem(at: root) }
+        let context = ModelContext(container), zip = try archive()
+        _ = try await run(zip, context)
+        let row = try #require(try entries(context).first { $0.sourceID == "C3000000000000000000000000000003" })
+        row.tags = nil // Simulate a V7 imported row with no local content edits.
+        try context.save()
+        let restored = try await run(zip, context, at: now.addingTimeInterval(60))
+        #expect(restored.summary.restoredTags == 1 && row.tags == ["بيت"])
+
+        let changed = try archive { $0[2]["text"] = "تحديث داي ون للنسخة النظيفة." }
+        let preview = try DayOneImportHandler.preview(try DayOneParser.plan(changed), context: context)
+        #expect(preview.actions["C3000000000000000000000000000003"] == .update)
+        let receipt = try await run(changed, context, at: now.addingTimeInterval(120))
+        #expect(receipt.summary.updated == 1)
+        let rows = try entries(context)
+        #expect(row.text == "تحديث داي ون للنسخة النظيفة." && row.tags == ["بيت"] && rows.count == 5)
+    }
+
     @Test func changedInDayOneUpdatesUnlessEditedInMadarThenKeepsBoth() async throws {
         let (container, root) = try store(); defer { try? FileManager.default.removeItem(at: root) }
         let context = ModelContext(container)
         _ = try await run(try archive(), context)
-        let v2 = try archive { $0[2]["text"] = "يوم كامل، بعد تعديل في داي ون." }
+        let v2 = try archive { $0[2]["text"] = "يوم كامل، بعد تعديل في داي ون."; $0[2]["tags"] = ["عائلة", "صحة"] }
         #expect(try DayOneImportHandler.preview(try DayOneParser.plan(v2), context: context).update == 1)
         let updated = try await run(v2, context, at: now.addingTimeInterval(60))
         #expect(updated.summary.updated == 1 && updated.summary.added == 0)
         let row = try #require(try entries(context).first { $0.sourceID == "C3000000000000000000000000000003" })
-        #expect(try row.text == "يوم كامل، بعد تعديل في داي ون." && row.dayKey == "2025-01-11" && (try entries(context).count) == 5)
+        #expect(try row.text == "يوم كامل، بعد تعديل في داي ون." && row.dayKey == "2025-01-11" && row.tags == ["عائلة", "صحة"] && (try entries(context).count) == 5)
         // The owner edits it in Madar; Day One changes it again → keep both, never overwrite.
         row.text = "نسختي"; row.updatedAt = now.addingTimeInterval(3600); try context.save()
         let v3 = try archive { $0[2]["text"] = "نسخة ثالثة من داي ون." }
         let both = try await run(v3, context, at: now.addingTimeInterval(7200))
         #expect(both.summary.keptBoth == 1)
         let copies = try entries(context).filter { $0.sourceID == "C3000000000000000000000000000003" }
-        #expect(copies.count == 2 && Set(copies.map(\.text)) == ["نسختي", "نسخة ثالثة من داي ون."] && copies.contains { $0.sourceBranch.count == 64 })
+        #expect(copies.count == 2 && Set(copies.map(\.text)) == ["نسختي", "نسخة ثالثة من داي ون."])
+        #expect(copies.first { $0.text == "نسختي" }?.tags == ["عائلة", "صحة"])
+        #expect(copies.first { $0.text == "نسخة ثالثة من داي ون." }?.tags == ["بيت"])
+        #expect(copies.contains { $0.sourceBranch.count == 64 })
         let repeatRun = try await run(v3, context, at: now.addingTimeInterval(7300))
         #expect(try repeatRun.summary.keptBoth == 0 && (try entries(context).count) == 6)
         #expect(try RowMerger(context: context).run() == 0)
