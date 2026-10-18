@@ -5,9 +5,12 @@ import XCTest
     func testLobbyBuiltBlocksArrangeAndOpen() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
-        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_NOW": "2026-10-07T16:20:00+03:00",
-                                 "MADAR_UI_TRACKING_START": "2026-10-01", "MADAR_UI_PRAYER_FIXTURE": "homeShowcase", "MADAR_UI_THEME": "light"]
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_NOW": "2026-10-09T16:20:00+03:00",
+                                 "MADAR_UI_TRACKING_START": "2026-10-01", "MADAR_UI_PRAYER_FIXTURE": "homeShowcaseFriday",
+                                 "MADAR_UI_QURAN_FIXTURE": "home", "MADAR_UI_DIARY_FIXTURE": "home", "MADAR_UI_HABIT_FIXTURE": "showcase",
+                                 "MADAR_UI_MONEY_FIXTURE": "showcase", "MADAR_UI_THEME": "light"]
         app.launch(); finishOnboarding(app)
+        app.tabBars.buttons["البهو"].tap()
         func element(_ id: String) -> XCUIElement { app.descendants(matching: .any).matching(identifier: id).firstMatch }
         XCTAssertTrue(element("bahw-greeting").waitForExistence(timeout: 15), app.debugDescription)
         XCTAssertEqual(element("bahw-greeting").label, "مساء الخير")
@@ -32,6 +35,40 @@ import XCTest
         XCTAssertTrue(element("prayer-today-header").waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertFalse(app.buttons["bahw-open-prayer"].exists)
         capture(app, "UX-02-direct-prayer-L")
+    }
+    func testHabitWideAndSmallBlocksShowAtRisk() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_HABIT_FIXTURE": "atRisk", "MADAR_UI_NOW": "2026-10-15T20:00:00+03:00", "MADAR_UI_THEME": "light"]
+        app.launch(); finishOnboarding(app)
+        let habits = app.descendants(matching: .any).matching(identifier: "bahw-block-habits").firstMatch
+        XCTAssertTrue(habits.waitForExistence(timeout: 15))
+        habits.press(forDuration: 0.7)
+        let size = app.buttons["bahw-size-habits"]
+        XCTAssertTrue(size.waitForExistence(timeout: 5))
+        size.tap()
+        let wide = app.buttons["عريضة"]
+        XCTAssertTrue(wide.waitForExistence(timeout: 5))
+        wide.tap()
+        app.buttons["bahw-arrange"].tap()
+        XCTAssertTrue(app.buttons["bahw-arrange"].waitForNonExistence(timeout: 5))
+        let next = app.buttons["bahw-habits-next"]
+        XCTAssertTrue(next.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(next.label.contains("التالي: الماء"), next.label)
+        XCTAssertTrue(next.label.contains("فاتتك فترة في الماء"), next.label)
+        capture(app, "M4-V01-habit-wide-after-L")
+
+        habits.press(forDuration: 0.7)
+        size.tap()
+        let small = app.buttons["صغيرة"]
+        XCTAssertTrue(small.waitForExistence(timeout: 5))
+        small.tap()
+        app.buttons["bahw-arrange"].tap()
+        XCTAssertTrue(app.buttons["bahw-arrange"].waitForNonExistence(timeout: 5))
+        let risk = app.staticTexts["bahw-habits-at-risk"]
+        XCTAssertTrue(risk.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertEqual(risk.label, "فاتتك فترة")
+        capture(app, "M4-V01-habit-small-after-L")
     }
     func testNextFajrAfterIsha() throws {
         continueAfterFailure = false
