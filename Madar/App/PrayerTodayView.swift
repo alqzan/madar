@@ -708,6 +708,7 @@ private struct PrayerTodayArch: View {
     @Environment(\.roomTheme) private var theme
     @Environment(\.dynamicTypeSize) private var dynamicType
     @Environment(\.prayerPool) private var pool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var statusText: String {
         switch cell.status {
@@ -838,11 +839,17 @@ private struct PrayerTodayArch: View {
                     VStack(spacing: 5) { ForEach(0..<8, id: \.self) { _ in Rectangle().fill(theme.background.opacity(0.7)).frame(height: 1) } }
                 }
                 .overlay(alignment: .top) {
-                    // A still pool glint grounds the mirrored arch at the waterline.
-                    Capsule()
-                        .fill(theme.color("goldMid").opacity(isNext ? 0.48 : 0.08))
-                        .frame(width: isNext ? 40 : 22, height: isNext ? 2.5 : 2)
-                        .blur(radius: isNext ? 2.5 : 2)
+                    // A slow, restrained glint gives the next arch a quiet water reflection.
+                    // Reduced Motion holds the same glint at its center frame.
+                    TimelineView(.animation(minimumInterval: 1 / 12, paused: reduceMotion || !isNext)) { context in
+                        let time = reduceMotion ? 0 : context.date.timeIntervalSinceReferenceDate
+                        let phase = (sin(time * 0.35) + 1) / 2
+                        Capsule()
+                            .fill(theme.color("goldMid").opacity(isNext ? 0.28 + 0.4 * phase : 0.08))
+                            .frame(width: isNext ? 32 + 16 * phase : 22, height: isNext ? 2 + phase : 2)
+                            .offset(x: isNext ? CGFloat(sin(time * 0.35) * 5) : 0)
+                            .blur(radius: isNext ? 2 + phase : 2)
+                    }
                 }
                 .mask(LinearGradient(colors: [.black, .black.opacity(0)], startPoint: .top, endPoint: .bottom))
                 .accessibilityHidden(true)
