@@ -31,6 +31,8 @@
 	<string>1</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSCameraUsageDescription</key>
+	<string>امسح باركود الكتاب وصوّر صفحة الفهرس على هذا الجهاز.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>افتح بيانات مدار المحمية بمصادقة الجهاز.</string>
 	<key>NSHealthShareUsageDescription</key>

@@ -79,10 +79,10 @@ private struct BookUndo: Codable {
             if shelf == "finished" { row.finishedAt = now; row.readCount = 1 }
             if !inspection.outline.isEmpty { row.tocJSON = try JSONEncoder().encode(inspection.outline) }
             context.insert(row); try touch(row, before: nil)
-        case .savePaper(let id, let title, let author, let pages, let shelf, let replacing):
+        case .savePaper(let id, let title, let author, let pages, let shelf, let replacing, let isbn13, let tocJSON):
             guard !books.contains(where: { $0.id == id }) else { throw DataError.invalidValue("الكتاب موجود؛ عدّله من بطاقته") }
             if shelf == "reading" { try slot(id, replacing: replacing) }
-            let row = Book(); row.id = id; row.title = title; row.author = author; row.pages = pages; row.shelf = shelf; row.createdAt = now
+            let row = Book(); row.id = id; row.title = title; row.author = author; row.pages = pages; row.shelf = shelf; row.isbn13 = isbn13; row.tocJSON = tocJSON; row.createdAt = now
             // An explicitly finished book gets an honest date; other shelves do not invent one.
             if shelf == "finished" { row.finishedAt = now; row.readCount = 1 }
             context.insert(row); try touch(row, before: nil)

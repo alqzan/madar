@@ -1,9 +1,10 @@
 import XCTest
 
 @MainActor final class MihbaraHomeUITests: XCTestCase {
-    private func app(_ fixture: String, epub: Data? = nil) -> XCUIApplication {
+    private func app(_ fixture: String, epub: Data? = nil, paperIndex: Bool = false) -> XCUIApplication {
         let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_MIHBARA_FIXTURE":fixture,"MADAR_UI_NOW":"2026-10-17T12:00:00+03:00","MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light"]
         if let epub { app.launchEnvironment["MADAR_UI_MIHBARA_EPUB_BASE64"] = epub.base64EncodedString() }
+        if paperIndex { app.launchEnvironment["MADAR_UI_MIHBARA_PAPER_INDEX_FIXTURE"] = "1" }
         return app
     }
     private func open(_ app: XCUIApplication) {
@@ -58,6 +59,24 @@ import XCTest
         let save = app.buttons["mihbara-paper-save"]; reach(app,save); shot(app,"M6-V01-add-paper-L"); save.tap()
         XCTAssertTrue(app.staticTexts["كتابي الأول"].firstMatch.waitForExistence(timeout:8)); undo(app)
         XCTAssertTrue(app.staticTexts["أضف كتابك الأول"].waitForExistence(timeout:8))
+    }
+    func testPaperIndexUsesEditableChapterRowsAndOneUndoableSave() {
+        continueAfterFailure = false; let app = app("empty", paperIndex: true); app.launch(); open(app)
+        app.buttons["mihbara-add-paper"].tap()
+        app.descendants(matching: .any)["mihbara-add-source-paper"].tap()
+        let title = app.textFields["mihbara-paper-title"]
+        XCTAssertTrue(title.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertEqual(title.value as? String, "دفتر البدايات")
+        XCTAssertEqual(app.textFields["mihbara-paper-chapter-title-0"].value as? String, "مدخل إلى القراءة")
+        shot(app, "M6-V20-paper-index-L")
+        let scroll = app.scrollViews.firstMatch
+        scroll.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.82))
+            .press(forDuration: 0.33, thenDragTo: scroll.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.79)))
+        shot(app, "M6-V20-paper-index-s1-L")
+        let save = app.buttons["mihbara-paper-save"]; reach(app, save); save.tap()
+        XCTAssertTrue(app.staticTexts["دفتر البدايات"].waitForExistence(timeout: 8))
+        undo(app)
+        XCTAssertTrue(app.staticTexts["أضف كتابك الأول"].waitForExistence(timeout: 8))
     }
     func testAddBookSourcesShowsV1FormatsAndHonestEmptyState() {
         continueAfterFailure = false; let app = app("home"); app.launch(); open(app)

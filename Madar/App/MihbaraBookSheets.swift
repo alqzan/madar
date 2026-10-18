@@ -50,7 +50,7 @@ struct MihbaraAddBookView: View {
                     .accessibilityIdentifier("mihbara-add-source-file")
 
                     NavigationLink {
-                        MihbaraPaperEditor(app: app, readingBooks: readingBooks, onSaved: onPaperBookSaved)
+                        MihbaraPaperIndexEditor(app: app, readingBooks: readingBooks, onSaved: onPaperBookSaved)
                             .toolbarVisibility(.hidden, for: .navigationBar)
                     } label: {
                         MihbaraAddBookSourceCard(

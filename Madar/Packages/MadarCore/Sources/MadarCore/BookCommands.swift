@@ -2,7 +2,7 @@ import Foundation
 
 /// §7.6: three reading slots, explicit finishes, and stable collection/number identities.
 public enum BookCommand: Codable, Equatable, Sendable {
-    case savePaper(id: UUID, title: String, author: String, pages: Int?, shelf: String, replacing: UUID?)
+    case savePaper(id: UUID, title: String, author: String, pages: Int?, shelf: String, replacing: UUID?, isbn13: String?, tocJSON: Data?)
     case importPDF(id: UUID, fileID: UUID, sha256: String, title: String, author: String, language: String)
     case importEPUB(id: UUID, fileID: UUID, sha256: String, title: String, author: String, language: String, shelf: String)
     case shelf(id: UUID, shelf: String, replacing: UUID?)
@@ -72,9 +72,23 @@ public enum BookCommand: Codable, Equatable, Sendable {
                   let shelf = text("shelf"), ["reading", "want", "finished"].contains(shelf) else { return nil }
             return .importEPUB(id: id, fileID: fileID, sha256: hash, title: title, author: author, language: language, shelf: shelf)
         case "book.savePaper":
-            guard Set(p.keys).isSubset(of: ["id","title","author","pages","shelf","replacing"]), let title = text("title")?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty, title.count <= 300, let author = text("author"), author.count <= 300, let shelf = text("shelf"), ["reading","want","finished"].contains(shelf), p["pages"] == nil || integer("pages").map({ (1...100000).contains($0) }) == true else { return nil }
+            guard Set(p.keys).isSubset(of: ["id","title","author","pages","shelf","replacing","isbn13","tocJSON"]), let title = text("title")?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty, title.count <= 300, let author = text("author"), author.count <= 300, let shelf = text("shelf"), ["reading","want","finished"].contains(shelf), p["pages"] == nil || integer("pages").map({ (1...100000).contains($0) }) == true else { return nil }
             guard p["replacing"] == nil || text("replacing").flatMap(UUID.init(uuidString:)) != nil else { return nil }
-            return .savePaper(id: id, title: title, author: author, pages: integer("pages"), shelf: shelf, replacing: text("replacing").flatMap(UUID.init(uuidString:)))
+            guard p["isbn13"] == nil || text("isbn13") != nil,
+                  p["tocJSON"] == nil || text("tocJSON") != nil else { return nil }
+            let isbn13: String?
+            if let raw = text("isbn13") {
+                guard let normalized = PaperBookIndex.normalizedISBN13(raw) else { return nil }
+                isbn13 = normalized
+            } else { isbn13 = nil }
+            let tocJSON: Data?
+            if let raw = text("tocJSON") {
+                guard raw.utf8.count <= PaperBookIndex.maximumEncodedBytes,
+                      let data = raw.data(using: .utf8),
+                      PaperBookIndex.decode(data, pages: integer("pages")) != nil else { return nil }
+                tocJSON = data
+            } else { tocJSON = nil }
+            return .savePaper(id: id, title: title, author: author, pages: integer("pages"), shelf: shelf, replacing: text("replacing").flatMap(UUID.init(uuidString:)), isbn13: isbn13, tocJSON: tocJSON)
         case "book.moveShelf":
             guard Set(p.keys).isSubset(of: ["id","shelf","replacing"]), let shelf = text("shelf"), ["reading","want","finished","old"].contains(shelf), p["replacing"] == nil || text("replacing").flatMap(UUID.init(uuidString:)) != nil else { return nil }
             return .shelf(id: id, shelf: shelf, replacing: text("replacing").flatMap(UUID.init(uuidString:)))

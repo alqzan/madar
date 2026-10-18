@@ -12,7 +12,7 @@ import MadarData
         let container = try MadarContainerFactory.makeLocal(at: root), c = ModelContext(container)
         c.autosaveEnabled = false
         let ids = (0..<4).map { _ in UUID() }
-        for i in 0..<4 { _ = try BookMutationHandler.stage(.savePaper(id: ids[i], title: "كتاب \(i)", author: "مؤلف", pages: 250, shelf: i < 3 ? "reading" : "want", replacing: nil), context: c, now: now, writer: "fixture") }; try c.save()
+        for i in 0..<4 { _ = try BookMutationHandler.stage(.savePaper(id: ids[i], title: "كتاب \(i)", author: "مؤلف", pages: 250, shelf: i < 3 ? "reading" : "want", replacing: nil, isbn13: nil, tocJSON: nil), context: c, now: now, writer: "fixture") }; try c.save()
         #expect(throws: (any Error).self) { _ = try BookMutationHandler.stage(.shelf(id: ids[3], shelf: "reading", replacing: nil), context: c, now: now, writer: "fixture") }
         let undo = try BookMutationHandler.stage(.shelf(id: ids[3], shelf: "reading", replacing: ids[1]), context: c, now: now.addingTimeInterval(1), writer: "fixture"); try c.save()
         let after = try c.fetch(FetchDescriptor<Book>())
@@ -26,7 +26,7 @@ import MadarData
     @Test func lastPageNeverFinishesWithoutTheExplicitChoice() throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "Mihbara-\(UUID())"); defer { try? FileManager.default.removeItem(at: root) }
         let container = try MadarContainerFactory.makeLocal(at: root), c = ModelContext(container), id = UUID()
-        _ = try BookMutationHandler.stage(.savePaper(id: id, title: "كتاب", author: "", pages: 250, shelf: "reading", replacing: nil), context: c, now: now, writer: "fixture"); try c.save()
+        _ = try BookMutationHandler.stage(.savePaper(id: id, title: "كتاب", author: "", pages: 250, shelf: "reading", replacing: nil, isbn13: nil, tocJSON: nil), context: c, now: now, writer: "fixture"); try c.save()
         _ = try BookMutationHandler.stage(.position(id: id, page: 250, finished: false), context: c, now: now, writer: "fixture"); try c.save()
         let b = try #require(c.fetch(FetchDescriptor<Book>()).first)
         #expect(try JSONDecoder().decode(PaperBookPosition.self, from: #require(b.locatorJSON)).page == 250); #expect(b.currentPage == 250); #expect(b.shelf == "reading"); #expect(b.finishedAt == nil); #expect(b.readCount == 0)
@@ -34,6 +34,21 @@ import MadarData
         #expect(b.readCount == 1); #expect(b.finishedAt == now)
         try BookMutationHandler.undo(undo, context: c, now: now.addingTimeInterval(1), writer: "fixture"); try c.save()
         #expect(b.finishedAt == nil); #expect(b.readCount == 0); #expect(b.currentPage == 250)
+    }
+
+    @Test func paperIndexAndISBNShareTheUndoableBookMutation() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "Mihbara-\(UUID())"); defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root), c = ModelContext(container), id = UUID()
+        let chapters = [PaperBookChapter(title: "المدخل", page: 1, pageSource: .entered), PaperBookChapter(title: "الرحلة", page: 24, pageSource: .estimated)]
+        let toc = try #require(PaperBookIndex.encode(chapters, pages: 120))
+        let saved = try BookMutationHandler.stage(.savePaper(id: id, title: "كتاب من مكتبتي", author: "مؤلف", pages: 120, shelf: "want", replacing: nil, isbn13: "9780306406157", tocJSON: toc), context: c, now: now, writer: "fixture")
+        try c.save()
+        let book = try #require(c.fetch(FetchDescriptor<Book>()).first)
+        #expect(book.isbn13 == "9780306406157")
+        #expect(try PaperBookIndex.decode(#require(book.tocJSON), pages: book.pages) == chapters)
+        try BookMutationHandler.undo(saved, context: c, now: now.addingTimeInterval(1), writer: "fixture")
+        try c.save()
+        #expect(book.deletedAt != nil)
     }
     @Test func hadithReturnAndUnderstandingUseTheSameIdentityAndUndo() throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "Mihbara-\(UUID())"); defer { try? FileManager.default.removeItem(at: root) }
