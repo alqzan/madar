@@ -61,4 +61,22 @@ import XCTest
         XCTAssertFalse(app.staticTexts["سر لا يظهر قبل المصادقة"].exists)
         app.buttons["mihbara-notebook-close"].tap()
     }
+    func testRahlOpeningChoiceResetUndoAndRelaunch() {
+        continueAfterFailure = false; let app = app("home"); app.launch(); open(app)
+        let preferences = app.buttons["mihbara-opening-preference"]; reach(app, preferences); preferences.tap()
+        let afterFajr = app.buttons["mihbara-rahlOpens-afterFajr"]
+        let untilDone = app.buttons["mihbara-rahlOpens-untilDone"]
+        let manual = app.buttons["mihbara-rahlOpens-manual"]
+        XCTAssertTrue(afterFajr.waitForExistence(timeout:8)); shot(app,"M6-V02-opening-L")
+        XCTAssertEqual(afterFajr.value as? String, "محدد")
+        untilDone.tap(); XCTAssertEqual(untilDone.value as? String, "محدد")
+        undo(app); XCTAssertEqual(afterFajr.value as? String, "محدد")
+        manual.tap(); XCTAssertEqual(manual.value as? String, "محدد")
+        app.buttons["mihbara-rahlOpens-reset"].tap()
+        XCTAssertEqual(afterFajr.value as? String, "محدد")
+        undo(app); XCTAssertEqual(manual.value as? String, "محدد")
+        app.buttons["mihbara-rahlOpens-close"].tap(); app.terminate(); app.launch(); open(app)
+        reach(app, preferences); preferences.tap()
+        XCTAssertEqual(app.buttons["mihbara-rahlOpens-manual"].value as? String, "محدد")
+    }
 }

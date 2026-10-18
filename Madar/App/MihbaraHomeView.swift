@@ -37,7 +37,7 @@ struct MihbaraHomeView: View {
         .background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
         .environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar)
         .safeAreaInset(edge: .bottom) {
-            if app.undoToken != nil {
+            if app.undoToken != nil && sheet == nil {
                 UndoToast(message: app.undoMessage, undo: app.undo)
                     .accessibilityIdentifier("mihbara-undo")
             }
@@ -51,6 +51,7 @@ struct MihbaraHomeView: View {
                     case .library: library(r)
                     case .book(let id): if let b = r.books.first(where: { $0.id == id }) { MihbaraBookCard(app: app, book: b, books: r.books) { tableID = id; sheet = nil } }
                     case .hadith(let n): if let h = r.collection.hadiths.first(where: { $0.number == n }) { MihbaraHadithView(app: app, hadith: h, collection: r.collection, day: r.day) }
+                    case .opening: MihbaraRahlOpeningView(app: app).presentationDetents([.large])
                     case .notebook:
                         if let lock = app.lockController { MadarLockGate(controller: lock, feature: .app) { MihbaraNotebookView(app: app) } }
                         else { ProgressView("تُفتح بيانات المحبرة…") }
@@ -101,6 +102,11 @@ struct MihbaraHomeView: View {
             HStack {
                 deskLabel("على الطاولة", title: true)
                 Spacer()
+                Button { sheet = .opening } label: {
+                    Image(systemName: "slider.horizontal.3").font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(theme.ink).frame(width: 46, height: 46)
+                        .background(theme.surface.opacity(0.88), in: .circle)
+                }.buttonStyle(.plain).accessibilityLabel("وقت فتح ورد السنّة").accessibilityIdentifier("mihbara-opening-preference")
                 Button { sheet = .notebook } label: {
                     Text("دفتر").font(.custom("ArefRuqaa-Regular", size: 18, relativeTo: .headline))
                         .foregroundStyle(theme.ink).frame(width: 58, height: 70)
@@ -185,7 +191,59 @@ struct MihbaraHomeView: View {
     }
 
 }
-private enum MihbaraSheet: Identifiable { case add, library, book(UUID), hadith(Int), notebook; var id: String { String(describing: self) } }
+private enum MihbaraSheet: Identifiable { case add, library, book(UUID), hadith(Int), opening, notebook; var id: String { String(describing: self) } }
+
+private struct MihbaraRahlOpeningView: View {
+    let app: AppSession
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.roomTheme) private var theme
+    private let key = "mihbara.rahlOpens"
+    private let choices = [("afterFajr", "بعد الفجر"), ("untilDone", "حتى يتمّه"), ("manual", "يدويًا")]
+    private var selected: String {
+        let value = app.string(key)
+        return value.isEmpty ? "afterFajr" : value
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 22) {
+                if app.undoToken != nil {
+                    UndoToast(message: app.undoMessage, undo: app.undo)
+                        .accessibilityIdentifier("mihbara-undo")
+                }
+                Text("اختر متى ينفتح الرَّحل لوردك اليوم.")
+                    .font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
+                VStack(spacing: 10) {
+                    ForEach(choices, id: \.0) { value, label in
+                        let isSelected = selected == value
+                        Button { app.set(.string(value), key: key) } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                                Text(label).font(MadarTypography.section())
+                                Spacer()
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+                            .padding(.horizontal, 16)
+                            .foregroundStyle(isSelected ? theme.onAccent : theme.ink)
+                            .background(isSelected ? theme.color("sunnahLeather") : theme.surface, in: .rect(cornerRadius: 14))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityValue(isSelected ? "محدد" : "غير محدد")
+                        .accessibilityIdentifier("mihbara-rahlOpens-" + value)
+                    }
+                }
+                Button("أعِد الإعداد الافتراضي") { app.reset([key]) }
+                    .font(MadarTypography.caption()).frame(minHeight: 44)
+                    .accessibilityIdentifier("mihbara-rahlOpens-reset")
+            }.padding(20)
+        }
+        .background(theme.background).foregroundStyle(theme.ink)
+        .toolbar {
+            ToolbarItem(placement: .principal) { Text("فتح الرَّحل").font(MadarTypography.section()) }
+            ToolbarItem(placement: .topBarTrailing) { Button("تمّ") { dismiss() }.accessibilityIdentifier("mihbara-rahlOpens-close") }
+        }
+    }
+}
 
 private struct MihbaraNotebookView: View {
     let app: AppSession
