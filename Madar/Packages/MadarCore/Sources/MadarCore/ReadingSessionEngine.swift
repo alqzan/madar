@@ -156,7 +156,9 @@ public enum ReadingPageEstimate {
 
 /// R06: installed in the resource bytes before WebKit parses any author content.
 public enum ReadingDocumentPolicy {
-    public static let content = "default-src 'self' data: blob:; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data: blob:; media-src 'self' data: blob:; script-src 'none'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"
+    /// Readium serves its own bundled Readium CSS and reader fonts from `readium://assets`, a
+    /// different origin from the book. Without it every user setting (size, font, theme) is lost.
+    public static let content = "default-src 'self' data: blob:; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' readium://assets; font-src 'self' data: blob: readium://assets; media-src 'self' data: blob:; script-src 'none'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"
 
     /// EPUB XHTML must have a head. Reject malformed prefixes rather than serving them without a policy.
     /// This only scans the prolog and the two opening elements; it does not rewrite the book's content.

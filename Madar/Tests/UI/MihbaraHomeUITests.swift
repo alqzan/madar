@@ -42,12 +42,20 @@ import XCTest
         XCTAssertTrue(app.buttons["mihbara-wird-closed"].waitForExistence(timeout:8)); shot(app,"M6-V01-understood-L"); undo(app)
         XCTAssertTrue(app.buttons["mihbara-wird-open"].waitForExistence(timeout:8)); app.terminate(); app.launch(); open(app)
         reach(app,app.buttons["mihbara-book-continue"]); app.buttons["mihbara-book-continue"].tap()
-        let page = app.textFields["mihbara-book-page"]; XCTAssertTrue(page.waitForExistence(timeout:8)); page.tap(); page.press(forDuration:1.1)
+        openPaperDetails(app)
+        let page = app.textFields["mihbara-paper-position"]; XCTAssertTrue(page.waitForExistence(timeout:8)); page.tap(); page.press(forDuration:1.1)
         if app.menuItems["تحديد الكل"].waitForExistence(timeout:2) { app.menuItems["تحديد الكل"].tap() }
         else { page.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 8)) }
-        page.typeText("١٤٨"); let done = app.toolbars.buttons["تمّ"]; if done.exists { done.tap() }; app.buttons["mihbara-book-save-position"].tap()
-        app.terminate(); app.launch(); open(app); reach(app,app.buttons["mihbara-book-continue"]); app.buttons["mihbara-book-continue"].tap(); XCTAssertTrue(app.textFields["mihbara-book-page"].waitForExistence(timeout:8)); XCTAssertTrue(String(describing: app.textFields["mihbara-book-page"].value).contains("١٤٨")); shot(app,"M6-V01-position-L")
+        page.typeText("١٤٨"); let done = app.toolbars.buttons["تمّ"]; if done.exists { done.tap() }; let save = app.buttons["mihbara-paper-save"]; reach(app, save); save.tap()
+        app.terminate(); app.launch(); open(app); reach(app,app.buttons["mihbara-book-continue"]); app.buttons["mihbara-book-continue"].tap(); openPaperDetails(app); XCTAssertTrue(app.textFields["mihbara-paper-position"].waitForExistence(timeout:8)); XCTAssertTrue(String(describing: app.textFields["mihbara-paper-position"].value).contains("١٤٨")); shot(app,"M6-V01-position-L")
     }
+    /// Since M6-V23 the paper-book card opens first; the position field lives in «الفهرس والتفاصيل».
+    private func openPaperDetails(_ app: XCUIApplication) {
+        let details = app.buttons["mihbara-paper-index-details"]
+        XCTAssertTrue(details.waitForExistence(timeout: 8), app.debugDescription)
+        reach(app, details); details.tap()
+    }
+
     func testEmptyShelfPaperAddAndUndo() {
         continueAfterFailure = false; let app = app("empty"); app.launch(); open(app); shot(app,"M6-V01-empty-L")
         app.buttons["mihbara-add-paper"].tap()

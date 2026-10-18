@@ -12,13 +12,14 @@ struct MihbaraBook: Identifiable, Equatable {
     var isbn13: String? = nil; var tocJSON: Data? = nil
     var progress: Double? {
         if let paper = MihbaraReading.progress(page: page, pages: pages) { return paper }
-        guard kind == "file", format == "epub", let locatorJSON,
+        guard kind == "file", ["epub", "pdf", "pdfScanned"].contains(format ?? ""), let locatorJSON,
               case .object(let locator)? = try? JSONDecoder().decode(JSONValue.self, from: locatorJSON),
               case .object(let locations)? = locator["locations"],
               case .number(let value)? = locations["totalProgression"], value.isFinite else { return nil }
         return min(1, max(0, value))
     }
     var isReadableEPUB: Bool { kind == "file" && format == "epub" && mediaID != nil && fileHash?.count == 64 }
+    var isReadablePDF: Bool { kind == "file" && ["pdf", "pdfScanned"].contains(format ?? "") && mediaID != nil && fileHash?.count == 64 }
 }
 struct MihbaraHadith: Codable, Identifiable { var number: Int; var title: String; var text: String; var id: Int { number } }
 struct MihbaraCollection: Codable {
@@ -62,11 +63,23 @@ struct MihbaraHomeReading {
     }
 
     func epubData(for book: MihbaraBook) throws -> Data {
-        guard book.isReadableEPUB, let mediaID = book.mediaID, let expectedHash = book.fileHash else { throw DataError.invalidValue("هذا الكتاب لا يملك ملف EPUB صالحًا") }
+        try verifiedBookData(for: book, allowedFormats: ["epub"])
+    }
+
+    func pdfData(for book: MihbaraBook) throws -> Data {
+        try verifiedBookData(for: book, allowedFormats: ["pdf", "pdfScanned"])
+    }
+
+    private func verifiedBookData(for book: MihbaraBook, allowedFormats: Set<String>) throws -> Data {
+        guard book.kind == "file", allowedFormats.contains(book.format ?? ""),
+              let mediaID = book.mediaID, let expectedHash = book.fileHash, expectedHash.count == 64 else {
+            throw DataError.invalidValue("هذا الكتاب لا يملك ملفًا صالحًا للقراءة")
+        }
         let context = ModelContext(app.container)
         let books = try context.fetch(FetchDescriptor<Book>())
         guard let currentBook = books.first(where: { $0.id == book.id && $0.deletedAt == nil && $0.mergedInto == nil }),
-              currentBook.kind == "file", currentBook.format == "epub", currentBook.mediaID == mediaID, currentBook.fileHash == expectedHash else { throw DataError.invalidValue("تغيّر ملف الكتاب؛ افتح مكتبته مجددًا") }
+              currentBook.kind == "file", allowedFormats.contains(currentBook.format ?? ""),
+              currentBook.mediaID == mediaID, currentBook.fileHash == expectedHash else { throw DataError.invalidValue("تغيّر ملف الكتاب؛ افتح مكتبته مجددًا") }
         let mediaRows = try context.fetch(FetchDescriptor<Media>())
         guard let media = mediaRows.first(where: { $0.id == mediaID && $0.deletedAt == nil && $0.mergedInto == nil }),
               media.kind == "doc", media.state == "ok", let data = media.data,

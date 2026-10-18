@@ -93,6 +93,18 @@ import Testing
         #expect(clock.activeSeconds == 240)
     }
 
+    @Test func epubPolicyAllowsOnlyReadiumAssetsForStylesAndFontsAndStillBlocksScripts() {
+        let directives = Dictionary(uniqueKeysWithValues: ReadingDocumentPolicy.content.split(separator: ";").map {
+            let parts = $0.split(separator: " ").map(String.init)
+            return (parts[0], Set(parts.dropFirst()))
+        })
+        #expect(directives["style-src"]?.contains("readium://assets") == true)
+        #expect(directives["font-src"]?.contains("readium://assets") == true)
+        #expect(directives["script-src"] == ["'none'"])
+        #expect(directives["default-src"]?.contains("readium://assets") == false)
+        #expect(directives["img-src"]?.contains("readium://assets") == false)
+    }
+
     @Test func epubPolicyPrecedesAuthorScriptsEvenWhenAuthorProvidesAPolicy() throws {
         let source = "<?xml version=\"1.0\"?><html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Security-Policy\" content=\"script-src *\"/><script>alert(1)</script></head><body>نص الكتاب</body></html>"
         let secured = try #require(ReadingDocumentPolicy.secure(source))

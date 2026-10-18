@@ -14,7 +14,7 @@ import MadarCommands
 import MadarPrayer
 
 /// Retained by the app session, rather than a reader subtree that an app lock can remove.
-@MainActor private final class MihbaraReadingSaveCoordinator {
+@MainActor final class MihbaraReadingSaveCoordinator {
     private static let owners = NSMapTable<AppSession, MihbaraReadingSaveCoordinator>.weakToStrongObjects()
     private weak var app: AppSession?
     private var sessions = PendingReadingSessionQueue()
@@ -70,9 +70,13 @@ import MadarPrayer
     func enqueueLocator(_ locator: Locator, bookID: UUID) {
         do {
             let json = try locator.jsonString()
-            pendingLocators[bookID] = LocatorWrite(bookID: bookID, commandID: UUID(), payload: ["id": .string(bookID.uuidString), "locator": .string(json)])
-            flush()
+            enqueueLocatorJSON(json, bookID: bookID)
         } catch { app?.errorMessage = error.localizedDescription }
+    }
+
+    func enqueueLocatorJSON(_ json: String, bookID: UUID) {
+        pendingLocators[bookID] = LocatorWrite(bookID: bookID, commandID: UUID(), payload: ["id": .string(bookID.uuidString), "locator": .string(json)])
+        flush()
     }
 
     func waitForCurrentAttempt() async { await writing?.value }
@@ -176,11 +180,12 @@ struct MihbaraReaderView: View {
               case .number(let size)? = settings["size"] else { return 4 }
         return min(7, max(1, Int(size)))
     }
-    private var readerFontPercent: Double { Double(70 + (readerSize - 1) * 10) }
+    private var readerFontPercent: Double { Double(95 + (readerSize - 1) * 10) }
     private var readerPreferences: EPUBPreferences {
         EPUBPreferences(
-            fontFamily: .serif,
-            fontSize: readerFontPercent,
+            fontFamily: MihbaraEPUBNavigator.amiri,
+            // Readium's fontSize is a multiplier: 1.0 is the publisher's 100%.
+            fontSize: readerFontPercent / 100,
             ligatures: true,
             readingProgression: .rtl,
             scroll: false,
@@ -201,7 +206,10 @@ struct MihbaraReaderView: View {
                         preferences: readerPreferences,
                         onLocation: locationChanged,
                         onInteraction: recordInteraction,
-                        onReady: { navigatorController = $0 },
+                        onReady: {
+                            navigatorController = $0
+                            if let currentLocator { resolvePrintPageMarker(for: currentLocator) }
+                        },
                         onError: {
                             switch $0 {
                             case .copyForbidden: readerAlert = "حقوق هذا الكتاب لا تسمح بنسخ نصه."
@@ -411,6 +419,42 @@ struct MihbaraReaderView: View {
         }
         currentLocator = locator
         scheduleLocatorSave(locator)
+        resolvePrintPageMarker(for: locator)
+    }
+
+    /// Readium's reflowable locators carry a progression, not the page-break anchor, so a
+    /// resource with several printed-page markers would otherwise show an unknown page.
+    /// Ask the visible document for the page in effect at the top of the screen.
+    @MainActor private func resolvePrintPageMarker(for locator: Locator) {
+        guard locator.locations.fragments.isEmpty, let navigatorController else { return }
+        let ids = printPages.filter { $0.href.isEquivalentTo(locator.href.removingFragment()) }.compactMap(\.fragment)
+        guard !ids.isEmpty, let idsJSON = try? JSONEncoder().encode(ids), let idsList = String(data: idsJSON, encoding: .utf8) else { return }
+        let script = """
+        (() => {
+          const rtl = getComputedStyle(document.documentElement).direction === 'rtl';
+          let before = null, firstVisible = null;
+          for (const id of \(idsList)) {
+            const element = document.getElementById(id);
+            if (!element) continue;
+            const r = element.getBoundingClientRect();
+            const earlier = r.bottom <= 0 || (rtl ? r.left >= window.innerWidth : r.right <= 0);
+            const later = r.top >= window.innerHeight || (rtl ? r.right <= 0 : r.left >= window.innerWidth);
+            if (earlier) before = id;
+            else if (!later && firstVisible === null) firstVisible = id;
+          }
+          return before ?? firstVisible;
+        })()
+        """
+        Task { @MainActor in
+            guard case .success(let value) = await navigatorController.evaluateJavaScript(script),
+                  let id = value as? String, !id.isEmpty,
+                  let current = currentLocator, current.href.isEquivalentTo(locator.href),
+                  current.locations.fragments.isEmpty,
+                  current.locations.totalProgression == locator.locations.totalProgression else { return }
+            let marked = current.copy(locations: { $0.fragments = [id] })
+            currentLocator = marked
+            scheduleLocatorSave(marked)
+        }
     }
 
     @MainActor private func recordInteraction() { recordInteraction(at: Date()) }
@@ -724,12 +768,24 @@ private struct MihbaraEPUBNavigator: UIViewControllerRepresentable {
     let onReady: (EPUBNavigatorViewController) -> Void
     let onError: (NavigatorError) -> Void
 
+    /// Amiri (OFL, bundled) is the schema default `mihbara.readerAr.font` (§7.6).
+    static let amiri = FontFamily(rawValue: "Amiri")
+    private static var fontDeclarations: [AnyHTMLFontFamilyDeclaration] {
+        guard let regular = Bundle.main.url(forResource: "Amiri-Regular", withExtension: "ttf").flatMap(FileURL.init(url:)) else { return [] }
+        var faces = [CSSFontFace(file: regular, preload: true, style: .normal, weight: .standard(.normal))]
+        if let bold = Bundle.main.url(forResource: "Amiri-Bold", withExtension: "ttf").flatMap(FileURL.init(url:)) {
+            faces.append(CSSFontFace(file: bold, style: .normal, weight: .standard(.bold)))
+        }
+        return [CSSFontFamilyDeclaration(fontFamily: amiri, fontFaces: faces).eraseToAnyHTMLFontFamilyDeclaration()]
+    }
+
     func makeCoordinator() -> Coordinator { Coordinator(onLocation: onLocation, onInteraction: onInteraction, onReady: onReady, onError: onError) }
 
     func makeUIViewController(context: Context) -> UIViewController {
         let configuration = EPUBNavigatorViewController.Configuration(
             preferences: preferences,
-            contentInset: [.compact: (top: 25, bottom: 22), .regular: (top: 38, bottom: 34)]
+            contentInset: [.compact: (top: 25, bottom: 22), .regular: (top: 38, bottom: 34)],
+            fontFamilyDeclarations: Self.fontDeclarations
         )
         do {
             let navigator = try EPUBNavigatorViewController(publication: publication, initialLocation: initialLocation, config: configuration)
@@ -799,10 +855,10 @@ private struct MihbaraEPUBNavigator: UIViewControllerRepresentable {
                   const style = document.createElement('style');
                   style.id = 'madar-reader-style';
                   style.textContent = `
-                    h1 { font-size: 1.45em !important; line-height: 1.35 !important; margin-block: .35em .55em !important; text-align: center !important; }
+                    h1 { font-family: var(--USER__fontFamily) !important; font-weight: 700 !important; font-size: 1.45em !important; line-height: 1.35 !important; margin-block: .35em .55em !important; text-align: center !important; }
                     h1::before { content: 'فصل'; display: block; color: #6A6052; font-size: .56em; font-weight: 400; margin-bottom: .32em; }
                     h1::after { content: ''; display: block; width: 3.8em; border-top: 1px solid #B7AA95; margin: .58em auto 0; }
-                    p { line-height: 1.55 !important; margin-block: .58em !important; }
+                    p { line-height: 1.95 !important; margin-block: .7em !important; }
                     a[role~='doc-noteref'] { display: inline-block; min-width: 1.25em; padding: .02em .18em; border-radius: 50%; background: #9E2F25 !important; color: #FAF6EA !important; font-size: .74em; font-weight: 600; line-height: 1.25; text-align: center; text-decoration: none !important; }
                   `;
                   head.appendChild(style);

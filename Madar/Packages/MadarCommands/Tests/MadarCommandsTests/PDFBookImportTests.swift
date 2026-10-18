@@ -111,6 +111,22 @@ import MadarData
         #expect(try context.fetchCount(FetchDescriptor<ImportBatch>()) == 0)
     }
 
+    @Test func importedPDFLocatorPersistsOnTheOwningBook() async throws {
+        let root = try root(); defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root.appendingPathComponent("Store"))
+        let adapter = DurableCommandAdapter(container: container, lockDirectory: root, transactionClock: { $0 })
+        let source = root.appendingPathComponent("كتاب.pdf"); try pdf().write(to: source)
+        let inspection = try PDFBookFiles.stage(source: source, root: adapter.bookStagingDirectory)
+        let id = UUID(), now = Date(), bus = CommandBus(adapter: adapter)
+        let result = try await bus.execute(.init(name: "book.importPDF", payload: .object(["id": .string(id.uuidString), "fileID": .string(inspection.id.uuidString), "sha256": .string(inspection.sha256), "title": .string("كتاب"), "author": .string(""), "language": .string("ar")]), issuedAt: now), now: now)
+        #expect(result.status == .applied)
+        let locator = "{\"href\":\"document.pdf\",\"type\":\"application/pdf\",\"pdfPageIndex\":1}"
+        let positioned = try await bus.execute(.init(name: "book.setLocator", payload: .object(["id": .string(id.uuidString), "locator": .string(locator)]), issuedAt: now), now: now)
+        #expect(positioned.status == .applied)
+        let freshBook = try #require(ModelContext(container).fetch(FetchDescriptor<Book>()).first)
+        #expect(freshBook.locatorJSON == Data(locator.utf8))
+    }
+
     @Test func protectedPDFAndAChangedStagedOriginalAreRejectedWithoutBookOrMedia() async throws {
         let root = try root(); defer { try? FileManager.default.removeItem(at: root) }
         let source = root.appendingPathComponent("محمي.pdf"), staging = root.appendingPathComponent("BookStaging")

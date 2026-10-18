@@ -78,9 +78,11 @@ struct MihbaraHomeView: View {
             }.environment(\.roomTheme, theme).presentationDragIndicator(.visible)
         }
         .fullScreenCover(item: $readerRoute, onDismiss: load) { route in
-            if let book = reading?.books.first(where: { $0.id == route.bookID && $0.isReadableEPUB }) {
-                MihbaraReaderView(app: app, book: book) { readerRoute = nil }
-                    .environment(\.roomTheme, theme)
+            if let book = reading?.books.first(where: { $0.id == route.bookID && ($0.isReadableEPUB || $0.isReadablePDF) }) {
+                Group {
+                    if book.isReadablePDF { MihbaraPDFReaderView(app: app, book: book) { readerRoute = nil } }
+                    else { MihbaraReaderView(app: app, book: book) { readerRoute = nil } }
+                }.environment(\.roomTheme, theme)
             } else {
                 VStack(spacing: 16) {
                     Text("ملف الكتاب غير متاح الآن").font(MadarTypography.body())
@@ -184,7 +186,7 @@ struct MihbaraHomeView: View {
             }
             HStack { deskLabel("كتاب القراءة"); Spacer(); deskLabel("موضعك محفوظ") }
             if let b = tableBook {
-                if b.isReadableEPUB {
+                if b.isReadableEPUB || b.isReadablePDF {
                     let position = b.progress.map { service.digits.string(Int(($0 * 100).rounded())) + "٪" } ?? "موضع محفوظ"
                     MihbaraOpenBook(
                         theme: theme, sunnah: false,
@@ -306,8 +308,16 @@ struct MihbaraHomeView: View {
     }
 
     private func openBook(_ book: MihbaraBook) {
-        if book.isReadableEPUB { readerRoute = MihbaraReaderRoute(bookID: book.id) }
-        else { sheet = .book(book.id) }
+        guard book.isReadableEPUB || book.isReadablePDF else { sheet = .book(book.id); return }
+        do {
+            // A reader can close while its last locator is being committed. Refresh
+            // the managed generation before constructing the next reader route.
+            try app.reload()
+            reading = try service.load()
+            readerRoute = MihbaraReaderRoute(bookID: book.id)
+        } catch {
+            app.errorMessage = error.localizedDescription
+        }
     }
 
 }

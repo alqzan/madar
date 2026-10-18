@@ -26,8 +26,8 @@ private struct BookUndo: Codable {
         }
         func fileBook(_ id: UUID) throws -> Book {
             let row = try book(id)
-            guard row.kind == "file", row.format == "epub", let mediaID = row.mediaID,
-                  let fileHash = row.fileHash, !fileHash.isEmpty else { throw DataError.invalidValue("هذا الكتاب لا يملك ملف EPUB صالحًا") }
+            guard row.kind == "file", ["epub", "pdf", "pdfScanned"].contains(row.format ?? ""), let mediaID = row.mediaID,
+                  let fileHash = row.fileHash, !fileHash.isEmpty else { throw DataError.invalidValue("هذا الكتاب لا يملك ملفًا صالحًا للقراءة") }
             let mediaRows = try context.fetch(FetchDescriptor<Media>())
             guard let media = mediaRows.first(where: { $0.id == mediaID && $0.deletedAt == nil && $0.mergedInto == nil }),
                   media.kind == "doc", media.state == "ok", let data = media.data,

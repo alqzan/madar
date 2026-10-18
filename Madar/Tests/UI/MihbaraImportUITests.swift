@@ -45,6 +45,64 @@ import UIKit
         XCTAssertTrue(app.staticTexts["أضف كتابك الأول"].exists)
     }
 
+    func testScannedPDFReaderSavesPositionAndResumes() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        let image = UIGraphicsImageRenderer(size: CGSize(width: 300, height: 400)).image { canvas in
+            UIColor(red: 0.98, green: 0.96, blue: 0.91, alpha: 1).setFill(); canvas.fill(CGRect(x: 0, y: 0, width: 300, height: 400))
+            let style = NSMutableParagraphStyle(); style.alignment = .right
+            let text = "كتاب الاختبار المصوّر\n\nالقراءة باب إلى المعرفة. هذا النص صورة من الملف الأصلي، يبقى محفوظًا على الجهاز.\n\nنعود إلى الصفحة نفسها بعد إغلاق الكتاب."
+            (text as NSString).draw(in: CGRect(x: 25, y: 35, width: 250, height: 300), withAttributes: [.font: UIFont.systemFont(ofSize: 19), .foregroundColor: UIColor.darkText, .paragraphStyle: style])
+        }
+        let pdf = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 300, height: 400)).pdfData { canvas in
+            for _ in 0..<2 { canvas.beginPage(); image.draw(in: CGRect(x: 20, y: 20, width: 250, height: 350)) }
+        }
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MIHBARA_FIXTURE": "empty",
+            "MADAR_UI_NOW": "2026-10-18T12:00:00+03:00", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
+            "MADAR_UI_MIHBARA_IMPORT_PDF": pdf.base64EncodedString()]
+        app.launch()
+        let customize = app.tabBars.buttons["خصّص"]; XCTAssertTrue(customize.waitForExistence(timeout: 20)); customize.tap()
+        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 8)); search.tap(); search.typeText("المحبرة")
+        let door = app.buttons["mihbara-open"]; XCTAssertTrue(door.waitForExistence(timeout: 8)); door.tap()
+        let add = app.buttons["mihbara-add-paper"]; XCTAssertTrue(add.waitForExistence(timeout: 8)); add.tap()
+        let confirm = app.buttons["mihbara-import-confirm"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 20), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["PDF مصوّر"].firstMatch.exists)
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "لا توجد طبقة نص")).firstMatch.exists)
+        attach(app, "M6-V17-preview-L")
+        for _ in 0..<6 where !confirm.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(confirm.isHittable)
+        let title = app.textFields["mihbara-import-title"]
+        XCTAssertEqual(title.value as? String, "ملف اختبار مصوّر")
+        attach(app, "M6-V17-preview-s1-L")
+        confirm.tap()
+        let addBook = app.buttons["mihbara-add-paper"]
+        let addBookVisible = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: addBook)
+        XCTAssertEqual(XCTWaiter.wait(for: [addBookVisible], timeout: 15), .completed, app.debugDescription)
+        addBook.tap()
+        XCTAssertTrue(app.staticTexts["لا يوجد ملف وصل مؤخرًا"].waitForExistence(timeout: 8))
+        XCTAssertFalse(app.buttons["mihbara-import-reopen"].exists)
+        app.buttons["mihbara-add-back"].tap()
+        app.buttons["mihbara-shelf-want"].tap()
+        XCTAssertTrue(app.staticTexts["ملف اختبار مصوّر"].firstMatch.waitForExistence(timeout: 8))
+        let imported = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "ملف اختبار مصوّر")).firstMatch
+        imported.tap()
+        XCTAssertTrue(app.buttons["mihbara-pdf-next"].waitForExistence(timeout: 12), app.debugDescription)
+        XCTAssertTrue(app.descendants(matching: .any)["mihbara-pdf-page"].label.replacingOccurrences(of: "\u{2068}", with: "").replacingOccurrences(of: "\u{2069}", with: "").contains("١ من ٢"), app.debugDescription)
+        attach(app, "M6-V18-PDF-L")
+        app.buttons["mihbara-pdf-next"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["mihbara-pdf-page"].label.replacingOccurrences(of: "\u{2068}", with: "").replacingOccurrences(of: "\u{2069}", with: "").contains("٢ من ٢"), app.debugDescription)
+        attach(app, "M6-V18-PDF-s1-L")
+        app.buttons["mihbara-pdf-close"].tap()
+        XCTAssertTrue(imported.waitForExistence(timeout: 8))
+        let importedReady = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: imported)
+        XCTAssertEqual(XCTWaiter.wait(for: [importedReady], timeout: 12), .completed, app.debugDescription)
+        imported.tap()
+        XCTAssertTrue(app.buttons["mihbara-pdf-close"].waitForExistence(timeout: 12))
+        XCTAssertTrue(app.descendants(matching: .any)["mihbara-pdf-page"].label.replacingOccurrences(of: "\u{2068}", with: "").replacingOccurrences(of: "\u{2069}", with: "").contains("٢ من ٢"), app.debugDescription)
+        app.buttons["mihbara-pdf-close"].tap()
+    }
+
     func testEPUBPreviewUsesFileMetadataAndAddsAnOfflineBook() throws {
         continueAfterFailure = false
         let fixture = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "english-import-poc", withExtension: "epub"))
