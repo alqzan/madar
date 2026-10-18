@@ -2,3 +2,6 @@
 output/
 tmp/
 .DS_Store
+
+# Owner bank-message samples (real, owner-approved 18 Oct): local only, never committed
+Madar/Private/

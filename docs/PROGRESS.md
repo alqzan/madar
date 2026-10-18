@@ -270,7 +270,7 @@ Answered by the owner, 18 Oct (details in DECISIONS):
 4. M6-V13/V14 English settings and word card: «خل كوديكس يسوي كل شي». Build them fully in v1 (device dictionary, plus Apple Translation behind availability).
 5. Zakat (silver nisab, debt options): «ابحث انت عن الموضوع واذا شفته تمام اعتمده». The agent researches recognised fiqh sources, adopts what is sound, and records the sources in DECISIONS.
 6. RM5 pairing window: 10 minutes, kept.
-7. RM6 accuracy: the owner authorises using the bank messages on this Mac (Messages) to measure the parser. Anonymise before anything is saved to the repo (no account numbers, names or OTPs); keep the real samples outside Git.
+7. RM6 accuracy: the owner authorises using the bank messages on this Mac (Messages), from every bank, and keeping them so the parser learns each bank's exact format («عادي تحفظها عندك»). Store the real messages in `Madar/Private/bank-messages/` (git-ignored, on this Mac only). Never store OTP codes. A local test reads them when the folder exists. Fixtures committed to Git are anonymised copies.
 
 M5 (16 Oct): (1) the zakat screen copy and options (silver basis, the debt options) need a specialist the owner chooses before any external tester (F11, RM7); (2) RM5 pairing window set at 10 minutes; (3) RM6 accuracy needs anonymised bank messages.
 
