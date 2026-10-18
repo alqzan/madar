@@ -166,6 +166,17 @@ struct MihbaraReaderView: View {
     @State private var readerUndoID: UUID?
     @State private var copiedAt: Date?
     @State private var footnote: MihbaraFootnote?
+    /// M6-V12: an English book reads left to right with its own settings (`mihbara.readerEn`).
+    @State private var isEnglish = false
+    private var settingsKey: String { isEnglish ? "mihbara.readerEn" : "mihbara.readerAr" }
+    /// §7.6 English faces; only system fonts ship until Literata's OFL file is bundled.
+    private var englishFamily: FontFamily {
+        switch readerSettings["font"]?.string {
+        case "system": FontFamily(rawValue: "-apple-system")
+        case "georgia": FontFamily(rawValue: "Georgia")
+        default: FontFamily(rawValue: "Literata, Georgia")
+        }
+    }
 
     /// `mihbara.readerAr.theme`; «تلقائي» is paper by day and night after dark.
     private var palette: MihbaraReaderPalette {
@@ -187,8 +198,8 @@ struct MihbaraReaderView: View {
     }
     /// `mihbara.readerAr` merged over its schema default, so values saved before a field existed read as its default.
     private var readerSettings: [String: MadarData.JSONValue] {
-        var merged = app.schema.settings.first(where: { $0.key == "mihbara.readerAr" })?.defaultValue.object ?? [:]
-        if case .object(let stored)? = app.values["mihbara.readerAr"] { merged.merge(stored) { _, new in new } }
+        var merged = app.schema.settings.first(where: { $0.key == settingsKey })?.defaultValue.object ?? [:]
+        if case .object(let stored)? = app.values[settingsKey] { merged.merge(stored) { _, new in new } }
         return merged
     }
     private func readerInt(_ key: String, _ range: ClosedRange<Int>, _ fallback: Int) -> Int {
@@ -214,17 +225,18 @@ struct MihbaraReaderView: View {
     private var readerPreferences: EPUBPreferences {
         EPUBPreferences(
             backgroundColor: ReadiumNavigator.Color(hex: palette.hex.bg),
-            fontFamily: readerFont.family,
+            fontFamily: isEnglish ? englishFamily : readerFont.family,
             // Readium's fontSize is a multiplier: 1.0 is the publisher's 100%.
             fontSize: readerFontPercent / 100,
             // A multiplier of the regular 400 weight, landing on a face the font really has.
-            fontWeight: readerHeavier ? readerFont.heavierWeight : nil,
+            fontWeight: readerHeavier && !isEnglish ? readerFont.heavierWeight : nil,
+            hyphens: isEnglish ? readerBool("hyphenation", true) : nil,
             ligatures: true,
             lineHeight: [1.6, 1.95, 2.25, 2.6][readerLineSpacing - 1],
             pageMargins: [0.6, 1.0, 1.5, 2.0][readerMargins - 1],
             // Line height, alignment and weight apply only over the publisher's own styles.
             publisherStyles: false,
-            readingProgression: .rtl,
+            readingProgression: isEnglish ? .ltr : .rtl,
             scroll: readerScroll,
             textAlign: readerJustify ? .justify : .start,
             textColor: ReadiumNavigator.Color(hex: palette.hex.ink),
@@ -291,7 +303,7 @@ struct MihbaraReaderView: View {
             }
         }
         .task { await openPublication() }
-        .onChange(of: app.values["mihbara.readerAr"]) { navigatorController?.submitPreferences(readerPreferences) }
+        .onChange(of: app.values[settingsKey]) { navigatorController?.submitPreferences(readerPreferences) }
         // An undo from the toast, or anywhere else, repaints the page from the store.
         .onChange(of: app.undoToken?.id) { reloadHighlights() }
         .onChange(of: palette) { applyHighlights() }
@@ -329,11 +341,11 @@ struct MihbaraReaderView: View {
         }
         .sheet(isPresented: $showingReaderSettings) {
             MihbaraReaderSettingsSheet(
-                app: app, paper: paper, palette: palette,
+                app: app, paper: paper, palette: palette, english: isEnglish,
                 options: .init(theme: readerSettings["theme"]?.string.flatMap(MihbaraReaderTheme.init(rawValue:)) ?? .auto, size: readerSize, font: readerFont, scroll: readerScroll, lineSpacing: readerLineSpacing,
                                margins: readerMargins, justify: readerJustify, heavier: readerHeavier, footer: readerFooter),
                 set: updateReaderSetting,
-                reset: { app.reset(["mihbara.readerAr"]) }
+                reset: { app.reset([settingsKey]) }
             )
             .environment(\.layoutDirection, .rightToLeft)
         }
@@ -461,6 +473,7 @@ struct MihbaraReaderView: View {
             localURL = file
 
             let opened = try await MihbaraEPUBLoader.open(at: file)
+            isEnglish = opened.metadata.languages.first?.lowercased().hasPrefix("en") ?? false
 
             let saved = readiumLocator(book.locatorJSON)
             let now = Date()
@@ -929,7 +942,7 @@ struct MihbaraReaderView: View {
     @MainActor private func updateReaderSetting(_ key: String, _ value: MadarData.JSONValue) {
         var settings = readerSettings
         settings[key] = value
-        app.set(.object(settings), key: "mihbara.readerAr")
+        app.set(.object(settings), key: settingsKey)
     }
 
     @MainActor private func toggleNarration() {
@@ -954,7 +967,7 @@ struct MihbaraReaderView: View {
                 readerAlert = "لا يوجد نص قابل للقراءة في هذا الموضع."
                 return
             }
-            guard let voice = AVSpeechSynthesisVoice.speechVoices().first(where: { $0.language.hasPrefix("ar") }) else {
+            guard let voice = AVSpeechSynthesisVoice.speechVoices().first(where: { $0.language.hasPrefix(isEnglish ? "en" : "ar") }) else {
                 readerAlert = "لا يتوفر صوت عربي على هذا الجهاز."
                 return
             }
@@ -1072,6 +1085,7 @@ private struct MihbaraReaderSettingsSheet: View {
     let app: AppSession
     let paper: SwiftUI.Color
     let palette: MihbaraReaderPalette
+    let english: Bool
     let options: MihbaraReaderOptions
     let set: (String, MadarData.JSONValue) -> Void
     let reset: () -> Void
@@ -1088,14 +1102,21 @@ private struct MihbaraReaderSettingsSheet: View {
                 header
                 themeRow
                 sizeRow
-                fontRow
+                // English fonts, spacing and hyphenation are M6-V13; an English book offers only what `readerEn` holds.
+                if !english { fontRow }
                 modeRow
+                if !english {
                 Button { withAnimation(.smooth(duration: 0.25)) { more.toggle() } } label: {
                     Text(more ? "خيارات أقل" : "خيارات أكثر").font(MadarTypography.caption().weight(.semibold))
                         .frame(maxWidth: .infinity, minHeight: 32).background(well, in: .capsule)
                 }
                 .buttonStyle(.plain).accessibilityIdentifier("mihbara-reader-more")
                 if more { moreOptions }
+                } else {
+                    Button("العودة إلى الإعدادات الافتراضية", action: reset)
+                        .font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 44)
+                        .accessibilityIdentifier("mihbara-reader-reset")
+                }
             }
             .padding(22)
         }
@@ -1113,7 +1134,7 @@ private struct MihbaraReaderSettingsSheet: View {
         HStack(alignment: .center, spacing: 10) {
             Text("عرض الصفحة").font(.custom("thmanyahserifdisplay-Bold", size: 22, relativeTo: .title2))
             Spacer(minLength: 8)
-            Text("كتاب عربي · إعداداتك للعربي").font(MadarTypography.fine().weight(.semibold))
+            Text(english ? "كتاب إنجليزي · إعداداتك للإنجليزي" : "كتاب عربي · إعداداتك للعربي").font(MadarTypography.fine().weight(.semibold))
                 .padding(.horizontal, 12).padding(.vertical, 6).background(well, in: .capsule)
             Button("تمّ") { dismiss() }.font(MadarTypography.caption()).frame(minWidth: 44, minHeight: 44)
                 .accessibilityIdentifier("mihbara-reader-settings-close")
@@ -1418,7 +1439,7 @@ private struct MihbaraEPUBNavigator: UIViewControllerRepresentable {
                   style.id = 'madar-reader-style';
                   style.textContent = `
                     h1 { font-family: var(--USER__fontFamily) !important; font-weight: 700 !important; font-size: 1.45em !important; line-height: 1.35 !important; margin-block: .35em .55em !important; text-align: center !important; }
-                    h1::before { content: 'فصل'; display: block; color: #6A6052; font-size: .56em; font-weight: 400; margin-bottom: .32em; }
+                    h1:lang(ar)::before { content: 'فصل'; display: block; color: #6A6052; font-size: .56em; font-weight: 400; margin-bottom: .32em; }
                     h1::after { content: ''; display: block; width: 3.8em; border-top: 1px solid #B7AA95; margin: .58em auto 0; }
                     p { margin-block: .7em !important; }
                     \(MihbaraReaderTheme.pageCSS)

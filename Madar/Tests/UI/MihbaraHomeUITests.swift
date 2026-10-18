@@ -410,6 +410,28 @@ import XCTest
         XCTAssertTrue(app.buttons["mihbara-reader-theme-auto"].waitForSelection(timeout: 5))
         XCTAssertTrue(app.buttons["mihbara-reader-mode-pages"].isSelected)
     }
+
+    func testEnglishEPUBReadsLeftToRightWithItsOwnSettings() throws {
+        continueAfterFailure = false
+        let fixtureURL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "english-import-poc", withExtension: "epub"))
+        let app = app("reader", epub: try Data(contentsOf: fixtureURL)); app.launch(); open(app)
+        let book = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "كتاب اختبار القارئ")).firstMatch
+        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); book.tap()
+        XCTAssertTrue(app.buttons["mihbara-reader-close"].waitForExistence(timeout: 20), app.debugDescription)
+        sleep(4); shot(app, "M6-V12-reader-L")
+        app.buttons["mihbara-reader-settings"].tap()
+        XCTAssertTrue(app.staticTexts["كتاب إنجليزي · إعداداتك للإنجليزي"].waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertFalse(app.buttons["mihbara-reader-font-amiri"].exists)
+        XCTAssertFalse(app.buttons["mihbara-reader-more"].exists)
+        app.buttons["mihbara-reader-size-6"].tap()
+        XCTAssertTrue(app.buttons["mihbara-reader-size-6"].waitForSelection(timeout: 5))
+        shot(app, "M6-V12-sheet-L")
+        app.buttons["mihbara-reader-reset"].tap()
+        XCTAssertTrue(app.buttons["mihbara-reader-size-4"].waitForSelection(timeout: 5))
+        app.buttons["mihbara-reader-settings-close"].tap()
+        app.buttons["mihbara-reader-close"].tap()
+        XCTAssertTrue(app.buttons["mihbara-add-paper"].waitForExistence(timeout: 10), app.debugDescription)
+    }
 }
 
 private extension XCUIElement {
