@@ -456,6 +456,42 @@ import XCTest
         shot(app, "M6-V11-focus-s2-L")
     }
 
+    func testArabicListeningReadsParagraphsAndOffersSpeedControls() throws {
+        continueAfterFailure = false
+        let fixtureURL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "arabic-reader-poc", withExtension: "epub"))
+        let app = app("reader", epub: try Data(contentsOf: fixtureURL)); app.launch(); open(app)
+        let book = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "كتاب اختبار القارئ")).firstMatch
+        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); book.tap()
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "القراءة باب يدخل")).firstMatch.waitForExistence(timeout: 20), app.debugDescription)
+        let listen = app.buttons["mihbara-reader-listen"]
+        XCTAssertTrue(listen.waitForExistence(timeout: 8), app.debugDescription); listen.tap()
+        let player = app.descendants(matching: .any)["mihbara-listening-player"]
+        if player.waitForExistence(timeout: 8) {
+            let paragraph = app.staticTexts["mihbara-listening-paragraph"]
+            XCTAssertTrue(paragraph.waitForExistence(timeout: 5), app.debugDescription)
+            let paragraphLabel = paragraph.label.filter { !["\u{2068}", "\u{2069}"].contains(String($0)) }
+            XCTAssertTrue(paragraphLabel.contains("صوت عربي من جهازك"), app.debugDescription)
+            XCTAssertTrue(paragraphLabel.contains("الفقرة"), app.debugDescription)
+            XCTAssertTrue(app.buttons["mihbara-listening-speed-1"].exists, app.debugDescription)
+            shot(app, "M6-V21-listening-L")
+
+            let faster = app.buttons["mihbara-listening-speed-1_5"]
+            XCTAssertTrue(faster.waitForExistence(timeout: 5), app.debugDescription); faster.tap()
+            XCTAssertEqual(faster.value as? String, "السرعة الحالية", app.debugDescription)
+            let pause = app.buttons["mihbara-listening-play-pause"]
+            pause.tap()
+            XCTAssertEqual(app.staticTexts["mihbara-listening-title"].label, "القراءة متوقفة مؤقتًا", app.debugDescription)
+            pause.tap()
+            app.buttons["mihbara-listening-stop"].tap()
+            XCTAssertTrue(player.waitForNonExistence(timeout: 5), app.debugDescription)
+        } else {
+            let alert = app.alerts["القارئ"]
+            XCTAssertTrue(alert.waitForExistence(timeout: 5), app.debugDescription)
+            XCTAssertTrue(alert.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "لا يتوفر صوت عربي")).firstMatch.exists, app.debugDescription)
+            alert.buttons["حسنًا"].tap()
+        }
+    }
+
     func testEnglishWordCardSavesItsContextAndOnlyOffersSupportedTranslation() throws {
         continueAfterFailure = false
         let fixtureURL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "english-import-poc", withExtension: "epub"))

@@ -77,3 +77,11 @@ Differences left: «حاشية الكتاب» instead of «حاشية المحق
 Not verified: dark reader, other footnote markup patterns, owner iPhone.
 Next: M6-V10 (night scroll): a brief is ready (the reader `theme` key is never read; there is no theme row in Aa; colours are hard-coded by colorScheme).
 Model/effort: Claude Opus 5.5 / not exposed; Sonnet 5.5 Explore agent for the V10 brief. Usage: five-hour 51% at last check.
+
+## Handover — M6-V10 reader themes — 2026-10-18 — Claude
+Works now: six reader themes from the Aa sheet (auto, paper, warm, calm, night, black) colour the whole reader; night + scroll matches the canonical and keeps the place.
+Verified: UI V10 1/1; V06, V08, V09 reader UI rerun (see commit); `compare-screens.py R9-Qari-Tamrir`; `git diff --check` clean.
+Differences left: content-driven parts of the canonical (paragraph numbers, per-page footnote block); no 0.2 s theme cross-fade (an animation inside the reader timeline caused a redraw loop).
+Not verified: warm/calm/black visuals, owner iPhone.
+Next: M6-V11 (focus reader) is the next ready card; focus mode is RMI2 "later", so check scope before building.
+Model/effort: Claude Opus 5.5 / not exposed. Usage: five-hour ~60% at last check.

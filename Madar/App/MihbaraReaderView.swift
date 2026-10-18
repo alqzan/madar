@@ -148,8 +148,7 @@ struct MihbaraReaderView: View {
     @State private var positionCount = 0
     @State private var showingContents = false
     @State private var showingReaderSettings = false
-    @State private var speechSynthesizer = AVSpeechSynthesizer()
-    @State private var isSpeaking = false
+    @State private var speechController = MihbaraSpeechController()
     @State private var readingClock: ActiveReadingClock?
     @State private var positionProgress = ReadingPositionProgress()
     @State private var sessionStart: Date?
@@ -192,6 +191,7 @@ struct MihbaraReaderView: View {
     private var saveCoordinator: MihbaraReadingSaveCoordinator { .forSession(app) }
     private var digits: MadarNumberFormatter { AppMihbaraService(app: app).digits }
     private var readerTheme: ReadiumNavigator.Theme { palette.isDark ? .dark : .light }
+    private var isSpeaking: Bool { speechController.isSpeaking }
     private var readerProgress: Double? {
         if let progression = currentLocator?.locations.totalProgression {
             return min(1, max(0, progression))
@@ -323,7 +323,6 @@ struct MihbaraReaderView: View {
             .environment(\.layoutDirection, .rightToLeft)
             .onChange(of: tick.date) { _, date in
                 advanceClock(to: date)
-                isSpeaking = speechSynthesizer.isSpeaking
             }
         }
         .task { await openPublication() }
@@ -343,19 +342,20 @@ struct MihbaraReaderView: View {
                 resumeReader(at: Date())
             } else {
                 pauseReader(at: Date())
+                stopNarration()
             }
         }
         .onChange(of: saveCoordinator.canWrite) { _, authorized in
             if authorized, scenePhase == .active { resumeReader(at: Date()) }
-            else if !authorized { pauseReader(at: Date()) }
+            else if !authorized { pauseReader(at: Date()); stopNarration() }
         }
-        .onChange(of: showingContents || showingReaderSettings || noteDraft != nil || lookupTerm != nil || translationRequest != nil) { _, covered in
-            if covered { pauseReader(at: Date()) }
+        .onChange(of: showingContents || showingReaderSettings || noteDraft != nil || lookupTerm != nil || translationRequest != nil || wordCard != nil || footnote != nil) { _, covered in
+            if covered { pauseReader(at: Date()); stopNarration() }
             else if scenePhase == .active { resumeReader(at: Date()) }
         }
         .onDisappear {
             pauseReader(at: Date())
-            speechSynthesizer.stopSpeaking(at: .immediate)
+            stopNarration()
             pendingLocatorSave?.cancel()
             if let localURL { try? FileManager.default.removeItem(at: localURL) }
         }
@@ -426,10 +426,10 @@ struct MihbaraReaderView: View {
                 Spacer(minLength: 0)
                 HStack(spacing: 12) {
                     Button(action: toggleNarration) {
-                        Image(systemName: isSpeaking ? "pause.fill" : "headphones").font(.system(size: 18, weight: .regular))
+                        Image(systemName: speechController.isActive ? (isSpeaking ? "pause.fill" : "play.fill") : "headphones").font(.system(size: 18, weight: .regular))
                             .frame(width: 32, height: 44).contentShape(Rectangle())
                     }
-                    .accessibilityLabel(isSpeaking ? "إيقاف القراءة الصوتية" : "استمع إلى هذا الفصل")
+                    .accessibilityLabel(speechController.isActive ? (isSpeaking ? "إيقاف القراءة الصوتية مؤقتًا" : "متابعة القراءة الصوتية") : "استمع إلى هذا الفصل")
                     .accessibilityIdentifier("mihbara-reader-listen")
                     Button { showingContents = true } label: {
                         Image(systemName: "list.bullet").font(.system(size: 18, weight: .regular))
@@ -534,8 +534,8 @@ struct MihbaraReaderView: View {
                         .font(MadarTypography.caption()).lineLimit(1).minimumScaleFactor(0.8)
                         .accessibilityIdentifier("mihbara-reader-print-page")
                     Spacer(minLength: 4)
-                    if readerFooter == .full || isSpeaking {
-                        Text(isSpeaking ? "تُقرأ الصفحة بصوت عربي" : (readingClock?.activeSeconds ?? 0) >= 60 ? "الجلسة بدأت · تُسجَّل وحدها" : "تُسجَّل الجلسة بعد دقيقة نشاط")
+                    if readerFooter == .full || speechController.isActive {
+                        Text(speechController.isActive ? (isSpeaking ? "تُقرأ الفقرة بصوت \(isEnglish ? "إنجليزي" : "عربي")" : "القراءة الصوتية متوقفة مؤقتًا") : (readingClock?.activeSeconds ?? 0) >= 60 ? "الجلسة بدأت · تُسجَّل وحدها" : "تُسجَّل الجلسة بعد دقيقة نشاط")
                             .font(MadarTypography.fine()).foregroundStyle(palette.ink2)
                     }
                 }
@@ -711,11 +711,88 @@ struct MihbaraReaderView: View {
             )
             .padding(.horizontal, 12).padding(.bottom, 10)
             .transition(.move(edge: .bottom).combined(with: .opacity))
+        } else if speechController.isActive {
+            listeningPlayer
         } else if let token = app.undoToken, token.id == readerUndoID, !showingReaderSettings {
             UndoToast(message: app.undoMessage, undo: app.undo)
                 .accessibilityIdentifier("mihbara-reader-toast")
                 .padding(.bottom, 64)
         }
+    }
+
+    private var listeningPlayer: some View {
+        GlassEffectContainer(spacing: 10) {
+            VStack(spacing: 11) {
+                HStack(spacing: 12) {
+                    Button(action: toggleNarration) {
+                        Image(systemName: isSpeaking ? "pause.fill" : "play.fill")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(palette.bg)
+                            .frame(width: 46, height: 46)
+                            .background(palette.accent, in: Circle())
+                            .contentShape(Circle())
+                    }
+                    .glassEffect(.regular.interactive(), in: Circle())
+                    .accessibilityLabel(isSpeaking ? "إيقاف القراءة الصوتية مؤقتًا" : "متابعة القراءة الصوتية")
+                    .accessibilityIdentifier("mihbara-listening-play-pause")
+
+                    VStack(alignment: .trailing, spacing: 3) {
+                        Text(isSpeaking ? "يقرأ لك الآن" : "القراءة متوقفة مؤقتًا")
+                            .font(MadarTypography.section())
+                            .foregroundStyle(palette.ink)
+                            .accessibilityIdentifier("mihbara-listening-title")
+                        Text("صوت \(isEnglish ? "إنجليزي" : "عربي") من جهازك، الفقرة \(digits.string(speechController.currentIndex + 1)) من \(digits.string(speechController.paragraphCount))")
+                            .font(MadarTypography.fine())
+                            .foregroundStyle(palette.ink2)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                            .accessibilityIdentifier("mihbara-listening-paragraph")
+                    }
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+
+                    Button(action: stopNarration) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(palette.ink2)
+                            .frame(width: 40, height: 40)
+                            .contentShape(Circle())
+                    }
+                    .glassEffect(.regular.interactive(), in: Circle())
+                    .accessibilityLabel("إنهاء الاستماع")
+                    .accessibilityIdentifier("mihbara-listening-stop")
+                }
+
+                HStack(spacing: 6) {
+                    ForEach(MihbaraListeningSpeed.allCases, id: \.self) { speed in
+                        let selected = speechController.speed == speed.rawValue
+                        Button { speechController.setSpeed(speed.rawValue) } label: {
+                            Text(digits.localized(speed.numberText + "×"))
+                                .font(MadarTypography.fine())
+                                .foregroundStyle(selected ? palette.bg : palette.ink2)
+                                .frame(maxWidth: .infinity, minHeight: 40)
+                                .background(selected ? palette.accent : .clear, in: Capsule())
+                                .contentShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .glassEffect(.regular.interactive(), in: Capsule())
+                        .accessibilityLabel("سرعة \(digits.localized(speed.numberText)) مرة")
+                        .accessibilityValue(selected ? "السرعة الحالية" : "")
+                        .accessibilityIdentifier("mihbara-listening-speed-\(speed.identifier)")
+                    }
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(paper.opacity(palette.isDark ? 0.72 : 0.82), in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+            .overlay { RoundedRectangle(cornerRadius: 26, style: .continuous).stroke(palette.line, lineWidth: 0.8) }
+            .shadow(color: .black.opacity(palette.isDark ? 0.24 : 0.13), radius: 18, y: 7)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("mihbara-listening-player")
+        }
+        .padding(.horizontal, 12)
+        .padding(.bottom, 10)
+        .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
     }
 
     @MainActor private func applyFocusMode() {
@@ -1162,9 +1239,8 @@ struct MihbaraReaderView: View {
     }
 
     @MainActor private func toggleNarration() {
-        if speechSynthesizer.isSpeaking {
-            speechSynthesizer.stopSpeaking(at: .immediate)
-            isSpeaking = false
+        if speechController.isActive {
+            speechController.togglePlayback()
             return
         }
         guard let navigatorController else {
@@ -1173,26 +1249,44 @@ struct MihbaraReaderView: View {
         }
         recordInteraction()
         Task { @MainActor in
-            let result = await navigatorController.evaluateJavaScript("document.body.innerText")
-            guard case .success(let value) = result, let rawText = value as? String else {
-                readerAlert = "تعذّر قراءة نص هذا الفصل."
+            let result = await navigatorController.evaluateJavaScript("window.madarReaderSpeechQueue ? window.madarReaderSpeechQueue() : ''")
+            guard case .success(let value) = result, let raw = value as? String,
+                  let data = raw.data(using: .utf8), let document = try? JSONDecoder().decode(MihbaraSpeechDocument.self, from: data) else {
+                readerAlert = "تعذّر تجهيز فقرات هذا الفصل للاستماع."
                 return
             }
-            let text = rawText.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }.joined(separator: " ")
-            guard !text.isEmpty else {
+            guard !document.paragraphs.isEmpty else {
                 readerAlert = "لا يوجد نص قابل للقراءة في هذا الموضع."
                 return
             }
-            guard let voice = AVSpeechSynthesisVoice.speechVoices().first(where: { $0.language.hasPrefix(isEnglish ? "en" : "ar") }) else {
-                readerAlert = "لا يتوفر صوت عربي على هذا الجهاز."
+            let prefix = isEnglish ? "en" : "ar"
+            let preferred = isEnglish ? "en-US" : "ar-SA"
+            let voices = AVSpeechSynthesisVoice.speechVoices().filter { $0.language.hasPrefix(prefix) }
+            guard let voice = voices.first(where: { $0.language == preferred }) ?? voices.first else {
+                readerAlert = "لا يتوفر صوت \(isEnglish ? "إنجليزي" : "عربي") على هذا الجهاز. ثبّت صوتًا من إعدادات تسهيلات الاستخدام ثم حاول مجددًا."
                 return
             }
-            let utterance = AVSpeechUtterance(string: text)
-            utterance.voice = voice
-            utterance.rate = 0.48
-            speechSynthesizer.speak(utterance)
-            isSpeaking = true
+            let navigator = navigatorController
+            speechController.onHighlightedParagraph = { [weak navigator] index in
+                guard let navigator else { return }
+                let script = index.map { "window.madarReaderSpeechSetActive ? window.madarReaderSpeechSetActive(\($0)) : ''" }
+                    ?? "window.madarReaderSpeechClear ? window.madarReaderSpeechClear() : ''"
+                Task { @MainActor in _ = await navigator.evaluateJavaScript(script) }
+            }
+            do {
+                try speechController.start(
+                    paragraphs: document.paragraphs,
+                    startIndex: document.startIndex,
+                    voice: voice
+                )
+            } catch {
+                readerAlert = "تعذّر تشغيل الصوت. أعد المحاولة."
+            }
         }
+    }
+
+    @MainActor private func stopNarration() {
+        speechController.stop()
     }
 }
 
@@ -1879,6 +1973,35 @@ private struct MihbaraEPUBNavigator: UIViewControllerRepresentable {
                 scrollFocusBlock(next, behavior);
                 return setFocusBlock(next, blocks);
               };
+              window.madarReaderSpeechQueue = () => {
+                const blocks = focusBlocks();
+                if (!blocks.length) return '';
+                const active = blocks.find(block => block.classList.contains('madar-focus-active')) || nearestFocusBlock(blocks);
+                const paragraphs = blocks.map((block, index) => ({ index, text: (block.innerText || '').replace(/\\s+/g, ' ').trim() }));
+                return JSON.stringify({ paragraphs, startIndex: Math.max(0, blocks.indexOf(active)) });
+              };
+              window.madarReaderSpeechSetActive = (index) => {
+                const blocks = focusBlocks();
+                const active = blocks[index];
+                if (!active) return '';
+                for (const block of blocks) {
+                  const selected = block === active;
+                  block.classList.toggle('madar-speech-active', selected);
+                  if (selected) block.setAttribute('aria-current', 'location');
+                  else if (!block.classList.contains('madar-focus-active')) block.removeAttribute('aria-current');
+                }
+                if (!active.id) active.id = 'madar-speech-target-' + index;
+                const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+                scrollFocusBlock(active, behavior);
+                return focusDescription(active, blocks);
+              };
+              window.madarReaderSpeechClear = () => {
+                for (const block of focusBlocks()) {
+                  block.classList.remove('madar-speech-active');
+                  if (!block.classList.contains('madar-focus-active')) block.removeAttribute('aria-current');
+                }
+                return '';
+              };
               let focusFrame = 0;
               document.addEventListener('scroll', () => {
                 if (!document.body?.dataset.madarFocus || focusFrame) return;
@@ -2324,6 +2447,7 @@ enum MihbaraReaderTheme: String, CaseIterable, Identifiable {
                 + "\(root) body[data-madar-focus='true'] :is(p, li, blockquote) { color: \(h.ink2) !important; } "
                 + "\(root) body[data-madar-focus='true'] :is(p, li, blockquote).madar-focus-active { color: \(h.ink) !important; }"
                 + "\(root) body[data-madar-focus='true'] { padding-bottom: 8rem !important; } "
+                + "\(root) body :is(p, li, blockquote).madar-speech-active { background-color: \(h.highlight[1]) !important; border-radius: .32em; box-decoration-break: clone; -webkit-box-decoration-break: clone; } "
                 + "@media (prefers-reduced-motion: no-preference) { \(root) body[data-madar-focus='true'] :is(p, li, blockquote) { transition: color .18s ease; } }"
         }.joined(separator: "\n")
     }
@@ -2338,4 +2462,169 @@ struct MihbaraReaderPalette: Equatable {
     var ink2: SwiftUI.Color { .init(uiColor: UIColor(madarHex: hex.ink2)) }
     var accent: SwiftUI.Color { .init(uiColor: UIColor(madarHex: hex.accent)) }
     var line: SwiftUI.Color { ink.opacity(isDark ? 0.16 : 0.10) }
+}
+
+private struct MihbaraSpeechParagraph: Decodable, Sendable {
+    var index: Int
+    var text: String
+}
+
+private struct MihbaraSpeechDocument: Decodable, Sendable {
+    var paragraphs: [MihbaraSpeechParagraph]
+    var startIndex: Int
+}
+
+private enum MihbaraListeningSpeed: Double, CaseIterable, Hashable {
+    case normal = 1
+    case quick = 1.25
+    case quicker = 1.5
+    case double = 2
+
+    var numberText: String {
+        switch self {
+        case .normal: "1"
+        case .quick: "1٫25"
+        case .quicker: "1٫5"
+        case .double: "2"
+        }
+    }
+
+    var identifier: String {
+        switch self {
+        case .normal: "1"
+        case .quick: "1_25"
+        case .quicker: "1_5"
+        case .double: "2"
+        }
+    }
+}
+
+@Observable @MainActor private final class MihbaraSpeechController: NSObject {
+    private let synthesizer: AVSpeechSynthesizer
+    private var paragraphs: [MihbaraSpeechParagraph] = []
+    private var voice: AVSpeechSynthesisVoice?
+    private var currentUtteranceID: ObjectIdentifier?
+    var onHighlightedParagraph: (@MainActor (Int?) -> Void)?
+    private(set) var isActive = false
+    private(set) var isSpeaking = false
+    private(set) var currentIndex = 0
+    private(set) var paragraphCount = 0
+    private(set) var speed = 1.0
+
+    override init() {
+        synthesizer = AVSpeechSynthesizer()
+        super.init()
+        synthesizer.delegate = self
+    }
+
+    func start(paragraphs: [MihbaraSpeechParagraph], startIndex: Int, voice: AVSpeechSynthesisVoice) throws {
+        guard !paragraphs.isEmpty else { throw CocoaError(.fileReadNoSuchFile) }
+        try AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+        try AVAudioSession.sharedInstance().setActive(true)
+        self.paragraphs = paragraphs
+        self.voice = voice
+        currentIndex = min(paragraphs.count - 1, max(0, startIndex))
+        paragraphCount = paragraphs.count
+        speed = MihbaraListeningSpeed.normal.rawValue
+        isActive = true
+        speakCurrentParagraph()
+    }
+
+    func togglePlayback() {
+        guard isActive else { return }
+        if isSpeaking {
+            _ = synthesizer.pauseSpeaking(at: .immediate)
+            isSpeaking = false
+        } else if synthesizer.isPaused {
+            isSpeaking = synthesizer.continueSpeaking()
+        } else {
+            speakCurrentParagraph()
+        }
+    }
+
+    func setSpeed(_ value: Double) {
+        guard MihbaraListeningSpeed.allCases.contains(where: { $0.rawValue == value }), speed != value else { return }
+        let wasSpeaking = isSpeaking
+        speed = value
+        guard isActive, currentUtteranceID != nil else { return }
+        currentUtteranceID = nil
+        _ = synthesizer.stopSpeaking(at: .immediate)
+        isSpeaking = false
+        if wasSpeaking { speakCurrentParagraph() }
+    }
+
+    func stop() {
+        guard isActive || synthesizer.isSpeaking || synthesizer.isPaused else { return }
+        currentUtteranceID = nil
+        _ = synthesizer.stopSpeaking(at: .immediate)
+        isActive = false
+        isSpeaking = false
+        onHighlightedParagraph?(nil)
+        onHighlightedParagraph = nil
+        paragraphs = []
+        voice = nil
+        currentIndex = 0
+        paragraphCount = 0
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    }
+
+    private func speakCurrentParagraph() {
+        guard isActive, paragraphs.indices.contains(currentIndex), let voice else { finish() ; return }
+        let text = paragraphs[currentIndex].text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { advance() ; return }
+        let utterance = AVSpeechUtterance(string: text)
+        utterance.voice = voice
+        utterance.rate = min(AVSpeechUtteranceMaximumSpeechRate, AVSpeechUtteranceDefaultSpeechRate * Float(speed))
+        currentUtteranceID = ObjectIdentifier(utterance)
+        isSpeaking = true
+        onHighlightedParagraph?(paragraphs[currentIndex].index)
+        synthesizer.speak(utterance)
+    }
+
+    private func advance() {
+        guard isActive else { return }
+        currentUtteranceID = nil
+        if currentIndex + 1 < paragraphs.count {
+            currentIndex += 1
+            speakCurrentParagraph()
+        } else {
+            finish()
+        }
+    }
+
+    private func finish() {
+        isActive = false
+        isSpeaking = false
+        currentUtteranceID = nil
+        onHighlightedParagraph?(nil)
+        onHighlightedParagraph = nil
+        paragraphs = []
+        voice = nil
+        currentIndex = 0
+        paragraphCount = 0
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    }
+
+    fileprivate func didFinish(_ id: ObjectIdentifier) {
+        guard currentUtteranceID == id else { return }
+        advance()
+    }
+
+    fileprivate func didCancel(_ id: ObjectIdentifier) {
+        guard currentUtteranceID == id else { return }
+        currentUtteranceID = nil
+        isSpeaking = false
+    }
+}
+
+extension MihbaraSpeechController: AVSpeechSynthesizerDelegate {
+    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+        let id = ObjectIdentifier(utterance)
+        Task { @MainActor [weak self] in self?.didFinish(id) }
+    }
+
+    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
+        let id = ObjectIdentifier(utterance)
+        Task { @MainActor [weak self] in self?.didCancel(id) }
+    }
 }
