@@ -140,6 +140,7 @@ struct MihbaraReaderView: View {
     @State private var currentLocator: Locator?
     @State private var navigatorController: EPUBNavigatorViewController?
     @State private var printPages: [MihbaraPrintPage] = []
+    @State private var printMarkedLocator: Locator?
     @State private var positionCount = 0
     @State private var showingContents = false
     @State private var showingReaderSettings = false
@@ -355,9 +356,17 @@ struct MihbaraReaderView: View {
         .background(paper)
     }
 
+    /// The current locator, with its printed-page anchor when the visible document supplied one.
+    private var printLocator: Locator? {
+        guard let current = currentLocator, let marked = printMarkedLocator,
+              marked.href.isEquivalentTo(current.href),
+              marked.locations.totalProgression == current.locations.totalProgression else { return currentLocator }
+        return marked
+    }
+
     private var printPageLabel: String {
         guard let last = printPages.last else { return "موضع من الكتاب" }
-        guard let ordinal = pageCoordinate(currentLocator), printPages.indices.contains(ordinal - 1) else {
+        guard let ordinal = pageCoordinate(printLocator), printPages.indices.contains(ordinal - 1) else {
             return "موضع من الكتاب؛ صفحة المطبوع غير معروفة هنا"
         }
         let current = printPages[ordinal - 1]
@@ -451,9 +460,9 @@ struct MihbaraReaderView: View {
                   let current = currentLocator, current.href.isEquivalentTo(locator.href),
                   current.locations.fragments.isEmpty,
                   current.locations.totalProgression == locator.locations.totalProgression else { return }
-            let marked = current.copy(locations: { $0.fragments = [id] })
-            currentLocator = marked
-            scheduleLocatorSave(marked)
+            // Kept beside the saved locator, which stays Readium's own so reopening returns to
+            // the exact spot rather than the start of the printed page.
+            printMarkedLocator = current.copy(locations: { $0.fragments = [id] })
         }
     }
 
