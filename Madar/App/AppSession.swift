@@ -602,6 +602,7 @@ final class AppSession {
     }
 
     var diaryStagingDirectory: URL { commandAdapter.diaryStagingDirectory }
+    var bookStagingDirectory: URL { commandAdapter.bookStagingDirectory }
     func executeDiaryCommand(_ name: String, payload: [String: MadarCore.JSONValue], id: UUID = UUID()) async throws {
         guard !name.hasPrefix("diary.") || (lockController?.canPresent(.notes) ?? protectedDataAuthorized) else { throw DataError.invalidValue("المذكرات مقفلة") }
         guard beginWrite() else { throw BackupOperationError.busy }

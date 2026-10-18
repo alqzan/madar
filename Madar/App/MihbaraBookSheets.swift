@@ -14,11 +14,10 @@ struct MihbaraAddBookView: View {
     @Environment(\.roomTheme) private var theme
     @State private var importingBook = false
     @State private var importingGoodreads = false
+    @State private var previewingPDF = false
 
     private var bookTypes: [UTType] {
-        var types: [UTType] = [.pdf, .plainText, .html]
-        if let epub = UTType(filenameExtension: "epub") { types.insert(epub, at: 0) }
-        return types
+        [.pdf]
     }
 
     var body: some View {
@@ -39,7 +38,7 @@ struct MihbaraAddBookView: View {
                     Button { importingBook = true } label: {
                         MihbaraAddBookSourceCard(
                             title: "من ملف",
-                            subtitle: "ePub · PDF · نص · HTML؛ شاركه إلى مدار من أي تطبيق",
+                            subtitle: "PDF نصّي أو مصوّر من تطبيق الملفات",
                             symbol: "square.and.arrow.down.fill",
                             color: theme.color("navy"),
                             foreground: theme.color("onNavy")
@@ -82,14 +81,16 @@ struct MihbaraAddBookView: View {
                         MihbaraRecentImportRow(name: pendingGoodreadsFile.lastPathComponent, kind: "CSV", theme: theme)
                     }
                     if let pendingBookFile {
-                        MihbaraRecentImportRow(name: pendingBookFile.lastPathComponent, kind: pendingBookFile.pathExtension.uppercased(), theme: theme)
+                        Button { previewingPDF = true } label: {
+                            MihbaraRecentImportRow(name: pendingBookFile.lastPathComponent, kind: "PDF", theme: theme)
+                        }.buttonStyle(.plain).accessibilityIdentifier("mihbara-import-reopen")
                     }
                     if pendingBookFile == nil && pendingGoodreadsFile == nil {
                         HStack(spacing: 12) {
                             Image(systemName: "tray").font(.title3).foregroundStyle(theme.secondaryInk)
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("لا يوجد ملف وصل مؤخرًا").font(MadarTypography.caption())
-                                Text("اختر ملفًا من جهازك أو شاركه إلى مدار.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                                Text("اختر ملف PDF من تطبيق الملفات.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                             }
                             Spacer(minLength: 0)
                         }
@@ -104,7 +105,7 @@ struct MihbaraAddBookView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("يقرأ مدار").font(MadarTypography.section())
                     HStack(spacing: 8) {
-                        ForEach(["ePub", "PDF", "PDF مصوّر", "نص", "HTML"], id: \.self) { value in
+                        ForEach(["PDF", "PDF مصوّر"], id: \.self) { value in
                             Text(value)
                                 .font(MadarTypography.fine())
                                 .padding(.horizontal, 11).padding(.vertical, 8)
@@ -125,10 +126,27 @@ struct MihbaraAddBookView: View {
         .toolbarVisibility(.hidden, for: .navigationBar)
         .statusBarHidden(true)
         .fileImporter(isPresented: $importingBook, allowedContentTypes: bookTypes, allowsMultipleSelection: false) { result in
-            handle(result, assign: { pendingBookFile = $0 })
+            handle(result, assign: { pendingBookFile = $0; previewingPDF = true })
         }
         .fileImporter(isPresented: $importingGoodreads, allowedContentTypes: [.commaSeparatedText], allowsMultipleSelection: false) { result in
             handle(result, assign: { pendingGoodreadsFile = $0 })
+        }
+        .navigationDestination(isPresented: $previewingPDF) {
+            if let pendingBookFile {
+                MihbaraPDFImportView(app: app, source: pendingBookFile) { onPaperBookSaved() }
+            }
+        }
+        .task {
+            #if DEBUG
+            let root = app.bookStagingDirectory
+            if root.deletingLastPathComponent().deletingLastPathComponent().lastPathComponent == "UITestStores",
+               let encoded = ProcessInfo.processInfo.environment["MADAR_UI_MIHBARA_IMPORT_PDF"], let bytes = Data(base64Encoded: encoded),
+               bytes.count < 1024 * 1024, pendingBookFile == nil {
+                let file = root.deletingLastPathComponent().appendingPathComponent("ملف اختبار مصوّر.pdf")
+                do { try bytes.write(to: file, options: .atomic); pendingBookFile = file; previewingPDF = true }
+                catch { app.errorMessage = "لم تُجهز عينة الاستيراد." }
+            }
+            #endif
         }
     }
 

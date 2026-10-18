@@ -56,6 +56,7 @@ private struct ReceiptWire: Codable {
         self.containerProvider = containerProvider; self.lockDirectory = lockDirectory; self.transactionClock = transactionClock; self.generationProvider = generationProvider
     }
     public var diaryStagingDirectory: URL { lockDirectory.appending(path: "DiaryStaging", directoryHint: .isDirectory) }
+    public var bookStagingDirectory: URL { lockDirectory.appending(path: "BookStaging", directoryHint: .isDirectory) }
     public func transact(_ request: CommandTransactionRequest, now arrivalDate: Date) async throws -> CommandOutcome {
         try FileManager.default.createDirectory(at: lockDirectory, withIntermediateDirectories: true)
         let lockURL = lockDirectory.appending(path: "CommandBus.lock")
@@ -183,7 +184,7 @@ private struct ReceiptWire: Codable {
             switch request.operation {
             case .book(let command):
                 do {
-                    let undo = try BookMutationHandler.stage(command, context: context, now: now, writer: writer)
+                    let undo = try BookMutationHandler.stage(command, context: context, now: now, writer: writer, stagingDirectory: bookStagingDirectory)
                     inverse = SettingsInverse(settings: [:], afterSettings: [:], layouts: [:], afterLayouts: [:], bookMutation: undo)
                 } catch DataError.invalidValue(let reason) { context.rollback(); return .init(status: .rejected, reason: reason) }
             case .money(let name, let payload):

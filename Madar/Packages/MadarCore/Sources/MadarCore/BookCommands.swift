@@ -3,12 +3,13 @@ import Foundation
 /// §7.6: three reading slots, explicit finishes, and stable collection/number identities.
 public enum BookCommand: Codable, Equatable, Sendable {
     case savePaper(id: UUID, title: String, author: String, pages: Int?, shelf: String, replacing: UUID?)
+    case importPDF(id: UUID, fileID: UUID, sha256: String, title: String, author: String, language: String)
     case shelf(id: UUID, shelf: String, replacing: UUID?)
     case position(id: UUID, page: Int, finished: Bool)
     case hadith(number: Int, edition: String, understood: Bool, day: GregorianDay)
     case savePrivateNote(id: UUID, text: String)
     case deletePrivateNote(id: UUID)
-    public static let names: Set<String> = ["book.savePaper", "book.moveShelf", "book.setPosition", "hadith.mark", "notebook.savePrivate", "notebook.deletePrivate"]
+    public static let names: Set<String> = ["book.savePaper", "book.importPDF", "book.moveShelf", "book.setPosition", "hadith.mark", "notebook.savePrivate", "notebook.deletePrivate"]
     public static func parse(_ name: String, _ p: [String: JSONValue]) -> Self? {
         func text(_ key: String) -> String? { if case .string(let s) = p[key] { s } else { nil } }
         func integer(_ key: String) -> Int? { if case .number(let n) = p[key], n.isFinite, n.rounded() == n, n >= 0, n <= 100000 { Int(n) } else { nil } }
@@ -26,6 +27,14 @@ public enum BookCommand: Codable, Equatable, Sendable {
         }
         guard let id = text("id").flatMap(UUID.init(uuidString:)) else { return nil }
         switch name {
+        case "book.importPDF":
+            guard Set(p.keys) == ["id", "fileID", "sha256", "title", "author", "language"],
+                  let fileID = text("fileID").flatMap(UUID.init(uuidString:)),
+                  let hash = text("sha256"), hash.count == 64, hash.allSatisfy({ "0123456789abcdef".contains($0) }),
+                  let title = text("title")?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty, title.count <= 300,
+                  let author = text("author"), author.count <= 300,
+                  let language = text("language"), ["ar", "en"].contains(language) else { return nil }
+            return .importPDF(id: id, fileID: fileID, sha256: hash, title: title, author: author, language: language)
         case "book.savePaper":
             guard Set(p.keys).isSubset(of: ["id","title","author","pages","shelf","replacing"]), let title = text("title")?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty, title.count <= 300, let author = text("author"), author.count <= 300, let shelf = text("shelf"), ["reading","want","finished"].contains(shelf), p["pages"] == nil || integer("pages").map({ (1...100000).contains($0) }) == true else { return nil }
             guard p["replacing"] == nil || text("replacing").flatMap(UUID.init(uuidString:)) != nil else { return nil }

@@ -51,7 +51,10 @@ struct MihbaraHomeView: View {
                 if let r = reading {
                     switch target {
                     case .library: library(r)
-                    case .book(let id): if let b = r.books.first(where: { $0.id == id }) { MihbaraBookCard(app: app, book: b, books: r.books) { tableID = id; sheet = nil } }
+                    case .book(let id): if let b = r.books.first(where: { $0.id == id }) {
+                        if b.kind == "file", ["pdf", "pdfScanned"].contains(b.format ?? "") { MihbaraImportedPDFSummary(book: b) }
+                        else { MihbaraBookCard(app: app, book: b, books: r.books) { tableID = id; sheet = nil } }
+                    }
                     case .hadith(let n): if let h = r.collection.hadiths.first(where: { $0.number == n }) { MihbaraHadithView(app: app, hadith: h, collection: r.collection, day: r.day) }
                     case .opening: MihbaraRahlOpeningView(app: app).presentationDetents([.large])
                     case .notebook:

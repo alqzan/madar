@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 import SwiftData
 import MadarCore
 import MadarData
@@ -6,11 +7,13 @@ import MadarData
 private struct BookUndo: Codable {
     struct Change: Codable { var before: DataRecord?; var after: DataRecord }
     var changes: [Change]
+    var importedMediaIDs: [UUID]? = nil
 }
 @MainActor enum BookMutationHandler {
-    static func stage(_ command: BookCommand, context: ModelContext, now: Date, writer: String) throws -> Data {
+    static func stage(_ command: BookCommand, context: ModelContext, now: Date, writer: String, stagingDirectory: URL? = nil) throws -> Data {
         let books = try context.fetch(FetchDescriptor<Book>())
         var changes: [BookUndo.Change] = []
+        var importedMediaIDs: [UUID] = []
         func touch(_ row: any MadarRecordModel, before: DataRecord?) throws {
             var record = try row.record()
             try record.set(StableIdentity.monotonic(now: now, previous: record.date("updatedAt") ?? .distantPast), for: "updatedAt")
@@ -28,6 +31,24 @@ private struct BookUndo: Codable {
             }
         }
         switch command {
+        case .importPDF(let id, let fileID, let sha256, let title, let author, let language):
+            guard let stagingDirectory else { throw DataError.invalidValue("ملف المعاينة غير موجود.") }
+            guard !books.contains(where: { $0.id == id }) else { throw DataError.invalidValue("هذا الكتاب موجود بالفعل.") }
+            guard !books.contains(where: { $0.fileHash == sha256 && $0.mergedInto == nil }) else { throw DataError.invalidValue("هذا الكتاب عندك بالفعل، أو أُزيل سابقًا؛ لن يُضاف مكررًا.") }
+            let inspection = try PDFBookFiles.inspect(id: fileID, root: stagingDirectory)
+            guard inspection.sha256 == sha256 else { throw DataError.invalidValue("تغيّر الملف بعد معاينته؛ اختره مرة أخرى.") }
+            guard try context.fetch(FetchDescriptor<Media>()).allSatisfy({ $0.id != fileID }) else { throw DataError.invalidValue("معرّف الملف مستخدم بالفعل.") }
+            let data = try Data(contentsOf: PDFBookFiles.stagedURL(id: fileID, root: stagingDirectory), options: .mappedIfSafe)
+            guard data.count == inspection.sizeBytes, SHA256.hash(data: data).map({ String(format: "%02x", $0) }).joined() == sha256 else { throw DataError.invalidValue("تغيّر الملف بعد المعاينة.") }
+            let media = Media(); media.id = fileID; media.kind = "doc"; media.contentType = "com.adobe.pdf"
+            media.data = data; media.sha256 = sha256; media.sizeBytes = data.count
+            media.createdAt = now; media.updatedAt = now; media.writerID = writer; context.insert(media)
+            importedMediaIDs.append(fileID)
+            let row = Book(); row.id = id; row.title = title; row.author = author; row.language = language
+            row.kind = "file"; row.format = inspection.scanned ? "pdfScanned" : "pdf"; row.pages = inspection.pages
+            row.shelf = "want"; row.mediaID = fileID; row.fileHash = sha256; row.createdAt = now
+            if !inspection.outline.isEmpty { row.tocJSON = try JSONEncoder().encode(inspection.outline) }
+            context.insert(row); try touch(row, before: nil)
         case .savePaper(let id, let title, let author, let pages, let shelf, let replacing):
             guard !books.contains(where: { $0.id == id }) else { throw DataError.invalidValue("الكتاب موجود؛ عدّله من بطاقته") }
             if shelf == "reading" { try slot(id, replacing: replacing) }
@@ -83,11 +104,20 @@ private struct BookUndo: Codable {
             let before = try row.record(); row.deletedAt = now; row.deletionBarrierAt = now
             try touch(row, before: before)
         }
-        return try JSONEncoder().encode(BookUndo(changes: changes))
+        return try JSONEncoder().encode(BookUndo(changes: changes, importedMediaIDs: importedMediaIDs.isEmpty ? nil : importedMediaIDs))
     }
     static func undo(_ data: Data, context: ModelContext, now: Date, writer: String) throws {
-        let state = try JSONDecoder().decode(BookUndo.self, from: data), records = try RecordBridge.all(context)
+        let state = try JSONDecoder().decode(BookUndo.self, from: data)
+        var records = try context.fetch(FetchDescriptor<Book>()).map { try $0.record() }
+        records += try context.fetch(FetchDescriptor<HadithProgress>()).map { try $0.record() }
+        records += try context.fetch(FetchDescriptor<NotebookNote>()).map { try $0.record() }
         for change in state.changes { guard records.contains(change.after) else { throw DataError.invalidValue("تغيّر الكتاب بعد هذا الإجراء") } }
+        for id in state.importedMediaIDs ?? [] {
+            let rows = try context.fetch(FetchDescriptor<Media>())
+            guard let media = rows.first(where: { $0.id == id && $0.deletedAt == nil && $0.mergedInto == nil }) else { throw DataError.invalidValue("تغيّر ملف الكتاب بعد إضافته.") }
+            media.deletedAt = now; media.deletionBarrierAt = now; media.data = nil
+            media.updatedAt = StableIdentity.monotonic(now: now, previous: media.updatedAt); media.writerID = writer
+        }
         for change in state.changes.reversed() {
             var row = change.before ?? change.after
             if change.before == nil { try row.set(now, for: "deletedAt"); try row.set(now, for: "deletionBarrierAt") }
