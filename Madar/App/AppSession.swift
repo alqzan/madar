@@ -592,7 +592,7 @@ final class AppSession {
         if let token = result.undoToken { showUndo(.init(id: token, expiresAt: now.addingTimeInterval(600)), message: name == "money.confirmSalary" ? "فُتحت الدورة · التراجع متاح لعشر دقائق" : name == "money.logExpense" ? "سُجّل المصروف · التراجع متاح لعشر دقائق" : "حُفظ التغيير · التراجع متاح لعشر دقائق") }
     }
 
-    func executeBookCommand(_ name: String, payload: [String: MadarCore.JSONValue], id: UUID = UUID()) async throws {
+    func executeBookCommand(_ name: String, payload: [String: MadarCore.JSONValue], id: UUID = UUID(), undoMessage: String = "حُفظ في المحبرة، والتراجع متاح") async throws {
         guard lockController?.canPresent(.app) ?? protectedDataAuthorized else { throw DataError.authenticationFailed }
         guard beginWrite() else { throw BackupOperationError.busy }
         defer { pendingWrites -= 1 }
@@ -600,7 +600,7 @@ final class AppSession {
         let result = try await bus.execute(.init(commandID: id, name: name, payload: .object(payload), issuedAt: now), now: now)
         guard result.status == .applied || result.status == .duplicate else { throw DataError.invalidValue(result.reason ?? "تعذّر حفظ الكتاب") }
         try reload(); try publishSnapshot()
-        if let token = result.undoToken { showUndo(.init(id: token, expiresAt: now.addingTimeInterval(600)), message: "حُفظ في المحبرة، والتراجع متاح") }
+        if let token = result.undoToken { showUndo(.init(id: token, expiresAt: now.addingTimeInterval(600)), message: undoMessage) }
     }
 
     var diaryStagingDirectory: URL { commandAdapter.diaryStagingDirectory }

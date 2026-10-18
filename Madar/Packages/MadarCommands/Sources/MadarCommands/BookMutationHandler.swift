@@ -171,6 +171,46 @@ private struct BookUndo: Codable {
             guard let row = notes.first(where: { $0.id == id && $0.deletedAt == nil && $0.mergedInto == nil && $0.isPrivate && $0.link == "general" && $0.targetID == nil }) else { throw DataError.invalidValue("الملاحظة الخاصة غير موجودة") }
             let before = try row.record(); row.deletedAt = now; row.deletionBarrierAt = now
             try touch(row, before: before)
+        case .saveHighlight(let id, let bookID, let locatorJSON, let color, let pageLabel):
+            let owner = try book(bookID)
+            guard owner.kind == "file" else { throw DataError.invalidValue("التظليل لكتب الملفات") }
+            let rows = try context.fetch(FetchDescriptor<Highlight>())
+            if let row = rows.filter({ $0.id == id && $0.mergedInto == nil }).max(by: { $0.updatedAt < $1.updatedAt }) {
+                guard row.bookID == bookID else { throw DataError.invalidValue("هذا التظليل لكتاب آخر") }
+                let before = try row.record()
+                if row.deletedAt != nil {
+                    let barrier = row.deletionBarrierAt ?? row.deletedAt ?? .distantPast
+                    row.restoredAt = max(now, barrier.addingTimeInterval(0.001)); row.deletedAt = nil
+                }
+                row.locatorJSON = locatorJSON; row.color = color; row.pageLabel = pageLabel
+                try touch(row, before: before)
+            } else {
+                let row = Highlight(); row.id = id; row.createdAt = now; row.bookID = bookID
+                row.locatorJSON = locatorJSON; row.color = color; row.pageLabel = pageLabel
+                context.insert(row); try touch(row, before: nil)
+            }
+        case .deleteHighlight(let id):
+            let rows = try context.fetch(FetchDescriptor<Highlight>())
+            guard let row = rows.first(where: { $0.id == id && $0.deletedAt == nil && $0.mergedInto == nil }) else { throw DataError.invalidValue("التظليل غير موجود") }
+            let before = try row.record(); row.deletedAt = now; row.deletionBarrierAt = now
+            try touch(row, before: before)
+        case .savePageNote(let id, let bookID, let text, let locatorJSON, let page):
+            _ = try book(bookID)
+            let notes = try context.fetch(FetchDescriptor<NotebookNote>())
+            if let row = notes.filter({ $0.id == id && $0.mergedInto == nil }).max(by: { $0.updatedAt < $1.updatedAt }) {
+                guard row.link == "page", row.targetID == bookID, !row.isPrivate else { throw DataError.invalidValue("هذه الملاحظة مرتبطة بمكان آخر") }
+                let before = try row.record()
+                if row.deletedAt != nil {
+                    let barrier = row.deletionBarrierAt ?? row.deletedAt ?? .distantPast
+                    row.restoredAt = max(now, barrier.addingTimeInterval(0.001)); row.deletedAt = nil
+                }
+                row.text = text; row.locatorJSON = locatorJSON; row.page = page
+                try touch(row, before: before)
+            } else {
+                let row = NotebookNote(); row.id = id; row.createdAt = now; row.link = "page"; row.targetID = bookID
+                row.isPrivate = false; row.text = text; row.locatorJSON = locatorJSON; row.page = page
+                context.insert(row); try touch(row, before: nil)
+            }
         }
         return command.isUndoable ? try JSONEncoder().encode(BookUndo(changes: changes, importedMediaIDs: importedMediaIDs.isEmpty ? nil : importedMediaIDs)) : Data()
     }
@@ -180,6 +220,7 @@ private struct BookUndo: Codable {
         var records = try context.fetch(FetchDescriptor<Book>()).map { try $0.record() }
         records += try context.fetch(FetchDescriptor<HadithProgress>()).map { try $0.record() }
         records += try context.fetch(FetchDescriptor<NotebookNote>()).map { try $0.record() }
+        records += try context.fetch(FetchDescriptor<Highlight>()).map { try $0.record() }
         for change in state.changes { guard records.contains(change.after) else { throw DataError.invalidValue("تغيّر الكتاب بعد هذا الإجراء") } }
         for id in state.importedMediaIDs ?? [] {
             let rows = try context.fetch(FetchDescriptor<Media>())

@@ -35,3 +35,12 @@ Not verified: No build, UI test, screenshot, or canonical comparison rerun this 
 Next: No ready card is available; preserve the current worktree and blockers until the board exposes ready work.
 Model/effort: not exposed / not exposed.
 Usage: Started at 99% used; natural five-hour reset reached 0% at 09:24 UTC; no manual reset or credits used.
+
+## Handover — M6-V23, PDF OCR comparison, and M1 reflection — 2026-10-18 — Codex
+Works now: Paper-book cards retain the scanned PDF as page images; the attached file opened at page ١ من ١٦٣ in a synthetic store. M1 home has a still glint at the waterline. Local Vision OCR provides a stronger Arabic/English extraction proof, outside Madar.
+Verified: V23 focused UI 1/1; `xcodebuild test ... -only-testing:MadarUITests/FoundationUITests/test_M1V01_HomeMatchesCanonical` passed 1/1; `compare-screens.py S1-Home` and `git diff --check` clean. `swift /tmp/madar_vision_ocr_full.swift`: 84,341 chars from 143/163 pages; 20 pages yielded no text. `ar-SA=false`, `en-US=true` for FoundationModels on this Mac.
+Differences left: V23 progress extends the canonical and awaits owner review; M1 glint is static. App preview does not index OCR; Vision still misreads the stylized cover title.
+Not verified: OCR accuracy against a gold transcript, in-app grounded summaries/posts/video, owner iPhone, and V18 resume remain unverified or blocked.
+Next: No M6 card is `ready`; preserve V18's uncommitted work. The output choice (written result, video, or both) determines the UI.
+Model/effort: not exposed / not exposed.
+Usage: 34% five-hour used / 36% weekly at latest check; no reset or credits used.

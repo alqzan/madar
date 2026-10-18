@@ -158,6 +158,13 @@ struct MihbaraReaderView: View {
     @State private var isClosing = false
     @State private var message: String?
     @State private var readerAlert: String?
+    @State private var highlights: [MihbaraHighlight] = []
+    @State private var wordCard: MihbaraWordCardState?
+    @State private var noteDraft: MihbaraWordCardState?
+    @State private var lookupTerm: MihbaraLookupTerm?
+    @State private var lastDecorationTap = Date.distantPast
+    @State private var readerUndoID: UUID?
+    @State private var copiedAt: Date?
 
     private var paper: SwiftUI.Color {
         colorScheme == .dark
@@ -232,10 +239,15 @@ struct MihbaraReaderView: View {
                         initialLocation: initialLocator,
                         preferences: readerPreferences,
                         onLocation: locationChanged,
-                        onInteraction: recordInteraction,
-                        onReady: {
-                            navigatorController = $0
+                        onInteraction: readerTapped,
+                        onSelection: selectionChanged,
+                        onReady: { navigator in
+                            navigatorController = navigator
                             if let currentLocator { resolvePrintPageMarker(for: currentLocator) }
+                            navigator.observeDecorationInteractions(inGroup: MihbaraHighlight.group) { event in
+                                highlightTapped(event.decoration.id)
+                            }
+                            reloadHighlights()
                         },
                         onError: {
                             switch $0 {
@@ -257,6 +269,7 @@ struct MihbaraReaderView: View {
                 }
                 footer
             }
+            .overlay(alignment: .bottom) { readerOverlay }
             .background(paper.ignoresSafeArea())
         .foregroundStyle(colorScheme == .dark ? SwiftUI.Color(red: 233 / 255, green: 225 / 255, blue: 210 / 255) : SwiftUI.Color(red: 42 / 255, green: 33 / 255, blue: 24 / 255))
             .environment(\.layoutDirection, .rightToLeft)
@@ -267,6 +280,9 @@ struct MihbaraReaderView: View {
         }
         .task { await openPublication() }
         .onChange(of: app.values["mihbara.readerAr"]) { navigatorController?.submitPreferences(readerPreferences) }
+        // An undo from the toast, or anywhere else, repaints the page from the store.
+        .onChange(of: app.undoToken?.id) { reloadHighlights() }
+        .onChange(of: colorScheme) { applyHighlights() }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 resumeReader(at: Date())
@@ -308,6 +324,15 @@ struct MihbaraReaderView: View {
                 reset: { app.reset(["mihbara.readerAr"]) }
             )
             .environment(\.layoutDirection, .rightToLeft)
+        }
+        .sheet(item: $noteDraft) { draft in
+            MihbaraPageNoteSheet(draft: draft, paper: paper, pageText: draft.pageText) { text in
+                await savePageNote(text, for: draft)
+            }
+            .environment(\.layoutDirection, .rightToLeft)
+        }
+        .sheet(item: $lookupTerm) { term in
+            MihbaraDictionaryView(term: term.word).ignoresSafeArea()
         }
         .alert("القارئ", isPresented: Binding(get: { readerAlert != nil }, set: { if !$0 { readerAlert = nil } })) {
             Button("حسنًا", role: .cancel) { readerAlert = nil }
@@ -466,6 +491,8 @@ struct MihbaraReaderView: View {
             positionProgress.observe(position: position, at: now, explicitJump: explicitJump)
         }
         currentLocator = locator
+        // The reader's undo toast belongs to the page it was made on; the undo itself stays available.
+        if !explicitJump, wordCard == nil { readerUndoID = nil }
         scheduleLocatorSave(locator)
         resolvePrintPageMarker(for: locator)
     }
@@ -502,6 +529,224 @@ struct MihbaraReaderView: View {
             // Kept beside the saved locator, which stays Readium's own so reopening returns to
             // the exact spot rather than the start of the printed page.
             printMarkedLocator = current.copy(locations: { $0.fragments = [id] })
+        }
+    }
+
+    // MARK: - M6-V08 word card, paragraph highlights and page notes
+
+    @ViewBuilder private var readerOverlay: some View {
+        if let wordCard {
+            MihbaraWordCard(
+                state: wordCard, dark: colorScheme == .dark, copied: copiedAt != nil,
+                lookUp: { lookupTerm = .init(word: wordCard.word) },
+                choose: { color in Task { await chooseHighlight(color, for: wordCard) } },
+                note: { noteDraft = wordCard },
+                copy: { Task { await copyWithCitation(wordCard) } },
+                close: closeWordCard
+            )
+            .padding(.horizontal, 12).padding(.bottom, 10)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+        } else if let token = app.undoToken, token.id == readerUndoID, !showingReaderSettings {
+            UndoToast(message: app.undoMessage, undo: app.undo)
+                .accessibilityIdentifier("mihbara-reader-toast")
+                .padding(.bottom, 64)
+        }
+    }
+
+    @MainActor private func readerTapped() {
+        recordInteraction()
+        guard wordCard != nil else { return }
+        let tapped = Date()
+        Task { @MainActor in
+            // A tap on a highlight reports both the tap and the decoration; the decoration wins.
+            try? await Task.sleep(for: .milliseconds(300))
+            if lastDecorationTap < tapped.addingTimeInterval(-0.05) { closeWordCard() }
+        }
+    }
+
+    @MainActor private func closeWordCard() {
+        withAnimation(.easeOut(duration: 0.2)) { wordCard = nil }
+        copiedAt = nil
+        navigatorController?.clearSelection()
+    }
+
+    @MainActor private func selectionChanged(_ selection: Selection) {
+        recordInteraction()
+        let text = (selection.locator.text.highlight ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, wordCard?.selection != selection.locator else { return }
+        openWordCard(href: selection.locator.href, base: selection.locator, selector: nil, selectionText: text)
+    }
+
+    @MainActor private func highlightTapped(_ id: Decoration.Id) {
+        lastDecorationTap = Date()
+        guard let highlight = highlights.first(where: { $0.id.uuidString == id }),
+              let locator = readiumLocator(highlight.locatorJSON),
+              case .string(let selector)? = locator.locations.otherLocations["cssSelector"] else { return }
+        openWordCard(href: locator.href, base: locator, selector: selector, selectionText: nil)
+    }
+
+    /// Finds the block that holds the selection (or the given selector) and the printed page it starts on.
+    @MainActor private func openWordCard(href: AnyURL, base: Locator, selector: String?, selectionText: String?) {
+        guard let navigatorController else { return }
+        let ids = printPages.filter { $0.href.isEquivalentTo(href.removingFragment()) }.compactMap(\.fragment)
+        guard let idsJSON = try? JSONEncoder().encode(ids), let idsList = String(data: idsJSON, encoding: .utf8),
+              let selectorJSON = try? JSONEncoder().encode(selector), let selectorValue = String(data: selectorJSON, encoding: .utf8) else { return }
+        let script = """
+        (() => {
+          const blocks = 'p, li, blockquote, h1, h2, h3, h4, h5, h6, dd, dt, figcaption, td, pre';
+          let block = null;
+          const wanted = \(selectorValue);
+          if (wanted) { block = document.querySelector(wanted); }
+          else {
+            const selection = window.getSelection();
+            if (!selection || selection.rangeCount === 0) return null;
+            let node = selection.getRangeAt(0).startContainer;
+            if (node.nodeType !== 1) node = node.parentElement;
+            block = node ? (node.closest(blocks) || node.closest('div')) : null;
+          }
+          if (!block || block === document.body || block === document.documentElement) return null;
+          const path = (element) => {
+            const parts = [];
+            while (element && element !== document.body) {
+              if (element.id) { parts.unshift('#' + CSS.escape(element.id)); return parts.join(' > '); }
+              const index = Array.prototype.indexOf.call(element.parentElement.children, element) + 1;
+              parts.unshift(element.tagName.toLowerCase() + ':nth-child(' + index + ')');
+              element = element.parentElement;
+            }
+            parts.unshift('body');
+            return parts.join(' > ');
+          };
+          let page = null;
+          for (const id of \(idsList)) {
+            const marker = document.getElementById(id);
+            if (marker && (marker.compareDocumentPosition(block) & Node.DOCUMENT_POSITION_FOLLOWING) && !block.contains(marker)) page = id;
+          }
+          const text = (block.innerText || '').replace(/\\s+/g, ' ').trim();
+          return JSON.stringify({ selector: wanted || path(block), text: text, page: page });
+        })()
+        """
+        Task { @MainActor in
+            guard case .success(let value) = await navigatorController.evaluateJavaScript(script),
+                  let json = (value as? String)?.data(using: .utf8),
+                  let found = try? JSONDecoder().decode(MihbaraParagraphProbe.self, from: json),
+                  !found.text.isEmpty else { return }
+            let paragraph = base.copy(
+                locations: { $0.fragments = []; $0.otherLocations = ["cssSelector": .string(found.selector)] },
+                text: { $0 = .init() }
+            )
+            let page = printPage(href: href, markerID: found.page)
+            let existing = matchingHighlight(paragraph)
+            let preview = found.text.split(separator: " ").prefix(4).joined(separator: " ")
+            var state = MihbaraWordCardState(
+                word: selectionText ?? preview + (found.text.split(separator: " ").count > 4 ? "…" : ""),
+                isWord: selectionText != nil, selection: selectionText == nil ? nil : base,
+                paragraph: paragraph, paragraphText: found.text, quote: selectionText ?? found.text,
+                page: page.number, pageLabel: page.label, pageText: page.label.map { "ص " + digits.localized($0) })
+            state.highlightID = existing?.id; state.color = existing?.color
+            copiedAt = nil
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) { wordCard = state }
+        }
+    }
+
+    /// The printed page in effect at a block: its own marker, else the last page that began before its resource.
+    private func printPage(href: AnyURL, markerID: String?) -> (label: String?, number: Int?) {
+        let resource = href.removingFragment()
+        var index: Int?
+        if let markerID { index = printPages.firstIndex { $0.href.isEquivalentTo(resource) && $0.fragment == markerID } }
+        if index == nil, let first = printPages.firstIndex(where: { $0.href.isEquivalentTo(resource) }) {
+            index = printPages[first].fragment == nil ? first : (first > 0 ? first - 1 : nil)
+        }
+        guard let index else { return (nil, nil) }
+        let label = printPages[index].label
+        let number = label.allSatisfy({ $0.wholeNumberValue != nil }) ? Int(label.compactMap { $0.wholeNumberValue.map(String.init) }.joined()) : nil
+        return (label, number.flatMap { $0 > 0 ? $0 : nil })
+    }
+
+    private func matchingHighlight(_ paragraph: Locator) -> MihbaraHighlight? {
+        guard let selector = paragraph.locations.otherLocations["cssSelector"] else { return nil }
+        return highlights.last { highlight in
+            guard let locator = readiumLocator(highlight.locatorJSON) else { return false }
+            return locator.href.isEquivalentTo(paragraph.href) && locator.locations.otherLocations["cssSelector"] == selector
+        }
+    }
+
+    @MainActor private func reloadHighlights() {
+        highlights = (try? AppMihbaraService(app: app).highlights(for: book.id)) ?? []
+        if var card = wordCard {
+            let existing = matchingHighlight(card.paragraph)
+            card.highlightID = existing?.id; card.color = existing?.color
+            wordCard = card
+        }
+        applyHighlights()
+    }
+
+    @MainActor private func applyHighlights() {
+        guard let navigatorController else { return }
+        let palette = colorScheme == .dark ? MihbaraHighlight.night : MihbaraHighlight.paper
+        let decorations = highlights.compactMap { highlight -> Decoration? in
+            guard let locator = readiumLocator(highlight.locatorJSON),
+                  let index = MihbaraHighlight.colors.firstIndex(of: highlight.color) else { return nil }
+            return Decoration(id: highlight.id.uuidString, locator: locator, style: .highlight(tint: UIColor(madarHex: palette[index])))
+        }
+        navigatorController.apply(decorations: decorations, in: MihbaraHighlight.group)
+    }
+
+    /// One tap colours the paragraph; tapping its colour again clears it. Both are undoable.
+    @MainActor private func chooseHighlight(_ color: String, for card: MihbaraWordCardState) async {
+        recordInteraction()
+        do {
+            let commandID = UUID()
+            if card.color == color, let id = card.highlightID {
+                try await app.executeBookCommand("highlight.delete", payload: ["id": .string(id.uuidString)], id: commandID,
+                                                 undoMessage: "أُزيل التظليل · التراجع متاح لعشر دقائق")
+            } else {
+                guard let locator = try? card.paragraph.jsonString() else { return }
+                var payload: [String: MadarCore.JSONValue] = [
+                    "id": .string((card.highlightID ?? UUID()).uuidString), "bookID": .string(book.id.uuidString),
+                    "locator": .string(locator), "color": .string(color)
+                ]
+                if let label = card.pageLabel { payload["pageLabel"] = .string(label) }
+                try await app.executeBookCommand("highlight.save", payload: payload, id: commandID,
+                                                 undoMessage: "ظُلّلت الفقرة · التراجع متاح لعشر دقائق")
+            }
+            readerUndoID = app.undoToken?.id
+            reloadHighlights()
+        } catch { readerAlert = error.localizedDescription }
+    }
+
+    @MainActor private func savePageNote(_ text: String, for card: MihbaraWordCardState) async -> Bool {
+        guard let locator = try? card.paragraph.jsonString() else { return false }
+        var payload: [String: MadarCore.JSONValue] = [
+            "id": .string(UUID().uuidString), "bookID": .string(book.id.uuidString),
+            "text": .string(text), "locator": .string(locator)
+        ]
+        if let page = card.page { payload["page"] = .number(Double(page)) }
+        do {
+            try await app.executeBookCommand("notebook.savePage", payload: payload, undoMessage: "دُوّنت الملاحظة في دفتر الكتاب · التراجع متاح لعشر دقائق")
+            readerUndoID = app.undoToken?.id
+            noteDraft = nil
+            closeWordCard()
+            return true
+        } catch {
+            readerAlert = error.localizedDescription
+            return false
+        }
+    }
+
+    /// «النص» then «— الكتاب، المؤلف، ص ٤٥٣»; a single word copies its whole paragraph.
+    /// Import refuses DRM-protected EPUBs (M6-V19), so every readable book may be quoted.
+    @MainActor private func copyWithCitation(_ card: MihbaraWordCardState) async {
+        let quote = card.isWord && card.quote.split(separator: " ").count > 1 ? card.quote : card.paragraphText
+        var source = [book.title]
+        if !book.author.trimmingCharacters(in: .whitespaces).isEmpty { source.append(book.author) }
+        if let label = card.pageLabel { source.append("ص " + digits.localized(label)) }
+        UIPasteboard.general.string = "«\(quote)»\n— " + source.joined(separator: "، ")
+        let stamp = Date()
+        copiedAt = stamp
+        UIAccessibility.post(notification: .announcement, argument: "نُسخت الفقرة مع توثيقها")
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1.6))
+            if copiedAt == stamp { copiedAt = nil }
         }
     }
 
@@ -982,8 +1227,21 @@ private struct MihbaraEPUBNavigator: UIViewControllerRepresentable {
     let preferences: EPUBPreferences
     let onLocation: (Locator, Bool) -> Void
     let onInteraction: () -> Void
+    let onSelection: (Selection) -> Void
     let onReady: (EPUBNavigatorViewController) -> Void
     let onError: (NavigatorError) -> Void
+
+    /// One opaque band behind the whole paragraph, across the page width (design tokens: never alpha over ink).
+    private static var highlightTemplates: [Decoration.Style.Id: HTMLDecorationTemplate] {
+        [.highlight: HTMLDecorationTemplate(
+            layout: .bounds, width: .viewport,
+            element: { decoration in
+                let tint = (decoration.style.config as? Decoration.Style.HighlightConfig)?.tint ?? .yellow
+                return "<div class=\"madar-highlight\" style=\"background-color: \(tint.madarCSS) !important;\"/>"
+            },
+            stylesheet: ".madar-highlight { z-index: -1; margin: -0.3em 0 0 0; padding: 0 0 0.6em 0; box-sizing: content-box; }"
+        )]
+    }
 
     /// Every bundled reader font is declared once, so switching in the Aa sheet applies live.
     private static var fontDeclarations: [AnyHTMLFontFamilyDeclaration] {
@@ -997,12 +1255,13 @@ private struct MihbaraEPUBNavigator: UIViewControllerRepresentable {
         }
     }
 
-    func makeCoordinator() -> Coordinator { Coordinator(onLocation: onLocation, onInteraction: onInteraction, onReady: onReady, onError: onError) }
+    func makeCoordinator() -> Coordinator { Coordinator(onLocation: onLocation, onInteraction: onInteraction, onSelection: onSelection, onReady: onReady, onError: onError) }
 
     func makeUIViewController(context: Context) -> UIViewController {
         let configuration = EPUBNavigatorViewController.Configuration(
             preferences: preferences,
             contentInset: [.compact: (top: 25, bottom: 22), .regular: (top: 38, bottom: 34)],
+            decorationTemplates: Self.highlightTemplates,
             fontFamilyDeclarations: Self.fontDeclarations
         )
         do {
@@ -1038,6 +1297,7 @@ private struct MihbaraEPUBNavigator: UIViewControllerRepresentable {
     func updateUIViewController(_ controller: UIViewController, context: Context) {
         context.coordinator.onLocation = onLocation
         context.coordinator.onInteraction = onInteraction
+        context.coordinator.onSelection = onSelection
         context.coordinator.onReady = onReady
         context.coordinator.onError = onError
         (controller as? EPUBNavigatorViewController)?.delegate = context.coordinator
@@ -1046,12 +1306,14 @@ private struct MihbaraEPUBNavigator: UIViewControllerRepresentable {
     final class Coordinator: NSObject, EPUBNavigatorDelegate {
         var onLocation: (Locator, Bool) -> Void
         var onInteraction: () -> Void
+        var onSelection: (Selection) -> Void
         var onReady: (EPUBNavigatorViewController) -> Void
         var onError: (NavigatorError) -> Void
 
-        init(onLocation: @escaping (Locator, Bool) -> Void, onInteraction: @escaping () -> Void, onReady: @escaping (EPUBNavigatorViewController) -> Void, onError: @escaping (NavigatorError) -> Void) {
+        init(onLocation: @escaping (Locator, Bool) -> Void, onInteraction: @escaping () -> Void, onSelection: @escaping (Selection) -> Void, onReady: @escaping (EPUBNavigatorViewController) -> Void, onError: @escaping (NavigatorError) -> Void) {
             self.onLocation = onLocation
             self.onInteraction = onInteraction
+            self.onSelection = onSelection
             self.onReady = onReady
             self.onError = onError
         }
@@ -1061,6 +1323,11 @@ private struct MihbaraEPUBNavigator: UIViewControllerRepresentable {
         func navigator(_ navigator: Navigator, presentError error: NavigatorError) { onError(error) }
         func navigator(_ navigator: VisualNavigator, didTapAt point: CGPoint) { onInteraction() }
         func navigator(_ navigator: Navigator, presentExternalURL url: URL) { onInteraction() }
+        /// Madar's word card replaces the system edit menu (RMI1: meaning through the system Look Up only).
+        func navigator(_ navigator: SelectableNavigator, shouldShowMenuForSelection selection: Selection) -> Bool {
+            onSelection(selection)
+            return false
+        }
         func navigator(_ navigator: EPUBNavigatorViewController, setupUserScripts userContentController: WKUserContentController) {
             let source = """
             (() => {
@@ -1089,4 +1356,192 @@ private struct MihbaraEPUBNavigator: UIViewControllerRepresentable {
             userContentController.addUserScript(WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         }
     }
+}
+
+// MARK: - M6-V08 word card
+
+struct MihbaraWordCardState: Identifiable, Equatable {
+    let id = UUID()
+    var word: String
+    var isWord: Bool
+    var selection: Locator?
+    var paragraph: Locator
+    var paragraphText: String
+    var quote: String
+    var page: Int?
+    var pageLabel: String?
+    var pageText: String?
+    var highlightID: UUID?
+    var color: String?
+}
+
+struct MihbaraLookupTerm: Identifiable { var word: String; var id: String { word } }
+private struct MihbaraParagraphProbe: Decodable { var selector: String; var text: String; var page: String? }
+
+extension MihbaraHighlight {
+    static let group: DecorationGroup = "highlights"
+    /// `rooms.mihbara.readerThemes.{paper,night}.highlight`, in `highlightNames` order.
+    static let paper = ["#F3E3A0", "#D5E5C3", "#F1D0C8"]
+    static let night = ["#5A4A1F", "#2F4A2C", "#5A2F2A"]
+    static func title(_ color: String) -> String {
+        switch color { case "yellow": "أصفر"; case "green": "أخضر"; default: "وردي" }
+    }
+}
+
+extension UIColor {
+    convenience init(madarHex hex: String) {
+        let value = UInt32(hex.dropFirst(), radix: 16) ?? 0
+        self.init(red: CGFloat((value >> 16) & 0xFF) / 255, green: CGFloat((value >> 8) & 0xFF) / 255, blue: CGFloat(value & 0xFF) / 255, alpha: 1)
+    }
+    var madarCSS: String {
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        getRed(&r, green: &g, blue: &b, alpha: &a)
+        return "rgb(\(Int((r * 255).rounded())), \(Int((g * 255).rounded())), \(Int((b * 255).rounded())))"
+    }
+}
+
+private struct MihbaraWordCard: View {
+    let state: MihbaraWordCardState
+    let dark: Bool
+    let copied: Bool
+    let lookUp: () -> Void
+    let choose: (String) -> Void
+    let note: () -> Void
+    let copy: () -> Void
+    let close: () -> Void
+
+    private var ink: SwiftUI.Color { dark ? SwiftUI.Color(red: 233 / 255, green: 225 / 255, blue: 210 / 255) : SwiftUI.Color(red: 42 / 255, green: 33 / 255, blue: 24 / 255) }
+    private var ink2: SwiftUI.Color { dark ? SwiftUI.Color(red: 171 / 255, green: 161 / 255, blue: 146 / 255) : SwiftUI.Color(red: 106 / 255, green: 96 / 255, blue: 82 / 255) }
+    private var accent: SwiftUI.Color { dark ? SwiftUI.Color(red: 220 / 255, green: 165 / 255, blue: 100 / 255) : SwiftUI.Color(red: 158 / 255, green: 47 / 255, blue: 37 / 255) }
+    private var surface: SwiftUI.Color { dark ? SwiftUI.Color(red: 42 / 255, green: 38 / 255, blue: 31 / 255) : SwiftUI.Color(red: 255 / 255, green: 253 / 255, blue: 248 / 255) }
+    private var well: SwiftUI.Color { ink.opacity(dark ? 0.10 : 0.05) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(state.word)
+                        .font(.custom("Amiri-Bold", size: state.isWord ? 30 : 22, relativeTo: .title))
+                        .foregroundStyle(ink).lineLimit(2).multilineTextAlignment(.leading)
+                        .accessibilityIdentifier("mihbara-word-title")
+                    if state.isWord {
+                        Button(action: lookUp) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "character.book.closed").font(.system(size: 15, weight: .semibold))
+                                Text("معناها في قاموس الجهاز").font(.custom("thmanyahsans-Bold", size: 17, relativeTo: .body))
+                            }
+                            .foregroundStyle(accent).frame(minHeight: 32).contentShape(Rectangle())
+                        }
+                        .accessibilityIdentifier("mihbara-word-lookup")
+                    } else if let page = state.pageText {
+                        Text("فقرة مظلّلة من \(page)").font(MadarTypography.caption()).foregroundStyle(ink2)
+                    }
+                }
+                Spacer(minLength: 8)
+                Button(action: close) {
+                    Image(systemName: "xmark").font(.system(size: 14, weight: .semibold)).foregroundStyle(ink2)
+                        .frame(width: 44, height: 44).background(Circle().fill(well)).contentShape(Circle())
+                }
+                .accessibilityLabel("إغلاق")
+                .accessibilityIdentifier("mihbara-word-close")
+            }
+            HStack(spacing: 12) {
+                Text("ظلّل الفقرة").font(MadarTypography.fine()).foregroundStyle(ink2)
+                ForEach(Array(MihbaraHighlight.colors.enumerated()), id: \.element) { index, color in
+                    let selected = state.color == color
+                    Button { choose(color) } label: {
+                        Circle().fill(SwiftUI.Color(uiColor: UIColor(madarHex: (dark ? MihbaraHighlight.night : MihbaraHighlight.paper)[index])))
+                            .overlay(Circle().strokeBorder(selected ? ink : ink2.opacity(0.35), lineWidth: selected ? 2.5 : 1))
+                            .overlay { if selected { Image(systemName: "checkmark").font(.system(size: 15, weight: .bold)).foregroundStyle(ink) } }
+                            .frame(width: 44, height: 44).contentShape(Circle())
+                    }
+                    .accessibilityLabel(selected ? "إزالة التظليل " + MihbaraHighlight.title(color) : "تظليل " + MihbaraHighlight.title(color))
+                    .accessibilityAddTraits(selected ? .isSelected : [])
+                    .accessibilityIdentifier("mihbara-highlight-\(color)")
+                }
+                Spacer(minLength: 0)
+            }
+            HStack(spacing: 10) {
+                action("دوّن ملاحظة", icon: "square.and.pencil", id: "mihbara-word-note", run: note)
+                action(copied ? "نُسخت" : "انسخ مع التوثيق", icon: copied ? "checkmark" : "doc.on.doc", id: "mihbara-word-copy", run: copy)
+            }
+        }
+        .padding(.horizontal, 20).padding(.top, 18).padding(.bottom, 16)
+        .background(RoundedRectangle(cornerRadius: 28, style: .continuous).fill(surface)
+            .shadow(color: .black.opacity(dark ? 0.45 : 0.14), radius: 22, y: 6))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("mihbara-word-card")
+    }
+
+    private func action(_ title: String, icon: String, id: String, run: @escaping () -> Void) -> some View {
+        Button(action: run) {
+            HStack(spacing: 6) {
+                Image(systemName: icon).font(.system(size: 14, weight: .semibold))
+                Text(title).font(.custom("thmanyahsans-Bold", size: 15, relativeTo: .subheadline)).lineLimit(1).minimumScaleFactor(0.85)
+            }
+            .foregroundStyle(ink).frame(maxWidth: .infinity, minHeight: 56)
+            .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(well))
+            .contentShape(Rectangle())
+        }
+        .accessibilityIdentifier(id)
+    }
+}
+
+private struct MihbaraPageNoteSheet: View {
+    let draft: MihbaraWordCardState
+    let paper: SwiftUI.Color
+    let pageText: String?
+    let save: (String) async -> Bool
+    @Environment(\.dismiss) private var dismiss
+    @State private var text = ""
+    @State private var saving = false
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Button("إلغاء") { dismiss() }.font(MadarTypography.body()).frame(minHeight: 44)
+                    .accessibilityIdentifier("mihbara-note-cancel")
+                Spacer()
+                Text("ملاحظة على الصفحة").font(MadarTypography.section())
+                Spacer()
+                Button("احفظ") {
+                    saving = true
+                    Task { if !(await save(text.trimmingCharacters(in: .whitespacesAndNewlines))) { saving = false } }
+                }
+                .font(.custom("thmanyahsans-Bold", size: 17, relativeTo: .body)).frame(minHeight: 44)
+                .disabled(saving || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || text.count > 2000)
+                .accessibilityIdentifier("mihbara-note-save")
+            }
+            HStack(alignment: .top, spacing: 10) {
+                RoundedRectangle(cornerRadius: 2).fill(SwiftUI.Color(red: 158 / 255, green: 47 / 255, blue: 37 / 255)).frame(width: 3)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(draft.paragraphText).font(.custom("Amiri-Regular", size: 17, relativeTo: .body)).lineLimit(4).lineSpacing(4)
+                    if let pageText { Text(pageText).font(MadarTypography.fine()).foregroundStyle(.secondary) }
+                }
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            ZStack(alignment: .topLeading) {
+                if text.isEmpty {
+                    Text("ما الذي أوقفك هنا؟").font(MadarTypography.body()).foregroundStyle(.secondary).padding(.top, 8).padding(.leading, 5)
+                }
+                TextEditor(text: $text).font(MadarTypography.body()).scrollContentBackground(.hidden).focused($focused)
+                    .accessibilityLabel("نص الملاحظة").accessibilityIdentifier("mihbara-note-text")
+            }
+            .padding(10)
+            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(SwiftUI.Color.black.opacity(0.04)))
+            Text("تُحفظ في دفتر هذا الكتاب مربوطة بهذه الفقرة.").font(MadarTypography.fine()).foregroundStyle(.secondary)
+        }
+        .padding(20)
+        .background(paper.ignoresSafeArea())
+        .presentationDetents([.medium, .large])
+        .onAppear { focused = true }
+    }
+}
+
+/// RMI1: the word's meaning comes only from the system dictionary.
+private struct MihbaraDictionaryView: UIViewControllerRepresentable {
+    let term: String
+    func makeUIViewController(context: Context) -> UIReferenceLibraryViewController { UIReferenceLibraryViewController(term: term) }
+    func updateUIViewController(_ controller: UIReferenceLibraryViewController, context: Context) {}
 }

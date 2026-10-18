@@ -115,9 +115,10 @@ struct PrayerStreakArches: View {
         let inset: CGFloat = 17
         return GeometryReader { geometry in
             let full = CGRect(origin: .zero, size: geometry.size).insetBy(dx: 5, dy: 0)
-            let rects = (0..<3).map { i in
-                CGRect(x: full.minX + CGFloat(i) * inset, y: full.minY + 5 + CGFloat(i) * inset,
-                       width: full.width - CGFloat(i) * inset * 2, height: full.height - 5 - CGFloat(i) * inset - 3)
+            let rects: [CGRect] = (0..<3).map { (i: Int) -> CGRect in
+                let step: CGFloat = CGFloat(i) * inset
+                return CGRect(x: full.minX + step, y: full.minY + 5 + step,
+                              width: full.width - step * 2, height: full.height - 5 - step - 3)
             }
             let inner = rects[2]
             ZStack {

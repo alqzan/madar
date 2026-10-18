@@ -303,6 +303,54 @@ import XCTest
         XCTAssertTrue(app.buttons["mihbara-add-paper"].waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "كتاب اختبار القارئ")).firstMatch.exists)
     }
+
+    func testReaderWordCardHighlightsParagraphUndoesNotesAndCopies() throws {
+        continueAfterFailure = false
+        let fixtureURL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "arabic-reader-poc", withExtension: "epub"))
+        let app = app("reader", epub: try Data(contentsOf: fixtureURL)); app.launch(); open(app)
+        let book = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "كتاب اختبار القارئ")).firstMatch
+        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); book.tap()
+        let paragraph = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "القراءة باب يدخل")).firstMatch
+        XCTAssertTrue(paragraph.waitForExistence(timeout: 20), app.debugDescription)
+        sleep(1)
+        // A long press selects a word; Madar's card replaces the system menu.
+        paragraph.coordinate(withNormalizedOffset: CGVector(dx: 0.7, dy: 0.15)).press(forDuration: 1.2)
+        let card = app.descendants(matching: .any)["mihbara-word-card"]
+        XCTAssertTrue(card.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(app.buttons["mihbara-word-lookup"].exists)
+        XCTAssertTrue(app.buttons["mihbara-word-note"].exists)
+        XCTAssertTrue(app.buttons["mihbara-word-copy"].exists)
+        XCTAssertFalse(app.buttons["mihbara-highlight-yellow"].isSelected)
+        shot(app, "M6-V08-card-L")
+        app.buttons["mihbara-highlight-yellow"].tap()
+        XCTAssertTrue(app.buttons["mihbara-highlight-yellow"].waitForSelection(timeout: 8), app.debugDescription)
+        sleep(1); shot(app, "M6-V08-highlight-L")
+        app.buttons["mihbara-highlight-green"].tap()
+        XCTAssertTrue(app.buttons["mihbara-highlight-green"].waitForSelection(timeout: 8))
+        XCTAssertFalse(app.buttons["mihbara-highlight-yellow"].isSelected)
+        app.buttons["mihbara-word-close"].tap()
+        XCTAssertTrue(card.waitForNonExistence(timeout: 5))
+        let undo = app.descendants(matching: .any)["mihbara-reader-toast"].buttons["undo-button"]
+        XCTAssertTrue(undo.waitForExistence(timeout: 5), app.debugDescription); undo.tap()
+        XCTAssertTrue(undo.waitForNonExistence(timeout: 8))
+        // Tapping the highlighted paragraph reopens its card with the restored colour.
+        paragraph.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        XCTAssertTrue(card.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(app.buttons["mihbara-highlight-yellow"].waitForSelection(timeout: 5), app.debugDescription)
+        XCTAssertFalse(app.buttons["mihbara-word-lookup"].exists)
+        app.buttons["mihbara-word-copy"].tap()
+        XCTAssertTrue(app.buttons["mihbara-word-copy"].staticTexts["نُسخت"].waitForExistence(timeout: 3) || app.staticTexts["نُسخت"].exists, app.debugDescription)
+        app.buttons["mihbara-word-note"].tap()
+        let text = app.textViews["mihbara-note-text"]
+        XCTAssertTrue(text.waitForExistence(timeout: 5), app.debugDescription)
+        text.typeText("فكرة")
+        shot(app, "M6-V08-note-L")
+        app.buttons["mihbara-note-save"].tap()
+        XCTAssertTrue(text.waitForNonExistence(timeout: 8))
+        XCTAssertFalse(card.exists)
+        XCTAssertTrue(app.descendants(matching: .any)["mihbara-reader-toast"].waitForExistence(timeout: 5), app.debugDescription)
+        sleep(1); shot(app, "M6-V08-saved-L")
+    }
 }
 
 private extension XCUIElement {

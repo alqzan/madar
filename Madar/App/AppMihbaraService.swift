@@ -21,6 +21,10 @@ struct MihbaraBook: Identifiable, Equatable {
     var isReadableEPUB: Bool { kind == "file" && format == "epub" && mediaID != nil && fileHash?.count == 64 }
     var isReadablePDF: Bool { kind == "file" && ["pdf", "pdfScanned"].contains(format ?? "") && mediaID != nil && fileHash?.count == 64 }
 }
+struct MihbaraHighlight: Identifiable, Equatable {
+    static let colors = ["yellow", "green", "rose"]
+    var id: UUID; var locatorJSON: Data; var color: String; var pageLabel: String?
+}
 struct MihbaraHadith: Codable, Identifiable { var number: Int; var title: String; var text: String; var id: Int { number } }
 struct MihbaraCollection: Codable {
     var collectionID: String; var editionID: String; var title: String; var source: String; var edition: String; var license: String; var licenseURL: String; var hadiths: [MihbaraHadith]
@@ -60,6 +64,15 @@ struct MihbaraHomeReading {
         let prayer = try PrayerRepository(context: c), civil = GregorianDay.containing(now, in: app.activePlace.timeZone)
         let fajr = prayer.occurrence(.init(day: civil, prayer: .fajr))?.time
         return .init(books: books, collection: collection, todayHadiths: collection.hadiths.filter { numbers.contains($0.number) }, readCount: read.count, completedToday: today.count, opensAfterFajr: fajr.map { now >= $0 } ?? false, day: day)
+    }
+
+    /// M6-V08: the book's live paragraph highlights, oldest first so a later one draws on top.
+    func highlights(for bookID: UUID) throws -> [MihbaraHighlight] {
+        guard app.lockController?.canPresent(.app) ?? app.protectedDataAuthorized else { throw DataError.authenticationFailed }
+        return try ModelContext(app.container).fetch(FetchDescriptor<Highlight>())
+            .filter { $0.bookID == bookID && $0.deletedAt == nil && $0.mergedInto == nil && MihbaraHighlight.colors.contains($0.color) }
+            .sorted { $0.createdAt == $1.createdAt ? $0.id.uuidString < $1.id.uuidString : $0.createdAt < $1.createdAt }
+            .map { MihbaraHighlight(id: $0.id, locatorJSON: $0.locatorJSON, color: $0.color, pageLabel: $0.pageLabel) }
     }
 
     func epubData(for book: MihbaraBook) throws -> Data {

@@ -13,7 +13,13 @@ public enum BookCommand: Codable, Equatable, Sendable {
     case hadith(number: Int, edition: String, understood: Bool, day: GregorianDay)
     case savePrivateNote(id: UUID, text: String)
     case deletePrivateNote(id: UUID)
-    public static let names: Set<String> = ["book.savePaper", "book.updatePaper", "book.importPDF", "book.importEPUB", "book.moveShelf", "book.setPosition", "book.setLocator", "reading.saveSession", "hadith.mark", "notebook.savePrivate", "notebook.deletePrivate"]
+    /// A paragraph or passage marked in a file book; `color` is a `readerThemes.highlightNames` id.
+    case saveHighlight(id: UUID, bookID: UUID, locatorJSON: Data, color: String, pageLabel: String?)
+    case deleteHighlight(id: UUID)
+    /// «دوّن ملاحظة»: a note tied to the place in the book it was written at (link `page`).
+    case savePageNote(id: UUID, bookID: UUID, text: String, locatorJSON: Data, page: Int?)
+    public static let highlightColors: Set<String> = ["yellow", "green", "rose"]
+    public static let names: Set<String> = ["book.savePaper", "book.updatePaper", "book.importPDF", "book.importEPUB", "book.moveShelf", "book.setPosition", "book.setLocator", "reading.saveSession", "hadith.mark", "notebook.savePrivate", "notebook.deletePrivate", "highlight.save", "highlight.delete", "notebook.savePage"]
     public var isUndoable: Bool {
         if case .readingSession = self { return false }
         return true
@@ -55,6 +61,23 @@ public enum BookCommand: Codable, Equatable, Sendable {
         }
         guard let id = text("id").flatMap(UUID.init(uuidString:)) else { return nil }
         switch name {
+        case "highlight.save":
+            guard Set(p.keys).isSubset(of: ["id", "bookID", "locator", "color", "pageLabel"]), Set(["id", "bookID", "locator", "color"]).isSubset(of: Set(p.keys)),
+                  let bookID = text("bookID").flatMap(UUID.init(uuidString:)), let locator = locatorData("locator"),
+                  let color = text("color"), highlightColors.contains(color) else { return nil }
+            let label = text("pageLabel")
+            guard p["pageLabel"] == nil || (label.map { !$0.isEmpty && $0.count <= 40 } ?? false) else { return nil }
+            return .saveHighlight(id: id, bookID: bookID, locatorJSON: locator, color: color, pageLabel: label)
+        case "highlight.delete":
+            guard Set(p.keys) == ["id"] else { return nil }
+            return .deleteHighlight(id: id)
+        case "notebook.savePage":
+            guard Set(p.keys).isSubset(of: ["id", "bookID", "text", "locator", "page"]), Set(["id", "bookID", "text", "locator"]).isSubset(of: Set(p.keys)),
+                  let bookID = text("bookID").flatMap(UUID.init(uuidString:)), let locator = locatorData("locator"),
+                  let value = text("text"), !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, value.count <= 2000 else { return nil }
+            let page = integer("page")
+            guard p["page"] == nil || page.map({ $0 > 0 }) == true else { return nil }
+            return .savePageNote(id: id, bookID: bookID, text: value, locatorJSON: locator, page: page)
         case "book.importPDF":
             guard Set(p.keys) == ["id", "fileID", "sha256", "title", "author", "language"],
                   let fileID = text("fileID").flatMap(UUID.init(uuidString:)),
