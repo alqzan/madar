@@ -95,6 +95,10 @@ import MadarPrayer
         let app=try AppSession(container:MadarContainerFactory.makeLocal(at:root),groupDirectory:root)
         for url in ["madar://salah","madar://prayer"]{app.open(URL(string:url)!);XCTAssertEqual(app.selectedTab,"prayer");XCTAssertNil(app.errorMessage)}
         for room in BuiltRoomWidget.allCases{app.open(URL(string:room.route)!);XCTAssertNil(app.errorMessage)}
+        app.open(URL(string: BuiltRoomWidget.money.route)!)
+        XCTAssertEqual(app.selectedTab, "money"); XCTAssertFalse(app.moneyOpen)
+        app.open(URL(string: BuiltRoomWidget.mihbara.route)!)
+        XCTAssertEqual(app.selectedTab, "mihbara"); XCTAssertFalse(app.mihbaraOpen)
         app.open(URL(string:BuiltRoomWidget.diaryWrite.route)!)
         XCTAssertEqual(app.selectedTab,"notes");XCTAssertEqual(app.diaryRoute?.path,["write"])
         app.open(URL(string:"madar://prayer?unexpected=1")!);XCTAssertNotNil(app.errorMessage)

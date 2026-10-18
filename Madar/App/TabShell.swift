@@ -15,22 +15,109 @@ struct TabShell<Content: View>: View {
     let tabs: [FoundationTab]
     @ViewBuilder let content: (String) -> Content
     @Environment(\.roomTheme) private var theme
+    @Environment(\.dynamicTypeSize) private var dynamicType
+    @AppStorage("Madar.TabViewCustomization") private var tabCustomization = TabViewCustomization()
+    private let bottomShortcuts: Set<String> = ["notes", "money", "mihbara"]
+
     var body: some View {
         TabView(selection: $selection) {
-            ForEach(tabs) { tab in
+            ForEach(tabs.filter { !bottomShortcuts.contains($0.id) }) { tab in
                 if tab.symbol.hasPrefix("Madar") {
                     Tab(tab.title, image: tab.symbol + (selection == tab.id ? "Selected" : ""), value: tab.id) {
                         content(tab.id).accessibilityIdentifier(tab.id + "-tab")
                     }
+                    .customizationID("com.madar.tab.\(tab.id)")
                 } else {
                     Tab(tab.title, systemImage: tab.symbol, value: tab.id) {
                         content(tab.id).accessibilityIdentifier(tab.id == "customize" ? "settings-tab" : tab.id + "-tab")
                     }
+                    .customizationID("com.madar.tab.\(tab.id)")
                 }
             }
+            TabSection {
+                ForEach(tabs.filter { bottomShortcuts.contains($0.id) }) { tab in
+                    if tab.symbol.hasPrefix("Madar") {
+                        Tab(tab.title, image: tab.symbol + (selection == tab.id ? "Selected" : ""), value: tab.id) {
+                            content(tab.id).accessibilityIdentifier(tab.id + "-tab")
+                        }
+                        .customizationID("com.madar.tab.\(tab.id)")
+                    } else {
+                        Tab(tab.title, systemImage: tab.symbol, value: tab.id) {
+                            content(tab.id).accessibilityIdentifier(tab.id == "customize" ? "settings-tab" : tab.id + "-tab")
+                        }
+                        .customizationID("com.madar.tab.\(tab.id)")
+                    }
+                }
+            } header: {
+                Label("غرف مدار", systemImage: "square.grid.2x2")
+            }
+            .customizationID("com.madar.section.quick-access")
+            .defaultVisibility(.hidden, for: .tabBar)
         }
+        .tabViewStyle(.sidebarAdaptable)
+        .tabViewCustomization($tabCustomization)
+        .defaultAdaptableTabBarPlacement(.tabBar)
         .tabBarMinimizeBehavior(.onScrollDown)
+        .tabViewBottomAccessory { bottomAccessory }
         .tint(theme.accent)
+    }
+
+    private var bottomAccessory: some View {
+        GlassRoomShortcuts(tabs: tabs.filter { bottomShortcuts.contains($0.id) }, selection: $selection,
+                           accent: theme.accent, secondaryInk: theme.secondaryInk)
+    }
+}
+
+private struct GlassRoomShortcuts: View {
+    let tabs: [FoundationTab]
+    @Binding var selection: String
+    let accent: Color
+    let secondaryInk: Color
+    @Environment(\.tabViewBottomAccessoryPlacement) private var placement
+
+    private var isInline: Bool { placement == .inline }
+
+    var body: some View {
+        GlassEffectContainer(spacing: isInline ? 8 : 6) {
+            HStack(spacing: isInline ? 8 : 10) {
+                ForEach(tabs) { tab in
+                    Button { selection = tab.id } label: {
+                        Group {
+                            if isInline {
+                                roomIcon(tab)
+                                    .frame(width: 22, height: 22)
+                                    .frame(maxWidth: .infinity, minHeight: 38)
+                            } else {
+                                Label {
+                                    Text(tab.title).lineLimit(1).minimumScaleFactor(0.8)
+                                } icon: {
+                                    roomIcon(tab).frame(width: 18, height: 18)
+                                }
+                                .font(MadarTypography.caption())
+                                .frame(maxWidth: .infinity, minHeight: 38)
+                            }
+                        }
+                        .contentShape(.capsule)
+                    }
+                    .buttonStyle(.glass)
+                    .tint(selection == tab.id ? accent : secondaryInk)
+                    .accessibilityLabel(tab.title)
+                    .accessibilityIdentifier("tab-\(tab.id)")
+                    .accessibilityAddTraits(selection == tab.id ? .isSelected : [])
+                }
+            }
+            .padding(.horizontal, isInline ? 8 : 12)
+            .padding(.vertical, 3)
+        }
+    }
+
+    @ViewBuilder private func roomIcon(_ tab: FoundationTab) -> some View {
+        if tab.symbol.hasPrefix("Madar") {
+            Image(tab.symbol + (selection == tab.id ? "Selected" : ""))
+                .resizable().scaledToFit()
+        } else {
+            Image(systemName: tab.symbol).font(.system(size: 16, weight: .regular))
+        }
     }
 }
 
@@ -43,14 +130,25 @@ struct MadarRootView: View {
     var body: some View {
         let dark = forcedColorScheme == .dark || (forcedColorScheme == nil && colorScheme == .dark)
         let theme = RoomTheme(dark: dark, calmPaper: false)
-        TabShell(selection: $session.selectedTab, tabs: [.init(id: "foundation", title: "البهو", symbol: "MadarOrbit"), .init(id: "prayer", title: "الصلاة", symbol: "MadarPrayer"), .init(id: "quran", title: "القرآن", symbol: "MadarQuran"), .init(id: "notes", title: "المذكرات", symbol: "MadarDiary"), .init(id: "customize", title: "خصّص", symbol: "MadarCustomize")]) { tab in
+        TabShell(selection: $session.selectedTab,
+                 tabs: [.init(id: "foundation", title: "البهو", symbol: "MadarOrbit"), .init(id: "prayer", title: "الصلاة", symbol: "MadarPrayer"), .init(id: "quran", title: "القرآن", symbol: "MadarQuran"), .init(id: "customize", title: "خصّص", symbol: "MadarCustomize"), .init(id: "notes", title: "المذكرات", symbol: "MadarDiary"), .init(id: "money", title: "المال", symbol: "banknote"), .init(id: "mihbara", title: "المحبرة", symbol: "books.vertical")]) { tab in
             NavigationStack {
-                if tab == "customize" { CustomizeMadar(session: session) }
-                else if tab == "prayer" { PrayerTodayView(session: session) }
-                else if tab == "quran" { QuranHomeView(service: AppQuranService(session: session)) }
-                else if tab == "notes" { DiaryRoomView(app: session) }
-                // M4-V01: the lobby replaces the M0 foundation home (kept in FoundationHome.swift, unused).
-                else { BahwLobbyView(session: session) }
+                Group {
+                    if tab == "customize" { CustomizeMadar(session: session) }
+                    else if tab == "prayer" { PrayerTodayView(session: session) }
+                    else if tab == "quran" { QuranHomeView(service: AppQuranService(session: session)) }
+                    else if tab == "notes" { DiaryRoomView(app: session) }
+                    else if tab == "money" { MoneyRoomView(app: session, isTabRoot: true) }
+                    else if tab == "mihbara" { MihbaraHomeView(app: session, isTabRoot: true) }
+                    // M4-V01: the lobby replaces the M0 foundation home (kept in FoundationHome.swift, unused).
+                    else { BahwLobbyView(session: session) }
+                }
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    Color.clear
+                        .frame(height: dynamicType.isAccessibilitySize ? 64 : 48)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                }
             }
         }
         .fullScreenCover(item: $session.moneyExpenseSeed) { seed in MoneyQuickExpense(app: session, seed: seed) }

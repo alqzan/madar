@@ -384,7 +384,7 @@ final class AppSession {
                 let raw = route.parameters["amount"].flatMap(Int.init).map { AppMoneyService(app: self).moneyInput($0) } ?? ""
                 moneyExpenseSeed = .init(amount: raw, merchant: String((route.parameters["merchant"] ?? "").prefix(80)), homeCurrency: true); return
             }
-            if route.room == .mal, route.path.isEmpty || route.path == ["now"] { selectedTab = "customize"; moneyOpen = true; return }
+            if route.room == .mal, route.path.isEmpty || route.path == ["now"] { selectedTab = "money"; return }
             if route.room == .salah,route.path.isEmpty {selectedTab="prayer";return}
             if route.room == .bahw,route.path.isEmpty {selectedTab="foundation";return}
             if route.room == .quran, route.path.isEmpty || route.path.first == "session" || route.path.first == "page" {
@@ -395,7 +395,7 @@ final class AppSession {
             }
             if route.room == .habits { habitRouteID=route.path.last.flatMap(UUID.init(uuidString:)) ?? route.parameters["habit"].flatMap(UUID.init(uuidString:)); selectedTab = "foundation"; habitsOpen = true; return }
             if route.room == .year, route.path == ["year"] { selectedTab = "foundation"; yearOpen = true; return }
-            if route.room == .mihbara { selectedTab = "customize"; mihbaraOpen = true; return }
+            if route.room == .mihbara { selectedTab = "mihbara"; return }
             guard url.host == "settings", route.room == .core else { throw CoreError.unavailableFeature }
             settingsQuery = try schema.definition(for: route.path[1]).title
             selectedTab = "customize"

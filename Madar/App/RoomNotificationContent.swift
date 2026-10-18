@@ -188,7 +188,7 @@ import MadarPrayer
     static func open(_ id: String, userInfo: [AnyHashable: Any], session: AppSession) {
         if id.hasPrefix("quran.") { session.selectedTab = "quran" }
         else if id.hasPrefix("qada.") { session.selectedTab = "prayer" }
-        else if id.hasPrefix("mal.alert80.") || id.hasPrefix("mal.card") { session.selectedTab = "customize"; session.moneyOpen = true }
+        else if id.hasPrefix("mal.alert80.") || id.hasPrefix("mal.card") { session.selectedTab = "money" }
         else if id.hasPrefix("notes.") { session.open(URL(string: id.hasSuffix(".onThisDay") ? "madar://notes" : "madar://notes/today")!) }
         else if id.hasPrefix("habits.") {
             session.habitRouteID = (userInfo["habit"] as? String).flatMap(UUID.init(uuidString:))

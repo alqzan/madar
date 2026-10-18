@@ -955,7 +955,7 @@ import XCTest
         let screenshot = XCTAttachment(screenshot: app.screenshot())
         screenshot.name = "M0-deep-link-cold-settings"; screenshot.lifetime = .keepAlways; add(screenshot)
     }
-    func testFirstRunAndSettingsRenderWithoutUnbuiltRooms() throws {
+    func testFirstRunAndSettingsRenderWithBuiltRoomsAndGlassShortcuts() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchEnvironment["MADAR_UI_STORE_ID"] = UUID().uuidString
@@ -965,10 +965,9 @@ import XCTest
         XCTAssertTrue(settings.waitForExistence(timeout: 20), app.debugDescription)
         XCTAssertTrue(app.tabBars.buttons["الصلاة"].exists, "The M1 prayer screen is the first built room.")
         XCTAssertTrue(app.tabBars.buttons["القرآن"].exists, "M2 Quran home is now built.")
-        XCTAssertTrue(app.tabBars.buttons["المذكرات"].exists, "M3 diary is built.")
-        for room in ["المال", "المحبرة"] {
-            XCTAssertFalse(app.tabBars.buttons[room].exists, "Unbuilt rooms have no tab entry.")
-        }
+        XCTAssertTrue(app.buttons["tab-notes"].exists, "M3 diary is built.")
+        XCTAssertTrue(app.buttons["tab-money"].exists, "The built money room has a direct glass shortcut.")
+        XCTAssertTrue(app.buttons["tab-mihbara"].exists, "The built Mihbara room has a direct glass shortcut.")
         let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "M0-iPhone17Pro-RTL-light-L"; shot.lifetime = .keepAlways; add(shot)
         settings.tap()
         XCTAssertTrue(app.buttons["reset-settings"].waitForExistence(timeout: 10), app.debugDescription)

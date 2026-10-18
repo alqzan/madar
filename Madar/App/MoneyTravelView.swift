@@ -8,14 +8,15 @@ import MadarCommands
 
 struct MoneyRoomView: View {
     let app: AppSession
+    var isTabRoot = false
     @State private var trip = false
     @State private var loaded = false
     @State private var revealed = false
     var body: some View {
         Group {
             if !loaded { ProgressView() }
-            else if trip { MoneyTravelView(app: app, revealed: $revealed) }
-            else { MoneyHomeView(app: app) }
+            else if trip { MoneyTravelView(app: app, revealed: $revealed, isTabRoot: isTabRoot) }
+            else { MoneyHomeView(app: app, isTabRoot: isTabRoot) }
         }.task { load() }.onChange(of: app.prayerRevision) { load() }
     }
     private func load() { trip = (try? MoneyRepository(context: ModelContext(app.container)).trip(at: app.prayerNow())) != nil; loaded = true }
@@ -24,6 +25,7 @@ struct MoneyRoomView: View {
 struct MoneyTravelView: View {
     let app: AppSession
     @Binding var revealed: Bool
+    var isTabRoot = false
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicType
@@ -91,7 +93,9 @@ struct MoneyTravelView: View {
     }
     private var header: some View {
         HStack(alignment: .firstTextBaseline) {
-            Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44).overlay { Circle().stroke(theme.color("stampText"), lineWidth: 1) } }.accessibilityLabel("إغلاق").accessibilityIdentifier("money-travel-close")
+            if !isTabRoot {
+                Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44).overlay { Circle().stroke(theme.color("stampText"), lineWidth: 1) } }.accessibilityLabel("إغلاق").accessibilityIdentifier("money-travel-close")
+            }
             Text("المال، " + (reading?.city ?? "السفر")).font(.custom("thmanyahserifdisplay-Bold", size: 23, relativeTo: .title2)); Spacer(minLength: 0)
             if !visible { Button { revealed = true } label: { Image(systemName: "eye").frame(width: 44, height: 44) }.accessibilityLabel("أظهر الأرقام").accessibilityIdentifier("money-travel-reveal") }
         }

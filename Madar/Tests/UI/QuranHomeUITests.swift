@@ -58,12 +58,28 @@ import XCTest
     func testFirstUseShowsPlanActionWithoutZeroStreakOrDepthControls() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
-        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MIHBARA_FIXTURE": "empty", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
         app.launch()
         if app.buttons["first-run-skip"].waitForExistence(timeout: 2) { app.buttons["first-run-skip"].tap() }
         let start = app.buttons["first-run-continue"]
         if start.waitForExistence(timeout: 2) { start.tap(); if start.exists && start.isHittable { start.tap() } }
-        app.tabBars.buttons["القرآن"].tap()
+        let tabBar = app.tabBars.firstMatch
+        XCTAssertTrue(tabBar.waitForExistence(timeout: 10), app.debugDescription)
+        for title in ["البهو", "الصلاة", "القرآن", "خصّص"] {
+            XCTAssertTrue(tabBar.buttons[title].waitForExistence(timeout: 5), "Missing native destination: \(title)\n\(app.debugDescription)")
+        }
+        XCTAssertTrue(app.buttons["tab-notes"].waitForExistence(timeout: 5), "Missing direct diary shortcut\n\(app.debugDescription)")
+        XCTAssertTrue(app.buttons["tab-money"].waitForExistence(timeout: 5), "Missing direct money shortcut\n\(app.debugDescription)")
+        XCTAssertTrue(app.buttons["tab-mihbara"].waitForExistence(timeout: 5), "Missing direct Mihbara shortcut\n\(app.debugDescription)")
+        let tabsShot = XCTAttachment(screenshot: app.screenshot()); tabsShot.name = "M0-native-glass-tabs-L"; tabsShot.lifetime = .keepAlways; add(tabsShot)
+        app.buttons["tab-notes"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["notes-tab"].waitForExistence(timeout: 8), app.debugDescription)
+        app.buttons["tab-money"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["money-home"].waitForExistence(timeout: 10), app.debugDescription)
+        let moneyShot = XCTAttachment(screenshot: app.screenshot()); moneyShot.name = "M0-native-glass-money-active-L"; moneyShot.lifetime = .keepAlways; add(moneyShot)
+        app.buttons["tab-mihbara"].tap()
+        XCTAssertTrue(app.buttons["mihbara-add-paper"].waitForExistence(timeout: 10), app.debugDescription)
+        tabBar.buttons["القرآن"].tap()
         XCTAssertTrue(app.buttons["quran-start-plan"].waitForExistence(timeout: 15), app.debugDescription)
         XCTAssertFalse(app.buttons["quran-streak"].exists)
         XCTAssertFalse(app.buttons["quran-level-hifz-medium"].exists)

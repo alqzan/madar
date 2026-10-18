@@ -6,6 +6,7 @@ import MadarData
 
 struct MihbaraHomeView: View {
     let app: AppSession
+    var isTabRoot = false
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicType
@@ -29,7 +30,14 @@ struct MihbaraHomeView: View {
         TimelineView(.periodic(from: Date(timeIntervalSince1970: 0), by: 60)) { tick in
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    HStack { Button { dismiss() } label: { Label("رجوع", systemImage: "chevron.right") }.accessibilityIdentifier("mihbara-back"); Spacer(); Text("المحبرة").font(MadarTypography.title()); Image(systemName: "books.vertical").font(.title2) }
+                    HStack {
+                        if isTabRoot { Color.clear.frame(width: 44, height: 44) }
+                        else { Button { dismiss() } label: { Label("رجوع", systemImage: "chevron.right") }.accessibilityIdentifier("mihbara-back") }
+                        Spacer(minLength: 8)
+                        Text("المحبرة").font(MadarTypography.title())
+                        Spacer(minLength: 8)
+                        Image(systemName: "books.vertical").font(.title2).frame(width: 44, height: 44)
+                    }
                     if let r = reading {
                         MadarDateLabel(app.dateLabels(r.day)).foregroundStyle(theme.secondaryInk)
                         shelfView(r)

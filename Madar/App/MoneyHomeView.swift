@@ -7,6 +7,7 @@ import MadarCommands
 
 struct MoneyHomeView: View {
     @Bindable var app: AppSession
+    var isTabRoot = false
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicType
@@ -130,8 +131,10 @@ struct MoneyHomeView: View {
                 }.buttonStyle(.plain).accessibilityElement(children: .ignore)
                     .accessibilityLabel(count > 0 ? "رسائل البنك، " + service.pending(count) : "رسائل البنك").accessibilityAddTraits(.isButton).accessibilityIdentifier("money-pending")
             }
-            Button { dismiss() } label: { Image(systemName: "chevron.backward").font(.body).frame(width: 44, height: 44) }
-                .buttonStyle(.plain).accessibilityLabel("العودة").accessibilityIdentifier("money-back")
+            if !isTabRoot {
+                Button { dismiss() } label: { Image(systemName: "chevron.backward").font(.body).frame(width: 44, height: 44) }
+                    .buttonStyle(.plain).accessibilityLabel("العودة").accessibilityIdentifier("money-back")
+            }
         }.frame(minHeight: 48)
     }
     private func headline(_ reading: MoneyHomeReading, cycle: MoneyCycleReading) -> some View {

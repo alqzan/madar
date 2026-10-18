@@ -166,8 +166,16 @@ import XCTest
         XCTAssertTrue(quran.waitForExistence(timeout: 5)); quran.tap()
         XCTAssertTrue(app.staticTexts["quran-coverage-title"].waitForExistence(timeout: 10), app.debugDescription)
         capture(app, "UX-10-single-tap-quran-L")
-        for (tab, id) in [("الصلاة", "prayer-today-header"), ("خصّص", "settings-search"), ("المذكرات", "diary-home-title"), ("البهو", "bahw-block-salah")] {
-            app.tabBars.buttons[tab].tap()
+        for (tab, id, shortcutID) in [
+            ("الصلاة", "prayer-today-header", ""),
+            ("خصّص", "settings-search", ""),
+            ("المذكرات", "diary-home-title", "notes"),
+            ("المال", "money-home", "money"),
+            ("المحبرة", "mihbara-add-paper", "mihbara"),
+            ("البهو", "bahw-block-salah", "")
+        ] {
+            if shortcutID.isEmpty { app.tabBars.buttons[tab].tap() }
+            else { app.buttons["tab-\(shortcutID)"].tap() }
             XCTAssertTrue(app.descendants(matching: .any).matching(identifier: id).firstMatch.waitForExistence(timeout: 10), tab + app.debugDescription)
         }
     }
