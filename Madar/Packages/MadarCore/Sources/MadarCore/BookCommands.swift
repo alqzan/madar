@@ -3,6 +3,7 @@ import Foundation
 /// §7.6: three reading slots, explicit finishes, and stable collection/number identities.
 public enum BookCommand: Codable, Equatable, Sendable {
     case savePaper(id: UUID, title: String, author: String, pages: Int?, shelf: String, replacing: UUID?, isbn13: String?, tocJSON: Data?)
+    case updatePaper(id: UUID, title: String, author: String, pages: Int?, position: Int, isbn13: String?, tocJSON: Data?)
     case importPDF(id: UUID, fileID: UUID, sha256: String, title: String, author: String, language: String)
     case importEPUB(id: UUID, fileID: UUID, sha256: String, title: String, author: String, language: String, shelf: String)
     case shelf(id: UUID, shelf: String, replacing: UUID?)
@@ -12,7 +13,7 @@ public enum BookCommand: Codable, Equatable, Sendable {
     case hadith(number: Int, edition: String, understood: Bool, day: GregorianDay)
     case savePrivateNote(id: UUID, text: String)
     case deletePrivateNote(id: UUID)
-    public static let names: Set<String> = ["book.savePaper", "book.importPDF", "book.importEPUB", "book.moveShelf", "book.setPosition", "book.setLocator", "reading.saveSession", "hadith.mark", "notebook.savePrivate", "notebook.deletePrivate"]
+    public static let names: Set<String> = ["book.savePaper", "book.updatePaper", "book.importPDF", "book.importEPUB", "book.moveShelf", "book.setPosition", "book.setLocator", "reading.saveSession", "hadith.mark", "notebook.savePrivate", "notebook.deletePrivate"]
     public var isUndoable: Bool {
         if case .readingSession = self { return false }
         return true
@@ -71,6 +72,34 @@ public enum BookCommand: Codable, Equatable, Sendable {
                   let language = text("language"), ["ar", "en"].contains(language),
                   let shelf = text("shelf"), ["reading", "want", "finished"].contains(shelf) else { return nil }
             return .importEPUB(id: id, fileID: fileID, sha256: hash, title: title, author: author, language: language, shelf: shelf)
+        case "book.updatePaper":
+            guard Set(p.keys) == ["id", "title", "author", "pages", "position", "isbn13", "tocJSON"],
+                  let title = text("title")?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty, title.count <= 300,
+                  let author = text("author"), author.count <= 300,
+                  let position = integer("position") else { return nil }
+            let pages: Int?
+            if case .null = p["pages"] { pages = nil }
+            else if let value = integer("pages"), value > 0 { pages = value }
+            else { return nil }
+            let isbn13: String?
+            switch p["isbn13"] {
+            case .null: isbn13 = nil
+            case .string(let raw):
+                guard let value = PaperBookIndex.normalizedISBN13(raw) else { return nil }
+                isbn13 = value
+            default: return nil
+            }
+            let tocJSON: Data?
+            switch p["tocJSON"] {
+            case .null: tocJSON = nil
+            case .string(let raw):
+                guard raw.utf8.count <= PaperBookIndex.maximumEncodedBytes,
+                      let data = raw.data(using: .utf8),
+                      PaperBookIndex.decode(data, pages: pages) != nil else { return nil }
+                tocJSON = data
+            default: return nil
+            }
+            return .updatePaper(id: id, title: title, author: author, pages: pages, position: position, isbn13: isbn13, tocJSON: tocJSON)
         case "book.savePaper":
             guard Set(p.keys).isSubset(of: ["id","title","author","pages","shelf","replacing","isbn13","tocJSON"]), let title = text("title")?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty, title.count <= 300, let author = text("author"), author.count <= 300, let shelf = text("shelf"), ["reading","want","finished"].contains(shelf), p["pages"] == nil || integer("pages").map({ (1...100000).contains($0) }) == true else { return nil }
             guard p["replacing"] == nil || text("replacing").flatMap(UUID.init(uuidString:)) != nil else { return nil }

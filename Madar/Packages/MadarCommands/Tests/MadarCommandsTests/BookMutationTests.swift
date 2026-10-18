@@ -50,6 +50,41 @@ import MadarData
         try c.save()
         #expect(book.deletedAt != nil)
     }
+    @Test func updatingPaperDetailsIsUndoableAndPreservesShelfAndPosition() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "Mihbara-\(UUID())"); defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root), c = ModelContext(container), id = UUID()
+        let originalChapters = [PaperBookChapter(title: "المدخل", page: 1, pageSource: .entered)]
+        let originalTOC = try #require(PaperBookIndex.encode(originalChapters, pages: 120))
+        _ = try BookMutationHandler.stage(.savePaper(id: id, title: "كتاب ورقي", author: "مؤلف", pages: 120, shelf: "want", replacing: nil, isbn13: "9780306406157", tocJSON: originalTOC), context: c, now: now, writer: "fixture")
+        try c.save()
+        let book = try #require(c.fetch(FetchDescriptor<Book>()).first)
+        book.currentPage = 24
+        try c.save()
+
+        let updatedChapters = [PaperBookChapter(title: "بداية الطريق", page: 1, pageSource: .entered), PaperBookChapter(title: "فصل ثانٍ", page: 32, pageSource: .estimated)]
+        let updatedTOC = try #require(PaperBookIndex.encode(updatedChapters, pages: 140))
+        let parsed = BookCommand.parse("book.updatePaper", [
+            "id": .string(id.uuidString), "title": .string("كتاب ورقي"), "author": .string("مؤلف"),
+            "pages": .number(140), "position": .number(26), "isbn13": .null, "tocJSON": .string(String(decoding: updatedTOC, as: UTF8.self))
+        ])
+        #expect(parsed == .updatePaper(id: id, title: "كتاب ورقي", author: "مؤلف", pages: 140, position: 26, isbn13: nil, tocJSON: updatedTOC))
+        #expect(throws: (any Error).self) {
+            _ = try BookMutationHandler.stage(.updatePaper(id: id, title: "كتاب ورقي", author: "مؤلف", pages: 20, position: 24, isbn13: nil, tocJSON: updatedTOC), context: c, now: now.addingTimeInterval(1), writer: "fixture")
+        }
+
+        let undo = try BookMutationHandler.stage(.updatePaper(id: id, title: "كتاب منقح", author: "مؤلف ثانٍ", pages: 140, position: 26, isbn13: nil, tocJSON: updatedTOC), context: c, now: now.addingTimeInterval(2), writer: "fixture")
+        try c.save()
+        #expect(book.title == "كتاب منقح"); #expect(book.author == "مؤلف ثانٍ"); #expect(book.pages == 140)
+        #expect(book.isbn13 == nil); #expect(book.shelf == "want"); #expect(book.currentPage == 26)
+        #expect(try JSONDecoder().decode(PaperBookPosition.self, from: #require(book.locatorJSON)).page == 26)
+        #expect(PaperBookIndex.decode(try #require(book.tocJSON), pages: book.pages) == updatedChapters)
+
+        try BookMutationHandler.undo(undo, context: c, now: now.addingTimeInterval(3), writer: "fixture")
+        try c.save()
+        #expect(book.title == "كتاب ورقي"); #expect(book.author == "مؤلف"); #expect(book.pages == 120)
+        #expect(book.isbn13 == "9780306406157"); #expect(book.shelf == "want"); #expect(book.currentPage == 24)
+        #expect(PaperBookIndex.decode(try #require(book.tocJSON), pages: book.pages) == originalChapters)
+    }
     @Test func hadithReturnAndUnderstandingUseTheSameIdentityAndUndo() throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "Mihbara-\(UUID())"); defer { try? FileManager.default.removeItem(at: root) }
         let container = try MadarContainerFactory.makeLocal(at: root), c = ModelContext(container)

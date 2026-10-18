@@ -1,10 +1,10 @@
 # Current milestone
 
-**M5 V01–V24 and X01 are built; bounded software gate recorded in docs/reports/M5.md. M6-V01 awaits later home controls; V02–V05 are blocked by RA8 v2-only appearance choices. V06–V14 are blocked by reader rendering/settings contract gaps; V15 and V18 depend on V17. V16, V19 and V20 are matched — awaiting owner. V17 is blocked: the imported PDF remains in «وصل مؤخرًا» after save, and two bounded repairs did not clear its action; visual differences also remain. M6-V21 is next ready.** Broad Money run: 58/59 passed, sole stale V01 assertion corrected and rerun green. Global source/specification checks and owner-device/specialist gates remain open; the owner approved continuing M6 software and deferring phone tests until app completion. Preserve RA1/RA2, RP1, RU1 and existing records.
+**M5 V01–V24 and X01 are built; bounded software gate recorded in docs/reports/M5.md. M6-V01 awaits later home controls; V02–V05 are blocked by RA8 v2-only appearance choices. V06–V14 and V21–V22 are blocked by reader rendering/settings contract gaps; V15 and V18 depend on V17. V16, V19, V20 and V23 are matched — awaiting owner. V17 is blocked: the imported PDF remains in «وصل مؤخرًا» after save, and two bounded repairs did not clear its action; visual differences also remain. M6-X01 is next ready.** Broad Money run: 58/59 passed, sole stale V01 assertion corrected and rerun green. Global source/specification checks and owner-device/specialist gates remain open; the owner approved continuing M6 software and deferring phone tests until app completion. Preserve RA1/RA2, RP1, RU1 and existing records.
 
 # Last checked
 
-2026-10-18 — M6-V19 `EPUBBookImportTests` 5/5 and simulator UI 1/1 passed; default L/light captures and `compare-screens.py R10-Milaf-ePub` generated/opened. V17 remains blocked after two focused UI failures. M6-V06 still renders a blank EPUB body; no focused Money tests ran here.
+2026-10-18 — M6-V23 Commands 7/7 and iPhone 17 Pro simulator UI 1/1 passed; default L/light captures and `compare-screens.py R10-Bitaqa-Waraqi` generated/opened. XCTest reported `Invalid frame dimension (negative or non-finite)` during a text-field tap. V21/V22 remain blocked by the blank V06 EPUB body. V17 remains blocked after two focused UI failures.
 
 # Board
 
@@ -252,9 +252,9 @@ Owner: «اعتمد ترتيب المحبرة وواصل». Each row includes it
 | M6-V18 | PDF reader — `19-R10-Milaf-PDF.jpg` | blocked: M6-V17 import preview is blocked and visually unresolved | Do not start the reader until V17 preview is resolved. |
 | M6-V19 | EPUB import — `20-R10-Milaf-ePub.jpg` / `20-R10-Milaf-ePub-s1.jpg` | matched — awaiting owner | EPUB 2/3 preview and local import: bounds ZIP entries/expanded size/ratio, rejects traversal, symlinks and DRM, extracts real title/author/language/direction/TOC/page list/footnote evidence, uses the selected shelf, and adds original Media + Book through an app-only command with undo. Package tests 5/5; iPhone 17 Pro simulator UI 1/1; default L/light captures and `compare-screens.py R10-Milaf-ePub` generated and opened. Differences: JSON paper tokens override the warmer canonical; the always-local copy is factual under RA1, so the screenshot toggle is represented as fixed offline availability; title/cover/layout follow the chosen file. Owner visual acceptance pending. Synthetic EPUB is test-only. |
 | M6-V20 | Paper book index — `21-R10-Waraqi.jpg` / `21-R10-Waraqi-s1.jpg` | matched — awaiting owner | Offline paper-book editor: validates EAN-13 ISBN-13, keeps title/author manual, scans one index page, uses Arabic OCR only when supported and stores no image; OCR page candidates stay estimated for review. Existing Book ISBN/TOC fields save in one undoable command. Core 4/4, Commands 6/6, final iPhone 17 Pro simulator UI 1/1; default L/light captures and `compare-screens.py R10-Waraqi` generated/opened. Differences: no chapter subtitle content in the current index shape; ISBN and shelf controls remain visible for manual entry. Camera capture/OCR quality not verified on hardware. Synthetic UI fixture only. |
-| M6-V21 | Listening — `23-R10-Istima.jpg` | ready | Real user data; 11 pt minimum, listed wood contrast pairs; no prototype moon/sample numbers, copyrighted modern snippets, unavailable bundled commentary, v2 Arabic hints or unavailable translation/dictionary. |
-| M6-V22 | Auto-scroll — `24-R10-Tamrir.jpg` | ready | Real user data; 11 pt minimum, listed wood contrast pairs; no prototype moon/sample numbers, copyrighted modern snippets, unavailable bundled commentary, v2 Arabic hints or unavailable translation/dictionary. |
-| M6-V23 | Paper book card — `25-R10-Bitaqa-Waraqi.jpg` | ready | Real user data; 11 pt minimum, listed wood contrast pairs; no prototype moon/sample numbers, copyrighted modern snippets, unavailable bundled commentary, v2 Arabic hints or unavailable translation/dictionary. |
+| M6-V21 | Listening — `23-R10-Istima.jpg` | blocked: shared EPUB body still renders blank in M6-V06, so the paragraph text needed for visible TTS highlighting cannot match the canonical screen | Resume after the shared Readium body renders; do not add sample text or retry V06's two bounded repair attempts here. |
+| M6-V22 | Auto-scroll — `24-R10-Tamrir.jpg` | blocked: its canonical reader background depends on the blank EPUB body already tracked by M6-V06 | Resume after shared Readium rendering works; the settings controls can be built then against visible text and progress. |
+| M6-V23 | Paper book card — `25-R10-Bitaqa-Waraqi.jpg` / `25-R10-Bitaqa-Waraqi-s1.jpg` | matched — awaiting owner | Card uses the book's title, author, shelf and page total; the index prompt opens the existing-book editor, and «ابدأه» places a wanted book on the table. One undoable `book.updatePaper` saves edited details, index and current page. Commands 7/7; iPhone 17 Pro simulator UI 1/1; default L/light captures and `compare-screens.py R10-Bitaqa-Waraqi` generated/opened. Differences: the live scrolled card keeps its real title and actions visible while the canonical panel is blank. XCTest reported one non-failing invalid-frame runtime warning during a text-field tap. Synthetic book only; owner visual acceptance pending. |
 | M6-X01 | Outside the room: lobby/widget/Control/capture/diary integration — §8–§9 | ready | Only once the owning room and facts work; preserve privacy and single ownership. |
 
 ## Waiting on the owner
@@ -268,13 +268,13 @@ Owner standing rule (15 Oct): screens that match their design or better count as
 M2 screens are owner-approved; M1-F04 software blocker is resolved. M3 built screens/F01 are integrated and covered by the owner’s provisional acceptance rule. V09 is built on a synthetic export (real round-trip unverified); V12 has bounded approval for generic reminders while locked. UX-01–UX-14 are complete. M4-E02/V02, UX-15, W01/W02, F01, F02 and V12 notifications are complete; M5 follows M4 software. Keep tafsir off until its separate licence is verified. No owner-iPhone or milestone pass is claimed.
 
 # Handovers
-## Handover — M6-V20 paper index — 2026-10-18 — Codex — Works now: edit a paper book and its index, scan ISBN/index locally, review estimated pages, and save with one undo.
-Verified: `swift test --package-path Madar/Packages/MadarCore --filter PaperBookIndexTests` 4/4; `swift test --package-path Madar/Packages/MadarCommands --filter BookMutationTests` 6/6; final iPhone 17 Pro simulator UI 1/1 and build succeeded; `compare-screens.py R10-Waraqi` opened; `git diff --check` clean.
-Differences left: chapter subtitle text is absent from the current index data; ISBN and shelf stay visible for manual entry; visual owner acceptance pending.
-Not verified: real camera permission/scan, Arabic OCR support and quality on hardware, owner iPhone, broad M6 flows.
-Next: M6-V21 Listening by board order; V17 remains blocked; preserve its uncommitted PDF changes.
+Works now (M6-V23): the paper card shows real book details; edit its index and saved page in one undoable action.
+Verified: `swift test --package-path Madar/Packages/MadarCommands --filter BookMutationTests` 7/7; iPhone 17 Pro simulator UI 1/1; `compare-screens.py R10-Bitaqa-Waraqi` generated/opened; `git diff --check` clean.
+Differences left: the live scrolled card shows useful book details where the canonical panel is blank; visual owner acceptance pending.
+Not verified: real camera/OCR hardware behavior, owner iPhone, broad M6 flows; one non-failing XCTest invalid-frame runtime warning occurred during a text-field tap.
+Next: M6-X01, first ready after V21/V22 stay blocked on V06; preserve V17 PDF changes.
 Model/effort: not exposed / not exposed.
-Usage: 22% used / 78% remaining at the last live check; no reset used.
+Usage: 27% used / 73% remaining at last live check; no reset used.
 
 ## Handover — M6 reader and PDF checkpoint — 2026-10-18 — Codex
 Works now: PDF preview confirms only detected metadata and adds Book/Media together with blob-clearing undo; reader queues newer same-session locators during an in-flight write.

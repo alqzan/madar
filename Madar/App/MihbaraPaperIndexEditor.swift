@@ -23,6 +23,7 @@ struct MihbaraPaperIndexEditor: View {
     let app: AppSession
     let readingBooks: [MihbaraBook]
     let onSaved: () -> Void
+    let existingBook: MihbaraBook?
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.roomTheme) private var theme
@@ -30,6 +31,7 @@ struct MihbaraPaperIndexEditor: View {
     @State private var author = ""
     @State private var isbn13 = ""
     @State private var pages = ""
+    @State private var positionPage = "٠"
     @State private var firstPage = ""
     @State private var chapters: [PaperChapterDraft] = [.init()]
     @State private var shelf = "reading"
@@ -46,6 +48,31 @@ struct MihbaraPaperIndexEditor: View {
     private var scanCanRun: Bool { VNDocumentScanAvailability.supported }
     private var shelfTitle: String {
         switch shelf { case "want": "أبي أقرأه"; case "finished": "أنهيته"; default: "أقرؤه الآن" }
+    }
+
+    init(app: AppSession, readingBooks: [MihbaraBook], onSaved: @escaping () -> Void, existingBook: MihbaraBook? = nil) {
+        self.app = app
+        self.readingBooks = readingBooks
+        self.onSaved = onSaved
+        self.existingBook = existingBook
+
+        let digits = AppMihbaraService(app: app).digits
+        var decodedChapters: [PaperBookChapter] = []
+        if let existingBook, let tocJSON = existingBook.tocJSON {
+            decodedChapters = PaperBookIndex.decode(tocJSON, pages: existingBook.pages) ?? []
+        }
+        let drafts = decodedChapters.map {
+            PaperChapterDraft(id: $0.id, title: $0.title, page: $0.page.map(digits.string) ?? "", source: $0.pageSource)
+        }
+        _title = State(initialValue: existingBook?.title ?? "")
+        _author = State(initialValue: existingBook?.author ?? "")
+        _isbn13 = State(initialValue: existingBook?.isbn13 ?? "")
+        _pages = State(initialValue: existingBook?.pages.map(digits.string) ?? "")
+        _positionPage = State(initialValue: existingBook?.page.map(digits.string) ?? digits.string(0))
+        _firstPage = State(initialValue: drafts.first?.page ?? "")
+        _chapters = State(initialValue: drafts.isEmpty ? [.init()] : drafts)
+        _shelf = State(initialValue: existingBook?.shelf ?? "reading")
+        _identity = State(initialValue: existingBook?.id ?? UUID())
     }
 
     var body: some View {
@@ -95,6 +122,19 @@ struct MihbaraPaperIndexEditor: View {
                             .padding(15)
                             .background(theme.surface, in: .rect(cornerRadius: 12))
                             .accessibilityIdentifier("mihbara-paper-pages")
+                    }
+                }
+
+                if existingBook != nil {
+                    VStack(alignment: .trailing, spacing: 7) {
+                        Text("وصلت إلى صفحة").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                        TextField("رقم الصفحة", text: $positionPage)
+                            .font(MadarTypography.body())
+                            .multilineTextAlignment(.trailing)
+                            .keyboardType(.numberPad)
+                            .padding(15)
+                            .background(theme.surface, in: .rect(cornerRadius: 12))
+                            .accessibilityIdentifier("mihbara-paper-position")
                     }
                 }
 
@@ -182,16 +222,18 @@ struct MihbaraPaperIndexEditor: View {
                         .font(MadarTypography.fine())
                         .foregroundStyle(theme.secondaryInk)
                     Spacer(minLength: 6)
-                    Menu {
-                        Button("أقرؤه الآن") { shelf = "reading" }
-                        Button("أبي أقرأه") { shelf = "want" }
-                        Button("أنهيته") { shelf = "finished" }
-                    } label: {
-                        Label("الرف", systemImage: "chevron.down")
-                            .font(MadarTypography.fine())
-                            .foregroundStyle(theme.secondaryInk)
+                    if existingBook == nil {
+                        Menu {
+                            Button("أقرؤه الآن") { shelf = "reading" }
+                            Button("أبي أقرأه") { shelf = "want" }
+                            Button("أنهيته") { shelf = "finished" }
+                        } label: {
+                            Label("الرف", systemImage: "chevron.down")
+                                .font(MadarTypography.fine())
+                                .foregroundStyle(theme.secondaryInk)
+                        }
+                        .accessibilityIdentifier("mihbara-paper-shelf")
                     }
-                    .accessibilityIdentifier("mihbara-paper-shelf")
                 }
                 TextField("ISBN-13، إن توفر", text: $isbn13)
                     .font(MadarTypography.caption())
@@ -278,7 +320,7 @@ struct MihbaraPaperIndexEditor: View {
     }
 
     private func save(replacing: UUID? = nil) {
-        if shelf == "reading", readingBooks.count >= 3, replacing == nil { choosingSlot = true; return }
+        if existingBook == nil, shelf == "reading", readingBooks.count >= 3, replacing == nil { choosingSlot = true; return }
         let pageCount: Int?
         if pages.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { pageCount = nil }
         else {
@@ -296,15 +338,42 @@ struct MihbaraPaperIndexEditor: View {
               PaperBookIndex.isValid(models, pages: pageCount) else { errorMessage = "راجع عناوين الفصول وترتيب الصفحات ضمن طبعتك."; return }
         let tocData = models.isEmpty ? nil : PaperBookIndex.encode(models, pages: pageCount)
         guard models.isEmpty || tocData != nil else { errorMessage = "الفهرس أطول من الحد المسموح."; return }
+        let position: Int?
+        if existingBook != nil {
+            guard let value = Self.integer(positionPage), (0...100_000).contains(value) else { errorMessage = "اكتب رقم صفحة صحيحًا"; return }
+            position = value
+        } else {
+            position = nil
+        }
 
-        var payload: [String: MadarCore.JSONValue] = ["id": .string(identity.uuidString), "title": .string(title), "author": .string(author), "shelf": .string(shelf)]
-        if let pageCount { payload["pages"] = .number(Double(pageCount)) }
-        if let normalizedISBN { payload["isbn13"] = .string(normalizedISBN) }
-        if let tocData, let tocText = String(data: tocData, encoding: .utf8) { payload["tocJSON"] = .string(tocText) }
-        if let replacing { payload["replacing"] = .string(replacing.uuidString) }
+        let command: String
+        var payload: [String: MadarCore.JSONValue]
+        if existingBook != nil {
+            command = "book.updatePaper"
+            payload = [
+                "id": .string(identity.uuidString),
+                "title": .string(title),
+                "author": .string(author),
+                "pages": pageCount.map { .number(Double($0)) } ?? .null,
+                "position": .number(Double(position ?? 0)),
+                "isbn13": normalizedISBN.map { .string($0) } ?? .null,
+                "tocJSON": tocData.flatMap { String(data: $0, encoding: .utf8) }.map { .string($0) } ?? .null
+            ]
+        } else {
+            command = "book.savePaper"
+            payload = ["id": .string(identity.uuidString), "title": .string(title), "author": .string(author), "shelf": .string(shelf)]
+            if let pageCount { payload["pages"] = .number(Double(pageCount)) }
+            if let normalizedISBN { payload["isbn13"] = .string(normalizedISBN) }
+            if let tocData, let tocText = String(data: tocData, encoding: .utf8) { payload["tocJSON"] = .string(tocText) }
+            if let replacing { payload["replacing"] = .string(replacing.uuidString) }
+        }
         saving = true
         Task {
-            do { try await app.executeBookCommand("book.savePaper", payload: payload); onSaved() }
+            do {
+                try await app.executeBookCommand(command, payload: payload)
+                if existingBook != nil { dismiss() }
+                onSaved()
+            }
             catch { app.errorMessage = error.localizedDescription }
             saving = false
         }

@@ -280,7 +280,11 @@ struct MihbaraPaperEditor: View {
     }
 }
 struct MihbaraBookCard: View {
-    let app: AppSession; let book: MihbaraBook; let books: [MihbaraBook]; var onTable: () -> Void
+    let app: AppSession
+    let book: MihbaraBook
+    let books: [MihbaraBook]
+    let onTable: () -> Void
+    let onPaperIndexSaved: () -> Void
     @Environment(\.dismiss) private var dismiss
     @Environment(\.roomTheme) private var theme
     @State private var page = ""
@@ -288,24 +292,123 @@ struct MihbaraBookCard: View {
     @State private var choosingSlot = false
     @State private var saving = false
     private var digits: MadarNumberFormatter { AppMihbaraService(app: app).digits }
+    private var paperChapters: [PaperBookChapter] {
+        guard let data = book.tocJSON, let chapters = PaperBookIndex.decode(data, pages: book.pages) else { return [] }
+        return chapters
+    }
+    private var shelfTitle: String {
+        switch book.shelf { case "want": "أبي أقرأها"; case "finished": "أنهيتها"; default: "أقرؤها الآن" }
+    }
+    private var paperIndexEditor: some View {
+        MihbaraPaperIndexEditor(
+            app: app,
+            readingBooks: books.filter { $0.shelf == "reading" && $0.id != book.id },
+            onSaved: onPaperIndexSaved,
+            existingBook: book
+        )
+        .toolbarVisibility(.hidden, for: .navigationBar)
+    }
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                HStack { Text(book.title).font(MadarTypography.title()); Spacer(); Button("تمّ") { dismiss() } }
-                Text(book.author).font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
-                if let finished = book.finished { Text("أنهيته").font(MadarTypography.caption()); MadarDateLabel(app.dateLabels(GregorianDay.containing(finished, in: app.activePlace.timeZone))) }
-                if book.shelf != "reading" { Button("ضعه على الطاولة") { moveToReading() }.buttonStyle(MadarPrimaryButton()).accessibilityIdentifier("mihbara-put-on-table") }
-                Text("وصلت إلى").font(MadarTypography.cardTitle())
-                HStack { Text("صفحة"); TextField("رقم الصفحة", text: $page).keyboardType(.numberPad).padding(14).background(theme.surface, in: .rect(cornerRadius: 12)).accessibilityIdentifier("mihbara-book-page"); if let total = book.pages { Text("من " + digits.string(total)) } }.font(MadarTypography.body())
-                Text("هذا يحفظ موضعك. جلسة القراءة تُحسب من وقت نشاطك في القارئ.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                Toggle("أنهيت الكتاب", isOn: $finish).font(MadarTypography.section()).accessibilityIdentifier("mihbara-book-finished")
-                Button("احفظ موضعي") { savePosition() }.buttonStyle(MadarPrimaryButton()).disabled(saving).accessibilityIdentifier("mihbara-book-save-position")
-                Button("أعده إلى أبي أقرأها") { move("want") }.frame(minHeight: 44).accessibilityIdentifier("mihbara-book-to-want")
+                if book.kind == "paper" {
+                    paperBookActions
+                } else {
+                    HStack { Text(book.title).font(MadarTypography.title()); Spacer(); Button("تمّ") { dismiss() } }
+                    Text(book.author).font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
+                    if let finished = book.finished { Text("أنهيته").font(MadarTypography.caption()); MadarDateLabel(app.dateLabels(GregorianDay.containing(finished, in: app.activePlace.timeZone))) }
+                    if book.shelf != "reading" { Button("ضعه على الطاولة") { moveToReading() }.buttonStyle(MadarPrimaryButton()).accessibilityIdentifier("mihbara-put-on-table") }
+                    Text("وصلت إلى").font(MadarTypography.cardTitle())
+                    HStack { Text("صفحة"); TextField("رقم الصفحة", text: $page).keyboardType(.numberPad).padding(14).background(theme.surface, in: .rect(cornerRadius: 12)).accessibilityIdentifier("mihbara-book-page"); if let total = book.pages { Text("من " + digits.string(total)) } }.font(MadarTypography.body())
+                    Text("هذا يحفظ موضعك. جلسة القراءة تُحسب من وقت نشاطك في القارئ.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    Toggle("أنهيت الكتاب", isOn: $finish).font(MadarTypography.section()).accessibilityIdentifier("mihbara-book-finished")
+                    Button("احفظ موضعي") { savePosition() }.buttonStyle(MadarPrimaryButton()).disabled(saving).accessibilityIdentifier("mihbara-book-save-position")
+                    Button("أعده إلى أبي أقرأها") { move("want") }.frame(minHeight: 44).accessibilityIdentifier("mihbara-book-to-want")
+                }
             }.padding(22)
         }.background(theme.background).foregroundStyle(theme.ink).scrollDismissesKeyboard(.interactively)
         .task { page = digits.string(book.page ?? 0).filter { $0.wholeNumberValue != nil } }
         .confirmationDialog("اختر كتابًا يرجع إلى أبي أقرأها", isPresented: $choosingSlot, titleVisibility: .visible) { ForEach(books.filter { $0.shelf == "reading" && $0.id != book.id }) { old in Button(old.title) { move("reading", replacing: old.id) } } }
         .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تمّ") { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) } } }
+        .presentationDetents(book.kind == "paper" ? [.height(360)] : [.large])
+    }
+    private var paperBookActions: some View {
+        VStack(alignment: .leading, spacing: 17) {
+            HStack(alignment: .center, spacing: 16) {
+                RoundedRectangle(cornerRadius: 7)
+                    .fill(theme.ink.gradient)
+                    .frame(width: 62, height: 88)
+                    .overlay(alignment: .leading) { Rectangle().fill(theme.line.opacity(0.8)).frame(width: 4) }
+                    .shadow(color: theme.ink.opacity(0.16), radius: 7, x: 0, y: 5)
+                    .accessibilityHidden(true)
+                VStack(alignment: .trailing, spacing: 7) {
+                    Text(book.title).font(.custom("thmanyahserifdisplay-Bold", size: 24, relativeTo: .title2)).fixedSize(horizontal: false, vertical: true)
+                    Text(book.author).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    Text("على رف «\(shelfTitle)»، " + (book.pages.map { digits.string($0) + " صفحة" } ?? "عدد الصفحات غير محدد"))
+                        .font(MadarTypography.caption())
+                }
+                Spacer(minLength: 0)
+            }
+
+            if paperChapters.isEmpty {
+                NavigationLink { paperIndexEditor } label: {
+                    HStack(spacing: 12) {
+                        VStack(alignment: .trailing, spacing: 4) {
+                            Text("جهّز فهرسه").font(.custom("thmanyahserifdisplay-Bold", size: 17, relativeTo: .headline))
+                            Text("كتاب ورقي بلا فهرس؛ نجد عناوين فصوله ونطابقها مع طبعتك")
+                                .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.left").font(.system(size: 13, weight: .semibold))
+                    }
+                    .padding(13).frame(maxWidth: .infinity, minHeight: 68, alignment: .leading)
+                    .background(theme.surface, in: .rect(cornerRadius: 18))
+                    .overlay { RoundedRectangle(cornerRadius: 18).stroke(theme.line, lineWidth: 1) }
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("mihbara-paper-index-prompt")
+            } else {
+                VStack(alignment: .trailing, spacing: 7) {
+                    Text("فهرس طبعتك").font(MadarTypography.cardTitle())
+                    ForEach(paperChapters.prefix(2)) { chapter in
+                        HStack {
+                            Text(chapter.title).font(MadarTypography.caption())
+                            Spacer(minLength: 8)
+                            if let chapterPage = chapter.page { Text("ص " + digits.string(chapterPage)).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
+                        }
+                    }
+                }
+                .padding(15).frame(maxWidth: .infinity, alignment: .trailing)
+                .background(theme.surface, in: .rect(cornerRadius: 18))
+                .overlay { RoundedRectangle(cornerRadius: 18).stroke(theme.line, lineWidth: 1) }
+            }
+
+            Button { startPaperBook() } label: {
+                Text("ابدأه · ضعه على الطاولة")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(theme.background)
+                    .frame(maxWidth: .infinity).frame(height: 52)
+                    .background(theme.ink, in: .rect(cornerRadius: 14))
+            }
+            .buttonStyle(.plain)
+            .disabled(saving)
+            .accessibilityIdentifier("mihbara-paper-start")
+
+            NavigationLink { paperIndexEditor } label: {
+                Text("الفهرس والتفاصيل")
+                    .font(.system(size: 16, weight: .semibold))
+                    .frame(maxWidth: .infinity).frame(height: 48)
+                    .background(theme.background, in: .rect(cornerRadius: 14))
+                    .overlay { RoundedRectangle(cornerRadius: 14).stroke(theme.line, lineWidth: 1) }
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("mihbara-paper-index-details")
+        }
+        .environment(\.layoutDirection, .rightToLeft)
+    }
+    private func startPaperBook() {
+        if book.shelf == "reading" { onTable() } else { moveToReading() }
     }
     private func moveToReading() { if books.filter({ $0.shelf == "reading" }).count >= 3 { choosingSlot = true } else { move("reading") } }
     private func move(_ shelf: String, replacing: UUID? = nil) {

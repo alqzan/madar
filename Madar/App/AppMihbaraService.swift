@@ -9,6 +9,7 @@ import MadarPrayer
 struct MihbaraBook: Identifiable, Equatable {
     var id: UUID; var title: String; var author: String; var shelf: String; var pages: Int?; var page: Int?; var finished: Date?; var updated: Date
     var kind: String = "paper"; var format: String? = nil; var mediaID: UUID? = nil; var fileHash: String? = nil; var locatorJSON: Data? = nil
+    var isbn13: String? = nil; var tocJSON: Data? = nil
     var progress: Double? {
         if let paper = MihbaraReading.progress(page: page, pages: pages) { return paper }
         guard kind == "file", format == "epub", let locatorJSON,
@@ -44,7 +45,7 @@ struct MihbaraHomeReading {
         for row in storedBooks where row.deletedAt == nil && row.mergedInto == nil {
             var page = row.currentPage
             if row.kind == "paper", let data = row.locatorJSON, let position = try? JSONDecoder().decode(PaperBookPosition.self, from: data) { page = position.page }
-            books.append(MihbaraBook(id: row.id, title: row.title, author: row.author, shelf: row.shelf, pages: row.pages, page: page, finished: row.finishedAt, updated: row.updatedAt, kind: row.kind, format: row.format, mediaID: row.mediaID, fileHash: row.fileHash, locatorJSON: row.kind == "file" ? row.locatorJSON : nil))
+            books.append(MihbaraBook(id: row.id, title: row.title, author: row.author, shelf: row.shelf, pages: row.pages, page: page, finished: row.finishedAt, updated: row.updatedAt, kind: row.kind, format: row.format, mediaID: row.mediaID, fileHash: row.fileHash, locatorJSON: row.kind == "file" ? row.locatorJSON : nil, isbn13: row.isbn13, tocJSON: row.tocJSON))
         }
         books.sort { $0.updated == $1.updated ? $0.id.uuidString < $1.id.uuidString : $0.updated > $1.updated }
         let collection = try MihbaraCollection.load()
