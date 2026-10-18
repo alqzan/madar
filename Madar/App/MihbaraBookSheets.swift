@@ -8,6 +8,7 @@ struct MihbaraAddBookView: View {
     let app: AppSession
     let readingBooks: [MihbaraBook]
     let onPaperBookSaved: () -> Void
+    let onPDFImported: () -> Void
     let onEPUBImported: () -> Void
     @Binding var pendingBookFile: URL?
     @Binding var pendingGoodreadsFile: URL?
@@ -31,6 +32,7 @@ struct MihbaraAddBookView: View {
                             .font(MadarTypography.caption())
                             .frame(minHeight: 44)
                     }
+                    .accessibilityIdentifier("mihbara-add-back")
                     Spacer()
                     Text("أضف كتابًا").font(.custom("thmanyahserifdisplay-Bold", size: 24, relativeTo: .title2))
                     Spacer().frame(width: 48)
@@ -142,7 +144,11 @@ struct MihbaraAddBookView: View {
         }
         .navigationDestination(isPresented: $previewingPDF) {
             if let pendingBookFile {
-                MihbaraPDFImportView(app: app, source: pendingBookFile) { onPaperBookSaved() }
+                MihbaraPDFImportView(app: app, source: pendingBookFile) {
+                    self.pendingBookFile = nil
+                    previewingPDF = false
+                    onPDFImported()
+                }
             }
         }
         .navigationDestination(isPresented: $previewingEPUB) {
@@ -161,14 +167,24 @@ struct MihbaraAddBookView: View {
                let encoded = ProcessInfo.processInfo.environment["MADAR_UI_MIHBARA_IMPORT_PDF"], let bytes = Data(base64Encoded: encoded),
                bytes.count < 1024 * 1024, pendingBookFile == nil {
                 let file = root.deletingLastPathComponent().appendingPathComponent("ملف اختبار مصوّر.pdf")
-                do { try bytes.write(to: file, options: .atomic); pendingBookFile = file; previewingPDF = true }
+                do {
+                    // Simulate one file arrival. Reopening Add Book must not inject the
+                    // already-confirmed fixture again after the production binding is cleared.
+                    if !FileManager.default.fileExists(atPath: file.path) {
+                        try bytes.write(to: file, options: .atomic); pendingBookFile = file; previewingPDF = true
+                    }
+                }
                 catch { app.errorMessage = "لم تُجهز عينة الاستيراد." }
             }
             if root.deletingLastPathComponent().deletingLastPathComponent().lastPathComponent == "UITestStores",
                let encoded = ProcessInfo.processInfo.environment["MADAR_UI_MIHBARA_IMPORT_EPUB"], let bytes = Data(base64Encoded: encoded),
                bytes.count < 2 * 1024 * 1024, pendingBookFile == nil {
                 let file = root.deletingLastPathComponent().appendingPathComponent("كتاب اختبار.epub")
-                do { try bytes.write(to: file, options: .atomic); pendingBookFile = file; previewingEPUB = true }
+                do {
+                    if !FileManager.default.fileExists(atPath: file.path) {
+                        try bytes.write(to: file, options: .atomic); pendingBookFile = file; previewingEPUB = true
+                    }
+                }
                 catch { app.errorMessage = "لم تُجهز عينة الاستيراد." }
             }
             #endif

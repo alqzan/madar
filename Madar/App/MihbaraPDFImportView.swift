@@ -51,31 +51,36 @@ struct MihbaraPDFImportView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 25) {
+            VStack(alignment: .leading, spacing: 16) {
                 ZStack {
-                    Text("من ملف").font(.custom("thmanyahserifdisplay-Bold", size: 24, relativeTo: .title2))
+                    Text("من ملف").font(.custom("thmanyahserifdisplay-Bold", size: 21, relativeTo: .title2))
                     HStack {
                         Button { dismiss() } label: { Label("رجوع", systemImage: "chevron.right").font(MadarTypography.caption()).frame(minHeight: 44) }
                             .disabled(saving).accessibilityIdentifier("mihbara-import-back")
                         Spacer()
                     }
                 }
-                HStack(spacing: 12) {
+                HStack(spacing: 10) {
                     Text(inspection.map { $0.scanned ? "PDF مصوّر" : "PDF" } ?? "PDF")
-                        .font(MadarTypography.fine()).foregroundStyle(theme.onAccent).padding(.horizontal, 10).padding(.vertical, 8)
-                        .background(theme.accentFill, in: .rect(cornerRadius: 9))
-                    Text(source.lastPathComponent).font(MadarTypography.section()).lineLimit(2)
+                        .font(MadarTypography.fine()).foregroundStyle(theme.onAccent).padding(.horizontal, 9).padding(.vertical, 7)
+                        .background(theme.accentFill, in: .rect(cornerRadius: 8))
+                    Text(source.lastPathComponent).font(MadarTypography.section()).lineLimit(2).fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 0)
                 }
-                .padding(15).frame(maxWidth: .infinity, minHeight: 64)
-                .background(theme.surface, in: .rect(cornerRadius: 18))
-                .overlay { RoundedRectangle(cornerRadius: 18).stroke(theme.line, lineWidth: 1) }
+                .padding(12).frame(maxWidth: .infinity, minHeight: 58)
+                .background(theme.surface, in: .rect(cornerRadius: 16))
+                .overlay { RoundedRectangle(cornerRadius: 16).stroke(theme.line, lineWidth: 1) }
 
-                VStack(alignment: .leading, spacing: 22) {
-                    Text(inspection == nil && error == nil ? "أفهم الكتاب…" : "ما في هذا الملف")
-                        .font(.custom("thmanyahserifdisplay-Bold", size: 26, relativeTo: .title))
+                VStack(alignment: .leading, spacing: 15) {
+                    Text(inspection == nil && error == nil ? "أفهم الكتاب…" : "ما وجدناه")
+                        .font(MadarTypography.cardTitle())
                     if inspection == nil && error == nil { ProgressView().tint(theme.ink).frame(maxWidth: .infinity).accessibilityLabel("يفحص ملف PDF") }
-                    else { Rectangle().fill(theme.ink).frame(height: 4).clipShape(.capsule) }
+                    else if inspection != nil {
+                        ProgressView(value: 1)
+                            .progressViewStyle(.linear)
+                            .tint(theme.ink)
+                            .accessibilityLabel("اكتمل فحص الملف")
+                    }
 
                     if let value = inspection {
                         row("نوع الملف", detail: value.scanned ? "PDF مصوّر؛ لا توجد طبقة نص في أي صفحة." : "PDF بطبقة نص في \(digits.string(value.textPages)) من \(digits.string(value.pages)) صفحة.", detected: true)
@@ -98,14 +103,15 @@ struct MihbaraPDFImportView: View {
                         Picker("لغة القراءة", selection: $language) { Text("العربية").tag("ar"); Text("الإنجليزية").tag("en") }
                             .font(MadarTypography.caption()).accessibilityIdentifier("mihbara-import-language")
                         Text("يبقى الأصل على جهازك. لا يُضاف شيء حتى تؤكد.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                    }.font(MadarTypography.body()).padding(18).background(theme.surface, in: .rect(cornerRadius: 18))
+                    }.font(MadarTypography.body()).padding(14).background(theme.surface, in: .rect(cornerRadius: 16))
+                        .overlay { RoundedRectangle(cornerRadius: 16).stroke(theme.line.opacity(0.7), lineWidth: 1) }
                         .disabled(saving || confirmedMetadata != nil)
                     Button(saving ? "يُضاف…" : "أضفه إلى «أبي أقرأها»") { confirm() }
                         .buttonStyle(MadarPrimaryButton()).disabled(saving || title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || title.count > 300 || author.count > 300)
                         .accessibilityIdentifier("mihbara-import-confirm")
                 }
             }
-            .padding(.horizontal, 22).padding(.top, 16).padding(.bottom, 35)
+            .padding(.horizontal, 22).padding(.top, 8).padding(.bottom, 24)
             .frame(maxWidth: 650).frame(maxWidth: .infinity)
         }
         .foregroundStyle(theme.ink).background(theme.background.ignoresSafeArea())
@@ -116,11 +122,11 @@ struct MihbaraPDFImportView: View {
     }
 
     private func row(_ title: String, detail: String, detected: Bool) -> some View {
-        HStack(alignment: .top, spacing: 13) {
+        HStack(alignment: .top, spacing: 10) {
             Image(systemName: detected ? "checkmark.circle.fill" : "circle")
-                .font(.system(size: 24, weight: .regular)).foregroundStyle(detected ? theme.ink : theme.secondaryInk)
-                .frame(width: 28).padding(.top, 5)
-            VStack(alignment: .leading, spacing: 6) {
+                .font(.system(size: 20, weight: .regular)).foregroundStyle(detected ? theme.color("sunnah") : theme.secondaryInk)
+                .frame(width: 25).padding(.top, 2)
+            VStack(alignment: .leading, spacing: 4) {
                 Text(title).font(MadarTypography.section())
                 Text(detail).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
             }

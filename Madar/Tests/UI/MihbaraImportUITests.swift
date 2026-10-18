@@ -30,7 +30,13 @@ import UIKit
         XCTAssertEqual(title.value as? String, "ملف اختبار مصوّر")
         attach(app, "M6-V17-preview-s1-L")
         confirm.tap()
-        XCTAssertTrue(app.buttons["mihbara-add-paper"].waitForExistence(timeout: 15), app.debugDescription)
+        let addBook = app.buttons["mihbara-add-paper"]
+        let addBookVisible = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: addBook)
+        XCTAssertEqual(XCTWaiter.wait(for: [addBookVisible], timeout: 15), .completed, app.debugDescription)
+        addBook.tap()
+        XCTAssertTrue(app.staticTexts["لا يوجد ملف وصل مؤخرًا"].waitForExistence(timeout: 8))
+        XCTAssertFalse(app.buttons["mihbara-import-reopen"].exists)
+        app.buttons["mihbara-add-back"].tap()
         app.buttons["mihbara-shelf-want"].tap()
         XCTAssertTrue(app.staticTexts["ملف اختبار مصوّر"].firstMatch.waitForExistence(timeout: 8))
         let undo = app.descendants(matching: .any)["mihbara-undo"].buttons["undo-button"]
