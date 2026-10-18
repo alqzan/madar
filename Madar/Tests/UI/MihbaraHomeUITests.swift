@@ -318,7 +318,7 @@ import XCTest
         paragraph.coordinate(withNormalizedOffset: CGVector(dx: 0.7, dy: 0.15)).press(forDuration: 1.2)
         let card = app.descendants(matching: .any)["mihbara-word-card"]
         XCTAssertTrue(card.waitForExistence(timeout: 8), app.debugDescription)
-        XCTAssertTrue(app.buttons["mihbara-word-lookup"].exists)
+        XCTAssertTrue(app.buttons["mihbara-word-lookup"].exists || app.staticTexts["mihbara-word-lookup-unavailable"].exists, app.debugDescription)
         XCTAssertTrue(app.buttons["mihbara-word-note"].exists)
         XCTAssertTrue(app.buttons["mihbara-word-copy"].exists)
         XCTAssertFalse(app.buttons["mihbara-highlight-yellow"].isSelected)
@@ -340,8 +340,9 @@ import XCTest
         XCTAssertTrue(card.waitForExistence(timeout: 8), app.debugDescription)
         XCTAssertTrue(app.buttons["mihbara-highlight-yellow"].waitForSelection(timeout: 5), app.debugDescription)
         XCTAssertFalse(app.buttons["mihbara-word-lookup"].exists)
-        app.buttons["mihbara-word-copy"].tap()
-        XCTAssertTrue(app.buttons["mihbara-word-copy"].staticTexts["نُسخت"].waitForExistence(timeout: 3) || app.staticTexts["نُسخت"].exists, app.debugDescription)
+        let copiedButton = app.buttons["mihbara-word-copy"]
+        copiedButton.tap()
+        XCTAssertTrue(copiedButton.waitForLabel("نُسخت", timeout: 2), app.debugDescription)
         app.buttons["mihbara-word-note"].tap()
         let text = app.textViews["mihbara-note-text"]
         XCTAssertTrue(text.waitForExistence(timeout: 5), app.debugDescription)
@@ -455,6 +456,49 @@ import XCTest
         shot(app, "M6-V11-focus-s2-L")
     }
 
+    func testEnglishWordCardSavesItsContextAndOnlyOffersSupportedTranslation() throws {
+        continueAfterFailure = false
+        let fixtureURL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "english-import-poc", withExtension: "epub"))
+        let app = app("reader", epub: try Data(contentsOf: fixtureURL)); app.launch(); open(app)
+        let book = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "كتاب اختبار القارئ")).firstMatch
+        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); book.tap()
+        let paragraph = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "This is original synthetic fixture text")).firstMatch
+        XCTAssertTrue(paragraph.waitForExistence(timeout: 20), app.debugDescription)
+        sleep(1)
+        paragraph.coordinate(withNormalizedOffset: CGVector(dx: 0.34, dy: 0.14)).press(forDuration: 1.2)
+        let card = app.descendants(matching: .any)["mihbara-word-card"]
+        XCTAssertTrue(card.waitForExistence(timeout: 8), app.debugDescription)
+        let word = app.staticTexts["mihbara-word-title"]
+        XCTAssertTrue(word.exists)
+        XCTAssertEqual(word.label.split(whereSeparator: \.isWhitespace).count, 1, app.debugDescription)
+        XCTAssertTrue(app.buttons["mihbara-word-save"].waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(app.buttons["mihbara-word-lookup"].exists || app.staticTexts["mihbara-word-lookup-unavailable"].exists, app.debugDescription)
+        shot(app, "M6-V14-word-L")
+        app.buttons["mihbara-word-save"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["mihbara-reader-toast"].waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(card.waitForNonExistence(timeout: 5))
+
+        paragraph.coordinate(withNormalizedOffset: CGVector(dx: 0.34, dy: 0.14)).press(forDuration: 1.2)
+        XCTAssertTrue(card.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["mihbara-word-saved"].waitForExistence(timeout: 5), app.debugDescription)
+
+        let translate = app.buttons["mihbara-word-translate"]
+        let needsDownload = app.descendants(matching: .any)["mihbara-translation-download"]
+        let checking = app.descendants(matching: .any)["mihbara-translation-checking"]
+        if translate.waitForExistence(timeout: 5) {
+            shot(app, "M6-V14-translation-ready-L")
+            translate.tap()
+            let result = app.staticTexts["mihbara-translation-result"]
+            let failure = app.staticTexts["mihbara-translation-error"]
+            XCTAssertTrue(result.waitForExistence(timeout: 30) || failure.waitForExistence(timeout: 1), app.debugDescription)
+        } else if needsDownload.waitForExistence(timeout: 2) {
+            XCTAssertFalse(translate.exists)
+        } else {
+            XCTAssertFalse(checking.exists, app.debugDescription)
+            XCTAssertFalse(translate.exists, app.debugDescription)
+        }
+    }
+
     func testEnglishEPUBReadsLeftToRightWithItsOwnSettings() throws {
         continueAfterFailure = false
         let fixtureURL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "english-import-poc", withExtension: "epub"))
@@ -520,6 +564,9 @@ import XCTest
 private extension XCUIElement {
     func waitForValue(_ value: String, timeout: TimeInterval) -> Bool {
         XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", value), object: self)], timeout: timeout) == .completed
+    }
+    func waitForLabel(_ label: String, timeout: TimeInterval) -> Bool {
+        XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", label), object: self)], timeout: timeout) == .completed
     }
     func waitForSelection(timeout: TimeInterval) -> Bool {
         XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "selected == true"), object: self)], timeout: timeout) == .completed

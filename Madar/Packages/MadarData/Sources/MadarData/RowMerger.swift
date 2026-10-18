@@ -155,8 +155,7 @@ private struct DictionarySpec: Decodable { let models: [ModelDefinition]; let re
         case "ZakatProfile": keys.insert("singleton")
         case "UserWord":
             let text = row.fields["word"]?.string ?? ""
-            let normalized = text.folding(options: [.diacriticInsensitive,.caseInsensitive], locale: Locale(identifier: "ar")).replacingOccurrences(of: "ـ", with: "").replacingOccurrences(of: "أ", with: "ا").replacingOccurrences(of: "إ", with: "ا").replacingOccurrences(of: "آ", with: "ا").replacingOccurrences(of: "ى", with: "ي")
-            keys.insert("\(row.fields["language"]?.string ?? "ar"):\(normalized)")
+            keys.insert(UserWordIdentity.key(language: row.fields["language"]?.string ?? "ar", word: text))
         case "Statement", "Cycle":
             let field = row.model == "Statement" ? "closeDate" : "start"
             if let date = row.date(field) { let day = Int(floor(date.timeIntervalSince1970 / 86400)); keys.insert("\(row.fields["cardID"]?.string ?? ""):\(day)") }

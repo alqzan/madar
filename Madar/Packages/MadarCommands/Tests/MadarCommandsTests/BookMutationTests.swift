@@ -138,6 +138,57 @@ import MadarData
         #expect(BookCommand.parse("notebook.savePrivate", ["id": .string(id.uuidString), "text": .string("فكرة"), "isPrivate": .bool(false)]) == nil)
     }
 
+    @Test func savedWordsUpsertByNaturalKeyAndUndoWithoutLosingMeaning() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "MihbaraWords-\(UUID())"); defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root), context = ModelContext(container)
+        let bookID = UUID(), firstID = UUID(), secondID = UUID(), book = Book()
+        book.id = bookID; book.title = "English book"; book.kind = "file"; book.format = "epub"
+        context.insert(book); try context.save()
+        let locator = "{\"href\":\"OEBPS/chapter.xhtml\",\"type\":\"application/xhtml+xml\",\"locations\":{\"progression\":0.25}}"
+        func payload(id: UUID, word: String, context text: String) -> [String: MadarCore.JSONValue] {
+            ["id": .string(id.uuidString), "word": .string(word), "language": .string("en"),
+             "bookID": .string(bookID.uuidString), "bookTitle": .string("English book"),
+             "locator": .string(locator), "context": .string(text)]
+        }
+        let firstPayload = payload(id: firstID, word: "Book", context: "A book opens a window.")
+        let first = try #require(BookCommand.parse("word.save", firstPayload))
+        #expect(first == .saveUserWord(id: firstID, word: "Book", language: "en", bookID: bookID,
+                                       bookTitle: "English book", locatorJSON: Data(locator.utf8), context: "A book opens a window."))
+        let createdUndo = try BookMutationHandler.stage(first, context: context, now: now, writer: "fixture")
+        try context.save()
+        let saved = try #require(context.fetch(FetchDescriptor<UserWord>()).first)
+        #expect(saved.word == "Book"); #expect(saved.language == "en"); #expect(saved.meaning == nil)
+        #expect(saved.bookID == bookID); #expect(saved.bookTitle == "English book"); #expect(saved.context == "A book opens a window.")
+
+        let secondPayload = payload(id: secondID, word: "book", context: "I closed the book.")
+        let update = try #require(BookCommand.parse("word.save", secondPayload))
+        try BookMutationHandler.undo(createdUndo, context: context, now: now.addingTimeInterval(1), writer: "fixture")
+        try context.save()
+        #expect(saved.deletedAt != nil); #expect(saved.deletionBarrierAt != nil)
+        _ = try BookMutationHandler.stage(update, context: context, now: now.addingTimeInterval(2), writer: "fixture")
+        try context.save()
+        #expect(saved.id == firstID); #expect(saved.deletedAt == nil); #expect(saved.restoredAt != nil)
+        #expect(saved.word == "book"); #expect(saved.context == "I closed the book.")
+
+        saved.meaning = "مجلد للقراءة"; saved.meaningSource = "user"; try context.save()
+        let updated = try #require(BookCommand.parse("word.save", firstPayload))
+        let updateUndo = try BookMutationHandler.stage(updated, context: context, now: now.addingTimeInterval(3), writer: "fixture")
+        try context.save()
+        #expect(try context.fetchCount(FetchDescriptor<UserWord>()) == 1)
+        #expect(saved.id == firstID); #expect(saved.word == "Book"); #expect(saved.context == "A book opens a window.")
+        #expect(saved.meaning == "مجلد للقراءة"); #expect(saved.meaningSource == "user")
+
+        try BookMutationHandler.undo(updateUndo, context: context, now: now.addingTimeInterval(4), writer: "fixture")
+        try context.save()
+        #expect(saved.word == "book"); #expect(saved.context == "I closed the book.")
+        #expect(saved.meaning == "مجلد للقراءة"); #expect(saved.meaningSource == "user")
+
+        var phrase = secondPayload; phrase["word"] = .string("two words")
+        #expect(BookCommand.parse("word.save", phrase) == nil)
+        var unsafeLocator = secondPayload; unsafeLocator["locator"] = .string("{\"href\":\"https://example.com/book\",\"type\":\"application/xhtml+xml\"}")
+        #expect(BookCommand.parse("word.save", unsafeLocator) == nil)
+    }
+
     @Test func diaryReadingLinesComeFromSavedSessionsAndRespectHide() throws {
         let root=FileManager.default.temporaryDirectory.appending(path:"MihbaraDiary-\(UUID())");defer{try? FileManager.default.removeItem(at:root)}
         let container=try MadarContainerFactory.makeLocal(at:root),context=ModelContext(container),day=try GregorianDay("2026-10-17")

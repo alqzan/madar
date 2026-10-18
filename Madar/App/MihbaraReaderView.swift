@@ -4,6 +4,7 @@ import UIKit
 import WebKit
 import SwiftData
 import AVFoundation
+import Translation
 import ReadiumShared
 import ReadiumStreamer
 import ReadiumNavigator
@@ -165,6 +166,9 @@ struct MihbaraReaderView: View {
     @State private var wordCard: MihbaraWordCardState?
     @State private var noteDraft: MihbaraWordCardState?
     @State private var lookupTerm: MihbaraLookupTerm?
+    @State private var translationRequest: MihbaraTranslationRequest?
+    @State private var translationAvailability: MihbaraTranslationAvailability = .unsupported
+    @State private var wordAlreadySaved = false
     @State private var lastDecorationTap = Date.distantPast
     @State private var readerUndoID: UUID?
     @State private var copiedAt: Date?
@@ -345,7 +349,7 @@ struct MihbaraReaderView: View {
             if authorized, scenePhase == .active { resumeReader(at: Date()) }
             else if !authorized { pauseReader(at: Date()) }
         }
-        .onChange(of: showingContents || showingReaderSettings) { _, covered in
+        .onChange(of: showingContents || showingReaderSettings || noteDraft != nil || lookupTerm != nil || translationRequest != nil) { _, covered in
             if covered { pauseReader(at: Date()) }
             else if scenePhase == .active { resumeReader(at: Date()) }
         }
@@ -385,6 +389,15 @@ struct MihbaraReaderView: View {
         }
         .sheet(item: $lookupTerm) { term in
             MihbaraDictionaryView(term: term.word).ignoresSafeArea()
+        }
+        .sheet(item: $translationRequest) { request in
+            if #available(iOS 18.0, *) {
+                MihbaraTranslationSheet(request: request, paper: paper, palette: palette)
+                    .environment(\.layoutDirection, .rightToLeft)
+            } else {
+                Text("الترجمة غير متاحة في هذا الإصدار.")
+                    .font(MadarTypography.body()).padding(28).background(paper.ignoresSafeArea())
+            }
         }
         .alert("القارئ", isPresented: Binding(get: { readerAlert != nil }, set: { if !$0 { readerAlert = nil } })) {
             Button("حسنًا", role: .cancel) { readerAlert = nil }
@@ -687,7 +700,10 @@ struct MihbaraReaderView: View {
         } else if let wordCard {
             MihbaraWordCard(
                 state: wordCard, dark: palette.isDark, swatches: palette.hex.highlight, copied: copiedAt != nil,
+                wordSaved: wordAlreadySaved, translationAvailability: translationAvailability,
                 lookUp: { lookupTerm = .init(word: wordCard.word) },
+                saveWord: { Task { await saveWordToLibrary(wordCard) } },
+                translate: { translationRequest = .init(text: wordCard.paragraphText, sourceLanguage: "en") },
                 choose: { color in Task { await chooseHighlight(color, for: wordCard) } },
                 note: { noteDraft = wordCard },
                 copy: { Task { await copyWithCitation(wordCard) } },
@@ -830,9 +846,53 @@ struct MihbaraReaderView: View {
                 paragraph: paragraph, paragraphText: found.text, quote: selectionText ?? found.text,
                 page: page.number, pageLabel: page.label, pageText: page.label.map { "ص " + digits.localized($0) })
             state.highlightID = existing?.id; state.color = existing?.color
+            state.hasSystemDefinition = selectionText.map(UIReferenceLibraryViewController.dictionaryHasDefinition(forTerm:)) ?? false
             copiedAt = nil
+            wordAlreadySaved = savedWordExists(state.word, language: isEnglish ? "en" : "ar")
+            translationAvailability = isEnglish ? .checking : .unsupported
             withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) { wordCard = state }
+            if isEnglish { Task { await refreshTranslationAvailability(for: state.id) } }
         }
+    }
+
+    @MainActor private func savedWordExists(_ word: String, language: String) -> Bool {
+        let key = UserWordIdentity.key(language: language, word: word)
+        let context = ModelContext(app.container)
+        return (try? context.fetch(FetchDescriptor<UserWord>()))?.contains {
+            $0.deletedAt == nil && $0.mergedInto == nil && UserWordIdentity.key(language: $0.language, word: $0.word) == key
+        } ?? false
+    }
+
+    @MainActor private func refreshTranslationAvailability(for cardID: UUID) async {
+        guard #available(iOS 18.0, *) else { translationAvailability = .unsupported; return }
+        let availability = LanguageAvailability()
+        let status = await availability.status(
+            from: Locale.Language(identifier: "en"),
+            to: Locale.Language(identifier: "ar")
+        )
+        guard wordCard?.id == cardID else { return }
+        switch status {
+        case .installed: translationAvailability = .installed
+        case .supported: translationAvailability = .needsDownload
+        case .unsupported: translationAvailability = .unsupported
+        @unknown default: translationAvailability = .unsupported
+        }
+    }
+
+    @MainActor private func saveWordToLibrary(_ card: MihbaraWordCardState) async {
+        guard card.canSaveAsWord, let selection = card.selection,
+              let locator = try? selection.jsonString() else { return }
+        let language = isEnglish ? "en" : "ar"
+        do {
+            try await app.executeBookCommand("word.save", payload: [
+                "id": .string(UUID().uuidString), "word": .string(card.word), "language": .string(language),
+                "bookID": .string(book.id.uuidString), "bookTitle": .string(book.title),
+                "locator": .string(locator), "context": .string(String(card.paragraphText.prefix(4000)))
+            ], undoMessage: "أُضيفت إلى كلماتي · التراجع متاح لعشر دقائق")
+            wordAlreadySaved = true
+            readerUndoID = app.undoToken?.id
+            closeWordCard()
+        } catch { readerAlert = error.localizedDescription }
     }
 
     /// The printed page in effect at a block: its own marker, else the last page that began before its resource.
@@ -932,7 +992,7 @@ struct MihbaraReaderView: View {
         copiedAt = stamp
         UIAccessibility.post(notification: .announcement, argument: "نُسخت الفقرة مع توثيقها")
         Task { @MainActor in
-            try? await Task.sleep(for: .seconds(1.6))
+            try? await Task.sleep(for: .seconds(2.4))
             if copiedAt == stamp { copiedAt = nil }
         }
     }
@@ -1853,9 +1913,22 @@ struct MihbaraWordCardState: Identifiable, Equatable {
     var pageText: String?
     var highlightID: UUID?
     var color: String?
+    var hasSystemDefinition = false
+
+    var canSaveAsWord: Bool {
+        guard isWord else { return false }
+        let parts = word.split(whereSeparator: \.isWhitespace)
+        return parts.count == 1 && parts[0].unicodeScalars.contains(where: CharacterSet.letters.contains)
+    }
 }
 
 struct MihbaraLookupTerm: Identifiable { var word: String; var id: String { word } }
+struct MihbaraTranslationRequest: Identifiable {
+    let id = UUID()
+    let text: String
+    let sourceLanguage: String
+}
+enum MihbaraTranslationAvailability: Equatable { case checking, installed, needsDownload, unsupported }
 private struct MihbaraParagraphProbe: Decodable { var selector: String; var text: String; var page: String? }
 
 extension MihbaraHighlight {
@@ -1885,7 +1958,11 @@ private struct MihbaraWordCard: View {
     let dark: Bool
     let swatches: [String]
     let copied: Bool
+    let wordSaved: Bool
+    let translationAvailability: MihbaraTranslationAvailability
     let lookUp: () -> Void
+    let saveWord: () -> Void
+    let translate: () -> Void
     let choose: (String) -> Void
     let note: () -> Void
     let copy: () -> Void
@@ -1905,15 +1982,20 @@ private struct MihbaraWordCard: View {
                         .font(.custom("Amiri-Bold", size: state.isWord ? 30 : 22, relativeTo: .title))
                         .foregroundStyle(ink).lineLimit(2).multilineTextAlignment(.leading)
                         .accessibilityIdentifier("mihbara-word-title")
-                    if state.isWord {
+                    if state.isWord, state.hasSystemDefinition {
                         Button(action: lookUp) {
                             HStack(spacing: 6) {
                                 Image(systemName: "character.book.closed").font(.system(size: 15, weight: .semibold))
                                 Text("معناها في قاموس الجهاز").font(.custom("thmanyahsans-Bold", size: 17, relativeTo: .body))
                             }
-                            .foregroundStyle(accent).frame(minHeight: 32).contentShape(Rectangle())
+                            .foregroundStyle(accent).frame(minHeight: 36).contentShape(Capsule())
                         }
+                        .glassEffect(.regular.interactive(), in: Capsule())
                         .accessibilityIdentifier("mihbara-word-lookup")
+                    } else if state.isWord {
+                        Text("لا يوجد تعريف لهذه الكلمة في قاموس الجهاز")
+                            .font(MadarTypography.fine()).foregroundStyle(ink2)
+                            .accessibilityIdentifier("mihbara-word-lookup-unavailable")
                     } else if let page = state.pageText {
                         Text("فقرة مظلّلة من \(page)").font(MadarTypography.caption()).foregroundStyle(ink2)
                     }
@@ -1921,8 +2003,9 @@ private struct MihbaraWordCard: View {
                 Spacer(minLength: 8)
                 Button(action: close) {
                     Image(systemName: "xmark").font(.system(size: 14, weight: .semibold)).foregroundStyle(ink2)
-                        .frame(width: 44, height: 44).background(Circle().fill(well)).contentShape(Circle())
+                        .frame(width: 44, height: 44).contentShape(Circle())
                 }
+                .glassEffect(.regular.interactive(), in: Circle())
                 .accessibilityLabel("إغلاق")
                 .accessibilityIdentifier("mihbara-word-close")
             }
@@ -1942,9 +2025,38 @@ private struct MihbaraWordCard: View {
                 }
                 Spacer(minLength: 0)
             }
-            HStack(spacing: 10) {
-                action("دوّن ملاحظة", icon: "square.and.pencil", id: "mihbara-word-note", run: note)
-                action(copied ? "نُسخت" : "انسخ مع التوثيق", icon: copied ? "checkmark" : "doc.on.doc", id: "mihbara-word-copy", run: copy)
+            GlassEffectContainer(spacing: 8) {
+                VStack(spacing: 10) {
+                    HStack(spacing: 10) {
+                        action("دوّن ملاحظة", icon: "square.and.pencil", id: "mihbara-word-note", run: note)
+                        action(copied ? "نُسخت" : "انسخ مع التوثيق", icon: copied ? "checkmark" : "doc.on.doc", id: "mihbara-word-copy", run: copy)
+                    }
+                    if state.isWord && (state.canSaveAsWord || translationAvailability != .unsupported) {
+                        HStack(spacing: 10) {
+                            if state.canSaveAsWord {
+                                if wordSaved {
+                                    Text("في كلماتي")
+                                        .font(.custom("thmanyahsans-Bold", size: 15, relativeTo: .subheadline))
+                                        .foregroundStyle(ink2).frame(maxWidth: .infinity, minHeight: 56)
+                                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                                        .accessibilityIdentifier("mihbara-word-saved")
+                                } else {
+                                    action("أضف إلى كلماتي", icon: "text.book.closed", id: "mihbara-word-save", run: saveWord)
+                                }
+                            }
+                            switch translationAvailability {
+                            case .installed:
+                                action("ترجم الفقرة", icon: "character.bubble", id: "mihbara-word-translate", run: translate)
+                            case .needsDownload:
+                                availability("ثبّت حزمة الترجمة من الإعدادات", id: "mihbara-translation-download")
+                            case .checking:
+                                availability("نتحقق من توفر الترجمة", id: "mihbara-translation-checking", progress: true)
+                            case .unsupported:
+                                EmptyView()
+                            }
+                        }
+                    }
+                }
             }
         }
         .padding(.horizontal, 20).padding(.top, 18).padding(.bottom, 16)
@@ -1961,9 +2073,20 @@ private struct MihbaraWordCard: View {
                 Text(title).font(.custom("thmanyahsans-Bold", size: 15, relativeTo: .subheadline)).lineLimit(1).minimumScaleFactor(0.85)
             }
             .foregroundStyle(ink).frame(maxWidth: .infinity, minHeight: 56)
-            .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(well))
             .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .accessibilityIdentifier(id)
+    }
+
+    private func availability(_ title: String, id: String, progress: Bool = false) -> some View {
+        HStack(spacing: 8) {
+            if progress { ProgressView().controlSize(.small) }
+            Text(title).font(MadarTypography.fine()).lineLimit(2).multilineTextAlignment(.center)
+        }
+        .foregroundStyle(ink2).frame(maxWidth: .infinity, minHeight: 56)
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .accessibilityIdentifier(id)
     }
 }
@@ -2025,6 +2148,73 @@ private struct MihbaraDictionaryView: UIViewControllerRepresentable {
     let term: String
     func makeUIViewController(context: Context) -> UIReferenceLibraryViewController { UIReferenceLibraryViewController(term: term) }
     func updateUIViewController(_ controller: UIReferenceLibraryViewController, context: Context) {}
+}
+
+@available(iOS 18.0, *)
+private struct MihbaraTranslationSheet: View {
+    let request: MihbaraTranslationRequest
+    let paper: SwiftUI.Color
+    let palette: MihbaraReaderPalette
+    @Environment(\.dismiss) private var dismiss
+    @State private var translatedText: String?
+    @State private var failed = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Button("تم") { dismiss() }
+                    .font(MadarTypography.body()).frame(minWidth: 44, minHeight: 44)
+                    .accessibilityIdentifier("mihbara-translation-close")
+                Spacer()
+                Text("ترجمة الفقرة").font(MadarTypography.section())
+                Spacer()
+                Color.clear.frame(width: 44, height: 44).accessibilityHidden(true)
+            }
+            Text("ترجمة آلية تقريبية · تُعالج على الجهاز")
+                .font(MadarTypography.fine()).foregroundStyle(palette.ink2)
+            Rectangle().fill(palette.line).frame(height: 1)
+            ScrollView {
+                if let translatedText {
+                    Text(translatedText).font(.custom("Amiri-Regular", size: 20, relativeTo: .body))
+                        .lineSpacing(7).foregroundStyle(palette.ink).frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityIdentifier("mihbara-translation-result")
+                } else if failed {
+                    Text("تعذّرت الترجمة. تحقّق من تثبيت اللغتين ثم حاول مجددًا.")
+                        .font(MadarTypography.body()).foregroundStyle(palette.ink2)
+                        .accessibilityIdentifier("mihbara-translation-error")
+                } else {
+                    ProgressView("تُترجم الفقرة على الجهاز…")
+                        .font(MadarTypography.body()).tint(palette.accent)
+                        .accessibilityIdentifier("mihbara-translation-progress")
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(20).background(paper.ignoresSafeArea())
+        .presentationDetents([.medium, .large])
+        .translationTask(
+            source: Locale.Language(identifier: request.sourceLanguage),
+            target: Locale.Language(identifier: "ar"),
+            action: Self.translationAction(text: request.text) { result in
+                translatedText = result
+                failed = result == nil
+            }
+        )
+    }
+
+    nonisolated private static func translationAction(
+        text: String,
+        completion: @escaping @MainActor @Sendable (String?) -> Void
+    ) -> @Sendable (TranslationSession) async -> Void {
+        { session in
+            do {
+                let response = try await session.translate(text)
+                await completion(response.targetText)
+            } catch {
+                await completion(nil)
+            }
+        }
+    }
 }
 
 // MARK: - M6-V09 footnotes

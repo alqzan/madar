@@ -211,6 +211,27 @@ private struct BookUndo: Codable {
                 row.isPrivate = false; row.text = text; row.locatorJSON = locatorJSON; row.page = page
                 context.insert(row); try touch(row, before: nil)
             }
+        case .saveUserWord(let id, let word, let language, let bookID, let bookTitle, let locatorJSON, let contextText):
+            let owner = try book(bookID)
+            guard owner.kind == "file", owner.format == "epub" else { throw DataError.invalidValue("أضف الكلمات من كتاب EPUB") }
+            let words = try context.fetch(FetchDescriptor<UserWord>())
+            let identity = UserWordIdentity.key(language: language, word: word)
+            if let row = words.filter({ $0.mergedInto == nil && UserWordIdentity.key(language: $0.language, word: $0.word) == identity }).max(by: { $0.updatedAt < $1.updatedAt }) {
+                let before = try row.record()
+                if row.deletedAt != nil {
+                    let barrier = row.deletionBarrierAt ?? row.deletedAt ?? .distantPast
+                    row.restoredAt = max(now, barrier.addingTimeInterval(0.001)); row.deletedAt = nil
+                }
+                row.word = word; row.language = language; row.bookID = bookID; row.bookTitle = bookTitle
+                row.locatorJSON = locatorJSON; row.context = contextText; row.savedAt = now
+                try touch(row, before: before)
+            } else {
+                guard !words.contains(where: { $0.id == id }) else { throw DataError.invalidValue("معرّف الكلمة مستخدم بالفعل") }
+                let row = UserWord(); row.id = id; row.createdAt = now; row.word = word; row.language = language
+                row.bookID = bookID; row.bookTitle = bookTitle; row.locatorJSON = locatorJSON
+                row.context = contextText; row.savedAt = now
+                context.insert(row); try touch(row, before: nil)
+            }
         }
         return command.isUndoable ? try JSONEncoder().encode(BookUndo(changes: changes, importedMediaIDs: importedMediaIDs.isEmpty ? nil : importedMediaIDs)) : Data()
     }
@@ -221,6 +242,7 @@ private struct BookUndo: Codable {
         records += try context.fetch(FetchDescriptor<HadithProgress>()).map { try $0.record() }
         records += try context.fetch(FetchDescriptor<NotebookNote>()).map { try $0.record() }
         records += try context.fetch(FetchDescriptor<Highlight>()).map { try $0.record() }
+        records += try context.fetch(FetchDescriptor<UserWord>()).map { try $0.record() }
         for change in state.changes { guard records.contains(change.after) else { throw DataError.invalidValue("تغيّر الكتاب بعد هذا الإجراء") } }
         for id in state.importedMediaIDs ?? [] {
             let rows = try context.fetch(FetchDescriptor<Media>())

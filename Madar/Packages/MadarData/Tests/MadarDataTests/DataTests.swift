@@ -239,6 +239,11 @@ import Testing
         context.insert(a); context.insert(b); context.insert(w1); context.insert(w2); try context.save(); try RowMerger(context:context).run()
         #expect(a.mergedInto == nil && b.mergedInto == nil); #expect(w1.mergedInto == nil && w2.mergedInto == nil)
     }
+    @Test func savedWordIdentityNormalizesArabicAndEnglishWithinTheirLanguages() {
+        #expect(UserWordIdentity.key(language: "en", word: "Book") == UserWordIdentity.key(language: "en", word: "book"))
+        #expect(UserWordIdentity.key(language: "ar", word: "أَكَلَ") == UserWordIdentity.key(language: "ar", word: "اكل"))
+        #expect(UserWordIdentity.key(language: "en", word: "book") != UserWordIdentity.key(language: "ar", word: "book"))
+    }
     @Test func rejectedBackupLeavesDiskStoreByteIdentical() throws {
         let source = try MadarContainerFactory.makeInMemory(); try fixture(source.mainContext)
         let backup = try BackupCodec.export(records:RecordBridge.all(source.mainContext),passphrase:"correct long password")

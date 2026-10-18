@@ -69,3 +69,11 @@ Differences left: reader header/footer stay visible under the card; dictionary b
 Not verified: dark reader, Look Up sheet content, highlights across several pages/resources, owner iPhone.
 Next: M6-V09 (verses and footnotes) is the next ready card; it owns «حاشيتها» on word touch.
 Model/effort: Claude Opus 5.5 / not exposed. Usage: not exposed.
+
+## Handover — M6-V09 verses and footnotes — 2026-10-18 — Claude
+Works now: Qur'an quotations (﴿…﴾) draw in the verse colour; note markers are accent circles; tapping one opens the footnote card in place. The V08 highlight band now follows a paragraph across a page break (per-line bands).
+Verified: UI V09 1/1, V06 reader 1/1, V08 word-card flow 1/1 after the band fix; `compare-screens.py R9-Qari-Riyad`; `git diff --check` clean.
+Differences left: «حاشية الكتاب» instead of «حاشية المحقق»; highlight band also fills the blank space under a page's last line.
+Not verified: dark reader, other footnote markup patterns, owner iPhone.
+Next: M6-V10 (night scroll): a brief is ready (the reader `theme` key is never read; there is no theme row in Aa; colours are hard-coded by colorScheme).
+Model/effort: Claude Opus 5.5 / not exposed; Sonnet 5.5 Explore agent for the V10 brief. Usage: five-hour 51% at last check.

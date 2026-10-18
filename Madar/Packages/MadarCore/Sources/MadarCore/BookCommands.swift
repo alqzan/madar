@@ -18,8 +18,10 @@ public enum BookCommand: Codable, Equatable, Sendable {
     case deleteHighlight(id: UUID)
     /// «دوّن ملاحظة»: a note tied to the place in the book it was written at (link `page`).
     case savePageNote(id: UUID, bookID: UUID, text: String, locatorJSON: Data, page: Int?)
+    /// «أضف إلى كلماتي»: one saved word with its source paragraph and reading position.
+    case saveUserWord(id: UUID, word: String, language: String, bookID: UUID, bookTitle: String, locatorJSON: Data, context: String)
     public static let highlightColors: Set<String> = ["yellow", "green", "rose"]
-    public static let names: Set<String> = ["book.savePaper", "book.updatePaper", "book.importPDF", "book.importEPUB", "book.moveShelf", "book.setPosition", "book.setLocator", "reading.saveSession", "hadith.mark", "notebook.savePrivate", "notebook.deletePrivate", "highlight.save", "highlight.delete", "notebook.savePage"]
+    public static let names: Set<String> = ["book.savePaper", "book.updatePaper", "book.importPDF", "book.importEPUB", "book.moveShelf", "book.setPosition", "book.setLocator", "reading.saveSession", "hadith.mark", "notebook.savePrivate", "notebook.deletePrivate", "highlight.save", "highlight.delete", "notebook.savePage", "word.save"]
     public var isUndoable: Bool {
         if case .readingSession = self { return false }
         return true
@@ -58,6 +60,19 @@ public enum BookCommand: Codable, Equatable, Sendable {
         if name == "hadith.mark" {
             guard Set(p.keys) == ["number","edition","understood","day"], let n = integer("number"), (1...42).contains(n), let edition = text("edition"), !edition.isEmpty, edition.count <= 120, case .bool(let understood) = p["understood"], let day = text("day").flatMap({ try? GregorianDay($0) }) else { return nil }
             return .hadith(number: n, edition: edition, understood: understood, day: day)
+        }
+        if name == "word.save" {
+            guard Set(p.keys) == ["id", "word", "language", "bookID", "bookTitle", "locator", "context"],
+                  let id = text("id").flatMap(UUID.init(uuidString:)),
+                  let word = text("word")?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !word.isEmpty, word.count <= 120, word.split(whereSeparator: \.isWhitespace).count == 1,
+                  let language = text("language"), ["ar", "en"].contains(language),
+                  let bookID = text("bookID").flatMap(UUID.init(uuidString:)),
+                  let bookTitle = text("bookTitle"), !bookTitle.isEmpty, bookTitle.count <= 300,
+                  let locator = locatorData("locator"),
+                  let context = text("context")?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !context.isEmpty, context.count <= 4000 else { return nil }
+            return .saveUserWord(id: id, word: word, language: language, bookID: bookID, bookTitle: bookTitle, locatorJSON: locator, context: context)
         }
         guard let id = text("id").flatMap(UUID.init(uuidString:)) else { return nil }
         switch name {
