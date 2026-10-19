@@ -24,6 +24,7 @@ import Testing
         ("سداد بطاقة ائتمانية *3333\nمبلغ: 700 SAR", .cardPayment),
         ("كشف حساب البطاقة *3333\nالمبلغ المستحق: 6,800.00 SAR\nالحد الأدنى: 340.00 SAR\nتاريخ الاستحقاق: 2026-11-05", .statement),
         ("استرداد مبلغ\nبطاقة *3333\nمبلغ: 40 SAR\nمن: STORE ONLINE", .refund),
+        ("استرداد نقدي\nبطاقة مدى *3333\nمبلغ: 35 SAR\n2026-10-15 14:00", .cashback),
         ("عملية مرفوضة\nبطاقة *1111\nمبلغ: 90 SAR\nالسبب: رصيد غير كاف", .declined),
         ("عكس عملية\nبطاقة *1111\nمبلغ: 90 SAR", .reversal),
         ("سداد فاتورة\nالمفوتر: شركة الكهرباء\nمبلغ: 410 SAR\nمن: 5555*", .billPayment),
@@ -56,6 +57,10 @@ import Testing
         #expect(credit.cardKind == .credit)
         #expect(credit.currency == "USD")
         #expect(credit.amountMinor == 1_234)
+        let cashback = BankMessageParser.parse(Self.samples[11].text, timeZone: riyadh)
+        #expect(cashback.kind == .cashback)
+        #expect(cashback.cardKind == .debit)
+        #expect(cashback.last4 == "3333")
     }
 
     @Test func eventAtComesFromTheTextWhenItCarriesATime() {
@@ -82,10 +87,10 @@ import Testing
 
     @Test func salaryThousandsAndBillerAndProvider() {
         #expect(BankMessageParser.parse(Self.samples[6].text, timeZone: riyadh).amountMinor == 1_500_000)
-        #expect(BankMessageParser.parse(Self.samples[13].text, timeZone: riyadh).biller == "شركة الكهرباء")
-        #expect(BankMessageParser.parse(Self.samples[15].text, timeZone: riyadh).provider == "Tamara")
-        #expect(BankMessageParser.parse(Self.samples[15].text, timeZone: riyadh).amountMinor == 4_000)
-        #expect(BankMessageParser.parse(Self.samples[16].text, timeZone: riyadh).provider == "Tabby")
+        #expect(BankMessageParser.parse(Self.samples[14].text, timeZone: riyadh).biller == "شركة الكهرباء")
+        #expect(BankMessageParser.parse(Self.samples[16].text, timeZone: riyadh).provider == "Tamara")
+        #expect(BankMessageParser.parse(Self.samples[16].text, timeZone: riyadh).amountMinor == 4_000)
+        #expect(BankMessageParser.parse(Self.samples[17].text, timeZone: riyadh).provider == "Tabby")
     }
 
     @Test func otpTextIsNeverKeptAndMarketingIsDropped() {
@@ -94,7 +99,7 @@ import Testing
         #expect(BankIntake.decision(.unknown) == .needsLook)
         #expect(BankIntake.decision(.purchase) == .record)
         // The parser reads nothing out of an OTP message.
-        let otp = BankMessageParser.parse(Self.samples[17].text, timeZone: riyadh)
+        let otp = BankMessageParser.parse(Self.samples[18].text, timeZone: riyadh)
         #expect(otp == ParsedBankMessage(kind: .otp))
     }
 

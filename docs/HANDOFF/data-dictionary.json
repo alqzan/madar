@@ -3611,11 +3611,11 @@
    "config": "synced",
    "naturalKey": "id",
    "deletePolicy": "softRestrict",
-   "invariants": [],
+   "invariants": ["preferredCardID is nil or references a live credit card; it only guides future purchases and never changes historical cardID."],
    "merge": "row LWW (§11 merge)",
    "seed": "default categories = UUIDv5(seedNS, \"Category:<slug>\")",
-   "note": null,
-   "amendedBy": null,
+   "note": "M5-V16: the preferred card is an optional UUID foreign key; historical transactions remain unchanged.",
+   "amendedBy": "M5-V16 owner-approved idea, 18 Oct 2026",
    "relationships": [],
    "eventProvenance": false,
    "fields": [
@@ -3644,7 +3644,14 @@
      "type": "Int",
      "optional": false,
      "default": 0
-    }
+    },
+     {
+       "name": "preferredCardID",
+       "type": "UUID?",
+       "optional": true,
+       "default": null,
+       "unit": "Card.id (foreign key; no relationship)"
+     }
    ]
   },
   {
@@ -5933,5 +5940,5 @@
    "execution": "Immediately on press, within undo window"
   }
  },
- "storeSchemaVersion": 9
+ "storeSchemaVersion": 10
 }

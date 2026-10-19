@@ -4,7 +4,7 @@ import Foundation
 /// M5-E03: the bank-message parser (§7.5 «رسائل البنك», RM6) and dedupe (F08 as amended by RM8).
 /// Formats are learned from synthetic samples written from the spec; the owner's anonymised messages will extend them.
 public enum BankMessageKind: String, Sendable, CaseIterable {
-    case purchase, withdrawal, transferOut, transferIn, salary, income, cardPayment, statement, refund
+    case purchase, withdrawal, transferOut, transferIn, salary, income, cardPayment, statement, refund, cashback
     case declined, reversal, billPayment, fee, bnplInstalment, otp, marketing, unknown
 }
 
@@ -31,7 +31,7 @@ public struct ParsedBankMessage: Equatable, Sendable {
 }
 
 public enum BankMessageParser {
-    public static let version = 1
+    public static let version = 2
 
     /// Digits and separators unified (Arabic-Indic → ASCII, «٫» → ".", «٬» → ","), tatweel removed; lines kept.
     public static func clean(_ text: String) -> String {
@@ -68,6 +68,7 @@ public enum BankMessageParser {
         if has(t, ["كشف حساب البطاقة", "كشف البطاقة", "statement", "الحد الأدنى للسداد", "المبلغ المستحق"]) { return .statement }
         if has(t, ["سداد بطاقة", "سداد البطاقة", "card payment"]) { return .cardPayment }
         if has(t, ["سداد فاتورة", "سداد", "SADAD", "المفوتر"]) { return .billPayment }
+        if has(t, ["استرداد نقدي", "cashback", "cash back", "cash-back", "مكافأة نقدية"]) { return .cashback }
         if has(t, ["استرداد", "refund", "مرتجع"]) { return .refund }
         if has(t, ["راتب", "salary", "payroll"]) { return .salary }
         if has(t, ["سحب صراف", "سحب نقدي", "ATM", "cash withdrawal"]) { return .withdrawal }
@@ -105,7 +106,7 @@ public enum BankMessageParser {
         result.counterparty = kind == .transferIn ? labelled(t, ["من", "From"]) : kind == .transferOut ? labelled(t, ["إلى", "To"]) : nil
         if kind == .refund, result.merchant == nil { result.merchant = labelled(t, ["من"]) }
         if kind == .bnplInstalment { result.provider = has(t, ["تمارا", "tamara"]) ? "Tamara" : "Tabby" }
-        if kind == .purchase || kind == .refund {
+        if kind == .purchase || kind == .refund || kind == .cashback {
             result.cardKind = has(t, ["ائتمان", "credit"]) ? .credit : has(t, ["مسبقة الدفع", "prepaid"]) ? .prepaid
                 : has(t, ["مدى", "mada", "Apple Pay"]) ? .debit : nil
         }

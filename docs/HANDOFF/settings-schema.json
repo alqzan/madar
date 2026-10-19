@@ -3078,6 +3078,21 @@
    "storage": "Setting (synced)",
    "preset": false,
    "note": "M5-V15: أي مدة من يوم إلى سنة؛ العدّ التالي يبدأ من تاريخ آخر مطابقة. أول مطابقة متى اختارها المستخدم."
+  },
+  {
+   "key": "mal.cashbackDestination",
+   "owner": "mal",
+   "section": "المال",
+   "title": "وجهة الاسترداد النقدي",
+   "type": "string",
+   "default": "",
+   "scope": "sync",
+   "storage": "Setting (synced)",
+   "preset": false,
+   "contract": {
+    "format": "uuidOrEmpty"
+   },
+   "note": "M5-V16: معرّف ظرف يوجه إليه الاسترداد النقدي المودع مستقبلًا؛ القيمة الفارغة تتركه في الفائض. لا يحوّل رصيدًا استُخدم لتخفيض دين بطاقة ائتمان."
   }
  ],
  "reviewAmendment": {

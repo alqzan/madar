@@ -61,6 +61,7 @@ struct MoneyExpenseView: View {
                     }
                     merchantChips(reading)
                     categorySuggestion(reading)
+                    preferredCardSuggestion(reading)
                     shares(reading)
                     keypad
                     diary(reading)
@@ -128,6 +129,34 @@ struct MoneyExpenseView: View {
                 .accessibilityIdentifier("money-expense-category")
             Spacer()
         }.padding(11).frame(minHeight: 44).overlay { Rectangle().stroke(theme.color("reserveText"), style: StrokeStyle(lineWidth: 1, dash: [3, 2])) }
+    }
+    @ViewBuilder private func preferredCardSuggestion(_ r: MoneyExpenseReading) -> some View {
+        if let category = r.categories.first(where: { $0.id == categoryID }),
+           let cardID = category.preferredCardID, let cardName = category.preferredCardName,
+           let payment = r.methods.first(where: { $0.cardID == cardID && $0.kind == .credit }) {
+            let selected = methodID == payment.id
+            GlassEffectContainer(spacing: 8) {
+                HStack(spacing: 10) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("بطاقتك المفضلة لـ" + category.name).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                        Text(cardName).font(MadarTypography.body().weight(.semibold)).lineLimit(1)
+                            .accessibilityIdentifier("money-expense-preferred-card-name")
+                    }
+                    Spacer(minLength: 6)
+                    Button { methodID = payment.id } label: {
+                        Text(selected ? "مختارة للدفع" : "استخدمها للدفع").font(MadarTypography.fine().weight(.semibold))
+                            .frame(minWidth: 96, minHeight: 44)
+                    }
+                    .buttonStyle(.plain).disabled(selected)
+                    .glassEffect(.regular.interactive(), in: Capsule())
+                    .accessibilityIdentifier("money-expense-preferred-card-use")
+                }
+                .padding(.horizontal, 12).padding(.vertical, 8)
+                .glassEffect(.regular, in: .rect(cornerRadius: 18))
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("money-expense-preferred-card")
+        }
     }
     @ViewBuilder private func shares(_ r: MoneyExpenseReading) -> some View {
         if r.tripEnvelopeID != nil {

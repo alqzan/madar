@@ -750,6 +750,28 @@ import MadarInbox
         #expect(try await f.run("system.undo", ["undoToken": .string(third.uuidString)]).status == .applied)
         #expect(try ModelContext(f.container).fetch(FetchDescriptor<Card>()).first { $0.id == card.id }?.cashbackBp == 200)
     }
+    /// M5-V16: the preferred credit card is optional, app-only, scoped to one live category, and undoable.
+    @Test func categoryPreferredCardGuidesFutureExpensesAndCanBeCleared() async throws {
+        let f = try MoneyFixture(); defer { f.clean() }
+        let c = ModelContext(f.container), category = MadarData.Category(), credit = Card(), debit = Card()
+        category.name = "بقالة"; credit.name = "بطاقة السفر"; credit.kind = "credit"; debit.name = "مدى"; debit.kind = "debit"
+        c.insert(category); c.insert(credit); c.insert(debit); try c.save()
+        let payload: [String: MadarCore.JSONValue] = ["categoryID": .string(category.id.uuidString), "cardID": .string(credit.id.uuidString)]
+        let change = UUID()
+        #expect(MoneyCommandPayload.validate(name: "money.setCategoryPreferredCard", payload: payload))
+        #expect(!MoneyCommandPayload.validate(name: "money.setCategoryPreferredCard", payload: ["categoryID": .string(category.id.uuidString)]))
+        #expect(!MoneyCommandPayload.validate(name: "money.setCategoryPreferredCard", payload: ["categoryID": .string("bad"), "cardID": .null]))
+        #expect(try await f.run("money.setCategoryPreferredCard", payload, source: .shortcut).status != .applied)
+        #expect(try await f.run("money.setCategoryPreferredCard", payload, id: change).status == .applied)
+        #expect(try ModelContext(f.container).fetch(FetchDescriptor<MadarData.Category>()).first { $0.id == category.id }?.preferredCardID == credit.id)
+        #expect(try await f.run("system.undo", ["undoToken": .string(change.uuidString)]).status == .applied)
+        #expect(try ModelContext(f.container).fetch(FetchDescriptor<MadarData.Category>()).first { $0.id == category.id }?.preferredCardID == nil)
+        #expect(try await f.run("money.setCategoryPreferredCard", ["categoryID": .string(category.id.uuidString), "cardID": .string(debit.id.uuidString)]).status == .rejected)
+        #expect(try await f.run("money.setCategoryPreferredCard", payload).status == .applied)
+        #expect(try await f.run("money.setCategoryPreferredCard", ["categoryID": .string(category.id.uuidString), "cardID": .null]).status == .applied)
+        #expect(try ModelContext(f.container).fetch(FetchDescriptor<MadarData.Category>()).first { $0.id == category.id }?.preferredCardID == nil)
+        #expect(try await f.run("money.setCategoryPreferredCard", ["categoryID": .string(UUID().uuidString), "cardID": .null]).status == .rejected)
+    }
     /// «منذ آخر زيارة»: the visit marker is one device row, updated in place, with no undo.
     @Test func markVisitKeepsOneDeviceRowAtTheCommandTime() async throws {
         let f = try MoneyFixture(); defer { f.clean() }
@@ -947,8 +969,65 @@ import MadarInbox
         legacy.balanceAt = nil; try legacyContext.save()
         #expect(try await f.run("money.saveAccount", renamed).status == .applied)
         #expect(try ModelContext(f.container).fetch(FetchDescriptor<Account>()).first { $0.id == f.bank }?.balanceAt == nil, "Renaming a legacy account never invents a checkpoint")
+    }
 
+    @Test func depositedCashbackRoutesToChosenEnvelopeAndUndoRestoresDraft() async throws {
+        let f = try MoneyFixture(); defer { f.clean() }; try await f.setup()
+        let context = ModelContext(f.container), envelope = Envelope(); envelope.name = "رحلة قادمة"; context.insert(envelope); try context.save()
+        #expect(try await f.run("settings.set", ["settings": .object(["mal.cashbackDestination": .string(envelope.id.uuidString)])]).status == .applied)
+        let before = try f.basis().inAccountMinor
+        #expect(try await f.ingest("استرداد نقدي\nمبلغ: 35.00 SAR\n2026-10-16 13:00").status == .applied)
+        let draft = try f.transaction(); #expect(draft.kind == "cashback"); #expect(draft.reviewState == "needsLook")
+        let confirmation = UUID()
+        #expect(try await f.run("money.confirmTransaction", ["id": .string(draft.id.uuidString), "toAccountID": .string(f.bank.uuidString)], id: confirmation).status == .applied)
+        let reader = ModelContext(f.container), landed = try #require(try reader.fetch(FetchDescriptor<MoneyTransaction>()).first { $0.id == draft.id })
+        #expect(landed.reviewState == "ok" && landed.toAccountID == f.bank)
+        #expect(try f.basis().inAccountMinor == before + 3_500)
+        let allocations = try MoneyRepository(context: reader).allocationRows(transactionID: draft.id)
+        #expect(allocations.count == 1)
+        #expect(allocations.contains { $0.target == .envelope(envelope.id.uuidString) && $0.amountMinor == 3_500 })
+        let redeemed = try #require(reader.fetch(FetchDescriptor<CashbackEntry>()).first { $0.transactionID == draft.id && $0.kind == "redeemed" && $0.deletedAt == nil })
+        #expect(redeemed.cardID == nil && redeemed.amountMinor == 3_500)
+        #expect(try await f.run("system.undo", ["undoToken": .string(confirmation.uuidString)]).status == .applied)
+        let restored = ModelContext(f.container)
+        #expect(try f.transaction(draft.id).reviewState == "needsLook")
+        #expect(try MoneyRepository(context: restored).allocationRows(transactionID: draft.id).isEmpty)
+        #expect(try restored.fetch(FetchDescriptor<CashbackEntry>()).first { $0.id == redeemed.id }?.deletedAt != nil)
+        #expect(try f.basis().inAccountMinor == before)
+    }
 
+    @Test func creditCardCashbackReducesDebtWithoutFundingAnEnvelope() async throws {
+        let f = try MoneyFixture(); defer { f.clean() }; try await f.setup()
+        let context = ModelContext(f.container), envelope = Envelope(); envelope.name = "هدف"; context.insert(envelope); try context.save()
+        #expect(try await f.run("settings.set", ["settings": .object(["mal.cashbackDestination": .string(envelope.id.uuidString)])]).status == .applied)
+        #expect(try await f.ingest("استرداد نقدي بطاقة ائتمانية *4444\nمبلغ: 35.00 SAR\n2026-10-16 13:00").status == .applied)
+        let draft = try f.transaction()
+        #expect(draft.kind == "cashback" && draft.cardID == f.credit)
+        #expect(try await f.run("money.confirmTransaction", ["id": .string(draft.id.uuidString)]).status == .applied)
+        let reader = ModelContext(f.container), landed = try #require(try reader.fetch(FetchDescriptor<MoneyTransaction>()).first { $0.id == draft.id })
+        #expect(landed.toAccountID == nil)
+        #expect(try MoneyRepository(context: reader).effect(of: landed).debtMinor == -3_500)
+        #expect(try MoneyRepository(context: reader).allocationRows(transactionID: draft.id).isEmpty)
+        #expect(try reader.fetch(FetchDescriptor<CashbackEntry>()).contains { $0.transactionID == draft.id && $0.kind == "redeemed" && $0.deletedAt == nil })
+    }
 
+    @Test func depositedCashbackDefaultsToSurplus() async throws {
+        let f = try MoneyFixture(); defer { f.clean() }; try await f.setup()
+        #expect(try await f.ingest("استرداد نقدي\nمبلغ: 12.00 SAR\n2026-10-16 14:00").status == .applied)
+        let draft = try f.transaction()
+        #expect(try await f.run("money.confirmTransaction", ["id": .string(draft.id.uuidString), "toAccountID": .string(f.bank.uuidString)]).status == .applied)
+        let reader = ModelContext(f.container), allocations = try MoneyRepository(context: reader).allocationRows(transactionID: draft.id)
+        #expect(allocations.count == 1 && allocations[0].target == .surplus && allocations[0].amountMinor == 1_200)
+    }
+
+    @Test func depositedCashbackCanRouteToReserve() async throws {
+        let f = try MoneyFixture(); defer { f.clean() }; try await f.setup()
+        let context = ModelContext(f.container), reserve = Envelope(); reserve.name = "الاحتياطي"; reserve.role = "reserve"; context.insert(reserve); try context.save()
+        #expect(try await f.run("settings.set", ["settings": .object(["mal.cashbackDestination": .string(reserve.id.uuidString)])]).status == .applied)
+        #expect(try await f.ingest("استرداد نقدي\nمبلغ: 12.00 SAR\n2026-10-16 14:00").status == .applied)
+        let draft = try f.transaction()
+        #expect(try await f.run("money.confirmTransaction", ["id": .string(draft.id.uuidString), "toAccountID": .string(f.bank.uuidString)]).status == .applied)
+        let reader = ModelContext(f.container), allocations = try MoneyRepository(context: reader).allocationRows(transactionID: draft.id)
+        #expect(allocations.count == 1 && allocations[0].target == .reserve && allocations[0].amountMinor == 1_200)
     }
 }

@@ -29,8 +29,22 @@ struct MoneyCashbackMonth: Identifiable {
 }
 struct MoneyCashbackSwitch {
     var to: MoneyCashbackCard
-    var rows: [(title: String, from: [String], baseMinor: Int, gainMinor: Int)]
+    var rows: [MoneyCashbackSwitchRow]
     var totalMinor: Int
+}
+struct MoneyCashbackSwitchRow: Identifiable {
+    var id: String
+    var categoryID: UUID?
+    var title: String
+    var from: [String]
+    var baseMinor: Int
+    var gainMinor: Int
+    var preferredCardID: UUID?
+}
+struct MoneyCashbackDestination: Identifiable {
+    var id: UUID
+    var name: String
+    var role: String
 }
 struct MoneyCashbackReading {
     var yearTitle: String
@@ -40,6 +54,8 @@ struct MoneyCashbackReading {
     var jar: CashbackJar.Reading
     var switchSuggestion: MoneyCashbackSwitch?
     var hasPurchases: Bool
+    var destinations: [MoneyCashbackDestination]
+    var destinationID: UUID?
     var current: Int { months.count - 1 }
 }
 
@@ -91,19 +107,21 @@ extension AppMoneyService {
         let ids = Set(ordered.map(\.id))
         let transactions = try repo.confirmedTransactions().filter { $0.eventAt <= now }
         let byID = Dictionary(transactions.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
-        let categories = Dictionary(try context.fetch(FetchDescriptor<MadarData.Category>()).filter { $0.deletedAt == nil }.map { ($0.id, $0.name) }, uniquingKeysWith: { a, _ in a })
+        let categories = Dictionary(try context.fetch(FetchDescriptor<MadarData.Category>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         func monthOf(_ tx: MoneyTransaction) -> Int? { (try? GregorianDay(tx.dayKey)).flatMap(month) }
         var purchases: [CashbackJar.Purchase] = []
         for tx in transactions {
             switch tx.kind {
             case "expense":
                 guard let card = tx.cardID, ids.contains(card), let m = monthOf(tx) else { continue }
-                purchases.append(.init(cardID: card.uuidString, month: m, amountMinor: tx.homeAmountMinor, category: tx.categoryID.flatMap { categories[$0] }))
+                let category = tx.categoryID.flatMap { categories[$0] }
+                purchases.append(.init(cardID: card.uuidString, month: m, amountMinor: tx.homeAmountMinor, category: category?.name, categoryID: category?.id.uuidString))
             case "refund":
                 // A linked refund lands on its original's month and category (V13: «يعود إلى يوم الأصل»).
                 let original = tx.relatedTransactionID.flatMap { byID[$0] }
                 guard let card = tx.cardID ?? original?.cardID, ids.contains(card), let m = original.map(monthOf) ?? monthOf(tx) else { continue }
-                purchases.append(.init(cardID: card.uuidString, month: m, amountMinor: -tx.homeAmountMinor, category: (original?.categoryID ?? tx.categoryID).flatMap { categories[$0] }))
+                let category = (original?.categoryID ?? tx.categoryID).flatMap { categories[$0] }
+                purchases.append(.init(cardID: card.uuidString, month: m, amountMinor: -tx.homeAmountMinor, category: category?.name, categoryID: category?.id.uuidString))
             default: continue
             }
         }
@@ -149,12 +167,24 @@ extension AppMoneyService {
         if let result = CashbackJar.switchToBest(cards: credit.map { .init(id: $0.id.uuidString, rateBp: $0.rateBp) }, purchases: purchases),
            let to = credit.first(where: { $0.id.uuidString == result.toCardID }) {
             suggestion = .init(to: to, rows: result.rows.map { row in
-                let from = credit.filter { card in card.id != to.id && (card.rateBp ?? Int.max) < (to.rateBp ?? 0) && purchases.contains { $0.cardID == card.id.uuidString && $0.category == row.category && $0.amountMinor > 0 } }.map(\.name)
-                return (row.category ?? "بلا تصنيف", from, row.baseMinor, row.gainMinor)
+                let from = Set(credit.filter { card in
+                    card.id != to.id && (card.rateBp ?? Int.max) < (to.rateBp ?? 0)
+                        && purchases.contains { $0.cardID == card.id.uuidString && $0.categoryID == row.categoryID && $0.amountMinor > 0 }
+                }.map(\.name)).sorted()
+                let categoryID = row.categoryID.flatMap(UUID.init(uuidString:))
+                return MoneyCashbackSwitchRow(id: row.categoryID ?? "uncategorised", categoryID: categoryID,
+                    title: row.category ?? "بلا تصنيف", from: from, baseMinor: row.baseMinor, gainMinor: row.gainMinor,
+                    preferredCardID: categoryID.flatMap { categories[$0]?.preferredCardID })
             }, totalMinor: result.totalGainMinor)
         }
+        let envelopes = try context.fetch(FetchDescriptor<Envelope>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
+            .sorted { $0.name < $1.name }
+        // Surplus has its own explicit chip; showing its backing row again made the choice ambiguous.
+        let destinations = envelopes.filter { $0.role != "surplus" }.map { MoneyCashbackDestination(id: $0.id, name: $0.name, role: $0.role) }
+        let savedDestination = try SettingsStore(context: context).value(for: "mal.cashbackDestination").string.flatMap(UUID.init(uuidString:))
+        let destinationID = savedDestination.flatMap { id in destinations.contains(where: { $0.id == id }) ? id : nil }
         return .init(yearTitle: yearTitle, yearSecondary: yearSecondary, months: months, cards: cards, jar: jar, switchSuggestion: suggestion,
-                     hasPurchases: purchases.contains { $0.amountMinor > 0 })
+                     hasPurchases: purchases.contains { $0.amountMinor > 0 }, destinations: destinations, destinationID: destinationID)
     }
 
     /// Basis points as a percent with no trailing zeros: 50 → «٠٫٥٪», 125 → «١٫٢٥٪», 200 → «٢٪».

@@ -88,4 +88,16 @@ struct CashbackJarTests {
         #expect(s.rows[0].baseMinor == 130_000 && s.totalGainMinor == 1_900)
         #expect(CashbackJar.switchToBest(cards: [travel, CashbackJar.Card(id: "U", rateBp: nil)], purchases: [.init(cardID: "U", month: 0, amountMinor: 1_000)]) == nil, "Nothing to compare")
     }
+
+    @Test func duplicateCategoryNamesRemainSeparateByStableCategoryID() throws {
+        let first = "category-groceries", second = "category-market"
+        let reading = try #require(CashbackJar.switchToBest(cards: [plat, travel], purchases: [
+            .init(cardID: "P", month: 0, amountMinor: 100_000, category: "بقالة", categoryID: first),
+            .init(cardID: "P", month: 0, amountMinor: 200_000, category: "بقالة", categoryID: second)
+        ]))
+        #expect(reading.rows.count == 2)
+        #expect(Set(reading.rows.compactMap(\.categoryID)) == [first, second])
+        #expect(reading.rows.map(\.baseMinor).sorted() == [100_000, 200_000])
+        #expect(reading.rows.map(\.gainMinor).sorted() == [1_000, 2_000])
+    }
 }

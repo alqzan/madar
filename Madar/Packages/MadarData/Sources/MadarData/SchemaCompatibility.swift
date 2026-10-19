@@ -19,6 +19,7 @@ enum SchemaCompatibility {
         case 6: MadarSchemaV6.syncedNames
         case 7: MadarSchemaV7.syncedNames
         case 8: MadarSchemaV8.syncedNames
+        case 9: MadarSchemaV9.syncedNames
         case MadarSchema.version: MadarSchema.syncedNames
         default: throw version > MadarSchema.version ? DataError.newerStore : DataError.unsupportedBackup
         }
@@ -64,6 +65,8 @@ enum SchemaCompatibility {
             if version < 8, row.model == "Entry" { row.fields["tags"] = .null }
             // V9 (M5-V15): the balance record can now point to an installment obligation.
             if version < 9, row.model == "Reconciliation" { row.fields["obligationID"] = .null }
+            // V10 (M5-V16): a category may guide future purchases to a preferred card; history stays unchanged.
+            if version < 10, row.model == "Category" { row.fields["preferredCardID"] = .null }
             return row
         }
     }

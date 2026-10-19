@@ -106,6 +106,7 @@ extension AppSession {
             let redeemed = CashbackEntry(); redeemed.cardID = card.id; redeemed.kind = "redeemed"; redeemed.amountMinor = 3_500; redeemed.eventAt = landed.eventAt; redeemed.transactionID = landed.id; c.insert(redeemed)
             }
             let recorded = CashbackEntry(); recorded.cardID = travel.id; recorded.kind = "earned"; recorded.amountMinor = 4_200; recorded.eventAt = today.adding(days: -100).date(in: zone).addingTimeInterval(9 * 3600); c.insert(recorded)
+            let destination = Envelope(); destination.name = "رحلة قادمة"; destination.role = "goal"; destination.targetMinor = 500_000; c.insert(destination)
             try c.save()
         }
         if variant == "budget" {

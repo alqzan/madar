@@ -262,7 +262,7 @@ import Testing
     @Test func test_M0S1_RA4_originalV1ArchiveMapsOnlyAfterAuthentication() throws {
         let bytes = try Data(contentsOf:resources.appendingPathComponent("source-v1.madarbackup"))
         let backup = try BackupCodec.validate(bytes,passphrase:"legacy fixture password")
-        #expect(MadarSchema.version == 9)
+        #expect(MadarSchema.version == 10)
         #expect(backup.records.contains { $0.model == "MoneyTransaction" })
         #expect(!backup.records.contains { $0.model == "Transaction" })
         let expected = try expectedRows().filter { MadarSchema.syncedNames.contains($0.model) }
@@ -285,7 +285,7 @@ import Testing
     @Test func test_M0S1_RA4_originalSQLiteIsAdoptedWithoutLosingAnyRow() throws {
         let base = try fixtureDirectory(); defer { try? FileManager.default.removeItem(at:base) }
         let managed = try ManagedDataStore.adoptLegacy(from:base.appendingPathComponent("Flat"),at:base.appendingPathComponent("Managed"))
-        #expect(MadarSchema.version == 9)
+        #expect(MadarSchema.version == 10)
         #expect(try RecordFingerprint.hash(RecordBridge.all(managed.container.mainContext,syncedOnly:false)) == RecordFingerprint.hash(expectedRows()))
         #expect(try managed.container.mainContext.fetchCount(FetchDescriptor<DeviceSetting>()) == 2)
         #expect(try managed.container.mainContext.fetchCount(FetchDescriptor<CommandReceipt>()) == 1)
@@ -372,7 +372,7 @@ import Testing
         let upgraded = try ManagedDataStore(root: root)
         #expect(upgraded.binding.generationID != oldID)
         #expect(try stableGenerationHashes(generation) == sourceHash)
-        #expect(try MadarContainerFactory.storeVersionForAdoption(at: upgraded.binding.syncedDirectory) == 9)
+        #expect(try MadarContainerFactory.storeVersionForAdoption(at: upgraded.binding.syncedDirectory) == 10)
         let context = upgraded.container.mainContext
         let entry = try #require(context.fetch(FetchDescriptor<Entry>()).first)
         #expect(entry.dayKey == "2025-07-14" && entry.text == "synthetic Day One memory" && entry.source == "dayOne")
@@ -425,7 +425,7 @@ import Testing
         let upgraded = try ManagedDataStore(root: root)
         #expect(upgraded.binding.generationID != oldID)
         #expect(try stableGenerationHashes(generation) == sourceHash)
-        #expect(try MadarContainerFactory.storeVersionForAdoption(at: upgraded.binding.syncedDirectory) == 9)
+        #expect(try MadarContainerFactory.storeVersionForAdoption(at: upgraded.binding.syncedDirectory) == 10)
 
         let context = upgraded.container.mainContext
         let record = try #require(context.fetch(FetchDescriptor<Reconciliation>()).first { $0.id == reconciliationID })
@@ -445,6 +445,55 @@ import Testing
         let reopened = try ManagedDataStore(root: root)
         #expect(reopened.binding.generationID == upgraded.binding.generationID)
         #expect(try reopened.container.mainContext.fetch(FetchDescriptor<Reconciliation>()).first { $0.id == reconciliationID }?.obligationID == nil)
+    }
+
+    /// M5-V16: V9→V10 adds a nullable preferred-card foreign key; category identity and data remain unchanged.
+    @Test func schemaV9UpgradeDefaultsOnlyPreferredCardWithoutChangingSourceGeneration() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("MadarV10-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let oldID = UUID(), generation = root.appendingPathComponent("Generations/\(oldID.uuidString)")
+        try FileManager.default.createDirectory(at: generation, withIntermediateDirectories: true)
+        let categoryID = UUID(), categoryName = "تصنيف اصطناعي", icon = "basket", color = "accent", eventAt = Date(timeIntervalSince1970: 1_797_000_000)
+        var before: [DataRecord] = []
+        do {
+            let old = try ModelContainer(for: MadarSchemaV9.schema, configurations: [
+                ModelConfiguration("synced", schema: Schema(MadarSchemaV9.syncedTypes), url: generation.appendingPathComponent("Madar.store"), cloudKitDatabase: .none),
+                ModelConfiguration("deviceOnly", schema: Schema(MadarSchemaV9.deviceTypes), url: root.appendingPathComponent("Device.store"), cloudKitDatabase: .none)])
+            old.mainContext.autosaveEnabled = false
+            let category = MadarFrozenCategoryV9.Category()
+            category.id = categoryID; category.name = categoryName; category.icon = icon; category.color = color; category.order = 7
+            category.createdAt = eventAt; category.updatedAt = eventAt; category.writerID = "synthetic-v9"
+            old.mainContext.insert(category)
+            let currentShape = MadarData.Category()
+            currentShape.id = categoryID; currentShape.name = categoryName; currentShape.icon = icon; currentShape.color = color; currentShape.order = 7
+            currentShape.createdAt = eventAt; currentShape.updatedAt = eventAt; currentShape.writerID = "synthetic-v9"
+            before = [try currentShape.record()]
+            before[0].fields.removeValue(forKey: "preferredCardID")
+            try old.mainContext.save()
+        }
+        try DurableFiles.encode(9, to: generation.appendingPathComponent("SchemaVersion.json"))
+        try DurableFiles.encode(1, to: root.appendingPathComponent("DeviceSchemaVersion.json"))
+        try DurableFiles.encode(GenerationReady(version: 1, generationID: oldID, recordsHash: RecordFingerprint.hash(before), createdAt: Date()), to: generation.appendingPathComponent("GenerationReady.json"))
+        try DurableFiles.encode(ManagedPointer(version: 1, generationID: oldID, previousGenerationID: nil, accountHash: nil, cloudKitContainerIdentifier: nil), to: root.appendingPathComponent("ActiveGeneration.json"))
+        let sourceHash = try stableGenerationHashes(generation)
+        let upgraded = try ManagedDataStore(root: root)
+        #expect(upgraded.binding.generationID != oldID)
+        #expect(try stableGenerationHashes(generation) == sourceHash)
+        #expect(try MadarContainerFactory.storeVersionForAdoption(at: upgraded.binding.syncedDirectory) == 10)
+
+        let context = upgraded.container.mainContext
+        let category = try #require(context.fetch(FetchDescriptor<MadarData.Category>()).first { $0.id == categoryID })
+        #expect(category.name == categoryName && category.icon == icon && category.color == color && category.order == 7)
+        #expect(category.createdAt == eventAt && category.updatedAt == eventAt && category.writerID == "synthetic-v9")
+        #expect(category.preferredCardID == nil)
+        var oldReceipt = before[0]; oldReceipt.fields["preferredCardID"] = nil
+        let expected = try SchemaCompatibility.currentRecords([oldReceipt], from: 9)
+        #expect(expected.first?.fields["preferredCardID"] == .null)
+        #expect(try RecordFingerprint.hash(RecordBridge.all(context)) == RecordFingerprint.hash(expected))
+        try RecordValidator.validate(RecordBridge.all(context))
+        let reopened = try ManagedDataStore(root: root)
+        #expect(reopened.binding.generationID == upgraded.binding.generationID)
+        #expect(try reopened.container.mainContext.fetch(FetchDescriptor<MadarData.Category>()).first { $0.id == categoryID }?.preferredCardID == nil)
     }
 
     @Test func schemaV2BackupValidationAndMergeRetainsPrayerLogWithoutFridayKind() async throws {

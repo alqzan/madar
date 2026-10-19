@@ -23,7 +23,13 @@ public struct SettingsSchema: Decodable, Sendable {
         case "bool": guard case .bool = value else { try reject() }
         case "choice": guard d.options.contains(where: { $0.value == value && $0.availability != "v2" && $0.availability != "deferred" }) else { try reject() }
         case "int", "money": guard let number = value.number, inRange(number, d.range ?? d.contract?["range"]?.array?.compactMap(\.number)) else { try reject() }
-        case "string": guard let s = value.string, Locale.Currency.isoCurrencies.map(\.identifier).contains(s) else { try reject() }
+        case "string":
+            guard let s = value.string else { try reject() }
+            if d.contract?["format"] == .string("uuidOrEmpty") {
+                guard s.isEmpty || UUID(uuidString: s) != nil else { try reject() }
+            } else {
+                guard Locale.Currency.isoCurrencies.map(\.identifier).contains(s) else { try reject() }
+            }
         case "time": guard let s = value.string, s.range(of: "^(?:[01][0-9]|2[0-3]):[0-5][0-9]$", options: .regularExpression) != nil else { try reject() }
         case "place":
             guard let o = value.object, Set(o.keys) == Set(["name","country","lat","lon","tz","currency"]), let name = o["name"]?.string, (1...80).contains(name.count), let country = o["country"]?.string, Locale.Region.isoRegions.map(\.identifier).contains(country), let lat = o["lat"]?.number, (-90...90).contains(lat), let lon = o["lon"]?.number, (-180...180).contains(lon), let tz = o["tz"]?.string, TimeZone(identifier:tz) != nil, let currency = o["currency"]?.string, Locale.Currency.isoCurrencies.map(\.identifier).contains(currency) else { try reject() }

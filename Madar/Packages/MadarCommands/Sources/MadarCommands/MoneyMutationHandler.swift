@@ -189,9 +189,24 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             guard let cardID = uuid(p, "id"), let card = try context.fetch(FetchDescriptor<Card>()).first(where: { $0.id == cardID && live($0) }) else { throw MoneyCommandError.invalidReference }
             let rate = MoneyCommandPayload.integer(p["cashbackBp"])
             var sources = (try? JSONSerialization.jsonObject(with: card.fieldSourcesJSON)) as? [String: Any] ?? [:]
-            if let rate { sources["cashbackBp"] = "entered" } else { sources.removeValue(forKey: "cashbackBp") }
+            if rate != nil { sources["cashbackBp"] = "entered" } else { sources.removeValue(forKey: "cashbackBp") }
             card.cashbackBp = rate; card.fieldSourcesJSON = try JSONSerialization.data(withJSONObject: sources, options: [.sortedKeys])
             try touch(card, now, writer)
+        case "money.setCategoryPreferredCard":
+            guard let categoryID = uuid(p, "categoryID"),
+                  let category = try context.fetch(FetchDescriptor<MadarData.Category>()).first(where: { $0.id == categoryID && live($0) }) else {
+                throw MoneyCommandError.invalidReference
+            }
+            let cardID = uuid(p, "cardID")
+            if let cardID {
+                guard try context.fetch(FetchDescriptor<Card>()).contains(where: { $0.id == cardID && live($0) && $0.kind == "credit" }) else {
+                    throw MoneyCommandError.invalidReference
+                }
+            }
+            if category.preferredCardID != cardID {
+                category.preferredCardID = cardID
+                try touch(category, now, writer)
+            }
         case MoneyCommandPayload.intakeName:
             try ingest([p], batch: nil, command: id, issuedAt: issuedAt, context: context, now: now, writer: writer)
         case "money.pasteBankMessages":
@@ -219,7 +234,7 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             if source == .app {
                 try resolvePayment(row, context: context)
                 // M5-V17: the sheet's split (envelope first, «يومك» last) must add up to the charge, as in a confirmation.
-                try confirm(row, payload: p["allocations"].map { ["allocations": $0] } ?? [:], context: context, now: now, writer: writer)
+                try confirm(row, payload: p["allocations"].map { ["allocations": $0] } ?? [:], commandID: id, context: context, now: now, writer: writer)
             } else {
                 // A draft from outside the app waits for review; a split is only decided in the app.
                 guard p["allocations"] == nil else { throw MoneyCommandError.invalidSplit }
@@ -228,7 +243,7 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         case "money.confirmTransaction":
             let row = try transaction(uuid(p, "id"), context)
             guard row.reviewState != "ok" else { throw MoneyCommandError.alreadyConfirmed }
-            try confirm(row, payload: p, context: context, now: now, writer: writer)
+            try confirm(row, payload: p, commandID: id, context: context, now: now, writer: writer)
         case "money.setCategoryLimit":
             guard let categoryID = uuid(p, "categoryID"), try context.fetch(FetchDescriptor<MadarData.Category>()).contains(where: { $0.id == categoryID && live($0) }) else { throw MoneyCommandError.invalidReference }
             // One live limit per category (natural key); extra rows from a merge are tombstoned here.
@@ -281,7 +296,7 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
                 guard case .string(let raw) = value else { throw MoneyCommandError.invalidReference }
                 let row = try transaction(UUID(uuidString: raw), context)
                 guard row.reviewState == "needsLook" else { throw MoneyCommandError.alreadyConfirmed }
-                try confirm(row, payload: [:], context: context, now: now, writer: writer)
+                try confirm(row, payload: [:], commandID: id, context: context, now: now, writer: writer)
             }
         case "money.setBudgetExclusion":
             try setBudgetExclusion(p, context: context, now: now, writer: writer)
@@ -672,10 +687,10 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             let context = ModelContext(container); context.autosaveEnabled = false
             defer { context.rollback() }
             guard let row = try? transaction(id, context), row.reviewState == "needsLook" else { return false }
-            return (try? confirm(row, payload: [:], context: context, now: now, writer: "dryRun")) != nil
+            return (try? confirm(row, payload: [:], commandID: UUID(), context: context, now: now, writer: "dryRun")) != nil
         })
     }
-    private static func confirm(_ row: MoneyTransaction, payload p: [String: MadarCore.JSONValue], context: ModelContext, now: Date, writer: String) throws {
+    private static func confirm(_ row: MoneyTransaction, payload p: [String: MadarCore.JSONValue], commandID: UUID, context: ModelContext, now: Date, writer: String) throws {
         guard row.kind != "salary" else { throw MoneyCommandError.salaryNeedsCycleConfirmation }
         for (key, setter) in [
             ("fromAccountID", { row.fromAccountID = $0 }), ("toAccountID", { row.toAccountID = $0 }),
@@ -743,6 +758,25 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
                 result.amountMinor -= paid; return result
             }
         } else if p["allocations"] != nil { throw MoneyCommandError.invalidSplit }
+        if row.kind == "cashback" {
+            let redeemed = CashbackEntry(); redeemed.id = StableIdentity.uuid(for: "CashbackEntry:redeemed:\(row.id):\(commandID)")
+            redeemed.cardID = row.cardID; redeemed.kind = "redeemed"; redeemed.amountMinor = row.homeAmountMinor
+            redeemed.eventAt = row.eventAt; redeemed.transactionID = row.id; redeemed.createdAt = now
+            context.insert(redeemed); try touch(redeemed, now, writer)
+
+            // A cashback deposit assigns its new cash directly to the chosen envelope.
+            // A credit-card statement credit reduces the debt; it never creates envelope cash.
+            let cards = try context.fetch(FetchDescriptor<Card>())
+            let isCreditCardCredit = row.cardID.flatMap { cardID in cards.first { live($0) && $0.id == cardID }?.kind == "credit" } ?? false
+            let selectedDestination = try SettingsStore(context: context).value(for: "mal.cashbackDestination").string.flatMap(UUID.init(uuidString:))
+            if !isCreditCardCredit {
+                let destination = try context.fetch(FetchDescriptor<Envelope>()).first { live($0) && $0.id == selectedDestination && $0.role != "surplus" }
+                let key = "cashback:\(row.id):\(commandID)"
+                let target: AllocationTarget = destination.map { $0.role == "reserve" ? .reserve : .envelope($0.id.uuidString) } ?? .surplus
+                allocations = [.init(transactionID: row.id.uuidString, target: target, amountMinor: row.homeAmountMinor,
+                    kind: .fund, idempotencyKey: key)]
+            }
+        }
         try writeAllocations(allocations, context: context, now: now, writer: writer)
         if row.kind == "repayment" {
             guard let itemID = row.installmentID, let item = try context.fetch(FetchDescriptor<InstallmentItem>()).first(where: { $0.id == itemID && live($0) }),
@@ -833,7 +867,7 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
                let bytes = message.parsedJSON, let parsed = try? JSONDecoder().decode(MoneyParsedFields.self, from: bytes),
                let kind = parsed.cardKind, kind != card.kind { throw MoneyCommandError.cardKindRequired }
             if ["expense", "fee"].contains(row.kind) && card.kind != "credit" { row.fromAccountID = card.accountID }
-            if row.kind == "refund" && card.kind != "credit" { row.toAccountID = card.accountID }
+            if ["refund", "cashback"].contains(row.kind) && card.kind != "credit" { row.toAccountID = card.accountID }
             if row.kind == "cardPayment", card.kind != "credit" { throw MoneyCommandError.invalidReference }
             if let accountID = card.accountID {
                 let owner = try account(accountID, context)
@@ -1043,6 +1077,7 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         rows += try context.fetch(FetchDescriptor<Trip>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<ZakatProfile>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<Card>()).map { try $0.record() }
+        rows += try context.fetch(FetchDescriptor<CashbackEntry>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<MoneyTransaction>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<Allocation>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<BankMessage>()).map { try $0.record() }
@@ -1053,6 +1088,7 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         rows += try context.fetch(FetchDescriptor<Statement>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<MerchantRule>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<Obligation>()).map { try $0.record() }
+        rows += try context.fetch(FetchDescriptor<MadarData.Category>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<CategoryLimit>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<Cycle>()).map { try $0.record() }
         rows += try context.fetch(FetchDescriptor<CyclePolicy>()).map { try $0.record() }
@@ -1165,7 +1201,7 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             repayment.createdAt = now; context.insert(repayment); try touch(repayment, now, writer)
             }
         }
-        try confirm(row, payload: ["allocations": .array(splits)], context: context, now: now, writer: writer)
+        try confirm(row, payload: ["allocations": .array(splits)], commandID: id, context: context, now: now, writer: writer)
     }
 
     private static func optionalText(_ p: [String: MadarCore.JSONValue], _ key: String) -> String? { if case .string(let s) = p[key] { s } else { nil } }
@@ -1176,6 +1212,7 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         case .purchase: "expense"
         case .transferOut, .transferIn: "transfer"
         case .reversal, .refund: "refund"
+        case .cashback: "cashback"
         case .bnplInstalment: "repayment"
         default: kind.rawValue
         }

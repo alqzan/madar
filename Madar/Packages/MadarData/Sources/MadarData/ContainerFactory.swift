@@ -25,7 +25,7 @@ public enum MadarContainerFactory {
     }
     private static func preflightVersion(at directory: URL) throws {
         let version = try storeVersion(at:directory)
-        guard version == MadarSchema.version || (2...8).contains(version) else { throw DataError.legacyStoreRequiresAdoption }
+        guard version == MadarSchema.version || (2..<MadarSchema.version).contains(version) else { throw DataError.legacyStoreRequiresAdoption }
     }
     public static func make(at syncedDirectory: URL, deviceStoreURL: URL, cloudKitContainerIdentifier: String? = nil) throws -> ModelContainer {
         try FileManager.default.createDirectory(at:syncedDirectory,withIntermediateDirectories:true)

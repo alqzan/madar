@@ -24,8 +24,9 @@ public enum CashbackJar {
         public var month: Int
         public var amountMinor: Int
         public var category: String?
-        public init(cardID: String, month: Int, amountMinor: Int, category: String? = nil) {
-            self.cardID = cardID; self.month = month; self.amountMinor = amountMinor; self.category = category
+        public var categoryID: String?
+        public init(cardID: String, month: Int, amountMinor: Int, category: String? = nil, categoryID: String? = nil) {
+            self.cardID = cardID; self.month = month; self.amountMinor = amountMinor; self.category = category; self.categoryID = categoryID
         }
     }
     public struct Recorded: Equatable, Sendable {
@@ -128,6 +129,7 @@ public enum CashbackJar {
     /// about a bank's category exclusions or caps.
     public struct Switch: Equatable, Sendable {
         public var category: String?
+        public var categoryID: String?
         public var baseMinor: Int
         public var gainMinor: Int
     }
@@ -140,24 +142,29 @@ public enum CashbackJar {
         let known = cards.filter { $0.rateBp != nil }
         guard let best = known.max(by: { ($0.rateBp ?? 0, $1.id) < ($1.rateBp ?? 0, $0.id) }), let top = best.rateBp else { return nil }
         // Grouped by (category, card), rounded once per group, then summed per category.
-        var groups: [String: (category: String?, card: Card, base: Int)] = [:]
+        var groups: [String: (categoryID: String?, category: String?, card: Card, base: Int)] = [:]
         for purchase in purchases {
             guard let card = known.first(where: { $0.id == purchase.cardID }), let rate = card.rateBp, rate < top else { continue }
-            let key = (purchase.category ?? "\u{0}") + "|" + card.id
+            let categoryKey = purchase.categoryID.map { "id:" + $0 } ?? purchase.category.map { "name:" + $0 } ?? "uncategorised"
+            let key = categoryKey + "|" + card.id
             let previous = groups[key]?.base ?? 0
             guard let next = total([previous, purchase.amountMinor]) else { return nil }
-            groups[key] = (purchase.category, card, next)
+            groups[key] = (purchase.categoryID, purchase.category, card, next)
         }
         var byCategory: [String: Switch] = [:]
         for group in groups.values {
             let base = max(0, group.base)
             guard base > 0, let gain = CardPlanning.rateAmount(base, numerator: top - (group.card.rateBp ?? 0), denominator: 10_000) else { continue }
-            let key = group.category ?? "\u{0}"
-            var row = byCategory[key] ?? .init(category: group.category, baseMinor: 0, gainMinor: 0)
+            let key = group.categoryID.map { "id:" + $0 } ?? group.category.map { "name:" + $0 } ?? "uncategorised"
+            var row = byCategory[key] ?? .init(category: group.category, categoryID: group.categoryID, baseMinor: 0, gainMinor: 0)
             guard let b = total([row.baseMinor, base]), let g = total([row.gainMinor, gain]) else { return nil }
             row.baseMinor = b; row.gainMinor = g; byCategory[key] = row
         }
-        let rows = byCategory.values.filter { $0.gainMinor > 0 }.sorted { $0.gainMinor != $1.gainMinor ? $0.gainMinor > $1.gainMinor : ($0.category ?? "") < ($1.category ?? "") }
+        let rows = byCategory.values.filter { $0.gainMinor > 0 }.sorted {
+            $0.gainMinor != $1.gainMinor ? $0.gainMinor > $1.gainMinor
+                : ($0.category ?? "") != ($1.category ?? "") ? ($0.category ?? "") < ($1.category ?? "")
+                : ($0.categoryID ?? "") < ($1.categoryID ?? "")
+        }
         guard !rows.isEmpty, let sum = total(rows.map(\.gainMinor)) else { return nil }
         return .init(toCardID: best.id, rows: rows, totalGainMinor: sum)
     }

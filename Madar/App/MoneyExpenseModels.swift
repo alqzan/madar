@@ -37,6 +37,8 @@ struct MoneyExpenseCategory: Identifiable, Equatable {
     var name: String
     var spentMinor: Int?
     var limitMinor: Int?
+    var preferredCardID: UUID?
+    var preferredCardName: String?
 }
 /// A movement already on the books near the chosen time, for «تبدو مسجّلة» before saving (RM8 the other way round).
 struct MoneyExpenseNearby {
@@ -126,7 +128,9 @@ extension AppMoneyService {
         let categories = try context.fetch(FetchDescriptor<MadarData.Category>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }.sorted { $0.order == $1.order ? $0.name < $1.name : $0.order < $1.order }
             .map { category in
                 let limit = home.limits.first { $0.id == category.id }
-                return MoneyExpenseCategory(id: category.id, name: category.name, spentMinor: limit?.spentMinor, limitMinor: limit?.limitMinor)
+                let preferred = category.preferredCardID.flatMap { id in cards.first { $0.id == id && $0.kind == "credit" } }
+                return MoneyExpenseCategory(id: category.id, name: category.name, spentMinor: limit?.spentMinor, limitMinor: limit?.limitMinor,
+                    preferredCardID: preferred?.id, preferredCardName: preferred?.name)
             }
         let start = home.cycle?.startDay.date(in: zone) ?? now.addingTimeInterval(-60 * 86_400)
         let nearby = try context.fetch(FetchDescriptor<MoneyTransaction>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && ["expense", "fee"].contains($0.kind) && abs($0.eventAt.timeIntervalSince(now)) < 2 * 86_400 }

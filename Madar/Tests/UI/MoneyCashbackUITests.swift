@@ -45,6 +45,66 @@ import XCTest
         expectation(for: entered, evaluatedWith: debit); waitForExpectations(timeout: 5)
         let undo = app.buttons["تراجع"]; XCTAssertTrue(undo.waitForExistence(timeout: 5)); undo.tap()
         expectation(for: NSPredicate(format: "label CONTAINS %@", "غير معروفة"), evaluatedWith: debit); waitForExpectations(timeout: 5)
+
+        // A chosen destination is a persistent setting with one glass undo toast.
+        let destinations = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "money-cashback-destination-"))
+        for _ in 0..<12 where destinations.count < 2 || !destinations.element(boundBy: 1).isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertEqual(destinations.count, 7, "Surplus appears once alongside the reserve and five goal envelopes")
+        XCTAssertTrue(destinations.element(boundBy: 6).isHittable, "The compact grid keeps every destination clear of the bottom navigation")
+        XCTAssertEqual(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "الاحتياطي")).count, 1)
+        let surplus = destinations.element(boundBy: 0), envelope = destinations.element(boundBy: 1)
+        XCTAssertTrue(surplus.isEnabled); XCTAssertTrue(envelope.isEnabled)
+        XCTAssertTrue(surplus.label.contains("الوجهة المختارة")); XCTAssertFalse(envelope.label.contains("الوجهة المختارة"))
+        envelope.tap()
+        let destinationUndo = app.buttons["تراجع"]; XCTAssertTrue(destinationUndo.waitForExistence(timeout: 5)); destinationUndo.tap()
+        expectation(for: NSPredicate(format: "label CONTAINS %@", "الوجهة المختارة"), evaluatedWith: surplus)
+        waitForExpectations(timeout: 5)
+        XCTAssertFalse(envelope.label.contains("الوجهة المختارة"))
+        envelope.tap()
+        XCTAssertTrue(app.buttons["تراجع"].waitForExistence(timeout: 5))
+        expectation(for: NSPredicate(format: "label CONTAINS %@", "الوجهة المختارة"), evaluatedWith: envelope)
+        waitForExpectations(timeout: 5)
+        surplus.tap()
+        XCTAssertTrue(app.buttons["تراجع"].waitForExistence(timeout: 5))
+        expectation(for: NSPredicate(format: "label CONTAINS %@", "الوجهة المختارة"), evaluatedWith: surplus)
+        waitForExpectations(timeout: 5)
+        envelope.tap()
+        XCTAssertTrue(app.buttons["تراجع"].waitForExistence(timeout: 5))
+        expectation(for: NSPredicate(format: "label CONTAINS %@", "الوجهة المختارة"), evaluatedWith: envelope)
+        waitForExpectations(timeout: 5)
+        sleep(1); shot(app, "M5-V16-cashback-destination-glass-L")
+    }
+
+    func testPreferredCardIsSavedAndOfferedForExplicitExpenseSelection() throws {
+        continueAfterFailure = false
+        let app = openJar(fixture: "cashback")
+        let groceries = app.buttons["money-cashback-chip-بقالة"]
+        for _ in 0..<10 where !groceries.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(groceries.waitForExistence(timeout: 8)); groceries.tap()
+        let preference = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "money-cashback-preferred-card-")).firstMatch
+        XCTAssertTrue(preference.waitForExistence(timeout: 8))
+        XCTAssertTrue(preference.label.contains("بطاقة السفر"))
+        preference.tap()
+        let undo = app.buttons["تراجع"]; XCTAssertTrue(undo.waitForExistence(timeout: 5)); undo.tap()
+        XCTAssertTrue(preference.waitForExistence(timeout: 5))
+        XCTAssertTrue(preference.label.contains("اجعل"), preference.label)
+        preference.tap()
+        XCTAssertTrue(app.buttons["تراجع"].waitForExistence(timeout: 5))
+        XCTAssertTrue(preference.label.contains("أزل"), preference.label)
+
+        app.buttons["money-cashback-close"].tap()
+        let expense = app.buttons["money-expense-open"]
+        for _ in 0..<10 where !expense.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(expense.waitForExistence(timeout: 8)); expense.tap()
+        let category = app.buttons["money-expense-category"]; XCTAssertTrue(category.waitForExistence(timeout: 8)); category.tap()
+        let groceriesOption = app.buttons["بقالة"]; XCTAssertTrue(groceriesOption.waitForExistence(timeout: 5)); groceriesOption.tap()
+        let preferredName = app.staticTexts["money-expense-preferred-card-name"]
+        XCTAssertTrue(preferredName.waitForExistence(timeout: 8)); XCTAssertTrue(preferredName.label.contains("بطاقة السفر"))
+        let useCard = app.buttons["money-expense-preferred-card-use"]
+        XCTAssertTrue(useCard.exists); XCTAssertTrue(useCard.label.contains("استخدمها"))
+        useCard.tap()
+        XCTAssertTrue(useCard.label.contains("مختارة للدفع"))
+        shot(app, "M5-V16-preferred-card-expense-L")
     }
 
     func testHiddenAmountsCardsDoorAndEmptyStore() throws {

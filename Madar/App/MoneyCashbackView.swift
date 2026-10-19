@@ -18,6 +18,8 @@ struct MoneyCashbackView: View {
     @State private var failure: String?
     @State private var selectedMonth: Int?
     @State private var selectedChip: String?
+    @State private var savingPreferredCard = false
+    @State private var preferredCardFailure: String?
     @State private var rateCard: MoneyCashbackCard?
     @State private var grown = false
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
@@ -42,7 +44,10 @@ struct MoneyCashbackView: View {
                         if reading.hasPurchases {
                             DoubleRule().stroke(theme.color("reserveText"), lineWidth: 0.8).frame(height: 3)
                             monthly(reading)
+                            destinationSection(reading)
                             if let suggestion = reading.switchSuggestion { switchSection(suggestion) }
+                        } else {
+                            destinationSection(reading)
                         }
                         footnote(reading)
                     }
@@ -229,9 +234,10 @@ struct MoneyCashbackView: View {
         var chips = Array(s.rows.prefix(s.rows.count > 5 ? 4 : 5))
         if s.rows.count > 5 {
             let rest = s.rows.dropFirst(4)
-            chips.append(("أخرى", Array(Set(rest.flatMap(\.from))).sorted(), rest.reduce(0) { $0 + $1.baseMinor }, rest.reduce(0) { $0 + $1.gainMinor }))
+            chips.append(.init(id: "other", categoryID: nil, title: "أخرى", from: Array(Set(rest.flatMap(\.from))).sorted(),
+                               baseMinor: rest.reduce(0) { $0 + $1.baseMinor }, gainMinor: rest.reduce(0) { $0 + $1.gainMinor }, preferredCardID: nil))
         }
-        let chosen = chips.first { $0.title == selectedChip }
+        let chosen = chips.first { $0.id == selectedChip }
         return VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text("لو كانت على " + s.to.name).font(.custom("thmanyahserifdisplay-Bold", size: 22, relativeTo: .title3)).lineLimit(2).minimumScaleFactor(0.8)
@@ -239,21 +245,39 @@ struct MoneyCashbackView: View {
                 Text("+" + whole(s.totalMinor)).font(.custom("thmanyahserifdisplay-Bold", size: 26, relativeTo: .title2)).foregroundStyle(theme.color("surplusText"))
                 Text("هذه السنة").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
             }.accessibilityElement(children: .combine).accessibilityIdentifier("money-cashback-switch")
-            HStack(spacing: 6) {
-                ForEach(chips, id: \.title) { chip in
-                    Button { selectedChip = selectedChip == chip.title ? nil : chip.title } label: {
+            GlassEffectContainer(spacing: 6) {
+                HStack(spacing: 6) {
+                    ForEach(chips) { chip in
+                        Button { selectedChip = selectedChip == chip.id ? nil : chip.id } label: {
                         VStack(spacing: 3) {
                             Text(chip.title).font(MadarTypography.caption().bold()).lineLimit(1).minimumScaleFactor(0.75)
                             Text("+" + whole(chip.gainMinor)).font(MadarTypography.fine().bold()).foregroundStyle(theme.color("surplusText"))
                         }.frame(maxWidth: .infinity, minHeight: 62).padding(.horizontal, 2)
-                            .background(chip.title == selectedChip ? theme.color("glass") : Color.clear, in: RoundedRectangle(cornerRadius: 14))
-                            .overlay { RoundedRectangle(cornerRadius: 14).stroke(chip.title == selectedChip ? theme.color("reserveText") : theme.line, lineWidth: 1) }
-                    }.buttonStyle(.plain).accessibilityAddTraits(chip.title == selectedChip ? .isSelected : []).accessibilityIdentifier("money-cashback-chip-" + chip.title)
+                        }
+                        .buttonStyle(.plain)
+                        .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 14))
+                        .overlay { RoundedRectangle(cornerRadius: 14).stroke(chip.id == selectedChip ? theme.color("reserveText") : theme.line, lineWidth: 1) }
+                        .accessibilityAddTraits(chip.id == selectedChip ? .isSelected : [])
+                        .accessibilityIdentifier("money-cashback-chip-" + chip.title + (chips.filter { $0.title == chip.title }.count > 1 ? "-" + chip.id : ""))
+                    }
                 }
             }
             if let chosen {
                 Text("اشتريت «" + chosen.title + "» بـ" + whole(chosen.baseMinor) + " على " + chosen.from.joined(separator: " و") + " هذه السنة؛ بنسبة " + s.to.name + " (" + (s.to.rateBp.map(service.percent) ?? "") + ") كانت ترجع " + whole(chosen.gainMinor) + " أكثر.")
-                    .font(MadarTypography.body()).fixedSize(horizontal: false, vertical: true).accessibilityIdentifier("money-cashback-chip-detail")
+                    .font(MadarTypography.body()).fixedSize(horizontal: false, vertical: true).padding(12)
+                    .glassEffect(.regular, in: .rect(cornerRadius: 16)).accessibilityIdentifier("money-cashback-chip-detail")
+                if let categoryID = chosen.categoryID {
+                    let isPreferred = chosen.preferredCardID == s.to.id
+                    Button { setPreferredCard(categoryID: categoryID, cardID: isPreferred ? nil : s.to.id, selectionID: chosen.id) } label: {
+                        Text(isPreferred ? "أزل البطاقة المفضلة لـ" + chosen.title : "اجعل " + s.to.name + " المفضلة لـ" + chosen.title)
+                            .font(MadarTypography.caption().weight(.semibold)).frame(maxWidth: .infinity, minHeight: 46)
+                    }
+                    .buttonStyle(.plain).disabled(savingPreferredCard)
+                    .glassEffect(.regular.interactive(), in: Capsule())
+                    .accessibilityLabel(isPreferred ? "أزل البطاقة المفضلة لتصنيف " + chosen.title : "اجعل " + s.to.name + " البطاقة المفضلة لتصنيف " + chosen.title)
+                    .accessibilityIdentifier("money-cashback-preferred-card-" + chosen.id)
+                    if let preferredCardFailure { Text(preferredCardFailure).font(MadarTypography.fine()).foregroundStyle(theme.color("dueText")) }
+                }
             }
             Text("مقارنة لما اشتريته فعلًا، لا دعوة لشراء أكثر. قد تستثني شروط البنك بعض الفئات أو تضع للاسترداد سقفًا.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
         }
@@ -263,6 +287,60 @@ struct MoneyCashbackView: View {
         Label(r.hasPurchases ? "الجرّة تقدير: مشتريات كل بطاقة في الشهر بعد الردود × نسبتها. لا تغيّر نقدك ولا «لك فعلًا»، وما ينزل فعلًا يُحسب مرة واحدة. اضغط بطاقة لترى نسبتها ومصدرها."
                 : "لا مشتريات مؤكّدة بالبطاقة في هذه السنة بعد. تمتلئ الجرّة مع أول شراء، من نسبة كل بطاقة.", systemImage: "info.circle")
             .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func destinationSection(_ r: MoneyCashbackReading) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("وين يروح الاسترداد؟").font(MadarTypography.section()).accessibilityAddTraits(.isHeader)
+            Text("عند تأكيد استرداد نقدي مودع، ينتقل إلى الظرف الذي تختاره. إذا خفّض الاسترداد دين بطاقة ائتمان، يبقى تخفيضًا للدين.")
+                .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
+            GlassEffectContainer(spacing: 8) {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 4),
+                          alignment: .trailing, spacing: 8) {
+                    destinationChip(id: nil, name: "الفائض", selected: r.destinationID == nil)
+                    ForEach(r.destinations) { destination in
+                        destinationChip(id: destination.id, name: destination.name, selected: r.destinationID == destination.id)
+                    }
+                }
+            }
+            if r.destinations.isEmpty {
+                Text("أضف ظرفًا من غرفة المال ليظهر هنا.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+            }
+        }
+        .padding(.top, 4)
+        .accessibilityIdentifier("money-cashback-destination-section")
+    }
+
+    private func destinationChip(id: UUID?, name: String, selected: Bool) -> some View {
+        Button {
+            guard !selected else { return }
+            app.set(.string(id?.uuidString ?? ""), key: "mal.cashbackDestination") { load() }
+        } label: {
+            Text(name).font(MadarTypography.caption().weight(.semibold))
+                .lineLimit(1).minimumScaleFactor(0.78).padding(.horizontal, 4).frame(maxWidth: .infinity, minHeight: 44)
+        }
+        .buttonStyle(.plain)
+        .glassEffect(.regular.interactive(), in: Capsule())
+        .overlay { Capsule().stroke(selected ? theme.color("reserveText") : .clear, lineWidth: 1) }
+        .accessibilityLabel(name + (selected ? "، الوجهة المختارة" : ""))
+        .accessibilityAddTraits(selected ? .isSelected : [])
+        .accessibilityIdentifier("money-cashback-destination-\(id?.uuidString ?? "surplus")")
+    }
+
+    private func setPreferredCard(categoryID: UUID, cardID: UUID?, selectionID: String) {
+        guard !savingPreferredCard else { return }
+        savingPreferredCard = true
+        preferredCardFailure = nil
+        Task {
+            do {
+                try await app.executeMoneyCommand("money.setCategoryPreferredCard", payload: [
+                    "categoryID": .string(categoryID.uuidString), "cardID": cardID.map { .string($0.uuidString) } ?? .null
+                ])
+                selectedChip = selectionID
+                load()
+            } catch { preferredCardFailure = "لم يُحفظ التفضيل. حاول مرة أخرى." }
+            savingPreferredCard = false
+        }
     }
 
     private var emptyPage: some View {
