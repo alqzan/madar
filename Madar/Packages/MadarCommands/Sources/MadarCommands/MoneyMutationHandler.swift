@@ -399,19 +399,30 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             guard at <= now else { throw MoneyCommandError.invalidReference }
             let name: ReconcileName?
             if let raw = optionalText(r, "name") { guard let parsed = ReconcileName(rawValue: raw) else { throw MoneyCommandError.invalidReference }; name = parsed } else { name = nil }
-            let line: ReconcileLine, accountID = uuid(r, "accountID"), cardID = uuid(r, "cardID")
+            let line: ReconcileLine, accountID = uuid(r, "accountID"), cardID = uuid(r, "cardID"), obligationID = uuid(r, "obligationID")
             if let accountID {
                 let owned = try account(accountID, context)
                 guard owned.ownership == "mine", owned.tracked, owned.currency == home else { throw MoneyCommandError.invalidReference }
                 line = .init(side: .account, expectedMinor: try repo.accountBalance(owned, at: at), observedMinor: observed)
             } else if let cardID, let debt = try repo.cardDebts(at: at).first(where: { $0.cardID == cardID }) {
                 line = .init(side: .creditCard, expectedMinor: debt.totalMinor, observedMinor: observed)
+            } else if let obligationID {
+                let obligations = try context.fetch(FetchDescriptor<Obligation>())
+                let prayer = try PrayerRepository(context: context)
+                let timeZone = prayer.place(at: now).timeZone
+                guard let obligation = obligations.first(where: { live($0) && $0.id == obligationID && $0.kind == "installment" && $0.currency == home }),
+                      GregorianDay.containing(at, in: timeZone) == GregorianDay.containing(now, in: timeZone) else {
+                    throw MoneyCommandError.invalidReference
+                }
+                let items = try context.fetch(FetchDescriptor<InstallmentItem>()).filter { live($0) && $0.obligationID == obligation.id }
+                let paid = items.reduce(0) { $0 + max(0, min($1.amountMinor, $1.paidMinor)) }
+                line = .init(side: .installment, expectedMinor: max(0, obligation.totalMinor - paid), observedMinor: observed)
             } else { throw MoneyCommandError.invalidReference }
             // The screen showed another book (a movement arrived meanwhile): nothing is written.
             guard line.expectedMinor == shown else { throw MoneyCommandError.invalidAmount }
             guard let resolution = ReconcileEngine.resolution(name, for: line) else { throw MoneyCommandError.invalidReference }
             let record = Reconciliation(); record.id = StableIdentity.uuid(for: "Reconciliation:\(command):\(index)")
-            record.accountID = accountID; record.cardID = cardID; record.at = at
+            record.accountID = accountID; record.cardID = cardID; record.obligationID = obligationID; record.at = at
             record.expectedMinor = line.expectedMinor; record.observedMinor = observed; record.deltaMinor = line.deltaMinor
             record.resolution = resolution; record.note = name == .bankFee ? "رسوم بنكية" : nil
             var snapshot: [String: Any] = ["v": 1, "balanceMinor": line.expectedMinor, "inAccountMinor": basis.inAccountMinor, "netMinor": basis.netMinor]

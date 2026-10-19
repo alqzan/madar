@@ -59,6 +59,21 @@ public enum RoomReminders {
         return .init(id: "mal.\(daysBefore == 0 ? "cardCash" : "cardDue").\(cardID.uuidString).\(dueDay)", room: .mal, dueAt: due, dayKey: reminder.description)
     }
 
+    /// M5-V15: one quiet balance-check reminder per line and interval. An overdue check is brought forward once;
+    /// the shared arbiter still applies the daily budget, quiet hours and prayer sanctity window.
+    public static func reconciliation(lineID: UUID, since: GregorianDay, everyDays: Int, timeZone: TimeZone,
+                                       prayerDays: [PrayerDay], now: Date, scheduledAt: Date? = nil) -> NotificationCandidate? {
+        guard (1...365).contains(everyDays) else { return nil }
+        let reminderDay = since.adding(days: everyDays)
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = timeZone
+        guard let proposed = calendar.date(bySettingHour: 12, minute: 0, second: 0, of: reminderDay.date(in: timeZone)) else { return nil }
+        let retained = scheduledAt.flatMap { $0 > now ? $0 : nil }
+        let due = SanctityGuard(prayerDays: prayerDays).clamp(retained ?? (proposed > now ? proposed : now.addingTimeInterval(60)))
+        guard due > now, due <= now.addingTimeInterval(48 * 3600) else { return nil }
+        let dayKey = GregorianDay.containing(due, in: timeZone).description
+        return .init(id: "mal.reconcile.\(lineID.uuidString).\(since).\(everyDays)", room: .mal, dueAt: due, dayKey: dayKey)
+    }
+
     /// The kind a request stands for in a digest: named, never its content.
     public static func kindLabel(for id: String) -> String? {
         if id.hasPrefix("quran.") { return id.hasSuffix(".late") ? "المراجعة" : "الورد" }
@@ -66,6 +81,7 @@ public enum RoomReminders {
         if id.hasPrefix("habits.") { return "عادة" }
         if id.hasPrefix("mal.alert80.") { return "حدود الصرف" }
         if id.hasPrefix("mal.card") { return "سداد البطاقة" }
+        if id.hasPrefix("mal.reconcile.") { return "مطابقة الرصيد" }
         if id.hasPrefix("notes.") { return id.hasSuffix(".niyya") ? "النيّة" : id.hasSuffix(".letter") ? "رسالة" : "ذكرى" }
         return nil
     }

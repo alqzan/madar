@@ -35,6 +35,7 @@ struct MoneyReconcileView: View {
         return "\u{2066}" + (minor < 0 ? "−" : minor > 0 ? "+" : "") + service.amount(abs(minor)) + "\u{2069}"
     }
     private var row: MoneyReconcileRow? { reading?.rows.first { $0.id == selected } ?? reading?.rows.first }
+    private var reconcileEveryDays: Int { min(365, max(1, Int(app.number("mal.reconcileEveryDays")))) }
     private func line(_ r: MoneyReconcileRow) -> ReconcileLine? {
         entries[r.id].map { ReconcileLine(side: r.side, expectedMinor: r.expectedMinor, observedMinor: $0.observedMinor) }
     }
@@ -77,7 +78,8 @@ struct MoneyReconcileView: View {
     private var header: some View {
         HStack(spacing: 14) {
             Button { dismiss() } label: { Image(systemName: "xmark").font(.title3).frame(width: 52, height: 52).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1.2) } }
-                .buttonStyle(.plain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-reconcile-close")
+                .buttonStyle(.plain).glassEffect(.regular.interactive(), in: Circle())
+                .accessibilityLabel("إغلاق").accessibilityIdentifier("money-reconcile-close")
             Text("المطابقة مع البنك").font(.custom("thmanyahserifdisplay-Bold", size: 27, relativeTo: .title)).accessibilityAddTraits(.isHeader)
             Spacer(minLength: 0)
         }.padding(.top, 6)
@@ -107,8 +109,18 @@ struct MoneyReconcileView: View {
             if r.lastAt == nil, let since = r.since {
                 HStack(spacing: 6) { Text(r.side == .account ? "الدفتر من رصيد البداية" : "الدفتر من أول حركة").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk); inlineDate(since) }
             }
+            if let span {
+                let left = reconcileEveryDays - span
+                HStack {
+                    Spacer(minLength: 0)
+                    Text(left > 0 ? "موعد المطابقة بعد " + PrayerCopy.days(left, digits: service.digits)
+                         : left == 0 ? "حان موعد المطابقة"
+                         : "تأخرت المطابقة " + PrayerCopy.days(abs(left), digits: service.digits))
+                        .font(MadarTypography.fine()).foregroundStyle(left > 0 ? theme.secondaryInk : theme.color("dueText"))
+                        .accessibilityIdentifier("money-reconcile-cadence")
+                }
+            }
         }.accessibilityElement(children: .combine).accessibilityIdentifier("money-reconcile-status")
-            .accessibilityLabel((r.lastAt == nil ? "لم يُطابق بعد" : "آخر مطابقة") + "، " + (span.map { "مرّ " + PrayerCopy.days($0, digits: service.digits) + "، فيها " + service.digits.string(r.movementCount) + " حركة" } ?? ""))
     }
 
     private func identity(_ r: MoneyReconcileRow, reading: MoneyReconcileReading) -> some View {
@@ -120,7 +132,8 @@ struct MoneyReconcileView: View {
                     .frame(width: 32, height: 32).overlay { Circle().stroke(theme.color("accent"), lineWidth: 1.2) }
                 Text(r.name).font(.custom("thmanyahserifdisplay-Bold", size: 25, relativeTo: .title2)).lineLimit(1).minimumScaleFactor(0.7)
                 Spacer(minLength: 6)
-                Text(r.side == .account ? "حساب، يقارن النقد" : "بطاقة، تقارن الدين").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                Text(r.side == .account ? "حساب، يقارن النقد" : r.side == .creditCard ? "بطاقة، تقارن الدين" : "تقسيط، يقارن رصيد المزود")
+                    .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
             }.contentShape(Rectangle())
         }.buttonStyle(.plain).accessibilityIdentifier("money-reconcile-account")
     }
@@ -131,13 +144,13 @@ struct MoneyReconcileView: View {
         return ZStack(alignment: .top) {
             HStack(spacing: 50) {
                 Button { source = composition(r) } label: {
-                    arch(caption: r.side == .account ? "ما يظنه مدار" : "ما يحسبه مدار عليك", title: r.side == .account ? "نقد مدار" : "دين مدار", tint: theme.color("accent"), titleTint: theme.color("accentText"), matched: matched) {
+                    arch(caption: bookCaption(r), title: bookTitle(r), tint: theme.color("accent"), titleTint: theme.color("accentText"), matched: matched) {
                         Text(amount(r.expectedMinor)).font(.custom("thmanyahserifdisplay-Black", size: 33, relativeTo: .largeTitle)).minimumScaleFactor(0.5).lineLimit(1)
                             .accessibilityIdentifier("money-reconcile-expected")
                     }
                 }.buttonStyle(.plain).disabled(!visible).accessibilityHint("يعرض كيف تكوّن هذا الرقم")
                     .accessibilityIdentifier("money-reconcile-madar")
-                arch(caption: r.side == .account ? "كم عندك فعلًا" : "كم عليك فعلًا", title: r.side == .account ? "رصيد البنك" : "مستحق البنك", tint: theme.color("dueText"), titleTint: theme.color("dueText"), matched: matched) {
+                arch(caption: providerCaption(r), title: providerTitle(r), tint: theme.color("dueText"), titleTint: theme.color("dueText"), matched: matched) {
                     VStack(spacing: 4) {
                         if visible {
                             // The figure reads like Madar's (grouped digits); a tap turns it into the field.
@@ -172,6 +185,19 @@ struct MoneyReconcileView: View {
         }.frame(maxWidth: .infinity).animation(reduceMotion ? nil : .snappy, value: entry)
     }
 
+    private func bookCaption(_ r: MoneyReconcileRow) -> String {
+        switch r.side { case .account: "ما يظنه مدار"; case .creditCard: "ما يحسبه مدار عليك"; case .installment: "ما بقي في جدول مدار" }
+    }
+    private func bookTitle(_ r: MoneyReconcileRow) -> String {
+        switch r.side { case .account: "نقد مدار"; case .creditCard: "دين مدار"; case .installment: "المتبقي عند مدار" }
+    }
+    private func providerCaption(_ r: MoneyReconcileRow) -> String {
+        switch r.side { case .account: "كم عندك فعلًا"; case .creditCard: "كم عليك فعلًا"; case .installment: "ما يظهر في حساب المزود" }
+    }
+    private func providerTitle(_ r: MoneyReconcileRow) -> String {
+        switch r.side { case .account: "رصيد البنك"; case .creditCard: "مستحق البنك"; case .installment: "رصيد المزود" }
+    }
+
     private func arch<Content: View>(caption: String, title: String, tint: Color, titleTint: Color, matched: Bool, @ViewBuilder content: () -> Content) -> some View {
         VStack(spacing: 4) {
             Text(caption).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).padding(.top, 34)
@@ -192,7 +218,8 @@ struct MoneyReconcileView: View {
             let size = visible ? " بـ " + service.amount(abs(line.deltaMinor)) : ""
             if line.deltaMinor == 0 { text = "يطابق دفتر مدار تمامًا"; color = theme.color("surplusText") }
             else if r.side == .account { text = (line.deltaMinor < 0 ? "عندك أقل" : "عندك أكثر") + size + " مما يظن مدار"; color = theme.color("dueText") }
-            else { text = (line.deltaMinor > 0 ? "عليك أكثر" : "عليك أقل") + size + " مما يحسب مدار"; color = theme.color("dueText") }
+            else if r.side == .creditCard { text = (line.deltaMinor > 0 ? "عليك أكثر" : "عليك أقل") + size + " مما يحسب مدار"; color = theme.color("dueText") }
+            else { text = (line.deltaMinor > 0 ? "المزود يطلب أكثر" : "المزود يطلب أقل") + size + " من جدول مدار"; color = theme.color("dueText") }
         } else { text = r.side == .account ? "اكتب رصيدك كما يظهر في تطبيق البنك" : "اكتب ما تطلبه البطاقة كما يظهر في تطبيق البنك"; color = theme.secondaryInk }
         return VStack(spacing: 4) {
             Text(text).font(MadarTypography.body()).bold().foregroundStyle(color).multilineTextAlignment(.center).accessibilityIdentifier("money-reconcile-sentence")
@@ -238,6 +265,9 @@ struct MoneyReconcileView: View {
                     }
                 }
                 Text(caption(chosen, reading: reading)).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-reconcile-name-caption")
+            } else if r.side == .installment, let line = line(r), line.deltaMinor != 0 {
+                Text("راجع جدول الأقساط في مدار؛ يبقى الفرق مفتوحًا ولا يُسجّل مصروفًا أو تسوية تلقائية.")
+                    .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-reconcile-installment-note")
             }
         }.animation(reduceMotion ? nil : .snappy, value: chosen)
     }
@@ -272,7 +302,7 @@ struct MoneyReconcileView: View {
     // MARK: «محضر جرد الحسابات»
 
     private func ledger(_ reading: MoneyReconcileReading) -> some View {
-        let cash = reading.rows.filter { $0.side == .account }, cards = reading.rows.filter { $0.side == .creditCard }
+        let cash = reading.rows.filter { $0.side == .account }, cards = reading.rows.filter { $0.side == .creditCard }, installments = reading.rows.filter { $0.side == .installment }
         let s = summary
         return VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
@@ -284,7 +314,7 @@ struct MoneyReconcileView: View {
                 ForEach(reading.rows) { item in Button { select(item.id) } label: { accessibleRow(item) }.buttonStyle(.plain) }
             } else {
                 HStack(spacing: 4) {
-                    Text("الحساب").frame(maxWidth: .infinity, alignment: .leading)
+                    Text("الحساب / المزود").frame(maxWidth: .infinity, alignment: .leading)
                     Text("دفتر مدار").frame(width: 70)
                     Text("الواقع").frame(width: 70)
                     Text("الفرق").frame(width: 52)
@@ -293,6 +323,7 @@ struct MoneyReconcileView: View {
                 Rectangle().fill(theme.ink).frame(height: 1)
                 if !cash.isEmpty { group("النقد", cash) }
                 if !cards.isEmpty { group("البطاقات", cards) }
+                if !installments.isEmpty { group("اشترِ الآن وادفع لاحقًا", installments) }
                 Rectangle().fill(theme.ink).frame(height: 1)
             }
             HStack {
@@ -399,6 +430,10 @@ struct MoneyReconcileView: View {
             return .init(id: "book-" + r.id.uuidString, title: "دين مدار على " + r.name, amountMinor: r.expectedMinor,
                 explanation: "الكشف المتبقي " + service.amount(r.inMinor) + " وغير المفوتر " + service.amount(r.outMinor) + "، من حركات البطاقة المؤكدة بعد الردود والسداد. هو نفسه ما تجمعه «عليك».")
         }
+        if r.side == .installment {
+            return .init(id: "book-" + r.id.uuidString, title: "المتبقي في أقساط " + r.name, amountMinor: r.expectedMinor,
+                explanation: "قيمة العقد " + service.amount(r.baseMinor ?? 0) + "، سُدّد منها " + service.amount(r.inMinor) + "، وبقي في جدول الأقساط " + service.amount(r.outMinor) + ". يظهر فرق المزود للمراجعة ولا يغيّر جدول السداد.", date: r.baseDay)
+        }
         var text = (r.baseIsReconciliation ? "آخر رصيد مؤكد عند المطابقة " : "رصيد البداية ") + service.amount(r.baseMinor ?? 0)
             + "، زاد بعده " + service.amount(r.inMinor) + " ونقص " + service.amount(r.outMinor) + "، فصار " + service.amount(r.expectedMinor) + ". مشتريات البطاقة الائتمانية لا تنقصه قبل سدادها."
         if let future = reading?.notYetAccruedMinor, future > 0 {
@@ -460,7 +495,8 @@ struct MoneyReconcileView: View {
         let formatter = ISO8601DateFormatter()
         let rows: [MadarCore.JSONValue] = reading.rows.compactMap { r in
             guard let entry = entries[r.id] else { return nil }
-            var object: [String: MadarCore.JSONValue] = [r.side == .account ? "accountID" : "cardID": .string(r.id.uuidString),
+            let target = r.side == .account ? "accountID" : r.side == .creditCard ? "cardID" : "obligationID"
+            var object: [String: MadarCore.JSONValue] = [target: .string(r.id.uuidString),
                 "expectedMinor": .string(String(r.expectedMinor)), "observedMinor": .string(String(entry.observedMinor))]
             if let name = entry.name { object["name"] = .string(name.rawValue) }
             if let at = entry.at { object["at"] = .string(formatter.string(from: at)) }

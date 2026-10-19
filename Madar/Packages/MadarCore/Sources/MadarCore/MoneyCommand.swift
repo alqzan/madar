@@ -159,19 +159,22 @@ public enum MoneyCommandPayload {
             return allocationRows(splits)
         case "money.deleteTransaction": return Set(p.keys) == ["id"] && id("id")
         case "money.reconcile":
-            // M5-V15: every line of one «محضر» in one command and one undo. Each line names one account or one card,
-            // the book the screen showed (re-checked by the handler), what the bank says and an optional name.
+            // M5-V15: every line of one «محضر» in one command and one undo. A line names one account, card, or
+            // installment obligation; the handler rechecks the shown book before it records the provider's figure.
             guard Set(p.keys) == ["rows"], case .array(let rows) = p["rows"], !rows.isEmpty, rows.count <= 60 else { return false }
             var targets = Set<String>()
             for value in rows {
-                guard case .object(let row) = value, Set(row.keys).isSubset(of: ["accountID", "cardID", "expectedMinor", "observedMinor", "name", "at"]),
+                guard case .object(let row) = value, Set(row.keys).isSubset(of: ["accountID", "cardID", "obligationID", "expectedMinor", "observedMinor", "name", "at"]),
                       integer(row["expectedMinor"]) != nil, let observed = integer(row["observedMinor"]), observed >= 0,
                       row["name"] == nil || { if case .string(let raw) = row["name"] { ["missedSpend", "bankFee", "unexplained"].contains(raw) } else { false } }(),
                       row["at"] == nil || date(row["at"]) != nil else { return false }
                 func rowID(_ key: String) -> UUID? { if case .string(let raw) = row[key] { UUID(uuidString: raw) } else { nil } }
-                let account = rowID("accountID"), card = rowID("cardID")
-                guard (account == nil) != (card == nil), row.keys.contains("accountID") == (account != nil), row.keys.contains("cardID") == (card != nil),
-                      targets.insert((account ?? card)!.uuidString).inserted else { return false }
+                let account = rowID("accountID"), card = rowID("cardID"), obligation = rowID("obligationID")
+                let identifiers = [account, card, obligation].compactMap { $0 }
+                guard identifiers.count == 1,
+                      row.keys.contains("accountID") == (account != nil), row.keys.contains("cardID") == (card != nil),
+                      row.keys.contains("obligationID") == (obligation != nil),
+                      targets.insert(identifiers[0].uuidString).inserted else { return false }
             }
             return true
         case "money.saveAccount":

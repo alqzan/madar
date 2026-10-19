@@ -864,6 +864,40 @@ import MadarInbox
         #expect(!MoneyCommandPayload.validate(name: "money.reconcile", payload: ["rows": .array([.object(["accountID": .string(f.bank.uuidString), "cardID": .string(f.credit.uuidString), "expectedMinor": .string("1"), "observedMinor": .string("1")])])]))
         #expect(!MoneyCommandPayload.validate(name: "money.reconcile", payload: ["rows": .array([line("accountID", f.bank, 1, -1)])]))
     }
+
+    @Test func installmentReconciliationLinksProviderCheckWithoutChangingScheduleOrSpending() async throws {
+        let f = try MoneyFixture(); defer { f.clean() }; try await f.setup()
+        let context = ModelContext(f.container), obligation = Obligation()
+        obligation.kind = "installment"; obligation.name = "synthetic purchase"; obligation.provider = "Tamara"
+        obligation.currency = "SAR"; obligation.totalMinor = 120_000; context.insert(obligation)
+        for (index, amount, paid) in [(1, 40_000, 10_000), (2, 40_000, 0), (3, 40_000, 0)] {
+            let item = InstallmentItem(); item.obligationID = obligation.id; item.seq = index
+            item.amountMinor = amount; item.paidMinor = paid; item.dueDate = f.now.addingTimeInterval(Double(index * 86_400)); context.insert(item)
+        }
+        try context.save()
+        let row: MadarCore.JSONValue = .object([
+            "obligationID": .string(obligation.id.uuidString),
+            "expectedMinor": .string("110000"), "observedMinor": .string("125000")
+        ])
+        let command = UUID()
+        #expect(try await f.run("money.reconcile", ["rows": .array([row])], id: command).status == .applied)
+        let read = ModelContext(f.container)
+        let reconciliation = try #require(read.fetch(FetchDescriptor<Reconciliation>()).first { $0.deletedAt == nil })
+        #expect(reconciliation.obligationID == obligation.id && reconciliation.accountID == nil && reconciliation.cardID == nil)
+        #expect(reconciliation.expectedMinor == 110_000 && reconciliation.observedMinor == 125_000 && reconciliation.deltaMinor == 15_000)
+        #expect(reconciliation.resolution == "leave" && reconciliation.adjustmentTransactionID == nil)
+        #expect(try read.fetch(FetchDescriptor<MoneyTransaction>()).filter { $0.kind == "adjustment" }.isEmpty)
+        #expect(try read.fetch(FetchDescriptor<InstallmentItem>()).filter { $0.obligationID == obligation.id }.map(\.paidMinor).sorted() == [0, 0, 10_000])
+        let falseSpend: MadarCore.JSONValue = .object([
+            "obligationID": .string(obligation.id.uuidString), "expectedMinor": .string("110000"),
+            "observedMinor": .string("125000"), "name": .string("missedSpend")
+        ])
+        #expect(try await f.run("money.reconcile", ["rows": .array([falseSpend])]).status == .rejected)
+        #expect(try ModelContext(f.container).fetch(FetchDescriptor<Reconciliation>()).filter { $0.deletedAt == nil }.count == 1)
+        #expect(try await f.run("system.undo", ["undoToken": .string(command.uuidString)]).status == .applied)
+        #expect(try ModelContext(f.container).fetch(FetchDescriptor<Reconciliation>()).allSatisfy { $0.deletedAt != nil })
+        #expect(try ModelContext(f.container).fetch(FetchDescriptor<InstallmentItem>()).filter { $0.obligationID == obligation.id }.map(\.paidMinor).sorted() == [0, 0, 10_000])
+    }
     /// M5-V19 «الحسابات»: F06 (an account that is not mine stays out of «لك فعلًا», its messages kept as ignored), RM5
     /// (last 4 tells accounts of one bank apart) and the frozen checkpoint once movements refer to an account.
     @Test func accountsOwnershipLast4AndCheckpoint() async throws {

@@ -10,7 +10,7 @@ import MadarPrayer
 /// M3-V12 adds the diary kinds (morning intention, «في مثل هذا اليوم», a letter whose day came) with fixed copy
 /// that never carries diary text, so they stand outside the lock cleanup of `madar.notes.` requests (owner, 15 Oct).
 @MainActor enum RoomNotificationContent {
-    static let roomPrefixes = ["quran.", "digest.", "qada.", "habits.", "notes.", "nudge.", "mal.alert80.", "mal.cardDue.", "mal.cardCash."]
+    static let roomPrefixes = ["quran.", "digest.", "qada.", "habits.", "notes.", "nudge.", "mal.alert80.", "mal.cardDue.", "mal.cardCash.", "mal.reconcile."]
     static func isRoomRequest(_ id: String) -> Bool { roomPrefixes.contains { id.hasPrefix($0) } }
 
     /// Qada while something is owed, and each push habit's window start today (custom, due, unmet, not paused).
@@ -29,7 +29,7 @@ import MadarPrayer
                 result.append(candidate)
             }
         }
-        return result + (try diaryCandidates(session: session, prayerDays: prayerDays, now: now)) + limitCandidates(session: session, prayerDays: prayerDays, now: now) + cardCandidates(session: session, prayerDays: prayerDays, now: now)
+        return result + (try diaryCandidates(session: session, prayerDays: prayerDays, now: now)) + limitCandidates(session: session, prayerDays: prayerDays, now: now) + cardCandidates(session: session, prayerDays: prayerDays, now: now) + reconciliationCandidates(session: session, prayerDays: prayerDays, now: now)
     }
 
     static func cardCandidates(session: AppSession, prayerDays: [PrayerDay], now: Date) -> [NotificationCandidate] {
@@ -56,6 +56,23 @@ import MadarPrayer
             return shelf.limitMinor.flatMap { RoomReminders.limit80(categoryID: shelf.id, cycleID: cycle, spentMinor: shelf.spentMinor, limitMinor: $0, dayKey: dayKey, prayerDays: prayerDays, now: now,
                                                                      scheduledAt: planned.filter { $0.requestID == id }.map(\.scheduledFor).max()) }
         }
+    }
+
+    /// One generic reminder for the oldest account/card/installment due for review; never exposes balances or provider names.
+    static func reconciliationCandidates(session: AppSession, prayerDays: [PrayerDay], now: Date) -> [NotificationCandidate] {
+        let interval = Int(session.number("mal.reconcileEveryDays"))
+        guard (1...365).contains(interval), let reading = try? AppMoneyService(app: session).loadReconcile(at: now) else { return [] }
+        let context = ModelContext(session.container)
+        let planned = (try? context.fetch(FetchDescriptor<NotificationLedger>()))?.filter {
+            $0.deletedAt == nil && $0.state == "submitted" && $0.requestID.hasPrefix("mal.reconcile.")
+        } ?? []
+        return reading.rows.compactMap { row in
+            guard let since = row.since else { return nil }
+            let id = "mal.reconcile.\(row.id.uuidString).\(since).\(interval)"
+            return RoomReminders.reconciliation(lineID: row.id, since: since, everyDays: interval,
+                timeZone: session.activePlace.timeZone, prayerDays: prayerDays, now: now,
+                scheduledAt: planned.first { $0.requestID == id }?.scheduledFor)
+        }.sorted { $0.dueAt == $1.dueAt ? $0.id < $1.id : $0.dueAt < $1.dueAt }.prefix(1).map { $0 }
     }
 
     /// Reads day keys, booleans and letter triggers only; no diary text is read for scheduling.
@@ -130,6 +147,10 @@ import MadarPrayer
                     : "«" + shelf.name + "» بلغ " + digits.string(used) + "٪ من حدّه، " + (limit > shelf.spentMinor ? "باقي " + service.amount(limit - shelf.spentMinor) : "تجاوزه")
             } else { content.body = protected ? "لديك تنبيه في مدار" : "اقترب أحد تصنيفاتك من حدّه" }
             content.userInfo = ["dayKey": candidate.dayKey, "room": "mal"]
+        } else if id.hasPrefix("mal.reconcile.") {
+            content.title = protected ? "مدار" : "مطابقة الرصيد"
+            content.body = protected ? "حان وقت المراجعة" : "حان موعد مراجعة حساباتك والتزاماتك في مدار"
+            content.userInfo = ["dayKey": candidate.dayKey, "room": "mal"]
         } else {
             content.title = "مدار"
             content.body = "افتح مدار ليحدّث تذكيراتك"
@@ -145,6 +166,7 @@ import MadarPrayer
         if id.hasPrefix("habits.") { return "habit" }
         if id.hasPrefix("mal.alert80.") { return "alert80" }
         if id.hasPrefix("mal.card") { return id.hasPrefix("mal.cardCash.") ? "cardCash" : "cardDue" }
+        if id.hasPrefix("mal.reconcile.") { return "reconciliation" }
         if id.hasPrefix("notes.") { return id.hasSuffix(".niyya") ? "niyya" : id.hasSuffix(".letter") ? "letter" : "onThisDay" }
         return "nudge"
     }
@@ -180,6 +202,13 @@ import MadarPrayer
                   let due = reading.dues.first(where: { $0.cardID == cardID && $0.day.description == id.split(separator: ".").last.map(String.init) }) else { return false }
             return due.amountMinor > 0 && (!id.hasPrefix("mal.cardCash.") || due.cashAfterMinor < 0)
         }
+        if id.hasPrefix("mal.reconcile.") {
+            let repository = try PrayerRepository(context: ModelContext(session.container))
+            let place = repository.place(at: now), firstDay = repository.prayerDay(at: now)
+            let days = (0..<4).compactMap { PrayerTimesEngine.calculate(day: firstDay.adding(days: $0), place: place, options: repository.options) }
+            let candidates = reconciliationCandidates(session: session, prayerDays: days, now: now)
+            return candidates.contains { $0.id == id }
+        }
         if id.hasPrefix("mal.alert80.") { return session.bool("mal.alert80") }
         return false // «افتح مدار» while Madar is open says nothing.
     }
@@ -188,7 +217,7 @@ import MadarPrayer
     static func open(_ id: String, userInfo: [AnyHashable: Any], session: AppSession) {
         if id.hasPrefix("quran.") { session.selectedTab = "quran" }
         else if id.hasPrefix("qada.") { session.selectedTab = "prayer" }
-        else if id.hasPrefix("mal.alert80.") || id.hasPrefix("mal.card") { session.selectedTab = "money" }
+        else if id.hasPrefix("mal.alert80.") || id.hasPrefix("mal.card") || id.hasPrefix("mal.reconcile.") { session.selectedTab = "money" }
         else if id.hasPrefix("notes.") { session.open(URL(string: id.hasSuffix(".onThisDay") ? "madar://notes" : "madar://notes/today")!) }
         else if id.hasPrefix("habits.") {
             session.habitRouteID = (userInfo["habit"] as? String).flatMap(UUID.init(uuidString:))

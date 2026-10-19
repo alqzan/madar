@@ -71,4 +71,23 @@ import XCTest
         XCTAssertFalse(empty.buttons["money-reconcile-save"].exists)
         shot(empty, "M5-V15-empty-L")
     }
+
+    func testProviderDifferenceRemainsAnOpenScheduleReview() throws {
+        continueAfterFailure = false
+        let app = openReconcile(fixture: "reconcile")
+        let tamara = app.buttons["money-reconcile-row-تمارا"]
+        XCTAssertTrue(tamara.waitForExistence(timeout: 10))
+        for _ in 0..<8 where !tamara.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(tamara.isHittable)
+        XCTAssertTrue(tamara.label.contains("١٬٢٠٠"), tamara.label)
+        tamara.tap()
+        let providerField = element(app, "money-reconcile-bank-field")
+        XCTAssertTrue(providerField.waitForExistence(timeout: 5))
+        providerField.tap(); providerField.typeText("1250.00")
+        XCTAssertTrue(element(app, "money-reconcile-sentence").label.contains("المزود يطلب أكثر"))
+        XCTAssertTrue(element(app, "money-reconcile-installment-note").exists)
+        XCTAssertFalse(app.buttons["money-reconcile-name-missedSpend"].exists)
+        XCTAssertFalse(app.buttons["money-reconcile-name-unexplained"].exists)
+        shot(app, "M5-V15-bnpl-open-L")
+    }
 }

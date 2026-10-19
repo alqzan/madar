@@ -18,6 +18,7 @@ enum SchemaCompatibility {
         case 5: MadarSchemaV5.syncedNames
         case 6: MadarSchemaV6.syncedNames
         case 7: MadarSchemaV7.syncedNames
+        case 8: MadarSchemaV8.syncedNames
         case MadarSchema.version: MadarSchema.syncedNames
         default: throw version > MadarSchema.version ? DataError.newerStore : DataError.unsupportedBackup
         }
@@ -61,6 +62,8 @@ enum SchemaCompatibility {
             }
             // V8 (M3-V09): older entries have no dedicated tag field; archived Day One JSON remains intact.
             if version < 8, row.model == "Entry" { row.fields["tags"] = .null }
+            // V9 (M5-V15): the balance record can now point to an installment obligation.
+            if version < 9, row.model == "Reconciliation" { row.fields["obligationID"] = .null }
             return row
         }
     }

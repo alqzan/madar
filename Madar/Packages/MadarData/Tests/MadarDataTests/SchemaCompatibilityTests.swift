@@ -262,7 +262,7 @@ import Testing
     @Test func test_M0S1_RA4_originalV1ArchiveMapsOnlyAfterAuthentication() throws {
         let bytes = try Data(contentsOf:resources.appendingPathComponent("source-v1.madarbackup"))
         let backup = try BackupCodec.validate(bytes,passphrase:"legacy fixture password")
-        #expect(MadarSchema.version == 8)
+        #expect(MadarSchema.version == 9)
         #expect(backup.records.contains { $0.model == "MoneyTransaction" })
         #expect(!backup.records.contains { $0.model == "Transaction" })
         let expected = try expectedRows().filter { MadarSchema.syncedNames.contains($0.model) }
@@ -285,7 +285,7 @@ import Testing
     @Test func test_M0S1_RA4_originalSQLiteIsAdoptedWithoutLosingAnyRow() throws {
         let base = try fixtureDirectory(); defer { try? FileManager.default.removeItem(at:base) }
         let managed = try ManagedDataStore.adoptLegacy(from:base.appendingPathComponent("Flat"),at:base.appendingPathComponent("Managed"))
-        #expect(MadarSchema.version == 8)
+        #expect(MadarSchema.version == 9)
         #expect(try RecordFingerprint.hash(RecordBridge.all(managed.container.mainContext,syncedOnly:false)) == RecordFingerprint.hash(expectedRows()))
         #expect(try managed.container.mainContext.fetchCount(FetchDescriptor<DeviceSetting>()) == 2)
         #expect(try managed.container.mainContext.fetchCount(FetchDescriptor<CommandReceipt>()) == 1)
@@ -372,7 +372,7 @@ import Testing
         let upgraded = try ManagedDataStore(root: root)
         #expect(upgraded.binding.generationID != oldID)
         #expect(try stableGenerationHashes(generation) == sourceHash)
-        #expect(try MadarContainerFactory.storeVersionForAdoption(at: upgraded.binding.syncedDirectory) == 8)
+        #expect(try MadarContainerFactory.storeVersionForAdoption(at: upgraded.binding.syncedDirectory) == 9)
         let context = upgraded.container.mainContext
         let entry = try #require(context.fetch(FetchDescriptor<Entry>()).first)
         #expect(entry.dayKey == "2025-07-14" && entry.text == "synthetic Day One memory" && entry.source == "dayOne")
@@ -386,6 +386,65 @@ import Testing
         let oldReceipt = Entry(); try oldReceipt.apply(before[0])
         #expect(oldReceipt.tags == nil && oldReceipt.sourceID == "synthetic-day-one-id")
         try RecordValidator.validate(RecordBridge.all(context))
+    }
+
+    /// M5-V15: V8→V9 adds a nullable provider link; old reconciliation, account, obligation and installment data survives.
+    @Test func schemaV8UpgradeAddsOnlyOptionalInstallmentReconciliationLink() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("MadarV9-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let oldID = UUID(), generation = root.appendingPathComponent("Generations/\(oldID.uuidString)")
+        try FileManager.default.createDirectory(at: generation, withIntermediateDirectories: true)
+        let accountID = UUID(), obligationID = UUID(), reconciliationID = UUID(), eventAt = Date(timeIntervalSince1970: 1_797_000_000)
+        var before: [DataRecord] = []
+        do {
+            let old = try ModelContainer(for: MadarSchemaV8.schema, configurations: [
+                ModelConfiguration("synced", schema: Schema(MadarSchemaV8.syncedTypes), url: generation.appendingPathComponent("Madar.store"), cloudKitDatabase: .none),
+                ModelConfiguration("deviceOnly", schema: Schema(MadarSchemaV8.deviceTypes), url: root.appendingPathComponent("Device.store"), cloudKitDatabase: .none)])
+            old.mainContext.autosaveEnabled = false
+            let account = Account(); account.id = accountID; account.name = "synthetic current"; account.balanceMinor = 128_500; account.balanceAt = eventAt
+            let obligation = Obligation(); obligation.id = obligationID; obligation.kind = "installment"; obligation.name = "synthetic purchase"; obligation.provider = "Tamara"; obligation.totalMinor = 120_000
+            let installment = InstallmentItem(); installment.obligationID = obligationID; installment.seq = 1; installment.amountMinor = 40_000; installment.paidMinor = 10_000; installment.dueDate = eventAt
+            let oldReconciliation = MadarFrozenReconciliationV8.Reconciliation(); oldReconciliation.id = reconciliationID; oldReconciliation.accountID = accountID
+            oldReconciliation.at = eventAt; oldReconciliation.expectedMinor = 128_500; oldReconciliation.observedMinor = 128_000
+            oldReconciliation.deltaMinor = -500; oldReconciliation.resolution = "leave"; oldReconciliation.beforeJSON = Data("synthetic snapshot".utf8)
+            oldReconciliation.note = "synthetic note"
+            for row in [account as any PersistentModel, obligation, installment, oldReconciliation] { old.mainContext.insert(row) }
+            let currentShape = Reconciliation(); currentShape.id = reconciliationID; currentShape.accountID = accountID
+            currentShape.at = eventAt; currentShape.expectedMinor = 128_500; currentShape.observedMinor = 128_000
+            currentShape.deltaMinor = -500; currentShape.resolution = "leave"; currentShape.beforeJSON = Data("synthetic snapshot".utf8)
+            currentShape.note = "synthetic note"; currentShape.createdAt = oldReconciliation.createdAt; currentShape.updatedAt = oldReconciliation.updatedAt
+            before = [try account.record(), try obligation.record(), try installment.record(), try currentShape.record()]
+            before[3].fields.removeValue(forKey: "obligationID")
+            try old.mainContext.save()
+        }
+        try DurableFiles.encode(8, to: generation.appendingPathComponent("SchemaVersion.json"))
+        try DurableFiles.encode(1, to: root.appendingPathComponent("DeviceSchemaVersion.json"))
+        try DurableFiles.encode(GenerationReady(version: 1, generationID: oldID, recordsHash: RecordFingerprint.hash(before), createdAt: Date()), to: generation.appendingPathComponent("GenerationReady.json"))
+        try DurableFiles.encode(ManagedPointer(version: 1, generationID: oldID, previousGenerationID: nil, accountHash: nil, cloudKitContainerIdentifier: nil), to: root.appendingPathComponent("ActiveGeneration.json"))
+        let sourceHash = try stableGenerationHashes(generation)
+        let upgraded = try ManagedDataStore(root: root)
+        #expect(upgraded.binding.generationID != oldID)
+        #expect(try stableGenerationHashes(generation) == sourceHash)
+        #expect(try MadarContainerFactory.storeVersionForAdoption(at: upgraded.binding.syncedDirectory) == 9)
+
+        let context = upgraded.container.mainContext
+        let record = try #require(context.fetch(FetchDescriptor<Reconciliation>()).first { $0.id == reconciliationID })
+        #expect(record.accountID == accountID && record.cardID == nil && record.obligationID == nil)
+        #expect(record.at == eventAt && record.expectedMinor == 128_500 && record.observedMinor == 128_000 && record.deltaMinor == -500)
+        #expect(record.resolution == "leave" && record.adjustmentTransactionID == nil && record.beforeJSON == Data("synthetic snapshot".utf8) && record.note == "synthetic note")
+        let storedObligation = try #require(context.fetch(FetchDescriptor<Obligation>()).first { $0.id == obligationID })
+        #expect(storedObligation.kind == "installment" && storedObligation.totalMinor == 120_000 && storedObligation.provider == "Tamara")
+        let storedItem = try #require(context.fetch(FetchDescriptor<InstallmentItem>()).first { $0.obligationID == obligationID })
+        #expect(storedItem.amountMinor == 40_000 && storedItem.paidMinor == 10_000)
+        let expected = try SchemaCompatibility.currentRecords(before, from: 8)
+        #expect(expected.first { $0.model == "Reconciliation" }?.fields["obligationID"] == .null)
+        #expect(try RecordFingerprint.hash(RecordBridge.all(context)) == RecordFingerprint.hash(expected))
+        let oldReceipt = Reconciliation(); try oldReceipt.apply(try #require(before.first { $0.model == "Reconciliation" }))
+        #expect(oldReceipt.obligationID == nil && oldReceipt.deltaMinor == -500 && oldReceipt.beforeJSON == Data("synthetic snapshot".utf8))
+        try RecordValidator.validate(RecordBridge.all(context))
+        let reopened = try ManagedDataStore(root: root)
+        #expect(reopened.binding.generationID == upgraded.binding.generationID)
+        #expect(try reopened.container.mainContext.fetch(FetchDescriptor<Reconciliation>()).first { $0.id == reconciliationID }?.obligationID == nil)
     }
 
     @Test func schemaV2BackupValidationAndMergeRetainsPrayerLogWithoutFridayKind() async throws {

@@ -1,6 +1,6 @@
 {
- "version": 3,
- "date": "2026-10-09",
+ "version": 4,
+ "date": "2026-10-19",
  "note": "default = المتفق عليه. scope sync = يُزامَن (Setting)، device = لهذا الجهاز (DeviceSetting في تكوين deviceOnly). preset = يدخل في الأنماط المحفوظة (§٦). layout entries are {blocks, pinned, hidden, sizes}; pinned blocks cannot be hidden. availability v2 = hidden in v1. Money values are Int minor units (halalas).",
  "constants": {
   "sanctityMinutes": {
@@ -3062,6 +3062,22 @@
    "contract": {
     "note": "Owner-approved free interval and first due day. cycleCalendar governs months/years. Existing cycle policies remain frozen."
    }
+  },
+  {
+   "key": "mal.reconcileEveryDays",
+   "owner": "mal",
+   "section": "التنبيهات",
+   "title": "الفاصل بين المطابقات",
+   "type": "int",
+   "default": 90,
+   "scope": "sync",
+   "range": [
+    1,
+    365
+   ],
+   "storage": "Setting (synced)",
+   "preset": false,
+   "note": "M5-V15: أي مدة من يوم إلى سنة؛ العدّ التالي يبدأ من تاريخ آخر مطابقة. أول مطابقة متى اختارها المستخدم."
   }
  ],
  "reviewAmendment": {

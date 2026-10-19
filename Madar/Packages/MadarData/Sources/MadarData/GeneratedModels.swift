@@ -1,6 +1,6 @@
 import Foundation
 import SwiftData
-// Generated from Specification/data-dictionary.json (schema V8). UUID foreign keys intentionally avoid ownership relationships.
+// Generated from Specification/data-dictionary.json (schema V9). UUID foreign keys intentionally avoid ownership relationships.
 @MainActor public protocol MadarRecordModel: PersistentModel { var id: UUID { get set }; func record() throws -> DataRecord; func apply(_ record: DataRecord) throws }
 @Model public final class Setting {
     public var id: UUID = UUID()
@@ -1907,6 +1907,7 @@ extension Allocation: MadarRecordModel {
     public var restoredAt: Date? = nil
     public var accountID: UUID? = nil
     public var cardID: UUID? = nil
+    public var obligationID: UUID? = nil
     public var at: Date = Date()
     public var expectedMinor: Int = 0
     public var observedMinor: Int = 0
@@ -1930,6 +1931,7 @@ extension Reconciliation: MadarRecordModel {
             "restoredAt": JSONValue.encode(restoredAt),
             "accountID": JSONValue.encode(accountID),
             "cardID": JSONValue.encode(cardID),
+            "obligationID": JSONValue.encode(obligationID),
             "at": JSONValue.encode(at),
             "expectedMinor": JSONValue.encode(expectedMinor),
             "observedMinor": JSONValue.encode(observedMinor),
@@ -1951,6 +1953,7 @@ extension Reconciliation: MadarRecordModel {
         restoredAt = try record.decode("restoredAt", as: Date?.self)
         accountID = try record.decode("accountID", as: UUID?.self)
         cardID = try record.decode("cardID", as: UUID?.self)
+        obligationID = try record.fields["obligationID"]?.decode(UUID?.self)
         at = try record.decode("at", as: Date.self)
         expectedMinor = try record.decode("expectedMinor", as: Int.self)
         observedMinor = try record.decode("observedMinor", as: Int.self)

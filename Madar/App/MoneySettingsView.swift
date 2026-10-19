@@ -14,8 +14,8 @@ struct MoneySettingsView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicType
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    private enum Page: Int, CaseIterable { case messages, daily, cycle, deficit, travel, room
-        var title: String { switch self { case .messages: "الرسائل"; case .daily: "اليومية"; case .cycle: "الدورة"; case .deficit: "العجز"; case .travel: "السفر"; case .room: "الغرفة" } }
+    private enum Page: Int, CaseIterable { case messages, daily, cycle, deficit, travel, room, reconciliation
+        var title: String { switch self { case .messages: "الرسائل"; case .daily: "اليومية"; case .cycle: "الدورة"; case .deficit: "العجز"; case .travel: "السفر"; case .room: "الغرفة"; case .reconciliation: "المطابقة" } }
     }
     @State private var page = Page.daily
     @State private var cycle: MoneyCycleReading?
@@ -30,6 +30,7 @@ struct MoneySettingsView: View {
     @State private var first = Date()
     @State private var rawBigAmount = "1000"
     @State private var rawBigPercent = "10"
+    @State private var rawReconcileDays = "90"
     @FocusState private var editing: Bool
     private var service: AppMoneyService { .init(app: app) }
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
@@ -68,6 +69,7 @@ struct MoneySettingsView: View {
                             case .messages: messagesPage
                             case .travel: toggle("تتوقف اليومية أثناء الرحلة", "mal.travelPausesDaily"); note("القطرة تتوقف مع اليومية؛ الحركات السابقة تبقى بسعرها يوم تسجيلها.")
                             case .room: roomPage
+                            case .reconciliation: reconciliationPage
                             }
                             Button("أعد إعدادات هذا الباب إلى المتفق عليه") { editing = false; app.reset(keys) }.font(MadarTypography.caption()).frame(minHeight: 44).accessibilityIdentifier("money-settings-reset")
                             Text("— " + service.digits.string(page.rawValue + 1) + " —").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).frame(maxWidth: .infinity)
@@ -168,6 +170,29 @@ struct MoneySettingsView: View {
             else { note("حدّد اليومية أو الراتب، أو اختر مبلغًا ثابتًا.") }
         }
     }
+    private var reconciliationPage: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("ذكّرني بمطابقة الرصيد كل").font(MadarTypography.body())
+            if visible {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    TextField("٩٠", text: $rawReconcileDays).keyboardType(.numberPad).focused($editing)
+                        .multilineTextAlignment(.center).font(MadarTypography.cardTitle()).frame(width: 88)
+                        .accessibilityIdentifier("money-settings-reconcile-days")
+                    Text("يومًا").font(MadarTypography.body())
+                }.frame(maxWidth: .infinity)
+                saveButton("احفظ مدة التذكير", id: "reconcile-cadence-save", enabled: reconcileDaysInput.map { (1...365).contains($0) } == true) {
+                    guard let days = reconcileDaysInput else { return }
+                    app.set(.number(Double(days)), key: "mal.reconcileEveryDays") { load() }
+                }
+            } else {
+                Text("••• يومًا").font(MadarTypography.cardTitle()).frame(maxWidth: .infinity)
+                Button("أظهر الأرقام") { revealed = true }.font(MadarTypography.caption()).frame(minHeight: 44)
+                    .accessibilityIdentifier("money-settings-reconcile-reveal")
+            }
+            note("اختر أي مدة من يوم إلى سنة. يبدأ العد من تاريخ أول مطابقة تحفظها، ثم يتجدد من كل مطابقة. يصل تذكير واحد بعد حلول الموعد، ويحترم أوقات السكينة وموازنة تذكيرات مدار.")
+        }
+    }
+    private var reconcileDaysInput: Int? { MoneyAmountInput.minor(rawReconcileDays, exponent: 0) }
     private var homeExponent: Int { CurrencyExponents.specified.exponent(app.string("core.currency")) ?? 2 }
     private var dialDate: Date { flexible ? first : cycle?.expectedEndDay.date(in: app.activePlace.timeZone) ?? app.prayerNow() }
     private var dialCalendar: Calendar { var c = Calendar(identifier: calendar == "hijri" ? .islamicUmmAlQura : .gregorian); c.timeZone = app.activePlace.timeZone; return c }
@@ -179,8 +204,8 @@ struct MoneySettingsView: View {
     private func saveButton(_ title: String, id: String, enabled: Bool, action: @escaping () -> Void) -> some View { Button { editing = false; action() } label: { Text(title).font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 48).background(theme.ink).foregroundStyle(theme.background) }.disabled(!enabled || app.settingsWriteInProgress).accessibilityIdentifier("money-settings-" + id) }
     private func toggle(_ title: String, _ key: String) -> some View { Toggle(title, isOn: Binding(get: { app.bool(key) }, set: { app.set(.bool($0), key: key) })).font(MadarTypography.body()).disabled(app.settingsWriteInProgress) }
     private func stringBinding(_ key: String) -> Binding<String> { .init(get: { app.string(key) }, set: { app.set(.string($0), key: key) }) }
-    private func tabValue(_ p: Page) -> String { switch p { case .daily: cycle.map { amount($0.headline.todayAllowanceMinor) } ?? "—"; case .cycle: salaryDay > 0 ? service.digits.string(salaryDay) : "الراتب"; case .deficit: service.digits.string(Int(app.number("mal.offsetCapDailies"))); case .travel: app.bool("mal.travelPausesDaily") ? "تتوقف" : "تستمر"; case .messages: "الاختصار"; case .room: "خصوصيتك" } }
-    private var keys: [String] { switch page { case .daily: ["mal.dailyAllowance"]; case .cycle: ["mal.salaryDay", "mal.cycleCalendar", "mal.salarySchedule"]; case .deficit: ["mal.autoOffset", "mal.offsetCapDailies", "mal.salaryRemainder", "mal.cashWithdrawalAsSpend"]; case .messages: ["mal.alert80", "mal.sinceLastVisit", "mal.cardDue"]; case .travel: ["mal.travelPausesDaily"]; case .room: ["core.hideMoneyOutside", "core.hideMoneyUntilTouch", "mal.bigExpenseRule", "mal.bigExpenseDays", "mal.bigExpenseSalaryBp", "mal.bigExpenseMinor"] } }
+    private func tabValue(_ p: Page) -> String { switch p { case .daily: cycle.map { amount($0.headline.todayAllowanceMinor) } ?? "—"; case .cycle: salaryDay > 0 ? service.digits.string(salaryDay) : "الراتب"; case .deficit: service.digits.string(Int(app.number("mal.offsetCapDailies"))); case .travel: app.bool("mal.travelPausesDaily") ? "تتوقف" : "تستمر"; case .messages: "الاختصار"; case .room: "خصوصيتك"; case .reconciliation: service.digits.string(Int(app.number("mal.reconcileEveryDays"))) + " يوم" } }
+    private var keys: [String] { switch page { case .daily: ["mal.dailyAllowance"]; case .cycle: ["mal.salaryDay", "mal.cycleCalendar", "mal.salarySchedule"]; case .deficit: ["mal.autoOffset", "mal.offsetCapDailies", "mal.salaryRemainder", "mal.cashWithdrawalAsSpend"]; case .messages: ["mal.alert80", "mal.sinceLastVisit", "mal.cardDue"]; case .travel: ["mal.travelPausesDaily"]; case .room: ["core.hideMoneyOutside", "core.hideMoneyUntilTouch", "mal.bigExpenseRule", "mal.bigExpenseDays", "mal.bigExpenseSalaryBp", "mal.bigExpenseMinor"]; case .reconciliation: ["mal.reconcileEveryDays"] } }
     private func load() {
         cycle = try? MoneyRepository(context: ModelContext(app.container)).cycle(at: app.prayerNow())
         let value = app.values["mal.dailyAllowance"]?.object ?? [:]; mode = value["mode"]?.string ?? "fixed"
@@ -193,6 +218,7 @@ struct MoneySettingsView: View {
         rawPercent = input(value["percentBp"]?.number.map(Int.init) ?? previousBp ?? 3000, exponent: 2)
         rawBigAmount = input(Int(app.number("mal.bigExpenseMinor")), exponent: homeExponent)
         rawBigPercent = input(Int(app.number("mal.bigExpenseSalaryBp")), exponent: 2)
+        rawReconcileDays = input(Int(app.number("mal.reconcileEveryDays")), exponent: 0)
         salaryDay = Int(app.number("mal.salaryDay")); calendar = app.string("mal.cycleCalendar")
         let schedule = app.values["mal.salarySchedule"]?.object ?? [:]; flexible = schedule["enabled"] == .bool(true); every = schedule["every"]?.number.map(Int.init) ?? 1; unit = RecurrenceUnit(rawValue: schedule["unit"]?.string ?? "month") ?? .month
         first = schedule["firstDayKey"]?.string.flatMap { try? GregorianDay($0) }?.date(in: app.activePlace.timeZone) ?? cycle?.expectedEndDay.date(in: app.activePlace.timeZone) ?? app.prayerNow()

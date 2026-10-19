@@ -51,6 +51,18 @@ struct ReconcileTests {
         #expect(ReconcileEngine.summary([(account, .missedSpend), (match, nil), (card, .unexplained)]).settlements == 2)
     }
 
+    @Test func installmentDifferenceStaysAnOpenDebtCheckWithoutSpendingOrMovement() {
+        let providerBalance = ReconcileLine(side: .installment, expectedMinor: 80_000, observedMinor: 90_000)
+        #expect(providerBalance.deltaMinor == 10_000)
+        #expect(!providerBalance.isShortfall)
+        #expect(providerBalance.netEffectMinor == -10_000, "More owed reduces net money")
+        #expect(ReconcileEngine.names(for: providerBalance).isEmpty, "A provider difference has no spending classification")
+        #expect(ReconcileEngine.resolution(nil, for: providerBalance) == "leave")
+        #expect(ReconcileEngine.resolution(.unexplained, for: providerBalance) == nil)
+        #expect(ReconcileEngine.effect(providerBalance, resolution: "leave") == nil)
+        #expect(ReconcileEngine.summary([(providerBalance, nil)]) == .init(open: 1, negativeMinor: 0, positiveMinor: 10_000, settlements: 0))
+    }
+
     @Test func nudgeMovesWholeUnitsAndStopsAtZero() {
         #expect(ReconcileEngine.nudge(12_850_000, units: -100, exponent: 2) == 12_840_000)
         #expect(ReconcileEngine.nudge(413_000, units: 10, exponent: 2) == 414_000)

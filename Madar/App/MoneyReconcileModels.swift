@@ -5,7 +5,7 @@ import MadarData
 import MadarMoney
 import MadarCommands
 
-/// One line of «محضر جرد الحسابات»: an owned, tracked account in the home currency, or a credit card.
+/// One line of «محضر جرد الحسابات»: an owned account, credit card, or BNPL installment plan in the home currency.
 struct MoneyReconcileRow: Identifiable {
     struct Suggestion { var observedMinor: Int; var at: Date; var day: GregorianDay; var text: String }
     struct Pending: Identifiable { var id: UUID; var title: String; var amountMinor: Int; var day: GregorianDay }
@@ -13,12 +13,12 @@ struct MoneyReconcileRow: Identifiable {
     var side: ReconcileLine.Side
     var name: String
     var detail: String
-    /// Madar's book now: `accountBalance` (the basis «في حسابك» rows) or `cardDebts` total («عليك»).
+    /// Madar's book now: account cash, card debt, or the unpaid amount in the installment schedule.
     var expectedMinor: Int
     /// The last live reconciliation of this line, or nil when it was never reconciled.
     var lastAt: Date?
     var lastResolution: String?
-    /// Since when the book has run unchecked: the last reconciliation, else the account's opening checkpoint.
+    /// Since when the book has run unchecked: the last reconciliation, else its first balance or movement.
     var since: GregorianDay?
     /// Days with a confirmed movement on this line since then: where a missing message could hide.
     var activeDays: Set<GregorianDay>
@@ -54,6 +54,10 @@ extension AppMoneyService {
         let cards = try context.fetch(FetchDescriptor<Card>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
         let records = try context.fetch(FetchDescriptor<Reconciliation>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }.sorted { $0.at < $1.at }
         let messages = try context.fetch(FetchDescriptor<BankMessage>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
+        let installments = try context.fetch(FetchDescriptor<InstallmentItem>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
+        let obligations = try context.fetch(FetchDescriptor<Obligation>()).filter {
+            $0.deletedAt == nil && $0.mergedInto == nil && $0.kind == "installment" && $0.currency == currency
+        }
         func day(_ row: MoneyTransaction) -> GregorianDay { (try? GregorianDay(row.dayKey)) ?? .containing(row.eventAt, in: zone) }
         var rows: [MoneyReconcileRow] = []
         let kinds = ["current": "حساب جارٍ", "savings": "حساب ادّخار", "cash": "نقد في اليد", "wallet": "محفظة"]
@@ -102,6 +106,27 @@ extension AppMoneyService {
                 activeDays: Set(moved.map(day)), movementCount: moved.count, baseMinor: nil, baseDay: nil, baseIsReconciliation: last != nil,
                 inMinor: debt.statementLeftMinor, outMinor: debt.unbilledLeftMinor, suggestion: nil,
                 pending: pendingRows.filter { $0.cardID == card.id }.map { .init(id: $0.id, title: $0.merchant ?? "حركة تنتظر", amountMinor: $0.homeAmountMinor, day: day($0)) }))
+        }
+        for obligation in obligations {
+            let schedule = installments.filter { $0.obligationID == obligation.id }
+            guard !schedule.isEmpty else { continue }
+            let paidMinor = schedule.reduce(0) { $0 + max(0, min($1.amountMinor, $1.paidMinor)) }
+            let remainingMinor = max(0, obligation.totalMinor - paidMinor)
+            guard remainingMinor > 0 else { continue }
+
+            let mine = records.filter { $0.obligationID == obligation.id }, last = mine.last
+            let purchase = confirmed.first { $0.id == obligation.purchaseTransactionID }
+            let firstDate = purchase?.eventAt ?? schedule.map(\.dueDate).min() ?? obligation.createdAt
+            let sinceAt = last?.at ?? firstDate
+            let moved = confirmed.filter { $0.obligationID == obligation.id && $0.eventAt > (last?.at ?? .distantPast) }
+            let provider = obligation.provider?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let folded = provider.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+            let name = folded.contains("tamara") ? "تمارا" : folded.contains("tabby") ? "تابي" : (provider.isEmpty ? obligation.name : provider)
+            rows.append(.init(id: obligation.id, side: .installment, name: name, detail: obligation.name,
+                expectedMinor: remainingMinor, lastAt: last?.at, lastResolution: last?.resolution,
+                since: .containing(sinceAt, in: zone), activeDays: Set(moved.map(day)), movementCount: moved.count,
+                baseMinor: obligation.totalMinor, baseDay: .containing(firstDate, in: zone), baseIsReconciliation: last != nil,
+                inMinor: paidMinor, outMinor: remainingMinor, suggestion: nil, pending: []))
         }
         let other = try context.fetch(FetchDescriptor<MadarData.Category>()).contains { $0.deletedAt == nil && $0.mergedInto == nil && $0.name == "أخرى" }
         return .init(today: today, rows: rows, notYetAccruedMinor: home.cycle.map { ReconciliationEngine.notYetAccrued(elapsedDays: $0.elapsedDays, $0.input) }, hasOtherCategory: other)

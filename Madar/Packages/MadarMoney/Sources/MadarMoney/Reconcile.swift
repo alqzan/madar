@@ -1,19 +1,25 @@
 /// M5-V15 «المطابقة مع البنك» (F03, `mal/24-Z-R19-rec`): one line per account or credit card — Madar's book against
 /// what the bank says — and what naming the difference writes. Pure; the command and the screen share these rules.
 public struct ReconcileLine: Equatable, Sendable {
-    public enum Side: String, Sendable { case account, creditCard }
+    public enum Side: String, Sendable { case account, creditCard, installment }
     public var side: Side
-    /// Madar's book: the account's cash, or the card's debt (statement + unbilled).
+    /// Madar's book: account cash, card debt, or the installment plan's unpaid schedule.
     public var expectedMinor: Int
-    /// What the bank says: the balance, or what the card owes.
+    /// What the provider says: the balance, or what is still owed.
     public var observedMinor: Int
     public init(side: Side, expectedMinor: Int, observedMinor: Int) {
         self.side = side; self.expectedMinor = expectedMinor; self.observedMinor = observedMinor
     }
     /// observed − expected, as stored in `Reconciliation.deltaMinor`.
     public var deltaMinor: Int { observedMinor - expectedMinor }
-    /// You have less than Madar thinks: the account holds less, or the card owes more.
-    public var isShortfall: Bool { side == .account ? deltaMinor < 0 : deltaMinor > 0 }
+    /// A cash/card shortfall can be spending. An installment difference cannot be classified as spending.
+    public var isShortfall: Bool {
+        switch side {
+        case .account: deltaMinor < 0
+        case .creditCard: deltaMinor > 0
+        case .installment: false
+        }
+    }
     /// The effect of settling it on «لك فعلًا» (cash − debt).
     public var netEffectMinor: Int { side == .account ? deltaMinor : -deltaMinor }
 }
@@ -32,6 +38,7 @@ public enum ReconcileEngine {
     /// The names a line can take: spending names only for a shortfall; a surplus can only be settled without a reason.
     public static func names(for line: ReconcileLine) -> [ReconcileName] {
         guard line.deltaMinor != 0 else { return [] }
+        guard line.side != .installment else { return [] }
         return line.isShortfall ? [.missedSpend, .bankFee, .unexplained] : [.unexplained]
     }
 
@@ -39,6 +46,7 @@ public enum ReconcileEngine {
     /// with no movement; no name leaves the difference open.
     public static func resolution(_ name: ReconcileName?, for line: ReconcileLine) -> String? {
         if line.deltaMinor == 0 { return name == nil ? "adjust" : nil }
+        if line.side == .installment { return name == nil ? "leave" : nil }
         guard let name else { return "leave" }
         guard names(for: line).contains(name) else { return nil }
         return name == .unexplained ? "adjust" : "unrecordedSpend"
@@ -46,7 +54,7 @@ public enum ReconcileEngine {
 
     /// The one adjustment movement a settled line writes; nil for a match or a difference left open.
     public static func effect(_ line: ReconcileLine, resolution: String) -> MovementEffect? {
-        guard line.deltaMinor != 0, resolution != "leave" else { return nil }
+        guard line.side != .installment, line.deltaMinor != 0, resolution != "leave" else { return nil }
         let spend = resolution == "unrecordedSpend"
         return MovementEngine.effect(line.side == .account ? .adjustment(unrecordedSpend: spend) : .cardAdjustment(unrecordedSpend: spend), amountMinor: line.deltaMinor)
     }

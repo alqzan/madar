@@ -25,6 +25,27 @@ import Testing
         #expect(RoomReminders.digestKinds(memberIDs: [reminder.id, cash!.id]) == ["سداد البطاقة"])
     }
 
+    @Test func reconciliationReminderUsesFreeLastCheckDateAndWaitsForSanctity() throws {
+        let id = UUID(), zone = ActivePlace.riyadh.timeZone
+        let dueToday = RoomReminders.reconciliation(lineID: id, since: day.day.adding(days: -90), everyDays: 90,
+            timeZone: zone, prayerDays: [day], now: dawn)
+        #expect(dueToday?.id == "mal.reconcile.\(id.uuidString).2026-07-11.90")
+        #expect(dueToday?.room == .mal && dueToday?.dayKey == "2026-10-09")
+        #expect(dueToday?.dueAt == SanctityGuard(prayerDays: [day]).clamp(calendarDate(12, day: day.day, zone: zone)))
+        #expect(RoomReminders.reconciliation(lineID: id, since: day.day, everyDays: 90, timeZone: zone, prayerDays: [day], now: dawn) == nil)
+        #expect(RoomReminders.reconciliation(lineID: id, since: day.day, everyDays: 0, timeZone: zone, prayerDays: [day], now: dawn) == nil)
+
+        let inSanctity = RoomReminders.reconciliation(lineID: id, since: day.day.adding(days: -90), everyDays: 90,
+            timeZone: zone, prayerDays: [day], now: day.asr.addingTimeInterval(300))
+        #expect(inSanctity?.dueAt == day.asr.addingTimeInterval(1800))
+        #expect(RoomReminders.kindLabel(for: dueToday!.id) == "مطابقة الرصيد")
+    }
+
+    private func calendarDate(_ hour: Int, day: GregorianDay, zone: TimeZone) -> Date {
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = zone
+        return calendar.date(bySettingHour: hour, minute: 0, second: 0, of: day.date(in: zone))!
+    }
+
     @Test func qadaFallsAtTheEndOfTheChosenPrayersSanctity() {
         let fajr = RoomReminders.qada(days: [day], time: .afterFajr, owed: 3, now: dawn)
         #expect(fajr == [.init(id: "qada.2026-10-09", room: .salah, dueAt: day.fajr.addingTimeInterval(1800), dayKey: "2026-10-09")])

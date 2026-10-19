@@ -33,6 +33,38 @@ import MadarCore
         XCTAssertTrue(RoomNotificationContent.cardCandidates(session: app, prayerDays: [day], now: now).isEmpty)
         XCTAssertEqual(RoomNotificationContent.content(for: candidate, plan: plan, session: app, habitNames: [:]).body, "لديك تنبيه في مدار")
     }
+
+    func testReconciliationReminderUsesSharedBudgetAndGenericCopy() throws {
+        let (app, root, now, day) = try fixture(["core.faceIDLock": .string("app"), "core.dayStart": .string("midnight"), "mal.reconcileEveryDays": .number(90)])
+        defer { try? FileManager.default.removeItem(at: root) }
+        app.authorizeProtectedData()
+        let context = ModelContext(app.container), account = Account()
+        account.name = "synthetic private account"; account.currency = "SAR"; account.balanceMinor = 1_234_567
+        account.balanceAt = now.addingTimeInterval(-100 * 86_400); context.insert(account); try context.save(); try app.reload()
+
+        let candidates = RoomNotificationContent.reconciliationCandidates(session: app, prayerDays: [day], now: now)
+        XCTAssertEqual(candidates.count, 1)
+        let candidate = try XCTUnwrap(candidates.first)
+        XCTAssertTrue(candidate.id.hasPrefix("mal.reconcile.")); XCTAssertTrue(RoomNotificationContent.isRoomRequest(candidate.id))
+        XCTAssertEqual(RoomNotificationContent.ledgerKind(candidate.id), "reconciliation")
+        let plan = NotificationArbiter.plan(candidates: candidates, prayerDays: [day], now: now, timeZone: day.place.timeZone,
+                                            policy: .init(dailyBudget: 1, staleNudgeEnabled: false))
+        XCTAssertEqual(plan.scheduled.map(\.id), [candidate.id], "It uses the existing per-device reminder budget and prayer guard")
+        let content = RoomNotificationContent.content(for: candidate, plan: plan, session: app, habitNames: [:])
+        let shown = content.title + content.body
+        XCTAssertEqual(content.body, "حان وقت المراجعة")
+        XCTAssertNil(shown.rangeOfCharacter(from: .decimalDigits))
+        XCTAssertFalse(shown.contains("synthetic private account"))
+        XCTAssertEqual(content.userInfo["room"] as? String, "mal")
+        XCTAssertEqual(content.userInfo["dayKey"] as? String, candidate.dayKey)
+        RoomNotificationContent.open(candidate.id, userInfo: content.userInfo, session: app)
+        XCTAssertEqual(app.selectedTab, "money")
+        XCTAssertTrue(try RoomNotificationContent.stillRelevant(candidate.id, session: app, now: now))
+
+        let last = Reconciliation(); last.accountID = account.id; last.at = now; last.expectedMinor = account.balanceMinor
+        last.observedMinor = account.balanceMinor; last.deltaMinor = 0; context.insert(last); try context.save(); try app.reload()
+        XCTAssertFalse(try RoomNotificationContent.stillRelevant(candidate.id, session: app, now: now), "A saved reconciliation makes the old request stale")
+    }
     private func fixture(_ settings: [String: MadarData.JSONValue]) throws -> (AppSession, URL, Date, PrayerDay) {
         let root = FileManager.default.temporaryDirectory.appending(path: "MadarRoomNotifications-\(UUID())")
         let container = try MadarContainerFactory.makeLocal(at: root.appending(path: "Data"))
@@ -67,7 +99,7 @@ import MadarCore
     }
 
     func testQadaCopyNeverCarriesTheDebtCount() throws {
-        let (app, root, _, day) = try fixture([:]); defer { try? FileManager.default.removeItem(at: root) }
+        let (app, root, _, day) = try fixture(["core.faceIDLock": .string("none")]); defer { try? FileManager.default.removeItem(at: root) }
         let qada = NotificationCandidate(id: "qada.2026-10-15", room: .salah, dueAt: day.fajr.addingTimeInterval(1800), dayKey: "2026-10-15")
         let plan = NotificationArbiter.plan(candidates: [], prayerDays: [day], now: day.fajr, timeZone: ActivePlace.riyadh.timeZone, policy: .init(staleNudgeEnabled: false))
         XCTAssertTrue(RoomNotificationContent.content(for: qada, plan: plan, session: app, habitNames: [:]).body.hasPrefix("حان وقت القضاء."))

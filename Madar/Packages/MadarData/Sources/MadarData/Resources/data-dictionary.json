@@ -1,6 +1,6 @@
 {
-  "version": 3,
-  "date": "2026-10-10",
+  "version": 4,
+  "date": "2026-10-19",
   "generatedBy": "Agent A gen_dd.py (single source with parts/p12.html §11 listing and natural-key table)",
   "conventions": {
     "seedNamespace": "2103b223-aa33-4c73-bab6-b2adaed8603e",
@@ -2838,7 +2838,7 @@
       "merge": "row LWW (§11 merge)",
       "seed": null,
       "note": "balance reconciliation record (money); unrelated to the row merge in §11; undo restores both",
-      "amendedBy": "D A12",
+      "amendedBy": "D A12; owner-approved M5-V15 reconciliation cadence and BNPL balance link (schema V9, 19 Oct)",
       "relationships": [
         {
           "field": "accountID",
@@ -2848,6 +2848,11 @@
         {
           "field": "cardID",
           "to": "Card",
+          "kind": "one"
+        },
+        {
+          "field": "obligationID",
+          "to": "Obligation",
           "kind": "one"
         },
         {
@@ -2869,6 +2874,13 @@
           "type": "UUID?",
           "optional": true,
           "fk": "Card"
+        },
+        {
+          "name": "obligationID",
+          "type": "UUID?",
+          "optional": true,
+          "fk": "Obligation",
+          "note": "M5-V15: links a provider-balance check to its installment obligation; no schedule or payment is changed by a difference."
         },
         {
           "name": "at",
@@ -5921,5 +5933,5 @@
       "execution": "Immediately on press, within undo window"
     }
   },
-  "storeSchemaVersion": 8
+  "storeSchemaVersion": 9
 }
