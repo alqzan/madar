@@ -111,8 +111,10 @@ public enum BankMessageParser {
     }
 
     /// `receivedAt` (the phone's receive time) settles two-digit dates that read both ways, «25-10-19» vs «19-10-25».
-    public static func parse(_ text: String, timeZone: TimeZone, exponents: CurrencyExponents = .specified, homeCurrency: String = "SAR", receivedAt: Date? = nil) -> ParsedBankMessage {
-        let t = clean(text), kind = classify(text)
+    public static func parse(_ text: String, timeZone: TimeZone, exponents: CurrencyExponents = .specified, homeCurrency: String = "SAR", receivedAt: Date? = nil, sender: String? = nil) -> ParsedBankMessage {
+        let t = clean(text)
+        // Owner, 19 Oct: the telecom sender «stc» (not stc pay / STC Bank) sends balance and offers only — ignore it all.
+        let kind = ["stc", "stc-ad"].contains(sender?.lowercased().trimmingCharacters(in: .whitespaces) ?? "") ? .marketing : classify(text)
         var result = ParsedBankMessage(kind: kind)
         // OTP and marketing: nothing is read out of them.
         guard kind != .otp, kind != .marketing else { return result }
@@ -140,7 +142,7 @@ public enum BankMessageParser {
         if [.purchase, .refund, .declined, .reversal].contains(kind), result.merchant == nil { result.merchant = lineMerchant(t) }
         // Owner special case: a card «purchase» at the owner's own wallet (barq, stc pay…) is a top-up — a self-transfer.
         if kind == .purchase, let m = result.merchant?.lowercased().replacingOccurrences(of: " ", with: ""),
-           ["barq", "stcpay", "tiqmo", "urpay", "drahim", "d360"].contains(where: { m.hasPrefix($0) }) { result.kind = .transferOut }
+           ["barq", "stcpay", "stcbank", "tiqmo", "urpay", "drahim", "d360", "alinmainv", "alinmainvestment", "sukuk"].contains(where: { m.hasPrefix($0) }) { result.kind = .transferOut }
         // «مبلغ: 23 USD(86.38 ريال)»: the bank's own riyal figure in brackets is the home amount, not the rate.
         if result.currency != homeCurrency, result.statedHomeMinor == nil,
            let match = t.range(of: #"\(\s*\d[\d.,]*\s*(?:ريال|SAR|SR|ر\.س)\s*\)"#, options: .regularExpression),

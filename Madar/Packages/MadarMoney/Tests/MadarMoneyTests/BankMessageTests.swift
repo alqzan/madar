@@ -281,3 +281,14 @@ import Testing
         #expect(BankMessageParser.classify("حوالة داخلية\nمبلغ:SAR 500\nالى:1234\nمن:SampleWallet") == .transferIn)
     }
 }
+
+@Suite struct OwnerSenderRuleTests {
+    let riyadh = TimeZone(identifier: "Asia/Riyadh")!
+    @Test func telecomStcIsIgnoredButStcPayIsRead() {
+        #expect(BankMessageParser.parse("تم خصم 30 ريال من رصيدك", timeZone: riyadh, sender: "stc").kind == .marketing)
+        #expect(BankMessageParser.parse("مشتريات إنترنت\nمبلغ: 30 SAR\nلدى: Sample", timeZone: riyadh, sender: "stcpay").kind == .purchase)
+    }
+    @Test func investmentAndSavingsWalletsAreTransfers() {
+        #expect(BankMessageParser.parse("شراء إنترنت\nبطاقة:1234 ;فيزا\nمبلغ:100.00 SAR\nلدى:Drahim", timeZone: riyadh).kind == .transferOut)
+    }
+}

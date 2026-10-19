@@ -38,7 +38,7 @@ final class BankCorpusTests: XCTestCase {
                 let fractional = ISO8601DateFormatter(); fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
                 let received = fractional.date(from: line.date) ?? ISO8601DateFormatter().date(from: line.date)
                 if received == nil { counts["gap.noReceiveTime", default: 0] += 1 }
-                let parsed = BankMessageParser.parse(line.text, timeZone: zone, receivedAt: received)
+                let parsed = BankMessageParser.parse(line.text, timeZone: zone, receivedAt: received, sender: line.sender)
                 // A printed time more than two days from the receive time is a misread date.
                 if let at = parsed.eventAt, let received, abs(at.timeIntervalSince(received)) > 2 * 86_400 { counts["gap.dateFar", default: 0] += 1 }
                 counts["total", default: 0] += 1
