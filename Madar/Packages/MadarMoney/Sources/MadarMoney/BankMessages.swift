@@ -68,7 +68,7 @@ public enum BankMessageParser {
         if has(t, ["عكس عملية", "إلغاء عملية", "عكس العملية", "reversal", "reversed"]) { return .reversal }
         if has(t, ["تمارا", "tamara", "تابي", "tabby", "دفعة مقسمة"]) { return .bnplInstalment }
         if has(t, ["كشف حساب البطاقة", "كشف البطاقة", "statement", "الحد الأدنى للسداد", "المبلغ المستحق"]) { return .statement }
-        if has(t, ["سداد بطاقة", "سداد البطاقة", "تسديد بطاقة", "تسديد البطاقة", "card payment"]) { return .cardPayment }
+        if has(t, ["سداد بطاقة", "سداد البطاقة", "ائتمانية:سداد", "ائتمانية: سداد", "تسديد بطاقة", "تسديد البطاقة", "card payment"]) { return .cardPayment }
         // RM6 corpus (19 Oct): a finance instalment is an obligation paid, like a bill.
         if has(t, ["قسط تمويل"]) { return .billPayment }
         if has(t, ["سداد فاتورة", "سداد", "SADAD", "المفوتر"]) { return .billPayment }

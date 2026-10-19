@@ -240,3 +240,10 @@ import Testing
         #expect(BankIntake.decision(BankMessageParser.classify(receipt)) == .discard)
     }
 }
+
+@Suite struct CreditCardPaymentShapeTests {
+    @Test func alRajhiCreditCardSettlementIsACardPaymentNotABill() {
+        #expect(BankMessageParser.classify("بطاقة ائتمانية:سداد\nبطاقة:*1234 ;فيزا\nمبلغ:SAR 500.00\nفي:25-10-19 10:00") == .cardPayment)
+        #expect(BankMessageParser.classify("سداد فاتورة\nالمفوتر: شركة الكهرباء\nمبلغ: 120 SAR") == .billPayment)
+    }
+}
