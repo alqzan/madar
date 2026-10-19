@@ -40,8 +40,9 @@ struct MoneyLogView: View {
                             ForEach(reading.monthStarts, id: \.description) { start in
                                 Button { month = start; selected = nil; load() } label: {
                                     let labels = service.logMonthLabels(start)
-                                    VStack(alignment: .leading, spacing: 3) { Text(labels.primary).font(MadarTypography.caption()); Text(labels.secondary).font(MadarTypography.fine()) }.padding(.horizontal, 12).padding(.vertical, 8)
-                                        .background(start == reading.monthStart ? theme.ink : theme.surface, in: UnevenRoundedRectangle(topLeadingRadius: 18, topTrailingRadius: 18))
+                                    VStack(alignment: .leading, spacing: 1) { Text(labels.primary).font(.custom("thmanyahserifdisplay-Bold", size: 16, relativeTo: .subheadline)); Text(labels.secondary).font(MadarTypography.fine()).opacity(0.8) }.padding(.horizontal, 12).padding(.vertical, 6)
+                                        .background(start == reading.monthStart ? theme.ink : theme.surface, in: UnevenRoundedRectangle(topLeadingRadius: 14, topTrailingRadius: 14))
+                                        .overlay { if start != reading.monthStart { UnevenRoundedRectangle(topLeadingRadius: 14, topTrailingRadius: 14).stroke(theme.line, lineWidth: 1) } }
                                         .foregroundStyle(start == reading.monthStart ? theme.background : theme.ink)
                                 }.buttonStyle(.plain).accessibilityIdentifier("money-log-month-" + start.description)
                             }
@@ -79,9 +80,22 @@ struct MoneyLogView: View {
         let days = r.arcadeDays.filter { $0.day >= week && $0.day < week.adding(days: 7) }
         let maximum = days.map { max($0.dailyMinor ?? 0, $0.spentMinor) }.max() ?? 1
         let scale = max(1, maximum + maximum / 2)
+        let dailies = Set(days.compactMap(\.dailyMinor))
+        // One gold line across the whole week when every day shares the same allowance, as in the canonical «خط ٤٠٠».
+        let shared = dailies.count == 1 ? dailies.first : nil
         return VStack(spacing: 10) {
-            HStack(alignment: .bottom, spacing: 8) { ForEach(days) { day in dayButton(day, scale: scale, height: 124) } }
-            if visible, let daily = (days.first { $0.day == chosen?.day } ?? days.first)?.dailyMinor { Text("خط " + amount(daily)).font(MadarTypography.fine()).foregroundStyle(theme.color("reserveText")).frame(maxWidth: .infinity, alignment: .leading).accessibilityIdentifier("money-log-limit-label") }
+            HStack(alignment: .bottom, spacing: 8) { ForEach(days) { day in dayButton(day, scale: scale, height: 124, drawsLimit: shared == nil) } }
+                .overlay(alignment: .top) {
+                    if visible, let daily = shared {
+                        let y = 35 + 124 * (1 - min(1, Double(max(0, daily)) / Double(scale)))
+                        ZStack(alignment: .bottomTrailing) {
+                            Rectangle().fill(theme.color("reserveText")).frame(height: 1)
+                            Text("خط " + amount(daily)).font(MadarTypography.fine()).foregroundStyle(theme.color("reserveText")).padding(.horizontal, 4).background(theme.background).offset(y: -3)
+                                .accessibilityIdentifier("money-log-limit-label")
+                        }.padding(.horizontal, -6).offset(y: y).allowsHitTesting(false)
+                    }
+                }
+            if visible, shared == nil, let daily = (days.first { $0.day == chosen?.day } ?? days.first)?.dailyMinor { Text("خط " + amount(daily)).font(MadarTypography.fine()).foregroundStyle(theme.color("reserveText")).frame(maxWidth: .infinity, alignment: .leading).accessibilityIdentifier("money-log-limit-label") }
             Text("الخط الذهبي يومك الفعلي؛ الرسم ليومك كاملًا، والتصفية للحركات أدناه.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
         }.padding(.top, 10).padding(.bottom, 6).accessibilityElement(children: .contain).accessibilityIdentifier("money-log-arcade")
     }
@@ -94,10 +108,10 @@ struct MoneyLogView: View {
         return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 7), spacing: 12) {
             ForEach(0..<7, id: \.self) { index in Text(["أحد", "اثنين", "ثلاثاء", "أربعاء", "خميس", "جمعة", "سبت"][(firstWeekday - 1 + index) % 7]).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
             ForEach(0..<leading, id: \.self) { _ in Color.clear.frame(height: 70) }
-            ForEach(r.days) { day in dayButton(day, scale: scale, height: 56) }
+            ForEach(r.days) { day in dayButton(day, scale: scale, height: 56, drawsLimit: true) }
         }.padding(.vertical, 10).accessibilityElement(children: .contain).accessibilityIdentifier("money-log-month-grid")
     }
-    private func dayButton(_ d: MoneyLogDay, scale: Int, height: CGFloat) -> some View {
+    private func dayButton(_ d: MoneyLogDay, scale: Int, height: CGFloat, drawsLimit: Bool) -> some View {
         let future = d.day > (reading?.today ?? d.day)
         let selected = chosen?.day == d.day
         let over = visible && !future && d.within == .missed
@@ -114,7 +128,7 @@ struct MoneyLogView: View {
                     let arch = UnevenRoundedRectangle(topLeadingRadius: proxy.size.width / 2, topTrailingRadius: proxy.size.width / 2)
                     ZStack(alignment: .bottom) {
                         Rectangle().fill(over ? theme.color("due") : theme.color("surplus").opacity(0.62)).frame(height: height * fill)
-                        if visible, let daily = d.dailyMinor {
+                        if visible, drawsLimit, let daily = d.dailyMinor {
                             Rectangle().fill(theme.color("reserveText")).frame(height: 0.7).offset(y: -height * min(1, Double(max(0, daily)) / Double(scale)))
                         }
                         if !future { Text(amount(d.spentMinor)).font(MadarTypography.fine()).foregroundStyle(over ? theme.onAccent : theme.ink).lineLimit(1).minimumScaleFactor(0.85).padding(.bottom, over ? height - 20 : min(height - 15, height * fill + 2)) }
@@ -147,7 +161,12 @@ struct MoneyLogView: View {
         }
         return VStack(alignment: .leading, spacing: 14) {
             DoubleRule().stroke(theme.color("reserveText"), lineWidth: 0.8).frame(height: 3)
-            MadarDateLabel(app.dateLabels(d.day, weekday: true), primaryFont: MadarTypography.cardTitle(), secondaryFont: MadarTypography.caption())
+            let title = MadarDateLabel(app.dateLabels(d.day, weekday: true), primaryFont: MadarTypography.cardTitle(), secondaryFont: MadarTypography.caption())
+            let tally = visible ? weekTally(d.day, reading: r) : nil
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline) { title.fixedSize(); Spacer(minLength: 6); if let tally { Text(tally).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).fixedSize() } }
+                VStack(alignment: .leading, spacing: 4) { title; if let tally { Text(tally).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) } }
+            }.accessibilityElement(children: .combine).accessibilityIdentifier("money-log-week-tally")
             HStack(alignment: .top, spacing: 6) {
                 metric("من يومك", value: amount(d.spentMinor), note: d.dailyMinor.map { "من " + amount($0) } ?? "اليومية غير معروفة", tint: theme.color("surplusText"))
                 metric("خارج يومك", value: amount(d.otherMinor), note: "مظاريف ومستثنى", tint: theme.color("accentText"))
@@ -160,19 +179,33 @@ struct MoneyLogView: View {
                     Button { source = row.detail } label: {
                         VStack(alignment: .leading, spacing: 7) {
                             HStack { Text(row.title).font(MadarTypography.body()).bold(); Spacer(minLength: 2); Text(service.time(row.at)).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
-                            Text(row.budgetLabel).font(MadarTypography.fine()).foregroundStyle(row.confirmed ? theme.color("surplusText") : theme.secondaryInk).padding(.horizontal, 7).padding(.vertical, 3).overlay { Capsule().stroke(theme.line, lineWidth: 1) }
-                            Text(amount(row.amountMinor)).font(.custom("thmanyahserifdisplay-Bold", size: 25, relativeTo: .title2))
+                            HStack(alignment: .center, spacing: 4) {
+                                Text(amount(row.amountMinor)).font(.custom("thmanyahserifdisplay-Bold", size: 25, relativeTo: .title2)).lineLimit(1).minimumScaleFactor(0.7)
+                                Spacer(minLength: 2)
+                                Text(row.budgetLabel).font(MadarTypography.fine()).foregroundStyle(row.confirmed ? theme.color("surplusText") : theme.secondaryInk).lineLimit(1).minimumScaleFactor(0.8).padding(.horizontal, 7).padding(.vertical, 3).overlay { Capsule().stroke(row.confirmed ? theme.color("surplusText") : theme.line, lineWidth: 1) }
+                            }
                             Text(row.payment + "، " + row.category).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
-                        }.padding(12).frame(maxWidth: .infinity, minHeight: 116, alignment: .topLeading).background(theme.surface)
+                        }.padding(12).frame(maxWidth: .infinity, minHeight: 96, alignment: .topLeading).background(theme.surface)
                             .overlay(alignment: .top) { Rectangle().fill(row.confirmed ? theme.color("surplusText") : theme.secondaryInk).frame(height: 3) }.overlay { Rectangle().stroke(theme.line, lineWidth: 1) }
                     }.buttonStyle(.plain).accessibilityIdentifier("money-log-row-" + row.title)
                 }
             }
         }.accessibilityElement(children: .contain).accessibilityIdentifier("money-log-detail")
     }
+    /// «٦ من ٧ أيام ضمن اليومية» for the week that holds the chosen day; pending and future days are not counted.
+    private func weekTally(_ day: GregorianDay, reading r: MoneyLogReading) -> String? {
+        var cal = Calendar(identifier: .gregorian); cal.timeZone = app.activePlace.timeZone
+        let firstWeekday = app.string("core.weekStart") == "sunday" ? 1 : 7
+        let week = day.adding(days: -((cal.component(.weekday, from: day.date(in: cal.timeZone)) - firstWeekday + 7) % 7))
+        let known = r.arcadeDays.filter { $0.day >= week && $0.day < week.adding(days: 7) && $0.day <= r.today && $0.within != nil && $0.within != .pending }
+        guard !known.isEmpty else { return nil }
+        let met = known.filter { $0.within == .met }.count
+        let of = known.count == 1 ? "من يوم واحد" : known.count == 2 ? "من يومين" : "من " + service.digits.string(known.count) + (known.count <= 10 ? " أيام" : " يومًا")
+        return service.digits.string(met) + " " + of + " ضمن اليومية"
+    }
     private func metric(_ title: String, value: String, note: String, tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 6) { Text(title).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk); Text(value).font(.custom("thmanyahserifdisplay-Bold", size: 22, relativeTo: .title3)).foregroundStyle(tint).lineLimit(1).minimumScaleFactor(0.65); Text(note).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
-            .frame(maxWidth: .infinity, minHeight: 90, alignment: .topLeading).padding(9).background(theme.surface).overlay(alignment: .top) { Rectangle().fill(tint).frame(height: 3) }
+            .frame(maxWidth: .infinity, minHeight: 78, alignment: .topLeading).padding(9).background(theme.surface).overlay(alignment: .top) { Rectangle().fill(tint).frame(height: 3) }
     }
     private func monthSummary(_ r: MoneyLogReading) -> some View {
         let known = r.days.filter { $0.day <= r.today && $0.within != nil && $0.within != .pending }
