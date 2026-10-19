@@ -11,22 +11,22 @@ Status values: `ready` · `in progress` · `blocked: <reason>` · `matched — a
 
 Every screen card follows protocol §2: canonical files → default-size screenshots → `python3 Madar/scripts/compare-screens.py <board> <shots>` → fix → `matched — awaiting owner` (default text size only; no enlarged-text testing, owner 13 October 2026). Spec for every prayer card: §7.2 `docs/HANDOFF/sections/09-r-salah.md` (the part for that screen), §5 shapes `05-ds.md`, and the fixes listed.
 
-## Next sessions — order (owner asked 19 Oct: «رتب الشغل القادم كاملا لي وللجلسات الجايه»)
+## Next work — one ordered queue (owner 19 Oct: no split by session; a session goes as far down the list as it can)
 
-Agents take these in order; each step lists its card. Owner items run in parallel and never block the agents.
+Agents take the first unfinished step and continue down the list in the same session. Owner items run in parallel and never block the agents.
 
-**Session 1 — bank messages (M5-E03 follow-on)**
+**Bank messages (M5-E03 follow-on)**
 1. M5-V27 learn salary from the owner's confirmation (one review pass: stored rule).
 2. Port the rest of the owner's My-dream analysis (`src/lib/bankParser.ts`, `bankIntelligence.ts`, `bankParser.regression.test.ts` — local copy `/Users/abdulrahman/Documents/Codex/2026-09-19/new-chat/work/My-dream-implementation/src/lib/`): self-transfer, add funds, per-bank templates; expectations from its tests, rewritten with invented text.
 3. Work `Madar/Private/bank-messages/GUIDE.md` top-down (`swift test --filter BankCorpusTests`): 240 unknown, 322 transfers without counterparty. Special cases stay ≥15/16 (`BankSpecialCaseTests`).
 4. Run the corpus through the app's «رسائل البنك» screen in the simulator (local only) and fix what the screen shows wrong.
 
-**Session 2 — approved v1 additions**
+**Approved v1 additions**
 5. M5-V25 subscriptions shelf in «الالتزامات».
 6. M5-V26 exact salary repayment (optional fields, nil on migration; one review pass).
 7. M6-V24 persist expanded Arabic reader settings (default, reset, undo).
 
-**Session 3 — polish and release preparation (M7)**
+**Polish and release preparation (M7)**
 8. Dark-mode shots of M5-V11/V12/V13; every-screen visual/state trace; «Go deeper and improve» pass on one earlier room.
 9. Final UI review page with fresh shots (owner memory: regenerate when the build is complete).
 
