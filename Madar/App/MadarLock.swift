@@ -310,7 +310,11 @@ struct MadarLockGate<Content: View>: View {
     @Environment(\.roomTheme) private var theme
     @State private var promptedAtStartup = false
     var body: some View {
-        Group {
+        // One container, not a transparent Group: modifiers on the gate (its startup
+        // task and the scene privacy bridge behind it) must keep their identity when
+        // the branch flips between locked and unlocked. A Group hands them to each
+        // branch, so unlocking dismantled the bridge and disconnected this controller.
+        ZStack {
             if !controller.requiresProtection(feature) {
                 // The unprotected shell stays mounted across system prompts and app switching.
                 // Protected child gates still remove their content and the adapter purges its rows.

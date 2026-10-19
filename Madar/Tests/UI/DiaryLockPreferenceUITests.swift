@@ -1,8 +1,11 @@
 import XCTest
+import notify
 
 @MainActor final class DiaryLockPreferenceUITests: XCTestCase {
     func testFreshInstallStartsAtTheSingleAppFaceIDGate() throws {
         continueAfterFailure = false
+        // Unenrolled, the gate stays on its own branded screen instead of the system prompt.
+        setFaceIDEnrolled(false)
         let app = XCUIApplication()
         app.launchEnvironment = [
             "MADAR_UI_STORE_ID": UUID().uuidString,
@@ -43,6 +46,50 @@ import XCTest
         XCTAssertTrue(app.buttons["option-core.faceIDLock-app"].exists)
         XCTAssertFalse(app.buttons["option-core.faceIDLock-notesOnly"].exists)
         capture(app, "UX-01-lock-options-L")
+    }
+    /// Regression: a successful match used to leave «محتوى مدار محمي» on screen for good,
+    /// because unlocking dismantled the scene privacy bridge and disconnected the lock.
+    func testFaceIDMatchOpensMadarAndSurvivesAppSwitch() throws {
+        continueAfterFailure = false
+        setFaceIDEnrolled(true)
+        let app = XCUIApplication()
+        app.launchEnvironment = [
+            "MADAR_UI_STORE_ID": UUID().uuidString,
+            "MADAR_UI_PRESERVE_FACE_ID_DEFAULT": "1",
+            "MADAR_UI_SIZE": "L",
+            "MADAR_UI_THEME": "light"
+        ]
+        app.launch()
+        // While the system prompt is up the scene is inactive, so the privacy cover sits above the gate.
+        let lobby = app.descendants(matching: .any)["foundation-tab"]
+        let gate = app.descendants(matching: .any)["protected-lock-screen"]
+        let cover = app.windows["scene-privacy-cover"].staticTexts["محتوى مدار محمي"]
+        XCTAssertTrue(gate.waitForExistence(timeout: 20) || cover.exists, app.debugDescription)
+        XCTAssertFalse(lobby.exists, "Rooms wait behind the gate until the match")
+        let start = app.buttons["first-run-continue"]
+        // The system prompt appears a moment after launch; repeat the simulated match until it lands.
+        for _ in 0..<15 where !start.exists {
+            notify_post("com.apple.BiometricKit_Sim.pearl.match")
+            _ = start.waitForExistence(timeout: 2)
+        }
+        XCTAssertTrue(start.exists, "A Face ID match must open Madar. \(app.debugDescription)")
+        XCTAssertFalse(cover.exists, "The privacy cover must lift after the match")
+        capture(app, "UX-01-face-id-unlocked-L")
+        if app.buttons["first-run-skip"].exists { app.buttons["first-run-skip"].tap() }
+        if start.exists { start.tap(); if start.exists && start.isHittable { start.tap() } }
+        XCTAssertTrue(lobby.waitForExistence(timeout: 20), app.debugDescription)
+        XCUIDevice.shared.press(.home)
+        app.activate()
+        XCTAssertTrue(lobby.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(cover.waitForExistence(timeout: 2), "Returning to the app must not strand the privacy cover")
+        capture(app, "UX-01-face-id-lobby-L")
+    }
+    private func setFaceIDEnrolled(_ enrolled: Bool) {
+        var token: Int32 = 0
+        notify_register_check("com.apple.BiometricKit.enrollmentChanged", &token)
+        notify_set_state(token, enrolled ? 1 : 0)
+        notify_post("com.apple.BiometricKit.enrollmentChanged")
+        notify_cancel(token)
     }
     private func capture(_ app: XCUIApplication, _ name: String) {
         let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = name; shot.lifetime = .keepAlways; add(shot)
