@@ -90,6 +90,18 @@ import UIKit
         XCTAssertTrue(app.buttons["mihbara-pdf-next"].waitForExistence(timeout: 12), app.debugDescription)
         XCTAssertTrue(app.descendants(matching: .any)["mihbara-pdf-page"].label.replacingOccurrences(of: "\u{2068}", with: "").replacingOccurrences(of: "\u{2069}", with: "").contains("١ من ٢"), app.debugDescription)
         attach(app, "M6-V18-PDF-L")
+        app.buttons["mihbara-pdf-search"].tap()
+        XCTAssertTrue(app.staticTexts["mihbara-pdf-ocr-complete"].waitForExistence(timeout: 45), app.debugDescription)
+        let query = app.textFields["mihbara-pdf-search-query"]
+        query.tap(); query.typeText("المعرفة\n")
+        let result = app.buttons["mihbara-pdf-result-1"]
+        XCTAssertTrue(result.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["نص ضوئي تقريبي"].firstMatch.exists)
+        attach(app, "M6-PDF-OCR-search-L")
+        result.tap()
+        let jumpedLabel = app.descendants(matching: .any)["mihbara-pdf-page"].label
+        XCTAssertTrue(jumpedLabel.replacingOccurrences(of: "\u{2068}", with: "").replacingOccurrences(of: "\u{2069}", with: "").contains("٢ من ٢"), jumpedLabel)
+        app.buttons["mihbara-pdf-previous"].tap()
         app.buttons["mihbara-pdf-next"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["mihbara-pdf-page"].label.replacingOccurrences(of: "\u{2068}", with: "").replacingOccurrences(of: "\u{2069}", with: "").contains("٢ من ٢"), app.debugDescription)
         attach(app, "M6-V18-PDF-s1-L")

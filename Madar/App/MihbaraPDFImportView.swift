@@ -85,7 +85,7 @@ struct MihbaraPDFImportView: View {
                     if let value = inspection {
                         row("نوع الملف", detail: value.scanned ? "PDF مصوّر؛ لا توجد طبقة نص في أي صفحة." : "PDF بطبقة نص في \(digits.string(value.textPages)) من \(digits.string(value.pages)) صفحة.", detected: true)
                         row("اللغة", detail: value.detectedLanguage == "ar" ? "تعرّف النص العربي؛ تُفتح القراءة بالعربية." : value.detectedLanguage == "en" ? "تعرّف النص الإنجليزي؛ تُفتح القراءة بالإنجليزية." : "لا يمكن تحديد اللغة بثقة من هذا الملف؛ اختر لغة القراءة أدناه.", detected: value.detectedLanguage == "ar" || value.detectedLanguage == "en")
-                        row("قراءة النص", detail: value.scanned ? "\(digits.string(value.pages)) صفحة صور؛ لا تعرّف ضوئي ولا نص مُستخرج." : "النص الموجود في الملف محفوظ كما هو؛ لم نستخدم التعرّف الضوئي.", detected: !value.scanned)
+                        row("قراءة النص", detail: value.scanned ? "\(digits.string(value.pages)) صفحة صور؛ يمكنك استخراج نص تقريبي والبحث فيه داخل القارئ على جهازك." : "النص الموجود في الملف محفوظ كما هو؛ صفحات الصور تُقرأ ضوئيًا عند البحث في القارئ.", detected: !value.scanned)
                         row("الفهرس", detail: value.outline.isEmpty ? "بلا فهرس إلكتروني قابل للتنقّل؛ لم نخمن فصول الكتاب." : "اكتُشف \(digits.string(value.outline.count)) عنوانًا في فهرس PDF.", detected: !value.outline.isEmpty)
                         row("أرقام الصفحات", detail: value.hasPageLabels ? "توجد تسميات صفحات؛ مطابقتها للمطبوع غير متحققة." : "\(digits.string(value.pages)) صفحة في الملف؛ بلا تسميات صفحات مطبوعة مكتشفة.", detected: value.hasPageLabels)
                         row("الحواشي", detail: "لم تُكتشف بنية حواشٍ منفصلة؛ تبقى كما وردت في الصفحة.", detected: false)
