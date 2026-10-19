@@ -153,17 +153,39 @@ import XCTest
     func testNativeMinimizedBarAndVisibleTabsSwitchOnce() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
-        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": "empty", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
+        app.launchEnvironment = [
+            "MADAR_UI_STORE_ID": UUID().uuidString,
+            "MADAR_UI_DIARY_FIXTURE": "empty",
+            "MADAR_UI_TRAVEL_FIX": "24.7136,46.6753,الرياض,SA,Asia/Riyadh",
+            "MADAR_UI_SIZE": "L",
+            "MADAR_UI_THEME": "light"
+        ]
         app.launch()
-        XCTAssertTrue(app.buttons["diary-write"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["diary-write"].waitForExistence(timeout: 20), app.debugDescription)
+        app.tabBars.buttons["البهو"].tap()
+        XCTAssertTrue(app.staticTexts["bahw-greeting"].waitForExistence(timeout: 10))
+        capture(app, "UX-10-glass-shortcuts-expanded-L")
+        let nextPrayer = app.descendants(matching: .any).matching(identifier: "tab-accessory-next-prayer").firstMatch
+        XCTAssertTrue(nextPrayer.waitForExistence(timeout: 5), "Expanded accessory should show the next prayer.\n\(app.debugDescription)")
+        for room in ["notes", "money", "mihbara"] {
+            let shortcut = app.buttons["tab-\(room)"]
+            XCTAssertTrue(shortcut.waitForExistence(timeout: 5), "Missing expanded room shortcut: \(room)\n\(app.debugDescription)")
+            XCTAssertTrue(shortcut.isHittable, "Expanded room shortcut is not tappable: \(room)")
+            XCTAssertGreaterThanOrEqual(shortcut.frame.width, 44, "Expanded room target is too narrow: \(room)")
+            XCTAssertGreaterThanOrEqual(shortcut.frame.height, 44, "Expanded room target is too short: \(room)")
+        }
+        app.buttons["tab-notes"].tap()
+        XCTAssertTrue(app.staticTexts["diary-home-title"].waitForExistence(timeout: 10))
         app.tabBars.buttons["البهو"].tap()
         XCTAssertTrue(app.staticTexts["bahw-greeting"].waitForExistence(timeout: 10))
         app.swipeUp(velocity: .slow)
-        capture(app, "UX-10-inline-all-rooms-L")
+        capture(app, "UX-10-glass-shortcuts-inline-L")
         for room in ["prayer", "quran", "customize", "notes", "money", "mihbara"] {
             let shortcut = app.buttons["tab-\(room)"]
-            XCTAssertTrue(shortcut.waitForExistence(timeout: 5), "Missing minimized glass shortcut: \(room)\n\(app.debugDescription)")
-            XCTAssertTrue(shortcut.isHittable, "Minimized glass shortcut is not tappable: \(room)")
+            XCTAssertTrue(shortcut.waitForExistence(timeout: 5), "Missing one-tap room shortcut: \(room)\n\(app.debugDescription)")
+            XCTAssertTrue(shortcut.isHittable, "Room shortcut is not tappable: \(room)")
+            XCTAssertGreaterThanOrEqual(shortcut.frame.width, 44, "Room target is too narrow: \(room)")
+            XCTAssertGreaterThanOrEqual(shortcut.frame.height, 44, "Room target is too short: \(room)")
         }
         for (room, destination) in [
             ("quran", "quran-coverage-title"),
@@ -175,11 +197,9 @@ import XCTest
             ("foundation", "bahw-block-salah")
         ] {
             let shortcut = app.buttons["tab-\(room)"]
-            XCTAssertTrue(shortcut.waitForExistence(timeout: 5), "Missing minimized glass shortcut: \(room)\n\(app.debugDescription)")
-            XCTAssertTrue(shortcut.isHittable, "Minimized glass shortcut is not tappable: \(room)")
+            XCTAssertTrue(shortcut.waitForExistence(timeout: 5), "Missing one-tap room shortcut: \(room)")
             shortcut.tap()
             XCTAssertTrue(app.descendants(matching: .any).matching(identifier: destination).firstMatch.waitForExistence(timeout: 10), room + app.debugDescription)
-            if room == "quran" { capture(app, "UX-10-single-tap-quran-L") }
         }
     }
     private func finishOnboarding(_ app: XCUIApplication) {
