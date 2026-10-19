@@ -10,6 +10,8 @@ public struct TurathCatalogueBook: Sendable, Identifiable, Hashable {
     public let pageCount: Int
     public let sizeBytes: Int
     public var link: URL { URL(string: "https://app.turath.io/book/\(id)")! }
+    /// The shared Shamela catalogue id opens the corresponding public book page.
+    public var shamelaLink: URL { URL(string: "https://shamela.ws/book/\(id)")! }
 }
 
 public enum TurathCatalogue {
@@ -79,6 +81,7 @@ public struct TurathBookDocument: Sendable, Equatable {
     public let headings: [Heading]
     public let pages: [Page]
     public let stamp: Int?
+    public var shamelaLink: URL { URL(string: "https://shamela.ws/book/\(id)")! }
 
     public static func decode(_ data: Data, catalogue book: TurathCatalogueBook) throws -> TurathBookDocument {
         guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -119,7 +122,7 @@ public enum TurathEPUB {
         var pageList = "", titleIDs: [Int: String] = [:]
         // The info page carries edition, editor and publisher with the source, ahead of the text.
         let infoBody = book.info.split(separator: "\n").map { "<p>\(escape(String($0)))</p>" }.joined()
-        files.append(("OEBPS/info.xhtml", xhtml(title: "بيانات الكتاب", body: "<section class=\"madar-turath-info\"><h1>\(escape(book.title))</h1>\(infoBody)<p class=\"madar-source\">المصدر: تراث · <a href=\"https://app.turath.io/book/\(book.id)\">app.turath.io/book/\(book.id)</a></p></section>")))
+        files.append(("OEBPS/info.xhtml", xhtml(title: "بيانات الكتاب", body: "<section class=\"madar-turath-info\"><h1>\(escape(book.title))</h1>\(infoBody)<p class=\"madar-source\">المصدر: تراث · <a href=\"https://app.turath.io/book/\(book.id)\">app.turath.io/book/\(book.id)</a></p><p class=\"madar-source\"><a href=\"\(book.shamelaLink.absoluteString)\">افتح هذا الكتاب في موقع المكتبة الشاملة</a></p></section>")))
         for (n, range) in chunks.enumerated() {
             var body = ""
             for index in range {

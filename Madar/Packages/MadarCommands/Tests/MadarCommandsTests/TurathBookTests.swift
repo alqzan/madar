@@ -27,6 +27,7 @@ struct TurathBookTests {
         #expect(books.count == 3)
         let jawzi = try #require(books.first { $0.id == 12028 })
         #expect(jawzi.author == "ابن الجوزي"); #expect(jawzi.authorDeath == 597); #expect(jawzi.category == "الرقاق والآداب"); #expect(jawzi.pageCount == 893)
+        #expect(jawzi.shamelaLink.absoluteString == "https://shamela.ws/book/12028")
         #expect(books.first { $0.id == 1 }?.authorDeath == nil)   // 99999 is Turath's "living / unknown"
         #expect(TurathCatalogue.search(books, query: "صَيْدُ الخاطِر").map(\.id) == [12028])
         #expect(TurathCatalogue.search(books, query: "صيد").map(\.id) == [12028, 2])

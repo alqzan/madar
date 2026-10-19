@@ -235,6 +235,13 @@ import UIKit
         XCTAssertTrue(app.buttons["mihbara-reader-close"].waitForExistence(timeout: 15), app.debugDescription)
         sleep(2)
         attach(app, "M6-T01-turath-reader-L")
+        app.buttons["mihbara-reader-contents"].tap()
+        let bookInfo = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "بيانات الكتاب")).firstMatch
+        XCTAssertTrue(bookInfo.waitForExistence(timeout: 8), app.debugDescription)
+        bookInfo.tap()
+        let shamelaPage = app.links.matching(NSPredicate(format: "label CONTAINS %@", "موقع المكتبة الشاملة")).firstMatch
+        XCTAssertTrue(shamelaPage.waitForExistence(timeout: 10), app.debugDescription)
+        attach(app, "M6-T01-turath-shamela-L")
     }
 
     private func attach(_ app: XCUIApplication, _ name: String) {
