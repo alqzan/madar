@@ -343,20 +343,26 @@ def scan_source(text, path, definitions):
         spot = f'{path}:{number}'
         decoded = re.sub(r'\\u\{([0-9a-fA-F]+)\}', lambda m: chr(int(m[1], 16)), line)
         if DIGIT_DOT.search(decoded): failures.append(f'{spot}: numeric middle dot')
+        numeric_formatter = r'(?:formatter\.string|digits\.string|session\.digits|app\.digits|arabicNumber|digits)'
+        numeric_interpolation = r'\\\(' + numeric_formatter + r'\([^"\n]*?\)\)'
+        if re.search(numeric_interpolation + r'\s*·|·\s*' + numeric_interpolation, decoded):
+            failures.append(f'{spot}: formatted number beside middle dot; use MadarInlineText or a comma')
         if re.search(r'\\\((?:arabicNumber|digits|session\.digits)\([^\n]*?سجلًّا', line):
             failures.append(f'{spot}: RU3 hand-built record count phrase requires catalog plurals')
         if re.search(r'\b(?:Color|UIColor|CGColor)\s*\(\s*(?:red:|white:|displayP3Red:|#["\w])', line):
             failures.append(f'{spot}: handwritten colour constructor')
         if re.search(r'\bColor\(\.sRGB,\s*red:|\.(?:foregroundStyle|foregroundColor|background|tint)\(\.(?:red|green|blue|white|black|yellow|orange|pink|purple|gray)\b', line):
             failures.append(f'{spot}: handwritten colour value')
+        if re.search(r'\b(?:Color|UIColor)\(\s*\.(?:systemRed|systemGreen|systemBlue|systemYellow|systemOrange|systemPink|systemPurple|systemTeal|systemIndigo|systemMint|systemBrown|systemCyan)\b', line):
+            failures.append(f'{spot}: system hue bypasses room tokens')
         for match in re.finditer(r'\b(?:Font\.)?(?:system|custom)\([^\n]*?size:\s*(\d+(?:\.\d+)?)', line):
             # SF Symbols are drawings, not sub-11 pt text. Keep the text rule intact.
             symbol_font = re.search(r'Image\([^)]*\)\.font\(\.$', line[:match.start()])
             if float(match[1]) < 11 and not symbol_font: failures.append(f'{spot}: explicit font size below 11')
-        for match in re.finditer(r'\b(?:session\.)?(string|bool|number)\("([\w.]+)"\)', line):
+        for match in re.finditer(r'\b(?:(?:session|app)\.)?(string|bool|number)\(\s*"([\w.]+)"\)', line):
             kind, key = match.groups()
-            # Only session or unqualified AppSession convenience functions are setting reads.
-            if 'session.' not in match[0] and not path.endswith('/AppSession.swift'): continue
+            # Only app/session or unqualified AppSession convenience reads are settings.
+            if not re.match(r'(?:session|app)\.', match[0]) and not path.endswith('/AppSession.swift'): continue
             keys.add(key)
             if key not in definitions: failures.append(f'{spot}: unknown setting {key}')
             elif (definitions[key]['type'] not in {'string': {'choice', 'string', 'time'}, 'bool': {'bool'}, 'number': {'int', 'money'}}[kind]
@@ -371,7 +377,7 @@ def scan_source(text, path, definitions):
             if name in definitions: keys.add(name)
             elif name.split('.')[0] in {'core','salah','quran','notes','mal','mihbara','bahw','notif','tabbar'}:
                 failures.append(f'{spot}: unknown literal setting key {name}')
-        for write in re.finditer(r'\bsession\.set\(\.(bool|number|string|object|array)\([^\n]*?\),\s*key:\s*"([\w.]+)"', line):
+        for write in re.finditer(r'\b(?:session|app)\.set\(\.(bool|number|string|object|array)\([^\n]*?\),\s*key:\s*"([\w.]+)"', line):
             kind, key = write.groups()
             if key in definitions:
                 expected = {'bool':'bool','int':'number','money':'number','string':'string','time':'string',
@@ -385,13 +391,16 @@ def scan_source(text, path, definitions):
         if '\\(' in line or re.search(r'String\(format:|\.formatted\(|Text\([^\n]*format:', line): kinds.append('dynamic-format')
         if '\\(' in line and re.search(r'(?:count|Count|digits\(|arabicNumber\()', line) and re.search(r'[\u0600-\u06ff]', line):
             kinds.append('count-phrase-candidate')
-        dynamic_setting = re.search(r'\bsession\.(?:string|bool|number)\((?!")|\b(?:key):\s*(?!")\w|\b(?:session\.)?values\[(?!")', line)
-        if dynamic_setting or (path.endswith('/SettingsStore.swift') and re.search(r'for:\s*\w', line)):
+        # A variable named `key`, a model's natural key and `values[0]` are
+        # unrelated to settings. Only actual AppSession accesses belong here.
+        dynamic_setting = re.search(r'\b(?:session|app)\.(?:string|bool|number)\((?!\s*")|\b(?:session|app)\.values\[(?!\s*")', line)
+        dynamic_write = re.search(r'\b(?:session|app)\.set\(.*\bkey:(?!\s*")\s*\w', line)
+        if dynamic_setting or dynamic_write or (path.endswith('/SettingsStore.swift') and re.search(r'for:\s*\w', line)):
             kinds.append('computed-setting-or-key-access')
         if re.search(r'\b(?:Text|Label|Button|NavigationLink|Toggle|Stepper|ShareLink|TextField|SecureField)\s*\(|\.foregroundStyle\(|\.background\(|\.font\(', line): kinds.append('UI-colour-text-action')
         if '·' in decoded and ('\\(' in decoded or '%' in decoded): kinds.append('dynamic-middle-dot')
         if re.search(r'\b(?:Color|UIColor|CGColor)\s*\(', line): kinds.append('colour-construction')
-        if '"""' in line or re.search(r'#+"', line): kinds.append('raw-or-multiline-string')
+        if '"""' in line or re.search(r'(?<!["\w])#+"', line): kinds.append('raw-or-multiline-string')
         if kinds: inventory.append(dict(location=spot, kinds=kinds, source=line.strip(), status='manual-trace-required'))
     return failures, inventory, sorted(keys)
 

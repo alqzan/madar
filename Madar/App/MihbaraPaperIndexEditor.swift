@@ -389,7 +389,7 @@ struct MihbaraPaperIndexEditor: View {
         chapters = parsed.map { .init(id: $0.id, title: $0.title, page: $0.page.map(digits.string) ?? "", source: .estimated) }
         firstPage = chapters.first?.page ?? ""
         hasReadIndexPage = true
-        status = "وجدنا \(digits.string(parsed.count)) فصول. راجع كل عنوان وصفحة قبل الحفظ؛ تبقى الأرقام تقديرية حتى تثبّتها."
+        status = "الفصول المكتشفة: \(digits.string(parsed.count)). راجع كل عنوان وصفحة قبل الحفظ؛ تبقى الأرقام تقديرية حتى تثبّتها."
     }
 
     private func loadUITestDraftIfRequested() {

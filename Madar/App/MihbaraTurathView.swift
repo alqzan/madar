@@ -161,7 +161,7 @@ struct MihbaraTurathView: View {
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: "books.vertical").font(.title3).foregroundStyle(theme.color("sunnah")).frame(width: 26)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("\(digits.string(books.count)) كتابًا من المكتبة الشاملة").font(MadarTypography.section())
+                    Text("كتب المكتبة الشاملة: \(digits.string(books.count))").font(MadarTypography.section())
                     Text("البحث والتنزيل عبر الإنترنت من تراث، ثم يُقرأ الكتاب على جهازك بلا إنترنت بترقيم المطبوع وفهرسه.")
                         .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
                 }
@@ -181,7 +181,7 @@ struct MihbaraTurathView: View {
                         Text(book.authorDeath.map { "\(book.author)، ت \(digits.string($0))هـ" } ?? book.author)
                             .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                     }
-                    Text([book.category, book.pageCount > 0 ? "\(digits.string(book.pageCount)) صفحة" : "", size(book.sizeBytes)].filter { !$0.isEmpty }.joined(separator: "، "))
+                    Text([book.category, book.pageCount > 0 ? "الصفحات: \(digits.string(book.pageCount))" : "", size(book.sizeBytes)].filter { !$0.isEmpty }.joined(separator: "، "))
                         .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                 }
                 Spacer(minLength: 0)

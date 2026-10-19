@@ -207,7 +207,7 @@ struct DiaryDayView: View {
                 }
                 if line.kind == "late" { Text("كُتبت لاحقًا").font(DiaryType.label) }
                 if line.kind == "margin" {
-                    Text("هامش · " + (page.marginDays[line.id].map { service.bothDates($0) } ?? "تاريخ الكتابة غير متاح")).font(DiaryType.label)
+                    Text(MadarInlineText.joined(["هامش", page.marginDays[line.id].map { service.bothDates($0) } ?? "تاريخ الكتابة غير متاح"])).font(DiaryType.label)
                 }
                 if auto { Text(line.kind == "salah" ? "الصلاة" : line.kind == "quran" ? "القرآن" : "المحبرة").font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)) }
             }.foregroundStyle(line.kind == "margin" ? secondInk : line.kind == "late" ? theme.color("late") : auto ? theme.color("autoInkText") : theme.ink)

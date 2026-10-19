@@ -270,7 +270,7 @@ extension AppQuranService {
             let isBridge = coach.bridgePending
             if isBridge, let id = coach.bridgeAyahs.last, let bridge = catalog.ayah(id: id) { state.page = try await page(bridge.page) }
             state.title = isBridge ? "الجسر" : "الحفظ الجديد · الورد"
-            state.segmentTitle = portionTitle(try QuranAyahRange(first: ids.min()!, last: ids.max()!), catalog: catalog) + " · " + (QuranLearningMethod(rawValue: value.method)?.title ?? "المدرّب الموجّه")
+            state.segmentTitle = MadarInlineText.joined([portionTitle(try QuranAyahRange(first: ids.min()!, last: ids.max()!), catalog: catalog), QuranLearningMethod(rawValue: value.method)?.title ?? "المدرّب الموجّه"])
             let stageTitle: String = switch draft.coachStage { case .repetition: "التكرار"; case .lineStarts: "أوائل الأسطر"; case .promptedRecall: "استرجاع بالتلقين"; case .blindRecitation: "تسميع مستور"; case .rating: "تقييمك" }
             var caption: String = switch draft.coachStage {
             case .repetition: "كرّر الآية " + ayahNumber + " وهي أمامك"

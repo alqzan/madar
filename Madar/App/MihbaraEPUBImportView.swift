@@ -96,7 +96,7 @@ struct MihbaraEPUBImportView: View {
                         row("نوع الملف", detail: "EPUB \(value.version)؛ اجتاز فحص بنية الملف والحدود الأمنية.", detected: true)
                         row("اللغة", detail: value.appLanguage == "en" ? "\(languageLabel)؛ يفتح وضع القراءة الإنجليزية." : value.appLanguage == "ar" ? "\(languageLabel)؛ يفتح وضع القراءة العربية." : "اللغة في البيانات: \(languageLabel). اختر وضع القراءة أدناه.", detected: value.languageCode != nil)
                         row("البيانات", detail: value.author.isEmpty ? "العنوان من الملف؛ لم يُسجل مؤلف." : "العنوان والمؤلف من بيانات الملف.", detected: !value.author.isEmpty)
-                        row("الفهرس", detail: value.outline.isEmpty ? "بلا فهرس إلكتروني قابل للتنقّل؛ لم نخمن فصول الكتاب." : "فهرس الملف: \(digits.string(value.outline.count)) عنوانًا.", detected: !value.outline.isEmpty)
+                        row("الفهرس", detail: value.outline.isEmpty ? "بلا فهرس إلكتروني قابل للتنقّل؛ لم نخمن فصول الكتاب." : "عناوين فهرس الملف: \(digits.string(value.outline.count)).", detected: !value.outline.isEmpty)
                         let pageList = value.hasPageList ? "توجد قائمة صفحات للمصدر المطبوع" : "لا توجد قائمة صفحات مطبوعة"
                         let notes = value.hasFootnotes == true ? "اكتُشفت حواشٍ" : value.hasFootnotes == false ? "لم تُكتشف حواشٍ" : "تعذّر حسم وجود الحواشي"
                         row("الصور والجداول", detail: "تبقى ضمن الملف كما حفظها · \(pageList) · \(notes).", detected: true)
@@ -149,7 +149,7 @@ struct MihbaraEPUBImportView: View {
                     HStack {
                         Text("الفهرس المستخرج").font(MadarTypography.section())
                         Spacer()
-                        Text("\(digits.string(value.outline.count)) عناوين").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                        Text("عناوين الفهرس: \(digits.string(value.outline.count))").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                     }
                     if value.outline.isEmpty {
                         Text("لا يوجد فهرس إلكتروني في هذا الملف.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)

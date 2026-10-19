@@ -228,7 +228,7 @@ struct PrayerTodayView: View {
     private func nextLine(_ next: PrayerOccurrence, now: Date) -> String {
         let time = clock(next.time, timeZone: next.place.timeZone)
         guard next.time > now else { return time }
-        return time + " · " + PrayerCopy.after(seconds: next.time.timeIntervalSince(now), digits: digits)
+        return MadarInlineText.joined([time, PrayerCopy.after(seconds: next.time.timeIntervalSince(now), digits: digits)])
     }
 
     private var verseDivider: some View {
@@ -515,7 +515,7 @@ struct PrayerTodayView: View {
     private func travelPillText(_ snapshot: PrayerSnapshot) -> String? {
         if let trip = snapshot.activeTrip {
             if let fix = locator.fix, !TravelRule.isAway(home: session.activePlace, current: fix.place, thresholdKm: travelThresholdKm) { return "عدتَ إلى مدينتك؟" }
-            return session.bool("salah.travelShortenCombine") ? "مسافر · \(trip.city) · قصرٌ وجمع" : "مسافر · \(trip.city)"
+        return MadarInlineText.joined(["مسافر", trip.city] + (session.bool("salah.travelShortenCombine") ? ["قصرٌ وجمع"] : []))
         }
         return travelDetects && awayFix() != nil ? "خارج مدينتك" : nil
     }
@@ -1721,7 +1721,7 @@ private struct PrayerStatisticsView: View {
                         VStack(spacing: 4) {
                             Text(mizan.due == 0 ? "—" : formatter.percent(Int((Double(mizan.onTime) / Double(mizan.due) * 100).rounded())))
                                 .font(serif(46))
-                            Text("أوفيت \(formatter.string(mizan.onTime)) · معلّقة \(formatter.string(mizan.pending))")
+                            Text("أوفيت \(formatter.string(mizan.onTime))، معلّقة \(formatter.string(mizan.pending))")
                                 .font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
                         }.offset(y: 12)
                     }

@@ -44,7 +44,7 @@ struct DiaryMarginView: View {
                     if originals.isEmpty { Text("ذكرى حفظتها بالصورة.").font(DiaryType.writing).padding(.vertical, 24) }
                     ForEach(replies) { line in
                         VStack(alignment: .leading, spacing: 7) {
-                            Text("في هامشها · " + (page.marginDays[line.id].map { service.bothDates($0) } ?? "تاريخ الكتابة غير متاح")).font(DiaryType.label)
+                            Text(MadarInlineText.joined(["في هامشها", page.marginDays[line.id].map { service.bothDates($0) } ?? "تاريخ الكتابة غير متاح"])).font(DiaryType.label)
                             Text(line.text).font(DiaryType.writing).italic().lineSpacing(11)
                         }.foregroundStyle(ink).padding(14).frame(maxWidth: .infinity, alignment: .leading)
                             .overlay(alignment: .leading) { Rectangle().fill(ink).frame(width: 2) }

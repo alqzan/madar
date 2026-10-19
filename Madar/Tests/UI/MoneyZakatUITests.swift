@@ -24,6 +24,19 @@ import XCTest
         let hidden=open("zakatHidden");XCTAssertEqual(hidden.staticTexts["money-zakat-result"].label,"•••");shot(hidden,"M5-V22-hidden-L");hidden.buttons["money-zakat-reveal"].tap();XCTAssertTrue(hidden.staticTexts["money-zakat-result"].label.contains("٣٬٢١٢"))
     }
 
+    func testSourcesExplainTheChosenCalculationWithoutSelectingADebtRuling(){
+        continueAfterFailure=false
+        let app=open("zakat"),before=app.staticTexts["money-zakat-result"].label
+        let sources=app.buttons["money-zakat-sources"]
+        for _ in 0..<10 where !sources.isHittable { app.swipeUp(velocity:.slow) }
+        XCTAssertTrue(sources.waitForExistence(timeout:5));sources.tap()
+        let explanation=app.staticTexts.containing(NSPredicate(format:"label CONTAINS %@","أثر الديون محل خلاف")).firstMatch
+        XCTAssertTrue(explanation.waitForExistence(timeout:5))
+        shot(app,"M5-V22-sources-L")
+        for _ in 0..<10 where !app.staticTexts["money-zakat-result"].isHittable { app.swipeDown(velocity:.slow) }
+        XCTAssertEqual(app.staticTexts["money-zakat-result"].label,before)
+    }
+
     func testAnnualReminderStartsOffSavesAndUndoRestoresOff(){
         continueAfterFailure=false
         let app=open("zakat")

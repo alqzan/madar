@@ -90,10 +90,10 @@ struct MihbaraMotivationCue: Identifiable {
                 let text = note.text.trimmingCharacters(in: .whitespacesAndNewlines)
                 let clipped = text.count <= 220 ? text : String(text.prefix(219)).trimmingCharacters(in: .whitespacesAndNewlines) + "…"
                 let position = note.page.map { "صفحة " + digits.string($0) } ?? "من دفتر كتابك"
-                let attribution = [book.title, book.author].filter { !$0.isEmpty }.joined(separator: " · ")
+            let attribution = MadarInlineText.joined([book.title, book.author])
                 cues.append(.init(
                     id: "note-\(note.id.uuidString)", title: "من هامشك", message: clipped,
-                    source: attribution + " · " + position, actionTitle: "افتح الكتاب", bookID: book.id
+                source: MadarInlineText.joined([attribution, position]), actionTitle: "افتح الكتاب", bookID: book.id
                 ))
             }
 
@@ -113,7 +113,7 @@ struct MihbaraMotivationCue: Identifiable {
             cues.append(.init(
                 id: "step-\(book.id.uuidString)", title: "خطوة صغيرة تكفي",
                 message: digits.string(stepPages) + " صفحات فقط",
-                source: "قرابة " + digits.string(minutes) + " دقائق · من موضعك المحفوظ",
+                source: "وقت تقريبي: " + PrayerCopy.minutes(minutes, digits: digits) + "، من موضعك المحفوظ",
                 actionTitle: book.isReadableEPUB || book.isReadablePDF ? "ابدأ القراءة" : "افتح موضعك", bookID: book.id
             ))
         }

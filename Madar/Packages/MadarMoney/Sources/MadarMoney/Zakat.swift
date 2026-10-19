@@ -3,7 +3,8 @@ import Foundation
 /// F11 as amended by RM7: Madar computes and does not give rulings. Every result is approximate («لو حال الحول اليوم»),
 /// the gold price is per gram of 24K and entered by hand, and the debt choice is the user's, written under the number.
 /// RM7 also makes the nisab basis an explicit choice (gold 24K or silver) and defines a debt option that includes the
-/// loan. Screen copy and options still pass the owner's specialist review before release (F11).
+/// loan. Owner 19 Oct delegates the F11 wording/source check to the agent; the
+/// screen explains the calculation and links the differing published rulings.
 public enum ZakatDebtsPolicy: String, Sendable { case unset, none, dueNow, allOwed, allOwedAndLoan }
 public enum NisabBasis: String, Sendable { case gold, silver }
 

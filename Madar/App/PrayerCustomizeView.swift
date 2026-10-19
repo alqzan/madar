@@ -92,7 +92,7 @@ struct PrayerCustomizeView: View {
         case "riwaq": return session.bool("salah.showMosqueStreak") ? "سلسلة الجماعة ظاهرة" : "سلسلة الجماعة مخفية"
         case "log": return session.bool("salah.askHeart") ? "اسألني عن القلب" : "بلا سؤال القلب"
         case "times": return label("salah.method") + " · " + label("salah.asr")
-        default: return session.bool("salah.askReminder") ? "بعد الأذان بـ \(session.digits(Int(session.number("salah.askAfterAdhanMin")))) دقيقة" : "بلا تذكير"
+        default: return session.bool("salah.askReminder") ? "بعد الأذان بـ " + PrayerCopy.minutes(Int(session.number("salah.askAfterAdhanMin")), digits: .init(style: session.string("core.numerals") == "western" ? .western : .hindi)) : "بلا تذكير"
         }
     }
     private var changedCount: Int {
@@ -144,7 +144,7 @@ struct PrayerCustomizeView: View {
             HStack(alignment: .top, spacing: 18) {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(spacing: 6) {
-                        Circle().fill(Color(.systemGreen)).frame(width: 8, height: 8)
+                        Circle().fill(theme.accent).frame(width: 8, height: 8)
                         Text("معاينة حيّة").font(PrayerHomeType.smallBold).foregroundStyle(theme.color("accentText"))
                     }
                     Text("الصلاة كما ستظهر").font(serif(26))
@@ -256,7 +256,7 @@ struct PrayerCustomizeView: View {
                 arrow("chevron.up", id: "prayer-block-up-" + key, label: "قدّم " + PrayerHomeLayout.title(key), disabled: index == 0) { session.set(layout.moved(key, by: -1).payload, key: "salah.layout") }
                 arrow("chevron.down", id: "prayer-block-down-" + key, label: "أخّر " + PrayerHomeLayout.title(key), disabled: index == nil || index == layout.order.count - 1) { session.set(layout.moved(key, by: 1).payload, key: "salah.layout") }
                 Toggle(PrayerHomeLayout.title(key), isOn: Binding(get: { !layout.hidden.contains(key) }, set: { _ in session.set(layout.toggled(key).payload, key: "salah.layout") }))
-                    .labelsHidden().tint(Color(.systemGreen)).accessibilityIdentifier("prayer-block-" + key)
+                    .labelsHidden().tint(theme.accent).accessibilityIdentifier("prayer-block-" + key)
             }
         }
         .padding(.vertical, 10).frame(minHeight: 60)

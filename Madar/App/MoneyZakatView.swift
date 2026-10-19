@@ -79,12 +79,31 @@ struct MoneyZakatView: View {
                         Text("المظاريف والاحتياطي أجزاء من أرصدة الحسابات؛ لا تُضاف مرة ثانية.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                     }
                     Text("حساب تقريبي بلا ترجيح. التاريخ الذي تختاره لا يُثبت أن المال بقي فوق النصاب طوال الحول.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                    zakatSources
                 } else { Text(failure ?? "جارٍ قراءة الحساب…").font(MadarTypography.body()) }
             }.padding(.horizontal, 18).padding(.bottom, 24).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.plain).environment(\.roomTheme, theme).toolbar(.hidden, for: .navigationBar, .tabBar)
             .task { load(); entered = true }.onChange(of: app.prayerRevision) { load() }.onChange(of: scenePhase) { if scenePhase != .active { revealed = false } }
             .sheet(isPresented: $editor, onDismiss: load) { if let r = reading { MoneyZakatEditor(app: app, reading: r, basis: basis, chosen: basisChosen, debt: debt, visible: visible) } }
             .accessibilityIdentifier("money-zakat")
+    }
+    private var zakatSources: some View {
+        DisclosureGroup {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("يقارن مدار المال بنصاب ٨٥ غرامًا من الذهب الخالص أو ٥٩٥ غرامًا من الفضة الخالصة، بسعر الغرام الذي تدخله. المقدار المعروض ربع العشر، ٢٫٥٪، على أساس الحول الهجري.")
+                Text("أثر الديون محل خلاف. عدم الخصم وخصم الدين الحال قولان مذكوران في المصادر أدناه. أما خصم جميع الديون، بما فيها القرض المؤجل، فهو سيناريو حسابي تختاره؛ لا يعني أن كل دين يجوز خصمه في حالتك. لا يختار مدار حكمًا عنك.")
+                Text("خيار «المستحق الآن» يقتصر على الكشوف والأقساط التي حلّت ولم تُدفع، وخيار «كل عليك» يشمل ديون الائتمان والتقسيط، ويضيف خيار القرض باقي القرض مرة واحدة. الأموال الأخرى يحدد المستخدم ما يدخل منها في حسابه.")
+                Link("الخثلان: نصاب الذهب والفضة وربع العشر", destination: URL(string: "https://saadalkhathlan.com/scientific-series/lessons/43566")!)
+                Link("ابن باز: الزكاة مع وجود الدين", destination: URL(string: "https://binbaz.org.sa/fatwas/1481/حكم-الزكاة-مع-وجود-الدين")!)
+                Link("الخثلان: خصم الدين الحال", destination: URL(string: "https://saadalkhathlan.com/radio-programs/lessons/47070")!)
+            }
+            .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+            .padding(.top, 10)
+        } label: {
+            Text("أساس الحساب ومصادره").font(MadarTypography.section()).frame(minHeight: 44)
+        }
+        .tint(theme.ink)
+        .accessibilityIdentifier("money-zakat-sources")
     }
     private var zakatReminder: some View {
         let saved = app.string("mal.zakatReminder")

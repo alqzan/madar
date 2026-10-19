@@ -20,6 +20,38 @@ def tokens():
 
 
 class ShippingCheckTests(unittest.TestCase):
+    def test_numeric_interpolation_beside_dot_fails_while_word_boundary_remains_allowed(self):
+        source = r'''Text("أوفيت \(formatter.string(count)) · معلقة")
+Text("المصدر · \(digits.string(page))")
+Text("\(digits.string(count)) اليوم · بقيت صلاة")'''
+        issues, _, _ = checks.scan_source(source, 'Madar/App/Test.swift', {})
+        self.assertEqual(len(issues), 2)
+        self.assertTrue(all('formatted number beside middle dot' in issue for issue in issues))
+
+    def test_system_hue_is_not_a_room_token_but_native_system_surface_is_inventoried(self):
+        issues, manual, _ = checks.scan_source('Circle().fill(Color(.systemGreen))\n.background(Color(uiColor: .systemBackground))', 'Madar/App/Test.swift', {})
+        self.assertEqual(len(issues), 1)
+        self.assertIn('system hue bypasses room tokens', issues[0])
+        self.assertEqual(len(manual), 2)
+
+    def test_app_receiver_is_checked_like_session_and_plain_keys_are_not_settings(self):
+        definitions = {'core.lock': {'type': 'bool', 'default': False}}
+        source = '''app.string("core.lock")
+app.bool("core.unknown")
+app.set(.string("bad"), key: "core.lock")
+app.bool(definition.key)
+app.set(.bool(true), key: definition.key)
+func label(_ key: String) -> String { key }
+let day = values[0]
+let hashtag = "#" + tag
+'''
+        issues, manual, _ = checks.scan_source(source, 'Madar/App/Test.swift', definitions)
+        for phrase in ['string read', 'unknown setting', 'string write']:
+            self.assertTrue(any(phrase in issue for issue in issues), phrase)
+        computed = [r['location'] for r in manual if 'computed-setting-or-key-access' in r['kinds']]
+        self.assertEqual(computed, ['Madar/App/Test.swift:4', 'Madar/App/Test.swift:5'])
+        self.assertFalse(any('raw-or-multiline-string' in r['kinds'] for r in manual))
+
     def test_complete_mode_rejects_manual_trace_even_with_no_static_findings(self):
         result = {'sources':[], 'catalogs':[], 'tokenPairsMeasured':[], 'findings':[], 'manualTrace':[{'status':'manual-trace-required'}]}
         with patch.object(checks, 'run', return_value=result), patch('sys.argv', ['checker','--require-complete']), patch('builtins.print'):

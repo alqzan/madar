@@ -174,7 +174,7 @@ struct DiaryHomeView: View {
                     Text(service.weekday(page.day)).font(DiaryType.label)
                 }
                 Text(service.dateTitle(page.day, calendar: FirstCalendar(rawValue: app.string("core.firstCalendar")) ?? .hijri)).font(DiaryType.title)
-                Text(service.dateTitle(page.day, calendar: app.string("core.firstCalendar") == "gregorian" ? .hijri : .gregorian) + (page.place.map { " · " + $0 } ?? ""))
+                Text(MadarInlineText.joined([service.dateTitle(page.day, calendar: app.string("core.firstCalendar") == "gregorian" ? .hijri : .gregorian)] + (page.place.map { [$0] } ?? [])))
                     .font(DiaryType.label).opacity(hasPhoto ? 1 : 0.8)
                 Text(snapshot.selection.days.isEmpty && page.lines.isEmpty ? "اكتب ما تيسّر من يومك." : page.excerpt)
                     .font(DiaryType.writing).lineSpacing(8).lineLimit(4).fixedSize(horizontal: false, vertical: true)
