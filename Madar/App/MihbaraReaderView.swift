@@ -2511,12 +2511,13 @@ private struct MihbaraQuoteCardSheet: View {
     let app: AppSession
     let card: MihbaraQuoteCardContent
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.roomTheme) private var theme
     @State private var image: UIImage?
     @State private var shareError: String?
 
-    private let background = SwiftUI.Color(red: 0.95, green: 0.93, blue: 0.87)
-    private let ink = SwiftUI.Color(red: 0.15, green: 0.22, blue: 0.18)
-    private let secondaryInk = SwiftUI.Color(red: 0.40, green: 0.39, blue: 0.34)
+    private var background: SwiftUI.Color { theme.background }
+    private var ink: SwiftUI.Color { theme.ink }
+    private var secondaryInk: SwiftUI.Color { theme.secondaryInk }
 
     var body: some View {
         VStack(spacing: 14) {
@@ -2640,11 +2641,13 @@ private struct MihbaraQuoteCardSheet: View {
 
 private struct MihbaraQuoteCardArtwork: View {
     let card: MihbaraQuoteCardContent
-    private let forest = SwiftUI.Color(red: 0.10, green: 0.22, blue: 0.17)
-    private let paper = SwiftUI.Color(red: 0.97, green: 0.95, blue: 0.89)
-    private let ink = SwiftUI.Color(red: 0.15, green: 0.22, blue: 0.18)
-    private let muted = SwiftUI.Color(red: 0.40, green: 0.39, blue: 0.34)
-    private let gold = SwiftUI.Color(red: 0.67, green: 0.52, blue: 0.29)
+    private let theme = RoomTheme(room: "mihbara")
+    private var forest: SwiftUI.Color { theme.accentFill }
+    private var paper: SwiftUI.Color { theme.surface }
+    private var ink: SwiftUI.Color { theme.ink }
+    private var muted: SwiftUI.Color { theme.secondaryInk }
+    private var gold: SwiftUI.Color { theme.color("goldUnderstand") }
+    private var goldText: SwiftUI.Color { theme.color("goldUnderstandText") }
 
     private var displayedQuote: String {
         guard card.quote.count > 520 else { return card.quote }
@@ -2708,7 +2711,7 @@ private struct MihbaraQuoteCardArtwork: View {
                 }
                 Spacer(minLength: 12)
                 Text("مِحبرة مدار").font(.custom("thmanyahsans-Bold", size: 17, relativeTo: .footnote))
-                    .foregroundStyle(gold)
+                    .foregroundStyle(goldText)
             }
             .padding(.horizontal, 118).padding(.vertical, 105)
             .environment(\.layoutDirection, .rightToLeft)

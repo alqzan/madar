@@ -386,6 +386,8 @@ import XCTest
         XCTAssertTrue(quotePreview.waitForExistence(timeout: 8), app.debugDescription)
         XCTAssertTrue(quotePreview.label.contains("كتاب اختبار القارئ"), quotePreview.label)
         XCTAssertTrue(quotePreview.label.contains("من مكتبتك"), quotePreview.label)
+        let quotedSentence = "القراءة باب يدخل منه الإنسان إلى خبرات من سبقه"
+        XCTAssertEqual(quotePreview.label.components(separatedBy: quotedSentence).count - 1, 1, quotePreview.label)
         XCTAssertFalse(quotePreview.label.contains("shamela.ws"), quotePreview.label)
         shot(app, "M6-V08-quote-card-L")
         app.buttons["mihbara-quote-card-close"].tap()
