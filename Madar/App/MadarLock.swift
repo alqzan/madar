@@ -51,7 +51,6 @@ struct PrivacyAuthorization {
     private let authenticator: @MainActor () -> any MadarDeviceAuthenticator
     private let authorizationCommitBoundary: @MainActor () -> Void
     private var currentAuth: (UUID, any MadarDeviceAuthenticator)?
-    private var backgroundAt: Date?
     private var authorizedFeatures: Set<MadarProtectedFeature> = []
     private var generation = 0
     private var epoch = 0
@@ -256,20 +255,18 @@ struct PrivacyAuthorization {
         covered = true; redactionFailed = failed || persisted == nil; notify()
     }
     func disconnect() { disconnected = true; epoch += 1; phase = .background; lock() }
-    func sceneChanged(_ next: ScenePhase, now: Date? = nil) {
+    func sceneChanged(_ next: ScenePhase, now _: Date? = nil) {
         guard !disconnected, next != phase else { return }
         epoch += 1; phase = next
         switch next {
         case .inactive:
             covered = true; revoke(cancelRequests: false); enqueueRedaction()
         case .background:
-            covered = true; backgroundAt = backgroundAt ?? now ?? clock(); generation += 1; invalidateAuth()
+            covered = true; generation += 1; invalidateAuth()
             revoke(cancelRequests: true); enqueueRedaction()
         case .active:
-            let expired = backgroundAt.map { (now ?? clock()).timeIntervalSince($0) >= 60 } ?? false
-            backgroundAt = nil
             let waiters = activeWaiters; activeWaiters.removeAll(); for waiter in waiters.values { waiter.resume() }
-            if expired { lock() } else { recoverActive() }
+            recoverActive()
         @unknown default: lock()
         }
     }

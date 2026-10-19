@@ -125,11 +125,11 @@ import UIKit
         let ticket = try await controller.authorize([.app]); XCTAssertNoThrow(try controller.validate(ticket))
     }
 
-    func test_M0P1a_lateBackgroundAttachmentStartsStableLeaseAtObservedBoundary() async throws {
+    func test_M0P1a_lateBackgroundAttachmentPreservesUnlockAcrossBackground() async throws {
         guard let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first else {
             throw XCTSkip("Requires an app-host UIWindowScene")
         }
-        for elapsed: TimeInterval in [59, 60] {
+        for elapsed: TimeInterval in [59, 60, 3_600] {
             var now = Date(timeIntervalSince1970: 2_000)
             let auth = Authenticator()
             let lock = MadarLockController(scope: .app, service: Service(), clock: { now }, authenticator: { auth })
@@ -144,7 +144,7 @@ import UIKit
             now = now.addingTimeInterval(50); presenter.transition(.background)
             now = Date(timeIntervalSince1970: 2_000 + elapsed); presenter.transition(.active)
             try await waitUntil { !lock.covered }
-            XCTAssertEqual(lock.canPresent(.app), elapsed < 60)
+            XCTAssertTrue(lock.canPresent(.app), "The app remains unlocked after (elapsed) seconds in the background")
             XCTAssertEqual(auth.calls, 1)
         }
     }
@@ -312,7 +312,7 @@ import UIKit
         XCTAssertEqual(service.bindings, [.app, .privateNote])
     }
 
-    func testBackgroundLeaseUsesFirstTimestampAndExpiresAtSixtySeconds() async throws {
+    func testBackgroundResumeKeepsWholeAppUnlockWithoutTimeout() async throws {
         let auth = Authenticator()
         let lock = MadarLockController(scope: .app, service: Service(), authenticator: { auth })
         let start = Date(timeIntervalSince1970: 1_000)
@@ -323,8 +323,9 @@ import UIKit
         XCTAssertTrue(lock.canPresent(.app)); XCTAssertEqual(auth.calls, 1)
         lock.sceneChanged(.background, now: start)
         lock.sceneChanged(.background, now: start.addingTimeInterval(59))
-        lock.sceneChanged(.active, now: start.addingTimeInterval(60)); await settle()
-        XCTAssertFalse(lock.canPresent(.app)); XCTAssertTrue(lock.unlocked.isEmpty)
+        lock.sceneChanged(.active, now: start.addingTimeInterval(3_600)); await settle()
+        XCTAssertTrue(lock.canPresent(.app)); XCTAssertFalse(lock.unlocked.isEmpty)
+        XCTAssertEqual(auth.calls, 1)
     }
 
     func testLateDeviceSuccessAfterBackgroundCannotBindProtectedRows() async throws {
