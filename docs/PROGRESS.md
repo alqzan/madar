@@ -26,15 +26,19 @@ Agents take the first unfinished step and continue down the list in the same ses
 6. M5-V26 exact salary repayment (optional fields, nil on migration; one review pass).
 7. M6-V24 persist expanded Arabic reader settings (default, reset, undo).
 
-**Polish and release preparation (M7)**
-8. Dark-mode shots of M5-V11/V12/V13; every-screen visual/state trace; «Go deeper and improve» pass on one earlier room.
-9. Final UI review page with fresh shots (owner memory: regenerate when the build is complete).
+**Live trial of everything (owner 19 Oct: «ابي تضيف تجربه لكل شي» — trials are agent work, not the owner's)**
+8. Turath live: search, download a real book, open it, quote it — in the simulator on the real network.
+9. Every room end to end in the simulator, as a user would: prayer (real times for the active place, log, qada, Friday, travel), Quran (plan, session, Mushaf, logs), diary (write, attach, search, import/export), lobby/habits/widgets, money (bank messages from the local corpus through the screen, envelopes, cards, log, zakat), Mihbara (import PDF/EPUB, read, listen, quote). Every defect found is fixed in the same pass; each flow gets or extends a UI test.
+10. The agent reviews the ~60 `matched — awaiting owner` screens against their canonicals (compare pages, light and dark), fixes every nameable difference, and applies one «Go deeper and improve» touch per room. The owner only gives taste feedback afterwards.
+11. Device run: when the owner's iPhone is connected to this Mac, the agent builds, installs and runs the milestone checks (M1, M3, M4, M5 gates, Release performance, iOS 27 behind availability) through Xcode and records the results.
+12. Final UI review page with fresh shots of every screen (owner memory: regenerate when the build is complete).
+13. Publishing preparation the agent can do: support and privacy pages drafted and ready to host, store text, screenshots, privacy manifest check. Nothing is published without the owner's go.
 
-**Owner — any time, in parallel**
-- Review the ~60 `matched — awaiting owner` screens (diary, lobby, money, Mihbara) and say what you dislike.
-- On your iPhone: M1, M3, M4, M5 device gates; Release performance; iOS 27.
-- Publishing: public support and privacy URLs, App Review contact, App Store Connect access, signing.
-- Open ideas when you have time: Day One tags as a field, PDF→EPUB, direct @als bridge.
+**Owner — only what needs your account, identity or phone**
+- Keep the iPhone connected and unlocked when step 11 runs.
+- App Store Connect access and the signing certificate (your Apple account).
+- Approve hosting the support and privacy pages, and give a contact for App Review.
+- Optional: taste feedback on any screen you dislike, any time.
 
 ## UX — owner app trial 15 Oct (do these first, in order)
 
