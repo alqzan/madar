@@ -38,6 +38,15 @@ struct MihbaraCollection: Codable {
 struct MihbaraHomeReading {
     var books: [MihbaraBook]; var collection: MihbaraCollection; var todayHadiths: [MihbaraHadith]; var readCount: Int; var completedToday: Int; var opensAfterFajr: Bool; var day: GregorianDay
 }
+struct MihbaraMotivationCue: Identifiable {
+    let id: String
+    let title: String
+    let message: String
+    let source: String
+    let actionTitle: String
+    var bookID: UUID? = nil
+    var hadithNumber: Int? = nil
+}
 @MainActor struct AppMihbaraService {
     unowned let app: AppSession
     var digits: MadarNumberFormatter { .init(style: app.string("core.numerals") == "western" ? .western : .hindi) }
@@ -64,6 +73,59 @@ struct MihbaraHomeReading {
         let prayer = try PrayerRepository(context: c), civil = GregorianDay.containing(now, in: app.activePlace.timeZone)
         let fajr = prayer.occurrence(.init(day: civil, prayer: .fajr))?.time
         return .init(books: books, collection: collection, todayHadiths: collection.hadiths.filter { numbers.contains($0.number) }, readCount: read.count, completedToday: today.count, opensAfterFajr: fajr.map { now >= $0 } ?? false, day: day)
+    }
+
+    /// RMI3: a book line comes only from the user's own page-linked note. When none exists,
+    /// the home offers a short reading step and real progress instead of inventing a quotation.
+    func motivationCues(for reading: MihbaraHomeReading, book: MihbaraBook?) throws -> [MihbaraMotivationCue] {
+        guard app.lockController?.canPresent(.app) ?? app.protectedDataAuthorized else { throw DataError.authenticationFailed }
+        var cues: [MihbaraMotivationCue] = []
+        if let book {
+            let context = ModelContext(app.container)
+            let notes = try context.fetch(FetchDescriptor<NotebookNote>())
+                .filter { $0.targetID == book.id && $0.link == "page" && $0.deletedAt == nil && $0.mergedInto == nil && !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+                .sorted { $0.updatedAt == $1.updatedAt ? $0.id.uuidString < $1.id.uuidString : $0.updatedAt > $1.updatedAt }
+            if let note = notes.first {
+                let text = note.text.trimmingCharacters(in: .whitespacesAndNewlines)
+                let clipped = text.count <= 220 ? text : String(text.prefix(219)).trimmingCharacters(in: .whitespacesAndNewlines) + "…"
+                let position = note.page.map { "صفحة " + digits.string($0) } ?? "من دفتر كتابك"
+                let attribution = [book.title, book.author].filter { !$0.isEmpty }.joined(separator: " · ")
+                cues.append(.init(
+                    id: "note-\(note.id.uuidString)", title: "من هامشك", message: clipped,
+                    source: attribution + " · " + position, actionTitle: "افتح الكتاب", bookID: book.id
+                ))
+            }
+
+            if let total = book.pages, total > 0, let current = book.page, current >= 0, current < total {
+                let remaining = total - current
+                cues.append(.init(
+                    id: "progress-\(book.id.uuidString)", title: "أنت أقرب مما تظن",
+                    message: "بقي " + digits.string(remaining) + " " + (remaining == 1 ? "صفحة" : "صفحات") + " لتكمل «" + book.title + "»",
+                    source: "موضعك: صفحة " + digits.string(current) + " من " + digits.string(total),
+                    actionTitle: "واصل القراءة", bookID: book.id
+                ))
+            }
+
+            let remainingPages = book.pages.flatMap { total in book.page.map { max(0, total - $0) } }
+            let stepPages = remainingPages.map { min(5, max(1, $0)) } ?? 5
+            let minutes = max(1, Int((Double(stepPages) * 1.4).rounded()))
+            cues.append(.init(
+                id: "step-\(book.id.uuidString)", title: "خطوة صغيرة تكفي",
+                message: digits.string(stepPages) + " صفحات فقط",
+                source: "قرابة " + digits.string(minutes) + " دقائق · من موضعك المحفوظ",
+                actionTitle: book.isReadableEPUB || book.isReadablePDF ? "ابدأ القراءة" : "افتح موضعك", bookID: book.id
+            ))
+        }
+
+        if let hadith = reading.todayHadiths.first {
+            cues.append(.init(
+                id: "hadith-\(hadith.number)", title: "ورد السنّة",
+                message: hadith.text,
+                source: reading.collection.title + " · الحديث " + digits.string(hadith.number) + "\n" + reading.collection.edition,
+                actionTitle: "افتح الحديث", hadithNumber: hadith.number
+            ))
+        }
+        return cues
     }
 
     /// M6-V08: the book's live paragraph highlights, oldest first so a later one draws on top.

@@ -192,6 +192,60 @@ import XCTest
         XCTAssertEqual(app.buttons["mihbara-rahlOpens-manual"].value as? String, "محدد")
     }
 
+    func testMotivationUsesOwnedPageNoteAndCyclesThroughProgressStepAndWird() {
+        continueAfterFailure = false
+        let app = app("home"); app.launch(); open(app)
+        let motivate = app.buttons["mihbara-motivate"]
+        reach(app, motivate); motivate.tap()
+
+        let title = app.staticTexts["mihbara-motivate-title"]
+        let message = app.staticTexts["mihbara-motivate-message"]
+        let source = app.staticTexts["mihbara-motivate-source"]
+        XCTAssertTrue(title.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertEqual(title.label, "من هامشك")
+        XCTAssertEqual(message.label, "أكمل من هذا الموضع على مهل.")
+        XCTAssertTrue(source.label.contains("رحلة القراءة"), source.label)
+        XCTAssertTrue(source.label.contains("من مكتبتك"), source.label)
+        XCTAssertTrue(source.label.contains("١٤٧"), source.label)
+
+        let next = app.buttons["mihbara-motivate-next"]
+        XCTAssertTrue(next.isHittable, app.debugDescription); next.tap()
+        XCTAssertEqual(title.label, "أنت أقرب مما تظن")
+        XCTAssertTrue(message.label.contains("١٠٣ صفحات"), message.label)
+        next.tap()
+        XCTAssertEqual(title.label, "خطوة صغيرة تكفي")
+        XCTAssertEqual(message.label, "٥ صفحات فقط")
+        XCTAssertTrue(source.label.contains("٧ دقائق"), source.label)
+        next.tap()
+        XCTAssertEqual(title.label, "ورد السنّة")
+        XCTAssertTrue(message.label.contains("لا يؤمن أحدكم"), message.label)
+        XCTAssertTrue(source.label.contains("ويكي مصدر"), source.label)
+        app.buttons["mihbara-motivate-action"].tap()
+        XCTAssertTrue(app.textViews["mihbara-hadith-text"].waitForExistence(timeout: 8), app.debugDescription)
+    }
+
+    func testMotivationWithoutBookUsesVerifiedDailyWirdAndNoInventedQuote() {
+        continueAfterFailure = false
+        let app = app("empty"); app.launch(); open(app)
+        let motivate = app.buttons["mihbara-motivate"]
+        reach(app, motivate); motivate.tap()
+        XCTAssertEqual(app.staticTexts["mihbara-motivate-title"].label, "ورد السنّة")
+        XCTAssertFalse(app.buttons["mihbara-motivate-next"].exists)
+        XCTAssertTrue(app.staticTexts["mihbara-motivate-source"].label.contains("الأربعون النووية"))
+        XCTAssertFalse(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "سطر من كتابك")).firstMatch.exists)
+    }
+
+    func testMotivationPageNoteOpensTheLinkedBook() {
+        continueAfterFailure = false
+        let app = app("home"); app.launch(); open(app)
+        let motivate = app.buttons["mihbara-motivate"]
+        reach(app, motivate); motivate.tap()
+        XCTAssertEqual(app.staticTexts["mihbara-motivate-title"].label, "من هامشك")
+        app.buttons["mihbara-motivate-action"].tap()
+        XCTAssertTrue(app.buttons["mihbara-paper-start"].waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["رحلة القراءة"].exists)
+    }
+
     func testSunnahDrawerUsesRealProgressAndOpensWirdAndImport() {
         continueAfterFailure = false
         let app = app("home"); app.launch(); open(app)

@@ -12,6 +12,7 @@ struct MihbaraHomeView: View {
     @Environment(\.dynamicTypeSize) private var dynamicType
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var reading: MihbaraHomeReading?
+    @State private var motivationCues: [MihbaraMotivationCue] = []
     @State private var shelf = "reading"
     @State private var tableID: UUID?
     @State private var sheet: MihbaraSheet?
@@ -23,6 +24,7 @@ struct MihbaraHomeView: View {
     @State private var libraryShelf = "all"
     @State private var pendingBookFile: URL?
     @State private var pendingGoodreadsFile: URL?
+    @State private var pendingMotivationBook: UUID?
     private var theme: RoomTheme { .init(room: "mihbara", dark: colorScheme == .dark) }
     private var service: AppMihbaraService { .init(app: app) }
     private var tableBook: MihbaraBook? { reading?.books.first { $0.id == tableID } ?? reading?.books.first { $0.shelf == "reading" } }
@@ -58,7 +60,7 @@ struct MihbaraHomeView: View {
             }
         }
         .task { load() }.onChange(of: app.prayerRevision) { load() }.onChange(of: reading?.day) { folded = false; manuallyOpen = false }
-        .sheet(item: $sheet) { target in
+        .sheet(item: $sheet, onDismiss: openPendingMotivationBook) { target in
             NavigationStack {
                 if let r = reading {
                     switch target {
@@ -78,6 +80,7 @@ struct MihbaraHomeView: View {
                     case .hadith(let n): if let h = r.collection.hadiths.first(where: { $0.number == n }) { MihbaraHadithView(app: app, hadith: h, collection: r.collection, day: r.day) }
                     case .opening: MihbaraRahlOpeningView(app: app).presentationDetents([.large])
                     case .notebook: MihbaraNotebookContent(app: app)
+                    case .motivation: MihbaraMotivationCard(cues: motivationCues, action: performMotivation)
                     }
                 }
             }.environment(\.roomTheme, theme).presentationDragIndicator(.visible)
@@ -113,6 +116,23 @@ struct MihbaraHomeView: View {
         }
     }
     private func load() { do { reading = try service.load() } catch { app.errorMessage = error.localizedDescription } }
+    private func showMotivation() {
+        guard let reading else { return }
+        do {
+            motivationCues = try service.motivationCues(for: reading, book: tableBook)
+            sheet = .motivation
+        } catch { app.errorMessage = error.localizedDescription }
+    }
+    private func performMotivation(_ cue: MihbaraMotivationCue) {
+        if let number = cue.hadithNumber { sheet = .hadith(number); return }
+        if let id = cue.bookID { pendingMotivationBook = id; sheet = nil }
+    }
+    private func openPendingMotivationBook() {
+        guard let id = pendingMotivationBook else { return }
+        pendingMotivationBook = nil
+        guard let book = reading?.books.first(where: { $0.id == id }) else { return }
+        openBook(book)
+    }
     private func shelfView(_ r: MihbaraHomeReading) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack { Text("رفّك").font(MadarTypography.cardTitle()); Spacer(); Button { showingAddBook = true } label: { Label("أضف كتابًا", systemImage: "plus") }.accessibilityIdentifier("mihbara-add-paper") }
@@ -156,11 +176,27 @@ struct MihbaraHomeView: View {
             HStack {
                 deskLabel("على الطاولة", title: true)
                 Spacer()
-                Button { sheet = .opening } label: {
-                    Image(systemName: "slider.horizontal.3").font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(theme.ink).frame(width: 46, height: 46)
-                        .background(theme.surface.opacity(0.88), in: .circle)
-                }.buttonStyle(.plain).accessibilityLabel("وقت فتح ورد السنّة").accessibilityIdentifier("mihbara-opening-preference")
+                GlassEffectContainer(spacing: 7) {
+                    HStack(spacing: 7) {
+                        Button(action: showMotivation) {
+                            Label("حمّسني", systemImage: "sparkles")
+                                .font(MadarTypography.caption()).frame(minWidth: 92, minHeight: 44)
+                                .padding(.horizontal, 8).foregroundStyle(theme.ink)
+                        }
+                        .buttonStyle(.plain)
+                        .glassEffect(.regular.tint(theme.color("goldUnderstand").opacity(0.18)).interactive(), in: Capsule())
+                        .accessibilityIdentifier("mihbara-motivate")
+                        .accessibilityHint("اقتراح صغير من كتابك أو ورد اليوم")
+
+                        Button { sheet = .opening } label: {
+                            Image(systemName: "slider.horizontal.3").font(.system(size: 17, weight: .semibold))
+                                .foregroundStyle(theme.ink).frame(width: 46, height: 46)
+                        }
+                        .buttonStyle(.plain)
+                        .glassEffect(.regular.interactive(), in: Circle())
+                        .accessibilityLabel("وقت فتح ورد السنّة").accessibilityIdentifier("mihbara-opening-preference")
+                    }
+                }
                 Button { sheet = .notebook } label: {
                     Text("دفتر").font(.custom("ArefRuqaa-Regular", size: 18, relativeTo: .headline))
                         .foregroundStyle(theme.ink).frame(width: 58, height: 70)
@@ -326,8 +362,65 @@ struct MihbaraHomeView: View {
     }
 
 }
-private enum MihbaraSheet: Identifiable { case library, book(UUID), hadith(Int), opening, notebook; var id: String { String(describing: self) } }
+private enum MihbaraSheet: Identifiable { case library, book(UUID), hadith(Int), opening, notebook, motivation; var id: String { String(describing: self) } }
 private struct MihbaraReaderRoute: Identifiable { let bookID: UUID; var id: String { bookID.uuidString } }
+
+private struct MihbaraMotivationCard: View {
+    let cues: [MihbaraMotivationCue]
+    let action: (MihbaraMotivationCue) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.roomTheme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var index = 0
+    private var cue: MihbaraMotivationCue? { cues.indices.contains(index) ? cues[index] : nil }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                if let cue {
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text(cue.title).font(MadarTypography.cardTitle()).accessibilityIdentifier("mihbara-motivate-title")
+                        Text(cue.message).font(MadarTypography.body()).fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("mihbara-motivate-message")
+                        Text(cue.source).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                            .fixedSize(horizontal: false, vertical: true).accessibilityIdentifier("mihbara-motivate-source")
+                    }
+                    .padding(20).frame(maxWidth: .infinity, alignment: .leading)
+                    .background(theme.surface, in: .rect(cornerRadius: 20))
+                    .overlay { RoundedRectangle(cornerRadius: 20).stroke(theme.line.opacity(0.7), lineWidth: 1) }
+                    .shadow(color: theme.ink.opacity(0.08), radius: 12, y: 5)
+
+                    Button { action(cue) } label: {
+                        Text(cue.actionTitle).font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 52)
+                    }
+                    .buttonStyle(MadarPrimaryButton())
+                    .accessibilityIdentifier("mihbara-motivate-action")
+
+                    if cues.count > 1 {
+                        Button {
+                            withAnimation(reduceMotion ? nil : .snappy(duration: 0.3)) { index = (index + 1) % cues.count }
+                        } label: {
+                            Text("اقتراح آخر").font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 46)
+                        }
+                        .buttonStyle(.plain).glassEffect(.regular.interactive(), in: Capsule())
+                        .accessibilityIdentifier("mihbara-motivate-next")
+                    }
+                } else {
+                    Text("أتممت ورد اليوم. عد إلى كتابك حين يحين وقتك.")
+                        .font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
+                        .frame(maxWidth: .infinity, minHeight: 110, alignment: .leading)
+                }
+            }
+            .padding(20).frame(maxWidth: 560).frame(maxWidth: .infinity)
+        }
+        .background(theme.background).foregroundStyle(theme.ink)
+        .presentationDetents([.medium, .large])
+        .toolbar {
+            ToolbarItem(placement: .principal) { Text("حمّسني").font(MadarTypography.section()) }
+            ToolbarItem(placement: .topBarTrailing) { Button("تمّ") { dismiss() }.accessibilityIdentifier("mihbara-motivate-close") }
+        }
+    }
+}
 
 private struct MihbaraRahlOpeningView: View {
     let app: AppSession
