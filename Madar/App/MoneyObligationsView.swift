@@ -8,6 +8,17 @@ import MadarCommands
 /// «الالتزامات» (`mal/11-Z-R19-obl`): what this cycle owes on a thread from salary to salary, the instalment ladder of
 /// the months ahead, and every obligation on its shelf.
 struct MoneyObligationsView: View {
+    private enum ObligationSheetRoute: Identifiable {
+        case new
+        case suggestion(SubscriptionSuggestionEngine.Suggestion)
+        var id: String {
+            switch self { case .new: "new"; case .suggestion(let value): "suggestion-" + value.id }
+        }
+        var suggestion: SubscriptionSuggestionEngine.Suggestion? {
+            if case .suggestion(let value) = self { value } else { nil }
+        }
+    }
+
     let app: AppSession
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dismiss) private var dismiss
@@ -15,7 +26,7 @@ struct MoneyObligationsView: View {
     @State private var reading: MoneyObligationsReading?
     @State private var failure: String?
     @State private var selected: String?
-    @State private var adding = false
+    @State private var obligationSheet: ObligationSheetRoute?
     @State private var revealed = false
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
     private var service: AppMoneyService { .init(app: app) }
@@ -41,7 +52,8 @@ struct MoneyObligationsView: View {
                     thread(reading)
                     if let due = current(reading) { detail(due, reading) }
                     ladder(reading)
-                    Button { adding = true } label: {
+                    ForEach(reading.subscriptionSuggestions) { suggestion in subscriptionSuggestion(suggestion) }
+                    Button { obligationSheet = .new } label: {
                         Text("+ أضف التزامًا، وشاهد أثره على السلّم").font(.custom("thmanyahserifdisplay-Bold", size: 19, relativeTo: .headline)).foregroundStyle(theme.background)
                             .frame(maxWidth: .infinity, minHeight: 60).background(theme.ink).shadow(color: theme.ink.opacity(0.18), radius: 8, y: 4)
                     }.buttonStyle(.plain).accessibilityIdentifier("money-obligations-add")
@@ -52,7 +64,12 @@ struct MoneyObligationsView: View {
         }.clipped().background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
             .environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar)
             .task { load() }.onChange(of: app.prayerRevision) { load() }
-            .sheet(isPresented: $adding) { if let reading { MoneyObligationSheet(app: app, ladder: reading.ladder, visible: visible).environment(\.roomTheme, theme) } }
+            .sheet(item: $obligationSheet) { route in
+                if let reading {
+                    MoneyObligationSheet(app: app, ladder: reading.ladder, visible: visible, suggestion: route.suggestion)
+                        .environment(\.roomTheme, theme)
+                }
+            }
             .accessibilityIdentifier("money-obligations")
     }
 
@@ -293,6 +310,61 @@ struct MoneyObligationsView: View {
                         .overlay(alignment: .bottom) { Rectangle().fill(theme.line).frame(height: 0.6) }.contentShape(Rectangle())
                 }.buttonStyle(.plain).accessibilityIdentifier("money-obligation-row-" + due.name)
             }
+        }
+    }
+
+    @ViewBuilder private func subscriptionSuggestion(_ suggestion: SubscriptionSuggestionEngine.Suggestion) -> some View {
+        let card = Button {
+            obligationSheet = .suggestion(suggestion)
+        } label: {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .center, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("تكرر عندك في \(service.digits.string(suggestion.count)) أشهر متتالية")
+                            .font(MadarTypography.fine().weight(.semibold)).foregroundStyle(theme.color("reserveText")).lineLimit(1).minimumScaleFactor(0.8)
+                        HStack(spacing: 5) {
+                            Text(suggestion.name).font(.custom("thmanyahserifdisplay-Bold", size: 19, relativeTo: .title3)).lineLimit(1)
+                            Text("،").foregroundStyle(theme.secondaryInk)
+                            Text(amount(suggestion.amountMinor)).font(.custom("thmanyahserifdisplay-Bold", size: 19, relativeTo: .title3))
+                                .accessibilityIdentifier("money-subscription-suggestion-amount")
+                        }
+                    }
+                    Spacer(minLength: 6)
+                    Text("راجع وثبّت").font(MadarTypography.caption().weight(.semibold)).foregroundStyle(theme.ink)
+                        .padding(.horizontal, 10).frame(minHeight: 40)
+                        .overlay { RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(theme.color("reserveText"), lineWidth: 1) }
+                }
+                HStack(spacing: 5) {
+                    ForEach(Array(suggestion.evidenceDates.enumerated()), id: \.offset) { _, date in
+                        let day = GregorianDay.containing(date, in: app.activePlace.timeZone)
+                        MadarDateLabel(app.dateLabels(day, compact: true), primaryFont: MadarTypography.fine(), secondaryFont: MadarTypography.fine())
+                            .frame(maxWidth: .infinity, minHeight: 32, alignment: .center)
+                            .padding(.horizontal, 3)
+                    }
+                }
+                HStack(alignment: .center, spacing: 8) {
+                    Text("يتكرر كل شهر · موعده القادم").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                    MadarDateLabel(app.dateLabels(.containing(suggestion.nextDue, in: app.activePlace.timeZone), compact: true),
+                                   primaryFont: MadarTypography.fine().weight(.semibold), secondaryFont: MadarTypography.fine())
+                }
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("اشتراك محتمل من مدفوعاتك، \(suggestion.name)، \(amount(suggestion.amountMinor))، راجع التفاصيل")
+        .accessibilityIdentifier("money-subscription-suggestion")
+
+        if #available(iOS 26.0, *) {
+            GlassEffectContainer(spacing: 8) {
+                card.glassEffect(.regular.tint(theme.color("reserve").opacity(0.12)).interactive(), in: .rect(cornerRadius: 18, style: .continuous))
+            }.overlay {
+                RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(theme.color("reserveText").opacity(0.65), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+            }
+        } else {
+            card.background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .overlay { RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(theme.color("reserveText").opacity(0.65), style: StrokeStyle(lineWidth: 1, dash: [4, 3])) }
         }
     }
 

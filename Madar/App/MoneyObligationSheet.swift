@@ -9,6 +9,7 @@ struct MoneyObligationSheet: View {
     let app: AppSession
     let ladder: [MoneyLadderMonth]
     let visible: Bool
+    let suggestion: SubscriptionSuggestionEngine.Suggestion?
     @Environment(\.dismiss) private var dismiss
     @Environment(\.roomTheme) private var theme
     @State private var saving = false
@@ -23,6 +24,27 @@ struct MoneyObligationSheet: View {
     /// The decimal pad has no return key: «تم» above it, a scroll or a tap on the title closes it.
     private enum Field { case name, amount }
     @FocusState private var field: Field?
+
+    init(app: AppSession, ladder: [MoneyLadderMonth], visible: Bool, suggestion: SubscriptionSuggestionEngine.Suggestion? = nil) {
+        self.app = app
+        self.ladder = ladder
+        self.visible = visible
+        self.suggestion = suggestion
+        _kind = State(initialValue: suggestion == nil ? "bill" : "subscription")
+        _name = State(initialValue: suggestion?.name ?? "")
+        _rawAmount = State(initialValue: suggestion.map { Self.decimalInput($0.amountMinor, currency: $0.currency) } ?? "")
+        _firstDue = State(initialValue: suggestion?.nextDue ?? .now)
+    }
+
+    private static func decimalInput(_ amountMinor: Int, currency: String) -> String {
+        guard let exponent = CurrencyExponents.specified.exponent(currency), (0...3).contains(exponent) else { return "" }
+        guard exponent > 0 else { return String(amountMinor) }
+        let digits = String(amountMinor)
+        let padded = String(repeating: "0", count: max(0, exponent + 1 - digits.count)) + digits
+        let whole = String(padded.dropLast(exponent))
+        let fraction = String(padded.suffix(exponent)).replacingOccurrences(of: "0+$", with: "", options: .regularExpression)
+        return fraction.isEmpty ? whole : whole + "." + fraction
+    }
     private var service: AppMoneyService { .init(app: app) }
     private var digits: MadarNumberFormatter { service.digits }
     private var zone: TimeZone { app.activePlace.timeZone }

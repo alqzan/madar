@@ -8,7 +8,7 @@ import MadarCommands
 extension AppSession {
     /// Named synthetic stores only. Never reads or writes the owner's store.
     func prepareMoneyFixture(group: URL) throws {
-        guard let variant = ProcessInfo.processInfo.environment["MADAR_UI_MONEY_FIXTURE"], ["goal", "zakat", "zakatHidden", "travel", "travelMissing", "travelHidden", "accounts", "expense", "showcase", "empty", "hidden", "zero", "shortfall", "messages", "since", "rules", "salary", "budget", "cards", "cardsHidden", "analysis", "analysisHidden", "reconcile", "reconcileHidden", "cashback", "cashbackHidden"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
+        guard let variant = ProcessInfo.processInfo.environment["MADAR_UI_MONEY_FIXTURE"], ["goal", "zakat", "zakatHidden", "travel", "travelMissing", "travelHidden", "accounts", "expense", "showcase", "empty", "hidden", "zero", "shortfall", "messages", "since", "rules", "salary", "budget", "cards", "cardsHidden", "analysis", "analysisHidden", "reconcile", "reconcileHidden", "cashback", "cashbackHidden", "subscriptions"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         let c = ModelContext(container)
         guard !(try c.fetch(FetchDescriptor<DeviceSetting>())).contains(where: { $0.key == "sys.moneyFixture" }) else { return }
         for key in ["sys.moneyFixture", "sys.onboardingCompleted"] { let marker = DeviceSetting(); marker.key = key; marker.valueJSON = Data("true".utf8); c.insert(marker) }
@@ -232,6 +232,18 @@ extension AppSession {
             let old = BankMessage(); old.sender = "بنك الاختبار"; old.channel = "shortcut"; old.kind = "purchase"; old.status = "ok"; old.receivedAt = today.adding(days: -4).date(in: zone).addingTimeInterval(13 * 3600); c.insert(old)
             let statement = BankMessage(); statement.sender = "بنك الاختبار"; statement.channel = "shortcut"; statement.kind = "statement"; statement.status = "needsLook"; statement.receivedAt = today.adding(days: -3).date(in: zone).addingTimeInterval(9 * 3600)
             statement.parsedJSON = try JSONSerialization.data(withJSONObject: ["v": 1, "kind": "statement", "last4": "8844", "statementDueMinor": 425_000, "minimumDueMinor": 21_300, "dueDate": today.adding(days: 9).date(in: zone).timeIntervalSinceReferenceDate]); c.insert(statement)
+            try c.save()
+        }
+        if variant == "subscriptions" {
+            var calendar = Calendar(identifier: .gregorian); calendar.timeZone = zone
+            for month in [7, 8, 9] {
+                guard let eventAt = calendar.date(from: DateComponents(year: 2026, month: month, day: 18, hour: 12)) else { continue }
+                let row = MoneyTransaction(); row.kind = "expense"; row.source = "bank"; row.reviewState = "ok"
+                row.method = "transfer"; row.fromAccountID = account.id; row.merchant = "منصة شاهد"
+                row.amountMinor = 39_900; row.homeAmountMinor = 39_900; row.currency = "SAR"; row.homeCurrency = "SAR"
+                row.eventAt = eventAt; row.dayKey = GregorianDay.containing(eventAt, in: zone).description
+                row.tzID = zone.identifier; row.dayPolicy = "midnight@1"; c.insert(row)
+            }
             try c.save()
         }
     }

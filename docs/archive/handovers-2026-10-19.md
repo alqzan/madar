@@ -1,5 +1,13 @@
 # Archived handover
 
+## Handover — M3-V09 Day One tags — 2026-10-19 — Codex
+Works now: Day One imports retain every tag, preserve the first-tag project link, and expose normalized `#وسم` search. Old unchanged exports restore tags alone while preserving whether the text was edited locally. Undo restores only tags and preserves later edits.
+Verified: `swift test` Data schema 19/19, Core Day One 8/8 + tag search 5/5, Commands `DayOneImportPersistenceTests` 10/10; `xcodebuild test` iPhone 17 Pro import UI 1/1 (`M3-V09-tags-final-ui-20261019.xcresult`, no startup alert), prior import + search UI 2/2 and search integration 1/1; compare generated; `git diff --check` clean.
+Differences left: M3-V08 uses the native safe area, live index counts and actual fixture names; V09 import description wraps one word earlier than the canonical.
+Not verified: real Day One export, multi-GB import, owner iPhone; old imported tags require re-importing the source ZIP.
+Next: M5-V15 Reconciliation cadence/BNPL; then continue the owner-approved ideas before the M7 gate.
+Model/effort: not exposed / not exposed. Usage: 64% five-hour used / 58% weekly at last check.
+
 ## Handover — M6-V14 English word tools — 2026-10-19 — Codex
 Works now: English word selection offers truthful dictionary availability, save-to-كلماتي with source/context/undo, and conditional on-device translation. The action card uses native interactive glass over the paper reader.
 Verified: Data + Commands focused tests 1/1 each; iPhone 17 Pro / iOS 26.5 UI V14 + V08 2/2; `compare-screens.py R9-Reader-En-Word`; `git diff --check` clean.

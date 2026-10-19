@@ -59,6 +59,7 @@ struct MoneyObligationsReading: Equatable {
     var installments: [MoneyObligationDue]
     var bills: [MoneyObligationDue]
     var subscriptions: [MoneyObligationDue]
+    var subscriptionSuggestions: [SubscriptionSuggestionEngine.Suggestion]
     var statements: [MoneyObligationDue]
 }
 
@@ -82,9 +83,20 @@ extension AppMoneyService {
         let cycle = try MoneyRepository(context: context).cycle(at: now)
         let start = cycle?.startDay ?? today, end = cycle?.expectedEndDay ?? today.adding(days: 30)
         func live<T: MadarRecordModel>(_ row: T) -> Bool { (try? row.record().isLive) == true }
-        let obligations = try context.fetch(FetchDescriptor<Obligation>()).filter { live($0) && $0.currency == home }
+        let liveObligations = try context.fetch(FetchDescriptor<Obligation>()).filter(live)
+        let obligations = liveObligations.filter { $0.currency == home }
         let items = try context.fetch(FetchDescriptor<InstallmentItem>()).filter(live)
-        let paidBills = try MoneyRepository(context: context).confirmedTransactions().filter { $0.obligationID != nil }
+        let confirmed = try MoneyRepository(context: context).confirmedTransactions()
+        let paidBills = confirmed.filter { $0.obligationID != nil }
+        let subscriptionSuggestions = SubscriptionSuggestionEngine.suggestions(
+            charges: confirmed.filter { $0.currency.uppercased() == home.uppercased() }.map {
+                .init(id: $0.id.uuidString, kind: $0.kind, reviewState: $0.reviewState, source: $0.source,
+                      merchant: $0.merchant, counterparty: $0.counterparty, currency: $0.currency, amountMinor: $0.amountMinor,
+                      cardID: $0.cardID?.uuidString, accountID: $0.fromAccountID?.uuidString,
+                      obligationID: $0.obligationID?.uuidString, at: $0.eventAt)
+            },
+            existingObligationNames: liveObligations.filter { $0.kind == "bill" || $0.kind == "subscription" }.map(\.name),
+            now: now, timeZone: zone)
         var calendar = Calendar(identifier: .gregorian); calendar.timeZone = zone
 
         // Every unpaid instalment, with its plan's progress.
@@ -162,6 +174,7 @@ extension AppMoneyService {
         return .init(today: today, cycleStart: start, cycleEnd: end, cycle: cycleDues,
                      fromSalaryMinor: cycleDues.filter { $0.group != .statement }.reduce(0) { $0 + $1.amountMinor },
                      cardsMinor: cycleDues.filter { $0.group == .statement }.reduce(0) { $0 + $1.amountMinor },
-                     ladder: ladder, endings: endings, installments: nextInstalments, bills: next(bills), subscriptions: next(subscriptions), statements: statements.sorted { $0.due < $1.due })
+                     ladder: ladder, endings: endings, installments: nextInstalments, bills: next(bills), subscriptions: next(subscriptions),
+                     subscriptionSuggestions: subscriptionSuggestions, statements: statements.sorted { $0.due < $1.due })
     }
 }
