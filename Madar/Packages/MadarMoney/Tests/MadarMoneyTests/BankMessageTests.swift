@@ -213,3 +213,22 @@ import Testing
         #expect(p.merchant == "Fuel Station 3"); #expect(p.last4 == "2468"); #expect(p.cardKind == .credit)
     }
 }
+
+@Suite struct BankMessageDateOrderTests {
+    let riyadh = TimeZone(identifier: "Asia/Riyadh")!
+    func at(_ y: Int, _ m: Int, _ d: Int, _ h: Int, _ min: Int) -> Date {
+        var c = Calendar(identifier: .gregorian); c.timeZone = riyadh
+        return c.date(from: DateComponents(year: y, month: m, day: d, hour: h, minute: min))!
+    }
+    @Test func yearFirstTwoDigitDateReadsByReceiveTime() {
+        let p = BankMessageParser.parse("خصم SAR 12.00 من حسابك *1234 في 25-10-19 14:30 - تحويل", timeZone: riyadh, receivedAt: at(2025, 10, 19, 14, 31))
+        #expect(p.eventAt == at(2025, 10, 19, 14, 30)); #expect(p.kind == .transferOut); #expect(p.amountMinor == 1200)
+    }
+    @Test func dayFirstTwoDigitDateReadsByReceiveTime() {
+        let p = BankMessageParser.parse("شراء عبر نقاط البيع\nبطاقة:4321;مدى\nمبلغ:30 SAR\nلدى:Sample Shop\n19-10-25 08:05", timeZone: riyadh, receivedAt: at(2025, 10, 19, 8, 6))
+        #expect(p.eventAt == at(2025, 10, 19, 8, 5))
+    }
+    @Test func srIsRiyal() {
+        #expect(BankMessageParser.parse("شراء انترنت بـSR 15.5 \nبطاقة:4321;مدى\nلـSAMPLE", timeZone: riyadh).amountMinor == 1550)
+    }
+}

@@ -472,7 +472,7 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         let homeCurrency = try SettingsStore(context: context).value(for: "core.currency").string ?? "SAR"
         let items = raw.filter { !discard(text($0, "text")) }.map { p in
             let at = MoneyCommandPayload.date(p["receivedAt"]) ?? issuedAt
-            let parsed = BankMessageParser.parse(text(p, "text"), timeZone: prayer.place(at: at).timeZone, homeCurrency: homeCurrency)
+            let parsed = BankMessageParser.parse(text(p, "text"), timeZone: prayer.place(at: at).timeZone, homeCurrency: homeCurrency, receivedAt: at)
             return (p, at, parsed, BankDedupe.fingerprint(sender: text(p, "sender"), text: text(p, "text")))
         }
         let existing = all.map { message -> BankDedupe.Stored in

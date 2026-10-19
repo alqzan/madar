@@ -62,19 +62,27 @@ public enum BankMessageParser {
         let t = clean(text)
         // Order matters: the dangerous and the specific first.
         if has(t, ["رمز التحقق", "رمز التفعيل", "كلمة المرور لمرة", "OTP", "verification code", "لا تشارك الرمز"]) { return .otp }
-        if has(t, ["مرفوضة", "رفض العملية", "لم تتم العملية", "declined"]) { return .declined }
+        if has(t, ["مرفوضة", "رفض العملية", "لم تتم العملية", "declined", "رصيد غير كافي", "رصيد غير كاف", "Insufficient"]) { return .declined }
         if has(t, ["عكس عملية", "إلغاء عملية", "عكس العملية", "reversal", "reversed"]) { return .reversal }
-        if has(t, ["تمارا", "tamara", "تابي", "tabby"]) { return .bnplInstalment }
+        if has(t, ["تمارا", "tamara", "تابي", "tabby", "دفعة مقسمة"]) { return .bnplInstalment }
         if has(t, ["كشف حساب البطاقة", "كشف البطاقة", "statement", "الحد الأدنى للسداد", "المبلغ المستحق"]) { return .statement }
-        if has(t, ["سداد بطاقة", "سداد البطاقة", "card payment"]) { return .cardPayment }
+        if has(t, ["سداد بطاقة", "سداد البطاقة", "تسديد بطاقة", "تسديد البطاقة", "card payment"]) { return .cardPayment }
+        // RM6 corpus (19 Oct): a finance instalment is an obligation paid, like a bill.
+        if has(t, ["قسط تمويل"]) { return .billPayment }
         if has(t, ["سداد فاتورة", "سداد", "SADAD", "المفوتر"]) { return .billPayment }
-        if has(t, ["استرداد نقدي", "cashback", "cash back", "cash-back", "مكافأة نقدية"]) { return .cashback }
+        if has(t, ["استرداد نقدي", "استرجاع نقدي", "cashback", "cash back", "cash-back", "مكافأة نقدية"]) { return .cashback }
         if has(t, ["استرداد", "refund", "مرتجع"]) { return .refund }
         if has(t, ["راتب", "salary", "payroll"]) { return .salary }
         if has(t, ["سحب صراف", "سحب نقدي", "ATM", "cash withdrawal"]) { return .withdrawal }
         if has(t, ["حوالة صادرة", "تحويل صادر", "تحويل إلى", "outgoing transfer"]) { return .transferOut }
         if has(t, ["حوالة واردة", "تحويل وارد", "incoming transfer"]) { return .transferIn }
-        if has(t, ["شراء", "purchase", "Apple Pay", "مدى", "POS"]) { return .purchase }
+        // RM6 corpus: «حوالة داخلية صادرة», «حوالة محلية واردة», wallet top-ups and own-account moves.
+        if has(t, ["حوالة", "تحويل"]) && has(t, ["صادرة", "صادر"]) { return .transferOut }
+        if has(t, ["حوالة", "تحويل"]) && has(t, ["واردة", "وارد"]) { return .transferIn }
+        if has(t, ["تغذية محفظة", "top up", "استلام قطة", "إضافة أموال", "إيداع عبر حوالة"]) { return .transferIn }
+        if has(t, ["خصم عبر حوالة", "بين حساباتي", "بين حساباتك", "للحساب *", "للبطاقة *"]) || (has(t, ["خصم"]) && has(t, ["من حسابك", "من حساب"]) && has(t, ["تحويل"])) { return .transferOut }
+        if has(t, ["اضافة", "إضافة"]) && has(t, ["الى حسابك", "إلى حسابك"]) { return .income }
+        if has(t, ["شراء", "مشتريات", "purchase", "Apple Pay", "مدى", "POS"]) { return .purchase }
         // After the movements: a transfer that mentions its fee is still the transfer.
         if has(t, ["رسوم", "عمولة", "fee"]) { return .fee }
         if has(t, ["إيداع", "deposit", "credited"]) { return .income }
@@ -82,7 +90,8 @@ public enum BankMessageParser {
         return .unknown
     }
 
-    public static func parse(_ text: String, timeZone: TimeZone, exponents: CurrencyExponents = .specified, homeCurrency: String = "SAR") -> ParsedBankMessage {
+    /// `receivedAt` (the phone's receive time) settles two-digit dates that read both ways, «25-10-19» vs «19-10-25».
+    public static func parse(_ text: String, timeZone: TimeZone, exponents: CurrencyExponents = .specified, homeCurrency: String = "SAR", receivedAt: Date? = nil) -> ParsedBankMessage {
         let t = clean(text), kind = classify(text)
         var result = ParsedBankMessage(kind: kind)
         // OTP and marketing: nothing is read out of them.
@@ -102,7 +111,7 @@ public enum BankMessageParser {
         result.last4 = first(#"\*\s?(\d{4})\b|\b(\d{4})\s?\*"#, in: t)
             // Al Rajhi: «بطاقة:1234;مدى», «عبر:1234;مدى».
             ?? first(#"(?:بطاقة|ببطاقة|عبر)\s*:?\s*(\d{4})(?!\d)"#, in: t)
-        result.eventAt = eventDate(t, timeZone)
+        result.eventAt = eventDate(t, timeZone, near: receivedAt ?? Date())
         result.merchant = labelled(t, ["لدى", "من متجر", "at"])
         result.biller = labelled(t, ["المفوتر", "Biller"])
         result.counterparty = kind == .transferIn ? labelled(t, ["من", "From"]) : kind == .transferOut ? labelled(t, ["إلى", "To"]) : nil
@@ -119,7 +128,7 @@ public enum BankMessageParser {
 
     // MARK: Fields
 
-    static let currencyWords: [(String, String)] = [("ر.س", "SAR"), ("ريال", "SAR"), ("SAR", "SAR"), ("USD", "USD"), ("دولار", "USD"),
+    static let currencyWords: [(String, String)] = [("ر.س", "SAR"), ("ريال", "SAR"), ("SAR", "SAR"), ("SR", "SAR"), ("USD", "USD"), ("دولار", "USD"),
                                                      ("JPY", "JPY"), ("KWD", "KWD"), ("د.ك", "KWD"), ("BHD", "BHD"), ("OMR", "OMR"),
                                                      ("AED", "AED"), ("EUR", "EUR"), ("GBP", "GBP"), ("EGP", "EGP")]
 
@@ -208,7 +217,7 @@ public enum BankMessageParser {
     }
 
     /// RM6: eventAt from the text — "2026-10-15 13:05", "15/10/26 13:05" or "15-10-2026 13:05".
-    static func eventDate(_ text: String, _ timeZone: TimeZone) -> Date? {
+    static func eventDate(_ text: String, _ timeZone: TimeZone, near reference: Date = Date()) -> Date? {
         let patterns = [#"(\d{4})-(\d{1,2})-(\d{1,2})[ T]+(\d{1,2}):(\d{2})"#, #"(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})\s+(\d{1,2}):(\d{2})"#]
         for (index, pattern) in patterns.enumerated() {
             guard let regex = try? NSRegularExpression(pattern: pattern),
@@ -216,10 +225,14 @@ public enum BankMessageParser {
             let values = (1...5).compactMap { Range(match.range(at: $0), in: text).flatMap { Int(text[$0]) } }
             guard values.count == 5 else { continue }
             var parts = DateComponents()
-            if index == 0 { parts.year = values[0]; parts.month = values[1]; parts.day = values[2] }
-            else { parts.day = values[0]; parts.month = values[1]; parts.year = values[2] < 100 ? 2000 + values[2] : values[2] }
             parts.hour = values[3]; parts.minute = values[4]
-            return date(parts, timeZone)
+            if index == 0 { parts.year = values[0]; parts.month = values[1]; parts.day = values[2]; return date(parts, timeZone) }
+            // RM6 corpus: Al Rajhi, Alinma and stc pay print «yy-mm-dd», others «dd-mm-yy». With two-digit ends both
+            // readings can be valid; the one nearest the receive time wins.
+            var dayFirst = parts; dayFirst.day = values[0]; dayFirst.month = values[1]; dayFirst.year = values[2] < 100 ? 2000 + values[2] : values[2]
+            var yearFirst = parts; yearFirst.year = 2000 + values[0]; yearFirst.month = values[1]; yearFirst.day = values[2]
+            let readings = [date(dayFirst, timeZone), values[2] < 100 ? date(yearFirst, timeZone) : nil].compactMap { $0 }
+            return readings.min { abs($0.timeIntervalSince(reference)) < abs($1.timeIntervalSince(reference)) }
         }
         return nil
     }
@@ -242,7 +255,8 @@ public enum BankMessageParser {
 
     static func date(_ parts: DateComponents, _ timeZone: TimeZone) -> Date? {
         var calendar = Calendar(identifier: .gregorian); calendar.timeZone = timeZone
-        guard let date = calendar.date(from: parts), calendar.component(.day, from: date) == parts.day else { return nil }
+        guard let date = calendar.date(from: parts), calendar.component(.day, from: date) == parts.day,
+              parts.month == nil || calendar.component(.month, from: date) == parts.month else { return nil }
         return date
     }
 }
