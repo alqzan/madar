@@ -17,6 +17,7 @@ struct MoneyZakatView: View {
     @State private var basisChosen = false
     @State private var debt = ZakatDebtsPolicy.unset
     @State private var editor = false
+    @State private var reminderDraft: String?
     @State private var entered = false
     @State private var failure: String?
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
@@ -33,9 +34,24 @@ struct MoneyZakatView: View {
                 if let r = reading, let input, let result {
                     hawlArc
                     if !dynamicType.isAccessibilitySize {
-                        MoneyZakatScale(pool: max(0, result.poolMinor - result.deductedMinor), nisab: result.nisabMinor, visible: visible && basisChosen && debt != .unset, entered: entered, theme: theme)
-                            .frame(height: 255).overlay(alignment: .bottom) { HStack(alignment: .top) { VStack { Text("مالك في الحساب").font(MadarTypography.fine()); Text(amount(max(0, result.poolMinor - result.deductedMinor))).font(MadarTypography.cardTitle()).foregroundStyle(theme.color("surplusText")) }; Spacer(); VStack { Text(basis == .gold ? "النصاب، ذهب ٢٤ قيراطًا" : "النصاب، فضة").font(MadarTypography.fine()); Text(result.nisabMinor.map(amount) ?? "أدخل السعر").font(MadarTypography.cardTitle()) } }.foregroundStyle(theme.secondaryInk).padding(.horizontal, 8).padding(.bottom, 6) }
-                            .accessibilityHidden(true)
+                        VStack(spacing: 4) {
+                            MoneyZakatScale(pool: max(0, result.poolMinor - result.deductedMinor), nisab: result.nisabMinor, visible: visible && basisChosen && debt != .unset, entered: entered, theme: theme)
+                                .frame(height: 255)
+                                .accessibilityHidden(true)
+                            HStack(alignment: .top) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("مالك في الحساب").font(MadarTypography.fine())
+                                    Text(amount(max(0, result.poolMinor - result.deductedMinor))).font(MadarTypography.cardTitle()).foregroundStyle(theme.color("surplusText"))
+                                }
+                                Spacer(minLength: 12)
+                                VStack(alignment: .trailing, spacing: 2) {
+                                    Text(basis == .gold ? "النصاب، ذهب ٢٤ قيراطًا" : "النصاب، فضة").font(MadarTypography.fine())
+                                    Text(result.nisabMinor.map(amount) ?? "أدخل السعر").font(MadarTypography.cardTitle())
+                                }
+                            }
+                            .foregroundStyle(theme.secondaryInk)
+                            .padding(.horizontal, 8)
+                        }
                     }
                     assessment(result)
                     VStack(alignment: .leading, spacing: 10) {
@@ -55,6 +71,7 @@ struct MoneyZakatView: View {
                             Text(result.goldPriceStale ? "السعر أقدم من ٣٠ يومًا؛ حدّثه" : "سعر أدخلته يدويًا").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                         }.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).contentShape(.rect) }.accessibilityIdentifier("money-zakat-price")
                     }
+                    if hawl != nil { zakatReminder }
                     Button { editor = true } label: { Label("بيانات الحساب والحول", systemImage: "slider.horizontal.3").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 50).background(theme.ink).foregroundStyle(theme.background) }.accessibilityIdentifier("money-zakat-edit")
                     VStack(alignment: .leading, spacing: 8) {
                         Text("ما يدخل في الوعاء").font(MadarTypography.section())
@@ -66,8 +83,94 @@ struct MoneyZakatView: View {
             }.padding(.horizontal, 18).padding(.bottom, 24).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.plain).environment(\.roomTheme, theme).toolbar(.hidden, for: .navigationBar, .tabBar)
             .task { load(); entered = true }.onChange(of: app.prayerRevision) { load() }.onChange(of: scenePhase) { if scenePhase != .active { revealed = false } }
-            .sheet(isPresented: $editor) { if let r = reading { MoneyZakatEditor(app: app, reading: r, basis: basis, chosen: basisChosen, debt: debt, visible: visible) } }
+            .sheet(isPresented: $editor, onDismiss: load) { if let r = reading { MoneyZakatEditor(app: app, reading: r, basis: basis, chosen: basisChosen, debt: debt, visible: visible) } }
             .accessibilityIdentifier("money-zakat")
+    }
+    private var zakatReminder: some View {
+        let saved = app.string("mal.zakatReminder")
+        let selected = reminderDraft ?? saved
+        let leadTitle = reminderTitle(selected)
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("تذكير موعد الزكاة").font(MadarTypography.section())
+                    Text("اختَر متى يذكّرك مدار قبل موعد الحول").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                }
+                Spacer()
+                if saved != "off" { Text("مفعل: " + reminderTitle(saved)).font(MadarTypography.fine()).foregroundStyle(theme.color("reserveText")).accessibilityIdentifier("money-zakat-reminder-state") }
+            }
+            reminderChips
+            HStack(alignment: .top) {
+                Text("موعد الحول القادم").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                Spacer()
+                if let hawl {
+                    MadarDateLabel(app.dateLabels(hawl.anniversary), primaryFont: MadarTypography.fine(), secondaryFont: MadarTypography.fine())
+                        .accessibilityElement(children: .ignore).accessibilityLabel(app.dateLabels(hawl.anniversary).combined)
+                        .accessibilityIdentifier("money-zakat-reminder-date")
+                }
+            }
+            if selected == "off" && saved == "off" {
+                Text("التذكير متوقف حتى تختار مهلة وتثبّتها.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+            } else if selected != saved {
+                Button {
+                    app.set(.string(selected), key: "mal.zakatReminder") { reminderDraft = nil }
+                } label: {
+                    VStack(spacing: 3) {
+                        Text(saved == "off" ? "ثبّت التذكير السنوي" : "حدّث التذكير السنوي").font(MadarTypography.body())
+                        Text(leadTitle + " من الموعد المعروض").font(MadarTypography.fine())
+                    }.frame(maxWidth: .infinity, minHeight: 48).background(theme.ink).foregroundStyle(theme.background)
+                }.disabled(app.settingsWriteInProgress).accessibilityIdentifier("money-zakat-reminder-save")
+            } else if saved != "off" {
+                Button("أوقف التذكير السنوي") {
+                    app.set(.string("off"), key: "mal.zakatReminder") { reminderDraft = nil }
+                }.font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 44)
+                    .disabled(app.settingsWriteInProgress).accessibilityIdentifier("money-zakat-reminder-disable")
+            }
+        }
+        .padding(14)
+        .background(theme.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay { RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(theme.color("reserveText").opacity(0.7), lineWidth: 1) }
+    }
+    @ViewBuilder private var reminderChips: some View {
+        if #available(iOS 26.0, *) {
+            GlassEffectContainer(spacing: 0) { reminderChipRow }
+        } else { reminderChipRow }
+    }
+    private var reminderChipRow: some View {
+        HStack(spacing: 7) {
+            reminderChip("1day", title: "قبل يوم")
+            reminderChip("1week", title: "قبل أسبوع")
+            reminderChip("1month", title: "قبل شهر")
+        }
+    }
+    private func reminderChip(_ value: String, title: String) -> some View {
+        let selected = (reminderDraft ?? app.string("mal.zakatReminder")) == value
+        let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+        return Button {
+            withAnimation(reduceMotion ? nil : .smooth(duration: 0.18)) { reminderDraft = value }
+        } label: {
+            reminderChipLabel(title, selected: selected, shape: shape)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("money-zakat-reminder-option-\(value)")
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+    @ViewBuilder private func reminderChipLabel(_ title: String, selected: Bool, shape: RoundedRectangle) -> some View {
+        let content = Text(title).font(MadarTypography.caption()).fontWeight(selected ? .semibold : .regular).foregroundStyle(theme.ink)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .background(theme.surface.opacity(0.28), in: shape)
+        if #available(iOS 26.0, *) {
+            content
+                .glassEffect(.regular.tint(theme.color("reserve").opacity(selected ? 0.24 : 0.08)).interactive(), in: shape)
+                .overlay { shape.stroke(selected ? theme.color("reserveText") : theme.line, lineWidth: selected ? 1.5 : 1) }
+        } else {
+            content
+                .background(.ultraThinMaterial, in: shape)
+                .overlay { shape.stroke(selected ? theme.color("reserveText") : theme.line, lineWidth: selected ? 1.5 : 1) }
+        }
+    }
+    private func reminderTitle(_ value: String) -> String {
+        switch value { case "1day": "قبل يوم"; case "1week": "قبل أسبوع"; case "1month": "قبل شهر"; default: "بلا تذكير" }
     }
     private var hawlArc: some View {
         VStack(spacing: 8) {

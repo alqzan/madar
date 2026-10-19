@@ -2108,6 +2108,36 @@
    "preset": false
   },
   {
+   "key": "mal.zakatReminder",
+   "owner": "mal",
+   "section": "التنبيهات",
+   "title": "تذكير موعد الزكاة",
+   "type": "choice",
+   "default": "off",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "off",
+     "label": "بلا تذكير"
+    },
+    {
+     "value": "1day",
+     "label": "قبل يوم"
+    },
+    {
+     "value": "1week",
+     "label": "قبل أسبوع"
+    },
+    {
+     "value": "1month",
+     "label": "قبل شهر"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": false,
+   "note": "M5-V22: one amount-free annual notice before the user-selected hawl date. Off by default; month = 30 civil days."
+  },
+  {
    "key": "mal.sinceLastVisit",
    "owner": "mal",
    "section": "التنبيهات",

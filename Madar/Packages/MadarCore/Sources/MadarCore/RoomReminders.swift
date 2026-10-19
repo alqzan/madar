@@ -59,6 +59,26 @@ public enum RoomReminders {
         return .init(id: "mal.\(daysBefore == 0 ? "cardCash" : "cardDue").\(cardID.uuidString).\(dueDay)", room: .mal, dueAt: due, dayKey: reminder.description)
     }
 
+    /// M5-V22: an amount-free annual reminder before the hawl date chosen by the user. The
+    /// candidate is long-range by design; NotificationArbiter grants this kind its bounded horizon.
+    public static func zakat(anniversary: GregorianDay, lead: String, timeZone: TimeZone,
+                             prayerDays: [PrayerDay], now: Date) -> NotificationCandidate? {
+        let leadDays: Int
+        switch lead {
+        case "1day": leadDays = 1
+        case "1week": leadDays = 7
+        case "1month": leadDays = 30
+        default: return nil
+        }
+        let reminderDay = anniversary.adding(days: -leadDays)
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = timeZone
+        guard let proposed = calendar.date(bySettingHour: 9, minute: 0, second: 0, of: reminderDay.date(in: timeZone)) else { return nil }
+        let due = SanctityGuard(prayerDays: prayerDays).clamp(proposed)
+        guard due > now else { return nil }
+        return .init(id: "mal.zakat.\(lead).\(anniversary)", room: .mal, kind: .annualReminder, dueAt: due,
+                     dayKey: GregorianDay.containing(due, in: timeZone).description)
+    }
+
     /// M5-V15: one quiet balance-check reminder per line and interval. An overdue check is brought forward once;
     /// the shared arbiter still applies the daily budget, quiet hours and prayer sanctity window.
     public static func reconciliation(lineID: UUID, since: GregorianDay, everyDays: Int, timeZone: TimeZone,
@@ -81,6 +101,7 @@ public enum RoomReminders {
         if id.hasPrefix("habits.") { return "عادة" }
         if id.hasPrefix("mal.alert80.") { return "حدود الصرف" }
         if id.hasPrefix("mal.card") { return "سداد البطاقة" }
+        if id.hasPrefix("mal.zakat.") { return "الزكاة" }
         if id.hasPrefix("mal.reconcile.") { return "مطابقة الرصيد" }
         if id.hasPrefix("notes.") { return id.hasSuffix(".niyya") ? "النيّة" : id.hasSuffix(".letter") ? "رسالة" : "ذكرى" }
         return nil

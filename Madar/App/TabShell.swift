@@ -150,7 +150,7 @@ struct MadarRootView: View {
                 }
                 .safeAreaInset(edge: .bottom, spacing: 0) {
                     Color.clear
-                        .frame(height: dynamicType.isAccessibilitySize ? 64 : 48)
+                        .frame(height: dynamicType.isAccessibilitySize ? 88 : 72)
                         .allowsHitTesting(false)
                         .accessibilityHidden(true)
                 }

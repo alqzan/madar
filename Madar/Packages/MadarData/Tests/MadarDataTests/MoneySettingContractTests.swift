@@ -6,6 +6,9 @@ struct MoneySettingContractTests {
         #expect(try s.definition(for: "mal.offsetCapDailies").defaultValue == .number(3))
         #expect(try s.definition(for: "mal.bigExpenseRule").defaultValue == .string("dailies"))
         #expect(try s.definition(for: "mal.reconcileEveryDays").defaultValue == .number(90))
+        #expect(try s.definition(for: "mal.zakatReminder").defaultValue == .string("off"))
+        for value in ["off", "1day", "1week", "1month"] { try s.validate(.string(value), for: "mal.zakatReminder") }
+        #expect(throws: DataError.self) { try s.validate(.string("everyday"), for: "mal.zakatReminder") }
         #expect(try s.definition(for: "mal.cashbackDestination").defaultValue == .string(""))
         try s.validate(.string(""), for: "mal.cashbackDestination")
         try s.validate(.string("57F4B8D3-A5C8-4D8F-8F49-FE54E923C428"), for: "mal.cashbackDestination")

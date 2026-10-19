@@ -10,7 +10,7 @@ import MadarPrayer
 /// M3-V12 adds the diary kinds (morning intention, «في مثل هذا اليوم», a letter whose day came) with fixed copy
 /// that never carries diary text, so they stand outside the lock cleanup of `madar.notes.` requests (owner, 15 Oct).
 @MainActor enum RoomNotificationContent {
-    static let roomPrefixes = ["quran.", "digest.", "qada.", "habits.", "notes.", "nudge.", "mal.alert80.", "mal.cardDue.", "mal.cardCash.", "mal.reconcile."]
+    static let roomPrefixes = ["quran.", "digest.", "qada.", "habits.", "notes.", "nudge.", "mal.alert80.", "mal.cardDue.", "mal.cardCash.", "mal.reconcile.", "mal.zakat."]
     static func isRoomRequest(_ id: String) -> Bool { roomPrefixes.contains { id.hasPrefix($0) } }
 
     /// Qada while something is owed, and each push habit's window start today (custom, due, unmet, not paused).
@@ -29,7 +29,81 @@ import MadarPrayer
                 result.append(candidate)
             }
         }
-        return result + (try diaryCandidates(session: session, prayerDays: prayerDays, now: now)) + limitCandidates(session: session, prayerDays: prayerDays, now: now) + cardCandidates(session: session, prayerDays: prayerDays, now: now) + reconciliationCandidates(session: session, prayerDays: prayerDays, now: now)
+        return result + (try diaryCandidates(session: session, prayerDays: prayerDays, now: now)) + limitCandidates(session: session, prayerDays: prayerDays, now: now) + cardCandidates(session: session, prayerDays: prayerDays, now: now) + reconciliationCandidates(session: session, prayerDays: prayerDays, now: now) + zakatCandidates(session: session, now: now)
+    }
+
+    /// Builds two upcoming amount-free requests from the saved hawl preference. Each has its own
+    /// future prayer days so the same sanctity guard can inspect the actual scheduled window.
+    /// While the app is locked, only already-published request metadata may be used; ZakatProfile
+    /// stays behind the app's biometric boundary.
+    static func zakatCandidates(session: AppSession, now: Date) -> [NotificationCandidate] {
+        let lead = session.string("mal.zakatReminder")
+        guard let leadDays = zakatLeadDays(lead) else { return [] }
+        guard session.lockController?.canPresent(.app) ?? session.protectedDataAuthorized else {
+            return zakatCandidatesFromLedger(session: session, lead: lead, now: now)
+        }
+        guard let key = zakatHawlKey(session: session),
+              let hawl = MoneyHawl.read(key, at: now, app: session),
+              let repository = try? PrayerRepository(context: ModelContext(session.container)) else { return [] }
+        let place = repository.place(at: now), trip = repository.activeTrip(at: now)
+        let options = trip == nil ? repository.options : repository.tripOptions
+        return [hawl.anniversary, hawl.followingAnniversary].compactMap { anniversary in
+            let reminderDay = anniversary.adding(days: -leadDays)
+            let relevantDays = (-1...2).compactMap { offset in
+                PrayerTimesEngine.calculate(day: reminderDay.adding(days: offset), place: place, options: options)
+            }
+            return RoomReminders.zakat(anniversary: anniversary, lead: lead, timeZone: place.timeZone,
+                                       prayerDays: relevantDays, now: now)
+        }
+    }
+
+    /// Reuses only future, live requests that were previously published while authorized.
+    /// This lets the arbiter preserve them under the lock without fetching protected money rows.
+    private static func zakatCandidatesFromLedger(session: AppSession, lead: String, now: Date) -> [NotificationCandidate] {
+        guard zakatLeadDays(lead) != nil,
+              let rows = try? ModelContext(session.container).fetch(FetchDescriptor<NotificationLedger>()) else { return [] }
+        let candidates = rows.compactMap { row -> NotificationCandidate? in
+            guard row.deletedAt == nil, row.mergedInto == nil, row.state == "submitted",
+                  row.room == "mal", row.kind == "zakat", row.requestClass == "room",
+                  row.scheduledFor > now, (try? GregorianDay(row.dayKey)) != nil else { return nil }
+            let parts = row.requestID.split(separator: ".").map(String.init)
+            guard parts.count == 4, parts[0] == "mal", parts[1] == "zakat", parts[2] == lead,
+                  (try? GregorianDay(parts[3])) != nil else { return nil }
+            return .init(id: row.requestID, room: .mal, kind: .annualReminder,
+                         dueAt: row.scheduledFor, dayKey: row.dayKey)
+        }
+        return Dictionary(grouping: candidates, by: \.id).compactMap { _, values in
+            values.max { $0.dueAt < $1.dueAt }
+        }.sorted { $0.dueAt == $1.dueAt ? $0.id < $1.id : $0.dueAt < $1.dueAt }
+    }
+
+    private static func zakatLeadDays(_ lead: String) -> Int? {
+        switch lead { case "1day": 1; case "1week": 7; case "1month": 30; default: nil }
+    }
+
+    /// Uses only the saved hawl-date field so scheduling continues under the app lock.
+    /// It does not calculate balances, and notification copy stays generic.
+    private static func zakatHawlKey(session: AppSession) -> String? {
+        let profiles = (try? ModelContext(session.container).fetch(FetchDescriptor<ZakatProfile>())) ?? []
+        return profiles.filter { $0.deletedAt == nil && $0.mergedInto == nil }
+            .sorted { $0.id.uuidString < $1.id.uuidString }.first?.hawlStartHijri
+    }
+
+    /// The planner needs the future prayer windows too; current-day calculations remain the source
+    /// for prayer asks, reconciliation and Live Activities.
+    static func planningPrayerDays(session: AppSession, candidates: [NotificationCandidate], current: [PrayerDay], now: Date) -> [PrayerDay] {
+        let annual = candidates.filter { $0.kind == .annualReminder && $0.id.hasPrefix("mal.zakat.") }
+        guard !annual.isEmpty, let repository = try? PrayerRepository(context: ModelContext(session.container)) else { return current }
+        let place = repository.place(at: now), trip = repository.activeTrip(at: now)
+        let options = trip == nil ? repository.options : repository.tripOptions
+        var byDay = Dictionary(uniqueKeysWithValues: current.map { ($0.day, $0) })
+        for candidate in annual {
+            let civil = GregorianDay.containing(candidate.dueAt, in: place.timeZone)
+            for offset in -1...2 {
+                if let day = PrayerTimesEngine.calculate(day: civil.adding(days: offset), place: place, options: options) { byDay[day.day] = day }
+            }
+        }
+        return byDay.values.sorted { $0.day < $1.day }
     }
 
     static func cardCandidates(session: AppSession, prayerDays: [PrayerDay], now: Date) -> [NotificationCandidate] {
@@ -151,6 +225,10 @@ import MadarPrayer
             content.title = protected ? "مدار" : "مطابقة الرصيد"
             content.body = protected ? "حان وقت المراجعة" : "حان موعد مراجعة حساباتك والتزاماتك في مدار"
             content.userInfo = ["dayKey": candidate.dayKey, "room": "mal"]
+        } else if id.hasPrefix("mal.zakat.") {
+            content.title = protected ? "مدار" : "الزكاة"
+            content.body = protected ? "لديك تذكير في مدار" : "اقترب موعد الحساب السنوي الذي اخترته."
+            content.userInfo = ["dayKey": candidate.dayKey, "room": "mal"]
         } else {
             content.title = "مدار"
             content.body = "افتح مدار ليحدّث تذكيراتك"
@@ -166,6 +244,7 @@ import MadarPrayer
         if id.hasPrefix("habits.") { return "habit" }
         if id.hasPrefix("mal.alert80.") { return "alert80" }
         if id.hasPrefix("mal.card") { return id.hasPrefix("mal.cardCash.") ? "cardCash" : "cardDue" }
+        if id.hasPrefix("mal.zakat.") { return "zakat" }
         if id.hasPrefix("mal.reconcile.") { return "reconciliation" }
         if id.hasPrefix("notes.") { return id.hasSuffix(".niyya") ? "niyya" : id.hasSuffix(".letter") ? "letter" : "onThisDay" }
         return "nudge"
@@ -209,6 +288,26 @@ import MadarPrayer
             let candidates = reconciliationCandidates(session: session, prayerDays: days, now: now)
             return candidates.contains { $0.id == id }
         }
+        if id.hasPrefix("mal.zakat.") {
+            let parts = id.split(separator: ".").map(String.init)
+            guard parts.count == 4, let leadDays = zakatLeadDays(parts[2]),
+                  session.string("mal.zakatReminder") == parts[2],
+                  let anniversary = try? GregorianDay(parts[3]) else { return false }
+            guard session.lockController?.canPresent(.app) ?? session.protectedDataAuthorized else {
+                let today = GregorianDay.containing(now, in: session.activePlace.timeZone)
+                let rows = try ModelContext(session.container).fetch(FetchDescriptor<NotificationLedger>())
+                return rows.contains { row in
+                    row.deletedAt == nil && row.mergedInto == nil && row.state == "submitted"
+                        && row.room == "mal" && row.kind == "zakat" && row.requestClass == "room"
+                        && row.requestID == id && row.dayKey == today.description
+                }
+            }
+            guard let key = zakatHawlKey(session: session),
+                  let hawl = MoneyHawl.read(key, at: now, app: session),
+                  [hawl.anniversary, hawl.followingAnniversary].contains(anniversary) else { return false }
+            let reminderDay = anniversary.adding(days: -leadDays)
+            return GregorianDay.containing(now, in: session.activePlace.timeZone) == reminderDay
+        }
         if id.hasPrefix("mal.alert80.") { return session.bool("mal.alert80") }
         return false // «افتح مدار» while Madar is open says nothing.
     }
@@ -217,7 +316,7 @@ import MadarPrayer
     static func open(_ id: String, userInfo: [AnyHashable: Any], session: AppSession) {
         if id.hasPrefix("quran.") { session.selectedTab = "quran" }
         else if id.hasPrefix("qada.") { session.selectedTab = "prayer" }
-        else if id.hasPrefix("mal.alert80.") || id.hasPrefix("mal.card") || id.hasPrefix("mal.reconcile.") { session.selectedTab = "money" }
+        else if id.hasPrefix("mal.alert80.") || id.hasPrefix("mal.card") || id.hasPrefix("mal.reconcile.") || id.hasPrefix("mal.zakat.") { session.selectedTab = "money" }
         else if id.hasPrefix("notes.") { session.open(URL(string: id.hasSuffix(".onThisDay") ? "madar://notes" : "madar://notes/today")!) }
         else if id.hasPrefix("habits.") {
             session.habitRouteID = (userInfo["habit"] as? String).flatMap(UUID.init(uuidString:))

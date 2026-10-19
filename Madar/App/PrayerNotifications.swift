@@ -118,6 +118,7 @@ final class PrayerNotificationCoordinator {
             candidates += try AppQuranService(session: session, clock: { now }).notificationCandidates(prayerDays: days, now: now)
             candidates += try RoomNotificationContent.candidates(session: session, prayerDays: days, now: now)
         }
+        let planningDays = RoomNotificationContent.planningPrayerDays(session: session, candidates: candidates, current: days, now: now)
         let externalPendingCount = existing.filter { !Self.manages($0.identifier) }.count
         let ledger = try ModelContext(session.container).fetch(FetchDescriptor<NotificationLedger>()).filter { $0.deletedAt == nil && ["submitted", "observed"].contains($0.state) && $0.requestClass != "prayer" }
         let consumed = ledger.filter { $0.scheduledFor <= now || $0.kind == "activityStart" }
@@ -130,7 +131,7 @@ final class PrayerNotificationCoordinator {
         else { priority = [.salah, .quran, .mal, .notes, .habits, .mihbara] }
         let plan = NotificationArbiter.plan(
             candidates: candidates,
-            prayerDays: days,
+            prayerDays: planningDays,
             now: now,
             timeZone: repository.place(at: now).timeZone,
             policy: .init(dailyBudget: Int(session.number("notif.dailyBudget")), priority: priority, quietFromMinutes: quietMinutes,

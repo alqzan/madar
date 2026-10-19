@@ -6,6 +6,18 @@ import MadarCore
 
 /// M4-F02: built rooms share the arbiter; app protection hides content (§8 item 10); a tap opens the room it speaks for.
 @MainActor final class RoomNotificationsIntegrationTests: XCTestCase {
+    private final class LockedNotificationLockService: MadarLockService {
+        func redactProtectedData() async throws {}
+        func authorizeAccess(to feature: MadarProtectedFeature) async throws {}
+        func privacyScopeDidChange(to scope: MadarLockScope) async throws {}
+        func persistedPrivacyScope() throws -> MadarLockScope { .app }
+    }
+    private final class LockedNotificationAuthenticator: MadarDeviceAuthenticator {
+        private(set) var calls = 0
+        func verify() async throws -> Bool { calls += 1; return true }
+        func invalidate() {}
+    }
+
     func testCardRemindersAreAmountFreeAndStopAfterPaymentOrOff() throws {
         let (app, root, now, day) = try fixture(["core.faceIDLock": .string("none"), "core.dayStart": .string("midnight"), "mal.cardDue": .string("3days")]); defer { try? FileManager.default.removeItem(at: root) }
         app.authorizeProtectedData()
@@ -64,6 +76,65 @@ import MadarCore
         let last = Reconciliation(); last.accountID = account.id; last.at = now; last.expectedMinor = account.balanceMinor
         last.observedMinor = account.balanceMinor; last.deltaMinor = 0; context.insert(last); try context.save(); try app.reload()
         XCTAssertFalse(try RoomNotificationContent.stillRelevant(candidate.id, session: app, now: now), "A saved reconciliation makes the old request stale")
+    }
+
+    func testZakatReminderSchedulesAmountFreeWhileAppLockedAndStopsWhenOff() throws {
+        let (app, root, now, day) = try fixture(["core.faceIDLock": .string("app"), "core.dayStart": .string("midnight"), "mal.zakatReminder": .string("1week")])
+        defer { try? FileManager.default.removeItem(at: root) }
+        app.authorizeProtectedData()
+        let context = ModelContext(app.container), profile = ZakatProfile()
+        profile.hawlStartHijri = "h:1448-05-01"
+        context.insert(profile); try context.save(); try app.reload()
+        let candidates = RoomNotificationContent.zakatCandidates(session: app, now: now)
+        XCTAssertEqual(candidates.count, 2, "Both upcoming anniversaries are prepared while authorized")
+        let hawl = try XCTUnwrap(MoneyHawl.read("h:1448-05-01", at: now, app: app))
+        XCTAssertEqual(Set(candidates.map(\.id)), Set([hawl.anniversary, hawl.followingAnniversary].map { "mal.zakat.1week.\($0)" }))
+        for candidate in candidates {
+            let row = NotificationLedger()
+            row.dayKey = candidate.dayKey; row.requestID = candidate.id; row.room = "mal"
+            row.kind = "zakat"; row.requestClass = "room"; row.scheduledFor = candidate.dueAt; row.state = "submitted"
+            context.insert(row)
+        }
+        try context.save(); try app.reload()
+        let authenticator = LockedNotificationAuthenticator()
+        let lock = MadarLockController(scope: .app, service: LockedNotificationLockService(), authenticator: { authenticator })
+        app.lockController = lock
+        XCTAssertFalse(lock.canPresent(.app), "The app-scope biometric gate starts locked")
+        app.redactProtectedData()
+        XCTAssertFalse(app.protectedDataAuthorized, "Background scheduling must not depend on unlocking the app")
+        XCTAssertThrowsError(try AppMoneyService(app: app).loadZakat(at: now), "Protected Zakat data remains unavailable while locked")
+
+        let restored = RoomNotificationContent.zakatCandidates(session: app, now: now)
+        XCTAssertEqual(Set(restored.map(\.id)), Set(candidates.map(\.id)), "The locked scheduler restores already-published requests from ledger metadata")
+        XCTAssertEqual(restored.map(\.dueAt), candidates.map(\.dueAt))
+        XCTAssertTrue(candidates.allSatisfy { $0.kind == .annualReminder && RoomNotificationContent.isRoomRequest($0.id) })
+        XCTAssertEqual(Set(candidates.map { RoomNotificationContent.ledgerKind($0.id) }), ["zakat"])
+
+        let planningDays = RoomNotificationContent.planningPrayerDays(session: app, candidates: restored, current: [day], now: now)
+        let plan = NotificationArbiter.plan(candidates: restored, prayerDays: planningDays, now: now, timeZone: day.place.timeZone,
+            policy: .init(dailyBudget: 4, staleNudgeEnabled: false, dayBoundary: .midnight))
+        XCTAssertEqual(Set(plan.scheduled.map(\.id)), Set(restored.map(\.id)))
+        for candidate in restored {
+            let content = RoomNotificationContent.content(for: candidate, plan: plan, session: app, habitNames: [:])
+            let shown = content.title + content.body
+            XCTAssertEqual(content.title, "مدار")
+            XCTAssertEqual(content.body, "لديك تذكير في مدار")
+            XCTAssertNil(shown.rangeOfCharacter(from: .decimalDigits), "A zakat reminder never reveals a balance or amount")
+            XCTAssertFalse(content.body.contains("هول"))
+            XCTAssertEqual(content.userInfo["room"] as? String, "mal")
+            RoomNotificationContent.open(candidate.id, userInfo: content.userInfo, session: app)
+            XCTAssertEqual(app.selectedTab, "money")
+        }
+
+        let first = try XCTUnwrap(restored.first)
+        let reminderDay = GregorianDay.containing(first.dueAt, in: day.place.timeZone)
+        let reminderMorning = reminderDay.date(in: day.place.timeZone).addingTimeInterval(10 * 3600)
+        XCTAssertTrue(try RoomNotificationContent.stillRelevant(first.id, session: app, now: reminderMorning))
+        XCTAssertFalse(lock.canPresent(.app), "Notification planning must not unlock protected room content")
+        XCTAssertEqual(authenticator.calls, 0, "Scheduling does not ask for Face ID")
+        _ = try SettingsStore(context: context).stage(["mal.zakatReminder": .string("off")]); try context.save(); try app.reload()
+        XCTAssertTrue(RoomNotificationContent.zakatCandidates(session: app, now: now).isEmpty)
+        XCTAssertFalse(try RoomNotificationContent.stillRelevant(first.id, session: app, now: reminderMorning))
     }
     private func fixture(_ settings: [String: MadarData.JSONValue]) throws -> (AppSession, URL, Date, PrayerDay) {
         let root = FileManager.default.temporaryDirectory.appending(path: "MadarRoomNotifications-\(UUID())")

@@ -23,4 +23,26 @@ import XCTest
         let empty=open("empty");XCTAssertTrue(empty.staticTexts["money-zakat-result"].label.contains("اختر أساس"));shot(empty,"M5-V22-first-L");empty.buttons["money-zakat-basis-silver"].tap();XCTAssertTrue(empty.staticTexts["money-zakat-result"].label.contains("الديون"));empty.terminate()
         let hidden=open("zakatHidden");XCTAssertEqual(hidden.staticTexts["money-zakat-result"].label,"•••");shot(hidden,"M5-V22-hidden-L");hidden.buttons["money-zakat-reveal"].tap();XCTAssertTrue(hidden.staticTexts["money-zakat-result"].label.contains("٣٬٢١٢"))
     }
+
+    func testAnnualReminderStartsOffSavesAndUndoRestoresOff(){
+        continueAfterFailure=false
+        let app=open("zakat")
+        shot(app,"M5-V22-zakat-L")
+        let week=app.buttons["money-zakat-reminder-option-1week"]
+        for _ in 0..<8 where !week.isHittable { app.swipeUp(velocity:.slow) }
+        XCTAssertTrue(week.waitForExistence(timeout:5))
+        let date=app.descendants(matching:.any)["money-zakat-reminder-date"]
+        XCTAssertTrue(date.exists);XCTAssertFalse(date.label.isEmpty,"The annual date is exposed as a dual-calendar label")
+        XCTAssertFalse(app.staticTexts["money-zakat-reminder-state"].exists,"A new reminder is opt-in")
+        week.tap()
+        let save=app.buttons["money-zakat-reminder-save"]
+        XCTAssertTrue(save.waitForExistence(timeout:5));XCTAssertTrue(week.isSelected)
+        shot(app,"M5-V22-zakat-reminder-s1-L")
+        save.tap()
+        XCTAssertTrue(app.staticTexts["money-zakat-reminder-state"].waitForExistence(timeout:5))
+        XCTAssertTrue(app.buttons["تراجع"].waitForExistence(timeout:5))
+        app.buttons["تراجع"].tap()
+        XCTAssertFalse(app.staticTexts["money-zakat-reminder-state"].exists,"Undo restores the default off setting")
+        XCTAssertFalse(week.isSelected)
+    }
 }

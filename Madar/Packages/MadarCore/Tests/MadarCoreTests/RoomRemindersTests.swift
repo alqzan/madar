@@ -41,6 +41,45 @@ import Testing
         #expect(RoomReminders.kindLabel(for: dueToday!.id) == "مطابقة الرصيد")
     }
 
+    @Test func zakatReminderUsesTheChosenAnnualDateAndAmountFreeIdentity() throws {
+        let anniversary = day.day.adding(days: 60), zone = ActivePlace.riyadh.timeZone
+        let reminder = try #require(RoomReminders.zakat(anniversary: anniversary, lead: "1month", timeZone: zone, prayerDays: [day], now: dawn))
+        #expect(reminder.id == "mal.zakat.1month.\(anniversary)")
+        #expect(reminder.kind == .annualReminder && reminder.room == .mal)
+        #expect(reminder.dayKey == anniversary.adding(days: -30).description)
+        #expect(GregorianDay.containing(reminder.dueAt, in: zone) == anniversary.adding(days: -30))
+        #expect(RoomReminders.zakat(anniversary: anniversary, lead: "off", timeZone: zone, prayerDays: [day], now: dawn) == nil)
+        #expect(RoomReminders.kindLabel(for: reminder.id) == "الزكاة")
+
+        let oneDay = try #require(RoomReminders.zakat(anniversary: anniversary, lead: "1day", timeZone: zone, prayerDays: [day], now: dawn))
+        let oneWeek = try #require(RoomReminders.zakat(anniversary: anniversary, lead: "1week", timeZone: zone, prayerDays: [day], now: dawn))
+        #expect(GregorianDay.containing(oneDay.dueAt, in: zone) == anniversary.adding(days: -1))
+        #expect(GregorianDay.containing(oneWeek.dueAt, in: zone) == anniversary.adding(days: -7))
+    }
+
+    @Test func annualRemindersHaveABoundedHorizonAndStillUseSanctity() {
+        let year = NotificationCandidate(id: "mal.zakat.1week.2027-10-09", room: .mal, kind: .annualReminder,
+            dueAt: dawn.addingTimeInterval(300 * 86_400), dayKey: "2027-08-01")
+        let secondYear = NotificationCandidate(id: "mal.zakat.1week.2028-10-09", room: .mal, kind: .annualReminder,
+            dueAt: dawn.addingTimeInterval(730 * 86_400), dayKey: "2028-08-01")
+        let outside = NotificationCandidate(id: "mal.zakat.1week.2029-10-09", room: .mal, kind: .annualReminder,
+            dueAt: dawn.addingTimeInterval(741 * 86_400), dayKey: "2029-08-01")
+        let ordinary = NotificationCandidate(id: "mal.cardDue.too-far", room: .mal,
+            dueAt: dawn.addingTimeInterval(3 * 86_400), dayKey: "2026-10-12")
+        let plan = NotificationArbiter.plan(candidates: [year, secondYear, outside, ordinary], prayerDays: [day], now: dawn,
+            timeZone: ActivePlace.riyadh.timeZone, policy: .init(staleNudgeEnabled: false, dayBoundary: .midnight))
+        #expect(plan.scheduled.map(\.id).contains(year.id))
+        #expect(plan.scheduled.map(\.id).contains(secondYear.id))
+        #expect(plan.droppedIDs.contains(outside.id))
+        #expect(plan.droppedIDs.contains(ordinary.id), "The 48-hour horizon stays unchanged for ordinary reminders")
+
+        let duringSanctity = NotificationCandidate(id: "mal.zakat.1day.near", room: .mal, kind: .annualReminder,
+            dueAt: day.asr.addingTimeInterval(300), dayKey: day.day.description)
+        let clamped = NotificationArbiter.plan(candidates: [duringSanctity], prayerDays: [day], now: day.asr.addingTimeInterval(60),
+            timeZone: ActivePlace.riyadh.timeZone, policy: .init(staleNudgeEnabled: false))
+        #expect(clamped.scheduled.first?.dueAt == day.asr.addingTimeInterval(1800))
+    }
+
     private func calendarDate(_ hour: Int, day: GregorianDay, zone: TimeZone) -> Date {
         var calendar = Calendar(identifier: .gregorian); calendar.timeZone = zone
         return calendar.date(bySettingHour: hour, minute: 0, second: 0, of: day.date(in: zone))!

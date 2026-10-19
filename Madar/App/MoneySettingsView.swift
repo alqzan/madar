@@ -149,7 +149,16 @@ struct MoneySettingsView: View {
         }
     }
     private var messagesPage: some View {
-        VStack(alignment: .leading, spacing: 14) { note("مدار يستقبل ما تمرّره له أتمتة «الاختصارات»، ولا يقرأ صندوق رسائلك."); toggle("تنبيه حدود التصنيف", "mal.alert80"); toggle("افتح منذ آخر زيارة بعد الغياب", "mal.sinceLastVisit"); Picker("تذكير سداد البطاقة", selection: stringBinding("mal.cardDue")) { Text("قبل ثلاثة أيام").tag("3days"); Text("قبل يوم").tag("1day"); Text("بلا تذكير").tag("off") } }
+        VStack(alignment: .leading, spacing: 14) {
+            note("مدار يستقبل ما تمرّره له أتمتة «الاختصارات»، ولا يقرأ صندوق رسائلك.")
+            toggle("تنبيه حدود التصنيف", "mal.alert80")
+            toggle("افتح منذ آخر زيارة بعد الغياب", "mal.sinceLastVisit")
+            Picker("تذكير سداد البطاقة", selection: stringBinding("mal.cardDue")) { Text("قبل ثلاثة أيام").tag("3days"); Text("قبل يوم").tag("1day"); Text("بلا تذكير").tag("off") }
+            Picker("تذكير موعد الزكاة", selection: stringBinding("mal.zakatReminder")) {
+                Text("بلا تذكير").tag("off"); Text("قبل يوم").tag("1day"); Text("قبل أسبوع").tag("1week"); Text("قبل شهر").tag("1month")
+            }.accessibilityIdentifier("money-settings-zakat-reminder")
+            note("يبدأ بعد اختيار تاريخ الحول من شاشة الزكاة، ويظهر الموعد بالتقويمين.")
+        }
     }
     private var roomPage: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -205,7 +214,7 @@ struct MoneySettingsView: View {
     private func toggle(_ title: String, _ key: String) -> some View { Toggle(title, isOn: Binding(get: { app.bool(key) }, set: { app.set(.bool($0), key: key) })).font(MadarTypography.body()).disabled(app.settingsWriteInProgress) }
     private func stringBinding(_ key: String) -> Binding<String> { .init(get: { app.string(key) }, set: { app.set(.string($0), key: key) }) }
     private func tabValue(_ p: Page) -> String { switch p { case .daily: cycle.map { amount($0.headline.todayAllowanceMinor) } ?? "—"; case .cycle: salaryDay > 0 ? service.digits.string(salaryDay) : "الراتب"; case .deficit: service.digits.string(Int(app.number("mal.offsetCapDailies"))); case .travel: app.bool("mal.travelPausesDaily") ? "تتوقف" : "تستمر"; case .messages: "الاختصار"; case .room: "خصوصيتك"; case .reconciliation: service.digits.string(Int(app.number("mal.reconcileEveryDays"))) + " يوم" } }
-    private var keys: [String] { switch page { case .daily: ["mal.dailyAllowance"]; case .cycle: ["mal.salaryDay", "mal.cycleCalendar", "mal.salarySchedule"]; case .deficit: ["mal.autoOffset", "mal.offsetCapDailies", "mal.salaryRemainder", "mal.cashWithdrawalAsSpend"]; case .messages: ["mal.alert80", "mal.sinceLastVisit", "mal.cardDue"]; case .travel: ["mal.travelPausesDaily"]; case .room: ["core.hideMoneyOutside", "core.hideMoneyUntilTouch", "mal.bigExpenseRule", "mal.bigExpenseDays", "mal.bigExpenseSalaryBp", "mal.bigExpenseMinor"]; case .reconciliation: ["mal.reconcileEveryDays"] } }
+    private var keys: [String] { switch page { case .daily: ["mal.dailyAllowance"]; case .cycle: ["mal.salaryDay", "mal.cycleCalendar", "mal.salarySchedule"]; case .deficit: ["mal.autoOffset", "mal.offsetCapDailies", "mal.salaryRemainder", "mal.cashWithdrawalAsSpend"]; case .messages: ["mal.alert80", "mal.sinceLastVisit", "mal.cardDue", "mal.zakatReminder"]; case .travel: ["mal.travelPausesDaily"]; case .room: ["core.hideMoneyOutside", "core.hideMoneyUntilTouch", "mal.bigExpenseRule", "mal.bigExpenseDays", "mal.bigExpenseSalaryBp", "mal.bigExpenseMinor"]; case .reconciliation: ["mal.reconcileEveryDays"] } }
     private func load() {
         cycle = try? MoneyRepository(context: ModelContext(app.container)).cycle(at: app.prayerNow())
         let value = app.values["mal.dailyAllowance"]?.object ?? [:]; mode = value["mode"]?.string ?? "fixed"

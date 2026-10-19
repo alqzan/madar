@@ -1,6 +1,6 @@
 import Foundation
 
-public enum NotificationKind: String, Codable, Sendable { case reminder, prayerAsk, digest, openApp }
+public enum NotificationKind: String, Codable, Sendable { case reminder, annualReminder, prayerAsk, digest, openApp }
 public struct NotificationCandidate: Codable, Equatable, Sendable {
     public let id: String
     public let room: Room
@@ -71,6 +71,7 @@ public enum NotificationArbiter {
         let windows = prayerDays.flatMap(\.sanctityWindows).sorted { $0.start < $1.start }
         let sanctityGuard = SanctityGuard(windows: windows)
         let ordinaryEnd = now.addingTimeInterval(48 * 3600), prayerEnd = now.addingTimeInterval(96 * 3600)
+        let annualEnd = now.addingTimeInterval(740 * 24 * 3600)
         let capacity = max(0, pendingCap - max(0, existingPendingCount))
         var scheduled: [NotificationCandidate] = [], dropped: [String] = [], digested: [String] = []
         var digestMembers: [String: [String]] = [:]
@@ -82,8 +83,8 @@ public enum NotificationArbiter {
         }
         for candidate in candidates.sorted(by: ordering) {
             guard ids.insert(candidate.id).inserted else { continue }
-            guard !disabledIDs.contains(candidate.id), candidate.kind == .reminder || candidate.kind == .prayerAsk else { dropped.append(candidate.id); continue }
-            let horizon = candidate.kind == .prayerAsk ? prayerEnd : ordinaryEnd
+            guard !disabledIDs.contains(candidate.id), candidate.kind == .reminder || candidate.kind == .annualReminder || candidate.kind == .prayerAsk else { dropped.append(candidate.id); continue }
+            let horizon = candidate.kind == .prayerAsk ? prayerEnd : candidate.kind == .annualReminder ? annualEnd : ordinaryEnd
             guard candidate.dueAt >= now, candidate.dueAt <= horizon else { dropped.append(candidate.id); continue }
             let due = sanctityGuard.clamp(candidate.dueAt)
             guard due <= horizon else { dropped.append(candidate.id); continue }
