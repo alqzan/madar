@@ -24,11 +24,13 @@ import MadarDesign
         } catch { EPUBBookFiles.discard(id: id, root: root); throw error }
     }
 
-    func confirmEPUB(_ inspection: EPUBBookInspection, bookID: UUID, commandID: UUID, title: String, author: String, language: String, shelf: String) async throws {
-        try await app.executeBookCommand("book.importEPUB", payload: [
+    func confirmEPUB(_ inspection: EPUBBookInspection, bookID: UUID, commandID: UUID, title: String, author: String, language: String, shelf: String, turathID: Int? = nil) async throws {
+        var payload: [String: MadarCore.JSONValue] = [
             "id": .string(bookID.uuidString), "fileID": .string(inspection.id.uuidString), "sha256": .string(inspection.sha256),
             "title": .string(title), "author": .string(author), "language": .string(language), "shelf": .string(shelf)
-        ], id: commandID)
+        ]
+        if let turathID { payload["turathID"] = .number(Double(turathID)) }
+        try await app.executeBookCommand("book.importEPUB", payload: payload, id: commandID)
         EPUBBookFiles.discard(id: inspection.id, root: app.bookStagingDirectory)
     }
 }
@@ -36,6 +38,7 @@ import MadarDesign
 struct MihbaraEPUBImportView: View {
     let app: AppSession
     let source: URL
+    var turathID: Int? = nil
     let onImported: () -> Void
     @Environment(\.dismiss) private var dismiss
     @Environment(\.roomTheme) private var theme
@@ -264,7 +267,8 @@ struct MihbaraEPUBImportView: View {
             do {
                 try await service.confirmEPUB(inspection, bookID: bookID, commandID: commandID,
                                               title: title.trimmingCharacters(in: .whitespacesAndNewlines),
-                                              author: author.trimmingCharacters(in: .whitespacesAndNewlines), language: language, shelf: shelf)
+                                              author: author.trimmingCharacters(in: .whitespacesAndNewlines), language: language, shelf: shelf,
+                                              turathID: turathID)
                 saving = false; finished = true; onImported()
             } catch {
                 saving = false

@@ -379,6 +379,17 @@ import XCTest
         shot(app, "M6-V08-card-L")
         app.buttons["mihbara-highlight-yellow"].tap()
         XCTAssertTrue(app.buttons["mihbara-highlight-yellow"].waitForSelection(timeout: 8), app.debugDescription)
+        let quoteCard = app.buttons["mihbara-quote-card-open"]
+        XCTAssertTrue(quoteCard.waitForExistence(timeout: 5), app.debugDescription)
+        quoteCard.tap()
+        let quotePreview = app.descendants(matching: .any)["mihbara-quote-card-preview"]
+        XCTAssertTrue(quotePreview.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(quotePreview.label.contains("كتاب اختبار القارئ"), quotePreview.label)
+        XCTAssertTrue(quotePreview.label.contains("من مكتبتك"), quotePreview.label)
+        XCTAssertFalse(quotePreview.label.contains("shamela.ws"), quotePreview.label)
+        shot(app, "M6-V08-quote-card-L")
+        app.buttons["mihbara-quote-card-close"].tap()
+        XCTAssertTrue(quoteCard.waitForExistence(timeout: 5), app.debugDescription)
         sleep(1); shot(app, "M6-V08-highlight-L")
         app.buttons["mihbara-highlight-green"].tap()
         XCTAssertTrue(app.buttons["mihbara-highlight-green"].waitForSelection(timeout: 8))

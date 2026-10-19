@@ -167,6 +167,7 @@ struct MihbaraReaderView: View {
     @State private var readerAlert: String?
     @State private var highlights: [MihbaraHighlight] = []
     @State private var wordCard: MihbaraWordCardState?
+    @State private var quoteCard: MihbaraQuoteCardContent?
     @State private var noteDraft: MihbaraWordCardState?
     @State private var lookupTerm: MihbaraLookupTerm?
     @State private var translationRequest: MihbaraTranslationRequest?
@@ -375,7 +376,7 @@ struct MihbaraReaderView: View {
             if authorized, scenePhase == .active { resumeReader(at: Date()); synchronizeAutoScroll() }
             else if !authorized { pauseReader(at: Date()); stopNarration(); cancelAutoScroll(clearActive: false) }
         }
-        .onChange(of: showingContents || showingReaderSettings || noteDraft != nil || lookupTerm != nil || translationRequest != nil || wordCard != nil || footnote != nil) { _, covered in
+        .onChange(of: showingContents || showingReaderSettings || noteDraft != nil || lookupTerm != nil || translationRequest != nil || wordCard != nil || quoteCard != nil || footnote != nil) { _, covered in
             if covered { pauseReader(at: Date()); stopNarration(); cancelAutoScroll(clearActive: false) }
             else if scenePhase == .active { resumeReader(at: Date()); synchronizeAutoScroll() }
         }
@@ -430,6 +431,11 @@ struct MihbaraReaderView: View {
                 Text("الترجمة غير متاحة في هذا الإصدار.")
                     .font(MadarTypography.body()).padding(28).background(paper.ignoresSafeArea())
             }
+        }
+        .sheet(item: $quoteCard) { card in
+            MihbaraQuoteCardSheet(app: app, card: card)
+                .environment(\.layoutDirection, .rightToLeft)
+                .presentationDetents([.large])
         }
         .alert("القارئ", isPresented: Binding(get: { readerAlert != nil }, set: { if !$0 { readerAlert = nil } })) {
             Button("حسنًا", role: .cancel) { readerAlert = nil }
@@ -739,6 +745,7 @@ struct MihbaraReaderView: View {
                 choose: { color in Task { await chooseHighlight(color, for: wordCard) } },
                 note: { noteDraft = wordCard },
                 copy: { Task { await copyWithCitation(wordCard) } },
+                makeQuoteCard: { makeQuoteCard(from: wordCard) },
                 close: closeWordCard
             )
             .padding(.horizontal, 12).padding(.bottom, 10)
@@ -756,7 +763,7 @@ struct MihbaraReaderView: View {
 
     private var shouldShowAutoScrollPlayer: Bool {
         autoScrollSpeed != .off && readerMode == "scroll" && !showingReaderSettings
-            && !showingContents && noteDraft == nil && lookupTerm == nil
+            && !showingContents && noteDraft == nil && lookupTerm == nil && quoteCard == nil
             && translationRequest == nil && wordCard == nil && footnote == nil
     }
 
@@ -1232,6 +1239,16 @@ struct MihbaraReaderView: View {
             try? await Task.sleep(for: .seconds(2.4))
             if copiedAt == stamp { copiedAt = nil }
         }
+    }
+
+    @MainActor private func makeQuoteCard(from state: MihbaraWordCardState) {
+        guard state.highlightID != nil else { return }
+        let quote = state.paragraphText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !quote.isEmpty else { return }
+        quoteCard = MihbaraQuoteCardContent(
+            quote: quote, bookTitle: book.title, author: book.author,
+            pageLabel: state.pageLabel, turathID: book.turathID, digits: digits
+        )
     }
 
     @MainActor private func recordInteraction() { recordInteraction(at: Date()) }
@@ -2284,6 +2301,39 @@ struct MihbaraWordCardState: Identifiable, Equatable {
     }
 }
 
+struct MihbaraQuoteCardContent: Identifiable {
+    let id = UUID()
+    let quote: String
+    let bookTitle: String
+    let author: String
+    let location: String?
+    let sourceURL: URL?
+    let sourceName: String
+
+    init(quote: String, bookTitle: String, author: String, pageLabel: String?, turathID: Int?, digits: MadarNumberFormatter) {
+        self.quote = quote
+        self.bookTitle = bookTitle
+        self.author = author
+        if let pageLabel, !pageLabel.isEmpty {
+            let parts = pageLabel.split(separator: "/", omittingEmptySubsequences: false)
+            if turathID != nil, parts.count == 2, !parts[0].isEmpty, !parts[1].isEmpty {
+                location = "ج \(digits.localized(String(parts[0])))، ص \(digits.localized(String(parts[1])))"
+            } else {
+                location = "ص \(digits.localized(pageLabel))"
+            }
+        } else {
+            location = nil
+        }
+        sourceURL = turathID.flatMap { URL(string: "https://shamela.ws/book/\($0)") }
+        sourceName = sourceURL == nil ? "من مكتبتك" : "المكتبة الشاملة"
+    }
+
+    var sourceAddress: String? {
+        guard let sourceURL else { return nil }
+        return sourceURL.host.map { $0 + sourceURL.path }
+    }
+}
+
 struct MihbaraLookupTerm: Identifiable { var word: String; var id: String { word } }
 struct MihbaraTranslationRequest: Identifiable {
     let id = UUID()
@@ -2328,6 +2378,7 @@ private struct MihbaraWordCard: View {
     let choose: (String) -> Void
     let note: () -> Void
     let copy: () -> Void
+    let makeQuoteCard: () -> Void
     let close: () -> Void
 
     private var ink: SwiftUI.Color { dark ? SwiftUI.Color(red: 233 / 255, green: 225 / 255, blue: 210 / 255) : SwiftUI.Color(red: 42 / 255, green: 33 / 255, blue: 24 / 255) }
@@ -2393,6 +2444,9 @@ private struct MihbaraWordCard: View {
                         action("دوّن ملاحظة", icon: "square.and.pencil", id: "mihbara-word-note", run: note)
                         action(copied ? "نُسخت" : "انسخ مع التوثيق", icon: copied ? "checkmark" : "doc.on.doc", id: "mihbara-word-copy", run: copy)
                     }
+                    if state.highlightID != nil {
+                        action("بطاقة اقتباس", icon: "quote.bubble", id: "mihbara-quote-card-open", run: makeQuoteCard)
+                    }
                     if state.isWord && (state.canSaveAsWord || translationAvailability != .unsupported) {
                         HStack(spacing: 10) {
                             if state.canSaveAsWord {
@@ -2450,6 +2504,218 @@ private struct MihbaraWordCard: View {
         .foregroundStyle(ink2).frame(maxWidth: .infinity, minHeight: 56)
         .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .accessibilityIdentifier(id)
+    }
+}
+
+private struct MihbaraQuoteCardSheet: View {
+    let app: AppSession
+    let card: MihbaraQuoteCardContent
+    @Environment(\.dismiss) private var dismiss
+    @State private var image: UIImage?
+    @State private var shareError: String?
+
+    private let background = SwiftUI.Color(red: 0.95, green: 0.93, blue: 0.87)
+    private let ink = SwiftUI.Color(red: 0.15, green: 0.22, blue: 0.18)
+    private let secondaryInk = SwiftUI.Color(red: 0.40, green: 0.39, blue: 0.34)
+
+    var body: some View {
+        VStack(spacing: 14) {
+            GlassEffectContainer(spacing: 12) {
+                ZStack {
+                    Text("بطاقة اقتباس").font(MadarTypography.section())
+                        .frame(maxWidth: .infinity)
+                    HStack {
+                        Spacer(minLength: 44)
+                        closeButton
+                    }
+                }
+                if image != nil {
+                    shareButton
+                    .accessibilityIdentifier("mihbara-quote-card-share")
+                    .accessibilityHint(card.sourceURL == nil ? "يشارك صورة البطاقة" : "يشارك صورة البطاقة ورابط الكتاب في الشاملة")
+                }
+            }
+
+            if let image {
+                ScrollView {
+                    Image(uiImage: image)
+                        .resizable().scaledToFit().frame(maxWidth: 360)
+                        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                        .shadow(color: ink.opacity(0.18), radius: 18, y: 7)
+                        .accessibilityLabel(accessibilityDescription)
+                        .accessibilityIdentifier("mihbara-quote-card-preview")
+                        .padding(.horizontal, 20).padding(.vertical, 8)
+                }
+                .scrollIndicators(.hidden)
+            } else {
+                ProgressView("يجهّز البطاقة…").font(MadarTypography.caption())
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .accessibilityIdentifier("mihbara-quote-card-rendering")
+            }
+
+            Text("الفقرة التي ظلّلتها، مع موضعها ورابط مصدرها عند توفره.")
+                .font(MadarTypography.fine()).foregroundStyle(secondaryInk)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
+            if let shareError {
+                Text(shareError).font(MadarTypography.caption()).foregroundStyle(ink)
+                    .accessibilityIdentifier("mihbara-quote-card-error")
+            }
+        }
+        .padding(.horizontal, 12).padding(.top, 14).padding(.bottom, 18)
+        .foregroundStyle(ink).background(background.ignoresSafeArea())
+        .task { renderCard() }
+        .alert("مشاركة البطاقة", isPresented: Binding(get: { shareError != nil }, set: { if !$0 { shareError = nil } })) {
+            Button("حسنًا", role: .cancel) { shareError = nil }
+        } message: { Text(shareError ?? "") }
+    }
+
+    private var accessibilityDescription: String {
+        [card.quote, card.bookTitle, card.author, card.location, card.sourceName, card.sourceAddress]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }.joined(separator: "، ")
+    }
+
+    private var closeLabel: some View {
+        Image(systemName: "xmark").font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(secondaryInk).frame(width: 44, height: 44).contentShape(Circle())
+    }
+
+    private var shareLabel: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "square.and.arrow.up").font(.system(size: 17, weight: .semibold))
+            Text("شارك البطاقة").font(.custom("thmanyahsans-Bold", size: 17, relativeTo: .body))
+        }
+        .foregroundStyle(ink).frame(maxWidth: .infinity, minHeight: 54).contentShape(Capsule())
+    }
+
+    @ViewBuilder private var closeButton: some View {
+        if #available(iOS 26.0, *) {
+            Button { dismiss() } label: { closeLabel }
+                .buttonStyle(.glass).buttonBorderShape(.circle)
+                .accessibilityLabel("إغلاق").accessibilityIdentifier("mihbara-quote-card-close")
+        } else {
+            Button { dismiss() } label: { closeLabel }
+                .buttonStyle(.bordered)
+                .accessibilityLabel("إغلاق").accessibilityIdentifier("mihbara-quote-card-close")
+        }
+    }
+
+    @ViewBuilder private var shareButton: some View {
+        if #available(iOS 26.0, *) {
+            Button(action: shareCard) { shareLabel }
+                .buttonStyle(.glass)
+        } else {
+            Button(action: shareCard) { shareLabel }
+                .buttonStyle(.bordered)
+        }
+    }
+
+    @MainActor private func renderCard() {
+        guard image == nil else { return }
+        let renderer = ImageRenderer(content: MihbaraQuoteCardArtwork(card: card))
+        renderer.scale = 2
+        image = renderer.uiImage
+        if image == nil { shareError = "تعذّر إنشاء صورة البطاقة." }
+    }
+
+    private func shareCard() {
+        guard let image else { return }
+        Task { @MainActor in
+            do {
+                guard let controller = app.lockController, let presenter = app.privacyPresenter else {
+                    throw PrivacyAuthorizationError.stale
+                }
+                let authorization = try await controller.authorize([.app])
+                try controller.validate(authorization)
+                var items: [Any] = [image]
+                if let sourceURL = card.sourceURL { items.append(sourceURL) }
+                try presenter.present(items: items, authorization: authorization)
+            } catch {
+                shareError = "تعذّرت المشاركة. أعد المحاولة من البطاقة."
+            }
+        }
+    }
+}
+
+private struct MihbaraQuoteCardArtwork: View {
+    let card: MihbaraQuoteCardContent
+    private let forest = SwiftUI.Color(red: 0.10, green: 0.22, blue: 0.17)
+    private let paper = SwiftUI.Color(red: 0.97, green: 0.95, blue: 0.89)
+    private let ink = SwiftUI.Color(red: 0.15, green: 0.22, blue: 0.18)
+    private let muted = SwiftUI.Color(red: 0.40, green: 0.39, blue: 0.34)
+    private let gold = SwiftUI.Color(red: 0.67, green: 0.52, blue: 0.29)
+
+    private var displayedQuote: String {
+        guard card.quote.count > 520 else { return card.quote }
+        return String(card.quote.prefix(519)).trimmingCharacters(in: .whitespacesAndNewlines) + "…"
+    }
+    private var quoteSize: CGFloat {
+        if displayedQuote.count > 360 { 35 }
+        else if displayedQuote.count > 240 { 41 }
+        else if displayedQuote.count > 150 { 47 }
+        else { 55 }
+    }
+
+    var body: some View {
+        ZStack {
+            forest
+            RoundedRectangle(cornerRadius: 54, style: .continuous).fill(paper).padding(28)
+            RoundedRectangle(cornerRadius: 44, style: .continuous)
+                .stroke(gold.opacity(0.78), lineWidth: 2).padding(48)
+
+            VStack(spacing: 0) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("مِحبرة").font(.custom("thmanyahserifdisplay-Bold", size: 45, relativeTo: .title))
+                    Spacer()
+                    Text("مَدَار").font(.custom("thmanyahsans-Bold", size: 22, relativeTo: .headline)).tracking(4)
+                }
+                .foregroundStyle(ink)
+                Text("مما ظلّلته في كتابك")
+                    .font(.custom("thmanyahsans-Medium", size: 23, relativeTo: .subheadline))
+                    .foregroundStyle(muted).padding(.top, 8)
+
+                Spacer(minLength: 42)
+                Text("❝").font(.custom("Amiri-Bold", size: 104, relativeTo: .largeTitle))
+                    .foregroundStyle(gold).frame(height: 86)
+                Text(displayedQuote)
+                    .font(.custom("Amiri", size: quoteSize, relativeTo: .title2))
+                    .foregroundStyle(ink).multilineTextAlignment(.center)
+                    .lineSpacing(15).lineLimit(13).minimumScaleFactor(0.68)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("mihbara-quote-card-artwork-quote")
+                Spacer(minLength: 48)
+
+                Rectangle().fill(gold.opacity(0.72)).frame(height: 2).padding(.horizontal, 120)
+                    .padding(.bottom, 25)
+                Text(card.bookTitle).font(.custom("thmanyahserifdisplay-Bold", size: 31, relativeTo: .title3))
+                    .foregroundStyle(ink).multilineTextAlignment(.center).lineLimit(2)
+                    .minimumScaleFactor(0.8)
+                if !card.author.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Text(card.author).font(.custom("thmanyahsans-Medium", size: 23, relativeTo: .body))
+                        .foregroundStyle(muted).padding(.top, 8).lineLimit(1).minimumScaleFactor(0.8)
+                }
+                if let location = card.location {
+                    Text(location).font(.custom("thmanyahsans-Bold", size: 22, relativeTo: .body))
+                        .foregroundStyle(ink).padding(.top, 8)
+                }
+                Text("المصدر: \(card.sourceName)")
+                    .font(.custom("thmanyahsans-Medium", size: 20, relativeTo: .caption))
+                    .foregroundStyle(muted).padding(.top, 16)
+                if let sourceAddress = card.sourceAddress {
+                    Text(sourceAddress).font(.system(size: 18, weight: .medium, design: .rounded))
+                        .foregroundStyle(ink).padding(.top, 5)
+                }
+                Spacer(minLength: 12)
+                Text("مِحبرة مدار").font(.custom("thmanyahsans-Bold", size: 17, relativeTo: .footnote))
+                    .foregroundStyle(gold)
+            }
+            .padding(.horizontal, 118).padding(.vertical, 105)
+            .environment(\.layoutDirection, .rightToLeft)
+            .multilineTextAlignment(.center)
+        }
+        .frame(width: 1080, height: 1350)
+        .environment(\.colorScheme, .light)
     }
 }
 

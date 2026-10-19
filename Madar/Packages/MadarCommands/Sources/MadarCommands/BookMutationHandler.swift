@@ -60,7 +60,7 @@ private struct BookUndo: Codable {
             row.shelf = "want"; row.mediaID = fileID; row.fileHash = sha256; row.createdAt = now
             if !inspection.outline.isEmpty { row.tocJSON = try JSONEncoder().encode(inspection.outline) }
             context.insert(row); try touch(row, before: nil)
-        case .importEPUB(let id, let fileID, let sha256, let title, let author, let language, let shelf):
+        case .importEPUB(let id, let fileID, let sha256, let title, let author, let language, let shelf, let turathID):
             guard let stagingDirectory else { throw DataError.invalidValue("ملف المعاينة غير موجود.") }
             guard !books.contains(where: { $0.id == id }) else { throw DataError.invalidValue("هذا الكتاب موجود بالفعل.") }
             guard !books.contains(where: { $0.fileHash == sha256 && $0.mergedInto == nil }) else { throw DataError.invalidValue("هذا الكتاب عندك بالفعل، أو أُزيل سابقًا؛ لن يُضاف مكررًا.") }
@@ -75,7 +75,7 @@ private struct BookUndo: Codable {
             media.createdAt = now; media.updatedAt = now; media.writerID = writer; context.insert(media)
             importedMediaIDs.append(fileID)
             let row = Book(); row.id = id; row.title = title; row.author = author; row.language = language
-            row.kind = "file"; row.format = "epub"; row.shelf = shelf; row.mediaID = fileID; row.fileHash = sha256; row.createdAt = now
+            row.kind = "file"; row.format = "epub"; row.shelf = shelf; row.mediaID = fileID; row.fileHash = sha256; row.turathID = turathID; row.createdAt = now
             if shelf == "finished" { row.finishedAt = now; row.readCount = 1 }
             if !inspection.outline.isEmpty { row.tocJSON = try JSONEncoder().encode(inspection.outline) }
             context.insert(row); try touch(row, before: nil)

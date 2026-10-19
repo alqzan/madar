@@ -70,9 +70,11 @@ import MadarData
     private func put32(_ value: UInt32, into data: inout Data) {
         for shift in stride(from: 0, through: 24, by: 8) { data.append(UInt8((value >> shift) & 0xFF)) }
     }
-    private func commandPayload(_ value: EPUBBookInspection, id: UUID, shelf: String = "want") -> MadarCore.JSONValue {
-        .object(["id": .string(id.uuidString), "fileID": .string(value.id.uuidString), "sha256": .string(value.sha256),
-                 "title": .string(value.title), "author": .string(value.author), "language": .string(value.appLanguage ?? "en"), "shelf": .string(shelf)])
+    private func commandPayload(_ value: EPUBBookInspection, id: UUID, shelf: String = "want", turathID: Int? = nil) -> MadarCore.JSONValue {
+        var payload: [String: MadarCore.JSONValue] = ["id": .string(id.uuidString), "fileID": .string(value.id.uuidString), "sha256": .string(value.sha256),
+                 "title": .string(value.title), "author": .string(value.author), "language": .string(value.appLanguage ?? "en"), "shelf": .string(shelf)]
+        if let turathID { payload["turathID"] = .number(Double(turathID)) }
+        return .object(payload)
     }
 
     @Test func readsRealMetadataAndNavigationWithoutCreatingRecords() throws {
@@ -107,7 +109,7 @@ import MadarData
         let original = try Data(contentsOf: fixture())
         let source = root.appendingPathComponent("selected.epub"); try original.write(to: source)
         let inspection = try EPUBBookFiles.stage(source: source, root: adapter.bookStagingDirectory)
-        let id = UUID(), commandID = UUID(), now = Date(), payload = commandPayload(inspection, id: id, shelf: "reading")
+        let id = UUID(), commandID = UUID(), now = Date(), payload = commandPayload(inspection, id: id, shelf: "reading", turathID: 12028)
         #expect(try payload.canonicalData().count < 1024)
         let bus = CommandBus(adapter: adapter), envelope = CommandEnvelope(commandID: commandID, name: "book.importEPUB", payload: payload, issuedAt: now)
         let denied = try await bus.execute(.init(name: "book.importEPUB", payload: payload, source: .shortcut, issuedAt: now), now: now)
@@ -120,6 +122,7 @@ import MadarData
         let books = try context.fetch(FetchDescriptor<Book>()), media = try context.fetch(FetchDescriptor<Media>())
         #expect(books.count == 1 && books[0].kind == "file" && books[0].format == "epub" && books[0].shelf == "reading")
         #expect(books[0].pages == nil && books[0].fileHash == inspection.sha256)
+        #expect(books[0].turathID == 12028)
         #expect(try JSONDecoder().decode([EPUBBookOutlineItem].self, from: #require(books[0].tocJSON)).count == 10)
         #expect(media.count == 1 && media[0].contentType == "org.idpf.epub-container" && media[0].data == original)
         let duplicate = try EPUBBookFiles.stage(source: source, root: adapter.bookStagingDirectory)

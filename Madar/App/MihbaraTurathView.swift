@@ -71,6 +71,7 @@ struct MihbaraTurathView: View {
     @State private var downloading: Int?
     @State private var error: String?
     @State private var downloaded: URL?
+    @State private var downloadedTurathID: Int?
     @State private var reviewing = false
     @FocusState private var searching: Bool
     private var digits: MadarNumberFormatter { AppMihbaraService(app: app).digits }
@@ -145,7 +146,7 @@ struct MihbaraTurathView: View {
         .onChange(of: query) { _, value in results = TurathCatalogue.search(books, query: value) }
         .navigationDestination(isPresented: $reviewing) {
             if let downloaded {
-                MihbaraEPUBImportView(app: app, source: downloaded) {
+                MihbaraEPUBImportView(app: app, source: downloaded, turathID: downloadedTurathID) {
                     try? FileManager.default.removeItem(at: downloaded)
                     reviewing = false; onImported()
                 }
@@ -218,6 +219,7 @@ struct MihbaraTurathView: View {
             do {
                 let folder = app.bookStagingDirectory.deletingLastPathComponent().appendingPathComponent("TurathDownloads")
                 downloaded = try await MihbaraTurathSource.download(book, into: folder)
+                downloadedTurathID = book.id
                 downloading = nil; reviewing = true
             } catch TurathError.tooLarge {
                 downloading = nil; error = "هذا الكتاب أكبر من ١٥٠ م.ب؛ لا يُنزّل إلى الجهاز."

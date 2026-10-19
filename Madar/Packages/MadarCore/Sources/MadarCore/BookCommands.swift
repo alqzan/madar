@@ -5,7 +5,7 @@ public enum BookCommand: Codable, Equatable, Sendable {
     case savePaper(id: UUID, title: String, author: String, pages: Int?, shelf: String, replacing: UUID?, isbn13: String?, tocJSON: Data?)
     case updatePaper(id: UUID, title: String, author: String, pages: Int?, position: Int, isbn13: String?, tocJSON: Data?)
     case importPDF(id: UUID, fileID: UUID, sha256: String, title: String, author: String, language: String)
-    case importEPUB(id: UUID, fileID: UUID, sha256: String, title: String, author: String, language: String, shelf: String)
+    case importEPUB(id: UUID, fileID: UUID, sha256: String, title: String, author: String, language: String, shelf: String, turathID: Int? = nil)
     case shelf(id: UUID, shelf: String, replacing: UUID?)
     case position(id: UUID, page: Int, finished: Bool)
     case readerLocator(id: UUID, locatorJSON: Data)
@@ -102,14 +102,19 @@ public enum BookCommand: Codable, Equatable, Sendable {
                   let language = text("language"), ["ar", "en"].contains(language) else { return nil }
             return .importPDF(id: id, fileID: fileID, sha256: hash, title: title, author: author, language: language)
         case "book.importEPUB":
-            guard Set(p.keys) == ["id", "fileID", "sha256", "title", "author", "language", "shelf"],
+            guard Set(p.keys).isSubset(of: ["id", "fileID", "sha256", "title", "author", "language", "shelf", "turathID"]),
+                  Set(["id", "fileID", "sha256", "title", "author", "language", "shelf"]).isSubset(of: Set(p.keys)),
                   let fileID = text("fileID").flatMap(UUID.init(uuidString:)),
                   let hash = text("sha256"), hash.count == 64, hash.allSatisfy({ "0123456789abcdef".contains($0) }),
                   let title = text("title")?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty, title.count <= 300,
                   let author = text("author"), author.count <= 300,
                   let language = text("language"), ["ar", "en"].contains(language),
                   let shelf = text("shelf"), ["reading", "want", "finished"].contains(shelf) else { return nil }
-            return .importEPUB(id: id, fileID: fileID, sha256: hash, title: title, author: author, language: language, shelf: shelf)
+            let turathID: Int?
+            if p["turathID"] == nil { turathID = nil }
+            else if let value = integer("turathID", max: 2_000_000_000), value > 0 { turathID = value }
+            else { return nil }
+            return .importEPUB(id: id, fileID: fileID, sha256: hash, title: title, author: author, language: language, shelf: shelf, turathID: turathID)
         case "book.updatePaper":
             guard Set(p.keys) == ["id", "title", "author", "pages", "position", "isbn13", "tocJSON"],
                   let title = text("title")?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty, title.count <= 300,

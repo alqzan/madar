@@ -198,7 +198,7 @@ import UIKit
     func testTurathSearchDownloadsABookIntoTheLibrary() throws {
         continueAfterFailure = false
         let catalogue = #"{"cats":{"23":{"id":23,"name":"الرقاق والآداب","books":[12028]}},"authors":{"51":{"id":51,"name":"ابن الجوزي","death":597,"books":[12028,7]}},"books":{"12028":{"id":12028,"name":"صيد الخاطر","author_id":51,"cat_id":23,"size":1480554,"page_count":893},"7":{"id":7,"name":"تلبيس إبليس","author_id":51,"cat_id":23,"size":3000000,"page_count":420}},"books_changed":[],"date":"2026-02-03","version":1}"#
-        let book = #"{"ً":{"ٌ":12028,"ّ":"الكتاب: صيد الخاطر\nالناشر: دار القلم","ٖ":1770153735},"٘":{"ٚ":[{"title":"مقدمة","level":1,"page":1},{"title":"علو الهمة","level":1,"page":2}]},"pages":[{"text":"<span data-type=\"title\" id=toc-1>مقدمة</span>\nالحمد لله الذي جعل للعقل نورًا.","vol":"1","page":1},{"text":"٧- فصل:<span data-type=\"title\" id=toc-2> علو الهمة</span>\nمن علامة كمال العقل علو الهمة، والراضي بالدون١ دني.\n_________\n١ الدون: الأمر الخسيس الحقير.","vol":"1","page":28}]}"#
+        let book = #"{"ً":{"ٌ":12028,"ّ":"الكتاب: صيد الخاطر\nالناشر: دار القلم","ٖ":1770153735},"٘":{"ٚ":[{"title":"مقدمة","level":1,"page":1},{"title":"علو الهمة","level":1,"page":2}]},"pages":[{"text":"<span data-type=\"title\" id=toc-1>مقدمة</span>\nالحمد لله الذي جعل للعقل نورًا.","vol":"1","page":1},{"text":"٧- فصل:<span data-type=\"title\" id=toc-2> علو الهمة</span>\nمن علامة كمال العقل علو الهمة، والراضي بالدون١ دني.\n_________\n١ الدون: الأمر الخسيس الحقير.","vol":"2","page":28}]}"#
         let app = XCUIApplication()
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MIHBARA_FIXTURE": "empty",
             "MADAR_UI_NOW": "2026-10-18T12:00:00+03:00", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
@@ -242,6 +242,30 @@ import UIKit
         let shamelaPage = app.links.matching(NSPredicate(format: "label CONTAINS %@", "موقع المكتبة الشاملة")).firstMatch
         XCTAssertTrue(shamelaPage.waitForExistence(timeout: 10), app.debugDescription)
         attach(app, "M6-T01-turath-shamela-L")
+        XCTAssertTrue(app.buttons["mihbara-reader-contents"].exists, app.debugDescription)
+        app.buttons["mihbara-reader-contents"].tap()
+        let chapter = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "علو الهمة")).firstMatch
+        XCTAssertTrue(chapter.waitForExistence(timeout: 8), app.debugDescription)
+        chapter.tap()
+        let passage = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "من علامة كمال العقل")).firstMatch
+        XCTAssertTrue(passage.waitForExistence(timeout: 10), app.debugDescription)
+        passage.coordinate(withNormalizedOffset: CGVector(dx: 0.7, dy: 0.15)).press(forDuration: 1.2)
+        let wordCard = app.descendants(matching: .any)["mihbara-word-card"]
+        XCTAssertTrue(wordCard.waitForExistence(timeout: 8), app.debugDescription)
+        let yellowHighlight = app.buttons["mihbara-highlight-yellow"]
+        yellowHighlight.tap()
+        let selectedHighlight = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isSelected == true"), object: yellowHighlight)
+        XCTAssertEqual(XCTWaiter.wait(for: [selectedHighlight], timeout: 8), .completed, app.debugDescription)
+        let quoteButton = app.buttons["mihbara-quote-card-open"]
+        XCTAssertTrue(quoteButton.waitForExistence(timeout: 5), app.debugDescription)
+        quoteButton.tap()
+        let preview = app.descendants(matching: .any)["mihbara-quote-card-preview"]
+        XCTAssertTrue(preview.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(preview.label.contains("صيد الخاطر"), preview.label)
+        XCTAssertTrue(preview.label.contains("ابن الجوزي"), preview.label)
+        XCTAssertTrue(preview.label.contains("ج ٢، ص ٢٨"), preview.label)
+        XCTAssertTrue(preview.label.contains("shamela.ws/book/12028"), preview.label)
+        attach(app, "M6-T01-turath-quote-card-L")
     }
 
     private func attach(_ app: XCUIApplication, _ name: String) {
