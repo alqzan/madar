@@ -247,3 +247,16 @@ import Testing
         #expect(BankMessageParser.classify("سداد فاتورة\nالمفوتر: شركة الكهرباء\nمبلغ: 120 SAR") == .billPayment)
     }
 }
+
+/// Notices that move no money, from the owner's earlier My-dream analysis; texts invented.
+@Suite struct NoticeShapeTests {
+    @Test func holdsBillNoticesAndAccountAlertsAreNotMovements() {
+        for text in ["حجز مؤقت على بطاقتك *1234 بمبلغ 50 SAR", "عزيزي المشترك، تم إصدار فاتورتك للحساب بمبلغ 120 ريال",
+                     "تمت إضافة المستفيد بنجاح", "تم تسجيل الدخول إلى حسابك", "Current balance: 3.50 SAR. Recharge now"] {
+            #expect(BankMessageParser.classify(text) == .marketing, "\(text)")
+        }
+    }
+    @Test func aGreetingWithAPurchaseIsStillAPurchase() {
+        #expect(BankMessageParser.classify("عزيزي العميل\nشراء عبر نقاط البيع\nمبلغ: 20 SAR\nلدى: متجر") == .purchase)
+    }
+}

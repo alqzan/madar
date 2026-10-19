@@ -50,6 +50,9 @@ public enum BankMessageParser {
     }
 
     /// Latin keywords match whole words only («fee» is not inside «Coffee»); Arabic ones match as written.
+    static func matches(_ text: String, _ pattern: String) -> Bool {
+        text.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil
+    }
     static func has(_ text: String, _ words: [String]) -> Bool {
         words.contains { word in
             guard word.unicodeScalars.allSatisfy({ $0.isASCII }) else { return text.localizedCaseInsensitiveContains(word) }
@@ -62,6 +65,12 @@ public enum BankMessageParser {
         let t = clean(text)
         // Order matters: the dangerous and the specific first.
         if has(t, ["رمز التحقق", "رمز التفعيل", "كلمة المرور لمرة", "OTP", "verification code", "لا تشارك الرمز"]) { return .otp }
+        // Ported from the owner's earlier My-dream analysis (src/lib/bankParser.ts): notices that move no money.
+        if matches(t, #"just\s+a\s+hold|hold\s+on\s+your\s+card|حجز\s+مؤقت|حجز\s+على\s+بطاقتك|pre[\s-]?authoriz"#)
+            || matches(t, #"صدور\s+فاتورة|فاتورة\s+جديدة|لم\s+يتم\s+سدادها|تم\s+إصدار\s+فاتورتك|invoice\s+(?:generated|due)|new\s+bill"#)
+            || matches(t, #"سداد\s+مبكر|منصة\s+الدين|معرف\s+(?:الفرصة|الاستثمار)|investment\s+opportunity|early\s+repayment"#)
+            || matches(t, #"لحمايتك،?\s+حاولنا\s+التواصل|للتحقق\s+من\s+عملية|يرجى\s+مراجعة\s+التفاصيل\s+في\s+التطبيق"#)
+            || matches(t, #"تمت\s+اضافة\s+المستفيد|تمت\s+إضافة\s+المستفيد|تم\s+تنشيط\s+المستفيد|تم\s+تسجيل\s+الدخول|تم\s+تسجيلك\s+بنجاح|تسجيل\s+جهاز\s+جديد|نقاط\s+قطاف|نقاط\s+عضوية|رصيد\s+قطاف"#) { return .marketing }
         // Owner, 19 Oct: a charity platform's thank-you receipt is not a movement; the bank's own debit records the gift.
         if has(t, ["وصل تبرعك", "Ehsan.sa"]) { return .marketing }
         if has(t, ["مرفوضة", "رفض العملية", "لم تتم العملية", "declined", "رصيد غير كافي", "رصيد غير كاف", "Insufficient"]) { return .declined }
@@ -89,6 +98,8 @@ public enum BankMessageParser {
         if has(t, ["رسوم", "عمولة", "fee"]) { return .fee }
         if has(t, ["إيداع", "deposit", "credited"]) { return .income }
         if has(t, ["عرض", "خصم حصري", "اشترك", "offer", "promo", "لإلغاء الاشتراك"]) { return .marketing }
+        // My-dream: greetings and rewards with no movement phrase above are notices.
+        if matches(t, #"عزيزي\s+العميل|عميلنا\s+العزيز|مبروك|rewards|خصم\s+خاص|Current\s+balance"#) { return .marketing }
         return .unknown
     }
 
