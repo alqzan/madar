@@ -75,9 +75,12 @@ public enum BankMessageParser {
         if has(t, ["وصل تبرعك", "Ehsan.sa"]) { return .marketing }
         if has(t, ["مرفوضة", "رفض العملية", "لم تتم العملية", "declined", "رصيد غير كافي", "رصيد غير كاف", "Insufficient"]) { return .declined }
         if has(t, ["عكس عملية", "إلغاء عملية", "عكس العملية", "reversal", "reversed"]) { return .reversal }
-        if has(t, ["تمارا", "tamara", "تابي", "tabby", "دفعة مقسمة"]) { return .bnplInstalment }
-        if has(t, ["كشف حساب البطاقة", "كشف البطاقة", "statement", "الحد الأدنى للسداد", "المبلغ المستحق"]) { return .statement }
-        if has(t, ["سداد بطاقة", "سداد البطاقة", "ائتمانية:سداد", "ائتمانية: سداد", "تسديد بطاقة", "تسديد البطاقة", "card payment"]) { return .cardPayment }
+        // Owner special cases: «تأكيد دفعة مقسمة» only confirms a plan (recording it double-counts); a bank purchase
+        // «لدى:Tamara» is an ordinary purchase.
+        if has(t, ["دفعة مقسمة"]) { return .marketing }
+        if has(t, ["تمارا", "tamara", "تابي", "tabby"]) && !has(t, ["شراء"]) { return .bnplInstalment }
+        if has(t, ["كشف حساب البطاقة", "كشف البطاقة", "statement", "الحد الأدنى للسداد", "المبلغ المستحق"]) && !has(t, ["شراء"]) { return .statement }
+        if has(t, ["سداد بطاقة", "سداد البطاقة", "ائتمانية:سداد", "ائتمانية: سداد", "فيزا:سداد", "ماستركارد:سداد", "تسديد بطاقة", "تسديد البطاقة", "card payment"]) { return .cardPayment }
         // RM6 corpus (19 Oct): a finance instalment is an obligation paid, like a bill.
         if has(t, ["قسط تمويل"]) { return .billPayment }
         if has(t, ["سداد فاتورة", "سداد", "SADAD", "المفوتر"]) { return .billPayment }
@@ -90,7 +93,11 @@ public enum BankMessageParser {
         // RM6 corpus: «حوالة داخلية صادرة», «حوالة محلية واردة», wallet top-ups and own-account moves.
         if has(t, ["حوالة", "تحويل"]) && has(t, ["صادرة", "صادر"]) { return .transferOut }
         if has(t, ["حوالة", "تحويل"]) && has(t, ["واردة", "وارد"]) { return .transferIn }
-        if has(t, ["تغذية محفظة", "top up", "استلام قطة", "إضافة أموال", "إيداع عبر حوالة"]) { return .transferIn }
+        // «استلام قطة» returns a share of a shared bill: a refund, not income (owner special case).
+        if has(t, ["استلام قطة"]) { return .refund }
+        if has(t, ["تغذية محفظة", "top up", "إضافة أموال", "إيداع عبر حوالة"]) { return .transferIn }
+        // «حوالة داخلية … الى:1234 … من:Drahim»: into the owner's own account from a named source.
+        if has(t, ["حوالة داخلية", "حوالة محلية"]) && matches(t, #"(?m)^\s*(?:الى|إلى)\s*:\s*\*?\d"#) && matches(t, #"(?m)^\s*من\s*:\s*[^\d\s*]"#) { return .transferIn }
         if has(t, ["خصم عبر حوالة", "بين حساباتي", "بين حساباتك", "للحساب *", "للبطاقة *"]) || (has(t, ["خصم"]) && has(t, ["من حسابك", "من حساب"]) && has(t, ["تحويل"])) { return .transferOut }
         if has(t, ["اضافة", "إضافة"]) && has(t, ["الى حسابك", "إلى حسابك"]) { return .income }
         if has(t, ["شراء", "مشتريات", "purchase", "Apple Pay", "مدى", "POS"]) { return .purchase }
@@ -131,6 +138,13 @@ public enum BankMessageParser {
         if kind == .refund, result.merchant == nil { result.merchant = labelled(t, ["من"]) }
         // BSF, SNB, Alinma, barq: the merchant opens its own line after «من», «لـ», «لدى» or «At», with or without a colon.
         if [.purchase, .refund, .declined, .reversal].contains(kind), result.merchant == nil { result.merchant = lineMerchant(t) }
+        // Owner special case: a card «purchase» at the owner's own wallet (barq, stc pay…) is a top-up — a self-transfer.
+        if kind == .purchase, let m = result.merchant?.lowercased().replacingOccurrences(of: " ", with: ""),
+           ["barq", "stcpay", "tiqmo", "urpay", "drahim", "d360"].contains(where: { m.hasPrefix($0) }) { result.kind = .transferOut }
+        // «مبلغ: 23 USD(86.38 ريال)»: the bank's own riyal figure in brackets is the home amount, not the rate.
+        if result.currency != homeCurrency, result.statedHomeMinor == nil,
+           let match = t.range(of: #"\(\s*\d[\d.,]*\s*(?:ريال|SAR|SR|ر\.س)\s*\)"#, options: .regularExpression),
+           let home = amounts(String(t[match]), exponents).first, home.currency == homeCurrency { result.statedHomeMinor = home.minor }
         if kind == .bnplInstalment { result.provider = has(t, ["تمارا", "tamara"]) ? "Tamara" : "Tabby" }
         if kind == .purchase || kind == .refund || kind == .cashback {
             result.cardKind = has(t, ["ائتمان", "إئتمان", "credit"]) ? .credit : has(t, ["مسبقة الدفع", "prepaid"]) ? .prepaid

@@ -260,3 +260,24 @@ import Testing
         #expect(BankMessageParser.classify("عزيزي العميل\nشراء عبر نقاط البيع\nمبلغ: 20 SAR\nلدى: متجر") == .purchase)
     }
 }
+
+/// The owner's special-case rules (19 Oct), with invented text and numbers.
+@Suite struct OwnerSpecialRuleTests {
+    let riyadh = TimeZone(identifier: "Asia/Riyadh")!
+    @Test func walletTopUpIsATransferNotAPurchase() {
+        #expect(BankMessageParser.parse("شراء إنترنت\nبطاقة:1234 ;فيزا\nمبلغ:200.00 SAR\nلدى:barq\nفي:19-10-2025 10:00", timeZone: riyadh).kind == .transferOut)
+    }
+    @Test func tamaraAsBankMerchantIsAPurchaseButAPlanConfirmationIsNot() {
+        #expect(BankMessageParser.classify("شراء إنترنت\nبطاقة:1234 ;فيزا\nمبلغ:40.00 SAR\nلدى:Tamara") == .purchase)
+        #expect(BankMessageParser.classify("تأكيد دفعة مقسمة إلى 4\nالمتجر: shop.example\nالطلب: 160.00 SAR") == .marketing)
+    }
+    @Test func purchaseTotalDueIsNotAStatementAndBracketRiyalIsHome() {
+        let p = BankMessageParser.parse("شراء انترنت\nبطاقة:1234 ;فيزا\nمبلغ: 10 USD(37.60 ريال)\nلدى:SAMPLE\nرسوم وضريبة: 0.90 SAR\nاجمالي المبلغ المستحق: 38.50 SAR", timeZone: riyadh)
+        #expect(p.kind == .purchase); #expect(p.currency == "USD"); #expect(p.statedHomeMinor == 3760)
+    }
+    @Test func visaSettlementSharedBillShareAndInternalTransferIn() {
+        #expect(BankMessageParser.classify("بطاقة فيزا:سداد بـSR 900.00\nعبر1234;فيزا") == .cardPayment)
+        #expect(BankMessageParser.classify("استلام قطة\nمبلغ:25.00 ر.س\nمن:شخص") == .refund)
+        #expect(BankMessageParser.classify("حوالة داخلية\nمبلغ:SAR 500\nالى:1234\nمن:SampleWallet") == .transferIn)
+    }
+}
