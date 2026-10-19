@@ -58,7 +58,8 @@ def main():
         if OTP.search(message):
             otp += 1
             continue
-        by_sender.setdefault(sender, []).append({"sender": sender, "date": when(date), "text": message})
+        # macOS file names ignore case: «AlRajhiBank» and «alrajhibank» must share one file, not overwrite each other.
+        by_sender.setdefault(sender.lower(), []).append({"sender": sender, "date": when(date), "text": message})
         kept += 1
     for sender, messages in by_sender.items():
         name = re.sub(r"[^\w.-]", "_", sender)

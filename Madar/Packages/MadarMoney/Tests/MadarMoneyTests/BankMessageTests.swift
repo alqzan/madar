@@ -192,3 +192,24 @@ import Testing
         #expect(CardStatements.predictNextClose([at(2026, 9, 20, 12, 0)], calendar: c) == nil)
     }
 }
+
+/// RM6 corpus shapes (19 Oct): layouts seen in the owner's local messages, rewritten with invented merchants and numbers.
+@Suite struct BankMessageShapeTests {
+    let riyadh = TimeZone(identifier: "Asia/Riyadh")!
+    @Test func bsfMerchantOnItsOwnLineAfterMin() {
+        let p = BankMessageParser.parse("شراء عبر نقاط البيع بـ SAR 23.50 \nرسوم العملية:0.00 \nمن Sample Cafe\nبطاقة مدى 7788\nفي 15/10/26 08:10", timeZone: riyadh)
+        #expect(p.kind == .purchase); #expect(p.amountMinor == 2350); #expect(p.merchant == "Sample Cafe")
+    }
+    @Test func alinmaMerchantAfterMinWithColonNotTheAccount() {
+        let p = BankMessageParser.parse("شراء عبر نقاط البيع\nعبر تطبيق: Apple Pay\nمبلغ: 45 SAR\nبطاقة مدى: 1234*\nحساب: **9876\nمن: Test Bakery\nفي: 15/10/26 09:00", timeZone: riyadh)
+        #expect(p.merchant == "Test Bakery"); #expect(p.last4 == "1234"); #expect(p.amountMinor == 4500)
+    }
+    @Test func alRajhiCardDigitsBeforeSemicolonAndLamMerchant() {
+        let p = BankMessageParser.parse("شراء انترنت\nعبر:4321;مدى\nمن:5566\nبـSAR 10 \nلـSAMPLE CHARITY\n15/10/26 21:30", timeZone: riyadh)
+        #expect(p.kind == .purchase); #expect(p.last4 == "4321"); #expect(p.merchant == "SAMPLE CHARITY"); #expect(p.amountMinor == 1000)
+    }
+    @Test func snbPosMerchantAfterMin() {
+        let p = BankMessageParser.parse("شراء-POS\nبـ120.00 SAR\nمن Fuel Station 3\nإئتمانية **2468 (Apple Pay)\nفي 15/10/26 07:45", timeZone: riyadh)
+        #expect(p.merchant == "Fuel Station 3"); #expect(p.last4 == "2468"); #expect(p.cardKind == .credit)
+    }
+}

@@ -100,14 +100,18 @@ public enum BankMessageParser {
         }
         result.balanceMinor = labelledAmount(t, ["الرصيد", "Balance"], exponents)?.minor
         result.last4 = first(#"\*\s?(\d{4})\b|\b(\d{4})\s?\*"#, in: t)
+            // Al Rajhi: «بطاقة:1234;مدى», «عبر:1234;مدى».
+            ?? first(#"(?:بطاقة|ببطاقة|عبر)\s*:?\s*(\d{4})(?!\d)"#, in: t)
         result.eventAt = eventDate(t, timeZone)
         result.merchant = labelled(t, ["لدى", "من متجر", "at"])
         result.biller = labelled(t, ["المفوتر", "Biller"])
         result.counterparty = kind == .transferIn ? labelled(t, ["من", "From"]) : kind == .transferOut ? labelled(t, ["إلى", "To"]) : nil
         if kind == .refund, result.merchant == nil { result.merchant = labelled(t, ["من"]) }
+        // BSF, SNB, Alinma, barq: the merchant opens its own line after «من», «لـ», «لدى» or «At», with or without a colon.
+        if [.purchase, .refund, .declined, .reversal].contains(kind), result.merchant == nil { result.merchant = lineMerchant(t) }
         if kind == .bnplInstalment { result.provider = has(t, ["تمارا", "tamara"]) ? "Tamara" : "Tabby" }
         if kind == .purchase || kind == .refund || kind == .cashback {
-            result.cardKind = has(t, ["ائتمان", "credit"]) ? .credit : has(t, ["مسبقة الدفع", "prepaid"]) ? .prepaid
+            result.cardKind = has(t, ["ائتمان", "إئتمان", "credit"]) ? .credit : has(t, ["مسبقة الدفع", "prepaid"]) ? .prepaid
                 : has(t, ["مدى", "mada", "Apple Pay"]) ? .debit : nil
         }
         return result
@@ -163,6 +167,22 @@ public enum BankMessageParser {
     static func labelledAmount(_ text: String, _ labels: [String], _ exponents: CurrencyExponents) -> (minor: Int, currency: String)? {
         for line in text.split(separator: "\n").map(String.init) where has(line, labels) {
             if let amount = amounts(line, exponents).first { return (amount.minor, amount.currency) }
+        }
+        return nil
+    }
+
+    /// A merchant line: «من Shml», «لـEHSAN», «At: NOON». A value that starts with a digit or «*» is an account, not a merchant.
+    static func lineMerchant(_ text: String) -> String? {
+        for line in text.split(separator: "\n").map({ $0.trimmingCharacters(in: .whitespaces) }) {
+            // clean() drops the tatweel, so «لـEHSAN» arrives as «لEHSAN»: «ل» glued to a Latin name.
+            if line.hasPrefix("ل"), let next = line.dropFirst().first, next.isASCII, next.isLetter { return String(line.dropFirst()).trimmingCharacters(in: .whitespaces) }
+            for label in ["لدى", "من", "At", "at", "Merchant"] where line.hasPrefix(label) {
+                var value = line.dropFirst(label.count).trimmingCharacters(in: .whitespaces)
+                if value.hasPrefix(":") { value = value.dropFirst().trimmingCharacters(in: .whitespaces) }
+                guard let head = value.first, !head.isNumber, head != "*", !value.hasPrefix("حساب"), !value.hasPrefix("رصيد") else { continue }
+                if label.count == 2, line.dropFirst(label.count).first?.isLetter == true { continue } // «منصة», «atm»: a word, not a label
+                return value
+            }
         }
         return nil
     }
