@@ -62,6 +62,8 @@ public enum BankMessageParser {
         let t = clean(text)
         // Order matters: the dangerous and the specific first.
         if has(t, ["رمز التحقق", "رمز التفعيل", "كلمة المرور لمرة", "OTP", "verification code", "لا تشارك الرمز"]) { return .otp }
+        // Owner, 19 Oct: a charity platform's thank-you receipt is not a movement; the bank's own debit records the gift.
+        if has(t, ["وصل تبرعك", "Ehsan.sa"]) { return .marketing }
         if has(t, ["مرفوضة", "رفض العملية", "لم تتم العملية", "declined", "رصيد غير كافي", "رصيد غير كاف", "Insufficient"]) { return .declined }
         if has(t, ["عكس عملية", "إلغاء عملية", "عكس العملية", "reversal", "reversed"]) { return .reversal }
         if has(t, ["تمارا", "tamara", "تابي", "tabby", "دفعة مقسمة"]) { return .bnplInstalment }

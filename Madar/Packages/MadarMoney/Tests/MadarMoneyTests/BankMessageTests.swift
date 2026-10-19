@@ -232,3 +232,11 @@ import Testing
         #expect(BankMessageParser.parse("شراء انترنت بـSR 15.5 \nبطاقة:4321;مدى\nلـSAMPLE", timeZone: riyadh).amountMinor == 1550)
     }
 }
+
+@Suite struct CharityReceiptTests {
+    @Test func charityThankYouIsDiscardedTheBankDebitRecords() {
+        let receipt = "عطاؤك الدائم\nوصل تبرعك اليومي إلى المنصة\nالمبلغ: 1.00\nEhsan.sa"
+        #expect(BankMessageParser.classify(receipt) == .marketing)
+        #expect(BankIntake.decision(BankMessageParser.classify(receipt)) == .discard)
+    }
+}
