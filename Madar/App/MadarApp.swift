@@ -3,6 +3,7 @@ import SwiftData
 import MadarData
 import MadarCore
 import MadarDesign
+import CoreSpotlight
 
 @main
 struct MadarApp: App {
@@ -15,6 +16,7 @@ private struct MadarSceneContent: View {
     @State private var session: AppSession?
     @State private var startupError: String?
     @State private var pendingURL: URL?
+    @State private var pendingSpotlightBookID: UUID?
     var body: some View {
             Group {
                 #if DEBUG
@@ -35,12 +37,23 @@ private struct MadarSceneContent: View {
                     do { try await session.drainInbox() }
                     catch BackupOperationError.busy { }
                     catch { session.errorMessage = "لم يكتمل تحديث البيانات. \(error.localizedDescription)" }
+                    await session.reconcileSpotlightIndex()
+                    await session.refreshEligibleDiaryLettersForNotificationLifecycle()
                     await MadarIntentHandoff.shared.flush()
                     await session.refreshPrayerNotifications()
                 }
             }
             // A diary line from Siri waits behind the diary lock and lands once it opens.
-            .onChange(of: session?.lockController?.unlocked) { _, _ in Task { await MadarIntentHandoff.shared.flush() } }
+            .onChange(of: session?.lockController?.unlocked) { _, _ in
+                Task {
+                    guard let session else { await MadarIntentHandoff.shared.flush(); return }
+                    if session.lockController?.canPresent(.notes) ?? session.protectedDataAuthorized {
+                        await session.refreshEligibleDiaryLettersForNotificationLifecycle()
+                        await session.refreshPrayerNotifications()
+                    }
+                    await MadarIntentHandoff.shared.flush()
+                }
+            }
             // A Shortcut ran in this process and queued a blind write: apply it now, not at the next launch.
             .onReceive(NotificationCenter.default.publisher(for: .madarInboxChanged)) { _ in
                 guard let session else { return }
@@ -49,6 +62,12 @@ private struct MadarSceneContent: View {
             .onOpenURL { url in
                 if let session { session.open(url) }
                 else { pendingURL = url }
+            }
+            .onContinueUserActivity(CSSearchableItemActionType) { activity in
+                guard let identifier = activity.userInfo?[CSSearchableItemActivityIdentifier] as? String,
+                      let bookID = UUID(uuidString: identifier) else { return }
+                if let session { session.openSpotlightBook(bookID) }
+                else { pendingSpotlightBookID = bookID }
             }
     }
     private var mainContent: some View {
@@ -85,8 +104,18 @@ private struct MadarSceneContent: View {
             guard var group = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.alqzan.madar2") else { throw DataError.missingAppGroup }
             var backupKeyService = "com.alqzan.madar2.backup"
             #if DEBUG
-            if let fixture = ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"], !fixture.isEmpty, fixture.count <= 100,
-               fixture.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-") }) {
+            let rawUITestID = ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"]
+            let isolatedUITestID: String?
+            if let rawUITestID {
+                guard !rawUITestID.isEmpty, rawUITestID.count <= 100,
+                      rawUITestID.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-") }) else {
+                    throw DataError.invalidValue("MADAR_UI_STORE_ID must be a non-empty ASCII identifier of at most 100 characters.")
+                }
+                isolatedUITestID = rawUITestID
+            } else {
+                isolatedUITestID = nil
+            }
+            if let fixture = isolatedUITestID {
                 group = group.appending(path: "UITestStores/\(fixture)", directoryHint: .isDirectory)
                 // The fixture's first export must never read or replace the real backup key.
                 backupKeyService += ".uitest.\(fixture)"
@@ -105,27 +134,30 @@ private struct MadarSceneContent: View {
             } else { managed = try ManagedDataStore(root: root, commandLockURL: lockURL) }
             let opened = try AppSession(container: managed.container, managedStore: managed, groupDirectory: group)
 #if DEBUG
-            if ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"] != nil,
+            if isolatedUITestID != nil,
                ProcessInfo.processInfo.environment["MADAR_UI_PRESERVE_FACE_ID_DEFAULT"] != "1" {
-                let storedPrivacyChoice = (try? managed.container.mainContext.fetch(FetchDescriptor<DeviceSetting>()))?
-                    .contains(where: { $0.key == "core.faceIDLock" }) ?? false
-                if !storedPrivacyChoice { try await opened.applySettingsAndWait(["core.faceIDLock": .string("none")]) }
+                // UI stores are isolated from owner data. Ordinary screen tests need
+                // an unlocked session; the dedicated Face ID test opts into the real
+                // fresh-install default with MADAR_UI_PRESERVE_FACE_ID_DEFAULT.
+                try await opened.applySettingsAndWait(["core.faceIDLock": .string("none")])
             }
 #endif
+            opened.lockController = MadarLockController(scope: MadarLockScope(rawValue: opened.string("core.faceIDLock")) ?? .app, service: AppPrivacyService(session: opened))
             await opened.attachPrayerNotifications(prayerNotifications)
             let backup = AppBackupService(session: opened, store: managed, backupDirectory: group.appending(path: "Backups", directoryHint: .isDirectory), keyStore: KeychainBackupKeyStore(service: backupKeyService))
             opened.backupService = backup
             opened.syncService = AppSyncService(session: opened, store: managed, backup: backup)
-            opened.lockController = MadarLockController(scope: MadarLockScope(rawValue: opened.string("core.faceIDLock")) ?? .app, service: AppPrivacyService(session: opened))
             if managed.recoveryRequiresRefresh {
                 let warnings = try await backup.coordinator.recoverPendingLifecycle()
                 guard warnings.isEmpty else { throw DataError.invalidValue(warnings.joined(separator: "\n")) }
             }
             session = opened; startupError = nil
+            await opened.reconcileSpotlightIndex()
             do { try await opened.drainInbox() }
             catch BackupOperationError.busy { }
             catch { opened.errorMessage = "لم يكتمل تحديث البيانات. \(error.localizedDescription)" }
             if let pendingURL { opened.open(pendingURL); self.pendingURL = nil }
+            if let pendingSpotlightBookID { opened.openSpotlightBook(pendingSpotlightBookID); self.pendingSpotlightBookID = nil }
             await MadarIntentHandoff.shared.attach { [weak opened] request in await opened?.handleIntentRequest(request) ?? false }
         } catch { startupError = error.localizedDescription }
     }

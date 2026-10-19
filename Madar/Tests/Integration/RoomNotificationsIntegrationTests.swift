@@ -19,7 +19,7 @@ import MadarCore
     }
 
     func testCardRemindersAreAmountFreeAndStopAfterPaymentOrOff() throws {
-        let (app, root, now, day) = try fixture(["core.faceIDLock": .string("none"), "core.dayStart": .string("midnight"), "mal.cardDue": .string("3days")]); defer { try? FileManager.default.removeItem(at: root) }
+        let (app, _, now, day) = try fixture(["core.faceIDLock": .string("none"), "core.dayStart": .string("midnight"), "mal.cardDue": .string("3days")])
         app.authorizeProtectedData()
         let c = ModelContext(app.container), account = Account(); account.balanceMinor = 10_000; account.balanceAt = now; c.insert(account)
         let card = Card(); card.name = "بطاقة سرية"; card.accountID = account.id; c.insert(card)
@@ -47,8 +47,7 @@ import MadarCore
     }
 
     func testReconciliationReminderUsesSharedBudgetAndGenericCopy() throws {
-        let (app, root, now, day) = try fixture(["core.faceIDLock": .string("app"), "core.dayStart": .string("midnight"), "mal.reconcileEveryDays": .number(90)])
-        defer { try? FileManager.default.removeItem(at: root) }
+        let (app, _, now, day) = try fixture(["core.faceIDLock": .string("app"), "core.dayStart": .string("midnight"), "mal.reconcileEveryDays": .number(90)])
         app.authorizeProtectedData()
         let context = ModelContext(app.container), account = Account()
         account.name = "synthetic private account"; account.currency = "SAR"; account.balanceMinor = 1_234_567
@@ -79,8 +78,7 @@ import MadarCore
     }
 
     func testZakatReminderSchedulesAmountFreeWhileAppLockedAndStopsWhenOff() throws {
-        let (app, root, now, day) = try fixture(["core.faceIDLock": .string("app"), "core.dayStart": .string("midnight"), "mal.zakatReminder": .string("1week")])
-        defer { try? FileManager.default.removeItem(at: root) }
+        let (app, _, now, day) = try fixture(["core.faceIDLock": .string("app"), "core.dayStart": .string("midnight"), "mal.zakatReminder": .string("1week")])
         app.authorizeProtectedData()
         let context = ModelContext(app.container), profile = ZakatProfile()
         profile.hawlStartHijri = "h:1448-05-01"
@@ -138,6 +136,7 @@ import MadarCore
     }
     private func fixture(_ settings: [String: MadarData.JSONValue]) throws -> (AppSession, URL, Date, PrayerDay) {
         let root = FileManager.default.temporaryDirectory.appending(path: "MadarRoomNotifications-\(UUID())")
+        addTeardownBlock { try? FileManager.default.removeItem(at: root) }
         let container = try MadarContainerFactory.makeLocal(at: root.appending(path: "Data"))
         let context = ModelContext(container), store = try SettingsStore(context: context)
         _ = try store.stage(settings); try context.save()
@@ -147,15 +146,15 @@ import MadarCore
     }
 
     func testQadaOffAndNothingOwedScheduleNothing() throws {
-        let (off, root, now, day) = try fixture(["salah.qadaReminder": .string("off")]); defer { try? FileManager.default.removeItem(at: root) }
+        let (off, _, now, day) = try fixture(["salah.qadaReminder": .string("off")])
         XCTAssertFalse(try RoomNotificationContent.candidates(session: off, prayerDays: [day], now: now).contains { $0.id.hasPrefix("qada.") })
-        let (fresh, root2, _, _) = try fixture(["salah.qadaReminder": .string("afterFajr")]); defer { try? FileManager.default.removeItem(at: root2) }
+        let (fresh, _, _, _) = try fixture(["salah.qadaReminder": .string("afterFajr")])
         // A fresh store owes nothing (RP1: an unlogged prayer never becomes qada).
         XCTAssertFalse(try RoomNotificationContent.candidates(session: fresh, prayerDays: [day], now: now).contains { $0.id.hasPrefix("qada.") })
     }
 
     func testProtectedAppShowsGenericCopyAndTapsOpenTheRoom() throws {
-        let (app, root, _, day) = try fixture(["core.faceIDLock": .string("app")]); defer { try? FileManager.default.removeItem(at: root) }
+        let (app, _, _, day) = try fixture(["core.faceIDLock": .string("app")])
         let habit = UUID()
         let qada = NotificationCandidate(id: "qada.2026-10-15", room: .salah, dueAt: day.fajr.addingTimeInterval(1800), dayKey: "2026-10-15")
         let reminder = NotificationCandidate(id: "habits.2026-10-15.\(habit.uuidString)", room: .habits, dueAt: day.asr.addingTimeInterval(1800), dayKey: "2026-10-15")
@@ -170,7 +169,7 @@ import MadarCore
     }
 
     func testQadaCopyNeverCarriesTheDebtCount() throws {
-        let (app, root, _, day) = try fixture(["core.faceIDLock": .string("none")]); defer { try? FileManager.default.removeItem(at: root) }
+        let (app, _, _, day) = try fixture(["core.faceIDLock": .string("none")])
         let qada = NotificationCandidate(id: "qada.2026-10-15", room: .salah, dueAt: day.fajr.addingTimeInterval(1800), dayKey: "2026-10-15")
         let plan = NotificationArbiter.plan(candidates: [], prayerDays: [day], now: day.fajr, timeZone: ActivePlace.riyadh.timeZone, policy: .init(staleNudgeEnabled: false))
         XCTAssertTrue(RoomNotificationContent.content(for: qada, plan: plan, session: app, habitNames: [:]).body.hasPrefix("حان وقت القضاء."))
@@ -188,7 +187,7 @@ import MadarCore
     /// with or without the whole-app lock (§8 item 10, RU2, owner 15 Oct).
     func testDiaryRemindersScheduleWithoutEverCarryingDiaryText() throws {
         for lock in ["none", "app"] {
-            let (app, root, now, day) = try fixture(["core.dayStart": .string("midnight"), "core.faceIDLock": .string(lock)]); defer { try? FileManager.default.removeItem(at: root) }
+            let (app, _, now, day) = try fixture(["core.dayStart": .string("midnight"), "core.faceIDLock": .string(lock)])
             let context = ModelContext(app.container), secret = "زعفرانيّة"
             let entry = Entry(); entry.dayKey = "2025-10-15"; entry.text = "كتبت " + secret; entry.eventAt = now.addingTimeInterval(-365 * 86400); context.insert(entry)
             let letter = Letter(); letter.text = secret; letter.triggerKind = "date"; letter.triggerValue = "2026-10-15"; context.insert(letter)
@@ -212,9 +211,9 @@ import MadarCore
     }
 
     func testDiaryCapZeroAndOffSettingsScheduleNoDiaryReminder() throws {
-        let (app, root, now, day) = try fixture(["core.dayStart": .string("midnight"), "notes.dailyCap": .number(0)]); defer { try? FileManager.default.removeItem(at: root) }
+        let (app, _, now, day) = try fixture(["core.dayStart": .string("midnight"), "notes.dailyCap": .number(0)])
         XCTAssertFalse(try RoomNotificationContent.candidates(session: app, prayerDays: [day], now: now).contains { $0.id.hasPrefix("notes.") })
-        let (quiet, root2, _, _) = try fixture(["core.dayStart": .string("midnight"), "notes.morningNiyya": .bool(false), "notes.onThisDay": .string("off")]); defer { try? FileManager.default.removeItem(at: root2) }
+        let (quiet, _, _, _) = try fixture(["core.dayStart": .string("midnight"), "notes.morningNiyya": .bool(false), "notes.onThisDay": .string("off")])
         XCTAssertFalse(try RoomNotificationContent.candidates(session: quiet, prayerDays: [day], now: now).contains { $0.id.hasPrefix("notes.") }, "no letter, no intention, no memory")
     }
 }

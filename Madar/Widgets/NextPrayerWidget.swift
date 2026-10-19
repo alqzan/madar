@@ -3,6 +3,15 @@ import WidgetKit
 import AppIntents
 import MadarSnapshots
 
+enum MadarWidgetFamilies {
+    static var homeAndAccessories: [WidgetFamily] {
+        var families: [WidgetFamily] = [.systemSmall, .systemMedium, .systemLarge]
+        if #available(iOS 27.0, *) { families.append(.systemExtraLargePortrait) }
+        families += [.accessoryCircular, .accessoryRectangular, .accessoryInline]
+        return families
+    }
+}
+
 /// «الصلاة القادمة»: the next prayer and its time, nothing else (RP9, RU2). It reads the `prayerNext`
 /// snapshot only and carries one timeline entry per minute, so the countdown is exact without refreshes.
 enum PrayerWidgetTemplate:String,AppEnum {
@@ -66,6 +75,7 @@ struct NextPrayerView: View {
     @Environment(\.widgetFamily) private var environmentFamily
     var previewFamily:WidgetFamily? = nil
     private var family:WidgetFamily {previewFamily ?? environmentFamily}
+    private var extraLargePortrait:Bool {if #available(iOS 27.0, *) {family == .systemExtraLargePortrait} else {false}}
     @Environment(\.widgetRenderingMode) private var rendering
 
     private var state: PrayerNextSnapshot.State? { entry.snapshot?.state(at: entry.date) }
@@ -113,14 +123,14 @@ struct NextPrayerView: View {
         }.frame(maxWidth: .infinity, alignment: .leading)
     }
     private var home: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("الصلاة القادمة").font(.caption).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: extraLargePortrait ? 18 : 4) {
+            Text("الصلاة القادمة").font(extraLargePortrait ? .title2 : .caption).foregroundStyle(.secondary)
             if let state {
-                Text(entry.template == .countdown ? countdown : state.item.name).font(.system(size: family == .systemSmall ? 34 : 40, weight: .bold, design: .serif))
+                Text(entry.template == .countdown ? countdown : state.item.name).font(.system(size: extraLargePortrait ? 72 : family == .systemSmall ? 34 : 40, weight: .bold, design: .serif))
                     .minimumScaleFactor(0.6).lineLimit(1).foregroundStyle(Salah.ink)
-                Text(clock(state.item.at)).font(.title3.weight(.semibold)).foregroundStyle(Salah.accent).widgetAccentable()
+                Text(clock(state.item.at)).font(.system(size: extraLargePortrait ? 52 : 22, weight: .semibold, design: .rounded)).foregroundStyle(Salah.accent).widgetAccentable()
                 Spacer(minLength: 0)
-                Text(entry.template == .countdown ? state.item.name : countdown).font(.callout).monospacedDigit().foregroundStyle(.secondary)
+                Text(entry.template == .countdown ? state.item.name : countdown).font(.system(size: extraLargePortrait ? 32 : 16, weight: .regular)).monospacedDigit().foregroundStyle(.secondary)
             } else {
                 Spacer(minLength: 0)
                 Text("افتح مدار").font(.title3.weight(.semibold)).foregroundStyle(Salah.ink)
@@ -155,6 +165,6 @@ struct NextPrayerWidget: Widget {
         AppIntentConfiguration(kind: kind, intent: PrayerWidgetConfiguration.self, provider: ConfiguredPrayerProvider()) { entry in NextPrayerView(entry: entry) }
             .configurationDisplayName("الصلاة القادمة")
             .description("اسم الصلاة القادمة ووقتها وكم بقي.")
-            .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .accessoryCircular, .accessoryRectangular, .accessoryInline])
+            .supportedFamilies(MadarWidgetFamilies.homeAndAccessories)
     }
 }

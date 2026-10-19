@@ -374,36 +374,61 @@ func GregorianDay_DSTIndependentArithmetic() throws {
     #expect(try GregorianDay("2026-12-31").adding(days: 1).description == "2027-01-01")
 }
 
-@Test("RL5 activity starts consume the actual Madar day's budget after sanctity")
+@Test("RL5 prayer activities start immediately only outside sanctity and consume the actual Madar day budget")
 func liveActivityBudgetAndSanctity() throws {
     let day = try #require(PrayerTimesEngine.calculate(day: GregorianDay("2026-10-09"), place: .riyadh))
-    // Approved golden row: Fajr 04:31 and fixed 30-minute sanctity -> 05:01.
-    let proposed = try instant(hour: 4, minute: 40)
-    let expected = try instant(hour: 5, minute: 1)
+    // Fajr is 04:31; an immediate start during its fixed 30-minute sanctity window is rejected, not queued.
+    let insideSanctity = try instant(hour: 4, minute: 40)
+    #expect(NotificationArbiter.liveActivityStart(id: "activity.sanctity", proposedAt: insideSanctity, prayerDays: [day],
+        timeZone: zone, policy: .init(dailyBudget: 4), submittedBudgetByDay: [:]) == nil)
+    // 06:00 is outside sanctity, before Dhuhr, and more than 12 hours before Isha.
+    let proposed = try instant(hour: 6)
     let allowed = NotificationArbiter.liveActivityStart(id: "activity.one", proposedAt: proposed, prayerDays: [day],
         timeZone: zone, policy: .init(dailyBudget: 4), submittedBudgetByDay: ["2026-10-09": 3])
-    #expect(allowed?.dueAt == expected)
+    #expect(allowed?.dueAt == proposed)
     #expect(allowed?.dayKey == "2026-10-09")
     #expect(NotificationArbiter.liveActivityStart(id: "activity.full", proposedAt: proposed, prayerDays: [day],
         timeZone: zone, policy: .init(dailyBudget: 4), submittedBudgetByDay: ["2026-10-09": 4]) == nil)
-    // At 04:00 the Fajr-based day is yesterday; midnight-based day is today.
-    let early = try instant(hour: 4)
-    #expect(NotificationArbiter.liveActivityStart(id: "early", proposedAt: early, prayerDays: [day], timeZone: zone,
-        policy: .init(), submittedBudgetByDay: ["2026-10-08": 4]) == nil)
-    #expect(NotificationArbiter.liveActivityStart(id: "early", proposedAt: early, prayerDays: [day], timeZone: zone,
-        policy: .init(dayBoundary: .midnight), submittedBudgetByDay: ["2026-10-08": 4])?.dayKey == "2026-10-09")
+    // At 06:00, the configured Maghrib boundary still counts yesterday while the Fajr boundary counts today.
+    let afterFajr = try instant(hour: 6)
+    #expect(NotificationArbiter.liveActivityStart(id: "maghrib-boundary-full", proposedAt: afterFajr, prayerDays: [day],
+        timeZone: zone, policy: .init(dayBoundary: .maghrib), submittedBudgetByDay: ["2026-10-08": 4]) == nil)
+    #expect(NotificationArbiter.liveActivityStart(id: "fajr-boundary-available", proposedAt: afterFajr, prayerDays: [day],
+        timeZone: zone, policy: .init(dayBoundary: .fajr), submittedBudgetByDay: ["2026-10-08": 4])?.dayKey == "2026-10-09")
 }
 
-@Test("RL5 activity starts respect quiet hours after clamping and device reminders")
+@Test("RL5 immediate activity starts respect quiet hours and device reminders")
 func liveActivityQuietAndOff() throws {
     let day = try #require(PrayerTimesEngine.calculate(day: GregorianDay("2026-10-09"), place: .riyadh))
-    // Friday noon is 11:41 + 60 min -> 12:41, which crosses the supplied quiet cutoff.
-    #expect(NotificationArbiter.liveActivityStart(id: "quiet", proposedAt: try instant(hour: 12), prayerDays: [day],
-        timeZone: zone, policy: .init(quietFromMinutes: 12 * 60 + 30), submittedBudgetByDay: [:]) == nil)
+    #expect(NotificationArbiter.liveActivityStart(id: "quiet", proposedAt: try instant(hour: 7), prayerDays: [day],
+        timeZone: zone, policy: .init(quietFromMinutes: 6 * 60 + 30), submittedBudgetByDay: [:]) == nil)
     #expect(NotificationArbiter.liveActivityStart(id: "off", proposedAt: try instant(hour: 10), prayerDays: [day],
         timeZone: zone, policy: .init(thisDeviceRemindersEnabled: false), submittedBudgetByDay: [:]) == nil)
-    #expect(NotificationArbiter.liveActivityStart(id: "boundary", proposedAt: try instant(hour: 21, minute: 30),
-        prayerDays: [day], timeZone: zone, policy: .init(quietFromMinutes: 21 * 60 + 30), submittedBudgetByDay: [:]) == nil)
+}
+
+@Test("RL5 contextual activities start only inside the shared budget and allowed prayer window")
+func contextActivityStartPolicy() throws {
+    let previous = try #require(PrayerTimesEngine.calculate(day: GregorianDay("2026-10-08"), place: .riyadh))
+    let day = try #require(PrayerTimesEngine.calculate(day: GregorianDay("2026-10-09"), place: .riyadh))
+    let next = try #require(PrayerTimesEngine.calculate(day: GregorianDay("2026-10-10"), place: .riyadh))
+    let allowedAt = try instant(hour: 6)
+    let allowed = NotificationArbiter.contextActivityStart(id: "context.one", proposedAt: allowedAt,
+        prayerDays: [previous, day, next], timeZone: zone, policy: .init(dailyBudget: 4),
+        submittedBudgetByDay: ["2026-10-09": 3])
+    #expect(allowed?.dueAt == allowedAt)
+    #expect(allowed?.dayKey == "2026-10-09")
+    #expect(NotificationArbiter.contextActivityStart(id: "context.full", proposedAt: allowedAt,
+        prayerDays: [previous, day, next], timeZone: zone, policy: .init(dailyBudget: 4),
+        submittedBudgetByDay: ["2026-10-09": 4]) == nil)
+    #expect(NotificationArbiter.contextActivityStart(id: "context.quiet", proposedAt: try instant(hour: 22),
+        prayerDays: [previous, day, next], timeZone: zone,
+        policy: .init(quietFromMinutes: 21 * 60 + 30), submittedBudgetByDay: [:]) == nil)
+    #expect(NotificationArbiter.contextActivityStart(id: "context.sanctity", proposedAt: try instant(hour: 4, minute: 40),
+        prayerDays: [previous, day, next], timeZone: zone, policy: .init(), submittedBudgetByDay: [:]) == nil)
+    #expect(NotificationArbiter.contextActivityStart(id: "context.night", proposedAt: try instant(hour: 2),
+        prayerDays: [previous, day, next], timeZone: zone, policy: .init(), submittedBudgetByDay: [:]) == nil)
+    #expect(NotificationArbiter.contextActivityStart(id: "context.beforeIsha", proposedAt: try instant(hour: 10),
+        prayerDays: [previous, day, next], timeZone: zone, policy: .init(), submittedBudgetByDay: [:]) == nil)
 }
 
 /// RP4. Expected clocks come from an independent implementation, not from this engine:

@@ -6,18 +6,22 @@ import MadarDesign
 import MadarSnapshots
 import WidgetKit
 
-/// The five built lobby blocks at the four sizes (§7.1 «ما تعرضه كل ودجة»). Room identities: prayer warm paper with
+/// Built lobby blocks at the four sizes (§7.1 «ما تعرضه كل ودجة»). Room identities: prayer warm paper with
 /// gold arches, Quran green cover with gold, diary the day's photo, year and upcoming on lobby paper.
 struct BahwBlockView: View {
     let service: AppBahwService
     let block: BahwBlock
     let size: BahwBlockSize
     var interactive = true
+    @State private var mihbaraSnapshot: MihbaraSnapshot?
+    @State private var mihbaraLocked = true
     @Environment(\.roomTheme) private var lobby
     private var dark: Bool { lobby.dark }
     private var room: RoomTheme {
-        switch block { case .salah: RoomTheme(room: "salah", dark: dark); case .quran: RoomTheme(room: "quran", dark: dark); case .notes: RoomTheme(room: "notes", dark: dark); default: lobby }
+        switch block { case .salah: RoomTheme(room: "salah", dark: dark); case .quran: RoomTheme(room: "quran", dark: dark); case .notes: RoomTheme(room: "notes", dark: dark); case .mihbara: RoomTheme(room: "mihbara", dark: dark); default: lobby }
     }
+    private var widgetFamily: WidgetFamily { switch size { case .icon: .accessoryCircular; case .small: .systemSmall; case .wide: .systemMedium; case .large: .systemLarge } }
+    private var mayReadMihbara: Bool { service.session.lockController?.canPresent(.app) ?? service.session.protectedDataAuthorized }
     var body: some View {
         content
             .padding(size == .icon ? 8 : 14)
@@ -25,6 +29,12 @@ struct BahwBlockView: View {
             .background(background, in: .rect(cornerRadius: 22))
             .overlay { RoundedRectangle(cornerRadius: 22).stroke(block == .quran ? room.color("gold").opacity(0.35) : room.line) }
             .clipShape(.rect(cornerRadius: 22))
+            .task(id: block) { refreshMihbaraSnapshot() }
+            .onChange(of: mayReadMihbara) { _, _ in refreshMihbaraSnapshot() }
+            .onChange(of: service.session.prayerRevision) { _, _ in refreshMihbaraSnapshot() }
+            .onChange(of: service.session.selectedTab) { _, selected in
+                if selected == "foundation" { refreshMihbaraSnapshot() }
+            }
     }
     private var background: Color { if block == .mal { return MadarToken.colors["widgetIdentity.room.mal.\(dark ? "dark" : "light").bg"] ?? lobby.surface }; return block == .quran ? room.color("cover") : room.surface }
     private var digits: MadarNumberFormatter { service.digits }
@@ -41,8 +51,20 @@ struct BahwBlockView: View {
         case .notes: notes
         case .year: year
         case .upcoming: upcoming
+        case .mihbara: mihbara
         default: EmptyView()
         }
+    }
+    private var mihbara: some View {
+        RoomWidgetContent(room: .mihbara, snapshot: nil, family: widgetFamily,
+                          mihbaraSnapshot: mihbaraSnapshot, mihbaraLocked: mihbaraLocked,
+                          numerals: service.session.string("core.numerals"))
+    }
+    private func refreshMihbaraSnapshot() {
+        guard block == .mihbara else { return }
+        let allowed = mayReadMihbara
+        mihbaraLocked = !allowed
+        mihbaraSnapshot = allowed ? service.session.mihbaraWidgetSnapshot(locked: false, at: service.now) : nil
     }
     private func title(_ color: Color) -> some View {
         Label { Text(block.title) } icon: { MadarGlyph(block.symbol, size: 17) }.font(label).foregroundStyle(color).labelStyle(.titleAndIcon).lineLimit(1)

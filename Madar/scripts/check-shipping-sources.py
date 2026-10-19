@@ -17,6 +17,27 @@ ROOT = Path(__file__).resolve().parents[2]
 DIGIT_DOT = re.compile(r"[0-9٠-٩۰-۹][\s\u2066-\u2069]*·|·[\s\u2066-\u2069]*[0-9٠-٩۰-۹]")
 SWIFT_STRING = re.compile(r'"(?:\\.|[^"\\])*"')
 PLURALS = {"zero", "one", "two", "few", "many", "other"}
+REMOTE_PRODUCTS = {
+    "https://github.com/readium/swift-toolkit.git": {
+        "ReadiumNavigator", "ReadiumShared", "ReadiumStreamer",
+    },
+}
+
+
+def resolved_pins(root):
+    path = root / 'Madar.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved'
+    document = json.loads(path.read_text())
+    pins = document.get('pins')
+    if document.get('version') != 3 or not isinstance(pins, list):
+        raise ValueError('unsupported or missing Xcode Package.resolved format')
+    result = {}
+    for pin in pins:
+        location, state = pin.get('location'), pin.get('state', {})
+        if not isinstance(location, str) or not isinstance(state, dict):
+            raise ValueError('invalid Xcode Package.resolved pin')
+        if location in result: raise ValueError(f'duplicate package pin {location}')
+        result[location] = pin
+    return result
 
 
 def uncomment(text):
@@ -95,7 +116,8 @@ def build_files(project, root):
         paths[identifier] = path
         for child in obj.get('children', []): walk(child, path)
     walk(objects[project['rootObject']]['mainGroup'], root)
-    sources, resources, packages, target_names = set(), set(), set(), []
+    sources, resources, packages, remote_products, target_names = set(), set(), set(), set(), []
+    pins = None
     targets = [o for o in objects.values() if o['isa'] == 'PBXNativeTarget'
                and o['productType'] in ('com.apple.product-type.application', 'com.apple.product-type.app-extension')]
     if {o['name'] for o in targets} != {'Madar', 'MadarWidgets'}:
@@ -119,7 +141,24 @@ def build_files(project, root):
         for identifier in target.get('packageProductDependencies', []):
             dep = objects[identifier]
             if 'package' in dep:
-                candidates = [objects[dep['package']]]
+                reference = objects[dep['package']]
+                if reference['isa'] == 'XCRemoteSwiftPackageReference':
+                    location, product = reference.get('repositoryURL'), dep['productName']
+                    if product not in REMOTE_PRODUCTS.get(location, set()):
+                        raise ValueError(f'unsupported remote package product {location} -> {product}')
+                    if pins is None: pins = resolved_pins(root)
+                    pin = pins.get(location)
+                    state = pin.get('state', {}) if pin else {}
+                    requirement = reference.get('requirement', {})
+                    version, revision = state.get('version'), state.get('revision')
+                    if (requirement.get('kind') != 'exactVersion' or requirement.get('version') != version
+                            or not isinstance(revision, str) or not re.fullmatch(r'[0-9a-f]{40}', revision)):
+                        raise ValueError(f'remote package is not pinned to its exact Xcode requirement: {location}')
+                    remote_products.add((location, product, version, revision))
+                    continue
+                if reference['isa'] != 'XCLocalSwiftPackageReference':
+                    raise ValueError(f'unsupported package reference for {dep["productName"]}')
+                candidates = [reference]
             else:
                 candidates = [objects[x] for x in objects[project['rootObject']]['packageReferences']
                               if objects[x]['isa'] == 'XCLocalSwiftPackageReference'
@@ -156,7 +195,7 @@ def build_files(project, root):
             resource_path = directory / resource
             if not resource_path.exists(): raise ValueError(f'missing declared package resource {resource_path}')
             resources.update(resource_path.rglob('*.xcstrings') if resource_path.is_dir() else [resource_path])
-    return sorted(sources), sorted(resources), sorted(packages), sorted(target_names)
+    return sorted(sources), sorted(resources), sorted(packages), sorted(remote_products), sorted(target_names)
 
 
 def get_path(document, path):
@@ -360,7 +399,7 @@ def scan_source(text, path, definitions):
 def run(root):
     app = root / 'Madar'
     project = json.loads(subprocess.check_output(['plutil', '-convert', 'json', '-o', '-', str(app/'Madar.xcodeproj/project.pbxproj')]))
-    sources, resources, packages, targets = build_files(project, app)
+    sources, resources, packages, remote_products, targets = build_files(project, app)
     schema = json.loads((app/'Specification/settings-schema.json').read_text())
     tokens = json.loads((app/'Packages/MadarDesign/Sources/MadarDesign/Resources/design-tokens.json').read_text())
     failures, manual, source_keys, catalogs = [], [], set(), []
@@ -397,15 +436,18 @@ def run(root):
         failures.append('reachable settings no longer guarded by supportedKeys')
     route_proof = re.search(r'settingsKeys: Set\(Self.supportedKeys\), availability: \.init\(builtRooms: \[(.*?)\]\)', session)
     built_rooms = set(re.findall(r'\.(\w+)', route_proof[1])) if route_proof else set()
-    # M5 boundary: each built room is explicit; Mihbara stays out until its own milestone.
-    if built_rooms != {'core', 'salah', 'quran', 'notes', 'bahw', 'year', 'habits', 'mal'}:
+    # Milestone boundary: each built room is explicit; update only when the app route is built.
+    if built_rooms != {'core', 'salah', 'quran', 'notes', 'bahw', 'year', 'habits', 'mal', 'mihbara'}:
         failures.append('settings/room deep-link availability proof changed')
     return dict(scope='M0 static shipping checks; NOT complete acceptance', targets=targets,
                 packages=[dict(path=p, product=n) for p,n in packages], sources=source_inventory,
+                remoteProducts=[dict(location=url, product=product, version=version, revision=revision)
+                                for url, product, version, revision in remote_products],
                 supportedKeys=supported, literalSettingKeys=sorted(source_keys),
                 tokenPairsMeasured=measured, catalogs=catalogs, findings=failures,
                 manualTrace=manual, reachability=reachability,
-                exclusions=['test/probe executable targets', 'excluded QuranRoom.swift', 'external Adhan dependency source'],
+                exclusions=['test/probe executable targets', 'excluded QuranRoom.swift',
+                            'external Adhan dependency source', 'pinned Readium package source'],
                 limits=['regex does not prove all rendered strings, computed settings or control reachability',
                         'UI inventory requires manual colour/background/font/action and count-phrase tracing',
                         'generated declarations exempt; canonical JSON parity and M0 pair math checked',

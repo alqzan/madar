@@ -4,7 +4,68 @@ import MadarCore
 import MadarData
 import MadarCommands
 import CryptoKit
+import CoreSpotlight
 @testable import Madar
+
+@MainActor private final class SpotlightIndexProbe {
+    private(set) var calls: [Bool] = []
+    private(set) var indexed = false
+    private var enableStarted = false
+    private var disableStarted = false
+    private var holdNextEnable = false
+    private var holdNextDisable = false
+    private var startWaiter: CheckedContinuation<Void, Never>?
+    private var disableWaiter: CheckedContinuation<Void, Never>?
+    private var enableContinuation: CheckedContinuation<Void, Never>?
+    private var disableContinuation: CheckedContinuation<Void, Never>?
+
+    func apply(enabled: Bool) async {
+        calls.append(enabled)
+        if enabled {
+            enableStarted = true
+            startWaiter?.resume()
+            startWaiter = nil
+            if holdNextEnable {
+                holdNextEnable = false
+                await withCheckedContinuation { enableContinuation = $0 }
+            }
+            indexed = true
+        } else {
+            disableStarted = true
+            disableWaiter?.resume()
+            disableWaiter = nil
+            if holdNextDisable {
+                holdNextDisable = false
+                await withCheckedContinuation { disableContinuation = $0 }
+            }
+            indexed = false
+        }
+    }
+
+    func holdEnable() { holdNextEnable = true }
+
+    func holdDisable() { holdNextDisable = true }
+
+    func waitForEnableStart() async {
+        guard !enableStarted else { return }
+        await withCheckedContinuation { startWaiter = $0 }
+    }
+
+    func waitForDisableStart() async {
+        guard !disableStarted else { return }
+        await withCheckedContinuation { disableWaiter = $0 }
+    }
+
+    func finishEnable() {
+        enableContinuation?.resume()
+        enableContinuation = nil
+    }
+
+    func finishDisable() {
+        disableContinuation?.resume()
+        disableContinuation = nil
+    }
+}
 
 @MainActor final class MihbaraHomeIntegrationTests: XCTestCase {
     func testPinnedMatnAndRealFajrGateThenExplicitWirdAndUndo() async throws {
@@ -25,5 +86,97 @@ import CryptoKit
         let adapter = DurableCommandAdapter(container: container, lockDirectory: root, generationProvider: { try app.pendingInbox.currentGeneration()?.generationID })
         let result = try await CommandBus(adapter: adapter).execute(.init(name: "system.undo", payload: .object(["undoToken":.string(token.id.uuidString)])))
         XCTAssertEqual(result.status, .applied, result.reason ?? ""); XCTAssertEqual(try service.load().todayHadiths.first?.number, 1)
+    }
+
+    func testSpotlightBookRecordsContainOnlyLiveTitles() throws {
+        let live = Book(); live.id = UUID(); live.title = "كتاب في المحبرة"; live.author = "اسم لا يُفهرس"
+        let deleted = Book(); deleted.deletedAt = Date(); deleted.title = "كتاب محذوف"
+        let merged = Book(); merged.mergedInto = UUID(); merged.title = "كتاب مدموج"
+        let untitled = Book(); untitled.title = "  \n"
+
+        let records = AppSpotlightIndexing.records(from: [live, deleted, merged, untitled])
+        XCTAssertEqual(records.map(\.id), [live.id])
+        let item = AppSpotlightIndexing.searchableItem(for: try XCTUnwrap(records.first))
+        XCTAssertEqual(item.domainIdentifier, AppSpotlightIndexing.bookDomain)
+        XCTAssertEqual(item.uniqueIdentifier, live.id.uuidString)
+        XCTAssertEqual(item.attributeSet.title, live.title)
+        XCTAssertNil(item.attributeSet.contentDescription)
+        XCTAssertNil(item.attributeSet.authorNames)
+        XCTAssertNil(item.attributeSet.keywords)
+        XCTAssertNil(item.attributeSet.textContent)
+    }
+
+    func testSpotlightSelectionTargetsTheBookRoomWithoutLosingTheRequestedBook() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "MihbaraSpotlight-\(UUID())"); defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root), app = try AppSession(container: container, groupDirectory: root)
+        XCTAssertFalse(app.bool("core.spotlightIndex"))
+        XCTAssertTrue(AppSession.supportedKeys.contains("core.spotlightIndex"))
+        XCTAssertEqual(sectionFor("core.spotlightIndex"), "البحث")
+        let id = UUID(); app.openSpotlightBook(id)
+        XCTAssertEqual(app.selectedTab, "mihbara")
+        XCTAssertEqual(app.mihbaraBookToOpen, id)
+    }
+
+    func testSpotlightIndexIsOptInAndClearsItsDomainWhenDisabled() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "MihbaraSpotlightIndex-\(UUID())"); defer { try? FileManager.default.removeItem(at: root) }
+        let app = try AppSession(container: MadarContainerFactory.makeLocal(at: root), groupDirectory: root)
+        XCTAssertFalse(app.bool("core.spotlightIndex"))
+        try await app.applySettingsAndWait(["core.spotlightIndex": .bool(true)])
+        XCTAssertTrue(app.bool("core.spotlightIndex")); XCTAssertNil(app.errorMessage)
+        try await app.applySettingsAndWait(["core.spotlightIndex": .bool(false)])
+        XCTAssertFalse(app.bool("core.spotlightIndex")); XCTAssertNil(app.errorMessage)
+    }
+
+    func testDisablingSpotlightDuringPendingIndexFinishesWithDeletion() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "MihbaraSpotlightRace-\(UUID())"); defer { try? FileManager.default.removeItem(at: root) }
+        let probe = SpotlightIndexProbe()
+        probe.holdEnable()
+        let app = try AppSession(
+            container: MadarContainerFactory.makeLocal(at: root),
+            groupDirectory: root,
+            spotlightIndexOperation: { enabled, _ in await probe.apply(enabled: enabled) }
+        )
+
+        let enableTask = Task { try await app.applySettingsAndWait(["core.spotlightIndex": .bool(true)]) }
+        await probe.waitForEnableStart()
+        let disableTask = Task { try await app.applySettingsAndWait(["core.spotlightIndex": .bool(false)]) }
+        for _ in 0..<100 where app.bool("core.spotlightIndex") { await Task.yield() }
+        XCTAssertFalse(app.bool("core.spotlightIndex"))
+        XCTAssertEqual(probe.calls, [true])
+
+        probe.finishEnable()
+        try await enableTask.value
+        try await disableTask.value
+        XCTAssertEqual(probe.calls, [true, false])
+        XCTAssertFalse(probe.indexed)
+    }
+
+    func testReenablingSpotlightDuringPendingDeletionRebuildsTheIndex() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "MihbaraSpotlightReverseRace-\(UUID())"); defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root)
+        let book = Book(); book.title = "كتاب محفوظ"
+        let context = ModelContext(container); context.insert(book); try context.save()
+        let probe = SpotlightIndexProbe()
+        let app = try AppSession(
+            container: container,
+            groupDirectory: root,
+            spotlightIndexOperation: { enabled, _ in await probe.apply(enabled: enabled) }
+        )
+        try await app.applySettingsAndWait(["core.spotlightIndex": .bool(true)])
+        XCTAssertTrue(probe.indexed)
+
+        probe.holdDisable()
+        let disableTask = Task { try await app.applySettingsAndWait(["core.spotlightIndex": .bool(false)]) }
+        await probe.waitForDisableStart()
+        let enableTask = Task { try await app.applySettingsAndWait(["core.spotlightIndex": .bool(true)]) }
+        for _ in 0..<100 where !app.bool("core.spotlightIndex") { await Task.yield() }
+        XCTAssertTrue(app.bool("core.spotlightIndex"))
+        XCTAssertEqual(probe.calls, [true, false])
+
+        probe.finishDisable()
+        try await disableTask.value
+        try await enableTask.value
+        XCTAssertEqual(probe.calls, [true, false, true])
+        XCTAssertTrue(probe.indexed)
     }
 }

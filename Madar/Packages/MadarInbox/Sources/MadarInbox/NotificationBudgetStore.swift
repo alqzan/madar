@@ -79,12 +79,12 @@ public struct NotificationBudgetStore: Sendable {
             let days = policy.prayerDays
             guard let zone = days.first?.place.timeZone else { throw NotificationBudgetError.unavailable }
             let occurrences = days.flatMap { day in Prayer.allCases.map { (day.time(for: $0), $0) } }.sorted { $0.0 < $1.0 }
-            let start = SanctityGuard(prayerDays: days).clamp(now.addingTimeInterval(1))
-            guard let next = occurrences.first(where: { $0.0 > start }), next.1 != .fajr, next.0.timeIntervalSince(start) <= 8 * 3600,
-                  !(occurrences.last(where: { $0.0 <= start })?.1 == .isha && next.1 == .fajr),
-                  !occurrences.contains(where: { $0.1 == .isha && $0.0 > start && $0.0 <= start.addingTimeInterval(12 * 3600) }) else {
+            let start = now
+            guard NotificationArbiter.liveActivityWindowAllows(start, prayerDays: days, timeZone: zone,
+                                                                 policy: policy.notificationPolicy) else {
                 throw NotificationBudgetError.disabled
             }
+            guard let next = occurrences.first(where: { $0.0 > start }) else { throw NotificationBudgetError.disabled }
             let purpose = "prayer.next.\(next.0.timeIntervalSince1970)"
             guard !state.reservations.contains(where: { $0.purpose == purpose }) else { throw NotificationBudgetError.duplicate }
             let counts = Dictionary(grouping: state.reservations, by: \.dayKey).mapValues(\.count)
@@ -96,6 +96,29 @@ public struct NotificationBudgetStore: Sendable {
             let reservation = NotificationBudgetReservation(id: id, dayKey: candidate.dayKey, scheduledAt: candidate.dueAt, activity: true, purpose: purpose)
             try insert(reservation, into: &state, limit: policy.dailyBudget, now: now)
             return ReservedPrayerActivity(reservation: reservation, prayer: next.1, prayerAt: next.0, numerals: policy.numerals)
+        }
+    }
+
+    /// Reserves a shared device-budget slot before an immediate contextual Live Activity starts.
+    /// A repeated underlying event is deduplicated by its stable purpose, even after the activity ends.
+    public func reserveContextActivity(id: String, purpose: String, now: Date) throws -> NotificationBudgetReservation {
+        try transaction { state in
+            let policy = try validPolicy(state, now: now)
+            guard policy.activityEnabled && policy.remindersEnabled else { throw NotificationBudgetError.disabled }
+            guard !state.reservations.contains(where: { $0.purpose == purpose }) else { throw NotificationBudgetError.duplicate }
+            guard let place = policy.prayerDays.first?.place else { throw NotificationBudgetError.unavailable }
+            let zone = place.timeZone
+            let emptyBudget: [String: Int] = [:]
+            guard let candidate = NotificationArbiter.contextActivityStart(id: id, proposedAt: now,
+                    prayerDays: policy.prayerDays, timeZone: zone, policy: policy.notificationPolicy,
+                    submittedBudgetByDay: emptyBudget) else { throw NotificationBudgetError.disabled }
+            let count = state.reservations.filter { $0.dayKey == candidate.dayKey }.count
+            guard count < policy.dailyBudget else { throw NotificationBudgetError.full }
+            let reservation = NotificationBudgetReservation(id: id, dayKey: candidate.dayKey,
+                scheduledAt: candidate.dueAt, activity: true, purpose: purpose)
+            guard candidate.dueAt < policy.validUntil else { throw NotificationBudgetError.unavailable }
+            try insert(reservation, into: &state, limit: policy.dailyBudget, now: now)
+            return reservation
         }
     }
     /// Only an explicit OS request failure may refund a start whose time has passed.

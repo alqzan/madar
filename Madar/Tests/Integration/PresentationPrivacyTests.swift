@@ -4,7 +4,7 @@ import UIKit
 @testable import Madar
 
 @MainActor final class PresentationPrivacyTests: XCTestCase {
-    func test_M0P1a_sceneCoverLockSymbolExists() { XCTAssertNotNil(UIImage(systemName: "lock")) }
+    func test_M0P1a_sceneCoverLockSymbolExists() { XCTAssertNotNil(UIImage(systemName: "lock.fill")) }
     private final class Service: MadarLockService {
         var bindings: [MadarProtectedFeature] = []
         var purges = 0

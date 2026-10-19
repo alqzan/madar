@@ -14,7 +14,8 @@ import XCTest
         let gate = app.descendants(matching: .any)["protected-lock-screen"]
         XCTAssertTrue(gate.waitForExistence(timeout: 20), app.debugDescription)
         XCTAssertFalse(app.buttons["scene-lock-authenticate"].exists, "The app's own Face ID gate should own the active locked screen")
-        XCTAssertFalse(app.buttons["tab-notes"].exists, "Room shortcuts must wait behind the single app gate")
+        XCTAssertFalse(app.buttons["tab-foundation"].exists, "Room navigation must wait behind the single app gate")
+        XCTAssertFalse(app.buttons["tab-mihbara"].exists, "Room shortcuts must wait behind the single app gate")
         capture(app, "UX-01-face-id-gate-L")
     }
 
@@ -27,7 +28,7 @@ import XCTest
         let start = app.buttons["first-run-continue"]
         if start.waitForExistence(timeout: 3) { start.tap(); if start.exists && start.isHittable { start.tap() } }
         let notes = app.buttons["tab-notes"]
-        XCTAssertTrue(notes.waitForExistence(timeout: 20)); notes.tap()
+        XCTAssertTrue(notes.waitForExistence(timeout: 20), app.debugDescription); notes.tap()
         XCTAssertTrue(app.buttons["diary-welcome-next"].waitForExistence(timeout: 10))
         for _ in 0..<4 { app.buttons["diary-welcome-next"].tap() }
         XCTAssertTrue(app.buttons["diary-write"].waitForExistence(timeout: 10))

@@ -7,6 +7,7 @@ import UniformTypeIdentifiers
 import MadarCore
 import MadarData
 import MadarCommands
+import MadarDesign
 
 struct DiaryExportOptions {
     var format = "pdf"
@@ -103,18 +104,23 @@ extension AppDiaryService {
 
 @MainActor enum DiaryPDF {
     static func render(_ pages:[DiaryExportPage],digits:MadarNumberFormatter,coverYear:Int?=nil,index:Bool=false,coverDates:MadarDateLabels?=nil)->Data {
-        let bounds=CGRect(x:0,y:0,width:595,height:842),paper=UIColor(red:0.96,green:0.94,blue:0.89,alpha:1),ink=UIColor(red:0.16,green:0.14,blue:0.11,alpha:1)
+        let bounds=CGRect(x:0,y:0,width:595,height:842),notes=RoomTheme(room:"notes")
+        let paper=UIColor(notes.background),ink=UIColor(notes.ink)
+        let coverLeather=UIColor(MadarToken.colors["rooms.notes.lockCover.leather"] ?? notes.accent)
+        let coverInk=UIColor(MadarToken.colors["rooms.notes.lockCover.text"] ?? notes.background)
+        let marginInk=UIColor(notes.color("pencil"))
+        let rulingInk=UIColor(notes.line).withAlphaComponent(0.72)
         var number=0
         return UIGraphicsPDFRenderer(bounds:bounds).pdfData { renderer in
-            func begin(){renderer.beginPage();number+=1;paper.setFill();renderer.cgContext.fill(bounds);UIColor(white:0.5,alpha:0.14).setStroke();let path=UIBezierPath();for y in stride(from:CGFloat(80),through:780,by:28){path.move(to:CGPoint(x:40,y:y));path.addLine(to:CGPoint(x:555,y:y))};path.lineWidth=0.5;path.stroke();(digits.string(number) as NSString).draw(at:CGPoint(x:290,y:805),withAttributes:[.font:UIFont.systemFont(ofSize:10),.foregroundColor:ink])}
+            func begin(){renderer.beginPage();number+=1;paper.setFill();renderer.cgContext.fill(bounds);rulingInk.setStroke();let path=UIBezierPath();for y in stride(from:CGFloat(80),through:780,by:28){path.move(to:CGPoint(x:40,y:y));path.addLine(to:CGPoint(x:555,y:y))};path.lineWidth=0.5;path.stroke();(digits.string(number) as NSString).draw(at:CGPoint(x:290,y:805),withAttributes:[.font:UIFont.systemFont(ofSize:10),.foregroundColor:ink])}
             if let coverYear {
-                begin();UIColor(red:0.369,green:0.169,blue:0.106,alpha:1).setFill();renderer.cgContext.fill(bounds)
+                begin();coverLeather.setFill();renderer.cgContext.fill(bounds)
                 let style=NSMutableParagraphStyle();style.alignment = .center;style.baseWritingDirection = .rightToLeft
-                ("مذكرات\n"+(coverDates?.primary ?? digits.string(coverYear)) as NSString).draw(in:CGRect(x:60,y:260,width:475,height:240),withAttributes:[.font:UIFont(name:"thmanyahserifdisplay-Bold",size:44) ?? UIFont.boldSystemFont(ofSize:44),.foregroundColor:UIColor(red:0.949,green:0.902,blue:0.827,alpha:1),.paragraphStyle:style])
+                ("مذكرات\n"+(coverDates?.primary ?? digits.string(coverYear)) as NSString).draw(in:CGRect(x:60,y:260,width:475,height:240),withAttributes:[.font:UIFont(name:"thmanyahserifdisplay-Bold",size:44) ?? UIFont.boldSystemFont(ofSize:44),.foregroundColor:coverInk,.paragraphStyle:style])
             }
                 if let secondary = coverDates?.secondary {
                     let style = NSMutableParagraphStyle(); style.alignment = .center
-                    (secondary as NSString).draw(in: CGRect(x:60,y:500,width:475,height:60), withAttributes:[.font:UIFont.systemFont(ofSize:18),.foregroundColor:UIColor(red:0.949,green:0.902,blue:0.827,alpha:1),.paragraphStyle:style])
+                    (secondary as NSString).draw(in: CGRect(x:60,y:500,width:475,height:60), withAttributes:[.font:UIFont.systemFont(ofSize:18),.foregroundColor:coverInk,.paragraphStyle:style])
                 }
             var indexLines:[String]=[]
             for page in pages {
@@ -123,7 +129,7 @@ extension AppDiaryService {
                 let headerParts = page.title.components(separatedBy: "، ")
                 let text=NSMutableAttributedString(string:(headerParts.first ?? page.title)+"\n",attributes:[.font:UIFont(name:"thmanyahserifdisplay-Bold",size:25) ?? UIFont.boldSystemFont(ofSize:25),.foregroundColor:ink,.paragraphStyle:paragraph])
                 if headerParts.count > 1 { text.append(NSAttributedString(string:headerParts.dropFirst().joined(separator: "، ")+"\n\n",attributes:[.font:UIFont.systemFont(ofSize:13),.foregroundColor:ink,.paragraphStyle:paragraph])) }
-                for line in page.lines {text.append(NSAttributedString(string:AppDiaryService.exportLabel(line.kind)+(line.markdown == true ? DayOneMarkdown.plain(line.text) : line.text)+"\n\n",attributes:[.font:UIFont(name:"thmanyahseriftext-Regular",size:17) ?? UIFont.systemFont(ofSize:17),.foregroundColor:line.kind=="margin" ? UIColor(red:0.18,green:0.32,blue:0.39,alpha:1):ink,.paragraphStyle:paragraph]))}
+                for line in page.lines {text.append(NSAttributedString(string:AppDiaryService.exportLabel(line.kind)+(line.markdown == true ? DayOneMarkdown.plain(line.text) : line.text)+"\n\n",attributes:[.font:UIFont(name:"thmanyahseriftext-Regular",size:17) ?? UIFont.systemFont(ofSize:17),.foregroundColor:line.kind=="margin" ? marginInk:ink,.paragraphStyle:paragraph]))}
                 for item in page.media where item.kind != "photo" {
                     let label=item.kind=="audio" ? "تسجيل صوتي محفوظ في هذا اليوم" : "مرفق محفوظ في هذا اليوم"
                     text.append(NSAttributedString(string:label+"\n\n",attributes:[.font:UIFont.systemFont(ofSize:14),.foregroundColor:ink,.paragraphStyle:paragraph]))

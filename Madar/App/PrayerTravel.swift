@@ -25,8 +25,11 @@ final class TravelLocator: NSObject, CLLocationManagerDelegate {
 
     func refresh() {
         #if DEBUG
-        // UI tests inject a place as "lat,lon,city,country,tz" instead of asking the system.
-        if let raw = ProcessInfo.processInfo.environment["MADAR_UI_TRAVEL_FIX"] {
+        // UI stores use a deterministic place instead of raising an OS permission
+        // alert over the app. Travel-specific tests can inject their own place.
+        if ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"] != nil {
+            let raw = ProcessInfo.processInfo.environment["MADAR_UI_TRAVEL_FIX"]
+                ?? "24.7136,46.6753,الرياض,SA,Asia/Riyadh"
             let parts = raw.split(separator: ",").map(String.init)
             if parts.count == 5, let lat = Double(parts[0]), let lon = Double(parts[1]), let place = try? ActivePlace(latitude: lat, longitude: lon, timeZoneID: parts[4]) {
                 fix = TravelFix(place: place, city: parts[2], country: parts[3])

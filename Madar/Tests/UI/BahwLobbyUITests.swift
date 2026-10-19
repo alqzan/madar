@@ -16,11 +16,10 @@ import XCTest
         XCTAssertEqual(element("bahw-greeting").label, "مساء الخير")
         XCTAssertFalse(element("bahw-date").label.contains("·"))
         for block in ["habits", "salah", "quran", "mal", "year", "upcoming"] { XCTAssertTrue(element("bahw-block-" + block).exists, block) }
-        // Mihbara waits for M6; money is now built in M5.
-        for block in ["mihbara"] { XCTAssertFalse(element("bahw-block-" + block).exists, block) }
+        // Every shipped room, including Mihbara from M6, has a lobby destination.
         XCTAssertTrue(element("bahw-salah-next").label.contains("المغرب"), element("bahw-salah-next").label)
         capture(app, "M4-V01-lobby-L")
-        app.swipeUp(); XCTAssertTrue(element("bahw-block-notes").waitForExistence(timeout: 5)); capture(app, "M4-V01-lobby-s1-L")
+        app.swipeUp(); XCTAssertTrue(element("bahw-block-notes").waitForExistence(timeout: 5)); XCTAssertTrue(element("bahw-block-mihbara").exists); capture(app, "M4-V01-lobby-s1-L")
         app.swipeDown()
 
         element("bahw-block-salah").press(forDuration: 0.7)
@@ -35,6 +34,20 @@ import XCTest
         XCTAssertTrue(element("prayer-today-header").waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertFalse(app.buttons["bahw-open-prayer"].exists)
         capture(app, "UX-02-direct-prayer-L")
+    }
+    func testMihbaraLobbyBlockOpensItsRoom() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_MIHBARA_FIXTURE": "empty", "MADAR_UI_THEME": "light"]
+        app.launch(); finishOnboarding(app)
+        let lobby = app.tabBars.buttons["البهو"]
+        XCTAssertTrue(lobby.waitForExistence(timeout: 15), app.debugDescription); lobby.tap()
+        let mihbara = app.descendants(matching: .any).matching(identifier: "bahw-block-mihbara").firstMatch
+        var attempts = 0
+        while attempts < 5 && !mihbara.exists { app.swipeUp(velocity: .slow); attempts += 1 }
+        XCTAssertTrue(mihbara.waitForExistence(timeout: 8), app.debugDescription)
+        mihbara.tap()
+        XCTAssertTrue(app.buttons["mihbara-add-paper"].waitForExistence(timeout: 10), app.debugDescription)
     }
     func testHabitWideAndSmallBlocksShowAtRisk() throws {
         continueAfterFailure = false

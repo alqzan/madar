@@ -18,7 +18,9 @@ struct RoomWidgetContent:View {
     @Environment(\.widgetRenderingMode) private var rendering
     private var theme:RoomTheme{.init(room:room == .mihbara ? "mihbara" : "bahw",dark:scheme == .dark)}
     private var accent:Color{rendering == .fullColor ? theme.accent : .primary}
-    private var capacity:Int {let n=family == .systemLarge ? 5 : family == .systemMedium ? 3 : 2;return type.isAccessibilitySize ? (n+1)/2 : n}
+    private var extraLargePortrait:Bool {if #available(iOS 27.0, *) {family == .systemExtraLargePortrait} else {false}}
+    private var largeHome:Bool {family == .systemLarge || extraLargePortrait}
+    private var capacity:Int {let n=extraLargePortrait ? 7 : largeHome ? 5 : family == .systemMedium ? 3 : 2;return type.isAccessibilitySize ? (n+1)/2 : n}
     private var rows:[RoomWidgetSnapshot.Row] {
         guard let snapshot else{return[]}
         if room == .habits && template == "periods"{return Array(snapshot.periods.prefix(capacity))}
@@ -43,25 +45,26 @@ struct RoomWidgetContent:View {
                 Spacer(minLength:0)
             } else if rows.isEmpty {
                 Spacer(minLength:0);Text(snapshot?.emptyTitle ?? "افتح مدار للتحديث").font(MadarTypography.section());dates;Spacer(minLength:0)
-            } else if room == .upcoming && family != .systemLarge {
+            } else if room == .upcoming && !largeHome {
                 HStack(alignment:.top,spacing:8) {ForEach(rows){row in upcoming(row)}}.frame(maxHeight:.infinity)
             } else {
                 if room == .habits && template != "periods" && family != .systemMedium && !type.isAccessibilitySize {Text(snapshot?.heading ?? "").font(.custom("thmanyahserifdisplay-Bold",size:22,relativeTo:.title2)).foregroundStyle(accent).privacySensitive()}
                 ForEach(rows) { row in
+                    let isHero = extraLargePortrait && row.id == rows.first?.id
                     Link(destination:URL(string:row.route) ?? URL(string:room.route)!) {
                         HStack(spacing:8) {
                             if room == .year || room == .habits {donut(row.share).frame(width:24,height:24)}
                             VStack(alignment:.leading,spacing:2) {
-                                Text(row.title).font(.custom("thmanyahsans-Bold",size:13,relativeTo:.caption)).lineLimit(1)
-                                Text(row.value).font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).foregroundStyle(theme.secondaryInk).lineLimit(1)
-                                if family == .systemLarge && !type.isAccessibilitySize && !row.detail.isEmpty && (room != .habits || row.id == rows.first?.id) {HStack(spacing:6){Text(row.detail).font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).foregroundStyle(theme.secondaryInk).lineLimit(1);if !row.secondDate.isEmpty {Text(row.secondDate).font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).foregroundStyle(theme.secondaryInk).lineLimit(1)}}}
+                                Text(row.title).font(.custom("thmanyahsans-Bold",size:isHero ? 19 : 13,relativeTo:isHero ? .headline : .caption)).lineLimit(1)
+                                Text(row.value).font(.custom("thmanyahsans-Regular",size:isHero ? 24 : 11,relativeTo:isHero ? .title3 : .caption2)).foregroundStyle(theme.secondaryInk).lineLimit(1)
+                                if largeHome && !type.isAccessibilitySize && !row.detail.isEmpty && (room != .habits || row.id == rows.first?.id) {HStack(spacing:6){Text(row.detail).font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).foregroundStyle(theme.secondaryInk).lineLimit(1);if !row.secondDate.isEmpty {Text(row.secondDate).font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).foregroundStyle(theme.secondaryInk).lineLimit(1)}}}
                             }
                             Spacer(minLength:0)
                             if row.done && room == .habits {Image(systemName:"checkmark").font(.caption).foregroundStyle(accent)}
                         }.contentShape(.rect)
                     }.buttonStyle(.plain).privacySensitive(room == .habits || room == .upcoming)
                 }
-                if room == .year || family == .systemLarge {Spacer(minLength:0);dates}
+                if room == .year || largeHome {Spacer(minLength:0);dates}
                 else {Spacer(minLength:0)}
             }
         }.foregroundStyle(theme.ink).frame(maxWidth:.infinity,maxHeight:.infinity,alignment:.topLeading)
@@ -112,7 +115,7 @@ struct RoomWidgetContent:View {
     /// RD7: the chosen diary template's row, present only when the owner opted in and nothing is locked.
     private var diaryRow:RoomWidgetSnapshot.Row? { room == .diaryWrite && snapshot?.locked != true ? snapshot?.rows.first { $0.id == template } : nil }
     @ViewBuilder private func diaryContent(_ row:RoomWidgetSnapshot.Row)->some View {
-        Text(row.value).font(.custom("thmanyahseriftext-Regular",size:family == .systemSmall ? 17 : 19,relativeTo:.body)).lineLimit(family == .systemLarge ? 8 : 4).lineSpacing(3).privacySensitive()
+        Text(row.value).font(.custom("thmanyahseriftext-Regular",size:family == .systemSmall ? 17 : 19,relativeTo:.body)).lineLimit(extraLargePortrait ? 12 : largeHome ? 8 : 4).lineSpacing(3).privacySensitive()
         Spacer(minLength:0)
         if row.id == "intention" {
             Link(destination:URL(string:room.route)!) {Text("اكتب").font(.custom("thmanyahsans-Bold",size:15,relativeTo:.body)).frame(maxWidth:.infinity,minHeight:40).foregroundStyle(theme.surface).background(theme.ink,in:.capsule)}.buttonStyle(.plain)
@@ -139,6 +142,8 @@ private struct MihbaraRoomWidgetContent:View {
     @Environment(\.colorScheme) private var scheme
     private var theme:RoomTheme{.init(room:"mihbara",dark:scheme == .dark)}
     private var digits:MadarNumberFormatter{.init(style:numerals == "western" ? .western : .hindi)}
+    private var extraLargePortrait:Bool {if #available(iOS 27.0, *) {family == .systemExtraLargePortrait} else {false}}
+    private var largeHome:Bool {family == .systemLarge || extraLargePortrait}
     private var bookTitle:String?{snapshot?.currentBook?.title.trimmingCharacters(in:.whitespacesAndNewlines).nonEmpty}
     private var fallbackTitle:String?{bookTitle ?? snapshot?.hadithToday?.title}
     private var bookProgress:Double? {
@@ -164,7 +169,7 @@ private struct MihbaraRoomWidgetContent:View {
     private var home:some View {
         VStack(alignment:.leading,spacing:8) {
             HStack(spacing:7) {
-                Image(systemName:"book.closed.fill").font(.system(size:15,weight:.semibold)).widgetAccentable()
+                Image(systemName:"books.vertical.fill").font(.system(size:15,weight:.semibold)).widgetAccentable()
                 Text("المحبرة").font(.custom("thmanyahsans-Bold",size:13,relativeTo:.caption))
                 Spacer(minLength:0)
                 if let count=snapshot?.shelfCount,count>0 {Text(digits.string(count)+" كتابًا").font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).foregroundStyle(theme.secondaryInk).lineLimit(1)}
@@ -187,9 +192,9 @@ private struct MihbaraRoomWidgetContent:View {
                     Rectangle().fill(theme.line).frame(height:1)
                     VStack(alignment:.leading,spacing:3){Text("حديث اليوم، "+digits.string(hadith.number)).font(.custom("thmanyahsans-Bold",size:11,relativeTo:.caption2)).foregroundStyle(theme.accent);Text(hadith.title).font(.custom("thmanyahsans-Regular",size:12,relativeTo:.caption)).lineLimit(2)}
                 }
-                if family == .systemLarge,let line=snapshot?.lastNotebookLine {
+                if largeHome,let line=snapshot?.lastNotebookLine {
                     Rectangle().fill(theme.line).frame(height:1)
-                    Text(line).font(.custom("thmanyahseriftext-Regular",size:15,relativeTo:.body)).lineLimit(3)
+                    Text(line).font(.custom("thmanyahseriftext-Regular",size:15,relativeTo:.body)).lineLimit(family == .systemLarge ? 3 : 5)
                 }
                 Spacer(minLength:0)
             }
@@ -205,11 +210,11 @@ private struct MihbaraRoomWidgetContent:View {
                     if let bookProgress {Circle().trim(from:0,to:bookProgress).stroke(.primary,style:.init(lineWidth:3,lineCap:.round)).rotationEffect(.degrees(-90))}
                     Text(digits.string(page)).font(.custom("thmanyahsans-Bold",size:14,relativeTo:.caption)).lineLimit(1).minimumScaleFactor(0.7)
                 }
-                else {Image(systemName:locked ? "lock.fill" : "book.closed").font(.system(size:17,weight:.medium))}
+                else {Image(systemName:locked ? "lock.fill" : "books.vertical").font(.system(size:17,weight:.medium))}
             }.accessibilityElement(children:.ignore).accessibilityLabel(locked ? "المحبرة مقفلة" : "المحبرة، "+(bookTitle ?? "رفّك")).accessibilityValue(locked ? "" : pageLine ?? "")
         } else {
             HStack(spacing:8) {
-                Image(systemName:locked ? "lock.fill" : "book.closed.fill").font(.system(size:18,weight:.semibold))
+                Image(systemName:locked ? "lock.fill" : "books.vertical.fill").font(.system(size:18,weight:.semibold))
                 VStack(alignment:.leading,spacing:3) {
                     Text("المحبرة").font(.custom("thmanyahsans-Bold",size:11,relativeTo:.caption2))
                     Text(locked ? "افتح مدار" : fallbackTitle ?? "رفّك ينتظرك").font(.custom("thmanyahsans-Bold",size:13,relativeTo:.caption)).lineLimit(1)

@@ -47,16 +47,54 @@ public struct SanctityGuard: Sendable {
 }
 public enum NotificationArbiter {
     public static let pendingCap = 60
-    /// RL5: a scheduled ActivityKit start is an alert and consumes one room-budget slot.
+    /// RL5: Live Activities start immediately and may remain visible for up to eight active hours plus four lock-screen hours.
+    public static let liveActivityMaximumDisplayedDuration: TimeInterval = 12 * 60 * 60
+
+    /// RL5: an immediate start cannot be deferred through sanctity, quiet hours, or the Isha cutoff.
     public static func liveActivityStart(id: String, proposedAt: Date, prayerDays: [PrayerDay], timeZone: TimeZone,
                                          policy: NotificationPolicy, submittedBudgetByDay: [String: Int]) -> NotificationCandidate? {
-        guard policy.thisDeviceRemindersEnabled else { return nil }
-        let due = SanctityGuard(prayerDays: prayerDays).clamp(proposedAt)
-        guard !isQuiet(due, timeZone: timeZone, policy: policy) else { return nil }
-        let key = madarKey(at: due, prayerDays: prayerDays, timeZone: timeZone, boundary: policy.dayBoundary)
+        guard liveActivityWindowAllows(proposedAt, prayerDays: prayerDays, timeZone: timeZone, policy: policy) else { return nil }
+        let key = madarKey(at: proposedAt, prayerDays: prayerDays, timeZone: timeZone, boundary: policy.dayBoundary)
         guard max(0, submittedBudgetByDay[key, default: 0]) < policy.dailyBudget else { return nil }
-        return .init(id: id, room: .salah, dueAt: due, dayKey: key)
+        return .init(id: id, room: .salah, dueAt: proposedAt, dayKey: key)
     }
+
+    public static func liveActivityWindowAllows(_ instant: Date, prayerDays: [PrayerDay], timeZone: TimeZone,
+                                                policy: NotificationPolicy) -> Bool {
+        let occurrences = prayerDays.flatMap { day in Prayer.allCases.map { (day.time(for: $0), $0) } }.sorted { $0.0 < $1.0 }
+        guard policy.thisDeviceRemindersEnabled,
+              SanctityGuard(prayerDays: prayerDays).clamp(instant) == instant,
+              !isQuiet(instant, timeZone: timeZone, policy: policy),
+              let next = occurrences.first(where: { $0.0 > instant }),
+              next.1 != .fajr,
+              next.0.timeIntervalSince(instant) <= 8 * 60 * 60,
+              let nextIsha = occurrences.first(where: { $0.1 == .isha && $0.0 > instant }) else { return false }
+        return nextIsha.0.timeIntervalSince(instant) > liveActivityMaximumDisplayedDuration
+    }
+    /// RL5: contextual Live Activities start immediately, so they cannot be moved past a quiet,
+    /// sanctity, or night window. Their starts still share the device's ordinary notification budget.
+    public static func contextActivityStart(id: String, proposedAt: Date, prayerDays: [PrayerDay], timeZone: TimeZone,
+                                            policy: NotificationPolicy, submittedBudgetByDay: [String: Int]) -> NotificationCandidate? {
+        guard policy.thisDeviceRemindersEnabled,
+              contextActivityWindowAllows(proposedAt, prayerDays: prayerDays, timeZone: timeZone, policy: policy) else { return nil }
+        let key = madarKey(at: proposedAt, prayerDays: prayerDays, timeZone: timeZone, boundary: policy.dayBoundary)
+        guard max(0, submittedBudgetByDay[key, default: 0]) < policy.dailyBudget else { return nil }
+        return .init(id: id, room: .salah, dueAt: proposedAt, dayKey: key)
+    }
+
+    /// An immediate-start Live Activity cannot safely wait out these windows while the app is open.
+    public static func contextActivityWindowAllows(_ instant: Date, prayerDays: [PrayerDay], timeZone: TimeZone,
+                                                   policy: NotificationPolicy) -> Bool {
+        guard policy.thisDeviceRemindersEnabled,
+              SanctityGuard(prayerDays: prayerDays).clamp(instant) == instant,
+              !isQuiet(instant, timeZone: timeZone, policy: policy) else { return false }
+        let occurrences = prayerDays.flatMap { day in Prayer.allCases.map { (day.time(for: $0), $0) } }.sorted { $0.0 < $1.0 }
+        guard let next = occurrences.first(where: { $0.0 > instant }) else { return false }
+        guard next.1 != .fajr,
+              let nextIsha = occurrences.first(where: { $0.1 == .isha && $0.0 > instant }) else { return false }
+        return nextIsha.0.timeIntervalSince(instant) > liveActivityMaximumDisplayedDuration
+    }
+
     public static func prayerAsk(day: PrayerDay, prayer: Prayer, askAfterAdhanMinutes: Int = 30, recorded: Bool = false) -> NotificationCandidate? {
         guard !recorded else { return nil }
         let adhan = day.time(for: prayer)

@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		968DDFBA853D4FB38987C644 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 64005D22B5404B54B6C42397 /* PrivacyInfo.xcprivacy */; };
+		84C4109AA9EA4878A2049CE8 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = BC06D8E1ACDB4611ADABCFF8 /* PrivacyInfo.xcprivacy */; };
 		008B64E237B04EA25E15F727 /* MoneyEnvelopesUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B511B41181CB16AF51EFDEF7 /* MoneyEnvelopesUITests.swift */; };
 		009585AD9F1CD6C65381F9BF /* MoneyTravelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBE5C27BA15849E4C802EBAC /* MoneyTravelView.swift */; };
 		00B99DBAF9E8E3D289962E54 /* MoneyAnalysisModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D5DA39DDD31B6E747BE357E /* MoneyAnalysisModels.swift */; };
@@ -430,6 +432,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		64005D22B5404B54B6C42397 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		BC06D8E1ACDB4611ADABCFF8 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		00625CA27F7107AFB4D7DB59 /* MoneyZakatModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyZakatModels.swift; sourceTree = "<group>"; };
 		01163278AE7300C6CD959552 /* HabitHealthStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HabitHealthStore.swift; sourceTree = "<group>"; };
 		018FFAFD0D740954AD88C24C /* AppDiaryImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDiaryImportService.swift; sourceTree = "<group>"; };
@@ -848,6 +852,7 @@
 		008B06C91993626CEA6B6EBD /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				64005D22B5404B54B6C42397 /* PrivacyInfo.xcprivacy */,
 				4FB250BC5106613476C01D41 /* Assets.xcassets */,
 				3B030435F71CD96C42619105 /* Customization.xcstrings */,
 				5A8523997C8D124B0ED15941 /* Money.xcstrings */,
@@ -863,6 +868,7 @@
 		37A1556E4E277E9E9B27E13A /* Widgets */ = {
 			isa = PBXGroup;
 			children = (
+				BC06D8E1ACDB4611ADABCFF8 /* PrivacyInfo.xcprivacy */,
 				1D4DECF86A1E7DCEBC1D6ADF /* Info.plist */,
 				723A592F407CF38115B5691E /* MadarWidgets.entitlements */,
 				2BF0DFC3D1738347A82224A8 /* MadarWidgets.swift */,
@@ -1532,6 +1538,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				968DDFBA853D4FB38987C644 /* PrivacyInfo.xcprivacy in Resources */,
 				19434B7D04914038631E3D4A /* AtkinsonHyperlegible-Bold.ttf in Resources */,
 				B5C735760EBB282208F94ABD /* AtkinsonHyperlegible-Regular.ttf in Resources */,
 				0F21CF4A1DBDDF5469CFCCFF /* AtkinsonHyperlegible-OFL.txt in Resources */,
@@ -1578,6 +1585,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				84C4109AA9EA4878A2049CE8 /* PrivacyInfo.xcprivacy in Resources */,
 				97776A96C37FAD60822E7616 /* RoomSymbols.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

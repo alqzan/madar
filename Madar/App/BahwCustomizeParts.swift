@@ -2,13 +2,13 @@ import SwiftUI
 import MadarCore
 import MadarDesign
 
-/// M4-V04 · `bahw/05-W4-Takhsis.jpg`: the live lobby model and the block list. Both read and write `bahw.layout` only;
-/// rooms not built yet (habits, money, Mihbara) keep their slots in the setting but have no row here (RL9).
+/// M4-V04 · `bahw/05-W4-Takhsis.jpg`: the live lobby model and the block list. Both read and write `bahw.layout` only.
+/// RL9 keeps unbuilt rooms out of the visible list; rooms whose milestones shipped appear here.
 extension BahwBlock {
     var detail: String {
         switch self {
         case .habits: "عاداتك اليوم وفتراتها"; case .salah: "القادمة والفروض"; case .quran: "في صدرك والمراجعة"; case .notes: "صفحة اليوم وصورتها"
-        case .year: "كم مضى وكم بقي"; case .upcoming: "كم بقي على ما يهمّك"; default: ""
+        case .year: "كم مضى وكم بقي"; case .upcoming: "كم بقي على ما يهمّك"; case .mal: "لك الآن وميزانيتك"; case .mihbara: "كتابك وصفحتك"
         }
     }
     var tone: String { switch self { case .salah: "amber"; case .quran: "green"; case .notes: "clay"; case .year: "gregorianInk"; case .upcoming: "clay"; default: "sepia" } }

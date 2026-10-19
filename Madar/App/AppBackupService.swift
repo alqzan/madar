@@ -40,6 +40,7 @@ import WidgetKit
             rebuildSnapshots: { [weak session] _ in
                 guard let session else { throw DataError.invalidValue("session unavailable") }
                 try session.reload(); try session.publishSnapshot(); WidgetCenter.shared.reloadAllTimelines()
+                await session.reconcileSpotlightIndex()
             },
             resetHistory: { [weak store] _ in
                 guard let store else { throw DataError.invalidValue("store unavailable") }

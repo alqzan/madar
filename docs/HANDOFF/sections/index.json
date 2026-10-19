@@ -57,7 +57,7 @@
   {
     "sectionID": "r-quran",
     "path": "sections/11-r-quran.md",
-    "sha256": "4c2d6fab52de442d4f2cbe15640fdba5859fe73b63d05acd66d4a0e46786c9bb"
+    "sha256": "dd21d4866d0e5cbee4a5633111e05859360cf8274eb0945a9e5a91c0bdae393d"
   },
   {
     "sectionID": "r-mal",
@@ -102,12 +102,12 @@
   {
     "sectionID": "risks",
     "path": "sections/20-risks.md",
-    "sha256": "459113bde5b86cb947be4b5099a0b3c3b5e9cba373c07bd05914f7d0cf40853b"
+    "sha256": "7646be9b03400c655faf6806faceaf3474a1f1cdf816786dd03cdbc2d8038a9d"
   },
   {
     "sectionID": "open",
     "path": "sections/21-open.md",
-    "sha256": "96f732fc099aa0b4b724b2034e3a6e174996bcc3b2aef073c437071f18876671"
+    "sha256": "c0029ce60eaa01d598b33b7aa6b8dc901353b21998bd1807f256e87b1063bc36"
   },
   {
     "sectionID": "gallery",
@@ -122,6 +122,6 @@
   {
     "sectionID": "closure",
     "path": "sections/24-closure.md",
-    "sha256": "48275ed868fd2fd2e8bd1cb5ba37da7de53c36854ffd02c9f05729ee11f3f458"
+    "sha256": "08113264a5709f9d66dd6bc645e9a1d30ca4f6da98faebda2ceca9ac48d7e371"
   }
 ]

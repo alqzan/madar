@@ -3,7 +3,7 @@ import Foundation
 public enum BuiltRoomWidget:String,CaseIterable,Codable,Sendable {
     case habits, year, upcoming, diaryWrite, money, mihbara
     public var title:String {switch self{case .money:"المال";case .habits:"العادات";case .year:"السنة";case .upcoming:"الأيام القادمة";case .diaryWrite:"سطر سريع";case .mihbara:"المحبرة"}}
-    public var glyph:String {switch self{case .money:"MadarMoney";case .habits:"MadarHabits";case .year:"MadarYear";case .upcoming:"MadarUpcoming";case .diaryWrite:"MadarDiary";case .mihbara:"book.closed"}}
+    public var glyph:String {switch self{case .money:"MadarMoney";case .habits:"MadarHabits";case .year:"MadarYear";case .upcoming:"MadarUpcoming";case .diaryWrite:"MadarDiary";case .mihbara:"books.vertical"}}
     public var route:String {switch self{case .money:"madar://mal";case .habits:"madar://bahw/habits";case .year,.upcoming:"madar://bahw/year";case .diaryWrite:"madar://notes/write";case .mihbara:"madar://mihbara"}}
 }
 /// Fixed room templates, never a maker configuration or a store handle. Diary rows exist only with the RD7 opt-in.

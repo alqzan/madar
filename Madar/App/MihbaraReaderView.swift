@@ -394,7 +394,7 @@ struct MihbaraReaderView: View {
         .toolbarVisibility(.hidden, for: .navigationBar)
         .statusBarHidden(true)
         .sheet(isPresented: $showingContents) {
-            MihbaraContentsSheet(publication: publication, paper: paper) { link in
+            MihbaraContentsSheet(publication: publication, palette: palette) { link in
                 showingContents = false
                 Task { @MainActor in
                     _ = await navigatorController?.go(to: link, options: .animated)
@@ -415,7 +415,7 @@ struct MihbaraReaderView: View {
             .environment(\.layoutDirection, .rightToLeft)
         }
         .sheet(item: $noteDraft) { draft in
-            MihbaraPageNoteSheet(draft: draft, paper: paper, pageText: draft.pageText) { text in
+            MihbaraPageNoteSheet(draft: draft, palette: palette, pageText: draft.pageText) { text in
                 await savePageNote(text, for: draft)
             }
             .environment(\.layoutDirection, .rightToLeft)
@@ -730,14 +730,14 @@ struct MihbaraReaderView: View {
 
     @ViewBuilder private var readerOverlay: some View {
         if let footnote {
-            MihbaraFootnoteCard(note: footnote, dark: palette.isDark, number: digits.localized(footnote.number)) {
+            MihbaraFootnoteCard(note: footnote, palette: palette, number: digits.localized(footnote.number)) {
                 withAnimation(.easeOut(duration: 0.2)) { self.footnote = nil }
             }
             .padding(.horizontal, 12).padding(.bottom, 10)
             .transition(.move(edge: .bottom).combined(with: .opacity))
         } else if let wordCard {
             MihbaraWordCard(
-                state: wordCard, dark: palette.isDark, swatches: palette.hex.highlight, copied: copiedAt != nil,
+                state: wordCard, palette: palette, swatches: palette.hex.highlight, copied: copiedAt != nil,
                 wordSaved: wordAlreadySaved, translationAvailability: translationAvailability,
                 lookUp: { lookupTerm = .init(word: wordCard.word) },
                 saveWord: { Task { await saveWordToLibrary(wordCard) } },
@@ -1476,7 +1476,7 @@ struct MihbaraReaderView: View {
 private struct MihbaraContentsSheet: View {
     @Environment(\.dismiss) private var dismiss
     let publication: Publication?
-    let paper: SwiftUI.Color
+    let palette: MihbaraReaderPalette
     let select: (ReadiumShared.Link) -> Void
 
     private var items: [MihbaraTOCItem] { Self.flatten(publication?.manifest.tableOfContents ?? []) }
@@ -1489,7 +1489,7 @@ private struct MihbaraContentsSheet: View {
                 Button("تمّ") { dismiss() }.font(MadarTypography.caption()).accessibilityIdentifier("mihbara-reader-contents-close")
             }
             if items.isEmpty {
-                Text("لا يتضمن هذا الكتاب فهرسًا").font(MadarTypography.body()).foregroundStyle(.secondary)
+                Text("لا يتضمن هذا الكتاب فهرسًا").font(MadarTypography.body()).foregroundStyle(palette.ink2)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
@@ -1499,7 +1499,7 @@ private struct MihbaraContentsSheet: View {
                                 HStack {
                                     Text(item.link.title ?? "موضع في الكتاب").font(MadarTypography.body()).lineLimit(2)
                                     Spacer(minLength: 12)
-                                    Image(systemName: "chevron.left").font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
+                                    Image(systemName: "chevron.left").font(.system(size: 11, weight: .medium)).foregroundStyle(palette.ink2)
                                 }
                                 .padding(.leading, CGFloat(item.depth) * 18)
                                 .padding(.vertical, 12)
@@ -1507,15 +1507,16 @@ private struct MihbaraContentsSheet: View {
                             }
                             .buttonStyle(.plain)
                             .accessibilityIdentifier("mihbara-reader-toc-" + item.id)
-                            Rectangle().fill(SwiftUI.Color.black.opacity(0.08)).frame(height: 1)
+                            Rectangle().fill(palette.line).frame(height: 1)
                         }
                     }
                 }
             }
         }
         .padding(20)
-        .foregroundStyle(SwiftUI.Color(red: 42 / 255, green: 33 / 255, blue: 24 / 255))
-        .background(paper.ignoresSafeArea())
+        .foregroundStyle(palette.ink)
+        .tint(palette.accent)
+        .background(palette.bg.ignoresSafeArea())
         .presentationDetents([.medium, .large])
     }
 
@@ -1982,7 +1983,7 @@ private struct MihbaraEPUBNavigator: UIViewControllerRepresentable {
             return navigator
         } catch {
             let unavailable = UIViewController()
-            unavailable.view.backgroundColor = UIColor(red: 250 / 255, green: 246 / 255, blue: 234 / 255, alpha: 1)
+            unavailable.view.backgroundColor = UIColor(madarHex: background)
             let label = UILabel()
             label.text = "تعذّر عرض هذا الكتاب"
             label.font = .preferredFont(forTextStyle: .body)
@@ -2367,7 +2368,7 @@ extension UIColor {
 
 private struct MihbaraWordCard: View {
     let state: MihbaraWordCardState
-    let dark: Bool
+    let palette: MihbaraReaderPalette
     let swatches: [String]
     let copied: Bool
     let wordSaved: Bool
@@ -2381,11 +2382,10 @@ private struct MihbaraWordCard: View {
     let makeQuoteCard: () -> Void
     let close: () -> Void
 
-    private var ink: SwiftUI.Color { dark ? SwiftUI.Color(red: 233 / 255, green: 225 / 255, blue: 210 / 255) : SwiftUI.Color(red: 42 / 255, green: 33 / 255, blue: 24 / 255) }
-    private var ink2: SwiftUI.Color { dark ? SwiftUI.Color(red: 171 / 255, green: 161 / 255, blue: 146 / 255) : SwiftUI.Color(red: 106 / 255, green: 96 / 255, blue: 82 / 255) }
-    private var accent: SwiftUI.Color { dark ? SwiftUI.Color(red: 220 / 255, green: 165 / 255, blue: 100 / 255) : SwiftUI.Color(red: 158 / 255, green: 47 / 255, blue: 37 / 255) }
-    private var surface: SwiftUI.Color { dark ? SwiftUI.Color(red: 42 / 255, green: 38 / 255, blue: 31 / 255) : SwiftUI.Color(red: 255 / 255, green: 253 / 255, blue: 248 / 255) }
-    private var well: SwiftUI.Color { ink.opacity(dark ? 0.10 : 0.05) }
+    private var ink: SwiftUI.Color { palette.ink }
+    private var ink2: SwiftUI.Color { palette.ink2 }
+    private var accent: SwiftUI.Color { palette.accent }
+    private var surface: SwiftUI.Color { palette.bg }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -2477,7 +2477,7 @@ private struct MihbaraWordCard: View {
         }
         .padding(.horizontal, 20).padding(.top, 18).padding(.bottom, 16)
         .background(RoundedRectangle(cornerRadius: 28, style: .continuous).fill(surface)
-            .shadow(color: .black.opacity(dark ? 0.45 : 0.14), radius: 22, y: 6))
+            .shadow(color: .black.opacity(palette.isDark ? 0.45 : 0.14), radius: 22, y: 6))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("mihbara-word-card")
     }
@@ -2724,7 +2724,7 @@ private struct MihbaraQuoteCardArtwork: View {
 
 private struct MihbaraPageNoteSheet: View {
     let draft: MihbaraWordCardState
-    let paper: SwiftUI.Color
+    let palette: MihbaraReaderPalette
     let pageText: String?
     let save: (String) async -> Bool
     @Environment(\.dismiss) private var dismiss
@@ -2749,26 +2749,28 @@ private struct MihbaraPageNoteSheet: View {
                 .accessibilityIdentifier("mihbara-note-save")
             }
             HStack(alignment: .top, spacing: 10) {
-                RoundedRectangle(cornerRadius: 2).fill(SwiftUI.Color(red: 158 / 255, green: 47 / 255, blue: 37 / 255)).frame(width: 3)
+                RoundedRectangle(cornerRadius: 2).fill(palette.accent).frame(width: 3)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(draft.paragraphText).font(.custom("Amiri-Regular", size: 17, relativeTo: .body)).lineLimit(4).lineSpacing(4)
-                    if let pageText { Text(pageText).font(MadarTypography.fine()).foregroundStyle(.secondary) }
+                    Text(draft.paragraphText).font(.custom("Amiri-Regular", size: 17, relativeTo: .body)).foregroundStyle(palette.ink).lineLimit(4).lineSpacing(4)
+                    if let pageText { Text(pageText).font(MadarTypography.fine()).foregroundStyle(palette.ink2) }
                 }
             }
             .fixedSize(horizontal: false, vertical: true)
             ZStack(alignment: .topLeading) {
                 if text.isEmpty {
-                    Text("ما الذي أوقفك هنا؟").font(MadarTypography.body()).foregroundStyle(.secondary).padding(.top, 8).padding(.leading, 5)
+                    Text("ما الذي أوقفك هنا؟").font(MadarTypography.body()).foregroundStyle(palette.ink2).padding(.top, 8).padding(.leading, 5)
                 }
-                TextEditor(text: $text).font(MadarTypography.body()).scrollContentBackground(.hidden).focused($focused)
+                TextEditor(text: $text).font(MadarTypography.body()).foregroundStyle(palette.ink).scrollContentBackground(.hidden).focused($focused)
                     .accessibilityLabel("نص الملاحظة").accessibilityIdentifier("mihbara-note-text")
             }
             .padding(10)
-            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(SwiftUI.Color.black.opacity(0.04)))
-            Text("تُحفظ في دفتر هذا الكتاب مربوطة بهذه الفقرة.").font(MadarTypography.fine()).foregroundStyle(.secondary)
+            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(palette.ink.opacity(palette.isDark ? 0.10 : 0.05)))
+            Text("تُحفظ في دفتر هذا الكتاب مربوطة بهذه الفقرة.").font(MadarTypography.fine()).foregroundStyle(palette.ink2)
         }
         .padding(20)
-        .background(paper.ignoresSafeArea())
+        .foregroundStyle(palette.ink)
+        .tint(palette.accent)
+        .background(palette.bg.ignoresSafeArea())
         .presentationDetents([.medium, .large])
         .onAppear { focused = true }
     }
@@ -2876,15 +2878,15 @@ struct MihbaraFootnote: Equatable {
 
 private struct MihbaraFootnoteCard: View {
     let note: MihbaraFootnote
-    let dark: Bool
+    let palette: MihbaraReaderPalette
     let number: String
     let close: () -> Void
 
-    private var ink: SwiftUI.Color { dark ? SwiftUI.Color(red: 233 / 255, green: 225 / 255, blue: 210 / 255) : SwiftUI.Color(red: 42 / 255, green: 33 / 255, blue: 24 / 255) }
-    private var ink2: SwiftUI.Color { dark ? SwiftUI.Color(red: 171 / 255, green: 161 / 255, blue: 146 / 255) : SwiftUI.Color(red: 106 / 255, green: 96 / 255, blue: 82 / 255) }
-    private var accent: SwiftUI.Color { dark ? SwiftUI.Color(red: 220 / 255, green: 165 / 255, blue: 100 / 255) : SwiftUI.Color(red: 158 / 255, green: 47 / 255, blue: 37 / 255) }
-    private var onAccent: SwiftUI.Color { dark ? SwiftUI.Color(red: 31 / 255, green: 28 / 255, blue: 23 / 255) : SwiftUI.Color(red: 250 / 255, green: 246 / 255, blue: 234 / 255) }
-    private var surface: SwiftUI.Color { dark ? SwiftUI.Color(red: 42 / 255, green: 38 / 255, blue: 31 / 255) : SwiftUI.Color(red: 255 / 255, green: 253 / 255, blue: 248 / 255) }
+    private var ink: SwiftUI.Color { palette.ink }
+    private var ink2: SwiftUI.Color { palette.ink2 }
+    private var accent: SwiftUI.Color { palette.accent }
+    private var onAccent: SwiftUI.Color { palette.onAccent }
+    private var surface: SwiftUI.Color { palette.bg }
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -2906,7 +2908,7 @@ private struct MihbaraFootnoteCard: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             Button(action: close) {
                 Image(systemName: "xmark").font(.system(size: 13, weight: .semibold)).foregroundStyle(ink2)
-                    .frame(width: 44, height: 44).background(Circle().fill(ink.opacity(dark ? 0.10 : 0.05)).padding(4)).contentShape(Circle())
+                    .frame(width: 44, height: 44).background(Circle().fill(ink.opacity(palette.isDark ? 0.10 : 0.05)).padding(4)).contentShape(Circle())
             }
             .accessibilityLabel("إغلاق الحاشية")
             .accessibilityIdentifier("mihbara-footnote-close")
@@ -2916,7 +2918,7 @@ private struct MihbaraFootnoteCard: View {
         .overlay(alignment: .top) { Rectangle().fill(accent).frame(height: 3) }
         .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
         .background(RoundedRectangle(cornerRadius: 26, style: .continuous).fill(surface)
-            .shadow(color: .black.opacity(dark ? 0.45 : 0.14), radius: 20, y: 6))
+            .shadow(color: .black.opacity(palette.isDark ? 0.45 : 0.14), radius: 20, y: 6))
         .accessibilityElement(children: .contain)
         .accessibilityLabel(number.isEmpty ? "حاشية" : "الحاشية \(number)")
         .accessibilityIdentifier("mihbara-footnote-card")
@@ -2970,6 +2972,7 @@ struct MihbaraReaderPalette: Equatable {
     var ink: SwiftUI.Color { .init(uiColor: UIColor(madarHex: hex.ink)) }
     var ink2: SwiftUI.Color { .init(uiColor: UIColor(madarHex: hex.ink2)) }
     var accent: SwiftUI.Color { .init(uiColor: UIColor(madarHex: hex.accent)) }
+    var onAccent: SwiftUI.Color { .init(uiColor: UIColor(madarHex: hex.onAccent)) }
     var line: SwiftUI.Color { ink.opacity(isDark ? 0.16 : 0.10) }
 }
 

@@ -12,6 +12,51 @@ import UIKit
 import SwiftUI
 #endif
 
+struct MadarContextTripFact: Equatable {
+    let city: String
+    let timeZoneID: String
+    let startsAt: Date
+    let endsAt: Date?
+}
+
+struct MadarContextActivityPlan: Equatable {
+    let kind: MadarContextActivityAttributes.Kind
+    let activityKey: String
+    let eventAt: Date?
+    let city: String?
+    let timeZoneID: String?
+    let staleAt: Date?
+
+    var state: MadarContextActivityAttributes.ContentState {
+        .init(eventAt: eventAt, city: city, timeZoneID: timeZoneID)
+    }
+}
+
+enum MadarContextActivityPlanner {
+    static let maximumActiveDuration: TimeInterval = 8 * 60 * 60
+
+    /// Produces only facts that are safe to put on an external surface. Letter text and IDs never enter the plan.
+    static func plans(now: Date, eligibleLetterAt: Date?, trip: MadarContextTripFact?, iftarAt: Date?) -> [MadarContextActivityPlan] {
+        var result: [MadarContextActivityPlan] = []
+        if let eligibleLetterAt, eligibleLetterAt <= now {
+            result.append(.init(kind: .letter, activityKey: "notes.letter", eventAt: eligibleLetterAt,
+                                city: nil, timeZoneID: nil,
+                                staleAt: now.addingTimeInterval(maximumActiveDuration)))
+        }
+        if let iftarAt, iftarAt > now, iftarAt.timeIntervalSince(now) <= maximumActiveDuration {
+            result.append(.init(kind: .iftar, activityKey: "bahw.iftar", eventAt: iftarAt,
+                                city: nil, timeZoneID: nil, staleAt: iftarAt))
+        }
+        if let trip, trip.startsAt <= now, trip.endsAt.map({ now < $0 }) ?? true {
+            result.append(.init(kind: .travel, activityKey: "salah.travel", eventAt: trip.startsAt,
+                                city: trip.city.isEmpty ? "مدينة السفر" : trip.city,
+                                timeZoneID: trip.timeZoneID,
+                                staleAt: trip.endsAt ?? now.addingTimeInterval(maximumActiveDuration)))
+        }
+        return result
+    }
+}
+
 @MainActor
 final class PrayerNotificationCoordinator {
     static let categoryID = "salah.ask"
@@ -145,6 +190,7 @@ final class PrayerNotificationCoordinator {
                             prayerDays: days)
         try await reconcileRooms(plan: plan, candidates: candidates, current: existing.filter { RoomNotificationContent.isRoomRequest($0.identifier) }, timeZone: repository.place(at: now).timeZone, consumed: Set(consumed.map(\.requestID)), now: now)
         try await reconcilePrayerActivity(prayerDays: days, now: now, session: session)
+        try await reconcileContextActivities(prayerDays: days, repository: repository, now: now, session: session)
     }
 
     private func acquireLifecycleLock() async {
@@ -435,7 +481,11 @@ final class PrayerNotificationCoordinator {
             Prayer.allCases.map { (day.time(for: $0), $0) }
         }.sorted { $0.0 < $1.0 }
         let guarder = SanctityGuard(prayerDays: prayerDays)
-        let startAt = guarder.clamp(now.addingTimeInterval(1))
+        let startAt = now
+        guard guarder.clamp(startAt) == startAt else {
+            for activity in active { try await endPrayerActivity(activity, now: now) }
+            return
+        }
         let timeZone = prayerDays.first?.place.timeZone ?? .current
         guard !Self.isQuiet(startAt, timeZone: timeZone,
                             quietAfterIsha: session.bool("notif.quietAfterIsha"),
@@ -445,9 +495,9 @@ final class PrayerNotificationCoordinator {
         }
         // ActivityKit may retain the Lock Screen presentation for four hours
         // after its eight-hour active lifetime ends.
-        let maximumDisplayedLifetimeEnd = startAt.addingTimeInterval(12 * 60 * 60)
-        if let nextIsha = occurrences.first(where: { $0.1 == .isha && $0.0 > startAt }),
-           nextIsha.0 <= maximumDisplayedLifetimeEnd {
+        let maximumDisplayedLifetimeEnd = startAt.addingTimeInterval(NotificationArbiter.liveActivityMaximumDisplayedDuration)
+        guard let nextIsha = occurrences.first(where: { $0.1 == .isha && $0.0 > startAt }),
+              nextIsha.0 > maximumDisplayedLifetimeEnd else {
             for activity in active { try await endPrayerActivity(activity, now: now) }
             return
         }
@@ -477,14 +527,12 @@ final class PrayerNotificationCoordinator {
         let attributes = PrayerCountdownAttributes(activityKey: "prayer.next", scheduledStartAt: startAt, budgetRequestID: requestID, numerals: reservation.numerals)
         let state = PrayerCountdownAttributes.ContentState(prayerName: Self.title(next.1), prayerAt: next.0)
         let content = ActivityContent(state: state, staleDate: next.0, relevanceScore: 1)
-        let alert = AlertConfiguration(title: "الصلاة القادمة", body: "بدأت متابعة الصلاة القادمة.", sound: .default)
         // Persist the reservation before asking the OS, so a failed save can never
         // leave a scheduled alert outside the device ledger.
         try updateLedger(requestID: requestID, dayKey: reservation.reservation.dayKey, dueAt: reservation.reservation.scheduledAt,
                          state: "submitted", kind: "activityStart")
         do {
-            _ = try Activity.request(attributes: attributes, content: content, pushType: nil, style: .standard,
-                                     alertConfiguration: alert, start: startAt)
+            _ = try Activity.request(attributes: attributes, content: content, pushType: nil, style: .standard)
         } catch {
             try session.notificationBudget.cancel(id: requestID, now: now, requestFailed: true)
             try updateLedger(requestID: requestID, state: "cancelled")
@@ -500,6 +548,129 @@ final class PrayerNotificationCoordinator {
             try session?.notificationBudget.cancel(id: id, now: now)
             try updateLedger(requestID: id, state: "cancelled")
         }
+    }
+
+    /// Context surfaces have no alert configuration, but RL5 still budgets every start and gates its window.
+    private func reconcileContextActivities(prayerDays: [PrayerDay], repository: PrayerRepository, now: Date, session: AppSession) async throws {
+        guard #available(iOS 26.0, *), UIApplication.shared.applicationState == .active else { return }
+
+        let eligibleLetterAt: Date?
+        if session.lockController?.canPresent(.notes) ?? session.protectedDataAuthorized {
+            let context = ModelContext(session.container)
+            let eligibleDescriptor = FetchDescriptor<Letter>(predicate: #Predicate<Letter> { $0.state == "eligible" })
+            let eligibleRows: [Letter] = try context.fetch(eligibleDescriptor)
+            let eligibleLetters = eligibleRows.filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.openedAt == nil }
+            eligibleLetterAt = eligibleLetters.compactMap(\.eligibleAt).min() ?? (eligibleLetters.isEmpty ? nil : now)
+        } else {
+            // The whole-app Face ID gate also protects diary rows. Do not fault
+            // private Letter models into memory until that gate has opened.
+            eligibleLetterAt = nil
+        }
+        let trip = repository.activeTrip(at: now).map {
+            MadarContextTripFact(city: $0.city, timeZoneID: $0.place.timeZoneID, startsAt: $0.start, endsAt: $0.end)
+        }
+        let iftarAt = prayerDays
+            .filter { $0.hijriDate?.month == 9 && $0.maghrib > now && $0.maghrib.timeIntervalSince(now) <= MadarContextActivityPlanner.maximumActiveDuration }
+            .min { $0.maghrib < $1.maghrib }?.maghrib
+        let plans = MadarContextActivityPlanner.plans(now: now, eligibleLetterAt: eligibleLetterAt, trip: trip, iftarAt: iftarAt)
+        let activities = Activity<MadarContextActivityAttributes>.activities.filter {
+            $0.activityState == .active || $0.activityState == .pending || $0.activityState == .stale
+        }
+
+        guard ActivityAuthorizationInfo().areActivitiesEnabled else {
+            for activity in activities { await activity.end(nil, dismissalPolicy: .immediate) }
+            return
+        }
+
+        let zone = prayerDays.first?.place.timeZone ?? repository.place(at: now).timeZone
+        let quietParts = session.string("notif.quietFrom").split(separator: ":").compactMap { Int($0) }
+        let quietFrom = session.bool("notif.quietAfterIsha")
+            ? (quietParts.count == 2 ? quietParts[0] * 60 + quietParts[1] : 0) : nil
+        let policy = NotificationPolicy(dailyBudget: Int(session.number("notif.dailyBudget")), quietFromMinutes: quietFrom,
+                                        thisDeviceRemindersEnabled: session.bool("notif.thisDeviceReminders"),
+                                        dayBoundary: DayBoundary(rawValue: session.string("core.dayStart")) ?? .fajr)
+        guard session.bool("salah.liveActivity"),
+              NotificationArbiter.contextActivityWindowAllows(now, prayerDays: prayerDays, timeZone: zone, policy: policy) else {
+            for activity in activities { await activity.end(nil, dismissalPolicy: .immediate) }
+            return
+        }
+
+        let numerals = session.string("core.numerals") == "western" ? "western" : "hindi"
+        var represented = Set<String>()
+        for activity in activities {
+            guard activity.activityState != .stale,
+                  let plan = plans.first(where: { $0.activityKey == activity.attributes.activityKey }),
+                  activity.attributes.kind == plan.kind,
+                  activity.attributes.numerals == numerals,
+                  represented.insert(plan.activityKey).inserted else {
+                await activity.end(nil, dismissalPolicy: .immediate)
+                continue
+            }
+            let staleAt = Self.contextActivityStaleDate(plan: plan, startedAt: activity.attributes.startedAt,
+                                                        prayerDays: prayerDays, timeZone: zone, quietFromMinutes: quietFrom)
+            let content = ActivityContent(state: plan.state, staleDate: staleAt, relevanceScore: 0.7)
+            if activity.content.state != plan.state || activity.content.staleDate != staleAt {
+                await activity.update(content)
+            }
+        }
+
+        for plan in plans where !represented.contains(plan.activityKey) {
+            let requestID = "activity.context.\(plan.activityKey).\(UUID().uuidString)"
+            let eventSecond = Int((plan.eventAt ?? now).timeIntervalSince1970)
+            let purpose = "context.\(plan.activityKey).\(eventSecond)"
+            let reservation: NotificationBudgetReservation
+            do {
+                reservation = try session.notificationBudget.reserveContextActivity(id: requestID, purpose: purpose, now: now)
+            } catch {
+                continue
+            }
+            let attributes = MadarContextActivityAttributes(activityKey: plan.activityKey, kind: plan.kind,
+                                                             startedAt: now, numerals: numerals)
+            let staleAt = Self.contextActivityStaleDate(plan: plan, startedAt: now, prayerDays: prayerDays,
+                                                        timeZone: zone, quietFromMinutes: quietFrom)
+            let content = ActivityContent(state: plan.state, staleDate: staleAt, relevanceScore: 0.7)
+            do {
+                try updateLedger(requestID: requestID, dayKey: reservation.dayKey, dueAt: reservation.scheduledAt,
+                                 state: "submitted", kind: "activityStart")
+            } catch {
+                try? session.notificationBudget.cancel(id: requestID, now: now, requestFailed: true)
+                throw error
+            }
+            do {
+                _ = try Activity.request(attributes: attributes, content: content, pushType: nil, style: .standard)
+            } catch {
+                try? session.notificationBudget.cancel(id: requestID, now: now, requestFailed: true)
+                try? updateLedger(requestID: requestID, state: "cancelled")
+            }
+        }
+    }
+
+    private static func contextActivityStaleDate(plan: MadarContextActivityPlan, startedAt: Date,
+                                                 prayerDays: [PrayerDay], timeZone: TimeZone,
+                                                 quietFromMinutes: Int?) -> Date {
+        let maximumEnd = startedAt.addingTimeInterval(MadarContextActivityPlanner.maximumActiveDuration)
+        var end = min(plan.staleAt ?? maximumEnd, maximumEnd)
+        if let nextIsha = prayerDays.map(\.isha).filter({ $0 > startedAt }).min() {
+            end = min(end, nextIsha)
+        }
+        if let quietFromMinutes, let quietAt = nextQuietBoundary(after: startedAt, timeZone: timeZone,
+                                                                 quietFromMinutes: quietFromMinutes) {
+            end = min(end, quietAt)
+        }
+        return end
+    }
+
+    private static func nextQuietBoundary(after instant: Date, timeZone: TimeZone, quietFromMinutes: Int) -> Date? {
+        guard (0..<1440).contains(quietFromMinutes) else { return nil }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let today = calendar.dateComponents([.year, .month, .day], from: instant)
+        var cutoff = DateComponents()
+        cutoff.year = today.year; cutoff.month = today.month; cutoff.day = today.day
+        cutoff.hour = quietFromMinutes / 60; cutoff.minute = quietFromMinutes % 60
+        guard let first = calendar.date(from: cutoff) else { return nil }
+        if first > instant { return first }
+        return calendar.date(byAdding: .day, value: 1, to: first)
     }
 
     func activityBudgetCounts() throws -> [String: Int] {

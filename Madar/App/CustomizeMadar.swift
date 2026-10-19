@@ -89,8 +89,8 @@ struct CustomizeMadar: View {
             return query.isEmpty || normalized(definition.title + " " + sectionFor(definition.key) + " " + definition.key).contains(normalized(query))
         }
     }
-    private var sections: [String] { ["العادات", "السنة", "الأيام القادمة", "اليوم والتقويم", "المظهر", "مدينتك", "الخصوصية", "الإشعارات", "الصلاة", "المواقيت"].filter { section in filtered.contains { sectionFor($0.key) == section } } }
-    private let symbols = ["العادات": "MadarHabits","السنة": "MadarYear", "الأيام القادمة": "MadarUpcoming", "اليوم والتقويم": "moon", "الصلاة": "MadarPrayer", "المواقيت": "clock.arrow.circlepath", "الخصوصية": "lock", "المظهر": "paintpalette", "مدينتك": "location", "الإشعارات": "bell.badge"]
+    private var sections: [String] { ["العادات", "السنة", "الأيام القادمة", "اليوم والتقويم", "المظهر", "مدينتك", "الخصوصية", "البحث", "الإشعارات", "الصلاة", "المواقيت"].filter { section in filtered.contains { sectionFor($0.key) == section } } }
+    private let symbols = ["العادات": "MadarHabits","السنة": "MadarYear", "الأيام القادمة": "MadarUpcoming", "اليوم والتقويم": "moon", "الصلاة": "MadarPrayer", "المواقيت": "clock.arrow.circlepath", "الخصوصية": "lock", "البحث": "magnifyingglass", "المظهر": "paintpalette", "مدينتك": "location", "الإشعارات": "bell.badge"]
     private var changesLabel: String {
         let count = session.schema.settings.filter { (AppSession.supportedKeys + ["bahw.layout"]).contains($0.key) && session.values[$0.key] != $0.defaultValue }.count
         return CustomizationCopy.changes(count: count, formattedCount: session.digits(count))
@@ -119,6 +119,7 @@ func sectionFor(_ key: String) -> String {
     if key == "core.homeCity" { return "مدينتك" }
     if ["salah.showMosqueStreak", "salah.askHeart"].contains(key) { return "الصلاة" }
     if key == "core.faceIDLock" { return "الخصوصية" }
+    if key == "core.spotlightIndex" { return "البحث" }
     if ["salah.askAfterAdhanMin", "salah.askReminder", "salah.liveActivity", "notif.thisDeviceReminders", "notif.quietAfterIsha", "notif.quietFrom"].contains(key) { return "الإشعارات" }
     return "المظهر"
 }
@@ -212,6 +213,11 @@ struct SettingControl: View {
                     .accessibilityLabel(definition.title)
                     .accessibilityIdentifier("setting-\(definition.key)")
             default: EmptyView()
+            }
+            if definition.key == "core.spotlightIndex" {
+                Text("يفهرس عناوين كتب المحبرة فقط؛ لا يُفهرس نص الكتب أو المؤلفون أو الملاحظات الخاصة.")
+                    .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }

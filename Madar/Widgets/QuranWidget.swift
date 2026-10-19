@@ -32,10 +32,11 @@ private struct QuranWidgetView: View {
     let entry: QuranWidgetEntry
     @Environment(\.widgetFamily) private var family
     @Environment(\.colorScheme) private var scheme
+    private var extraLargePortrait: Bool { if #available(iOS 27.0, *) { family == .systemExtraLargePortrait } else { false } }
     var body: some View {
         Group {
             if family == .accessoryInline { Text(entry.value?.nextDetail ?? "افتح القرآن") }
-            else { QuranWidgetContent(snapshot: entry.value, template: entry.template, compact: family == .accessoryCircular || family == .accessoryRectangular) }
+            else { QuranWidgetContent(snapshot: entry.value, template: entry.template, compact: family == .accessoryCircular || family == .accessoryRectangular, extraLarge: extraLargePortrait) }
         }
         .environment(\.layoutDirection, .rightToLeft)
         .widgetURL(URL(string: entry.value?.route ?? "madar://quran"))
@@ -46,7 +47,7 @@ struct QuranWidget: Widget {
     var body: some WidgetConfiguration {
         AppIntentConfiguration(kind: "MadarQuran", intent: QuranWidgetConfiguration.self, provider: QuranWidgetProvider()) { QuranWidgetView(entry: $0) }
             .configurationDisplayName("القرآن").description("في صدرك، ومسار اليوم، والحفظ والمراجعة.")
-            .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .accessoryCircular, .accessoryRectangular, .accessoryInline])
+            .supportedFamilies(MadarWidgetFamilies.homeAndAccessories)
     }
 }
 struct QuranReviewTimerControl: ControlWidget {

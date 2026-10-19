@@ -12,9 +12,9 @@ import XCTest
         XCTAssertTrue(app.tabBars.buttons["خصّص"].waitForExistence(timeout: 15), app.debugDescription)
         app.tabBars.buttons["خصّص"].tap()
         XCTAssertTrue(element("bahw-custom-blocks").waitForExistence(timeout: 10), app.debugDescription)
-        for block in ["salah", "quran", "year", "upcoming", "notes"] { XCTAssertTrue(element("bahw-custom-block-" + block).exists, block) }
-        // RL9: rooms not built yet have no row.
-        for block in ["habits", "mal", "mihbara"] { XCTAssertFalse(element("bahw-custom-block-" + block).exists, block) }
+        for block in ["habits", "salah", "quran", "mal", "year", "upcoming", "notes", "mihbara"] {
+            XCTAssertTrue(element("bahw-custom-block-" + block).exists, block)
+        }
         capture(app, "M4-V04-customize-L")
         app.swipeUp(); capture(app, "M4-V04-customize-s1-L"); app.swipeUp(); capture(app, "M4-V04-customize-s2-L")
         app.swipeDown(); app.swipeDown()

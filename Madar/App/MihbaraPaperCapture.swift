@@ -4,6 +4,7 @@ import AVFoundation
 import Vision
 import VisionKit
 import MadarCore
+import MadarDesign
 
 struct PaperBarcodeScannerSheet: View {
     let onISBN: (String) -> Void
@@ -25,7 +26,7 @@ struct PaperBarcodeScannerSheet: View {
                 .padding()
                 .accessibilityIdentifier("mihbara-paper-scanner-close")
         }
-        .background(.black)
+        .background(MadarToken.colors["rooms.mihbara.dark.desk"] ?? RoomTheme(room: "mihbara", dark: true).background)
     }
 }
 

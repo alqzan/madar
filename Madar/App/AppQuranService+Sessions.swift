@@ -96,10 +96,15 @@ extension AppQuranService {
                 try await command("quran.discardDraft", ["draftID": .string(draftID.uuidString)])
                 return .discarded
             }
+            let wasKhatm: Bool
+            if draft.kind == .hifz { wasKhatm = try snapshot().coverage.isKhatm } else { wasKhatm = false }
             var payload: [String: MadarCore.JSONValue] = ["draftID": .string(draftID.uuidString)]
             if draft.kind == .qiyam, case .commitPartial = action { payload["partial"] = .bool(true) }
             try await command("quran.commitSession", payload)
-            let state = try await load(); return .completed(summary: state.summary)
+            let state = try await load()
+            let reachedKhatm: Bool
+            if draft.kind == .hifz, !wasKhatm { reachedKhatm = try snapshot().coverage.isKhatm } else { reachedKhatm = false }
+            return .completed(summary: state.summary, reachedKhatm: reachedKhatm)
         case .saveProgress: break
         case .changeMethod(let method):
             guard draft.kind == .hifz ? QuranLearningMethod(rawValue: method) != nil : method == "continuous" else { throw DataError.invalidValue("هذه الطريقة غير متاحة للجلسة") }

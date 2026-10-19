@@ -21,29 +21,47 @@ struct NotificationBudgetTests {
             remindersEnabled: true, dailyBudget: budget, quietFromMinutes: quiet, dayBoundary: boundary, prayerDays: prayers))
         return (store, root)
     }
-    @Test func sanctityClampsStartAndRepeatDoesNotSpendTwice() throws {
+    @Test func prayerStartMustBeImmediateAndOutsideSanctityAndRepeatDoesNotSpendTwice() throws {
         let (store, root) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
-        let result = try store.reservePrayerActivity(id: "activity.one", now: clock("04:40"))
-        #expect(result.reservation.scheduledAt == clock("05:01"))
+        #expect(throws: NotificationBudgetError.disabled) { try store.reservePrayerActivity(id: "activity.in.sanctity", now: clock("04:40")) }
+        let result = try store.reservePrayerActivity(id: "activity.one", now: clock("05:02"))
+        #expect(result.reservation.scheduledAt == clock("05:02"))
         #expect(result.prayer == .dhuhr)
         #expect(result.prayerAt == clock("11:41"))
         #expect(result.reservation.dayKey == "2026-10-09")
-        #expect(throws: NotificationBudgetError.duplicate) { try store.reservePrayerActivity(id: "activity.two", now: clock("04:41")) }
+        #expect(throws: NotificationBudgetError.duplicate) { try store.reservePrayerActivity(id: "activity.two", now: clock("05:03")) }
         #expect(try store.reservations().count == 1)
     }
     @Test func roomAndActivityShareFourSlotsAcrossIndependentClients() throws {
         let (store, root) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
-        for n in 0..<3 { try store.reserve(.init(id: "quran.\(n)", dayKey: "2026-10-09", scheduledAt: clock("15:32")), now: clock("04:40")) }
-        _ = try NotificationBudgetStore(directory: root).reservePrayerActivity(id: "activity.one", now: clock("04:40"))
-        #expect(throws: NotificationBudgetError.full) { try store.reserve(.init(id: "quran.extra", dayKey: "2026-10-09", scheduledAt: clock("16:00")), now: clock("04:40")) }
+        for n in 0..<3 { try store.reserve(.init(id: "quran.\(n)", dayKey: "2026-10-09", scheduledAt: clock("15:32")), now: clock("05:02")) }
+        _ = try NotificationBudgetStore(directory: root).reservePrayerActivity(id: "activity.one", now: clock("05:02"))
+        #expect(throws: NotificationBudgetError.full) { try store.reserve(.init(id: "quran.extra", dayKey: "2026-10-09", scheduledAt: clock("16:00")), now: clock("05:02")) }
+        #expect(try store.reservations().count == 4)
+    }
+    @Test func contextualActivityReservationUsesTheSharedBudgetAndDeduplicatesItsEvent() throws {
+        let (store, root) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
+        let reservation = try store.reserveContextActivity(id: "context.one", purpose: "context.letter.1", now: clock("06:00"))
+        #expect(reservation.activity)
+        #expect(reservation.dayKey == "2026-10-09")
+        #expect(reservation.scheduledAt == clock("06:00"))
+        #expect(throws: NotificationBudgetError.duplicate) {
+            try store.reserveContextActivity(id: "context.two", purpose: "context.letter.1", now: clock("06:01"))
+        }
+        for n in 1..<4 {
+            try store.reserve(.init(id: "room.\(n)", dayKey: "2026-10-09", scheduledAt: clock("15:32")), now: clock("06:00"))
+        }
+        #expect(throws: NotificationBudgetError.full) {
+            try store.reserveContextActivity(id: "context.full", purpose: "context.travel.2", now: clock("06:02"))
+        }
         #expect(try store.reservations().count == 4)
     }
     @Test func cancellationRefundsOnlyBeforeStartOrKnownFailure() throws {
         let (store, root) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
-        let first = try store.reservePrayerActivity(id: "pending", now: clock("04:40"))
-        try store.cancel(id: first.reservation.id, now: clock("04:50"))
+        let first = try store.reservePrayerActivity(id: "pending", now: clock("05:02"))
+        try store.cancel(id: first.reservation.id, now: clock("05:01"))
         #expect(try store.reservations().isEmpty)
-        _ = try store.reservePrayerActivity(id: "spent", now: clock("04:40"))
+        _ = try store.reservePrayerActivity(id: "spent", now: clock("05:02"))
         try store.cancel(id: "spent", now: clock("05:02"))
         #expect(try store.reservations().count == 1)
         try store.cancel(id: "spent", now: clock("05:02"), requestFailed: true)
@@ -52,18 +70,19 @@ struct NotificationBudgetTests {
     @Test func staleDisabledQuietAndNightFailClosed() throws {
         let (store, root) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
         #expect(throws: NotificationBudgetError.unavailable) { try store.reservePrayerActivity(id: "stale", now: clock("23:59")) }
+        #expect(throws: NotificationBudgetError.disabled) { try store.reservePrayerActivity(id: "sanctity", now: clock("04:40")) }
         #expect(throws: NotificationBudgetError.disabled) { try store.reservePrayerActivity(id: "night", now: clock("02:00")) }
         #expect(throws: NotificationBudgetError.disabled) { try store.reservePrayerActivity(id: "isha", now: clock("18:00")) }
         let (off, offRoot) = try fixture(enabled: false); defer { try? FileManager.default.removeItem(at: offRoot) }
         #expect(throws: NotificationBudgetError.disabled) { try off.reservePrayerActivity(id: "off", now: clock("04:40")) }
         let (quiet, quietRoot) = try fixture(quiet: 5*60); defer { try? FileManager.default.removeItem(at: quietRoot) }
-        #expect(throws: NotificationBudgetError.full) { try quiet.reservePrayerActivity(id: "quiet", now: clock("04:40")) }
+        #expect(throws: NotificationBudgetError.disabled) { try quiet.reservePrayerActivity(id: "quiet", now: clock("07:00")) }
         try Data("broken".utf8).write(to: root.appending(path: "budget.json"))
         #expect(throws: (any Error).self) { try store.reservePrayerActivity(id: "corrupt", now: clock("04:40")) }
     }
     @Test func legacyImportAndRepublishRetainExternalReservations() throws {
         let (store, root) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
-        _ = try store.reservePrayerActivity(id: "external", now: clock("04:40"))
+        _ = try store.reservePrayerActivity(id: "external", now: clock("05:02"))
         let day = try GregorianDay("2026-10-09")
         let prayers = try #require(PrayerTimesEngine.calculate(day: day, place: .riyadh))
         let seed = NotificationBudgetReservation(id: "legacy", dayKey: "2026-10-09", scheduledAt: clock("06:00"))
@@ -92,9 +111,9 @@ struct NotificationBudgetTests {
     @Test func storedBudgetDayFollowsConfiguredBoundaryAfterSanctity() throws {
         for boundary in [DayBoundary.midnight, .fajr, .maghrib] {
             let (store, root) = try fixture(boundary: boundary); defer { try? FileManager.default.removeItem(at: root) }
-            let reserved = try store.reservePrayerActivity(id: "boundary", now: clock("04:40"))
+            let reserved = try store.reservePrayerActivity(id: "boundary", now: clock("05:02"))
             #expect(reserved.reservation.dayKey == (boundary == .maghrib ? "2026-10-08" : "2026-10-09"))
-            #expect(reserved.reservation.scheduledAt == clock("05:01"))
+            #expect(reserved.reservation.scheduledAt == clock("05:02"))
         }
     }
 }

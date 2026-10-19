@@ -1,8 +1,8 @@
 import XCTest
 
 @MainActor final class MihbaraHomeUITests: XCTestCase {
-    private func app(_ fixture: String, epub: Data? = nil, paperIndex: Bool = false) -> XCUIApplication {
-        let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_MIHBARA_FIXTURE":fixture,"MADAR_UI_NOW":"2026-10-17T12:00:00+03:00","MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light"]
+    private func app(_ fixture: String, epub: Data? = nil, paperIndex: Bool = false, storeID: String? = nil) -> XCUIApplication {
+        let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID":storeID ?? UUID().uuidString,"MADAR_UI_MIHBARA_FIXTURE":fixture,"MADAR_UI_NOW":"2026-10-17T12:00:00+03:00","MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light"]
         if let epub { app.launchEnvironment["MADAR_UI_MIHBARA_EPUB_BASE64"] = epub.base64EncodedString() }
         if paperIndex { app.launchEnvironment["MADAR_UI_MIHBARA_PAPER_INDEX_FIXTURE"] = "1" }
         return app
@@ -54,6 +54,33 @@ import XCTest
         let details = app.buttons["mihbara-paper-index-details"]
         XCTAssertTrue(details.waitForExistence(timeout: 8), app.debugDescription)
         reach(app, details); details.tap()
+    }
+
+    func testSpotlightBookIndexIsVisibleOptInAndCanBeTurnedOff() {
+        continueAfterFailure = false
+        let storeID = UUID().uuidString
+        var app = self.app("empty", storeID: storeID); app.launch()
+        let customize = app.tabBars.buttons["خصّص"]; XCTAssertTrue(customize.waitForExistence(timeout: 20)); customize.tap()
+        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("فهرسة")
+        var toggle = app.switches["setting-core.spotlightIndex"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertEqual(toggle.value as? String, "0")
+        XCTAssertTrue(app.staticTexts["يفهرس عناوين كتب المحبرة فقط؛ لا يُفهرس نص الكتب أو المؤلفون أو الملاحظات الخاصة."].exists)
+        search.typeText(XCUIKeyboardKey.return.rawValue)
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5), app.debugDescription)
+        shot(app, "M7-spotlight-off-L")
+        toggle.tap(); XCTAssertTrue(toggle.waitForValue("1", timeout: 8))
+        app.terminate()
+        app = self.app("empty", storeID: storeID); app.launch()
+        let reopenedCustomize = app.tabBars.buttons["خصّص"]; XCTAssertTrue(reopenedCustomize.waitForExistence(timeout: 20)); reopenedCustomize.tap()
+        let reopenedSearch = app.textFields["settings-search"]; XCTAssertTrue(reopenedSearch.waitForExistence(timeout: 10)); reopenedSearch.tap(); reopenedSearch.typeText("فهرسة")
+        toggle = app.switches["setting-core.spotlightIndex"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertEqual(toggle.value as? String, "1", "The Spotlight choice must persist after relaunch.")
+        reopenedSearch.typeText(XCUIKeyboardKey.return.rawValue)
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5), app.debugDescription)
+        shot(app, "M7-spotlight-on-L")
+        toggle.tap(); XCTAssertTrue(toggle.waitForValue("0", timeout: 8))
     }
 
     func testEmptyShelfPaperAddAndUndo() {
@@ -459,6 +486,38 @@ import XCTest
         for theme in ["paper", "warm", "calm", "black"] { XCTAssertTrue(app.buttons["mihbara-reader-theme-\(theme)"].exists, theme) }
         app.buttons["mihbara-reader-theme-night"].tap()
         XCTAssertTrue(app.buttons["mihbara-reader-theme-night"].waitForSelection(timeout: 5))
+        app.buttons["mihbara-reader-settings-close"].tap()
+        XCTAssertTrue(app.buttons["mihbara-reader-settings-close"].waitForNonExistence(timeout: 5))
+        app.buttons["mihbara-reader-contents"].tap()
+        let contentsClose = app.buttons["mihbara-reader-contents-close"]
+        XCTAssertTrue(contentsClose.waitForExistence(timeout: 8), app.debugDescription)
+        shot(app, "M6-V19-contents-night-L")
+        contentsClose.tap()
+        XCTAssertTrue(contentsClose.waitForNonExistence(timeout: 5))
+        let marker = app.links["١"].firstMatch
+        XCTAssertTrue(marker.waitForExistence(timeout: 8), app.debugDescription)
+        marker.tap()
+        let footnote = app.descendants(matching: .any)["mihbara-footnote-card"]
+        XCTAssertTrue(footnote.waitForExistence(timeout: 8), app.debugDescription)
+        shot(app, "M6-V09-footnote-night-L")
+        app.buttons["mihbara-footnote-close"].tap()
+        XCTAssertTrue(footnote.waitForNonExistence(timeout: 5))
+        let paragraph = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "القراءة باب يدخل")).firstMatch
+        XCTAssertTrue(paragraph.waitForExistence(timeout: 8), app.debugDescription)
+        paragraph.coordinate(withNormalizedOffset: CGVector(dx: 0.7, dy: 0.15)).press(forDuration: 1.2)
+        let wordCard = app.descendants(matching: .any)["mihbara-word-card"]
+        XCTAssertTrue(wordCard.waitForExistence(timeout: 8), app.debugDescription)
+        shot(app, "M6-V08-card-night-L")
+        app.buttons["mihbara-word-note"].tap()
+        let noteEditor = app.textViews["mihbara-note-text"]
+        XCTAssertTrue(noteEditor.waitForExistence(timeout: 8), app.debugDescription)
+        shot(app, "M6-V08-note-night-L")
+        app.buttons["mihbara-note-cancel"].tap()
+        XCTAssertTrue(noteEditor.waitForNonExistence(timeout: 5))
+        app.buttons["mihbara-word-close"].tap()
+        XCTAssertTrue(wordCard.waitForNonExistence(timeout: 5))
+        app.buttons["mihbara-reader-settings"].tap()
+        XCTAssertTrue(app.buttons["mihbara-reader-mode-scroll"].waitForExistence(timeout: 5))
         app.buttons["mihbara-reader-mode-scroll"].tap()
         XCTAssertTrue(app.buttons["mihbara-reader-mode-scroll"].waitForSelection(timeout: 5))
         shot(app, "M6-V10-sheet-night-L")

@@ -68,11 +68,10 @@ import XCTest
         for title in ["البهو", "الصلاة", "القرآن", "خصّص"] {
             XCTAssertTrue(tabBar.buttons[title].waitForExistence(timeout: 5), "Missing native destination: \(title)\n\(app.debugDescription)")
         }
-        XCTAssertTrue(app.buttons["tab-notes"].waitForExistence(timeout: 5), "Missing direct diary shortcut\n\(app.debugDescription)")
-        XCTAssertTrue(app.buttons["tab-money"].waitForExistence(timeout: 5), "Missing direct money shortcut\n\(app.debugDescription)")
-        XCTAssertTrue(app.buttons["tab-mihbara"].waitForExistence(timeout: 5), "Missing direct Mihbara shortcut\n\(app.debugDescription)")
-        let tabsShot = XCTAttachment(screenshot: app.screenshot()); tabsShot.name = "M0-native-glass-tabs-L"; tabsShot.lifetime = .keepAlways; add(tabsShot)
-        app.buttons["tab-notes"].tap()
+        let notes = app.buttons["tab-notes"]
+        XCTAssertTrue(notes.waitForExistence(timeout: 5), "Notes must stay directly reachable.\n\(app.debugDescription)")
+        let tabsShot = XCTAttachment(screenshot: app.screenshot()); tabsShot.name = "M0-native-glass-room-shortcuts-L"; tabsShot.lifetime = .keepAlways; add(tabsShot)
+        notes.tap()
         XCTAssertTrue(app.descendants(matching: .any)["notes-tab"].waitForExistence(timeout: 8), app.debugDescription)
         app.buttons["tab-money"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["money-home"].waitForExistence(timeout: 10), app.debugDescription)

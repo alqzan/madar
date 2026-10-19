@@ -5,6 +5,7 @@ import AVFoundation
 import SwiftData
 import MadarCore
 import MadarData
+import MadarDesign
 
 extension AppSession {
     func prepareDiaryHomeFixture(group: URL) throws {
@@ -112,10 +113,15 @@ extension AppSession {
     private static func diaryFixturePhoto(variant: Int) -> Data? {
         let renderer = UIGraphicsImageRenderer(size: CGSize(width: 720, height: 800))
         return renderer.jpegData(withCompressionQuality: 0.8) { surface in
-            let c = surface.cgContext, colors = [UIColor(red: 0.22, green: 0.12, blue: 0.07, alpha: 1).cgColor, UIColor(red: 0.62, green: 0.37, blue: 0.16, alpha: 1).cgColor, UIColor(red: 0.15, green: 0.08, blue: 0.04, alpha: 1).cgColor]
+            let c = surface.cgContext, notes = RoomTheme(room: "notes"), colors = [
+                UIColor(MadarToken.colors["rooms.mihbara.dark.desk"] ?? notes.ink).cgColor,
+                UIColor(MadarToken.colors["rooms.mihbara.dark.wood"] ?? notes.accent).cgColor,
+                UIColor(MadarToken.colors["rooms.notes.lockCover.leather"] ?? notes.accent).cgColor
+            ]
             c.drawLinearGradient(CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors as CFArray, locations: [0,0.4,1])!, start: .zero, end: .init(x: 550, y: 800), options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
             for (x,y,r) in [(140.0,240.0,24.0),(500,160,32),(330,300,46),(600,360,28),(250,110,18)] {
-                let glow = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [UIColor(red: 1, green: 0.82, blue: 0.5, alpha: 0.8).cgColor, UIColor.clear.cgColor] as CFArray, locations: [0.7,1])!
+                let highlight = UIColor(MadarToken.colors["rooms.notes.lockCover.text"] ?? notes.background).withAlphaComponent(0.8)
+                let glow = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [highlight.cgColor, UIColor.clear.cgColor] as CFArray, locations: [0.7,1])!
                 c.drawRadialGradient(glow, startCenter: .init(x: x, y: y), startRadius: 0, endCenter: .init(x: x, y: y), endRadius: r + Double(variant)*3, options: [])
             }
         }

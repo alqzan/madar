@@ -9,7 +9,7 @@ import MadarQuran
 extension AppSession {
     func prepareQuranHomeFixture(group: URL) throws {
         let env = ProcessInfo.processInfo.environment
-        guard let variant = env["MADAR_UI_QURAN_FIXTURE"], ["home", "drill", "dayClose", "dayCloseStart"].contains(variant), let id = env["MADAR_UI_STORE_ID"],
+        guard let variant = env["MADAR_UI_QURAN_FIXTURE"], ["home", "drill", "dayClose", "dayCloseStart", "khatmaStart"].contains(variant), let id = env["MADAR_UI_STORE_ID"],
               group.lastPathComponent == id, group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         let context = ModelContext(container)
         selectedTab = "quran"
@@ -29,6 +29,10 @@ extension AppSession {
         }
         if variant == "dayCloseStart" {
             plan.unit = "ayah"; plan.amount = 7; plan.rhythm = "light"; plan.activeFrom = now
+        } else if variant == "khatmaStart" {
+            let finalAyah = catalog.ayahs(on: 604).last!.id
+            plan.startAyah = finalAyah; plan.unit = "ayah"; plan.amount = 1; plan.rhythm = "light"; plan.activeFrom = now
+            append(kind: "hifz", first: 1, last: finalAyah - 1, pages: Array(1...603), offset: -1)
         } else {
             let baseEnd = catalog.ayahs(on: 270).last!.id
             append(kind: "hifz", first: 1, last: baseEnd, pages: Array(1...270), offset: -70)

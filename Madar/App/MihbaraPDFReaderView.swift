@@ -103,7 +103,7 @@ struct MihbaraPDFReaderView: View {
         VStack(spacing: 8) {
             if pageCount > 0 {
                 ProgressView(value: Double(pageIndex + 1), total: Double(pageCount))
-                    .tint(Color(red: 158 / 255, green: 47 / 255, blue: 37 / 255))
+                    .tint(readerTheme.accentFill)
                     .accessibilityIdentifier("mihbara-pdf-progress")
                 HStack(spacing: 8) {
                     Button { go(to: pageIndex - 1) } label: { Image(systemName: "chevron.right").frame(width: 44, height: 44) }

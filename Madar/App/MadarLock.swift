@@ -337,13 +337,13 @@ struct MadarLockGate<Content: View>: View {
         promptedAtStartup = controller.authenticate(for: feature)
     }
     private var privacyCover: some View {
-        ZStack { theme.background.ignoresSafeArea(); Image(systemName: "lock.closed").font(.largeTitle).foregroundStyle(theme.ink) }
+        ZStack { theme.background.ignoresSafeArea(); Image(systemName: "lock.fill").font(.largeTitle).foregroundStyle(theme.ink) }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .accessibilityHidden(true)
     }
     private var lockedContent: some View {
         VStack(spacing: 20) {
-            Image(systemName: "lock.closed").font(.largeTitle).accessibilityHidden(true)
+            Image(systemName: "lock.fill").font(.largeTitle).accessibilityHidden(true)
             Text("مدار مقفل").font(MadarTypography.title())
             if let message = controller.statusMessage { Text(message).font(MadarTypography.caption()) }
             if controller.authenticating { ProgressView("يتحقق Face ID…") }

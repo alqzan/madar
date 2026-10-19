@@ -57,6 +57,36 @@ import XCTest
         XCTAssertTrue(app.staticTexts["quran-coverage-title"].waitForExistence(timeout: 15))
         app.terminate()
     }
+    func testKhatmaMomentAppearsWhenTheFinalAyahCompletesMemorisation() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00", "MADAR_UI_QURAN_FIXTURE": "khatmaStart"]
+        app.launch()
+        let begin = app.buttons["quran-begin"]
+        XCTAssertTrue(begin.waitForExistence(timeout: 20), app.debugDescription); begin.tap()
+        XCTAssertTrue(app.buttons["quran-session-method"].waitForExistence(timeout: 15), app.debugDescription)
+        app.buttons["quran-session-method"].tap()
+        app.buttons["quran-method-completeAyah"].tap()
+        let advance = app.buttons["quran-session-advance"]
+        let grade = app.buttons["quran-coach-grade-mastered"]
+        for _ in 0..<12 {
+            if grade.waitForExistence(timeout: 1) { break }
+            XCTAssertTrue(advance.waitForExistence(timeout: 5), app.debugDescription)
+            advance.tap()
+        }
+        XCTAssertTrue(grade.waitForExistence(timeout: 8), app.debugDescription)
+        grade.tap()
+        let save = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@ AND enabled == true", "سجّل"), object: advance)
+        XCTAssertEqual(XCTWaiter.wait(for: [save], timeout: 10), .completed, app.debugDescription)
+        advance.tap()
+        let message = app.staticTexts["quran-khatma-moment-message"]
+        XCTAssertTrue(message.waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertTrue(message.label.contains("تقبّل الله منك"), message.label)
+        XCTAssertTrue(app.buttons["quran-khatma-moment-dismiss"].exists, app.debugDescription)
+        attach(app, "M7-khatma-quiet-sheet-L")
+        app.buttons["quran-khatma-moment-dismiss"].tap()
+        XCTAssertTrue(app.staticTexts["quran-day-close-title"].waitForExistence(timeout: 10), app.debugDescription)
+    }
     private func openSummary(_ app: XCUIApplication) {
         XCTAssertTrue(app.staticTexts["quran-coverage-title"].waitForExistence(timeout: 20))
         let entry = app.buttons["quran-day-close-open"]

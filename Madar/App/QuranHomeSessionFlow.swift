@@ -11,6 +11,7 @@ struct QuranHomeSessionFlow: View {
     @State private var busy = false
     @State private var error: String?
     @State private var showDayClose = false
+    @State private var showKhatmaMoment = false
     var body: some View {
         Group {
             if showDayClose {
@@ -24,6 +25,11 @@ struct QuranHomeSessionFlow: View {
             } else { legacyBody }
         }
         .alert("لم تكتمل العملية", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) { Button("تمّ") { error = nil } } message: { Text(error ?? "") }
+        .sheet(isPresented: $showKhatmaMoment) {
+            QuranKhatmaMomentSheet(close: { showKhatmaMoment = false })
+                .environment(\.roomTheme, theme)
+                .environment(\.layoutDirection, .rightToLeft)
+        }
         .interactiveDismissDisabled()
     }
     private var legacyBody: some View {
@@ -63,9 +69,54 @@ struct QuranHomeSessionFlow: View {
         guard !busy else { return }; busy = true
         Task { defer { busy = false }; do { switch try await service.session(draftID: state.id, action: action) {
         case .active(let next): state = next
-        case .completed:
-            if case .commit = action, state.coach?.pastDay != true { showDayClose = true } else { close() }
+        case .completed(_, let reachedKhatm):
+            if case .commit = action, state.coach?.pastDay != true {
+                showDayClose = true
+                showKhatmaMoment = reachedKhatm
+            } else { close() }
         case .discarded: close()
         } } catch { self.error = quranUserMessage(error) } }
+    }
+}
+
+private struct QuranKhatmaMomentSheet: View {
+    let close: () -> Void
+    @Environment(\.roomTheme) private var theme
+    @Environment(\.dynamicTypeSize) private var dynamicType
+
+    var body: some View {
+        VStack(spacing: 24) {
+            Text("أتممت حفظ القرآن، تقبّل الله منك.")
+                .font(.custom("Amiri-Bold", size: 27, relativeTo: .title2))
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity)
+                .accessibilityIdentifier("quran-khatma-moment-message")
+            doneButton
+        }
+        .padding(.horizontal, 24)
+        .padding(.vertical, 30)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .foregroundStyle(theme.ink)
+        .background(theme.background.ignoresSafeArea())
+        .presentationDetents(dynamicType.isAccessibilitySize ? [.medium, .large] : [.height(250)])
+        .presentationDragIndicator(.visible)
+    }
+
+    @ViewBuilder private var doneButton: some View {
+        if #available(iOS 26.0, *) {
+            Button("تمّ", action: close)
+                .font(.custom("thmanyahsans-Bold", size: 15, relativeTo: .body))
+                .frame(maxWidth: .infinity, minHeight: 48)
+                .buttonStyle(.glass)
+                .accessibilityIdentifier("quran-khatma-moment-dismiss")
+        } else {
+            Button("تمّ", action: close)
+                .font(.custom("thmanyahsans-Bold", size: 15, relativeTo: .body))
+                .frame(maxWidth: .infinity, minHeight: 48)
+                .foregroundStyle(theme.onAccent)
+                .background(theme.accent, in: Capsule())
+                .accessibilityIdentifier("quran-khatma-moment-dismiss")
+        }
     }
 }

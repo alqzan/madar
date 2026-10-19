@@ -59,7 +59,9 @@ struct MihbaraHomeView: View {
                     .accessibilityIdentifier("mihbara-undo")
             }
         }
-        .task { load() }.onChange(of: app.prayerRevision) { load() }.onChange(of: reading?.day) { folded = false; manuallyOpen = false }
+        .task { load(); openSpotlightBookIfNeeded() }
+        .onChange(of: app.mihbaraBookToOpen) { _, _ in openSpotlightBookIfNeeded() }
+        .onChange(of: app.prayerRevision) { load() }.onChange(of: reading?.day) { folded = false; manuallyOpen = false }
         .sheet(item: $sheet, onDismiss: openPendingMotivationBook) { target in
             NavigationStack {
                 if let r = reading {
@@ -116,6 +118,16 @@ struct MihbaraHomeView: View {
         }
     }
     private func load() { do { reading = try service.load() } catch { app.errorMessage = error.localizedDescription } }
+    private func openSpotlightBookIfNeeded() {
+        guard let id = app.mihbaraBookToOpen else { return }
+        if reading == nil { load() }
+        defer { app.mihbaraBookToOpen = nil }
+        guard let book = reading?.books.first(where: { $0.id == id }) else {
+            app.errorMessage = "الكتاب لم يعد موجودًا في المحبرة."
+            return
+        }
+        openBook(book)
+    }
     private func showMotivation() {
         guard let reading else { return }
         do {

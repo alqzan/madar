@@ -114,7 +114,7 @@ private struct FixedRoomWidgetView:View {
 struct FixedRoomWidget<Config:FixedRoomConfiguration>:Widget {
     var body:some WidgetConfiguration {
         AppIntentConfiguration(kind:"MadarRoom-"+Config.room.rawValue,intent:Config.self,provider:FixedRoomProvider<Config>()){FixedRoomWidgetView(entry:$0)}
-            .configurationDisplayName(Config.room.title).description("ملخص من غرفتك، وفتح مباشر لها.").supportedFamilies([.systemSmall,.systemMedium,.systemLarge,.accessoryCircular,.accessoryRectangular,.accessoryInline])
+            .configurationDisplayName(Config.room.title).description("ملخص من غرفتك، وفتح مباشر لها.").supportedFamilies(MadarWidgetFamilies.homeAndAccessories)
     }
 }
 struct AdditionalRoomWidgets:WidgetBundle {

@@ -1,5 +1,6 @@
 """Negative fixtures for the bounded shipping checks; no app/simulator dependency."""
 import importlib.util
+import json
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -98,10 +99,39 @@ Text("\\(digits(count)) سجلًّا")
                 'phase':{'isa':'PBXSourcesBuildPhase','files':['build']},
                 'app':{'isa':'PBXNativeTarget','name':'Madar','productType':'com.apple.product-type.application','buildPhases':['phase']},
                 'widget':{'isa':'PBXNativeTarget','name':'MadarWidgets','productType':'com.apple.product-type.app-extension','buildPhases':[]}}}
-            sources, _, _, _ = checks.build_files(project, root)
+            sources, _, _, _, _ = checks.build_files(project, root)
             self.assertEqual(sources, [root/'Included.swift'])
             project['objects']['included']['sourceTree'] = 'UNRESOLVED'
             with self.assertRaisesRegex(ValueError, 'unsupported sourceTree'): checks.build_files(project, root)
+
+    def test_remote_readium_product_requires_matching_exact_pin(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            url = 'https://github.com/readium/swift-toolkit.git'
+            project = {'rootObject':'project','objects': {
+                'project':{'isa':'PBXProject','mainGroup':'group','packageReferences':['package']},
+                'group':{'isa':'PBXGroup','children':[]},
+                'package':{'isa':'XCRemoteSwiftPackageReference','repositoryURL':url,
+                           'requirement':{'kind':'exactVersion','version':'3.11.1'}},
+                'product':{'isa':'XCSwiftPackageProductDependency','productName':'ReadiumNavigator','package':'package'},
+                'app':{'isa':'PBXNativeTarget','name':'Madar','productType':'com.apple.product-type.application',
+                       'buildPhases':[],'packageProductDependencies':['product']},
+                'widget':{'isa':'PBXNativeTarget','name':'MadarWidgets','productType':'com.apple.product-type.app-extension',
+                          'buildPhases':[]}}}
+            with self.assertRaises(FileNotFoundError): checks.build_files(project, root)
+
+            lock = root/'Madar.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved'
+            lock.parent.mkdir(parents=True)
+            lock.write_text(json.dumps({'version':3,'pins':[{
+                'identity':'swift-toolkit','kind':'remoteSourceControl','location':url,
+                'state':{'revision':'a'*40,'version':'3.11.1'}}]}))
+            _, _, _, remote_products, targets = checks.build_files(project, root)
+            self.assertEqual(remote_products, [(url,'ReadiumNavigator','3.11.1','a'*40)])
+            self.assertEqual(set(targets), {'Madar','MadarWidgets'})
+
+            project['objects']['package']['requirement']['version'] = '3.11.0'
+            with self.assertRaisesRegex(ValueError, 'not pinned to its exact Xcode requirement'):
+                checks.build_files(project, root)
 
     def test_M0L01_main_to_helper_is_rejected_not_silently_omitted(self):
         with tempfile.TemporaryDirectory() as directory:

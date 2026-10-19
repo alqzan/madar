@@ -120,13 +120,16 @@ import UIKit
         }
     }
     func present(file: URL, authorization: PrivacyAuthorization) throws {
+        try present(items: [file], authorization: authorization)
+    }
+    func present(items: [Any], authorization: PrivacyAuthorization) throws {
         try controller.validate(authorization)
-        guard scene != nil, coverWindow?.isHidden == true, let hostWindow,
+        guard !items.isEmpty, scene != nil, coverWindow?.isHidden == true, let hostWindow,
               hostWindow.windowScene === scene, var top = hostWindow.rootViewController,
               activity == nil, retiringActivityID == nil else { throw PrivacyAuthorizationError.stale }
         while let presented = top.presentedViewController { top = presented }
         guard top.viewIfLoaded?.window === hostWindow else { throw PrivacyAuthorizationError.stale }
-        let id = UUID(); let share = UIActivityViewController(activityItems: [file], applicationActivities: nil)
+        let id = UUID(); let share = UIActivityViewController(activityItems: items, applicationActivities: nil)
         share.popoverPresentationController?.sourceView = top.view
         share.popoverPresentationController?.sourceRect = CGRect(x: top.view.bounds.midX, y: top.view.bounds.midY, width: 1, height: 1)
         share.completionWithItemsHandler = { [weak self] _, _, _, _ in

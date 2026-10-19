@@ -173,7 +173,7 @@ enum QuranUISessionResult: Sendable { case active(QuranUISessionState), complete
     }
     func advance(_ action: QuranUISessionAction) async {
         guard !busy, let id = session?.id else { return }; busy = true; error = nil; defer { busy = false }
-        do { switch try await service.session(draftID: id, action: action) { case .active(let next): session = next; case .completed(let summary): session = nil; completion = summary; state = try await service.load(); case .discarded: session = nil; state = try await service.load() } } catch { self.error = error.localizedDescription }
+        do { switch try await service.session(draftID: id, action: action) { case .active(let next): session = next; case .completed(let summary, _): session = nil; completion = summary; state = try await service.load(); case .discarded: session = nil; state = try await service.load() } } catch { self.error = error.localizedDescription }
     }
 }
 

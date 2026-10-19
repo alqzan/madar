@@ -22,6 +22,7 @@ final class AppSession {
     var yearOpen = false
     var moneyOpen = false
     var mihbaraOpen = false
+    var mihbaraBookToOpen: UUID?
     var moneyExpenseSeed: MoneyExpenseSeed?
     var habitsOpen = false
     /// A capture named a prayer without its state; the prayer home opens that prayer's log sheet.
@@ -79,12 +80,26 @@ final class AppSession {
         return self.lockController?.canPresent(.app) == true ? nil : .init(status: .needsUnlock)
     })
     private var expiryTask: Task<Void, Never>?
+    @ObservationIgnored private var spotlightBookSnapshot: [AppSpotlightBookRecord]?
+    @ObservationIgnored private var spotlightDomainsClearedWhileDisabled = false
+    @ObservationIgnored private var spotlightReconciliationRevision: UInt64 = 0
+    @ObservationIgnored private var spotlightReconciliationTask: Task<Void, Never>?
+    @ObservationIgnored private let spotlightIndexOperation: AppSpotlightIndexOperation
 
-    static let supportedKeys = ["core.dayStart", "core.firstCalendar", "core.hijriSource", "core.hijriOffset", "core.weekStart", "core.theme", "core.numerals", "core.homeCity", "core.faceIDLock", "salah.askAfterAdhanMin", "salah.askReminder", "salah.liveActivity", "salah.showMosqueStreak", "salah.askHeart", "salah.method", "salah.asr", "salah.highLatitudeRule", "salah.offsets", "notif.thisDeviceReminders", "notif.quietAfterIsha", "notif.quietFrom", "bahw.yearWhich", "bahw.upcomingCount", "bahw.streakBreakAfter", "bahw.travelFreezesHome"]
+    static let supportedKeys = ["core.dayStart", "core.firstCalendar", "core.hijriSource", "core.hijriOffset", "core.weekStart", "core.theme", "core.numerals", "core.homeCity", "core.faceIDLock", "core.spotlightIndex", "salah.askAfterAdhanMin", "salah.askReminder", "salah.liveActivity", "salah.showMosqueStreak", "salah.askHeart", "salah.method", "salah.asr", "salah.highLatitudeRule", "salah.offsets", "notif.thisDeviceReminders", "notif.quietAfterIsha", "notif.quietFrom", "bahw.yearWhich", "bahw.upcomingCount", "bahw.streakBreakAfter", "bahw.travelFreezesHome"]
 
-    init(container: ModelContainer, managedStore: ManagedDataStore? = nil, groupDirectory: URL? = nil) throws {
+    init(
+        container: ModelContainer,
+        managedStore: ManagedDataStore? = nil,
+        groupDirectory: URL? = nil,
+        spotlightIndexOperation: @escaping AppSpotlightIndexOperation = { enabled, records in
+            if enabled { try await AppSpotlightIndexing.replaceBookItems(records) }
+            else { try await AppSpotlightIndexing.removeAppItems() }
+        }
+    ) throws {
         self.container = container
         self.managedStore = managedStore
+        self.spotlightIndexOperation = spotlightIndexOperation
         guard let group = groupDirectory ?? FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.alqzan.madar2") else { throw DataError.missingAppGroup }
         snapshotStore = SnapshotStore(directory: group.appending(path: "Snapshots", directoryHint: .isDirectory))
         pendingInbox = PendingInbox(directory: group.appending(path: "PendingInbox", directoryHint: .isDirectory))
@@ -119,6 +134,67 @@ final class AppSession {
         for item in schema.settings { current[item.key] = try store.value(for: item.key) }
         values = current
         prayerRevision &+= 1
+    }
+    func reconcileSpotlightIndex(reportFailure: Bool = false) async {
+        spotlightReconciliationRevision &+= 1
+        let revision = spotlightReconciliationRevision
+        let enabled = bool("core.spotlightIndex")
+        if enabled {
+            spotlightDomainsClearedWhileDisabled = false
+        } else {
+            // An in-flight index or deletion may have changed Spotlight even if its
+            // completion becomes stale. Never let a newer enable trust that snapshot.
+            spotlightBookSnapshot = nil
+        }
+        if !enabled, spotlightDomainsClearedWhileDisabled, spotlightReconciliationTask == nil { return }
+
+        let previousTask = spotlightReconciliationTask
+        let task = Task { @MainActor [weak self] in
+            await previousTask?.value
+            guard let self, self.spotlightReconciliationRevision == revision else { return }
+            await self.performSpotlightReconciliation(enabled: enabled, revision: revision, reportFailure: reportFailure)
+        }
+        spotlightReconciliationTask = task
+        await task.value
+        if spotlightReconciliationRevision == revision { spotlightReconciliationTask = nil }
+    }
+
+    private func performSpotlightReconciliation(enabled: Bool, revision: UInt64, reportFailure: Bool) async {
+        guard spotlightReconciliationRevision == revision, bool("core.spotlightIndex") == enabled else { return }
+        if !enabled {
+            do {
+                try await spotlightIndexOperation(false, [])
+                guard spotlightReconciliationRevision == revision, !bool("core.spotlightIndex") else { return }
+                spotlightBookSnapshot = nil
+                spotlightDomainsClearedWhileDisabled = true
+            } catch {
+                guard spotlightReconciliationRevision == revision, !bool("core.spotlightIndex") else { return }
+                if reportFailure { errorMessage = "تعذّر تنظيف نتائج البحث لهذا الجهاز." }
+            }
+            return
+        }
+
+        do {
+            let books = try ModelContext(container).fetch(FetchDescriptor<Book>())
+            let records = AppSpotlightIndexing.records(from: books)
+            guard records != spotlightBookSnapshot || spotlightDomainsClearedWhileDisabled else { return }
+            guard spotlightReconciliationRevision == revision, bool("core.spotlightIndex") else { return }
+            // Once a write starts, a newer request must re-read/re-index even when it
+            // returns to the previous snapshot; this operation may finish out of date.
+            spotlightBookSnapshot = nil
+            try await spotlightIndexOperation(true, records)
+            guard spotlightReconciliationRevision == revision, bool("core.spotlightIndex") else { return }
+            spotlightBookSnapshot = records
+            spotlightDomainsClearedWhileDisabled = false
+        } catch {
+            guard spotlightReconciliationRevision == revision, bool("core.spotlightIndex") else { return }
+            spotlightBookSnapshot = nil
+            if reportFailure { errorMessage = "تعذّر تحديث نتائج بحث الكتب. أعد المحاولة بعد قليل." }
+        }
+    }
+    func openSpotlightBook(_ id: UUID) {
+        mihbaraBookToOpen = id
+        selectedTab = "mihbara"
     }
     func prayerSnapshot(at now: Date) throws -> PrayerSnapshot {
         _ = prayerRevision // Observation invalidates the derived view after a committed write.
@@ -463,6 +539,7 @@ final class AppSession {
                     let result = try await bus.execute(CommandEnvelope(name: "system.undo", payload: .object(["undoToken": .string(token.id.uuidString)])))
                     guard result.status == .applied else { throw DataError.undoExpired }
                     try reload(); undoToken = nil; expiryTask?.cancel(); try publishSnapshot()
+                    await reconcileSpotlightIndex()
                     WidgetCenter.shared.reloadAllTimelines()
                 }
             } catch { errorMessage = "لم يكتمل التراجع. \(error.localizedDescription)" }
@@ -489,6 +566,7 @@ final class AppSession {
                     try publishSnapshot()
                     WidgetCenter.shared.reloadAllTimelines()
                 }
+                if values["core.spotlightIndex"] != nil { await reconcileSpotlightIndex(reportFailure: true) }
                 completion?()
             } catch { errorMessage = "لم يُحفظ التعديل. \(error.localizedDescription)" }
         }
@@ -600,6 +678,9 @@ final class AppSession {
         let result = try await bus.execute(.init(commandID: id, name: name, payload: .object(payload), issuedAt: now), now: now)
         guard result.status == .applied || result.status == .duplicate else { throw DataError.invalidValue(result.reason ?? "تعذّر حفظ الكتاب") }
         try reload(); try publishSnapshot()
+        if ["book.importPDF", "book.importEPUB", "book.savePaper", "book.updatePaper"].contains(name) {
+            await reconcileSpotlightIndex()
+        }
         if let token = result.undoToken { showUndo(.init(id: token, expiresAt: now.addingTimeInterval(600)), message: undoMessage) }
     }
 
@@ -643,10 +724,22 @@ final class AppSession {
             guard result.status == .applied || result.status == .duplicate else { throw DataError.invalidValue(result.reason ?? "settings") }
             try reload(); try publishSnapshot()
         }
+        if changes["core.spotlightIndex"] != nil { await reconcileSpotlightIndex(reportFailure: true) }
     }
     func attachPrayerNotifications(_ coordinator: PrayerNotificationCoordinator) async {
         prayerNotifications = coordinator
+        await refreshEligibleDiaryLettersForNotificationLifecycle()
         await coordinator.attach(to: self)
+    }
+    /// Diary eligibility is a forward-only, protected-state change. Reconcile it
+    /// when the app opens or returns to the foreground, but only after the diary
+    /// access gate is open; the notification coordinator then sees the new state.
+    func refreshEligibleDiaryLettersForNotificationLifecycle() async {
+        guard lockController?.canPresent(.notes) ?? protectedDataAuthorized,
+              notificationStoreAccessAvailable else { return }
+        do { try await AppDiaryService(app: self).refreshLetters() }
+        catch BackupOperationError.busy { }
+        catch { errorMessage = "تعذّر تحديث موعد الرسالة. \(error.localizedDescription)" }
     }
     func refreshPrayerNotifications() async {
         do { try await prayerNotifications?.refresh() }

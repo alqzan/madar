@@ -68,9 +68,6 @@ struct QuranDayCloseView: View {
                     .fixedSize(horizontal: false, vertical: true).accessibilityIdentifier("quran-day-close-tomorrow")
             }.frame(maxWidth: .infinity, alignment: .leading).padding(14)
                 .overlay { RoundedRectangle(cornerRadius: 17).stroke(theme.line, style: StrokeStyle(lineWidth: 1, dash: [3, 3])) }
-            if value.isKhatm {
-                Text("أتممت حفظ القرآن، تقبّل الله منك").font(serif(22)).multilineTextAlignment(.center).padding(.top, 8)
-            }
         }.padding(18).frame(maxWidth: .infinity)
             .background(theme.surface, in: .rect(cornerRadius: 26))
             .shadow(color: theme.ink.opacity(0.05), radius: 16, y: 8)

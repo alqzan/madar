@@ -2,6 +2,7 @@ import SwiftUI
 import WidgetKit
 import ActivityKit
 import AppIntents
+import UIKit
 import MadarSnapshots
 
 private struct FoundationEntry: TimelineEntry {
@@ -44,6 +45,7 @@ private struct FoundationWidget: Widget {
         AdditionalRoomWidgets().body
         QuranReviewTimerControl()
         PrayerCountdownActivityWidget()
+        MadarContextActivityWidget()
         PrayerLogControl()
         PrayerCountdownControl()
     }
@@ -63,8 +65,8 @@ private struct PrayerCountdownActivityWidget: Widget {
             }
             .environment(\.layoutDirection, .rightToLeft)
             .padding()
-            .activityBackgroundTint(.black.opacity(0.92))
-            .activitySystemActionForegroundColor(.white)
+            .activityBackgroundTint(Color(uiColor: .secondarySystemBackground))
+            .activitySystemActionForegroundColor(Color(uiColor: .label))
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.center) {
@@ -85,6 +87,113 @@ private struct PrayerCountdownActivityWidget: Widget {
             .widgetURL(URL(string: "madar://prayer"))
             .keylineTint(.teal)
         }
+    }
+}
+
+private struct MadarContextActivityWidget: Widget {
+    var body: some WidgetConfiguration {
+        ActivityConfiguration(for: MadarContextActivityAttributes.self) { context in
+            HStack(spacing: 12) {
+                ContextActivityIcon(kind: context.attributes.kind).frame(width: 24, height: 24)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(context.attributes.kind.title).font(.caption)
+                    if context.isStale {
+                        Text(context.attributes.kind.staleTitle).font(.headline)
+                    } else if context.attributes.kind == .travel, let city = context.state.city {
+                        Text(city).font(.headline).privacySensitive()
+                    } else {
+                        Text(context.attributes.kind == .iftar ? "الإفطار" : "مدار").font(.headline)
+                    }
+                }
+                Spacer(minLength: 8)
+                if !context.isStale {
+                    ContextActivityTime(attributes: context.attributes, state: context.state).font(.body)
+                }
+            }
+            .environment(\.layoutDirection, .rightToLeft)
+            .padding()
+            .activityBackgroundTint(.black.opacity(0.92))
+            .activitySystemActionForegroundColor(.white)
+            .widgetURL(context.attributes.kind.destination)
+        } dynamicIsland: { context in
+            DynamicIsland {
+                DynamicIslandExpandedRegion(.leading) {
+                    ContextActivityIcon(kind: context.attributes.kind).frame(width: 22, height: 22)
+                }
+                DynamicIslandExpandedRegion(.center) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(context.attributes.kind.title).font(.caption2)
+                        if context.isStale {
+                            Text(context.attributes.kind.staleTitle).font(.headline)
+                        } else if context.attributes.kind == .travel, let city = context.state.city {
+                            Text(city).font(.headline).privacySensitive()
+                        }
+                    }
+                    .environment(\.layoutDirection, .rightToLeft)
+                }
+                DynamicIslandExpandedRegion(.trailing) {
+                    if !context.isStale {
+                        ContextActivityTime(attributes: context.attributes, state: context.state).font(.caption)
+                    }
+                }
+                DynamicIslandExpandedRegion(.bottom) {
+                    if context.attributes.kind == .letter && !context.isStale {
+                        Text("رسالة تنتظر وقتها").font(.caption)
+                    }
+                }
+            } compactLeading: {
+                ContextActivityIcon(kind: context.attributes.kind).frame(width: 16, height: 16)
+            } compactTrailing: {
+                if context.isStale {
+                    Text(context.attributes.kind.compactStaleTitle).font(.caption2)
+                } else {
+                    ContextActivityTime(attributes: context.attributes, state: context.state).font(.caption2)
+                }
+            } minimal: {
+                ContextActivityIcon(kind: context.attributes.kind).frame(width: 16, height: 16)
+            }
+            .widgetURL(context.attributes.kind.destination)
+            .keylineTint(context.attributes.kind == .iftar ? .orange : .teal)
+        }
+    }
+}
+
+private struct ContextActivityIcon: View {
+    let kind: MadarContextActivityAttributes.Kind
+    var body: some View {
+        Image(systemName: kind.symbol)
+            .resizable()
+            .scaledToFit()
+            .foregroundStyle(Color(uiColor: .label))
+            .accessibilityHidden(true)
+    }
+}
+
+private struct ContextActivityTime: View {
+    let attributes: MadarContextActivityAttributes
+    let state: MadarContextActivityAttributes.ContentState
+
+    var body: some View {
+        Group {
+            if attributes.kind == .iftar, let eventAt = state.eventAt {
+                Text(.currentDate, format: .timer(countingDownIn:
+                    min(attributes.startedAt, eventAt.addingTimeInterval(-1))..<eventAt,
+                    maxFieldCount: 2, maxPrecision: .seconds(60)))
+            } else if attributes.kind == .travel, let timeZoneID = state.timeZoneID {
+                Text(.currentDate, format: Date.FormatStyle(date: .omitted, time: .shortened,
+                    locale: Locale(identifier: numeralLocaleID), timeZone: TimeZone(identifier: timeZoneID) ?? .current))
+            } else if let eventAt = state.eventAt {
+                Text(eventAt, style: .time)
+            } else {
+                EmptyView()
+            }
+        }
+        .monospacedDigit()
+        .environment(\.locale, Locale(identifier: numeralLocaleID))
+    }
+
+    private var numeralLocaleID: String {
+        attributes.numerals == "western" ? "ar_SA@numbers=latn" : "ar_SA@numbers=arab"
     }
 }
 

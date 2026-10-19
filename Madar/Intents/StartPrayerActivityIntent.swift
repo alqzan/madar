@@ -3,7 +3,7 @@ import AppIntents
 import Foundation
 import MadarInbox
 
-/// The same transaction is used by Shortcuts and the Control; neither opens the app store.
+/// The same immediate-start transaction is used by Shortcuts and the Control; neither opens the app store.
 @MainActor enum PrayerActivityStarter {
     static func start(budget: NotificationBudgetStore, now: Date,
                       request: (ReservedPrayerActivity) async throws -> Void) async throws {
@@ -25,15 +25,13 @@ import MadarInbox
                                                    budgetRequestID: reserved.reservation.id, numerals: reserved.numerals)
         let state = PrayerCountdownAttributes.ContentState(prayerName: names[reserved.prayer.rawValue] ?? "الصلاة القادمة", prayerAt: reserved.prayerAt)
         _ = try Activity.request(attributes: attributes, content: ActivityContent(state: state, staleDate: reserved.prayerAt, relevanceScore: 1),
-            pushType: nil, style: .standard,
-            alertConfiguration: AlertConfiguration(title: "الصلاة القادمة", body: "بدأت متابعة الصلاة القادمة.", sound: .default),
-            start: reserved.reservation.scheduledAt)
+            pushType: nil, style: .standard)
     }
 }
 
 struct StartPrayerActivityIntent: LiveActivityIntent {
     static let title: LocalizedStringResource = "ابدأ عدّاد الصلاة"
-    static let description = IntentDescription("يتابع الصلاة القادمة بعد الحرمة، ضمن ميزانية التنبيه وأوقات الهدوء.")
+    static let description = IntentDescription("يبدأ متابعة الصلاة القادمة الآن خارج وقت الحرمة والهدوء، ضمن ميزانية هذا الجهاز.")
     static let openAppWhenRun = false
 
     @MainActor func perform() async throws -> some IntentResult {
@@ -52,7 +50,7 @@ struct StartPrayerActivityIntent: LiveActivityIntent {
         } catch NotificationBudgetError.disabled { throw PrayerActivityIntentError.disabled }
         catch NotificationBudgetError.full { throw PrayerActivityIntentError.budget }
         catch NotificationBudgetError.unavailable { throw PrayerActivityIntentError.refresh }
-        return .result(dialog: "طُلب عدّاد الصلاة القادمة؛ يبدأ بعد انتهاء الحرمة.")
+        return .result(dialog: "بدأت متابعة الصلاة القادمة.")
     }
 }
 
@@ -61,7 +59,7 @@ private enum PrayerActivityIntentError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .unavailable: "اسمح بالأنشطة الحيّة لمدار في إعدادات الجهاز."
-        case .disabled: "فعّل النشاط الحيّ وتذكيرات هذا الجهاز في مدار. لا يبدأ العدّاد ليلًا أو في وقت الهدوء."
+        case .disabled: "فعّل النشاط الحيّ وتذكيرات هذا الجهاز. لا يبدأ العدّاد في وقت الحرمة أو الهدوء أو الليل. جرّب بعد انقضائها."
         case .budget: "لا توجد سعة للتنبيه الآن ضمن ميزانية هذا الجهاز أو وقت الهدوء."
         case .refresh: "افتح مدار لتحديث المواقيت والإعدادات ثم أعد المحاولة."
         }

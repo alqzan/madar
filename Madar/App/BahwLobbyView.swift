@@ -3,16 +3,16 @@ import UniformTypeIdentifiers
 import MadarCore
 import MadarDesign
 
-/// M4-V01 · `bahw/02-W1-Bahw.jpg`: the flexible lobby (RL1 labelled blocks first). Only built rooms enter;
-/// habits, money and Mihbara keep their slots in `bahw.layout` but have no entry point until they are built.
+/// M4-V01 · `bahw/02-W1-Bahw.jpg`: the flexible lobby (RL1 labelled blocks first).
+/// A room enters the lobby after its milestone builds its block; RL9 still excludes deferred options.
 enum BahwBlock: String, CaseIterable {
     case habits, salah, quran, mal, year, upcoming, notes, mihbara
-    static let built: Set<BahwBlock> = [.habits, .salah, .quran, .mal, .year, .upcoming, .notes]
+    static let built: Set<BahwBlock> = [.habits, .salah, .quran, .mal, .year, .upcoming, .notes, .mihbara]
     var title: String {
         switch self { case .habits: "عاداتك"; case .salah: "الصلاة"; case .quran: "القرآن"; case .mal: "المال"; case .year: "السنة"; case .upcoming: "الأيام القادمة"; case .notes: "المذكرات"; case .mihbara: "المحبرة" }
     }
     var symbol: String {
-        switch self { case .habits: "MadarHabits"; case .salah: "MadarPrayer"; case .quran: "MadarQuran"; case .year: "MadarYear"; case .upcoming: "MadarUpcoming"; case .notes: "MadarDiary"; default: "circle" }
+        switch self { case .habits: "MadarHabits"; case .salah: "MadarPrayer"; case .quran: "MadarQuran"; case .year: "MadarYear"; case .upcoming: "MadarUpcoming"; case .notes: "MadarDiary"; case .mihbara: "books.vertical"; default: "circle" }
     }
     var tab: String? { switch self { case .salah: "prayer"; case .quran: "quran"; case .notes: "notes"; default: nil } }
 }
@@ -168,6 +168,7 @@ struct BahwLobbyView: View {
         guard !arranging else { return }
         if block == .habits { session.habitsOpen = true }
         else if block == .mal { session.open(URL(string: "madar://mal")!) }
+        else if block == .mihbara { session.selectedTab = "mihbara" }
         else if block == .notes, (service.diary()?.count ?? 0) == 0 { session.open(URL(string: "madar://notes/write")!) }
         else if let tab = block.tab { session.selectedTab = tab }
         else if block == .year || block == .upcoming { session.yearOpen = true }

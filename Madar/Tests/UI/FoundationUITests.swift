@@ -955,7 +955,7 @@ import XCTest
         let screenshot = XCTAttachment(screenshot: app.screenshot())
         screenshot.name = "M0-deep-link-cold-settings"; screenshot.lifetime = .keepAlways; add(screenshot)
     }
-    func testFirstRunAndSettingsRenderWithBuiltRoomsAndGlassShortcuts() throws {
+    func testFirstRunAndNativeRoomSectionOpensBuiltRooms() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchEnvironment["MADAR_UI_STORE_ID"] = UUID().uuidString
@@ -965,13 +965,14 @@ import XCTest
         XCTAssertTrue(settings.waitForExistence(timeout: 20), app.debugDescription)
         XCTAssertTrue(app.tabBars.buttons["الصلاة"].exists, "The M1 prayer screen is the first built room.")
         XCTAssertTrue(app.tabBars.buttons["القرآن"].exists, "M2 Quran home is now built.")
-        XCTAssertTrue(app.buttons["tab-notes"].exists, "M3 diary is built.")
-        XCTAssertTrue(app.buttons["tab-money"].exists, "The built money room has a direct glass shortcut.")
-        XCTAssertTrue(app.buttons["tab-mihbara"].exists, "The built Mihbara room has a direct glass shortcut.")
-        let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "M0-iPhone17Pro-RTL-light-L"; shot.lifetime = .keepAlways; add(shot)
+        let mihbara = app.buttons["tab-mihbara"]
+        XCTAssertTrue(mihbara.waitForExistence(timeout: 8), app.debugDescription)
+        attachScreenshot(app, named: "M0-native-glass-room-shortcuts-L")
+        mihbara.tap()
+        XCTAssertTrue(app.buttons["mihbara-add-paper"].waitForExistence(timeout: 10), app.debugDescription)
         settings.tap()
         XCTAssertTrue(app.buttons["reset-settings"].waitForExistence(timeout: 10), app.debugDescription)
-        let settingsShot = XCTAttachment(screenshot: app.screenshot()); settingsShot.name = "M0-customize-RTL"; settingsShot.lifetime = .keepAlways; add(settingsShot)
+        attachScreenshot(app, named: "M0-customize-RTL")
     }
 
     func test_M1T01_PrayerLogPersistsChangeUndo() throws {
