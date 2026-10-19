@@ -31,8 +31,8 @@ struct MoneyBudgetView: View {
                     let days = Array(Set(reading.rows.map(\.day))).sorted(by: >)
                     ForEach(days, id: \.description) { day in
                         VStack(alignment: .leading, spacing: 0) {
-                            MadarDateLabel(app.dateLabels(day, compact: true, weekday: true), primaryFont: MadarTypography.caption(), secondaryFont: MadarTypography.fine())
-                                .foregroundStyle(theme.secondaryInk).padding(.bottom, 7)
+                            MadarDateLabel(app.dateLabels(day, compact: true, weekday: true), primaryFont: MadarTypography.section(), secondaryFont: MadarTypography.fine())
+                                .foregroundStyle(theme.ink).padding(.top, 6).padding(.bottom, 7)
                             ForEach(reading.rows.filter { $0.day == day }) { row in movement(row) }
                         }
                     }
@@ -74,13 +74,14 @@ struct MoneyBudgetView: View {
             }
             GeometryReader { proxy in
                 let total = max(1, r.excludedMinor + r.dailyMinor)
+                // The struck share sits under the struck total (leading); the daily share under «احتُسب من يومك».
                 HStack(spacing: 0) {
-                    Rectangle().fill(theme.ink).frame(width: visible ? proxy.size.width * CGFloat(r.dailyMinor) / CGFloat(total) : proxy.size.width / 2)
                     BudgetHatching().stroke(theme.color("reserveText"), lineWidth: 1.5).clipped()
+                    Rectangle().fill(theme.ink).frame(width: visible ? proxy.size.width * CGFloat(r.dailyMinor) / CGFloat(total) : proxy.size.width / 2)
                 }.clipShape(.capsule).overlay { Capsule().stroke(theme.line, lineWidth: 1) }
             }.frame(height: 12).accessibilityHidden(true)
             HStack {
-                Label("في السجل، لا يُخصم", systemImage: "line.3.horizontal").foregroundStyle(theme.secondaryInk)
+                Label { Text("في السجل، لا يُخصم") } icon: { MoneyStrike().stroke(theme.color("reserveText"), lineWidth: 1.2).frame(width: 22, height: 5) }.foregroundStyle(theme.secondaryInk)
                 Spacer()
                 Text("من الحركات المعتمدة").foregroundStyle(theme.color("surplusText"))
             }.font(MadarTypography.fine())
@@ -91,7 +92,7 @@ struct MoneyBudgetView: View {
             HStack(spacing: 10) {
                 Image(systemName: "diamond.fill").font(.system(size: 8)).foregroundStyle(theme.color("reserveText"))
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(row.merchant).font(MadarTypography.cardTitle()).foregroundStyle(row.excluded ? theme.secondaryInk : theme.ink)
+                    Text(row.merchant).font(.custom("thmanyahserifdisplay-Bold", size: 18, relativeTo: .headline)).foregroundStyle(row.excluded ? theme.secondaryInk : theme.ink)
                     Text(row.category).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                     if let reason = row.reason { Text("لأن: " + reason).font(MadarTypography.fine()).foregroundStyle(theme.color("reserveText")).lineLimit(1) }
                 }
@@ -100,8 +101,8 @@ struct MoneyBudgetView: View {
                     Text("خارج الميزانية").font(MadarTypography.fine()).foregroundStyle(theme.color("accentText")).padding(.horizontal, 8).padding(.vertical, 5)
                         .background(theme.background).overlay { Capsule().stroke(theme.color("accentText"), lineWidth: 1) }.rotationEffect(.degrees(-5))
                 }
-                Text(amount(row.netMinor)).font(.custom("thmanyahserifdisplay-Bold", size: 22, relativeTo: .title3)).foregroundStyle(row.excluded ? theme.secondaryInk : theme.ink)
-            }.padding(.vertical, 11).frame(minHeight: 58)
+                Text(amount(row.netMinor)).font(.custom("thmanyahserifdisplay-Bold", size: 20, relativeTo: .title3)).foregroundStyle(row.excluded ? theme.secondaryInk : theme.ink)
+            }.padding(.vertical, 9).frame(minHeight: 52)
                 .overlay { if row.excluded { MoneyStrike().stroke(theme.color("reserveText"), lineWidth: 1).frame(height: 6).allowsHitTesting(false) } }
                 .overlay(alignment: .top) { Rectangle().fill(theme.line).frame(height: 0.7) }.contentShape(Rectangle())
         }.buttonStyle(.plain).accessibilityLabel(row.merchant + "، " + amount(row.netMinor) + (row.excluded ? "، خارج الميزانية" + (row.reason.map { "، لأن " + $0 } ?? "") : "، داخل الميزانية"))
@@ -140,7 +141,7 @@ private struct MoneyBudgetReceipt: View {
                         BudgetStamp().foregroundStyle(theme.color("accentText")).frame(width: 108, height: 108).rotationEffect(.degrees(-12))
                     }
                     MadarDateLabel(app.dateLabels(row.day, compact: true), primaryFont: MadarTypography.fine(), secondaryFont: MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
-                    Rectangle().fill(theme.line).frame(height: 0.7)
+                    Line().stroke(theme.line, style: .init(lineWidth: 1, dash: [4, 4])).frame(height: 1)
                     HStack(alignment: .firstTextBaseline) {
                         Text(amount(row.amountMinor)).font(.custom("thmanyahserifdisplay-Black", size: 39, relativeTo: .largeTitle))
                             .overlay { if !row.excluded { MoneyStrike().stroke(theme.color("accentText"), lineWidth: 2).frame(height: 10) } }
@@ -165,6 +166,7 @@ private struct MoneyBudgetReceipt: View {
                     }
                 }.padding(20).background(theme.background).clipShape(BudgetReceiptPaper())
                     .overlay { BudgetReceiptPaper().stroke(theme.line, lineWidth: 1) }.shadow(color: theme.ink.opacity(0.08), radius: 9, y: 4)
+                    .rotationEffect(.degrees(-1.2)).padding(.horizontal, 4)
                 Text(row.excluded ? "تعود الحركة إلى توزيعها الأصلي؛ النقد والدين يبقيان كما هما." : "الختم لهذه الحركة فقط. تخرج من يومك والمظاريف وحدود التصنيفات، وتبقى في حسابك والسجل.")
                     .font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
                 if !visible { Button("أظهر الأرقام") { revealed = true }.frame(minHeight: 44) }
@@ -198,6 +200,9 @@ private struct MoneyBudgetReceipt: View {
 private struct MoneyStrike: Shape {
     func path(in r: CGRect) -> Path { Path { p in p.move(to: .init(x: 0, y: r.minY)); p.addLine(to: .init(x: r.maxX, y: r.minY + 1)); p.move(to: .init(x: 0, y: r.maxY)); p.addLine(to: .init(x: r.maxX, y: r.maxY - 1)) } }
 }
+private struct Line: Shape {
+    func path(in r: CGRect) -> Path { Path { p in p.move(to: .init(x: 0, y: r.midY)); p.addLine(to: .init(x: r.maxX, y: r.midY)) } }
+}
 private struct BudgetHatching: Shape {
     func path(in r: CGRect) -> Path { Path { p in for x in stride(from: -r.height, to: r.width + r.height, by: 7) { p.move(to: .init(x: x, y: r.maxY)); p.addLine(to: .init(x: x + r.height, y: 0)) } } }
 }
@@ -215,8 +220,12 @@ private struct BudgetStamp: View {
     var body: some View {
         ZStack {
             Circle().stroke(lineWidth: 3); Circle().stroke(lineWidth: 0.8).padding(6)
-            Circle().stroke(style: .init(lineWidth: 1, dash: [2, 3])).padding(12)
-            Text("خارج\nالميزانية").font(.custom("thmanyahserifdisplay-Bold", size: 20, relativeTo: .headline)).multilineTextAlignment(.center)
+            Circle().stroke(style: .init(lineWidth: 1, dash: [2, 3])).padding(16)
+            // A ring of small stars between the rims, as on the canonical seal.
+            ForEach(0..<20, id: \.self) { n in
+                Image(systemName: "star.fill").font(.system(size: 4)).offset(y: -43).rotationEffect(.degrees(Double(n) * 18))
+            }
+            Text("خارج\nالميزانية").font(.custom("thmanyahserifdisplay-Bold", size: 17, relativeTo: .headline)).multilineTextAlignment(.center)
         }.accessibilityHidden(true)
     }
 }
