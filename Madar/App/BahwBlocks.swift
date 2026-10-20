@@ -369,8 +369,7 @@ private struct BahwHabitsWide: View {
         guard let current = row.summary.current else { return "افتح العادة" }
         if current.rule.measure == .once { return "أكملها" }
         let remaining = max(0, current.target - current.value)
-        let unit = current.rule.unit.map(habitUnitName) ?? "مرة"
-        return "بقي " + digits.string(remaining) + " " + unit
+        return "بقي " + habitUnitCount(remaining, current.rule.unit, digits)
     }
 
     private func missedText(for row: HabitReading) -> String {

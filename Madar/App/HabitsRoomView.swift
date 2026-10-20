@@ -120,6 +120,14 @@ struct HabitMiniRing:View {
     var body:some View { ZStack { Circle().stroke(theme.line,lineWidth:4); Circle().trim(from:0,to:min(1,max(0,share))).stroke(theme.accentFill,style:.init(lineWidth:4,lineCap:.round)).rotationEffect(.degrees(-90)) }.accessibilityHidden(true) }
 }
 func habitUnitName(_ unit:String)->String { ["minutes":"دقيقة","exerciseMinutes":"دقيقة حركة","steps":"خطوة","pages":"صفحة"][unit] ?? unit }
+/// A count with its unit in Arabic number agreement («دقيقتان»، «٨ صفحات»، «١٥ خطوة») for the built-in units;
+/// a unit the user typed has no known plural, so it follows the number unchanged. Nominative only.
+func habitUnitCount(_ count:Int,_ unit:String?,_ digits:MadarNumberFormatter)->String {
+    let known:[String:[String]]=["minutes":["دقيقة واحدة","دقيقتان","دقائق","دقيقة"],"exerciseMinutes":["دقيقة حركة واحدة","دقيقتا حركة","دقائق حركة","دقيقة حركة"],
+        "steps":["خطوة واحدة","خطوتان","خطوات","خطوة"],"pages":["صفحة واحدة","صفحتان","صفحات","صفحة"],"":["مرة واحدة","مرتان","مرات","مرة"]]
+    guard let forms=known[unit ?? ""] else { return digits.string(count)+" "+(unit ?? "") }
+    return count == 1 ? forms[0] : count == 2 ? forms[1] : digits.string(count)+" "+((3...10).contains(count%100) ? forms[2] : forms[3])
+}
 func habitPeriodCount(_ count:Int,_ frequency:HabitFrequency,_ digits:MadarNumberFormatter)->String {
     let forms:[String]
     switch frequency {case .daily:forms=["يوم واحد","يومان","أيام","يومًا"];case .weekly:forms=["أسبوع واحد","أسبوعان","أسابيع","أسبوعًا"];case .monthly:forms=["شهر واحد","شهران","أشهر","شهرًا"];case .yearly:forms=["سنة واحدة","سنتان","سنوات","سنة"]}
