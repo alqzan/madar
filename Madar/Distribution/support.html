@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>مساعدة مدار</title>
+<style>
+:root{color-scheme:light dark;--paper:#fbf7ee;--ink:#202820;--quiet:#626559;--line:#d5ccba;--accent:#24412f}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:1.08rem/1.95 system-ui,sans-serif}
+main{max-width:48rem;margin:auto;padding:3rem 1.3rem 4rem}header{padding-bottom:1.8rem;border-bottom:1px solid var(--line)}
+.brand{color:var(--accent);font-weight:650}h1{font-size:clamp(2.1rem,7vw,3.5rem);line-height:1.3;margin:.6rem 0}h2{font-size:1.35rem;margin-top:2.4rem}
+p{margin:.7rem 0}header p,footer{color:var(--quiet)}nav{display:flex;flex-wrap:wrap;gap:.6rem;margin:1.6rem 0}
+a{color:var(--accent);text-underline-offset:.2em}nav a{padding:.45rem .9rem;border:1px solid var(--line);border-radius:2rem;text-decoration:none;min-height:44px}
+details{border-bottom:1px solid var(--line);padding:1rem 0}summary{font-weight:650;cursor:pointer;min-height:44px;padding:.25rem 0}
+details p{padding-inline-start:1.1rem}a:focus-visible,summary:focus-visible{outline:3px solid var(--accent);outline-offset:4px;border-radius:.3rem}
+footer{margin-top:2.4rem;padding-top:1rem;border-top:1px solid var(--line);font-size:.95rem}
+@media(prefers-color-scheme:dark){:root{--paper:#1f241f;--ink:#f2eee4;--quiet:#c2c5b9;--line:#555b4e;--accent:#c2d6bc}}
+@media(prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+</style>
+<main>
+<header><a class="brand" href="#">مدار</a><h1>كيف نساعدك؟</h1><p>إجابات قريبة لما تحتاجه في يومك مع مدار.</p></header>
+<nav aria-label="أقسام المساعدة"><a href="#prayer">الصلاة والتواريخ</a><a href="#money">رسائل البنك</a><a href="#reading">القراءة</a><a href="#privacy">الخصوصية</a></nav>
+
+<section id="prayer" aria-labelledby="prayer-title"><h2 id="prayer-title">الصلاة والتواريخ</h2>
+<details><summary>كيف أراجع مواقيت الصلاة؟</summary><p>راجع المدينة وطريقة الحساب والتعديلات من «خصّص الصلاة». عند السفر، راجع المكان الذي يعرضه مدار؛ تحديد الموقع يحتاج إلى إذنك في إعدادات الجهاز.</p></details>
+<details><summary>لماذا يظهر تاريخان؟</summary><p>يعرض مدار التاريخ الهجري والميلادي معًا. تحدد «التقويم الأول» في التخصيص التاريخ الأساسي؛ لتقويم المذكرات خياره المستقل.</p></details>
+<details><summary>كيف أصحّح تسجيلًا؟</summary><p>افتح يوم الصلاة لتعديل تسجيله. يظهر التراجع بعد التغييرات التي تدعمه. الصلاة التي لم تسجلها تبقى غير مسجّلة حتى تختار حالتها بنفسك.</p></details>
+</section>
+
+<section id="money" aria-labelledby="money-title"><h2 id="money-title">رسائل البنك</h2>
+<details><summary>كيف تصل رسائل البنك إلى مدار؟</summary><p>افتح «رسائل البنك» ثم «دليل إعداد الاختصار وفحص الوصول» لإعداد الأتمتة في تطبيق «الاختصارات». ويمكنك استخدام «الصق رسائل»؛ افصل الرسائل بسطر فارغ. مدار لا يقرأ صندوق رسائل جهازك مباشرة.</p></details>
+<details><summary>هل تُعتمد الرسائل تلقائيًا؟</summary><p>تظهر الحركات كمسودات تنتظر قرارك. راجع المبلغ وطريقة الدفع قبل الاعتماد. الرسالة غير المفهومة تبقى في «تحتاج نظرة»، ولا تدخل الحساب قبل حسمها.</p></details>
+<details><summary>ماذا تعني «قد يكون مكرّرًا»؟</summary><p>قد تصف الرسالة حركة سبق تسجيلها. راجع الحركة قبل اعتمادها مرة أخرى؛ الإشارة سؤال للمراجعة وليست حذفًا تلقائيًا.</p></details>
+</section>
+
+<section id="reading" aria-labelledby="reading-title"><h2 id="reading-title">المحبرة والقراءة</h2>
+<details><summary>كيف أضيف كتابًا؟</summary><p>من «أضف كتابًا» اختر ملف EPUB أو PDF من جهازك، ثم راجع المعاينة وأكّد الإضافة. يبقى الملف المستورد محفوظًا محليًا للقراءة.</p></details>
+<details><summary>كيف أبحث في PDF مصوّر؟</summary><p>افتح البحث في قارئ PDF ثم شغّل استخراج النص. يقرأ مدار النص الموجود أولًا، ويتعرّف على صفحات الصور محليًا. يمكنك إيقاف الاستخراج واستكماله؛ تبقى الصفحة الأصلية مرجعك لأن النص الضوئي قد يخطئ.</p></details>
+<details><summary>لماذا لا تظهر ترجمة الكلمة أو معناها؟</summary><p>يظهر معنى الكلمة حين يوفّره قاموس النظام. ترجمة الإنجليزية إلى العربية تعتمد على دعم الجهاز وتثبيت اللغتين؛ توضّح بطاقة الكلمة حالة التوفّر.</p></details>
+</section>
+
+<section id="privacy" aria-labelledby="privacy-title"><h2 id="privacy-title">الخصوصية والبيانات</h2>
+<details><summary>هل أحتاج إلى حساب؟</summary><p>لا تحتاج إلى إنشاء حساب في مدار. سجلات الإصدار الأول محلية على جهازك، ولا يفعّل مدار مزامنة CloudKit لها.</p></details>
+<details><summary>كيف يعمل قفل مدار؟</summary><p>قفل التطبيق يستخدم Face ID دون رمز بديل داخل مدار. بعد فتح التطبيق تدخل غرفه دون قفل إضافي لكل غرفة. يمكنك اختيار القفل من تخصيص مدار.</p></details>
+<details><summary>هل يغادر الصوت جهازي؟</summary><p>يفضّل مدار تحويل الصوت محليًا. حين لا يتوفر ذلك، يحتاج التحويل عبر Apple إلى إذن النظام وموافقتك داخل مدار. اقرأ <a href="privacy.html">سياسة الخصوصية</a> لتفاصيل الخدمات الاختيارية.</p></details>
+</section>
+
+<!-- Publication gate: add the owner's approved support contact here before hosting or store submission. -->
+<footer><p>إذا احتجت إلى وصف مشكلة، جهّز إصدار مدار، وطراز جهازك، وإصدار iOS، والخطوات التي أظهرتها؛ يكفي وصف المشكلة دون إرسال محتوى مذكراتك أو رسائل بنكك.</p><a href="privacy.html">خصوصية مدار</a></footer>
+</main>
+</html>
