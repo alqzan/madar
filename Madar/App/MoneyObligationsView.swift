@@ -136,6 +136,8 @@ struct MoneyObligationsView: View {
                             let day = MadarCalendarDays.distance(from: r.cycleStart, to: due.due)
                             Button { withAnimation(.easeOut(duration: 0.2)) { selected = due.id } } label: { lantern(due, drop: 14 + CGFloat(levels[index]) * 76, active: current(r)?.id == due.id) }
                                 .buttonStyle(.plain).frame(width: 74).offset(x: x(day) - 37, y: 31)
+                                // Higher lanterns sit above the strings of the ones hanging below them.
+                                .zIndex(-Double(levels[index]))
                                 .accessibilityIdentifier("money-obligation-lantern-" + due.name)
                         }
                     }.environment(\.layoutDirection, .leftToRight)
@@ -160,12 +162,14 @@ struct MoneyObligationsView: View {
         return VStack(spacing: 3) {
             Rectangle().fill(theme.color("reserveText")).frame(width: 1, height: drop)
             ZStack {
-                LanternShape().fill(outline ? Color.clear : tint)
+                LanternShape().fill(outline ? theme.background : tint)
                 LanternShape().stroke(outline ? tint : theme.color("reserve"), lineWidth: active ? 3 : 1.5)
-                if !outline { Rectangle().fill(theme.background.opacity(0.8)).frame(width: 2, height: 10) }
+                if !outline { Circle().fill(theme.background.opacity(0.85)).frame(width: 6, height: 6).offset(y: 2) }
             }.frame(width: 26, height: 30).scaleEffect(active ? 1.15 : 1)
-            Text(figure: amount(due.amountMinor)).font(.custom("thmanyahserifdisplay-Bold", size: 15, relativeTo: .callout)).lineLimit(1).minimumScaleFactor(0.6)
-            Text(due.name).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(theme.secondaryInk).lineLimit(1).minimumScaleFactor(0.6)
+            VStack(spacing: 3) {
+                Text(figure: amount(due.amountMinor)).font(.custom("thmanyahserifdisplay-Bold", size: 15, relativeTo: .callout)).lineLimit(1).minimumScaleFactor(0.6)
+                Text(due.name).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(theme.secondaryInk).lineLimit(1).minimumScaleFactor(0.6)
+            }.padding(.horizontal, 3).background(theme.background, in: .rect(cornerRadius: 4))
         }
     }
 
