@@ -14,8 +14,8 @@ struct QuranOutsideView: View {
             VStack(alignment: .leading, spacing: 16) {
                 HStack { Button("رجوع", action: close).frame(minHeight: 44); Spacer(); Text("التذكير والودجات").font(MadarTypography.cardTitle()) }
                 if let value {
-                    reminder("القرآن، وردك", detail: value.nextDetail, timing: reminderTitle)
-                    if app.bool("quran.lateReminder") { reminder("القرآن، المراجعة", detail: "راجع المستحق قبل أن يبعد", timing: "بعد العصر") }
+                    if app.string("quran.wirdReminder") != "off" { reminder(QuranReminderCopy.title, detail: QuranReminderCopy.body, timing: reminderTitle) }
+                    if app.bool("quran.lateReminder") { reminder(QuranReminderCopy.lateTitle, detail: QuranReminderCopy.lateBody, timing: "بعد العصر") }
                     HStack(spacing: 14) { preview(value, .coverage, height: 170); preview(value, .path, height: 170) }
                     preview(value, .week, height: 150)
                 }

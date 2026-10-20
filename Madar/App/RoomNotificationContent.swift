@@ -181,8 +181,8 @@ import MadarPrayer
         content.threadIdentifier = id.split(separator: ".").first.map(String.init).map { $0 + "." + candidate.dayKey } ?? candidate.dayKey
         if id.hasPrefix("quran.") {
             let late = id.hasSuffix(".late")
-            content.title = late ? "القرآن، المراجعة" : "القرآن، وردك"
-            content.body = late ? "راجع المستحق قبل أن يبعد" : "تابع وردك من الموضع الذي توقفت عنده"
+            content.title = late ? QuranReminderCopy.lateTitle : QuranReminderCopy.title
+            content.body = late ? QuranReminderCopy.lateBody : QuranReminderCopy.body
             content.userInfo = ["dayKey": candidate.dayKey, "room": "quran"]
         } else if id.hasPrefix("digest.") {
             content.title = "ملخّص تذكيراتك"
@@ -338,4 +338,10 @@ import MadarPrayer
         return String(localized: "notif.reminders", defaultValue: "\(count) \(formatted)", table: "Prayer", locale: Locale(identifier: "ar"))
             .replacingOccurrences(of: "\u{2068}", with: "").replacingOccurrences(of: "\u{2069}", with: "")
     }
+}
+
+/// The Quran reminders' fixed copy, shared by the notification and its preview in «التذكير والودجات» so the preview never promises other words.
+enum QuranReminderCopy {
+    static let title = "القرآن، وردك", body = "تابع من الموضع الذي توقفت عنده"
+    static let lateTitle = "القرآن، المراجعة", lateBody = "راجع المستحق قبل أن يبعد"
 }
