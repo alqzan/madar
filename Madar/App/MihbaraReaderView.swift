@@ -409,8 +409,9 @@ struct MihbaraReaderView: View {
                                margins: readerMargins, justify: readerJustify, heavier: readerHeavier, footer: readerFooter,
                                englishFont: englishReaderFont, englishFooter: englishReaderFooter, hyphenation: readerHyphenation, wordSpacing: readerWordSpacing,
                                autoScroll: autoScrollSpeed),
+                undoTokenID: readerUndoID,
                 set: updateReaderSetting,
-                reset: { app.reset([settingsKey]) }
+                reset: { app.reset([settingsKey]) { readerUndoID = app.undoToken?.id } }
             )
             .environment(\.layoutDirection, .rightToLeft)
         }
@@ -1418,7 +1419,7 @@ struct MihbaraReaderView: View {
         if key == "mode", value.string != "scroll" {
             settings["autoScroll"] = .string("off")
         }
-        app.set(.object(settings), key: settingsKey)
+        app.set(.object(settings), key: settingsKey) { readerUndoID = app.undoToken?.id }
     }
 
     @MainActor private func toggleNarration() {
@@ -1653,6 +1654,7 @@ private struct MihbaraReaderSettingsSheet: View {
     let palette: MihbaraReaderPalette
     let english: Bool
     let options: MihbaraReaderOptions
+    let undoTokenID: UUID?
     let set: (String, MadarData.JSONValue) -> Void
     let reset: () -> Void
     @State private var more = false
@@ -1661,6 +1663,10 @@ private struct MihbaraReaderSettingsSheet: View {
     private var accent: SwiftUI.Color { palette.accent }
     private var well: SwiftUI.Color { ink.opacity(0.06) }
     private var digits: MadarNumberFormatter { AppMihbaraService(app: app).digits }
+    private var hasSettingsUndo: Bool {
+        guard let token = app.undoToken, let undoTokenID else { return false }
+        return token.id == undoTokenID
+    }
 
     var body: some View {
         ScrollView {
@@ -1684,6 +1690,14 @@ private struct MihbaraReaderSettingsSheet: View {
         .scrollBounceBehavior(.basedOnSize)
         .foregroundStyle(ink)
         .background(paper.ignoresSafeArea())
+        .safeAreaInset(edge: .top) {
+            if hasSettingsUndo {
+                UndoToast(message: app.undoMessage, undo: app.undo)
+                    .accessibilityIdentifier("mihbara-reader-undo")
+                    .padding(.horizontal, 12)
+                    .padding(.top, 4)
+            }
+        }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
     }

@@ -490,10 +490,10 @@ final class AppSession {
     func setMany(_ values: [String: JSONValue], completion: (() -> Void)? = nil) {
         execute(name: "settings.set", values: values, message: "حُفظ التعديل", completion: completion)
     }
-    func reset(_ keys: [String]) {
+    func reset(_ keys: [String], completion: (() -> Void)? = nil) {
         // Privacy authorization is changed through its own redaction lifecycle, never a shape reset.
         let defaults = Dictionary(uniqueKeysWithValues: schema.settings.filter { keys.contains($0.key) && $0.key != "core.faceIDLock" }.map { ($0.key, $0.defaultValue) })
-        execute(name: "settings.set", values: defaults, message: "عادت الإعدادات المتفق عليها")
+        execute(name: "settings.set", values: defaults, message: "عادت الإعدادات المتفق عليها", completion: completion)
     }
     func applyPreset(_ settings: [String: JSONValue], completion: (() -> Void)? = nil) {
         execute(name: "settings.applyPreset", values: settings, message: "طُبّق النمط · التراجع متاح دقيقة", completion: completion)

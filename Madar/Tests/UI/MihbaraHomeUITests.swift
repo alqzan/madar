@@ -386,6 +386,77 @@ import XCTest
         XCTAssertTrue(app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "كتاب اختبار القارئ")).firstMatch.exists)
     }
 
+    func testArabicExpandedReaderSettingsPersistAcrossRelaunchAndUndoReset() throws {
+        continueAfterFailure = false
+        let fixtureURL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "arabic-reader-poc", withExtension: "epub"))
+        let epub = try Data(contentsOf: fixtureURL)
+        let storeID = UUID().uuidString
+        let app = app("reader", epub: epub, storeID: storeID)
+        app.launch(); open(app)
+        var book = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "كتاب اختبار القارئ")).firstMatch
+        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); book.tap()
+        XCTAssertTrue(app.buttons["mihbara-reader-settings"].waitForExistence(timeout: 20), app.debugDescription)
+        app.buttons["mihbara-reader-settings"].tap()
+        let more = app.buttons["mihbara-reader-more"]
+        XCTAssertTrue(more.waitForExistence(timeout: 5), app.debugDescription); more.tap()
+
+        let lineSpacing = app.buttons["mihbara-reader-lineSpacing-3"]
+        reach(app, lineSpacing); lineSpacing.tap()
+        XCTAssertTrue(lineSpacing.waitForSelection(timeout: 8), app.debugDescription)
+        let margins = app.buttons["mihbara-reader-margins-1"]
+        reach(app, margins); margins.tap()
+        XCTAssertTrue(margins.waitForSelection(timeout: 8), app.debugDescription)
+        let justify = app.switches["mihbara-reader-justify"]
+        XCTAssertEqual(justify.value as? String, "1", app.debugDescription); justify.tap()
+        XCTAssertTrue(justify.waitForValue("0", timeout: 8), app.debugDescription)
+        let heavier = app.switches["mihbara-reader-heavier"]
+        XCTAssertEqual(heavier.value as? String, "0", app.debugDescription); heavier.tap()
+        XCTAssertTrue(heavier.waitForValue("1", timeout: 8), app.debugDescription)
+        let footerBar = app.buttons["mihbara-reader-footer-bar"]
+        reach(app, footerBar); footerBar.tap()
+        XCTAssertTrue(footerBar.waitForSelection(timeout: 8), app.debugDescription)
+        app.buttons["mihbara-reader-settings-close"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["mihbara-reader-progress"].waitForExistence(timeout: 8), app.debugDescription)
+
+        app.terminate(); app.launch(); open(app)
+        book = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "كتاب اختبار القارئ")).firstMatch
+        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); book.tap()
+        XCTAssertTrue(app.buttons["mihbara-reader-settings"].waitForExistence(timeout: 20), app.debugDescription)
+        app.buttons["mihbara-reader-settings"].tap()
+        let reopenedMore = app.buttons["mihbara-reader-more"]
+        XCTAssertTrue(reopenedMore.waitForExistence(timeout: 5), app.debugDescription); reopenedMore.tap()
+        shot(app, "M6-V24-reader-settings-reopened-L")
+        let reopenedSpacing = app.buttons["mihbara-reader-lineSpacing-3"]
+        reach(app, reopenedSpacing); XCTAssertTrue(reopenedSpacing.isSelected, app.debugDescription)
+        let reopenedMargins = app.buttons["mihbara-reader-margins-1"]
+        reach(app, reopenedMargins); XCTAssertTrue(reopenedMargins.isSelected, app.debugDescription)
+        XCTAssertEqual(app.switches["mihbara-reader-justify"].value as? String, "0", app.debugDescription)
+        XCTAssertEqual(app.switches["mihbara-reader-heavier"].value as? String, "1", app.debugDescription)
+        let reopenedFooterBar = app.buttons["mihbara-reader-footer-bar"]
+        reach(app, reopenedFooterBar); XCTAssertTrue(reopenedFooterBar.isSelected, app.debugDescription)
+        shot(app, "M6-V24-reader-settings-reopened-s1-L")
+
+        let reset = app.buttons["mihbara-reader-reset"]
+        reach(app, reset); reset.tap()
+        XCTAssertTrue(app.buttons["mihbara-reader-lineSpacing-2"].waitForSelection(timeout: 8), app.debugDescription)
+        XCTAssertTrue(app.buttons["mihbara-reader-margins-2"].isSelected, app.debugDescription)
+        XCTAssertTrue(app.switches["mihbara-reader-justify"].waitForValue("1", timeout: 8), app.debugDescription)
+        XCTAssertTrue(app.switches["mihbara-reader-heavier"].waitForValue("0", timeout: 8), app.debugDescription)
+        XCTAssertTrue(app.buttons["mihbara-reader-footer-full"].waitForSelection(timeout: 8), app.debugDescription)
+        let undo = app.descendants(matching: .any)["mihbara-reader-undo"].buttons["undo-button"]
+        XCTAssertTrue(undo.waitForExistence(timeout: 8), app.debugDescription)
+        shot(app, "M6-V24-reader-settings-undo-L")
+        undo.tap()
+        let restoredSpacing = app.buttons["mihbara-reader-lineSpacing-3"]
+        reach(app, restoredSpacing); XCTAssertTrue(restoredSpacing.waitForSelection(timeout: 8), app.debugDescription)
+        let restoredMargins = app.buttons["mihbara-reader-margins-1"]
+        reach(app, restoredMargins); XCTAssertTrue(restoredMargins.isSelected, app.debugDescription)
+        XCTAssertEqual(app.switches["mihbara-reader-justify"].value as? String, "0", app.debugDescription)
+        XCTAssertEqual(app.switches["mihbara-reader-heavier"].value as? String, "1", app.debugDescription)
+        let restoredFooterBar = app.buttons["mihbara-reader-footer-bar"]
+        reach(app, restoredFooterBar); XCTAssertTrue(restoredFooterBar.isSelected, app.debugDescription)
+    }
+
     func testReaderWordCardHighlightsParagraphUndoesNotesAndCopies() throws {
         continueAfterFailure = false
         let fixtureURL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "arabic-reader-poc", withExtension: "epub"))
