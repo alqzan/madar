@@ -119,4 +119,40 @@ import XCTest
         app.buttons["إلغاء"].tap()
         XCTAssertFalse(app.buttons["money-obligation-row-منصة شاهد"].exists, app.debugDescription)
     }
+
+    /// M5-V25: a repeated confirmed bank charge becomes an obligation only after the owner confirms the review draft.
+    func testConfirmingRepeatChargeCreatesSubscriptionOnShelf() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": "subscriptions",
+            "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-16T20:00:00+03:00"]
+        app.launch()
+        let tab = app.tabBars.buttons["خصّص"]; XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
+        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("المال")
+        let money = app.buttons["money-open"]; XCTAssertTrue(money.waitForExistence(timeout: 5)); money.tap()
+        let open = app.buttons["money-obligations-open"]; XCTAssertTrue(open.waitForExistence(timeout: 10))
+        for _ in 0..<6 where !open.isHittable { app.swipeUp(velocity: .slow) }
+        open.tap()
+
+        let suggestion = app.buttons["money-subscription-suggestion"]
+        XCTAssertTrue(suggestion.waitForExistence(timeout: 10), app.debugDescription)
+        for _ in 0..<8 where !suggestion.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(suggestion.isHittable, app.debugDescription)
+        shot(app, "M5-V25-subscription-suggestion-L")
+        suggestion.tap()
+
+        let name = app.textFields["money-obligation-name"]
+        let amount = app.textFields["money-obligation-amount"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertEqual(name.value as? String, "منصة شاهد")
+        XCTAssertEqual(amount.value as? String, "399")
+        XCTAssertTrue(app.segmentedControls["money-obligation-kind"].buttons["اشتراك"].isSelected)
+        app.buttons["money-obligation-save"].tap()
+
+        let row = app.buttons["money-obligation-row-منصة شاهد"]
+        XCTAssertTrue(row.waitForExistence(timeout: 10), app.debugDescription)
+        for _ in 0..<10 where !row.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(row.isHittable, app.debugDescription)
+        XCTAssertFalse(app.buttons["money-subscription-suggestion"].exists, app.debugDescription)
+        shot(app, "M5-V25-confirmed-subscription-shelf-L")
+    }
 }
