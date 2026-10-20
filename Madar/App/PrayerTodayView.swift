@@ -948,9 +948,12 @@ private struct PrayerQadaListSheet: View {
             .fixedSize(horizontal: false, vertical: true).padding(.top, 8)
             ScrollView {
                 VStack(spacing: 0) {
-                    ForEach(items) { item in
-                        Rectangle().fill(theme.ink.opacity(0.1)).frame(height: 1)
-                        row(item, on: item.id == selected?.id)
+                    // Prayers missed on the same day share one date: it is written once, on the
+                    // group's first row, and the group has no divider inside it.
+                    ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                        let opensDay = index == 0 || items[index - 1].reference.day != item.reference.day
+                        if opensDay { Rectangle().fill(theme.ink.opacity(0.1)).frame(height: 1) }
+                        row(item, on: item.id == selected?.id, showsDate: opensDay)
                     }
                     Rectangle().fill(theme.ink.opacity(0.1)).frame(height: 1)
                 }
@@ -969,13 +972,14 @@ private struct PrayerQadaListSheet: View {
         .presentationCornerRadius(34)
     }
 
-    private func row(_ item: PrayerQada, on: Bool) -> some View {
+    private func row(_ item: PrayerQada, on: Bool, showsDate: Bool) -> some View {
         Button { chosen = item.id } label: {
             HStack(spacing: 12) {
                 PrayerStar().fill(theme.color("missed")).frame(width: 14, height: 14).accessibilityHidden(true)
                 Text(prayerTitle(item.reference.prayer)).font(PrayerHomeType.lead)
                 Spacer(minLength: 8)
                 MadarDateLabel(dateLabel(item.reference.day)).foregroundStyle(theme.secondaryInk)
+                    .opacity(showsDate ? 1 : 0)
             }
             .padding(.horizontal, 10).frame(minHeight: 60)
             .background(on ? theme.color("missed").opacity(0.08) : .clear, in: .rect(cornerRadius: 14))
