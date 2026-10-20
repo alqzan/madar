@@ -29,7 +29,15 @@ import XCTest
     func testOrbitAndAllFrequencyListsMatchDefaultBoards() throws {
         continueAfterFailure=false;let app=app("showcase");open(app);shot(app,"M4-V02-Adat-L")
         app.swipeUp(velocity:.slow);shot(app,"M4-V02-Adat-s1-L");app.swipeUp(velocity:.slow);shot(app,"M4-V02-Adat-s2-L")
-        XCTAssertTrue(app.staticTexts["سنوية"].exists)
+        // Each period card shows only its own habits (owner 20 Oct).
+        app.swipeDown(velocity:.fast);app.swipeDown(velocity:.fast)
+        for (kind,habit) in [("weekly","الاتصال بالأخوال"),("monthly","صدقة الشهر"),("yearly","العمرة")] {
+            let card=app.buttons["habits-period-"+kind];XCTAssertTrue(card.waitForExistence(timeout:5),app.debugDescription);card.tap()
+            XCTAssertTrue(card.isSelected,kind)
+            XCTAssertTrue(app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@",habit)).firstMatch.waitForExistence(timeout:5),kind)
+            XCTAssertFalse(app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@","الماء،")).firstMatch.exists,kind)
+            shot(app,"M4-V02-Adat-"+kind+"-L")
+        }
         XCTAssertFalse(app.segmentedControls["عرض العادات"].exists) // RA8: alternate designs are v2.
     }
 }
