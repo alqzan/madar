@@ -280,6 +280,61 @@ import UIKit
         attach(app, "M6-T01-turath-quote-card-L")
     }
 
+    /// Explicit opt-in: real catalogue/book requests, never the synthetic Turath launch payloads.
+    func testLiveTurathSearchDownloadsAndQuotesABook() throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard environment["MADAR_RUN_LIVE_TURATH"] == "1" || environment["TEST_RUNNER_MADAR_RUN_LIVE_TURATH"] == "1" else {
+            throw XCTSkip("Set TEST_RUNNER_MADAR_RUN_LIVE_TURATH=1 for the live Turath trial")
+        }
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MIHBARA_FIXTURE": "empty",
+            "MADAR_UI_NOW": "2026-10-20T12:00:00+03:00", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
+        app.launch()
+        let customize = app.tabBars.buttons["خصّص"]; XCTAssertTrue(customize.waitForExistence(timeout: 20)); customize.tap()
+        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 8)); search.tap(); search.typeText("المحبرة")
+        let door = app.buttons["mihbara-open"]; XCTAssertTrue(door.waitForExistence(timeout: 8)); door.tap()
+        let add = app.buttons["mihbara-add-paper"]; XCTAssertTrue(add.waitForExistence(timeout: 8)); add.tap()
+        let turath = app.buttons["mihbara-add-source-turath"]; XCTAssertTrue(turath.waitForExistence(timeout: 8)); turath.tap()
+        let suggestion = app.buttons["mihbara-turath-suggestion-صيد الخاطر"]
+        XCTAssertTrue(suggestion.waitForExistence(timeout: 60), "The real catalogue did not load")
+        let field = app.textFields["mihbara-turath-search"]; field.tap(); field.typeText("صيد الخاطر")
+        let result = app.buttons["mihbara-turath-book-12028"]
+        XCTAssertTrue(result.waitForExistence(timeout: 10)); attach(app, "M6-T01-live-search-L"); result.tap()
+        let confirm = app.buttons["mihbara-epub-import-confirm"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 60), "The real book download/conversion did not finish")
+        XCTAssertEqual(app.textFields["mihbara-epub-import-title"].value as? String, "صيد الخاطر")
+        XCTAssertEqual(app.textFields["mihbara-epub-import-author"].value as? String, "ابن الجوزي")
+        XCTAssertTrue(confirm.isHittable, "Long real outlines keep the import action visible")
+        attach(app, "M6-T01-live-import-L"); confirm.tap()
+        let wantShelf = app.buttons["mihbara-shelf-want"]; XCTAssertTrue(wantShelf.waitForExistence(timeout: 20)); wantShelf.tap()
+        let imported = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "صيد الخاطر")).firstMatch
+        XCTAssertTrue(imported.waitForExistence(timeout: 10)); imported.tap()
+        XCTAssertTrue(app.buttons["mihbara-reader-close"].waitForExistence(timeout: 20))
+        app.buttons["mihbara-reader-contents"].tap()
+        let chapter = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "المواعظ والسامع")).firstMatch
+        XCTAssertTrue(chapter.waitForExistence(timeout: 10)); chapter.tap()
+        let passage = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "قد يعرض عند سماع المواعظ")).firstMatch
+        XCTAssertTrue(passage.waitForExistence(timeout: 15), "The downloaded chapter must be readable")
+        XCTAssertTrue(passage.isHittable)
+        attach(app, "M6-T01-live-reader-L")
+        passage.coordinate(withNormalizedOffset: CGVector(dx: 0.7, dy: 0.15)).press(forDuration: 1.2)
+        XCTAssertTrue(app.descendants(matching: .any)["mihbara-word-card"].waitForExistence(timeout: 10))
+        let highlight = app.buttons["mihbara-highlight-yellow"]; XCTAssertTrue(highlight.waitForExistence(timeout: 8)); highlight.tap()
+        let selected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isSelected == true"), object: highlight)
+        XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 8), .completed)
+        let quoteButton = app.buttons["mihbara-quote-card-open"]; XCTAssertTrue(quoteButton.waitForExistence(timeout: 8)); quoteButton.tap()
+        let preview = app.descendants(matching: .any)["mihbara-quote-card-preview"]
+        XCTAssertTrue(preview.waitForExistence(timeout: 10))
+        XCTAssertTrue(preview.label.contains("صيد الخاطر")); XCTAssertTrue(preview.label.contains("ابن الجوزي"))
+        // The live source has 893 pages in one volume; this chapter's printed label is 23.
+        // Unlike the two-volume synthetic fixture, this citation correctly omits a volume prefix.
+        XCTAssertTrue(preview.label.contains("ص ٢٣"), preview.label)
+        XCTAssertFalse(preview.label.contains("ج ١"), preview.label)
+        XCTAssertTrue(preview.label.contains("shamela.ws/book/12028"), preview.label)
+        attach(app, "M6-T01-live-quote-L")
+    }
+
     private func attach(_ app: XCUIApplication, _ name: String) {
         let attachment = XCTAttachment(screenshot: app.screenshot()); attachment.name = name; attachment.lifetime = .keepAlways; add(attachment)
     }
