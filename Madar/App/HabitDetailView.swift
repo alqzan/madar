@@ -13,6 +13,8 @@ struct HabitDetailView:View {
     @Environment(\.dismiss) private var dismiss
     @State private var busy=false
     private var theme:RoomTheme{.init(room:"bahw",dark:session.string("core.theme") == "dark")}
+    /// «تُقاس يوميًا»: the adverb, not the adjective «يومية».
+    private func measured(_ f:HabitFrequency)->String { switch f {case .daily:"يوميًا";case .weekly:"أسبوعيًا";case .monthly:"شهريًا";case .yearly:"سنويًا"} }
     private var digits:MadarNumberFormatter{.init(style:session.string("core.numerals") == "western" ? .western : .hindi)}
     var body:some View {
         ScrollView {
@@ -21,7 +23,7 @@ struct HabitDetailView:View {
                 if let current=reading.summary.current {
                     Text(current.target == 0 ? "سجلك محفوظ" : digits.string(current.value)+" من "+digits.string(current.target)+(current.rule.unit.map{" "+habitUnitName($0)} ?? "")).font(MadarTypography.cardTitle()).accessibilityIdentifier("habit-progress")
                     Text(reading.statusTitle).font(MadarTypography.section()).foregroundStyle(theme.accent)
-                    Text("تُقاس "+current.rule.frequency.arabic+"؛ "+habitBreakExplanation(Int(session.number("bahw.streakBreakAfter")))).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    Text("تُقاس "+measured(current.rule.frequency)+"؛ "+habitBreakExplanation(Int(session.number("bahw.streakBreakAfter")),current.rule.frequency)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                     if current.rule.minimum != nil { Text("أقلّ القليل يحفظ السلسلة، ويظهر بعلامة أخفّ.").font(MadarTypography.caption()) }
                     if reading.source == "walking" {
                         if HabitHealthStore.available { Button("حدّث من الصحة") {Task{do{try await HabitHealthStore.authorize(unit:reading.summary.current?.rule.unit ?? "steps");_ = try await HabitHealthStore.refresh(session:session);dismiss()}catch{session.errorMessage=error.localizedDescription}}}.buttonStyle(.borderedProminent).frame(minHeight:44) } else {Text("بيانات الصحة غير متاحة على هذا الجهاز").font(MadarTypography.caption())}
@@ -45,7 +47,7 @@ struct HabitDetailView:View {
                     Spacer();Button("عدّل"){dismiss();edit()}.frame(minHeight:44).accessibilityIdentifier("habit-edit")
                     Spacer();Button("احذف"){perform("habit.archive",["id":.string(reading.id.uuidString),"archived":.bool(true)])}.frame(minHeight:44).accessibilityIdentifier("habit-delete")
                 }
-                DisclosureGroup("آخر ١٤ فترة") {
+                DisclosureGroup(reading.summary.current.map { "آخر "+habitPeriodCount(14,$0.rule.frequency,digits) } ?? "آخر ١٤ فترة") {
                     if reading.summary.current != nil {
                     LazyVGrid(columns:[GridItem(.adaptive(minimum:85))],spacing:8) { ForEach(Array(reading.summary.periods.suffix(14).enumerated()),id:\.offset) { _,p in
                         VStack(spacing:4){Image(systemName:p.met ? (p.outcome == .minimum ? "checkmark.circle" : "checkmark.circle.fill") : p.outcome == .excluded ? "pause.circle" : "circle").foregroundStyle(theme.accent);MadarDateLabel(session.dateLabels(p.start,compact:true)).foregroundStyle(theme.secondaryInk)}.frame(minWidth:85,minHeight:74).accessibilityLabel(session.dateLabels(p.start).combined+"، "+(p.met ? "تمّت" : p.outcome == .excluded ? "مستثناة" : "بلا تسجيل"))

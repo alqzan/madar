@@ -186,7 +186,15 @@ func habitPeriodCount(_ count:Int,_ frequency:HabitFrequency,_ digits:MadarNumbe
     switch frequency {case .daily:forms=["يوم واحد","يومان","أيام","يومًا"];case .weekly:forms=["أسبوع واحد","أسبوعان","أسابيع","أسبوعًا"];case .monthly:forms=["شهر واحد","شهران","أشهر","شهرًا"];case .yearly:forms=["سنة واحدة","سنتان","سنوات","سنة"]}
     return count == 1 ? forms[0] : count == 2 ? forms[1] : digits.string(count)+" "+((0...10).contains(count%100) ? forms[2] : forms[3])
 }
-func habitBreakExplanation(_ periods:Int)->String {
-    let missed=periods == 1 ? "فترة واحدة" : periods == 2 ? "فترتين متتاليتين" : "ثلاث فترات متتالية"
-    return "تنكسر السلسلة بفوت "+missed+". الفترات المجمدة مستثناة."
+/// Named in the habit's own period when known: «تنكسر السلسلة بفوت يومين متتاليين. الأيام المجمدة مستثناة.»
+func habitBreakExplanation(_ periods:Int,_ frequency:HabitFrequency?=nil)->String {
+    let forms:[String], frozen:String
+    switch frequency {
+    case .daily?: forms=["يوم واحد","يومين متتاليين","ثلاثة أيام متتالية"]; frozen="الأيام"
+    case .weekly?: forms=["أسبوع واحد","أسبوعين متتاليين","ثلاثة أسابيع متتالية"]; frozen="الأسابيع"
+    case .monthly?: forms=["شهر واحد","شهرين متتاليين","ثلاثة أشهر متتالية"]; frozen="الأشهر"
+    case .yearly?: forms=["سنة واحدة","سنتين متتاليتين","ثلاث سنوات متتالية"]; frozen="السنوات"
+    case nil: forms=["فترة واحدة","فترتين متتاليتين","ثلاث فترات متتالية"]; frozen="الفترات"
+    }
+    return "تنكسر السلسلة بفوت "+forms[min(max(periods,1),3)-1]+". "+frozen+" المجمدة مستثناة."
 }
