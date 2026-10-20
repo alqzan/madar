@@ -320,6 +320,15 @@ M0-M6 software is integrated; M5 has its bounded software gate. M7 remains open 
 
 # Handovers
 
+## Handover — owner UX pass: Quran flexibility, widgets, Mihbara, lobby habits — 2026-10-20 — Claude
+Works now: any open Quran step starts from its sheet; review adapts per page (mastered page: «سمّعته كاملًا» one tap; far page: ayah by ayah); widget/reminder copy in Arabic agreement; reminder preview matches the notification; day-path widget line; Mihbara audit (counts, shelf moves by long press, «أنت هنا», cleaner EPUB preview); lobby habits block shows one period at a time; hero money figures draw «٬/٫».
+Verified: QuranReviewUITests 4/4, QuranHomeUITests step test 1/1, QuranOutsideUITests 2/2, RoomWidgetSnapshotTests 7/7, RoomNotificationsIntegrationTests 10/10, Mihbara reader 3/3 + library/shelf 2/2 + motivation 1/1, BahwLobbyUITests 9/9, MoneyHomeUITests 4/4, HabitsUITests 2/2 (simulator 412F4437, iOS 26.5); `git diff --check` clean.
+Differences left: Thmanyah fonts lack «٬/٫», so non-hero amounts still fall back (owner decision listed); prayer widget countdown keeps RL7's «١:٢٠» form; upcoming medium widget shows no date.
+Not verified: owner iPhone, real OS widgets/notifications, the far-page caption (no far page in fixtures), dark mode for the new controls.
+Next: owner decision on the font glyphs; Quran quick day actions on «مسار اليوم» if the owner still finds the day rigid; Step 10 device run when the iPhone is connected.
+Model/effort: claude-opus-5-5 lead with two claude-sonnet helpers (widgets, Mihbara) / not exposed.
+Usage: 29% five-hour used / 12% weekly used at the last live check.
+
 Works now: first incoming salary choice is confirmed through the existing cycle report; the confirmed counterparty then marks later incoming drafts «راتب مقترح», with normal-income choice and undo preserved.
 Verified: MadarMoney `SalarySourceMatcherTests` 1/1; MadarCommands `confirmingIncomingTransferLearnsSourceAndUndoRemovesIt` 1/1; iPhone 17 Pro / iOS 26.5 UI 1/1 (`M5-V27-ui-r5.xcresult`); `compare-screens.py Z-R18-msg-1`; `git diff --check` clean.
 Differences left: live fixture values and floating room navigation below the first viewport; the canonical has no scrolled companion.
@@ -336,12 +345,3 @@ Not verified: owner iPhone unavailable to Xcode, real OS notification/Control in
 Next: resume Step 10 when the owner's iPhone is connected; build the final UI review page after M7 software and device evidence.
 Model/effort: not exposed / not exposed.
 Usage: 5% five-hour used / 6% weekly used at the live check on 2026-10-20.
-
-## Handover — complete bank inbox, live Turath and local gallery — 2026-10-20 — Codex
-Works now: all 3,770 private bank inputs reach the usable inbox; live Turath download/read/highlight/sourced quote; local Arabic support page and 104-screen gallery with 126/129 actual states. Shared fetches are bounded; no schema change or owner-store access.
-Verified: MoneyPersistenceTests 50/50; bank full/normal UI 2/2 (responsive r3), salary/selected 2/2 (r2); live Turath 1/1 (persisted r3); gallery year/travel/night 3/3, customize r2 1/1, log/heart 1/1; 253 local image references, support browser checks and git diff --check pass.
-Differences left: existing bank title/card sizes, missing mini card stamp and floating accessory; native prayer sheet/RP2 options/background differ. Missing S2b-Missed-s1, S5-Qada-s1 and real OS notification capture; gallery includes older simulator images and is not final fresh/device acceptance.
-Not verified: device smoke stopped before installation (app/widget profiles omit App Groups; only Personal Team available). No iPhone runtime, Release performance, OS widget/Control/notification invocation, gold-label bank accuracy, publishing or final M7 acceptance.
-Next: finish the two additional prayer states; obtain valid App Group signing profiles, then device/system/performance trials and regenerate the gallery; public HTTPS support/privacy and real contact remain owner inputs.
-Model/effort: not exposed / not exposed.
-Usage: 94% five-hour used / 21% weekly used at the last live check; reserve used for validation, commit and handover.
