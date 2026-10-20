@@ -19,8 +19,10 @@ public struct QuranWidgetSnapshot: Codable, Sendable, Equatable {
     public var hifzWeek: String
     public var reviewWeek: String
     public var days: [Day]
-    public init(coverage: String, fraction: Double, nextTitle: String, nextDetail: String, route: String, done: Int, total: Int, hifzToday: String, reviewToday: String, hifzWeek: String, reviewWeek: String, days: [Day]) {
+    /// Where today's path stands in words («أتممت ١ من ٣»); optional so older snapshots still decode.
+    public var dayLine: String?
+    public init(coverage: String, fraction: Double, nextTitle: String, nextDetail: String, route: String, done: Int, total: Int, hifzToday: String, reviewToday: String, hifzWeek: String, reviewWeek: String, days: [Day], dayLine: String? = nil) {
         self.coverage = coverage; self.fraction = fraction; self.nextTitle = nextTitle; self.nextDetail = nextDetail; self.route = route; self.done = done; self.total = total
-        self.hifzToday = hifzToday; self.reviewToday = reviewToday; self.hifzWeek = hifzWeek; self.reviewWeek = reviewWeek; self.days = days
+        self.hifzToday = hifzToday; self.reviewToday = reviewToday; self.hifzWeek = hifzWeek; self.reviewWeek = reviewWeek; self.days = days; self.dayLine = dayLine
     }
 }

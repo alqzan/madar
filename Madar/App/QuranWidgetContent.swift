@@ -47,6 +47,10 @@ struct QuranWidgetContent: View {
             if !compact, !type.isAccessibilitySize, value.total > 0 {
                 HStack(spacing: 4) { ForEach(0..<value.total, id: \.self) { index in Capsule().fill(index < value.done ? theme.color("hifz") : theme.color("track")).frame(height: 5) } }.accessibilityHidden(true)
             }
+            if let line = value.dayLine {
+                // The bars alone read as empty; say where the day stands.
+                Text(line).font(.system(size: extraLarge ? 18 : 11)).foregroundStyle(theme.secondaryInk)
+            }
             Spacer(minLength: 0)
             Text(value.nextTitle).font(.system(size: extraLarge ? 26 : 13, weight: .semibold)).foregroundStyle(theme.color("hifzText"))
             Text(value.nextDetail).font(.system(size: extraLarge ? 31 : compact ? 13 : 19, design: .serif)).fixedSize(horizontal: false, vertical: true)

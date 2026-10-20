@@ -28,11 +28,14 @@ extension AppQuranService {
         let hifzSteps = hasHifz ? (value.hifz?.bridge == nil ? 1 : 2) : 0
         let reviewDone = reviewed(today) > 0 && !hasReview
         let drillDone = value.drillBoard.drilledToday > 0 && !drill
+        let done = (saved ? hifzSteps : 0) + (reviewDone ? 1 : 0) + (drillDone ? 1 : 0), total = hifzSteps + (hasReview || reviewDone ? 1 : 0) + (drill || drillDone ? 1 : 0)
+        let dayLine = total == 0 ? nil : done >= total ? "أتممت خطواته كلها" : done > 0 ? "أتممت " + numerals.string(done) + " من " + numerals.string(total)
+            : total == 1 ? "خطوة واحدة اليوم" : total == 2 ? "خطوتان اليوم" : numerals.string(total) + " خطوات اليوم"
         let payload = QuranWidgetSnapshot(coverage: coverage, fraction: Double(completed) / 604, nextTitle: title, nextDetail: detail, route: route,
-            done: (saved ? hifzSteps : 0) + (reviewDone ? 1 : 0) + (drillDone ? 1 : 0), total: hifzSteps + (hasReview || reviewDone ? 1 : 0) + (drill || drillDone ? 1 : 0),
+            done: done, total: total,
             hifzToday: QuranDayCloseCopy.faces(memorized(today), digits: numerals), reviewToday: QuranDayCloseCopy.faces(reviewed(today), digits: numerals),
             hifzWeek: QuranDayCloseCopy.faces(days.reduce(0) { $0 + memorized($1) }, digits: numerals), reviewWeek: QuranDayCloseCopy.faces(days.reduce(0) { $0 + reviewed($1) }, digits: numerals),
-            days: days.map { .init(label: numerals.string($0.day), hifz: Double(memorized($0)), review: Double(reviewed($0)) / 8) })
+            days: days.map { .init(label: numerals.string($0.day), hifz: Double(memorized($0)), review: Double(reviewed($0)) / 8) }, dayLine: dayLine)
         let now = clock(), prayerRepository = try PrayerRepository(context: repository().context)
         let place = prayerRepository.place(at: now)
         let civil = GregorianDay.containing(now, in: place.timeZone)
