@@ -20,7 +20,7 @@ import XCTest
         XCTAssertTrue(app.descendants(matching: .any)["money-salary-rating"].exists)
         XCTAssertTrue(app.descendants(matching: .any)["money-salary-carry"].exists, "The closing cycle's carry is shown")
         shot(app, "M5-V08-sal-L")
-        let entry = app.buttons["money-salary-entry-dailies"]; for _ in 0..<3 where !entry.isHittable { app.swipeUp(velocity: .slow) }
+        let entry = app.buttons["money-salary-entry-dailies"]; app.swipeUp(velocity: .slow); for _ in 0..<3 where !entry.isHittable { app.swipeUp(velocity: .slow) }
         entry.tap(); XCTAssertTrue(app.staticTexts["money-salary-explanation"].waitForExistence(timeout: 5))
         entry.tap(); app.swipeUp(velocity: .slow)
         shot(app, "M5-V08-sal-s1-L")
