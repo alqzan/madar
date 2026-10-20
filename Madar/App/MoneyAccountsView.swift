@@ -32,7 +32,7 @@ struct MoneyAccountsView: View {
                     if !visible { Button("أظهر الأرقام") { revealed = true }.frame(minHeight: 44).accessibilityIdentifier("money-accounts-reveal") }
                     ledger(r)
                     if let basis = r.basis {
-                        HStack { Text("كاش " + amount(basis.inAccountMinor) + "، عليك " + amount(basis.owedMinor)).font(MadarTypography.caption()); Spacer(); Text(amount(basis.netMinor)).font(MadarTypography.cardTitle()).foregroundStyle(theme.color("surplusText")) }.padding(12).background(theme.surface)
+                        HStack { Text("كاش " + amount(basis.inAccountMinor) + "، عليك " + amount(basis.owedMinor)).font(MadarTypography.caption()); Spacer(); Text(figure: amount(basis.netMinor)).font(MadarTypography.cardTitle()).foregroundStyle(theme.color("surplusText")) }.padding(12).background(theme.surface)
                     } else { Text("لا نجمع عملات مختلفة بلا سعر صرف. أرصدة الحسابات أدناه بعملاتها.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
                     if r.rows.isEmpty { Text("من هنا تبدأ الجذور. أضف حسابك ورصيده، ثم تصله رسائل البنك.").font(MadarTypography.body()).padding(.vertical, 20).accessibilityIdentifier("money-accounts-empty") }
                     HStack(spacing: 8) {

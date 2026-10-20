@@ -176,7 +176,7 @@ struct MoneyMessagesView: View {
         VStack(alignment: .leading, spacing: 4) {
             Rectangle().fill(theme.ink).frame(height: 2)
             Text(title).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
-            Text(value).font(.custom("thmanyahserifdisplay-Bold", size: 22, relativeTo: .title3)).foregroundStyle(tint).lineLimit(1).minimumScaleFactor(0.6)
+            Text(figure: value).font(.custom("thmanyahserifdisplay-Bold", size: 22, relativeTo: .title3)).foregroundStyle(tint).lineLimit(1).minimumScaleFactor(0.6)
         }.frame(maxWidth: .infinity, alignment: .leading)
     }
     private func draftRow(_ d: MoneyMessageDraft) -> some View {

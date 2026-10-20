@@ -20,8 +20,8 @@ struct MoneyCashView: View {
                 if visible && !dynamicType.isAccessibilitySize && reading.home.basis.inAccountMinor > 0 && reading.home.basis.netMinor >= 0 {
                     MoneyCashColumns(reading: reading, app: app, onSource: { source = $0 }).frame(height: 450)
                 } else {
-                    HStack { Text("في حسابك"); Spacer(); Text(amount(reading.home.basis.inAccountMinor)) }
-                    HStack { Text("لك فعلًا"); Spacer(); Text(amount(reading.home.basis.netMinor)) }
+                    HStack { Text("في حسابك"); Spacer(); Text(figure: amount(reading.home.basis.inAccountMinor)) }
+                    HStack { Text("لك فعلًا"); Spacer(); Text(figure: amount(reading.home.basis.netMinor)) }
                     if reading.home.basis.netMinor < 0 { Text("ما عليك أكثر من النقد المسجّل.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
                 }
                 VStack(alignment: .leading, spacing: 8) {
@@ -50,7 +50,7 @@ struct MoneyCashView: View {
                     if let date = item.date { MadarDateLabel(app.dateLabels(date, compact: true), primaryFont: MadarTypography.fine(), secondaryFont: MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
                 }
                 Spacer()
-                Text(amount(item.amountMinor)).font(MadarTypography.cardTitle())
+                Text(figure: amount(item.amountMinor)).font(MadarTypography.cardTitle())
                 Image(systemName: "chevron.left").font(.caption).padding(.top, 5)
             }.padding(.vertical, 10).frame(minHeight: 44).overlay(alignment: .bottom) { Rectangle().fill(theme.line).frame(height: 1) }
         }.buttonStyle(.plain).accessibilityIdentifier("money-source-" + item.id)
@@ -89,16 +89,16 @@ private struct MoneyCashColumns: View {
                     var ground = Path(); ground.move(to: .init(x: netX - 18, y: base)); ground.addLine(to: .init(x: cashX + width + 18, y: base))
                     context.stroke(ground, with: .color(theme.ink), lineWidth: 1.6)
                 }.accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 2) { Text("في حسابك").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk); Text(service.amount(reading.home.basis.inAccountMinor)).font(MadarTypography.cardTitle()).accessibilityIdentifier("money-cash-total") }
+                VStack(alignment: .leading, spacing: 2) { Text("في حسابك").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk); Text(figure: service.amount(reading.home.basis.inAccountMinor)).font(MadarTypography.cardTitle()).accessibilityIdentifier("money-cash-total") }
                     .frame(width: 150, alignment: .leading).position(x: 75, y: 22)
-                VStack(alignment: .leading, spacing: 2) { Text("لك فعلًا").font(MadarTypography.caption()).foregroundStyle(theme.color("surplusText")); Text(service.amount(reading.home.basis.netMinor)).font(MadarTypography.cardTitle()).foregroundStyle(theme.color("surplusText")).accessibilityIdentifier("money-cash-net") }
+                VStack(alignment: .leading, spacing: 2) { Text("لك فعلًا").font(MadarTypography.caption()).foregroundStyle(theme.color("surplusText")); Text(figure: service.amount(reading.home.basis.netMinor)).font(MadarTypography.cardTitle()).foregroundStyle(theme.color("surplusText")).accessibilityIdentifier("money-cash-net") }
                     .frame(width: 140, alignment: .leading).position(x: proxy.size.width - 70, y: 64)
                 ForEach(Array(reading.debts.prefix(4))) { item in
                     let index = reading.debts.firstIndex { $0.id == item.id } ?? 0
                     Button { onSource(item) } label: {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(item.title).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).lineLimit(2)
-                            Text(service.amount(-item.amountMinor)).font(MadarTypography.section())
+                            Text(figure: service.amount(-item.amountMinor)).font(MadarTypography.section())
                             if item.estimated { Text("تقريبًا").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
                             if let date = item.date { MadarDateLabel(app.dateLabels(date, compact: true), primaryFont: MadarTypography.fine(), secondaryFont: MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
                         }.frame(maxWidth: .infinity, alignment: .leading).frame(minHeight: 44)

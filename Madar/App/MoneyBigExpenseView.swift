@@ -87,7 +87,7 @@ struct MoneyBigExpenseView: View {
         VStack(alignment: .leading, spacing: 5) {
             Text(r.title).font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
             HStack(alignment: .firstTextBaseline) {
-                Text(amount(r.amountMinor)).font(.custom("thmanyahserifdisplay-Black", size: 48, relativeTo: .largeTitle)).accessibilityIdentifier("money-big-amount")
+                Text(figure: amount(r.amountMinor)).font(.custom("thmanyahserifdisplay-Black", size: 48, relativeTo: .largeTitle)).accessibilityIdentifier("money-big-amount")
                 if visible, case .dailies(let count) = ExpenseEntry.dailyPart(amountMinor: r.amountMinor, dailyMinor: r.home.cycle?.headline.todayAllowanceMinor) {
                     Text("نحو " + service.dailies(count)).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText"))
                 }
@@ -106,11 +106,11 @@ struct MoneyBigExpenseView: View {
             GeometryReader { proxy in HStack(spacing: 2) { ForEach(parts, id: \.0) { part in
                 let width = max(1, (proxy.size.width - CGFloat(parts.count - 1) * 2) * CGFloat(part.1) / CGFloat(max(1, total)))
                 Rectangle().fill(part.2).frame(width: width, height: 64).overlay {
-                    if width > 68 { Text(amount(part.1)).font(MadarTypography.caption()).foregroundStyle(theme.ink).padding(4).background(theme.surface) }
+                    if width > 68 { Text(figure: amount(part.1)).font(MadarTypography.caption()).foregroundStyle(theme.ink).padding(4).background(theme.surface) }
                 }
             } } }.frame(height: 64).accessibilityHidden(true)
             }
-            HStack(alignment: .top) { ForEach(parts, id: \.0) { part in VStack(spacing: 3) { Text(part.0); Text(amount(part.1)) }.font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).frame(maxWidth: .infinity) } }
+            HStack(alignment: .top) { ForEach(parts, id: \.0) { part in VStack(spacing: 3) { Text(part.0); Text(figure: amount(part.1)) }.font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).frame(maxWidth: .infinity) } }
         }.padding(.vertical, 3).animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: mode)
     }
     private func effect(_ p: BigExpense.Plan, reading r: MoneyBigExpenseReading) -> some View {

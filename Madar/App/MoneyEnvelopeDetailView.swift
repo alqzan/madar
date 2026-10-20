@@ -25,7 +25,7 @@ struct MoneyEnvelopeDetailView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(alignment: .firstTextBaseline) {
                             Text(reading.envelope.name).font(MadarTypography.title()); Spacer()
-                            Text(amount(reading.envelope.balanceMinor)).font(MadarTypography.title()).foregroundStyle(reading.envelope.balanceMinor < 0 ? theme.color("debt") : theme.ink).accessibilityIdentifier("money-detail-balance")
+                            Text(figure: amount(reading.envelope.balanceMinor)).font(MadarTypography.title()).foregroundStyle(reading.envelope.balanceMinor < 0 ? theme.color("debt") : theme.ink).accessibilityIdentifier("money-detail-balance")
                         }
                         if let target = reading.envelope.targetMinor, visible {
                             HStack(alignment: .firstTextBaseline, spacing: 4) {
@@ -38,7 +38,7 @@ struct MoneyEnvelopeDetailView: View {
                     if !visible { Button("أظهر الأرقام") { revealed = true }.frame(minHeight: 44) }
                     if reading.savingMinor > 0 || (visible && reading.savingPlanID != nil) {
                         HStack(spacing: 10) {
-                            Label { Text("الادخار: ") + Text(amount(reading.savingMinor)).font(MadarTypography.cardTitle()) + Text(" من كل راتب") } icon: { Image(systemName: "diamond.fill").foregroundStyle(theme.color("reserveText")) }.font(MadarTypography.body())
+                            Label { Text("الادخار: ") + Text(figure: amount(reading.savingMinor)).font(MadarTypography.cardTitle()) + Text(" من كل راتب") } icon: { Image(systemName: "diamond.fill").foregroundStyle(theme.color("reserveText")) }.font(MadarTypography.body()).accessibilityLabel("الادخار: " + amount(reading.savingMinor) + " من كل راتب")
                             Spacer(minLength: 0)
                             if visible && reading.savingPlanID != nil {
                                 Button { savingAdd = false; savingOpen = true } label: { Image(systemName: "minus").frame(width: 48, height: 48).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1) } }.accessibilityLabel("قلّل ادخار المظروف").buttonStyle(.plain)
@@ -59,8 +59,8 @@ struct MoneyEnvelopeDetailView: View {
                             HStack(alignment: .top, spacing: 12) {
                                 MadarDateLabel(app.dateLabels(.containing(entry.at, in: app.activePlace.timeZone), compact: true), primaryFont: MadarTypography.fine(), secondaryFont: MadarTypography.fine()).frame(width: 80, alignment: .leading)
                                 Text(entry.title).font(MadarTypography.caption()).frame(maxWidth: .infinity, alignment: .leading)
-                                Text(signed(entry.amountMinor)).font(MadarTypography.cardTitle()).foregroundStyle(entry.amountMinor < 0 ? theme.color("debt") : theme.color("surplusText"))
-                                Text(signed(entry.balanceMinor)).font(MadarTypography.fine()).foregroundStyle(entry.balanceMinor < 0 ? theme.color("debt") : theme.ink).frame(width: 62, alignment: .trailing)
+                                Text(figure: signed(entry.amountMinor)).font(MadarTypography.cardTitle()).foregroundStyle(entry.amountMinor < 0 ? theme.color("debt") : theme.color("surplusText"))
+                                Text(figure: signed(entry.balanceMinor)).font(MadarTypography.fine()).foregroundStyle(entry.balanceMinor < 0 ? theme.color("debt") : theme.ink).frame(width: 62, alignment: .trailing)
                             }
                             Rectangle().fill(theme.line).frame(height: 0.6)
                         }.accessibilityElement(children: .combine)
@@ -178,17 +178,17 @@ struct MoneyRepaymentView: View {
                 Rectangle().fill(theme.line).frame(height: 1)
                 if let preview {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text(service.amount(preview.installmentsMinor[0])).font(.custom("thmanyahsans-Bold", size: 40, relativeTo: .largeTitle)).accessibilityIdentifier("money-repay-per-salary")
+                        Text(figure: service.amount(preview.installmentsMinor[0])).font(.custom("thmanyahsans-Bold", size: 40, relativeTo: .largeTitle)).accessibilityIdentifier("money-repay-per-salary")
                         Text("من كل راتب").font(MadarTypography.body())
                         Spacer()
                         Text("يومك بعدها").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                        Text(service.amount(preview.dailyAfterMinor[0])).font(MadarTypography.title()).foregroundStyle(preview.dailyAfterMinor[0] < 0 ? theme.color("dueText") : theme.color("surplusText")).accessibilityIdentifier("money-repay-daily-after")
+                        Text(figure: service.amount(preview.dailyAfterMinor[0])).font(MadarTypography.title()).foregroundStyle(preview.dailyAfterMinor[0] < 0 ? theme.color("dueText") : theme.color("surplusText")).accessibilityIdentifier("money-repay-daily-after")
                     }
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 96))], spacing: 10) {
                         ForEach(Array(preview.installmentsMinor.enumerated()), id: \.offset) { index, amount in
                             VStack(spacing: 6) {
                                 if let date = service.salaryForecast(index, home: reading.home) { MadarDateLabel(app.dateLabels(date, compact: true), primaryFont: MadarTypography.fine(), secondaryFont: MadarTypography.fine()) }
-                                Text(service.amount(amount)).font(MadarTypography.cardTitle())
+                                Text(figure: service.amount(amount)).font(MadarTypography.cardTitle())
                             }.padding(10).frame(maxWidth: .infinity).overlay { Rectangle().stroke(theme.color("reserveText"), style: .init(lineWidth: 1, dash: [3, 2])) }
                         }
                     }

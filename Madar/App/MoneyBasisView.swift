@@ -28,7 +28,7 @@ struct MoneyBasisView: View {
                                 VStack(alignment: .leading, spacing: 0) {
                                     Text("لك فعلًا، في حسابك " + amount(reading.home.basis.inAccountMinor)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                                     HStack(alignment: .firstTextBaseline, spacing: 8) {
-                                        Text(amount(reading.home.basis.netMinor)).font(.custom("thmanyahserifdisplay-Black", size: 44, relativeTo: .largeTitle))
+                                        Text(figure: amount(reading.home.basis.netMinor)).font(.custom("thmanyahserifdisplay-Black", size: 44, relativeTo: .largeTitle))
                                         Image(systemName: "arrow.up.left").font(.caption)
                                     }
                                 }.frame(maxWidth: .infinity, alignment: .trailing).contentShape(.rect)
@@ -69,12 +69,12 @@ struct MoneyBasisView: View {
             if let value = reading.explanation.futureDailyMinor { basisRow("يومياتك القادمة", value, "money-basis-future") }
             if let value = reading.explanation.cycleRemainderMinor { basisRow(value < 0 ? "فرق التمويل" : "فائض الدورة", value, "money-basis-remainder") }
             ForEach(reading.reserved) { piece in
-                Button { source = piece.detail } label: { HStack { Text(piece.title); Spacer(); Text(amount(piece.amountMinor)) }.frame(minHeight: 44) }.buttonStyle(.plain)
+                Button { source = piece.detail } label: { HStack { Text(piece.title); Spacer(); Text(figure: amount(piece.amountMinor)) }.frame(minHeight: 44) }.buttonStyle(.plain)
             }
         }
     }
     private func basisRow(_ title: String, _ value: Int, _ id: String) -> some View {
-        HStack { Text(title); Spacer(); Text(amount(value)).font(MadarTypography.cardTitle()).accessibilityIdentifier(id) }.font(MadarTypography.body())
+        HStack { Text(title); Spacer(); Text(figure: amount(value)).font(MadarTypography.cardTitle()).accessibilityIdentifier(id) }.font(MadarTypography.body())
     }
     private func amount(_ value: Int) -> String { visible ? service.amount(value) : "•••" }
 }
@@ -139,8 +139,8 @@ struct MoneyBasisColumn: View {
                 }.accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("غير مخصّص").font(MadarTypography.caption()).foregroundStyle(theme.color("surplusText"))
-                    Text(service.amount(reading.explanation.unallocatedMinor)).font(MadarTypography.cardTitle()).foregroundStyle(theme.color("surplusText")).accessibilityIdentifier("money-basis-unallocated")
-                    Text(service.amount(reading.explanation.reservedMinor)).font(MadarTypography.cardTitle()).padding(.top, 8).accessibilityIdentifier("money-basis-reserved")
+                    Text(figure: service.amount(reading.explanation.unallocatedMinor)).font(MadarTypography.cardTitle()).foregroundStyle(theme.color("surplusText")).accessibilityIdentifier("money-basis-unallocated")
+                    Text(figure: service.amount(reading.explanation.reservedMinor)).font(MadarTypography.cardTitle()).padding(.top, 8).accessibilityIdentifier("money-basis-reserved")
                     Text("المحجوز").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                 }.frame(width: 108, alignment: .leading).position(x: proxy.size.width - 54, y: 142)
                 VStack(alignment: .leading, spacing: 8) {
@@ -155,7 +155,7 @@ struct MoneyBasisColumn: View {
                     Button { onSource(piece.detail) } label: {
                         VStack(alignment: .leading, spacing: 1) {
                             Text(piece.title).font(MadarTypography.fine()).foregroundStyle(theme.color(piece.role))
-                            Text(service.amount(piece.amountMinor)).font(MadarTypography.cardTitle())
+                            Text(figure: service.amount(piece.amountMinor)).font(MadarTypography.cardTitle())
                         }.frame(minHeight: 44)
                     }.buttonStyle(.plain).frame(width: 170, alignment: .leading).position(x: proxy.size.width - barX + 90, y: y)
                         .accessibilityIdentifier("money-basis-source-" + piece.id)
@@ -164,7 +164,7 @@ struct MoneyBasisColumn: View {
         }
     }
     private func callout(_ title: String, _ value: Int, role: String, id: String) -> some View {
-        VStack(alignment: .leading, spacing: 0) { Text(title).font(MadarTypography.fine()).foregroundStyle(theme.color(role)); Text(service.amount(value)).font(MadarTypography.cardTitle()).accessibilityIdentifier(id) }
+        VStack(alignment: .leading, spacing: 0) { Text(title).font(MadarTypography.fine()).foregroundStyle(theme.color(role)); Text(figure: service.amount(value)).font(MadarTypography.cardTitle()).accessibilityIdentifier(id) }
     }
 }
 

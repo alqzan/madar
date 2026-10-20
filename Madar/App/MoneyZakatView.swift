@@ -41,7 +41,7 @@ struct MoneyZakatView: View {
                             HStack(alignment: .top) {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text("مالك في الحساب").font(MadarTypography.fine())
-                                    Text(amount(max(0, result.poolMinor - result.deductedMinor))).font(MadarTypography.cardTitle()).foregroundStyle(theme.color("surplusText"))
+                                    Text(figure: amount(max(0, result.poolMinor - result.deductedMinor))).font(MadarTypography.cardTitle()).foregroundStyle(theme.color("surplusText"))
                                 }
                                 Spacer(minLength: 12)
                                 VStack(alignment: .trailing, spacing: 2) {
@@ -224,7 +224,7 @@ struct MoneyZakatView: View {
                 case .due(let n):
                     Text("لو حال الحول اليوم، تقريبي").font(MadarTypography.caption()).foregroundStyle(theme.color("surplusText"))
                     dueAmount(n)
-                    Text(amount(max(0, r.poolMinor-r.deductedMinor)) + " × ٢٫٥٪").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    Text(figure: amount(max(0, r.poolMinor-r.deductedMinor)) + " × ٢٫٥٪").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                 }
             }
         }.frame(maxWidth: .infinity).padding(.vertical, 10)

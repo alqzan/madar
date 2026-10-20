@@ -65,7 +65,7 @@ struct MoneyCategoriesView: View {
 
     private func header(_ r: MoneyCategoriesReading) -> some View {
         HStack(alignment: .center, spacing: 10) {
-            Text(amount(r.totalLimitsMinor)).font(.custom("thmanyahserifdisplay-Black", size: 30, relativeTo: .title)).lineLimit(1).minimumScaleFactor(0.6)
+            Text(figure: amount(r.totalLimitsMinor)).font(.custom("thmanyahserifdisplay-Black", size: 30, relativeTo: .title)).lineLimit(1).minimumScaleFactor(0.6)
             Text("حدودك" + (r.incomeMinor > 0 && visible ? "، " + service.percent(r.totalLimitsMinor, of: r.incomeMinor) + " من الراتب" : "")).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
             Spacer(minLength: 6)
             if r.autoCategorized > 0 {
@@ -84,7 +84,7 @@ struct MoneyCategoriesView: View {
                 HStack(alignment: .firstTextBaseline) {
                     Text(s.name).font(.custom("thmanyahserifdisplay-Bold", size: 20, relativeTo: .headline))
                     Spacer(minLength: 6)
-                    Text(amount(s.spentMinor) + " من " + (s.limitMinor.map(amount) ?? "بلا حد")).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                    Text(figure: amount(s.spentMinor) + " من " + (s.limitMinor.map(amount) ?? "بلا حد")).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                     Text(visible ? used.map { service.digits.string($0) + "٪" } ?? "—" : "•••").font(.custom("thmanyahsans-Bold", size: 15, relativeTo: .callout))
                         .foregroundStyle((used ?? 0) >= 80 ? theme.color("dueText") : theme.color("reserveText")).frame(minWidth: 40, alignment: .trailing)
                 }
@@ -120,7 +120,7 @@ struct MoneyCategoriesView: View {
             Rectangle().fill(theme.background.opacity(0.25)).frame(height: 2).frame(maxHeight: .infinity, alignment: .top)
             HStack(spacing: 4) {
                 if showName && width > 110 { Text(book.name).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).lineLimit(1) }
-                if width > 40 { Text(amount(book.amountMinor)).font(.custom("thmanyahsans-Bold", size: 12, relativeTo: .caption)).lineLimit(1).minimumScaleFactor(0.7) }
+                if width > 40 { Text(figure: amount(book.amountMinor)).font(.custom("thmanyahsans-Bold", size: 12, relativeTo: .caption)).lineLimit(1).minimumScaleFactor(0.7) }
             }.foregroundStyle(theme.background).padding(.horizontal, 4).environment(\.layoutDirection, .rightToLeft)
         }.frame(width: width, height: height).accessibilityLabel(book.name)
     }

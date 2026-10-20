@@ -27,14 +27,14 @@ struct MoneyEnvelopesView: View {
                 HStack(alignment: .firstTextBaseline) {
                     Text("المظاريف").font(MadarTypography.title())
                     Spacer()
-                    if let reading { Text(amount(reading.totalMinor)).font(MadarTypography.cardTitle()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-envelope-total") }
+                    if let reading { Text(figure: amount(reading.totalMinor)).font(MadarTypography.cardTitle()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-envelope-total") }
                 }
                 if !visible { Button("أظهر الأرقام") { revealed = true }.frame(minHeight: 44).accessibilityIdentifier("money-envelopes-reveal") }
                 if let reading {
                     if let cycle = reading.home.cycle { dailySplit(cycle) }
                     reserve(reading)
                     VStack(alignment: .leading, spacing: 10) {
-                        HStack { Text("الفائض").font(MadarTypography.cardTitle()).foregroundStyle(theme.color("surplusText")); Text(amount(reading.home.surplusMinor)).font(MadarTypography.cardTitle()); Spacer() }
+                        HStack { Text("الفائض").font(MadarTypography.cardTitle()).foregroundStyle(theme.color("surplusText")); Text(figure: amount(reading.home.surplusMinor)).font(MadarTypography.cardTitle()); Spacer() }
                         Text("كيف تجمّع من الدورات").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                         if visible && !dynamicType.isAccessibilitySize && reading.home.surplusMinor >= 0 {
                             MoneySurplusChart(points: reading.waterfall, current: reading.home.surplusMinor, next: reading.home.cycle?.expectedEndDay, app: app).frame(height: 148)
@@ -107,7 +107,7 @@ struct MoneyEnvelopesView: View {
                 }.font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
             }
             if let target = reading.reserveTargetMinor {
-                HStack { Text("هدف الاحتياطي"); Spacer(); Text(amount(target)) }.font(MadarTypography.caption()).foregroundStyle(theme.color("reserveText")).accessibilityElement(children: .combine).accessibilityIdentifier("money-reserve-target")
+                HStack { Text("هدف الاحتياطي"); Spacer(); Text(figure: amount(target)) }.font(MadarTypography.caption()).foregroundStyle(theme.color("reserveText")).accessibilityElement(children: .combine).accessibilityIdentifier("money-reserve-target")
                 if visible { ProgressView(value: min(1, Double(max(0, reading.home.reserveMinor)) / Double(target))).tint(theme.color("reserveText")) }
             }
             if visible {
@@ -116,7 +116,7 @@ struct MoneyEnvelopesView: View {
                 Spacer(minLength: 2)
                 ForEach(previews(reading.home.reserveMinor), id: \.self) { value in
                     Button { previewMinor = value } label: {
-                        Text(value == 0 ? "لا شيء" : visible ? service.amount(value) : "•••")
+                        Text(figure: value == 0 ? "لا شيء" : visible ? service.amount(value) : "•••")
                             .font(MadarTypography.fine()).padding(.horizontal, 10).padding(.vertical, 7)
                             .foregroundStyle(value == previewMinor ? theme.background : theme.ink)
                             .background(value == previewMinor ? theme.ink : .clear, in: .capsule)
@@ -136,7 +136,7 @@ struct MoneyEnvelopesView: View {
     private func reserveTitle(_ reading: MoneyEnvelopesReading) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             Text("الاحتياطي").font(MadarTypography.cardTitle()).foregroundStyle(theme.color("reserveText"))
-            Text(amount(reading.home.reserveMinor)).font(MadarTypography.cardTitle()).accessibilityIdentifier("money-envelope-reserve")
+            Text(figure: amount(reading.home.reserveMinor)).font(MadarTypography.cardTitle()).accessibilityIdentifier("money-envelope-reserve")
         }
     }
     private func reserveModes(_ reading: MoneyEnvelopesReading) -> some View {

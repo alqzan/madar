@@ -93,7 +93,7 @@ struct MoneyExpenseView: View {
     }
     private func amountHeading(_ r: MoneyExpenseReading) -> some View {
         VStack(spacing: 0) {
-            Text(service.amount(minor, currency: inputCurrency)).font(.custom("thmanyahserifdisplay-Black", size: 60, relativeTo: .largeTitle)).contentTransition(.numericText()).accessibilityIdentifier("money-expense-amount")
+            Text(figure: service.amount(minor, currency: inputCurrency)).font(.custom("thmanyahserifdisplay-Black", size: 60, relativeTo: .largeTitle)).contentTransition(.numericText()).accessibilityIdentifier("money-expense-amount")
             Text((inputCurrency == "SAR" ? "ريال" : service.currencyName(inputCurrency)) + dailyDescription).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
         }.frame(maxWidth: .infinity).frame(minHeight: 94)
     }

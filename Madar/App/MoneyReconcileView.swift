@@ -145,7 +145,7 @@ struct MoneyReconcileView: View {
             HStack(spacing: 50) {
                 Button { source = composition(r) } label: {
                     arch(caption: bookCaption(r), title: bookTitle(r), tint: theme.color("accent"), titleTint: theme.color("accentText"), matched: matched) {
-                        Text(amount(r.expectedMinor)).font(.custom("thmanyahserifdisplay-Black", size: 33, relativeTo: .largeTitle)).minimumScaleFactor(0.5).lineLimit(1)
+                        Text(figure: amount(r.expectedMinor)).font(.custom("thmanyahserifdisplay-Black", size: 33, relativeTo: .largeTitle)).minimumScaleFactor(0.5).lineLimit(1)
                             .accessibilityIdentifier("money-reconcile-expected")
                     }
                 }.buttonStyle(.plain).disabled(!visible).accessibilityHint("يعرض كيف تكوّن هذا الرقم")
@@ -161,7 +161,7 @@ struct MoneyReconcileView: View {
                                     .accessibilityLabel(r.side == .account ? "رصيد البنك" : "مستحق البنك").accessibilityIdentifier("money-reconcile-bank-field")
                                     .onChange(of: typed) { commitTyped(r) }
                                 if let entry, !typing {
-                                    Text(amount(entry.observedMinor)).font(.custom("thmanyahserifdisplay-Black", size: 33, relativeTo: .largeTitle)).foregroundStyle(theme.color("dueText"))
+                                    Text(figure: amount(entry.observedMinor)).font(.custom("thmanyahserifdisplay-Black", size: 33, relativeTo: .largeTitle)).foregroundStyle(theme.color("dueText"))
                                         .minimumScaleFactor(0.5).lineLimit(1).contentTransition(.numericText()).onTapGesture { typing = true }
                                         .accessibilityHidden(true)
                                 }
@@ -329,8 +329,8 @@ struct MoneyReconcileView: View {
             HStack {
                 Text("فروق مفتوحة: " + service.digits.string(s.open)).font(MadarTypography.caption()).bold().accessibilityIdentifier("money-reconcile-open-count")
                 Spacer()
-                if s.negativeMinor != 0 { Text(signed(s.negativeMinor)).font(MadarTypography.caption()).bold().foregroundStyle(theme.color("dueText")) }
-                if s.positiveMinor != 0 { Text(signed(s.positiveMinor)).font(MadarTypography.caption()).bold().foregroundStyle(theme.color("accentText")) }
+                if s.negativeMinor != 0 { Text(figure: signed(s.negativeMinor)).font(MadarTypography.caption()).bold().foregroundStyle(theme.color("dueText")) }
+                if s.positiveMinor != 0 { Text(figure: signed(s.positiveMinor)).font(MadarTypography.caption()).bold().foregroundStyle(theme.color("accentText")) }
             }
         }.padding(.horizontal, 18).padding(.vertical, 18)
             .background(theme.surface)
@@ -356,7 +356,7 @@ struct MoneyReconcileView: View {
         let l = line(item), active = item.id == row?.id
         return HStack(spacing: 4) {
             Text(item.name).font(MadarTypography.body()).lineLimit(1).minimumScaleFactor(0.75).frame(maxWidth: .infinity, alignment: .leading)
-            Text(amount(item.expectedMinor)).font(MadarTypography.caption()).lineLimit(1).minimumScaleFactor(0.6).frame(width: 70)
+            Text(figure: amount(item.expectedMinor)).font(MadarTypography.caption()).lineLimit(1).minimumScaleFactor(0.6).frame(width: 70)
             Text(l.map { amount($0.observedMinor) } ?? "—").font(MadarTypography.caption()).bold().lineLimit(1).minimumScaleFactor(0.6).frame(width: 70)
                 .foregroundStyle(l.map { $0.deltaMinor == 0 ? theme.ink : theme.color("dueText") } ?? theme.secondaryInk)
             Text(l.map { $0.deltaMinor == 0 ? "—" : signed($0.deltaMinor) } ?? "").font(MadarTypography.caption()).bold().lineLimit(1).minimumScaleFactor(0.6).frame(width: 52)
@@ -384,7 +384,7 @@ struct MoneyReconcileView: View {
             let text = stampText(item, l), tint = l.deltaMinor == 0 ? theme.color("surplusText") : text == "تسوية" ? theme.color("reserveText") : theme.color("dueText")
             ZStack {
                 Circle().stroke(tint, lineWidth: 1.2); Circle().stroke(tint, lineWidth: 0.6).padding(3)
-                Text(text).font(.custom("thmanyahserifdisplay-Bold", size: 11, relativeTo: .caption2)).foregroundStyle(tint)
+                Text(figure: text).font(.custom("thmanyahserifdisplay-Bold", size: 11, relativeTo: .caption2)).foregroundStyle(tint)
             }.frame(width: 36, height: 36).rotationEffect(.degrees(-12))
                 .transition(reduceMotion ? .opacity : .scale(scale: 1.6).combined(with: .opacity))
         } else {

@@ -96,7 +96,7 @@ struct MoneySalaryView: View {
                     .accessibilityElement(children: .combine).accessibilityIdentifier("money-salary-rating")
                 VStack(spacing: 2) {
                     Text("اليومية المستهدفة").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
-                    Text(amount(r.plan.rate.dailyRateMinor)).font(.custom("thmanyahserifdisplay-Black", size: 52, relativeTo: .largeTitle)).lineLimit(1).minimumScaleFactor(0.5)
+                    Text(figure: amount(r.plan.rate.dailyRateMinor)).font(.custom("thmanyahserifdisplay-Black", size: 52, relativeTo: .largeTitle)).lineLimit(1).minimumScaleFactor(0.5)
                         .accessibilityIdentifier("money-salary-daily")
                     if let previous = r.opening.previousDailyMinor {
                         Text("السابقة " + amount(previous) + "، " + (r.opening.previousMode == "percent" ? "نسبة" : "ثابتة")).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
@@ -119,7 +119,7 @@ struct MoneySalaryView: View {
             HStack {
                 Text(plan.leftoverMinor >= 0 ? "الباقي ← " + destination : "الباقي").bold()
                 Spacer(minLength: 4)
-                Text(amount(plan.leftoverMinor)).bold().foregroundStyle(plan.leftoverMinor >= 0 ? tint("reserve") : tint("due"))
+                Text(figure: amount(plan.leftoverMinor)).bold().foregroundStyle(plan.leftoverMinor >= 0 ? tint("reserve") : tint("due"))
                 Text(service.percent(max(0, plan.leftoverMinor), of: salary)).foregroundStyle(theme.secondaryInk).frame(width: 34, alignment: .trailing)
             }.font(MadarTypography.fine()).padding(.vertical, 5).overlay(alignment: .top) { Rectangle().fill(theme.ink).frame(height: 1.2) }
                 .accessibilityIdentifier("money-salary-leftover")
@@ -127,7 +127,7 @@ struct MoneySalaryView: View {
                 HStack {
                     Text(carried >= 0 ? "الفائض المرحّل" : "العجز المرحّل")
                     Spacer(minLength: 4)
-                    Text(signed(carried) + " " + carryWord(r)).foregroundStyle(carried >= 0 ? tint("surplus") : tint("due"))
+                    Text(figure: signed(carried) + " " + carryWord(r)).foregroundStyle(carried >= 0 ? tint("surplus") : tint("due"))
                 }.font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).padding(.vertical, 5).accessibilityIdentifier("money-salary-carry")
             }
         }
@@ -143,7 +143,7 @@ struct MoneySalaryView: View {
         HStack {
             Text(title)
             Spacer(minLength: 4)
-            Text(value).foregroundStyle(color).lineLimit(1).minimumScaleFactor(0.7)
+            Text(figure: value).foregroundStyle(color).lineLimit(1).minimumScaleFactor(0.7)
             Text(share).foregroundStyle(theme.secondaryInk).frame(width: 34, alignment: .trailing)
         }.font(MadarTypography.fine()).padding(.vertical, 5).overlay(alignment: .bottom) { Rectangle().fill(theme.line).frame(height: 0.6) }
     }
@@ -176,7 +176,7 @@ struct MoneySalaryView: View {
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("الباقي").font(.custom("thmanyahserifdisplay-Bold", size: 22, relativeTo: .title3))
-                    Text(amount(r.plan.leftoverMinor)).font(.custom("thmanyahserifdisplay-Black", size: 44, relativeTo: .largeTitle))
+                    Text(figure: amount(r.plan.leftoverMinor)).font(.custom("thmanyahserifdisplay-Black", size: 44, relativeTo: .largeTitle))
                         .foregroundStyle(r.plan.leftoverMinor >= 0 ? tint("reserve") : tint("due")).lineLimit(1).minimumScaleFactor(0.5)
                 }
                 Spacer(minLength: 8)
@@ -196,7 +196,7 @@ struct MoneySalaryView: View {
     private func split(_ title: String, _ minor: Int) -> some View {
         VStack(alignment: .trailing, spacing: 0) {
             Text(title).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
-            Text(amount(minor)).font(.custom("thmanyahserifdisplay-Bold", size: 17, relativeTo: .headline))
+            Text(figure: amount(minor)).font(.custom("thmanyahserifdisplay-Bold", size: 17, relativeTo: .headline))
         }
     }
     /// A waterfall step: the bar spans what this entry moved, measured from the right (the salary's start).
@@ -206,9 +206,9 @@ struct MoneySalaryView: View {
         return VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
                 Text(e.title).font(.custom("thmanyahsans-Bold", size: 16, relativeTo: .body))
-                Text(signed(e.amountMinor)).font(.custom("thmanyahserifdisplay-Bold", size: 19, relativeTo: .headline)).foregroundStyle(tint(e.tint))
+                Text(figure: signed(e.amountMinor)).font(.custom("thmanyahserifdisplay-Bold", size: 19, relativeTo: .headline)).foregroundStyle(tint(e.tint))
                 Spacer(minLength: 6)
-                Text(amount(e.balanceMinor)).font(.custom("thmanyahsans-Regular", size: 15, relativeTo: .callout)).foregroundStyle(theme.secondaryInk)
+                Text(figure: amount(e.balanceMinor)).font(.custom("thmanyahsans-Regular", size: 15, relativeTo: .callout)).foregroundStyle(theme.secondaryInk)
             }
             GeometryReader { proxy in
                 let w = proxy.size.width, unit = w / CGFloat(salary)
@@ -272,7 +272,7 @@ struct MoneySalaryView: View {
             Text("الشكل ١، الفائض المرحّل").font(.custom("thmanyahserifdisplay-Bold", size: 21, relativeTo: .title3))
             Text("آخر " + service.digits.string(r.history.count) + " دورات، والأخيرة هي التي تُغلق الآن").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
             if dynamicType.isAccessibilitySize {
-                ForEach(r.history) { bar in HStack { Text(bar.label); Spacer(); Text(signed(bar.carriedMinor)) } }
+                ForEach(r.history) { bar in HStack { Text(bar.label); Spacer(); Text(figure: signed(bar.carriedMinor)) } }
             } else {
                 HStack(alignment: .center, spacing: 14) {
                     ForEach(r.history) { bar in carryBar(bar, peak: peak) }
@@ -280,7 +280,7 @@ struct MoneySalaryView: View {
             }
             HStack {
                 Text("الفوائض بعدها").foregroundStyle(theme.secondaryInk)
-                Text(amount(r.surplusAfterMinor)).bold()
+                Text(figure: amount(r.surplusAfterMinor)).bold()
                 Spacer()
             }.font(MadarTypography.caption()).accessibilityIdentifier("money-salary-surplus-after")
         }.accessibilityIdentifier("money-salary-history")
@@ -291,13 +291,13 @@ struct MoneySalaryView: View {
         return VStack(spacing: 4) {
             VStack(spacing: 3) {
                 Spacer(minLength: 0)
-                if positive { Text(signed(bar.carriedMinor)).font(.custom("thmanyahsans-Bold", size: 11, relativeTo: .caption2)).lineLimit(1).minimumScaleFactor(0.6)
+                if positive { Text(figure: signed(bar.carriedMinor)).font(.custom("thmanyahsans-Bold", size: 11, relativeTo: .caption2)).lineLimit(1).minimumScaleFactor(0.6)
                     Rectangle().fill(fill).frame(height: height).overlay { if bar.current { Rectangle().stroke(theme.ink, lineWidth: 2) } } }
             }.frame(height: 88)
             Rectangle().fill(theme.ink).frame(height: 1)
             VStack(spacing: 3) {
                 if !positive { Rectangle().fill(fill).frame(height: height).overlay { if bar.current { Rectangle().stroke(theme.ink, lineWidth: 2) } }
-                    Text(signed(bar.carriedMinor)).font(.custom("thmanyahsans-Bold", size: 11, relativeTo: .caption2)).foregroundStyle(tint("due")).lineLimit(1).minimumScaleFactor(0.6) }
+                    Text(figure: signed(bar.carriedMinor)).font(.custom("thmanyahsans-Bold", size: 11, relativeTo: .caption2)).foregroundStyle(tint("due")).lineLimit(1).minimumScaleFactor(0.6) }
                 Spacer(minLength: 0)
             }.frame(height: 50)
             Text(bar.current ? bar.label + "، هذه" : bar.label).font(.custom(bar.current ? "thmanyahsans-Bold" : "thmanyahsans-Regular", size: 12, relativeTo: .caption))
@@ -324,7 +324,7 @@ struct MoneySalaryView: View {
         let color = e.repay ? theme.color("due") : theme.color("bills")
         return VStack(spacing: 6) {
             Text(e.name).font(.custom("thmanyahsans-Bold", size: 15, relativeTo: .callout)).lineLimit(1).minimumScaleFactor(0.7)
-            Text(amount(e.amountMinor)).font(.custom("thmanyahserifdisplay-Bold", size: 22, relativeTo: .title3))
+            Text(figure: amount(e.amountMinor)).font(.custom("thmanyahserifdisplay-Bold", size: 22, relativeTo: .title3))
             if let line = completion(e) { Text(line).font(MadarTypography.fine()).foregroundStyle(tint("surplus")).lineLimit(2).multilineTextAlignment(.center).minimumScaleFactor(0.8) }
             if e.adjustable {
                 HStack(spacing: 6) {

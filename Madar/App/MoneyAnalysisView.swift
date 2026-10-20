@@ -102,7 +102,7 @@ struct MoneyAnalysisView: View {
             }
             HStack(alignment: .center, spacing: 10) {
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    Text(amount(r.spentMinor)).font(.custom("thmanyahserifdisplay-Black", size: 62, relativeTo: .largeTitle)).lineLimit(1).minimumScaleFactor(0.5)
+                    Text(figure: amount(r.spentMinor)).font(.custom("thmanyahserifdisplay-Black", size: 62, relativeTo: .largeTitle)).lineLimit(1).minimumScaleFactor(0.5)
                         .contentTransition(.numericText())
                     VStack(alignment: .leading, spacing: 0) {
                         Text("من " + amount(r.allowanceMinor)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
@@ -134,7 +134,7 @@ struct MoneyAnalysisView: View {
         if dynamicType.isAccessibilitySize {
             VStack(spacing: 8) {
                 ForEach(r.days.filter { $0.day <= r.today }) { d in
-                    HStack { MadarDateLabel(app.dateLabels(d.day, weekday: true)); Spacer(); Text(amount(d.spentMinor) + " من " + (d.dailyMinor.map(amount) ?? "غير معروف")) }.font(MadarTypography.body())
+                    HStack { MadarDateLabel(app.dateLabels(d.day, weekday: true)); Spacer(); Text(figure: amount(d.spentMinor) + " من " + (d.dailyMinor.map(amount) ?? "غير معروف")) }.font(MadarTypography.body())
                 }
             }.accessibilityIdentifier("money-analysis-days")
         } else {
@@ -164,7 +164,7 @@ struct MoneyAnalysisView: View {
                 if let line, visible {
                     let y = labelBand + plot - plot * CGFloat(Double(line) / scale)
                     DashLine().stroke(theme.color("reserveText"), style: .init(lineWidth: 1, dash: [4, 3])).frame(height: 1).offset(y: y).allowsHitTesting(false)
-                    Text(amount(line) + " يوميًا").font(MadarTypography.fine()).foregroundStyle(theme.color("reserveText"))
+                    Text(figure: amount(line) + " يوميًا").font(MadarTypography.fine()).foregroundStyle(theme.color("reserveText"))
                         .padding(.horizontal, 3).background(theme.background.opacity(0.85))
                         .frame(maxWidth: .infinity, alignment: .trailing).offset(y: y - 18).allowsHitTesting(false).accessibilityIdentifier("money-analysis-line")
                 }
@@ -228,7 +228,7 @@ struct MoneyAnalysisView: View {
             }
             Spacer(minLength: 6)
             VStack(alignment: .trailing, spacing: 2) {
-                if d.day <= r.today { Text(amount(d.spentMinor)).font(.custom("thmanyahserifdisplay-Bold", size: 22, relativeTo: .title3)) }
+                if d.day <= r.today { Text(figure: amount(d.spentMinor)).font(.custom("thmanyahserifdisplay-Bold", size: 22, relativeTo: .title3)) }
                 Text(judgement.0).font(MadarTypography.fine()).foregroundStyle(judgement.1)
             }
         }.fixedSize(horizontal: false, vertical: true).padding(.vertical, 2)
@@ -286,7 +286,7 @@ struct MoneyAnalysisView: View {
                     }
                 }.frame(width: w, height: 26).environment(\.layoutDirection, .leftToRight)
             }.frame(height: 26)
-            Text(amount(c.spentMinor)).font(.custom("thmanyahserifdisplay-Bold", size: 18, relativeTo: .body)).lineLimit(1).minimumScaleFactor(0.7).frame(width: 66, alignment: .trailing)
+            Text(figure: amount(c.spentMinor)).font(.custom("thmanyahserifdisplay-Bold", size: 18, relativeTo: .body)).lineLimit(1).minimumScaleFactor(0.7).frame(width: 66, alignment: .trailing)
             Group {
                 if let gap, visible { Text((gap > 0 ? "+" : gap < 0 ? "−" : "") + approx(abs(gap))).foregroundStyle(gap > 0 ? theme.color("dueText") : theme.color("surplusText")).environment(\.layoutDirection, .leftToRight) }
                 else if gap == nil { Text("بلا حد").foregroundStyle(theme.secondaryInk) }
@@ -378,7 +378,7 @@ struct MoneyAnalysisView: View {
                 HStack(alignment: .bottom, spacing: 8) {
                     ForEach(Array(top.enumerated()), id: \.element.id) { index, m in
                         VStack(spacing: 4) {
-                            Text(amount(m.amountMinor)).font(.custom("thmanyahserifdisplay-Bold", size: 18, relativeTo: .body)).lineLimit(1).minimumScaleFactor(0.6)
+                            Text(figure: amount(m.amountMinor)).font(.custom("thmanyahserifdisplay-Bold", size: 18, relativeTo: .body)).lineLimit(1).minimumScaleFactor(0.6)
                             UnevenRoundedRectangle(topLeadingRadius: 16, topTrailingRadius: 16)
                                 .fill(index == 0 ? theme.color("reserve") : theme.color("glass").mix(with: theme.color("reserve"), by: 0.18))
                                 .overlay { if index == 0 { UnevenRoundedRectangle(topLeadingRadius: 16, topTrailingRadius: 16).stroke(theme.color("reserveText"), lineWidth: 1) } }

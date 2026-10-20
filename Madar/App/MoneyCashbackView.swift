@@ -118,7 +118,7 @@ struct MoneyCashbackView: View {
         return n != 0 && abs(n) < scale ? amount(n) : amount(MoneyMath.divideRounded(n, by: scale) * scale)
     }
     @ViewBuilder private func landedLine(_ r: MoneyCashbackReading) -> some View {
-        let landed = Text(amount(r.jar.landedMinor)).bold().foregroundStyle(theme.color("surplusText"))
+        let landed = Text(figure: amount(r.jar.landedMinor)).bold().foregroundStyle(theme.color("surplusText"))
         let gathering = Text(whole(r.jar.accumulatingMinor)).bold()
         Group {
             if r.jar.landedMinor == 0 { Text("لم ينزل شيء بعد، ويتجمّع \(gathering)") }

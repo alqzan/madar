@@ -60,7 +60,7 @@ struct MoneyScrollChart: View {
                         HStack(alignment: .top) {
                             Color.clear.frame(width: 1, height: 1)
                             Spacer()
-                            Text(service.amount(cycle.curve.last?.accruedMinor ?? 0)).font(.custom("thmanyahsans-Regular", size: 11)).foregroundStyle(theme.secondaryInk)
+                            Text(figure: service.amount(cycle.curve.last?.accruedMinor ?? 0)).font(.custom("thmanyahsans-Regular", size: 11)).foregroundStyle(theme.secondaryInk)
                         }.padding(.horizontal, rod + 8).padding(.top, 13)
                         Spacer()
                         HStack(alignment: .bottom) {

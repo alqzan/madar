@@ -68,18 +68,33 @@ struct MoneyWidgetContent: View {
     }
 }
 
-/// Thmanyah display has no «٬» or «٫», so the system fallback draws them wide («١ , ٣٦٠»).
-/// Only those marks are drawn in Amiri, which has them; the figure stays one Text. Where Amiri is not bundled
-/// (the widget extension, which draws everything in the system font) the marks fall back as before.
+/// The Thmanyah fonts have no «٬» or «٫», so the system fallback draws them wide («١ , ٣٦٠»). The font licence
+/// forbids editing the files, so the marks are drawn with Thmanyah's own glyphs: «٬» as a small raised «،» and «٫»
+/// as its «,» — the shapes these marks take in Arabic type. VoiceOver still reads the real figure. Where Thmanyah
+/// is not bundled (the widget extension draws in the system font, which has both marks) the string is left alone.
+let thmanyahBundled = UIFont(name: "thmanyahsans-Regular", size: 12) != nil
+
 func displayFigure(_ value: String, _ name: String, size: CGFloat, relativeTo style: Font.TextStyle) -> Text {
-    var text = Text(verbatim: ""), run = ""
-    func flush() {
-        guard !run.isEmpty else { return }
-        text = Text("\(text)\(Text(verbatim: run).font(.custom(name, size: size, relativeTo: style)))"); run = ""
+    figureText(value) { mark in
+        mark == "٬" ? Text(verbatim: "،").font(.custom(name, size: size * 0.65, relativeTo: style)).baselineOffset(size * 0.23)
+                    : Text(verbatim: ",").font(.custom(name, size: size * 0.9, relativeTo: style))
+    } run: { Text(verbatim: $0).font(.custom(name, size: size, relativeTo: style)) }
+}
+
+extension Text {
+    /// A figure that keeps whatever font the caller applies, with «٬» and «٫» drawn as above.
+    init(figure value: String) {
+        self = figureText(value) { mark in mark == "٬" ? Text(verbatim: "،").textScale(.secondary) : Text(verbatim: ",") } run: { Text(verbatim: $0) }
     }
+}
+
+private func figureText(_ value: String, mark: (Character) -> Text, run make: (String) -> Text) -> Text {
+    guard thmanyahBundled, value.contains(where: { $0 == "٬" || $0 == "٫" }) else { return make(value) }
+    var text = Text(verbatim: ""), run = ""
+    func flush() { guard !run.isEmpty else { return }; text = Text("\(text)\(make(run))"); run = "" }
     for character in value {
         guard character == "٬" || character == "٫" else { run.append(character); continue }
-        flush(); text = Text("\(text)\(Text(verbatim: String(character)).font(.custom("Amiri-Bold", size: size, relativeTo: style)))")
+        flush(); text = Text("\(text)\(mark(character))")
     }
-    flush(); return text
+    flush(); return text.accessibilityLabel(Text(verbatim: value))
 }

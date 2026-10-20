@@ -87,7 +87,7 @@ struct MoneyObligationsView: View {
                     Text("←").font(MadarTypography.fine())
                     MadarDateLabel(app.dateLabels(r.cycleEnd, compact: true), primaryFont: MadarTypography.fine(), secondaryFont: MadarTypography.fine())
                 }.foregroundStyle(theme.secondaryInk)
-                Text(amount(r.totalMinor)).font(.custom("thmanyahserifdisplay-Black", size: 58, relativeTo: .largeTitle)).lineLimit(1).minimumScaleFactor(0.5)
+                Text(figure: amount(r.totalMinor)).font(.custom("thmanyahserifdisplay-Black", size: 58, relativeTo: .largeTitle)).lineLimit(1).minimumScaleFactor(0.5)
                     .accessibilityIdentifier("money-obligations-total")
             }
             Spacer(minLength: 8)
@@ -101,7 +101,7 @@ struct MoneyObligationsView: View {
         HStack(spacing: 6) {
             Rectangle().fill(striped ? tint.opacity(0.35) : tint).frame(width: 12, height: 12).overlay { if striped { Rectangle().stroke(tint, lineWidth: 1.5) } }
             Text(title).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
-            Text(amount(minor)).font(.custom("thmanyahsans-Bold", size: 15, relativeTo: .callout))
+            Text(figure: amount(minor)).font(.custom("thmanyahsans-Bold", size: 15, relativeTo: .callout))
         }
     }
 
@@ -113,7 +113,7 @@ struct MoneyObligationsView: View {
         return Group {
             if dynamicType.isAccessibilitySize {
                 VStack(alignment: .leading, spacing: 8) {
-                    ForEach(r.cycle) { due in Button { selected = due.id } label: { HStack { Text(due.name); Spacer(); Text(amount(due.amountMinor)) } }.buttonStyle(.plain) }
+                    ForEach(r.cycle) { due in Button { selected = due.id } label: { HStack { Text(due.name); Spacer(); Text(figure: amount(due.amountMinor)) } }.buttonStyle(.plain) }
                 }
             } else {
                 GeometryReader { proxy in
@@ -164,7 +164,7 @@ struct MoneyObligationsView: View {
                 LanternShape().stroke(outline ? tint : theme.color("reserve"), lineWidth: active ? 3 : 1.5)
                 if !outline { Rectangle().fill(theme.background.opacity(0.8)).frame(width: 2, height: 10) }
             }.frame(width: 26, height: 30).scaleEffect(active ? 1.15 : 1)
-            Text(amount(due.amountMinor)).font(.custom("thmanyahserifdisplay-Bold", size: 15, relativeTo: .callout)).lineLimit(1).minimumScaleFactor(0.6)
+            Text(figure: amount(due.amountMinor)).font(.custom("thmanyahserifdisplay-Bold", size: 15, relativeTo: .callout)).lineLimit(1).minimumScaleFactor(0.6)
             Text(due.name).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(theme.secondaryInk).lineLimit(1).minimumScaleFactor(0.6)
         }
     }
@@ -176,7 +176,7 @@ struct MoneyObligationsView: View {
             HStack(alignment: .firstTextBaseline) {
                 Text(due.name).font(.custom("thmanyahserifdisplay-Bold", size: 22, relativeTo: .title3))
                 Spacer(minLength: 8)
-                Text(amount(due.amountMinor)).font(.custom("thmanyahserifdisplay-Black", size: 26, relativeTo: .title2))
+                Text(figure: amount(due.amountMinor)).font(.custom("thmanyahserifdisplay-Black", size: 26, relativeTo: .title2))
             }
             HStack(alignment: .top) {
                 HStack(spacing: 6) {
@@ -231,7 +231,7 @@ struct MoneyObligationsView: View {
                     .font(MadarTypography.fine()).foregroundStyle(theme.color("surplusText")).accessibilityIdentifier("money-ladder-ending")
             }
             if dynamicType.isAccessibilitySize {
-                ForEach(r.ladder) { month in HStack { Text(month.label + "، " + month.hijri); Spacer(); Text(amount(month.total)) } }
+                ForEach(r.ladder) { month in HStack { Text(month.label + "، " + month.hijri); Spacer(); Text(figure: amount(month.total)) } }
             } else {
                 HStack(alignment: .bottom, spacing: 4) {
                     ForEach(Array(r.ladder.enumerated()), id: \.element.id) { index, month in
@@ -302,7 +302,7 @@ struct MoneyObligationsView: View {
                         }
                         Spacer(minLength: 8)
                         VStack(alignment: .trailing, spacing: 2) {
-                            Text(amount(due.amountMinor)).font(.custom("thmanyahserifdisplay-Bold", size: 19, relativeTo: .headline))
+                            Text(figure: amount(due.amountMinor)).font(.custom("thmanyahserifdisplay-Bold", size: 19, relativeTo: .headline))
                             Text(due.due >= r.cycleEnd ? "الدورة القادمة" : service.relative(r.today, due.due)).font(.custom("thmanyahsans-Bold", size: 12, relativeTo: .caption))
                                 .foregroundStyle(MadarCalendarDays.distance(from: r.today, to: due.due) <= 3 ? theme.color("dueText") : theme.secondaryInk)
                         }
@@ -325,7 +325,7 @@ struct MoneyObligationsView: View {
                         HStack(spacing: 5) {
                             Text(suggestion.name).font(.custom("thmanyahserifdisplay-Bold", size: 19, relativeTo: .title3)).lineLimit(1)
                             Text("،").foregroundStyle(theme.secondaryInk)
-                            Text(amount(suggestion.amountMinor)).font(.custom("thmanyahserifdisplay-Bold", size: 19, relativeTo: .title3))
+                            Text(figure: amount(suggestion.amountMinor)).font(.custom("thmanyahserifdisplay-Bold", size: 19, relativeTo: .title3))
                                 .accessibilityIdentifier("money-subscription-suggestion-amount")
                         }
                     }

@@ -88,7 +88,7 @@ struct MoneySettingsView: View {
             Picker("طريقة اليومية", selection: $mode) { Text("من الدخل").tag("percent"); Text("مبلغ ثابت").tag("fixed") }.pickerStyle(.segmented).accessibilityIdentifier("money-settings-daily-mode")
             VStack(spacing: 12) {
                 if visible {
-                    if mode == "percent" { HStack { Text(amount(cycle?.incomeMinor ?? 0)); Text("×"); TextField("النسبة", text: $rawPercent).keyboardType(.decimalPad).focused($editing).frame(width: 60).accessibilityIdentifier("money-settings-percent"); Text("٪ ÷ " + service.digits.string(cycle?.input.expectedLengthDays ?? 30) + " يومًا") }.font(MadarTypography.body()).multilineTextAlignment(.center) }
+                    if mode == "percent" { HStack { Text(figure: amount(cycle?.incomeMinor ?? 0)); Text("×"); TextField("النسبة", text: $rawPercent).keyboardType(.decimalPad).focused($editing).frame(width: 60).accessibilityIdentifier("money-settings-percent"); Text("٪ ÷ " + service.digits.string(cycle?.input.expectedLengthDays ?? 30) + " يومًا") }.font(MadarTypography.body()).multilineTextAlignment(.center) }
                     else { HStack { Text("البدل المضبوط").font(MadarTypography.caption()); TextField("المبلغ", text: $rawAmount).keyboardType(.decimalPad).focused($editing).font(MadarTypography.body()).multilineTextAlignment(.center).frame(width: 110).accessibilityIdentifier("money-settings-allowance") } }
                 }
                 Rectangle().fill(theme.line).frame(height: 1)
@@ -100,7 +100,7 @@ struct MoneySettingsView: View {
                 if let p = proposed { Text("للخطط " + amount(p.allowanceMinor - p.dailyMinor)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
             }.padding(18).background(theme.background).overlay { Rectangle().stroke(theme.color("reserveText"), lineWidth: 1).padding(3) }.overlay { if !dynamicType.isAccessibilitySize { MoneyBookRosette().stroke(theme.color("reserveText").opacity(0.13), lineWidth: 1).padding(24).allowsHitTesting(false) } }
             if let c = cycle {
-                HStack { Text("من دخلك"); Spacer(); Text(amount(c.incomeMinor)) }.font(MadarTypography.body())
+                HStack { Text("من دخلك"); Spacer(); Text(figure: amount(c.incomeMinor)) }.font(MadarTypography.body())
                 GeometryReader { g in HStack(spacing: 0) { Rectangle().fill(theme.color("reserve")).frame(width: g.size.width * (visible && c.incomeMinor > 0 ? min(1, CGFloat(dailiesTotal ?? 0) / CGFloat(c.incomeMinor)) : 0.5)); Rectangle().fill(theme.color("accent").opacity(0.7)) }.clipShape(.capsule) }.frame(height: 12).accessibilityHidden(true)
                 HStack { Text("يوميات الدورة " + amount(dailiesTotal ?? 0)); Spacer(); Text("باقي الدخل " + amount(c.incomeMinor - (dailiesTotal ?? 0))) }.font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
             }

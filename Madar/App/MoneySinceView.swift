@@ -85,21 +85,23 @@ struct MoneySinceView: View {
     private func box(_ title: String, _ value: String, tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).lineLimit(2).minimumScaleFactor(0.8).fixedSize(horizontal: false, vertical: true)
-            Text(value).font(.custom("thmanyahserifdisplay-Bold", size: 19, relativeTo: .headline)).foregroundStyle(tint).lineLimit(1).minimumScaleFactor(0.6)
+            Text(figure: value).font(.custom("thmanyahserifdisplay-Bold", size: 19, relativeTo: .headline)).foregroundStyle(tint).lineLimit(1).minimumScaleFactor(0.6)
         }.padding(.horizontal, 6).padding(.vertical, 5).frame(maxWidth: 92).overlay { Rectangle().stroke(theme.line, lineWidth: 1) }
     }
     /// The lead sentence picks the biggest fact of the days away.
     private func headline(_ r: MoneySinceReading) -> some View {
-        let text: Text
+        let text: Text, spoken: String
         if r.salaryMinor > 0 {
-            text = Text("نزل الراتب ") + Text(amount(r.salaryMinor)).foregroundStyle(theme.color("surplusText")) + Text(r.envelopesMinor > 0 ? "، وتعبّأت مظاريفك بـ" : "") + Text(r.envelopesMinor > 0 ? amount(r.envelopesMinor) : "").foregroundStyle(theme.color("accent"))
+            spoken = "نزل الراتب " + amount(r.salaryMinor) + (r.envelopesMinor > 0 ? "، وتعبّأت مظاريفك بـ" + amount(r.envelopesMinor) : "")
+            text = Text("نزل الراتب ") + Text(figure: amount(r.salaryMinor)).foregroundStyle(theme.color("surplusText")) + Text(r.envelopesMinor > 0 ? "، وتعبّأت مظاريفك بـ" : "") + Text(figure: r.envelopesMinor > 0 ? amount(r.envelopesMinor) : "").foregroundStyle(theme.color("accent"))
         } else if r.allowanceMinor > 0 {
             let saved = r.allowanceMinor - r.spentMinor
-            text = Text("صرفت ") + Text(amount(r.spentMinor)).foregroundStyle(theme.color("accent")) + Text(" من يومك في " + service.days(r.days.filter { $0.allowanceMinor != nil }.count)) + Text(saved >= 0 ? "، وبقي منه " : "، وتجاوزته بـ") + Text(amount(abs(saved))).foregroundStyle(saved >= 0 ? theme.color("surplusText") : theme.color("dueText"))
+            spoken = "صرفت " + amount(r.spentMinor) + " من يومك في " + service.days(r.days.filter { $0.allowanceMinor != nil }.count) + (saved >= 0 ? "، وبقي منه " : "، وتجاوزته بـ") + amount(abs(saved))
+            text = Text("صرفت ") + Text(figure: amount(r.spentMinor)).foregroundStyle(theme.color("accent")) + Text(" من يومك في " + service.days(r.days.filter { $0.allowanceMinor != nil }.count)) + Text(saved >= 0 ? "، وبقي منه " : "، وتجاوزته بـ") + Text(figure: amount(abs(saved))).foregroundStyle(saved >= 0 ? theme.color("surplusText") : theme.color("dueText"))
         } else {
-            text = Text("مرّت " + service.days(r.days.count) + " منذ زيارتك الأخيرة")
+            spoken = "مرّت " + service.days(r.days.count) + " منذ زيارتك الأخيرة"; text = Text(spoken)
         }
-        return text.font(.custom("thmanyahserifdisplay-Bold", size: 30, relativeTo: .title)).fixedSize(horizontal: false, vertical: true).accessibilityIdentifier("money-since-headline")
+        return text.font(.custom("thmanyahserifdisplay-Bold", size: 30, relativeTo: .title)).fixedSize(horizontal: false, vertical: true).accessibilityLabel(spoken).accessibilityIdentifier("money-since-headline")
     }
     private func columns(_ r: MoneySinceReading) -> some View {
         let maxSpent = max(1, r.days.map { max($0.spentMinor, $0.allowanceMinor ?? 0) }.max() ?? 1)
@@ -107,7 +109,7 @@ struct MoneySinceView: View {
         return Group {
             if dynamicType.isAccessibilitySize {
                 VStack(alignment: .leading, spacing: 6) {
-                    ForEach(r.days) { day in HStack { Text(app.dateLabels(day.day, compact: true).primary); Spacer(); Text(amount(day.spentMinor)) } }
+                    ForEach(r.days) { day in HStack { Text(app.dateLabels(day.day, compact: true).primary); Spacer(); Text(figure: amount(day.spentMinor)) } }
                 }
             } else {
                 HStack(alignment: .bottom, spacing: 6) {
@@ -132,7 +134,7 @@ struct MoneySinceView: View {
                 if d.over { icon("exclamationmark", theme.color("due")) }
                 if d.pending > 0 { icon("hourglass", theme.color("reserveText"), outline: true) }
             }.frame(maxHeight: .infinity, alignment: .top)
-            Text(amount(d.spentMinor)).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(d.over ? theme.color("dueText") : theme.secondaryInk).lineLimit(1).minimumScaleFactor(0.6)
+            Text(figure: amount(d.spentMinor)).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(d.over ? theme.color("dueText") : theme.secondaryInk).lineLimit(1).minimumScaleFactor(0.6)
             GeometryReader { proxy in
                 let h = proxy.size.height
                 ZStack(alignment: .bottom) {
@@ -174,7 +176,7 @@ struct MoneySinceView: View {
             DiamondMark().fill(diamond ?? theme.color("surplus")).frame(width: 11, height: 13)
             Text(title).font(MadarTypography.body())
             Spacer()
-            Text(value).font(.custom("thmanyahserifdisplay-Bold", size: 18, relativeTo: .headline)).foregroundStyle(tint)
+            Text(figure: value).font(.custom("thmanyahserifdisplay-Bold", size: 18, relativeTo: .headline)).foregroundStyle(tint)
         }.padding(.bottom, 6).overlay(alignment: .bottom) { Rectangle().fill(theme.line).frame(height: 1) }
     }
     private func decisions(_ r: MoneySinceReading) -> some View {
@@ -215,7 +217,7 @@ struct MoneySinceView: View {
     private func door(_ title: String, _ value: String, _ note: String, tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title).font(MadarTypography.caption()).bold()
-            Text(value).font(.custom("thmanyahserifdisplay-Black", size: 26, relativeTo: .title2)).foregroundStyle(tint).lineLimit(1).minimumScaleFactor(0.6)
+            Text(figure: value).font(.custom("thmanyahserifdisplay-Black", size: 26, relativeTo: .title2)).foregroundStyle(tint).lineLimit(1).minimumScaleFactor(0.6)
             Text(note).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).lineLimit(2)
         }.padding(14).frame(maxWidth: .infinity, minHeight: 124, alignment: .topLeading).background(theme.surface, in: .rect(cornerRadius: 18))
             .overlay { RoundedRectangle(cornerRadius: 18).stroke(theme.line, lineWidth: 1) }
@@ -230,7 +232,7 @@ struct MoneySinceView: View {
                         if let due = item.due { HStack(spacing: 3) { Text("يستحق"); MadarDateLabel(app.dateLabels(due, compact: true), primaryFont: MadarTypography.fine(), secondaryFont: MadarTypography.fine()) }.font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
                     }
                     Spacer(minLength: 4)
-                    Text(amount(item.amountMinor)).font(MadarTypography.caption()).bold()
+                    Text(figure: amount(item.amountMinor)).font(MadarTypography.caption()).bold()
                 }
             }
         }.padding(14).frame(maxWidth: .infinity, minHeight: 124, alignment: .topLeading).background(theme.surface, in: .rect(cornerRadius: 18))

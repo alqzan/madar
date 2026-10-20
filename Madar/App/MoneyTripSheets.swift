@@ -50,7 +50,7 @@ struct MoneyTripRateSheet: View {
         ScrollView { VStack(alignment: .leading, spacing: 14) {
             HStack { Text("قبل تطبيق السعر").font(MadarTypography.cardTitle()); Spacer(); Button("إغلاق") { previewOpen = false }.frame(minHeight: 44) }
             Text("هذه القيم بعملة البيت. المبلغ الأصلي ويوم الحركة لا يتغيّران.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-            ForEach(p.lines) { row in HStack { Text(row.title); Spacer(); Text(service.amount(row.beforeMinor) + " ← " + service.amount(row.afterMinor)) }.font(MadarTypography.body()) }
+            ForEach(p.lines) { row in HStack { Text(row.title); Spacer(); Text(figure: service.amount(row.beforeMinor) + " ← " + service.amount(row.afterMinor)) }.font(MadarTypography.body()) }
             if p.excludedCount > 0 { Text("تبقى الحركات ذات سعر البنك وتقارير الدورات المغلقة وخطط السداد المعتمدة على أرقامها المحفوظة.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
             if p.lines.isEmpty { Text("لا توجد حركات مؤهلة لإعادة التحويل.").font(MadarTypography.body()) }
             Button {

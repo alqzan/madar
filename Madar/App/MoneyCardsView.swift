@@ -83,7 +83,7 @@ struct MoneyCardsView: View {
                     Spacer(minLength: 4)
                     VStack(alignment: .trailing, spacing: 1) {
                         Text(c.kind == "credit" ? "عليك" : c.kind == "debit" ? "مدى" : "مسبقة الدفع").font(MadarTypography.fine())
-                        if c.kind == "credit" { Text(amount(c.owedMinor)).font(MadarTypography.body()) }
+                        if c.kind == "credit" { Text(figure: amount(c.owedMinor)).font(MadarTypography.body()) }
                     }
                 }
                 Spacer(minLength: 0)
@@ -203,7 +203,7 @@ struct MoneyCardsView: View {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Image(systemName: "diamond.fill").font(.system(size: 7)).foregroundStyle(theme.color("bills"))
                 VStack(alignment: .leading, spacing: 5) { Text(row.merchant).font(MadarTypography.body()); Text(row.budgeted ? "احتُسب في الميزانية يوم الشراء" : "خارج الميزانية").font(MadarTypography.fine()).foregroundStyle(theme.color("surplusText")) }
-                Spacer(minLength: 2); dates(row.day); Text(amount(row.amountMinor)).font(MadarTypography.body())
+                Spacer(minLength: 2); dates(row.day); Text(figure: amount(row.amountMinor)).font(MadarTypography.body())
             }.padding(.vertical, 11).overlay(alignment: .bottom) { Rectangle().fill(theme.line).frame(height: 0.7) }
         }.buttonStyle(.plain).accessibilityIdentifier("money-card-movement-" + row.merchant)
     }
@@ -229,7 +229,7 @@ struct MoneyCardsView: View {
             HStack {
                 Text("مبلغ الشراء").font(MadarTypography.caption()); Spacer()
                 ForEach([50_000, 200_000, 800_000], id: \.self) { value in
-                    Button { purchaseMinor = value } label: { Text(amount(value)).font(MadarTypography.caption()).padding(.horizontal, 12).frame(minHeight: 44).background(purchaseMinor == value ? theme.ink : Color.clear, in: Capsule()).foregroundStyle(purchaseMinor == value ? theme.background : theme.ink).overlay { Capsule().stroke(theme.line, lineWidth: 1) } }.buttonStyle(.plain)
+                    Button { purchaseMinor = value } label: { Text(figure: amount(value)).font(MadarTypography.caption()).padding(.horizontal, 12).frame(minHeight: 44).background(purchaseMinor == value ? theme.ink : Color.clear, in: Capsule()).foregroundStyle(purchaseMinor == value ? theme.background : theme.ink).overlay { Capsule().stroke(theme.line, lineWidth: 1) } }.buttonStyle(.plain)
                 }
             }
             let best = r.cards.filter { $0.kind == "credit" && $0.graceDays != nil }.max { ($0.graceDays ?? 0) < ($1.graceDays ?? 0) }?.id
@@ -272,7 +272,7 @@ struct MoneyCardsView: View {
             }
             if let selected {
                 VStack(alignment: .leading, spacing: 12) {
-                    HStack { Text(selected.name).font(MadarTypography.cardTitle()); Spacer(); Text(amount(-selected.amountMinor)).font(MadarTypography.cardTitle()) }
+                    HStack { Text(selected.name).font(MadarTypography.cardTitle()); Spacer(); Text(figure: amount(-selected.amountMinor)).font(MadarTypography.cardTitle()) }
                     dates(selected.day)
                     Text("النقد بعد الالتزامات المعروفة حتى هذا الموعد: " + amount(selected.cashAfterMinor)).font(MadarTypography.body())
                     Label(visible ? selected.cashAfterMinor >= 0 ? "يكفي من النقد الحالي" : "النقد الحالي لا يغطي المواعيد المعروفة" : "•••", systemImage: "checkmark.circle").font(MadarTypography.caption()).foregroundStyle(theme.color("surplusText"))
@@ -280,7 +280,7 @@ struct MoneyCardsView: View {
             } else { Text("لا مبالغ مستحقة معروفة بعد.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk) }
             Text("المواعيد المعروفة").font(MadarTypography.cardTitle())
             ForEach(r.dues) { due in
-                Button { selectedDue = due.id } label: { HStack { Text(due.name); Spacer(); dates(due.day); Text(amount(due.amountMinor)) }.font(MadarTypography.caption()).padding(.vertical, 8) }.buttonStyle(.plain)
+                Button { selectedDue = due.id } label: { HStack { Text(due.name); Spacer(); dates(due.day); Text(figure: amount(due.amountMinor)) }.font(MadarTypography.caption()).padding(.vertical, 8) }.buttonStyle(.plain)
             }
             Text("التغطية من النقد الموجود الآن بعد المواعيد السابقة فقط، دون افتراض راتب قادم. لا يُحجز المال ولا يُسجّل سداد من هذه الصفحة.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
         }.accessibilityElement(children: .contain).accessibilityIdentifier("money-card-calendar")
@@ -309,7 +309,7 @@ struct MoneyCardsView: View {
         VStack(alignment: .leading, spacing: 16) {
             if let payment = c.payment {
                 Button { source = payment.detail } label: {
-                    HStack { Image(systemName: "arrow.left.arrow.right").foregroundStyle(theme.color("reserveText")); VStack(alignment: .leading, spacing: 5) { Text("سداد " + c.name).font(MadarTypography.cardTitle()); Text("تحويل، ليس مصروفًا جديدًا").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk); dates(payment.day) }; Spacer(); Text(amount(payment.amountMinor)).font(.custom("thmanyahserifdisplay-Bold", size: 28, relativeTo: .title)) }.padding(16).overlay { RoundedRectangle(cornerRadius: 13).stroke(theme.color("reserveText"), lineWidth: 1) }
+                    HStack { Image(systemName: "arrow.left.arrow.right").foregroundStyle(theme.color("reserveText")); VStack(alignment: .leading, spacing: 5) { Text("سداد " + c.name).font(MadarTypography.cardTitle()); Text("تحويل، ليس مصروفًا جديدًا").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk); dates(payment.day) }; Spacer(); Text(figure: amount(payment.amountMinor)).font(.custom("thmanyahserifdisplay-Bold", size: 28, relativeTo: .title)) }.padding(16).overlay { RoundedRectangle(cornerRadius: 13).stroke(theme.color("reserveText"), lineWidth: 1) }
                 }.buttonStyle(.plain).accessibilityIdentifier("money-card-payment-source")
                 if !c.matchedPurchases.isEmpty {
                     let total = c.matchedPurchases.reduce(0) { $0 + $1.amountMinor }

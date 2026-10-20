@@ -120,7 +120,7 @@ struct MoneyLogView: View {
             VStack(spacing: 5) {
                 if height > 60 {
                     VStack(spacing: 0) {
-                        if over { Text(amount(d.spentMinor)).font(MadarTypography.fine()).foregroundStyle(theme.color("dueText")).lineLimit(1).minimumScaleFactor(0.7); Rectangle().fill(theme.color("due")).frame(width: 5, height: 14) }
+                        if over { Text(figure: amount(d.spentMinor)).font(MadarTypography.fine()).foregroundStyle(theme.color("dueText")).lineLimit(1).minimumScaleFactor(0.7); Rectangle().fill(theme.color("due")).frame(width: 5, height: 14) }
                     }.frame(height: 30, alignment: .bottom).accessibilityHidden(true)
                 }
                 GeometryReader { proxy in
@@ -131,7 +131,7 @@ struct MoneyLogView: View {
                         if visible, drawsLimit, let daily = d.dailyMinor {
                             Rectangle().fill(theme.color("reserveText")).frame(height: 0.7).offset(y: -height * min(1, Double(max(0, daily)) / Double(scale)))
                         }
-                        if !future { Text(amount(d.spentMinor)).font(MadarTypography.fine()).foregroundStyle(over ? theme.onAccent : theme.ink).lineLimit(1).minimumScaleFactor(0.85).padding(.bottom, over ? height - 20 : min(height - 15, height * fill + 2)) }
+                        if !future { Text(figure: amount(d.spentMinor)).font(MadarTypography.fine()).foregroundStyle(over ? theme.onAccent : theme.ink).lineLimit(1).minimumScaleFactor(0.85).padding(.bottom, over ? height - 20 : min(height - 15, height * fill + 2)) }
                         if d.pending > 0 { Circle().stroke(theme.ink, lineWidth: 1.5).frame(width: 7, height: 7).padding(.bottom, 4) }
                     }.frame(width: proxy.size.width, height: height, alignment: .bottom).clipShape(arch).overlay { arch.stroke(selected ? theme.ink : theme.color("reserveText"), style: .init(lineWidth: selected ? 2 : 1, dash: future ? [3, 3] : [])) }
                 }.frame(height: height)
@@ -146,7 +146,7 @@ struct MoneyLogView: View {
             .accessibilityIdentifier("money-log-day-" + d.id)
     }
     private func dayList(_ days: [MoneyLogDay]) -> some View {
-        VStack(spacing: 10) { ForEach(days) { d in Button { selected = d.day } label: { HStack { MadarDateLabel(app.dateLabels(d.day)); Spacer(); Text(amount(d.spentMinor) + " من " + (d.dailyMinor.map(amount) ?? "غير معروف")) }.font(MadarTypography.body()).frame(minHeight: 44) }.buttonStyle(.plain) } }
+        VStack(spacing: 10) { ForEach(days) { d in Button { selected = d.day } label: { HStack { MadarDateLabel(app.dateLabels(d.day)); Spacer(); Text(figure: amount(d.spentMinor) + " من " + (d.dailyMinor.map(amount) ?? "غير معروف")) }.font(MadarTypography.body()).frame(minHeight: 44) }.buttonStyle(.plain) } }
     }
     private func weekday(_ day: GregorianDay, formatter: DateFormatter) -> String {
         formatter.locale = Locale(identifier: "ar_SA"); formatter.timeZone = app.activePlace.timeZone; formatter.dateFormat = "EEE"
@@ -180,7 +180,7 @@ struct MoneyLogView: View {
                         VStack(alignment: .leading, spacing: 7) {
                             HStack { Text(row.title).font(MadarTypography.body()).bold(); Spacer(minLength: 2); Text(service.time(row.at)).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
                             HStack(alignment: .center, spacing: 4) {
-                                Text(amount(row.amountMinor)).font(.custom("thmanyahserifdisplay-Bold", size: 25, relativeTo: .title2)).lineLimit(1).minimumScaleFactor(0.7)
+                                Text(figure: amount(row.amountMinor)).font(.custom("thmanyahserifdisplay-Bold", size: 25, relativeTo: .title2)).lineLimit(1).minimumScaleFactor(0.7)
                                 Spacer(minLength: 2)
                                 Text(row.budgetLabel).font(MadarTypography.fine()).foregroundStyle(row.confirmed ? theme.color("surplusText") : theme.secondaryInk).lineLimit(1).minimumScaleFactor(0.8).padding(.horizontal, 7).padding(.vertical, 3).overlay { Capsule().stroke(row.confirmed ? theme.color("surplusText") : theme.line, lineWidth: 1) }
                             }
@@ -204,7 +204,7 @@ struct MoneyLogView: View {
         return service.digits.string(met) + " " + of + " ضمن اليومية"
     }
     private func metric(_ title: String, value: String, note: String, tint: Color) -> some View {
-        VStack(alignment: .leading, spacing: 6) { Text(title).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk); Text(value).font(.custom("thmanyahserifdisplay-Bold", size: 22, relativeTo: .title3)).foregroundStyle(tint).lineLimit(1).minimumScaleFactor(0.65); Text(note).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
+        VStack(alignment: .leading, spacing: 6) { Text(title).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk); Text(figure: value).font(.custom("thmanyahserifdisplay-Bold", size: 22, relativeTo: .title3)).foregroundStyle(tint).lineLimit(1).minimumScaleFactor(0.65); Text(note).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
             .frame(maxWidth: .infinity, minHeight: 78, alignment: .topLeading).padding(9).background(theme.surface).overlay(alignment: .top) { Rectangle().fill(tint).frame(height: 3) }
     }
     private func monthSummary(_ r: MoneyLogReading) -> some View {

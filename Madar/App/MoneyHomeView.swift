@@ -156,7 +156,7 @@ struct MoneyHomeView: View {
                 Spacer(minLength: 12)
                 VStack(alignment: .trailing, spacing: 7) {
                     Text("لك فعلًا").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                    Text(amount(reading.basis.netMinor)).font(MadarTypography.cardTitle()).accessibilityIdentifier("money-net")
+                    Text(figure: amount(reading.basis.netMinor)).font(MadarTypography.cardTitle()).accessibilityIdentifier("money-net")
                     Text(reading.currency == "SAR" ? "ريال سعودي" : reading.currency).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                 }
             }
@@ -188,7 +188,7 @@ struct MoneyHomeView: View {
             Button("ابدأ برسالة الراتب") { messagesOpen = true }.font(MadarTypography.body()).frame(minHeight: 44).accessibilityIdentifier("money-first-salary")
             if reading.hasAccounts {
                 Button { basisOpen = true } label: {
-                    HStack { Text("في حسابك"); Spacer(); Text(amount(reading.basis.inAccountMinor)).font(MadarTypography.cardTitle()); Image(systemName: "chevron.left").font(.caption) }.frame(minHeight: 44)
+                    HStack { Text("في حسابك"); Spacer(); Text(figure: amount(reading.basis.inAccountMinor)).font(MadarTypography.cardTitle()); Image(systemName: "chevron.left").font(.caption) }.frame(minHeight: 44)
                 }.buttonStyle(.plain).accessibilityLabel("على أي أساس، في حسابك " + amount(reading.basis.inAccountMinor))
                 if !amountsVisible { Button("أظهر الأرقام") { revealed = true }.frame(minHeight: 44).accessibilityIdentifier("money-reveal") }
             }
@@ -201,7 +201,7 @@ struct MoneyHomeView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("الاحتياطي").font(.custom("thmanyahserifdisplay-Bold", size: 18, relativeTo: .headline)).foregroundStyle(theme.color("reserveText"))
                     HStack(alignment: .firstTextBaseline, spacing: 7) {
-                        Text(amount(reading.reserveMinor)).font(MadarTypography.cardTitle()).accessibilityIdentifier("money-reserve")
+                        Text(figure: amount(reading.reserveMinor)).font(MadarTypography.cardTitle()).accessibilityIdentifier("money-reserve")
                         if amountsVisible, let runway = reading.reserveRunway {
                             Text(service.days(runway.days)).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                         }
@@ -214,7 +214,7 @@ struct MoneyHomeView: View {
             HStack(spacing: 14) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("الفائض").font(.custom("thmanyahserifdisplay-Bold", size: 18, relativeTo: .headline)).foregroundStyle(theme.color("surplusText"))
-                    Text(amount(reading.surplusMinor)).font(MadarTypography.cardTitle()).accessibilityIdentifier("money-surplus")
+                    Text(figure: amount(reading.surplusMinor)).font(MadarTypography.cardTitle()).accessibilityIdentifier("money-surplus")
                 }.frame(maxWidth: .infinity, alignment: .leading)
                 if !dynamicType.isAccessibilitySize && amountsVisible {
                     MoneyWaterfall(values: reading.surplusHistory).frame(width: 152, height: 38)
@@ -257,7 +257,7 @@ struct MoneyHomeView: View {
                     }
                     VStack(alignment: .leading, spacing: 0) {
                         Text(limit.title).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                        Text(amount(limit.spentMinor)).font(MadarTypography.section())
+                        Text(figure: amount(limit.spentMinor)).font(MadarTypography.section())
                     }
                 }.accessibilityElement(children: .combine)
             }
@@ -283,7 +283,7 @@ struct MoneyHomeView: View {
                         MadarDateLabel(app.dateLabels(obligation.due, compact: true), primaryFont: MadarTypography.fine(), secondaryFont: MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                     }
                     Spacer(minLength: 0)
-                    Text(amount(obligation.amountMinor)).font(MadarTypography.section()).fixedSize()
+                    Text(figure: amount(obligation.amountMinor)).font(MadarTypography.section()).fixedSize()
                 }.accessibilityElement(children: .combine)
             }
         }
