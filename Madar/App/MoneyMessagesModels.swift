@@ -119,7 +119,7 @@ extension AppMoneyService {
         let confirmable = MoneyMutationHandler.confirmableAsRead(rows.filter { $0.reviewState == "needsLook" && $0.messageID != nil }.map(\.id), container: app.container, now: now)
         var drafts: [MoneyMessageDraft] = []
         for row in rows where open.contains(row.reviewState) && row.messageID != nil {
-            let message = messages.first { $0.id == row.messageID }
+            let message = row.messageID.flatMap { messagesByID[$0] }
             let dir = direction(row, message: message)
             var note: String?
             if let obligation = obligations.first(where: { $0.id == row.obligationID }) { note = "مرتبطة بـ" + obligation.name }

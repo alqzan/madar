@@ -378,6 +378,7 @@ public enum BankIntake {
 
 /// F08 as amended by RM8: fingerprint = SHA-256(sender + normalised text), no minute; occurrence counts repeats.
 public enum BankDedupe {
+    public static let nearDuplicateWindow: TimeInterval = 600
     /// Spaces collapsed, digits unified, Latin lowercased.
     public static func normalize(_ text: String) -> String {
         BankMessageParser.clean(text).lowercased().split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
@@ -455,7 +456,7 @@ public enum BankDedupe {
     }
 
     /// RM8 near-duplicate: same account, amount and merchant within ±10 minutes but a different text → ask the user.
-    public static func nearDuplicate(_ new: Movement, among existing: [Movement], window: TimeInterval = 600) -> Bool {
+    public static func nearDuplicate(_ new: Movement, among existing: [Movement], window: TimeInterval = BankDedupe.nearDuplicateWindow) -> Bool {
         existing.contains { old in
             old.fingerprint != new.fingerprint && old.accountKey == new.accountKey && old.amountMinor == new.amountMinor
                 && BankDedupe.normalize(old.merchant ?? "") == BankDedupe.normalize(new.merchant ?? "") && abs(old.at.timeIntervalSince(new.at)) <= window

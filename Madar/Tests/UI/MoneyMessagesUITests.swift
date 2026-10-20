@@ -41,24 +41,37 @@ import XCTest
         XCTAssertTrue(app.staticTexts["money-messages-title"].waitForExistence(timeout: 10))
         let review = app.descendants(matching: .any)["money-messages-review"]
         let clear = app.buttons["money-confirm-clear"]
-        XCTAssertTrue(clear.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(review.label.contains("٦"), review.label)
-        XCTAssertTrue(clear.label.contains("(٣)"), clear.label)
-        XCTAssertTrue(app.descendants(matching: .any)["money-draft-duplicate"].exists)
         XCTAssertTrue(app.descendants(matching: .any)["money-statement"].exists)
-        shot(app, "M5-V05-msg-L"); app.swipeUp(velocity: .slow); shot(app, "M5-V05-msg-s1-L")
-        for _ in 0..<3 where !clear.isHittable { app.swipeUp(velocity: .slow) }
+        shot(app, "M5-V05-msg-L")
+        var sawDuplicate = app.descendants(matching: .any)["money-draft-duplicate"].exists
+        for _ in 0..<8 where !clear.isHittable {
+            app.swipeUp(velocity: .slow)
+            sawDuplicate = sawDuplicate || app.descendants(matching: .any)["money-draft-duplicate"].exists
+        }
+        XCTAssertTrue(sawDuplicate)
+        XCTAssertTrue(clear.isHittable)
+        XCTAssertTrue(clear.label.contains("(٢)"), "An incoming transfer still needs an explicit income/salary choice")
+        shot(app, "M5-V05-msg-s1-L")
         clear.tap()
         XCTAssertTrue(clear.waitForNonExistence(timeout: 10))
-        XCTAssertTrue(review.label.contains("٣"), review.label)
+        for _ in 0..<5 where !app.buttons["money-messages-close"].isHittable { app.swipeDown(velocity: .fast) }
+        XCTAssertTrue(review.label.contains("٤"), review.label)
         let spent = app.descendants(matching: .any)["money-messages-spent"]
         XCTAssertTrue(spent.label.contains("٢") && spent.label.contains("٦٠٫٥٠"), spent.label)
+        let incoming = app.otherElements["money-draft-سالم"].buttons["money-draft-confirm"]
+        for _ in 0..<4 where !incoming.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(incoming.isHittable); incoming.tap()
+        let confirmIncome = app.buttons["اعتمده كدخل"]; XCTAssertTrue(confirmIncome.waitForExistence(timeout: 5)); confirmIncome.tap()
+        for _ in 0..<5 where !app.buttons["money-messages-close"].isHittable { app.swipeDown(velocity: .fast) }
+        XCTAssertTrue(review.label.contains("٣"), review.label)
         XCTAssertTrue(app.descendants(matching: .any)["money-messages-incoming"].label.contains("١٢٠"))
         app.swipeDown(velocity: .fast)
         let apply = app.buttons["money-statement-apply"]; XCTAssertTrue(apply.waitForExistence(timeout: 5)); apply.tap()
         XCTAssertTrue(apply.waitForNonExistence(timeout: 10)); XCTAssertTrue(review.label.contains("٢"), review.label)
         let ignore = app.buttons["money-look-ignore"]; for _ in 0..<3 where !ignore.isHittable { app.swipeUp(velocity: .slow) }
         ignore.tap(); XCTAssertTrue(ignore.waitForNonExistence(timeout: 10))
+        for _ in 0..<5 where !app.buttons["money-messages-close"].isHittable { app.swipeDown(velocity: .fast) }
         XCTAssertTrue(review.label.contains("١"), review.label)
         app.swipeDown(velocity: .fast); shot(app, "M5-V05-msg-decided-L")
     }
@@ -125,12 +138,54 @@ import XCTest
         let tray = app.descendants(matching: .any)["money-pending"]; XCTAssertTrue(tray.waitForExistence(timeout: 10)); tray.tap()
         XCTAssertTrue(app.staticTexts["money-messages-title"].waitForExistence(timeout: 10))
 
-        let drafts = app.buttons.matching(identifier: "money-draft-confirm")
-        let expected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "count == %d", corpus.count), object: drafts)
+        let title = app.staticTexts["money-messages-title"]
+        let expected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", String(corpus.count)), object: title)
         XCTAssertEqual(XCTWaiter.wait(for: [expected], timeout: 30), .completed, "Selected messages did not all reach the review tray")
-        XCTAssertTrue(app.descendants(matching: .any)["money-messages-review"].exists)
-        XCTAssertEqual(drafts.count, 3, "The three selected messages should each have a review action")
+        XCTAssertTrue(app.descendants(matching: .any)["money-messages-review"].label.contains("٣"))
+        XCTAssertTrue(app.buttons.matching(identifier: "money-draft-confirm").firstMatch.exists)
         shot(app, "M5-E03-local-corpus-L")
+    }
+
+    /// Private inputs stay on this Mac and in the isolated simulator store; no real text enters Git.
+    func testAllLocalCorpusMessagesReachReviewTray() throws {
+        continueAfterFailure = false
+        let madar = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let folder = madar.appendingPathComponent("Private/bank-messages", isDirectory: true)
+        guard let files = try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
+            .filter({ $0.pathExtension == "jsonl" }), !files.isEmpty else { throw XCTSkip("Local bank-message corpus is unavailable") }
+        let corpus = try files.sorted { $0.lastPathComponent < $1.lastPathComponent }.flatMap { file in
+            try String(contentsOf: file, encoding: .utf8).split(whereSeparator: \.isNewline).map { raw in
+                try JSONDecoder().decode(LocalCorpusLine.self, from: Data(raw.utf8))
+            }
+        }
+        XCTAssertGreaterThan(corpus.count, 500, "Exercise more than one intake batch")
+        let packed = try (JSONEncoder().encode(corpus) as NSData).compressed(using: .lzfse) as Data
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": "bankCorpus",
+            "MADAR_UI_BANK_CORPUS_LZFSE": packed.base64EncodedString(), "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
+            "MADAR_UI_NOW": "2026-10-27T20:00:00+03:00"]
+        app.launch()
+        let tab = app.tabBars.buttons["خصّص"]; XCTAssertTrue(tab.waitForExistence(timeout: 60)); tab.tap()
+        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("المال")
+        let money = app.buttons["money-open"]; XCTAssertTrue(money.waitForExistence(timeout: 10)); money.tap()
+        let tray = app.descendants(matching: .any)["money-pending"]; XCTAssertTrue(tray.waitForExistence(timeout: 30)); tray.tap()
+        let title = app.staticTexts["money-messages-title"]
+        XCTAssertTrue(title.waitForExistence(timeout: 30))
+        let completed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", String(corpus.count)), object: title)
+        XCTAssertEqual(XCTWaiter.wait(for: [completed], timeout: 60), .completed, "Every batch must finish successfully before the screen trial")
+        let review = app.descendants(matching: .any)["money-messages-review"]
+        XCTAssertTrue(review.waitForExistence(timeout: 10))
+        let pendingDigits = review.label.compactMap(\.wholeNumberValue).map(String.init).joined()
+        XCTAssertGreaterThan(Int(pendingDigits) ?? 0, 500, "The review count must cover the large inbox")
+        shot(app, "M5-E03-complete-local-corpus-L")
+        // Statements precede movement drafts, so this corpus may have many statement cards first.
+        app.swipeUp(velocity: .slow); app.swipeUp(velocity: .slow)
+        shot(app, "M5-E03-complete-local-corpus-scrolled-L")
+        XCTAssertFalse(title.isHittable, "The large inbox scrolls without blocking interaction")
+        for _ in 0..<6 where !app.buttons["money-messages-close"].isHittable { app.swipeDown(velocity: .fast) }
+        XCTAssertTrue(app.buttons["money-messages-close"].isHittable)
+        app.buttons["money-messages-close"].tap()
+        XCTAssertTrue(tray.waitForExistence(timeout: 10), "The large inbox can return to the money room")
     }
 
 }

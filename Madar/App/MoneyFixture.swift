@@ -304,7 +304,8 @@ extension AppSession {
             for start in stride(from: 0, to: messages.count, by: 500) {
                 let end = min(start + 500, messages.count)
                 let batch = Array(messages[start..<end])
-                await executeFixtureCommand(.init(name: "money.pasteBankMessages", payload: .object(["messages": .array(batch)]), source: .app, issuedAt: prayerNow()))
+                guard await executeFixtureCommand(.init(name: "money.pasteBankMessages", payload: .object(["messages": .array(batch)]), source: .app, issuedAt: prayerNow())) else { return }
+                bankCorpusImportedInputCount += batch.count
             }
             try? reload()
         }

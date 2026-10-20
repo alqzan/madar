@@ -42,6 +42,7 @@ final class AppSession {
     private(set) var notificationAuthorization = "unknown"
 #if DEBUG
     var notificationTestResult = ""
+    var bankCorpusImportedInputCount = 0
 #endif
     @ObservationIgnored weak var prayerNotifications: PrayerNotificationCoordinator?
     let schema: SettingsSchema
@@ -653,7 +654,11 @@ final class AppSession {
 
     #if DEBUG
     /// UI fixtures only: runs a command as its real producer (for example the Shortcut) would.
-    func executeFixtureCommand(_ envelope: CommandEnvelope) async { _ = try? await bus.execute(envelope, now: prayerNow()) }
+    @discardableResult
+    func executeFixtureCommand(_ envelope: CommandEnvelope) async -> Bool {
+        guard let outcome = try? await bus.execute(envelope, now: prayerNow()) else { return false }
+        return outcome.status == .applied || outcome.status == .duplicate
+    }
     #endif
     func executeMoneyCommand(_ name: String, payload: [String: MadarCore.JSONValue] = [:], id: UUID = UUID()) async throws {
         guard lockController?.canPresent(.app) ?? protectedDataAuthorized else { throw DataError.authenticationFailed }

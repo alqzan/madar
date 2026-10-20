@@ -619,8 +619,16 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
     }
     private static func flagNearDuplicate(_ row: MoneyTransaction, message: BankMessage, context: ModelContext, now: Date, writer: String) throws {
         guard let key = row.cardID ?? row.fromAccountID ?? row.toAccountID else { return }
-        let rows = try transactions(context), messages = try context.fetch(FetchDescriptor<BankMessage>())
-        let existing = rows.filter { $0.id != row.id && ($0.cardID ?? $0.fromAccountID ?? $0.toAccountID) == key }.compactMap { old -> BankDedupe.Movement? in
+        let amount = row.amountMinor
+        let lower = row.eventAt.addingTimeInterval(-BankDedupe.nearDuplicateWindow)
+        let upper = row.eventAt.addingTimeInterval(BankDedupe.nearDuplicateWindow)
+        let matches = try context.fetch(FetchDescriptor<MoneyTransaction>(predicate: #Predicate {
+            $0.amountMinor == amount && $0.eventAt >= lower && $0.eventAt <= upper
+        }))
+        let rows = matches.filter { $0.id != row.id && ($0.cardID ?? $0.fromAccountID ?? $0.toAccountID) == key && live($0) }
+        guard !rows.isEmpty else { return }
+        let messages = try context.fetch(FetchDescriptor<BankMessage>())
+        let existing = rows.compactMap { old -> BankDedupe.Movement? in
             // M5-V17: an expense recorded by hand has no message; it still counts, so its bank message waits for a decision.
             let fingerprint = messages.first(where: { $0.id == old.messageID })?.fingerprint ?? (old.messageID == nil && old.source == "manual" && old.kind == "expense" ? "manual:" + old.id.uuidString : nil)
             guard let fingerprint else { return nil }
@@ -872,14 +880,15 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
     }
     private static func resolvePayment(_ row: MoneyTransaction, context: ModelContext) throws {
         let accounts = try context.fetch(FetchDescriptor<Account>()).filter { live($0) }
-        if let messageID = row.messageID, let message = try context.fetch(FetchDescriptor<BankMessage>()).first(where: { $0.id == messageID }),
-           let bytes = message.parsedJSON, let parsed = try? JSONDecoder().decode(MoneyParsedFields.self, from: bytes),
-           parsed.cardKind != nil && row.cardID == nil { throw MoneyCommandError.cardKindRequired }
+        let parsed: MoneyParsedFields?
+        if let messageID = row.messageID {
+            let message = try context.fetch(FetchDescriptor<BankMessage>(predicate: #Predicate { $0.id == messageID })).first
+            parsed = message?.parsedJSON.flatMap { try? JSONDecoder().decode(MoneyParsedFields.self, from: $0) }
+        } else { parsed = nil }
+        if parsed?.cardKind != nil && row.cardID == nil { throw MoneyCommandError.cardKindRequired }
         if let id = row.cardID {
             guard let card = try context.fetch(FetchDescriptor<Card>()).first(where: { $0.id == id && live($0) }) else { throw MoneyCommandError.invalidReference }
-            if let messageID = row.messageID, let message = try context.fetch(FetchDescriptor<BankMessage>()).first(where: { $0.id == messageID }),
-               let bytes = message.parsedJSON, let parsed = try? JSONDecoder().decode(MoneyParsedFields.self, from: bytes),
-               let kind = parsed.cardKind, kind != card.kind { throw MoneyCommandError.cardKindRequired }
+            if let kind = parsed?.cardKind, kind != card.kind { throw MoneyCommandError.cardKindRequired }
             if ["expense", "fee"].contains(row.kind) && card.kind != "credit" { row.fromAccountID = card.accountID }
             if ["refund", "cashback"].contains(row.kind) && card.kind != "credit" { row.toAccountID = card.accountID }
             if row.kind == "cardPayment", card.kind != "credit" { throw MoneyCommandError.invalidReference }
@@ -1131,7 +1140,12 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         return try context.fetch(FetchDescriptor<BankMessage>()).filter { ids.contains($0.id) && live($0) }
     }
     private static func transaction(_ id: UUID?, _ context: ModelContext) throws -> MoneyTransaction {
-        guard let id, let row = try transactions(context).first(where: { $0.id == id }) else { throw MoneyCommandError.missingRow }; return row
+        guard let id else { throw MoneyCommandError.missingRow }
+        // A review preflight asks for one movement at a time. Fetching and decoding every
+        // record here made opening a large bank inbox quadratic in its transaction count.
+        let matches = try context.fetch(FetchDescriptor<MoneyTransaction>(predicate: #Predicate { $0.id == id }))
+        guard let row = matches.first(where: { live($0) }) else { throw MoneyCommandError.missingRow }
+        return row
     }
     private static func account(_ id: UUID, _ context: ModelContext) throws -> Account {
         guard let row = try context.fetch(FetchDescriptor<Account>()).first(where: { $0.id == id && live($0) }) else { throw MoneyCommandError.invalidReference }; return row

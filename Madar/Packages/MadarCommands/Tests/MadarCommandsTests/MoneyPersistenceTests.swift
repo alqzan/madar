@@ -280,6 +280,23 @@ import MadarInbox
         let rows = try ModelContext(f.container).fetch(FetchDescriptor<BankMessage>())
         #expect(rows.count == 2); #expect(rows.filter { $0.channel == "bulk" }.first?.status == "possibleDuplicate")
     }
+    /// RM8: both ten-minute boundaries are inclusive, in either receive order.
+    @Test(arguments: [-601, -600, 600, 601])
+    func nearDuplicateIntakeKeepsTheTenMinuteBoundary(offset: Int) async throws {
+        let f = try MoneyFixture(); defer { f.clean() }; try await f.setup()
+        let context = ModelContext(f.container), original = MoneyTransaction()
+        original.source = "manual"; original.kind = "expense"; original.reviewState = "ok"
+        original.cardID = f.debit; original.fromAccountID = f.bank; original.method = "card"
+        original.amountMinor = 4200; original.homeAmountMinor = 4200; original.merchant = "Coffee"
+        original.eventAt = ISO8601DateFormatter().date(from: "2026-10-16T10:05:00Z")!.addingTimeInterval(Double(offset))
+        original.dayKey = "2026-10-16"; context.insert(original); try context.save()
+        #expect(try await f.ingest("شراء مدى\n*3333\n42.00 SAR\nلدى: Coffee\n2026-10-16 13:05").status == .applied)
+        let message = try #require(try ModelContext(f.container).fetch(FetchDescriptor<BankMessage>()).first)
+        #expect(message.status == (abs(offset) == 600 ? "possibleDuplicate" : "needsLook"))
+        let draft = try #require(try ModelContext(f.container).fetch(FetchDescriptor<MoneyTransaction>()).first { $0.messageID == message.id })
+        #expect(draft.reviewState == message.status)
+        #expect(try f.transaction(original.id).reviewState == "ok", "Import never changes the confirmed original")
+    }
     @Test func splitDeleteAndUndoAreAtomicAndExactToTheHalala() async throws {
         let f = try MoneyFixture(); defer { f.clean() }; try await f.setup()
         let context = ModelContext(f.container), envelope = Envelope(); envelope.name = "هدف"; context.insert(envelope); try context.save()

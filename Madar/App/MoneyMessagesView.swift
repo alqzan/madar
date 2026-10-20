@@ -28,7 +28,7 @@ struct MoneyMessagesView: View {
     private var visible: Bool { revealed || !app.bool("core.hideMoneyUntilTouch") }
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
+            LazyVStack(alignment: .leading, spacing: 14) {
                 header
                 if let reading {
                     HStack(alignment: .firstTextBaseline) {
@@ -69,6 +69,9 @@ struct MoneyMessagesView: View {
     private var header: some View {
         HStack(spacing: 12) {
             Text("رسائل البنك").font(MadarTypography.title()).accessibilityIdentifier("money-messages-title")
+                #if DEBUG
+                .accessibilityValue(ProcessInfo.processInfo.environment["MADAR_UI_MONEY_FIXTURE"] == "bankCorpus" ? String(app.bankCorpusImportedInputCount) : "")
+                #endif
             Button { dismiss() } label: {
                 Image(systemName: "xmark").font(.title3).frame(width: 52, height: 52)
                     .overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1.2) }
@@ -227,7 +230,7 @@ struct MoneyMessagesView: View {
         Image(systemName: "checkmark").font(.body.bold()).foregroundStyle(theme.background).frame(width: 52, height: 52).background(theme.ink, in: .circle)
     }
     private func looks(_ items: [MoneyMessageLook]) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        LazyVStack(alignment: .leading, spacing: 10) {
             HStack { Text("تحتاج نظرة").font(MadarTypography.cardTitle()).foregroundStyle(theme.color("reserveText")); DoubleRule().stroke(theme.color("reserveText"), lineWidth: 0.7).frame(height: 3) }
             Text("رسائل لم يفهمها المحلّل؛ لا تُحسب حتى تحسمها.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
             ForEach(items) { item in
