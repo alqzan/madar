@@ -56,7 +56,7 @@ struct RoomWidgetContent:View {
                             if room == .year || room == .habits {donut(row.share).frame(width:24,height:24)}
                             VStack(alignment:.leading,spacing:2) {
                                 Text(row.title).font(.custom("thmanyahsans-Bold",size:isHero ? 19 : 13,relativeTo:isHero ? .headline : .caption)).lineLimit(1)
-                                Text(row.value).font(.custom("thmanyahsans-Regular",size:isHero ? 24 : 11,relativeTo:isHero ? .title3 : .caption2)).foregroundStyle(theme.secondaryInk).lineLimit(1)
+                                Text(figure: row.value).font(.custom("thmanyahsans-Regular",size:isHero ? 24 : 11,relativeTo:isHero ? .title3 : .caption2)).foregroundStyle(theme.secondaryInk).lineLimit(1)
                                 if largeHome && !type.isAccessibilitySize && !row.detail.isEmpty && (room != .habits || (template != "periods" && row.id == rows.first?.id)) {HStack(spacing:6){Text(row.detail).font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).foregroundStyle(theme.secondaryInk).lineLimit(1);if !row.secondDate.isEmpty {Text(row.secondDate).font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).foregroundStyle(theme.secondaryInk).lineLimit(1)}}}
                             }
                             Spacer(minLength:0)
@@ -116,7 +116,7 @@ struct RoomWidgetContent:View {
     /// RD7: the chosen diary template's row, present only when the owner opted in and nothing is locked.
     private var diaryRow:RoomWidgetSnapshot.Row? { room == .diaryWrite && snapshot?.locked != true ? snapshot?.rows.first { $0.id == template } : nil }
     @ViewBuilder private func diaryContent(_ row:RoomWidgetSnapshot.Row)->some View {
-        Text(row.value).font(.custom("thmanyahseriftext-Regular",size:family == .systemSmall ? 17 : 19,relativeTo:.body)).lineLimit(extraLargePortrait ? 12 : largeHome ? 8 : 4).lineSpacing(3).privacySensitive()
+        Text(figure: row.value).font(.custom("thmanyahseriftext-Regular",size:family == .systemSmall ? 17 : 19,relativeTo:.body)).lineLimit(extraLargePortrait ? 12 : largeHome ? 8 : 4).lineSpacing(3).privacySensitive()
         Spacer(minLength:0)
         if row.id == "intention" {
             Link(destination:URL(string:room.route)!) {Text("اكتب").font(.custom("thmanyahsans-Bold",size:15,relativeTo:.body)).frame(maxWidth:.infinity,minHeight:40).foregroundStyle(theme.surface).background(theme.ink,in:.capsule)}.buttonStyle(.plain)

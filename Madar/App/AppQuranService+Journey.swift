@@ -26,7 +26,9 @@ extension AppQuranService {
         } else { actual = "بعد خمسة أيام حفظ وخمسين آية" }
         var planned = "ابدأ خطة الحفظ لتقدير الموعد"
         if let p = value.plan {
-            planned = try forecast(QuranUIPlanInput(startAyah: p.plan.startAyah, unit: QuranUIUnit(rawValue: p.plan.unit.rawValue)!, amount: p.plan.amount, rhythm: QuranUIRhythm(rawValue: p.plan.intensity.rawValue)!, restDay: value.restDay.rawValue, missPolicy: p.missPolicy), snapshot: value).title
+            let forecast = try forecast(QuranUIPlanInput(startAyah: p.plan.startAyah, unit: QuranUIUnit(rawValue: p.plan.unit.rawValue)!, amount: p.plan.amount, rhythm: QuranUIRhythm(rawValue: p.plan.intensity.rawValue)!, restDay: value.restDay.rawValue, missPolicy: p.missPolicy), snapshot: value)
+            planned = forecast.title
+            if let other = forecast.secondaryDate { planned += "، " + other }
         }
         let groups = Dictionary(grouping: value.completedOn.values.filter { $0 <= today }, by: { $0 }).sorted { $0.key < $1.key }
         var total = 0
