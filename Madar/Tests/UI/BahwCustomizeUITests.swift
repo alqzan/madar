@@ -30,7 +30,10 @@ import XCTest
         XCTAssertTrue(element("bahw-block-quran").waitForExistence(timeout: 8))
         XCTAssertFalse(element("bahw-block-year").exists)
 
-        app.tabBars.buttons["خصّص"].tap()
+        let customizeTab = app.tabBars.buttons["خصّص"]
+        if customizeTab.exists { customizeTab.tap() } else {
+            let shortcut = app.buttons["tab-customize"]; XCTAssertTrue(shortcut.waitForExistence(timeout: 8)); shortcut.tap()
+        }
         let reset = app.buttons["reset-settings"]; XCTAssertTrue(reset.waitForExistence(timeout: 8)); reset.tap()
         let confirm = app.buttons.matching(NSPredicate(format: "label == %@ AND identifier != %@", "أعِد الافتراضي", "reset-settings")).firstMatch; XCTAssertTrue(confirm.waitForExistence(timeout: 5)); confirm.tap()
         XCTAssertTrue(app.buttons["bahw-custom-size-quran-small"].waitForExistence(timeout: 5)); reveal(app.buttons["bahw-custom-size-quran-small"])

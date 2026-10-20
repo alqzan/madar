@@ -203,6 +203,21 @@ import XCTest
         let changed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", "جماعة"), object: asr)
         XCTAssertEqual(XCTWaiter.wait(for: [changed], timeout: 15), .completed, asr.label)
         XCTAssertTrue(app.buttons["undo-button"].waitForExistence(timeout: 15), app.debugDescription)
+        app.buttons["undo-button"].tap()
+        // The companion canonical shows the optional heart question. Enable it
+        // through the real setting in this isolated store, preserving RP6's default.
+        app.terminate(); app.launch(); finishOnboarding(app)
+        app.tabBars.buttons["خصّص"].tap()
+        let search = app.textFields["settings-search"]
+        scrollTo(search, in: app); search.tap(); search.typeText("salah.askHeart\n")
+        let toggle = app.switches["setting-salah.askHeart"]
+        scrollTo(toggle, in: app); XCTAssertEqual(toggle.value as? String, "0"); toggle.tap()
+        app.swipeDown(); app.tabBars.buttons["الصلاة"].tap()
+        XCTAssertTrue(asr.waitForExistence(timeout: 10), app.debugDescription)
+        asr.tap()
+        XCTAssertTrue(alone.waitForExistence(timeout: 10)); XCTAssertTrue(alone.isSelected)
+        XCTAssertTrue(app.buttons["prayer-heart-present"].waitForExistence(timeout: 10), app.debugDescription)
+        attachScreenshot(app, named: "M1-V02-log-heart-L")
         app.terminate()
     }
 

@@ -19,6 +19,7 @@ import XCTest
         XCTAssertFalse(app.buttons["العِقد"].exists)
         capture(app, "M4-V03-year-L")
         app.swipeUp(); XCTAssertTrue(element("bahw-matter-رمضان").waitForExistence(timeout: 5)); capture(app, "M4-V03-year-s1-L")
+        app.swipeUp(); capture(app, "M4-V03-year-s2-L"); app.swipeDown()
 
         element("bahw-add-day").tap()
         let title = element("bahw-day-title"); XCTAssertTrue(title.waitForExistence(timeout: 5)); title.tap(); title.typeText("هدية أمي")

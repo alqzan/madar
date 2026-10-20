@@ -40,3 +40,13 @@ Not verified: owner iPhone, iOS 27 runtime, OS widget/Control invocation, actual
 Next: remaining work requires device/system/store evidence. A direct Shamela app route needs a provider-issued API key; the installed @als MCP still has no iOS endpoint/export.
 Model/effort: not exposed / not exposed.
 Usage: 5% five-hour used / 76% weekly used at last live check; the five-hour window reset during this turn.
+
+
+## Handover - PDF OCR, source fixes and release preparation - 2026-10-19 - Codex
+Works now: local Arabic/English PDF OCR/search, selectable text and original-page jumps; sourced Zakat explanations; numeric-safe separators and corrected quantity copy; store metadata/privacy policy prepared, direct @als optional/deferred per owner.
+Verified: native source-fix run 9/9 plus Zakat source UI 1/1; OCR 4/4, PDF import 6/6, Core InlineText 2/2, shipping fixtures 16/16, review contracts 86/86; static source 0 findings; unsigned device Release archive succeeded with app/widget manifests; metadata limits/plists and git diff --check clean.
+Differences left: PDF reader has native document chrome and approximate OCR; punctuation/count labels and prayer token accents changed. L/light captures and S1-Home/K-Salah/R10-Milaf-Yafham comparisons generated; full owner/Claude comparison remains pending, panel opens queued.
+Not verified: 4,352 conservative manual trace sites (3,763 UI-only) remain unaccepted; frozen backup date formatting is recorded. No owner device, iOS 27 runtime, OS invocation, actual Spotlight result, real-device performance, qualified human certification, signed distribution or store submission; live Turath attempt HTTP 403 from this connection.
+Next: owner/Claude every-screen comparison and device/system/performance runs; close remaining manual/render trace with evidence, keep frozen routes frozen, then real support/privacy URLs, review contact and signing/store access for publication. No complete M0/M7 or zero-manual-trace claim.
+Model/effort: not exposed / not exposed.
+Usage: 41% five-hour used / 94% weekly used at last live check.
