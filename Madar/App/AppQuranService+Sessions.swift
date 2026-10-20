@@ -205,6 +205,8 @@ extension AppQuranService {
                         draft.grades.append(QuranDraftGrade(page: draft.page, rating: QuranMistakeEngine.gradeFromBlindSlips(slips, ayatCount: ayahs.count), isTest: value.testPages?.contains(draft.page) == true))
                     }
                     draft.coachStage = .rating
+                    // Grading shows the page it grades: a whole-page check uncovers everything in the same save.
+                    value.revealedAyahs = (value.revealedAyahs ?? []).union(ayahs)
                 } else if let current = pages.firstIndex(of: draft.page), pages.indices.contains(current + 1) {
                     draft.page = pages[current + 1]
                     draft.ayahID = catalog.ayahs(on: draft.page).first(where: { planned.contains($0.id) })?.id ?? draft.ayahID
@@ -323,11 +325,15 @@ extension AppQuranService {
             state.title = draft.kind == .free ? "مراجعة حرة" : "المراجعة · " + faceCount(orderedPages.count) + " في خطوة واحدة"
             let range = section.pages.first == section.pages.last ? numerals.string(section.pages.first ?? draft.page) : numerals.string(section.pages.first ?? draft.page) + "–" + numerals.string(section.pages.last ?? draft.page)
             state.segmentTitle = section.title + " " + range + "، الوجه " + numerals.string(draft.page)
-            let caption = draft.kind == .free && !canGrade ? "قراءة فقط؛ هذا الوجه غير مكتمل في صدرك" : stage == .grading ? "تقييم مقترح من تعثّرك؛ يمكنك تغييره" : "كشفت " + numerals.string(revealedCount) + " من " + numerals.string(currentAyahs.count)
+            let record = try snapshot().pages.first { $0.page == draft.page }
+            let far = record?.isFar == true, quick = canGrade && record.map { $0.grade == .mastered && !$0.isFar } == true
+            let progressLine = "كشفت " + numerals.string(revealedCount) + " من " + numerals.string(currentAyahs.count)
+            let caption = draft.kind == .free && !canGrade ? "قراءة فقط؛ هذا الوجه غير مكتمل في صدرك" : stage == .grading ? "تقييم مقترح من تعثّرك؛ يمكنك تغييره"
+                : revealedCount > 0 ? progressLine : quick ? "وجه متقن؛ سمّعه كله ثم اكشفه مرة واحدة" : far ? "وجه بعُد عهدك به؛ خذه آية آية" : progressLine
             state.coach = QuranUICoach(activeAyahID: next?.id ?? currentAyahs.last?.id ?? draft.ayahID, activeAyahNumber: numerals.string(next?.ayahNumber ?? 0),
                 plannedAyahs: ids, revealedAyahs: revealed, repetition: 0, target: 0, bridge: false, method: "continuous", stageTitle: stage == .grading ? "تقييمك" : "المراجعة المستورة",
                 pageProgress: "المقطع " + numerals.string(sectionIndex + 1) + " من " + numerals.string(sections.count), caption: caption, pages: orderedPages, referenceText: nil,
-                pastDay: draft.storedDay.date != (try snapshot().day.date), review: true, flaggedAyahs: Set(draft.mistakes.filter { $0.key.wordIndex == nil }.map { $0.key.ayahID }))
+                pastDay: draft.storedDay.date != (try snapshot().day.date), review: true, flaggedAyahs: Set(draft.mistakes.filter { $0.key.wordIndex == nil }.map { $0.key.ayahID }), quickCheck: quick, farPage: far, pageAyahs: currentAyahs.map(\.id))
             state.availableMethods = ["continuous": "سرد متصل"]
             if stage == .review {
                 if let next { state.primaryTitle = "كشفت التالية"; state.primaryAction = .reveal(ayahID: next.id, wordIndex: nil) }

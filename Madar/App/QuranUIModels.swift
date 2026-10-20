@@ -174,6 +174,10 @@ struct QuranUICoach: Sendable {
     var review = false
     var flaggedAyahs: Set<Int> = []
     var flaggedWords: Set<String> = []
+    /// Review only, from the page's own record: a mastered page that is not far gets one whole-page check; a far page (RQ4) is taken ayah by ayah.
+    var quickCheck = false
+    var farPage = false
+    var pageAyahs: [Int] = []
     static func wordKey(_ ayah: Int, _ word: Int) -> String { "\(ayah):\(word)" }
 }
 enum QuranUISessionResult: Sendable { case active(QuranUISessionState), completed(summary: [String], reachedKhatm: Bool), discarded }

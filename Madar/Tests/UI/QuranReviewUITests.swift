@@ -10,7 +10,9 @@ import XCTest
         app.buttons["quran-begin"].tap()
         let advance = app.buttons["quran-session-advance"]
         XCTAssertTrue(advance.waitForExistence(timeout: 15), app.debugDescription)
-        XCTAssertEqual(advance.label, "كشفت التالية")
+        // The fixture's pages are mastered and recent, so each starts with one whole-page check.
+        XCTAssertEqual(advance.label, "سمّعته كاملًا")
+        XCTAssertTrue(app.staticTexts["quran-session-stage"].label.contains("وجه متقن"), app.staticTexts["quran-session-stage"].label)
         let closeFrame = app.buttons["quran-session-close"].frame
         XCTAssertGreaterThanOrEqual(closeFrame.minX, app.frame.minX, "Close button: \(closeFrame), window: \(app.frame)")
         XCTAssertLessThanOrEqual(closeFrame.maxX, app.frame.maxX, "Close button: \(closeFrame), window: \(app.frame)")
@@ -23,9 +25,10 @@ import XCTest
         XCTAssertTrue(advance.waitForExistence(timeout: 5))
         let flag = app.buttons["quran-session-hint"]
         XCTAssertEqual(flag.label, "تعثّرت"); flag.tap()
-        let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true AND label == %@", "كشفت التالية"), object: advance)
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: advance)
         XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 8), .completed, advance.debugDescription)
-        advance.tap()
+        // Uncovering one ayah by hand keeps this page ayah by ayah.
+        app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "اكشف ")).firstMatch.tap()
         let one = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", "كشفت ١"), object: app.staticTexts["quran-session-stage"])
         XCTAssertEqual(XCTWaiter.wait(for: [one], timeout: 8), .completed, app.staticTexts["quran-session-stage"].label)
         app.terminate(); app.launch()
@@ -43,7 +46,7 @@ import XCTest
         XCTAssertTrue(grade.waitForExistence(timeout: 10), app.debugDescription); grade.tap()
         attach(app, "M2-V03-grade-L")
         // A grade moves on to the next page by itself.
-        let nextPage = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@ AND enabled == true", "كشفت التالية"), object: advance)
+        let nextPage = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@ AND enabled == true", "سمّعته كاملًا"), object: advance)
         XCTAssertEqual(XCTWaiter.wait(for: [nextPage], timeout: 12), .completed)
         app.buttons["quran-session-close"].tap()
         XCTAssertTrue(app.buttons["quran-session-save-partial"].waitForExistence(timeout: 5))
@@ -57,6 +60,23 @@ import XCTest
     }
     private func attach(_ app: XCUIApplication, _ name: String) {
         let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = name; shot.lifetime = .keepAlways; add(shot)
+    }
+    /// Owner 20 Oct: review adapts to the page. A mastered, recent page is checked whole: one tap uncovers it and opens grading.
+    func testMasteredPageIsCheckedWholeInOneTap() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-16T15:00:00+03:00", "MADAR_UI_QURAN_FIXTURE": "home"]
+        app.launch()
+        XCTAssertTrue(app.buttons["quran-begin"].waitForExistence(timeout: 20), app.debugDescription); app.buttons["quran-begin"].tap()
+        let advance = app.buttons["quran-session-advance"]
+        let whole = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true AND label == %@", "سمّعته كاملًا"), object: advance)
+        XCTAssertEqual(XCTWaiter.wait(for: [whole], timeout: 15), .completed, app.debugDescription)
+        attach(app, "M2-V03-whole-check-L")
+        advance.tap()
+        XCTAssertTrue(app.buttons["quran-coach-grade-mastered"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertEqual(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "اكشف ")).count, 0, "the whole page is uncovered")
+        attach(app, "M2-V03-whole-graded-L")
+        app.terminate()
     }
     /// Owner 20 Oct: a finger dragged down the covered page uncovers every ayah it crosses, no button needed.
     func testDraggingAcrossTheCoveredPageRevealsAyahs() throws {

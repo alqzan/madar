@@ -149,6 +149,11 @@ struct QuranHifzCoachView: View {
         }.padding(.horizontal, 12).padding(.bottom, 10)
             .accessibilityElement(children: .contain)
     }
+    private var wholePageCheck: Bool {
+        // Once the reader uncovers an ayah by hand, the page stays ayah by ayah.
+        guard coach.review, coach.quickCheck, state.stage == .review, case .reveal = state.primaryAction else { return false }
+        return !coach.pageAyahs.contains(where: coach.revealedAyahs.contains)
+    }
     private var controls: some View {
         HStack(spacing: 8) {
             Button { sheet = .methods } label: {
@@ -157,8 +162,11 @@ struct QuranHifzCoachView: View {
                     Text(state.availableMethods[state.method] ?? "المدرّب الموجّه").font(font(12, bold: true)).multilineTextAlignment(.center)
                 }.frame(maxWidth: .infinity, minHeight: 48).contentShape(Capsule())
             }.buttonStyle(.plain).accessibilityIdentifier("quran-session-method")
-            Button { action(state.primaryAction) } label: {
-                Text(state.primaryTitle).font(font(14, bold: true)).multilineTextAlignment(.center)
+            Button {
+                // A mastered page is checked whole: recite it, then one tap uncovers it and opens grading.
+                action(wholePageCheck ? .advance : state.primaryAction)
+            } label: {
+                Text(wholePageCheck ? "سمّعته كاملًا" : state.primaryTitle).font(font(14, bold: true)).multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity, minHeight: 52).foregroundStyle(theme.onAccent)
                     .background(theme.accent, in: Capsule())
             }.buttonStyle(.plain).accessibilityIdentifier("quran-session-advance")
