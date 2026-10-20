@@ -321,6 +321,15 @@ M0-M6 software is integrated; M5 has its bounded software gate. M7 remains open 
 
 # Handovers
 
+## Handover — Thmanyah «٬/٫», prayer/diary/habits/money polish — 2026-10-21 — Claude
+Works now: money amounts (about 90 places), the money widget and lobby rows draw «٬/٫» from Thmanyah's own «،/,» (its licence forbids editing the files); the Quran plan date shows both calendars; prayer day line without «٠ من ٥ ·»; number settings show their unit («٣٠ دقيقة»); echo cards without a repeated date; full-width habit editor; habit page in its own period; obligation lanterns that no longer overlap; «بقي ٨ أكواب».
+Verified: MoneyHome 4/4, Salary 1/1, Since 1/1, Analysis 2/2, EnvelopeDetail 1/1, Log 1/1, Obligations 4/4, Envelopes 2/2, QuranJourney 1/1, RoomWidgetSnapshotTests 7/7, PrayerFirstDay 1/1, PrayerCountdown 1/1, DiaryEchoes 1/1, Habits 2/2, BahwLobby 9/9 (simulator 412F4437); `git diff --check` clean.
+Differences left: «٬/٫» outside the money room (e.g. Quran in Amiri, which has them) unchanged; tiny chart axis dates show one calendar; the diary microphone-denial message is still blocked (item 15).
+Not verified: owner iPhone, VoiceOver reading of the composed figures on a device, dark mode.
+Next: diary microphone denial on a real device; continue the UX pass in Mihbara and the money sheets.
+Model/effort: claude-opus-5-5 / not exposed.
+Usage: 59% five-hour used / 16% weekly used at the last live check.
+
 ## Handover — owner UX pass: Quran flexibility, widgets, Mihbara, lobby habits — 2026-10-20 — Claude
 Works now: any open Quran step starts from its sheet; review adapts per page (mastered page: «سمّعته كاملًا» one tap; far page: ayah by ayah); widget/reminder copy in Arabic agreement; reminder preview matches the notification; day-path widget line; Mihbara audit (counts, shelf moves by long press, «أنت هنا», cleaner EPUB preview); lobby habits block shows one period at a time; hero money figures draw «٬/٫».
 Verified: QuranReviewUITests 4/4, QuranHomeUITests step test 1/1, QuranOutsideUITests 2/2, RoomWidgetSnapshotTests 7/7, RoomNotificationsIntegrationTests 10/10, Mihbara reader 3/3 + library/shelf 2/2 + motivation 1/1, BahwLobbyUITests 9/9, MoneyHomeUITests 4/4, HabitsUITests 2/2 (simulator 412F4437, iOS 26.5); `git diff --check` clean.
@@ -337,12 +346,3 @@ Not verified: owner visual approval, owner iPhone, real bank corpus through this
 Next: port the remaining My-dream parser cases, then run the private corpus guide and simulator screen trial in queue order.
 Model/effort: not exposed / not exposed.
 Usage: 10% five-hour used / 2% weekly used at the last live check; reserve remains.
-
-## Handover — M7 visual review and reader scroll evidence — 2026-10-20 — Codex
-Works now: Step 9 visual review covers 68 matched boards / 86 canonical states; 85 actual pairs include all four matched dark states. Fresh W2-Adat and Mihbara scrolled states are attached in local artifacts.
-Verified: M4-V02 UI 1/1; Mihbara capture bundle 1/2 (V09 passed; initial V10 swipe hit off-screen text), then focused V10 rerun 1/1; W2-Adat 3/3, R9-Qari-Riyad 2/2, R9-Qari-Tamrir 3/3 comparisons; `git diff --check` clean.
-Differences left: M5-V10's OS notification has no real-delivery pair; RU2-invalid M3-V16 remains excluded; fixture content/native chrome differ in places; W2's lower first-row edge is partly under the floating accessory although the tap center is reachable.
-Not verified: owner iPhone unavailable to Xcode, real OS notification/Control invocation, iOS 27 runtime and final M7 release acceptance.
-Next: resume Step 10 when the owner's iPhone is connected; build the final UI review page after M7 software and device evidence.
-Model/effort: not exposed / not exposed.
-Usage: 5% five-hour used / 6% weekly used at the live check on 2026-10-20.
