@@ -15,6 +15,8 @@ struct BahwBlockView: View {
     var interactive = true
     @State private var mihbaraSnapshot: MihbaraSnapshot?
     @State private var mihbaraLocked = true
+    @State private var habitPeriod: HabitFrequency?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.roomTheme) private var lobby
     private var dark: Bool { lobby.dark }
     private var room: RoomTheme {
@@ -77,6 +79,21 @@ struct BahwBlockView: View {
         } else { MoneyWidgetContent(snapshot: service.session.moneyWidgetPayload(hidden: service.session.bool("core.hideMoneyUntilTouch"), at: service.now), family: size == .icon ? .accessoryCircular : size == .small ? .systemSmall : size == .wide ? .systemMedium : .systemLarge, template: size == .wide ? "basis" : "now") }
     }
 
+    private func periodRing(_ f: HabitFrequency, rows: [HabitReading], selected: Bool) -> some View {
+        let group = rows.filter { $0.summary.current?.rule.frequency == f }
+        let met = group.filter { $0.summary.current?.met == true }.count
+        let share: Double = group.isEmpty ? 0 : Double(met) / Double(group.count)
+        let spoken: String = group.isEmpty ? "لا عادات" : digits.string(met) + " من " + digits.string(group.count)
+        return Button { withAnimation(reduceMotion ? nil : .snappy) { habitPeriod = f } } label: {
+            VStack(spacing: 4) {
+                HabitMiniRing(share: share, theme: room).frame(width: 24, height: 24)
+                Text(f.arabic).font(selected ? label : small).foregroundStyle(selected ? room.accent : room.ink)
+                Capsule().fill(selected ? room.accentFill : Color.clear).frame(width: 18, height: 3)
+            }.frame(maxWidth: .infinity, minHeight: 44).contentShape(.rect).opacity(group.isEmpty ? 0.45 : 1)
+        }.buttonStyle(.plain).disabled(!interactive || group.isEmpty)
+        .accessibilityLabel(f.arabic + "، " + spoken)
+        .accessibilityAddTraits(selected ? .isSelected : []).accessibilityIdentifier("bahw-habits-period-" + f.rawValue)
+    }
     private var habits: some View {
         let rows = (try? HabitRepository(context: ModelContext(service.session.container)).readings(at:service.now)) ?? []
         let met = rows.filter { $0.summary.current?.met == true }.count
@@ -97,10 +114,14 @@ struct BahwBlockView: View {
                 Spacer(minLength:0)
             }
             else if size == .large {
-                HStack { ForEach([HabitFrequency.daily,.weekly,.monthly,.yearly],id:\.self){f in let group=rows.filter{$0.summary.current?.rule.frequency == f};VStack(spacing:4){HabitMiniRing(share:group.isEmpty ? 0 : Double(group.filter{$0.summary.current?.met == true}.count)/Double(group.count),theme:room).frame(width:24,height:24);Text(f.arabic).font(small)}.frame(maxWidth:.infinity)} }
-                // Improvement 20 Oct: the room left under the grid names the next useful habit, the same
-                // «التالي» line as the wide size, instead of staying blank; the chips keep their order.
-                LazyVGrid(columns:[GridItem(.flexible()),GridItem(.flexible())],spacing:8){ ForEach(Array(rows.prefix(6))){r in
+                // Owner 20 Oct («ولا فيه تفريق صاحي»): the period rings choose which habits the grid shows, as in the
+                // habits room; it opens on the first period with something unfinished.
+                let periods=[HabitFrequency.daily,.weekly,.monthly,.yearly]
+                let open=periods.first{f in rows.contains{$0.summary.current?.rule.frequency == f && $0.summary.current?.met != true && !$0.paused}} ?? periods.first{f in rows.contains{$0.summary.current?.rule.frequency == f}} ?? .daily
+                let period=habitPeriod.flatMap{p in rows.contains{$0.summary.current?.rule.frequency == p} ? p : nil} ?? open
+                let shown=rows.filter{$0.summary.current?.rule.frequency == period}
+                HStack { ForEach(periods,id:\.self){f in periodRing(f,rows:rows,selected:f == period)} }
+                LazyVGrid(columns:[GridItem(.flexible()),GridItem(.flexible())],spacing:8){ ForEach(Array(shown.prefix(6))){r in
                     Button {
                         if r.source == "walking" {service.session.habitsOpen=true}
                         else if let source=r.source { service.session.selectedTab=source == "jamaah" ? "prayer" : source == "review" ? "quran" : "notes" }

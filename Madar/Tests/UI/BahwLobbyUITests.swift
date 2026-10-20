@@ -61,6 +61,15 @@ import XCTest
         XCTAssertTrue(largeNext.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertTrue(largeNext.label.contains("التالي: الماء"), largeNext.label)
         capture(app, "M4-V01-habit-large-next-L")
+        // The period rings choose which habits the grid shows; one opens selected.
+        let rings = ["daily", "weekly", "monthly", "yearly"].map { app.buttons["bahw-habits-period-" + $0] }
+        XCTAssertEqual(rings.filter(\.isSelected).count, 1, app.debugDescription)
+        if let other = rings.first(where: { $0.isEnabled && !$0.isSelected }) {
+            other.tap()
+            let chosen = XCTNSPredicateExpectation(predicate: NSPredicate(format: "selected == true"), object: other)
+            XCTAssertEqual(XCTWaiter.wait(for: [chosen], timeout: 5), .completed, app.debugDescription)
+            capture(app, "M4-V01-habit-large-period-L")
+        }
         habits.press(forDuration: 0.7)
         let size = app.buttons["bahw-size-habits"]
         XCTAssertTrue(size.waitForExistence(timeout: 5))
