@@ -56,6 +56,11 @@ import XCTest
         app.launch(); finishOnboarding(app)
         let habits = app.descendants(matching: .any).matching(identifier: "bahw-block-habits").firstMatch
         XCTAssertTrue(habits.waitForExistence(timeout: 15))
+        // The large block names the next habit under its grid, with the wide block's wording.
+        let largeNext = app.buttons["bahw-habits-next"]
+        XCTAssertTrue(largeNext.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(largeNext.label.contains("التالي: الماء"), largeNext.label)
+        capture(app, "M4-V01-habit-large-next-L")
         habits.press(forDuration: 0.7)
         let size = app.buttons["bahw-size-habits"]
         XCTAssertTrue(size.waitForExistence(timeout: 5))

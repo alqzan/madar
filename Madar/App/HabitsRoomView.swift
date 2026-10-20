@@ -52,7 +52,7 @@ struct HabitsRoomView: View {
                         ForEach([HabitFrequency.daily,.weekly,.monthly,.yearly],id:\.self) { frequency in
                             let rows = active.filter { $0.summary.current?.rule.frequency == frequency }.sorted { priority($0) < priority($1) }
                             if !rows.isEmpty {
-                                HStack { Text(frequency.arabic).font(MadarTypography.section()); Text(digits.string(rows.filter { $0.summary.current?.met == true }.count) + " من " + digits.string(rows.count)).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk); Spacer(); Text("السلسلة: " + frequency.periodArabic).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
+                                HStack { Text(frequency.arabic).font(MadarTypography.section()); Text(digits.string(rows.filter { $0.summary.current?.met == true }.count) + " من " + digits.string(rows.count)).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk); Spacer() }
                                 VStack(spacing:0) { ForEach(rows) { row in habitRow(row); if row.id != rows.last?.id { Divider().overlay(theme.line) } } }.background(theme.surface,in:.rect(cornerRadius:24))
                             }
                         }

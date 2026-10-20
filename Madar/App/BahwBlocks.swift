@@ -98,6 +98,8 @@ struct BahwBlockView: View {
             }
             else if size == .large {
                 HStack { ForEach([HabitFrequency.daily,.weekly,.monthly,.yearly],id:\.self){f in let group=rows.filter{$0.summary.current?.rule.frequency == f};VStack(spacing:4){HabitMiniRing(share:group.isEmpty ? 0 : Double(group.filter{$0.summary.current?.met == true}.count)/Double(group.count),theme:room).frame(width:24,height:24);Text(f.arabic).font(small)}.frame(maxWidth:.infinity)} }
+                // Improvement 20 Oct: the room left under the grid names the next useful habit, the same
+                // «التالي» line as the wide size, instead of staying blank; the chips keep their order.
                 LazyVGrid(columns:[GridItem(.flexible()),GridItem(.flexible())],spacing:8){ ForEach(Array(rows.prefix(6))){r in
                     Button {
                         if r.source == "walking" {service.session.habitsOpen=true}
@@ -105,6 +107,10 @@ struct BahwBlockView: View {
                         else { Task { do {try await service.session.executeDiaryCommand("habit.complete",payload:["id":.string(r.id.uuidString),"delta":.number(r.summary.current?.rule.measure == .duration ? 15 : 1)])}catch{service.session.errorMessage=error.localizedDescription} } }
                     } label:{HStack(spacing:5){Image(systemName:r.paused ? "pause.circle" : r.summary.current?.met == true ? "checkmark.circle.fill" : "circle");Text(r.name).lineLimit(1)}.font(small).frame(maxWidth:.infinity,minHeight:44).background(room.background,in:.rect(cornerRadius:12))}.buttonStyle(.plain).disabled(!interactive || r.paused)
                 } }
+                Spacer(minLength:0)
+                BahwHabitsWide(rows: rows, digits: digits, theme: room, interactive: interactive, showsPeriods: false) {
+                    service.session.habitsOpen = true
+                }
             } else if size == .wide {
                 BahwHabitsWide(rows: rows, digits: digits, theme: room, interactive: interactive) {
                     service.session.habitsOpen = true
@@ -310,6 +316,7 @@ private struct BahwHabitsWide: View {
     let digits: MadarNumberFormatter
     let theme: RoomTheme
     let interactive: Bool
+    var showsPeriods = true
     let open: () -> Void
 
     private var next: HabitReading? {
@@ -326,9 +333,11 @@ private struct BahwHabitsWide: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 4) {
-                ForEach([HabitFrequency.daily, .weekly, .monthly, .yearly], id: \.self) { frequency in
-                    BahwHabitPeriod(rows: rows, frequency: frequency, digits: digits, theme: theme)
+            if showsPeriods {
+                HStack(spacing: 4) {
+                    ForEach([HabitFrequency.daily, .weekly, .monthly, .yearly], id: \.self) { frequency in
+                        BahwHabitPeriod(rows: rows, frequency: frequency, digits: digits, theme: theme)
+                    }
                 }
             }
             Button(action: open) {
