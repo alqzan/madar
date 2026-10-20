@@ -539,6 +539,11 @@ import XCTest
         // The reader stayed on the chapter rather than jumping to the notes file.
         XCTAssertTrue(app.staticTexts["mihbara-reader-print-page"].label.contains("٤٥٣"))
         sleep(1); shot(app, "M6-V09-footnote-L")
+        let passage = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "القراءة باب يدخل")).firstMatch
+        XCTAssertTrue(passage.waitForExistence(timeout: 5), app.debugDescription)
+        passage.swipeUp(velocity: .slow)
+        sleep(1); shot(app, "M6-V09-footnote-s1-L")
+        XCTAssertTrue(card.exists)
         app.buttons["mihbara-footnote-close"].tap()
         XCTAssertTrue(card.waitForNonExistence(timeout: 5))
     }
