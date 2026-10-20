@@ -83,11 +83,11 @@ struct MihbaraPDFImportView: View {
                     }
 
                     if let value = inspection {
-                        row("نوع الملف", detail: value.scanned ? "PDF مصوّر؛ لا توجد طبقة نص في أي صفحة." : "PDF بطبقة نص في \(digits.string(value.textPages)) من \(digits.string(value.pages)) صفحة.", detected: true)
+                        row("نوع الملف", detail: value.scanned ? "مصوّر: صفحاته صور بلا طبقة نص." : value.textPages >= value.pages ? "كل صفحاته نصّية وقابلة للبحث." : "بعض صفحاته نصّية (\(digits.string(value.textPages)) من \(digits.string(value.pages)))، والباقي صور.", detected: true)
                         row("اللغة", detail: value.detectedLanguage == "ar" ? "تعرّف النص العربي؛ تُفتح القراءة بالعربية." : value.detectedLanguage == "en" ? "تعرّف النص الإنجليزي؛ تُفتح القراءة بالإنجليزية." : "لا يمكن تحديد اللغة بثقة من هذا الملف؛ اختر لغة القراءة أدناه.", detected: value.detectedLanguage == "ar" || value.detectedLanguage == "en")
-                        row("قراءة النص", detail: value.scanned ? "\(digits.string(value.pages)) صفحة صور؛ يمكنك استخراج نص تقريبي والبحث فيه داخل القارئ على جهازك." : "النص الموجود في الملف محفوظ كما هو؛ صفحات الصور تُقرأ ضوئيًا عند البحث في القارئ.", detected: !value.scanned)
-                        row("الفهرس", detail: value.outline.isEmpty ? "بلا فهرس إلكتروني قابل للتنقّل؛ لم نخمن فصول الكتاب." : "عناوين فهرس PDF: \(digits.string(value.outline.count)).", detected: !value.outline.isEmpty)
-                        row("أرقام الصفحات", detail: value.hasPageLabels ? "توجد تسميات صفحات؛ مطابقتها للمطبوع غير متحققة." : "\(digits.string(value.pages)) صفحة في الملف؛ بلا تسميات صفحات مطبوعة مكتشفة.", detected: value.hasPageLabels)
+                        row("قراءة النص", detail: value.scanned ? "يستخرج مدار نص الصور تقريبيًا على جهازك لتبحث فيه داخل القارئ." : "النص الموجود في الملف محفوظ كما هو؛ صفحات الصور تُقرأ ضوئيًا عند البحث في القارئ.", detected: !value.scanned)
+                        row("الفهرس", detail: value.outline.isEmpty ? "بلا فهرس إلكتروني قابل للتنقّل؛ لم نخمن فصول الكتاب." : "فهرس جاهز للتنقّل فيه " + arabicCount(value.outline.count, ["عنوان واحد", "عنوانان", "عناوين", "عنوانًا"], digits) + ".", detected: !value.outline.isEmpty)
+                        row("أرقام الصفحات", detail: value.hasPageLabels ? "توجد تسميات صفحات؛ مطابقتها للمطبوع غير متحققة." : "فيه " + arabicCount(value.pages, ["صفحة واحدة", "صفحتان", "صفحات", "صفحة"], digits) + "؛ لم تُكتشف أرقام مطبوعة، فيُشار إليها بترتيبها في الملف.", detected: value.hasPageLabels)
                         row("الحواشي", detail: "لم تُكتشف بنية حواشٍ منفصلة؛ تبقى كما وردت في الصفحة.", detected: false)
                     }
                 }
@@ -123,8 +123,9 @@ struct MihbaraPDFImportView: View {
 
     private func row(_ title: String, detail: String, detected: Bool) -> some View {
         HStack(alignment: .top, spacing: 10) {
-            Image(systemName: detected ? "checkmark.circle.fill" : "circle")
-                .font(.system(size: 20, weight: .regular)).foregroundStyle(detected ? theme.color("sunnah") : theme.secondaryInk)
+            // Found → filled check; not in this file → a quiet dash, so information never reads as an unfinished task.
+            Image(systemName: detected ? "checkmark.circle.fill" : "minus.circle")
+                .font(.system(size: 20, weight: .regular)).foregroundStyle(detected ? theme.color("sunnah") : theme.secondaryInk.opacity(0.6))
                 .frame(width: 25).padding(.top, 2)
             VStack(alignment: .leading, spacing: 4) {
                 Text(title).font(MadarTypography.section())

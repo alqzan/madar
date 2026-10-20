@@ -22,7 +22,7 @@ import UIKit
         let confirm = app.buttons["mihbara-import-confirm"]
         XCTAssertTrue(confirm.waitForExistence(timeout: 20), app.debugDescription)
         XCTAssertTrue(app.staticTexts["PDF مصوّر"].firstMatch.exists)
-        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "لا توجد طبقة نص")).firstMatch.exists)
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "صفحاته صور بلا طبقة نص")).firstMatch.exists)
         attach(app, "M6-V17-preview-L")
         for _ in 0..<6 where !confirm.isHittable { app.swipeUp(velocity: .slow) }
         XCTAssertTrue(confirm.isHittable)
@@ -68,7 +68,7 @@ import UIKit
         let confirm = app.buttons["mihbara-import-confirm"]
         XCTAssertTrue(confirm.waitForExistence(timeout: 20), app.debugDescription)
         XCTAssertTrue(app.staticTexts["PDF مصوّر"].firstMatch.exists)
-        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "لا توجد طبقة نص")).firstMatch.exists)
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "صفحاته صور بلا طبقة نص")).firstMatch.exists)
         attach(app, "M6-V17-preview-L")
         for _ in 0..<6 where !confirm.isHittable { app.swipeUp(velocity: .slow) }
         XCTAssertTrue(confirm.isHittable)
@@ -141,7 +141,7 @@ import UIKit
         let add = app.buttons["mihbara-add-paper"]; XCTAssertTrue(add.waitForExistence(timeout: 8)); add.tap()
         let confirm = app.buttons["mihbara-import-confirm"]
         XCTAssertTrue(confirm.waitForExistence(timeout: 20), app.debugDescription)
-        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "PDF بطبقة نص في")).firstMatch.exists, app.debugDescription)
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "كل صفحاته نصّية")).firstMatch.exists, app.debugDescription)
         XCTAssertEqual(app.textFields["mihbara-import-title"].value as? String, "كتاب رقمي")
         attach(app, "M6-PDF-text-preview-L")
         for _ in 0..<6 where !confirm.isHittable { app.swipeUp(velocity: .slow) }

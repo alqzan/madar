@@ -174,7 +174,11 @@ func habitUnitCount(_ count:Int,_ unit:String?,_ digits:MadarNumberFormatter)->S
     let known:[String:[String]]=["minutes":["دقيقة واحدة","دقيقتان","دقائق","دقيقة"],"exerciseMinutes":["دقيقة حركة واحدة","دقيقتا حركة","دقائق حركة","دقيقة حركة"],
         "steps":["خطوة واحدة","خطوتان","خطوات","خطوة"],"pages":["صفحة واحدة","صفحتان","صفحات","صفحة"],"":["مرة واحدة","مرتان","مرات","مرة"]]
     guard let forms=known[unit ?? ""] else { return digits.string(count)+" "+(unit ?? "") }
-    return count == 1 ? forms[0] : count == 2 ? forms[1] : digits.string(count)+" "+((3...10).contains(count%100) ? forms[2] : forms[3])
+    return arabicCount(count,forms,digits)
+}
+/// Arabic number agreement from four forms: one, two, plural (٣–١٠), and the singular after ١١ and above.
+func arabicCount(_ count:Int,_ forms:[String],_ digits:MadarNumberFormatter)->String {
+    count == 1 ? forms[0] : count == 2 ? forms[1] : digits.string(count)+" "+((3...10).contains(count%100) ? forms[2] : forms[3])
 }
 func habitPeriodCount(_ count:Int,_ frequency:HabitFrequency,_ digits:MadarNumberFormatter)->String {
     let forms:[String]
