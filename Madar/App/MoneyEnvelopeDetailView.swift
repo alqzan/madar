@@ -204,7 +204,7 @@ struct MoneyRepaymentView: View {
                     .disabled(working || reading.home.reserveMinor < debt)
                 if let errorMessage { Text(errorMessage).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")) }
             }.padding(18)
-        }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).presentationDetents([.large]).presentationDragIndicator(.visible).accessibilityIdentifier("money-repayment-preview")
+        }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).presentationDetents([.medium, .large]).presentationDragIndicator(.visible).accessibilityIdentifier("money-repayment-preview")
     }
     private func outlined(_ title: String, note: String?, id: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
