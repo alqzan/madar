@@ -58,8 +58,23 @@ struct QuranDayCloseView: View {
                     .font(.system(size: 30, weight: .bold)).foregroundStyle(theme.color("onGold"))
             }.frame(width: 66, height: 66).padding(.top, 4).padding(.bottom, 8).accessibilityHidden(true)
             Text(value.title).font(serif(30)).accessibilityIdentifier("quran-day-close-title")
-            Text(value.dateAndStreak).font(font(12)).foregroundStyle(theme.secondaryInk).multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true).padding(.bottom, 8)
+            // Both calendars: the primary date as the main line, the other smaller beneath it;
+            // the streak stands apart in the same mark as the Quran home instead of trailing the date.
+            VStack(spacing: 3) {
+                Text(value.date.primary).font(font(13)).foregroundStyle(theme.ink)
+                Text(value.date.secondary).font(font(11)).foregroundStyle(theme.secondaryInk)
+            }
+            .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
+            .accessibilityElement(children: .combine).accessibilityIdentifier("quran-day-close-date")
+            if !value.streak.isEmpty {
+                HStack(spacing: 6) { Circle().fill(theme.color("hifz")).frame(width: 7, height: 7).accessibilityHidden(true); Text(value.streak) }
+                    .font(font(12, bold: true)).foregroundStyle(theme.ink)
+                    .padding(.horizontal, 12).padding(.vertical, 6)
+                    .background(theme.color("hifzTint"), in: .capsule)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("quran-day-close-streak")
+            }
+            Color.clear.frame(height: 4)
             coverage(value)
             review(value)
             VStack(alignment: .leading, spacing: 8) {

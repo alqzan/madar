@@ -49,9 +49,10 @@ extension AppQuranService {
         let formatter = DateFormatter(); formatter.locale = Locale(identifier: "ar_SA-u-nu-latn")
         formatter.calendar = calendar; formatter.timeZone = calendar.timeZone; formatter.dateFormat = "EEEE"
         let weekday = formatter.string(from: dayInstant)
-        formatter.dateFormat = "d MMMM yyyy"
-        let dateTitle = date.labels(firstCalendar: firstCalendar, numerals: numerals.style).combined
-        return QuranUIDayClose(title: complete ? "أتممت يومك" : "حصيلة يومك", dateAndStreak: weekday + " " + dateTitle + "، سلسلتك " + PrayerCopy.days(streak.days, digits: numerals),
+        let labels = date.labels(firstCalendar: firstCalendar, numerals: numerals.style)
+        return QuranUIDayClose(title: complete ? "أتممت يومك" : "حصيلة يومك",
+            date: MadarDateLabels(primary: weekday + " " + labels.primary, secondary: labels.secondary),
+            streak: streak.days > 0 ? "سلسلتك " + PrayerCopy.days(streak.days, digits: numerals) : "",
             beforeFaces: before.coverage.completedPages.count, afterFaces: after.coverage.completedPages.count,
             addedFaces: after.coverage.completedPages.subtracting(before.coverage.completedPages).count,
             addedAyahs: after.coverage.coveredAyahs.subtracting(before.coverage.coveredAyahs).count,

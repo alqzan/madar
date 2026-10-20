@@ -1,4 +1,5 @@
 import Foundation
+import MadarCore
 
 // This projection contains domain results and validated read-only resources.
 // UI never invents coverage, a grade, a verse, a draft position or a resource license.
@@ -64,7 +65,7 @@ struct QuranUIDayCloseStrength: Identifiable, Sendable {
     var id: Int; var title: String; var before: Int?; var after: Int?
 }
 struct QuranUIDayClose: Sendable {
-    var title: String; var dateAndStreak: String
+    var title: String; var date: MadarDateLabels; var streak: String
     var beforeFaces: Int; var afterFaces: Int; var addedFaces: Int; var addedAyahs: Int
     var reviewedFaces: Int; var strengthBefore: Int?; var strengthAfter: Int?
     var strengths: [QuranUIDayCloseStrength]; var tomorrow: String; var isKhatm: Bool
