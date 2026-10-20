@@ -43,7 +43,7 @@ struct HabitsRoomView: View {
                 Button { editor = .init(id:UUID()) } label: { Image(systemName:"plus").frame(width:44,height:44).overlay { Circle().stroke(theme.line) } }.accessibilityLabel("عادة جديدة").accessibilityIdentifier("habit-add")
             }.padding(.horizontal,14).padding(.vertical,8)
             ScrollView {
-                VStack(alignment:.leading,spacing:14) {
+                VStack(alignment:.leading,spacing:8) {
                     if active.isEmpty { empty }
                     else {
                         summaries
