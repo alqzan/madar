@@ -10,6 +10,8 @@ import MadarPrayer
     func testSnapshotsUseActualQuantitiesAndExpireWithoutReadingTheStoreOutsideApp() async throws {
         let root=FileManager.default.temporaryDirectory.appendingPathComponent("RoomWidget-\(UUID())");defer{try? FileManager.default.removeItem(at:root)}
         let app=try AppSession(container:MadarContainerFactory.makeLocal(at:root),groupDirectory:root),id=UUID()
+        // The schema default locks the whole app, which keeps personal rows out of widgets; this test reads them unlocked.
+        try await app.applySettingsAndWait(["core.faceIDLock":.string("none")])
         var rule=HabitRule(effectiveFrom:AppBahwService(session:app).today);rule.measure = .count;rule.target=2;rule.unit="كوب"
         let encoded=try JSONDecoder().decode(MadarCore.JSONValue.self,from:JSONEncoder().encode(rule))
         try await app.executeDiaryCommand("habit.save",payload:["id":.string(id.uuidString),"name":.string("الماء"),"rule":encoded])
