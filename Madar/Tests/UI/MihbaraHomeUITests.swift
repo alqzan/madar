@@ -605,6 +605,8 @@ import XCTest
         shot(app, "M6-V10-night-scroll-L")
         app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "القراءة باب يدخل")).firstMatch.swipeUp(velocity: .slow)
         sleep(2); shot(app, "M6-V10-night-scroll-s1-L")
+        app.swipeUp(velocity: .slow)
+        sleep(2); shot(app, "M6-V10-night-scroll-s2-L")
         app.buttons["mihbara-reader-settings"].tap()
         if !app.buttons["mihbara-reader-reset"].exists { app.buttons["mihbara-reader-more"].tap() }
         let reset = app.buttons["mihbara-reader-reset"]

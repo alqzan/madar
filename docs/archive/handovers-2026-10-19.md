@@ -31,3 +31,12 @@ Model/effort: not exposed / not exposed. Usage: 41% five-hour used / 54% weekly 
 - **Not verified:** owner iPhone; dark mode for these three screens.
 - **Next:** owner review of matched screens, then M1/M3/M4/M5 device gates and M7 release items (owner).
 - **Model/effort:** claude-opus-5-5 / not exposed. **Usage:** not exposed.
+
+## Handover — M6 reader polish and M7 integration — 2026-10-19 — Codex
+Works now: glass shortcuts remain visible above the native floating room selector, with no duplicate active room; the broken lock glyph is corrected; Spotlight stays opt-in, title-only, and persistent; PDF pages open and resume.
+Verified: focused `xcodebuild test` 48/48 (45 integration + 3 UI); Core 137, Inbox 18, Snapshots 10 package tests; shipping-check unit tests 13/13; `check-review-contracts.py` 86/86; static shipping check 0 findings; `git diff --check` clean.
+Differences left: scanned PDFs have no OCR/search; 4,429 source lines still require human tracing, so complete shipping/M0 acceptance remains open.
+Not verified: owner iPhone, iOS 27 runtime, OS widget/Control invocation, actual on-device Spotlight result, performance/release, scholarly review, App Store page/privacy label, and direct @als app API/export.
+Next: remaining work requires device/system/store evidence. A direct Shamela app route needs a provider-issued API key; the installed @als MCP still has no iOS endpoint/export.
+Model/effort: not exposed / not exposed.
+Usage: 5% five-hour used / 76% weekly used at last live check; the five-hour window reset during this turn.
