@@ -80,7 +80,8 @@ struct DiaryEchoesView: View {
                 }
                 VStack(alignment: .leading, spacing: 12) {
                     Text(page.excerpt).font(DiaryType.writing).lineSpacing(8).lineLimit(4).multilineTextAlignment(.leading).frame(maxWidth: .infinity, alignment: .leading)
-                    Text(service.dateTitle(page.day, calendar: .hijri) + (page.place.map { " · " + $0 } ?? "")).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
+                    // The row above already shows this day in both calendars; the card adds only where it was written.
+                    if let place = page.place { Label(place, systemImage: "mappin").font(DiaryType.label).foregroundStyle(theme.color("ink3Text")) }
                 }.padding(16)
             }.background(theme.surface).clipShape(.rect(cornerRadius: 24))
                 .overlay { RoundedRectangle(cornerRadius: 24).stroke(theme.line) }
