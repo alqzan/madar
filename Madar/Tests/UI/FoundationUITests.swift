@@ -238,6 +238,10 @@ import XCTest
         XCTAssertTrue(app.buttons["prayer-missed-later"].exists)
         XCTAssertFalse(app.buttons["undo-button"].exists, "Nothing is saved until «قضيتُها الآن» or «لاحقًا»")
         attachScreenshot(app, named: "M1-V03-missed-L")
+        // Companion -s1: the sheet scrolled to «قضيتُها الآن» / «لاحقًا» / «امسح التسجيل».
+        app.buttons["prayer-makeup-now"].swipeUp()
+        XCTAssertTrue(app.buttons["prayer-missed-later"].isHittable, app.debugDescription)
+        attachScreenshot(app, named: "M1-V03-missed-L-s1")
         app.terminate()
     }
 
@@ -355,6 +359,10 @@ import XCTest
         XCTAssertTrue(isha.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(app.buttons["prayer-qada-row-2026-10-06-maghrib"].exists)
         attachScreenshot(app, named: "M1-V06-qada-L")
+        // Companion -s1: the sheet scrolled to its rows and the two actions.
+        app.staticTexts["prayer-qada-title"].swipeUp()
+        XCTAssertTrue(app.buttons["prayer-qada-makeup-chosen"].waitForExistence(timeout: 5), app.debugDescription)
+        attachScreenshot(app, named: "M1-V06-qada-L-s1")
         isha.tap()
         XCTAssertTrue(isha.isSelected)
         app.buttons["prayer-qada-makeup-chosen"].tap()
