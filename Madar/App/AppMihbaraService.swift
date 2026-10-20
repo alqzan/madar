@@ -101,7 +101,7 @@ struct MihbaraMotivationCue: Identifiable {
                 let remaining = total - current
                 cues.append(.init(
                     id: "progress-\(book.id.uuidString)", title: "أنت أقرب مما تظن",
-                    message: "بقي " + digits.string(remaining) + " " + (remaining == 1 ? "صفحة" : "صفحات") + " لتكمل «" + book.title + "»",
+                    message: "بقي " + arabicCount(remaining, ["صفحة واحدة", "صفحتان", "صفحات", "صفحة"], digits) + " لتكمل «" + book.title + "»",
                     source: "موضعك: صفحة " + digits.string(current) + " من " + digits.string(total),
                     actionTitle: "واصل القراءة", bookID: book.id
                 ))
@@ -112,7 +112,7 @@ struct MihbaraMotivationCue: Identifiable {
             let minutes = max(1, Int((Double(stepPages) * 1.4).rounded()))
             cues.append(.init(
                 id: "step-\(book.id.uuidString)", title: "خطوة صغيرة تكفي",
-                message: digits.string(stepPages) + " صفحات فقط",
+                message: arabicCount(stepPages, ["صفحة واحدة", "صفحتان", "صفحات", "صفحة"], digits) + " فقط",
                 source: "وقت تقريبي: " + PrayerCopy.minutes(minutes, digits: digits) + "، من موضعك المحفوظ",
                 actionTitle: book.isReadableEPUB || book.isReadablePDF ? "ابدأ القراءة" : "افتح موضعك", bookID: book.id
             ))

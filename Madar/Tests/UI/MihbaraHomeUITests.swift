@@ -98,6 +98,20 @@ import XCTest
         XCTAssertTrue(app.staticTexts["mihbara-library-status"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["mihbara-library-status"].label.hasPrefix("المطابق: كتاب واحد"), app.staticTexts["mihbara-library-status"].label)
     }
+    /// A long press on a library row moves the book between shelves with the existing book.moveShelf command.
+    func testLongPressMovesATableBookToFinished() {
+        continueAfterFailure = false; let app = app("home"); app.launch(); open(app)
+        let library = app.buttons["mihbara-library"]; reach(app, library); library.tap()
+        let readingLabels = app.staticTexts.matching(NSPredicate(format: "label == %@", "أقرؤه"))
+        XCTAssertTrue(readingLabels.firstMatch.waitForExistence(timeout: 8), app.debugDescription)
+        let before = readingLabels.count
+        let row = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "mihbara-library-book-")).containing(NSPredicate(format: "label == %@", "أقرؤه")).firstMatch
+        row.press(forDuration: 1.2)
+        let finish = app.buttons["أنهيته"]
+        XCTAssertTrue(finish.waitForExistence(timeout: 5), app.debugDescription); shot(app, "M6-audit-shelf-menu-L"); finish.tap()
+        let fewer = XCTNSPredicateExpectation(predicate: NSPredicate(block: { _, _ in readingLabels.count == before - 1 }), object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [fewer], timeout: 8), .completed, "before \(before), after \(readingLabels.count)")
+    }
     func testEmptyShelfPaperAddAndUndo() {
         continueAfterFailure = false; let app = app("empty"); app.launch(); open(app); shot(app,"M6-V01-empty-L")
         app.buttons["mihbara-add-paper"].tap()
@@ -697,7 +711,7 @@ import XCTest
         let previous = app.buttons["mihbara-focus-previous"]
         let next = app.buttons["mihbara-focus-next"]
         XCTAssertTrue(next.waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertTrue(app.staticTexts["mihbara-focus-print-page"].waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(app.descendants(matching: .any)["mihbara-reader-footer-value"].waitForExistence(timeout: 5), app.debugDescription)
         next.tap()
         let positionReady = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value != ''"), object: next)
         XCTAssertEqual(XCTWaiter.wait(for: [positionReady], timeout: 8), .completed, app.debugDescription)
