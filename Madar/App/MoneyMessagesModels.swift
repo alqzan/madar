@@ -27,6 +27,10 @@ struct MoneyMessageDraft: Identifiable, Equatable {
     var canCategorize = false
     /// A salary opens «نزل الراتب» instead of confirming in place (a salary closes and opens a cycle).
     var isSalary = false
+    /// Incoming bank messages can be confirmed as income or opened as a salary; neither choice is automatic.
+    var isIncomingBankDraft = false
+    /// Exact match against a counterparty learned from a previously confirmed salary.
+    var isSalarySuggestion = false
     var isBigExpense = false
 }
 
@@ -90,17 +94,24 @@ extension AppMoneyService {
             if let row = byMessage[message.id], !row.dayKey.isEmpty { return row.dayKey == today.description }
             return GregorianDay.containing(message.receivedAt, in: zone) == today
         }.count
-        func direction(_ row: MoneyTransaction) -> MoneyMessageDraft.Direction {
+        let messagesByID = Dictionary(messages.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        func direction(_ row: MoneyTransaction, message: BankMessage? = nil) -> MoneyMessageDraft.Direction {
             switch row.kind {
-            case "income", "salary", "refund", "cashback": .incoming
-            case "transfer": row.fromAccountID != nil && row.toAccountID != nil ? .neutral : row.toAccountID != nil ? .incoming : .out
-            case "cardPayment": .neutral
-            default: .out
+            case "income", "salary", "refund", "cashback": return .incoming
+            case "transfer":
+                if row.fromAccountID != nil && row.toAccountID != nil { return .neutral }
+                if message?.kind == BankMessageKind.transferIn.rawValue { return .incoming }
+                return row.toAccountID != nil ? .incoming : .out
+            case "cardPayment": return .neutral
+            default: return .out
             }
         }
+        let learnedSalarySources = Set(rows.filter { $0.kind == "salary" && $0.reviewState == "ok" && $0.source == "bank" }
+            .compactMap { SalarySourceMatcher.key($0.counterparty) })
         // «مصروف» and «وارد» count what the user confirmed today from bank messages (nothing is added without them).
         let confirmedToday = rows.filter { $0.reviewState == "ok" && $0.source == "bank" && $0.dayKey == today.description && !$0.ignoredFromBudget }
-        let spent = confirmedToday.filter { direction($0) == .out }, incoming = confirmedToday.filter { direction($0) == .incoming }
+        let spent = confirmedToday.filter { direction($0, message: $0.messageID.flatMap { messagesByID[$0] }) == .out }
+        let incoming = confirmedToday.filter { direction($0, message: $0.messageID.flatMap { messagesByID[$0] }) == .incoming }
         // A big expense waits for its own flow (mal.bigExpenseDays × today's allowance), so it is never «واضح».
         let bigFrom = bigExpenseThreshold(cycle: try repo.cycle(at: now))
         func cardName(_ id: UUID?) -> String? { cards.first { $0.id == id }?.name }
@@ -109,7 +120,7 @@ extension AppMoneyService {
         var drafts: [MoneyMessageDraft] = []
         for row in rows where open.contains(row.reviewState) && row.messageID != nil {
             let message = messages.first { $0.id == row.messageID }
-            let dir = direction(row)
+            let dir = direction(row, message: message)
             var note: String?
             if let obligation = obligations.first(where: { $0.id == row.obligationID }) { note = "مرتبطة بـ" + obligation.name }
             else if row.kind == "transfer" && dir == .neutral { note = "تحويل بين حساباتك، لا مصروف" }
@@ -117,12 +128,18 @@ extension AppMoneyService {
             if row.tripID != nil { note = (note.map { $0 + "، " } ?? "") + "من مظروف الرحلة" }
             let resolvable = ["expense", "fee", "withdrawal", "income", "transfer", "cardPayment"].contains(row.kind) && confirmable.contains(row.id)
             let big = row.tripID == nil && dir == .out && bigFrom.map { $0 > 0 && row.homeAmountMinor >= $0 } == true
-            let clear = row.reviewState == "needsLook" && resolvable && !big && (row.kind != "expense" || bigFrom != nil) && row.currency == home
+            let incomingBankDraft = row.source == "bank" && row.reviewState == "needsLook" && dir == .incoming
+                && (message?.kind == BankMessageKind.transferIn.rawValue || message?.kind == BankMessageKind.income.rawValue)
+            let clear = row.reviewState == "needsLook" && resolvable && !incomingBankDraft && !big
+                && (row.kind != "expense" || bigFrom != nil) && row.currency == home
+            let salarySuggestion = incomingBankDraft && SalarySourceMatcher.matches(row.counterparty, learnedKeys: learnedSalarySources)
             drafts.append(.init(id: row.id, sender: message?.sender ?? "", title: row.merchant ?? row.counterparty ?? Self.kindLabels[row.kind] ?? "حركة",
-                kindLabel: Self.kindLabels[row.kind] ?? "حركة", payment: cardName(row.cardID) ?? accountName(row.fromAccountID ?? row.toAccountID),
+                kindLabel: salarySuggestion ? "راتب مقترح" : Self.kindLabels[row.kind] ?? "حركة", payment: cardName(row.cardID) ?? accountName(row.fromAccountID ?? row.toAccountID),
                 amountMinor: row.amountMinor, currency: row.currency, direction: dir, possibleDuplicate: row.reviewState == "possibleDuplicate",
                 note: note, clear: clear, at: row.eventAt, categoryID: row.categoryID, categoryName: categories.first { $0.id == row.categoryID }?.name,
-                canCategorize: ["expense", "fee", "withdrawal"].contains(row.kind) && !categories.isEmpty, isSalary: row.kind == "salary", isBigExpense: big && row.kind == "expense" && !row.ignoredFromBudget && row.obligationID == nil))
+                canCategorize: ["expense", "fee", "withdrawal"].contains(row.kind) && !categories.isEmpty, isSalary: row.kind == "salary",
+                isIncomingBankDraft: incomingBankDraft, isSalarySuggestion: salarySuggestion,
+                isBigExpense: big && row.kind == "expense" && !row.ignoredFromBudget && row.obligationID == nil))
         }
         drafts.sort { $0.clear == $1.clear ? $0.at > $1.at : !$0.clear }
         var statementCards: [MoneyMessageStatement] = []

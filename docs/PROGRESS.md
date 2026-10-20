@@ -4,6 +4,7 @@
 
 # Last checked
 
+2026-10-20 - M5-V27 focused proof: MadarMoney `SalarySourceMatcherTests` 1/1; MadarCommands `MoneyPersistenceTests/confirmingIncomingTransferLearnsSourceAndUndoRemovesIt` 1/1; iPhone 17 Pro / iOS 26.5 `MoneyMessagesUITests/testSalarySourceIsLearnedOnlyAfterConfirmation` 1/1 (`M5-V27-ui-r5.xcresult`); `compare-screens.py Z-R18-msg-1` generated. No schema or owner-store migration. Owner visual approval remains pending.
 2026-10-19 - Current focused evidence: native source-fix run 9/9 (2 PrayerCopy integration + 7 prayer/customization/PDF/EPUB/Turath UI), plus Zakat sources UI 1/1; PDF OCR package 4/4, PDF import 6/6, Core InlineText 2/2; shipping-check negative fixtures 16/16; review contracts 86/86. Static shipping PASS: 0 findings, 360 Swift files, 4 catalogs, 38 M0 token pairs; 4,352 conservative manual trace entries remain (3,763 UI-only), so complete source/M0 acceptance is not claimed. Privacy plists and store-field limits validate. Final unsigned device Release archive succeeded (M7-Release-final-20261019.xcarchive); app/widget privacy manifests are present and MinimumOSVersion is 26.0. This is not signed distribution or a runtime performance measurement. No real-device performance, iOS 27 runtime, OS placement/Control, actual Spotlight result, qualified human review or store submission is claimed. Live Turath catalogue attempt returned HTTP 403 from this connection; fixture import still passes.
 # Board
 
@@ -16,23 +17,22 @@ Every screen card follows protocol §2: canonical files → default-size screens
 Agents take the first unfinished step and continue down the list in the same session. Owner items run in parallel and never block the agents.
 
 **Bank messages (M5-E03 follow-on)**
-1. M5-V27 learn salary from the owner's confirmation (one review pass: stored rule).
-2. Port the rest of the owner's My-dream analysis (`src/lib/bankParser.ts`, `bankIntelligence.ts`, `bankParser.regression.test.ts` — local copy `/Users/abdulrahman/Documents/Codex/2026-09-19/new-chat/work/My-dream-implementation/src/lib/`): self-transfer, add funds, per-bank templates; expectations from its tests, rewritten with invented text.
-3. Work `Madar/Private/bank-messages/GUIDE.md` top-down (`swift test --filter BankCorpusTests`): 240 unknown, 322 transfers without counterparty. Special cases stay ≥15/16 (`BankSpecialCaseTests`).
-4. Run the corpus through the app's «رسائل البنك» screen in the simulator (local only) and fix what the screen shows wrong.
+1. Port the rest of the owner's My-dream analysis (`src/lib/bankParser.ts`, `bankIntelligence.ts`, `bankParser.regression.test.ts` — local copy `/Users/abdulrahman/Documents/Codex/2026-09-19/new-chat/work/My-dream-implementation/src/lib/`): self-transfer, add funds, per-bank templates; expectations from its tests, rewritten with invented text.
+2. Work `Madar/Private/bank-messages/GUIDE.md` top-down (`swift test --filter BankCorpusTests`): 240 unknown, 322 transfers without counterparty. Special cases stay ≥15/16 (`BankSpecialCaseTests`).
+3. Run the corpus through the app's «رسائل البنك» screen in the simulator (local only) and fix what the screen shows wrong.
 
 **Approved v1 additions**
-5. M5-V25 subscriptions shelf in «الالتزامات».
-6. M5-V26 exact salary repayment (optional fields, nil on migration; one review pass).
-7. M6-V24 persist expanded Arabic reader settings (default, reset, undo).
+4. M5-V25 subscriptions shelf in «الالتزامات».
+5. M5-V26 exact salary repayment (optional fields, nil on migration; one review pass).
+6. M6-V24 persist expanded Arabic reader settings (default, reset, undo).
 
 **Live trial of everything (owner 19 Oct: «ابي تضيف تجربه لكل شي» — trials are agent work, not the owner's)**
-8. Turath live: search, download a real book, open it, quote it — in the simulator on the real network.
-9. Every room end to end in the simulator, as a user would: prayer (real times for the active place, log, qada, Friday, travel), Quran (plan, session, Mushaf, logs), diary (write, attach, search, import/export), lobby/habits/widgets, money (bank messages from the local corpus through the screen, envelopes, cards, log, zakat), Mihbara (import PDF/EPUB, read, listen, quote). Every defect found is fixed in the same pass; each flow gets or extends a UI test.
-10. The agent reviews the ~60 `matched — awaiting owner` screens against their canonicals (compare pages, light and dark), fixes every nameable difference, and applies one «Go deeper and improve» touch per room. The owner only gives taste feedback afterwards.
-11. Device run: when the owner's iPhone is connected to this Mac, the agent builds, installs and runs the milestone checks (M1, M3, M4, M5 gates, Release performance, iOS 27 behind availability) through Xcode and records the results.
-12. Final UI review page with fresh shots of every screen (owner memory: regenerate when the build is complete).
-13. Publishing preparation the agent can do: support and privacy pages drafted and ready to host, store text, screenshots, privacy manifest check. Nothing is published without the owner's go.
+7. Turath live: search, download a real book, open it, quote it — in the simulator on the real network.
+8. Every room end to end in the simulator, as a user would: prayer (real times for the active place, log, qada, Friday, travel), Quran (plan, session, Mushaf, logs), diary (write, attach, search, import/export), lobby/habits/widgets, money (bank messages from the local corpus through the screen, envelopes, cards, log, zakat), Mihbara (import PDF/EPUB, read, listen, quote). Every defect found is fixed in the same pass; each flow gets or extends a UI test.
+9. The agent reviews the ~60 `matched — awaiting owner` screens against their canonicals (compare pages, light and dark), fixes every nameable difference, and applies one «Go deeper and improve» touch per room. The owner only gives taste feedback afterwards.
+10. Device run: when the owner's iPhone is connected to this Mac, the agent builds, installs and runs the milestone checks (M1, M3, M4, M5 gates, Release performance, iOS 27 behind availability) through Xcode and records the results.
+11. Final UI review page with fresh shots of every screen (owner memory: regenerate when the build is complete).
+12. Publishing preparation the agent can do: support and privacy pages drafted and ready to host, store text, screenshots, privacy manifest check. Nothing is published without the owner's go.
 
 **Owner — only what needs your account, identity or phone**
 - Keep the iPhone connected and unlocked when step 11 runs.
@@ -233,7 +233,7 @@ Read before any card: §7.5 `sections/12-r-mal.md` end to end (numbers table, en
 | M5-X01 | Money outside the room — lobby block, widget cells (•••), Control Center «مصروف», capture routing, diary money lines. | matched — awaiting owner (codex, 17 Oct) | Shared actual lobby/widget data, hidden JSON with no amount/share/curve, amount-free lock/StandBy, foreground expense Control, Capture confirmation without premature writes, and confirmed/refund diary facts once. MoneyOutside UI 2/2 + owning integration passed; final MoneyHome 4/4, Capture 4/4, Qiyam/Week 3/3 passed. Broad Money 58/59; corrected stale V01 assertion passed on rerun. Compare W1-Bahw, X1-Raisiya, X2-Qifl; M5-X01-large-shots. Overall gate limits in reports/M5.md. |
 | M5-V25 | Subscriptions shelf in «الالتزامات» — `mal/11-Z-R19-obl.jpg` shelf; owner approved v1, 19 Oct (DECISIONS). Suggest from repeated confirmed bank movements; the user confirms; no automatic obligation. | ready | |
 | M5-V26 | Exact salary repayment — optional `EnvelopePlan.repaymentTotalMinor` + `repaymentPaychecks`, nil on migration; owner approved 19 Oct. One review pass (touches stored records). | ready | |
-| M5-V27 | Learn salary from the owner's confirmation — the first «this is salary» on an incoming transfer remembers its source; later incoming from it is suggested as salary, the user confirms (owner 19 Oct). | ready | Needs a stored learned-source rule (optional field or setting); one review pass. |
+| M5-V27 | Learn salary from the owner's confirmation — `mal/07-Z-R18-msg-1.jpg`. The first «this is salary» on an incoming transfer remembers its source; later incoming from it is suggested as salary, the user confirms (owner 19 Oct). | matched — awaiting owner | «رسائل البنك» keeps incoming transfers as drafts and offers «اعتمده كدخل» or «اعتبره راتبًا». The salary report still requires final confirmation; only then does the existing bank `MoneyTransaction` become `kind=salary`. Later exact-normalized counterparties show «راتب مقترح» with both choices intact. The learned source is derived from confirmed bank salary rows, so there is no duplicate setting/field or schema migration; undo reverts the row and removes the suggestion. Verified: Money `SalarySourceMatcherTests` 1/1; Commands `confirmingIncomingTransferLearnsSourceAndUndoRemovesIt` 1/1 (including undo); iPhone 17 Pro / iOS 26.5 UI 1/1, `Artifacts/M5-V27-ui-r5.xcresult`; `compare-screens.py Z-R18-msg-1` generated. Differences: live fixture amounts and the floating room navigation below the first viewport; no scrolled canonical companion. Owner visual approval and iPhone remain pending. |
 | M5-G | Device acceptance — §12/§13, F09 device log. | deferred: after the whole app is finished | |
 
 ## Done — software (integrated on main, visual acceptance pending in M1-V)
@@ -311,14 +311,6 @@ M0-M6 software is integrated; M5 has its bounded software gate. M7 remains open 
 
 # Handovers
 
-## Handover — M5-V11/V12/V13 visual match — 2026-10-19 — Claude
-- **Works now:** the three remaining «improving» money screens are matched to their canonical files (ignore-from-budgets, cards, log); no code cards remain `ready` or `improving` on the board.
-- **Verified:** MoneyBudgetUITests 1/1 (M5-V11-match-1792429914.xcresult); MoneyCardsUITests 2/2 + MoneyLogUITests 1/1 (M5-V12V13-match-1792430036), then four-tab + log 2/2 (M5-V12V13-final-1792430210); `git diff --check` clean; compare pages Z-R19-ign/-ign-b, Z-R19-cards-1…4, Z-R18-log-4/-4x.
-- **Differences left:** V11 stamp kinds wait for «Budget stamp reasons»; paired dates make V13 month tabs taller than the Gregorian-only canonical; no red for overspent (RM10).
-- **Not verified:** owner iPhone; dark mode for these three screens.
-- **Next:** owner review of matched screens, then M1/M3/M4/M5 device gates and M7 release items (owner).
-- **Model/effort:** claude-opus-5-5 / not exposed. **Usage:** not exposed.
-
 ## Handover — M6 reader polish and M7 integration — 2026-10-19 — Codex
 Works now: glass shortcuts remain visible above the native floating room selector, with no duplicate active room; the broken lock glyph is corrected; Spotlight stays opt-in, title-only, and persistent; PDF pages open and resume.
 Verified: focused `xcodebuild test` 48/48 (45 integration + 3 UI); Core 137, Inbox 18, Snapshots 10 package tests; shipping-check unit tests 13/13; `check-review-contracts.py` 86/86; static shipping check 0 findings; `git diff --check` clean.
@@ -337,3 +329,11 @@ Not verified: 4,352 conservative manual trace sites (3,763 UI-only) remain unacc
 Next: owner/Claude every-screen comparison and device/system/performance runs; close remaining manual/render trace with evidence, keep frozen routes frozen, then real support/privacy URLs, review contact and signing/store access for publication. No complete M0/M7 or zero-manual-trace claim.
 Model/effort: not exposed / not exposed.
 Usage: 41% five-hour used / 94% weekly used at last live check.
+
+Works now: first incoming salary choice is confirmed through the existing cycle report; the confirmed counterparty then marks later incoming drafts «راتب مقترح», with normal-income choice and undo preserved.
+Verified: MadarMoney `SalarySourceMatcherTests` 1/1; MadarCommands `confirmingIncomingTransferLearnsSourceAndUndoRemovesIt` 1/1; iPhone 17 Pro / iOS 26.5 UI 1/1 (`M5-V27-ui-r5.xcresult`); `compare-screens.py Z-R18-msg-1`; `git diff --check` clean.
+Differences left: live fixture values and floating room navigation below the first viewport; the canonical has no scrolled companion.
+Not verified: owner visual approval, owner iPhone, real bank corpus through this flow.
+Next: port the remaining My-dream parser cases, then run the private corpus guide and simulator screen trial in queue order.
+Model/effort: not exposed / not exposed.
+Usage: 10% five-hour used / 2% weekly used at the last live check; reserve remains.

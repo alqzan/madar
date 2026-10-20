@@ -8,7 +8,7 @@ import MadarCommands
 extension AppSession {
     /// Named synthetic stores only. Never reads or writes the owner's store.
     func prepareMoneyFixture(group: URL) throws {
-        guard let variant = ProcessInfo.processInfo.environment["MADAR_UI_MONEY_FIXTURE"], ["goal", "zakat", "zakatHidden", "travel", "travelMissing", "travelHidden", "accounts", "expense", "showcase", "empty", "hidden", "zero", "shortfall", "messages", "since", "rules", "salary", "budget", "cards", "cardsHidden", "analysis", "analysisHidden", "reconcile", "reconcileHidden", "cashback", "cashbackHidden", "subscriptions"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
+        guard let variant = ProcessInfo.processInfo.environment["MADAR_UI_MONEY_FIXTURE"], ["goal", "zakat", "zakatHidden", "travel", "travelMissing", "travelHidden", "accounts", "expense", "showcase", "empty", "hidden", "zero", "shortfall", "messages", "salarySourceFlow", "since", "rules", "salary", "budget", "cards", "cardsHidden", "analysis", "analysisHidden", "reconcile", "reconcileHidden", "cashback", "cashbackHidden", "subscriptions"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         let c = ModelContext(container)
         guard !(try c.fetch(FetchDescriptor<DeviceSetting>())).contains(where: { $0.key == "sys.moneyFixture" }) else { return }
         for key in ["sys.moneyFixture", "sys.onboardingCompleted"] { let marker = DeviceSetting(); marker.key = key; marker.valueJSON = Data("true".utf8); c.insert(marker) }
@@ -52,7 +52,7 @@ extension AppSession {
             let o = Obligation(); o.name = title; o.kind = index == 0 ? "loan" : "bill"; o.amountMinor = amount; o.dueDay = min(28, today.day + index + 2); c.insert(o)
             if index == 0 { let item = InstallmentItem(); item.obligationID = o.id; item.amountMinor = amount; item.dueDate = today.adding(days: 2).date(in: zone); c.insert(item) }
         }
-        if variant != "messages" { let m = BankMessage(); m.text = "شراء اصطناعي ينتظر التوزيع"; m.kind = "purchase"; m.status = "needsLook"; m.receivedAt = now; c.insert(m) }
+        if variant != "messages" && variant != "salarySourceFlow" { let m = BankMessage(); m.text = "شراء اصطناعي ينتظر التوزيع"; m.kind = "purchase"; m.status = "needsLook"; m.receivedAt = now; c.insert(m) }
         account.bank = "بنك الاختبار"; account.senderIDs = ["بنك الاختبار"]; account.last4 = "5512"; account.ownership = "mine"
         let debit = Card(); debit.name = "بطاقة مدى"; debit.kind = "debit"; debit.bank = "بنك الاختبار"; debit.last4 = "3317"; debit.accountID = account.id; c.insert(debit)
         let card = Card(); card.name = "بطاقة المشتريات"; card.kind = "credit"; card.bank = "بنك الاختبار"; card.last4 = "8844"; card.accountID = account.id; c.insert(card)
@@ -170,7 +170,7 @@ extension AppSession {
             let travelStatement = Statement(); travelStatement.cardID = travel.id; travelStatement.statementMinor = 115_000; travelStatement.closeDate = today.adding(days: -3).date(in: zone); travelStatement.dueDate = today.adding(days: 18).date(in: zone); c.insert(travelStatement)
             try c.save()
         }
-        if variant == "messages" { seedMoneyMessages(today: today, zone: zone) }
+        if variant == "messages" || variant == "salarySourceFlow" { seedMoneyMessages(today: today, zone: zone, salarySourceFlow: variant == "salarySourceFlow") }
         if variant == "rules" {
             // Merchants the user already filed: rules, their movements, and one merchant filed two ways.
             func spend(_ merchant: String, _ category: MadarData.Category, _ days: Int, _ amount: Int) {
@@ -249,17 +249,18 @@ extension AppSession {
     }
 
     /// Synthetic texts through the real intake (parser, dedupe, duplicate flag), as the Shortcut would send them.
-    private func seedMoneyMessages(today: GregorianDay, zone: TimeZone) {
+    private func seedMoneyMessages(today: GregorianDay, zone: TimeZone, salarySourceFlow: Bool = false) {
         let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.timeZone = zone; f.dateFormat = "yyyy-MM-dd"
         let day = f.string(from: today.date(in: zone)), due = f.string(from: today.adding(days: 12).date(in: zone))
-        let texts = [
+        var texts = [
             "مرحبًا بك في خدماتنا",
             "كشف حساب البطاقة *8844\nالمبلغ المستحق: 4,250.00 SAR\nالحد الأدنى: 213.00 SAR\nتاريخ الاستحقاق: \(due)",
-            "حوالة واردة\nإلى: 5512*\nمن: سالم\nمبلغ: 120 SAR\n\(day) 11:40",
+            salarySourceFlow ? "حوالة واردة\nإلى: 5512*\nمن: شركة المدار\nمبلغ: 15000 SAR\n\(day) 11:40" : "حوالة واردة\nإلى: 5512*\nمن: سالم\nمبلغ: 120 SAR\n\(day) 11:40",
             "شراء مدى Apple Pay\nبطاقة *3317\n18.50 SAR\nلدى: مخبز الحي\n\(day) 10:20",
             "شراء مدى Apple Pay\nبطاقة *3317\n42.00 SAR\nلدى: مقهى الزاوية\n\(day) 09:05",
             "شراء مدى Apple Pay\nبطاقة *3317\n42.00 SAR\nلدى: مقهى الزاوية\n\(day) 09:05",
         ]
+        if salarySourceFlow { texts.insert("حوالة واردة\nإلى: 5512*\nمن: شركة المدار\nمبلغ: 18000 SAR\n\(day) 12:40", at: 3) }
         Task { @MainActor in
             for (index, text) in texts.enumerated() {
                 let at = today.date(in: zone).addingTimeInterval(Double(9 * 3600 + index * 60))

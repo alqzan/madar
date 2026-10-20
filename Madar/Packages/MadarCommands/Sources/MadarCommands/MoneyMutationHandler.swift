@@ -679,7 +679,7 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         cycle.createdAt = now; policy.createdAt = now
         context.insert(cycle); context.insert(policy); try touch(cycle, now, writer); try touch(policy, now, writer)
         try writeAllocations(plan.rows, context: context, now: now, writer: writer)
-        salary.homeAmountMinor = reading.salaryMinor; salary.cycleID = command; salary.reviewState = "ok"; try touch(salary, now, writer)
+        salary.kind = "salary"; salary.homeAmountMinor = reading.salaryMinor; salary.cycleID = command; salary.reviewState = "ok"; try touch(salary, now, writer)
         for message in try messages(for: salary, context) { message.status = "ok"; try touch(message, now, writer) }
     }
     public static func confirmableAsRead(_ ids: [UUID], container: ModelContainer, now: Date) -> Set<UUID> {

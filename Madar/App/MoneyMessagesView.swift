@@ -205,9 +205,16 @@ struct MoneyMessagesView: View {
                 Text(visible ? sign + amount(d.amountMinor, currency: d.currency) : "•••").font(.custom("thmanyahserifdisplay-Bold", size: 22, relativeTo: .title3))
                     .foregroundStyle(tint).lineLimit(1).minimumScaleFactor(0.6)
                 HStack(spacing: 8) {
-                    Button { if d.isSalary { salary = .init(id: d.id) } else if d.isBigExpense { bigExpense = .init(transactionID: d.id) } else { run("money.confirmTransaction", ["id": .string(d.id.uuidString)]) } } label: {
-                        Image(systemName: "checkmark").font(.body.bold()).foregroundStyle(theme.background).frame(width: 52, height: 52).background(theme.ink, in: .circle)
-                    }.buttonStyle(.plain).accessibilityLabel("اعتمد " + d.title).accessibilityIdentifier("money-draft-confirm")
+                    if d.isIncomingBankDraft {
+                        Menu {
+                            Button("اعتمده كدخل") { run("money.confirmTransaction", ["id": .string(d.id.uuidString)]) }
+                            Button(d.isSalarySuggestion ? "راجع الراتب المقترح" : "اعتبره راتبًا") { salary = .init(id: d.id) }
+                        } label: { draftConfirmGlyph }
+                            .accessibilityLabel("خيارات اعتماد " + d.title).accessibilityIdentifier("money-draft-confirm")
+                    } else {
+                        Button { if d.isSalary { salary = .init(id: d.id) } else if d.isBigExpense { bigExpense = .init(transactionID: d.id) } else { run("money.confirmTransaction", ["id": .string(d.id.uuidString)]) } } label: { draftConfirmGlyph }
+                            .buttonStyle(.plain).accessibilityLabel("اعتمد " + d.title).accessibilityIdentifier("money-draft-confirm")
+                    }
                     Button { run("money.deleteTransaction", ["id": .string(d.id.uuidString)]) } label: {
                         Image(systemName: "xmark").font(.body).foregroundStyle(theme.secondaryInk).frame(width: 52, height: 52).overlay { Circle().stroke(theme.line, lineWidth: 1.2) }
                     }.buttonStyle(.plain).accessibilityLabel("احذف " + d.title).accessibilityIdentifier("money-draft-delete")
@@ -215,6 +222,9 @@ struct MoneyMessagesView: View {
             }
         }.padding(14).background(theme.surface).overlay { TicketEdge().stroke(theme.line, lineWidth: 1) }
             .accessibilityElement(children: .contain).accessibilityIdentifier("money-draft-" + d.title)
+    }
+    private var draftConfirmGlyph: some View {
+        Image(systemName: "checkmark").font(.body.bold()).foregroundStyle(theme.background).frame(width: 52, height: 52).background(theme.ink, in: .circle)
     }
     private func looks(_ items: [MoneyMessageLook]) -> some View {
         VStack(alignment: .leading, spacing: 10) {

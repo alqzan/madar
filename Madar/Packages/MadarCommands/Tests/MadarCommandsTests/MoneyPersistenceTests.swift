@@ -604,6 +604,37 @@ import MadarInbox
         #expect(try ModelContext(f.container).fetch(FetchDescriptor<Cycle>()).filter { $0.deletedAt == nil && $0.closedAt == nil }.count == 1)
         #expect(!MoneyCommandPayload.validate(name: "money.confirmSalary", payload: ["id": .string(salary.id.uuidString), "remainderTo": .string("goal")]))
     }
+    /// M5-V27: an incoming transfer becomes a learned salary source only after the owner opens and confirms the salary flow.
+    @Test func confirmingIncomingTransferLearnsSourceAndUndoRemovesIt() async throws {
+        let f = try MoneyFixture(); defer { f.clean() }; try await f.setup()
+        let c = ModelContext(f.container), zone = ActivePlace.riyadh.timeZone, start = try GregorianDay("2026-10-10")
+        _ = try SettingsStore(context: c).stage(["core.dayStart": .string("midnight")])
+        let cycle = Cycle(); cycle.start = start.date(in: zone); cycle.expectedEnd = start.adding(days: 30).date(in: zone); cycle.dailyAllowanceMinor = 20_000; c.insert(cycle)
+        let policy = CyclePolicy(); policy.cycleID = cycle.id; policy.effectiveFromDayKey = start.description; policy.allowanceMinor = 20_000; policy.dailyRateMinor = 20_000; c.insert(policy); try c.save()
+
+        _ = try await f.ingest("حوالة واردة\nإلى: *1111\nمن: شركة المدار\n15000.00 SAR\n2026-10-16 12:00")
+        let incoming = try f.transaction()
+        #expect(incoming.kind == "transfer" && incoming.reviewState == "needsLook")
+        let preview = try MoneyRepository(context: ModelContext(f.container)).salaryOpening(salaryID: incoming.id, newCycleID: UUID())
+        #expect(preview.salaryMinor == 1_500_000)
+
+        let command = UUID()
+        #expect(try await f.run("money.confirmSalary", ["id": .string(incoming.id.uuidString)], id: command).status == .applied)
+        let confirmed = try f.transaction(incoming.id)
+        #expect(confirmed.kind == "salary" && confirmed.reviewState == "ok")
+
+        _ = try await f.ingest("حوالة واردة\nإلى: *1111\nمن: شركة المدار\n18000.00 SAR\n2026-10-16 13:00")
+        let later = try ModelContext(f.container).fetch(FetchDescriptor<MoneyTransaction>()).first { $0.amountMinor == 1_800_000 }
+        #expect(later?.reviewState == "needsLook")
+        #expect(SalarySourceMatcher.matches(later?.counterparty, learnedKeys: ["شركة المدار"]))
+
+        #expect(try await f.run("system.undo", ["undoToken": .string(command.uuidString)]).status == .applied)
+        let undone = try f.transaction(incoming.id)
+        #expect(undone.kind == "transfer" && undone.reviewState != "ok")
+        let learned = Set(try ModelContext(f.container).fetch(FetchDescriptor<MoneyTransaction>())
+            .filter { $0.kind == "salary" && $0.reviewState == "ok" }.compactMap { SalarySourceMatcher.key($0.counterparty) })
+        #expect(!SalarySourceMatcher.matches(later?.counterparty, learnedKeys: learned))
+    }
     /// M5-V09: a bill is one row on its day; a loan writes its equal monthly instalments; undo removes both.
     @Test func saveObligationWritesInstalmentsAndUndoesThem() async throws {
         let f = try MoneyFixture(); defer { f.clean() }

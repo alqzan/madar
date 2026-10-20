@@ -62,8 +62,15 @@ extension MoneyRepository {
     public func salaryOpening(salaryID: UUID, newCycleID: UUID, remainderOverride: SalaryRemainder? = nil) throws -> SalaryOpeningReading {
         func live<T: MadarRecordModel>(_ row: T) -> Bool { (try? row.record().isLive) == true }
         func whole(_ value: Double?) -> Int? { value.flatMap { $0.isFinite && abs($0) <= 9_007_199_254_740_991 ? Int($0) : nil } }
-        guard let salary = try context.fetch(FetchDescriptor<MoneyTransaction>()).first(where: { $0.id == salaryID && live($0) }),
-              salary.kind == "salary", salary.reviewState != "ok" else { throw MoneyCommandError.missingRow }
+        let transactions = try context.fetch(FetchDescriptor<MoneyTransaction>())
+        guard let salary = transactions.first(where: { $0.id == salaryID && live($0) }) else { throw MoneyCommandError.missingRow }
+        let incomingBankDraft: Bool = {
+            guard salary.source == "bank", salary.reviewState == "needsLook", let messageID = salary.messageID,
+                  let message = try? context.fetch(FetchDescriptor<BankMessage>()).first(where: { $0.id == messageID && live($0) && $0.status == "needsLook" }) else { return false }
+            return (salary.kind == "transfer" && message.kind == BankMessageKind.transferIn.rawValue)
+                || (salary.kind == "income" && message.kind == BankMessageKind.income.rawValue)
+        }()
+        guard (salary.kind == "salary" && salary.reviewState != "ok") || incomingBankDraft else { throw MoneyCommandError.missingRow }
         guard salary.currency == salary.homeCurrency || salary.rateAtTime != nil else { throw MoneyCommandError.missingRate }
         let salaryMinor = try FX.homeAmount(amountMinor: salary.amountMinor, currency: salary.currency, rate: salary.rateAtTime ?? "1", home: salary.homeCurrency)
         guard salaryMinor > 0 else { throw MoneyCommandError.invalidAmount }
