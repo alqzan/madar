@@ -55,6 +55,27 @@ import XCTest
         XCTAssertTrue(app.buttons["quran-session-advance"].waitForExistence(timeout: 15))
         app.terminate()
     }
+    /// Owner 20 Oct: the day is flexible; a later open step starts directly from its sheet.
+    func testLaterStepStartsOutOfOrderFromItsSheet() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00", "MADAR_UI_QURAN_FIXTURE": "home"]
+        app.launch()
+        XCTAssertTrue(app.buttons["quran-begin"].waitForExistence(timeout: 20), app.debugDescription)
+        XCTAssertTrue(app.buttons["quran-step-hifz"].exists, app.debugDescription)
+        let later = app.buttons["quran-step-review"], laterID = later.identifier
+        XCTAssertTrue(later.waitForExistence(timeout: 5), app.debugDescription)
+        if !later.isHittable { app.swipeUp(velocity: .slow) }
+        later.tap()
+        let start = app.buttons["quran-step-start"]
+        XCTAssertTrue(start.waitForExistence(timeout: 5), "\(laterID) " + app.debugDescription)
+        XCTAssertEqual(start.label, "ابدأ بها الآن", "review must be a later step than hifz here")
+        let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "M2-V01-step-start-L"; shot.lifetime = .keepAlways; add(shot)
+        start.tap()
+        XCTAssertTrue(app.buttons["quran-session-advance"].waitForExistence(timeout: 15), app.debugDescription)
+        app.terminate()
+    }
+
     func testFirstUseShowsPlanActionWithoutZeroStreakOrDepthControls() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
