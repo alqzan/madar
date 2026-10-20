@@ -173,8 +173,13 @@ func habitUnitName(_ unit:String)->String { ["minutes":"دقيقة","exerciseMin
 /// a unit the user typed has no known plural, so it follows the number unchanged. Nominative only.
 func habitUnitCount(_ count:Int,_ unit:String?,_ digits:MadarNumberFormatter)->String {
     let known:[String:[String]]=["minutes":["دقيقة واحدة","دقيقتان","دقائق","دقيقة"],"exerciseMinutes":["دقيقة حركة واحدة","دقيقتا حركة","دقائق حركة","دقيقة حركة"],
-        "steps":["خطوة واحدة","خطوتان","خطوات","خطوة"],"pages":["صفحة واحدة","صفحتان","صفحات","صفحة"],"":["مرة واحدة","مرتان","مرات","مرة"]]
-    guard let forms=known[unit ?? ""] else { return digits.string(count)+" "+(unit ?? "") }
+        "steps":["خطوة واحدة","خطوتان","خطوات","خطوة"],"pages":["صفحة واحدة","صفحتان","صفحات","صفحة"],"":["مرة واحدة","مرتان","مرات","مرة"],
+        // Units people commonly type themselves, so «٨ كوب» reads «٨ أكواب».
+        "كوب":["كوب واحد","كوبان","أكواب","كوبًا"],"كأس":["كأس واحدة","كأسان","كؤوس","كأسًا"],"لتر":["لتر واحد","لتران","لترات","لترًا"],
+        "صفحة":["صفحة واحدة","صفحتان","صفحات","صفحة"],"دقيقة":["دقيقة واحدة","دقيقتان","دقائق","دقيقة"],"ساعة":["ساعة واحدة","ساعتان","ساعات","ساعة"],
+        "ركعة":["ركعة واحدة","ركعتان","ركعات","ركعة"],"مرة":["مرة واحدة","مرتان","مرات","مرة"],"خطوة":["خطوة واحدة","خطوتان","خطوات","خطوة"],
+        "آية":["آية واحدة","آيتان","آيات","آية"],"كيلو":["كيلو واحد","كيلوان","كيلوات","كيلو"],"تمرين":["تمرين واحد","تمرينان","تمارين","تمرينًا"]]
+    guard let forms=known[(unit ?? "").trimmingCharacters(in:.whitespaces)] else { return digits.string(count)+" "+(unit ?? "") }
     return arabicCount(count,forms,digits)
 }
 /// Arabic number agreement from four forms: one, two, plural (٣–١٠), and the singular after ١١ and above.
