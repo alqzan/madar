@@ -57,6 +57,7 @@ struct MihbaraEPUBImportView: View {
     @State private var confirmedMetadata = false
     private var service: AppMihbaraService { .init(app: app) }
     private var digits: MadarNumberFormatter { service.digits }
+    private var needsPersistentImportAction: Bool { (inspection?.outline.count ?? 0) > 12 }
 
     private var languageLabel: String {
         guard let code = inspection?.languageCode else { return "غير محددة في الملف" }
@@ -195,10 +196,7 @@ struct MihbaraEPUBImportView: View {
                     .overlay { RoundedRectangle(cornerRadius: 18).stroke(theme.line.opacity(0.7), lineWidth: 1) }
                     .disabled(saving || confirmedMetadata)
 
-                    Button(saving ? "يُضاف…" : "أضفه إلى مكتبتي") { confirm() }
-                        .buttonStyle(MadarPrimaryButton())
-                        .disabled(saving || title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || title.count > 300 || author.count > 300)
-                        .accessibilityIdentifier("mihbara-epub-import-confirm")
+                    if !needsPersistentImportAction { confirmButton }
                 }
             }
             .padding(.horizontal, 22).padding(.top, 8).padding(.bottom, 24)
@@ -206,9 +204,24 @@ struct MihbaraEPUBImportView: View {
         }
         .foregroundStyle(theme.ink).background(theme.background.ignoresSafeArea())
         .environment(\.layoutDirection, .rightToLeft).toolbarVisibility(.hidden, for: .navigationBar).statusBarHidden(true)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if needsPersistentImportAction {
+                confirmButton
+                    .padding(.horizontal, 22).padding(.top, 10).padding(.bottom, 8)
+                    .frame(maxWidth: 650).frame(maxWidth: .infinity)
+                    .background(theme.background.ignoresSafeArea(edges: .bottom))
+            }
+        }
         .interactiveDismissDisabled(saving)
         .task { await inspect() }
         .onDisappear { if !saving && !finished { EPUBBookFiles.discard(id: fileID, root: app.bookStagingDirectory) } }
+    }
+
+    private var confirmButton: some View {
+        Button(saving ? "يُضاف…" : "أضفه إلى مكتبتي") { confirm() }
+            .buttonStyle(MadarPrimaryButton())
+            .disabled(saving || title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || title.count > 300 || author.count > 300)
+            .accessibilityIdentifier("mihbara-epub-import-confirm")
     }
 
     private func row(_ title: String, detail: String, detected: Bool) -> some View {
