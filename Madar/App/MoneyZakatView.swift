@@ -223,11 +223,22 @@ struct MoneyZakatView: View {
                 case .belowNisab: Text("دون النصاب تقريبًا").font(MadarTypography.cardTitle()).accessibilityIdentifier("money-zakat-result")
                 case .due(let n):
                     Text("لو حال الحول اليوم، تقريبي").font(MadarTypography.caption()).foregroundStyle(theme.color("surplusText"))
-                    Text(amount(n)).font(.custom("thmanyahserifdisplay-Black", size: 48, relativeTo: .largeTitle)).contentTransition(.numericText()).accessibilityIdentifier("money-zakat-result")
+                    dueAmount(n)
                     Text(amount(max(0, r.poolMinor-r.deductedMinor)) + " × ٢٫٥٪").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                 }
             }
         }.frame(maxWidth: .infinity).padding(.vertical, 10)
+    }
+    /// In the display serif the decimal mark «٫» looks like the thousands mark «٬», so «٣٬٢١٢٫٥٠» read as
+    /// three groups. Riyals stay large and halalas follow smaller on the same baseline, the way prices are written.
+    private func dueAmount(_ minor: Int) -> some View {
+        let text = amount(minor)
+        let parts = text.split(separator: "٫", maxSplits: 1).map(String.init)
+        let whole = parts.first ?? text
+        let fraction = parts.count > 1 && parts[1].contains(where: { $0.wholeNumberValue.map { $0 > 0 } ?? false }) ? "٫" + parts[1] : "\u{2069}"
+        // One Text keeps the number a single isolated run (and a single accessible text).
+        return Text("\(Text(parts.count > 1 ? whole : text).font(.custom("thmanyahserifdisplay-Black", size: 48, relativeTo: .largeTitle)))\(Text(parts.count > 1 ? fraction : "").font(.custom("thmanyahserifdisplay-Bold", size: 26, relativeTo: .title2)).foregroundStyle(theme.secondaryInk))")
+            .contentTransition(.numericText()).accessibilityIdentifier("money-zakat-result")
     }
     private func basisButton(_ choice: NisabBasis, _ title: String) -> some View { Button { basis = choice; basisChosen = true } label: { Text(title).font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 44).background(basisChosen && basis == choice ? theme.ink : theme.background).foregroundStyle(basisChosen && basis == choice ? theme.background : theme.ink).overlay { Rectangle().stroke(theme.color("reserveText"), lineWidth: 1) } }.accessibilityIdentifier("money-zakat-basis-" + choice.rawValue) }
     private func debtTitle(_ p: ZakatDebtsPolicy) -> String { switch p { case .unset: "لم أختر"; case .none: "لا أخصم ديونًا"; case .dueNow: "المستحق الآن فقط"; case .allOwed: "عليك كله، دون باقي القرض"; case .allOwedAndLoan: "عليك وباقي القرض" } }
