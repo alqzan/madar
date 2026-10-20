@@ -52,7 +52,7 @@ struct DiaryExportView:View {
     }
     private func ready(_ file:DiaryExportArtifact)->some View {
         VStack(alignment:.leading,spacing:12) {
-            Text("جاهز · عدد الأيام: "+service.digits.string(file.dayCount)).font(DiaryType.label).accessibilityIdentifier("diary-export-ready")
+            Text(file.dayCount == 0 ? "جاهز" : "جاهز: "+PrayerCopy.days(file.dayCount, digits: service.digits)).font(DiaryType.label).accessibilityIdentifier("diary-export-ready")
             HStack {
                 Button("معاينة الملف"){preview=true}.accessibilityIdentifier("diary-export-preview")
                 Spacer()

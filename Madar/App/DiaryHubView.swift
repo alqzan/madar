@@ -116,9 +116,14 @@ struct DiaryHubView: View {
     private func alternateMonthTitle(_ month: Int) -> String {
         let days = grid.days(year: selectedYear, month: month)
         guard let first = days.first, let last = days.last else { return "" }
-        let a = service.dateLabels(first, first: grid.first).secondary.split(separator: " ").dropFirst().joined(separator: " ")
-        let b = service.dateLabels(last, first: grid.first).secondary.split(separator: " ").dropFirst().joined(separator: " ")
-        return a == b ? a : a + " – " + b
+        let a = service.dateLabels(first, first: grid.first).secondary.split(separator: " ").dropFirst()
+        let b = service.dateLabels(last, first: grid.first).secondary.split(separator: " ").dropFirst()
+        // The year header already names the alternate years, so a card shows its months only
+        // («رجب – شعبان») and names a year only where the alternate year turns («ذو الحجة – محرم ١٤٤٨»).
+        guard a.count > 2, b.count > 2 else { return a == b ? a.joined(separator: " ") : a.joined(separator: " ") + " – " + b.joined(separator: " ") }
+        let aMonth = a.dropLast(2).joined(separator: " "), bMonth = b.dropLast(2).joined(separator: " ")
+        if a.suffix(2) == b.suffix(2) { return aMonth == bMonth ? aMonth : aMonth + " – " + bMonth }
+        return aMonth + " – " + bMonth + " " + (b.dropLast().last.map(String.init) ?? "")
     }
     private func miniMonth(_ archive: DiaryArchiveSnapshot, month: Int) -> some View {
         let days = grid.days(year: selectedYear, month: month), counts = Dictionary(uniqueKeysWithValues: archive.days.map { ($0.day,$0.writings) })

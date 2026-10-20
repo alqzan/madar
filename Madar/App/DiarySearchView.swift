@@ -46,7 +46,7 @@ struct DiarySearchView: View {
                         ForEach(["العام الماضي","صور","هوامش"],id:\.self) { example in Button {query=example;focused=false} label:{Text(example).font(DiaryType.writing).frame(maxWidth:.infinity,alignment:.leading).padding(16).overlay{RoundedRectangle(cornerRadius:14).stroke(theme.line)}}.buttonStyle(.plain) }
                         Text("فهرس الكتاب").font(DiaryType.heading).foregroundStyle(theme.accent).padding(.top,12)
                         if index.terms.isEmpty {Text("تظهر هنا الأماكن والمشاريع والوسوم التي استخدمتها.").font(DiaryType.writing)}
-                        ForEach(index.terms,id:\.1) { name,filter,count in Button {query=filter;focused=false} label:{HStack{Text(name).font(DiaryType.writing);Rectangle().fill(theme.line).frame(height:1);Text("أيام: "+service.digits.string(count)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))}.frame(minHeight:44)}.buttonStyle(.plain) }
+                        ForEach(index.terms,id:\.1) { name,filter,count in Button {query=filter;focused=false} label:{HStack{Text(name).font(DiaryType.writing);Rectangle().fill(theme.line).frame(height:1);Text(PrayerCopy.days(count, digits: service.digits)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))}.frame(minHeight:44)}.buttonStyle(.plain) }
                     }
                 }.padding(18)
             }.navigationBarTitleDisplayMode(.inline).scrollDismissesKeyboard(.interactively).background(theme.background).foregroundStyle(theme.ink)
