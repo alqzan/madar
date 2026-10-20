@@ -66,6 +66,10 @@ struct DiaryTextEditor: View {
 
                     }.padding(.horizontal, 16)
                 }
+                if margin == nil, let voice, focused, voice.microphoneDenied {
+                    DiaryVoiceFeedback(controller: voice)
+                        .padding(.horizontal, 16).padding(.vertical, 8)
+                }
                 if margin == nil, let voice, !focused {
                     VStack(alignment: .leading, spacing: 8) {
                         DiaryVoiceControls(controller: voice, compact: true)
@@ -130,7 +134,7 @@ struct DiaryTextEditor: View {
             } catch { failure = error.localizedDescription }
         } }
         .onChange(of: voice?.lastMedia?.id) { _, id in if id != nil { attachmentSaved = true; editorUndo = true } }
-        .onChange(of: scenePhase) { _, phase in if phase != .active { Task { draftTask?.cancel(); if loaded { try? await persistDraft() }; await voice?.stop() } } }
+        .onChange(of: scenePhase) { _, phase in if phase == .active { voice?.refreshMicrophoneAuthorization() } else { Task { draftTask?.cancel(); if loaded { try? await persistDraft() }; await voice?.stop() } } }
         .safeAreaInset(edge: .bottom) { if editorUndo, app.undoToken != nil { UndoToast(message: app.undoMessage, undo: app.undo) } }
         .interactiveDismissDisabled(!text.isEmpty || saving || importing || voice?.recording == true || voice?.savingAudio == true)
         .onDisappear { draftTask?.cancel(); voice?.cancelConversion(); voice?.cancelDownload(); if let voice { Task { await voice.stop() } } }

@@ -49,9 +49,20 @@ import XCTest
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
         let deny = springboard.alerts.buttons.matching(NSPredicate(format: "label IN %@", ["Don't Allow", "عدم السماح", "لا تسمح"])).firstMatch
         XCTAssertTrue(deny.waitForExistence(timeout: 10), springboard.debugDescription); deny.tap()
-        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "الميكروفون غير مسموح")).firstMatch.waitForExistence(timeout: 10))
+        let status = app.staticTexts["diary-voice-status"]
+        XCTAssertTrue(status.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(status.label.contains("الميكروفون غير مسموح"))
+        XCTAssertTrue(app.buttons["افتح إعدادات الميكروفون"].isHittable)
+        // A second attempt uses the already-denied authorization without a new prompt.
+        app.buttons["diary-editor-record"].tap()
+        XCTAssertTrue(status.waitForExistence(timeout: 5))
+        XCTAssertTrue(status.label.contains("الميكروفون غير مسموح"))
+        XCTAssertFalse(springboard.alerts.firstMatch.exists)
         capture(app, "M3-V06-editor-audio-denied-L")
-        app.buttons["diary-editor-keyboard"].tap(); XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
+        if !app.keyboards.firstMatch.exists { app.buttons["diary-editor-keyboard"].tap() }
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(status.exists, "Permission feedback must remain visible while writing.")
+        capture(app, "M3-V06-editor-denied-keyboard-L")
         app.textViews["diary-editor-text"].typeText("كتبت دون ميكروفون"); app.buttons["diary-editor-save"].tap()
         app.buttons["diary-today"].tap(); XCTAssertTrue(app.staticTexts["كتبت دون ميكروفون"].waitForExistence(timeout: 10))
     }

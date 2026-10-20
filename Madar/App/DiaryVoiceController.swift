@@ -33,7 +33,23 @@ import MadarCore
     private var download: Task<Void, Never>?
     private var installation: AssetInstallationRequest?
     private var consentMedia: DiaryDisplayMedia?
-    init(app: AppSession) { self.app = app }
+    private static let microphoneDeniedMessage = "الميكروفون غير مسموح. يمكنك الكتابة، أو تفعيله من إعدادات النظام."
+    init(app: AppSession) {
+        self.app = app
+        super.init()
+        refreshMicrophoneAuthorization()
+    }
+
+    /// Permission belongs to the system, so rebuilding an editor after its prompt must not lose it.
+    func refreshMicrophoneAuthorization() {
+        if AVAudioApplication.shared.recordPermission == .denied {
+            microphoneDenied = true
+            message = Self.microphoneDeniedMessage
+        } else if microphoneDenied {
+            microphoneDenied = false
+            if message == Self.microphoneDeniedMessage { message = "" }
+        }
+    }
 
     func refreshLanguage() async {
         let selected = language
@@ -51,7 +67,7 @@ import MadarCore
     func start(writingDay: GregorianDay) async {
         guard !recording, !savingAudio else { return }
         let allowed = await AVAudioApplication.requestRecordPermission()
-        guard allowed else { microphoneDenied = true; message = "الميكروفون غير مسموح. يمكنك الكتابة، أو تفعيله من إعدادات النظام."; return }
+        guard allowed else { refreshMicrophoneAuthorization(); return }
         do {
             try AppDiaryService(app: app).authorizeRead()
             app.diaryPlayback.stop()

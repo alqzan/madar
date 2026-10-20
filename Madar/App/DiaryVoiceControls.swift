@@ -10,11 +10,7 @@ struct DiaryVoiceControls: View {
                 DisclosureGroup((controller.language == "ar-SA" ? "العربية" : "الإنجليزية") + " · " + controller.runtimeDescription) { options }
                     .font(MadarTypography.caption())
             } else { options }
-            if !controller.message.isEmpty { Text(controller.message).font(MadarTypography.caption()).accessibilityIdentifier("diary-voice-status") }
-            if !controller.partialText.isEmpty { Text(controller.partialText).font(DiaryType.writing).foregroundStyle(.secondary) }
-            if controller.converting { Button("ألغِ التحويل؛ أبقِ الصوت") { controller.cancelConversion() }.font(MadarTypography.caption()).frame(minHeight: 44).accessibilityIdentifier("diary-voice-cancel") }
-            if controller.pendingAudioCount > 0 { Button("أعد حفظ التسجيل في الصفحة") { Task { await controller.recoverRecordings() } }.frame(minHeight: 44).disabled(controller.savingAudio || controller.recording) }
-            if controller.microphoneDenied { Button("افتح إعدادات الميكروفون") { if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) } }.font(MadarTypography.caption()).frame(minHeight: 44) }
+            DiaryVoiceFeedback(controller: controller)
         }
         .task(id: controller.language) { await controller.refreshLanguage() }
         .alert("يُرسل الصوت إلى Apple للتحويل", isPresented: $controller.needsConsent) {
@@ -33,6 +29,20 @@ struct DiaryVoiceControls: View {
                     Button("ألغِ التحميل") { controller.cancelDownload() }.frame(minHeight: 44)
                 } else { Button("حمّل لغة الإملاء") { controller.downloadLanguage() }.font(MadarTypography.caption()).frame(minHeight: 44) }
             }
+        }
+    }
+}
+
+/// Feedback stays available in the text editor even when its recording options are collapsed.
+struct DiaryVoiceFeedback: View {
+    let controller: DiaryVoiceController
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if !controller.message.isEmpty { Text(controller.message).font(MadarTypography.caption()).accessibilityIdentifier("diary-voice-status") }
+            if !controller.partialText.isEmpty { Text(controller.partialText).font(DiaryType.writing).foregroundStyle(.secondary) }
+            if controller.converting { Button("ألغِ التحويل؛ أبقِ الصوت") { controller.cancelConversion() }.font(MadarTypography.caption()).frame(minHeight: 44).accessibilityIdentifier("diary-voice-cancel") }
+            if controller.pendingAudioCount > 0 { Button("أعد حفظ التسجيل في الصفحة") { Task { await controller.recoverRecordings() } }.frame(minHeight: 44).disabled(controller.savingAudio || controller.recording) }
+            if controller.microphoneDenied { Button("افتح إعدادات الميكروفون") { if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) } }.font(MadarTypography.caption()).frame(minHeight: 44) }
         }
     }
 }
