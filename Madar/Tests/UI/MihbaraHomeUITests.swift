@@ -41,7 +41,10 @@ import XCTest
         let understood = app.buttons["mihbara-hadith-understood"]; reach(app,understood); understood.tap()
         XCTAssertTrue(app.buttons["mihbara-wird-closed"].waitForExistence(timeout:8)); shot(app,"M6-V01-understood-L"); undo(app)
         XCTAssertTrue(app.buttons["mihbara-wird-open"].waitForExistence(timeout:8)); app.terminate(); app.launch(); open(app)
-        reach(app,app.buttons["mihbara-book-continue"]); app.buttons["mihbara-book-continue"].tap()
+        reach(app,app.buttons["mihbara-book-continue"])
+        // M6 audit: the open book says what is left in real pages and time, not a bare number.
+        XCTAssertTrue(app.staticTexts["بقي ١٠٣ صفحات، نحو ساعتين"].exists, app.debugDescription)
+        app.buttons["mihbara-book-continue"].tap()
         openPaperDetails(app)
         let page = app.textFields["mihbara-paper-position"]; XCTAssertTrue(page.waitForExistence(timeout:8)); page.tap(); page.press(forDuration:1.1)
         if app.menuItems["تحديد الكل"].waitForExistence(timeout:2) { app.menuItems["تحديد الكل"].tap() }
@@ -83,6 +86,18 @@ import XCTest
         toggle.tap(); XCTAssertTrue(toggle.waitForValue("0", timeout: 8))
     }
 
+    /// M6 audit: the library says how many books there are, tells each kind apart, and counts what a search matches.
+    func testLibraryCountsBooksNamesTheOldShelfAndCountsMatches() {
+        continueAfterFailure = false; let app = app("home"); app.launch(); open(app)
+        let library = app.buttons["mihbara-library"]; reach(app, library); library.tap()
+        XCTAssertTrue(app.staticTexts["٣ كتب في مكتبتك."].waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["قديمًا"].exists, "an old-shelf book must not be labelled finished")
+        XCTAssertTrue(app.staticTexts["كتاب ورقي، ١٨٠ صفحة"].exists)
+        shot(app, "M6-audit-library-L")
+        let search = app.textFields["mihbara-library-search"]; search.tap(); search.typeText("ينتظر")
+        XCTAssertTrue(app.staticTexts["mihbara-library-status"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["mihbara-library-status"].label.hasPrefix("المطابق: كتاب واحد"), app.staticTexts["mihbara-library-status"].label)
+    }
     func testEmptyShelfPaperAddAndUndo() {
         continueAfterFailure = false; let app = app("empty"); app.launch(); open(app); shot(app,"M6-V01-empty-L")
         app.buttons["mihbara-add-paper"].tap()
@@ -242,7 +257,7 @@ import XCTest
         next.tap()
         XCTAssertEqual(title.label, "خطوة صغيرة تكفي")
         XCTAssertEqual(message.label, "٥ صفحات فقط")
-        XCTAssertTrue(source.label.contains("٧ دقائق"), source.label)
+        XCTAssertTrue(source.label.filter { !"\u{2066}\u{2067}\u{2068}\u{2069}".contains($0) }.contains("٧ دقائق"), source.label)
         next.tap()
         XCTAssertEqual(title.label, "ورد السنّة")
         XCTAssertTrue(message.label.contains("لا يؤمن أحدكم"), message.label)
@@ -283,7 +298,7 @@ import XCTest
         drawer.tap()
         let read = app.buttons["mihbara-sunnah-drawer-read"]
         reach(app, read)
-        XCTAssertTrue(app.staticTexts["١٢ من ٤٢ فهمتها"].exists)
+        XCTAssertTrue(app.staticTexts["فهمت ١٢ حديثًا من ٤٢"].exists)
         XCTAssertFalse(app.staticTexts["رياض الصالحين"].exists)
         reach(app, app.buttons["mihbara-sunnah-drawer-add"])
         app.swipeUp(velocity: .slow)

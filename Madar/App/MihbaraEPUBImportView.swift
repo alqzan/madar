@@ -61,8 +61,8 @@ struct MihbaraEPUBImportView: View {
 
     private var languageLabel: String {
         guard let code = inspection?.languageCode else { return "غير محددة في الملف" }
-        if code.lowercased().hasPrefix("en") { return "English · الإنجليزية" }
-        if code.lowercased().hasPrefix("ar") { return "العربية · Arabic" }
+        if code.lowercased().hasPrefix("en") { return "الإنجليزية" }
+        if code.lowercased().hasPrefix("ar") { return "العربية" }
         return code
     }
 
@@ -94,13 +94,14 @@ struct MihbaraEPUBImportView: View {
                         ProgressView().tint(theme.ink).frame(maxWidth: .infinity).accessibilityLabel("يفحص ملف EPUB")
                     }
                     if let value = inspection {
-                        row("نوع الملف", detail: "EPUB \(value.version)؛ اجتاز فحص بنية الملف والحدود الأمنية.", detected: true)
+                        Text("ما وجدناه").font(MadarTypography.cardTitle())
+                        row("نوع الملف", detail: "كتاب إلكتروني سليم؛ فُحصت بنيته وحدوده الأمنية.", detected: true)
                         row("اللغة", detail: value.appLanguage == "en" ? "\(languageLabel)؛ يفتح وضع القراءة الإنجليزية." : value.appLanguage == "ar" ? "\(languageLabel)؛ يفتح وضع القراءة العربية." : "اللغة في البيانات: \(languageLabel). اختر وضع القراءة أدناه.", detected: value.languageCode != nil)
                         row("البيانات", detail: value.author.isEmpty ? "العنوان من الملف؛ لم يُسجل مؤلف." : "العنوان والمؤلف من بيانات الملف.", detected: !value.author.isEmpty)
-                        row("الفهرس", detail: value.outline.isEmpty ? "بلا فهرس إلكتروني قابل للتنقّل؛ لم نخمن فصول الكتاب." : "عناوين فهرس الملف: \(digits.string(value.outline.count)).", detected: !value.outline.isEmpty)
+                        row("الفهرس", detail: value.outline.isEmpty ? "بلا فهرس إلكتروني قابل للتنقّل؛ لم نخمن فصول الكتاب." : "فهرس جاهز للتنقّل بين عناوينه.", detected: !value.outline.isEmpty)
                         let pageList = value.hasPageList ? "توجد قائمة صفحات للمصدر المطبوع" : "لا توجد قائمة صفحات مطبوعة"
                         let notes = value.hasFootnotes == true ? "اكتُشفت حواشٍ" : value.hasFootnotes == false ? "لم تُكتشف حواشٍ" : "تعذّر حسم وجود الحواشي"
-                        row("الصور والجداول", detail: "تبقى ضمن الملف كما حفظها · \(pageList) · \(notes).", detected: true)
+                        row("الصور والجداول", detail: "تبقى ضمن الملف كما حفظها؛ \(pageList)؛ \(notes).", detected: true)
                     }
                 }
 
@@ -137,7 +138,7 @@ struct MihbaraEPUBImportView: View {
                                     Text("الإنجليزية").tag("en")
                                 }
                                 .font(MadarTypography.caption()).accessibilityIdentifier("mihbara-epub-import-language")
-                                Text(value.direction == "rtl" ? "العربية · اتجاه من اليمين" : value.direction == "ltr" ? "English · left-to-right" : "اتجاه القراءة غير محدد")
+                                Text(value.direction == "rtl" ? "تُقرأ من اليمين إلى اليسار" : value.direction == "ltr" ? "تُقرأ من اليسار إلى اليمين" : "اتجاه القراءة غير محدد")
                                     .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                             }
                             Spacer(minLength: 0)
@@ -150,7 +151,7 @@ struct MihbaraEPUBImportView: View {
                     HStack {
                         Text("الفهرس المستخرج").font(MadarTypography.section())
                         Spacer()
-                        Text("عناوين الفهرس: \(digits.string(value.outline.count))").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                        Text(arabicCount(value.outline.count, ["عنوان واحد", "عنوانان", "عناوين", "عنوانًا"], digits)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                     }
                     if value.outline.isEmpty {
                         Text("لا يوجد فهرس إلكتروني في هذا الملف.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
@@ -226,8 +227,9 @@ struct MihbaraEPUBImportView: View {
 
     private func row(_ title: String, detail: String, detected: Bool) -> some View {
         HStack(alignment: .top, spacing: 10) {
-            Image(systemName: detected ? "checkmark.circle.fill" : "circle")
-                .font(.system(size: 20, weight: .regular)).foregroundStyle(detected ? theme.color("sunnah") : theme.secondaryInk)
+            // Found → filled check; absent from the file → a quiet dash, so information never reads as an unfinished task.
+            Image(systemName: detected ? "checkmark.circle.fill" : "minus.circle")
+                .font(.system(size: 20, weight: .regular)).foregroundStyle(detected ? theme.color("sunnah") : theme.secondaryInk.opacity(0.6))
                 .frame(width: 25).padding(.top, 2)
             VStack(alignment: .trailing, spacing: 4) {
                 Text(title).font(MadarTypography.section())

@@ -94,7 +94,7 @@ struct MihbaraPDFReaderView: View {
         ZStack {
             VStack(spacing: 2) {
                 Text(book.title).font(.custom("thmanyahserifdisplay-Bold", size: 17, relativeTo: .headline)).lineLimit(1)
-                Text(book.author.isEmpty ? "PDF من مكتبتك" : book.author).font(MadarTypography.fine()).foregroundStyle(ink.opacity(0.65)).lineLimit(1)
+                Text(book.author.isEmpty ? "ملف PDF على جهازك" : book.author).font(MadarTypography.fine()).foregroundStyle(ink.opacity(0.65)).lineLimit(1)
             }.frame(maxWidth: .infinity)
             HStack {
                 Button(action: finishAndClose) {
@@ -130,8 +130,15 @@ struct MihbaraPDFReaderView: View {
                         Text("صفحة الملف \(digits.string(pageIndex + 1)) من \(digits.string(pageCount))")
                             .font(MadarTypography.caption())
                         if let currentLabel {
-                            Text("تسمية PDF: \(digits.localized(currentLabel))")
+                            Text("رقمها المطبوع: \(digits.localized(currentLabel))")
                                 .font(MadarTypography.fine()).foregroundStyle(ink.opacity(0.65))
+                        }
+                        if pageIndex + 1 >= pageCount {
+                            Text("هذه آخر صفحة").font(MadarTypography.fine()).foregroundStyle(ink.opacity(0.65))
+                                .accessibilityIdentifier("mihbara-pdf-remaining")
+                        } else if let left = MihbaraCopy.remaining(pages: pageCount, read: pageIndex + 1, digits) {
+                            Text(left).font(MadarTypography.fine()).foregroundStyle(ink.opacity(0.65))
+                                .accessibilityIdentifier("mihbara-pdf-remaining")
                         }
                     }
                     .accessibilityElement(children: .ignore)

@@ -124,7 +124,7 @@ struct MihbaraTurathView: View {
                         Text("جرّب كلمة واحدة من العنوان، أو اسم المؤلف المشهور.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                     }.frame(maxWidth: .infinity, minHeight: 160).accessibilityIdentifier("mihbara-turath-empty")
                 } else {
-                    Text(results.count >= 50 ? "أقرب \(digits.string(50)) نتيجة" : "النتائج: \(digits.string(results.count))")
+                    Text(results.count >= 50 ? "أقرب \(digits.string(50)) نتيجة" : arabicCount(results.count, ["نتيجة واحدة", "نتيجتان", "نتائج", "نتيجة"], digits))
                         .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                     VStack(spacing: 0) {
                         ForEach(Array(results.enumerated()), id: \.element.id) { index, book in
@@ -161,7 +161,7 @@ struct MihbaraTurathView: View {
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: "books.vertical").font(.title3).foregroundStyle(theme.color("sunnah")).frame(width: 26)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("كتب المكتبة الشاملة: \(digits.string(books.count))").font(MadarTypography.section())
+                    Text(books.isEmpty ? "المكتبة الشاملة" : "في الفهرس \(MihbaraCopy.books(books.count, digits))").font(MadarTypography.section())
                     Text("البحث والتنزيل عبر الإنترنت من تراث، ثم يُقرأ الكتاب على جهازك بلا إنترنت بترقيم المطبوع وفهرسه.")
                         .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
                 }
@@ -178,10 +178,10 @@ struct MihbaraTurathView: View {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(book.title).font(MadarTypography.cardTitle()).multilineTextAlignment(.leading).lineLimit(3).fixedSize(horizontal: false, vertical: true)
                     if !book.author.isEmpty {
-                        Text(book.authorDeath.map { "\(book.author)، ت \(digits.string($0))هـ" } ?? book.author)
+                        Text(book.authorDeath.map { "\(book.author)، ت \(deathYears($0))" } ?? book.author)
                             .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                     }
-                    Text([book.category, book.pageCount > 0 ? "الصفحات: \(digits.string(book.pageCount))" : "", size(book.sizeBytes)].filter { !$0.isEmpty }.joined(separator: "، "))
+                    Text([book.category, book.pageCount > 0 ? MihbaraCopy.pages(book.pageCount, digits) : "", size(book.sizeBytes)].filter { !$0.isEmpty }.joined(separator: "، "))
                         .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                 }
                 Spacer(minLength: 0)
@@ -197,6 +197,15 @@ struct MihbaraTurathView: View {
         .accessibilityIdentifier("mihbara-turath-book-\(book.id)")
     }
 
+    /// The death year in both calendars: «٦٧٦هـ، ١٢٧٧م». The Gregorian year is the civil-calendar conversion of the middle of the Hijri year.
+    private func deathYears(_ hijriYear: Int) -> String {
+        let hijri = digits.string(hijriYear) + "هـ"
+        var civil = Calendar(identifier: .islamicCivil)
+        civil.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
+        guard hijriYear > 0, let date = civil.date(from: DateComponents(year: hijriYear, month: 7, day: 1)) else { return hijri }
+        let gregorianYear = Calendar(identifier: .gregorian).component(.year, from: date)
+        return hijri + "، " + digits.string(gregorianYear) + "م"
+    }
     private func size(_ bytes: Int) -> String {
         guard bytes > 0 else { return "" }
         let mb = Double(bytes) / 1_048_576

@@ -4,6 +4,47 @@ import UniformTypeIdentifiers
 import MadarCore
 import MadarDesign
 
+/// Copy for Mihbara amounts: real quantities in Arabic number agreement instead of abstract fractions.
+enum MihbaraCopy {
+    static func pages(_ count: Int, _ digits: MadarNumberFormatter) -> String {
+        arabicCount(count, ["صفحة واحدة", "صفحتان", "صفحات", "صفحة"], digits)
+    }
+    static func books(_ count: Int, _ digits: MadarNumberFormatter) -> String {
+        arabicCount(count, ["كتاب واحد", "كتابان", "كتب", "كتابًا"], digits)
+    }
+    static func hadiths(_ count: Int, _ digits: MadarNumberFormatter) -> String {
+        arabicCount(count, ["حديث واحد", "حديثان", "أحاديث", "حديثًا"], digits)
+    }
+    /// The same noun as an object: «فهمت حديثًا واحدًا / حديثين / ٣ أحاديث / ١٢ حديثًا».
+    static func hadithsObject(_ count: Int, _ digits: MadarNumberFormatter) -> String {
+        arabicCount(count, ["حديثًا واحدًا", "حديثين", "أحاديث", "حديثًا"], digits)
+    }
+    static func years(_ count: Int, _ digits: MadarNumberFormatter) -> String {
+        arabicCount(count, ["سنة واحدة", "سنتين", "سنوات", "سنة"], digits)
+    }
+    /// «بقيت ٤٠ صفحة» (singular, dual and 3-10 take the feminine verb).
+    static func pagesLeft(_ count: Int, _ digits: MadarNumberFormatter) -> String {
+        (count <= 10 ? "بقيت " : "بقي ") + pages(count, digits)
+    }
+    /// «نحو ساعة»: an honest estimate at the app's own pace of 1.4 minutes a page (the same pace «حمّسني» uses).
+    static func readingTime(pages count: Int, _ digits: MadarNumberFormatter) -> String {
+        let minutes = max(1, Int((Double(count) * 1.4).rounded()))
+        if minutes < 60 { return "نحو " + PrayerCopy.minutes(minutes, digits: digits) }
+        return "نحو " + PrayerCopy.hours(max(1, Int((Double(minutes) / 60).rounded())), digits: digits)
+    }
+    /// «بقيت ١٠٣ صفحات، نحو ساعتين», or nil when the book is finished.
+    static func remaining(pages total: Int?, read: Int?, _ digits: MadarNumberFormatter) -> String? {
+        guard let total, total > 0, let read, read >= 0, read < total else { return nil }
+        let left = total - read
+        return pagesLeft(left, digits) + "، " + readingTime(pages: left, digits)
+    }
+    /// How far into a file book the reader is, as pages: progress × the stored page count.
+    static func pagesRead(_ book: MihbaraBook) -> Int? {
+        guard let total = book.pages, total > 0, let progress = book.progress else { return nil }
+        return min(total, max(0, Int((progress * Double(total)).rounded())))
+    }
+}
+
 struct MihbaraAddBookView: View {
     let app: AppSession
     let readingBooks: [MihbaraBook]
@@ -331,10 +372,21 @@ struct MihbaraBookCard: View {
     private var shelfTitle: String {
         switch book.shelf { case "want": "أبي أقرأها"; case "finished": "أنهيتها"; default: "أقرؤها الآن" }
     }
+    /// «أنهيته قبل ١٠ سنوات» for a book finished a year or more ago; plain «أنهيته» otherwise.
+    private func finishedAgo(_ finished: Date) -> String {
+        let years = Calendar(identifier: .gregorian).dateComponents([.year], from: finished, to: Date()).year ?? 0
+        return years >= 1 ? "أنهيته قبل " + MihbaraCopy.years(years, digits) : "أنهيته"
+    }
     private var paperBookPrimaryAction: String {
         if book.shelf == "finished" { return "أعد قراءته" }
         if let page = book.page, page > 0 { return "واصل القراءة" }
         return "ابدأه"
+    }
+    /// A book already on the table just continues; one on another shelf names the move it makes.
+    private var paperBookStartTitle: String {
+        if book.shelf == "reading" { return paperBookPrimaryAction }
+        if book.shelf == "finished" { return "ضعه على الطاولة وأعد قراءته" }
+        return "ضعه على الطاولة و" + (paperBookPrimaryAction == "ابدأه" ? "ابدأه" : "واصل القراءة")
     }
     private var paperIndexEditor: some View {
         MihbaraPaperIndexEditor(
@@ -353,7 +405,12 @@ struct MihbaraBookCard: View {
                 } else {
                     HStack { Text(book.title).font(MadarTypography.title()); Spacer(); Button("تمّ") { dismiss() } }
                     Text(book.author).font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
-                    if let finished = book.finished { Text("أنهيته").font(MadarTypography.caption()); MadarDateLabel(app.dateLabels(GregorianDay.containing(finished, in: app.activePlace.timeZone))) }
+                    if let finished = book.finished {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(finishedAgo(finished)).font(MadarTypography.caption()).accessibilityIdentifier("mihbara-book-finished-ago")
+                            MadarDateLabel(app.dateLabels(GregorianDay.containing(finished, in: app.activePlace.timeZone)))
+                        }
+                    }
                     if book.shelf != "reading" { Button("ضعه على الطاولة") { moveToReading() }.buttonStyle(MadarPrimaryButton()).accessibilityIdentifier("mihbara-put-on-table") }
                     Text("وصلت إلى").font(MadarTypography.cardTitle())
                     HStack { Text("صفحة"); TextField("رقم الصفحة", text: $page).keyboardType(.numberPad).padding(14).background(theme.surface, in: .rect(cornerRadius: 12)).accessibilityIdentifier("mihbara-book-page"); if let total = book.pages { Text("من " + digits.string(total)) } }.font(MadarTypography.body())
@@ -381,15 +438,20 @@ struct MihbaraBookCard: View {
                 VStack(alignment: .trailing, spacing: 7) {
                     Text(book.title).font(.custom("thmanyahserifdisplay-Bold", size: 24, relativeTo: .title2)).fixedSize(horizontal: false, vertical: true)
                     Text(book.author).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                    Text("على رف «\(shelfTitle)»، " + (book.pages.map { digits.string($0) + " صفحة" } ?? "عدد الصفحات غير محدد"))
+                    Text("على رف «\(shelfTitle)»، " + (book.pages.map { MihbaraCopy.pages($0, digits) } ?? "عدد الصفحات غير محدد"))
                         .font(MadarTypography.caption())
                     if let page = book.page, page > 0 {
                         let total = book.pages.flatMap { $0 >= page ? digits.string($0) : nil }
-                        Text("وصلت إلى الصفحة " + digits.string(page) + (total.map { " من " + $0 } ?? ""))
-                            .font(MadarTypography.fine())
-                            .foregroundStyle(theme.secondaryInk)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .accessibilityIdentifier("mihbara-paper-position-summary")
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text("وصلت إلى الصفحة " + digits.string(page) + (total.map { " من " + $0 } ?? ""))
+                                .accessibilityIdentifier("mihbara-paper-position-summary")
+                            if book.shelf != "finished", let left = MihbaraCopy.remaining(pages: book.pages, read: page, digits) {
+                                Text(left).accessibilityIdentifier("mihbara-paper-remaining")
+                            }
+                        }
+                        .font(MadarTypography.fine())
+                        .foregroundStyle(theme.secondaryInk)
+                        .fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 Spacer(minLength: 0)
@@ -430,7 +492,7 @@ struct MihbaraBookCard: View {
             }
 
             Button { startPaperBook() } label: {
-                Text(paperBookPrimaryAction + " · ضعه على الطاولة")
+                Text(paperBookStartTitle)
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(theme.background)
                     .frame(maxWidth: .infinity).frame(height: 52)
