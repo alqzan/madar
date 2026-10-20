@@ -21,14 +21,16 @@ extension AppSession {
         }.map(\.element)
         let rows=ordered.prefix(6).compactMap { r->RoomWidgetSnapshot.Row? in
             guard let p=r.summary.current else{return nil}
-            let value=r.paused ? "مجمّدة" : p.target==0 ? "إجازتها اليوم" : r.source=="walking" ? "تُحدّث من الصحة" : digits.string(p.value)+" من "+digits.string(p.target)+(p.rule.unit.map{" "+habitUnitName($0)} ?? "")
+            let value=r.paused ? "مجمّدة" : p.target==0 ? "إجازتها اليوم" : r.source=="walking" ? "تُحدّث من الصحة" : WidgetCopy.habitProgress(value:p.value,target:p.target,measure:p.rule.measure,unit:p.rule.unit,digits:digits)
             return .init(id:r.id.uuidString,title:r.name,value:value,detail:r.summary.atRisk ? "القليل يحفظ سلسلتك" : r.isNow ? "وقتها الآن" : r.sourceTitle.map{"تُقرأ من "+$0} ?? "",share:Double(p.value)/Double(max(1,p.target)),route:"madar://bahw/habits/"+r.id.uuidString,done:p.met)
         }
         let periods=[HabitFrequency.daily,.weekly,.monthly,.yearly].map { f->RoomWidgetSnapshot.Row in
             let group=readings.filter{$0.summary.current?.rule.frequency==f && !$0.paused && ($0.summary.current?.target ?? 0)>0},met=group.filter{$0.summary.current?.met==true}.count
-            return .init(id:f.rawValue,title:f.arabic,value:group.isEmpty ? "لا استحقاق" : digits.string(met)+" من "+digits.string(group.count),share:Double(met)/Double(max(1,group.count)),route:BuiltRoomWidget.habits.route)
+            // `detail` carries the compact remainder for the lock-screen circle; empty means nothing is due in this period.
+            return .init(id:f.rawValue,title:f.arabic,value:WidgetCopy.periodProgress(met:met,total:group.count,digits:digits),detail:group.isEmpty ? "" : met==group.count ? "تمّ" : digits.string(group.count-met),share:Double(met)/Double(max(1,group.count)),route:BuiltRoomWidget.habits.route)
         }
-        payloads[.habits] = .init(datePrimary:date.primary,dateSecondary:date.secondary,heading:digits.string(readings.filter{$0.summary.current?.met==true}.count)+" تمّت",emptyTitle:"أضف أول عادة",rows:rows,periods:periods,locked:locked)
+        let dueToday=eligible.filter{!$0.paused && ($0.summary.current?.target ?? 0)>0}
+        payloads[.habits] = .init(datePrimary:date.primary,dateSecondary:date.secondary,heading:WidgetCopy.habitsHeading(met:dueToday.filter{$0.summary.current?.met==true}.count,total:dueToday.count,digits:digits),emptyTitle:"أضف أول عادة",rows:rows,periods:periods,locked:locked)
         let year=service.year()
         var yearRows:[RoomWidgetSnapshot.Row]=[
             .init(id:"hijri",title:digits.string(year.hijriYear)+" هـ",value:digits.string(year.hijri.basisPoints/100)+"٪\u{061C}",detail:"بقي "+digits.string(year.hijri.remaining)+" "+service.dayCount(year.hijri.remaining),share:Double(year.hijri.basisPoints)/10000,route:BuiltRoomWidget.year.route),
@@ -37,7 +39,7 @@ extension AppSession {
         payloads[.year] = .init(datePrimary:date.primary,dateSecondary:date.secondary,heading:"عامك، يومًا بيوم",emptyTitle:"افتح السنة",rows:yearRows)
         let upcoming=locked ? [] : service.upcoming(limit:7).map { item->RoomWidgetSnapshot.Row in
             let labels=dateLabels(item.day)
-            return .init(id:item.id,title:item.title,value:digits.string(item.daysLeft)+" "+service.dayCount(item.daysLeft),detail:labels.primary,secondDate:labels.secondary,share:item.closed,route:BuiltRoomWidget.upcoming.route)
+            return .init(id:item.id,title:item.title,value:WidgetCopy.daysLeft(item.daysLeft,digits:digits,dayCount:service.dayCount),detail:labels.primary,secondDate:labels.secondary,share:item.closed,route:BuiltRoomWidget.upcoming.route)
         }
         payloads[.upcoming] = .init(datePrimary:date.primary,dateSecondary:date.secondary,heading:"كم بقي",emptyTitle:"أضف يومًا تنتظره",rows:upcoming,locked:locked)
         let diaryRows=locked || !bool("notes.widgetContent") ? [] : diaryWidgetRows(today:today)

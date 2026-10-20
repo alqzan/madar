@@ -196,7 +196,9 @@ import MadarPrayer
         } else if id.hasPrefix("habits.") {
             let habitID = String(id.split(separator: ".").last ?? "")
             content.title = protected ? "مدار" : habitNames[habitID] ?? "عادتك"
-            content.body = protected ? "حان وقت عادة" : "بدأ وقتها، وأقلّ القليل يحفظ سلسلتك"
+            // Never promise to keep a streak that does not exist: a first step starts one.
+            let streak = protected ? 0 : ((try? HabitRepository(context: ModelContext(session.container)).readings(at: Date()))?.first { $0.id.uuidString == habitID }?.summary.streak ?? 0)
+            content.body = protected ? "حان وقت عادة" : streak > 0 ? "بدأ وقتها، وأقلّ القليل يحفظ سلسلتك" : "بدأ وقتها، وخطوة صغيرة اليوم تبدأ سلسلتك"
             content.userInfo = ["dayKey": candidate.dayKey, "room": "habits", "habit": habitID]
         } else if id.hasPrefix("notes.") {
             // §8 item 10 matrix copy; under the whole-app lock the owner's generic line (15 Oct). Never diary text.
@@ -208,7 +210,7 @@ import MadarPrayer
         } else if id.hasPrefix("mal.card") {
             // Always amount-free, including core.hideMoneyOutside's default and whole-app protection.
             content.title = protected ? "مدار" : "سداد البطاقة"
-            content.body = protected ? "لديك تنبيه في مدار" : id.hasPrefix("mal.cardCash.") ? "راجع سداد بطاقتك اليوم؛ النقد الحالي لا يغطي الالتزامات المعروفة" : "اقترب موعد سداد بطاقتك؛ راجع الكشف والنقد المتاح"
+            content.body = protected ? "لديك تنبيه في مدار" : id.hasPrefix("mal.cardCash.") ? "راجع سداد بطاقتك اليوم؛ النقد الحالي لا يغطي الالتزامات المعروفة" : "موعد سداد بطاقتك " + (session.string("mal.cardDue") == "1day" ? "غدًا" : "بعد ثلاثة أيام") + "؛ راجع الكشف والنقد المتاح"
             content.userInfo = ["dayKey": candidate.dayKey, "room": "mal"]
         } else if id.hasPrefix("mal.alert80.") {
             // RM10: no amount on the lock screen while amounts hide until touch, nor under the whole-app lock.
@@ -223,11 +225,11 @@ import MadarPrayer
             content.userInfo = ["dayKey": candidate.dayKey, "room": "mal"]
         } else if id.hasPrefix("mal.reconcile.") {
             content.title = protected ? "مدار" : "مطابقة الرصيد"
-            content.body = protected ? "حان وقت المراجعة" : "حان موعد مراجعة حساباتك والتزاماتك في مدار"
+            content.body = protected ? "حان وقت المراجعة" : "راجع أرصدة حساباتك والتزاماتك؛ دقيقة واحدة تكفي"
             content.userInfo = ["dayKey": candidate.dayKey, "room": "mal"]
         } else if id.hasPrefix("mal.zakat.") {
             content.title = protected ? "مدار" : "الزكاة"
-            content.body = protected ? "لديك تذكير في مدار" : "اقترب موعد الحساب السنوي الذي اخترته."
+            content.body = protected ? "لديك تذكير في مدار" : "يحين موعد الحساب السنوي الذي اخترته " + zakatWhen(id)
             content.userInfo = ["dayKey": candidate.dayKey, "room": "mal"]
         } else {
             content.title = "مدار"
@@ -235,6 +237,11 @@ import MadarPrayer
             content.userInfo = ["dayKey": candidate.dayKey, "room": "bahw"]
         }
         return content
+    }
+
+    /// «mal.zakat.<lead>.<day>»: how far off the anniversary is, in words (never a digit beside an amount-free reminder).
+    private static func zakatWhen(_ id: String) -> String {
+        switch id.split(separator: ".").dropFirst(2).first.map(String.init) { case "1day": "غدًا"; case "1week": "بعد أسبوع"; case "1month": "بعد نحو شهر"; default: "قريبًا" }
     }
 
     static func ledgerKind(_ id: String) -> String {

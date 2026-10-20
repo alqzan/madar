@@ -22,8 +22,32 @@ import MadarPrayer
         let year=try XCTUnwrap(app.snapshotStore.read("year",as:RoomWidgetSnapshot.self,now:now))
         XCTAssertTrue(year.payload.rows.allSatisfy{$0.detail.contains(where:{$0.isNumber})})
         let upcoming=try XCTUnwrap(app.snapshotStore.read("upcoming",as:RoomWidgetSnapshot.self,now:now))
-        XCTAssertFalse(upcoming.payload.rows.isEmpty);XCTAssertTrue(upcoming.payload.rows.allSatisfy{$0.value.contains(where:{$0.isNumber})})
+        // A season can fall on today (اليوم) or tomorrow (غدًا), so the value is a number or one of those words, never empty.
+        XCTAssertFalse(upcoming.payload.rows.isEmpty);XCTAssertTrue(upcoming.payload.rows.allSatisfy{$0.value.contains(where:{$0.isNumber}) || ["اليوم","غدًا","يومان"].contains($0.value)})
+        let habits=try XCTUnwrap(app.snapshotStore.read("habits",as:RoomWidgetSnapshot.self,now:now)).payload
+        XCTAssertEqual(habits.heading,"أتممت عادتك","one due habit, finished: say so instead of a bare count")
+        XCTAssertEqual(habits.periods.first{$0.id=="daily"}?.value,"تمّت");XCTAssertEqual(habits.periods.first{$0.id=="daily"}?.detail,"تمّ")
+        XCTAssertEqual(habits.periods.first{$0.id=="weekly"}?.value,"لا استحقاق");XCTAssertEqual(habits.periods.first{$0.id=="weekly"}?.detail,"")
 
+    }
+    /// Expected strings come from Arabic number agreement (singular, dual, 3 to 10, 11 and up), not from the code's own output.
+    func testWidgetCopyAgreesWithItsNumbersInArabic() {
+        let d=MadarNumberFormatter(style:.hindi)
+        XCTAssertEqual(WidgetCopy.habitProgress(value:0,target:1,measure:.once,unit:nil,digits:d),"لم تتم بعد")
+        XCTAssertEqual(WidgetCopy.habitProgress(value:1,target:1,measure:.once,unit:nil,digits:d),"تمّت")
+        XCTAssertEqual(WidgetCopy.habitProgress(value:1,target:3,measure:.count,unit:nil,digits:d),"١ من ٣ مرات")
+        XCTAssertEqual(WidgetCopy.habitProgress(value:1,target:2,measure:.count,unit:nil,digits:d),"١ من مرتين")
+        XCTAssertEqual(WidgetCopy.habitProgress(value:200,target:8000,measure:.count,unit:"steps",digits:d),"٢٠٠ من ٨٠٠٠ خطوة")
+        XCTAssertEqual(WidgetCopy.habitProgress(value:5,target:30,measure:.duration,unit:"minutes",digits:d),"٥ من ٣٠ دقيقة")
+        XCTAssertEqual(WidgetCopy.habitProgress(value:0,target:8,measure:.count,unit:"كوب",digits:d),"٠ من ٨ كوب")
+        XCTAssertEqual(WidgetCopy.periodProgress(met:0,total:1,digits:d),"عادة واحدة تنتظرك")
+        XCTAssertEqual(WidgetCopy.periodProgress(met:0,total:2,digits:d),"عادتان تنتظرانك")
+        XCTAssertEqual(WidgetCopy.periodProgress(met:0,total:3,digits:d),"٣ عادات تنتظرك")
+        XCTAssertEqual(WidgetCopy.periodProgress(met:0,total:11,digits:d),"١١ عادة تنتظرك")
+        XCTAssertEqual(WidgetCopy.periodProgress(met:2,total:5,digits:d),"تمّت ٢ من ٥")
+        XCTAssertEqual(WidgetCopy.periodProgress(met:5,total:5,digits:d),"تمّت كلها")
+        XCTAssertEqual(WidgetCopy.habitsHeading(met:0,total:3,digits:d),"٣ عادات تنتظرك")
+        XCTAssertEqual([0,1,2,3,11].map{WidgetCopy.daysLeft($0,digits:d,dayCount:{$0>10 ? "يومًا" : "أيام"})},["اليوم","غدًا","يومان","٣ أيام","١١ يومًا"])
     }
     func testAdjustedFajrOwnsWidgetDayAndExpiry() async throws {
         let root=FileManager.default.temporaryDirectory.appendingPathComponent("WidgetFajr-\(UUID())");defer{try? FileManager.default.removeItem(at:root)}

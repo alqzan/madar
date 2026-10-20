@@ -32,6 +32,7 @@ import MadarCore
         let content = RoomNotificationContent.content(for: candidate, plan: plan, session: app, habitNames: [:])
         XCTAssertNil(content.body.rangeOfCharacter(from: .decimalDigits))
         XCTAssertFalse(content.body.contains(card.name))
+        XCTAssertTrue(content.body.contains("بعد ثلاثة أيام"), "the card reminder says when, in words")
         RoomNotificationContent.open(candidate.id, userInfo: content.userInfo, session: app)
         XCTAssertEqual(app.selectedTab, "money"); XCTAssertFalse(app.moneyOpen)
         statement.dueDate = day.day.date(in: day.place.timeZone); try c.save()
@@ -175,6 +176,19 @@ import MadarCore
         XCTAssertTrue(RoomNotificationContent.content(for: qada, plan: plan, session: app, habitNames: [:]).body.hasPrefix("حان وقت القضاء."))
         let body = RoomNotificationContent.content(for: qada, plan: plan, session: app, habitNames: [:]).body
         XCTAssertNil(body.rangeOfCharacter(from: .decimalDigits), "RU2: no prayer-debt count outside the app")
+    }
+
+    func testHabitAndZakatCopySayWhenAndNeverPromiseAMissingStreak() throws {
+        let (app, _, _, day) = try fixture(["core.faceIDLock": .string("none")])
+        let plan = NotificationArbiter.plan(candidates: [], prayerDays: [day], now: day.fajr, timeZone: ActivePlace.riyadh.timeZone, policy: .init(staleNudgeEnabled: false))
+        let habit = NotificationCandidate(id: "habits.2026-10-15.\(UUID().uuidString)", room: .habits, dueAt: day.asr.addingTimeInterval(1800), dayKey: "2026-10-15")
+        XCTAssertEqual(RoomNotificationContent.content(for: habit, plan: plan, session: app, habitNames: [:]).body, "بدأ وقتها، وخطوة صغيرة اليوم تبدأ سلسلتك")
+        for (lead, words) in [("1day", "غدًا"), ("1week", "بعد أسبوع"), ("1month", "بعد نحو شهر")] {
+            let zakat = NotificationCandidate(id: "mal.zakat.\(lead).2026-11-20", room: .mal, kind: .annualReminder, dueAt: day.asr.addingTimeInterval(1800), dayKey: "2026-10-15")
+            let body = RoomNotificationContent.content(for: zakat, plan: plan, session: app, habitNames: [:]).body
+            XCTAssertEqual(body, "يحين موعد الحساب السنوي الذي اخترته " + words)
+            XCTAssertNil(body.rangeOfCharacter(from: .decimalDigits))
+        }
     }
 
     func testDigestCountUsesTheCatalogPlural() {

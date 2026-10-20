@@ -58,11 +58,16 @@ struct QuranWidgetContent: View {
             if !compact, !type.isAccessibilitySize { weekColumn("المراجعة", today: value.reviewToday, total: value.reviewWeek, fractions: value.days.map(\.review), color: theme.color("review")) }
         }
     }
+    /// A count of zero reads «لا أوجه», never «٠ أوجه».
+    private func spoken(_ count: String) -> String {
+        let digits = count.filter(\.isNumber)
+        return !digits.isEmpty && digits.allSatisfy { $0.wholeNumberValue == 0 } ? "لا أوجه" : count
+    }
     private func weekColumn(_ title: String, today: String, total: String, fractions: [Double], color: Color) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title).font(.system(size: extraLarge ? 22 : 12, weight: .semibold))
-            Text(today + " اليوم").font(.system(size: extraLarge ? 30 : 18, design: .serif)).fixedSize(horizontal: false, vertical: true)
-            if !compact, !type.isAccessibilitySize { Text("هذا الأسبوع " + total).font(.system(size: 11)).foregroundStyle(theme.secondaryInk) }
+            Text(spoken(today) + " اليوم").font(.system(size: extraLarge ? 30 : 18, design: .serif)).fixedSize(horizontal: false, vertical: true)
+            if !compact, !type.isAccessibilitySize { Text(spoken(total) + " هذا الأسبوع").font(.system(size: 11)).foregroundStyle(theme.secondaryInk) }
             if !type.isAccessibilitySize {
                 HStack(spacing: 3) { ForEach(Array(fractions.enumerated()), id: \.offset) { _, fraction in RoundedRectangle(cornerRadius: 3).fill(fraction > 0 ? color.opacity(min(1, 0.4 + fraction * 0.4)) : theme.color("track")).frame(height: extraLarge ? 30 : 18) } }.accessibilityHidden(true)
             }

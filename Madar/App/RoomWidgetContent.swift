@@ -48,7 +48,7 @@ struct RoomWidgetContent:View {
             } else if room == .upcoming && !largeHome {
                 HStack(alignment:.top,spacing:8) {ForEach(rows){row in upcoming(row)}}.frame(maxHeight:.infinity)
             } else {
-                if room == .habits && template != "periods" && family != .systemMedium && !type.isAccessibilitySize {Text(snapshot?.heading ?? "").font(.custom("thmanyahserifdisplay-Bold",size:22,relativeTo:.title2)).foregroundStyle(accent).privacySensitive()}
+                if room == .habits && template != "periods" && family != .systemMedium && !type.isAccessibilitySize {Text(snapshot?.heading ?? "").font(.custom("thmanyahserifdisplay-Bold",size:22,relativeTo:.title2)).foregroundStyle(accent).lineLimit(2).minimumScaleFactor(0.7).privacySensitive()}
                 ForEach(rows) { row in
                     let isHero = extraLargePortrait && row.id == rows.first?.id
                     Link(destination:URL(string:row.route) ?? URL(string:room.route)!) {
@@ -57,7 +57,7 @@ struct RoomWidgetContent:View {
                             VStack(alignment:.leading,spacing:2) {
                                 Text(row.title).font(.custom("thmanyahsans-Bold",size:isHero ? 19 : 13,relativeTo:isHero ? .headline : .caption)).lineLimit(1)
                                 Text(row.value).font(.custom("thmanyahsans-Regular",size:isHero ? 24 : 11,relativeTo:isHero ? .title3 : .caption2)).foregroundStyle(theme.secondaryInk).lineLimit(1)
-                                if largeHome && !type.isAccessibilitySize && !row.detail.isEmpty && (room != .habits || row.id == rows.first?.id) {HStack(spacing:6){Text(row.detail).font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).foregroundStyle(theme.secondaryInk).lineLimit(1);if !row.secondDate.isEmpty {Text(row.secondDate).font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).foregroundStyle(theme.secondaryInk).lineLimit(1)}}}
+                                if largeHome && !type.isAccessibilitySize && !row.detail.isEmpty && (room != .habits || (template != "periods" && row.id == rows.first?.id)) {HStack(spacing:6){Text(row.detail).font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).foregroundStyle(theme.secondaryInk).lineLimit(1);if !row.secondDate.isEmpty {Text(row.secondDate).font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).foregroundStyle(theme.secondaryInk).lineLimit(1)}}}
                             }
                             Spacer(minLength:0)
                             if row.done && room == .habits {Image(systemName:"checkmark").font(.caption).foregroundStyle(accent)}
@@ -72,7 +72,7 @@ struct RoomWidgetContent:View {
         .accessibilityElement(children:.contain)
     }
     private var accessoryRow:RoomWidgetSnapshot.Row? {
-        room == .habits ? snapshot?.periods.first : rows.first
+        room == .habits ? (snapshot?.periods.first{!$0.detail.isEmpty} ?? snapshot?.periods.first) : rows.first
     }
     private var accessoryValue:String {
         if snapshot?.locked==true{return "افتح مدار"}
@@ -91,9 +91,10 @@ struct RoomWidgetContent:View {
                     if snapshot?.locked==true{Image(systemName:"lock");Text("افتح").font(.caption2)}
                     else if room == .diaryWrite{Image(room.glyph).renderingMode(.template).resizable().scaledToFit().frame(width:24,height:24);Text("اكتب").font(.caption2)}
                     else {
-                        let value=accessoryRow?.value ?? ""
-                        Text(value.contains(where:{$0.isNumber}) ? (room == .upcoming ? value.split(separator:" ").first.map(String.init) ?? value : value) : "افتح").font(.custom("thmanyahsans-Bold",size:15,relativeTo:.caption)).lineLimit(1).minimumScaleFactor(0.7)
-                        Text(room == .upcoming ? accessoryRow?.title ?? room.title : room == .habits ? "اليوم" : "السنة").font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).lineLimit(1)
+                        let value=accessoryRow?.value ?? "",remaining=accessoryRow?.detail ?? ""
+                        let big=room == .upcoming ? value.split(separator:" ").first.map(String.init) : room == .habits ? (remaining.isEmpty ? nil : remaining) : (value.contains(where:{$0.isNumber}) ? value : nil)
+                        Text(big ?? "افتح").font(.custom("thmanyahsans-Bold",size:15,relativeTo:.caption)).lineLimit(1).minimumScaleFactor(0.7)
+                        Text(room == .upcoming ? accessoryRow?.title ?? room.title : room == .habits ? (remaining == "تمّ" ? "اليوم" : "متبقية") : "السنة").font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).lineLimit(1)
                     }
                 }.padding(7)
             }.privacySensitive(room == .habits || room == .upcoming).foregroundStyle(.primary).accessibilityElement(children:.combine)
@@ -152,10 +153,14 @@ private struct MihbaraRoomWidgetContent:View {
     }
     private var pageLine:String? {
         guard let book=snapshot?.currentBook else{return nil}
-        if let page=book.currentPage,let pages=book.pages{return digits.string(page)+" من "+digits.string(pages)+" صفحة"}
+        if let page=book.currentPage,let pages=book.pages{return digits.string(page)+" من "+WidgetCopy.agree(pages,digits,one:"صفحة واحدة",two:"صفحتين",few:"صفحات",many:"صفحة")}
         if let page=book.currentPage{return "صفحة "+digits.string(page)}
-        if let pages=book.pages{return digits.string(pages)+" صفحة"}
+        if let pages=book.pages{return WidgetCopy.agree(pages,digits,one:"صفحة واحدة",two:"صفحتان",few:"صفحات",many:"صفحة")}
         return nil
+    }
+    /// The title of a Nawawi hadith already says its ordinal («الحديث الثالث عشر»); repeating the number beside it adds nothing.
+    private func hadithLabel(_ hadith:MihbaraSnapshot.HadithSummary)->String {
+        hadith.title.hasPrefix("الحديث ") ? "حديث اليوم" : "حديث اليوم، "+digits.string(hadith.number)
     }
     var body:some View {
         Group {
@@ -172,7 +177,7 @@ private struct MihbaraRoomWidgetContent:View {
                 Image(systemName:"books.vertical.fill").font(.system(size:15,weight:.semibold)).widgetAccentable()
                 Text("المحبرة").font(.custom("thmanyahsans-Bold",size:13,relativeTo:.caption))
                 Spacer(minLength:0)
-                if let count=snapshot?.shelfCount,count>0 {Text(digits.string(count)+" كتابًا").font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).foregroundStyle(theme.secondaryInk).lineLimit(1)}
+                if let count=snapshot?.shelfCount,count>0 {Text(WidgetCopy.agree(count,digits,one:"كتاب واحد",two:"كتابان",few:"كتب",many:"كتابًا")).font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).foregroundStyle(theme.secondaryInk).lineLimit(1)}
             }.foregroundStyle(theme.accent)
             if locked {
                 Spacer(minLength:0);Label("افتح مدار",systemImage:"lock").font(MadarTypography.section());Text("المحتوى محمي").font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).foregroundStyle(theme.secondaryInk);Spacer(minLength:0)
@@ -186,11 +191,12 @@ private struct MihbaraRoomWidgetContent:View {
                         if let pageLine {Text(pageLine).font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).foregroundStyle(theme.secondaryInk).lineLimit(1)}
                     }
                 } else if let hadith=snapshot?.hadithToday {
+                    Text("حديث اليوم").font(.custom("thmanyahsans-Bold",size:11,relativeTo:.caption2)).foregroundStyle(theme.accent)
                     Text(hadith.title).font(.custom("thmanyahserifdisplay-Bold",size:20,relativeTo:.title3)).lineLimit(3)
                 }
                 if family != .systemSmall,let hadith=snapshot?.hadithToday,snapshot?.currentBook != nil {
                     Rectangle().fill(theme.line).frame(height:1)
-                    VStack(alignment:.leading,spacing:3){Text("حديث اليوم، "+digits.string(hadith.number)).font(.custom("thmanyahsans-Bold",size:11,relativeTo:.caption2)).foregroundStyle(theme.accent);Text(hadith.title).font(.custom("thmanyahsans-Regular",size:12,relativeTo:.caption)).lineLimit(2)}
+                    VStack(alignment:.leading,spacing:3){Text(hadithLabel(hadith)).font(.custom("thmanyahsans-Bold",size:11,relativeTo:.caption2)).foregroundStyle(theme.accent);Text(hadith.title).font(.custom("thmanyahsans-Regular",size:12,relativeTo:.caption)).lineLimit(2)}
                 }
                 if largeHome,let line=snapshot?.lastNotebookLine {
                     Rectangle().fill(theme.line).frame(height:1)
@@ -227,4 +233,47 @@ private struct MihbaraRoomWidgetContent:View {
 
 private extension String {
     var nonEmpty:String? { isEmpty ? nil : self }
+}
+
+/// Arabic number agreement for widget copy: «مرة واحدة»، «مرتان»، «٣ مرات»، «١١ مرة». Real amounts, never a bare «٠ من ١».
+enum WidgetCopy {
+    static func agree(_ n:Int,_ digits:MadarNumberFormatter,one:String,two:String,few:String,many:String,withDigits:Bool=true)->String {
+        if n==1{return one};if n==2{return two}
+        let word=(3...10).contains(n%100) ? few : many
+        return withDigits ? digits.string(n)+" "+word : word
+    }
+    /// Built-in unit names agree with their number (the dual is genitive, since it always follows «من»); a custom unit the owner typed is kept as written.
+    private static func unitForms(_ unit:String?)->(one:String,two:String,few:String,many:String)? {
+        switch unit {
+        case "minutes":("دقيقة واحدة","دقيقتين","دقائق","دقيقة")
+        case "exerciseMinutes":("دقيقة حركة","دقيقتي حركة","دقائق حركة","دقيقة حركة")
+        case "steps":("خطوة واحدة","خطوتين","خطوات","خطوة")
+        case "pages":("صفحة واحدة","صفحتين","صفحات","صفحة")
+        case nil:("مرة واحدة","مرتين","مرات","مرة")
+        default:nil
+        }
+    }
+    static func habitProgress(value:Int,target:Int,measure:HabitMeasure,unit:String?,digits:MadarNumberFormatter)->String {
+        if target==1 && (measure == .once || unit == nil){return value>=1 ? "تمّت" : "لم تتم بعد"}
+        guard let forms=unitForms(unit) else{return digits.string(value)+" من "+digits.string(target)+" "+(["exerciseMinutes":"دقيقة حركة"][unit ?? ""] ?? unit ?? "")}
+        return digits.string(value)+" من "+agree(target,digits,one:forms.one,two:forms.two,few:forms.few,many:forms.many)
+    }
+    static func periodProgress(met:Int,total:Int,digits:MadarNumberFormatter)->String {
+        if total==0{return "لا استحقاق"}
+        if met==total{return total==1 ? "تمّت" : "تمّت كلها"}
+        if met==0{
+            switch total {case 1:return "عادة واحدة تنتظرك";case 2:return "عادتان تنتظرانك"
+            default:return agree(total,digits,one:"",two:"",few:"عادات",many:"عادة")+" تنتظرك"}
+        }
+        return "تمّت "+digits.string(met)+" من "+digits.string(total)
+    }
+    static func habitsHeading(met:Int,total:Int,digits:MadarNumberFormatter)->String {
+        if total==0{return "لا عادات اليوم"}
+        if met==total{return total==1 ? "أتممت عادتك" : "أتممت عاداتك"}
+        if met==0{return periodProgress(met:0,total:total,digits:digits)}
+        return "تمّت "+digits.string(met)+" من "+digits.string(total)
+    }
+    static func daysLeft(_ n:Int,digits:MadarNumberFormatter,dayCount:(Int)->String)->String {
+        n<=0 ? "اليوم" : n==1 ? "غدًا" : n==2 ? "يومان" : digits.string(n)+" "+dayCount(n)
+    }
 }

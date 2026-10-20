@@ -35,7 +35,7 @@ private struct QuranWidgetView: View {
     private var extraLargePortrait: Bool { if #available(iOS 27.0, *) { family == .systemExtraLargePortrait } else { false } }
     var body: some View {
         Group {
-            if family == .accessoryInline { Text(entry.value?.nextDetail ?? "افتح القرآن") }
+            if family == .accessoryInline { Text("القرآن، " + (entry.value?.nextDetail ?? "افتح مدار")) }
             else { QuranWidgetContent(snapshot: entry.value, template: entry.template, compact: family == .accessoryCircular || family == .accessoryRectangular, extraLarge: extraLargePortrait) }
         }
         .environment(\.layoutDirection, .rightToLeft)

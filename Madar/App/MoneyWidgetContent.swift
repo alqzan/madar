@@ -52,6 +52,8 @@ struct MoneyWidgetContent: View {
                                 }
                             }
                         }
+                        // A row of dots says nothing by itself: name why the amounts are hidden and where they are.
+                        if hidden { Text("المبالغ مخفية، افتح المال لتراها").font(MadarTypography.fine()).foregroundStyle(color("ink2")).fixedSize(horizontal: false, vertical: true) }
                         if !hidden && !type.isAccessibilitySize && template != "basis", let points = snapshot?.periods, points.count > 1 {
                             GeometryReader { proxy in Path { path in
                                 for (index, point) in points.enumerated() { let p = CGPoint(x: proxy.size.width * Double(index) / Double(max(1, points.count - 1)), y: proxy.size.height * (1 - min(1, max(-1, point.share))) / 2); if index == 0 { path.move(to: p) } else { path.addLine(to: p) } }
