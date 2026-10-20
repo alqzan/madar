@@ -42,13 +42,13 @@ struct MoneyWidgetContent: View {
                             if extraLargePortrait && row.id == rows.first?.id {
                                 VStack(alignment: .leading, spacing: 1) {
                                     Text(row.title).font(MadarTypography.caption()).lineLimit(1)
-                                    Text(row.value).font(.custom("thmanyahserifdisplay-Bold", size: 38, relativeTo: .largeTitle)).lineLimit(1).minimumScaleFactor(0.7)
+                                    displayFigure(row.value, "thmanyahserifdisplay-Bold", size: 38, relativeTo: .largeTitle).lineLimit(1).minimumScaleFactor(0.7)
                                 }
                             } else {
                                 HStack(alignment: .firstTextBaseline) {
                                     Text(row.title).font(MadarTypography.caption()).lineLimit(1)
                                     Spacer(minLength: 2)
-                                    Text(row.value).font(.custom("thmanyahserifdisplay-Bold", size: family == .systemSmall && row.id == "now" ? 30 : largeHome ? 18 : 19, relativeTo: .title2)).lineLimit(1).minimumScaleFactor(0.7)
+                                    displayFigure(row.value, "thmanyahserifdisplay-Bold", size: family == .systemSmall && row.id == "now" ? 30 : largeHome ? 18 : 19, relativeTo: .title2).lineLimit(1).minimumScaleFactor(0.7)
                                 }
                             }
                         }
@@ -66,4 +66,20 @@ struct MoneyWidgetContent: View {
             }
         }.environment(\.layoutDirection, .rightToLeft)
     }
+}
+
+/// Thmanyah display has no «٬» or «٫», so the system fallback draws them wide («١ , ٣٦٠»).
+/// Only those marks are drawn in Amiri, which has them; the figure stays one Text. Where Amiri is not bundled
+/// (the widget extension, which draws everything in the system font) the marks fall back as before.
+func displayFigure(_ value: String, _ name: String, size: CGFloat, relativeTo style: Font.TextStyle) -> Text {
+    var text = Text(verbatim: ""), run = ""
+    func flush() {
+        guard !run.isEmpty else { return }
+        text = Text("\(text)\(Text(verbatim: run).font(.custom(name, size: size, relativeTo: style)))"); run = ""
+    }
+    for character in value {
+        guard character == "٬" || character == "٫" else { run.append(character); continue }
+        flush(); text = Text("\(text)\(Text(verbatim: String(character)).font(.custom("Amiri-Bold", size: size, relativeTo: style)))")
+    }
+    flush(); return text
 }

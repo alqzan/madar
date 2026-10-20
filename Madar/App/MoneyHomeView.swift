@@ -149,7 +149,7 @@ struct MoneyHomeView: View {
                 Button { basisOpen = true } label: {
                 VStack(alignment: .leading, spacing: 1) {
                     Text("لك الآن").font(.custom("thmanyahserifdisplay-Bold", size: 18, relativeTo: .headline)).foregroundStyle(theme.color("reserveText"))
-                    Text(amount(cycle.headline.availableNowMinor)).font(.custom("thmanyahserifdisplay-Black", size: 54, relativeTo: .largeTitle))
+                    displayFigure(amount(cycle.headline.availableNowMinor), "thmanyahserifdisplay-Black", size: 54, relativeTo: .largeTitle)
                         .contentTransition(.numericText()).minimumScaleFactor(0.55).lineLimit(1).accessibilityIdentifier("money-available")
                 }
                 }.buttonStyle(.plain).accessibilityIdentifier("money-basis-open")
