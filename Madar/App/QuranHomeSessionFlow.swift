@@ -9,6 +9,8 @@ struct QuranHomeSessionFlow: View {
     @Environment(\.roomTheme) private var theme
     @State private var showExit = false
     @State private var busy = false
+    @State private var queuedReveals: [Int] = []
+    @State private var autoAdvance: UUID?
     @State private var error: String?
     @State private var showDayClose = false
     @State private var showKhatmaMoment = false
@@ -65,16 +67,45 @@ struct QuranHomeSessionFlow: View {
     private var stageTitle: String {
         switch state.stage { case .repetition: "التكرار"; case .lineStarts: "أوائل الأسطر"; case .recall: "استرجاع بالتلقين"; case .covered: "تسميع مستور"; case .grading: "تقييمك"; default: "المراجعة" }
     }
+    /// Owner 20 Oct: review had too many taps per page. In review only: the last uncovered ayah opens
+    /// grading at once (the suggested grade is already chosen), and a grade moves on to the next page after
+    /// a short beat; another grade in that beat replaces the pending move. Saving the session stays explicit.
+    private func autoStep(after action: QuranUISessionAction, _ next: QuranUISessionState) {
+        guard next.coach?.review == true else { return }
+        let token = UUID(); autoAdvance = token
+        switch action {
+        case .reveal where next.stage != .grading && queuedReveals.isEmpty:
+            if case .advance = next.primaryAction { schedule(token, after: 0.35) }
+        case .grade where next.stage == .grading && next.primaryTitle == "تابع":
+            schedule(token, after: 0.7)
+        default: break
+        }
+    }
+    /// Only ayahs still covered on the page in front of the reader; anything else is stale.
+    private func drainReveals() {
+        let open = (state.coach?.plannedAyahs ?? []).subtracting(state.coach?.revealedAyahs ?? [])
+        queuedReveals.removeAll { !open.contains($0) }
+        guard state.stage != .grading, !queuedReveals.isEmpty else { queuedReveals = []; return }
+        perform(.reveal(ayahID: queuedReveals.removeFirst(), wordIndex: nil))
+    }
+    private func schedule(_ token: UUID, after seconds: Double) {
+        Task { try? await Task.sleep(for: .seconds(seconds)); if autoAdvance == token, !busy { autoAdvance = nil; perform(.advance) } }
+    }
     private func perform(_ action: QuranUISessionAction) {
-        guard !busy else { return }; busy = true
-        Task { defer { busy = false }; do { switch try await service.session(draftID: state.id, action: action) {
-        case .active(let next): state = next
+        // A finger dragged across the covered page reveals several ayahs in a row: queue them
+        // instead of dropping the ones that arrive while the previous reveal is still saving.
+        if busy { if case .reveal(let ayah, nil) = action, !queuedReveals.contains(ayah) { queuedReveals.append(ayah) }; return }
+        busy = true
+        if case .reveal = action {} else { queuedReveals = [] }
+        Task { defer { busy = false; drainReveals() }; do { switch try await service.session(draftID: state.id, action: action) {
+        case .active(let next): state = next; autoStep(after: action, next)
         case .completed(_, let reachedKhatm):
+            queuedReveals = []; autoAdvance = nil
             if case .commit = action, state.coach?.pastDay != true {
                 showDayClose = true
                 showKhatmaMoment = reachedKhatm
             } else { close() }
-        case .discarded: close()
+        case .discarded: queuedReveals = []; close()
         } } catch { self.error = quranUserMessage(error) } }
     }
 }

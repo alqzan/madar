@@ -90,6 +90,9 @@ private final class QuranCoachTextView: UIView {
         super.init(frame: frame); isOpaque = false; backgroundColor = .clear
         addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(tap(_:))))
         addGestureRecognizer(UILongPressGestureRecognizer(target: self, action: #selector(press(_:))))
+        // Owner 20 Oct: uncover the page with the finger, the way a hand slides off a covered line.
+        let drag = UIPanGestureRecognizer(target: self, action: #selector(drag(_:))); drag.maximumNumberOfTouches = 1
+        addGestureRecognizer(drag)
         isAccessibilityElement = false
     }
     required init?(coder: NSCoder) { nil }
@@ -211,6 +214,19 @@ private final class QuranCoachTextView: UIView {
         guard let coach, stage != .grading, !coach.bridge else { return }
         let point = gesture.location(in: self)
         if let id = hits.first(where: { $0.0.contains(point) })?.1, coach.plannedAyahs.contains(id) { reveal?(id) }
+    }
+    private var dragRevealed: Set<Int> = []
+    /// Each covered planned ayah the finger passes over is revealed once, in the order it was touched.
+    @objc private func drag(_ gesture: UIPanGestureRecognizer) {
+        guard let coach, stage != .grading, !coach.bridge, readingTap == nil else { return }
+        if gesture.state == .began { dragRevealed = [] }
+        guard gesture.state == .began || gesture.state == .changed else { return }
+        let point = gesture.location(in: self)
+        guard let id = hits.first(where: { $0.0.insetBy(dx: 0, dy: -6).contains(point) })?.1, coach.plannedAyahs.contains(id),
+              !coach.revealedAyahs.contains(id), !dragRevealed.contains(id) else { return }
+        dragRevealed.insert(id)
+        UISelectionFeedbackGenerator().selectionChanged()
+        reveal?(id)
     }
     /// Only while the words are hidden from the reciter: blind recitation, or the covered one-step review.
     @objc private func press(_ gesture: UILongPressGestureRecognizer) {
