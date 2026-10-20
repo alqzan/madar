@@ -31,6 +31,7 @@ struct HabitsRoomView: View {
     @State private var period: HabitFrequency?
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var theme: RoomTheme { .init(room:"bahw",dark:session.string("core.theme") == "dark") }
     private var digits: MadarNumberFormatter { .init(style:session.string("core.numerals") == "western" ? .western : .hindi) }
     private var active: [HabitReading] { readings.filter { !$0.archived } }
@@ -90,7 +91,7 @@ struct HabitsRoomView: View {
         HStack(spacing:7) { ForEach([HabitFrequency.daily,.weekly,.monthly,.yearly],id:\.self) { f in
             let rows = active.filter { $0.summary.current?.rule.frequency == f && ($0.summary.current?.target ?? 0) > 0 && !$0.paused }, met = rows.filter { $0.summary.current?.met == true }.count
             let on = f == selectedPeriod, count = active.filter { $0.summary.current?.rule.frequency == f }.count
-            Button { withAnimation(.snappy) { period = f } } label: {
+            Button { withAnimation(reduceMotion ? nil : .snappy) { period = f } } label: {
                 VStack(spacing:5) {
                     HabitMiniRing(share:rows.isEmpty ? 0 : Double(met)/Double(rows.count),theme:theme).frame(width:28,height:28)
                     Text(f.arabic).font(MadarTypography.caption())
