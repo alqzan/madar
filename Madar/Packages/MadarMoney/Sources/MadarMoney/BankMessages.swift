@@ -30,6 +30,59 @@ public struct ParsedBankMessage: Equatable, Sendable {
     public var statedHomeMinor: Int?
 }
 
+/// A small, explicit alias table for bank and wallet identities. The sender remains the authority:
+/// message-body merchants are never treated as the sending bank.
+public enum BankMessageIdentity {
+    private static let groups: [(String, [String])] = [
+        ("rajhi", ["الراجحي", "مصرف الراجحي", "بنك الراجحي", "al rajhi", "alrajhibank"]),
+        ("fransi", ["الفرنسي", "البنك السعودي الفرنسي", "السعودي الفرنسي", "fransi", "bsf", "saudi fransi bank"]),
+        ("snb", ["الاهلي", "الأهلي", "السعودي الاهلي", "السعودي الأهلي", "البنك الأهلي", "البنك الاهلي", "snb", "saudi national bank"]),
+        ("inma", ["الانماء", "الإنماء", "inma", "alinma", "alinma bank"]),
+        ("sab", ["ساب", "البنك السعودي البريطاني", "sab", "saab", "sabb", "saudi british bank"]),
+        ("riyad", ["بنك الرياض", "riyad", "riyad bank"]),
+        ("barq", ["برق", "barq"]),
+        ("stcbank", ["stc bank", "stcbank", "بنك stc", "stc بنك", "اس تي سي بنك"]),
+        ("stcpay", ["stc pay", "stcpay", "اس تي سي باي"]),
+        ("drahim", ["دراهم", "drahim"]),
+        ("tiqmo", ["تيقمو", "tiqmo"]),
+        ("d360", ["دي 360", "دي360", "d360"]),
+        ("tweeq", ["تويك", "tweeq"]),
+        ("urpay", ["يورباي", "يو ار باي", "urpay"]),
+        ("alinma-investment", ["الإنماء للاستثمار", "الانماء للاستثمار", "alinma investment", "alinmainvestment"]),
+        ("sukuk", ["صكوك", "sukuk"])
+    ]
+
+    private static func compact(_ value: String) -> String {
+        String(BankMessageParser.clean(value).lowercased().unicodeScalars.filter(CharacterSet.alphanumerics.contains))
+    }
+
+    private static func group(for key: String) -> String? {
+        groups.first { identity, aliases in
+            aliases.contains { alias in
+                let candidate = compact(alias)
+                return key == candidate
+            }
+        }?.0
+    }
+
+    /// Matches an explicitly configured bank/sender or a known Arabic/English alias.
+    public static func matches(_ lhs: String, _ rhs: String) -> Bool {
+        let left = compact(lhs), right = compact(rhs)
+        guard !left.isEmpty, !right.isEmpty else { return false }
+        if left == right { return true }
+        guard let leftGroup = group(for: left) else { return false }
+        return leftGroup == group(for: right)
+    }
+}
+
+/// A top-up becomes an internal transfer only when its endpoint is an owned, tracked wallet/account.
+public enum BankWalletIdentity {
+    public static func matches(_ endpoint: String?, trackedWallets: [String]) -> Bool {
+        guard let endpoint, !endpoint.isEmpty else { return false }
+        return trackedWallets.contains { BankMessageIdentity.matches(endpoint, $0) }
+    }
+}
+
 public enum BankMessageParser {
     public static let version = 2
 
@@ -90,12 +143,22 @@ public enum BankMessageParser {
         if has(t, ["سحب صراف", "سحب نقدي", "ATM", "cash withdrawal"]) { return .withdrawal }
         if has(t, ["حوالة صادرة", "تحويل صادر", "تحويل إلى", "outgoing transfer"]) { return .transferOut }
         if has(t, ["حوالة واردة", "تحويل وارد", "incoming transfer"]) { return .transferIn }
+        // Explicit moves between the owner's accounts are transfers even when a bank omits
+        // «صادر» and «وارد». Keep the direction conservative when the message names no endpoint.
+        if has(t, ["حوالة بين حساباتك", "حوالة بين حساباتي", "تحويل بين حساباتك", "تحويل بين حساباتي"])
+            || matches(t, #"\b(?:transfer\s+between\s+your\s+accounts|debit\s+transfer\s+internal)\b"#) { return .transferOut }
         // RM6 corpus: «حوالة داخلية صادرة», «حوالة محلية واردة», wallet top-ups and own-account moves.
         if has(t, ["حوالة", "تحويل"]) && has(t, ["صادرة", "صادر"]) { return .transferOut }
         if has(t, ["حوالة", "تحويل"]) && has(t, ["واردة", "وارد"]) { return .transferIn }
+        // Some internal-transfer templates show only their source account and no direction word.
+        if has(t, ["حوالة داخلية", "حوالة محلية"]) && labelled(t, ["من", "From"]) != nil { return .transferIn }
         // «استلام قطة» returns a share of a shared bill: a refund, not income (owner special case).
         if has(t, ["استلام قطة"]) { return .refund }
-        if has(t, ["تغذية محفظة", "top up", "إضافة أموال", "إيداع عبر حوالة"]) { return .transferIn }
+        if has(t, ["تغذية محفظة", "إضافة أموال", "اضافة اموال", "إضافة باستخدام", "اضافة باستخدام", "إيداع عبر حوالة", "شحن المحفظة", "تعبئة المحفظة"])
+            || matches(t, #"\b(?:money\s+added|add(?:ed)?\s+funds|funds\s+added|top[\s-]*up|cash[\s-]*in)\b"#) {
+            // Explicit purchase/debit wording is parsed below and only becomes neutral when it matches a tracked wallet.
+            if !has(t, ["شراء", "مشتريات", "purchase", "خصم"]) { return .transferIn }
+        }
         // «حوالة داخلية … الى:1234 … من:Drahim»: into the owner's own account from a named source.
         if has(t, ["حوالة داخلية", "حوالة محلية"]) && matches(t, #"(?m)^\s*(?:الى|إلى)\s*:\s*\*?\d"#) && matches(t, #"(?m)^\s*من\s*:\s*[^\d\s*]"#) { return .transferIn }
         if has(t, ["خصم عبر حوالة", "بين حساباتي", "بين حساباتك", "للحساب *", "للبطاقة *"]) || (has(t, ["خصم"]) && has(t, ["من حسابك", "من حساب"]) && has(t, ["تحويل"])) { return .transferOut }
@@ -111,7 +174,7 @@ public enum BankMessageParser {
     }
 
     /// `receivedAt` (the phone's receive time) settles two-digit dates that read both ways, «25-10-19» vs «19-10-25».
-    public static func parse(_ text: String, timeZone: TimeZone, exponents: CurrencyExponents = .specified, homeCurrency: String = "SAR", receivedAt: Date? = nil, sender: String? = nil) -> ParsedBankMessage {
+    public static func parse(_ text: String, timeZone: TimeZone, exponents: CurrencyExponents = .specified, homeCurrency: String = "SAR", receivedAt: Date? = nil, sender: String? = nil, trackedWallets: [String] = []) -> ParsedBankMessage {
         let t = clean(text)
         // Owner, 19 Oct: the telecom sender «stc» (not stc pay / STC Bank) sends balance and offers only — ignore it all.
         let kind = ["stc", "stc-ad"].contains(sender?.lowercased().trimmingCharacters(in: .whitespaces) ?? "") ? .marketing : classify(text)
@@ -140,9 +203,11 @@ public enum BankMessageParser {
         if kind == .refund, result.merchant == nil { result.merchant = labelled(t, ["من"]) }
         // BSF, SNB, Alinma, barq: the merchant opens its own line after «من», «لـ», «لدى» or «At», with or without a colon.
         if [.purchase, .refund, .declined, .reversal].contains(kind), result.merchant == nil { result.merchant = lineMerchant(t) }
-        // Owner special case: a card «purchase» at the owner's own wallet (barq, stc pay…) is a top-up — a self-transfer.
-        if kind == .purchase, let m = result.merchant?.lowercased().replacingOccurrences(of: " ", with: ""),
-           ["barq", "stcpay", "stcbank", "tiqmo", "urpay", "drahim", "d360", "alinmainv", "alinmainvestment", "sukuk"].contains(where: { m.hasPrefix($0) }) { result.kind = .transferOut }
+        // The same wallet can be tracked (internal transfer) or untracked (spending); use the owner's existing account choice.
+        if kind == .purchase, BankWalletIdentity.matches(result.merchant, trackedWallets: trackedWallets) {
+            result.kind = .transferOut
+            result.counterparty = result.merchant
+        }
         // «مبلغ: 23 USD(86.38 ريال)»: the bank's own riyal figure in brackets is the home amount, not the rate.
         if result.currency != homeCurrency, result.statedHomeMinor == nil,
            let match = t.range(of: #"\(\s*\d[\d.,]*\s*(?:ريال|SAR|SR|ر\.س)\s*\)"#, options: .regularExpression),
@@ -411,8 +476,7 @@ public enum CardStatements {
 
     /// (bank + last 4) with aliases for sender names; an unknown last 4 → «بطاقة جديدة؟», never created silently.
     public static func identify(sender: String, last4: String, cards: [KnownCard]) -> Identity {
-        let s = BankDedupe.normalize(sender)
-        let match = cards.first { $0.last4 == last4 && (BankDedupe.normalize($0.bank) == s || $0.aliases.map(BankDedupe.normalize).contains(s)) }
+        let match = cards.first { $0.last4 == last4 && (BankMessageIdentity.matches($0.bank, sender) || $0.aliases.contains { BankMessageIdentity.matches($0, sender) }) }
         return match.map { .known($0.id) } ?? .newCardQuestion
     }
 

@@ -5,10 +5,16 @@ import MadarCore
 import MadarData
 import MadarCommands
 
+private struct UITestBankCorpusLine: Decodable {
+    let sender: String
+    let date: String
+    let text: String
+}
+
 extension AppSession {
     /// Named synthetic stores only. Never reads or writes the owner's store.
     func prepareMoneyFixture(group: URL) throws {
-        guard let variant = ProcessInfo.processInfo.environment["MADAR_UI_MONEY_FIXTURE"], ["goal", "zakat", "zakatHidden", "travel", "travelMissing", "travelHidden", "accounts", "expense", "showcase", "empty", "hidden", "zero", "shortfall", "messages", "salarySourceFlow", "since", "rules", "salary", "budget", "cards", "cardsHidden", "analysis", "analysisHidden", "reconcile", "reconcileHidden", "cashback", "cashbackHidden", "subscriptions"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
+        guard let variant = ProcessInfo.processInfo.environment["MADAR_UI_MONEY_FIXTURE"], ["goal", "zakat", "zakatHidden", "travel", "travelMissing", "travelHidden", "accounts", "expense", "showcase", "empty", "hidden", "zero", "shortfall", "messages", "salarySourceFlow", "bankCorpus", "since", "rules", "salary", "budget", "cards", "cardsHidden", "analysis", "analysisHidden", "reconcile", "reconcileHidden", "cashback", "cashbackHidden", "subscriptions"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         let c = ModelContext(container)
         guard !(try c.fetch(FetchDescriptor<DeviceSetting>())).contains(where: { $0.key == "sys.moneyFixture" }) else { return }
         for key in ["sys.moneyFixture", "sys.onboardingCompleted"] { let marker = DeviceSetting(); marker.key = key; marker.valueJSON = Data("true".utf8); c.insert(marker) }
@@ -52,8 +58,13 @@ extension AppSession {
             let o = Obligation(); o.name = title; o.kind = index == 0 ? "loan" : "bill"; o.amountMinor = amount; o.dueDay = min(28, today.day + index + 2); c.insert(o)
             if index == 0 { let item = InstallmentItem(); item.obligationID = o.id; item.amountMinor = amount; item.dueDate = today.adding(days: 2).date(in: zone); c.insert(item) }
         }
-        if variant != "messages" && variant != "salarySourceFlow" { let m = BankMessage(); m.text = "شراء اصطناعي ينتظر التوزيع"; m.kind = "purchase"; m.status = "needsLook"; m.receivedAt = now; c.insert(m) }
+        if !["messages", "salarySourceFlow", "bankCorpus"].contains(variant) { let m = BankMessage(); m.text = "شراء اصطناعي ينتظر التوزيع"; m.kind = "purchase"; m.status = "needsLook"; m.receivedAt = now; c.insert(m) }
         account.bank = "بنك الاختبار"; account.senderIDs = ["بنك الاختبار"]; account.last4 = "5512"; account.ownership = "mine"
+        if variant == "bankCorpus" {
+            for name in ["Barq", "STC Pay", "STC Bank", "Tiqmo", "Drahim", "D360", "Tweeq", "urpay", "Alinma Investment", "Sukuk"] {
+                let wallet = Account(); wallet.name = name; wallet.bank = name; wallet.kind = "wallet"; wallet.ownership = "mine"; wallet.tracked = true; c.insert(wallet)
+            }
+        }
         let debit = Card(); debit.name = "بطاقة مدى"; debit.kind = "debit"; debit.bank = "بنك الاختبار"; debit.last4 = "3317"; debit.accountID = account.id; c.insert(debit)
         let card = Card(); card.name = "بطاقة المشتريات"; card.kind = "credit"; card.bank = "بنك الاختبار"; card.last4 = "8844"; card.accountID = account.id; c.insert(card)
         let statement = Statement(); statement.cardID = card.id; statement.statementMinor = 680000; statement.closeDate = start.date(in: zone).addingTimeInterval(-86400); statement.dueDate = today.adding(days: 4).date(in: zone); statement.closeDateSource = "estimated"; c.insert(statement)
@@ -171,6 +182,7 @@ extension AppSession {
             try c.save()
         }
         if variant == "messages" || variant == "salarySourceFlow" { seedMoneyMessages(today: today, zone: zone, salarySourceFlow: variant == "salarySourceFlow") }
+        if variant == "bankCorpus" { seedCorpusBankMessages() }
         if variant == "rules" {
             // Merchants the user already filed: rules, their movements, and one merchant filed two ways.
             func spend(_ merchant: String, _ category: MadarData.Category, _ days: Int, _ amount: Int) {
@@ -265,6 +277,34 @@ extension AppSession {
             for (index, text) in texts.enumerated() {
                 let at = today.date(in: zone).addingTimeInterval(Double(9 * 3600 + index * 60))
                 await executeFixtureCommand(.init(name: MoneyCommandPayload.intakeName, payload: .object(["text": .string(text), "sender": .string("بنك الاختبار"), "receivedAt": .string(ISO8601DateFormatter().string(from: at))]), source: .shortcut, issuedAt: at))
+            }
+            try? reload()
+        }
+    }
+
+    /// Local UI trial only: the XCTest host supplies corpus lines in the test-store launch environment.
+    private func seedCorpusBankMessages() {
+        let environment = ProcessInfo.processInfo.environment
+        let data: Data?
+        if let serialized = environment["MADAR_UI_BANK_CORPUS_LZFSE"], let packed = Data(base64Encoded: serialized),
+           let expanded = try? (packed as NSData).decompressed(using: .lzfse) {
+            data = expanded as Data
+        } else if let serialized = environment["MADAR_UI_BANK_CORPUS"], let decoded = serialized.data(using: .utf8) {
+            data = decoded
+        } else {
+            data = nil
+        }
+        guard let data,
+              let lines = try? JSONDecoder().decode([UITestBankCorpusLine].self, from: data), !lines.isEmpty else { return }
+        let messages: [MadarCore.JSONValue] = lines.map { line in
+            .object(["text": .string(line.text), "sender": .string(line.sender), "receivedAt": .string(line.date)])
+        }
+        Task { @MainActor in
+            // The real paste command accepts at most 500 rows per batch.
+            for start in stride(from: 0, to: messages.count, by: 500) {
+                let end = min(start + 500, messages.count)
+                let batch = Array(messages[start..<end])
+                await executeFixtureCommand(.init(name: "money.pasteBankMessages", payload: .object(["messages": .array(batch)]), source: .app, issuedAt: prayerNow()))
             }
             try? reload()
         }

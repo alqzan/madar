@@ -292,3 +292,72 @@ import Testing
         #expect(BankMessageParser.parse("شراء إنترنت\nبطاقة:1234 ;فيزا\nمبلغ:100.00 SAR\nلدى:Drahim", timeZone: riyadh).kind == .transferOut)
     }
 }
+
+/// My-dream follow-on rules, adapted to Madar's existing transfer kinds and tracked-account setting.
+@Suite struct BankMessageFollowOnTests {
+    let riyadh = TimeZone(identifier: "Asia/Riyadh")!
+
+    @Test func addFundsPhrasesAreIncomingTransfersRatherThanIncome() {
+        let messages = [
+            "Money added to wallet\nAmount: 25.00 SAR",
+            "Add funds to your account\nAmount: 18.00 SAR",
+            "Top-up completed\nAmount: 12.50 SAR",
+            "تمت إضافة أموال إلى المحفظة\nالمبلغ: 25.00 SAR",
+            "تغذية محفظة\nمبلغ: 18.00 SAR"
+        ]
+        for text in messages {
+            let parsed = BankMessageParser.parse(text, timeZone: riyadh)
+            #expect(parsed.kind == .transferIn, "\(text)")
+            #expect(parsed.amountMinor != nil)
+        }
+    }
+
+    @Test func trackedWalletTopUpIsNeutralButUntrackedWalletTopUpRemainsSpending() {
+        let text = "شراء إنترنت\nبطاقة:1234 ;فيزا\nمبلغ:200.00 SAR\nلدى:barq\nفي:2026-10-16 10:00"
+        let tracked = BankMessageParser.parse(text, timeZone: riyadh, trackedWallets: ["محفظتي برق", "برق"])
+        let untracked = BankMessageParser.parse(text, timeZone: riyadh)
+        #expect(tracked.kind == .transferOut)
+        #expect(tracked.counterparty == "barq")
+        #expect(tracked.amountMinor == 20_000)
+        #expect(untracked.kind == .purchase)
+    }
+
+    @Test func walletAndInvestmentCounterpartiesMatchTheirArabicAndEnglishAliases() {
+        #expect(BankWalletIdentity.matches("Drahim", trackedWallets: ["دراهم"]))
+        #expect(BankWalletIdentity.matches("الإنماء للاستثمار", trackedWallets: ["Alinma Investment"]))
+        #expect(!BankWalletIdentity.matches("Barq Store", trackedWallets: ["Barq" ]))
+    }
+
+    @Test func knownBankSenderAliasesMatchButUnknownContactsDoNot() {
+        #expect(BankMessageIdentity.matches("مصرف الراجحي", "AlRajhiBank"))
+        #expect(BankMessageIdentity.matches("البنك السعودي البريطاني", "SABB"))
+        #expect(!BankMessageIdentity.matches("مصرف الراجحي", "900"))
+        #expect(!BankMessageIdentity.matches("مصرف الراجحي", "AlinmaBank"))
+
+        let cards = [CardStatements.KnownCard(id: "rajhi-4321", bank: "مصرف الراجحي", last4: "4321")]
+        #expect(CardStatements.identify(sender: "AlRajhiBank", last4: "4321", cards: cards) == .known("rajhi-4321"))
+    }
+
+    @Test func ownerAccountMovesAndBankSpecificLayoutsStayConservative() {
+        let ownAccounts = BankMessageParser.parse("تحويل بين حساباتي\nمبلغ: 40 SAR", timeZone: riyadh)
+        #expect(ownAccounts.kind == .transferOut)
+        #expect(ownAccounts.counterparty == nil)
+
+        let internalFromWallet = BankMessageParser.parse("حوالة داخلية\nمن:Drahim\nمبلغ: SAR 40", timeZone: riyadh, trackedWallets: ["Drahim"])
+        #expect(internalFromWallet.kind == .transferIn)
+        #expect(internalFromWallet.counterparty == "Drahim")
+
+        let rajhiLayout = BankMessageParser.parse("شراء انترنت\nعبر:1493;مدى-ابل باي\nمن:9004\nبـSAR 5\nلـTEST DONATION\n17/1/26 06:09",
+            timeZone: riyadh, receivedAt: ISO8601DateFormatter().date(from: "2026-01-17T06:09:00+03:00"), sender: "AlRajhiBank")
+        #expect(rajhiLayout.kind == .purchase)
+        #expect(rajhiLayout.amountMinor == 500)
+        #expect(rajhiLayout.last4 == "1493")
+        #expect(rajhiLayout.merchant == "TEST DONATION")
+
+        let bsfLayout = BankMessageParser.parse("شراء عبر نقاط البيع\nلدى:TEST CAFE\nمبلغ: 39 SAR\n17/1/26 06:09",
+            timeZone: riyadh, receivedAt: ISO8601DateFormatter().date(from: "2026-01-17T06:09:00+03:00"), sender: "BSF")
+        #expect(bsfLayout.kind == .purchase)
+        #expect(bsfLayout.amountMinor == 3_900)
+        #expect(bsfLayout.merchant == "TEST CAFE")
+    }
+}

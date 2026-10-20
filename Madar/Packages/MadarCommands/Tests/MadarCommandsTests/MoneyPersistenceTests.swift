@@ -1002,6 +1002,41 @@ import MadarInbox
         #expect(try ModelContext(f.container).fetch(FetchDescriptor<Account>()).first { $0.id == f.bank }?.balanceAt == nil, "Renaming a legacy account never invents a checkpoint")
     }
 
+    @Test func trackedWalletTopUpLinksBothSidesWhileUntrackedTopUpStaysSpending() async throws {
+        let tracked = try MoneyFixture(); defer { tracked.clean() }; try await tracked.setup()
+        let walletID = UUID(), context = ModelContext(tracked.container), wallet = Account()
+        wallet.id = walletID; wallet.name = "محفظة برق"; wallet.bank = "برق"; wallet.kind = "wallet"; wallet.ownership = "mine"; wallet.tracked = true
+        context.insert(wallet); try context.save()
+
+        let text = "شراء إنترنت\nبطاقة:3333 ;مدى\nمبلغ:20.00 SAR\nلدى:barq\nفي:2026-10-16 14:00"
+        #expect(try await tracked.ingest(text).status == .applied)
+        let transfer = try tracked.transaction()
+        #expect(transfer.kind == "transfer" && transfer.reviewState == "needsLook")
+        #expect(transfer.fromAccountID == tracked.bank && transfer.toAccountID == walletID)
+        #expect(transfer.counterparty == "barq")
+
+        let untracked = try MoneyFixture(); defer { untracked.clean() }; try await untracked.setup()
+        let other = Account(); other.name = "محفظة دراهم"; other.bank = "دراهم"; other.kind = "wallet"; other.ownership = "mine"; other.tracked = false
+        let untrackedContext = ModelContext(untracked.container); untrackedContext.insert(other); try untrackedContext.save()
+        #expect(try await untracked.ingest("شراء إنترنت\nبطاقة:3333 ;مدى\nمبلغ:20.00 SAR\nلدى:Drahim\nفي:2026-10-16 14:00").status == .applied)
+        let expense = try untracked.transaction()
+        #expect(expense.kind == "expense" && expense.reviewState == "needsLook")
+        #expect(expense.fromAccountID == untracked.bank && expense.toAccountID == nil)
+    }
+
+    @Test func addFundsMessageStaysANeutralTransferAndMatchesConfiguredBankAlias() async throws {
+        let f = try MoneyFixture(); defer { f.clean() }; try await f.setup()
+        let context = ModelContext(f.container)
+        let account = try #require(try context.fetch(FetchDescriptor<Account>()).first { $0.id == f.bank })
+        account.bank = "مصرف الراجحي"; try context.save()
+        #expect(MoneyAccountRules.matches(account, sender: "AlRajhiBank", last4: "1111"))
+
+        let text = "Money added to account\nTo:1111*\nAmount:25.00 SAR\n2026-10-16 14:10"
+        #expect(try await f.run("money.ingestBankMessage", ["text": .string(text), "sender": .string("AlRajhiBank")], source: .shortcut).status == .applied)
+        let row = try f.transaction()
+        #expect(row.kind == "transfer" && row.toAccountID == f.bank && row.reviewState == "needsLook")
+    }
+
     @Test func depositedCashbackRoutesToChosenEnvelopeAndUndoRestoresDraft() async throws {
         let f = try MoneyFixture(); defer { f.clean() }; try await f.setup()
         let context = ModelContext(f.container), envelope = Envelope(); envelope.name = "رحلة قادمة"; context.insert(envelope); try context.save()

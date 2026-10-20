@@ -470,9 +470,13 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         let all = try context.fetch(FetchDescriptor<BankMessage>()).filter { $0.mergedInto == nil }
         let prayer = try PrayerRepository(context: context)
         let homeCurrency = try SettingsStore(context: context).value(for: "core.currency").string ?? "SAR"
+        let trackedWallets = try context.fetch(FetchDescriptor<Account>()).filter {
+            live($0) && $0.ownership == "mine" && $0.tracked && ["wallet", "savings"].contains($0.kind)
+        }.flatMap { [$0.name, $0.bank] }
         let items = raw.filter { !discard(text($0, "text")) }.map { p in
             let at = MoneyCommandPayload.date(p["receivedAt"]) ?? issuedAt
-            let parsed = BankMessageParser.parse(text(p, "text"), timeZone: prayer.place(at: at).timeZone, homeCurrency: homeCurrency, receivedAt: at, sender: text(p, "sender"))
+            let parsed = BankMessageParser.parse(text(p, "text"), timeZone: prayer.place(at: at).timeZone, homeCurrency: homeCurrency,
+                receivedAt: at, sender: text(p, "sender"), trackedWallets: trackedWallets)
             return (p, at, parsed, BankDedupe.fingerprint(sender: text(p, "sender"), text: text(p, "text")))
         }
         let existing = all.map { message -> BankDedupe.Stored in
@@ -577,7 +581,7 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
     private static func identify(_ row: MoneyTransaction, parsed: ParsedBankMessage, sender: String, context: ModelContext) throws {
         let accounts = try context.fetch(FetchDescriptor<Account>()).filter { live($0) }
         let cards = try context.fetch(FetchDescriptor<Card>()).filter { live($0) }
-        let known = cards.filter { $0.last4 == parsed.last4 && (BankDedupe.normalize($0.bank) == BankDedupe.normalize(sender) || $0.aliases.map(BankDedupe.normalize).contains(BankDedupe.normalize(sender))) }
+        let known = cards.filter { $0.last4 == parsed.last4 && (BankMessageIdentity.matches($0.bank, sender) || $0.aliases.contains { BankMessageIdentity.matches($0, sender) }) }
         if known.count == 1, let card = known.first {
             row.cardID = card.id; row.method = "card"
             if card.kind != "credit" {
@@ -594,6 +598,16 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             }
         }
         if parsed.kind == .transferOut || parsed.kind == .transferIn { row.method = "transfer" }
+        if let endpoint = parsed.counterparty {
+            let walletAccounts = accounts.filter {
+                $0.ownership == "mine" && $0.tracked && ["wallet", "savings"].contains($0.kind)
+                    && (BankMessageIdentity.matches($0.bank, endpoint) || BankMessageIdentity.matches($0.name, endpoint))
+            }
+            if walletAccounts.count == 1, let wallet = walletAccounts.first {
+                if parsed.kind == .transferOut, wallet.id != row.fromAccountID { row.toAccountID = wallet.id }
+                if parsed.kind == .transferIn, wallet.id != row.toAccountID { row.fromAccountID = wallet.id }
+            }
+        }
         if parsed.kind == .billPayment, let biller = parsed.biller {
             let matches = try context.fetch(FetchDescriptor<Obligation>()).filter { live($0) && $0.kind == "bill" && $0.provider == biller }
             if matches.count == 1 { row.obligationID = matches.first?.id }

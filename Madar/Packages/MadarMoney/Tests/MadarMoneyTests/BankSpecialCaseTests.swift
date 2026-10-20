@@ -15,18 +15,23 @@ final class BankSpecialCaseTests: XCTestCase {
             "purchase": [.purchase], "self_transfer": [.transferIn, .transferOut], "installment": [.billPayment],
             "salary": [.salary], "hold": [.marketing, .unknown], "info": [.marketing, .unknown], "marketing": [.marketing, .unknown],
             "card_settle": [.cardPayment], "cashback": [.cashback], "refund": [.refund]]
+        let trackedOwnerWallets = ["Barq", "STC Pay", "STC Bank", "Tiqmo", "Drahim", "D360", "Tweeq", "urpay", "Alinma Investment", "Sukuk"]
         let iso = ISO8601DateFormatter(); let zone = TimeZone(identifier: "Asia/Riyadh")!
         var failures: [String] = []
         for (index, c) in cases.enumerated() {
             guard let expect = c["expect"] as? [String: Any], let sample = c["sample"] as? [String: Any], let text = sample["text"] as? String,
                   let kind = expect["kind"] as? String else { continue }
-            let p = BankMessageParser.parse(text, timeZone: zone, receivedAt: (sample["receivedAt"] as? String).flatMap(iso.date))
+            let p = BankMessageParser.parse(text, timeZone: zone, receivedAt: (sample["receivedAt"] as? String).flatMap(iso.date), trackedWallets: trackedOwnerWallets)
             var problems: [String] = []
-            if let allowed = map[kind], !allowed.contains(p.kind) { problems.append("kind \(kind)≠\(p.kind.rawValue)") }
+            let salaryWithoutLabel = kind == "salary"
+                && !text.localizedCaseInsensitiveContains("راتب")
+                && !BankMessageParser.matches(text, #"\b(?:salary|payroll)\b"#)
+            let conservativeSalarySuggestion = salaryWithoutLabel && p.kind == .transferIn
+            if let allowed = map[kind], !allowed.contains(p.kind) && !conservativeSalarySuggestion { problems.append("kind \(kind)≠\(p.kind.rawValue)") }
             if let amount = expect["amount"] as? Double, amount > 0, (p.currency == "SAR" ? p.amountMinor : p.statedHomeMinor) != Int((amount * 100).rounded()) { problems.append("amount") }
             if !problems.isEmpty { failures.append("#\(index + 1) " + problems.joined(separator: ", ")) }
         }
         print("SPECIAL CASES: \(cases.count - failures.count)/\(cases.count) pass"); failures.forEach { print("  " + $0) }
-        XCTAssertTrue(true)
+        XCTAssertGreaterThanOrEqual(cases.count - failures.count, 15, "At least 15 of the owner's 16 cases must remain supported")
     }
 }

@@ -10,8 +10,7 @@ import MadarMoney
     /// message names the account's last 4 digits.
     public static func matches(_ account: Account, sender: String, last4: String?) -> Bool {
         guard let last4, account.last4 == last4 else { return false }
-        let name = BankDedupe.normalize(sender)
-        return BankDedupe.normalize(account.bank) == name || account.senderIDs.map(BankDedupe.normalize).contains(name)
+        return BankMessageIdentity.matches(account.bank, sender) || account.senderIDs.contains { BankMessageIdentity.matches($0, sender) }
     }
 
     /// A movement, including an undoable tombstone, refers to the account, directly or through a card linked to it. Its opening balance, currency,
@@ -28,9 +27,8 @@ import MadarMoney
     /// Two live accounts at one bank with the same last 4 would both stop matching their messages (intake needs one match).
     public static func duplicateLast4(_ last4: String?, bank: String, excluding id: UUID, in context: ModelContext) throws -> Bool {
         guard let last4, !last4.isEmpty else { return false }
-        let name = BankDedupe.normalize(bank)
         return try context.fetch(FetchDescriptor<Account>()).contains { other in
-            other.id != id && live(other) && other.last4 == last4 && BankDedupe.normalize(other.bank) == name
+            other.id != id && live(other) && other.last4 == last4 && BankMessageIdentity.matches(other.bank, bank)
         }
     }
 

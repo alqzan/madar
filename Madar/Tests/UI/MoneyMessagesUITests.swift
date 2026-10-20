@@ -3,7 +3,32 @@ import XCTest
 /// M5-V05: synthetic Shortcut messages through the real intake; «اعتمد الواضح» skips the duplicate, the statement
 /// updates its card once, and an unread message is ignored from «تحتاج نظرة».
 @MainActor final class MoneyMessagesUITests: XCTestCase {
+    private struct LocalCorpusLine: Codable { let sender: String; let date: String; let text: String }
+
     func shot(_ app: XCUIApplication, _ name: String) { let a = XCTAttachment(screenshot: app.screenshot()); a.name = name; a.lifetime = .keepAlways; add(a) }
+
+    private func localCorpusSamples() throws -> [LocalCorpusLine] {
+        let madar = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let folder = madar.appendingPathComponent("Private/bank-messages", isDirectory: true)
+        let selectors: [(String, [String])] = [
+            ("alrajhibank.jsonl", ["شراء"]),
+            ("barq_app.jsonl", ["money added", "add funds", "تمت إضافة", "إضافة أموال", "اضافة اموال"]),
+            ("stcpay.jsonl", ["wallet top up", "wallet top-up", "تغذية محفظة", "شحن المحفظة", "تعبئة المحفظة"])
+        ]
+        var selected: [LocalCorpusLine] = []
+        for (filename, needles) in selectors {
+            let file = folder.appendingPathComponent(filename)
+            guard let contents = try? String(contentsOf: file, encoding: .utf8) else { throw XCTSkip("Local bank-message corpus is unavailable") }
+            let sample = contents.split(whereSeparator: \.isNewline).compactMap { raw -> LocalCorpusLine? in
+                guard let line = try? JSONDecoder().decode(LocalCorpusLine.self, from: Data(raw.utf8)) else { return nil }
+                return needles.contains(where: { line.text.localizedCaseInsensitiveContains($0) }) ? line : nil
+            }.first
+            guard let sample else { throw XCTSkip("A needed local parser example is unavailable") }
+            selected.append(sample)
+        }
+        return selected
+    }
+
     func testClearDraftsStatementAndLookAreDecidedHere() throws {
         continueAfterFailure = false
         let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": "messages",
@@ -78,4 +103,34 @@ import XCTest
         let incomeChoice = app.buttons["اعتمده كدخل"]; XCTAssertTrue(incomeChoice.exists); incomeChoice.tap()
         XCTAssertTrue(suggestion.waitForNonExistence(timeout: 10), "A salary suggestion can still be explicitly confirmed as ordinary income")
     }
+
+    func testSelectedLocalCorpusMessagesReachReviewTray() throws {
+        continueAfterFailure = false
+        let corpus = try localCorpusSamples()
+        let serialized = try JSONEncoder().encode(corpus)
+        let packed = try (serialized as NSData).compressed(using: .lzfse) as Data
+        let app = XCUIApplication()
+        app.launchEnvironment = [
+            "MADAR_UI_STORE_ID": UUID().uuidString,
+            "MADAR_UI_MONEY_FIXTURE": "bankCorpus",
+            "MADAR_UI_BANK_CORPUS_LZFSE": packed.base64EncodedString(),
+            "MADAR_UI_SIZE": "L",
+            "MADAR_UI_THEME": "light",
+            "MADAR_UI_NOW": "2026-10-27T20:00:00+03:00"
+        ]
+        app.launch()
+        let tab = app.tabBars.buttons["خصّص"]; XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
+        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("المال")
+        let money = app.buttons["money-open"]; XCTAssertTrue(money.waitForExistence(timeout: 5)); money.tap()
+        let tray = app.descendants(matching: .any)["money-pending"]; XCTAssertTrue(tray.waitForExistence(timeout: 10)); tray.tap()
+        XCTAssertTrue(app.staticTexts["money-messages-title"].waitForExistence(timeout: 10))
+
+        let drafts = app.buttons.matching(identifier: "money-draft-confirm")
+        let expected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "count == %d", corpus.count), object: drafts)
+        XCTAssertEqual(XCTWaiter.wait(for: [expected], timeout: 30), .completed, "Selected messages did not all reach the review tray")
+        XCTAssertTrue(app.descendants(matching: .any)["money-messages-review"].exists)
+        XCTAssertEqual(drafts.count, 3, "The three selected messages should each have a review action")
+        shot(app, "M5-E03-local-corpus-L")
+    }
+
 }
