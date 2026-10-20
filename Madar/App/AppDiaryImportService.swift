@@ -30,7 +30,7 @@ struct DayOneImportDraft: Identifiable {
         let copy = folder.appending(path: "export.zip")
         do {
             try FileManager.default.copyItem(at: url, to: copy)
-            try (copy as NSURL).setResourceValue(URLFileProtection.complete, forKey: .fileProtectionKey)
+            try FileManager.default.setAttributes([.protectionKey: FileProtectionType.complete], ofItemAtPath: copy.path)
             let parsed = try await Task.detached(priority: .userInitiated) { () throws -> (ZIPReader, DayOnePlan, String) in
                 let zip = try ZIPReader(url: copy)
                 let plan = try DayOneParser.plan(zip)

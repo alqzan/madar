@@ -7,7 +7,10 @@ import XCTest
         XCTAssertTrue(app.staticTexts["quran-plan-forecast"].waitForExistence(timeout:10));capture(app,"M2-V12-plan-L")
         XCTAssertTrue(app.staticTexts["quran-plan-forecast-secondary"].exists); XCTAssertTrue(app.staticTexts["quran-plan-forecast-secondary"].label.contains(" م"))
         let before=app.staticTexts["quran-plan-forecast"].label
-        app.buttons["quran-plan-quran.hifzLevel"].tap();app.buttons["quran-plan-option-quran.hifzLevel-deep"].tap()
+        let level=app.buttons["quran-plan-quran.hifzLevel"];XCTAssertTrue(level.waitForExistence(timeout:10))
+        let enabled=XCTNSPredicateExpectation(predicate:NSPredicate(format:"isEnabled == true"),object:level)
+        XCTAssertEqual(XCTWaiter.wait(for:[enabled],timeout:30),.completed,app.debugDescription)
+        level.tap();let deep=app.buttons["quran-plan-option-quran.hifzLevel-deep"];XCTAssertTrue(deep.waitForExistence(timeout:10),app.debugDescription);deep.tap()
         XCTAssertTrue(app.buttons["quran-plan-quran.hifzLevel"].label.contains("عميق"));XCTAssertNotEqual(app.staticTexts["quran-plan-forecast"].label,before)
         app.terminate();app.launch();XCTAssertTrue(app.buttons["quran-streak"].waitForExistence(timeout:25));app.buttons["quran-streak"].tap()
         XCTAssertTrue(app.buttons["quran-plan-quran.hifzLevel"].waitForExistence(timeout:10));XCTAssertTrue(app.buttons["quran-plan-quran.hifzLevel"].label.contains("عميق"))
