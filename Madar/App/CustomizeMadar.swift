@@ -173,10 +173,18 @@ struct SettingControl: View {
     @Bindable var session: AppSession
     @Environment(\.roomTheme) private var theme
     @Environment(\.dynamicTypeSize) private var dynamicType
+    /// «اسألني بعد الأذان بـ (دقيقة)» over a bare «٣٠» reads as a form; the number carries its unit instead («٣٠ دقيقة»).
+    private var unitSuffix: String { definition.title.hasSuffix(" (دقيقة)") ? " (دقيقة)" : " (أيام)" }
+    private var unitForms: [String]? {
+        guard definition.type == "int", (definition.range?.first ?? 0) >= 0 else { return nil }
+        if definition.title.hasSuffix(" (دقيقة)") { return ["دقيقة واحدة", "دقيقتان", "دقائق", "دقيقة"] }
+        if definition.title.hasSuffix(" (أيام)") { return ["يوم واحد", "يومان", "أيام", "يومًا"] }
+        return nil
+    }
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text(definition.title).font(MadarTypography.section())
+                Text(unitForms == nil ? definition.title : String(definition.title.dropLast(unitSuffix.count))).font(MadarTypography.section())
                 Spacer()
                 if definition.scope == "device" { Text("لهذا الجهاز").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
             }
@@ -191,7 +199,8 @@ struct SettingControl: View {
                     .labelsHidden().accessibilityIdentifier("setting-\(definition.key)")
             case "int":
                 Stepper(value: Binding(get: { Int(session.number(definition.key)) }, set: { session.set(.number(Double($0)), key: definition.key) }), in: integerRange) {
-                    Text(session.digits(Int(session.number(definition.key))))
+                    let n = Int(session.number(definition.key))
+                    Text(unitForms.map { arabicCount(n, $0, MadarNumberFormatter(style: session.string("core.numerals") == "western" ? .western : .hindi)) } ?? session.digits(n))
                 }.accessibilityIdentifier("setting-\(definition.key)")
             case "map":
                 if definition.key == "salah.offsets" {

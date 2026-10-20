@@ -294,14 +294,18 @@ struct PrayerTodayView: View {
         }
     }
 
-    /// «٣ من ٥ اليوم · بقيت صلاتان»: «·» sits between words only (RU1).
+    /// «سجّلت ٣ من ٥ اليوم، بقيت صلاتان». No «·» (it sat beside the count's digit, RU1), and no «٠ من ٥»
+    /// before a tail that already says the same thing.
     private func todaySummary(_ snapshot: PrayerSnapshot, now: Date) -> String {
         let cells = snapshot.today.cells.filter { $0.time != nil }
         let recorded = cells.filter { [.jamaah, .alone, .qada, .missed, .excused].contains($0.status) }.count
         let remaining = cells.count - recorded
         let afterLastAdhan = cells.compactMap(\.prayerTime).max().map { now >= $0 } ?? false
         let tail = afterLastAdhan && remaining > 0 ? PrayerCopy.pending(remaining, digits: digits) : PrayerCopy.remaining(remaining, digits: digits)
-        return "\(digits.string(recorded)) من \(digits.string(cells.count)) اليوم · " + tail
+        if cells.isEmpty { return "" }
+        if remaining == 0 { return "سجّلت صلوات اليوم كلها" }
+        if recorded == 0 { return tail }
+        return "سجّلت \(digits.string(recorded)) من \(digits.string(cells.count)) اليوم، " + tail
     }
 
     // MARK: Notices
