@@ -109,7 +109,7 @@ struct MoneySinceView: View {
         return Group {
             if dynamicType.isAccessibilitySize {
                 VStack(alignment: .leading, spacing: 6) {
-                    ForEach(r.days) { day in HStack { Text(app.dateLabels(day.day, compact: true).primary); Spacer(); Text(figure: amount(day.spentMinor)) } }
+                    ForEach(r.days) { day in HStack { MadarDateLabel(app.dateLabels(day.day, compact: true), primaryFont: MadarTypography.caption(), secondaryFont: MadarTypography.fine()); Spacer(); Text(figure: amount(day.spentMinor)) } }
                 }
             } else {
                 HStack(alignment: .bottom, spacing: 6) {
@@ -124,8 +124,19 @@ struct MoneySinceView: View {
     private func column(_ d: MoneySinceDay, maxSpent: Int, active: Bool) -> some View {
         let labels = app.dateLabels(d.day, compact: true, weekday: true)
         let parts = labels.primary.split(separator: " ")
+        let details: [String?] = [labels.combined, "صرفت " + amount(d.spentMinor),
+                                  d.salaryMinor > 0 ? "نزل راتب" : nil,
+                                  d.messages > 0 ? "رسائل بنك" : nil,
+                                  d.statements > 0 ? "كشف بطاقة" : nil,
+                                  d.over ? "تجاوزت يومك" : nil,
+                                  d.pending > 0 ? "رسائل تنتظر قرارك" : nil]
         return VStack(spacing: 6) {
-            Text(String(parts.dropFirst().first ?? Substring(labels.primary))).font(.custom("thmanyahserifdisplay-Bold", size: 17, relativeTo: .headline))
+            VStack(spacing: 1) {
+                Text(String(parts.dropFirst().first ?? Substring(labels.primary))).font(.custom("thmanyahserifdisplay-Bold", size: 17, relativeTo: .headline))
+                Text(String(labels.secondary.split(separator: " ").first ?? ""))
+                    .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                    .accessibilityIdentifier("money-since-secondary-day-" + d.id)
+            }
             Text(String(parts.first ?? "")).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(theme.secondaryInk).lineLimit(1).minimumScaleFactor(0.7)
             VStack(spacing: 5) {
                 if d.salaryMinor > 0 { icon("arrow.down", theme.color("surplus")) }
@@ -148,6 +159,7 @@ struct MoneySinceView: View {
             .background(active ? theme.surface : theme.surface.opacity(0.5), in: UnevenRoundedRectangle(topLeadingRadius: 22, topTrailingRadius: 22))
             .overlay { UnevenRoundedRectangle(topLeadingRadius: 22, topTrailingRadius: 22).stroke(active ? theme.color("reserveText") : theme.line, lineWidth: active ? 2 : 1) }
             .accessibilityElement(children: .combine)
+            .accessibilityLabel(details.compactMap { $0 }.joined(separator: "، "))
     }
     private func icon(_ name: String, _ tint: Color, outline: Bool = false) -> some View {
         Image(systemName: name).font(.caption.bold()).foregroundStyle(outline ? tint : theme.background).frame(width: 26, height: 26)

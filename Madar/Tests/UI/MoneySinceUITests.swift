@@ -15,6 +15,10 @@ import XCTest
         let headline = app.staticTexts["money-since-headline"]; XCTAssertTrue(headline.waitForExistence(timeout: 5))
         XCTAssertTrue(headline.label.contains("نزل الراتب") && headline.label.contains("١٥٬٠٠٠"), headline.label)
         XCTAssertTrue(app.descendants(matching: .any)["money-since-silent"].exists, "Last Shortcut message four days ago")
+        let secondaryDay = app.staticTexts["money-since-secondary-day-2026-10-16"]
+        XCTAssertTrue(secondaryDay.waitForExistence(timeout: 5))
+        XCTAssertTrue(secondaryDay.label.contains("١٦"), secondaryDay.label)
+        XCTAssertTrue(app.buttons["money-since-day-2026-10-16"].label.contains("أكتوبر"))
         shot(app, "M5-V06-since-L"); app.swipeUp(velocity: .slow); shot(app, "M5-V06-since-s1-L")
         app.swipeUp(velocity: .slow); shot(app, "M5-V06-since-s2-L")
         let done = app.buttons["money-since-done"]; for _ in 0..<3 where !done.isHittable { app.swipeUp(velocity: .slow) }
