@@ -186,6 +186,68 @@ import UIKit
         XCTAssertTrue(page.label.replacingOccurrences(of: "\u{2068}", with: "").replacingOccurrences(of: "\u{2069}", with: "").contains("٢ من ٢"), app.debugDescription)
     }
 
+    /// Owner, 21 October 2026: a PDF becomes a flowing book on the device, through the normal EPUB review.
+    func testTextPDFConvertsOnDeviceIntoAFlowingBook() {
+        continueAfterFailure = false
+        let format = UIGraphicsPDFRendererFormat()
+        format.documentInfo = [kCGPDFContextTitle as String: "كتاب منساب", kCGPDFContextAuthor as String: "قارئ الاختبار"]
+        let pdf = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 300, height: 400), format: format).pdfData { canvas in
+            let paragraph = NSMutableParagraphStyle(); paragraph.alignment = .right
+            for page in 1...3 {
+                canvas.beginPage()
+                let text = "الصفحة رقم \(page)\n\nالقراءة باب إلى المعرفة، والكتاب صاحب لا يمل."
+                (text as NSString).draw(in: CGRect(x: 20, y: 35, width: 260, height: 320), withAttributes: [
+                    .font: UIFont.systemFont(ofSize: 21), .foregroundColor: UIColor.darkText, .paragraphStyle: paragraph
+                ])
+            }
+        }
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MIHBARA_FIXTURE": "empty",
+            "MADAR_UI_NOW": "2026-10-18T12:00:00+03:00", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
+            "MADAR_UI_MIHBARA_IMPORT_PDF_NAME": "كتاب منساب",
+            "MADAR_UI_MIHBARA_IMPORT_PDF": pdf.base64EncodedString()]
+        app.launch()
+        let customize = app.tabBars.buttons["خصّص"]; XCTAssertTrue(customize.waitForExistence(timeout: 20)); customize.tap()
+        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 8)); search.tap(); search.typeText("المحبرة")
+        let door = app.buttons["mihbara-open"]; XCTAssertTrue(door.waitForExistence(timeout: 8)); door.tap()
+        let add = app.buttons["mihbara-add-paper"]; XCTAssertTrue(add.waitForExistence(timeout: 8)); add.tap()
+        let confirm = app.buttons["mihbara-import-confirm"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 20), app.debugDescription)
+        for _ in 0..<6 where !confirm.isHittable { app.swipeUp(velocity: .slow) }
+        confirm.tap()
+        let addBook = app.buttons["mihbara-add-paper"]
+        let visible = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: addBook)
+        XCTAssertEqual(XCTWaiter.wait(for: [visible], timeout: 15), .completed, app.debugDescription)
+        addBook.tap()
+        app.buttons["mihbara-add-back"].tap()
+        app.buttons["mihbara-shelf-want"].tap()
+        let imported = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "كتاب منساب")).firstMatch
+        XCTAssertTrue(imported.waitForExistence(timeout: 8), app.debugDescription); imported.tap()
+        XCTAssertTrue(app.buttons["mihbara-pdf-flow"].waitForExistence(timeout: 12), app.debugDescription)
+        app.buttons["mihbara-pdf-flow"].tap()
+        XCTAssertTrue(app.buttons["mihbara-pdf-flow-turath"].waitForExistence(timeout: 8), app.debugDescription)
+        attach(app, "M6-PDF-flow-choice-L")
+        app.buttons["mihbara-pdf-flow-device"].tap()
+        let review = app.buttons["mihbara-pdf-flow-review"]
+        XCTAssertTrue(review.waitForExistence(timeout: 60), app.debugDescription)
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "٣ صفحات")).firstMatch.exists, app.debugDescription)
+        attach(app, "M6-PDF-flow-ready-L")
+        review.tap()
+        let importConfirm = app.buttons["mihbara-epub-import-confirm"]
+        XCTAssertTrue(importConfirm.waitForExistence(timeout: 20), app.debugDescription)
+        XCTAssertEqual(app.textFields["mihbara-epub-import-title"].value as? String, "كتاب منساب")
+        attach(app, "M6-PDF-flow-review-L")
+        for _ in 0..<8 where !importConfirm.isHittable { app.swipeUp(velocity: .slow) }
+        importConfirm.tap()
+        XCTAssertTrue(app.buttons["mihbara-pdf-close"].waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertFalse(app.buttons["mihbara-pdf-flow-device"].exists)
+        app.buttons["mihbara-pdf-close"].tap()
+        let copies = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "كتاب منساب"))
+        let both = XCTNSPredicateExpectation(predicate: NSPredicate(format: "count >= 2"), object: copies)
+        XCTAssertEqual(XCTWaiter.wait(for: [both], timeout: 12), .completed, app.debugDescription)
+        attach(app, "M6-PDF-flow-shelf-L")
+    }
+
     func testEPUBPreviewUsesFileMetadataAndAddsAnOfflineBook() throws {
         continueAfterFailure = false
         let fixture = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "english-import-poc", withExtension: "epub"))
@@ -354,6 +416,78 @@ import UIKit
         XCTAssertFalse(preview.label.contains("ج ١"), preview.label)
         XCTAssertTrue(preview.label.contains("shamela.ws/book/12028"), preview.label)
         attach(app, "M6-T01-live-quote-L")
+    }
+
+    /// Owner trial, 21 Oct 2026: ten real Turath books spread over every shelf, then the room as it looks.
+    func testLiveTurathTenBooksAcrossEveryShelf() throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard environment["MADAR_RUN_LIVE_TURATH"] == "1" || environment["TEST_RUNNER_MADAR_RUN_LIVE_TURATH"] == "1" else {
+            throw XCTSkip("Set TEST_RUNNER_MADAR_RUN_LIVE_TURATH=1 for the live Turath trial")
+        }
+        continueAfterFailure = false
+        // (Turath id, search words, title as it lands, shelf at import, moved to «قديمًا» afterwards)
+        let books: [(Int, String, String, String, Bool)] = [
+            (9820, "الرحيق المختوم", "الرحيق المختوم", "reading", false),
+            (12014, "رياض الصالحين الرسالة", "رياض الصالحين", "reading", false),
+            (9884, "حلية طالب العلم", "حلية طالب العلم", "reading", false),
+            (13566, "الأذكار للنووي مستو", "الأذكار", "want", false),
+            (216, "الوابل الصيب دار الحديث", "الوابل الصيب", "want", false),
+            (197, "زاد المعاد عطاءات", "زاد المعاد", "want", false),
+            (12028, "صيد الخاطر", "صيد الخاطر", "finished", false),
+            (12836, "الأربعون النووية", "الأربعون النووية", "finished", false),
+            (98087, "مختصر منهاج القاصدين", "مختصر منهاج القاصدين", "finished", true),
+            (158, "الداء والدواء دار المعرفة", "الداء والدواء", "finished", true)
+        ]
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MIHBARA_FIXTURE": "empty",
+            "MADAR_UI_NOW": "2026-10-21T21:00:00+03:00", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
+        app.launch()
+        let customize = app.tabBars.buttons["خصّص"]; XCTAssertTrue(customize.waitForExistence(timeout: 20)); customize.tap()
+        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 8)); search.tap(); search.typeText("المحبرة")
+        let door = app.buttons["mihbara-open"]; XCTAssertTrue(door.waitForExistence(timeout: 8)); door.tap()
+        for (n, book) in books.enumerated() {
+            let add = app.buttons["mihbara-add-paper"]
+            let addReady = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: add)
+            XCTAssertEqual(XCTWaiter.wait(for: [addReady], timeout: 20), .completed, app.debugDescription); add.tap()
+            let turath = app.buttons["mihbara-add-source-turath"]; XCTAssertTrue(turath.waitForExistence(timeout: 8)); turath.tap()
+            let field = app.textFields["mihbara-turath-search"]
+            XCTAssertTrue(app.buttons["mihbara-turath-suggestion-صيد الخاطر"].waitForExistence(timeout: 90), "The real catalogue did not load")
+            field.tap(); field.typeText(book.1)
+            let result = app.buttons["mihbara-turath-book-\(book.0)"]
+            XCTAssertTrue(result.waitForExistence(timeout: 15), "No result \(book.0) for \(book.1)")
+            if n == 0 { attach(app, "trial-01-turath-search") }
+            result.tap()
+            let confirm = app.buttons["mihbara-epub-import-confirm"]
+            XCTAssertTrue(confirm.waitForExistence(timeout: 180), "Download/conversion of \(book.0) did not finish")
+            if n == 5 { attach(app, "trial-02-import-review-large") }
+            let shelf = app.buttons["mihbara-epub-shelf-\(book.3)"]
+            for _ in 0..<10 where !shelf.isHittable { app.swipeUp(velocity: .slow) }
+            shelf.tap()
+            for _ in 0..<10 where !confirm.isHittable { app.swipeUp(velocity: .slow) }
+            confirm.tap()
+            XCTAssertTrue(app.buttons["mihbara-shelf-want"].waitForExistence(timeout: 30), "Import of \(book.0) did not return to the room")
+        }
+        app.buttons["mihbara-shelf-finished"].tap()
+        for book in books where book.4 {
+            let row = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", book.2)).firstMatch
+            XCTAssertTrue(row.waitForExistence(timeout: 10), app.debugDescription)
+            row.press(forDuration: 1.2)
+            let move = app.buttons["انقله إلى «قديمًا»"]
+            XCTAssertTrue(move.waitForExistence(timeout: 8), app.debugDescription); move.tap()
+            _ = app.buttons["mihbara-shelf-finished"].waitForExistence(timeout: 5)
+        }
+        app.swipeDown(velocity: .fast)
+        for shelf in ["reading", "want", "finished"] {
+            app.buttons["mihbara-shelf-\(shelf)"].tap(); sleep(1); attach(app, "trial-03-shelf-\(shelf)")
+        }
+        app.buttons["mihbara-shelf-reading"].tap()
+        for i in 0..<3 { app.swipeUp(velocity: .slow); sleep(1); attach(app, "trial-04-room-scroll-\(i + 1)") }
+        app.swipeDown(velocity: .fast); app.swipeDown(velocity: .fast)
+        let reading = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "الرحيق المختوم")).firstMatch
+        XCTAssertTrue(reading.waitForExistence(timeout: 8)); reading.tap()
+        XCTAssertTrue(app.buttons["mihbara-reader-close"].waitForExistence(timeout: 30), app.debugDescription)
+        sleep(2); attach(app, "trial-05-reader")
+        app.buttons["mihbara-reader-close"].tap()
     }
 
     private func attach(_ app: XCUIApplication, _ name: String) {

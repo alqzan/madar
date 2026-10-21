@@ -23,6 +23,7 @@ struct MihbaraPDFReaderView: View {
     @State private var positionProgress = ReadingPositionProgress()
     @State private var closing = false
     @State private var searching = false
+    @State private var flowing = false
 
     private var saveCoordinator: MihbaraReadingSaveCoordinator { .forSession(app) }
     private var service: AppMihbaraService { .init(app: app) }
@@ -73,11 +74,11 @@ struct MihbaraPDFReaderView: View {
         .task { openPDF() }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { resume(at: Date()) } else { pause(at: Date()) }
-            if phase != .active { searching = false }
+            if phase != .active { searching = false; flowing = false }
         }
         .onChange(of: canRead) { _, authorized in
             if authorized, scenePhase == .active { resume(at: Date()) }
-            else if !authorized { searching = false; pause(at: Date()) }
+            else if !authorized { searching = false; flowing = false; pause(at: Date()) }
         }
         .sheet(isPresented: $searching) {
             MihbaraPDFSearchView(app: app, book: book) { index in
@@ -85,6 +86,10 @@ struct MihbaraPDFReaderView: View {
                 searching = false
             }
             .environment(\.roomTheme, readerTheme)
+        }
+        .sheet(isPresented: $flowing) {
+            MihbaraPDFFlowView(app: app, book: book) { flowing = false }
+                .environment(\.roomTheme, readerTheme)
         }
         .onDisappear { pause(at: Date()) }
         .toolbarVisibility(.hidden, for: .navigationBar)
@@ -110,6 +115,11 @@ struct MihbaraPDFReaderView: View {
                     }
                     .accessibilityLabel("ابحث في PDF واستخرج نصه")
                     .accessibilityIdentifier("mihbara-pdf-search")
+                    Button { flowing = true } label: {
+                        Image(systemName: "text.justify.leading").frame(width: 44, height: 44)
+                    }
+                    .accessibilityLabel("اجعله كتابًا منسابًا")
+                    .accessibilityIdentifier("mihbara-pdf-flow")
                 }
             }
         }

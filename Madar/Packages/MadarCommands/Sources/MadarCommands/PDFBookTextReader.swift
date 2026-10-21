@@ -92,12 +92,14 @@ public actor PDFBookTextReader {
         return opened.pageCount
     }
 
-    public func page(at index: Int) throws -> PDFBookPageText {
+    /// `optical: true` reads the page image even when it has a text layer, for pages whose
+    /// embedded Arabic is malformed (`hasUnreliableArabicMapping`).
+    public func page(at index: Int, optical: Bool = false) throws -> PDFBookPageText {
         let count = try pageCount()
         guard (0..<count).contains(index), let page = document?.page(at: index) else { throw Failure.unreadable }
         return try autoreleasepool {
             try Task.checkCancellation()
-            if let text = page.string?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty {
+            if !optical, let text = page.string?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty {
                 return PDFBookPageText(index: index, text: text, source: .embedded)
             }
             let request = VNRecognizeTextRequest()
@@ -116,6 +118,20 @@ public actor PDFBookTextReader {
             let text = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: "\n")
             return PDFBookPageText(index: index, text: text, source: .optical)
         }
+    }
+
+    /// The printed page label when the PDF carries one ("iv", "12"), else nil.
+    public func pageLabel(at index: Int) throws -> String? {
+        _ = try pageCount()
+        guard let page = document?.page(at: index), let label = page.label?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !label.isEmpty, label != String(index + 1) else { return nil }
+        return label
+    }
+
+    /// The PDF's own bookmarks, depth-first; `page` is one-based (same as the import inspection).
+    public func outline() throws -> [PDFBookOutlineItem] {
+        _ = try pageCount()
+        return document.map(PDFBookFiles.outline(of:)) ?? []
     }
 
     private static func render(_ page: PDFPage) throws -> CGImage {

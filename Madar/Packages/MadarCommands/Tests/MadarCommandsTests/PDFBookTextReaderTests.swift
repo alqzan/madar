@@ -39,6 +39,9 @@ struct PDFBookTextReaderTests {
         #expect(try await reader.pageCount() == 2)
         let first = try await reader.page(at: 0), second = try await reader.page(at: 1)
         #expect(first.source == .embedded && first.contains("original text layer"))
+        // A text page can also be read from its image (for malformed embedded Arabic).
+        let forced = try await reader.page(at: 0, optical: true)
+        #expect(forced.source == .optical && forced.contains("ORIGINAL TEXT"), "Recognized fixture: \(forced.text)")
         #expect(second.source == .optical)
         #expect(second.contains("المعرفة"), "Recognized fixture: \(second.text)")
         #expect(second.contains("READING OPENS"), "Recognized fixture: \(second.text)")

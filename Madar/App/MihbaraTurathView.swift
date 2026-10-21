@@ -61,6 +61,8 @@ import MadarDesign
 
 struct MihbaraTurathView: View {
     let app: AppSession
+    /// Prefilled search, e.g. the title of a PDF the owner wants as a flowing book.
+    var initialQuery = ""
     let onImported: () -> Void
     @Environment(\.dismiss) private var dismiss
     @Environment(\.roomTheme) private var theme
@@ -214,6 +216,7 @@ struct MihbaraTurathView: View {
     }
 
     private func load() async {
+        if query.isEmpty, !initialQuery.isEmpty { query = initialQuery }
         guard books.isEmpty else { return }
         do { books = try await MihbaraTurathSource.catalogue(); error = nil }
         catch { self.error = "تعذّر الوصول إلى فهرس تراث. تأكد من الاتصال بالإنترنت ثم ارجع لهذه الصفحة." }

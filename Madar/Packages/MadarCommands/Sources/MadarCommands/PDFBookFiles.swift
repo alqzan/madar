@@ -30,6 +30,27 @@ public enum PDFBookFiles {
     public static let maximumBytes = 500 * 1024 * 1024
     public static let maximumPages = 1000
 
+    /// The PDF's own bookmarks, depth-first; `page` is one-based.
+    static func outline(of document: PDFDocument) -> [PDFBookOutlineItem] {
+        var outline: [PDFBookOutlineItem] = [], visited = 0
+        func visit(_ parent: PDFOutline, depth: Int) {
+            guard depth < 20, visited < 2000 else { return }
+            for index in 0..<min(parent.numberOfChildren, 2000) {
+                guard visited < 2000 else { break }
+                visited += 1
+                guard let child = parent.child(at: index) else { continue }
+                if let title = child.label?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty,
+                   let page = child.destination?.page {
+                    let pageIndex = document.index(for: page)
+                    if pageIndex != NSNotFound { outline.append(.init(title: String(title.prefix(300)), page: pageIndex + 1)) }
+                }
+                visit(child, depth: depth + 1)
+            }
+        }
+        if let root = document.outlineRoot { visit(root, depth: 0) }
+        return outline
+    }
+
     public static func stagedURL(id: UUID, root: URL) -> URL { root.appendingPathComponent(id.uuidString).appendingPathExtension("pdf") }
 
     public static func stage(source: URL, root: URL, id: UUID = UUID()) throws -> PDFBookInspection {
@@ -96,22 +117,7 @@ public enum PDFBookFiles {
         let recognizer = NLLanguageRecognizer(); recognizer.processString(sample)
         let dominant = recognizer.languageHypotheses(withMaximum: 1).first
         let language = !sample.isEmpty && (dominant?.value ?? 0) >= 0.75 ? dominant?.key.rawValue : nil
-        var outline: [PDFBookOutlineItem] = [], visited = 0
-        func visit(_ parent: PDFOutline, depth: Int) {
-            guard depth < 20, visited < 2000 else { return }
-            for index in 0..<min(parent.numberOfChildren, 2000) {
-                guard visited < 2000 else { break }
-                visited += 1
-                guard let child = parent.child(at: index) else { continue }
-                if let title = child.label?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty,
-                   let page = child.destination?.page {
-                    let pageIndex = document.index(for: page)
-                    if pageIndex != NSNotFound { outline.append(.init(title: String(title.prefix(300)), page: pageIndex + 1)) }
-                }
-                visit(child, depth: depth + 1)
-            }
-        }
-        if let root = document.outlineRoot { visit(root, depth: 0) }
+        let outline = Self.outline(of: document)
         var labels: CGPDFDictionaryRef?
         let hasLabels = document.documentRef?.catalog.map { CGPDFDictionaryGetDictionary($0, "PageLabels", &labels) } ?? false
         let attributes = document.documentAttributes ?? [:]
