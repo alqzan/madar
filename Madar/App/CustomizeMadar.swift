@@ -67,7 +67,9 @@ struct CustomizeMadar: View {
                 if query.isEmpty {
                     if let backup = session.backupService {
                         NavigationLink("النسخ والاستعادة") {
-                            BackupSettingsView(service: backup, numerals: session.string("core.numerals") == "western" ? .western : .hindi)
+                            BackupSettingsView(service: backup, numerals: session.string("core.numerals") == "western" ? .western : .hindi,
+                                dates: { session.dateLabels(GregorianDay.containing($0, in: session.activePlace.timeZone)) },
+                                time: { session.backupTime($0) })
                         }.frame(minHeight: 44).font(MadarTypography.section()).accessibilityIdentifier("backup-settings-link")
                     }
                 }

@@ -51,6 +51,60 @@ import Testing
         let keys = MemoryBackupKeyStore(); let coordinator = BackupCoordinator(store:store,backupDirectory:base.appendingPathComponent("Backups"),keyStore:keys,lifecycle:lifecycle)
         try await coordinator.configurePassphrase("correct long password"); return (store,coordinator,keys)
     }
+    private func addBook(_ context: ModelContext, title: String, bytes: Int, turath: Int? = nil) throws -> (book: UUID, media: UUID) {
+        let data = Data((0..<bytes).map { UInt8(truncatingIfNeeded: $0 &* 31 &+ title.count) })
+        let media = Media(); media.kind = "doc"; media.contentType = "com.adobe.pdf"; media.data = data; media.sizeBytes = data.count; media.sha256 = BackupCodec.hash(data); context.insert(media)
+        let book = Book(); book.title = title; book.kind = "file"; book.format = "pdf"; book.mediaID = media.id; book.fileHash = media.sha256; book.turathID = turath; context.insert(book)
+        try context.save(); return (book.id, media.id)
+    }
+    @Test func rd4BooksOverBudgetLeaveTurathFirstThenLargestAndBackupSucceeds() throws {
+        let container = try MadarContainerFactory.makeInMemory(); try fixture(container.mainContext)
+        let small = try addBook(container.mainContext, title: "صغير", bytes: 2_000)
+        let large = try addBook(container.mainContext, title: "كبير", bytes: 9_000)
+        let turath = try addBook(container.mainContext, title: "من تراث", bytes: 3_000, turath: 12028)
+        let rows = try RecordBridge.all(container.mainContext); let total = BackupBookFiles.estimatedBytes(rows)
+        #expect(BackupBookFiles.fitting(rows, budget: total).excluded.isEmpty)
+        // Removing the Turath file alone is not enough; the largest user file goes next, the small one stays.
+        let fitted = BackupBookFiles.fitting(rows, budget: total - 3_500)
+        #expect(fitted.excluded.map(\.title) == ["من تراث", "كبير"]); #expect(fitted.excluded.first?.fromTurath == true)
+        func media(_ id: UUID) -> DataRecord? { fitted.records.first { $0.model == "Media" && $0.id == id } }
+        #expect(media(turath.media)?.fields["state"] == .string("missing")); #expect(media(turath.media)?.fields["data"] == .null)
+        #expect(media(large.media)?.fields["state"] == .string("missing"))
+        #expect(media(small.media)?.fields["state"] == .string("ok")); #expect(media(small.media)?.fields["data"] != .null)
+        // Photos and audio are never candidates, and the archive still validates (missing is an allowed state).
+        #expect(fitted.records.filter { $0.model == "Media" && $0.fields["kind"]?.string != "doc" } == rows.filter { $0.model == "Media" && $0.fields["kind"]?.string != "doc" })
+        let sealed = try BackupCodec.export(records: fitted.records, passphrase: "correct long password")
+        #expect(try BackupCodec.validate(sealed, passphrase: "correct long password").records.count == rows.count)
+    }
+    @Test func rd4RestoreKeepsDeviceBookBytesInMergeAndReplaceAndReportsExclusion() async throws {
+        for mode in [RestoreMode.merge, .replace] {
+            let base = try scratch(); defer { try? FileManager.default.removeItem(at:base) }
+            let (store,coordinator,_) = try await makeCoordinator(base:base,seed:true)
+            let ids = try addBook(store.container.mainContext, title: "كتابي", bytes: 6_000)
+            let before = try RecordBridge.all(store.container.mainContext).first { $0.model == "Media" && $0.id == ids.media }
+            coordinator.bookBudget = try coordinator.estimatedBytes() - 1
+            let receipt = try await coordinator.export(kind:.manual,now:Date().addingTimeInterval(10))
+            #expect(try coordinator.status().excludedBooks == [BackupBookExclusion(title: "كتابي", bytes: 6_000, fromTurath: false)])
+            let saved = try BackupCodec.validate(Data(contentsOf:receipt.fileURL),passphrase:"correct long password").records.first { $0.model == "Media" && $0.id == ids.media }
+            #expect(saved?.fields["state"] == .string("missing")); #expect(saved?.fields["data"] == .null)
+            let preview = try await coordinator.preview(file:receipt.fileURL,passphrase:"correct long password")
+            let result = try await coordinator.restore(preview:preview,mode:mode,now:Date().addingTimeInterval(100))
+            let after = try RecordBridge.all(result.container.mainContext).first { $0.model == "Media" && $0.id == ids.media }
+            #expect(after?.fields["state"] == .string("ok")); #expect(after?.fields["data"] == before?.fields["data"]); #expect(after?.isLive == true)
+        }
+    }
+    @Test func rd4CleanRestoreWithoutTheDeviceFileMarksBookMissing() async throws {
+        let base = try scratch(); defer { try? FileManager.default.removeItem(at:base) }
+        let source = try MadarContainerFactory.makeInMemory(); try fixture(source.mainContext)
+        let ids = try addBook(source.mainContext, title: "مفقود", bytes: 5_000)
+        let rows = try RecordBridge.all(source.mainContext)
+        let fitted = BackupBookFiles.fitting(rows, budget: BackupBookFiles.estimatedBytes(rows) - 1)
+        let file = try backupFile(fitted.records,base:base); let (_,coordinator,_) = try await makeCoordinator(base:base)
+        let result = try await coordinator.restore(preview:try await coordinator.preview(file:file,passphrase:"correct long password"),mode:.replace)
+        let media = try RecordBridge.all(result.container.mainContext).first { $0.model == "Media" && $0.id == ids.media }
+        #expect(media?.fields["state"] == .string("missing")); #expect(media?.fields["data"] == .null)
+        #expect(try RecordBridge.all(result.container.mainContext).contains { $0.model == "Book" && $0.id == ids.book && $0.isLive })
+    }
     @Test func logicalAdoptionPreservesAll61ModelsAndSourceAndReopens() throws {
         let base = try scratch(); defer { try? FileManager.default.removeItem(at:base) }
         let source = try MadarContainerFactory.makeLocal(at:base.appendingPathComponent("FlatNewMadar")); source.mainContext.autosaveEnabled = false; try fixture(source.mainContext)

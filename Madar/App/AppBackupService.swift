@@ -57,7 +57,9 @@ import WidgetKit
         return BackupUIStatus(schedule: BackupUISchedule(rawValue: session.string("core.backup")) ?? .weekly,
             lastSuccess: actual.lastSuccessAt, lastResult: Self.resultLabel(actual.lastResult), localOnly: actual.localOnly,
             automaticCount: catalog.filter { $0.kind == .automatic }.count,
-            manualCount: catalog.filter { $0.kind == .manual }.count, keyConfigured: try coordinator.hasConfiguredKey())
+            manualCount: catalog.filter { $0.kind == .manual }.count, keyConfigured: try coordinator.hasConfiguredKey(),
+            estimatedBytes: try? coordinator.estimatedBytes(),
+            excludedBooks: (actual.excludedBooks ?? []).map { BackupUIExcludedBook(title: $0.title, bytes: $0.bytes, fromTurath: $0.fromTurath) })
     }
     func setSchedule(_ schedule: BackupUISchedule) async throws {
         guard let session else { throw DataError.invalidValue("session unavailable") }
@@ -251,5 +253,12 @@ import WidgetKit
             }
             Task { @MainActor in report(BackupUIProgress(message: message, completedUnits: update.completedUnits, totalUnits: update.totalUnits)) }
         }
+    }
+}
+extension AppSession {
+    /// «٩:٤١ م» in the active place, digits per `core.numerals`.
+    func backupTime(_ at: Date) -> String {
+        let formatter = DateFormatter(); formatter.locale = Locale(identifier: string("core.numerals") == "western" ? "ar_SA@numbers=latn" : "ar_SA@numbers=arab")
+        formatter.timeZone = activePlace.timeZone; formatter.dateFormat = "h:mm a"; return formatter.string(from: at)
     }
 }

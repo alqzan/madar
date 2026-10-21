@@ -1355,7 +1355,7 @@ import XCTest
         scrollBackupForm(to: app.secureTextFields["backup-password"], in: app)
     }
     private func scrollBackupForm(to element: XCUIElement, in app: XCUIApplication, towardsTop: Bool = false) {
-        let form = app.collectionViews.firstMatch
+        let form = app.scrollViews.firstMatch // The backup screen is a Madar paper scroll view, not a grouped Form.
         XCTAssertTrue(form.waitForExistence(timeout: 10), app.debugDescription)
         for _ in 0..<12 {
             if elementIsOnscreenAndHittable(element, in: app) { return }
@@ -1379,7 +1379,7 @@ import XCTest
         XCTAssertTrue(app.navigationBars["النسخ والاستعادة"].waitForExistence(timeout: 10), app.debugDescription)
         // Form is a CollectionView in the captured AX3 hierarchy. Its offscreen cells
         // are virtualized, so scroll before requiring the export button to exist.
-        let form = app.collectionViews.firstMatch
+        let form = app.scrollViews.firstMatch // The backup screen is a Madar paper scroll view, not a grouped Form.
         XCTAssertTrue(form.waitForExistence(timeout: 10), app.debugDescription)
         let export = app.buttons["plain-export-now"]
         for _ in 0..<12 {

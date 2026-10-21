@@ -157,6 +157,10 @@ struct MihbaraMotivationCue: Identifiable {
               currentBook.kind == "file", allowedFormats.contains(currentBook.format ?? ""),
               currentBook.mediaID == mediaID, currentBook.fileHash == expectedHash else { throw DataError.invalidValue("تغيّر ملف الكتاب؛ افتح مكتبته مجددًا") }
         let mediaRows = try context.fetch(FetchDescriptor<Media>())
+        if let media = mediaRows.first(where: { $0.id == mediaID && $0.deletedAt == nil && $0.mergedInto == nil }), media.state == "missing" {
+            // RD4: a backup restored on another device may leave a large book file out.
+            throw DataError.invalidValue(currentBook.turathID != nil ? "ملف هذا الكتاب لم يدخل النسخة الاحتياطية. نزّله من تراث مجددًا." : "ملف هذا الكتاب لم يدخل النسخة الاحتياطية. استورد الملف الأصلي مجددًا.")
+        }
         guard let media = mediaRows.first(where: { $0.id == mediaID && $0.deletedAt == nil && $0.mergedInto == nil }),
               media.kind == "doc", media.state == "ok", let data = media.data,
               data.count == media.sizeBytes, data.count <= 500 * 1024 * 1024,

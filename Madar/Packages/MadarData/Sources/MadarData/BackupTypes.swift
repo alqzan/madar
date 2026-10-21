@@ -52,5 +52,7 @@ public enum BackupSchedule: String, Codable, Sendable {
 
 public struct BackupStatus: Codable, Sendable {
     public let lastSuccessAt: Date?; public let lastResult: String; public let localOnly: Bool
-    public init(lastSuccessAt: Date?, lastResult: String, localOnly: Bool) { self.lastSuccessAt = lastSuccessAt; self.lastResult = lastResult; self.localOnly = localOnly }
+    /// Book files the last successful backup left out to stay within its budget (RD4); nil in older status files.
+    public let excludedBooks: [BackupBookExclusion]?
+    public init(lastSuccessAt: Date?, lastResult: String, localOnly: Bool, excludedBooks: [BackupBookExclusion]? = nil) { self.lastSuccessAt = lastSuccessAt; self.lastResult = lastResult; self.localOnly = localOnly; self.excludedBooks = excludedBooks }
 }

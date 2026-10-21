@@ -10,6 +10,8 @@ import Darwin
     private var statusURL: URL { backupDirectory.appendingPathComponent("BackupStatus.json") }
     enum Checkpoint: String { case afterJournal, afterStagingSave, afterReady, afterPointer, afterHooks }
     var interruption: Checkpoint?
+    /// RD4 archive budget; tests lower it to exercise book exclusion without large files.
+    var bookBudget = BackupBookFiles.budget
     public init(store: ManagedDataStore, backupDirectory: URL, keyStore: any BackupKeyStore, lifecycle: BackupLifecycle = BackupLifecycle(), localOnly: Bool = true,
                 deriveCredential: @escaping @Sendable (String) async throws -> BackupCredential = { passphrase in
                     try await Task.detached(priority: .userInitiated) { try BackupCredential.derive(passphrase: passphrase) }.value
@@ -26,6 +28,8 @@ import Darwin
         guard FileManager.default.fileExists(atPath:catalogURL.path) else { return [] }
         return try JSONDecoder().decode([BackupReceipt].self,from:Data(contentsOf:catalogURL)).sorted { a,b in a.createdAt == b.createdAt ? a.id.uuidString > b.id.uuidString : a.createdAt > b.createdAt }
     }
+    /// RD4: the plaintext size a backup of the current data would have, shown before the user schedules one.
+    public func estimatedBytes() throws -> Int { BackupBookFiles.estimatedBytes(try currentRecords()) }
     public func status() throws -> BackupStatus {
         guard FileManager.default.fileExists(atPath:statusURL.path) else { return .init(lastSuccessAt:nil,lastResult:"never",localOnly:localOnly) }
         return try JSONDecoder().decode(BackupStatus.self,from:Data(contentsOf:statusURL))
@@ -196,8 +200,9 @@ import Darwin
         if let passphrase { credential = try await background(cancellation) { try BackupCredential.derive(passphrase:passphrase) }; prefix = BackupCodec.random(count:4) }
         else { guard var stored = try keyStore.load() else { throw BackupOperationError.backupNotConfigured }; prefix = try stored.reserveNoncePrefix(); try keyStore.save(stored); credential = stored }
         let directory = backupDirectory; let id = UUID(); let generationID = store.binding.generationID
+        let fitted = BackupBookFiles.fitting(rows,budget:bookBudget); let archived = fitted.records
         let receipt = try await background(cancellation) {
-            let archive = try BackupCodec.archive(records:rows,now:now); try cancellation.check()
+            let archive = try BackupCodec.archive(records:archived,now:now); try cancellation.check()
             let encrypted = try BackupCodec.seal(archive:archive,credential:credential,noncePrefix:prefix,now:now,cancellation:cancellation,progress:progress)
             // Verify bytes before making a finished file visible or pruning previous automatic backups.
             _ = try BackupCodec.validateContents(encrypted,credential:credential,cancellation:cancellation)
@@ -218,7 +223,7 @@ import Darwin
         }
         var entries = try catalog(); entries.append(receipt)
         try DurableFiles.encode(entries,to:catalogURL)
-        try DurableFiles.encode(BackupStatus(lastSuccessAt:now,lastResult:"success",localOnly:localOnly),to:statusURL)
+        try DurableFiles.encode(BackupStatus(lastSuccessAt:now,lastResult:"success",localOnly:localOnly,excludedBooks:fitted.excluded),to:statusURL)
         try persistDeviceBackupStatus(at:now,result:"success")
         try prune(entries)
         progress(.init(phase:.completed,completedUnits:1,totalUnits:1)); return receipt
@@ -234,7 +239,7 @@ import Darwin
     }
     private func recordFailure(_ error: any Error) throws {
         let previous = try status(); let result = error is CancellationError || (error as? BackupOperationError) == .cancelled ? "cancelled" : "failed"
-        try DurableFiles.encode(BackupStatus(lastSuccessAt:previous.lastSuccessAt,lastResult:result,localOnly:localOnly),to:statusURL)
+        try DurableFiles.encode(BackupStatus(lastSuccessAt:previous.lastSuccessAt,lastResult:result,localOnly:localOnly,excludedBooks:previous.excludedBooks),to:statusURL)
     }
     private func persistDeviceBackupStatus(at date: Date,result: String) throws {
         let context = ModelContext(store.container); context.autosaveEnabled = false; let writer = try SettingsStore(context:context).writerIDForWrite(now:date)
@@ -282,6 +287,9 @@ import Darwin
     nonisolated private static func counts(_ records: [DataRecord]) -> [String:Int] { Dictionary(uniqueKeysWithValues:MadarSchema.syncedNames.map { name in (name,records.filter { $0.model == name }.count) }) }
     static func plan(existing: [DataRecord], incoming: [DataRecord], mode: RestoreMode, now: Date, writerID: String) throws -> [DataRecord] {
         if existing.isEmpty { return incoming } // Clean restore preserves every timestamp, alias, tombstone and media byte.
+        return BackupBookFiles.retainingLocalFiles(try planned(existing:existing,incoming:incoming,mode:mode,now:now,writerID:writerID),existing:existing)
+    }
+    private static func planned(existing: [DataRecord], incoming: [DataRecord], mode: RestoreMode, now: Date, writerID: String) throws -> [DataRecord] {
         if mode == .merge {
             var rows = existing
             for record in incoming {

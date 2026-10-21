@@ -19,7 +19,10 @@ struct BackupUIStatus: Sendable {
     let automaticCount: Int
     let manualCount: Int
     let keyConfigured: Bool
+    var estimatedBytes: Int? = nil
+    var excludedBooks: [BackupUIExcludedBook] = []
 }
+struct BackupUIExcludedBook: Sendable, Hashable { let title: String; let bytes: Int; let fromTurath: Bool }
 struct BackupUIProgress: Sendable {
     let message: String
     let completedUnits: Int64?
@@ -192,65 +195,45 @@ struct BackupRestoreResult: Sendable { let restoredCount: Int; let skippedCount:
 
 struct BackupSettingsView: View {
     let numerals: NumeralStyle
+    /// Both calendars for every date shown here (owner rule); the caller supplies the app's labels.
+    let dates: (Date) -> MadarDateLabels
+    let time: (Date) -> String
     @State private var model: BackupSettingsModel
     @State private var importing = false
     @State private var confirmingRestore = false
     @FocusState private var focusedPassword: Int?
     @Environment(\.roomTheme) private var theme
-    init(service: any BackupUIService, numerals: NumeralStyle = .hindi) {
-        self.numerals = numerals
+    init(service: any BackupUIService, numerals: NumeralStyle = .hindi,
+         dates: @escaping (Date) -> MadarDateLabels = { .init(primary: $0.formatted(date: .abbreviated, time: .omitted), secondary: "") },
+         time: @escaping (Date) -> String = { $0.formatted(date: .omitted, time: .shortened) }) {
+        self.numerals = numerals; self.dates = dates; self.time = time
         _model = State(initialValue: BackupSettingsModel(service: service))
     }
     var body: some View {
         @Bindable var model = model
-        Form {
-            Section {
-                if let status = model.status {
-                    Picker("موعد النسخ", selection: Binding(get: { status.schedule }, set: { model.setSchedule($0) })) {
-                        ForEach(BackupUISchedule.allCases) { Text($0.title).tag($0) }
-                    }.disabled(model.busy).accessibilityIdentifier("backup-schedule")
-                    if let success = status.lastSuccess { Text("آخر نسخة ناجحة: \(success.formatted(.dateTime.locale(Locale(identifier: "ar_SA")).day().month().year().hour().minute()))") }
-                    else { Text("لم تُحفظ نسخة ناجحة بعد.") }
-                    if let result = status.lastResult { Text(result).foregroundStyle(theme.secondaryInk) }
-                    if status.localOnly { Label("النسخة على الجهاز فقط", systemImage: "internaldrive") }
-                    Text("النسخ المحفوظة: \(digits(status.automaticCount)) تلقائية، \(digits(status.manualCount)) يدوية.")
-                        .accessibilityIdentifier("backup-saved-counts")
-                    Text("نحتفظ بآخر أربع نسخ تلقائية وكل النسخ اليدوية.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                } else { ProgressView("يقرأ حالة النسخ…") }
-            } header: { Text("النسخ الاحتياطية") } footer: { Text("النسخ المجدولة تُنفّذ حين يسمح النظام، ويمكنك النسخ يدويًا في أي وقت.") }
-            Section {
-                Button("جهّز ملف التصدير", action: model.exportPlain).disabled(model.busy).accessibilityIdentifier("plain-export-now")
-                if model.plainExportedURL != nil {
-                    Button(action: model.sharePlain) { Label("احفظ التصدير أو شاركه", systemImage: "square.and.arrow.up") }.disabled(model.busy).accessibilityIdentifier("plain-export-share")
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                statusCard
+                encryptedCard
+                restoreCard
+                plainCard
+                if let progress = model.progress {
+                    MadarCard {
+                        VStack(alignment: .leading, spacing: 12) {
+                            if let done = progress.completedUnits, let total = progress.totalUnits, total > 0 {
+                                ProgressView(progress.message, value: Double(done), total: Double(total))
+                            } else { ProgressView(progress.message) }
+                            Button("إلغاء الإجراء", role: .cancel, action: model.cancel).frame(minHeight: 44).accessibilityIdentifier("backup-cancel")
+                        }
+                    }.accessibilityElement(children: .contain).accessibilityIdentifier("backup-progress")
                 }
-            } header: { Text("تصدير بياناتك") } footer: { Text("ملف ZIP غير مشفّر يحتوي سجلاتك بصيغة JSONL وصورها وصوتها، ويمكن فتحه خارج مدار. شاركه مع من تثق به. إعدادات هذا الجهاز وقفل التطبيق لا تدخل فيه.") }
-            Section {
-                SecureField("كلمة مرور — عشرة أحرف على الأقل", text: $model.exportPassphrase).textContentType(.newPassword).focused($focusedPassword, equals: 1).submitLabel(.next).onSubmit { focusedPassword = 2 }.accessibilityIdentifier("backup-password")
-                SecureField("أعِد كلمة المرور", text: $model.exportConfirmation).textContentType(.newPassword).focused($focusedPassword, equals: 2).submitLabel(.done).onSubmit { focusedPassword = nil }.accessibilityIdentifier("backup-password-confirmation")
-                Text("احفظ كلمة المرور في مكان آمن. فقدانها يجعل النسخة غير قابلة للقراءة.").font(MadarTypography.caption())
-                if model.status?.keyConfigured == false { Text("تُستخدم كلمة مرور أول نسخة للنسخ التلقائي أيضًا. يُحفظ مفتاح مشتق منها على هذا الجهاز، وتبقى كلمة المرور عندك.").font(MadarTypography.caption()).accessibilityIdentifier("backup-key-setup") }
-                exportButton
-                if model.exportedURL != nil {
-                    Button(action: model.shareEncrypted) { Label("احفظ النسخة أو شاركها", systemImage: "square.and.arrow.up") }.disabled(model.busy).accessibilityIdentifier("backup-export")
-                }
-            } header: { Text("نسخة مشفّرة") } footer: { Text("تشمل بياناتك وصورها وصوتها؛ إعدادات هذا الجهاز لا تدخل في النسخة.") }
-            Section {
-                Button("اختر ملف النسخة") { importing = true }.disabled(model.busy).accessibilityIdentifier("restore-select-file")
-                if let file = model.selectedFile { Text(file.lastPathComponent).font(MadarTypography.caption()) }
-                SecureField("كلمة مرور النسخة", text: $model.restorePassphrase).textContentType(.password).focused($focusedPassword, equals: 3).submitLabel(.done).onSubmit { focusedPassword = nil }.accessibilityIdentifier("restore-password")
-                Button("افحص وعاين", action: model.inspect).disabled(!model.canInspect).accessibilityIdentifier("restore-inspect")
-                if let preview = model.preview { previewRows(preview) }
-            } header: { Text("استعادة نسخة") } footer: { Text("الفحص والمعاينة لا يغيران بياناتك. تبدأ الاستعادة بعد اختيارك وتأكيدك.") }
-            if let progress = model.progress {
-                Section {
-                    if let done = progress.completedUnits, let total = progress.totalUnits, total > 0 {
-                        ProgressView(progress.message, value: Double(done), total: Double(total))
-                    } else { ProgressView(progress.message) }
-                    Button("إلغاء الإجراء", role: .cancel, action: model.cancel).accessibilityIdentifier("backup-cancel")
-                }.accessibilityIdentifier("backup-progress")
+                if let result = resultCopy { MadarCard { Text(result).font(MadarTypography.body()).accessibilityIdentifier("backup-result") } }
             }
-            if let result = resultCopy { Section { Text(result).accessibilityIdentifier("backup-result") } }
-        }.navigationTitle("النسخ والاستعادة")
+            .padding(16).frame(maxWidth: 620).frame(maxWidth: .infinity)
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .background(theme.background).foregroundStyle(theme.ink)
+        .navigationTitle("النسخ والاستعادة").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); keyboardDoneButton } }
             .task { await model.refresh() }
             .onDisappear { model.close() }
@@ -263,6 +246,130 @@ struct BackupSettingsView: View {
                 Text(BackupCopy.restoreConfirmation(mode: model.restoreMode, keyConfigured: model.status?.keyConfigured != false))
             }
             .alert("لم يكتمل الإجراء", isPresented: Binding(get: { model.errorMessage != nil }, set: { if !$0 { model.errorMessage = nil } })) { Button("حسنًا") { model.errorMessage = nil } } message: { Text(model.errorMessage ?? "") }
+    }
+
+    private func heading(_ title: String, _ symbol: String) -> some View {
+        Label { Text(title).font(MadarTypography.section()) } icon: { Image(systemName: symbol).foregroundStyle(theme.color("accentText")) }
+    }
+    private func note(_ text: String) -> some View {
+        Text(text).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// What is protected now, when the next copy is due, how large it is, and where it lives.
+    @ViewBuilder private var statusCard: some View {
+        MadarCard {
+            if let status = model.status {
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(alignment: .top, spacing: 12) {
+                        Image(systemName: status.lastSuccess == nil ? "shield" : "lock.shield.fill").font(.title2)
+                            .foregroundStyle(theme.color("accentText")).frame(width: 44, height: 44).background(theme.background, in: .rect(cornerRadius: 14)).accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 4) {
+                            if let success = status.lastSuccess {
+                                Text("آخر نسخة ناجحة").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                                let labels = dates(success)
+                                MadarDateLabel(.init(primary: labels.primary + "، " + time(success), secondary: labels.secondary), primaryFont: MadarTypography.section())
+                            } else {
+                                Text("لم تُحفظ نسخة بعد").font(MadarTypography.section())
+                                note("أول نسخة مشفّرة تحدد كلمة المرور، وبعدها يعمل النسخ التلقائي وحده.")
+                            }
+                        }
+                    }
+                    if let next = nextLine(status) { note(next).accessibilityIdentifier("backup-next") }
+                    if let result = status.lastResult, status.lastResult != "آخر عملية نسخ نجحت." { Text(result).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
+                    Divider().overlay(theme.line)
+                    HStack {
+                        Text("موعد النسخ").font(MadarTypography.body())
+                        Spacer()
+                        Picker("موعد النسخ", selection: Binding(get: { status.schedule }, set: { model.setSchedule($0) })) {
+                            ForEach(BackupUISchedule.allCases) { Text($0.title).tag($0) }
+                        }.pickerStyle(.menu).disabled(model.busy).accessibilityIdentifier("backup-schedule")
+                    }
+                    if let bytes = status.estimatedBytes { Text("حجم النسخة الآن نحو " + size(bytes) + ".").font(MadarTypography.body()).accessibilityIdentifier("backup-size") }
+                    if let bytes = status.estimatedBytes, bytes > 256 * 1024 * 1024 {
+                        // RD4: say before the backup runs that big book files will stay out of it.
+                        note("هذا أكبر مما تتسع له النسخة، فتبقى ملفات كتب كبيرة خارجها، بدءًا بكتب تراث. تبقى الكتب على جهازك، ونسمّيها لك بعد النسخ.")
+                            .accessibilityIdentifier("backup-size-over")
+                    }
+                    Text("النسخ المحفوظة: \(digits(status.automaticCount)) تلقائية، \(digits(status.manualCount)) يدوية.").font(MadarTypography.body())
+                        .accessibilityIdentifier("backup-saved-counts")
+                    note("نحتفظ بآخر أربع نسخ تلقائية وكل النسخ اليدوية.")
+                    if !status.excludedBooks.isEmpty {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("كتب لم تدخل آخر نسخة لكبر حجمها").font(MadarTypography.body())
+                            ForEach(status.excludedBooks, id: \.self) { book in
+                                note("• " + book.title + "، " + size(book.bytes) + (book.fromTurath ? "، يُنزَّل من تراث مجددًا" : "، احتفظ بملفه الأصلي"))
+                            }
+                        }.accessibilityElement(children: .combine).accessibilityIdentifier("backup-excluded-books")
+                    }
+                    HStack(alignment: .top, spacing: 8) {
+                        Image(systemName: "internaldrive").foregroundStyle(theme.secondaryInk).accessibilityHidden(true)
+                        note("النسخ محفوظة داخل مدار على هذا الجهاز، وتُحذف إن حذفت التطبيق. احفظ نسخة يدوية في «الملفات» أو على حاسوبك.")
+                    }.accessibilityElement(children: .combine)
+                }
+            } else { ProgressView("يقرأ حالة النسخ…").frame(maxWidth: .infinity, minHeight: 80) }
+        }
+    }
+    private func nextLine(_ status: BackupUIStatus) -> String? {
+        guard status.schedule != .manual else { return "النسخ يدوي فقط؛ اضغط «انسخ الآن» متى شئت." }
+        guard status.keyConfigured else { return nil }
+        guard let last = status.lastSuccess else { return "تُنسخ أول نسخة تلقائية في المرة القادمة التي تفتح فيها مدار." }
+        let next = last.addingTimeInterval(status.schedule == .daily ? 86_400 : 7 * 86_400)
+        if next <= .now { return "حلّ موعد النسخة التالية؛ تُنسخ حين تفتح مدار." }
+        let labels = dates(next)
+        return "النسخة التالية: " + labels.primary + (labels.secondary.isEmpty ? "" : "، " + labels.secondary)
+    }
+
+    @ViewBuilder private var encryptedCard: some View {
+        @Bindable var model = model
+        MadarCard {
+            VStack(alignment: .leading, spacing: 12) {
+                heading("نسخة مشفّرة", "lock.doc")
+                note("تشمل بياناتك وصورها وصوتها؛ إعدادات هذا الجهاز لا تدخل في النسخة.")
+                SecureField("كلمة مرور — عشرة أحرف على الأقل", text: $model.exportPassphrase).textContentType(.newPassword).focused($focusedPassword, equals: 1).submitLabel(.next).onSubmit { focusedPassword = 2 }
+                    .padding(12).background(theme.background, in: .rect(cornerRadius: 12)).accessibilityIdentifier("backup-password")
+                SecureField("أعِد كلمة المرور", text: $model.exportConfirmation).textContentType(.newPassword).focused($focusedPassword, equals: 2).submitLabel(.done).onSubmit { focusedPassword = nil }
+                    .padding(12).background(theme.background, in: .rect(cornerRadius: 12)).accessibilityIdentifier("backup-password-confirmation")
+                note("احفظ كلمة المرور في مكان آمن. فقدانها يجعل النسخة غير قابلة للقراءة.")
+                if model.status?.keyConfigured == false { note("تُستخدم كلمة مرور أول نسخة للنسخ التلقائي أيضًا. يُحفظ مفتاح مشتق منها على هذا الجهاز، وتبقى كلمة المرور عندك.").accessibilityIdentifier("backup-key-setup") }
+                exportButton.buttonStyle(MadarPrimaryButton())
+                if model.exportedURL != nil {
+                    Button(action: model.shareEncrypted) { Label("احفظ النسخة أو شاركها", systemImage: "square.and.arrow.up").frame(maxWidth: .infinity, minHeight: 44) }.disabled(model.busy).accessibilityIdentifier("backup-export")
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private var restoreCard: some View {
+        @Bindable var model = model
+        MadarCard {
+            VStack(alignment: .leading, spacing: 12) {
+                heading("استعادة نسخة", "arrow.counterclockwise")
+                note("الفحص والمعاينة لا يغيران بياناتك. تبدأ الاستعادة بعد اختيارك وتأكيدك.")
+                Button("اختر ملف النسخة") { importing = true }.frame(minHeight: 44).disabled(model.busy).accessibilityIdentifier("restore-select-file")
+                if let file = model.selectedFile { Text(file.lastPathComponent).font(MadarTypography.caption()) }
+                SecureField("كلمة مرور النسخة", text: $model.restorePassphrase).textContentType(.password).focused($focusedPassword, equals: 3).submitLabel(.done).onSubmit { focusedPassword = nil }
+                    .padding(12).background(theme.background, in: .rect(cornerRadius: 12)).accessibilityIdentifier("restore-password")
+                Button("افحص وعاين", action: model.inspect).frame(minHeight: 44).disabled(!model.canInspect).accessibilityIdentifier("restore-inspect")
+                if let preview = model.preview { Divider().overlay(theme.line); previewRows(preview) }
+            }
+        }
+    }
+
+    @ViewBuilder private var plainCard: some View {
+        MadarCard {
+            VStack(alignment: .leading, spacing: 12) {
+                heading("تصدير بياناتك", "square.and.arrow.up.on.square")
+                note("ملف ZIP غير مشفّر يحتوي سجلاتك بصيغة JSONL وصورها وصوتها، ويمكن فتحه خارج مدار. شاركه مع من تثق به. إعدادات هذا الجهاز وقفل التطبيق لا تدخل فيه.")
+                Button("جهّز ملف التصدير", action: model.exportPlain).frame(minHeight: 44).disabled(model.busy).accessibilityIdentifier("plain-export-now")
+                if model.plainExportedURL != nil {
+                    Button(action: model.sharePlain) { Label("احفظ التصدير أو شاركه", systemImage: "square.and.arrow.up") }.frame(minHeight: 44).disabled(model.busy).accessibilityIdentifier("plain-export-share")
+                }
+            }
+        }
+    }
+    private func size(_ bytes: Int) -> String {
+        let mb = Double(bytes) / 1_048_576
+        return mb < 1 ? "أقل من ميغابايت" : digits(Int(mb.rounded())) + " ميغابايت"
     }
     @ViewBuilder private var exportButton: some View {
         let button = Button("انسخ الآن", action: model.export).disabled(!model.canExport).accessibilityIdentifier("backup-now")
@@ -298,13 +405,14 @@ struct BackupSettingsView: View {
     #endif
     @ViewBuilder private func previewRows(_ preview: BackupRestorePreview) -> some View {
         Text("معاينة \(preview.fileName)").font(MadarTypography.section())
-        Text(preview.createdAt, format: .dateTime.year().month().day()).font(MadarTypography.caption())
+        MadarDateLabel(dates(preview.createdAt))
         ForEach(preview.counts) { row in
             LabeledContent(row.title) { Text("حاليًا \(digits(row.current))، في النسخة \(digits(row.saved))") }
         }
         Text("إضافة \(digits(preview.additions))، تحديث \(digits(preview.updates))، حذف عند الاستبدال \(digits(preview.deletions))")
         if let first = preview.earliestDate, let last = preview.latestDate {
-            Text("الفترة: \(first.formatted(.dateTime.day().month().year())) — \(last.formatted(.dateTime.day().month().year()))")
+            let a = dates(first), b = dates(last)
+            MadarDateLabel(.init(primary: "الفترة: " + a.primary + " — " + b.primary, secondary: a.secondary.isEmpty ? "" : a.secondary + " — " + b.secondary))
         }
         if preview.skippedCount > 0 { Text(BackupCopy.skipped(count: preview.skippedCount, formattedCount: digits(preview.skippedCount))) }
         ForEach(preview.warnings, id: \.self) { Text($0).foregroundStyle(theme.secondaryInk) }
@@ -313,7 +421,7 @@ struct BackupSettingsView: View {
             Text("استبدال").tag(BackupUIRestoreMode.replace)
         }.pickerStyle(.segmented).disabled(model.busy).accessibilityIdentifier("restore-mode")
         Text(model.restoreMode == .replace ? "سيُستبدل محتوى مدار على هذا الجهاز." : "تبقى السجلات الحالية، وتُصالح معها النسخة.").font(MadarTypography.caption())
-        Button("استعد النسخة") { confirmingRestore = true }.disabled(model.busy).accessibilityIdentifier("restore-confirm")
+        Button("استعد النسخة") { confirmingRestore = true }.buttonStyle(MadarPrimaryButton()).disabled(model.busy).accessibilityIdentifier("restore-confirm")
     }
     private func digits(_ number: Int) -> String { MadarNumberFormatter(style: numerals).string(number) }
     private var resultCopy: String? {
