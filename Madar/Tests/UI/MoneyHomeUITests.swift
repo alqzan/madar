@@ -7,7 +7,7 @@ import XCTest
         app.launch(); return app
     }
     func open(_ app: XCUIApplication) {
-        let tab = app.tabBars.buttons["خصّص"]; XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
+        let tab = app.buttons["tab-customize"]; XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
         let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("المال")
         let money = app.buttons["money-open"]; XCTAssertTrue(money.waitForExistence(timeout: 5)); money.tap()
         XCTAssertTrue(app.staticTexts["money-title"].waitForExistence(timeout: 10), app.debugDescription)

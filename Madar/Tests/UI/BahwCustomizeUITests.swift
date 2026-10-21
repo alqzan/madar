@@ -9,8 +9,8 @@ import XCTest
                                  "MADAR_UI_TRACKING_START": "2026-10-01", "MADAR_UI_PRAYER_FIXTURE": "homeShowcase", "MADAR_UI_THEME": "light"]
         app.launch(); finishOnboarding(app)
         func element(_ id: String) -> XCUIElement { app.descendants(matching: .any).matching(identifier: id).firstMatch }
-        XCTAssertTrue(app.tabBars.buttons["خصّص"].waitForExistence(timeout: 15), app.debugDescription)
-        app.tabBars.buttons["خصّص"].tap()
+        XCTAssertTrue(app.buttons["tab-customize"].waitForExistence(timeout: 15), app.debugDescription)
+        app.buttons["tab-customize"].tap()
         XCTAssertTrue(element("bahw-custom-blocks").waitForExistence(timeout: 10), app.debugDescription)
         for block in ["habits", "salah", "quran", "mal", "year", "upcoming", "notes", "mihbara"] {
             XCTAssertTrue(element("bahw-custom-block-" + block).exists, block)
@@ -30,7 +30,7 @@ import XCTest
         XCTAssertTrue(element("bahw-block-quran").waitForExistence(timeout: 8))
         XCTAssertFalse(element("bahw-block-year").exists)
 
-        let customizeTab = app.tabBars.buttons["خصّص"]
+        let customizeTab = app.buttons["tab-customize"]
         if customizeTab.exists { customizeTab.tap() } else {
             let shortcut = app.buttons["tab-customize"]; XCTAssertTrue(shortcut.waitForExistence(timeout: 8)); shortcut.tap()
         }

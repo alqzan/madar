@@ -147,7 +147,7 @@ import XCTest
         XCTAssertTrue(app.buttons["bahw-arrange"].waitForExistence(timeout: 5))
         app.buttons["bahw-arrange"].tap()
         XCTAssertFalse(app.buttons["bahw-arrange"].exists)
-        app.tabBars.buttons["خصّص"].tap()
+        app.buttons["tab-customize"].tap()
         XCTAssertTrue(app.textFields["settings-search"].waitForExistence(timeout: 10))
     }
     func testUpcomingShowsGregorianDatesAndComparableRings() throws {

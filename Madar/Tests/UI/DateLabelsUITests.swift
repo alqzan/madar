@@ -12,7 +12,7 @@ import XCTest
         capture(app, "UX-11-lobby-L")
         app.swipeUp(velocity: .slow); capture(app, "UX-11-upcoming-L"); app.swipeDown(velocity: .fast)
         app.tabBars.buttons["الصلاة"].tap(); XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "prayer-today-header").firstMatch.waitForExistence(timeout: 10)); capture(app, "UX-11-prayer-L")
-        app.tabBars.buttons["خصّص"].tap()
+        app.buttons["tab-customize"].tap()
         let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("core.firstCalendar\n")
         let gregorian = app.buttons["option-core.firstCalendar-gregorian"]; XCTAssertTrue(gregorian.waitForExistence(timeout: 5)); gregorian.tap()
         app.tabBars.buttons["البهو"].tap()

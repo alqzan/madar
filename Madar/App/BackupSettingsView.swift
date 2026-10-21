@@ -204,7 +204,7 @@ struct BackupSettingsView: View {
     @FocusState private var focusedPassword: Int?
     @Environment(\.roomTheme) private var theme
     init(service: any BackupUIService, numerals: NumeralStyle = .hindi,
-         dates: @escaping (Date) -> MadarDateLabels = { .init(primary: $0.formatted(date: .abbreviated, time: .omitted), secondary: "") },
+         dates: @escaping (Date) -> MadarDateLabels,
          time: @escaping (Date) -> String = { $0.formatted(date: .omitted, time: .shortened) }) {
         self.numerals = numerals; self.dates = dates; self.time = time
         _model = State(initialValue: BackupSettingsModel(service: service))

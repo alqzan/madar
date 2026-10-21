@@ -18,7 +18,9 @@ struct TabShell<Content: View>: View {
     @Environment(\.roomTheme) private var theme
     @Environment(\.dynamicTypeSize) private var dynamicType
     @AppStorage("Madar.TabViewCustomization.v2") private var tabCustomization = TabViewCustomization()
-    private let bottomShortcuts: Set<String> = ["notes", "money", "mihbara"]
+    /// Owner, 21 Oct 2026: «خصّص» and «المزيد» in the bar hid المال and المحبرة. The bar holds the five daily rooms;
+    /// the diary and «خصّص» ride the glass accessory beside the next prayer.
+    private let bottomShortcuts: Set<String> = ["notes", "customize"]
 
     var body: some View {
         baseTabView
@@ -31,41 +33,30 @@ struct TabShell<Content: View>: View {
         .tint(theme.accent)
     }
 
+    /// The room under the bar's highlight while the diary or «خصّص» is open from the accessory.
+    @State private var lastRoom = "foundation"
+    private var showingShortcut: Bool { bottomShortcuts.contains(selection) }
+
     private var baseTabView: some View {
-        TabView(selection: $selection) {
+        // Only the five rooms are tabs: any further Tab, even hidden or sidebar-only, makes iPhone add «المزيد».
+        // A shortcut room renders in the highlighted room's place; tapping any tab (even that one) returns to it.
+        TabView(selection: Binding(get: { showingShortcut ? lastRoom : selection }, set: { selection = $0; lastRoom = $0 })) {
             ForEach(tabs.filter { !bottomShortcuts.contains($0.id) }) { tab in
+                let shown = showingShortcut && tab.id == lastRoom ? selection : tab.id
                 if tab.symbol.hasPrefix("Madar") {
                     Tab(tab.title, image: tab.symbol + (selection == tab.id ? "Selected" : ""), value: tab.id) {
-                        content(tab.id).accessibilityIdentifier(tab.id + "-tab")
+                        content(shown).accessibilityIdentifier(shown == "customize" ? "settings-tab" : shown + "-tab")
                     }
                     .customizationID("com.madar.tab.\(tab.id)")
                 } else {
                     Tab(tab.title, systemImage: tab.symbol, value: tab.id) {
-                        content(tab.id).accessibilityIdentifier(tab.id == "customize" ? "settings-tab" : tab.id + "-tab")
+                        content(shown).accessibilityIdentifier(shown == "customize" ? "settings-tab" : shown + "-tab")
                     }
                     .customizationID("com.madar.tab.\(tab.id)")
                 }
             }
-            TabSection {
-                ForEach(tabs.filter { bottomShortcuts.contains($0.id) }) { tab in
-                    if tab.symbol.hasPrefix("Madar") {
-                        Tab(tab.title, image: tab.symbol + (selection == tab.id ? "Selected" : ""), value: tab.id) {
-                            content(tab.id).accessibilityIdentifier(tab.id + "-tab")
-                        }
-                        .customizationID("com.madar.tab.\(tab.id)")
-                    } else {
-                        Tab(tab.title, systemImage: tab.symbol, value: tab.id) {
-                            content(tab.id).accessibilityIdentifier(tab.id == "customize" ? "settings-tab" : tab.id + "-tab")
-                        }
-                        .customizationID("com.madar.tab.\(tab.id)")
-                    }
-                }
-            } header: {
-                Label("غرف مدار", systemImage: "square.grid.2x2")
-            }
-            .customizationID("com.madar.section.quick-access")
-            .defaultVisibility(.hidden, for: .tabBar)
         }
+        .onChange(of: selection) { _, value in if !bottomShortcuts.contains(value) { lastRoom = value } }
         .tabViewStyle(.sidebarAdaptable)
         .tabViewCustomization($tabCustomization)
         .defaultAdaptableTabBarPlacement(.tabBar)
@@ -187,7 +178,7 @@ struct MadarRootView: View {
         let dark = forcedColorScheme == .dark || (forcedColorScheme == nil && colorScheme == .dark)
         let theme = RoomTheme(dark: dark, calmPaper: false)
         TabShell(session: session, selection: $session.selectedTab,
-                 tabs: [.init(id: "foundation", title: "البهو", symbol: "MadarOrbit"), .init(id: "prayer", title: "الصلاة", symbol: "MadarPrayer"), .init(id: "quran", title: "القرآن", symbol: "MadarQuran"), .init(id: "customize", title: "خصّص", symbol: "MadarCustomize"), .init(id: "notes", title: "المذكرات", symbol: "MadarDiary"), .init(id: "money", title: "المال", symbol: "banknote"), .init(id: "mihbara", title: "المحبرة", symbol: "books.vertical")]) { tab in
+                 tabs: [.init(id: "foundation", title: "البهو", symbol: "MadarOrbit"), .init(id: "prayer", title: "الصلاة", symbol: "MadarPrayer"), .init(id: "quran", title: "القرآن", symbol: "MadarQuran"), .init(id: "money", title: "المال", symbol: "banknote"), .init(id: "mihbara", title: "المحبرة", symbol: "books.vertical"), .init(id: "notes", title: "المذكرات", symbol: "MadarDiary"), .init(id: "customize", title: "خصّص", symbol: "MadarCustomize")]) { tab in
             NavigationStack {
                 Group {
                     if tab == "customize" { CustomizeMadar(session: session) }

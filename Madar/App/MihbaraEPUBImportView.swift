@@ -55,9 +55,12 @@ struct MihbaraEPUBImportView: View {
     @State private var saving = false
     @State private var finished = false
     @State private var confirmedMetadata = false
+    @State private var showingFullIndex = false
+    private static let indexPreview = 8
     private var service: AppMihbaraService { .init(app: app) }
     private var digits: MadarNumberFormatter { service.digits }
-    private var needsPersistentImportAction: Bool { (inspection?.outline.count ?? 0) > 12 }
+    // The index preview keeps the page short; only the full index needs the pinned button (it hid the shelf row).
+    private var needsPersistentImportAction: Bool { showingFullIndex && (inspection?.outline.count ?? 0) > 12 }
 
     private var languageLabel: String {
         guard let code = inspection?.languageCode else { return "غير محددة في الملف" }
@@ -148,33 +151,6 @@ struct MihbaraEPUBImportView: View {
                     .overlay { RoundedRectangle(cornerRadius: 18).stroke(theme.line.opacity(0.7), lineWidth: 1) }
                     .disabled(saving || confirmedMetadata)
 
-                    HStack {
-                        Text("الفهرس المستخرج").font(MadarTypography.section())
-                        Spacer()
-                        Text(arabicCount(value.outline.count, ["عنوان واحد", "عنوانان", "عناوين", "عنوانًا"], digits)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                    }
-                    if value.outline.isEmpty {
-                        Text("لا يوجد فهرس إلكتروني في هذا الملف.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
-                            .frame(maxWidth: .infinity, minHeight: 62, alignment: .leading).padding(.horizontal, 16)
-                            .background(theme.surface, in: .rect(cornerRadius: 16))
-                    } else {
-                        VStack(spacing: 0) {
-                            ForEach(Array(value.outline.enumerated()), id: \.offset) { index, item in
-                                HStack(spacing: 12) {
-                                    Text(digits.string(index + 1)).font(MadarTypography.caption().weight(.semibold)).foregroundStyle(theme.secondaryInk).frame(width: 24, alignment: .leading)
-                                    Text(item.title).font(MadarTypography.body()).lineLimit(2).frame(maxWidth: .infinity, alignment: .leading)
-                                    Spacer(minLength: 0)
-                                }
-                                .padding(.horizontal, 16).padding(.vertical, 10).padding(.leading, CGFloat(min(item.depth, 4) * 12))
-                                .environment(\.layoutDirection, value.direction == "ltr" ? .leftToRight : .rightToLeft)
-                                .accessibilityIdentifier("mihbara-epub-import-toc-\(index + 1)")
-                                if index < value.outline.count - 1 { Divider().padding(.leading, 42) }
-                            }
-                        }
-                        .background(theme.surface, in: .rect(cornerRadius: 16))
-                        .overlay { RoundedRectangle(cornerRadius: 16).stroke(theme.line.opacity(0.7), lineWidth: 1) }
-                    }
-
                     VStack(alignment: .trailing, spacing: 12) {
                         Text("أين تضعه؟").font(MadarTypography.section())
                         HStack(spacing: 8) {
@@ -196,6 +172,39 @@ struct MihbaraEPUBImportView: View {
                     .padding(14).background(theme.surface, in: .rect(cornerRadius: 18))
                     .overlay { RoundedRectangle(cornerRadius: 18).stroke(theme.line.opacity(0.7), lineWidth: 1) }
                     .disabled(saving || confirmedMetadata)
+
+                    HStack {
+                        Text("الفهرس المستخرج").font(MadarTypography.section())
+                        Spacer()
+                        Text(arabicCount(value.outline.count, ["عنوان واحد", "عنوانان", "عناوين", "عنوانًا"], digits)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    }
+                    if value.outline.isEmpty {
+                        Text("لا يوجد فهرس إلكتروني في هذا الملف.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
+                            .frame(maxWidth: .infinity, minHeight: 62, alignment: .leading).padding(.horizontal, 16)
+                            .background(theme.surface, in: .rect(cornerRadius: 16))
+                    } else {
+                        VStack(spacing: 0) {
+                            ForEach(Array(value.outline.prefix(showingFullIndex ? value.outline.count : Self.indexPreview).enumerated()), id: \.offset) { index, item in
+                                HStack(spacing: 12) {
+                                    Text(digits.string(index + 1)).font(MadarTypography.caption().weight(.semibold)).foregroundStyle(theme.secondaryInk).lineLimit(1).fixedSize().frame(minWidth: 24, alignment: .leading)
+                                    Text(item.title).font(MadarTypography.body()).lineLimit(2).padding(.leading, CGFloat(min(item.depth, 4) * 12)).frame(maxWidth: .infinity, alignment: .leading)
+                                    Spacer(minLength: 0)
+                                }
+                                .padding(.horizontal, 16).padding(.vertical, 10)
+                                .environment(\.layoutDirection, value.direction == "ltr" ? .leftToRight : .rightToLeft)
+                                .accessibilityIdentifier("mihbara-epub-import-toc-\(index + 1)")
+                                if index < min(value.outline.count, showingFullIndex ? .max : Self.indexPreview) - 1 { Divider().padding(.leading, 42) }
+                            }
+                        }
+                        .background(theme.surface, in: .rect(cornerRadius: 16))
+                        .overlay { RoundedRectangle(cornerRadius: 16).stroke(theme.line.opacity(0.7), lineWidth: 1) }
+                        // A long index (Turath books reach thousands of headings) shows a preview; the reader has it all.
+                        if value.outline.count > Self.indexPreview {
+                            Button(showingFullIndex ? "اختصر الفهرس" : "اعرض الفهرس كاملًا") { showingFullIndex.toggle() }
+                                .font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 44)
+                                .accessibilityIdentifier("mihbara-epub-import-toc-all")
+                        }
+                    }
 
                     if !needsPersistentImportAction { confirmButton }
                 }

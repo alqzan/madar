@@ -49,6 +49,9 @@ struct TurathBookTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let file = root.appendingPathComponent("صيد الخاطر.epub"); try epub.write(to: file)
         let inspection = try EPUBBookFiles.stage(source: file, root: root.appendingPathComponent("staging"))
+        // The fixture has three printed pages in two volumes (vol "1" twice, vol "2" once).
+        let shape = try #require(try EPUBBookFiles.printedShape(file: file))
+        #expect(shape.pages == 3); #expect(shape.volumes == 2)
         #expect(inspection.title == "صيد الخاطر"); #expect(inspection.author == "ابن الجوزي"); #expect(inspection.appLanguage == "ar")
         #expect(inspection.direction == "rtl"); #expect(inspection.hasPageList)
         #expect(inspection.outline.map(\.title) == ["بيانات الكتاب", "مقدمة", "علو الهمة", "خاتمة"])

@@ -881,7 +881,7 @@ struct MihbaraReaderView: View {
                         }
                         .buttonStyle(.plain)
                         .glassEffect(.regular.interactive(), in: Capsule())
-                        .accessibilityLabel("سرعة \(digits.localized(speed.numberText)) مرة")
+                        .accessibilityLabel(speed.spokenLabel)
                         .accessibilityValue(selected ? "السرعة الحالية" : "")
                         .accessibilityIdentifier("mihbara-listening-speed-\(speed.identifier)")
                     }
@@ -3050,6 +3050,16 @@ private enum MihbaraListeningSpeed: Double, CaseIterable, Hashable {
         case .quick: "1٫25"
         case .quicker: "1٫5"
         case .double: "2"
+        }
+    }
+
+    /// VoiceOver says the speed in words, never «سرعة ١ مرة».
+    var spokenLabel: String {
+        switch self {
+        case .normal: "السرعة العادية"
+        case .quick: "أسرع بالربع"
+        case .quicker: "أسرع بالنصف"
+        case .double: "ضعف السرعة"
         }
     }
 

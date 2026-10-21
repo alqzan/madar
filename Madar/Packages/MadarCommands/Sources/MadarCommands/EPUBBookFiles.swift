@@ -192,6 +192,37 @@ public enum EPUBBookFiles {
                                   hasCover: hasCover, coverData: coverData, hasFootnotes: hasFootnotes)
     }
 
+    /// The printed size of a book from its EPUB page list: how many printed pages, and how many volumes
+    /// (Turath labels a multi-volume page «ج/ص»). Nil when the file has no page list.
+    public static func printedShape(file: URL) throws -> (pages: Int, volumes: Int)? {
+        let archive = try ZIPReader(url: file)
+        guard let containerMember = archive.member("META-INF/container.xml") else { return nil }
+        let container = try xml(archive, containerMember, maximum: 64 * 1024)
+        guard let packagePath = container.descendants(named: "rootfile").first?.attribute("full-path"),
+              Self.safeArchivePath(packagePath), let packageMember = archive.member(packagePath) else { return nil }
+        let package = try xml(archive, packageMember, maximum: metadataMemberLimit)
+        guard let packageNode = package.name == "package" ? package : package.descendants(named: "package").first else { return nil }
+        let folder = (packagePath as NSString).deletingLastPathComponent
+        let items = packageNode.first(named: "manifest")?.children.filter { $0.name == "item" } ?? []
+        var labels: [String] = []
+        if let nav = items.first(where: { ($0.attribute("properties") ?? "").split(whereSeparator: \.isWhitespace).contains("nav") }),
+           let href = nav.attribute("href"), let path = archivePath(for: href, base: folder) {
+            let node = try xml(archive, path: path, maximum: metadataMemberLimit)
+            if let list = node.descendants(named: "nav").first(where: { $0.attribute("type")?.split(whereSeparator: { $0.isWhitespace }).contains("page-list") == true }) {
+                labels = list.descendants(named: "a").map { $0.stringValue.trimmingCharacters(in: .whitespacesAndNewlines) }
+            }
+        }
+        if labels.isEmpty, let tocID = packageNode.first(named: "spine")?.attribute("toc"),
+           let ncx = items.first(where: { $0.attribute("id") == tocID }), let href = ncx.attribute("href"), let path = archivePath(for: href, base: folder) {
+            labels = try xml(archive, path: path, maximum: metadataMemberLimit).descendants(named: "pageTarget").map { $0.stringValue.trimmingCharacters(in: .whitespacesAndNewlines) }
+        }
+        guard !labels.isEmpty else { return nil }
+        let volumes = Set(labels.compactMap { label -> String? in
+            let parts = label.split(separator: "/"); return parts.count == 2 ? String(parts[0]) : nil
+        })
+        return (labels.count, max(1, volumes.count))
+    }
+
     private static func validate(_ archive: ZIPReader) throws {
         guard archive.members.count <= maximumEntries else { throw DataError.invalidValue("ملف EPUB يحتوي عددًا كبيرًا من الملفات.") }
         var expanded = 0

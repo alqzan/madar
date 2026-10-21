@@ -18,7 +18,7 @@ import notify
         XCTAssertTrue(gate.waitForExistence(timeout: 20), app.debugDescription)
         XCTAssertFalse(app.buttons["scene-lock-authenticate"].exists, "The app's own Face ID gate should own the active locked screen")
         XCTAssertFalse(app.buttons["tab-foundation"].exists, "Room navigation must wait behind the single app gate")
-        XCTAssertFalse(app.buttons["tab-mihbara"].exists, "Room shortcuts must wait behind the single app gate")
+        XCTAssertFalse(app.buttons["tab-notes"].exists, "Room shortcuts must wait behind the single app gate")
         capture(app, "UX-01-face-id-gate-L")
     }
 
@@ -37,7 +37,7 @@ import notify
         XCTAssertTrue(app.buttons["diary-write"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.staticTexts["المذكرات مقفلة"].exists)
         capture(app, "UX-01-diary-L")
-        app.tabBars.buttons["خصّص"].tap()
+        app.buttons["tab-customize"].tap()
         let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10))
         search.tap(); search.typeText("القفل")
         let none = app.buttons["option-core.faceIDLock-none"]

@@ -4,7 +4,7 @@ import XCTest
     func testFirstRunGuideChecksOnlyNewShortcutIntakeAndManualAccountRoute() {
         continueAfterFailure = false
         let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_MONEY_FIXTURE":"empty","MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light","MADAR_UI_NOW":"2026-10-17T12:00:00+03:00"]
-        app.launch(); let tab = app.tabBars.buttons["خصّص"]; XCTAssertTrue(tab.waitForExistence(timeout:20)); tab.tap()
+        app.launch(); let tab = app.buttons["tab-customize"]; XCTAssertTrue(tab.waitForExistence(timeout:20)); tab.tap()
         let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout:10)); search.tap(); search.typeText("المال"); app.buttons["money-open"].tap()
         let guide = app.buttons["money-guide-open"]; XCTAssertTrue(guide.waitForExistence(timeout:10)); shot(app,"M5-V24-first-L"); guide.tap(); XCTAssertTrue(app.staticTexts["تُعدّها مرة لكل بنك"].waitForExistence(timeout:5)); shot(app,"M5-V24-guide-L")
         let start = app.buttons["money-guide-start"]; for _ in 0..<8 where !start.isHittable { app.swipeUp(velocity:.slow) }; start.tap()

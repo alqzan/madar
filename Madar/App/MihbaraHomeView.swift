@@ -12,6 +12,7 @@ struct MihbaraHomeView: View {
     @Environment(\.dynamicTypeSize) private var dynamicType
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var reading: MihbaraHomeReading?
+    @State private var shapes: [UUID: MihbaraBookShape] = [:]
     @State private var motivationCues: [MihbaraMotivationCue] = []
     @State private var shelf = "reading"
     @State private var tableID: UUID?
@@ -125,7 +126,13 @@ struct MihbaraHomeView: View {
             }
         }
     }
-    private func load() { do { reading = try service.load() } catch { app.errorMessage = error.localizedDescription } }
+    private func load() {
+        do {
+            reading = try service.load()
+            let books = reading?.books ?? []
+            Task { shapes = await service.bookShapes(books) }
+        } catch { app.errorMessage = error.localizedDescription }
+    }
     private func openSpotlightBookIfNeeded() {
         guard let id = app.mihbaraBookToOpen else { return }
         if reading == nil { load() }
@@ -158,6 +165,10 @@ struct MihbaraHomeView: View {
             Button { moveBook(b, to: "finished") } label: { Label("أنهيته", systemImage: "checkmark.circle") }
             Button { moveBook(b, to: "want") } label: { Label("أعده إلى أبي أقرأها", systemImage: "bookmark") }
         }
+        // The «قديمًا» cabinet holds books read long ago; this is the only way in.
+        if b.shelf == "finished" { Button { moveBook(b, to: "old") } label: { Label("انقله إلى «قديمًا»", systemImage: "archivebox") } }
+        if b.shelf == "want" { Button { moveBook(b, to: "old") } label: { Label("قرأته قديمًا", systemImage: "archivebox") } }
+        if b.shelf == "old" { Button { moveBook(b, to: "finished") } label: { Label("أعده إلى أنهيتها", systemImage: "checkmark.circle") } }
     }
     private func moveBook(_ b: MihbaraBook, to shelf: String, replacing: UUID? = nil) {
         if shelf == "reading", replacing == nil, b.shelf != "reading", (reading?.books.filter { $0.shelf == "reading" }.count ?? 0) >= 3 {
@@ -188,33 +199,85 @@ struct MihbaraHomeView: View {
                     Button { shelf = value.0 } label: { Text(value.1).font(MadarTypography.caption()).padding(.horizontal, 10).frame(minHeight: 44).background(shelf == value.0 ? theme.ink : .clear, in: .capsule).foregroundStyle(shelf == value.0 ? theme.background : theme.ink) }.accessibilityIdentifier("mihbara-shelf-" + value.0)
                 }
             }.fixedSize(horizontal: false, vertical: true)
-            let books = r.books.filter { $0.shelf == shelf }
+            // Smart order: what you touched last comes first; finished books by when you finished them.
+            let books = r.books.filter { $0.shelf == shelf }.sorted { a, b in
+                shelf == "finished" ? (a.finished ?? a.updated) > (b.finished ?? b.updated) : a.updated > b.updated
+            }
+            let leathers = MihbaraBookCovers.leatherIndices(for: books)
             if books.isEmpty {
                 emptyShelf(r)
             } else {
                 ScrollView(.horizontal) {
-                    HStack(alignment: .bottom, spacing: 12) {
-                        ForEach(books) { b in
-                            Button { openBook(b) } label: {
-                                VStack(spacing: 8) {
-                                    if b.id == tableBook?.id {
-                                        VStack(spacing: 10) { Text(b.title).font(MadarTypography.caption()); Text("على الطاولة").font(MadarTypography.fine()) }.padding(12).frame(width: 110, height: 145).foregroundStyle(theme.secondaryInk).overlay { RoundedRectangle(cornerRadius: 5).stroke(theme.line, style: .init(lineWidth: 1, dash: [4,4])) }
-                                    } else {
-                                    VStack(spacing: 8) { Text(b.title).font(.custom("thmanyahserifdisplay-Bold", size: 18, relativeTo: .headline)).lineLimit(3); Text(b.author).font(MadarTypography.fine()).lineLimit(1); Spacer(minLength: 0); Rectangle().frame(height: 1).opacity(0.4); if let p = b.progress { Text(service.digits.string(Int(p * 100)) + "٪").font(MadarTypography.fine()) } }
-                                        .padding(12).frame(width: 110, height: 145).foregroundStyle(theme.color("onNavy")).background(theme.color("navy"), in: .rect(topLeadingRadius: 3, bottomLeadingRadius: 3, bottomTrailingRadius: 9, topTrailingRadius: 9)).overlay(alignment: .leading) { Rectangle().fill(theme.line).frame(width: 5) }.shadow(color: theme.ink.opacity(0.14), radius: 5, x: 0, y: 5)
+                    // Owner, 21 Oct 2026: what you read stands in order; what you finished lies in loose piles.
+                    if shelf == "finished" {
+                        HStack(alignment: .bottom, spacing: 14) {
+                            ForEach(Array(piles(books).enumerated()), id: \.offset) { _, pile in
+                                VStack(spacing: 0) {
+                                    ForEach(pile.reversed(), id: \.key) { item in
+                                        Button { openBook(item.book) } label: { lying(item, leather: leathers[item.book.id] ?? 0) }
+                                            .buttonStyle(.plain).contextMenu { bookMenu(item.book) }.accessibilityLabel(shelfLabel(item.book)).accessibilityIdentifier("mihbara-book-" + item.book.id.uuidString)
                                     }
                                 }
-                            }.buttonStyle(.plain).contextMenu { bookMenu(b) }.accessibilityIdentifier("mihbara-book-" + b.id.uuidString)
-                        }
-                    }.padding(.bottom, 8)
+                            }
+                        }.padding(.horizontal, 10).padding(.top, 16)
+                    } else {
+                        HStack(alignment: .bottom, spacing: 9) {
+                            ForEach(books.filter { $0.id != tableBook?.id }) { b in
+                                Button { openBook(b) } label: { standing(b, leather: leathers[b.id] ?? 0) }
+                                    .buttonStyle(.plain).contextMenu { bookMenu(b) }.accessibilityLabel(shelfLabel(b)).accessibilityIdentifier("mihbara-book-" + b.id.uuidString)
+                            }
+                        }.padding(.horizontal, 10).padding(.top, 16)
+                    }
                 }.scrollIndicators(.hidden)
+                    // The back of the bookcase: a faint wall the spines stand against.
+                    .background(LinearGradient(colors: [theme.color("wood").opacity(0.05), theme.color("wood").opacity(0.16)], startPoint: .top, endPoint: .bottom))
             }
-            Rectangle().fill(theme.color("wood").gradient).frame(height: 9).shadow(color: theme.ink.opacity(0.14), radius: 5, y: 5)
+            MihbaraShelfPlank().padding(.top, -14)
             HStack { Button("كل كتبي ‹") { sheet = .library }.accessibilityIdentifier("mihbara-library"); Spacer(); Text(shelfTotal(r.books.count)).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
-            MihbaraOldBooksCabinet(books: r.books.filter { $0.shelf == "old" }, theme: theme) { id in
+            MihbaraOldBooksCabinet(books: r.books.filter { $0.shelf == "old" }, theme: theme, shapes: shapes, digits: service.digits) { id in
                 if let book = r.books.first(where: { $0.id == id }) { openBook(book) }
             }
         }
+    }
+    /// One book as it stands on the shelf: a spine, a numbered spine per volume for a set, or the gap a book leaves on the table.
+    @ViewBuilder private func standing(_ b: MihbaraBook, leather: Int) -> some View {
+        let shape = shapes[b.id], volumes = max(1, shape?.volumes ?? 1)
+        if volumes > 1 {
+            HStack(alignment: .bottom, spacing: 1) {
+                ForEach(0..<min(volumes, 8), id: \.self) { MihbaraBookSpine(book: b, shape: shape, leather: leather, digits: service.digits, volume: $0) }
+                if volumes > 8 { Text("+" + service.digits.string(volumes - 8)).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).padding(.leading, 4) }
+            }
+        } else {
+            MihbaraBookSpine(book: b, shape: shape, leather: leather, digits: service.digits)
+        }
+    }
+    private struct PileItem { let book: MihbaraBook; let volume: Int?; var key: String { book.id.uuidString + "-\(volume ?? -1)" } }
+    /// Finished books (each volume of a set on its own) in piles of up to four, the newest on top.
+    private func piles(_ books: [MihbaraBook]) -> [[PileItem]] {
+        let items = books.flatMap { b -> [PileItem] in
+            let n = max(1, shapes[b.id]?.volumes ?? 1)
+            return n > 1 ? (0..<min(n, 6)).map { PileItem(book: b, volume: $0) } : [PileItem(book: b, volume: nil)]
+        }
+        return stride(from: 0, to: items.count, by: 4).map { Array(items[$0..<min($0 + 4, items.count)]) }
+    }
+    /// A finished book lying on its side, a little askew, as books left on a shelf after reading.
+    private func lying(_ item: PileItem, leather: Int) -> some View {
+        let shape = shapes[item.book.id]
+        let size = MihbaraBookSpine.size(pagesPerVolume: shape?.pages.map { $0 / max(1, shape?.volumes ?? 1) } ?? item.book.pages)
+        let seed = item.key.unicodeScalars.reduce(0) { ($0 &* 31 &+ Int($1.value)) % 9973 }
+        let tilt = Double(seed % 7) - 3, shift = CGFloat(seed % 13) - 6
+        return MihbaraBookSpine(book: item.book, shape: shape, leather: leather, digits: service.digits, volume: item.volume)
+            .rotationEffect(.degrees(-90))
+            .frame(width: size.height, height: size.width)
+            .rotationEffect(.degrees(tilt)).offset(x: shift)
+    }
+    /// The spine shows a short title; VoiceOver hears the whole book: full title, author, size and progress.
+    private func shelfLabel(_ b: MihbaraBook) -> String {
+        var parts = [b.title]
+        if !b.author.isEmpty { parts.append(b.author) }
+        if let size = MihbaraBookCovers.sizeWord(shapes[b.id], service.digits) { parts.append(size) }
+        if b.shelf == "reading", let p = b.progress, p > 0 { parts.append("قرأت " + service.digits.string(Int((p * 100).rounded())) + "٪") }
+        return parts.joined(separator: "، ")
     }
     /// What an empty shelf says depends on which shelf it is and on what the other shelves hold.
     private func emptyShelf(_ r: MihbaraHomeReading) -> some View {
@@ -251,16 +314,7 @@ struct MihbaraHomeView: View {
                 Spacer(minLength: 4)
                 GlassEffectContainer(spacing: 7) {
                     HStack(spacing: 7) {
-                        Button(action: showMotivation) {
-                            Label("حمّسني", systemImage: "sparkles")
-                                .font(MadarTypography.caption()).frame(minHeight: 44)
-                                .padding(.horizontal, 12).foregroundStyle(theme.ink)
-                        }
-                        .buttonStyle(.plain)
-                        .glassEffect(.regular.tint(theme.color("goldUnderstand").opacity(0.18)).interactive(), in: Capsule())
-                        .accessibilityIdentifier("mihbara-motivate")
-                        .accessibilityHint("اقتراح صغير من كتابك أو ورد اليوم")
-
+                        // Owner, 21 Oct 2026: «زر حمسني غبي احذفه». The suggestion sheet stays in code, with no way in.
                         Button { sheet = .opening } label: {
                             Image(systemName: "slider.horizontal.3").font(.system(size: 17, weight: .semibold))
                                 .foregroundStyle(theme.ink).frame(width: 46, height: 46)
@@ -722,7 +776,10 @@ private struct MihbaraNotebookEditor: View {
 private struct MihbaraOldBooksCabinet: View {
     let books: [MihbaraBook]
     let theme: RoomTheme
+    var shapes: [UUID: MihbaraBookShape] = [:]
+    var digits: MadarNumberFormatter = .init()
     let openBook: (UUID) -> Void
+    private var leathers: [UUID: Int] { MihbaraBookCovers.leatherIndices(for: books) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -745,25 +802,18 @@ private struct MihbaraOldBooksCabinet: View {
                     HStack(alignment: .bottom, spacing: 10) {
                         ForEach(books) { book in
                             Button { openBook(book.id) } label: {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Text(book.title).font(MadarTypography.section()).lineLimit(3).fixedSize(horizontal: false, vertical: true)
-                                    Spacer(minLength: 0)
-                                    Text(book.author).font(MadarTypography.fine()).lineLimit(1)
-                                }
-                                .padding(12).frame(width: 118, height: 116, alignment: .leading)
-                                .foregroundStyle(theme.color("onNavy"))
-                                .background(theme.color("navy").gradient, in: .rect(topLeadingRadius: 3, bottomLeadingRadius: 3, bottomTrailingRadius: 8, topTrailingRadius: 8))
-                                .overlay(alignment: .leading) { Rectangle().fill(theme.color("wood")).frame(width: 5) }
-                                .shadow(color: theme.ink.opacity(0.18), radius: 4, x: 0, y: 4)
+                                // The cabinet is desk-dark, so a desk-coloured leather would vanish; it takes the next one.
+                                let index = leathers[book.id] ?? 0
+                                MihbaraBookSpine(book: book, shape: shapes[book.id], leather: index == 3 ? 4 : index, digits: digits)
                             }
                             .buttonStyle(.plain)
                             .accessibilityLabel("افتح كتابًا قديمًا: " + book.title)
                             .accessibilityHint("خيارات العودة إلى القراءة أو إلى رف أبي أقرأها")
                             .accessibilityIdentifier("mihbara-old-book-" + book.id.uuidString)
                         }
-                    }.padding(.vertical, 4)
+                    }.padding(.horizontal, 6).padding(.top, 10)
                 }.scrollIndicators(.hidden)
-                Rectangle().fill(theme.color("wood").gradient).frame(height: 8).shadow(color: theme.ink.opacity(0.16), radius: 4, y: 3)
+                MihbaraShelfPlank().padding(.top, -12)
             }
         }
         .padding(14)

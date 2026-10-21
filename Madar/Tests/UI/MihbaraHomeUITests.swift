@@ -8,7 +8,7 @@ import XCTest
         return app
     }
     private func open(_ app: XCUIApplication) {
-        let customize = app.tabBars.buttons["خصّص"]; XCTAssertTrue(customize.waitForExistence(timeout:20)); customize.tap()
+        let customize = app.buttons["tab-customize"]; XCTAssertTrue(customize.waitForExistence(timeout:20)); customize.tap()
         let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout:10)); search.tap(); search.typeText("المحبرة")
         let door = app.buttons["mihbara-open"]; XCTAssertTrue(door.waitForExistence(timeout:5)); door.tap()
         XCTAssertTrue(app.buttons["mihbara-add-paper"].waitForExistence(timeout:10), app.debugDescription)
@@ -29,11 +29,15 @@ import XCTest
         XCTAssertTrue(button.isHittable, app.debugDescription)
         button.tap()
     }
-    private func shot(_ app: XCUIApplication, _ name: String) { let a = XCTAttachment(screenshot:app.screenshot()); a.name = name; a.lifetime = .keepAlways; add(a) }
+    private func shot(_ app: XCUIApplication, _ name: String) {
+        let s = app.screenshot(), a = XCTAttachment(screenshot:s); a.name = name; a.lifetime = .keepAlways; add(a)
+        // xcodebuild can hang after the run and lose attachments; a shot folder keeps them on disk.
+        if let dir = ProcessInfo.processInfo.environment["MADAR_SHOT_DIR"] { try? s.pngRepresentation.write(to: URL(fileURLWithPath: dir).appendingPathComponent(name + ".png")) }
+    }
     private func reach(_ app: XCUIApplication, _ button: XCUIElement) { for _ in 0..<7 where !button.isHittable { app.swipeUp(velocity:.slow) }; XCTAssertTrue(button.isHittable) }
     func testHomeWirdExplicitUnderstandingUndoAndRelaunch() {
         continueAfterFailure = false; let app = app("home"); app.launch(); open(app)
-        XCTAssertFalse(app.tabBars.buttons["خصّص"].isHittable)
+        XCTAssertFalse(app.buttons["tab-customize"].isHittable)
         XCTAssertTrue(app.staticTexts["خزانة «قديمًا»"].waitForExistence(timeout:8))
         shot(app,"M6-V01-home-L")
         var wird = app.buttons["mihbara-wird-open"]; reach(app,wird)
@@ -73,7 +77,7 @@ import XCTest
         continueAfterFailure = false
         let storeID = UUID().uuidString
         var app = self.app("empty", storeID: storeID); app.launch()
-        let customize = app.tabBars.buttons["خصّص"]; XCTAssertTrue(customize.waitForExistence(timeout: 20)); customize.tap()
+        let customize = app.buttons["tab-customize"]; XCTAssertTrue(customize.waitForExistence(timeout: 20)); customize.tap()
         let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("فهرسة")
         var toggle = app.switches["setting-core.spotlightIndex"]
         XCTAssertTrue(toggle.waitForExistence(timeout: 8), app.debugDescription)
@@ -85,7 +89,7 @@ import XCTest
         toggle.tap(); XCTAssertTrue(toggle.waitForValue("1", timeout: 8))
         app.terminate()
         app = self.app("empty", storeID: storeID); app.launch()
-        let reopenedCustomize = app.tabBars.buttons["خصّص"]; XCTAssertTrue(reopenedCustomize.waitForExistence(timeout: 20)); reopenedCustomize.tap()
+        let reopenedCustomize = app.buttons["tab-customize"]; XCTAssertTrue(reopenedCustomize.waitForExistence(timeout: 20)); reopenedCustomize.tap()
         let reopenedSearch = app.textFields["settings-search"]; XCTAssertTrue(reopenedSearch.waitForExistence(timeout: 10)); reopenedSearch.tap(); reopenedSearch.typeText("فهرسة")
         toggle = app.switches["setting-core.spotlightIndex"]
         XCTAssertTrue(toggle.waitForExistence(timeout: 8), app.debugDescription)
@@ -99,7 +103,7 @@ import XCTest
     /// M6 audit: the library says how many books there are, tells each kind apart, and counts what a search matches.
     func testLibraryCountsBooksNamesTheOldShelfAndCountsMatches() {
         continueAfterFailure = false; let app = app("home"); app.launch(); open(app)
-        let library = app.buttons["mihbara-library"]; reach(app, library); library.tap()
+        let library = app.buttons["mihbara-library"]; reach(app, library); shot(app, "M6-shelf-covers-L"); library.tap()
         XCTAssertTrue(app.staticTexts["٣ كتب في مكتبتك."].waitForExistence(timeout: 8), app.debugDescription)
         XCTAssertTrue(app.staticTexts["قديمًا"].exists, "an old-shelf book must not be labelled finished")
         XCTAssertTrue(app.staticTexts["كتاب ورقي، ١٨٠ صفحة"].exists)
@@ -315,60 +319,6 @@ import XCTest
         app.buttons["mihbara-rahlOpens-close"].tap(); app.terminate(); app.launch(); open(app)
         reach(app, preferences); preferences.tap()
         XCTAssertEqual(app.buttons["mihbara-rahlOpens-manual"].value as? String, "محدد")
-    }
-
-    func testMotivationUsesOwnedPageNoteAndCyclesThroughProgressStepAndWird() {
-        continueAfterFailure = false
-        let app = app("home"); app.launch(); open(app)
-        let motivate = app.buttons["mihbara-motivate"]
-        reach(app, motivate); motivate.tap()
-
-        let title = app.staticTexts["mihbara-motivate-title"]
-        let message = app.staticTexts["mihbara-motivate-message"]
-        let source = app.staticTexts["mihbara-motivate-source"]
-        XCTAssertTrue(title.waitForExistence(timeout: 8), app.debugDescription)
-        XCTAssertEqual(title.label, "من هامشك")
-        XCTAssertEqual(message.label, "أكمل من هذا الموضع على مهل.")
-        XCTAssertTrue(source.label.contains("رحلة القراءة"), source.label)
-        XCTAssertTrue(source.label.contains("من مكتبتك"), source.label)
-        XCTAssertTrue(source.label.contains("١٤٧"), source.label)
-
-        let next = app.buttons["mihbara-motivate-next"]
-        XCTAssertTrue(next.isHittable, app.debugDescription); next.tap()
-        XCTAssertEqual(title.label, "أنت أقرب مما تظن")
-        XCTAssertTrue(message.label.contains("١٠٣ صفحات"), message.label)
-        next.tap()
-        XCTAssertEqual(title.label, "خطوة صغيرة تكفي")
-        XCTAssertEqual(message.label, "٥ صفحات فقط")
-        XCTAssertTrue(source.label.filter { !"\u{2066}\u{2067}\u{2068}\u{2069}".contains($0) }.contains("٧ دقائق"), source.label)
-        next.tap()
-        XCTAssertEqual(title.label, "ورد السنّة")
-        XCTAssertTrue(message.label.contains("لا يؤمن أحدكم"), message.label)
-        XCTAssertTrue(source.label.contains("ويكي مصدر"), source.label)
-        app.buttons["mihbara-motivate-action"].tap()
-        XCTAssertTrue(app.textViews["mihbara-hadith-text"].waitForExistence(timeout: 8), app.debugDescription)
-    }
-
-    func testMotivationWithoutBookUsesVerifiedDailyWirdAndNoInventedQuote() {
-        continueAfterFailure = false
-        let app = app("empty"); app.launch(); open(app)
-        let motivate = app.buttons["mihbara-motivate"]
-        reach(app, motivate); motivate.tap()
-        XCTAssertEqual(app.staticTexts["mihbara-motivate-title"].label, "ورد السنّة")
-        XCTAssertFalse(app.buttons["mihbara-motivate-next"].exists)
-        XCTAssertTrue(app.staticTexts["mihbara-motivate-source"].label.contains("الأربعون النووية"))
-        XCTAssertFalse(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "سطر من كتابك")).firstMatch.exists)
-    }
-
-    func testMotivationPageNoteOpensTheLinkedBook() {
-        continueAfterFailure = false
-        let app = app("home"); app.launch(); open(app)
-        let motivate = app.buttons["mihbara-motivate"]
-        reach(app, motivate); motivate.tap()
-        XCTAssertEqual(app.staticTexts["mihbara-motivate-title"].label, "من هامشك")
-        app.buttons["mihbara-motivate-action"].tap()
-        XCTAssertTrue(app.buttons["mihbara-paper-start"].waitForExistence(timeout: 8), app.debugDescription)
-        XCTAssertTrue(app.staticTexts["رحلة القراءة"].exists)
     }
 
     func testSunnahDrawerUsesRealProgressAndOpensWirdAndImport() {

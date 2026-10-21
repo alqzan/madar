@@ -15,7 +15,7 @@ import UIKit
             "MADAR_UI_NOW": "2026-10-18T12:00:00+03:00", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
             "MADAR_UI_MIHBARA_IMPORT_PDF": pdf.base64EncodedString()]
         app.launch()
-        let customize = app.tabBars.buttons["خصّص"]; XCTAssertTrue(customize.waitForExistence(timeout: 20)); customize.tap()
+        let customize = app.buttons["tab-customize"]; XCTAssertTrue(customize.waitForExistence(timeout: 20)); customize.tap()
         let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 8)); search.tap(); search.typeText("المحبرة")
         let door = app.buttons["mihbara-open"]; XCTAssertTrue(door.waitForExistence(timeout: 8)); door.tap()
         let add = app.buttons["mihbara-add-paper"]; XCTAssertTrue(add.waitForExistence(timeout: 8)); add.tap()
@@ -61,7 +61,7 @@ import UIKit
             "MADAR_UI_NOW": "2026-10-18T12:00:00+03:00", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
             "MADAR_UI_MIHBARA_IMPORT_PDF": pdf.base64EncodedString()]
         app.launch()
-        let customize = app.tabBars.buttons["خصّص"]; XCTAssertTrue(customize.waitForExistence(timeout: 20)); customize.tap()
+        let customize = app.buttons["tab-customize"]; XCTAssertTrue(customize.waitForExistence(timeout: 20)); customize.tap()
         let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 8)); search.tap(); search.typeText("المحبرة")
         let door = app.buttons["mihbara-open"]; XCTAssertTrue(door.waitForExistence(timeout: 8)); door.tap()
         let add = app.buttons["mihbara-add-paper"]; XCTAssertTrue(add.waitForExistence(timeout: 8)); add.tap()
@@ -137,7 +137,7 @@ import UIKit
             "MADAR_UI_MIHBARA_IMPORT_PDF_NAME": "كتاب رقمي",
             "MADAR_UI_MIHBARA_IMPORT_PDF": pdf.base64EncodedString()]
         app.launch()
-        let customize = app.tabBars.buttons["خصّص"]; XCTAssertTrue(customize.waitForExistence(timeout: 20)); customize.tap()
+        let customize = app.buttons["tab-customize"]; XCTAssertTrue(customize.waitForExistence(timeout: 20)); customize.tap()
         let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 8)); search.tap(); search.typeText("المحبرة")
         let door = app.buttons["mihbara-open"]; XCTAssertTrue(door.waitForExistence(timeout: 8)); door.tap()
         let add = app.buttons["mihbara-add-paper"]; XCTAssertTrue(add.waitForExistence(timeout: 8)); add.tap()
@@ -207,7 +207,7 @@ import UIKit
             "MADAR_UI_MIHBARA_IMPORT_PDF_NAME": "كتاب منساب",
             "MADAR_UI_MIHBARA_IMPORT_PDF": pdf.base64EncodedString()]
         app.launch()
-        let customize = app.tabBars.buttons["خصّص"]; XCTAssertTrue(customize.waitForExistence(timeout: 20)); customize.tap()
+        let customize = app.buttons["tab-customize"]; XCTAssertTrue(customize.waitForExistence(timeout: 20)); customize.tap()
         let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 8)); search.tap(); search.typeText("المحبرة")
         let door = app.buttons["mihbara-open"]; XCTAssertTrue(door.waitForExistence(timeout: 8)); door.tap()
         let add = app.buttons["mihbara-add-paper"]; XCTAssertTrue(add.waitForExistence(timeout: 8)); add.tap()
@@ -257,7 +257,7 @@ import UIKit
             "MADAR_UI_NOW": "2026-10-18T12:00:00+03:00", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
             "MADAR_UI_MIHBARA_IMPORT_EPUB": bytes.base64EncodedString()]
         app.launch()
-        let customize = app.tabBars.buttons["خصّص"]; XCTAssertTrue(customize.waitForExistence(timeout: 20)); customize.tap()
+        let customize = app.buttons["tab-customize"]; XCTAssertTrue(customize.waitForExistence(timeout: 20)); customize.tap()
         let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 8)); search.tap(); search.typeText("المحبرة")
         let door = app.buttons["mihbara-open"]; XCTAssertTrue(door.waitForExistence(timeout: 8)); door.tap()
         let add = app.buttons["mihbara-add-paper"]; XCTAssertTrue(add.waitForExistence(timeout: 8)); add.tap()
@@ -266,7 +266,13 @@ import UIKit
         let title = app.textFields["mihbara-epub-import-title"]
         XCTAssertEqual(title.value as? String, "A Book About Reading")
         XCTAssertEqual(app.textFields["mihbara-epub-import-author"].value as? String, "Madar Fixture Author")
-        XCTAssertTrue(app.descendants(matching: .any)["mihbara-epub-import-toc-10"].exists)
+        // A long index shows its first eight headings; the rest opens on request.
+        XCTAssertTrue(app.descendants(matching: .any)["mihbara-epub-import-toc-8"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["mihbara-epub-import-toc-10"].exists)
+        let fullIndex = app.buttons["mihbara-epub-import-toc-all"]
+        for _ in 0..<8 where !fullIndex.isHittable { app.swipeUp(velocity: .slow) }
+        fullIndex.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["mihbara-epub-import-toc-10"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "حواشٍ")).firstMatch.exists)
         attach(app, "M6-V19-epub-preview-L")
         for _ in 0..<8 where !confirm.isHittable { app.swipeUp(velocity: .slow) }
@@ -299,7 +305,7 @@ import UIKit
             "MADAR_UI_NOW": "2026-10-18T12:00:00+03:00", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
             "MADAR_UI_TURATH_CATALOGUE_BASE64": Data(catalogue.utf8).base64EncodedString(), "MADAR_UI_TURATH_BOOK_BASE64": Data(book.utf8).base64EncodedString()]
         app.launch()
-        let customize = app.tabBars.buttons["خصّص"]; XCTAssertTrue(customize.waitForExistence(timeout: 20)); customize.tap()
+        let customize = app.buttons["tab-customize"]; XCTAssertTrue(customize.waitForExistence(timeout: 20)); customize.tap()
         let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 8)); search.tap(); search.typeText("المحبرة")
         let door = app.buttons["mihbara-open"]; XCTAssertTrue(door.waitForExistence(timeout: 8)); door.tap()
         let add = app.buttons["mihbara-add-paper"]; XCTAssertTrue(add.waitForExistence(timeout: 8)); add.tap()
@@ -374,11 +380,14 @@ import UIKit
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MIHBARA_FIXTURE": "empty",
             "MADAR_UI_NOW": "2026-10-20T12:00:00+03:00", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
         app.launch()
-        let customize = app.tabBars.buttons["خصّص"]; XCTAssertTrue(customize.waitForExistence(timeout: 20)); customize.tap()
+        let customize = app.buttons["tab-customize"]; XCTAssertTrue(customize.waitForExistence(timeout: 20)); customize.tap()
         let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 8)); search.tap(); search.typeText("المحبرة")
         let door = app.buttons["mihbara-open"]; XCTAssertTrue(door.waitForExistence(timeout: 8)); door.tap()
         let add = app.buttons["mihbara-add-paper"]; XCTAssertTrue(add.waitForExistence(timeout: 8)); add.tap()
-        let turath = app.buttons["mihbara-add-source-turath"]; XCTAssertTrue(turath.waitForExistence(timeout: 8)); turath.tap()
+        let turath = app.buttons["mihbara-add-source-turath"]
+            // The shelf may still be settling after the previous import; a second tap opens the sources.
+            if !turath.waitForExistence(timeout: 6) { attach(app, "trial-debug-add"); add.tap() }
+            XCTAssertTrue(turath.waitForExistence(timeout: 8), app.debugDescription); turath.tap()
         let suggestion = app.buttons["mihbara-turath-suggestion-صيد الخاطر"]
         XCTAssertTrue(suggestion.waitForExistence(timeout: 60), "The real catalogue did not load")
         let field = app.textFields["mihbara-turath-search"]; field.tap(); field.typeText("صيد الخاطر")
@@ -442,14 +451,17 @@ import UIKit
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MIHBARA_FIXTURE": "empty",
             "MADAR_UI_NOW": "2026-10-21T21:00:00+03:00", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
         app.launch()
-        let customize = app.tabBars.buttons["خصّص"]; XCTAssertTrue(customize.waitForExistence(timeout: 20)); customize.tap()
+        let customize = app.buttons["tab-customize"]; XCTAssertTrue(customize.waitForExistence(timeout: 20)); customize.tap()
         let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 8)); search.tap(); search.typeText("المحبرة")
         let door = app.buttons["mihbara-open"]; XCTAssertTrue(door.waitForExistence(timeout: 8)); door.tap()
         for (n, book) in books.enumerated() {
             let add = app.buttons["mihbara-add-paper"]
             let addReady = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: add)
             XCTAssertEqual(XCTWaiter.wait(for: [addReady], timeout: 20), .completed, app.debugDescription); add.tap()
-            let turath = app.buttons["mihbara-add-source-turath"]; XCTAssertTrue(turath.waitForExistence(timeout: 8)); turath.tap()
+            let turath = app.buttons["mihbara-add-source-turath"]
+            // The shelf may still be settling after the previous import; a second tap opens the sources.
+            if !turath.waitForExistence(timeout: 6) { attach(app, "trial-debug-add"); add.tap() }
+            XCTAssertTrue(turath.waitForExistence(timeout: 8), app.debugDescription); turath.tap()
             let field = app.textFields["mihbara-turath-search"]
             XCTAssertTrue(app.buttons["mihbara-turath-suggestion-صيد الخاطر"].waitForExistence(timeout: 90), "The real catalogue did not load")
             field.tap(); field.typeText(book.1)
@@ -461,8 +473,13 @@ import UIKit
             XCTAssertTrue(confirm.waitForExistence(timeout: 180), "Download/conversion of \(book.0) did not finish")
             if n == 5 { attach(app, "trial-02-import-review-large") }
             let shelf = app.buttons["mihbara-epub-shelf-\(book.3)"]
+            // The shelf row sits under the pinned «أضفه إلى مكتبتي» until the review scrolls; isHittable does not see that.
+            app.swipeUp(velocity: .slow)
             for _ in 0..<10 where !shelf.isHittable { app.swipeUp(velocity: .slow) }
-            shelf.tap()
+            // The review may still settle after it appears; tap until the shelf choice really took.
+            for _ in 0..<4 where !shelf.isSelected { shelf.tap(); sleep(1) }
+            if !shelf.isSelected { attach(app, "trial-debug-shelf") }
+            XCTAssertTrue(shelf.isSelected, "Shelf \(book.3) not chosen for \(book.0)\n\(app.debugDescription)")
             for _ in 0..<10 where !confirm.isHittable { app.swipeUp(velocity: .slow) }
             confirm.tap()
             XCTAssertTrue(app.buttons["mihbara-shelf-want"].waitForExistence(timeout: 30), "Import of \(book.0) did not return to the room")
@@ -491,6 +508,7 @@ import UIKit
     }
 
     private func attach(_ app: XCUIApplication, _ name: String) {
-        let attachment = XCTAttachment(screenshot: app.screenshot()); attachment.name = name; attachment.lifetime = .keepAlways; add(attachment)
+        let s = app.screenshot(), attachment = XCTAttachment(screenshot: s); attachment.name = name; attachment.lifetime = .keepAlways; add(attachment)
+        if let dir = ProcessInfo.processInfo.environment["MADAR_SHOT_DIR"] { try? s.pngRepresentation.write(to: URL(fileURLWithPath: dir).appendingPathComponent(name + ".png")) }
     }
 }

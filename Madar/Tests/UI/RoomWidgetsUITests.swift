@@ -2,7 +2,7 @@ import XCTest
 @MainActor final class RoomWidgetsUITests:XCTestCase {
     private func openGallery()->XCUIApplication {
         let app=XCUIApplication();app.launchEnvironment=["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_HABIT_FIXTURE":"showcase","MADAR_UI_MIHBARA_FIXTURE":"home","MADAR_UI_NOW":"2026-10-15T20:00:00+03:00","MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light"];app.launch()
-        XCTAssertTrue(app.tabBars.buttons["خصّص"].waitForExistence(timeout:20));app.tabBars.buttons["خصّص"].tap()
+        XCTAssertTrue(app.buttons["tab-customize"].waitForExistence(timeout:20));app.buttons["tab-customize"].tap()
         let search=app.textFields["settings-search"];XCTAssertTrue(search.waitForExistence(timeout:10));search.tap();search.typeText("خارج التطبيق")
         let gallery=app.buttons["room-widgets-gallery"];XCTAssertTrue(gallery.waitForExistence(timeout:10));gallery.tap()
         XCTAssertTrue(app.staticTexts["room-widgets-title"].waitForExistence(timeout:10));return app
@@ -28,7 +28,7 @@ import XCTest
         XCTAssertEqual(toggle.value as? String,"1")
         shot(app,"M3-V16-diary-setting-L")
         app.buttons["diary-customize-back"].tap()
-        XCTAssertTrue(app.tabBars.buttons["خصّص"].waitForExistence(timeout:10));app.tabBars.buttons["خصّص"].tap()
+        XCTAssertTrue(app.buttons["tab-customize"].waitForExistence(timeout:10));app.buttons["tab-customize"].tap()
         let search=app.textFields["settings-search"];XCTAssertTrue(search.waitForExistence(timeout:10));search.tap();search.typeText("خارج التطبيق")
         let gallery=app.buttons["room-widgets-gallery"];XCTAssertTrue(gallery.waitForExistence(timeout:10));gallery.tap();XCTAssertTrue(app.staticTexts["room-widgets-title"].waitForExistence(timeout:10))
         let last=app.buttons["room-widget-diary-lastLine"]
