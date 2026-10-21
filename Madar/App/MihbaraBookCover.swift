@@ -190,51 +190,34 @@ struct MihbaraBookSpine: View {
         let pair = MihbaraBookCovers.leathers[leather % MihbaraBookCovers.leathers.count]
         let fill = theme.color(pair.fill), ink = theme.color(pair.ink)
         let perVolume = shape?.pages.map { $0 / max(1, shape?.volumes ?? 1) } ?? book.pages
-        let size = Self.size(pagesPerVolume: perVolume)
-        let title = MihbaraBookCovers.split(book.title).main
+        let single = Self.size(pagesPerVolume: perVolume)
+        // A volume of a set is a big printed volume: wider and a little taller than a single book.
+        let size = volume == nil ? single : CGSize(width: max(58, single.width * 1.3), height: single.height + 14)
+        let parts = BookTitle.parts(book.title)
         ZStack {
             // Rounded leather: dark at both edges, a soft highlight a third of the way in.
             LinearGradient(stops: [.init(color: .black.opacity(0.30), location: 0), .init(color: .clear, location: 0.18),
                                    .init(color: .white.opacity(0.16), location: 0.36), .init(color: .clear, location: 0.6),
                                    .init(color: .black.opacity(0.34), location: 1)], startPoint: .leading, endPoint: .trailing)
                 .background(fill)
-            VStack(spacing: 0) {
-                bands(ink).padding(.top, 12)
-                if lying {
-                    Text(title)
+            if let volume, !lying {
+                volumeSpine(parts, volume: volume, ink: ink, size: size)
+            } else {
+                // Owner, 21 Oct 2026: a single book reads down its spine, as books usually do.
+                VStack(spacing: 0) {
+                    bands(ink).padding(.top, 12)
+                    Text(parts.short)
                         .font(.custom("thmanyahserifdisplay-Bold", size: 15, relativeTo: .caption))
-                        .lineLimit(1).minimumScaleFactor(11 / 15).multilineTextAlignment(.center)
+                        .lineLimit(size.width < 48 ? 1 : 2).minimumScaleFactor(11 / 15).multilineTextAlignment(.center)
                         .frame(width: size.height - 72, height: size.width - 6)
                         .rotationEffect(.degrees(90))
                         .frame(width: size.width, height: size.height - 72)
-                } else {
-                    // Owner, 21 Oct 2026: as on printed sets, the title runs across the spine, a word to a line,
-                    // on a framed label near the head.
-                    let words = title.split(separator: " ").prefix(4).map(String.init)
-                    VStack(spacing: 1) {
-                        ForEach(Array(words.enumerated()), id: \.offset) { _, word in
-                            Text(word).font(.custom("thmanyahserifdisplay-Bold", size: size.width >= 50 ? 14 : 13, relativeTo: .caption))
-                                .lineLimit(1).minimumScaleFactor(11 / 13)
-                        }
-                    }
-                    .padding(.vertical, 7).frame(width: size.width - 8)
-                    .background(.black.opacity(0.16))
-                    .overlay { Rectangle().stroke(ink.opacity(0.5), lineWidth: 0.8) }
-                    .padding(.top, 10)
-                }
-                Spacer(minLength: 0)
-                bands(ink)
-                // A set's volume number sits on a gilt label, as on a printed multi-volume set.
-                if volume != nil {
-                    Text(footer).font(MadarTypography.fine().weight(.semibold)).lineLimit(1).fixedSize()
-                        .padding(.horizontal, 3).frame(minWidth: 22, minHeight: 20)
-                        .background(theme.color("goldUnderstand"), in: .rect(cornerRadius: 2)).foregroundStyle(theme.color("ink"))
-                        .padding(.vertical, 6)
-                } else {
+                    Spacer(minLength: 0)
+                    bands(ink)
                     Text(footer).font(MadarTypography.fine()).lineLimit(1).minimumScaleFactor(1).frame(height: 22).padding(.bottom, 6)
                 }
+                .foregroundStyle(ink)
             }
-            .foregroundStyle(ink)
         }
         .frame(width: size.width, height: size.height)
         .clipShape(.rect(topLeadingRadius: 3, bottomLeadingRadius: 2, bottomTrailingRadius: 2, topTrailingRadius: 3))
@@ -246,6 +229,43 @@ struct MihbaraBookSpine: View {
             }
         }
         .shadow(color: .black.opacity(0.22), radius: 1.5, x: 1, y: 0)
+    }
+
+    /// Owner, 21 Oct 2026 (a photo of a printed «زاد المعاد» set): gilt ornament at head and foot, the name large across
+    /// the spine inside a gilt frame with its subtitle under it, and the volume number in a medallion.
+    private func volumeSpine(_ parts: BookTitle.Parts, volume: Int, ink: Color, size: CGSize) -> some View {
+        let rest = parts.main.count > parts.short.count ? String(parts.main.dropFirst(parts.short.count)).trimmingCharacters(in: .whitespaces) : ""
+        let words = parts.short.split(separator: " ").prefix(3).map(String.init)
+        return VStack(spacing: 8) {
+            ornament(ink).padding(.top, 8)
+            VStack(spacing: 2) {
+                ForEach(Array(words.enumerated()), id: \.offset) { _, word in
+                    Text(word).font(.custom("thmanyahserifdisplay-Bold", size: 17, relativeTo: .caption)).lineLimit(1).minimumScaleFactor(11 / 17)
+                }
+                if !rest.isEmpty {
+                    Text(rest).font(MadarTypography.fine()).lineLimit(3).multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true).padding(.top, 2)
+                }
+            }
+            .padding(.vertical, 8).padding(.horizontal, 3).frame(width: size.width - 10)
+            .overlay { RoundedRectangle(cornerRadius: 3).stroke(ink.opacity(0.7), lineWidth: 1).padding(1.5) }
+            .overlay { RoundedRectangle(cornerRadius: 4).stroke(ink.opacity(0.35), lineWidth: 0.6).padding(-1.5) }
+            Spacer(minLength: 0)
+            Text(digits.string(volume + 1)).font(MadarTypography.caption().weight(.bold))
+                .frame(width: 26, height: 26).overlay { Circle().stroke(ink.opacity(0.8), lineWidth: 1) }
+                .overlay { Circle().stroke(ink.opacity(0.35), lineWidth: 0.6).padding(-3) }
+            ornament(ink).padding(.bottom, 8)
+        }
+        .foregroundStyle(ink)
+    }
+
+    /// A gilt band: two rules with a row of small lozenges between them.
+    private func ornament(_ ink: Color) -> some View {
+        VStack(spacing: 2) {
+            Rectangle().frame(height: 1)
+            HStack(spacing: 3) { ForEach(0..<5, id: \.self) { _ in Rectangle().frame(width: 4, height: 4).rotationEffect(.degrees(45)) } }.frame(height: 7)
+            Rectangle().frame(height: 1)
+        }
+        .opacity(0.7).padding(.horizontal, 5).accessibilityHidden(true)
     }
 
     private var footer: String {
