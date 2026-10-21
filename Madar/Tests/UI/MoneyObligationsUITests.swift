@@ -24,11 +24,47 @@ import XCTest
         let name = app.textFields["money-obligation-name"]; XCTAssertTrue(name.waitForExistence(timeout: 5)); name.tap(); name.typeText("الماء")
         let amount = app.textFields["money-obligation-amount"]; amount.tap(); amount.typeText("85")
         XCTAssertTrue(app.descendants(matching: .any)["money-obligation-preview"].waitForExistence(timeout: 5))
+        let done = app.buttons["money-obligation-keyboard-done"]
+        XCTAssertTrue(done.waitForExistence(timeout: 5)); done.tap()
+        let peak = app.staticTexts["money-obligation-monthly-peak"]
+        for _ in 0..<5 where !peak.exists || !peak.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(peak.exists, app.debugDescription)
+        XCTAssertTrue(peak.label.contains("بعد الإضافة") && peak.label.contains("ريال"), peak.label)
+        XCTAssertTrue(app.staticTexts["قبل الإضافة"].exists)
+        XCTAssertTrue(app.staticTexts["الإضافة"].exists)
+        shot(app, "M5-V09-add-preview-L")
         shot(app, "M5-V09-add-L")
         app.buttons["money-obligation-save"].tap()
         let row = app.buttons["money-obligation-row-الماء"]; XCTAssertTrue(row.waitForExistence(timeout: 10), app.debugDescription)
         for _ in 0..<5 where !row.isHittable { app.swipeUp(velocity: .slow) }
         shot(app, "M5-V09-obl-s2-L")
+    }
+
+    func testHiddenAmountsKeepTheAddPreviewPrivate() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": "hidden",
+                                 "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-16T20:00:00+03:00"]
+        app.launch()
+        let tab = app.tabBars.buttons["خصّص"]; XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
+        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("المال")
+        app.buttons["money-open"].tap()
+        let open = app.buttons["money-obligations-open"]
+        for _ in 0..<7 where !open.isHittable || open.frame.maxY > app.frame.maxY - 150 { app.swipeUp(velocity: .slow) }
+        open.tap()
+        let total = app.staticTexts["money-obligations-total"]
+        XCTAssertTrue(total.waitForExistence(timeout: 10)); XCTAssertTrue(total.label.contains("•••"))
+        let add = app.buttons["money-obligations-add"]
+        for _ in 0..<6 where !add.isHittable || add.frame.maxY > app.frame.maxY - 150 { app.swipeUp(velocity: .slow) }
+        add.tap()
+        let amount = app.textFields["money-obligation-amount"]
+        XCTAssertTrue(amount.waitForExistence(timeout: 5)); amount.tap(); amount.typeText("85")
+        app.buttons["money-obligation-keyboard-done"].tap()
+        app.swipeUp(velocity: .slow)
+        shot(app, "M5-V09-hidden-add-preview-L")
+        XCTAssertFalse(app.descendants(matching: .any)["money-obligation-preview"].exists,
+                       "An unrevealed balance must not be exposed through the preview's relative bar heights.")
+        XCTAssertTrue(app.staticTexts["money-obligation-preview-hidden"].exists)
     }
 
     /// M5-X00 (owner 16 Oct): rent every 6 months, first due 18 Feb 2027 (4 months and 2 days after 16 Oct 2026),

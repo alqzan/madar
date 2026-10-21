@@ -113,7 +113,14 @@ struct MoneyObligationSheet: View {
                         .accessibilityIdentifier("money-obligation-count")
                 }
                 rhythm
-                if amountMinor != nil, !ladder.isEmpty { ladderPreview }
+                if amountMinor != nil, !ladder.isEmpty {
+                    if visible { ladderPreview }
+                    else {
+                        Text("أرقامك مخفية؛ أظهرها من صفحة الالتزامات لترى أثر الإضافة.")
+                            .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                            .accessibilityIdentifier("money-obligation-preview-hidden")
+                    }
+                }
                 if let errorMessage { Text(errorMessage).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")) }
                 Button(action: save) {
                     Text("احفظ الالتزام").font(.custom("thmanyahsans-Bold", size: 18, relativeTo: .headline)).foregroundStyle(theme.background)
@@ -184,7 +191,12 @@ struct MoneyObligationSheet: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("أثره على السلّم").font(MadarTypography.cardTitle())
             let totals = ladder.enumerated().map { $0.element.total + added($0.offset) }
-            let peak = max(1, totals.max() ?? 1)
+            let monthlyPeak = totals.max() ?? 0
+            let peak = max(1, monthlyPeak)
+            HStack(spacing: 14) {
+                HStack(spacing: 5) { Rectangle().fill(theme.secondaryInk.opacity(0.35)).frame(width: 8, height: 8).accessibilityHidden(true); Text("قبل الإضافة") }
+                HStack(spacing: 5) { Rectangle().fill(theme.color("reserve")).frame(width: 8, height: 8).accessibilityHidden(true); Text("الإضافة") }
+            }.font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
             HStack(alignment: .bottom, spacing: 3) {
                 ForEach(Array(ladder.enumerated()), id: \.element.id) { index, month in
                     VStack(spacing: 0) {
@@ -194,9 +206,9 @@ struct MoneyObligationSheet: View {
                     }.frame(maxWidth: .infinity).frame(height: 70)
                 }
             }.environment(\.layoutDirection, .rightToLeft)
-            Text("الشهر الأثقل بعده " + (visible ? service.amount(totals.max() ?? 0) : "•••"))
-                .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
-        }.accessibilityIdentifier("money-obligation-preview")
+            Text(figure: "أعلى مجموع شهري بعد الإضافة " + service.amount(monthlyPeak) + " " + service.currencyName(app.string("core.currency")))
+                .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-obligation-monthly-peak")
+        }.accessibilityElement(children: .contain).accessibilityIdentifier("money-obligation-preview")
     }
 
     private func field<Content: View>(_ title: String, @ViewBuilder _ content: () -> Content) -> some View {
