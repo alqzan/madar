@@ -32,7 +32,7 @@ struct MoneyAccountsView: View {
                     if !visible { Button("أظهر الأرقام") { revealed = true }.frame(minHeight: 44).accessibilityIdentifier("money-accounts-reveal") }
                     ledger(r)
                     if let basis = r.basis {
-                        HStack { Text("كاش " + amount(basis.inAccountMinor) + "، عليك " + amount(basis.owedMinor)).font(MadarTypography.caption()); Spacer(); Text(figure: amount(basis.netMinor)).font(MadarTypography.cardTitle()).foregroundStyle(theme.color("surplusText")) }.padding(12).background(theme.surface)
+                        HStack { Text(figure: "كاش " + amount(basis.inAccountMinor) + "، عليك " + amount(basis.owedMinor)).font(MadarTypography.caption()); Spacer(); Text(figure: amount(basis.netMinor)).font(MadarTypography.cardTitle()).foregroundStyle(theme.color("surplusText")) }.padding(12).background(theme.surface)
                     } else { Text("لا نجمع عملات مختلفة بلا سعر صرف. أرصدة الحسابات أدناه بعملاتها.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
                     if r.rows.isEmpty { Text("من هنا تبدأ الجذور. أضف حسابك ورصيده، ثم تصله رسائل البنك.").font(MadarTypography.body()).padding(.vertical, 20).accessibilityIdentifier("money-accounts-empty") }
                     HStack(spacing: 8) {
@@ -57,7 +57,7 @@ struct MoneyAccountsView: View {
             }
             VStack(spacing: 5) {
                 Text("لك فعلًا").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                Text(r.basis.map { amount($0.netMinor) } ?? "—").font(.custom("thmanyahserifdisplay-Black", size: 42, relativeTo: .largeTitle)).foregroundStyle(theme.color("surplusText")).accessibilityIdentifier("money-accounts-net")
+                displayFigure(r.basis.map { amount($0.netMinor) } ?? "—", "thmanyahserifdisplay-Black", size: 42, relativeTo: .largeTitle).foregroundStyle(theme.color("surplusText")).accessibilityIdentifier("money-accounts-net")
                 Text("الجذور تغذّي، والديون تسحب").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
             }.padding(15).frame(maxWidth: 210).background(theme.background).clipShape(.rect(cornerRadius: 16)).overlay { RoundedRectangle(cornerRadius: 16).stroke(theme.color("reserveText"), lineWidth: 1) }.padding(.bottom, 18)
         }.frame(maxWidth: .infinity).frame(minHeight: dynamicType.isAccessibilitySize ? 150 : 170)
@@ -68,7 +68,7 @@ struct MoneyAccountsView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Button(row.name) { if let edit = row.edit { selected = edit } else { selectedSource = row } }.font(MadarTypography.cardTitle()).frame(minHeight: 44)
                     Text(row.subtitle + (row.counted ? "، يُحتسب" : "، خارج الحساب")).font(MadarTypography.body())
-                    Text(row.amountMinor.map { amount($0, currency: row.currency) } ?? "—").font(MadarTypography.body())
+                    Text(figure: row.amountMinor.map { amount($0, currency: row.currency) } ?? "—").font(MadarTypography.body())
                     Button("مصدر الرصيد") { selectedSource = row }.frame(minHeight: 44)
                 }
             } }
@@ -81,7 +81,7 @@ struct MoneyAccountsView: View {
                     Button { if let edit = row.edit { selected = edit } else { selectedSource = row } } label: {
                         VStack(alignment: .leading, spacing: 2) { Text(row.name).font(.custom("thmanyahserifdisplay-Bold", size: 18, relativeTo: .headline)); Text(row.subtitle + (row.currency == app.string("core.currency") ? "" : "، " + row.currency)).font(MadarTypography.fine()).foregroundStyle(tint(row)) }.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                     }.accessibilityIdentifier("money-account-" + row.name)
-                    Text(row.amountMinor.map { (row.side == .cash ? "" : "(") + amount($0, currency: row.currency) + (row.side == .cash ? "" : ")") } ?? "—").font(.custom("thmanyahserifdisplay-Bold", size: 18, relativeTo: .headline)).foregroundStyle(row.counted ? theme.ink : theme.secondaryInk).frame(width: 90).strikethrough(!row.counted)
+                    Text(figure: row.amountMinor.map { (row.side == .cash ? "" : "(") + amount($0, currency: row.currency) + (row.side == .cash ? "" : ")") } ?? "—").font(.custom("thmanyahserifdisplay-Bold", size: 18, relativeTo: .headline)).foregroundStyle(row.counted ? theme.ink : theme.secondaryInk).frame(width: 90).strikethrough(!row.counted)
                     Image(systemName: row.counted ? "checkmark.square" : "square").font(.system(size: 20)).foregroundStyle(row.counted ? theme.color("surplusText") : theme.secondaryInk).frame(width: 38).accessibilityLabel(row.counted ? "يُحتسب" : "خارج الحساب")
                     Button { selectedSource = row } label: { VStack(spacing: 2) { Circle().fill(row.counted ? theme.color("surplusText") : theme.color("reserveText")).frame(width: 5, height: 5); Text(row.counted ? "تُحتسب" : "تُتجاهل").font(MadarTypography.fine()) }.frame(width: 55, height: 44) }.accessibilityLabel("مصدر " + row.name).accessibilityIdentifier("money-account-source-" + row.name)
                 }.padding(.vertical, 8).padding(.horizontal, 8).frame(minHeight: 60).overlay(alignment: .top) { Rectangle().fill(theme.line).frame(height: 0.7) }
@@ -115,7 +115,7 @@ struct MoneyAccountsView: View {
                 Text(sourceTitle(s)).font(MadarTypography.cardTitle())
                 MadarDateLabel(app.dateLabels(.containing(s.at, in: app.activePlace.timeZone)), primaryFont: MadarTypography.body(), secondaryFont: MadarTypography.caption())
                 Text(service.time(s.at)).font(MadarTypography.caption())
-                if case .messageDiffers(_, let printed, let difference) = s { Text("ورد في الرسالة " + amount(printed, currency: r.currency) + "؛ الفرق عن الدفتر " + amount(abs(difference), currency: r.currency)).font(MadarTypography.body()) }
+                if case .messageDiffers(_, let printed, let difference) = s { Text(figure: "ورد في الرسالة " + amount(printed, currency: r.currency) + "؛ الفرق عن الدفتر " + amount(abs(difference), currency: r.currency)).font(MadarTypography.body()) }
             } else { Text("من دفتر الحركات والكشوف؛ لا نضع رصيدًا بدلًا عن البنك.").font(MadarTypography.body()) }
             if !r.counted { Text("هذا الجذر خارج النقد ولك فعلًا والزكاة. رسائله لا تدخل المصروفات.").font(MadarTypography.body()) }
         }.padding(24) }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).presentationDetents([.medium, .large])
