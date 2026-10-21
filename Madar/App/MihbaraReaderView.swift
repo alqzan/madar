@@ -270,7 +270,7 @@ struct MihbaraReaderView: View {
         // A fixed origin: `.now` would restart the timeline on every redraw.
         TimelineView(.periodic(from: Date(timeIntervalSinceReferenceDate: 0), by: 5)) { tick in
             VStack(spacing: 0) {
-                if !readerFocus || focusChromeVisible {
+                if !speechController.isActive && (!readerFocus || focusChromeVisible) {
                     header
                     Rectangle().fill(palette.line).frame(height: 1)
                 }

@@ -804,6 +804,8 @@ import XCTest
         XCTAssertTrue(listen.waitForExistence(timeout: 8), app.debugDescription); listen.tap()
         let player = app.descendants(matching: .any)["mihbara-listening-player"]
         if player.waitForExistence(timeout: 8) {
+            let closeReader = app.buttons["mihbara-reader-close"]
+            XCTAssertFalse(closeReader.exists, "The reader header should stay out of the listening view.\n\(app.debugDescription)")
             let paragraph = app.staticTexts["mihbara-listening-paragraph"]
             XCTAssertTrue(paragraph.waitForExistence(timeout: 5), app.debugDescription)
             let paragraphLabel = paragraph.label.filter { !["\u{2068}", "\u{2069}"].contains(String($0)) }
@@ -821,6 +823,7 @@ import XCTest
             pause.tap()
             app.buttons["mihbara-listening-stop"].tap()
             XCTAssertTrue(player.waitForNonExistence(timeout: 5), app.debugDescription)
+            XCTAssertTrue(closeReader.waitForExistence(timeout: 5), "Stopping listening must restore the reader header.\n\(app.debugDescription)")
         } else {
             let alert = app.alerts["القارئ"]
             XCTAssertTrue(alert.waitForExistence(timeout: 5), app.debugDescription)
