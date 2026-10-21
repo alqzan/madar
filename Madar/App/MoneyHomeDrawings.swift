@@ -80,8 +80,14 @@ struct MoneyScrollChart: View {
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(visible ? "منحنى الدورة: الخط المنقّط استحقاق اليومية، والمتصل ما صُرف" : "منحنى الدورة مخفي")
+        .accessibilityLabel(accessibilitySummary)
         .accessibilityIdentifier("money-scroll-chart")
+    }
+    private var accessibilitySummary: String {
+        guard visible else { return "منحنى الدورة مخفي" }
+        let start = app.dateLabels(cycle.startDay, compact: true).combined
+        let end = app.dateLabels(cycle.expectedEndDay, compact: true).combined
+        return "منحنى الدورة من \(start) إلى \(end)؛ الخط المنقّط استحقاق اليومية، والمتصل ما صُرف."
     }
     private var rodView: some View {
         Capsule().fill(LinearGradient(colors: [theme.color("rod2"), theme.color("rod"), theme.color("rod2")], startPoint: .leading, endPoint: .trailing))

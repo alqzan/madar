@@ -13,12 +13,22 @@ import XCTest
         XCTAssertTrue(app.staticTexts["money-title"].waitForExistence(timeout: 10), app.debugDescription)
     }
     func shot(_ app: XCUIApplication, _ name: String) { let a = XCTAttachment(screenshot: app.screenshot()); a.name = name; a.lifetime = .keepAlways; add(a) }
+    private func assertChartDates(_ chart: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
+        let dateRange = chart.label.components(separatedBy: "؛").first ?? chart.label
+        let dates = dateRange.components(separatedBy: " إلى ")
+        XCTAssertEqual(dates.count, 2, chart.label, file: file, line: line)
+        for date in dates {
+            XCTAssertTrue(date.contains("،"), "A chart endpoint must include both calendars: \(chart.label)", file: file, line: line)
+        }
+    }
     func testHomeReadsActualCycleAndHasNoUnbuiltDoors() throws {
         continueAfterFailure = false; let app = app("showcase"); open(app)
         XCTAssertTrue(app.staticTexts["money-today"].label.contains("١٤٠"), app.staticTexts["money-today"].label)
         XCTAssertTrue(app.staticTexts["money-today"].label.contains("٤٠٠"), app.staticTexts["money-today"].label)
         XCTAssertTrue(app.staticTexts["money-available"].label.contains("١٬٣٦٠"), app.staticTexts["money-available"].label)
-        XCTAssertTrue(app.descendants(matching: .any)["money-scroll-chart"].exists)
+        let chart = app.descendants(matching: .any)["money-scroll-chart"]
+        XCTAssertTrue(chart.exists)
+        assertChartDates(chart)
         XCTAssertTrue(app.descendants(matching: .any)["money-pending"].exists)
         // V14 analysis and V17 manual expense are both built; each must have a live door.
         XCTAssertTrue(app.buttons["سجّل مصروفًا"].exists); XCTAssertTrue(app.buttons["money-analysis-open"].exists)
@@ -33,8 +43,11 @@ import XCTest
         shot(app, "M5-V01-empty-L"); app.terminate()
         app = self.app("hidden"); open(app)
         XCTAssertEqual(app.staticTexts["money-available"].label, "•••")
+        let chart = app.descendants(matching: .any)["money-scroll-chart"]
+        XCTAssertEqual(chart.label, "منحنى الدورة مخفي")
         shot(app, "M5-V01-hidden-L"); app.buttons["money-reveal"].tap()
         XCTAssertTrue(app.staticTexts["money-available"].label.contains("١٬٣٦٠"))
+        assertChartDates(chart)
         app.buttons["money-back"].tap(); app.buttons["money-open"].tap()
         XCTAssertEqual(app.staticTexts["money-available"].label, "•••")
     }
