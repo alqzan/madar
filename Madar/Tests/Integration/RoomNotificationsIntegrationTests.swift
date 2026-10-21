@@ -47,6 +47,42 @@ import MadarCore
         XCTAssertEqual(RoomNotificationContent.content(for: candidate, plan: plan, session: app, habitNames: [:]).body, "لديك تنبيه في مدار")
     }
 
+    func testLimitAlertStaysAmountFreeWhenMoneyIsVisibleInsideTheApp() throws {
+        let (app, _, _, day) = try fixture(["core.faceIDLock": .string("none"), "core.dayStart": .string("midnight"),
+                                            "core.hideMoneyUntilTouch": .bool(false)])
+        app.authorizeProtectedData()
+        let context = ModelContext(app.container), now = Date(), zone = ActivePlace.riyadh.timeZone
+        let cycle = Cycle(); cycle.start = now.addingTimeInterval(-20 * 86_400); cycle.expectedEnd = now.addingTimeInterval(10 * 86_400); context.insert(cycle)
+        let category = MadarData.Category(); category.name = "مطاعم"; context.insert(category)
+        let limit = CategoryLimit(); limit.categoryID = category.id; limit.mode = "fixed"; limit.limitMinor = 100_000; context.insert(limit)
+        let account = Account(); context.insert(account)
+        let transaction = MoneyTransaction(); transaction.kind = "expense"; transaction.categoryID = category.id
+        transaction.cycleID = cycle.id; transaction.fromAccountID = account.id; transaction.eventAt = now
+        transaction.dayKey = GregorianDay.containing(now, in: zone).description; transaction.tzID = zone.identifier
+        transaction.dayPolicy = "midnight@1"; transaction.method = "cash"; transaction.source = "manual"
+        transaction.reviewState = "ok"; transaction.amountMinor = 90_000; transaction.homeAmountMinor = 90_000; context.insert(transaction)
+        let allocation = Allocation(); allocation.transactionID = transaction.id; allocation.cycleID = cycle.id
+        allocation.target = "daily"; allocation.amountMinor = -90_000; allocation.kind = "spend"
+        allocation.idempotencyKey = UUID().uuidString; context.insert(allocation)
+        try context.save(); try app.reload()
+
+        let shelf = try XCTUnwrap(AppMoneyService(app: app).loadCategories().shelves.first { $0.id == category.id })
+        XCTAssertEqual(shelf.spentMinor, 90_000); XCTAssertEqual(shelf.percentUsed, 90)
+        let candidate = try XCTUnwrap(RoomNotificationContent.limitCandidates(session: app, prayerDays: [], now: now).first)
+        let plan = NotificationArbiter.plan(candidates: [], prayerDays: [day], now: now,
+                                            timeZone: zone, policy: .init(staleNudgeEnabled: false))
+
+        for hideMoney in [false, true] {
+            _ = try SettingsStore(context: context).stage(["core.hideMoneyUntilTouch": .bool(hideMoney)])
+            try context.save(); try app.reload()
+            let body = RoomNotificationContent.content(for: candidate, plan: plan, session: app, habitNames: [:]).body
+            XCTAssertEqual(body, "اقترب أحد تصنيفاتك من حدّه لهذه الدورة")
+            XCTAssertNil(body.rangeOfCharacter(from: .decimalDigits))
+            XCTAssertFalse(body.contains(category.name))
+            XCTAssertFalse(body.contains("باقي"))
+        }
+    }
+
     func testReconciliationReminderUsesSharedBudgetAndGenericCopy() throws {
         let (app, _, now, day) = try fixture(["core.faceIDLock": .string("app"), "core.dayStart": .string("midnight"), "mal.reconcileEveryDays": .number(90)])
         app.authorizeProtectedData()

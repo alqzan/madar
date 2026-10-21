@@ -213,15 +213,9 @@ import MadarPrayer
             content.body = protected ? "لديك تنبيه في مدار" : id.hasPrefix("mal.cardCash.") ? "راجع سداد بطاقتك اليوم؛ النقد الحالي لا يغطي الالتزامات المعروفة" : "موعد سداد بطاقتك " + (session.string("mal.cardDue") == "1day" ? "غدًا" : "بعد ثلاثة أيام") + "؛ راجع الكشف والنقد المتاح"
             content.userInfo = ["dayKey": candidate.dayKey, "room": "mal"]
         } else if id.hasPrefix("mal.alert80.") {
-            // RM10: no amount on the lock screen while amounts hide until touch, nor under the whole-app lock.
-            let categoryID = String(id.split(separator: ".").last ?? "")
-            let shelf = protected ? nil : (try? AppMoneyService(app: session).loadCategories())?.shelves.first { $0.id.uuidString == categoryID }
+            // RU2: notifications stay amount-free even when amounts are visible inside the app.
             content.title = protected ? "مدار" : "حدود الصرف"
-            if let shelf, let limit = shelf.limitMinor, let used = shelf.percentUsed {
-                let service = AppMoneyService(app: session)
-                content.body = session.bool("core.hideMoneyUntilTouch") ? "«" + shelf.name + "» اقترب من حدّه لهذه الدورة"
-                    : "«" + shelf.name + "» بلغ " + digits.string(used) + "٪ من حدّه، " + (limit > shelf.spentMinor ? "باقي " + service.amount(limit - shelf.spentMinor) : "تجاوزه")
-            } else { content.body = protected ? "لديك تنبيه في مدار" : "اقترب أحد تصنيفاتك من حدّه" }
+            content.body = protected ? "لديك تنبيه في مدار" : "اقترب أحد تصنيفاتك من حدّه لهذه الدورة"
             content.userInfo = ["dayKey": candidate.dayKey, "room": "mal"]
         } else if id.hasPrefix("mal.reconcile.") {
             content.title = protected ? "مدار" : "مطابقة الرصيد"
