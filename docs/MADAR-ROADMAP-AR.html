@@ -5,94 +5,67 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>خارطة طريق مدار</title>
   <style>
-    :root { --paper:#f7f4ec; --card:#fffdf8; --ink:#213a32; --muted:#5f5c52; --gold:#9a7942; --line:#dfd7c7; --green:#244b40; --warn:#7a5520; --done:#344e6b; }
-    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --paper:#14201c; --card:#1c2a25; --ink:#e8e2d2; --muted:#b9b3a3; --gold:#d2b47a; --line:#33443d; --green:#9cc9b4; --warn:#e2bf86; --done:#a9c3e0; } }
-    :root[data-theme="dark"] { --paper:#14201c; --card:#1c2a25; --ink:#e8e2d2; --muted:#b9b3a3; --gold:#d2b47a; --line:#33443d; --green:#9cc9b4; --warn:#e2bf86; --done:#a9c3e0; }
+    :root { --paper:#f7f4ec; --card:#fffdf8; --ink:#213a32; --muted:#5f5c52; --line:#dfd7c7; --green:#244b40; --gold:#8a6a35; }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --paper:#14201c; --card:#1c2a25; --ink:#e8e2d2; --muted:#b9b3a3; --line:#33443d; --green:#9cc9b4; --gold:#d2b47a; } }
+    :root[data-theme="dark"] { --paper:#14201c; --card:#1c2a25; --ink:#e8e2d2; --muted:#b9b3a3; --line:#33443d; --green:#9cc9b4; --gold:#d2b47a; }
     * { box-sizing:border-box; }
-    body { margin:0; background:var(--paper); color:var(--ink); font-family:-apple-system,"Geeza Pro","Noto Naskh Arabic",Arial,sans-serif; line-height:1.8; }
-    main { max-width:1060px; margin:auto; padding:28px 16px 64px; }
-    .hero { padding:28px clamp(18px,5vw,48px); color:#fffaf1; border-radius:24px; background:linear-gradient(125deg,#183d35,#356352); }
-    .hero h1 { margin:0; font-size:clamp(1.8rem,5vw,2.8rem); line-height:1.3; }
-    .hero p { margin:10px 0 0; color:#e9e4d8; max-width:760px; }
-    .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin-top:18px; }
-    .stat { background:#ffffff14; border:1px solid #ffffff2a; border-radius:14px; padding:10px 14px; }
-    .stat b { display:block; font-size:1.6rem; color:#f2e3b8; }
-    section { margin-top:30px; }
-    h2 { font-size:1.4rem; margin:0 0 6px; }
-    .intro { color:var(--muted); margin:0 0 14px; }
-    ol.steps { list-style:none; padding:0; margin:0; display:grid; gap:10px; counter-reset:s; }
-    ol.steps > li { counter-increment:s; background:var(--card); border:1px solid var(--line); border-radius:16px; padding:14px 16px 14px 16px; display:grid; grid-template-columns:40px 1fr; gap:12px; }
-    ol.steps > li::before { content:counter(s); display:grid; place-items:center; width:34px; height:34px; border-radius:50%; background:var(--green); color:var(--paper); font-weight:700; }
-    li h3 { margin:0; font-size:1.05rem; }
-    li p { margin:4px 0 0; color:var(--muted); font-size:.96rem; }
-    .tag { display:inline-block; font-size:.78rem; font-weight:650; padding:1px 9px; border-radius:999px; border:1px solid currentColor; margin-inline-start:6px; vertical-align:middle; }
-    .t-now { color:var(--green); } .t-wait { color:var(--warn); } .t-done { color:var(--done); }
-    .note { border-inline-start:4px solid var(--gold); background:var(--card); border-radius:12px; padding:12px 16px; color:var(--muted); }
-    .chain { display:grid; gap:8px; }
-    .chain div { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:10px 14px; }
-    .chain b { color:var(--gold); }
-    code { font-size:.88em; direction:ltr; unicode-bidi:embed; }
-    footer { margin-top:36px; color:var(--muted); font-size:.88rem; }
+    body { margin:0; background:var(--paper); color:var(--ink); font-family:-apple-system,"Geeza Pro",Arial,sans-serif; line-height:1.9; font-size:18px; }
+    main { max-width:720px; margin:auto; padding:28px 16px 60px; }
+    h1 { font-size:2rem; margin:0 0 4px; }
+    .sub { color:var(--muted); margin:0 0 24px; }
+    .box { background:var(--card); border:1px solid var(--line); border-radius:18px; padding:16px 20px; margin-bottom:18px; }
+    h2 { font-size:1.3rem; margin:0 0 8px; color:var(--green); }
+    .box.you h2 { color:var(--gold); }
+    ol { margin:0; padding-inline-start:22px; }
+    li { margin:6px 0; }
+    .small { color:var(--muted); font-size:.92rem; }
   </style>
 </head>
 <body>
 <main>
-  <div class="hero">
-    <h1>خارطة طريق مدار: ما بقي ومن عليه</h1>
-    <p>مراجعة كاملة للوحة <code>docs/PROGRESS.md</code> والكود في ١٠ جمادى الأولى ١٤٤٨ (٢١ أكتوبر ٢٠٢٦). البرمجيات من M0 إلى M6 مدمجة في <code>main</code>. ما بقي ثلاثة أنواع: عمل للوكلاء يُنجز الآن، وخطوات لا يقدر عليها إلا أنت، وعمل للوكلاء ينتظر خطوة منك.</p>
-    <div class="stats">
-      <div class="stat"><b>٣٢</b>شاشة معتمدة منك</div>
-      <div class="stat"><b>٦٥</b>شاشة مطابقة تنتظر نظرتك</div>
-      <div class="stat"><b>١٥</b>إصلاح تجربة ينتظر تجربتك</div>
-      <div class="stat"><b>٠</b>بطاقة «جاهزة» في الطابور</div>
-    </div>
+  <h1>خارطة طريق مدار</h1>
+  <p class="sub">التطبيق مبني كله تقريبًا. هذا ما بقي، باختصار.</p>
+
+  <div class="box you">
+    <h2>عليك أنت (٤ أشياء فقط)</h2>
+    <ol>
+      <li><b>اشترك في Apple Developer</b> (٩٩ دولارًا في السنة)، وأعطني رقم الفريق (Team ID). هذه أهم خطوة، فبدونها لا يُثبَّت مدار على جوالك.</li>
+      <li><b>وصّل جوالك</b> وافتح قفله وقت التجربة. التجارب نفسها أجريها أنا.</li>
+      <li><b>جرّب التطبيق</b> وقل لي ما لا يعجبك فقط.</li>
+      <li><b>أعطني بريدًا للتواصل</b>، وقل «انشر» حين تريد رفعه للمتجر.</li>
+    </ol>
   </div>
 
-  <section>
-    <h2>أولًا: على الوكلاء الآن (لا يحتاج جوالك ولا حسابك)</h2>
-    <p class="intro">يبدأ Claude بهذه الخطوات في هذه الجلسة بالترتيب، ثم يكملها Codex أو Claude في الجلسات التالية.</p>
-    <ol class="steps">
-      <li><div><h3>كل تاريخ يظهر بالتقويمين <span class="tag t-now">الآن</span></h3><p>بقيت أماكن صغيرة تعرض تقويمًا واحدًا: تاريخ حفظ الأنماط، وتواريخ محاور الرسوم الصغيرة. تُصلح بنفس مكوّن التاريخين المستخدم في بقية مدار. تواريخ النسخ الاحتياطي والمزامنة ضمن منطقة مجمّدة، فلا تُلمس إلا إذا فككت التجميد.</p></div></li>
-      <li><div><h3>جولة «أعمق وأحسن» على الغرف <span class="tag t-now">الآن</span></h3><p>الصلاة والقرآن واليوميات والبهو والعادات والمال والمحبرة: نصوص أوضح، وحالات فارغة أفضل، وتكرار أقل. كل لمسة لها صف في <code>DECISIONS.md</code> مع صورة قبل وبعد.</p></div></li>
-      <li><div><h3>تحويل قائمة الفحص اليدوي (٤٬٣٥٢ سطرًا) إلى فحوص فعلية <span class="tag t-now">على دفعات</span></h3><p>الماسح الحالي يدرج كل سطر واجهة فيه خط أو لون أو إجراء متغيّر، ولا يحكم عليه. ليست أعطالًا، لكنها شرط لإغلاق M7. الخطة: فحص آلي لأزواج الألوان المعتمدة والحد الأدنى للخط (١١ نقطة)، ثم مراجعة ما يبقى غرفةً غرفة بأعداد حقيقية، دون قبول جماعي.</p></div></li>
-      <li><div><h3>تحويل PDF إلى EPUB في المحبرة: مقترح النطاق <span class="tag t-now">تجهيز فقط</span></h3><p>يُعد Claude مقترحًا: ما يدخل v1 وما يؤجل إلى v2، مع اختبار عيّنات عربية. لا يُبنى قبل قرارك (البند ٤ في قسمك).</p></div></li>
-      <li><div><h3>الوضع الداكن <span class="tag t-now">على دفعات</span></h3><p>لقطات الشاشات المهمة في الوضع الداكن على المحاكي، ثم إصلاح أي تباين أو لون خارج الأزواج المعتمدة.</p></div></li>
-      <li><div><h3>صفحات الدعم والخصوصية <span class="tag t-done">جاهزة محليًا</span></h3><p>جاهزة في <code>Madar/Distribution</code>. ينقصها بريد التواصل منك، وإذن النشر.</p></div></li>
+  <div class="box">
+    <h2>علينا (Claude وCodex)، ونعمل عليه الآن</h2>
+    <ol>
+      <li>نتأكد أن كل تاريخ يظهر بالهجري والميلادي.</li>
+      <li>نتأكد أن لا نص يصغر تحت الحد المسموح.</li>
+      <li>نحسّن الشاشات غرفةً غرفة.</li>
+      <li>نراجع الوضع الداكن.</li>
     </ol>
-    <p class="note">مقبول ومعروف: قصّ زر التفاصيل في بطاقة الورق عند عنوان طويل جدًا. فشلت فيه محاولتان، فبقي مسجّلًا كقيد ولن تتكرر المحاولة دون فكرة جديدة.</p>
-  </section>
+  </div>
 
-  <section>
-    <h2>ثانيًا: عليك أنت بالضبط</h2>
-    <p class="intro">مرتبة حسب ما يفتح أكبر قدر من العمل. لا شيء منها يوقف التطوير، لكن البندين ١ و٢ يقفلان بقية M7.</p>
-    <ol class="steps">
-      <li><div><h3>الاشتراك في Apple Developer Program <span class="tag t-wait">يفتح أكثر شيء</span></h3><p>٩٩ دولارًا في السنة بحسابك. أعطنا بعدها <b>Team ID</b> فقط، دون كلمة مرور أو رمز تحقق. الحساب الشخصي المجاني الحالي لا يسمح بمجموعة <code>group.com.alqzan.madar2</code> التي يتشارك بها التطبيق والودجت. لهذا توقّف التثبيت على جوالك (الخطوة ١٠).</p></div></li>
-      <li><div><h3>جوالك متصل ومفتوح وقت التجربة <span class="tag t-wait">بعد البند ١</span></h3><p>iPhone 15 Pro Max بنظام iOS 27.0.1، وقد فُعّل فيه Developer Mode. التجارب نفسها يجريها الوكيل. منك فقط الاتصال، وفتح القفل، وبصمة الوجه عند طلبها.</p></div></li>
-      <li><div><h3>نظرة على الشاشات <span class="tag t-wait">متى ما ناسبك</span></h3><p>٦٥ شاشة مطابقة للتصميم و١٥ إصلاحًا من تجربتك في ١٥ أكتوبر تنتظر رأيك. أنت وحدك من يضع «معتمد». افتح المعرض <code>Madar/Artifacts/review/madar-ui-review.html</code> أو جرّب التطبيق، وقل لنا ما لا يعجبك فقط. المال (٢٩) والمحبرة (١٨) واليوميات (١٦) أكثرها.</p></div></li>
-      <li><div><h3>خمسة قرارات <span class="tag t-wait">دفعة واحدة</span></h3><p>
-        أ) تحويل PDF إلى EPUB: هل يدخل v1 أم v2؟ بعد مقترح Claude.<br>
-        ب) المناطق المجمّدة: النسخ الاحتياطي المشفّر، وإخفاء المحتوى في مبدّل التطبيقات، والمزامنة، وفحص التباين. نتركها مجمّدة لـ v1، أم يُفك تجميد واحد منها؟<br>
-        ج) مراجعة القرآن (البند ١٣): هل ما زال اليوم «رتيبًا» بعد السحب بالإصبع و«ابدأ بها الآن» والتكيّف مع المستوى؟<br>
-        د) أشكال المكتب البديلة في المحبرة (الحديث والمخطوط والمركّز): مؤجلة إلى v2 حسب المواصفة. نُبقيها كذلك؟<br>
-        هـ) السماح بتنزيل محاكي iOS 27 من Apple (عدة غيغابايت)، ليختبر الوكيل ميزات iOS 27 قبل جوالك.</p></div></li>
-      <li><div><h3>بريد تواصل وإذن نشر صفحتي الدعم والخصوصية <span class="tag t-wait">قبل المتجر</span></h3><p>بريد يظهر لمراجعي Apple وللمستخدمين، ومكان النشر (مثل GitHub Pages)، وموافقتك. أجّلته في ٢٠ أكتوبر، وما زال مؤجلًا.</p></div></li>
-      <li><div><h3>App Store Connect والنشر <span class="tag t-wait">آخر شيء</span></h3><p>إنشاء سجل التطبيق، وإذن رفع نسخة TestFlight، ثم إذن الإرسال للمراجعة. لا يُرفع ولا يُنشر شيء دون كلمة منك.</p></div></li>
+  <div class="box">
+    <h2>بعد خطوتك الأولى مباشرة</h2>
+    <ol>
+      <li>أثبّت مدار على جوالك وأختبر كل غرفة عليه.</li>
+      <li>أجهّز صور المتجر وصفحتي الدعم والخصوصية.</li>
+      <li>أرفعه للمتجر بعد كلمتك.</li>
     </ol>
-  </section>
+  </div>
 
-  <section>
-    <h2>ثالثًا: عمل الوكلاء الذي ينتظر خطوة منك</h2>
-    <p class="intro">كل خطوة منك تفتح دفعة عمل يكملها الوكيل فورًا.</p>
-    <div class="chain">
-      <div><b>بعد Team ID:</b> ضبط التوقيع للتطبيق والودجت، ثم تثبيت مدار على جوالك واختبار تشغيله (الخطوة ١٠). لا تُفتح بياناتك الحقيقية ولا تُنقل.</div>
-      <div><b>بعد التثبيت:</b> بوابات الغرف على الجهاز (M1 حتى M6): بصمة الوجه، والإشعارات الحقيقية مع حرمة الصلاة، والودجات وأزرار التحكم وLive Activities، والميكروفون، والأداء في نسخة Release، وiOS 27 على الجهاز.</div>
-      <div><b>بعد البوابات:</b> إعادة توليد معرض المراجعة بلقطات جديدة، ثم لقطات المتجر من نسخة موقّعة.</div>
-      <div><b>بعد بريد التواصل وإذنك:</b> وضع البريد في صفحتي الدعم والخصوصية، ونشرهما، وإدخال روابطهما في بيانات المتجر.</div>
-      <div><b>بعد إذن تنزيل محاكي iOS 27:</b> اختبار ودجت iOS 27 والميزات المحمية بـ <code>#available</code> على المحاكي.</div>
-    </div>
-  </section>
+  <div class="box">
+    <h2>أسئلة لك، أجب متى شئت (لا توقف العمل)</h2>
+    <ol>
+      <li>تحويل ملفات PDF إلى كتب منسابة: نضيفه الآن أو لاحقًا؟</li>
+      <li>النسخ الاحتياطي المشفّر والمزامنة: نتركها لنسخة لاحقة؟</li>
+      <li>مراجعة القرآن: هل ما زالت متعبة بعد التعديلات؟</li>
+      <li>تسمح لي بتنزيل محاكي iOS 27 من Apple (حجمه كبير)؟</li>
+    </ol>
+  </div>
 
-  <footer>المصدر: <code>docs/PROGRESS.md</code> (اللوحة الوحيدة للحالة) و<code>docs/OWNER-RUNBOOK.md</code> لخطوات الحساب والتوقيع. تحدَّث هذه الصفحة عند تغيّر الخارطة نفسها فقط.</footer>
+  <p class="small">التفاصيل الكاملة في docs/PROGRESS.md.</p>
 </main>
 </body>
 </html>
