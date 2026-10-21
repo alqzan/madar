@@ -6,6 +6,49 @@ import MadarData
 @testable import MadarCommands
 
 @MainActor struct MoneyGoalTests {
+    @Test func goalPreparationUsesOnlyConfirmedNetRefundsAndOmitsZeroExpenses() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "MoneyGoalRefunds-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root), context = ModelContext(container)
+        let now = ISO8601DateFormatter().date(from: "2026-10-21T12:00:00+03:00")!
+        let settings = try SettingsStore(context: context); _ = try settings.stage(["core.dayStart": .string("midnight")])
+
+        let partiallyRefunded = MoneyTransaction()
+        partiallyRefunded.reviewState = "ok"; partiallyRefunded.kind = "expense"; partiallyRefunded.merchant = "جزئي"
+        partiallyRefunded.homeAmountMinor = 10_000; partiallyRefunded.eventAt = now; partiallyRefunded.dayKey = "2026-10-21"
+        context.insert(partiallyRefunded)
+
+        for amount in [2_500, 1_500] {
+            let refund = MoneyTransaction()
+            refund.reviewState = "ok"; refund.kind = "refund"; refund.relatedTransactionID = partiallyRefunded.id
+            refund.homeAmountMinor = amount; refund.eventAt = now.addingTimeInterval(60); refund.dayKey = "2026-10-21"
+            context.insert(refund)
+        }
+        let unconfirmedRefund = MoneyTransaction()
+        unconfirmedRefund.reviewState = "needsLook"; unconfirmedRefund.kind = "refund"
+        unconfirmedRefund.relatedTransactionID = partiallyRefunded.id; unconfirmedRefund.homeAmountMinor = 10_000
+        context.insert(unconfirmedRefund)
+
+        let fullyRefunded = MoneyTransaction()
+        fullyRefunded.reviewState = "ok"; fullyRefunded.kind = "expense"; fullyRefunded.homeAmountMinor = 5_000
+        fullyRefunded.eventAt = now.addingTimeInterval(-60); fullyRefunded.dayKey = "2026-10-21"
+        context.insert(fullyRefunded)
+        let fullRefund = MoneyTransaction()
+        fullRefund.reviewState = "ok"; fullRefund.kind = "refund"; fullRefund.relatedTransactionID = fullyRefunded.id
+        fullRefund.homeAmountMinor = 5_000; fullRefund.eventAt = now; fullRefund.dayKey = "2026-10-21"
+        context.insert(fullRefund)
+
+        let zero = MoneyTransaction()
+        zero.reviewState = "ok"; zero.kind = "expense"; zero.eventAt = now.addingTimeInterval(-120); zero.dayKey = "2026-10-21"
+        context.insert(zero)
+        try context.save()
+
+        let reading = try MoneyRepository(context: ModelContext(container)).goalPreparation(at: now)
+        #expect(reading.paid.map(\.id) == [partiallyRefunded.id])
+        #expect(reading.paid.first?.amountMinor == 6_000)
+        #expect(reading.paid.first?.title == "جزئي")
+    }
+
     @Test func oneGoalBalancedFundingExactDailyCapAndUndo() async throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "MoneyGoal-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }

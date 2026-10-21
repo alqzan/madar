@@ -24,9 +24,12 @@ extension MoneyRepository {
             return allocations.filter { ($0.target == role && $0.targetID == nil) || $0.targetID.map(ids.contains) == true }.reduce(0) { $0 + $1.amountMinor }
         }
         let movements = try confirmedTransactions()
-        let paid = movements.filter { $0.kind == "expense" && $0.homeAmountMinor != nil }.sorted { $0.eventAt > $1.eventAt }.compactMap { row -> MoneyGoalReading.Paid? in
-            let returned = movements.filter { $0.kind == "refund" && $0.relatedTransactionID == row.id }.reduce(0) { $0 + ($1.homeAmountMinor ?? 0) }
-            let net = max(0, (row.homeAmountMinor ?? 0) - returned)
+        let returnsByTransaction = movements.reduce(into: [UUID: Int]()) { totals, row in
+            guard row.kind == "refund", let originalID = row.relatedTransactionID else { return }
+            totals[originalID, default: 0] += row.homeAmountMinor
+        }
+        let paid = movements.filter { $0.kind == "expense" }.sorted { $0.eventAt > $1.eventAt }.compactMap { row -> MoneyGoalReading.Paid? in
+            let net = max(0, row.homeAmountMinor - (returnsByTransaction[row.id] ?? 0))
             return net == 0 ? nil : .init(id: row.id, title: row.merchant ?? "مصروف مسجل", amountMinor: net, dayKey: row.dayKey)
         }
         let daily = max(0, cycle?.headline.todayAllowanceMinor ?? 0), surplus = balance("surplus"), reserve = balance("reserve")
