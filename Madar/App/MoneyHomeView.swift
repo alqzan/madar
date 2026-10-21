@@ -142,7 +142,7 @@ struct MoneyHomeView: View {
             HStack(alignment: .firstTextBaseline) {
                 Text("اليوم").font(MadarTypography.section())
                 Spacer()
-                Text("صرفت " + amount(cycle.headline.todaySpentMinor) + " من " + amount(cycle.headline.todayAllowanceMinor))
+                Text(figure: "صرفت " + amount(cycle.headline.todaySpentMinor) + " من " + amount(cycle.headline.todayAllowanceMinor))
                     .font(MadarTypography.body()).accessibilityIdentifier("money-today")
             }
             HStack(alignment: .center) {
@@ -161,10 +161,10 @@ struct MoneyHomeView: View {
                 }
             }
             if let over = cycle.headline.overTodayMinor {
-                Text("تجاوزت يومك بـ" + amount(over)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-over-today")
+                Text(figure: "تجاوزت يومك بـ" + amount(over)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-over-today")
             }
             if let over = cycle.headline.overCycleMinor {
-                Text("تجاوزت استحقاق الدورة بـ" + amount(over)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-over-cycle")
+                Text(figure: "تجاوزت استحقاق الدورة بـ" + amount(over)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-over-cycle")
             }
             if !amountsVisible {
                 Button("أظهر الأرقام") { revealed = true }.font(MadarTypography.caption()).frame(minHeight: 44).accessibilityIdentifier("money-reveal")
