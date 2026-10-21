@@ -15,7 +15,8 @@ struct MoneyZakatScale: View {
             let left = CGPoint(x: 45, y: center.y - shift), right = CGPoint(x: w-45, y: center.y+shift)
             ZStack {
                 Path { p in p.move(to:CGPoint(x:30,y:232));p.addLine(to:CGPoint(x:30,y:82));p.addQuadCurve(to:CGPoint(x:w/2,y:15),control:CGPoint(x:50,y:30));p.addQuadCurve(to:CGPoint(x:w-30,y:82),control:CGPoint(x:w-50,y:30));p.addLine(to:CGPoint(x:w-30,y:232));p.closeSubpath() }.fill(theme.background.opacity(0.5))
-                Path { p in p.move(to:CGPoint(x:30,y:232));p.addLine(to:CGPoint(x:30,y:82));p.addQuadCurve(to:CGPoint(x:w/2,y:15),control:CGPoint(x:50,y:30));p.addQuadCurve(to:CGPoint(x:w-30,y:82),control:CGPoint(x:w-50,y:30));p.addLine(to:CGPoint(x:w-30,y:232));p.closeSubpath() }.stroke(theme.color("reserveText"),lineWidth:0.7)
+                // Keep the arch outline open at its foot; its closing edge crossed the balance labels below.
+                Path { p in p.move(to:CGPoint(x:30,y:232));p.addLine(to:CGPoint(x:30,y:82));p.addQuadCurve(to:CGPoint(x:w/2,y:15),control:CGPoint(x:50,y:30));p.addQuadCurve(to:CGPoint(x:w-30,y:82),control:CGPoint(x:w-50,y:30));p.addLine(to:CGPoint(x:w-30,y:232)) }.stroke(theme.color("reserveText"),lineWidth:0.7)
                 Path { p in p.move(to:center);p.addLine(to:CGPoint(x:w/2,y:222));p.move(to:left);p.addLine(to:right) }.stroke(theme.ink,style: .init(lineWidth:3,lineCap:.round))
                 Path { p in p.move(to:CGPoint(x:w/2-27,y:220));p.addLine(to:CGPoint(x:w/2+27,y:220));p.addLine(to:CGPoint(x:w/2+39,y:234));p.addLine(to:CGPoint(x:w/2-39,y:234));p.closeSubpath() }.fill(theme.color("reserveText"))
                 pan(left, coin: false); pan(right, coin: true)
