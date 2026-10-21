@@ -176,12 +176,14 @@ struct MihbaraBookSpine: View {
     let digits: MadarNumberFormatter
     /// Zero-based volume of a set; nil for a single book.
     var volume: Int? = nil
+    /// A finished book lying on its side keeps its title along the length.
+    var lying = false
     @Environment(\.roomTheme) private var theme
 
     static func size(pagesPerVolume pages: Int?) -> CGSize {
-        guard let pages, pages > 0 else { return .init(width: 34, height: 162) }
+        guard let pages, pages > 0 else { return .init(width: 44, height: 162) }
         let p = Double(pages)
-        return .init(width: 24 + min(26, 5.5 * log2(max(1, p / 50))), height: 148 + min(36, 8.5 * log2(max(1, p / 60))))
+        return .init(width: 40 + min(22, 4.6 * log2(max(1, p / 50))), height: 148 + min(36, 8.5 * log2(max(1, p / 60))))
     }
 
     var body: some View {
@@ -198,12 +200,28 @@ struct MihbaraBookSpine: View {
                 .background(fill)
             VStack(spacing: 0) {
                 bands(ink).padding(.top, 12)
-                Text(title)
-                    .font(.custom("thmanyahserifdisplay-Bold", size: size.width < 32 ? 13 : 15, relativeTo: .caption))
-                    .lineLimit(size.width < 40 ? 1 : 2).minimumScaleFactor(size.width < 32 ? 1 : 11 / 15).multilineTextAlignment(.center)
-                    .frame(width: size.height - 72, height: size.width - 6)
-                    .rotationEffect(.degrees(90))
-                    .frame(width: size.width, height: size.height - 72)
+                if lying {
+                    Text(title)
+                        .font(.custom("thmanyahserifdisplay-Bold", size: 15, relativeTo: .caption))
+                        .lineLimit(1).minimumScaleFactor(11 / 15).multilineTextAlignment(.center)
+                        .frame(width: size.height - 72, height: size.width - 6)
+                        .rotationEffect(.degrees(90))
+                        .frame(width: size.width, height: size.height - 72)
+                } else {
+                    // Owner, 21 Oct 2026: as on printed sets, the title runs across the spine, a word to a line,
+                    // on a framed label near the head.
+                    let words = title.split(separator: " ").prefix(4).map(String.init)
+                    VStack(spacing: 1) {
+                        ForEach(Array(words.enumerated()), id: \.offset) { _, word in
+                            Text(word).font(.custom("thmanyahserifdisplay-Bold", size: size.width >= 50 ? 14 : 13, relativeTo: .caption))
+                                .lineLimit(1).minimumScaleFactor(11 / 13)
+                        }
+                    }
+                    .padding(.vertical, 7).frame(width: size.width - 8)
+                    .background(.black.opacity(0.16))
+                    .overlay { Rectangle().stroke(ink.opacity(0.5), lineWidth: 0.8) }
+                    .padding(.top, 10)
+                }
                 Spacer(minLength: 0)
                 bands(ink)
                 // A set's volume number sits on a gilt label, as on a printed multi-volume set.

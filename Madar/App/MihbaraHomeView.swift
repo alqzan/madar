@@ -266,7 +266,7 @@ struct MihbaraHomeView: View {
         let size = MihbaraBookSpine.size(pagesPerVolume: shape?.pages.map { $0 / max(1, shape?.volumes ?? 1) } ?? item.book.pages)
         let seed = item.key.unicodeScalars.reduce(0) { ($0 &* 31 &+ Int($1.value)) % 9973 }
         let tilt = Double(seed % 7) - 3, shift = CGFloat(seed % 13) - 6
-        return MihbaraBookSpine(book: item.book, shape: shape, leather: leather, digits: service.digits, volume: item.volume)
+        return MihbaraBookSpine(book: item.book, shape: shape, leather: leather, digits: service.digits, volume: item.volume, lying: true)
             .rotationEffect(.degrees(-90))
             .frame(width: size.height, height: size.width)
             .rotationEffect(.degrees(tilt)).offset(x: shift)
