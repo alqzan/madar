@@ -3,173 +3,96 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>مدار ٢٫٠ — خارطة الطريق والقرارات</title>
+  <title>خارطة طريق مدار</title>
   <style>
-    :root { color-scheme: light; --paper:#f7f4ec; --card:#fffdf8; --ink:#213a32; --muted:#6e6b60; --gold:#9a7942; --line:#dfd7c7; --green:#244b40; --sand:#eee6d5; --warn:#8d6425; }
+    :root { --paper:#f7f4ec; --card:#fffdf8; --ink:#213a32; --muted:#5f5c52; --gold:#9a7942; --line:#dfd7c7; --green:#244b40; --warn:#7a5520; --done:#344e6b; }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --paper:#14201c; --card:#1c2a25; --ink:#e8e2d2; --muted:#b9b3a3; --gold:#d2b47a; --line:#33443d; --green:#9cc9b4; --warn:#e2bf86; --done:#a9c3e0; } }
+    :root[data-theme="dark"] { --paper:#14201c; --card:#1c2a25; --ink:#e8e2d2; --muted:#b9b3a3; --gold:#d2b47a; --line:#33443d; --green:#9cc9b4; --warn:#e2bf86; --done:#a9c3e0; }
     * { box-sizing:border-box; }
-    html { scroll-behavior:smooth; }
-    body { margin:0; background:var(--paper); color:#34362f; font-family:-apple-system,BlinkMacSystemFont,"Geeza Pro","Noto Naskh Arabic",Arial,sans-serif; line-height:1.75; }
-    main { max-width:1120px; margin:auto; padding:32px 22px 72px; }
-    .hero { padding:34px clamp(22px,5vw,58px); color:#fffaf1; border-radius:28px; background:linear-gradient(125deg,#183d35,#356352); box-shadow:0 14px 38px #263c301c; position:relative; overflow:hidden; }
-    .hero:after { content:""; position:absolute; width:310px; height:310px; border:1px solid #ffffff22; border-radius:50%; left:-90px; top:-140px; box-shadow:0 0 0 30px #ffffff0c,0 0 0 62px #ffffff08; }
-    .eyebrow { color:#d9c79c; font-size:.9rem; letter-spacing:.02em; margin:0 0 5px; }
-    h1 { margin:0; font-size:clamp(2rem,5vw,3.2rem); line-height:1.25; }
-    .hero p:last-of-type { max-width:760px; margin:14px 0 0; color:#e9e4d8; }
-    .stamp { display:inline-flex; align-items:center; gap:8px; margin-top:18px; padding:5px 13px; border:1px solid #ffffff45; border-radius:999px; color:#f2e8d2; font-size:.88rem; }
-    section { margin-top:28px; }
-    h2 { color:var(--ink); font-size:1.45rem; margin:0 0 14px; }
-    h3 { color:var(--ink); margin:0 0 6px; font-size:1.08rem; }
-    p { margin:6px 0; }
-    .intro { color:var(--muted); margin-top:-8px; }
-    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(245px,1fr)); gap:14px; }
-    .card { background:var(--card); border:1px solid var(--line); border-radius:18px; padding:18px; box-shadow:0 4px 16px #41351a08; }
-    .card p { color:#54564e; font-size:.96rem; }
-    .tag { display:inline-block; padding:2px 10px; border-radius:999px; background:#e5eee7; color:#315c4a; font-size:.8rem; font-weight:650; margin-bottom:8px; }
-    .tag.wait { color:var(--warn); background:#f6edda; }
-    .tag.done { color:#344e6b; background:#e8eef5; }
-    .notice { border-right:4px solid var(--gold); background:#f1eadb; border-radius:12px; padding:14px 17px; color:#4e493d; }
-    .tree { background:var(--card); border:1px solid var(--line); border-radius:22px; padding:14px; text-align:center; overflow:hidden; }
-    .tree img { width:min(100%,900px); height:auto; display:block; margin:auto; }
-    .tree a { color:var(--green); }
-    .milestones { display:grid; gap:10px; }
-    .mile { display:grid; grid-template-columns:76px 1fr; align-items:start; gap:13px; background:var(--card); border:1px solid var(--line); border-radius:16px; padding:14px 16px; }
-    .mile .num { color:var(--green); font-weight:800; font-size:1.07rem; padding-top:2px; }
-    .mile p { margin:0; color:#5b5c53; font-size:.94rem; }
-    .steps { list-style:none; counter-reset:work; padding:0; display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:10px; }
-    .steps li { counter-increment:work; background:#fffdf8; border:1px solid var(--line); border-radius:14px; padding:13px 15px; }
-    .steps li:before { content:counter(work); display:inline-grid; place-items:center; width:26px; height:26px; margin-left:8px; border-radius:50%; background:#e8dfca; color:var(--green); font-weight:750; }
-    .decisions { display:grid; gap:12px; }
-    .decision { background:#fffaf0; border:1px dashed #c9ae79; border-radius:17px; padding:17px 19px; }
-    .decision strong { color:#654c22; }
-    .gallery { display:grid; grid-template-columns:repeat(auto-fit,minmax(185px,1fr)); gap:12px; }
-    figure { margin:0; border:1px solid var(--line); border-radius:15px; overflow:hidden; background:var(--card); }
-    figure img { display:block; width:100%; aspect-ratio:4/5; object-fit:cover; object-position:top; background:#e9e4da; }
-    figcaption { padding:10px 11px 12px; font-size:.88rem; line-height:1.45; }
-    figcaption a { color:#35604e; text-decoration:none; }
-    figcaption a:hover { text-decoration:underline; }
-    .tiny { display:block; color:#787468; font-size:.76rem; margin-top:4px; }
-    .links { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
-    .links a { color:#315c4a; text-decoration:none; border:1px solid #d4c9b2; border-radius:999px; padding:2px 10px; font-size:.8rem; }
-    .links a:hover { background:#eee8d9; }
-    .footer { color:#716d61; border-top:1px solid var(--line); margin-top:34px; padding-top:15px; font-size:.88rem; }
-    code { direction:ltr; unicode-bidi:isolate; font-size:.9em; background:#eeeade; border-radius:5px; padding:1px 4px; }
-    @media print { body { background:#fff; } main { max-width:none; padding:0; } .hero,.card,.mile,.decision,.tree { box-shadow:none; break-inside:avoid; } .gallery { grid-template-columns:repeat(4,1fr); } a { color:inherit; } }
+    body { margin:0; background:var(--paper); color:var(--ink); font-family:-apple-system,"Geeza Pro","Noto Naskh Arabic",Arial,sans-serif; line-height:1.8; }
+    main { max-width:1060px; margin:auto; padding:28px 16px 64px; }
+    .hero { padding:28px clamp(18px,5vw,48px); color:#fffaf1; border-radius:24px; background:linear-gradient(125deg,#183d35,#356352); }
+    .hero h1 { margin:0; font-size:clamp(1.8rem,5vw,2.8rem); line-height:1.3; }
+    .hero p { margin:10px 0 0; color:#e9e4d8; max-width:760px; }
+    .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin-top:18px; }
+    .stat { background:#ffffff14; border:1px solid #ffffff2a; border-radius:14px; padding:10px 14px; }
+    .stat b { display:block; font-size:1.6rem; color:#f2e3b8; }
+    section { margin-top:30px; }
+    h2 { font-size:1.4rem; margin:0 0 6px; }
+    .intro { color:var(--muted); margin:0 0 14px; }
+    ol.steps { list-style:none; padding:0; margin:0; display:grid; gap:10px; counter-reset:s; }
+    ol.steps > li { counter-increment:s; background:var(--card); border:1px solid var(--line); border-radius:16px; padding:14px 16px 14px 16px; display:grid; grid-template-columns:40px 1fr; gap:12px; }
+    ol.steps > li::before { content:counter(s); display:grid; place-items:center; width:34px; height:34px; border-radius:50%; background:var(--green); color:var(--paper); font-weight:700; }
+    li h3 { margin:0; font-size:1.05rem; }
+    li p { margin:4px 0 0; color:var(--muted); font-size:.96rem; }
+    .tag { display:inline-block; font-size:.78rem; font-weight:650; padding:1px 9px; border-radius:999px; border:1px solid currentColor; margin-inline-start:6px; vertical-align:middle; }
+    .t-now { color:var(--green); } .t-wait { color:var(--warn); } .t-done { color:var(--done); }
+    .note { border-inline-start:4px solid var(--gold); background:var(--card); border-radius:12px; padding:12px 16px; color:var(--muted); }
+    .chain { display:grid; gap:8px; }
+    .chain div { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:10px 14px; }
+    .chain b { color:var(--gold); }
+    code { font-size:.88em; direction:ltr; unicode-bidi:embed; }
+    footer { margin-top:36px; color:var(--muted); font-size:.88rem; }
   </style>
 </head>
 <body>
 <main>
-  <header class="hero">
-    <p class="eyebrow">مدار ٢٫٠ · لوحة طريق العمل</p>
-    <h1>وش أشتغل عليه، وش بعده؟</h1>
-    <p>هذه خريطة تنفيذ من حالة المشروع الحالية إلى التكامل النهائي. توضح ما أُنجز، وما ينتظر قرارك، وترتيب المراحل. لوحة الحالة الرسمية تبقى <code>docs/PROGRESS.md</code>.</p>
-    <span class="stamp">آخر لقطة للحالة: ١٣ أكتوبر ٢٠٢٦ · الفرع main</span>
-  </header>
-
-  <section>
-    <h2>الحالة الآن</h2>
-    <div class="grid">
-      <article class="card">
-        <span class="tag">العمل الحالي</span>
-        <h3>M2-RQ2 · تدقيق محرك القرآن مكتمل</h3>
-        <p>قرأت المصدر القديم عند commit المثبّت ودوّنت معادلات الجدولة والسقف والاختبار الذكي، وصنّفت ملفات اختبارات القرآن الاثني عشر. أضفت التدقيق إلى المواصفة ونسخة العمل.</p>
-        <p><strong>تصحيح مهم:</strong> شاشة R18-Home ليست شاشة عاملة في التطبيق؛ ملفها مستبعد من الهدف ولا توجد خدمة أو وجهة تنقّل للقرآن. لا أضع بيانات نموذجية مكان الأرقام الحقيقية. قبل بناء الشاشة يلزم تأسيس مسار البيانات والواجهة، وقبل المحرك تُحسم دلالة <code>PageSchedule.stage</code> وهدف RQ1 والترخيص.</p>
-      </article>
-      <article class="card">
-        <span class="tag wait">جزئي؛ مسار النشاط الحيّ متوقف تقنيًا</span>
-        <h3>M1-F04 · الاختصارات وControl</h3>
-        <p>الاختصار وControl يكتبان أمرًا مؤرخًا إلى <code>PendingInbox</code>، والتطبيق وحده يفتح SwiftData. Control يحسب يوم الصلاة من لقطة أوقات حديثة ويرفض وقتًا مستقبليًا.</p>
-        <p><strong>العالق:</strong> RL5 يطلب بدءًا من <code>LiveActivityIntent</code> يحترم ميزانية الجهاز. سجل الميزانية حاليًا في SwiftData، والتوسعة لا تفتح المخزن (RA2)، لذلك يلزم تصميم حجز مشترك ذري قبل التنفيذ. إعداد RP9 مخفي افتراضيًا؛ وفحوص الجهاز تنتظر iPhone.</p>
-      </article>
-      <article class="card">
-        <span class="tag wait">بانتظار قرارك</span>
-        <h3>M1-F05 · سجل الصلاة القديم</h3>
-        <p>المعاينة الاصطناعية للقراءة فقط جاهزة. المصدر لا يملك وقت الأذان والمنطقة الزمنية أو وقت إتمام القضاء؛ لم أفتح مخزن بياناتك ولم أبدأ الاستيراد.</p>
-        <p>تحتاج هذه البطاقة سياسة وقت الحدث والمنطقة ومصدرًا موثوقًا لوقت القضاء، أو أرشفة الصف الناقص.</p>
-      </article>
+  <div class="hero">
+    <h1>خارطة طريق مدار: ما بقي ومن عليه</h1>
+    <p>مراجعة كاملة للوحة <code>docs/PROGRESS.md</code> والكود في ١٠ جمادى الأولى ١٤٤٨ (٢١ أكتوبر ٢٠٢٦). البرمجيات من M0 إلى M6 مدمجة في <code>main</code>. ما بقي ثلاثة أنواع: عمل للوكلاء يُنجز الآن، وخطوات لا يقدر عليها إلا أنت، وعمل للوكلاء ينتظر خطوة منك.</p>
+    <div class="stats">
+      <div class="stat"><b>٣٢</b>شاشة معتمدة منك</div>
+      <div class="stat"><b>٦٥</b>شاشة مطابقة تنتظر نظرتك</div>
+      <div class="stat"><b>١٥</b>إصلاح تجربة ينتظر تجربتك</div>
+      <div class="stat"><b>٠</b>بطاقة «جاهزة» في الطابور</div>
     </div>
-    <p class="notice" style="margin-top:14px"><strong>الحالة بدقة:</strong> تدقيق M2-RQ2 مكتمل فقط؛ لا توجد شاشة قرآن مدمجة. M1 لم يُعتمد بعد؛ موافقات الشاشات وفحوص iPhone لك. تنفيذ F04 الجزئي لا يعني إقفال البطاقة. حالة التسليم المحلي والـcommit موضحة في <code>docs/PROGRESS.md</code>.</p>
-  </section>
+  </div>
 
   <section>
-    <h2>الصورة المرجعية لشاشة القرآن</h2>
-    <p class="intro">هذه هي الوجهة البصرية لـR18-Home. ملف الشاشة الموجود في المشروع غير مضمّن في هدف التطبيق، ولا توجد بيانات تشغيلية أو مقارنة فعلية لهذه اللقطة بعد.</p>
-    <figure style="max-width:360px"><a href="HANDOFF/screens/quran/03-R18-Home.jpg" target="_blank" rel="noreferrer"><img loading="lazy" src="HANDOFF/screens/quran/03-R18-Home.jpg" alt="التصميم المعتمد لشاشة القرآن الرئيسية R18-Home"></a><figcaption>R18-Home · مرجع التصميم فقط<span class="tiny">مُرفق للتوضيح. لا يعني أن الشاشة مدمجة أو مقبولة بصريًا.</span></figcaption></figure>
-  </section>
-
-  <section>
-    <h2>شجرة الطريق</h2>
-    <p class="intro">الفرع اليسار هو استمرار التنفيذ. الفرع اليمين يجمع مراجعاتك وفحوص الجهاز؛ نؤجلها الآن ولا نسجلها «مقبولة».</p>
-    <div class="tree"><a href="MADAR-ROADMAP-AR.svg" target="_blank" rel="noreferrer"><img src="MADAR-ROADMAP-AR.svg" alt="شجرة مراحل مدار من M1 إلى M7 مع مسار منفصل للقرارات والفحوص"></a></div>
-  </section>
-
-  <section>
-    <h2>ترتيب المراحل حتى التقرير الختامي</h2>
-    <div class="milestones">
-      <article class="mile"><div class="num">M1 · الصلاة</div><div><h3>العناصر التي تنتظر المالك</h3><p>اعتماد الشاشات وفحص iPhone وقرار F05 تبقى معلّقة. العمل البرمجي المنفصل لا يعني أن بوابة M1 أُغلقت.</p></div></article>
-      <article class="mile"><div class="num">M2 · القرآن</div><div><h3>تأسيس الخدمة ثم الشاشات</h3><p>تدقيق RQ2 موثق. واجهة R18-Home الحالية غير مضمّنة في التطبيق ولا تملك مصدر بيانات أو مسار تنقّل؛ لذلك أولًا نحتاج أساس التشغيل المعتمد للغرفة. تنفيذ المحرك ينتظر تعريف stage ونتيجة محاكاة RQ1، وتضمين موارد المصحف/التفسير ينتظر الترخيص. بعد ذلك تُنفذ المراجع الـ١٩ بترتيب اللوحة.</p></div></article>
-      <article class="mile"><div class="num">M3 · اليوميات</div><div><h3>بناء مسارات اليوميات حسب اللوحة</h3><p>أحوّل مواصفات هذه المرحلة إلى بطاقات عند دخول دورها، وأعمل حسب ترتيب الشاشات والحالات المعتمدة.</p></div></article>
-      <article class="mile"><div class="num">M4 · الردهة</div><div><h3>الردهة والعادات والودجات</h3><p>بناء ما هو متاح في v1 فقط، وربط كل رقم بغرفته المالكة ومصادر JSON المعتمدة للودجات.</p></div></article>
-      <article class="mile"><div class="num">M5 · المال</div><div><h3>المبالغ والميزانيات والتدفقات</h3><p>تنفيذ البطاقات حسب الدور، مع حفظ المبالغ بوحدات minor integer، وإبقاء الحسابات متسقة مع تعريفاتها في المواصفة.</p></div></article>
-      <article class="mile"><div class="num">M6 · المِهبرة</div><div><h3>الرف والقراءة والاستيراد</h3><p>تنفيذ مسارات الكتب والقراءة بعد التحقق من الأصول والتراخيص التي تخص هذه المرحلة.</p></div></article>
-      <article class="mile"><div class="num">M7 · الإقفال</div><div><h3>تكامل نهائي ثم تقرير مبني على الأدلة</h3><p>حل عيوب التكامل، تشغيل بوابات M7 المطلوبة، توثيق ما ثبت فقط، وإظهار ما بقي غير مختبر. قبول الآيفون والتوزيع لا يُعلنان قبل حصولهما فعلًا.</p></div></article>
-    </div>
-  </section>
-
-  <section>
-    <h2>كيف أنفذ كل بطاقة؟</h2>
+    <h2>أولًا: على الوكلاء الآن (لا يحتاج جوالك ولا حسابك)</h2>
+    <p class="intro">يبدأ Claude بهذه الخطوات في هذه الجلسة بالترتيب، ثم يكملها Codex أو Claude في الجلسات التالية.</p>
     <ol class="steps">
-      <li>أقرأ بطاقة اللوحة والجزء المحدد من المواصفة والإصلاحات فقط.</li>
-      <li>أنفذ أصغر تدفق مفيد يظهر للمستخدم، من دون إدخال ميزة v2.</li>
-      <li>أشغّل البناء والفحص الخاص بالتغيير، ولا أذكر إلا نتيجة لها خرج فعلي.</li>
-      <li>للشاشات: لقطة بالحجم الافتراضي ومقارنة بالمرجع، ثم تسجيل الفروقات.</li>
-      <li>أحدّث صف البطاقة والتسليم المختصر مع commit واحد عند اكتمال البطاقة.</li>
+      <li><div><h3>كل تاريخ يظهر بالتقويمين <span class="tag t-now">الآن</span></h3><p>بقيت أماكن صغيرة تعرض تقويمًا واحدًا: تاريخ حفظ الأنماط، وتواريخ محاور الرسوم الصغيرة. تُصلح بنفس مكوّن التاريخين المستخدم في بقية مدار. تواريخ النسخ الاحتياطي والمزامنة ضمن منطقة مجمّدة، فلا تُلمس إلا إذا فككت التجميد.</p></div></li>
+      <li><div><h3>جولة «أعمق وأحسن» على الغرف <span class="tag t-now">الآن</span></h3><p>الصلاة والقرآن واليوميات والبهو والعادات والمال والمحبرة: نصوص أوضح، وحالات فارغة أفضل، وتكرار أقل. كل لمسة لها صف في <code>DECISIONS.md</code> مع صورة قبل وبعد.</p></div></li>
+      <li><div><h3>تحويل قائمة الفحص اليدوي (٤٬٣٥٢ سطرًا) إلى فحوص فعلية <span class="tag t-now">على دفعات</span></h3><p>الماسح الحالي يدرج كل سطر واجهة فيه خط أو لون أو إجراء متغيّر، ولا يحكم عليه. ليست أعطالًا، لكنها شرط لإغلاق M7. الخطة: فحص آلي لأزواج الألوان المعتمدة والحد الأدنى للخط (١١ نقطة)، ثم مراجعة ما يبقى غرفةً غرفة بأعداد حقيقية، دون قبول جماعي.</p></div></li>
+      <li><div><h3>تحويل PDF إلى EPUB في المحبرة: مقترح النطاق <span class="tag t-now">تجهيز فقط</span></h3><p>يُعد Claude مقترحًا: ما يدخل v1 وما يؤجل إلى v2، مع اختبار عيّنات عربية. لا يُبنى قبل قرارك (البند ٤ في قسمك).</p></div></li>
+      <li><div><h3>الوضع الداكن <span class="tag t-now">على دفعات</span></h3><p>لقطات الشاشات المهمة في الوضع الداكن على المحاكي، ثم إصلاح أي تباين أو لون خارج الأزواج المعتمدة.</p></div></li>
+      <li><div><h3>صفحات الدعم والخصوصية <span class="tag t-done">جاهزة محليًا</span></h3><p>جاهزة في <code>Madar/Distribution</code>. ينقصها بريد التواصل منك، وإذن النشر.</p></div></li>
     </ol>
-    <p class="notice">عند نهاية M7 أرتب تقرير الإقفال: ما يعمل، ما اختُبر وأين، ما لم يُختبر، ما ينتظر قرارك، وما يلزم لقبول الجهاز والتوزيع. هذا الملف خريطة الطريق؛ التقرير النهائي يأتي بعد إنجاز المراحل لا قبله.</p>
+    <p class="note">مقبول ومعروف: قصّ زر التفاصيل في بطاقة الورق عند عنوان طويل جدًا. فشلت فيه محاولتان، فبقي مسجّلًا كقيد ولن تتكرر المحاولة دون فكرة جديدة.</p>
   </section>
 
   <section>
-    <h2>الأشياء التي تحتاج قرارك أو جهازك</h2>
-    <p class="intro">لن أوقف العمل المستقل بسببها، كما طلبت. أضعها هنا كي تعرف ما بقي عليك بوضوح.</p>
-    <div class="decisions">
-      <article class="decision"><strong>١ · اعتماد شاشات الصلاة:</strong> اللوحة تسجل M1-V01 إلى M1-V10 بوصفها «مطابقة بانتظار المالك»، ويضاف إليها تصميم الجمعة M1-F01. الصور أدناه هي <em>مراجع التصميم المعتمدة</em>؛ افتح «المقارنة» لمشاهدة صفحة المقارنة المحلية وما بقي من فروق. لا أعتبر أي واحدة معتمدة حتى تعتمدها أنت.</article>
-      <article class="decision"><strong>٢ · F05 وسجلات القضاء القديمة:</strong> يلزم تحديد سياسة وقت الحدث والمنطقة الزمنية للسجل ذي التاريخ فقط، وهل يمكن حفظ صف القضاء بلا <code>madeUpAt</code> (مثلًا أرشفته) أو توجد لديك معلومة موثوقة أخرى. <code>prayerUpdatedAt</code> ختم تعديل للحالة، ولا يثبت وقت الأذان أو إتمام القضاء؛ لذلك لن أستخدمه كتخمين.</article>
-      <article class="decision"><strong>٣ · فحوص الجهاز:</strong> الموقع الحقيقي والسفر في F02، ثم استدعاء الاختصار والودجات/Control والنشاط الحيّ في F04، وبعدها قبول M1 على iPhone. تحتاج هذه تحققًا على جهازك؛ نجاح build أو simulator لا يثبته.</article>
-      <article class="decision"><strong>٤ · موارد القرآن:</strong> ترخيص المصحف مغلق بتأكيد المالك. تُطابق الملفات وإصدارها وبصماتها وتُفحص سلامتها قبل التفعيل؛ التفسير مورد مستقل.</article>
-      <article class="decision"><strong>٥ · معنى <code>PageSchedule.stage</code>:</strong> النموذج الحالي يحدد ١٣ قيمة (٠–١٢)، لكن المحرك القديم لا يحتوي حقل stage. اختر معنى القيم وعلاقة درجات «جيد/يحتاج» بها، أو وافق على حذف الحقل قبل كتابة محرك M2.</article>
-      <article class="decision"><strong>٦ · قاعدة RQ1 لقرار نصف الورد:</strong> الإصلاح يلغي العتبة الثابتة القديمة <code>BACKLOG_FACTOR × cap</code> ويطلب ربط القرار بالحاجة المحسوبة، لكن لا يعرّف المقارنة الدقيقة. نحتاج تعريف القاعدة قبل المحاكاة أو اختبار المحرك؛ لا أضع صيغة من عندي.</article>
-      <article class="decision"><strong>٧ · معيار الحمل في RQ1:</strong> بعد تعريف القاعدة أعلاه، أشغّل محاكاة ٣٦٥ يومًا على ١٠٠ و٣٠٠ و٦٠٤ أوجه. حد «أيام نصف الورد ≤١٠٪» مقترح؛ أعرض لك النتيجة لتقرر إبقاءه أو تغييره.</article>
-      <article class="decision"><strong>٨ · عداد القضاء خارج التطبيق (RP9):</strong> السلوك الحالي لا يعرض أعداد القضاء خارج التطبيق، وهذا يوافق الحالة الافتراضية. لا حاجة لقرار الآن؛ إذا رغبت لاحقًا بإظهارها، نحدد opt-in وحدّ العرض قبل التنفيذ.</article>
-      <article class="decision"><strong>٨ · أتمتة Codex:</strong> آخر حالة في اللوحة أنها متوقفة. استئنافها قرار منفصل إذا أردت تشغيلها.</article>
-    </div>
+    <h2>ثانيًا: عليك أنت بالضبط</h2>
+    <p class="intro">مرتبة حسب ما يفتح أكبر قدر من العمل. لا شيء منها يوقف التطوير، لكن البندين ١ و٢ يقفلان بقية M7.</p>
+    <ol class="steps">
+      <li><div><h3>الاشتراك في Apple Developer Program <span class="tag t-wait">يفتح أكثر شيء</span></h3><p>٩٩ دولارًا في السنة بحسابك. أعطنا بعدها <b>Team ID</b> فقط، دون كلمة مرور أو رمز تحقق. الحساب الشخصي المجاني الحالي لا يسمح بمجموعة <code>group.com.alqzan.madar2</code> التي يتشارك بها التطبيق والودجت. لهذا توقّف التثبيت على جوالك (الخطوة ١٠).</p></div></li>
+      <li><div><h3>جوالك متصل ومفتوح وقت التجربة <span class="tag t-wait">بعد البند ١</span></h3><p>iPhone 15 Pro Max بنظام iOS 27.0.1، وقد فُعّل فيه Developer Mode. التجارب نفسها يجريها الوكيل. منك فقط الاتصال، وفتح القفل، وبصمة الوجه عند طلبها.</p></div></li>
+      <li><div><h3>نظرة على الشاشات <span class="tag t-wait">متى ما ناسبك</span></h3><p>٦٥ شاشة مطابقة للتصميم و١٥ إصلاحًا من تجربتك في ١٥ أكتوبر تنتظر رأيك. أنت وحدك من يضع «معتمد». افتح المعرض <code>Madar/Artifacts/review/madar-ui-review.html</code> أو جرّب التطبيق، وقل لنا ما لا يعجبك فقط. المال (٢٩) والمحبرة (١٨) واليوميات (١٦) أكثرها.</p></div></li>
+      <li><div><h3>خمسة قرارات <span class="tag t-wait">دفعة واحدة</span></h3><p>
+        أ) تحويل PDF إلى EPUB: هل يدخل v1 أم v2؟ بعد مقترح Claude.<br>
+        ب) المناطق المجمّدة: النسخ الاحتياطي المشفّر، وإخفاء المحتوى في مبدّل التطبيقات، والمزامنة، وفحص التباين. نتركها مجمّدة لـ v1، أم يُفك تجميد واحد منها؟<br>
+        ج) مراجعة القرآن (البند ١٣): هل ما زال اليوم «رتيبًا» بعد السحب بالإصبع و«ابدأ بها الآن» والتكيّف مع المستوى؟<br>
+        د) أشكال المكتب البديلة في المحبرة (الحديث والمخطوط والمركّز): مؤجلة إلى v2 حسب المواصفة. نُبقيها كذلك؟<br>
+        هـ) السماح بتنزيل محاكي iOS 27 من Apple (عدة غيغابايت)، ليختبر الوكيل ميزات iOS 27 قبل جوالك.</p></div></li>
+      <li><div><h3>بريد تواصل وإذن نشر صفحتي الدعم والخصوصية <span class="tag t-wait">قبل المتجر</span></h3><p>بريد يظهر لمراجعي Apple وللمستخدمين، ومكان النشر (مثل GitHub Pages)، وموافقتك. أجّلته في ٢٠ أكتوبر، وما زال مؤجلًا.</p></div></li>
+      <li><div><h3>App Store Connect والنشر <span class="tag t-wait">آخر شيء</span></h3><p>إنشاء سجل التطبيق، وإذن رفع نسخة TestFlight، ثم إذن الإرسال للمراجعة. لا يُرفع ولا يُنشر شيء دون كلمة منك.</p></div></li>
+    </ol>
   </section>
 
   <section>
-    <h2>صور شاشات الصلاة التي تنتظر اعتمادك</h2>
-    <p class="intro">اضغط أي صورة لفتح المرجع كاملًا. زر «المقارنة» يفتح مقارنة التنفيذ المحلية إن كانت موجودة. عند بعض البطاقات توجد فروق موثقة؛ المرجع وحده لا يعني أن التنفيذ مطابق بلا فروق.</p>
-    <div class="gallery">
-      <figure><a href="HANDOFF/screens/salah/01-S1-Home.jpg" target="_blank" rel="noreferrer"><img loading="lazy" src="HANDOFF/screens/salah/01-S1-Home.jpg" alt="المرجع: الصلاة الرئيسية"></a><figcaption><a href="HANDOFF/screens/salah/01-S1-Home.jpg">M1-V01 · الصلاة الرئيسية</a><span class="tiny">فرق مذكور: الخط/النجوم في القوس القادم، مقارنة النص بالمرجع.</span><div class="links"><a href="../Madar/Artifacts/compare/S1-Home.html">المقارنة</a><a href="HANDOFF/screens/salah/01-S1-Home-s1.jpg">الصورة بعد التمرير</a></div></figcaption></figure>
-      <figure><a href="HANDOFF/screens/salah/02-S2-Log.jpg" target="_blank" rel="noreferrer"><img loading="lazy" src="HANDOFF/screens/salah/02-S2-Log.jpg" alt="المرجع: تسجيل الصلاة"></a><figcaption><a href="HANDOFF/screens/salah/02-S2-Log.jpg">M1-V02 · تسجيل الصلاة</a><span class="tiny">تظهر الحالات التي تسمح بها RP2 فقط.</span><div class="links"><a href="../Madar/Artifacts/compare/S2-Log.html">المقارنة</a><a href="HANDOFF/screens/salah/02-S2-Log-s1.jpg">الصورة بعد التمرير</a></div></figcaption></figure>
-      <figure><a href="HANDOFF/screens/salah/03-S2b-Missed.jpg" target="_blank" rel="noreferrer"><img loading="lazy" src="HANDOFF/screens/salah/03-S2b-Missed.jpg" alt="المرجع: الفائت والقضاء"></a><figcaption><a href="HANDOFF/screens/salah/03-S2b-Missed.jpg">M1-V03 · الفائت والقضاء</a><span class="tiny">ما قبل نهاية الوقت لا يعرض قرار القضاء المبكر.</span><div class="links"><a href="../Madar/Artifacts/compare/S2b-Missed.html">المقارنة</a><a href="HANDOFF/screens/salah/03-S2b-Missed-s1.jpg">الصورة بعد التمرير</a></div></figcaption></figure>
-      <figure><a href="HANDOFF/screens/salah/04-S3-Hali.jpg" target="_blank" rel="noreferrer"><img loading="lazy" src="HANDOFF/screens/salah/04-S3-Hali.jpg" alt="المرجع: حالي"></a><figcaption><a href="HANDOFF/screens/salah/04-S3-Hali.jpg">M1-V04 · حالي</a><span class="tiny">نسبة الميزان محسوبة حسب تعريف النص.</span><div class="links"><a href="../Madar/Artifacts/compare/S3-Hali.html">المقارنة</a><a href="HANDOFF/screens/salah/04-S3-Hali-s1.jpg">الصورة بعد التمرير</a></div></figcaption></figure>
-      <figure><a href="HANDOFF/screens/salah/05-S4-Day.jpg" target="_blank" rel="noreferrer"><img loading="lazy" src="HANDOFF/screens/salah/05-S4-Day.jpg" alt="المرجع: تعديل يوم سابق"></a><figcaption><a href="HANDOFF/screens/salah/05-S4-Day.jpg">M1-V05 · يوم سابق</a><span class="tiny">الحالات غير المتاحة لا تظهر كخيارات معطلة.</span><div class="links"><a href="../Madar/Artifacts/compare/S4-Day.html">المقارنة</a><a href="HANDOFF/screens/salah/05-S4-Day-s1.jpg">الصورة بعد التمرير</a></div></figcaption></figure>
-      <figure><a href="HANDOFF/screens/salah/06-S5-Qada.jpg" target="_blank" rel="noreferrer"><img loading="lazy" src="HANDOFF/screens/salah/06-S5-Qada.jpg" alt="المرجع: القضاء"></a><figcaption><a href="HANDOFF/screens/salah/06-S5-Qada.jpg">M1-V06 · القضاء</a><span class="tiny">العدد مرتبط بالسجلات الصريحة فقط.</span><div class="links"><a href="../Madar/Artifacts/compare/S5-Qada.html">المقارنة</a><a href="HANDOFF/screens/salah/06-S5-Qada-s1.jpg">الصورة بعد التمرير</a></div></figcaption></figure>
-      <figure><a href="HANDOFF/screens/salah/07-S6-Qiyam.jpg" target="_blank" rel="noreferrer"><img loading="lazy" src="HANDOFF/screens/salah/07-S6-Qiyam.jpg" alt="المرجع: قيام الليل"></a><figcaption><a href="HANDOFF/screens/salah/07-S6-Qiyam.jpg">M1-V07 · قيام الليل</a><span class="tiny">بلا صياغة سلسلة تنكسر.</span><div class="links"><a href="../Madar/Artifacts/compare/S6-Qiyam.html">المقارنة</a><a href="HANDOFF/screens/salah/07-S6-Qiyam-s1.jpg">الصورة بعد التمرير</a></div></figcaption></figure>
-      <figure><a href="HANDOFF/screens/salah/08-S7-Night.jpg" target="_blank" rel="noreferrer"><img loading="lazy" src="HANDOFF/screens/salah/08-S7-Night.jpg" alt="المرجع الداكن: الصلاة ليلًا"></a><figcaption><a href="HANDOFF/screens/salah/08-S7-Night.jpg">M1-V08 · الصلاة ليلًا</a><span class="tiny">مرجع داكن؛ يختلف عن نسخة النهار.</span><div class="links"><a href="../Madar/Artifacts/compare/S7-Night.html">المقارنة</a><a href="HANDOFF/screens/salah/08-S7-Night-s1.jpg">الصورة بعد التمرير</a></div></figcaption></figure>
-      <figure><a href="HANDOFF/screens/salah/12-S11-Mizan.jpg" target="_blank" rel="noreferrer"><img loading="lazy" src="HANDOFF/screens/salah/12-S11-Mizan.jpg" alt="المرجع: ميزان السبحة"></a><figcaption><a href="HANDOFF/screens/salah/12-S11-Mizan.jpg">M1-V09 · ميزان السبحة</a><span class="tiny">منفّذ ضمن بطاقة «حالي»؛ خيارات الأسلوب الأخرى v2.</span><div class="links"><a href="../Madar/Artifacts/compare/S3-Hali.html">المقارنة في حالي</a><a href="HANDOFF/screens/salah/12-S11-Mizan-s1.jpg">الصورة بعد التمرير</a></div></figcaption></figure>
-      <figure><a href="HANDOFF/screens/flex/06-K-Salah.jpg" target="_blank" rel="noreferrer"><img loading="lazy" src="HANDOFF/screens/flex/06-K-Salah.jpg" alt="المرجع: تخصيص الصلاة"></a><figcaption><a href="HANDOFF/screens/flex/06-K-Salah.jpg">M1-V10 · تخصيص الصلاة</a><span class="tiny">الترتيب داخل الشاشة نفسها لم يُبن بعد.</span><div class="links"><a href="../Madar/Artifacts/compare/K-Salah.html">المقارنة</a><a href="HANDOFF/screens/flex/06-K-Salah-s1.jpg">الصورة بعد التمرير</a></div></figcaption></figure>
-      <figure><a href="HANDOFF/screens/salah/09-S8-Friday.jpg" target="_blank" rel="noreferrer"><img loading="lazy" src="HANDOFF/screens/salah/09-S8-Friday.jpg" alt="المرجع: شاشة الجمعة"></a><figcaption><a href="HANDOFF/screens/salah/09-S8-Friday.jpg">M1-F01 · الجمعة</a><span class="tiny">فرق مذكور: شارة «جمعة مباركة» أضيق من المرجع.</span><div class="links"><a href="../Madar/Artifacts/compare/S8-Friday.html">المقارنة</a><a href="HANDOFF/screens/salah/09-S8-Friday-s1.jpg">الصورة بعد التمرير</a></div></figcaption></figure>
+    <h2>ثالثًا: عمل الوكلاء الذي ينتظر خطوة منك</h2>
+    <p class="intro">كل خطوة منك تفتح دفعة عمل يكملها الوكيل فورًا.</p>
+    <div class="chain">
+      <div><b>بعد Team ID:</b> ضبط التوقيع للتطبيق والودجت، ثم تثبيت مدار على جوالك واختبار تشغيله (الخطوة ١٠). لا تُفتح بياناتك الحقيقية ولا تُنقل.</div>
+      <div><b>بعد التثبيت:</b> بوابات الغرف على الجهاز (M1 حتى M6): بصمة الوجه، والإشعارات الحقيقية مع حرمة الصلاة، والودجات وأزرار التحكم وLive Activities، والميكروفون، والأداء في نسخة Release، وiOS 27 على الجهاز.</div>
+      <div><b>بعد البوابات:</b> إعادة توليد معرض المراجعة بلقطات جديدة، ثم لقطات المتجر من نسخة موقّعة.</div>
+      <div><b>بعد بريد التواصل وإذنك:</b> وضع البريد في صفحتي الدعم والخصوصية، ونشرهما، وإدخال روابطهما في بيانات المتجر.</div>
+      <div><b>بعد إذن تنزيل محاكي iOS 27:</b> اختبار ودجت iOS 27 والميزات المحمية بـ <code>#available</code> على المحاكي.</div>
     </div>
   </section>
 
-  <section>
-    <h2>صور الفحوص التي تنتظر جهازك</h2>
-    <div class="gallery">
-      <figure><a href="HANDOFF/screens/salah/10-S9-Travel.jpg" target="_blank" rel="noreferrer"><img loading="lazy" src="HANDOFF/screens/salah/10-S9-Travel.jpg" alt="مرجع السفر"></a><figcaption>M1-F02 · السفر<span class="tiny">الصورة مرجع للسلوك. الفحص المتبقي هو الموقع الحقيقي والتنقل على iPhone.</span><div class="links"><a href="HANDOFF/screens/salah/10-S9-Travel-s1.jpg">الصورة بعد التمرير</a></div></figcaption></figure>
-      <figure><a href="HANDOFF/screens/salah/11-S10-Abwab.jpg" target="_blank" rel="noreferrer"><img loading="lazy" src="HANDOFF/screens/salah/11-S10-Abwab.jpg" alt="مرجع الودجات والأبواب"></a><figcaption>M1-F04 · الودجات والاختصارات<span class="tiny">فحص الاختصار والودجت/Control والنشاط الحيّ على الجهاز.</span></figcaption></figure>
-    </div>
-  </section>
-
-  <footer class="footer">مرجع هذه اللقطة: <a href="PROGRESS.md">لوحة التقدم</a>، ومواصفة القرآن <a href="HANDOFF/sections/11-r-quran.md">§7.4</a>، وإصلاحات RQ في <a href="HANDOFF/Madar%20-%20Handoff%20Review%20Fixes%20-%20V1.md">ملف الإصلاحات</a>. المراجعة النهائية المطلوبة: Sol 6.1 High بعد إكمال التغييرات، كما طلبت.</footer>
+  <footer>المصدر: <code>docs/PROGRESS.md</code> (اللوحة الوحيدة للحالة) و<code>docs/OWNER-RUNBOOK.md</code> لخطوات الحساب والتوقيع. تحدَّث هذه الصفحة عند تغيّر الخارطة نفسها فقط.</footer>
 </main>
 </body>
 </html>
