@@ -462,7 +462,7 @@ struct MihbaraBookCard: View {
                     HStack(spacing: 12) {
                         VStack(alignment: .trailing, spacing: 4) {
                             Text("جهّز فهرسه").font(.custom("thmanyahserifdisplay-Bold", size: 17, relativeTo: .headline))
-                            Text("كتاب ورقي بلا فهرس؛ نجد عناوين فصوله ونطابقها مع طبعتك")
+                            Text("صوّر فهرس طبعتك أو أضف عناوينه وصفحاته يدويًا")
                                 .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                                 .fixedSize(horizontal: false, vertical: true)
                         }

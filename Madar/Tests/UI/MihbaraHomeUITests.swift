@@ -169,6 +169,8 @@ import XCTest
         XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); book.tap()
         let prompt = app.buttons["mihbara-paper-index-prompt"]
         XCTAssertTrue(prompt.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["صوّر فهرس طبعتك أو أضف عناوينه وصفحاته يدويًا"].exists)
+        shot(app, "M6-V23-index-guidance-L")
         XCTAssertTrue(app.buttons["mihbara-paper-start"].exists)
         XCTAssertTrue(app.buttons["mihbara-paper-index-details"].exists)
         app.buttons["mihbara-paper-index-details"].tap()
