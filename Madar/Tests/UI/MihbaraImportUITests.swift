@@ -97,6 +97,8 @@ import UIKit
         let result = app.buttons["mihbara-pdf-result-1"]
         XCTAssertTrue(result.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(app.staticTexts["نص ضوئي تقريبي"].firstMatch.exists)
+        XCTAssertEqual(app.staticTexts["mihbara-pdf-search-count"].label, "العبارة في صفحتين")
+        XCTAssertTrue(app.staticTexts["mihbara-pdf-result-excerpt-1"].label.contains("المعرفة"))
         attach(app, "M6-PDF-OCR-search-L")
         result.tap()
         let jumpedLabel = app.descendants(matching: .any)["mihbara-pdf-page"].label
@@ -161,6 +163,25 @@ import UIKit
         let page = app.descendants(matching: .any)["mihbara-pdf-page"]
         XCTAssertTrue(page.label.replacingOccurrences(of: "\u{2068}", with: "").replacingOccurrences(of: "\u{2069}", with: "").contains("١ من ٢"), app.debugDescription)
         attach(app, "M6-PDF-text-reader-L")
+        app.buttons["mihbara-pdf-search"].tap()
+        XCTAssertTrue(app.staticTexts["mihbara-pdf-ocr-complete"].waitForExistence(timeout: 15), app.debugDescription)
+        let query = app.textFields["mihbara-pdf-search-query"]
+        query.tap(); query.typeText("PDF\n")
+        XCTAssertEqual(app.staticTexts["mihbara-pdf-search-count"].label, "العبارة في صفحتين")
+        XCTAssertTrue(app.staticTexts["mihbara-pdf-result-unreliable-0"].exists)
+        XCTAssertFalse(app.staticTexts["mihbara-pdf-result-excerpt-0"].exists)
+        attach(app, "M6-PDF-search-excerpts-L")
+        app.buttons["mihbara-pdf-search-clear"].tap()
+        XCTAssertFalse(app.staticTexts["mihbara-pdf-search-count"].exists)
+        query.tap(); query.typeText("عبارة لا توجد في الكتاب\n")
+        XCTAssertTrue(app.staticTexts["mihbara-pdf-search-empty"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["mihbara-pdf-search-count"].label, "لا صفحات مطابقة")
+        XCTAssertTrue(app.staticTexts["mihbara-pdf-search-empty"].label.contains("راجع صورة الصفحة"))
+        XCTAssertFalse(app.buttons["mihbara-pdf-result-0"].exists)
+        attach(app, "M6-PDF-search-empty-L")
+        app.buttons["mihbara-pdf-search-clear"].tap()
+        XCTAssertTrue(app.buttons["mihbara-pdf-result-0"].exists)
+        app.buttons["mihbara-pdf-search-close"].tap()
         app.buttons["mihbara-pdf-next"].tap()
         XCTAssertTrue(page.label.replacingOccurrences(of: "\u{2068}", with: "").replacingOccurrences(of: "\u{2069}", with: "").contains("٢ من ٢"), app.debugDescription)
     }

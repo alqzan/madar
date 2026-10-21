@@ -288,11 +288,22 @@ private struct MihbaraPDFSearchView: View {
                     Button("تمّ") { dismiss() }.frame(minHeight: 44)
                         .accessibilityIdentifier("mihbara-pdf-search-close")
                 }
-                TextField("ابحث عن كلمة أو عبارة", text: $query)
-                    .font(MadarTypography.body()).padding(12)
-                    .background(theme.surface, in: .rect(cornerRadius: 12))
-                    .submitLabel(.search).autocorrectionDisabled()
-                    .accessibilityIdentifier("mihbara-pdf-search-query")
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass").foregroundStyle(theme.secondaryInk)
+                    TextField("ابحث عن كلمة أو عبارة", text: $query)
+                        .font(MadarTypography.body())
+                        .submitLabel(.search).autocorrectionDisabled()
+                        .accessibilityIdentifier("mihbara-pdf-search-query")
+                    if !query.isEmpty {
+                        Button { query = "" } label: {
+                            Image(systemName: "xmark.circle.fill").frame(width: 44, height: 44)
+                        }
+                        .accessibilityLabel("امسح البحث")
+                        .accessibilityIdentifier("mihbara-pdf-search-clear")
+                    }
+                }
+                .padding(.horizontal, 12).frame(minHeight: 52)
+                .background(theme.surface, in: .rect(cornerRadius: 12))
                 VStack(alignment: .leading, spacing: 8) {
                     if phase == "scanning" {
                         ProgressView(value: Double(pages.count), total: Double(max(1, total)))
@@ -314,9 +325,15 @@ private struct MihbaraPDFSearchView: View {
                     Text("يُقرأ النص الموجود أولًا، وتُقرأ صفحات الصور على جهازك. النص الضوئي قد يخطئ؛ راجع صورة الصفحة. يُحذف هذا النص عند إغلاق البحث.")
                         .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                 }
-                if !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && matches.isEmpty {
-                    Text(phase == "done" ? "لم أجد العبارة في النص المستخرج؛ قد لا يلتقط التعرّف الضوئي بعض الكلمات." : "لم تظهر العبارة في الصفحات المقروءة حتى الآن.")
-                        .font(MadarTypography.body())
+                if !PDFBookPageText.normalize(query).isEmpty {
+                    Text(matches.isEmpty ? "لا صفحات مطابقة" : matches.count == 2 ? "العبارة في صفحتين" : "العبارة في " + MihbaraCopy.pages(matches.count, digits))
+                        .font(MadarTypography.section())
+                        .accessibilityIdentifier("mihbara-pdf-search-count")
+                    if matches.isEmpty {
+                        Text(phase == "done" ? "لم تظهر العبارة؛ راجع صورة الصفحة فقد يخطئ النص المستخرج." : "لم تظهر العبارة في الصفحات المقروءة حتى الآن.")
+                            .font(MadarTypography.body())
+                            .accessibilityIdentifier("mihbara-pdf-search-empty")
+                    }
                 }
                 LazyVStack(alignment: .leading, spacing: 12) {
                     ForEach(matches) { page in
@@ -329,6 +346,15 @@ private struct MihbaraPDFSearchView: View {
                                 }.font(MadarTypography.section()).frame(minHeight: 44)
                             }
                             .accessibilityIdentifier("mihbara-pdf-result-\(page.index)")
+                            if let excerpt = page.excerpt(matching: query) {
+                                Text(excerpt).font(MadarTypography.body())
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .accessibilityIdentifier("mihbara-pdf-result-excerpt-\(page.index)")
+                            } else if page.hasUnreliableArabicMapping {
+                                Text("النص المستخرج غير واضح؛ راجع الصفحة الأصلية.")
+                                    .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                                    .accessibilityIdentifier("mihbara-pdf-result-unreliable-\(page.index)")
+                            }
                             Text(page.source == .optical ? "نص ضوئي تقريبي" : "من طبقة النص الأصلية")
                                 .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                             DisclosureGroup("اقرأ النص المستخرج") {

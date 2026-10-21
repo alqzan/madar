@@ -61,6 +61,18 @@ struct PDFBookTextReaderTests {
         #expect(!page.contains("كلمة غير موجودة"))
     }
 
+    @Test func compatibilityFormsSearchNormallyAndBrokenArabicMappingsNeverBecomeExcerpts() {
+        let forms = PDFBookPageText(index: 0, text: "ﻧﺺ ﻋﺮﺑﻲ PDF", source: .embedded)
+        #expect(forms.contains("نص عربي"))
+        #expect(!forms.hasUnreliableArabicMapping)
+        #expect(forms.excerpt(matching: "نص عربي") != nil)
+
+        let broken = PDFBookPageText(index: 1, text: "ﻫﺬا ٮ'ﺺ ﻋرٮ3ى 4 ﻣﻮﺣ 3 ﻮد PDF", source: .embedded)
+        #expect(broken.contains("PDF"))
+        #expect(broken.hasUnreliableArabicMapping)
+        #expect(broken.excerpt(matching: "PDF") == nil)
+    }
+
     @Test func cancellationIsObservedBeforeRenderingTheNextPage() async throws {
         let reader = PDFBookTextReader(data: try sample(), language: "ar")
         let task = Task {
@@ -69,5 +81,18 @@ struct PDFBookTextReaderTests {
         }
         do { _ = try await task.value; Issue.record("Cancelled OCR unexpectedly returned a page") }
         catch is CancellationError { }
+    }
+
+    @Test func excerptKeepsOriginalArabicAroundAMatchBeyondThePageOpening() {
+        let page = PDFBookPageText(index: 0,
+            text: "واحد اثنان ثلاثة أربعة خمسة ستة سبعة ثمانية تسعة عشرة إِنَّ\nالقِراءةَ بابُ المَعرفة ثم يأتي كلام آخر في نهاية هذه الصفحة الطويلة جدًا للقارئ",
+            source: .embedded)
+        #expect(page.excerpt(matching: "ان القراءة باب") == "… خمسة ستة سبعة ثمانية تسعة عشرة إِنَّ القِراءةَ بابُ المَعرفة ثم يأتي كلام آخر في نهاية هذه الصفحة …")
+        #expect(page.excerpt(matching: "واحد")?.hasPrefix("واحد اثنان") == true)
+        #expect(page.excerpt(matching: "للقارئ")?.hasSuffix("للقارئ") == true)
+        #expect(page.excerpt(matching: "غير موجودة") == nil)
+        #expect(page.excerpt(matching: "  \n ") == nil)
+        let marks = PDFBookPageText(index: 1, text: "ـ إِنَّ ـ القِراءةَ\tبابُ المَعرفة", source: .optical)
+        #expect(marks.excerpt(matching: "ان القراءة باب") == "إِنَّ القِراءةَ بابُ المَعرفة")
     }
 }

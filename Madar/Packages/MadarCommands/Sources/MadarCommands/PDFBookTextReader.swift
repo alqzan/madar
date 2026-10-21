@@ -18,12 +18,54 @@ public struct PDFBookPageText: Equatable, Sendable, Identifiable {
     }
 
     public static func normalize(_ text: String) -> String {
-        DiarySearchParser.normalize(text).split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        DiarySearchParser.normalize(text.precomposedStringWithCompatibilityMapping)
+            .split(whereSeparator: \.isWhitespace).joined(separator: " ")
+    }
+
+    /// PDFKit can expose an unmapped glyph as an ASCII character inside an
+    /// Arabic word. Such text remains searchable where possible, but is unsafe
+    /// to show as a quotation from the source page.
+    public var hasUnreliableArabicMapping: Bool {
+        guard source == .embedded else { return false }
+        let scalars = Array(text.unicodeScalars)
+        guard scalars.count >= 3 else { return false }
+        return (1..<(scalars.count - 1)).contains { index in
+            Self.isArabicLetter(scalars[index - 1])
+                && scalars[index].value < 128
+                && (CharacterSet.alphanumerics.contains(scalars[index]) || CharacterSet.punctuationCharacters.contains(scalars[index]))
+                && Self.isArabicLetter(scalars[index + 1])
+        }
+    }
+
+    private static func isArabicLetter(_ scalar: Unicode.Scalar) -> Bool {
+        let value = scalar.value
+        let isArabicBlock = (0x0600...0x06FF).contains(value)
+            || (0x0750...0x077F).contains(value)
+            || (0x08A0...0x08FF).contains(value)
+            || (0xFB50...0xFDFF).contains(value)
+            || (0xFE70...0xFEFF).contains(value)
+        return isArabicBlock && CharacterSet.letters.contains(scalar)
     }
 
     public func contains(_ query: String) -> Bool {
         let needle = Self.normalize(query)
         return !needle.isEmpty && normalizedText.contains(needle)
+    }
+
+    /// A short window around the first match, preserving the extracted spelling
+    /// and marks. Search normalization must never become the displayed quotation.
+    public func excerpt(matching query: String) -> String? {
+        guard !hasUnreliableArabicMapping else { return nil }
+        let needle = Self.normalize(query)
+        guard !needle.isEmpty, let match = normalizedText.range(of: needle) else { return nil }
+        let first = normalizedText[..<match.lowerBound].filter { $0 == " " }.count
+        let last = normalizedText[..<match.upperBound].filter { $0 == " " }.count
+        let words = text.split(whereSeparator: \.isWhitespace).filter { !Self.normalize(String($0)).isEmpty }
+        let lower = max(0, first - 6)
+        let upper = min(words.count, last + 10)
+        guard lower < upper else { return nil }
+        return (lower > 0 ? "… " : "") + words[lower..<upper].joined(separator: " ")
+            + (upper < words.count ? " …" : "")
     }
 }
 
