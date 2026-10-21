@@ -162,11 +162,6 @@ struct DiaryHomeSnapshot {
         let formatter = DateFormatter(); formatter.locale = Locale(identifier: app.string("core.numerals") == "western" ? "ar_SA@numbers=latn" : "ar_SA@numbers=arab")
         formatter.timeZone = zone.flatMap(TimeZone.init(identifier:)) ?? app.activePlace.timeZone; formatter.dateFormat = "h:mm a"; return formatter.string(from: at)
     }
-    func monthTitle(_ day: GregorianDay) -> String {
-        let f = DateFormatter(); f.locale = Locale(identifier: app.string("core.numerals") == "western" ? "ar_SA@numbers=latn" : "ar_SA@numbers=arab")
-        f.calendar = Calendar(identifier: .gregorian); f.timeZone = app.activePlace.timeZone; f.dateFormat = "MMMM yyyy"
-        return f.string(from: day.date(in: app.activePlace.timeZone))
-    }
     func weekday(_ day: GregorianDay) -> String {
         let f = DateFormatter(); f.locale = Locale(identifier: "ar_SA"); f.calendar = Calendar(identifier: .gregorian)
         f.timeZone = app.activePlace.timeZone; f.dateFormat = "EEEE"; return f.string(from: day.date(in: app.activePlace.timeZone))

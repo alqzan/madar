@@ -11,6 +11,11 @@ import XCTest
     func testWindowYearsMarginTodayAndRelaunch() throws {
         continueAfterFailure = false
         let app = launch("home")
+        let currentMonth = app.descendants(matching: .any)["diary-current-month"]
+        XCTAssertTrue(currentMonth.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(currentMonth.label.contains("أكتوبر"), currentMonth.label)
+        XCTAssertTrue(currentMonth.label.contains("ربيع"), currentMonth.label)
+        XCTAssertTrue(currentMonth.label.contains("جمادى"), currentMonth.label)
         XCTAssertTrue(app.buttons["diary-year-2025-10-15"].waitForExistence(timeout: 10), app.debugDescription)
         capture(app, "M3-V01-window-L")
         app.buttons["diary-year-2024-10-15"].tap()

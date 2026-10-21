@@ -39,6 +39,27 @@ extension AppDiaryService {
         .init(first: FirstCalendar(rawValue: app.string("notes.calendarFirst")) ?? .gregorian, zone: app.activePlace.timeZone,
             offset: app.string("core.hijriSource") == "sighting" ? min(2,max(-2,Int(app.number("core.hijriOffset")))) : 0, weekStart: app.string("core.weekStart") == "sunday" ? 1 : 7)
     }
+    func monthLabels(_ day: GregorianDay) -> MadarDateLabels {
+        let grid = diaryCalendar, parts = grid.parts(day)
+        guard let year = parts.year, let month = parts.month else { return .init(primary: "", secondary: "") }
+        let primary = grid.monthName(year: year, month: month) + " " + digits.string(year)
+        return .init(primary: primary, secondary: alternateMonthTitle(year: year, month: month, includeYear: true))
+    }
+    func alternateMonthTitle(year: Int, month: Int, includeYear: Bool = false) -> String {
+        let grid = diaryCalendar, days = grid.days(year: year, month: month)
+        guard let first = days.first, let last = days.last else { return "" }
+        let a = dateLabels(first, first: grid.first).secondary.split(separator: " ").dropFirst()
+        let b = dateLabels(last, first: grid.first).secondary.split(separator: " ").dropFirst()
+        guard a.count > 2, b.count > 2 else { return a == b ? a.joined(separator: " ") : a.joined(separator: " ") + " – " + b.joined(separator: " ") }
+        let aMonth = a.dropLast(2).joined(separator: " "), bMonth = b.dropLast(2).joined(separator: " ")
+        if a.suffix(2) == b.suffix(2) {
+            let span = aMonth == bMonth ? aMonth : aMonth + " – " + bMonth
+            return includeYear ? span + " " + a.suffix(2).joined(separator: " ") : span
+        }
+        let start = aMonth + (includeYear ? " " + a.suffix(2).joined(separator: " ") : "")
+        let end = bMonth + " " + b.suffix(2).joined(separator: " ")
+        return start + " – " + end
+    }
     func archive() throws -> DiaryArchiveSnapshot {
         try authorizeRead()
         let context = ModelContext(app.container)

@@ -229,11 +229,19 @@ struct DiaryHomeView: View {
     }
     private func recentDays(_ snapshot: DiaryHomeSnapshot) -> some View {
         let days = snapshot.days.filter { $0.day < snapshot.today }.prefix(5)
+        let month = service.monthLabels(snapshot.today)
         return VStack(alignment: .leading, spacing: 10) {
             HStack {
             Button { archiveOpen = true } label: { HStack { Text("أيامك").font(DiaryType.heading); Image(systemName: "arrow.left").font(.caption) } }.buttonStyle(.plain)
                 Spacer()
-                Text(service.monthTitle(snapshot.today)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(month.primary).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
+                    Text(month.secondary).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(month.combined)
+                .accessibilityIdentifier("diary-current-month")
             }.padding(.top, 4)
             VStack(spacing: 0) {
                 ForEach(Array(days)) { day in
