@@ -1054,6 +1054,22 @@ import MadarInbox
         #expect(row.kind == "transfer" && row.toAccountID == f.bank && row.reviewState == "needsLook")
     }
 
+    @Test func explicitTransferDestinationImportsAsUnconfirmedDraft() async throws {
+        let f = try MoneyFixture(); defer { f.clean() }; try await f.setup()
+        let balanceBefore = try f.basis().inAccountMinor
+        let text = "تحويل 235.50 ريال إلى مستفيد تجريبي\n2026-10-16 14:10"
+        #expect(try await f.ingest(text).status == .applied)
+
+        let context = ModelContext(f.container)
+        let message = try #require(try context.fetch(FetchDescriptor<BankMessage>()).first)
+        let draft = try f.transaction()
+        #expect(message.kind == BankMessageKind.transferOut.rawValue && message.status == "needsLook")
+        #expect(draft.kind == "transfer" && draft.reviewState == "needsLook")
+        #expect(draft.amountMinor == 23_550 && draft.currency == "SAR")
+        #expect(draft.counterparty == "مستفيد تجريبي" && draft.toAccountID == nil)
+        #expect(try f.basis().inAccountMinor == balanceBefore, "Parsing a transfer never changes the balance before confirmation")
+    }
+
     @Test func depositedCashbackRoutesToChosenEnvelopeAndUndoRestoresDraft() async throws {
         let f = try MoneyFixture(); defer { f.clean() }; try await f.setup()
         let context = ModelContext(f.container), envelope = Envelope(); envelope.name = "رحلة قادمة"; context.insert(envelope); try context.save()
