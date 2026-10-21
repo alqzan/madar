@@ -162,6 +162,30 @@ import Testing
         #expect(BankMessageParser.parse(text, timeZone: riyadh).amountMinor == 30_000)
     }
 
+    @Test func explicitTransferDirectionAfterAmountIsRecognised() {
+        let toRecipient = BankMessageParser.parse("تحويل 235.50 ريال إلى مستفيد تجريبي", timeZone: riyadh)
+        #expect(toRecipient.kind == .transferOut)
+        #expect(toRecipient.amountMinor == 23_550)
+        #expect(toRecipient.counterparty == "مستفيد تجريبي")
+
+        let toRecipientWithParticle = BankMessageParser.parse("حوالة 120 ريال ل مستفيد تجريبي", timeZone: riyadh)
+        #expect(toRecipientWithParticle.kind == .transferOut)
+        #expect(toRecipientWithParticle.amountMinor == 12_000)
+        #expect(toRecipientWithParticle.counterparty == "مستفيد تجريبي")
+
+        let outgoingIPS = BankMessageParser.parse("Outgoing IPS local transfer from: Own account\nAmount: SAR 40.00", timeZone: riyadh)
+        #expect(outgoingIPS.kind == .transferOut)
+        #expect(outgoingIPS.amountMinor == 4_000)
+        // The source account is not a destination/counterparty.
+        #expect(outgoingIPS.counterparty == nil)
+    }
+
+    @Test func walletDebitWithoutAnEndpointStaysReviewable() {
+        let parsed = BankMessageParser.parse("Wallet operations\nWallet: stc pay\nDebit via wallet transfer\nAmount: SAR 45.00", timeZone: riyadh, sender: "stcpay")
+        #expect(parsed.kind == .unknown)
+        #expect(BankIntake.decision(parsed.kind) == .needsLook)
+    }
+
     @Test func rm8NearDuplicateAsksWithinTenMinutes() {
         let t = at(2026, 10, 15, 13, 5)
         let old = BankDedupe.Movement(accountKey: "1111", amountMinor: 4_200, merchant: "مطعم الريف", at: t, fingerprint: "a")
@@ -265,7 +289,7 @@ import Testing
 @Suite struct OwnerSpecialRuleTests {
     let riyadh = TimeZone(identifier: "Asia/Riyadh")!
     @Test func walletTopUpIsATransferNotAPurchase() {
-        #expect(BankMessageParser.parse("شراء إنترنت\nبطاقة:1234 ;فيزا\nمبلغ:200.00 SAR\nلدى:barq\nفي:19-10-2025 10:00", timeZone: riyadh).kind == .transferOut)
+        #expect(BankMessageParser.parse("شراء إنترنت\nبطاقة:1234 ;فيزا\nمبلغ:200.00 SAR\nلدى:barq\nفي:19-10-2025 10:00", timeZone: riyadh, trackedWallets: ["barq"]).kind == .transferOut)
     }
     @Test func tamaraAsBankMerchantIsAPurchaseButAPlanConfirmationIsNot() {
         #expect(BankMessageParser.classify("شراء إنترنت\nبطاقة:1234 ;فيزا\nمبلغ:40.00 SAR\nلدى:Tamara") == .purchase)
@@ -289,7 +313,7 @@ import Testing
         #expect(BankMessageParser.parse("مشتريات إنترنت\nمبلغ: 30 SAR\nلدى: Sample", timeZone: riyadh, sender: "stcpay").kind == .purchase)
     }
     @Test func investmentAndSavingsWalletsAreTransfers() {
-        #expect(BankMessageParser.parse("شراء إنترنت\nبطاقة:1234 ;فيزا\nمبلغ:100.00 SAR\nلدى:Drahim", timeZone: riyadh).kind == .transferOut)
+        #expect(BankMessageParser.parse("شراء إنترنت\nبطاقة:1234 ;فيزا\nمبلغ:100.00 SAR\nلدى:Drahim", timeZone: riyadh, trackedWallets: ["دراهم"]).kind == .transferOut)
     }
 }
 

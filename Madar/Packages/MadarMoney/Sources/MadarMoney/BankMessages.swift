@@ -141,8 +141,12 @@ public enum BankMessageParser {
         if has(t, ["استرداد", "refund", "مرتجع"]) { return .refund }
         if has(t, ["راتب", "salary", "payroll"]) { return .salary }
         if has(t, ["سحب صراف", "سحب نقدي", "ATM", "cash withdrawal"]) { return .withdrawal }
-        if has(t, ["حوالة صادرة", "تحويل صادر", "تحويل إلى", "outgoing transfer"]) { return .transferOut }
+        if has(t, ["حوالة صادرة", "تحويل صادر", "تحويل إلى", "outgoing transfer"])
+            || matches(t, #"\boutgoing\b[\s\S]{0,80}\btransfer\b"#) { return .transferOut }
         if has(t, ["حوالة واردة", "تحويل وارد", "incoming transfer"]) { return .transferIn }
+        // Some banks put the amount between «تحويل» and its explicit destination.
+        // A recipient after the amount is enough for an outgoing draft; a source-only «من» stays reviewable.
+        if transferOutPartyAfterAmount(t) != nil { return .transferOut }
         // Explicit moves between the owner's accounts are transfers even when a bank omits
         // «صادر» and «وارد». Keep the direction conservative when the message names no endpoint.
         if has(t, ["حوالة بين حساباتك", "حوالة بين حساباتي", "تحويل بين حساباتك", "تحويل بين حساباتي"])
@@ -173,6 +177,31 @@ public enum BankMessageParser {
         return .unknown
     }
 
+    /// A transfer recipient can follow its amount without a colon: «تحويل ١٢٠ ريال إلى فلان» or «حوالة ١٢٠ ريال ل فلان».
+    /// Only inspect the same line after a parsed amount so ordinary «إلى/ل» prose cannot create a transfer.
+    private static func transferOutPartyAfterAmount(_ text: String) -> String? {
+        for line in text.split(separator: "\n").map(String.init) where has(line, ["حوالة", "تحويل"]) {
+            guard let amount = amounts(line, .specified).first else { continue }
+            let tail = line[amount.range.upperBound...].trimmingCharacters(in: .whitespaces)
+            for label in ["إلى", "الى", "To"] {
+                guard let range = tail.range(of: label, options: [.anchored, .caseInsensitive]) else { continue }
+                var value = String(tail[range.upperBound...])
+                guard value.first?.isWhitespace == true || value.first == ":" || value.first == "：" else { continue }
+                if value.first == ":" || value.first == "：" { value.removeFirst() }
+                value = value.trimmingCharacters(in: .whitespaces)
+                if !value.isEmpty { return value }
+            }
+            if tail.hasPrefix("ل") {
+                var value = String(tail.dropFirst())
+                guard value.first?.isWhitespace == true || value.first == ":" || value.first == "：" else { continue }
+                if value.first == ":" || value.first == "：" { value.removeFirst() }
+                value = value.trimmingCharacters(in: .whitespaces)
+                if !value.isEmpty { return value }
+            }
+        }
+        return nil
+    }
+
     /// `receivedAt` (the phone's receive time) settles two-digit dates that read both ways, «25-10-19» vs «19-10-25».
     public static func parse(_ text: String, timeZone: TimeZone, exponents: CurrencyExponents = .specified, homeCurrency: String = "SAR", receivedAt: Date? = nil, sender: String? = nil, trackedWallets: [String] = []) -> ParsedBankMessage {
         let t = clean(text)
@@ -199,7 +228,7 @@ public enum BankMessageParser {
         result.eventAt = eventDate(t, timeZone, near: receivedAt ?? Date())
         result.merchant = labelled(t, ["لدى", "من متجر", "at"])
         result.biller = labelled(t, ["المفوتر", "Biller"])
-        result.counterparty = kind == .transferIn ? labelled(t, ["من", "From"]) : kind == .transferOut ? labelled(t, ["إلى", "To"]) : nil
+        result.counterparty = kind == .transferIn ? labelled(t, ["من", "From"]) : kind == .transferOut ? (labelled(t, ["إلى", "To"]) ?? transferOutPartyAfterAmount(t)) : nil
         if kind == .refund, result.merchant == nil { result.merchant = labelled(t, ["من"]) }
         // BSF, SNB, Alinma, barq: the merchant opens its own line after «من», «لـ», «لدى» or «At», with or without a colon.
         if [.purchase, .refund, .declined, .reversal].contains(kind), result.merchant == nil { result.merchant = lineMerchant(t) }
