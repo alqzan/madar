@@ -120,7 +120,7 @@ struct MoneyLogView: View {
             VStack(spacing: 5) {
                 if height > 60 {
                     VStack(spacing: 0) {
-                        if over { Text(figure: amount(d.spentMinor)).font(MadarTypography.fine()).foregroundStyle(theme.color("dueText")).lineLimit(1).minimumScaleFactor(0.7); Rectangle().fill(theme.color("due")).frame(width: 5, height: 14) }
+                        if over { Text(figure: amount(d.spentMinor)).font(MadarTypography.fine()).foregroundStyle(theme.color("dueText")).lineLimit(1); Rectangle().fill(theme.color("due")).frame(width: 5, height: 14) }
                     }.frame(height: 30, alignment: .bottom).accessibilityHidden(true)
                 }
                 GeometryReader { proxy in
@@ -131,7 +131,7 @@ struct MoneyLogView: View {
                         if visible, drawsLimit, let daily = d.dailyMinor {
                             Rectangle().fill(theme.color("reserveText")).frame(height: 0.7).offset(y: -height * min(1, Double(max(0, daily)) / Double(scale)))
                         }
-                        if !future { Text(figure: amount(d.spentMinor)).font(MadarTypography.fine()).foregroundStyle(over ? theme.onAccent : theme.ink).lineLimit(1).minimumScaleFactor(0.85).padding(.bottom, over ? height - 20 : min(height - 15, height * fill + 2)) }
+                        if !future { Text(figure: amount(d.spentMinor)).font(MadarTypography.fine()).foregroundStyle(over ? theme.onAccent : theme.ink).lineLimit(1).padding(.bottom, over ? height - 20 : min(height - 15, height * fill + 2)) }
                         if d.pending > 0 { Circle().stroke(theme.ink, lineWidth: 1.5).frame(width: 7, height: 7).padding(.bottom, 4) }
                     }.frame(width: proxy.size.width, height: height, alignment: .bottom).clipShape(arch).overlay { arch.stroke(selected ? theme.ink : theme.color("reserveText"), style: .init(lineWidth: selected ? 2 : 1, dash: future ? [3, 3] : [])) }
                 }.frame(height: height)
@@ -182,7 +182,7 @@ struct MoneyLogView: View {
                             HStack(alignment: .center, spacing: 4) {
                                 Text(figure: amount(row.amountMinor)).font(.custom("thmanyahserifdisplay-Bold", size: 25, relativeTo: .title2)).lineLimit(1).minimumScaleFactor(0.7)
                                 Spacer(minLength: 2)
-                                Text(row.budgetLabel).font(MadarTypography.fine()).foregroundStyle(row.confirmed ? theme.color("surplusText") : theme.secondaryInk).lineLimit(1).minimumScaleFactor(0.8).padding(.horizontal, 7).padding(.vertical, 3).overlay { Capsule().stroke(row.confirmed ? theme.color("surplusText") : theme.line, lineWidth: 1) }
+                                Text(row.budgetLabel).font(MadarTypography.fine()).foregroundStyle(row.confirmed ? theme.color("surplusText") : theme.secondaryInk).lineLimit(1).padding(.horizontal, 7).padding(.vertical, 3).overlay { Capsule().stroke(row.confirmed ? theme.color("surplusText") : theme.line, lineWidth: 1) }
                             }
                             Text(row.payment + "، " + row.category).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                         }.padding(12).frame(maxWidth: .infinity, minHeight: 96, alignment: .topLeading).background(theme.surface)

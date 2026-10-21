@@ -167,8 +167,8 @@ struct MoneyObligationsView: View {
                 if !outline { Circle().fill(theme.background.opacity(0.85)).frame(width: 6, height: 6).offset(y: 2) }
             }.frame(width: 26, height: 30).scaleEffect(active ? 1.15 : 1)
             VStack(spacing: 3) {
-                Text(figure: amount(due.amountMinor)).font(.custom("thmanyahserifdisplay-Bold", size: 15, relativeTo: .callout)).lineLimit(1).minimumScaleFactor(0.6)
-                Text(due.name).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(theme.secondaryInk).lineLimit(1).minimumScaleFactor(0.6)
+                Text(figure: amount(due.amountMinor)).font(.custom("thmanyahserifdisplay-Bold", size: 15, relativeTo: .callout)).lineLimit(1).minimumScaleFactor(0.74)
+                Text(due.name).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(theme.secondaryInk).lineLimit(1)
             }.padding(.horizontal, 3).background(theme.background, in: .rect(cornerRadius: 4))
         }
     }
@@ -325,7 +325,7 @@ struct MoneyObligationsView: View {
                 HStack(alignment: .center, spacing: 12) {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("تكرر عندك في \(service.digits.string(suggestion.count)) أشهر متتالية")
-                            .font(MadarTypography.fine().weight(.semibold)).foregroundStyle(theme.color("reserveText")).lineLimit(1).minimumScaleFactor(0.8)
+                            .font(MadarTypography.fine().weight(.semibold)).foregroundStyle(theme.color("reserveText")).lineLimit(1)
                         HStack(spacing: 5) {
                             Text(suggestion.name).font(.custom("thmanyahserifdisplay-Bold", size: 19, relativeTo: .title3)).lineLimit(1)
                             Text("،").foregroundStyle(theme.secondaryInk)

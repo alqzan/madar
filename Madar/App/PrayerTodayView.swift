@@ -238,7 +238,7 @@ struct PrayerTodayView: View {
             Text("إِنَّ الصَّلَاةَ كَانَتْ عَلَى الْمُؤْمِنِينَ كِتَابًا مَوْقُوتًا")
                 .font(.custom("Amiri-Regular", size: 15, relativeTo: .subheadline))
                 .foregroundStyle(theme.secondaryInk)
-                .lineLimit(1).minimumScaleFactor(0.6)
+                .lineLimit(1).minimumScaleFactor(0.74)
                 .layoutPriority(1)
             PrayerStar().fill(theme.accent).frame(width: 9, height: 9)
             Rectangle().fill(theme.line).frame(height: 1)
@@ -753,11 +753,11 @@ private struct PrayerTodayArch: View {
                     .clipped()
                 VStack(spacing: 3) {
                     Text(title).font(PrayerHomeType.archName).lineLimit(1).minimumScaleFactor(0.75)
-                    Text(timeLabel).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk).lineLimit(1).minimumScaleFactor(0.8)
+                    Text(timeLabel).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk).lineLimit(1).minimumScaleFactor(0.85)
                     Text(countdown ?? note ?? statusText)
                         .font(countdown != nil || cell.status == .missed ? PrayerHomeType.smallBold : PrayerHomeType.small)
                         .foregroundStyle(countdown != nil ? theme.accent : cell.status == .missed ? theme.color("missedTextOnSurface") : cell.status == .future ? theme.secondaryInk : theme.ink.opacity(0.78))
-                        .lineLimit(1).minimumScaleFactor(0.8)
+                        .lineLimit(1).minimumScaleFactor(0.85)
                 }
                 .padding(.top, 8)
             }
@@ -1168,7 +1168,7 @@ private struct PrayerTodayLogSheet: View {
                     .foregroundStyle(on ? (missed ? theme.color("missedTextOnSurface") : theme.color("accentText")) : theme.ink)
                 Text(detail).font(PrayerHomeType.small).foregroundStyle(on && missed ? theme.color("missedTextOnSurface") : theme.secondaryInk)
             }
-            .lineLimit(1).minimumScaleFactor(0.8)
+            .lineLimit(1).minimumScaleFactor(0.85)
             .frame(maxWidth: .infinity, minHeight: 62)
             .background(on ? tint.opacity(0.12) : .clear, in: .rect(cornerRadius: 20))
             .overlay { RoundedRectangle(cornerRadius: 20).stroke(on ? tint : theme.ink.opacity(0.13), lineWidth: on ? 1.5 : 1) }
@@ -1250,7 +1250,7 @@ private struct PrayerTodayLogSheet: View {
                                 .foregroundStyle(on ? theme.color("accentText") : theme.ink)
                             Text(heartSentence(value)).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
                         }
-                        .lineLimit(1).minimumScaleFactor(0.75)
+                        .lineLimit(1).minimumScaleFactor(0.85)
                         .frame(maxWidth: .infinity, minHeight: 56)
                         .background(on ? theme.accent.opacity(0.12) : .clear, in: .rect(cornerRadius: 20))
                         .overlay { RoundedRectangle(cornerRadius: 20).stroke(on ? theme.accent : theme.ink.opacity(0.13), lineWidth: on ? 1.5 : 1) }
@@ -1987,7 +1987,7 @@ private struct PrayerDayEditSheet: View {
                     .accessibilityHidden(true)
                 Text(title).font(on ? PrayerHomeType.smallBold : PrayerHomeType.small)
                     .foregroundStyle(on ? statusText(option) : theme.secondaryInk)
-                    .lineLimit(1).minimumScaleFactor(0.78)
+                    .lineLimit(1).minimumScaleFactor(0.85)
             }
                 .frame(maxWidth: 76, minHeight: 52)
                 .padding(.horizontal, 3)

@@ -120,7 +120,7 @@ struct MoneyCategoriesView: View {
             Rectangle().fill(theme.background.opacity(0.25)).frame(height: 2).frame(maxHeight: .infinity, alignment: .top)
             HStack(spacing: 4) {
                 if showName && width > 110 { Text(book.name).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).lineLimit(1) }
-                if width > 40 { Text(figure: amount(book.amountMinor)).font(.custom("thmanyahsans-Bold", size: 12, relativeTo: .caption)).lineLimit(1).minimumScaleFactor(0.7) }
+                if width > 40 { Text(figure: amount(book.amountMinor)).font(.custom("thmanyahsans-Bold", size: 12, relativeTo: .caption)).lineLimit(1).minimumScaleFactor(0.92) }
             }.foregroundStyle(theme.background).padding(.horizontal, 4).environment(\.layoutDirection, .rightToLeft)
         }.frame(width: width, height: height).accessibilityLabel(book.name)
     }

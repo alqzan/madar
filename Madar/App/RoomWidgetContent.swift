@@ -93,7 +93,7 @@ struct RoomWidgetContent:View {
                     else {
                         let value=accessoryRow?.value ?? "",remaining=accessoryRow?.detail ?? ""
                         let big=room == .upcoming ? value.split(separator:" ").first.map(String.init) : room == .habits ? (remaining.isEmpty ? nil : remaining) : (value.contains(where:{$0.isNumber}) ? value : nil)
-                        Text(big ?? "افتح").font(.custom("thmanyahsans-Bold",size:15,relativeTo:.caption)).lineLimit(1).minimumScaleFactor(0.7)
+                        Text(big ?? "افتح").font(.custom("thmanyahsans-Bold",size:15,relativeTo:.caption)).lineLimit(1).minimumScaleFactor(0.74)
                         Text(room == .upcoming ? accessoryRow?.title ?? room.title : room == .habits ? (remaining == "تمّ" ? "اليوم" : "متبقية") : "السنة").font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).lineLimit(1)
                     }
                 }.padding(7)
@@ -214,7 +214,7 @@ private struct MihbaraRoomWidgetContent:View {
                 Circle().stroke(.primary.opacity(0.25),lineWidth:3)
                 if !locked,let page=snapshot?.currentBook?.currentPage {
                     if let bookProgress {Circle().trim(from:0,to:bookProgress).stroke(.primary,style:.init(lineWidth:3,lineCap:.round)).rotationEffect(.degrees(-90))}
-                    Text(digits.string(page)).font(.custom("thmanyahsans-Bold",size:14,relativeTo:.caption)).lineLimit(1).minimumScaleFactor(0.7)
+                    Text(digits.string(page)).font(.custom("thmanyahsans-Bold",size:14,relativeTo:.caption)).lineLimit(1).minimumScaleFactor(0.79)
                 }
                 else {Image(systemName:locked ? "lock.fill" : "books.vertical").font(.system(size:17,weight:.medium))}
             }.accessibilityElement(children:.ignore).accessibilityLabel(locked ? "المحبرة مقفلة" : "المحبرة، "+(bookTitle ?? "رفّك")).accessibilityValue(locked ? "" : pageLine ?? "")

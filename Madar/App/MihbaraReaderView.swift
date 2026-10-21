@@ -565,14 +565,14 @@ struct MihbaraReaderView: View {
             if isEnglish {
                 HStack(alignment: .center) {
                     Text(footerLabel)
-                        .font(MadarTypography.caption()).lineLimit(1).minimumScaleFactor(0.8)
+                        .font(MadarTypography.caption()).lineLimit(1).minimumScaleFactor(0.85)
                         .accessibilityIdentifier("mihbara-reader-footer-value")
                     Spacer(minLength: 4)
                 }
             } else if readerFooter != .bar {
                 HStack(alignment: .center, spacing: 12) {
                     Text(printPageLabel)
-                        .font(MadarTypography.caption()).lineLimit(1).minimumScaleFactor(0.8)
+                        .font(MadarTypography.caption()).lineLimit(1).minimumScaleFactor(0.85)
                         .accessibilityIdentifier("mihbara-reader-print-page")
                     Spacer(minLength: 4)
                     if readerFooter == .full || speechController.isActive {
@@ -852,7 +852,6 @@ struct MihbaraReaderView: View {
                             .font(MadarTypography.fine())
                             .foregroundStyle(palette.ink2)
                             .lineLimit(1)
-                            .minimumScaleFactor(0.8)
                             .accessibilityIdentifier("mihbara-listening-paragraph")
                     }
                     .frame(maxWidth: .infinity, alignment: .trailing)
@@ -1746,7 +1745,7 @@ private struct MihbaraReaderSettingsSheet: View {
             Text("عرض الصفحة").font(.custom("thmanyahserifdisplay-Bold", size: 22, relativeTo: .title2))
             Spacer(minLength: 8)
             Text(english ? "كتاب إنجليزي · إعداداتك للإنجليزي" : "كتاب عربي · إعداداتك للعربي").font(MadarTypography.fine().weight(.semibold))
-                .lineLimit(1).minimumScaleFactor(0.8)
+                .lineLimit(1)
                 .padding(.horizontal, 12).padding(.vertical, 6).background(well, in: .capsule)
             Button("تمّ") { dismiss() }.font(MadarTypography.caption()).frame(minWidth: 44, minHeight: 44)
                 .accessibilityIdentifier("mihbara-reader-settings-close")
@@ -1790,7 +1789,7 @@ private struct MihbaraReaderSettingsSheet: View {
                             Button { set("font", .string(option.rawValue)) } label: {
                                 VStack(spacing: 3) {
                                     Text("Book").font(.custom(option.previewName, size: 22, relativeTo: .title3)).lineLimit(1).minimumScaleFactor(0.75)
-                                    Text(option.title).font(MadarTypography.fine()).foregroundStyle(ink.opacity(0.72)).lineLimit(1).minimumScaleFactor(0.75)
+                                    Text(option.title).font(MadarTypography.fine()).foregroundStyle(ink.opacity(0.72)).lineLimit(1)
                                 }
                                 .frame(maxWidth: .infinity, minHeight: 76)
                                 .background(SwiftUI.Color.white.opacity(0.26), in: .rect(cornerRadius: 16))

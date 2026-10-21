@@ -81,7 +81,7 @@ struct DiaryCityStamp: View {
     var body: some View {
         VStack(spacing: 4) {
             DiaryDome().stroke(theme.onAccent, style: .init(lineWidth: 1.6, lineCap: .round, lineJoin: .round)).frame(width: 50, height: 40)
-            Text(city).font(.custom("thmanyahsans-Bold", size: 12, relativeTo: .caption)).foregroundStyle(theme.onAccent).lineLimit(1).minimumScaleFactor(0.7)
+            Text(city).font(.custom("thmanyahsans-Bold", size: 12, relativeTo: .caption)).foregroundStyle(theme.onAccent).lineLimit(1).minimumScaleFactor(0.92)
         }.frame(width: 76, height: 92).background(theme.color("accent")).padding(6)
             .overlay { Rectangle().stroke(theme.color("accent").opacity(0.45), style: .init(lineWidth: 2, dash: [3, 3])) }
             .accessibilityElement(children: .ignore).accessibilityLabel("طابع " + city).accessibilityIdentifier("diary-travel-stamp")

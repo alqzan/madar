@@ -106,7 +106,7 @@ struct NextPrayerView: View {
     private var circular:some View {
         VStack(spacing:3) {
             Image("MadarPrayer").renderingMode(.template).resizable().scaledToFit().frame(width:16,height:16)
-            if let state {Text(entry.snapshot?.countdown(minutes:state.minutes) ?? "").font(.system(size:15,weight:.semibold)).monospacedDigit().minimumScaleFactor(0.7).lineLimit(1);Text(state.item.name).font(.system(size:11)).lineLimit(1)}
+            if let state {Text(entry.snapshot?.countdown(minutes:state.minutes) ?? "").font(.system(size:15,weight:.semibold)).monospacedDigit().minimumScaleFactor(0.74).lineLimit(1);Text(state.item.name).font(.system(size:11)).lineLimit(1)}
             else{Text("افتح مدار").font(.system(size:11))}
         }.foregroundStyle(.primary).frame(maxWidth:.infinity,maxHeight:.infinity)
     }

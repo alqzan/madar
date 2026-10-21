@@ -282,7 +282,7 @@ struct BahwBlockView: View {
                                     PrayerHorseshoe().stroke(room.accent, lineWidth: arch.next ? 2.4 : 1)
                                     if arch.done { Image(systemName: "checkmark").font(.caption2.bold()).foregroundStyle(room.ink) }
                                 }.frame(maxWidth: size == .small ? 26 : 34).frame(height: size == .small ? 36 : 40).accessibilityHidden(true)
-                                if size != .small { Text(arch.name + " " + arch.time).font(small).lineLimit(1).minimumScaleFactor(0.7) }
+                                if size != .small { Text(arch.name + " " + arch.time).font(small).lineLimit(1) }
                             }.frame(maxWidth: .infinity)
                                 .accessibilityElement(children: .ignore).accessibilityLabel(arch.name + "، " + arch.clock24 + (arch.done ? "، صُلّيت" : ""))
                                 .accessibilityIdentifier("foundation-prayer-time-" + arch.id)
@@ -420,7 +420,7 @@ struct BahwBlockView: View {
                     ForEach(items.prefix(4)) { item in
                         VStack(spacing: 6) {
                             ring(item, diameter: 64)
-                            Text(item.title).font(label).lineLimit(1).minimumScaleFactor(0.75)
+                            Text(item.title).font(label).lineLimit(1).minimumScaleFactor(0.79)
                             MadarDateLabel(service.session.dateLabels(item.day, compact: true)).foregroundStyle(lobby.secondaryInk)
                         }.frame(maxWidth: .infinity).accessibilityElement(children: .ignore)
                             .accessibilityLabel(item.title + " بعد " + digits.string(item.daysLeft) + " " + service.dayCount(item.daysLeft)).accessibilityIdentifier("bahw-upcoming-item")
@@ -440,7 +440,7 @@ struct BahwBlockView: View {
             Circle().stroke(lobby.line, lineWidth: 5)
             Circle().trim(from: 0, to: service.upcomingCloseness(daysLeft: item.daysLeft)).stroke(lobby.color("clay"), style: .init(lineWidth: 5, lineCap: .round)).rotationEffect(.degrees(-90))
             VStack(spacing: 0) {
-                Text(digits.string(item.daysLeft)).font(.custom("thmanyahserifdisplay-Bold", size: diameter * 0.34, relativeTo: .title2)).minimumScaleFactor(0.5)
+                Text(digits.string(item.daysLeft)).font(.custom("thmanyahserifdisplay-Bold", size: diameter * 0.34, relativeTo: .title2)).minimumScaleFactor(0.51)
                 Text(service.dayCount(item.daysLeft)).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(lobby.secondaryInk)
             }
         }.frame(width: diameter, height: diameter).accessibilityHidden(true)

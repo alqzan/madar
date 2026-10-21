@@ -112,7 +112,7 @@ extension AppDiaryService {
         let rulingInk=UIColor(notes.line).withAlphaComponent(0.72)
         var number=0
         return UIGraphicsPDFRenderer(bounds:bounds).pdfData { renderer in
-            func begin(){renderer.beginPage();number+=1;paper.setFill();renderer.cgContext.fill(bounds);rulingInk.setStroke();let path=UIBezierPath();for y in stride(from:CGFloat(80),through:780,by:28){path.move(to:CGPoint(x:40,y:y));path.addLine(to:CGPoint(x:555,y:y))};path.lineWidth=0.5;path.stroke();(digits.string(number) as NSString).draw(at:CGPoint(x:290,y:805),withAttributes:[.font:UIFont.systemFont(ofSize:10),.foregroundColor:ink])}
+            func begin(){renderer.beginPage();number+=1;paper.setFill();renderer.cgContext.fill(bounds);rulingInk.setStroke();let path=UIBezierPath();for y in stride(from:CGFloat(80),through:780,by:28){path.move(to:CGPoint(x:40,y:y));path.addLine(to:CGPoint(x:555,y:y))};path.lineWidth=0.5;path.stroke();(digits.string(number) as NSString).draw(at:CGPoint(x:290,y:805),withAttributes:[.font:UIFont.systemFont(ofSize:11),.foregroundColor:ink])}
             if let coverYear {
                 begin();coverLeather.setFill();renderer.cgContext.fill(bounds)
                 let style=NSMutableParagraphStyle();style.alignment = .center;style.baseWritingDirection = .rightToLeft

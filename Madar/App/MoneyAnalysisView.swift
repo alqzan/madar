@@ -199,7 +199,7 @@ struct MoneyAnalysisView: View {
                         .overlay { if isSelected && !future { UnevenRoundedRectangle(topLeadingRadius: week ? 4 : 2, topTrailingRadius: week ? 4 : 2).stroke(theme.color("reserve"), lineWidth: week ? 2.5 : 1.5) } }
                 }.frame(height: min(plot, max(height, future && visible ? plot * CGFloat(Double(line ?? 0) / scale) : 0, 1)), alignment: .bottom)
                 VStack(spacing: 0) {
-                    if week { Text(weekday(d.day)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).lineLimit(1).minimumScaleFactor(0.7) }
+                    if week { Text(weekday(d.day)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).lineLimit(1).minimumScaleFactor(0.85) }
                     else if index % 5 == 0 || d.day == r.last {
                         Text(service.digits.string(primaryDay)).font(MadarTypography.fine()).fixedSize()
                         Text(service.digits.string(secondaryDay)).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(theme.secondaryInk).fixedSize()
@@ -291,7 +291,7 @@ struct MoneyAnalysisView: View {
                 if let gap, visible { Text((gap > 0 ? "+" : gap < 0 ? "−" : "") + approx(abs(gap))).foregroundStyle(gap > 0 ? theme.color("dueText") : theme.color("surplusText")).environment(\.layoutDirection, .leftToRight) }
                 else if gap == nil { Text("بلا حد").foregroundStyle(theme.secondaryInk) }
                 else { Text("•••") }
-            }.font(.custom("thmanyahsans-Bold", size: 13, relativeTo: .caption)).lineLimit(1).minimumScaleFactor(0.7).frame(width: 50, alignment: .trailing)
+            }.font(.custom("thmanyahsans-Bold", size: 13, relativeTo: .caption)).lineLimit(1).minimumScaleFactor(0.85).frame(width: 50, alignment: .trailing)
         }.accessibilityElement(children: .ignore)
             .accessibilityLabel(c.name + "، " + amount(c.spentMinor) + (c.capMinor.map { "، الحد " + amount($0) } ?? "، بلا حد") + (gap.map { visible ? ($0 > 0 ? "، فوقه بـ" + service.amount($0) : "، دونه بـ" + service.amount(-$0)) : "" } ?? ""))
             .accessibilityIdentifier("money-analysis-category-" + c.name)
@@ -378,12 +378,12 @@ struct MoneyAnalysisView: View {
                 HStack(alignment: .bottom, spacing: 8) {
                     ForEach(Array(top.enumerated()), id: \.element.id) { index, m in
                         VStack(spacing: 4) {
-                            Text(figure: amount(m.amountMinor)).font(.custom("thmanyahserifdisplay-Bold", size: 18, relativeTo: .body)).lineLimit(1).minimumScaleFactor(0.6)
+                            Text(figure: amount(m.amountMinor)).font(.custom("thmanyahserifdisplay-Bold", size: 18, relativeTo: .body)).lineLimit(1).minimumScaleFactor(0.62)
                             UnevenRoundedRectangle(topLeadingRadius: 16, topTrailingRadius: 16)
                                 .fill(index == 0 ? theme.color("reserve") : theme.color("glass").mix(with: theme.color("reserve"), by: 0.18))
                                 .overlay { if index == 0 { UnevenRoundedRectangle(topLeadingRadius: 16, topTrailingRadius: 16).stroke(theme.color("reserveText"), lineWidth: 1) } }
                                 .frame(height: visible ? 22 + 32 * CGFloat(m.amountMinor) / CGFloat(peak) : 36)
-                            Text(m.name).font(.custom("thmanyahsans-Bold", size: 13, relativeTo: .caption)).lineLimit(1).minimumScaleFactor(0.7)
+                            Text(m.name).font(.custom("thmanyahsans-Bold", size: 13, relativeTo: .caption)).lineLimit(1).minimumScaleFactor(0.85)
                             Text(visible ? service.times(m.count) : "•••").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).lineLimit(1)
                         }.frame(maxWidth: .infinity).accessibilityElement(children: .combine).accessibilityIdentifier("money-analysis-merchant-" + m.name)
                     }

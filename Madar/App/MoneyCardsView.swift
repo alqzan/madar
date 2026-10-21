@@ -175,7 +175,7 @@ struct MoneyCardsView: View {
         }
     }
     private func swatch(_ color: Color, _ title: String, _ value: String?) -> some View {
-        HStack(spacing: 4) { RoundedRectangle(cornerRadius: 2).fill(color).frame(width: 9, height: 9); Text(title + (visible ? value.map { " " + $0 } ?? "" : "")) }.lineLimit(1).minimumScaleFactor(0.8)
+        HStack(spacing: 4) { RoundedRectangle(cornerRadius: 2).fill(color).frame(width: 9, height: 9); Text(title + (visible ? value.map { " " + $0 } ?? "" : "")) }.lineLimit(1)
     }
     /// Basis points as a short percent: 4300 → «٤٣٪», 50 → «٠٫٥٪».
     private func percent(_ bp: Int) -> String {
@@ -293,7 +293,7 @@ struct MoneyCardsView: View {
         let content = VStack(spacing: 2) {
                 Text(service.digits.string(calendar.identifier == .gregorian ? pair.gregorian.day : pair.hijri.day)).font(MadarTypography.caption())
                 Text(service.digits.string(calendar.identifier == .gregorian ? pair.hijri.day : pair.gregorian.day)).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
-                Text(shown?.name ?? " ").font(MadarTypography.fine()).lineLimit(1).minimumScaleFactor(0.85).foregroundStyle(theme.color("accentText"))
+                Text(shown?.name ?? " ").font(MadarTypography.fine()).lineLimit(1).foregroundStyle(theme.color("accentText"))
                 if items.count > 1 { Text("+" + service.digits.string(items.count - 1)).font(MadarTypography.fine()) }
             }.frame(maxWidth: .infinity, minHeight: 61).background(items.isEmpty ? Color.clear : theme.surface)
                 .overlay { if day == today { RoundedRectangle(cornerRadius: 7).stroke(theme.color("reserveText"), style: .init(lineWidth: 1, dash: [3, 2])) } }

@@ -178,7 +178,7 @@ struct MoneyReconcileView: View {
                     Rectangle().stroke(matched ? theme.color("surplusText") : theme.color("dueText"), lineWidth: 1.2).frame(width: 52, height: 52).rotationEffect(.degrees(45))
                     Rectangle().stroke(matched ? theme.color("surplusText") : theme.color("dueText"), lineWidth: 0.7).frame(width: 44, height: 44).rotationEffect(.degrees(45))
                     Text(delta.map(signed) ?? "؟").font(MadarTypography.caption()).bold().foregroundStyle(matched ? theme.color("surplusText") : theme.color("dueText"))
-                        .minimumScaleFactor(0.6).lineLimit(1).frame(width: 66).contentTransition(.numericText())
+                        .minimumScaleFactor(0.85).lineLimit(1).frame(width: 66).contentTransition(.numericText())
                         .accessibilityLabel(delta.map { "الفرق " + signed($0) } ?? "لم يُدخل رصيد البنك").accessibilityIdentifier("money-reconcile-delta")
                 }.padding(.top, 34)
             }
@@ -257,7 +257,7 @@ struct MoneyReconcileView: View {
                     Spacer(minLength: 4)
                     ForEach(names, id: \.self) { name in
                         Button { entries[r.id]?.name = chosen == name ? nil : name } label: {
-                            Text(title(name)).font(MadarTypography.caption()).bold().lineLimit(1).minimumScaleFactor(0.8).padding(.horizontal, 8)
+                            Text(title(name)).font(MadarTypography.caption()).bold().lineLimit(1).minimumScaleFactor(0.85).padding(.horizontal, 8)
                                 .frame(minHeight: 58).frame(maxWidth: .infinity)
                                 .background(chosen == name ? theme.ink : theme.color("surface2"), in: Rectangle())
                                 .foregroundStyle(chosen == name ? theme.background : theme.ink).overlay { Rectangle().stroke(theme.line, lineWidth: 1) }
@@ -355,11 +355,11 @@ struct MoneyReconcileView: View {
     private func ledgerRow(_ item: MoneyReconcileRow) -> some View {
         let l = line(item), active = item.id == row?.id
         return HStack(spacing: 4) {
-            Text(item.name).font(MadarTypography.body()).lineLimit(1).minimumScaleFactor(0.75).frame(maxWidth: .infinity, alignment: .leading)
-            Text(figure: amount(item.expectedMinor)).font(MadarTypography.caption()).lineLimit(1).minimumScaleFactor(0.6).frame(width: 70)
-            Text(l.map { amount($0.observedMinor) } ?? "—").font(MadarTypography.caption()).bold().lineLimit(1).minimumScaleFactor(0.6).frame(width: 70)
+            Text(item.name).font(MadarTypography.body()).lineLimit(1).minimumScaleFactor(0.79).frame(maxWidth: .infinity, alignment: .leading)
+            Text(figure: amount(item.expectedMinor)).font(MadarTypography.caption()).lineLimit(1).minimumScaleFactor(0.85).frame(width: 70)
+            Text(l.map { amount($0.observedMinor) } ?? "—").font(MadarTypography.caption()).bold().lineLimit(1).minimumScaleFactor(0.85).frame(width: 70)
                 .foregroundStyle(l.map { $0.deltaMinor == 0 ? theme.ink : theme.color("dueText") } ?? theme.secondaryInk)
-            Text(l.map { $0.deltaMinor == 0 ? "—" : signed($0.deltaMinor) } ?? "").font(MadarTypography.caption()).bold().lineLimit(1).minimumScaleFactor(0.6).frame(width: 52)
+            Text(l.map { $0.deltaMinor == 0 ? "—" : signed($0.deltaMinor) } ?? "").font(MadarTypography.caption()).bold().lineLimit(1).minimumScaleFactor(0.85).frame(width: 52)
                 .foregroundStyle(l.map { $0.deltaMinor < 0 ? theme.color("dueText") : $0.deltaMinor > 0 ? theme.color("accentText") : theme.secondaryInk } ?? theme.secondaryInk)
             stamp(item).frame(width: 40)
         }.padding(.vertical, 10).padding(.horizontal, 6)

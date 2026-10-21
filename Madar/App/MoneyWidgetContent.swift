@@ -48,7 +48,7 @@ struct MoneyWidgetContent: View {
                                 HStack(alignment: .firstTextBaseline) {
                                     Text(row.title).font(MadarTypography.caption()).lineLimit(1)
                                     Spacer(minLength: 2)
-                                    displayFigure(row.value, "thmanyahserifdisplay-Bold", size: family == .systemSmall && row.id == "now" ? 30 : largeHome ? 18 : 19, relativeTo: .title2).lineLimit(1).minimumScaleFactor(0.7)
+                                    displayFigure(row.value, "thmanyahserifdisplay-Bold", size: family == .systemSmall && row.id == "now" ? 30 : largeHome ? 18 : 19, relativeTo: .title2).lineLimit(1).minimumScaleFactor(0.85)
                                 }
                             }
                         }

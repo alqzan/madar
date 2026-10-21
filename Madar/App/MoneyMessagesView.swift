@@ -99,7 +99,7 @@ struct MoneyMessagesView: View {
                         VStack(spacing: 2) {
                             Text(item.1).font(.custom("thmanyahsans-Bold", size: 15, relativeTo: .subheadline)).foregroundStyle(item.4)
                             Text(service.digits.string(item.2)).font(.custom("thmanyahserifdisplay-Black", size: 30, relativeTo: .title))
-                            Text(item.3).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).lineLimit(1).minimumScaleFactor(0.7)
+                            Text(item.3).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).lineLimit(1)
                         }.padding(.top, 22).padding(.bottom, 10).padding(.horizontal, 6).frame(maxWidth: .infinity)
                             .background { MessageArch().fill(item.5 ? theme.surface : .clear) }
                             .overlay { MessageArch().stroke(item.4.opacity(item.5 ? 1 : 0.7), lineWidth: item.5 ? 1.6 : 1) }
@@ -146,7 +146,7 @@ struct MoneyMessagesView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Rectangle().fill(theme.color("accent")).frame(height: 2)
                     Text("الاستحقاق").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
-                    if let due = s.due { MadarDateLabel(app.dateLabels(due, compact: true), primaryFont: .custom("thmanyahserifdisplay-Bold", size: 17, relativeTo: .headline), secondaryFont: MadarTypography.fine()).foregroundStyle(theme.color("accent")).lineLimit(1).minimumScaleFactor(0.7) }
+                    if let due = s.due { MadarDateLabel(app.dateLabels(due, compact: true), primaryFont: .custom("thmanyahserifdisplay-Bold", size: 17, relativeTo: .headline), secondaryFont: MadarTypography.fine()).foregroundStyle(theme.color("accent")).lineLimit(1) }
                     else { Text("—").font(MadarTypography.cardTitle()) }
                 }.frame(maxWidth: .infinity, alignment: .leading)
             }

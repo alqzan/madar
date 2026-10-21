@@ -143,7 +143,7 @@ struct MoneySalaryView: View {
         HStack {
             Text(title)
             Spacer(minLength: 4)
-            Text(figure: value).foregroundStyle(color).lineLimit(1).minimumScaleFactor(0.7)
+            Text(figure: value).foregroundStyle(color).lineLimit(1)
             Text(share).foregroundStyle(theme.secondaryInk).frame(width: 34, alignment: .trailing)
         }.font(MadarTypography.fine()).padding(.vertical, 5).overlay(alignment: .bottom) { Rectangle().fill(theme.line).frame(height: 0.6) }
     }
@@ -291,17 +291,17 @@ struct MoneySalaryView: View {
         return VStack(spacing: 4) {
             VStack(spacing: 3) {
                 Spacer(minLength: 0)
-                if positive { Text(figure: signed(bar.carriedMinor)).font(.custom("thmanyahsans-Bold", size: 11, relativeTo: .caption2)).lineLimit(1).minimumScaleFactor(0.6)
+                if positive { Text(figure: signed(bar.carriedMinor)).font(.custom("thmanyahsans-Bold", size: 11, relativeTo: .caption2)).lineLimit(1)
                     Rectangle().fill(fill).frame(height: height).overlay { if bar.current { Rectangle().stroke(theme.ink, lineWidth: 2) } } }
             }.frame(height: 88)
             Rectangle().fill(theme.ink).frame(height: 1)
             VStack(spacing: 3) {
                 if !positive { Rectangle().fill(fill).frame(height: height).overlay { if bar.current { Rectangle().stroke(theme.ink, lineWidth: 2) } }
-                    Text(figure: signed(bar.carriedMinor)).font(.custom("thmanyahsans-Bold", size: 11, relativeTo: .caption2)).foregroundStyle(tint("due")).lineLimit(1).minimumScaleFactor(0.6) }
+                    Text(figure: signed(bar.carriedMinor)).font(.custom("thmanyahsans-Bold", size: 11, relativeTo: .caption2)).foregroundStyle(tint("due")).lineLimit(1) }
                 Spacer(minLength: 0)
             }.frame(height: 50)
             Text(bar.current ? bar.label + "، هذه" : bar.label).font(.custom(bar.current ? "thmanyahsans-Bold" : "thmanyahsans-Regular", size: 12, relativeTo: .caption))
-                .foregroundStyle(bar.current ? theme.ink : theme.secondaryInk).lineLimit(1).minimumScaleFactor(0.7)
+                .foregroundStyle(bar.current ? theme.ink : theme.secondaryInk).lineLimit(1).minimumScaleFactor(0.92)
         }.frame(maxWidth: .infinity)
     }
 
@@ -323,9 +323,9 @@ struct MoneySalaryView: View {
     private func envelopeCard(_ e: SalaryOpeningReading.EnvelopeLine) -> some View {
         let color = e.repay ? theme.color("due") : theme.color("bills")
         return VStack(spacing: 6) {
-            Text(e.name).font(.custom("thmanyahsans-Bold", size: 15, relativeTo: .callout)).lineLimit(1).minimumScaleFactor(0.7)
+            Text(e.name).font(.custom("thmanyahsans-Bold", size: 15, relativeTo: .callout)).lineLimit(1).minimumScaleFactor(0.74)
             Text(figure: amount(e.amountMinor)).font(.custom("thmanyahserifdisplay-Bold", size: 22, relativeTo: .title3))
-            if let line = completion(e) { Text(line).font(MadarTypography.fine()).foregroundStyle(tint("surplus")).lineLimit(2).multilineTextAlignment(.center).minimumScaleFactor(0.8) }
+            if let line = completion(e) { Text(line).font(MadarTypography.fine()).foregroundStyle(tint("surplus")).lineLimit(2).multilineTextAlignment(.center) }
             if e.adjustable {
                 HStack(spacing: 6) {
                     stepper("minus", e, -5_000)

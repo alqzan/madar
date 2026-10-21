@@ -217,8 +217,8 @@ struct MoneyCashbackView: View {
                     .background { if selected { RoundedRectangle(cornerRadius: 3).fill(theme.color("glass")).padding(.top, -6) } }
                     .overlay(alignment: .bottom) { Rectangle().fill(theme.ink).frame(height: 1).padding(.horizontal, -6) }
                 VStack(spacing: 0) {
-                    label.foregroundStyle(selected ? theme.ink : theme.secondaryInk).lineLimit(1).minimumScaleFactor(0.7)
-                    Text(m.secondaryShort).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).lineLimit(1).minimumScaleFactor(0.55)
+                    label.foregroundStyle(selected ? theme.ink : theme.secondaryInk).lineLimit(1)
+                    Text(m.secondaryShort).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).lineLimit(1)
                 }
             }.frame(maxWidth: .infinity).contentShape(Rectangle())
         }.buttonStyle(.plain)
@@ -250,7 +250,7 @@ struct MoneyCashbackView: View {
                     ForEach(chips) { chip in
                         Button { selectedChip = selectedChip == chip.id ? nil : chip.id } label: {
                         VStack(spacing: 3) {
-                            Text(chip.title).font(MadarTypography.caption().bold()).lineLimit(1).minimumScaleFactor(0.75)
+                            Text(chip.title).font(MadarTypography.caption().bold()).lineLimit(1).minimumScaleFactor(0.85)
                             Text("+" + whole(chip.gainMinor)).font(MadarTypography.fine().bold()).foregroundStyle(theme.color("surplusText"))
                         }.frame(maxWidth: .infinity, minHeight: 62).padding(.horizontal, 2)
                         }
@@ -317,7 +317,7 @@ struct MoneyCashbackView: View {
             app.set(.string(id?.uuidString ?? ""), key: "mal.cashbackDestination") { load() }
         } label: {
             Text(name).font(MadarTypography.caption().weight(.semibold))
-                .lineLimit(1).minimumScaleFactor(0.78).padding(.horizontal, 4).frame(maxWidth: .infinity, minHeight: 44)
+                .lineLimit(1).minimumScaleFactor(0.85).padding(.horizontal, 4).frame(maxWidth: .infinity, minHeight: 44)
         }
         .buttonStyle(.plain)
         .glassEffect(.regular.interactive(), in: Capsule())

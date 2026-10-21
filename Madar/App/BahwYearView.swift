@@ -221,7 +221,7 @@ struct BahwYearView: View {
             HStack(spacing: 4) {
                 ForEach(0..<12, id: \.self) { index in
                     Text(shorts[index]).font(.custom(index == month ? "thmanyahsans-Bold" : "thmanyahsans-Regular", size: 11, relativeTo: .caption2))
-                        .foregroundStyle(index == month ? lobby.ink : lobby.secondaryInk).lineLimit(1).minimumScaleFactor(0.6).frame(maxWidth: .infinity)
+                        .foregroundStyle(index == month ? lobby.ink : lobby.secondaryInk).lineLimit(1).frame(maxWidth: .infinity)
                 }
             }
         }

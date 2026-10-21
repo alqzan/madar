@@ -80,7 +80,7 @@ struct BahwCustomizePreview: View {
                     let w = CGFloat(place.size.columns) * unit + CGFloat(place.size.columns - 1) * gap, h = CGFloat(place.size.rows) * unit + CGFloat(place.size.rows - 1) * gap
                     RoundedRectangle(cornerRadius: 7).fill(lobby.color(block.tone).opacity(0.16))
                         .overlay { RoundedRectangle(cornerRadius: 7).stroke(lobby.line) }
-                        .overlay { if place.size != .icon { Text(block.title).font(.custom("thmanyahsans-Bold", size: 11, relativeTo: .caption2)).foregroundStyle(lobby.ink).lineLimit(1).minimumScaleFactor(0.7).padding(2) } }
+                        .overlay { if place.size != .icon { Text(block.title).font(.custom("thmanyahsans-Bold", size: 11, relativeTo: .caption2)).foregroundStyle(lobby.ink).lineLimit(1).padding(2) } }
                         .frame(width: w, height: h)
                         .position(x: CGFloat(place.column) * (unit + gap) + w / 2, y: CGFloat(place.row) * (unit + gap) + h / 2)
                 }
@@ -131,7 +131,7 @@ struct BahwBlocksSection: View {
             MadarGlyph(block.symbol, size: 17).foregroundStyle(lobby.ink).frame(width: 30, height: 30).background(lobby.color(block.tone).opacity(0.16), in: .rect(cornerRadius: 9)).accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(block.title).font(MadarTypography.section()).lineLimit(1)
-                Text(size.title + "، " + block.detail).font(MadarTypography.caption()).foregroundStyle(lobby.secondaryInk).lineLimit(1).minimumScaleFactor(0.75)
+                Text(size.title + "، " + block.detail).font(MadarTypography.caption()).foregroundStyle(lobby.secondaryInk).lineLimit(1).minimumScaleFactor(0.85)
             }.frame(minWidth: 70, alignment: .leading).layoutPriority(1)
             Spacer(minLength: 0)
             HStack(spacing: 3) {

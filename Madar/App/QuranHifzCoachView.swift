@@ -50,7 +50,7 @@ struct QuranHifzCoachView: View {
                                     ForEach(QuranUIGrade.allCases) { value in
                                         Button { action(.grade(page: grade.page, grade: value)) } label: {
                                             Text(value.title).font(font(11, bold: value == grade.grade))
-                                                .lineLimit(1).minimumScaleFactor(0.9)
+                                                .lineLimit(1)
                                                 .frame(maxWidth: .infinity, minHeight: 32)
                                                 .foregroundStyle(value == grade.grade ? theme.onAccent : theme.ink)
                                                 .background(value == grade.grade ? theme.accent : theme.surface, in: Capsule())

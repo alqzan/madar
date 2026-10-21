@@ -84,7 +84,7 @@ struct MoneySinceView: View {
     }
     private func box(_ title: String, _ value: String, tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(title).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).lineLimit(2).minimumScaleFactor(0.8).fixedSize(horizontal: false, vertical: true)
+            Text(title).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).lineLimit(2).fixedSize(horizontal: false, vertical: true)
             Text(figure: value).font(.custom("thmanyahserifdisplay-Bold", size: 19, relativeTo: .headline)).foregroundStyle(tint).lineLimit(1).minimumScaleFactor(0.6)
         }.padding(.horizontal, 6).padding(.vertical, 5).frame(maxWidth: 92).overlay { Rectangle().stroke(theme.line, lineWidth: 1) }
     }
@@ -137,7 +137,7 @@ struct MoneySinceView: View {
                     .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                     .accessibilityIdentifier("money-since-secondary-day-" + d.id)
             }
-            Text(String(parts.first ?? "")).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(theme.secondaryInk).lineLimit(1).minimumScaleFactor(0.7)
+            Text(String(parts.first ?? "")).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(theme.secondaryInk).lineLimit(1)
             VStack(spacing: 5) {
                 if d.salaryMinor > 0 { icon("arrow.down", theme.color("surplus")) }
                 if d.messages > 0 { icon("envelope", theme.color("accent")) }
@@ -145,7 +145,7 @@ struct MoneySinceView: View {
                 if d.over { icon("exclamationmark", theme.color("due")) }
                 if d.pending > 0 { icon("hourglass", theme.color("reserveText"), outline: true) }
             }.frame(maxHeight: .infinity, alignment: .top)
-            Text(figure: amount(d.spentMinor)).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(d.over ? theme.color("dueText") : theme.secondaryInk).lineLimit(1).minimumScaleFactor(0.6)
+            Text(figure: amount(d.spentMinor)).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(d.over ? theme.color("dueText") : theme.secondaryInk).lineLimit(1)
             GeometryReader { proxy in
                 let h = proxy.size.height
                 ZStack(alignment: .bottom) {

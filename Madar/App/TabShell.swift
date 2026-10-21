@@ -159,7 +159,7 @@ private struct PrayerAccessoryStatus: View {
                         .font(MadarTypography.caption())
                         .foregroundStyle(ink)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.8)
+                        .minimumScaleFactor(0.85)
                     }
             }
             .padding(.leading, 12)
