@@ -364,6 +364,7 @@ struct MihbaraBookCard: View {
     @State private var finish = false
     @State private var choosingSlot = false
     @State private var saving = false
+    @State private var paperTitlePinned = false
     private var digits: MadarNumberFormatter { AppMihbaraService(app: app).digits }
     private var paperChapters: [PaperBookChapter] {
         guard let data = book.tocJSON, let chapters = PaperBookIndex.decode(data, pages: book.pages) else { return [] }
@@ -421,6 +422,29 @@ struct MihbaraBookCard: View {
                 }
             }.padding(22)
         }.background(theme.background).foregroundStyle(theme.ink).scrollDismissesKeyboard(.interactively)
+        .onScrollGeometryChange(for: Bool.self) { geometry in
+            geometry.contentOffset.y > 48
+        } action: { _, isPinned in
+            if book.kind == "paper" { paperTitlePinned = isPinned }
+        }
+        .overlay(alignment: .top) {
+            if book.kind == "paper", paperTitlePinned {
+                HStack(spacing: 8) {
+                    Image(systemName: "book.closed.fill").font(.system(size: 13, weight: .medium))
+                        .accessibilityHidden(true)
+                    Text(book.title).font(MadarTypography.caption()).lineLimit(1).truncationMode(.middle)
+                        .accessibilityIdentifier("mihbara-paper-title-pinned")
+                }
+                .foregroundStyle(theme.ink)
+                .frame(maxWidth: .infinity, minHeight: 38, alignment: .trailing)
+                .padding(.horizontal, 22)
+                .background(theme.background.opacity(0.98))
+                .overlay(alignment: .bottom) { Rectangle().fill(theme.line.opacity(0.65)).frame(height: 0.5) }
+                .environment(\.layoutDirection, .rightToLeft)
+                .allowsHitTesting(false)
+                .transition(.opacity)
+            }
+        }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if book.kind == "paper" {
                 paperBookFooter

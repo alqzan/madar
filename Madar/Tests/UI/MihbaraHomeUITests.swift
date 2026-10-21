@@ -249,8 +249,13 @@ import XCTest
 
         XCTAssertTrue(app.staticTexts["mihbara-paper-position-summary"].waitForExistence(timeout: 8), app.debugDescription)
         XCTAssertTrue(app.buttons["mihbara-paper-start"].label.contains("واصل القراءة"))
+        XCTAssertFalse(app.staticTexts["mihbara-paper-title-pinned"].exists, app.debugDescription)
         shot(app, "M6-V23-long-title-actions-L")
         app.scrollViews.firstMatch.swipeUp(velocity: .slow)
+        let pinnedTitle = app.staticTexts["mihbara-paper-title-pinned"]
+        XCTAssertTrue(pinnedTitle.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(pinnedTitle.isHittable, app.debugDescription)
+        XCTAssertTrue(pinnedTitle.label.contains("مدخل طويل إلى القراءة"), pinnedTitle.label)
         XCTAssertTrue(details.isHittable, app.debugDescription)
         XCTAssertTrue(start.isHittable, app.debugDescription)
         shot(app, "M6-V23-long-title-actions-s1-L")
