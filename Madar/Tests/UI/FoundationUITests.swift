@@ -383,6 +383,11 @@ import XCTest
         app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
         let qiyam = app.buttons["prayer-qiyam"]; scrollTo(qiyam, in: app); qiyam.tap()
         XCTAssertTrue(app.buttons["prayer-qiyam-plus"].waitForExistence(timeout: 10), app.debugDescription)
+        let nightPicker = app.buttons["prayer-qiyam-night"]
+        XCTAssertTrue(nightPicker.exists, app.debugDescription)
+        XCTAssertTrue(nightPicker.label.contains("،"), nightPicker.label)
+        XCTAssertTrue(nightPicker.label.contains("ربيع") && nightPicker.label.contains("أكتوبر"), nightPicker.label)
+        XCTAssertFalse(nightPicker.label.contains("-"), "Night labels use words rather than ISO: \(nightPicker.label)")
         XCTAssertFalse(app.buttons["ورد القيام من محفوظك"].exists, "The Quran room is not built, so it has no entry point")
         attachScreenshot(app, named: "M1-V07-qiyam-L")
         app.terminate()
