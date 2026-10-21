@@ -269,7 +269,7 @@ private struct MoneyEnvelopeRoad: View {
                             }
                             if let dueIndex {
                                 let x = right - slot * CGFloat(dueIndex) - slot / 2
-                                var line = Path(); line.move(to: .init(x: x, y: 18)); line.addLine(to: .init(x: x, y: 70))
+                                var line = Path(); line.move(to: .init(x: x, y: 27)); line.addLine(to: .init(x: x, y: 70))
                                 context.stroke(line, with: .color(theme.color("debt")), lineWidth: 2)
                             }
                         }.accessibilityHidden(true)
@@ -280,8 +280,15 @@ private struct MoneyEnvelopeRoad: View {
                             }.frame(width: slot, height: 80, alignment: .top).position(x: right - slot * CGFloat(index) - slot / 2, y: 72)
                         }
                         if let dueIndex, let due = reading.envelope.due {
-                            Text(app.dateLabels(due, compact: true).primary).font(.custom("thmanyahsans-Bold", size: 11)).foregroundStyle(theme.color("dueText"))
-                                .position(x: right - slot * CGFloat(dueIndex) - slot / 2, y: 8)
+                            let labels = app.dateLabels(due, compact: true)
+                            VStack(spacing: 0) {
+                                Text(labels.primary).font(.custom("thmanyahsans-Bold", size: 11, relativeTo: .caption2))
+                                Text(labels.secondary).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2))
+                            }
+                            .foregroundStyle(theme.color("dueText"))
+                            .multilineTextAlignment(.center)
+                            .fixedSize()
+                            .position(x: right - slot * CGFloat(dueIndex) - slot / 2, y: 13)
                         }
                         Capsule().fill(LinearGradient(colors: [theme.color("rod2"), theme.color("rod"), theme.color("rod2")], startPoint: .leading, endPoint: .trailing)).frame(width: 12, height: 48).position(x: right + 8, y: 41)
                     }

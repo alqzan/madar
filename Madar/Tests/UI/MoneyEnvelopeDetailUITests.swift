@@ -11,6 +11,9 @@ import XCTest
         for _ in 0..<5 { if rent.isHittable { break }; app.swipeUp(velocity: .slow) }
         XCTAssertTrue(rent.isHittable); rent.tap()
         XCTAssertTrue(app.descendants(matching: .any)["money-envelope-detail"].waitForExistence(timeout: 10))
+        let shortfall = app.descendants(matching: .any)["money-detail-shortfall"]
+        XCTAssertTrue(shortfall.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(shortfall.label.contains("نوفمبر"), shortfall.label)
         shot(app, "M5-V04-detail-L")
         app.buttons["money-repay-open"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["money-repayment-preview"].waitForExistence(timeout: 5))
