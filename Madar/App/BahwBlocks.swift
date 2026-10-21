@@ -17,6 +17,7 @@ struct BahwBlockView: View {
     @State private var mihbaraLocked = true
     @State private var habitPeriod: HabitFrequency?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.roomTheme) private var lobby
     private var dark: Bool { lobby.dark }
     private var room: RoomTheme {
@@ -94,6 +95,105 @@ struct BahwBlockView: View {
         .accessibilityLabel(f.arabic + "، " + spoken)
         .accessibilityAddTraits(selected ? .isSelected : []).accessibilityIdentifier("bahw-habits-period-" + f.rawValue)
     }
+    private func periodChoice(_ f: HabitFrequency, rows: [HabitReading], selected: Bool) -> some View {
+        let group = rows.filter { $0.summary.current?.rule.frequency == f }
+        let met = group.filter { $0.summary.current?.met == true }.count
+        let spoken = group.isEmpty ? "لا عادات" : digits.string(met) + " من " + digits.string(group.count)
+        return Button { withAnimation(reduceMotion ? nil : .snappy) { habitPeriod = f } } label: {
+            Text(f.arabic + "، " + spoken)
+                .font(MadarTypography.caption())
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .padding(.horizontal, 4)
+                .background(selected ? room.accentFill : room.background, in: .rect(cornerRadius: 12))
+                .foregroundStyle(selected ? room.onAccent : room.secondaryInk)
+        }
+        .buttonStyle(.plain)
+        .disabled(!interactive || group.isEmpty)
+        .accessibilityLabel(f.arabic + "، " + spoken)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+        .accessibilityIdentifier("bahw-habits-period-" + f.rawValue)
+    }
+    private func habitProgress(_ row: HabitReading) -> String {
+        if row.paused { return "مجمّدة" }
+        guard let current = row.summary.current else { return "لا فترة بعد" }
+        if current.outcome == .excluded { return "إجازتها اليوم" }
+        if current.rule.measure == .once {
+            if current.outcome == .minimum { return "أقلّ القليل" }
+            return current.met ? "تمّت" : "لم تتمّها بعد"
+        }
+        guard current.target > 0 else { return row.statusTitle }
+        return digits.string(current.value) + " من " + habitUnitCount(current.target, current.rule.unit, digits)
+    }
+    private func activateHabit(_ row: HabitReading) {
+        if row.source == "walking" { service.session.habitsOpen = true }
+        else if let source = row.source { service.session.selectedTab = source == "jamaah" ? "prayer" : source == "review" ? "quran" : "notes" }
+        else {
+            Task {
+                do {
+                    try await service.session.executeDiaryCommand("habit.complete", payload: [
+                        "id": .string(row.id.uuidString),
+                        "delta": .number(row.summary.current?.rule.measure == .duration ? 15 : 1)
+                    ])
+                } catch { service.session.errorMessage = error.localizedDescription }
+            }
+        }
+    }
+    private func habitRing(_ row: HabitReading) -> some View {
+        let current = row.summary.current
+        let share = Double(current?.value ?? 0) / Double(max(1, current?.target ?? 1))
+        let progress = habitProgress(row)
+        return Button { activateHabit(row) } label: {
+            VStack(spacing: 2) {
+                ZStack(alignment: .topTrailing) {
+                    HabitMiniRing(share: share, theme: room).frame(width: 36, height: 36)
+                    if row.source != nil || current?.met == true {
+                        MadarGlyph(row.symbol, size: 16).frame(width: 36, height: 36)
+                    }
+                    if row.paused || (row.source != nil && current?.met == true) {
+                        Image(systemName: row.paused ? "pause.fill" : "checkmark")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(room.ink)
+                            .padding(3)
+                            .background(room.surface, in: .circle)
+                            .offset(x: 1, y: -1)
+                    }
+                }
+                Text(row.name).font(small).lineLimit(2).multilineTextAlignment(.center)
+                Text(progress).font(MadarTypography.fine()).foregroundStyle(room.secondaryInk).lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, minHeight: 74)
+            .contentShape(.rect(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+        .disabled(!interactive || row.paused)
+        .accessibilityLabel(row.name + "، " + progress + (row.statusTitle == progress ? "" : "، " + row.statusTitle))
+        .accessibilityHint(row.source == nil ? "المس لتسجيل العادة" : "المس لفتح الغرفة المرتبطة")
+        .accessibilityIdentifier("bahw-habit-ring-" + row.id.uuidString)
+    }
+    private func habitListRow(_ row: HabitReading) -> some View {
+        let progress = habitProgress(row)
+        return Button { activateHabit(row) } label: {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(row.name).font(MadarTypography.body())
+                    Spacer(minLength: 8)
+                    Text(progress).font(MadarTypography.caption()).foregroundStyle(room.secondaryInk)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(row.name).font(MadarTypography.body())
+                    Text(progress).font(MadarTypography.caption()).foregroundStyle(room.secondaryInk)
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .disabled(!interactive || row.paused)
+        .accessibilityLabel(row.name + "، " + progress + (row.statusTitle == progress ? "" : "، " + row.statusTitle))
+        .accessibilityHint(row.source == nil ? "المس لتسجيل العادة" : "المس لفتح الغرفة المرتبطة")
+        .accessibilityIdentifier("bahw-habit-item-" + row.id.uuidString)
+    }
     private var habits: some View {
         let rows = (try? HabitRepository(context: ModelContext(service.session.container)).readings(at:service.now)) ?? []
         let met = rows.filter { $0.summary.current?.met == true }.count
@@ -102,7 +202,14 @@ struct BahwBlockView: View {
             if rows.isEmpty {
                 // Improvement 16 Oct: no «٠ من ٠»; the four period rings at rest show what a habit becomes, and the action is a real button.
                 Spacer(minLength:0)
-                if size == .large { HStack { ForEach([HabitFrequency.daily,.weekly,.monthly,.yearly],id:\.self){f in VStack(spacing:4){HabitMiniRing(share:0,theme:room).frame(width:24,height:24);Text(f.arabic).font(small).foregroundStyle(room.secondaryInk)}.frame(maxWidth:.infinity)} }.accessibilityHidden(true).padding(.bottom,12) }
+                if size == .large {
+                    HStack {
+                        ForEach([HabitFrequency.daily, .weekly, .monthly, .yearly], id: \.self) { f in
+                            if dynamicTypeSize.isAccessibilitySize { Text(f.arabic).font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 44) }
+                            else { VStack(spacing: 4) { HabitMiniRing(share: 0, theme: room).frame(width: 24, height: 24); Text(f.arabic).font(small).foregroundStyle(room.secondaryInk) }.frame(maxWidth: .infinity) }
+                        }
+                    }.accessibilityHidden(true).padding(.bottom, 12)
+                }
                 Text("عادة صغيرة تدوم").font(size == .icon ? small : big)
                 if size == .icon { EmptyView() }
                 else if size == .small { Text("أضف أول عادة").font(small).foregroundStyle(room.secondaryInk) }
@@ -120,17 +227,25 @@ struct BahwBlockView: View {
                 let open=periods.first{f in rows.contains{$0.summary.current?.rule.frequency == f && $0.summary.current?.met != true && !$0.paused}} ?? periods.first{f in rows.contains{$0.summary.current?.rule.frequency == f}} ?? .daily
                 let period=habitPeriod.flatMap{p in rows.contains{$0.summary.current?.rule.frequency == p} ? p : nil} ?? open
                 let shown=rows.filter{$0.summary.current?.rule.frequency == period}
-                HStack { ForEach(periods,id:\.self){f in periodRing(f,rows:rows,selected:f == period)} }
-                LazyVGrid(columns:[GridItem(.flexible()),GridItem(.flexible())],spacing:8){ ForEach(Array(shown.prefix(6))){r in
-                    Button {
-                        if r.source == "walking" {service.session.habitsOpen=true}
-                        else if let source=r.source { service.session.selectedTab=source == "jamaah" ? "prayer" : source == "review" ? "quran" : "notes" }
-                        else { Task { do {try await service.session.executeDiaryCommand("habit.complete",payload:["id":.string(r.id.uuidString),"delta":.number(r.summary.current?.rule.measure == .duration ? 15 : 1)])}catch{service.session.errorMessage=error.localizedDescription} } }
-                    } label:{HStack(spacing:5){Image(systemName:r.paused ? "pause.circle" : r.summary.current?.met == true ? "checkmark.circle.fill" : "circle");Text(r.name).lineLimit(1)}.font(small).frame(maxWidth:.infinity,minHeight:44).background(room.background,in:.rect(cornerRadius:12))}.buttonStyle(.plain).disabled(!interactive || r.paused)
-                } }
-                Spacer(minLength:0)
-                BahwHabitsWide(rows: rows, digits: digits, theme: room, interactive: interactive, showsPeriods: false) {
-                    service.session.habitsOpen = true
+                if dynamicTypeSize.isAccessibilitySize {
+                    ScrollView(.vertical) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack { ForEach(periods, id: \.self) { f in periodChoice(f, rows: rows, selected: f == period) } }
+                            ForEach(Array(shown.prefix(6))) { row in habitListRow(row) }
+                            if shown.count > 6 { Button("افتح بقية العادات") { service.session.habitsOpen = true }.font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 44) }
+                            BahwHabitsWide(rows: rows, digits: digits, theme: room, interactive: interactive, showsPeriods: false) { service.session.habitsOpen = true }
+                        }
+                    }
+                } else {
+                    HStack { ForEach(periods, id: \.self) { f in periodRing(f, rows: rows, selected: f == period) } }
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 6) {
+                        ForEach(Array(shown.prefix(6))) { row in habitRing(row) }
+                    }
+                    .accessibilityIdentifier("bahw-habits-items")
+                    Spacer(minLength: 0)
+                    BahwHabitsWide(rows: rows, digits: digits, theme: room, interactive: interactive, showsPeriods: false) {
+                        service.session.habitsOpen = true
+                    }
                 }
             } else if size == .wide {
                 BahwHabitsWide(rows: rows, digits: digits, theme: room, interactive: interactive) {

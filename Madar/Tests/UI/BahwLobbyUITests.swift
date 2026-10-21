@@ -60,7 +60,12 @@ import XCTest
         let largeNext = app.buttons["bahw-habits-next"]
         XCTAssertTrue(largeNext.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertTrue(largeNext.label.contains("التالي: الماء"), largeNext.label)
-        capture(app, "M4-V01-habit-large-next-L")
+        let dailyRings = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "bahw-habit-ring-"))
+        XCTAssertEqual(dailyRings.count, 3, app.debugDescription)
+        let waterRing = dailyRings.matching(NSPredicate(format: "label CONTAINS %@", "الماء")).firstMatch
+        XCTAssertTrue(waterRing.exists, app.debugDescription)
+        XCTAssertTrue(waterRing.label.contains("أكواب"), waterRing.label)
+        capture(app, "M4-V01-habit-large-rings-L")
         // The period rings choose which habits the grid shows; one opens selected.
         let rings = ["daily", "weekly", "monthly", "yearly"].map { app.buttons["bahw-habits-period-" + $0] }
         XCTAssertEqual(rings.filter(\.isSelected).count, 1, app.debugDescription)
@@ -68,7 +73,9 @@ import XCTest
             other.tap()
             let chosen = XCTNSPredicateExpectation(predicate: NSPredicate(format: "selected == true"), object: other)
             XCTAssertEqual(XCTWaiter.wait(for: [chosen], timeout: 5), .completed, app.debugDescription)
-            capture(app, "M4-V01-habit-large-period-L")
+            let weeklyRings = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "bahw-habit-ring-"))
+            XCTAssertEqual(weeklyRings.count, 2, app.debugDescription)
+            capture(app, "M4-V01-habit-large-period-rings-L")
         }
         habits.press(forDuration: 0.7)
         let size = app.buttons["bahw-size-habits"]
