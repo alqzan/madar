@@ -93,7 +93,7 @@ Bigger improvement ideas from Claude or Codex (new features, rule or data-model 
 | A preferred card per category (M5-V16) | The owner-approved `Category.preferredCardID` is optional and added in V10; V9 remains frozen and migrates the new field as nil. Cashback Jar can set/clear it with undo. «سجّل مصروفًا» shows the glass suggestion and only selects the live credit card after the user presses «استخدمها للدفع». | Claude, M5-V16, 17 Oct; owner approved 18 Oct | Yes — built in M5-V16/V10. |
 | Cashback messages (M5-V16) | Bank messages recognize «استرداد نقدي» as `.cashback` and create a reviewable draft. Confirmation links one redeemed cashback entry and one landed movement; the chosen destination is applied only on confirmation. Credit-card cashback remains a debt reduction. | Claude, M5-V16, 17 Oct; owner approved 18 Oct | Yes — built in M5-V16. |
 | Zakat annual reminder (M5-V22) | The canonical reminder chips need a stored lead time and an enable choice. Owner approved the idea on 18 Oct; implemented as an optional resettable setting, default off, with generic amount-free annual reminders through the shared arbiter. | Codex, 17 Oct | Yes — built in M5-V22 |
-| On-device PDF-to-EPUB conversion (Mihbara) | Resolve with Claude as a separate end-to-end topic: local Swift flow; inspect PDFKit Arabic extraction/order without blindly reversing text; test Vision Arabic OCR for scanned pages; create a reflowable EPUB with `lang="ar"`, `dir="rtl"`, and OPF `page-progression-direction="rtl"`; review OFL font and ZIPFoundation (MIT) licensing; validate samples with EPUBCheck in development. Claude skill references: `claude-code-apple-skills`, `xcode27-skills`, Axiom. `pdf-to-epub`, Marker, and `pdf2text-arabic` are prototype/reference tools only, not app dependencies. Arabic extraction/OCR accuracy and implementation scope remain open; outside current v1 import/reader cards. | Owner research and direction, 18 Oct | Owner: solve fully with Claude; decide v1/v2 scope before implementation |
+| On-device PDF-to-EPUB conversion (Mihbara) | Resolve with Claude as a separate end-to-end topic: local Swift flow; inspect PDFKit Arabic extraction/order without blindly reversing text; test Vision Arabic OCR for scanned pages; create a reflowable EPUB with `lang="ar"`, `dir="rtl"`, and OPF `page-progression-direction="rtl"`; review OFL font and ZIPFoundation (MIT) licensing; validate samples with EPUBCheck in development. Claude skill references: `claude-code-apple-skills`, `xcode27-skills`, Axiom. `pdf-to-epub`, Marker, and `pdf2text-arabic` are prototype/reference tools only, not app dependencies. Arabic extraction/OCR accuracy and implementation scope remain open; outside current v1 import/reader cards. **Claude scope proposal, 21 Oct (awaiting owner):** everything needed already exists locally: `PDFBookTextReader` (embedded text first, Vision OCR for image pages, malformed-mapping detection) and the Turath EPUB writer (`TurathBook.build`/`encode`, own ZIP + CRC, `lang="ar"`, RTL spine), so no new dependency or licence. *v1 (recommended):* one action on an imported PDF, «حوّله إلى كتاب منساب», builds a new EPUB beside the original: one section per printed page with a page anchor (quotes keep the page citation), OCR pages marked, pages whose embedded Arabic is malformed shown as a link back to the original page instead of garbled text; the PDF and its records stay unchanged; cancelable progress; additive only. *v2:* headings/TOC from the PDF outline, footnote separation, tables, EPUBCheck in development. | Owner research and direction, 18 Oct | Owner: solve fully with Claude; decide v1/v2 scope before implementation |
 
 ## Section M1-V — prayer screens match the design (do in this order)
 
@@ -266,7 +266,7 @@ Read before any card: §7.5 `sections/12-r-mal.md` end to end (numbers table, en
 
 ## Frozen — do not work on until the owner unfreezes
 
-M0-T06 (device acceptance paperwork), M0-T09 (encrypted backup and privacy matrix), M0-T12 (contrast inspector), app-switcher privacy, sync. The owner explicitly reopened only the app-level Face ID gate in UX-01; all other frozen areas remain untouched. Earlier evidence: `docs/archive/reports/`, `docs/archive/reviews/`.
+M0-T06 (device acceptance paperwork), M0-T09 privacy matrix (encrypted backup unfrozen by the owner 21 Oct), M0-T12 (contrast inspector), app-switcher privacy, sync. The owner explicitly reopened only the app-level Face ID gate in UX-01; all other frozen areas remain untouched. Earlier evidence: `docs/archive/reports/`, `docs/archive/reviews/`.
 
 ## Section M6 — Mihbara (owner-approved order, 17 Oct)
 
@@ -304,6 +304,13 @@ Owner: «اعتمد ترتيب المحبرة وواصل». Each row includes it
 ## Waiting on the owner
 
 **Owner rule (18 Oct): «اي شي ينتظر قراري جمعهن كلهن اخر شي لكن مهب شي يوقف عليه التطوير».** A pending owner decision never stops development. Do the safe default, or skip that one item and take the next ready card. Add the question to this list, and the owner answers them all together at the end.
+
+Answered by the owner, 21 Oct (details in DECISIONS):
+1. PDF to books: build both parts — (a) through Turath (find the same book there and import it), (b) on-device conversion of any PDF the owner adds.
+2. Encrypted backup: unfrozen — build it («سوها»). App-switcher privacy, sync and the contrast inspector stay frozen.
+3. Quran day (item 13): agent does one final check; the owner tries it later in the full app trial.
+4. Mihbara v2 desks: unchanged (v2 under RA8).
+5. iOS 27 simulator and enlarged-text runs: never; do not download, test or plan them.
 
 Answered by the owner, 18 Oct (details in DECISIONS):
 1. Turath: personal reading is fine; the books are waqf for Muslims. New request: nice quoting from Turath books (a quote card with book, author, volume/page and source).
@@ -343,12 +350,3 @@ Not verified: owner iPhone, hardware microphone/VoiceOver, real OS widgets/notif
 Next: continue the live queue and safe money/Mihbara improvements; retain the bounded long-title-card blocker. Paid-account/signing and real-device gates remain postponed by owner.
 Model/effort: not exposed / not exposed.
 Usage: 95% five-hour used / 37% weekly used at the final live check; stopped new work with 5% remaining, no reset or credits used.
-
-## Handover — Thmanyah «٬/٫», prayer/diary/habits/money polish — 2026-10-21 — Claude
-Works now: money amounts (about 90 places), the money widget and lobby rows draw «٬/٫» from Thmanyah's own «،/,» (its licence forbids editing the files); the Quran plan date shows both calendars; prayer day line without «٠ من ٥ ·»; number settings show their unit («٣٠ دقيقة»); echo cards without a repeated date; full-width habit editor; habit page in its own period; obligation lanterns that no longer overlap; «بقي ٨ أكواب».
-Verified: MoneyHome 4/4, Salary 1/1, Since 1/1, Analysis 2/2, EnvelopeDetail 1/1, Log 1/1, Obligations 4/4, Envelopes 2/2, QuranJourney 1/1, RoomWidgetSnapshotTests 7/7, PrayerFirstDay 1/1, PrayerCountdown 1/1, DiaryEchoes 1/1, Habits 2/2, BahwLobby 9/9 (simulator 412F4437); `git diff --check` clean.
-Differences left: «٬/٫» outside the money room (e.g. Quran in Amiri, which has them) unchanged; tiny chart axis dates show one calendar; the diary microphone-denial message is still blocked (item 15).
-Not verified: owner iPhone, VoiceOver reading of the composed figures on a device, dark mode.
-Next: diary microphone denial on a real device; continue the UX pass in Mihbara and the money sheets.
-Model/effort: claude-opus-5-5 / not exposed.
-Usage: 59% five-hour used / 16% weekly used at the last live check.
