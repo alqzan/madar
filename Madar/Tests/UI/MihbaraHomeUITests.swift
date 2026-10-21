@@ -13,6 +13,16 @@ import XCTest
         let door = app.buttons["mihbara-open"]; XCTAssertTrue(door.waitForExistence(timeout:5)); door.tap()
         XCTAssertTrue(app.buttons["mihbara-add-paper"].waitForExistence(timeout:10), app.debugDescription)
     }
+    private func useReaderMode(_ app: XCUIApplication, _ mode: String) {
+        let settings = app.buttons["mihbara-reader-settings"]
+        XCTAssertTrue(settings.waitForExistence(timeout:8), app.debugDescription); settings.tap()
+        let modeButton = app.buttons["mihbara-reader-mode-\(mode)"]
+        XCTAssertTrue(modeButton.waitForExistence(timeout:5), app.debugDescription)
+        if !modeButton.isSelected { modeButton.tap(); XCTAssertTrue(modeButton.waitForSelection(timeout:5), app.debugDescription) }
+        let close = app.buttons["mihbara-reader-settings-close"]
+        XCTAssertTrue(close.waitForExistence(timeout:5), app.debugDescription); close.tap()
+        XCTAssertTrue(close.waitForNonExistence(timeout:5), app.debugDescription)
+    }
     private func undo(_ app: XCUIApplication) {
         let button = app.descendants(matching: .any)["mihbara-undo"].buttons["undo-button"]
         XCTAssertTrue(button.waitForExistence(timeout:8), app.debugDescription)
@@ -551,18 +561,34 @@ import XCTest
         let app = app("reader", epub: try Data(contentsOf: fixtureURL)); app.launch(); open(app)
         let book = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "كتاب اختبار القارئ")).firstMatch
         XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); book.tap()
-        let paragraph = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "القراءة باب يدخل")).firstMatch
+        useReaderMode(app, "scroll")
+        var paragraph = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "القراءة باب يدخل")).firstMatch
         XCTAssertTrue(paragraph.waitForExistence(timeout: 20), app.debugDescription)
         sleep(1)
+        let closeReader = app.buttons["mihbara-reader-close"]
+        let readerFooter = app.descendants(matching: .any)["mihbara-reader-print-page"]
+        XCTAssertTrue(closeReader.exists, app.debugDescription)
         // A long press selects a word; Madar's card replaces the system menu.
         paragraph.coordinate(withNormalizedOffset: CGVector(dx: 0.7, dy: 0.15)).press(forDuration: 1.2)
         let card = app.descendants(matching: .any)["mihbara-word-card"]
         XCTAssertTrue(card.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertFalse(closeReader.exists, "The word card should have a clear page without reader chrome.\n\(app.debugDescription)")
+        XCTAssertFalse(readerFooter.exists, "The reader footer should leave room to read behind the word card.\n\(app.debugDescription)")
         XCTAssertTrue(app.buttons["mihbara-word-lookup"].exists || app.staticTexts["mihbara-word-lookup-unavailable"].exists, app.debugDescription)
         XCTAssertTrue(app.buttons["mihbara-word-note"].exists)
         XCTAssertTrue(app.buttons["mihbara-word-copy"].exists)
         XCTAssertFalse(app.buttons["mihbara-highlight-yellow"].isSelected)
         shot(app, "M6-V08-card-L")
+        app.swipeUp(velocity: .slow)
+        sleep(1); shot(app, "M6-V08-card-s1-L")
+        XCTAssertTrue(card.exists, app.debugDescription)
+        app.buttons["mihbara-word-close"].tap()
+        XCTAssertTrue(card.waitForNonExistence(timeout:5))
+        XCTAssertTrue(closeReader.waitForExistence(timeout:5), app.debugDescription)
+        useReaderMode(app, "pages")
+        paragraph = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "القراءة باب يدخل")).firstMatch
+        paragraph.coordinate(withNormalizedOffset: CGVector(dx: 0.7, dy: 0.15)).press(forDuration: 1.2)
+        XCTAssertTrue(card.waitForExistence(timeout:8), app.debugDescription)
         app.buttons["mihbara-highlight-yellow"].tap()
         XCTAssertTrue(app.buttons["mihbara-highlight-yellow"].waitForSelection(timeout: 8), app.debugDescription)
         let quoteCard = app.buttons["mihbara-quote-card-open"]
@@ -584,6 +610,8 @@ import XCTest
         XCTAssertFalse(app.buttons["mihbara-highlight-yellow"].isSelected)
         app.buttons["mihbara-word-close"].tap()
         XCTAssertTrue(card.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(closeReader.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(readerFooter.waitForExistence(timeout: 5), app.debugDescription)
         let undo = app.descendants(matching: .any)["mihbara-reader-toast"].buttons["undo-button"]
         XCTAssertTrue(undo.waitForExistence(timeout: 5), app.debugDescription); undo.tap()
         XCTAssertTrue(undo.waitForNonExistence(timeout: 8))
@@ -614,26 +642,35 @@ import XCTest
         let app = app("reader", epub: try Data(contentsOf: fixtureURL)); app.launch(); open(app)
         let book = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "كتاب اختبار القارئ")).firstMatch
         XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); book.tap()
+        useReaderMode(app, "scroll")
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "اقْرَأْ")).firstMatch.waitForExistence(timeout: 20), app.debugDescription)
         sleep(1); shot(app, "M6-V09-verse-L")
         let marker = app.links["١"].firstMatch
         XCTAssertTrue(marker.waitForExistence(timeout: 5), app.debugDescription)
+        let closeReader = app.buttons["mihbara-reader-close"]
+        let readerFooter = app.descendants(matching: .any)["mihbara-reader-print-page"]
+        XCTAssertTrue(readerFooter.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(readerFooter.label.contains("٤٥٣"), readerFooter.label)
         marker.tap()
         let card = app.descendants(matching: .any)["mihbara-footnote-card"]
         XCTAssertTrue(card.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertFalse(closeReader.exists, "The footnote should have a clear page without reader chrome.\n\(app.debugDescription)")
+        XCTAssertFalse(readerFooter.exists, "The reader footer should leave room to read behind the footnote.\n\(app.debugDescription)")
         let text = app.staticTexts["mihbara-footnote-text"]
         XCTAssertTrue(text.label.contains("هامش تجريبي"), text.label)
         XCTAssertFalse(text.label.contains("عودة إلى المتن"), text.label)
         // The reader stayed on the chapter rather than jumping to the notes file.
-        XCTAssertTrue(app.staticTexts["mihbara-reader-print-page"].label.contains("٤٥٣"))
         sleep(1); shot(app, "M6-V09-footnote-L")
         let passage = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "القراءة باب يدخل")).firstMatch
         XCTAssertTrue(passage.waitForExistence(timeout: 5), app.debugDescription)
-        passage.swipeUp(velocity: .slow)
+        app.swipeUp(velocity: .slow)
         sleep(1); shot(app, "M6-V09-footnote-s1-L")
         XCTAssertTrue(card.exists)
         app.buttons["mihbara-footnote-close"].tap()
         XCTAssertTrue(card.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(closeReader.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(readerFooter.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(readerFooter.label.contains("٤٥٣"), readerFooter.label)
     }
 
     func testReaderNightThemeScrollKeepsPlaceAndResets() throws {

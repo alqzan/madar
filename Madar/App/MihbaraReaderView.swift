@@ -270,7 +270,7 @@ struct MihbaraReaderView: View {
         // A fixed origin: `.now` would restart the timeline on every redraw.
         TimelineView(.periodic(from: Date(timeIntervalSinceReferenceDate: 0), by: 5)) { tick in
             VStack(spacing: 0) {
-                if !speechController.isActive && (!readerFocus || focusChromeVisible) {
+                if !speechController.isActive && !isReaderCardVisible && (!readerFocus || focusChromeVisible) {
                     header
                     Rectangle().fill(palette.line).frame(height: 1)
                 }
@@ -318,7 +318,9 @@ struct MihbaraReaderView: View {
                         }
                     }.frame(maxWidth: .infinity, maxHeight: .infinity).padding(28)
                 }
-                if readerFocus { focusFooter } else { footer }
+                if !isReaderCardVisible {
+                    if readerFocus { focusFooter } else { footer }
+                }
             }
             .overlay(alignment: .bottom) {
                 VStack(spacing: 8) {
@@ -767,6 +769,8 @@ struct MihbaraReaderView: View {
             && !showingContents && noteDraft == nil && lookupTerm == nil && quoteCard == nil
             && translationRequest == nil && wordCard == nil && footnote == nil
     }
+
+    private var isReaderCardVisible: Bool { wordCard != nil || footnote != nil }
 
     private var autoScrollPlayer: some View {
         GlassEffectContainer(spacing: 10) {
