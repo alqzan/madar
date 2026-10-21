@@ -41,6 +41,28 @@ import XCTest
         XCTAssertTrue(debit.isHittable); debit.tap(); app.buttons["money-cards-tab-نظرة"].tap()
         XCTAssertTrue(app.staticTexts["تُخصم مشتريات مدى من الحساب مباشرة"].waitForExistence(timeout: 5))
     }
+    /// 21 Oct 2026: a card can be added from the cards page (before, `money.saveCard` had no screen).
+    func testAddCardFromCardsPage() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication(); open(app, fixture: "zero")
+        app.buttons["money-cards-add"].tap()
+        let name = app.textFields["money-card-name"]; XCTAssertTrue(name.waitForExistence(timeout: 8))
+        name.tap(); name.typeText("بطاقة البقالة")
+        let bank = app.textFields["money-card-bank"]; bank.tap(); bank.typeText("بنك التجربة")
+        let last4 = app.textFields["money-card-last4"]; last4.tap(); last4.typeText("4512")
+        app.buttons["money-card-keyboard-done"].firstMatch.tap()
+        let account = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "money-card-account-")).firstMatch
+        XCTAssertTrue(account.waitForExistence(timeout: 5), app.debugDescription)
+        if !account.isSelected { account.tap() }
+        shot(app, "money-card-add-L")
+        let save = app.buttons["money-card-save"]
+        for _ in 0..<4 where !save.isHittable { app.swipeUp(velocity: .slow) }
+        save.tap()
+        let added = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "بطاقة البقالة")).firstMatch
+        XCTAssertTrue(added.waitForExistence(timeout: 10), app.debugDescription)
+        shot(app, "money-card-added-L")
+    }
+
     func testHiddenAmountsAndEmptyCards() throws {
         continueAfterFailure = false
         let app = XCUIApplication(); open(app, fixture: "cardsHidden")

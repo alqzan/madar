@@ -18,6 +18,7 @@ struct MoneyCardsView: View {
     @State private var source: MoneySourceDetail?
     @State private var failure: String?
     @State private var jarOpen = false
+    @State private var adding = false
     private let tabs = ["نظرة", "متى يخرج النقد", "تقويم السداد", "المطابقة"]
     private var service: AppMoneyService { .init(app: app) }
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
@@ -32,11 +33,15 @@ struct MoneyCardsView: View {
                         .buttonStyle(.plain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-cards-close")
                     Text("البطاقات").font(.custom("thmanyahserifdisplay-Bold", size: 26, relativeTo: .title)).accessibilityAddTraits(.isHeader)
                     Spacer()
+                    Button { adding = true } label: { Image(systemName: "plus").frame(width: 44, height: 44).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1) } }
+                        .buttonStyle(.plain).accessibilityLabel("أضف بطاقة").accessibilityIdentifier("money-cards-add")
                 }.padding(.top, 8)
                 if let reading {
                     if reading.cards.isEmpty {
                         Text("لا بطاقات بعد").font(MadarTypography.cardTitle())
-                        Text("تظهر بطاقتك بعد تحديد هويتها في رسائل البنك. لا تُنشأ بطاقة من رقم غير معروف تلقائيًا.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
+                        Text("أضف بطاقتك باسمها وآخر أربعة أرقامها، فتُربط بها رسائل البنك. لا تُنشأ بطاقة من رقم غير معروف تلقائيًا.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
+                        Button { adding = true } label: { Text("أضف بطاقة").font(MadarTypography.cardTitle()).frame(maxWidth: .infinity, minHeight: 54).background(theme.ink).foregroundStyle(theme.background) }
+                            .buttonStyle(.plain).accessibilityIdentifier("money-cards-add-first")
                     } else {
                         ScrollView(.horizontal) {
                             HStack(spacing: 10) { ForEach(reading.cards) { miniature($0) } }
@@ -63,6 +68,7 @@ struct MoneyCardsView: View {
             .task { load() }.onChange(of: app.prayerRevision) { load() }
             .sheet(item: $source) { MoneySourceView(app: app, detail: $0, visible: visible).environment(\.roomTheme, theme) }
             .navigationDestination(isPresented: $jarOpen) { MoneyCashbackView(app: app, revealed: $revealed) }
+            .sheet(isPresented: $adding, onDismiss: load) { MoneyCardSheet(app: app) }
     }
     private var tabStrip: some View {
         HStack(spacing: 0) {
