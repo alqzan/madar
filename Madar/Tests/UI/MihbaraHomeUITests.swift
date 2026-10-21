@@ -207,6 +207,58 @@ import XCTest
         XCTAssertTrue(savedBook.waitForExistence(timeout: 8), app.debugDescription); savedBook.tap()
         XCTAssertTrue(app.buttons["mihbara-paper-index-prompt"].waitForExistence(timeout: 8), app.debugDescription)
     }
+
+    func testLongPaperTitleKeepsReadingAndDetailsActionsReachable() {
+        continueAfterFailure = false; let app = app("empty"); app.launch(); open(app)
+        app.buttons["mihbara-add-paper"].tap()
+        app.descendants(matching: .any)["mihbara-add-source-paper"].tap()
+        let titleText = "مدخل طويل إلى القراءة العربية وفنون المطالعة في مجالس العلم وما وراءها"
+        let title = app.textFields["mihbara-paper-title"]
+        XCTAssertTrue(title.waitForExistence(timeout: 8), app.debugDescription)
+        title.tap(); title.typeText(titleText)
+        let author = app.textFields["mihbara-paper-author"]; author.tap(); author.typeText("من مكتبتي")
+        let pages = app.textFields["mihbara-paper-pages"]; pages.tap(); pages.typeText("١٢٠")
+        app.buttons["mihbara-paper-shelf"].tap()
+        let wantShelf = app.buttons["أبي أقرأه"]
+        XCTAssertTrue(wantShelf.waitForExistence(timeout: 5), app.debugDescription); wantShelf.tap()
+        if app.toolbars.buttons["تمّ"].exists { app.toolbars.buttons["تمّ"].tap() }
+        let save = app.buttons["mihbara-paper-save"]; reach(app, save); save.tap()
+
+        let homeScroll = app.scrollViews.firstMatch
+        XCTAssertTrue(homeScroll.waitForExistence(timeout: 8), app.debugDescription)
+        for _ in 0..<6 { homeScroll.swipeDown(velocity: .slow) }
+        let wantShelfTab = app.buttons["mihbara-shelf-want"]
+        XCTAssertTrue(wantShelfTab.isHittable, app.debugDescription); wantShelfTab.tap()
+        let book = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "mihbara-book-")).firstMatch
+        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); book.tap()
+
+        let details = app.buttons["mihbara-paper-index-details"]
+        let start = app.buttons["mihbara-paper-start"]
+        XCTAssertTrue(details.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(details.isHittable, app.debugDescription)
+        XCTAssertTrue(start.isHittable, app.debugDescription)
+        details.tap()
+        let position = app.textFields["mihbara-paper-position"]
+        XCTAssertTrue(position.waitForExistence(timeout: 8), app.debugDescription)
+        position.tap(); position.press(forDuration: 1.1)
+        if app.menuItems["تحديد الكل"].waitForExistence(timeout: 2) { app.menuItems["تحديد الكل"].tap() }
+        else { position.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 8)) }
+        position.typeText("٤٧")
+        if app.toolbars.buttons["تمّ"].exists { app.toolbars.buttons["تمّ"].tap() }
+        let savePosition = app.buttons["mihbara-paper-save"]; reach(app, savePosition); savePosition.tap()
+
+        XCTAssertTrue(app.staticTexts["mihbara-paper-position-summary"].waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(app.buttons["mihbara-paper-start"].label.contains("واصل القراءة"))
+        shot(app, "M6-V23-long-title-actions-L")
+        app.scrollViews.firstMatch.swipeUp(velocity: .slow)
+        XCTAssertTrue(details.isHittable, app.debugDescription)
+        XCTAssertTrue(start.isHittable, app.debugDescription)
+        shot(app, "M6-V23-long-title-actions-s1-L")
+        details.tap()
+        XCTAssertTrue(app.textFields["mihbara-paper-position"].waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(String(describing: app.textFields["mihbara-paper-position"].value).contains("٤٧"))
+    }
+
     func testAddBookSourcesShowsV1FormatsAndHonestEmptyState() {
         continueAfterFailure = false; let app = app("home"); app.launch(); open(app)
         let addBook = app.buttons["mihbara-add-paper"]

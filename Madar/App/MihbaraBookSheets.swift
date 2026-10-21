@@ -401,7 +401,7 @@ struct MihbaraBookCard: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 if book.kind == "paper" {
-                    paperBookActions
+                    paperBookContent
                 } else {
                     HStack { Text(book.title).font(MadarTypography.title()); Spacer(); Button("تمّ") { dismiss() } }
                     Text(book.author).font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
@@ -421,12 +421,17 @@ struct MihbaraBookCard: View {
                 }
             }.padding(22)
         }.background(theme.background).foregroundStyle(theme.ink).scrollDismissesKeyboard(.interactively)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if book.kind == "paper" {
+                paperBookFooter
+            }
+        }
         .task { page = digits.string(book.page ?? 0).filter { $0.wholeNumberValue != nil } }
         .confirmationDialog("اختر كتابًا يرجع إلى أبي أقرأها", isPresented: $choosingSlot, titleVisibility: .visible) { ForEach(books.filter { $0.shelf == "reading" && $0.id != book.id }) { old in Button(old.title) { move("reading", replacing: old.id) } } }
         .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تمّ") { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) } } }
         .presentationDetents(book.kind == "paper" ? [.height(360)] : [.large])
     }
-    private var paperBookActions: some View {
+    private var paperBookContent: some View {
         VStack(alignment: .leading, spacing: 17) {
             HStack(alignment: .center, spacing: 16) {
                 RoundedRectangle(cornerRadius: 7)
@@ -491,6 +496,12 @@ struct MihbaraBookCard: View {
                 .overlay { RoundedRectangle(cornerRadius: 18).stroke(theme.line, lineWidth: 1) }
             }
 
+        }
+        .environment(\.layoutDirection, .rightToLeft)
+    }
+
+    private var paperBookFooter: some View {
+        VStack(spacing: 10) {
             Button { startPaperBook() } label: {
                 Text(paperBookStartTitle)
                     .font(.system(size: 18, weight: .semibold))
@@ -512,6 +523,10 @@ struct MihbaraBookCard: View {
             .buttonStyle(.plain)
             .accessibilityIdentifier("mihbara-paper-index-details")
         }
+        .padding(.horizontal, 22)
+        .padding(.top, 10)
+        .padding(.bottom, 14)
+        .background(theme.background)
         .environment(\.layoutDirection, .rightToLeft)
     }
     private func startPaperBook() {
