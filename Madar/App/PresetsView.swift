@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import MadarCore
 import MadarData
 import MadarDesign
 
@@ -34,7 +35,7 @@ struct PresetsView: View {
                     MadarCard {
                         VStack(alignment: .leading, spacing: 8) {
                             Text(preset.name).font(MadarTypography.section())
-                            Text(preset.createdAt, format: .dateTime.year().month().day()).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                            MadarDateLabel(session.dateLabels(GregorianDay.containing(preset.createdAt, in: session.activePlace.timeZone))).foregroundStyle(theme.secondaryInk)
                             Button("عاين النمط") {
                                 do {
                                     let payload = try JSONDecoder().decode(JSONValue.self, from: preset.payloadJSON)

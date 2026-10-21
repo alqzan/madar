@@ -1775,7 +1775,7 @@ private struct PrayerStatisticsView: View {
         let leading = ((calendar.component(.weekday, from: monthDays[0].date(in: calendar.timeZone)) - firstWeekday) + 7) % 7
         return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 2), count: 7), spacing: 6) {
             ForEach(weekdays, id: \.self) { Text($0).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk).padding(.bottom, 4) }
-            ForEach(0..<leading, id: \.self) { _ in Color.clear.frame(height: 50).accessibilityHidden(true) }
+            ForEach(0..<leading, id: \.self) { _ in Color.clear.frame(height: 64).accessibilityHidden(true) }
             ForEach(monthDays, id: \.self) { day in
                 let isToday = day == snapshot.today.day
                 if let summary = snapshot.history.first(where: { $0.day == day }) {
@@ -1794,8 +1794,11 @@ private struct PrayerStatisticsView: View {
             PrayerDayGlyph(cells: cells).frame(width: 28, height: 26).accessibilityHidden(true)
             Text(formatter.string(hijri(day).day)).font(today ? PrayerHomeType.smallBold : PrayerHomeType.small)
                 .foregroundStyle(today ? theme.ink : theme.secondaryInk)
+            // The Gregorian day beneath, smaller: every date shows both calendars.
+            Text(formatter.string(day.day)).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2))
+                .foregroundStyle(theme.secondaryInk).accessibilityHidden(true)
         }
-        .frame(maxWidth: .infinity, minHeight: 50)
+        .frame(maxWidth: .infinity, minHeight: 64)
         .background(today ? theme.color("goldSoft") : .clear, in: .rect(cornerRadius: 12))
         .contentShape(.rect)
     }
