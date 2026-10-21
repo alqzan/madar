@@ -105,7 +105,7 @@ struct MoneyAnalysisView: View {
                     Text(figure: amount(r.spentMinor)).font(.custom("thmanyahserifdisplay-Black", size: 62, relativeTo: .largeTitle)).lineLimit(1).minimumScaleFactor(0.5)
                         .contentTransition(.numericText())
                     VStack(alignment: .leading, spacing: 0) {
-                        Text("من " + amount(r.allowanceMinor)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                        Text(figure: "من " + amount(r.allowanceMinor)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                         if r.running { Text("حتى اليوم").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
                     }.fixedSize()
                 }.accessibilityElement(children: .combine).accessibilityLabel("صرفت من يومك " + amount(r.spentMinor) + " من " + amount(r.allowanceMinor) + (r.running ? " حتى اليوم" : "")).accessibilityIdentifier("money-analysis-spent")
@@ -187,7 +187,7 @@ struct MoneyAnalysisView: View {
         return Button { selected = d.day } label: {
             VStack(spacing: 0) {
                 Spacer(minLength: 0)
-                Text(showLabel ? amount(d.spentMinor) : " ").font(week ? MadarTypography.section() : .custom("thmanyahsans-Bold", size: 11, relativeTo: .caption2))
+                Text(figure: showLabel ? amount(d.spentMinor) : " ").font(week ? MadarTypography.section() : .custom("thmanyahsans-Bold", size: 11, relativeTo: .caption2))
                     .foregroundStyle(over ? theme.color("dueText") : theme.ink).lineLimit(1).fixedSize().frame(height: 18).padding(.bottom, 3)
                 ZStack(alignment: .bottom) {
                     if future, let line, visible {
@@ -266,7 +266,7 @@ struct MoneyAnalysisView: View {
                 }
                 ForEach(rows) { c in categoryRow(c, scale: scale) }
                 if r.categoriesTotalMinor != r.spentMinor {
-                    Text("المجموع " + amount(r.categoriesTotalMinor) + "، ويشمل ما صُرف من المظاريف لا من يومك وحده.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                    Text(figure: "المجموع " + amount(r.categoriesTotalMinor) + "، ويشمل ما صُرف من المظاريف لا من يومك وحده.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                 }
             }
         }.accessibilityElement(children: .contain).accessibilityIdentifier("money-analysis-categories")
