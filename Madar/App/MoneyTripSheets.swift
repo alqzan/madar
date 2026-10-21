@@ -28,7 +28,7 @@ struct MoneyTripRateSheet: View {
             if currency != app.string("core.currency") {
                 Text("كل وحدة من " + service.currencyName(currency) + " تساوي، بعملة البيت:").font(MadarTypography.body())
                 TextField("سعر الصرف", text: $raw).keyboardType(.decimalPad).focused($focused).font(.title2).padding(12).background(theme.surface).accessibilityIdentifier("money-trip-rate-input")
-                if let rate, let example = try? FX.homeAmount(amountMinor: 100 * scale(currency), currency: currency, rate: rate, home: app.string("core.currency")) { Text("١٠٠ " + service.currencyName(currency) + " = " + service.amount(example) + " " + service.currencyName(app.string("core.currency"))).font(MadarTypography.caption()).accessibilityIdentifier("money-trip-rate-preview") }
+                if let rate, let example = try? FX.homeAmount(amountMinor: 100 * scale(currency), currency: currency, rate: rate, home: app.string("core.currency")) { Text(figure: service.digits.string(100) + " " + service.currencyName(currency) + " = " + service.amount(example) + " " + service.currencyName(app.string("core.currency"))).font(MadarTypography.caption()).accessibilityIdentifier("money-trip-rate-preview") }
             }
             if let at = reading.rateAt { VStack(alignment: .leading, spacing: 3) { Text("آخر سعر أدخلته").font(MadarTypography.caption()); MadarDateLabel(app.dateLabels(.containing(at, in: app.activePlace.timeZone)), primaryFont: MadarTypography.caption(), secondaryFont: MadarTypography.fine()); Text(service.time(at)).font(MadarTypography.fine()) }.foregroundStyle(theme.secondaryInk) }
             Text("السعر يدوي. يُحفظ مع كل حركة وقت تسجيلها؛ تغيير هذا السعر لا يغيّر مصروفاتك السابقة.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
@@ -82,17 +82,34 @@ struct MoneyTripFundingSheet: View {
     private var service: AppMoneyService { .init(app: app) }
     private var minor: Int? { MoneyAmountInput.minor(raw, exponent: CurrencyExponents.specified.exponent(app.string("core.currency")) ?? 2) }
     private var available: Int { source == "surplus" ? reading.surplusMinor : reading.reserveMinor }
+    private var sourceTitle: String { source == "surplus" ? "الفائض" : "الاحتياطي" }
+    private var fundingHint: String? {
+        guard visible else { return nil }
+        if available <= 0 { return "لا يوجد مبلغ متاح في " + sourceTitle + " الآن. اختر مصدرًا آخر." }
+        guard !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        guard let minor, minor > 0 else { return "اكتب مبلغًا صحيحًا أكبر من صفر." }
+        return minor > available ? "المبلغ أكبر من المتاح في " + sourceTitle + ". خفّضه أو اختر مصدرًا آخر." : nil
+    }
     var body: some View {
         NavigationStack { ScrollView { VStack(alignment: .leading, spacing: 16) {
             HStack { Text("مظروف رحلة " + reading.city).font(MadarTypography.cardTitle()); Spacer(); Button("إغلاق") { dismiss() }.frame(minHeight: 44) }
             Text("انقل من مالك المخصّص إلى الرحلة. المجموع لا يتغيّر.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-            TextField("المبلغ بعملة البيت", text: $raw).keyboardType(.decimalPad).focused($focused).font(.title2).padding(12).background(theme.surface).accessibilityIdentifier("money-trip-fund-input")
+            Text("المبلغ بعملة البيت، " + service.currencyName(app.string("core.currency"))).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+            TextField("المبلغ", text: $raw).keyboardType(.decimalPad).focused($focused).font(.title2).padding(12).background(theme.surface).accessibilityIdentifier("money-trip-fund-input")
             Picker("من أين؟", selection: $source) { Text("الفائض").tag("surplus"); Text("الاحتياطي").tag("reserve") }.pickerStyle(.segmented).accessibilityIdentifier("money-trip-fund-source")
-            Text("المتاح فيه " + (visible ? service.amount(available) : "•••")).font(MadarTypography.caption())
+            Text(figure: "في " + sourceTitle + " " + (visible ? service.amount(available) : "•••") + " " + service.currencyName(app.string("core.currency")))
+                .font(MadarTypography.caption()).accessibilityIdentifier("money-trip-fund-available")
+            if let fundingHint {
+                Text(fundingHint).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    .fixedSize(horizontal: false, vertical: true).accessibilityIdentifier("money-trip-fund-hint")
+            }
             DatePicker("آخر يوم في خطة الرحلة", selection: $due, in: app.prayerNow()..., displayedComponents: .date).accessibilityIdentifier("money-trip-fund-date")
             MadarDateLabel(app.dateLabels(.containing(due, in: app.activePlace.timeZone)), primaryFont: MadarTypography.caption(), secondaryFont: MadarTypography.fine())
-            if let amount = minor, let daily = TravelBudget.dailyMinor(targetMinor: (reading.targetMinor ?? 0) + amount, durationDays: MadarCalendarDays.distance(from: reading.start, to: .containing(due, in: app.activePlace.timeZone)) + 1, day: MadarCalendarDays.distance(from: reading.start, to: reading.today) + 1) {
-                Text("خطة اليوم " + (visible ? service.amount(daily) : "•••")).font(MadarTypography.cardTitle())
+            if let amount = minor, amount > 0, amount <= available, let daily = TravelBudget.dailyMinor(targetMinor: (reading.targetMinor ?? 0) + amount, durationDays: MadarCalendarDays.distance(from: reading.start, to: .containing(due, in: app.activePlace.timeZone)) + 1, day: MadarCalendarDays.distance(from: reading.start, to: reading.today) + 1) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("خطة اليوم بعد النقل").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    Text(figure: (visible ? service.amount(daily) : "•••") + " " + service.currencyName(app.string("core.currency"))).font(MadarTypography.cardTitle())
+                }
                 Text("هذا موعد للخطة فقط؛ عودتك الفعلية تُنهي حالة السفر لكل الغرف.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
             }
             if let failure { Text(failure).font(MadarTypography.caption()) }
