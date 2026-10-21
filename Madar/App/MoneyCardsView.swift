@@ -332,6 +332,8 @@ struct MoneyCardsView: View {
         let closeDays = max(0, MadarCalendarDays.distance(from: today, to: close))
         let endDays = max(1, MadarCalendarDays.distance(from: today, to: purchaseDue))
         let span = Double(max(endDays, closeDays, statementDays ?? 0) + 8)
+        let closeLabels = app.dateLabels(close, compact: true)
+        let purchaseDueLabels = app.dateLabels(purchaseDue, compact: true)
         return GeometryReader { g in
             let w = g.size.width
             let x: (Int) -> CGFloat = { days in w * (1 - CGFloat(Double(days) / span)) }
@@ -352,7 +354,8 @@ struct MoneyCardsView: View {
         }.frame(height: 118).overlay(alignment: .bottomLeading) {
             HStack(spacing: 14) { inlineDates(purchaseDue).foregroundStyle(green); inlineDates(close) }.padding(.top, 4).offset(y: 22)
         }.padding(.bottom, 28).accessibilityElement(children: .combine)
-            .accessibilityLabel("يقفل تقريبًا " + app.dateLabels(close, compact: true).primary + "، شراء اليوم يُسدَّد تقريبًا " + app.dateLabels(purchaseDue, compact: true).primary)
+            .accessibilityLabel("يقفل تقريبًا " + closeLabels.combined + "، شراء اليوم يُسدَّد تقريبًا " + purchaseDueLabels.combined)
+            .accessibilityIdentifier("money-card-cashflow-timeline")
     }
     private func inlineDates(_ day: GregorianDay) -> some View {
         ViewThatFits(in: .horizontal) {

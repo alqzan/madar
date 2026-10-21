@@ -21,6 +21,10 @@ import XCTest
         statement.tap(); XCTAssertTrue(app.staticTexts["الرسالة المصدر"].waitForExistence(timeout: 5)); shot(app, "M5-V12-card-source-L"); app.swipeDown(velocity: .fast)
         app.buttons["money-cards-tab-متى يخرج النقد"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["money-card-cashflow"].waitForExistence(timeout: 5))
+        let timeline = app.descendants(matching: .any)["money-card-cashflow-timeline"].firstMatch
+        XCTAssertTrue(timeline.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(timeline.label.contains("نوفمبر"), timeline.label)
+        XCTAssertTrue(timeline.label.contains("جمادى"), timeline.label)
         shot(app, "M5-V12-cards-2-L"); app.swipeUp(velocity: .slow); shot(app, "M5-V12-cards-2-s1-L"); app.swipeDown(velocity: .fast)
         app.buttons["money-cards-tab-تقويم السداد"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["money-card-calendar-grid"].waitForExistence(timeout: 5)); shot(app, "M5-V12-cards-3-L")
