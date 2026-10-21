@@ -6,9 +6,16 @@ import XCTest
 /// Skipped when the folder is absent. Writes aggregate counts only to Madar/Artifacts/bank-corpus-report.json and redacted layouts to the git-ignored local guide.
 final class BankCorpusTests: XCTestCase {
     private struct Line: Decodable { let sender: String; let date: String; let text: String }
+    private struct Layout { var count = 0; var kinds: [String: Int] = [:]; var missing = Set<String>() }
     private static let madar = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     /// Owner-confirmed institutions represented as tracked accounts in this parser-only corpus pass.
     private static let trackedOwnerWallets = ["Barq", "STC Pay", "STC Bank", "Tiqmo", "Drahim", "D360", "Tweeq", "urpay", "Alinma Investment", "Sukuk"]
+
+    private static func kindSummary(_ kinds: [String: Int]) -> String {
+        kinds.sorted { $0.value == $1.value ? $0.key < $1.key : $0.value > $1.value }
+            .map { "\($0.key)×\($0.value)" }
+            .joined(separator: "، ")
+    }
 
     /// A message's layout: digits → #, greetings and party/merchant values hidden, lines joined with ⏎.
     static func layout(_ text: String) -> String {
@@ -42,6 +49,10 @@ final class BankCorpusTests: XCTestCase {
         XCTAssertFalse(shape.contains("Example"))
     }
 
+    func testGuideKeepsEveryKindForAGroupedLayout() {
+        XCTAssertEqual(Self.kindSummary(["unknown": 2, "transferOut": 1]), "unknown×2، transferOut×1")
+    }
+
     func testOwnerCorpusReport() throws {
         let folder = Self.madar.appendingPathComponent("Private/bank-messages")
         guard let files = try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil).filter({ $0.pathExtension == "jsonl" }), !files.isEmpty else {
@@ -49,8 +60,7 @@ final class BankCorpusTests: XCTestCase {
         }
         let zone = TimeZone(identifier: "Asia/Riyadh")!
         var report: [String: [String: Int]] = [:]
-        // The analysis guide: every layout per sender, with what Madar reads from it. Local only (Private/ is git-ignored).
-        struct Layout { var count = 0; var kind = ""; var missing = Set<String>() }
+        // The guide groups masked layouts per sender; keep every observed class because hidden party names can affect parsing.
         var guide: [String: [String: Layout]] = [:]
         for file in files {
             let sender = file.deletingPathExtension().lastPathComponent
@@ -66,7 +76,7 @@ final class BankCorpusTests: XCTestCase {
                 counts["total", default: 0] += 1
                 let key = Self.layout(line.text)
                 var entry = guide[sender, default: [:]][key, default: Layout()]
-                entry.count += 1; entry.kind = parsed.kind.rawValue
+                entry.count += 1; entry.kinds[parsed.kind.rawValue, default: 0] += 1
                 if BankIntake.decision(parsed.kind) == .record {
                     if parsed.amountMinor == nil { entry.missing.insert("المبلغ") }
                     if parsed.eventAt == nil { entry.missing.insert("الوقت") }
@@ -94,9 +104,9 @@ final class BankCorpusTests: XCTestCase {
         var md = "# دليل تحليل رسائل البنوك (محلي)\n\nيُولَّد من `BankCorpusTests` عند كل تشغيل. الأرقام مقنّعة بـ#، وما بعد «من/لدى/لـ/إلى/At» مخفي بـ‹…›.\n"
         for (sender, layouts) in guide.sorted(by: { $0.value.values.map(\.count).reduce(0, +) > $1.value.values.map(\.count).reduce(0, +) }) {
             let total = layouts.values.map(\.count).reduce(0, +)
-            md += "\n## \(sender) — \(total) رسالة، \(layouts.count) شكل\n\n| العدد | النوع | ينقصه | الشكل |\n|---|---|---|---|\n"
+            md += "\n## \(sender) — \(total) رسالة، \(layouts.count) شكل\n\n| العدد | الأنواع حسب العدد | ينقصه | الشكل |\n|---|---|---|---|\n"
             for (shape, l) in layouts.sorted(by: { $0.value.count > $1.value.count }).prefix(25) {
-                md += "| \(l.count) | \(l.kind) | \(l.missing.sorted().joined(separator: "، ")) | \(shape.replacingOccurrences(of: "|", with: "/")) |\n"
+                md += "| \(l.count) | \(Self.kindSummary(l.kinds)) | \(l.missing.sorted().joined(separator: "، ")) | \(shape.replacingOccurrences(of: "|", with: "/")) |\n"
             }
         }
         try md.write(to: folder.appendingPathComponent("GUIDE.md"), atomically: true, encoding: .utf8)
