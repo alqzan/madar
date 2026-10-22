@@ -394,6 +394,23 @@ import UIKit
         attach(app, "library-old-section-L")
     }
 
+    /// The owner's layout ٢ in dark: the wall bookcase, its labels and the stand keep their contrast.
+    func testWallBookcaseAndStandInDark() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MIHBARA_FIXTURE": "home",
+            "MADAR_UI_NOW": "2026-10-18T12:00:00+03:00", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "dark"]
+        app.launch()
+        let customize = app.buttons["tab-customize"]; XCTAssertTrue(customize.waitForExistence(timeout: 20)); customize.tap()
+        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 8)); search.tap(); search.typeText("المحبرة")
+        let door = app.buttons["mihbara-open"]; XCTAssertTrue(door.waitForExistence(timeout: 8)); door.tap()
+        XCTAssertTrue(app.buttons["mihbara-shelf-want"].waitForExistence(timeout: 15), app.debugDescription)
+        sleep(1); attach(app, "M6-UX-R-wall-dark")
+        let go = app.buttons["mihbara-book-continue"]
+        for _ in 0..<6 where !go.isHittable { app.swipeUp(velocity: .slow) }
+        sleep(1); attach(app, "M6-UX-R-stand-dark")
+    }
+
     /// M6-T01: search Turath's catalogue, download a book (fixture data, no network), review it and read it.
     func testTurathSearchDownloadsABookIntoTheLibrary() throws {
         continueAfterFailure = false

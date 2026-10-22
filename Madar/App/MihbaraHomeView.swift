@@ -478,8 +478,9 @@ struct MihbaraHomeView: View {
         VStack(spacing: 14) {
             HStack(alignment: .top) {
                 Button { sheet = .notebook } label: {
+                    // The notebook stays yellow in dark, so its label keeps the light room's ink.
                     Text("دفتر").font(.custom("ArefRuqaa-Regular", size: 18, relativeTo: .headline))
-                        .foregroundStyle(theme.ink).frame(width: 58, height: 70)
+                        .foregroundStyle(RoomTheme(room: "mihbara", dark: false).ink).frame(width: 58, height: 70)
                         .background(theme.color("notebookYellow"), in: .rect(topLeadingRadius: 2, bottomLeadingRadius: 10, bottomTrailingRadius: 2, topTrailingRadius: 2))
                         .overlay(alignment: .top) { Rectangle().fill(theme.color("goldUnderstandText").opacity(0.7)).frame(height: 3).padding(.horizontal, 5) }
                         .shadow(color: theme.ink.opacity(0.18), radius: 5, y: 4).rotationEffect(.degrees(-3))
