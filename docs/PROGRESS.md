@@ -320,6 +320,8 @@ Owner, 22 Oct: the device run (paid developer account) and the review of built w
 
 Owner, 22 Oct (trial findings): the owner never typed expenses by hand. The 402 older money rows (3 Jul to 21 Sep, Latin merchant notes, no time, no message text) came from an earlier automatic source; bank-message rows with text start on 21 Sep. Import them as automatic rows without message text, never as «يدوي». Diary photos are only references in the backup; the owner thinks they are right that the old app kept no copies. Open question, not blocking: what fed the old app before 21 Sep (Apple Pay automation?).
 
+Owner, 23 Oct: (1) Habits do not feel simple. He wants much more flexibility, in the habits themselves and in how they are shown, and a room that is far easier, clearer and simpler. Unclear visual wish: show 2–3 mockups first, the owner picks, then build (mockup rule). (2) The order to the phone: finish the real-data import (money, Quran, prayer and the rest), try and check every room with it, check everything is fine, then install on the owner's iPhone for daily use. His own use is expected to surface most problems.
+
 Answered by the owner, 21 Oct (details in DECISIONS):
 1. PDF to books: build both parts — (a) through Turath (find the same book there and import it), (b) on-device conversion of any PDF the owner adds.
 2. Encrypted backup: unfrozen — build it («سوها»). App-switcher privacy, sync and the contrast inspector stay frozen.
