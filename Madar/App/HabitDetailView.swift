@@ -21,7 +21,7 @@ struct HabitDetailView:View {
             VStack(alignment:.leading,spacing:20) {
                 HStack { Text(reading.name).font(MadarTypography.title());Spacer();Button("تمّ"){dismiss()}.frame(minHeight:44) }
                 if let current=reading.summary.current {
-                    Text(current.target == 0 ? "سجلك محفوظ" : digits.string(current.value)+" من "+digits.string(current.target)+(current.rule.unit.map{" "+habitUnitName($0)} ?? "")).font(MadarTypography.cardTitle()).accessibilityIdentifier("habit-progress")
+                    Text(current.target == 0 ? "سجلك محفوظ" : habitProgressText(current.value,current.target,current.rule.unit,digits)).font(MadarTypography.cardTitle()).accessibilityIdentifier("habit-progress")
                     Text(reading.statusTitle).font(MadarTypography.section()).foregroundStyle(theme.accent)
                     Text("تُقاس "+measured(current.rule.frequency)+"؛ "+habitBreakExplanation(Int(session.number("bahw.streakBreakAfter")),current.rule.frequency)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                     if current.rule.minimum != nil { Text("أقلّ القليل يحفظ السلسلة، ويظهر بعلامة أخفّ.").font(MadarTypography.caption()) }
@@ -32,7 +32,7 @@ struct HabitDetailView:View {
                             if source == "jamaah"{session.selectedTab="prayer"}else if source == "review"{session.selectedTab="quran"}else{session.selectedTab="notes"};dismiss()
                         }.buttonStyle(.borderedProminent).frame(minHeight:44).accessibilityIdentifier("habit-owner")
                     } else if !reading.paused && current.target > 0 {
-                        Button(current.rule.measure == .duration ? "+١٥ دقيقة" : current.rule.measure == .count ? "+١ "+(current.rule.unit ?? "مرة") : current.met ? "تمّت" : "أتممتها") { perform("habit.complete",["id":.string(reading.id.uuidString),"delta":.number(current.rule.measure == .duration ? 15 : 1)]) }.buttonStyle(.borderedProminent).disabled(busy || current.met && current.rule.measure == .once).accessibilityIdentifier("habit-complete")
+                        Button(current.rule.measure == .duration ? "أضف "+digits.string(15)+" دقيقة" : current.rule.measure == .count ? "أضف "+digits.string(1)+" "+habitUnitName(current.rule.unit ?? "مرة") : current.met ? "تمّت" : "أتممتها") { perform("habit.complete",["id":.string(reading.id.uuidString),"delta":.number(current.rule.measure == .duration ? 15 : 1)]) }.buttonStyle(.borderedProminent).disabled(busy || current.met && current.rule.measure == .once).accessibilityIdentifier("habit-complete")
                         if let minimum=current.rule.minimum,current.value<minimum { Button("أقلّ القليل: "+digits.string(minimum)) { perform("habit.complete",["id":.string(reading.id.uuidString),"delta":.number(Double(minimum-current.value))]) }.frame(minHeight:44).accessibilityIdentifier("habit-minimum") }
                     }
                 }

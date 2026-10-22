@@ -61,7 +61,7 @@ struct HabitsRoomView: View {
                     }
                     if readings.contains(where: \.archived) {
                         Button(showArchived ? "أخفِ العادات المحذوفة" : "عادات محذوفة") { showArchived.toggle() }.font(MadarTypography.caption()).frame(minHeight:44).accessibilityIdentifier("habit-archived")
-                        if showArchived { ForEach(readings.filter(\.archived)) { row in HStack { Text(row.name); Spacer(); Button("استعد") { perform("habit.archive",["id":.string(row.id.uuidString),"archived":.bool(false)]) };Button("حذف نهائي") { deletingArchived=row }.accessibilityLabel("حذف نهائي "+row.name) }.padding(14).background(theme.surface,in:.rect(cornerRadius:18)) } }
+                        if showArchived { ForEach(readings.filter(\.archived)) { row in HStack(spacing:10) { Text(row.name); Spacer(); Button("حذف نهائي") { deletingArchived=row }.font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).frame(minHeight:44).accessibilityLabel("حذف نهائي "+row.name); Button("استعدها") { perform("habit.archive",["id":.string(row.id.uuidString),"archived":.bool(false)]) }.buttonStyle(.borderedProminent).frame(minHeight:44) }.padding(14).background(theme.surface,in:.rect(cornerRadius:18)) } }
                     }
                     VStack(spacing:5) { Text("«أحبّ الأعمال إلى الله أدومها وإن قلّ»").font(MadarTypography.body()); Text("متفق عليه، من حديث عائشة رضي الله عنها").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }.frame(maxWidth:.infinity).padding(.vertical,24)
                 }.padding(.horizontal,14).padding(.vertical,8)
@@ -95,7 +95,7 @@ struct HabitsRoomView: View {
                 VStack(spacing:5) {
                     HabitMiniRing(share:rows.isEmpty ? 0 : Double(met)/Double(rows.count),theme:theme).frame(width:28,height:28)
                     Text(f.arabic).font(MadarTypography.caption())
-                    Text(count == 0 ? "لا عادات" : rows.isEmpty ? "لا استحقاق" : digits.string(met)+" من "+digits.string(rows.count)).font(MadarTypography.fine()).foregroundStyle(on ? theme.ink : theme.secondaryInk)
+                    Text(count == 0 ? "لا عادات" : rows.isEmpty ? "لا استحقاق" : met == 0 ? "لم تبدأ بعد" : digits.string(met)+" من "+digits.string(rows.count)).font(MadarTypography.fine()).foregroundStyle(on ? theme.ink : theme.secondaryInk)
                 }
                 .padding(.vertical,10).frame(maxWidth:.infinity,minHeight:44)
                 .background(on ? theme.accentFill.opacity(0.16) : theme.surface,in:.rect(cornerRadius:16))
@@ -147,6 +147,7 @@ struct HabitsRoomView: View {
     }
     private func priority(_ r:HabitReading)->Int { (r.summary.current?.met == true ? 100 : 0) + (r.isNow ? 0 : 10) + (r.summary.atRisk ? 0 : 1) }
     private func habitRow(_ row:HabitReading)->some View {
+        HStack(spacing:0) {
         Button { detail = row } label: {
             HStack(spacing:12) {
                 ZStack { HabitMiniRing(share:Double(row.summary.current?.value ?? 0)/Double(max(1,row.summary.current?.target ?? 1)),theme:theme); if row.source != nil || row.summary.current?.met == true { MadarGlyph(row.symbol,size:18).padding(10) } }.frame(width:40,height:40)
@@ -156,17 +157,45 @@ struct HabitsRoomView: View {
                     if row.paused || row.isNow || row.summary.atRisk || row.summary.current?.met == true { Label(row.statusTitle,systemImage:row.paused ? "pause.circle" : row.summary.current?.met == true ? "checkmark.circle" : "circle.lefthalf.filled").font(MadarTypography.fine()).foregroundStyle(theme.accent) }
                 }
                 Spacer(minLength:0)
-                VStack(alignment:.trailing,spacing:4) { Text(habitPeriodCount(row.summary.streak,row.summary.current?.rule.frequency ?? .daily,digits)).font(MadarTypography.caption()).foregroundStyle(theme.accent); HStack(spacing:3) { ForEach(Array(row.summary.periods.suffix(7).enumerated()),id:\.offset) { _,p in Circle().fill(p.met ? theme.accentFill : theme.background).overlay { Circle().stroke(theme.line) }.frame(width:5,height:5) } }.accessibilityHidden(true) }
+                VStack(alignment:.trailing,spacing:4) { if row.summary.streak > 0 { Text(habitPeriodCount(row.summary.streak,row.summary.current?.rule.frequency ?? .daily,digits)).font(MadarTypography.caption()).foregroundStyle(theme.accent) }; HStack(spacing:3) { ForEach(Array(row.summary.periods.suffix(7).enumerated()),id:\.offset) { _,p in Circle().fill(p.met ? theme.accentFill : theme.background).overlay { Circle().stroke(theme.line) }.frame(width:5,height:5) } }.accessibilityHidden(true) }
             }.padding(.horizontal,14).padding(.vertical,15).frame(minHeight:74).contentShape(.rect)
         }.buttonStyle(.plain).accessibilityIdentifier("habit-row-"+row.id.uuidString).accessibilityLabel(row.name+"، "+progress(row)+"، "+row.statusTitle)
+        quickLog(row).padding(.trailing,8)
+        }
     }
-    private func progress(_ row:HabitReading)->String { guard let p=row.summary.current else{return "لا فترة بعد"}; return (p.target == 0 ? "سجلك محفوظ" : p.rule.measure == .once && p.target == 1 ? (p.value >= 1 ? "" : "لم تتمّها بعد") : digits.string(p.value)+" من "+digits.string(p.target)+(p.rule.unit.map { " "+habitUnitName($0) } ?? ""))+(row.sourceTitle.map { "، تُقرأ من "+$0 } ?? "") }
+    /// The daily action in one tap from the room, as from the lobby: a manual habit still open gets its own «سجّل» button.
+    @ViewBuilder private func quickLog(_ row:HabitReading)->some View {
+        if row.source == nil, !row.paused, let p=row.summary.current, p.target > 0, !(p.met && p.rule.measure == .once) {
+            Button { perform("habit.complete",["id":.string(row.id.uuidString),"delta":.number(p.rule.measure == .duration ? 15 : 1)]) } label: {
+                Image(systemName:p.met ? "plus" : p.rule.measure == .once ? "checkmark" : "plus").font(.system(size:16,weight:.semibold))
+                    .foregroundStyle(theme.onAccent).frame(width:36,height:36).background(theme.accentFill,in:.circle).frame(width:44,height:44).contentShape(.circle)
+            }.buttonStyle(.plain)
+            .accessibilityLabel(quickLogLabel(row.name,p.rule.measure))
+            .accessibilityIdentifier("habit-quick-"+row.id.uuidString)
+        }
+    }
+    private func quickLogLabel(_ name:String,_ measure:HabitMeasure)->String {
+        switch measure {
+        case .once: return "أتممت " + name
+        case .duration: return "أضف " + digits.string(15) + " دقيقة إلى " + name
+        default: return "أضف واحدًا إلى " + name
+        }
+    }
+    private func progress(_ row:HabitReading)->String { guard let p=row.summary.current else{return "لا فترة بعد"}; return (p.target == 0 ? "سجلك محفوظ" : p.rule.measure == .once && p.target == 1 ? (p.value >= 1 ? "" : "لم تتمّها بعد") : habitProgressText(p.value,p.target,p.rule.unit,digits))+(row.sourceTitle.map { "، تُقرأ من "+$0 } ?? "") }
     private func reload() { do { readings=try HabitRepository(context:ModelContext(session.container)).readings(at:session.prayerNow(),includeArchived:true,liveHealth:liveHealth);if let id=session.habitRouteID {if let row=readings.first(where:{$0.id==id}) {if row.archived {showArchived=true}else{detail=row}};session.habitRouteID=nil} } catch { session.errorMessage=error.localizedDescription } }
     private func perform(_ name:String,_ payload:[String:MadarCore.JSONValue]) { Task { do {try await session.executeDiaryCommand(name,payload:payload);reload()}catch{session.errorMessage=error.localizedDescription} } }
 }
 struct HabitMiniRing:View {
     let share:Double; let theme:RoomTheme
     var body:some View { ZStack { Circle().stroke(theme.line,lineWidth:4); Circle().trim(from:0,to:min(1,max(0,share))).stroke(theme.accentFill,style:.init(lineWidth:4,lineCap:.round)).rotationEffect(.degrees(-90)) }.accessibilityHidden(true) }
+}
+/// «٣ من ٨ أكواب»; before anything is logged, the goal alone («الهدف: ٨ أكواب») rather than «٠ من ٨».
+func habitProgressText(_ value:Int,_ target:Int,_ unit:String?,_ digits:MadarNumberFormatter)->String {
+    guard let unit, !unit.isEmpty else {
+        if value > 0 { return digits.string(value)+" من "+digits.string(target) }
+        return target == 1 ? "لم تتمّها بعد" : "الهدف: "+arabicCount(target,["مرة واحدة","مرتان","مرات","مرة"],digits)
+    }
+    return value == 0 ? "الهدف: "+habitUnitCount(target,unit,digits) : digits.string(value)+" من "+habitUnitCount(target,unit,digits)
 }
 func habitUnitName(_ unit:String)->String { ["minutes":"دقيقة","exerciseMinutes":"دقيقة حركة","steps":"خطوة","pages":"صفحة"][unit] ?? unit }
 /// A count with its unit in Arabic number agreement («دقيقتان»، «٨ صفحات»، «١٥ خطوة») for the built-in units;

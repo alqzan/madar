@@ -201,7 +201,11 @@ import XCTest
         capture(app, "UX-10-glass-shortcuts-expanded-L")
         let nextPrayer = app.descendants(matching: .any).matching(identifier: "tab-accessory-next-prayer").firstMatch
         XCTAssertTrue(nextPrayer.waitForExistence(timeout: 5), "Expanded accessory should show the next prayer.\n\(app.debugDescription)")
-        for room in ["notes", "money", "mihbara"] {
+        // Owner, 21 Oct 2026: المال and المحبرة are tabs; the diary and «خصّص» ride the expanded accessory.
+        for title in ["البهو", "الصلاة", "القرآن", "المال", "المحبرة"] {
+            XCTAssertTrue(app.tabBars.buttons[title].exists, "Missing tab: \(title)\n\(app.debugDescription)")
+        }
+        for room in ["notes", "customize"] {
             let shortcut = app.buttons["tab-\(room)"]
             XCTAssertTrue(shortcut.waitForExistence(timeout: 5), "Missing expanded room shortcut: \(room)\n\(app.debugDescription)")
             XCTAssertTrue(shortcut.isHittable, "Expanded room shortcut is not tappable: \(room)")
