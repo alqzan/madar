@@ -348,7 +348,7 @@ import UIKit
         for _ in 0..<20 where !subtitle.label.hasPrefix("الجزء الثاني") { usleep(500_000) }
         attach(app, "M6-UX-V-reader-after-tap-L")
         // Blocker (M6-UX-V, 22 Oct): a Turath file holds 30 printed pages, so a volume can begin mid-chapter. The reader opens
-        // that chapter but Readium does not scroll to the page anchor, so the screen still shows the end of volume 1.
+        // that chapter but does not reach the page anchor, so the screen still shows volume 1.
         XCTExpectFailure("M6-UX-V: the reader opens the chapter, not the page anchor where volume 2 begins") {
             XCTAssertTrue(subtitle.label.hasPrefix("الجزء الثاني"), "Reader subtitle: \(subtitle.label)")
         }
@@ -377,6 +377,11 @@ import UIKit
             sleep(1)
             attach(app, String(format: "bindings-shelf-%02d-L", n))
         }
+        // «أنهيتها»: the finished books lie in piles across the shelves.
+        for _ in 0..<4 { app.swipeDown(velocity: .fast) }
+        let finished = app.buttons["mihbara-shelf-finished"]; XCTAssertTrue(finished.waitForExistence(timeout: 5), app.debugDescription)
+        finished.tap(); sleep(1)
+        attach(app, "bindings-finished-L")
     }
 
     /// M6-T01: search Turath's catalogue, download a book (fixture data, no network), review it and read it.

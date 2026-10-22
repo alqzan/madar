@@ -240,6 +240,8 @@ struct MihbaraHomeView: View {
             } else {
                 if shelf != "finished" {
                     bookcase(books.filter { $0.id != tableBook?.id }, leathers: leathers)
+                } else if piles(books).count > 1 {
+                    pileBookcase(books, leathers: leathers)
                 } else {
                 ScrollView(.horizontal) {
                     // Owner, 21 Oct 2026: what you read stands in order; what you finished lies in loose piles.
@@ -295,6 +297,51 @@ struct MihbaraHomeView: View {
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { shelfWidth = $0 }
     }
 
+    /// «أنهيتها» as a bookcase too: the piles of finished books fill a shelf, then the next one down.
+    @ViewBuilder private func pileBookcase(_ books: [MihbaraBook], leathers: [UUID: Int]) -> some View {
+        let rows = pileRows(piles(books), width: shelfWidth - 20)
+        let shown = rows.prefix(5), hidden = rows.dropFirst(5).flatMap { $0 }.flatMap { $0 }.count
+        VStack(spacing: 0) {
+            ForEach(Array(shown.enumerated()), id: \.offset) { _, row in
+                HStack(alignment: .bottom, spacing: 14) {
+                    ForEach(Array(row.enumerated()), id: \.offset) { _, pile in
+                        VStack(spacing: 0) {
+                            ForEach(pile.reversed(), id: \.key) { item in
+                                Button { openBook(item.book, volume: item.volume) } label: { lying(item, leather: leathers[item.book.id] ?? 0) }
+                                    .buttonStyle(.plain).contextMenu { bookMenu(item.book) }.accessibilityLabel(shelfLabel(item.book)).accessibilityIdentifier("mihbara-book-" + item.book.id.uuidString)
+                            }
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 10).padding(.top, 16).padding(.bottom, 12)
+                .background(LinearGradient(colors: [theme.color("wood").opacity(0.05), theme.color("wood").opacity(0.16)], startPoint: .top, endPoint: .bottom))
+                MihbaraShelfPlank().padding(.top, -14)
+            }
+            if hidden > 0 {
+                Button { sheet = .library } label: { Text(MihbaraCopy.books(hidden, service.digits) + " أخرى في «كل كتبي» ‹").font(MadarTypography.caption()) }
+                    .frame(maxWidth: .infinity, minHeight: 44)
+            }
+        }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { shelfWidth = $0 }
+    }
+
+    private func pileRows(_ all: [[PileItem]], width: CGFloat) -> [[[PileItem]]] {
+        var rows: [[[PileItem]]] = [], used: [CGFloat] = []
+        for pile in all {
+            let w = pile.map { pileLength($0) }.max() ?? 160
+            if let i = used.firstIndex(where: { $0 + 14 + w <= width }) { rows[i].append(pile); used[i] += 14 + w }
+            else { rows.append([pile]); used.append(w) }
+        }
+        return rows
+    }
+
+    /// How long a finished book is lying down: its spine's height.
+    private func pileLength(_ item: PileItem) -> CGFloat {
+        let shape = shapes[item.book.id]
+        return MihbaraBookSpine.size(pagesPerVolume: shape?.pages.map { $0 / max(1, shape?.volumes ?? 1) } ?? item.book.pages).height * Self.lyingScale + 12
+    }
+
     /// The width a book takes standing: a spine, or all of a set's volumes side by side.
     private func standingWidth(_ b: MihbaraBook) -> CGFloat {
         let shape = shapes[b.id], volumes = max(1, shape?.volumes ?? 1)
@@ -344,15 +391,18 @@ struct MihbaraHomeView: View {
         }
         return stride(from: 0, to: items.count, by: 4).map { Array(items[$0..<min($0 + 4, items.count)]) }
     }
+    private static let lyingScale: CGFloat = 0.8
     /// A finished book lying on its side, a little askew, as books left on a shelf after reading.
     private func lying(_ item: PileItem, leather: Int) -> some View {
         let shape = shapes[item.book.id]
         let size = MihbaraBookSpine.size(pagesPerVolume: shape?.pages.map { $0 / max(1, shape?.volumes ?? 1) } ?? item.book.pages)
         let seed = item.key.unicodeScalars.reduce(0) { ($0 &* 31 &+ Int($1.value)) % 9973 }
         let tilt = Double(seed % 7) - 3, shift = CGFloat(seed % 13) - 6
+        // A little smaller than the standing books, so two piles share a shelf.
         return MihbaraBookSpine(book: item.book, shape: shape, leather: leather, digits: service.digits, volume: item.volume, lying: true)
             .rotationEffect(.degrees(-90))
-            .frame(width: size.height, height: size.width)
+            .scaleEffect(Self.lyingScale)
+            .frame(width: size.height * Self.lyingScale, height: size.width * Self.lyingScale)
             .rotationEffect(.degrees(tilt)).offset(x: shift)
     }
     /// The spine shows a short title; VoiceOver hears the whole book: full title, author, size and progress.

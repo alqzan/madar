@@ -198,7 +198,7 @@ struct MihbaraBookSpine: View {
         let perVolume = shape?.pages.map { $0 / max(1, shape?.volumes ?? 1) } ?? book.pages
         let single = Self.size(pagesPerVolume: perVolume)
         // A volume of a set is a big printed volume: wider and a little taller than a single book.
-        let size = volume == nil ? single : Self.volumeSize(single)
+        let size = volume == nil || lying ? single : Self.volumeSize(single)
         let parts = BookTitle.parts(book.title)
         ZStack {
             // Rounded leather or cloth: the darker shade at both edges, a soft highlight a third of the way in.
