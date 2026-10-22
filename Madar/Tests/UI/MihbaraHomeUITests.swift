@@ -828,7 +828,7 @@ import XCTest
         let paragraph = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "This is original synthetic fixture text")).firstMatch
         XCTAssertTrue(paragraph.waitForExistence(timeout: 20), app.debugDescription)
         sleep(1)
-        paragraph.coordinate(withNormalizedOffset: CGVector(dx: 0.34, dy: 0.14)).press(forDuration: 1.2)
+        paragraph.coordinate(withNormalizedOffset: CGVector(dx: 0.34, dy: 0.14)).press(forDuration: 0.8)
         let card = app.descendants(matching: .any)["mihbara-word-card"]
         XCTAssertTrue(card.waitForExistence(timeout: 8), app.debugDescription)
         let word = app.staticTexts["mihbara-word-title"]
@@ -841,7 +841,7 @@ import XCTest
         XCTAssertTrue(app.descendants(matching: .any)["mihbara-reader-toast"].waitForExistence(timeout: 8), app.debugDescription)
         XCTAssertTrue(card.waitForNonExistence(timeout: 5))
 
-        paragraph.coordinate(withNormalizedOffset: CGVector(dx: 0.34, dy: 0.14)).press(forDuration: 1.2)
+        paragraph.coordinate(withNormalizedOffset: CGVector(dx: 0.34, dy: 0.14)).press(forDuration: 0.8)
         XCTAssertTrue(card.waitForExistence(timeout: 8), app.debugDescription)
         XCTAssertTrue(app.staticTexts["mihbara-word-saved"].waitForExistence(timeout: 5), app.debugDescription)
 
