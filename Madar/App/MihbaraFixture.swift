@@ -4,10 +4,11 @@ import CryptoKit
 import SwiftData
 import MadarCore
 import MadarData
+import MadarCommands
 
 extension AppSession {
     func prepareMihbaraFixture(group: URL) throws {
-        guard let variant = ProcessInfo.processInfo.environment["MADAR_UI_MIHBARA_FIXTURE"], ["home","empty","reader"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
+        guard let variant = ProcessInfo.processInfo.environment["MADAR_UI_MIHBARA_FIXTURE"], ["home","empty","reader","bindings"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         let c = ModelContext(container)
         guard !(try c.fetch(FetchDescriptor<DeviceSetting>())).contains(where: { $0.key == "sys.mihbaraFixture" }) else { return }
         for key in ["sys.mihbaraFixture","sys.onboardingCompleted"] { let r = DeviceSetting(); r.key = key; r.valueJSON = Data("true".utf8); c.insert(r) }
@@ -21,6 +22,15 @@ extension AppSession {
             let pageNote = NotebookNote(); pageNote.id = StableIdentity.uuid(for: "mihbara-fixture-page-note"); pageNote.text = "أكمل من هذا الموضع على مهل."; pageNote.isPrivate = true; pageNote.link = "page"; pageNote.targetID = r.id; pageNote.page = 147; pageNote.updatedAt = now; c.insert(pageNote)
             for n in 1...12 { let h = HadithProgress(); h.id = StableIdentity.uuid(for: "hadith:nawawi40:\(n)"); h.collectionID = "nawawi40"; h.editionID = "wikisource-ar-500107"; h.number = n; h.readAt = now.addingTimeInterval(-86400); h.understood = true; c.insert(h) }
         }
+        if variant == "bindings" {
+            // Owner, 22 Oct 2026: one book per binding, sets and single books, to see all twenty on the shelf.
+            for (k, item) in Self.bindingShelf.enumerated() {
+                var seed = 0, id = StableIdentity.uuid(for: "binding-\(k)-0")
+                while BookBindings.indices(for: [id])[id] != k { seed += 1; id = StableIdentity.uuid(for: "binding-\(k)-\(seed)") }
+                let b = Book(); b.id = id; b.title = item.title; b.author = item.author; b.pages = item.pages; b.shelf = "want"
+                b.updatedAt = now.addingTimeInterval(-Double(k) * 60); c.insert(b)
+            }
+        }
         if variant == "reader", let encoded = ProcessInfo.processInfo.environment["MADAR_UI_MIHBARA_EPUB_BASE64"], let data = Data(base64Encoded: encoded) {
             let hash = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined(), mediaID = StableIdentity.uuid(for: "mihbara-reader-fixture-media")
             let media = Media(); media.id = mediaID; media.kind = "doc"; media.contentType = "org.idpf.epub-container"; media.data = data; media.sizeBytes = data.count; media.sha256 = hash; c.insert(media)
@@ -28,5 +38,19 @@ extension AppSession {
         }
         try c.save()
     }
+
+    /// Title, author, printed pages per volume and volumes, for the bindings fixture.
+    static let bindingShelf: [(title: String, author: String, pages: Int, volumes: Int)] = [
+        ("زاد المعاد في هدي خير العباد", "ابن قيم الجوزية", 2400, 5), ("رياض الصالحين", "النووي", 560, 1),
+        ("فتح الباري شرح صحيح البخاري", "ابن حجر", 6400, 4), ("الأربعون النووية", "النووي", 120, 1),
+        ("مدارج السالكين", "ابن قيم الجوزية", 1500, 3), ("الرحيق المختوم", "المباركفوري", 480, 1),
+        ("سير أعلام النبلاء", "الذهبي", 3200, 4), ("الفوائد", "ابن قيم الجوزية", 300, 1),
+        ("تفسير القرآن العظيم", "ابن كثير", 3600, 4), ("صيد الخاطر", "ابن الجوزي", 520, 1),
+        ("البداية والنهاية", "ابن كثير", 2800, 4), ("الداء والدواء", "ابن قيم الجوزية", 380, 1),
+        ("إحياء علوم الدين", "الغزالي", 2600, 4), ("حلية طالب العلم", "بكر أبو زيد", 90, 1),
+        ("الموافقات", "الشاطبي", 1800, 3), ("بلوغ المرام", "ابن حجر", 420, 1),
+        ("الأدب المفرد", "البخاري", 350, 1), ("كتاب التوحيد", "محمد بن عبد الوهاب", 160, 1),
+        ("لا تحزن", "عائض القرني", 440, 1), ("مختصر منهاج القاصدين", "ابن قدامة", 400, 1),
+    ]
 }
 #endif

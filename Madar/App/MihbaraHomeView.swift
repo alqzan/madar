@@ -14,6 +14,7 @@ struct MihbaraHomeView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var reading: MihbaraHomeReading?
     @State private var shapes: [UUID: MihbaraBookShape] = [:]
+    @State private var shelfWidth: CGFloat = 360
     @State private var motivationCues: [MihbaraMotivationCue] = []
     @State private var shelf = "reading"
     @State private var tableID: UUID?
@@ -237,6 +238,9 @@ struct MihbaraHomeView: View {
             if books.isEmpty {
                 emptyShelf(r)
             } else {
+                if shelf != "finished" {
+                    bookcase(books.filter { $0.id != tableBook?.id }, leathers: leathers)
+                } else {
                 ScrollView(.horizontal) {
                     // Owner, 21 Oct 2026: what you read stands in order; what you finished lies in loose piles.
                     if shelf == "finished" {
@@ -258,14 +262,60 @@ struct MihbaraHomeView: View {
                 }.scrollIndicators(.hidden)
                     // The back of the bookcase: a faint wall the spines stand against.
                     .background(LinearGradient(colors: [theme.color("wood").opacity(0.05), theme.color("wood").opacity(0.16)], startPoint: .top, endPoint: .bottom))
+                MihbaraShelfPlank().padding(.top, -14)
+                }
             }
-            MihbaraShelfPlank().padding(.top, -14)
+            if books.isEmpty { MihbaraShelfPlank().padding(.top, -14) }
             HStack { Button("كل كتبي ‹") { sheet = .library }.accessibilityIdentifier("mihbara-library"); Spacer(); Text(shelfTotal(r.books.count)).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
             MihbaraOldBooksCabinet(books: r.books.filter { $0.shelf == "old" }, theme: theme, shapes: shapes, digits: service.digits) { id in
                 if let book = r.books.first(where: { $0.id == id }) { openBook(book) }
             }
         }
     }
+    /// Owner, 22 Oct 2026: «اذا كبرت المكتبه يصير زي البوك شيلف كبير مليان وكم دور». Books fill a shelf to the width of
+    /// the screen, then the next shelf down; a set stands whole on one shelf. Five shelves show; the rest wait in «كل كتبي».
+    @ViewBuilder private func bookcase(_ books: [MihbaraBook], leathers: [UUID: Int]) -> some View {
+        let rows = shelfRows(books, width: shelfWidth - 20)
+        let shown = rows.prefix(5), hidden = rows.dropFirst(5).reduce(0) { $0 + $1.count }
+        VStack(spacing: 0) {
+            ForEach(Array(shown.enumerated()), id: \.offset) { _, row in
+                ScrollView(.horizontal) {
+                    HStack(alignment: .bottom, spacing: 9) { ForEach(row) { b in standing(b, leather: leathers[b.id] ?? 0) } }
+                        .padding(.horizontal, 10).padding(.top, 16)
+                }
+                .scrollIndicators(.hidden).scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+                .background(LinearGradient(colors: [theme.color("wood").opacity(0.05), theme.color("wood").opacity(0.16)], startPoint: .top, endPoint: .bottom))
+                MihbaraShelfPlank().padding(.top, -14)
+            }
+            if hidden > 0 {
+                Button { sheet = .library } label: { Text(MihbaraCopy.books(hidden, service.digits) + " أخرى في «كل كتبي» ‹").font(MadarTypography.caption()) }
+                    .frame(maxWidth: .infinity, minHeight: 44).accessibilityIdentifier("mihbara-bookcase-more")
+            }
+        }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { shelfWidth = $0 }
+    }
+
+    /// The width a book takes standing: a spine, or all of a set's volumes side by side.
+    private func standingWidth(_ b: MihbaraBook) -> CGFloat {
+        let shape = shapes[b.id], volumes = max(1, shape?.volumes ?? 1)
+        let single = MihbaraBookSpine.size(pagesPerVolume: shape?.pages.map { $0 / volumes } ?? b.pages)
+        guard volumes > 1 else { return single.width }
+        let n = CGFloat(min(volumes, 8)), w = MihbaraBookSpine.volumeSize(single).width
+        return n * w + (n - 1) * MihbaraBookSpine.volumeGap + (volumes > 8 ? 34 : 0)
+    }
+
+    /// Books in shelf order packed into rows no wider than the shelf: each book takes the first shelf with room for it,
+    /// so a gap left before a wide set fills with the next slim books. A set wider than a shelf stands alone.
+    private func shelfRows(_ books: [MihbaraBook], width: CGFloat) -> [[MihbaraBook]] {
+        var rows: [[MihbaraBook]] = [], used: [CGFloat] = []
+        for b in books {
+            let w = standingWidth(b)
+            if let i = used.firstIndex(where: { $0 + 9 + w <= width }) { rows[i].append(b); used[i] += 9 + w }
+            else { rows.append([b]); used.append(w) }
+        }
+        return rows
+    }
+
     /// One book as it stands on the shelf: a spine, or a numbered spine per volume for a set. Owner, 21 Oct 2026:
     /// tapping a volume opens that volume (at the saved place when it is inside it).
     @ViewBuilder private func standing(_ b: MihbaraBook, leather: Int) -> some View {

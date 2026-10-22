@@ -355,6 +355,30 @@ import UIKit
         attach(app, "M6-UX-V-reader-second-volume-L")
     }
 
+    /// Owner, 22 Oct 2026: twenty bindings, each on one book (eight sets and twelve single books), photographed along the shelf.
+    func testTwentyBindingsAlongTheShelf() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MIHBARA_FIXTURE": "bindings",
+            "MADAR_UI_NOW": "2026-10-18T12:00:00+03:00", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
+        app.launch()
+        let customize = app.buttons["tab-customize"]; XCTAssertTrue(customize.waitForExistence(timeout: 20)); customize.tap()
+        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 8)); search.tap(); search.typeText("المحبرة")
+        let door = app.buttons["mihbara-open"]; XCTAssertTrue(door.waitForExistence(timeout: 8)); door.tap()
+        let wantShelf = app.buttons["mihbara-shelf-want"]; XCTAssertTrue(wantShelf.waitForExistence(timeout: 15), app.debugDescription)
+        wantShelf.tap()
+        let first = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "زاد المعاد")).firstMatch
+        XCTAssertTrue(first.waitForExistence(timeout: 10), app.debugDescription)
+        sleep(1)
+        attach(app, "bindings-shelf-01-L")
+        // The bookcase grows downwards: five shelves, the rest under «كل كتبي».
+        for n in 2...5 {
+            app.swipeUp(velocity: .slow)
+            sleep(1)
+            attach(app, String(format: "bindings-shelf-%02d-L", n))
+        }
+    }
+
     /// M6-T01: search Turath's catalogue, download a book (fixture data, no network), review it and read it.
     func testTurathSearchDownloadsABookIntoTheLibrary() throws {
         continueAfterFailure = false
