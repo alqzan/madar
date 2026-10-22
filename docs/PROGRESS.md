@@ -322,6 +322,8 @@ Owner, 22 Oct (trial findings): the owner never typed expenses by hand. The 402 
 
 Owner, 23 Oct: (1) Habits do not feel simple. He wants much more flexibility, in the habits themselves and in how they are shown, and a room that is far easier, clearer and simpler. Unclear visual wish: show 2–3 mockups first, the owner picks, then build (mockup rule). (2) The order to the phone: finish the real-data import (money, Quran, prayer and the rest), try and check every room with it, check everything is fine, then install on the owner's iPhone for daily use. His own use is expected to surface most problems.
 
+Owner, 23 Oct: cloud. «انا رابط التطبيق الاول بفاير بيس وكلاود ابي نفس الشي». The owner wants his data in the cloud as in the old app (Firebase + cloud), not on the phone alone. This lifts RA1 (local-only v1) and the sync freeze. Open question to the owner: Firebase itself, or cloud by any means? Agent's recommendation: CloudKit private database. The data model is already CloudKit-shaped; it is free and in the owner's own iCloud; no third-party SDK; it needs the paid developer account. With Firebase, diary and money must be end-to-end encrypted before upload, and the SDK licence and size apply. Before daily use on the phone, there must at least be an automatic encrypted backup off the device.
+
 Answered by the owner, 21 Oct (details in DECISIONS):
 1. PDF to books: build both parts — (a) through Turath (find the same book there and import it), (b) on-device conversion of any PDF the owner adds.
 2. Encrypted backup: unfrozen — build it («سوها»). App-switcher privacy, sync and the contrast inspector stay frozen.
