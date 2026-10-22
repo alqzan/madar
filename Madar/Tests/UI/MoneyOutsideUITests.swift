@@ -7,7 +7,9 @@ import XCTest
         app.launch(); let lobby = app.tabBars.buttons["البهو"]; XCTAssertTrue(lobby.waitForExistence(timeout:20)); lobby.tap()
         let money = app.otherElements["bahw-block-mal"]; XCTAssertTrue(money.waitForExistence(timeout:10)); shot(app,"M5-X01-lobby-L")
         for _ in 0..<4 where !money.isHittable { app.swipeUp(velocity:.slow) }; for _ in 0..<3 where money.frame.maxY > app.frame.height - 100 { app.swipeUp(velocity: .slow) }; shot(app,"M5-X01-lobby-s1-L"); money.tap()
-        XCTAssertTrue(app.staticTexts["money-title"].waitForExistence(timeout:10)); app.buttons["money-back"].tap()
+        XCTAssertTrue(app.staticTexts["money-title"].waitForExistence(timeout:10))
+        // The lobby block opens the المال tab (no back button there); «خصّص» rides the glass accessory.
+        let customize = app.buttons["tab-customize"]; XCTAssertTrue(customize.waitForExistence(timeout:5)); customize.tap()
         let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout:5)); search.tap(); search.typeText("خارج التطبيق"); app.buttons["room-widgets-gallery"].tap()
         let widget = app.descendants(matching: .any).matching(identifier: "room-widget-money").firstMatch; XCTAssertTrue(widget.waitForExistence(timeout:5)); for _ in 0..<5 where !widget.isHittable { app.swipeUp(velocity:.slow) }; XCTAssertTrue((widget.label + widget.staticTexts.allElementsBoundByIndex.map(\.label).joined()).contains("•••"), widget.debugDescription); for _ in 0..<3 where widget.frame.maxY > app.frame.height - 60 { app.swipeUp(velocity: .slow) }; shot(app,"M5-X01-widget-L")
         let lock = app.buttons["room-widgets-lock"]; for _ in 0..<6 where !lock.isHittable { app.swipeDown(velocity:.slow) }; lock.tap(); XCTAssertTrue(app.staticTexts["lock-widgets-title"].waitForExistence(timeout:5)); shot(app,"M5-X01-lock-L")

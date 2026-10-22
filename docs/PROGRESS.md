@@ -316,6 +316,10 @@ Owner: «اعتمد ترتيب المحبرة وواصل». Each row includes it
 
 **Owner rule (18 Oct): «اي شي ينتظر قراري جمعهن كلهن اخر شي لكن مهب شي يوقف عليه التطوير».** A pending owner decision never stops development. Do the safe default, or skip that one item and take the next ready card. Add the question to this list, and the owner answers them all together at the end.
 
+Owner, 22 Oct: the device run (paid developer account) and the review of built work wait a few days. Meanwhile the owner sends their current real data from the old Madar app for a trial import; problems are expected and fixed from it. Agent handling: work only on a copy, import into a separate simulator test store, never into the owner's real store and never off the Mac; record every mismatch as a board row.
+
+Owner, 22 Oct (trial findings): the owner never typed expenses by hand. The 402 older money rows (3 Jul to 21 Sep, Latin merchant notes, no time, no message text) came from an earlier automatic source; bank-message rows with text start on 21 Sep. Import them as automatic rows without message text, never as «يدوي». Diary photos are only references in the backup; the owner thinks they are right that the old app kept no copies. Open question, not blocking: what fed the old app before 21 Sep (Apple Pay automation?).
+
 Answered by the owner, 21 Oct (details in DECISIONS):
 1. PDF to books: build both parts — (a) through Turath (find the same book there and import it), (b) on-device conversion of any PDF the owner adds.
 2. Encrypted backup: unfrozen — build it («سوها»). App-switcher privacy, sync and the contrast inspector stay frozen.
@@ -344,6 +348,69 @@ M0-M6 software is integrated; M5 has its bounded software gate. M7 remains open 
 
 # Handovers
 
+## Handover — owner data trial, diary freeze fixed, Gregorian first — 2026-10-22 — Claude
+Owner, 22 Oct: a handover may be longer than 7 lines. What matters is that the next agent understands. Details below.
+
+**Works now (all committed on main)**
+- **Habits:**
+  - Every open manual habit row logs in one tap (`habit-quick-<uuid>`).
+  - Progress reads «الهدف: ٨ أكواب» before the first log, never «٠ من ٨».
+  - One Arabic count table is shared by the room, the lobby and the widget: `WidgetCopy.unitCount`. After «من» the dual is genitive: «١ من كوبين».
+  - The lobby hides «٠ من ٥» (prayer) and «٠ من N» (habits) until something is logged.
+- **Money home:**
+  - The scroll's due diamonds sit on the baseline, clear of the dates.
+  - «سجّل مصروفًا» is a filled button under «لك الآن».
+  - The other eight doors are a drawer grid. It must stay a non-lazy `Grid`: a `LazyVGrid` hid off-screen doors from 23 UI tests.
+- **Lobby test:** fixed for the five-room bar. المال and المحبرة are tabs; the diary and «خصّص» ride the accessory.
+- **Calendar (owner decision):** `core.firstCalendar` now defaults to `gregorian` in all three schema copies. Only the Quran room forces Hijri first (`AppQuranService+Week.swift`, `+DayClose`, `+Year`, `AppQuranService.swift:208`). Both dates always show.
+- **Owner data trial (diary):**
+  - The owner put `madar-backup-2026-10-22.json` in `Madar/Artifacts/owner-data/`. That folder is git-ignored. Never commit its content, never put diary text, names, amounts or bank strings in board or DECISIONS rows, and never point a helper agent at it.
+  - `Madar/scripts/legacy-diary-to-dayone.py` converts `journalEntries` to a Day One ZIP. Each entry carries `madarLegacyDay`, the old stored date.
+  - `DayOneParser` reads that key into `DayOneEntryPlan.legacyDay`, and `DayOneDayKey.resolve` returns it with policy `legacy@0` (MIGRATION.md: the old date is never recomputed). Real Day One exports never carry the key.
+  - The DEBUG hook `runLegacyDiaryTrialIfRequested` (in `DiaryHomeFixture.swift`, called from the root `.task`) runs only with `MADAR_UI_LEGACY_DIARY_ZIP` and a UI-test store. It sends the ZIP through the shipped `AppDiaryImportService` and writes a counts-only report next to the ZIP.
+  - Run it with: `TEST_RUNNER_MADAR_TRIAL_ZIP=<abs zip> xcodebuild test … -only-testing:MadarUITests/DiaryHubUITests/testOwnerLegacyDiaryTrial`
+  - Result: 2,263 added in 26 s, 7 empty entries skipped, 2,097 photos missing, all 2,263 on `legacy@0`.
+- **Freeze fixed:** finishing the diary welcome ran `DiaryLineRenderer.freezeBeforeSourceChange`, which re-read every table for every day. With 2,263 days that was more than 3 minutes on the main thread. It now uses `DiaryLineRenderer.live(days:)`, one read per table. Each day's lines are unchanged.
+- **Diary home:** a past page whose imported photos are missing says «صور هذا اليوم لم تُنقل». The excerpt skips empty photo-only lines.
+
+**Verified (commands run, results seen)**
+- HabitsUITests 2/2.
+- RoomWidgetSnapshotTests 7/7.
+- BahwLobby at-risk and five-tab tests.
+- MoneyHome, Log, Outside, Reconcile and Zakat: 14/14 after the drawer fix.
+- QuranHomeUITests 3/3.
+- MadarCore DayOneImportTests 9/9.
+- MadarCommands diary, money and book tests 22/22.
+- MadarDataTests 78/78. The settings count was stale at 137; it is 140.
+- The owner diary trial passed.
+
+**Not verified**
+- **Money suites after the drawer grid:** Accounts, Analysis, Cards, Cashback, Goal, Expense, BigExpense and Settings. Their run was cut off. All 23 earlier failures were "door not found", caused by the lazy grid, so they should now pass.
+- **UI tests after the Gregorian default:** not run at all. Tests that assert Hijri-first labels (for example a hub year «١٤٤٨») will fail. Update them to the owner's rule. Never revert the default.
+- **Not run in the UI:** the missing-photo hero and the diary-month VoiceOver label (it now adds the other calendar).
+
+**Next, in order**
+1. Run the full UI suite once. Fix the tests the Gregorian default broke, and the money suites listed above.
+2. **Diary export:** `AppDiaryExportService.exportPages` still loops per day (`day(date)`, `live(day:)`, `index.documents` filter). Batch it like `live(days:)`, and time it with the owner trial.
+3. **Diary welcome:** it shows even when the store already has thousands of entries. Consider skipping it when entries exist.
+4. **Owner trial, money:** a money data card, so it needs one review pass (owner, 16 Oct). The data has 533 transactions:
+   - 131 from 21 Sep onward carry `rawText`. Re-parse them with the bank parser and compare.
+   - 402 from 3 Jul to 21 Sep have Latin merchant notes, no time and no text. The owner says he never typed expenses, so import them as automatic rows without message text, never as «يدوي».
+   - 9 account strings must map to 3 credit cards.
+   - 25 categories, most custom with random IDs.
+   - 11 inbox events, 2 without a trusted amount: these need the owner's decision.
+   - `dailyBudget`, `salaryDay`, `monthlyIncome` and `incomePct` map to cycle settings.
+   - Amounts have at most 2 decimals: convert to Int halalas through Decimal.
+5. **Then:** Quran memorisation (plan unit «ربع», balanced intensity; 70 sessions, 53 reviews, 45 mistakes, 15 tombstones in `deletedRecords`). Prayer: 113 days of جماعة/منفردة/فائتة/لم; RP1 applies, and unlogged never becomes missed; carry `qadaBacklog` as a number only. Then 1 habit with 16 logs, 1 future letter, 2 countdowns and 2 reserves.
+
+**Owner**
+- The device run and the review wait a few days.
+- Open question, not blocking: what fed the old app's money before 21 Sep (Apple Pay automation?).
+- Ideas waiting on the owner: whether v1 ships an «استيراد من مدار القديم» entry point. Keep it dev-only until he says yes.
+
+**Model/effort:** claude-opus-5-5, effort not exposed.
+**Usage:** the owner reported about 10% left; stopped new work to commit and hand over.
+
 ## Handover — volume opens at its page, the wall bookcase and the stand — 2026-10-22 — Claude
 - **Works now:** tapping a volume opens its first page (Readium stopped one RTL column short; the reader now turns to the anchor). «قديمًا» lies under «أنهيتها» in piles by year, and «كل كتبي» has sections. The room is the owner's layout ٢: a wall bookcase with named shelves, and the stand with one open book, «أكمل من صفحة …» and the wird strip.
 - **Verified:** Mihbara home + import UI 30/32 (`m6uxr-wall-r1`); after fixes, paper card 1/1 (`r2`) and shelf, wird and empty-shelf 3/3 (`r3`); volume test without the expected-failure wrapper (`m6uxv-fix2`); app build.
@@ -359,12 +426,4 @@ M0-M6 software is integrated; M5 has its bounded software gate. M7 remains open 
 - **Not verified:** owner iPhone; dark mode of the spines; long real sets of 8+ volumes.
 - **Next:** owner looks at the shelf; M6-UX-V blocker; M6-UX-R needs two or three layout proposals before code.
 - **Model/effort:** claude-opus-5-5, effort not exposed; helpers Haiku and Sonnet (read-only). **Usage:** not exposed.
-
-## Handover — real shelf, smart titles, five-room tab bar — 2026-10-21 — Claude
-- **Works now:** the Mihbara shelf shows real spines: thickness from pages, each volume of a set numbered on a gilt label, finished books lying in loose piles, and no «على الطاولة» text. Titles come from `BookTitle.parts` (the editor, edition, «مطبوع ضمن» and «=» move to a note; long rhymed titles shorten to their known name). The tab bar is البهو، الصلاة، القرآن، المال، المحبرة, with the diary and «خصّص» in the glass accessory. «حمّسني» is removed. The card sheet (M5-C01) is committed. The EPUB review no longer pins its button over the shelf row.
-- **Verified:** `swift test --filter BookTitleTests` 12/12; UI `testLiveTurathTenBooksAcrossEveryShelf` passed (227 s, shots in `Madar/Artifacts/shelf-21oct/`); `RoomGlyphUITests/testWalkBuiltRoomsWithNativeRoomGlyphs` passed; earlier this session: EPUB import, library and card tests passed.
-- **Differences left / failing:** `QuranHomeUITests/testFirstUseShowsPlanActionWithoutZeroStreakOrDepthControls` fails at line 97: after opening the diary from the accessory, the «المال» tab is not found. Check whether the diary hides the tab bar, and fix the shortcut flow in `TabShell` (the `lastRoom` binding). The other ~80 UI tests that now use `tab-customize` were not rerun.
-- **Not verified:** owner iPhone; dark mode of the spines; the tab change on iPad (sidebar).
-- **Next (owner answered, all «yes» to the proposal):** M6-UX-R (merge «قديمًا» into «أنهيتها»; cabinet into «كل كتبي»; the desk becomes one open book with the wird), M6-UX-V (tapping a volume opens it), M6-UX-T (title edit and size at import).
-- **Model/effort:** claude-opus-5-5, effort not exposed. **Usage:** about 83% of the five-hour window at handover.
 

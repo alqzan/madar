@@ -25,7 +25,7 @@ extension AppQuranService {
         for session in value.sessions where session.kind == .hifz {
             for ayah in session.ayahs.first...session.ayahs.last where credited[ayah] == nil { credited[ayah] = session.dayKey }
         }
-        let firstCalendar = FirstCalendar(rawValue: app.string("core.firstCalendar")) ?? .hijri
+        let firstCalendar = FirstCalendar.hijri // Quran room: Hijri always first (owner, 16 and 22 Oct)
         func day(_ key: GregorianDay) -> QuranUIWeekDay {
             let instant = key.date(in: calendar.timeZone).addingTimeInterval(12 * 3600)
             let weekday = weekdays[calendar.component(.weekday, from: instant) - 1]

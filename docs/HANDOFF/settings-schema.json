@@ -96,7 +96,7 @@
    "section": "اليوم والتقويم",
    "title": "التقويم الأول",
    "type": "choice",
-   "default": "hijri",
+   "default": "gregorian",
    "scope": "sync",
    "options": [
     {

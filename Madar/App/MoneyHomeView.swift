@@ -36,6 +36,55 @@ struct MoneyHomeView: View {
     private var service: AppMoneyService { .init(app: app) }
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
     private var amountsVisible: Bool { !app.bool("core.hideMoneyUntilTouch") || revealed }
+    /// Owner, «تعمّق وحسّن» 22 Oct 2026: the daily action sits under «لك الآن», not at the foot of ten equal buttons.
+    private var expenseButton: some View {
+        Button { expenseOpen = true } label: {
+            Label("سجّل مصروفًا", systemImage: "plus").font(MadarTypography.body().weight(.semibold))
+                .frame(maxWidth: .infinity, minHeight: 50).foregroundStyle(theme.onAccent).background(theme.accent, in: .capsule)
+        }.buttonStyle(.plain).padding(.vertical, 4).accessibilityIdentifier("money-expense-open")
+    }
+    /// The room's other doors as drawers of one desk, two to a row, most used first; settings close the desk.
+    private var doors: some View {
+        VStack(spacing: 10) {
+            // Not lazy: eight drawers are cheap, and every door must exist before it scrolls into view.
+            Grid(horizontalSpacing: 10, verticalSpacing: 10) {
+                GridRow {
+                    drawer("السجل", "book.pages", "money-log-open") { logOpen = true }
+                    drawer("التحليل", "chart.bar.xaxis", "money-analysis-open") { analysisOpen = true }
+                }
+                GridRow {
+                    drawer("البطاقات", "creditcard", "money-cards-open") { cardsOpen = true }
+                    drawer("الحسابات", "tree", "money-accounts-open") { accountsOpen = true }
+                }
+                GridRow {
+                    drawer("المطابقة مع البنك", "checkmark.seal", "money-reconcile-open") { reconcileOpen = true }
+                    drawer("جهّز لشيء قادم", "sparkles", "money-goal-open") { goalOpen = true }
+                }
+                GridRow {
+                    drawer("الاسترداد النقدي", "drop", "money-cashback-open") { cashbackOpen = true }
+                    drawer("الزكاة", "scalemass", "money-zakat-open") { zakatOpen = true }
+                }
+            }
+            Button { settingsOpen = true } label: {
+                Label("إعدادات المال", systemImage: "slider.horizontal.3").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).frame(minHeight: 44)
+            }.buttonStyle(.plain).accessibilityIdentifier("money-settings-open")
+        }.padding(.top, 8)
+    }
+    private func drawer(_ title: String, _ symbol: String, _ id: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 8) {
+                Image(systemName: symbol).font(.system(size: 18, weight: .regular)).foregroundStyle(theme.color("reserveText"))
+                Text(title).font(MadarTypography.body()).lineLimit(2).minimumScaleFactor(0.85).multilineTextAlignment(.leading)
+                // The drawer's brass pull.
+                Capsule().fill(theme.color("reserveText").opacity(0.55)).frame(width: 22, height: 3).frame(maxWidth: .infinity).accessibilityHidden(true)
+            }
+            .padding(.horizontal, 14).padding(.top, 14).padding(.bottom, 10)
+            .frame(maxWidth: .infinity, minHeight: 92, alignment: .topLeading)
+            .background(theme.surface, in: .rect(cornerRadius: 14))
+            .overlay { RoundedRectangle(cornerRadius: 14).stroke(theme.color("reserveText").opacity(0.45), lineWidth: 1) }
+            .contentShape(.rect(cornerRadius: 14))
+        }.buttonStyle(.plain).accessibilityLabel(title).accessibilityIdentifier(id)
+    }
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
@@ -46,23 +95,10 @@ struct MoneyHomeView: View {
                         else { MoneyScrollChart(cycle: cycle, app: app, visible: amountsVisible, obligations: reading.obligations).frame(height: 224) }
                         headline(reading, cycle: cycle)
                     } else { firstPage(reading) }
+                    expenseButton
                     envelopeSection(reading)
                     lowerDesk(reading)
-                    Button { cardsOpen = true } label: { Label("البطاقات", systemImage: "creditcard").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 48).overlay { Capsule().stroke(theme.color("reserveText"), lineWidth: 1) } }
-                        .buttonStyle(.plain).accessibilityIdentifier("money-cards-open")
-                    Button { logOpen = true } label: { Label("السجل", systemImage: "book.pages").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 48).overlay { Capsule().stroke(theme.color("reserveText"), lineWidth: 1) } }
-                        .buttonStyle(.plain).accessibilityIdentifier("money-log-open")
-                    Button { analysisOpen = true } label: { Label("التحليل", systemImage: "chart.bar.xaxis").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 48).overlay { Capsule().stroke(theme.color("reserveText"), lineWidth: 1) } }
-                        .buttonStyle(.plain).accessibilityIdentifier("money-analysis-open")
-                    Button { reconcileOpen = true } label: { Label("المطابقة مع البنك", systemImage: "checkmark.seal").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 48).overlay { Capsule().stroke(theme.color("reserveText"), lineWidth: 1) } }
-                        .buttonStyle(.plain).accessibilityIdentifier("money-reconcile-open")
-                    Button { goalOpen = true } label: { Label("جهّز لشيء قادم", systemImage: "sparkles").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 48).overlay { Capsule().stroke(theme.color("reserveText")) } }.buttonStyle(.plain).accessibilityIdentifier("money-goal-open")
-                    Button { zakatOpen = true } label: { Label("الزكاة", systemImage: "scalemass").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 48).overlay { Capsule().stroke(theme.color("reserveText"), lineWidth: 1) } }.buttonStyle(.plain).accessibilityIdentifier("money-zakat-open")
-                    Button { settingsOpen = true } label: { Label("إعدادات المال", systemImage: "slider.horizontal.3").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 48).overlay { Capsule().stroke(theme.color("reserveText"), lineWidth: 1) } }.buttonStyle(.plain).accessibilityIdentifier("money-settings-open")
-                    Button { accountsOpen = true } label: { Label("الحسابات", systemImage: "tree").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 48).overlay { Capsule().stroke(theme.color("reserveText"), lineWidth: 1) } }.buttonStyle(.plain).accessibilityIdentifier("money-accounts-open")
-                    Button { expenseOpen = true } label: { Label("سجّل مصروفًا", systemImage: "plus").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 48).overlay { Capsule().stroke(theme.color("reserveText"), lineWidth: 1) } }.buttonStyle(.plain).accessibilityIdentifier("money-expense-open")
-                    Button { cashbackOpen = true } label: { Label("الاسترداد النقدي", systemImage: "drop").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 48).overlay { Capsule().stroke(theme.color("reserveText"), lineWidth: 1) } }
-                        .buttonStyle(.plain).accessibilityIdentifier("money-cashback-open")
+                    doors
                 } else if let failure {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("لم تكتمل قراءة المال").font(MadarTypography.cardTitle())

@@ -16,3 +16,11 @@ Not verified: owner iPhone; a long real Arabic PDF; EPUBCheck. `test_M0S2_Backup
 Next: owner trial of both features; incremental media by sha256 for backups; scheduled background backup.
 Model/effort: claude-opus-5-5 / not exposed.
 Usage: 45% five-hour / 22% weekly at the last check.
+
+## Handover — real shelf, smart titles, five-room tab bar — 2026-10-21 — Claude
+- **Works now:** the Mihbara shelf shows real spines: thickness from pages, each volume of a set numbered on a gilt label, finished books lying in loose piles, and no «على الطاولة» text. Titles come from `BookTitle.parts` (the editor, edition, «مطبوع ضمن» and «=» move to a note; long rhymed titles shorten to their known name). The tab bar is البهو، الصلاة، القرآن، المال، المحبرة, with the diary and «خصّص» in the glass accessory. «حمّسني» is removed. The card sheet (M5-C01) is committed. The EPUB review no longer pins its button over the shelf row.
+- **Verified:** `swift test --filter BookTitleTests` 12/12; UI `testLiveTurathTenBooksAcrossEveryShelf` passed (227 s, shots in `Madar/Artifacts/shelf-21oct/`); `RoomGlyphUITests/testWalkBuiltRoomsWithNativeRoomGlyphs` passed; earlier this session: EPUB import, library and card tests passed.
+- **Differences left / failing:** `QuranHomeUITests/testFirstUseShowsPlanActionWithoutZeroStreakOrDepthControls` fails at line 97: after opening the diary from the accessory, the «المال» tab is not found. Check whether the diary hides the tab bar, and fix the shortcut flow in `TabShell` (the `lastRoom` binding). The other ~80 UI tests that now use `tab-customize` were not rerun.
+- **Not verified:** owner iPhone; dark mode of the spines; the tab change on iPad (sidebar).
+- **Next (owner answered, all «yes» to the proposal):** M6-UX-R (merge «قديمًا» into «أنهيتها»; cabinet into «كل كتبي»; the desk becomes one open book with the wird), M6-UX-V (tapping a volume opens it), M6-UX-T (title edit and size at import).
+- **Model/effort:** claude-opus-5-5, effort not exposed. **Usage:** about 83% of the five-hour window at handover.
