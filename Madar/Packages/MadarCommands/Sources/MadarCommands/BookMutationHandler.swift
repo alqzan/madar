@@ -99,6 +99,10 @@ private struct BookUndo: Codable {
             if shelf == "reading" { try slot(id, replacing: replacing) }
             if shelf == "finished", row.shelf != "finished" { row.finishedAt = now; row.readCount += 1 }
             row.shelf = shelf; try touch(row, before: before)
+        case .rename(let id, let title, let author):
+            let row = try book(id), before = try row.record()
+            guard row.kind == "file" else { throw DataError.invalidValue("يُعدَّل الكتاب الورقي من فهرسه") }
+            row.title = title; row.author = author; try touch(row, before: before)
         case .position(let id, let page, let finished):
             let row = try book(id), before = try row.record()
             guard row.kind == "paper", row.pages.map({ page <= $0 }) ?? true else { throw DataError.invalidValue("الموضع خارج صفحات الكتاب") }

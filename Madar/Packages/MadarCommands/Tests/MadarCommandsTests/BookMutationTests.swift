@@ -23,6 +23,21 @@ import MadarData
         #expect(after.first { $0.id == ids[1] }?.shelf == "reading")
         #expect(after.first { $0.id == ids[3] }?.shelf == "want")
     }
+    @Test func renameAFileBookAndUndoIt() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "Mihbara-\(UUID())"); defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root), c = ModelContext(container), id = UUID(), paper = UUID()
+        let file = Book(); file.id = id; file.kind = "file"; file.format = "epub"; file.title = "زاد المعاد في هدي خير العباد - ط الرسالة"; file.author = "ابن القيم"
+        file.shelf = "want"; file.createdAt = now; file.updatedAt = now; c.insert(file)
+        _ = try BookMutationHandler.stage(.savePaper(id: paper, title: "كتاب", author: "", pages: 250, shelf: "want", replacing: nil, isbn13: nil, tocJSON: nil), context: c, now: now, writer: "fixture"); try c.save()
+        #expect(BookCommand.parse("book.rename", ["id": .string(id.uuidString), "title": .string("  "), "author": .string("")]) == nil)
+        let command = try #require(BookCommand.parse("book.rename", ["id": .string(id.uuidString), "title": .string(" زاد المعاد "), "author": .string("ابن قيم الجوزية")]))
+        let undo = try BookMutationHandler.stage(command, context: c, now: now.addingTimeInterval(1), writer: "fixture"); try c.save()
+        #expect(file.title == "زاد المعاد"); #expect(file.author == "ابن قيم الجوزية")
+        #expect(throws: (any Error).self) { _ = try BookMutationHandler.stage(.rename(id: paper, title: "آخر", author: ""), context: c, now: now, writer: "fixture") }
+        try BookMutationHandler.undo(undo, context: c, now: now.addingTimeInterval(2), writer: "fixture"); try c.save()
+        let restored = try c.fetch(FetchDescriptor<Book>()).first { $0.id == id }
+        #expect(restored?.title == "زاد المعاد في هدي خير العباد - ط الرسالة"); #expect(restored?.author == "ابن القيم")
+    }
     @Test func lastPageNeverFinishesWithoutTheExplicitChoice() throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "Mihbara-\(UUID())"); defer { try? FileManager.default.removeItem(at: root) }
         let container = try MadarContainerFactory.makeLocal(at: root), c = ModelContext(container), id = UUID()

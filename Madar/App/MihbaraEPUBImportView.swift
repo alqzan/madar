@@ -46,6 +46,7 @@ struct MihbaraEPUBImportView: View {
     @State private var bookID = UUID()
     @State private var commandID = UUID()
     @State private var inspection: EPUBBookInspection?
+    @State private var printedShape: MihbaraBookShape?
     @State private var cover: UIImage?
     @State private var title = ""
     @State private var author = ""
@@ -101,6 +102,7 @@ struct MihbaraEPUBImportView: View {
                         row("نوع الملف", detail: "كتاب إلكتروني سليم؛ فُحصت بنيته وحدوده الأمنية.", detected: true)
                         row("اللغة", detail: value.appLanguage == "en" ? "\(languageLabel)؛ يفتح وضع القراءة الإنجليزية." : value.appLanguage == "ar" ? "\(languageLabel)؛ يفتح وضع القراءة العربية." : "اللغة في البيانات: \(languageLabel). اختر وضع القراءة أدناه.", detected: value.languageCode != nil)
                         row("البيانات", detail: value.author.isEmpty ? "العنوان من الملف؛ لم يُسجل مؤلف." : "العنوان والمؤلف من بيانات الملف.", detected: !value.author.isEmpty)
+                        row("الحجم", detail: sizeLine(value), detected: printedShape != nil).accessibilityElement(children: .combine).accessibilityIdentifier("mihbara-epub-import-size")
                         row("الفهرس", detail: value.outline.isEmpty ? "بلا فهرس إلكتروني قابل للتنقّل؛ لم نخمن فصول الكتاب." : "فهرس جاهز للتنقّل بين عناوينه.", detected: !value.outline.isEmpty)
                         let pageList = value.hasPageList ? "توجد قائمة صفحات للمصدر المطبوع" : "لا توجد قائمة صفحات مطبوعة"
                         let notes = value.hasFootnotes == true ? "اكتُشفت حواشٍ" : value.hasFootnotes == false ? "لم تُكتشف حواشٍ" : "تعذّر حسم وجود الحواشي"
@@ -133,6 +135,11 @@ struct MihbaraEPUBImportView: View {
                                 TextField("عنوان الكتاب", text: $title, prompt: Text("عنوان الكتاب").foregroundStyle(theme.secondaryInk), axis: .vertical)
                                     .lineLimit(1...3).textFieldStyle(.plain).font(MadarTypography.cardTitle()).multilineTextAlignment(.trailing)
                                     .accessibilityIdentifier("mihbara-epub-import-title")
+                                // The spine shows the name the book is known by; the full title stays on the book.
+                                if BookTitle.parts(title).short != title.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty {
+                                    Text("على الرف: «" + BookTitle.parts(title).short + "»").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                                        .accessibilityIdentifier("mihbara-epub-import-shelf-name")
+                                }
                                 TextField("المؤلف، إن عُرف", text: $author, prompt: Text("المؤلف، إن عُرف").foregroundStyle(theme.secondaryInk))
                                     .textFieldStyle(.plain).font(MadarTypography.body()).multilineTextAlignment(.trailing)
                                     .accessibilityIdentifier("mihbara-epub-import-author")
@@ -262,6 +269,14 @@ struct MihbaraEPUBImportView: View {
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
+    /// «٤ مجلدات، ١٬٢٠٠ صفحة مطبوعة؛ الملف ٣٫٢ م.ب» — the size the shelf will show, from the moment of download.
+    private func sizeLine(_ value: EPUBBookInspection) -> String {
+        let file = "الملف " + digits.localized(ByteCountFormatter.string(fromByteCount: Int64(value.sizeBytes), countStyle: .file))
+        guard let shape = printedShape, let pages = shape.pages, pages > 0 else { return file + "؛ لا يذكر الملف عدد صفحات المطبوع." }
+        let printed = MihbaraCopy.pages(pages, digits) + " مطبوعة"
+        return (shape.volumes > 1 ? (MihbaraBookCovers.sizeWord(shape, digits) ?? "") + "، " + printed : printed) + "؛ " + file
+    }
+
     @MainActor private func inspect() async {
         guard inspection == nil, error == nil else { return }
         do {
@@ -271,6 +286,7 @@ struct MihbaraEPUBImportView: View {
             defer { publication.close() }
             guard !Task.isCancelled else { EPUBBookFiles.discard(id: fileID, root: app.bookStagingDirectory); return }
             inspection = value
+            printedShape = (try? EPUBBookFiles.printedShape(file: EPUBBookFiles.stagedURL(id: fileID, root: app.bookStagingDirectory))).map { MihbaraBookShape(pages: $0.pages, volumes: $0.volumes) }
             if let readiumTitle = publication.metadata.title?.trimmingCharacters(in: .whitespacesAndNewlines), !readiumTitle.isEmpty { title = readiumTitle }
             else { title = value.title }
             author = value.author.isEmpty ? publication.metadata.authors.map(\.name).joined(separator: "، ") : value.author

@@ -3,6 +3,7 @@ import SwiftData
 import MadarCore
 import MadarDesign
 import MadarData
+import MadarCommands
 
 struct MihbaraHomeView: View {
     let app: AppSession
@@ -20,6 +21,9 @@ struct MihbaraHomeView: View {
     @State private var showingAddBook = false
     @State private var sunnahDrawerOpen = false
     @State private var readerRoute: MihbaraReaderRoute?
+    @State private var renaming: MihbaraBook?
+    @State private var renameTitle = ""
+    @State private var renameAuthor = ""
     @State private var manuallyOpen = false
     @State private var libraryQuery = ""
     @State private var libraryShelf = "all"
@@ -84,7 +88,8 @@ struct MihbaraHomeView: View {
                                 book: b,
                                 books: r.books,
                                 onTable: { tableID = id; sheet = nil },
-                                onPaperIndexSaved: { load() }
+                                onPaperIndexSaved: { load() },
+                                shape: shapes[id]
                             )
                         }
                     }
@@ -96,11 +101,20 @@ struct MihbaraHomeView: View {
                 }
             }.environment(\.roomTheme, theme).presentationDragIndicator(.visible)
         }
+        // Owner, 21 Oct 2026: «اقدر اعدل اسم الكتاب». The spine keeps the short name the title is known by.
+        .alert("اسم الكتاب", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
+            TextField("عنوان الكتاب", text: $renameTitle).accessibilityIdentifier("mihbara-rename-title")
+            TextField("المؤلف", text: $renameAuthor).accessibilityIdentifier("mihbara-rename-author")
+            Button("احفظ") { rename() }.accessibilityIdentifier("mihbara-rename-save")
+            Button("إلغاء", role: .cancel) { renaming = nil }
+        } message: {
+            Text("على الرف: «" + BookTitle.parts(renameTitle.isEmpty ? (renaming?.title ?? "") : renameTitle).short + "»")
+        }
         .fullScreenCover(item: $readerRoute, onDismiss: load) { route in
             if let book = reading?.books.first(where: { $0.id == route.bookID && ($0.isReadableEPUB || $0.isReadablePDF) }) {
                 Group {
                     if book.isReadablePDF { MihbaraPDFReaderView(app: app, book: book) { readerRoute = nil } }
-                    else { MihbaraReaderView(app: app, book: book) { readerRoute = nil } }
+                    else { MihbaraReaderView(app: app, book: book, volume: route.volume) { readerRoute = nil } }
                 }.environment(\.roomTheme, theme)
             } else {
                 VStack(spacing: 16) {
@@ -169,6 +183,22 @@ struct MihbaraHomeView: View {
         if b.shelf == "finished" { Button { moveBook(b, to: "old") } label: { Label("انقله إلى «قديمًا»", systemImage: "archivebox") } }
         if b.shelf == "want" { Button { moveBook(b, to: "old") } label: { Label("قرأته قديمًا", systemImage: "archivebox") } }
         if b.shelf == "old" { Button { moveBook(b, to: "finished") } label: { Label("أعده إلى أنهيتها", systemImage: "checkmark.circle") } }
+        if b.kind == "file" {
+            Button { renameTitle = b.title; renameAuthor = b.author; renaming = b } label: { Label("غيّر الاسم", systemImage: "pencil") }
+                .accessibilityIdentifier("mihbara-book-rename")
+        }
+    }
+    private func rename() {
+        guard let b = renaming else { return }
+        let title = renameTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        renaming = nil
+        guard !title.isEmpty, title != b.title || renameAuthor != b.author else { return }
+        let payload: [String: MadarCore.JSONValue] = ["id": .string(b.id.uuidString), "title": .string(String(title.prefix(300))),
+                                                      "author": .string(String(renameAuthor.trimmingCharacters(in: .whitespacesAndNewlines).prefix(300)))]
+        Task {
+            do { try await app.executeBookCommand("book.rename", payload: payload); load() }
+            catch { app.errorMessage = error.localizedDescription }
+        }
     }
     private func moveBook(_ b: MihbaraBook, to shelf: String, replacing: UUID? = nil) {
         if shelf == "reading", replacing == nil, b.shelf != "reading", (reading?.books.filter { $0.shelf == "reading" }.count ?? 0) >= 3 {
@@ -214,7 +244,7 @@ struct MihbaraHomeView: View {
                             ForEach(Array(piles(books).enumerated()), id: \.offset) { _, pile in
                                 VStack(spacing: 0) {
                                     ForEach(pile.reversed(), id: \.key) { item in
-                                        Button { openBook(item.book) } label: { lying(item, leather: leathers[item.book.id] ?? 0) }
+                                        Button { openBook(item.book, volume: item.volume) } label: { lying(item, leather: leathers[item.book.id] ?? 0) }
                                             .buttonStyle(.plain).contextMenu { bookMenu(item.book) }.accessibilityLabel(shelfLabel(item.book)).accessibilityIdentifier("mihbara-book-" + item.book.id.uuidString)
                                     }
                                 }
@@ -222,10 +252,7 @@ struct MihbaraHomeView: View {
                         }.padding(.horizontal, 10).padding(.top, 16)
                     } else {
                         HStack(alignment: .bottom, spacing: 9) {
-                            ForEach(books.filter { $0.id != tableBook?.id }) { b in
-                                Button { openBook(b) } label: { standing(b, leather: leathers[b.id] ?? 0) }
-                                    .buttonStyle(.plain).contextMenu { bookMenu(b) }.accessibilityLabel(shelfLabel(b)).accessibilityIdentifier("mihbara-book-" + b.id.uuidString)
-                            }
+                            ForEach(books.filter { $0.id != tableBook?.id }) { b in standing(b, leather: leathers[b.id] ?? 0) }
                         }.padding(.horizontal, 10).padding(.top, 16)
                     }
                 }.scrollIndicators(.hidden)
@@ -239,16 +266,23 @@ struct MihbaraHomeView: View {
             }
         }
     }
-    /// One book as it stands on the shelf: a spine, a numbered spine per volume for a set, or the gap a book leaves on the table.
+    /// One book as it stands on the shelf: a spine, or a numbered spine per volume for a set. Owner, 21 Oct 2026:
+    /// tapping a volume opens that volume (at the saved place when it is inside it).
     @ViewBuilder private func standing(_ b: MihbaraBook, leather: Int) -> some View {
         let shape = shapes[b.id], volumes = max(1, shape?.volumes ?? 1)
         if volumes > 1 {
-            HStack(alignment: .bottom, spacing: 1) {
-                ForEach(0..<min(volumes, 8), id: \.self) { MihbaraBookSpine(book: b, shape: shape, leather: leather, digits: service.digits, volume: $0) }
+            HStack(alignment: .bottom, spacing: MihbaraBookSpine.volumeGap) {
+                ForEach(0..<min(volumes, 8), id: \.self) { v in
+                    Button { openBook(b, volume: v) } label: { MihbaraBookSpine(book: b, shape: shape, leather: leather, digits: service.digits, volume: v, volumeCount: min(volumes, 8)) }
+                        .buttonStyle(.plain).contextMenu { bookMenu(b) }
+                        .accessibilityLabel(shelfLabel(b) + "، " + (BookVolumes.name(v) ?? "الجزء " + service.digits.string(v + 1)))
+                        .accessibilityIdentifier("mihbara-book-" + b.id.uuidString + (v == 0 ? "" : "-v\(v + 1)"))
+                }
                 if volumes > 8 { Text("+" + service.digits.string(volumes - 8)).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).padding(.leading, 4) }
             }
         } else {
-            MihbaraBookSpine(book: b, shape: shape, leather: leather, digits: service.digits)
+            Button { openBook(b) } label: { MihbaraBookSpine(book: b, shape: shape, leather: leather, digits: service.digits) }
+                .buttonStyle(.plain).contextMenu { bookMenu(b) }.accessibilityLabel(shelfLabel(b)).accessibilityIdentifier("mihbara-book-" + b.id.uuidString)
         }
     }
     private struct PileItem { let book: MihbaraBook; let volume: Int?; var key: String { book.id.uuidString + "-\(volume ?? -1)" } }
@@ -557,14 +591,14 @@ struct MihbaraHomeView: View {
         }
     }
 
-    private func openBook(_ book: MihbaraBook) {
+    private func openBook(_ book: MihbaraBook, volume: Int? = nil) {
         guard book.isReadableEPUB || book.isReadablePDF else { sheet = .book(book.id); return }
         do {
             // A reader can close while its last locator is being committed. Refresh
             // the managed generation before constructing the next reader route.
             try app.reload()
             reading = try service.load()
-            readerRoute = MihbaraReaderRoute(bookID: book.id)
+            readerRoute = MihbaraReaderRoute(bookID: book.id, volume: volume)
         } catch {
             app.errorMessage = error.localizedDescription
         }
@@ -572,7 +606,7 @@ struct MihbaraHomeView: View {
 
 }
 private enum MihbaraSheet: Identifiable { case library, book(UUID), hadith(Int), opening, notebook, motivation; var id: String { String(describing: self) } }
-private struct MihbaraReaderRoute: Identifiable { let bookID: UUID; var id: String { bookID.uuidString } }
+private struct MihbaraReaderRoute: Identifiable { let bookID: UUID; var volume: Int? = nil; var id: String { bookID.uuidString + "-\(volume ?? -1)" } }
 
 private struct MihbaraMotivationCard: View {
     let cues: [MihbaraMotivationCue]

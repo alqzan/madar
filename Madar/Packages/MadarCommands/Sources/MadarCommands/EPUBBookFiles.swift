@@ -217,10 +217,7 @@ public enum EPUBBookFiles {
             labels = try xml(archive, path: path, maximum: metadataMemberLimit).descendants(named: "pageTarget").map { $0.stringValue.trimmingCharacters(in: .whitespacesAndNewlines) }
         }
         guard !labels.isEmpty else { return nil }
-        let volumes = Set(labels.compactMap { label -> String? in
-            let parts = label.split(separator: "/"); return parts.count == 2 ? String(parts[0]) : nil
-        })
-        return (labels.count, max(1, volumes.count))
+        return (labels.count, max(1, BookVolumes.order(labels).count))
     }
 
     private static func validate(_ archive: ZIPReader) throws {

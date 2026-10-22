@@ -131,6 +131,8 @@ private struct MihbaraPrintPage: Identifiable, Equatable {
 struct MihbaraReaderView: View {
     let app: AppSession
     let book: MihbaraBook
+    /// The volume of a set whose spine was tapped (0-based); nil opens the saved place.
+    var volume: Int? = nil
     let close: () -> Void
 
     @Environment(\.scenePhase) private var scenePhase
@@ -449,10 +451,11 @@ struct MihbaraReaderView: View {
         ZStack {
             VStack(spacing: 2) {
                 Text(book.title).font(.custom("thmanyahserifdisplay-Bold", size: 17, relativeTo: .headline)).lineLimit(1)
-                Text(currentLocator?.title ?? book.author)
+                Text(headerSubtitle)
                     .font(MadarTypography.fine())
                     .foregroundStyle(palette.ink2)
                     .lineLimit(1)
+                    .accessibilityIdentifier("mihbara-reader-subtitle")
             }
             .frame(maxWidth: .infinity)
             HStack(spacing: 12) {
@@ -626,6 +629,17 @@ struct MihbaraReaderView: View {
         return "ص \(digits.localized(current.label)) من \(digits.localized(last.label)) في المطبوع"
     }
 
+    /// «الجزء الثاني، باب …» in a set, so the reader always knows which volume the page is in.
+    private var headerSubtitle: String {
+        let place = currentLocator?.title ?? book.author
+        // A chapter with several printed pages may not say which one is on screen; its first page names the volume.
+        let page = pageCoordinate(printLocator).map { $0 - 1 }
+            ?? currentLocator.flatMap { c in printPages.firstIndex { $0.href.isEquivalentTo(c.href.removingFragment()) } }
+        guard let page, let v = BookVolumes.volume(ofPage: page, labels: printPages.map(\.label)) else { return place }
+        let name = BookVolumes.name(v) ?? "الجزء " + digits.string(v + 1)
+        return currentLocator?.title.map { name + "، " + $0 } ?? name
+    }
+
     @MainActor private func openPublication() async {
         guard publication == nil, localURL == nil, message == nil else { return }
         do {
@@ -642,8 +656,19 @@ struct MihbaraReaderView: View {
 
             let saved = readiumLocator(book.locatorJSON)
             let now = Date()
-            let (readyPublication, firstLocator, readyPages, readyPositionCount) = await prepareReader(from: opened)
-            let startLocator = saved ?? firstLocator
+            let (readyPublication, firstLocator, readyPages, readyPositionCount, volumeStarts) = await prepareReader(from: opened)
+            printPages = readyPages
+            var startLocator = saved ?? firstLocator
+            // Owner, 21 Oct 2026: a tapped volume opens at its first page, unless the saved place is already inside it.
+            if let volume {
+                let labels = readyPages.map(\.label)
+                let savedPage = saved.flatMap { s in pageCoordinate(s).map { $0 - 1 } ?? readyPages.firstIndex { $0.href.isEquivalentTo(s.href.removingFragment()) } }
+                if let page = BookVolumes.startPage(volume: volume, labels: labels, savedPage: savedPage),
+                   let key = BookVolumes.key(labels[page]), let index = BookVolumes.order(labels).firstIndex(of: key),
+                   volumeStarts.indices.contains(index), let start = volumeStarts[index] {
+                    startLocator = start
+                }
+            }
             initialLocator = startLocator
             currentLocator = startLocator
             let context = ModelContext(app.container)
@@ -667,7 +692,7 @@ struct MihbaraReaderView: View {
         }
     }
 
-    nonisolated private func prepareReader(from publication: sending Publication) async -> (Publication, Locator?, [MihbaraPrintPage], Int) {
+    nonisolated private func prepareReader(from publication: sending Publication) async -> (Publication, Locator?, [MihbaraPrintPage], Int, [Locator?]) {
         let firstLocator = await publication.locate(progression: 0)
         let positions = await publication.positionsByReadingOrder().getOrNil() ?? []
         let positionCount = positions.reduce(0) { $0 + $1.count }
@@ -677,7 +702,14 @@ struct MihbaraReaderView: View {
             let target = link.url(relativeTo: publication.baseURL)
             result.append(.init(href: target.removingFragment(), fragment: target.fragment, label: label))
         }
-        return (publication, firstLocator, result, positionCount)
+        // The first printed page of each volume of a set, in reading order.
+        var volumeStarts: [Locator?] = []
+        var seen = Set<String>()
+        for link in publication.pageList {
+            guard let key = link.title.flatMap(BookVolumes.key), seen.insert(key).inserted else { continue }
+            volumeStarts.append(await publication.locate(link))
+        }
+        return (publication, firstLocator, result, positionCount, volumeStarts)
     }
 
     @MainActor private func locationChanged(_ locator: Locator, explicitJump: Bool) {

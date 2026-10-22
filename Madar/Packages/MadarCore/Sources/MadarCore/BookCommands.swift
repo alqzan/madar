@@ -7,6 +7,8 @@ public enum BookCommand: Codable, Equatable, Sendable {
     case importPDF(id: UUID, fileID: UUID, sha256: String, title: String, author: String, language: String)
     case importEPUB(id: UUID, fileID: UUID, sha256: String, title: String, author: String, language: String, shelf: String, turathID: Int? = nil)
     case shelf(id: UUID, shelf: String, replacing: UUID?)
+    /// Owner, 21 Oct 2026: rename a file book (EPUB or PDF) after import; paper books edit through `updatePaper`.
+    case rename(id: UUID, title: String, author: String)
     case position(id: UUID, page: Int, finished: Bool)
     case readerLocator(id: UUID, locatorJSON: Data)
     case readingSession(id: UUID, bookID: UUID, start: Date, end: Date, activeSeconds: Int, fromPage: Int, toPage: Int, startLocatorJSON: Data, endLocatorJSON: Data, startProgression: Double, endProgression: Double, pagesCounted: Int)
@@ -21,7 +23,7 @@ public enum BookCommand: Codable, Equatable, Sendable {
     /// «أضف إلى كلماتي»: one saved word with its source paragraph and reading position.
     case saveUserWord(id: UUID, word: String, language: String, bookID: UUID, bookTitle: String, locatorJSON: Data, context: String)
     public static let highlightColors: Set<String> = ["yellow", "green", "rose"]
-    public static let names: Set<String> = ["book.savePaper", "book.updatePaper", "book.importPDF", "book.importEPUB", "book.moveShelf", "book.setPosition", "book.setLocator", "reading.saveSession", "hadith.mark", "notebook.savePrivate", "notebook.deletePrivate", "highlight.save", "highlight.delete", "notebook.savePage", "word.save"]
+    public static let names: Set<String> = ["book.savePaper", "book.updatePaper", "book.importPDF", "book.importEPUB", "book.moveShelf", "book.rename", "book.setPosition", "book.setLocator", "reading.saveSession", "hadith.mark", "notebook.savePrivate", "notebook.deletePrivate", "highlight.save", "highlight.delete", "notebook.savePage", "word.save"]
     public var isUndoable: Bool {
         if case .readingSession = self { return false }
         return true
@@ -164,6 +166,11 @@ public enum BookCommand: Codable, Equatable, Sendable {
         case "book.moveShelf":
             guard Set(p.keys).isSubset(of: ["id","shelf","replacing"]), let shelf = text("shelf"), ["reading","want","finished","old"].contains(shelf), p["replacing"] == nil || text("replacing").flatMap(UUID.init(uuidString:)) != nil else { return nil }
             return .shelf(id: id, shelf: shelf, replacing: text("replacing").flatMap(UUID.init(uuidString:)))
+        case "book.rename":
+            guard Set(p.keys) == ["id", "title", "author"],
+                  let title = text("title")?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty, title.count <= 300,
+                  let author = text("author")?.trimmingCharacters(in: .whitespacesAndNewlines), author.count <= 300 else { return nil }
+            return .rename(id: id, title: title, author: author)
         case "book.setPosition":
             guard Set(p.keys) == ["id","page","finished"], let page = integer("page"), case .bool(let finished) = p["finished"] else { return nil }
             return .position(id: id, page: page, finished: finished)

@@ -176,6 +176,10 @@ struct MihbaraBookSpine: View {
     let digits: MadarNumberFormatter
     /// Zero-based volume of a set; nil for a single book.
     var volume: Int? = nil
+    /// How many volumes of the set stand side by side; the title is spread across them.
+    var volumeCount: Int? = nil
+    /// The gap between the volumes of a set on the shelf.
+    static let volumeGap: CGFloat = 1
     /// A finished book lying on its side keeps its title along the length.
     var lying = false
     @Environment(\.roomTheme) private var theme
@@ -231,24 +235,32 @@ struct MihbaraBookSpine: View {
         .shadow(color: .black.opacity(0.22), radius: 1.5, x: 1, y: 0)
     }
 
-    /// Owner, 21 Oct 2026 (a photo of a printed «زاد المعاد» set): gilt ornament at head and foot, the name large across
-    /// the spine inside a gilt frame with its subtitle under it, and the volume number in a medallion.
+    /// Owner, 22 Oct 2026, of the printed «زاد المعاد» set: «زا في مجلد ثم د في مجلد… الكتابه متفرقه بين المجلدات بشكل افقي
+    /// والكتب عموديه». The volumes stand upright and the name runs once, large and horizontal, across all of them: each
+    /// spine carries its slice of the letters, under gilt ornament, with the volume number in a medallion at the foot.
     private func volumeSpine(_ parts: BookTitle.Parts, volume: Int, ink: Color, size: CGSize) -> some View {
+        let count = max(1, volumeCount ?? 1), gap = Self.volumeGap
+        let total = CGFloat(count) * size.width + CGFloat(count - 1) * gap
+        // Volume 1 stands rightmost, where an Arabic title starts; measure from the left edge of the whole set.
+        let fromLeft = CGFloat(count - 1 - volume) * (size.width + gap)
         let rest = parts.main.count > parts.short.count ? String(parts.main.dropFirst(parts.short.count)).trimmingCharacters(in: .whitespaces) : ""
-        let words = parts.short.split(separator: " ").prefix(3).map(String.init)
         return VStack(spacing: 8) {
             ornament(ink).padding(.top, 8)
-            VStack(spacing: 2) {
-                ForEach(Array(words.enumerated()), id: \.offset) { _, word in
-                    Text(word).font(.custom("thmanyahserifdisplay-Bold", size: 17, relativeTo: .caption)).lineLimit(1).minimumScaleFactor(11 / 17)
-                }
+            VStack(spacing: 4) {
+                Text(parts.short).font(.custom("thmanyahserifdisplay-Bold", size: 40, relativeTo: .title))
+                    .lineLimit(1).minimumScaleFactor(0.34)
                 if !rest.isEmpty {
-                    Text(rest).font(MadarTypography.fine()).lineLimit(3).multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true).padding(.top, 2)
+                    Text(rest).font(.custom("thmanyahserifdisplay-Bold", size: 17, relativeTo: .caption)).lineLimit(1).minimumScaleFactor(0.66)
                 }
             }
-            .padding(.vertical, 8).padding(.horizontal, 3).frame(width: size.width - 10)
-            .overlay { RoundedRectangle(cornerRadius: 3).stroke(ink.opacity(0.7), lineWidth: 1).padding(1.5) }
-            .overlay { RoundedRectangle(cornerRadius: 4).stroke(ink.opacity(0.35), lineWidth: 0.6).padding(-1.5) }
+            .padding(.horizontal, 10)
+            .frame(width: total, height: 96)
+            .offset(x: -fromLeft)
+            .frame(width: size.width, height: 96, alignment: .leading)
+            .clipped()
+            .environment(\.layoutDirection, .leftToRight)
+            .overlay { Rectangle().stroke(ink.opacity(0.6), lineWidth: 0.8).padding(.vertical, -4).padding(.horizontal, 2) }
+            .accessibilityHidden(true)
             Spacer(minLength: 0)
             Text(digits.string(volume + 1)).font(MadarTypography.caption().weight(.bold))
                 .frame(width: 26, height: 26).overlay { Circle().stroke(ink.opacity(0.8), lineWidth: 1) }

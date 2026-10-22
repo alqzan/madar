@@ -358,6 +358,8 @@ struct MihbaraBookCard: View {
     let books: [MihbaraBook]
     let onTable: () -> Void
     let onPaperIndexSaved: () -> Void
+    /// The printed size from the file's page list, in the same words as the spine.
+    var shape: MihbaraBookShape? = nil
     @Environment(\.dismiss) private var dismiss
     @Environment(\.roomTheme) private var theme
     @State private var page = ""
@@ -406,6 +408,10 @@ struct MihbaraBookCard: View {
                 } else {
                     HStack { Text(book.title).font(MadarTypography.title()); Spacer(); Button("تمّ") { dismiss() } }
                     Text(book.author).font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
+                    if let size = MihbaraBookCovers.sizeWord(shape, digits) {
+                        Text(shape.flatMap { s in s.volumes > 1 ? s.pages.map { size + "، " + MihbaraCopy.pages($0, digits) } : nil } ?? size)
+                            .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("mihbara-book-size")
+                    }
                     if let finished = book.finished {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(finishedAgo(finished)).font(MadarTypography.caption()).accessibilityIdentifier("mihbara-book-finished-ago")
