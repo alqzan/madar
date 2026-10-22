@@ -16,7 +16,7 @@ struct MihbaraHomeView: View {
     @State private var shapes: [UUID: MihbaraBookShape] = [:]
     @State private var shelfWidth: CGFloat = 360
     @State private var motivationCues: [MihbaraMotivationCue] = []
-    @State private var shelf = "reading"
+    @State private var scrollTarget: String?
     @State private var tableID: UUID?
     @State private var sheet: MihbaraSheet?
     @State private var showingAddBook = false
@@ -38,6 +38,7 @@ struct MihbaraHomeView: View {
     private var tableBook: MihbaraBook? { reading?.books.first { $0.id == tableID } ?? reading?.books.first { $0.shelf == "reading" } }
     var body: some View {
         TimelineView(.periodic(from: Date(timeIntervalSince1970: 0), by: 60)) { tick in
+            ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     HStack {
@@ -58,6 +59,12 @@ struct MihbaraHomeView: View {
                     }
                 }.padding(.horizontal, 16).padding(.top, 10).padding(.bottom, 28).frame(maxWidth: 650).frame(maxWidth: .infinity)
             }.clipped().onChange(of: tick.date) { load() }
+            .onChange(of: scrollTarget) { _, target in
+                guard let target else { return }
+                withAnimation(reduceMotion ? nil : .smooth) { proxy.scrollTo("shelf-" + target, anchor: .top) }
+                scrollTarget = nil
+            }
+            }
         }
         .background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
         .environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar)
@@ -222,63 +229,67 @@ struct MihbaraHomeView: View {
         guard let book = reading?.books.first(where: { $0.id == id }) else { return }
         openBook(book)
     }
+    /// Owner, 22 Oct 2026 («٢»): one bookcase on the wall, its shelves named — what you read, what waits, what you
+    /// finished — with no tabs; the book you are reading stands open on the stand in front of it.
     private func shelfView(_ r: MihbaraHomeReading) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack { Text("رفّك").font(MadarTypography.cardTitle()); Spacer(); Button { showingAddBook = true } label: { Label("أضف كتابًا", systemImage: "plus") }.accessibilityIdentifier("mihbara-add-paper") }
-            HStack(spacing: 8) {
-                ForEach([("reading","أقرؤها الآن"),("want","أبي أقرأها"),("finished","أنهيتها")], id: \.0) { value in
-                    Button { shelf = value.0 } label: { Text(value.1).font(MadarTypography.caption()).padding(.horizontal, 10).frame(minHeight: 44).background(shelf == value.0 ? theme.ink : .clear, in: .capsule).foregroundStyle(shelf == value.0 ? theme.background : theme.ink) }.accessibilityIdentifier("mihbara-shelf-" + value.0)
-                }
-            }.fixedSize(horizontal: false, vertical: true)
-            // Smart order: what you touched last comes first; finished books by when you finished them.
-            let books = r.books.filter { $0.shelf == shelf }.sorted { a, b in
-                shelf == "finished" ? (a.finished ?? a.updated) > (b.finished ?? b.updated) : a.updated > b.updated
-            }
-            let leathers = MihbaraBookCovers.leatherIndices(for: books)
-            if books.isEmpty {
+        let leathers = MihbaraBookCovers.leatherIndices(for: r.books)
+        let readingBooks = shelfBooks(r.books, "reading").filter { $0.id != tableBook?.id }
+        let want = shelfBooks(r.books, "want"), finished = shelfBooks(r.books, "finished")
+        return VStack(alignment: .leading, spacing: 14) {
+            HStack { Text("مكتبتك").font(MadarTypography.cardTitle()); Spacer(); Button { showingAddBook = true } label: { Label("أضف كتابًا", systemImage: "plus") }.accessibilityIdentifier("mihbara-add-paper") }
+            if r.books.isEmpty {
                 emptyShelf(r)
-            } else {
-                if shelf != "finished" {
-                    bookcase(books.filter { $0.id != tableBook?.id }, leathers: leathers)
-                } else if piles(books).count > 1 {
-                    pileBookcase(books, leathers: leathers)
-                } else {
-                ScrollView(.horizontal) {
-                    // Owner, 21 Oct 2026: what you read stands in order; what you finished lies in loose piles.
-                    if shelf == "finished" {
-                        HStack(alignment: .bottom, spacing: 14) {
-                            ForEach(Array(piles(books).enumerated()), id: \.offset) { _, pile in
-                                VStack(spacing: 0) {
-                                    ForEach(pile.reversed(), id: \.key) { item in
-                                        Button { openBook(item.book, volume: item.volume) } label: { lying(item, leather: leathers[item.book.id] ?? 0) }
-                                            .buttonStyle(.plain).contextMenu { bookMenu(item.book) }.accessibilityLabel(shelfLabel(item.book)).accessibilityIdentifier("mihbara-book-" + item.book.id.uuidString)
-                                    }
-                                }
-                            }
-                        }.padding(.horizontal, 10).padding(.top, 16)
-                    } else {
-                        HStack(alignment: .bottom, spacing: 9) {
-                            ForEach(books.filter { $0.id != tableBook?.id }) { b in standing(b, leather: leathers[b.id] ?? 0) }
-                        }.padding(.horizontal, 10).padding(.top, 16)
-                    }
-                }.scrollIndicators(.hidden)
-                    // The back of the bookcase: a faint wall the spines stand against.
-                    .background(LinearGradient(colors: [theme.color("wood").opacity(0.05), theme.color("wood").opacity(0.16)], startPoint: .top, endPoint: .bottom))
                 MihbaraShelfPlank().padding(.top, -14)
+            } else {
+                VStack(spacing: 10) {
+                    if !readingBooks.isEmpty {
+                        wallShelf("reading", "أقرؤها") { bookcase(readingBooks, leathers: leathers, maxRows: 2) }
+                    }
+                    wallShelf("want", "أبي أقرأها") {
+                        if want.isEmpty { emptyWallShelf("ما تنوي قراءته يقف هنا حتى تبدأه.") }
+                        else { bookcase(want, leathers: leathers, maxRows: 3) }
+                    }
+                    wallShelf("finished", "أنهيتها") {
+                        if finished.isEmpty { emptyWallShelf("ما تنهيه يستلقي هنا مع سنة إنهائه.") }
+                        else { pileBookcase(finished, leathers: leathers, maxRows: 2) }
+                    }
                 }
+                .padding(8)
+                .background(LinearGradient(colors: [theme.color("wood"), theme.color("wood").mix(with: .black, by: 0.22)], startPoint: .top, endPoint: .bottom), in: .rect(cornerRadius: 14))
+                .shadow(color: theme.ink.opacity(0.18), radius: 8, y: 5)
             }
-            if books.isEmpty { MihbaraShelfPlank().padding(.top, -14) }
             HStack { Button("كل كتبي ‹") { sheet = .library }.accessibilityIdentifier("mihbara-library"); Spacer(); Text(shelfTotal(r.books.count)).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
-            MihbaraOldBooksCabinet(books: r.books.filter { $0.shelf == "old" }, theme: theme, shapes: shapes, digits: service.digits) { id in
-                if let book = r.books.first(where: { $0.id == id }) { openBook(book) }
-            }
+        }
+    }
+    /// One named shelf of the wall bookcase: a brass label, then its rows. Tapping the label brings the shelf into view.
+    private func wallShelf<Content: View>(_ id: String, _ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button { scrollTarget = id } label: {
+                Text(title).font(MadarTypography.caption().weight(.semibold))
+                    .foregroundStyle(RoomTheme(room: "mihbara", dark: false).ink)
+                    .padding(.horizontal, 10).padding(.vertical, 4)
+                    .background(theme.color("goldUnderstand"), in: .rect(cornerRadius: 4))
+                    .shadow(color: .black.opacity(0.25), radius: 1.5, y: 1)
+                    .frame(minHeight: 44, alignment: .bottom)
+            }.buttonStyle(.plain).accessibilityAddTraits(.isHeader).accessibilityIdentifier("mihbara-shelf-" + id)
+            content()
+        }
+        .background(theme.background.opacity(0.92), in: .rect(cornerRadius: 6))
+        .accessibilityElement(children: .contain).accessibilityIdentifier("mihbara-wall-" + id)
+        .id("shelf-" + id)
+    }
+    private func emptyWallShelf(_ text: String) -> some View {
+        VStack(spacing: 0) {
+            Text(text).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading).padding(.horizontal, 12)
+            MihbaraShelfPlank()
         }
     }
     /// Owner, 22 Oct 2026: «اذا كبرت المكتبه يصير زي البوك شيلف كبير مليان وكم دور». Books fill a shelf to the width of
     /// the screen, then the next shelf down; a set stands whole on one shelf. Five shelves show; the rest wait in «كل كتبي».
-    @ViewBuilder private func bookcase(_ books: [MihbaraBook], leathers: [UUID: Int]) -> some View {
+    @ViewBuilder private func bookcase(_ books: [MihbaraBook], leathers: [UUID: Int], maxRows: Int = 5) -> some View {
         let rows = shelfRows(books, width: shelfWidth - 20)
-        let shown = rows.prefix(5), hidden = rows.dropFirst(5).reduce(0) { $0 + $1.count }
+        let shown = rows.prefix(maxRows), hidden = rows.dropFirst(maxRows).reduce(0) { $0 + $1.count }
         VStack(spacing: 0) {
             ForEach(Array(shown.enumerated()), id: \.offset) { _, row in
                 ScrollView(.horizontal) {
@@ -298,20 +309,13 @@ struct MihbaraHomeView: View {
     }
 
     /// «أنهيتها» as a bookcase too: the piles of finished books fill a shelf, then the next one down.
-    @ViewBuilder private func pileBookcase(_ books: [MihbaraBook], leathers: [UUID: Int]) -> some View {
+    @ViewBuilder private func pileBookcase(_ books: [MihbaraBook], leathers: [UUID: Int], maxRows: Int = 5) -> some View {
         let rows = pileRows(piles(books), width: shelfWidth - 20)
-        let shown = rows.prefix(5), hidden = rows.dropFirst(5).flatMap { $0 }.flatMap { $0 }.count
+        let shown = rows.prefix(maxRows), hidden = rows.dropFirst(maxRows).flatMap { $0 }.flatMap { $0 }.count
         VStack(spacing: 0) {
             ForEach(Array(shown.enumerated()), id: \.offset) { _, row in
                 HStack(alignment: .bottom, spacing: 14) {
-                    ForEach(Array(row.enumerated()), id: \.offset) { _, pile in
-                        VStack(spacing: 0) {
-                            ForEach(pile.reversed(), id: \.key) { item in
-                                Button { openBook(item.book, volume: item.volume) } label: { lying(item, leather: leathers[item.book.id] ?? 0) }
-                                    .buttonStyle(.plain).contextMenu { bookMenu(item.book) }.accessibilityLabel(shelfLabel(item.book)).accessibilityIdentifier("mihbara-book-" + item.book.id.uuidString)
-                            }
-                        }
-                    }
+                    ForEach(Array(row.enumerated()), id: \.offset) { _, pile in pileView(pile, leathers: leathers) }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 10).padding(.top, 16).padding(.bottom, 12)
@@ -383,14 +387,57 @@ struct MihbaraHomeView: View {
         }
     }
     private struct PileItem { let book: MihbaraBook; let volume: Int?; var key: String { book.id.uuidString + "-\(volume ?? -1)" } }
-    /// Finished books (each volume of a set on its own) in piles of up to four, the newest on top.
+    /// Finished books (each volume of a set on its own) in piles of up to four, the newest on top. A pile holds the
+    /// books of one year, so the shelf reads as a history; books read long ago («قديمًا») make the last piles.
     private func piles(_ books: [MihbaraBook]) -> [[PileItem]] {
-        let items = books.flatMap { b -> [PileItem] in
+        var result: [[PileItem]] = [], year: String?
+        for b in books {
             let n = max(1, shapes[b.id]?.volumes ?? 1)
-            return n > 1 ? (0..<min(n, 6)).map { PileItem(book: b, volume: $0) } : [PileItem(book: b, volume: nil)]
+            let items = n > 1 ? (0..<min(n, 6)).map { PileItem(book: b, volume: $0) } : [PileItem(book: b, volume: nil)]
+            let key = pileYear(b)?.primary ?? "old"
+            for item in items {
+                if key != year || result.last?.count == 4 { result.append([]) }
+                result[result.count - 1].append(item); year = key
+            }
         }
-        return stride(from: 0, to: items.count, by: 4).map { Array(items[$0..<min($0 + 4, items.count)]) }
+        return result
     }
+    /// A shelf's books in shelf order: what you touched last first; finished books by when you finished them.
+    private func shelfBooks(_ books: [MihbaraBook], _ shelf: String) -> [MihbaraBook] {
+        books.filter { shelf == "finished" ? ["finished", "old"].contains($0.shelf) : $0.shelf == shelf }.sorted { a, b in
+            guard shelf == "finished" else { return a.updated > b.updated }
+            if (a.shelf == "old") != (b.shelf == "old") { return b.shelf == "old" }
+            return (a.finished ?? a.updated) > (b.finished ?? b.updated)
+        }
+    }
+    /// The year a book was finished, in the user's first calendar and the other one; nil for a book read long ago.
+    private func pileYear(_ b: MihbaraBook) -> (primary: String, secondary: String)? {
+        guard b.shelf != "old", let date = b.finished else { return nil }
+        let hijri = service.digits.string(Calendar(identifier: .islamicUmmAlQura).component(.year, from: date)) + " هـ"
+        let gregorian = service.digits.string(Calendar(identifier: .gregorian).component(.year, from: date)) + " م"
+        return app.string("core.firstCalendar") == "gregorian" ? (gregorian, hijri) : (hijri, gregorian)
+    }
+    /// One pile, newest on top, with its year written under the first pile of that year.
+    private func pileView(_ pile: [PileItem], leathers: [UUID: Int]) -> some View {
+        // The finished shelf in order, to tell whether this pile opens its year.
+        let all = piles(shelfBooks(reading?.books ?? [], "finished"))
+        let year = pile.first.flatMap { pileYear($0.book) }
+        let index = all.firstIndex { $0.first?.key == pile.first?.key }
+        let starts = index.map { $0 == 0 || pileYear(all[$0 - 1][0].book)?.primary != year?.primary } ?? true
+        return VStack(spacing: 0) {
+            if starts {
+                VStack(spacing: 0) {
+                    Text(year?.primary ?? "قديمًا").font(MadarTypography.fine().weight(.semibold))
+                    if let secondary = year?.secondary { Text(secondary).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
+                }.padding(.bottom, 4).accessibilityElement(children: .combine).accessibilityIdentifier("mihbara-pile-year")
+            }
+            ForEach(pile, id: \.key) { item in
+                Button { openBook(item.book, volume: item.volume) } label: { lying(item, leather: leathers[item.book.id] ?? 0) }
+                    .buttonStyle(.plain).contextMenu { bookMenu(item.book) }.accessibilityLabel(shelfLabel(item.book)).accessibilityIdentifier("mihbara-book-" + item.book.id.uuidString)
+            }
+        }
+    }
+
     private static let lyingScale: CGFloat = 0.8
     /// A finished book lying on its side, a little askew, as books left on a shelf after reading.
     private func lying(_ item: PileItem, leather: Int) -> some View {
@@ -411,53 +458,25 @@ struct MihbaraHomeView: View {
         if !b.author.isEmpty { parts.append(b.author) }
         if let size = MihbaraBookCovers.sizeWord(shapes[b.id], service.digits) { parts.append(size) }
         if b.shelf == "reading", let p = b.progress, p > 0 { parts.append("قرأت " + service.digits.string(Int((p * 100).rounded())) + "٪") }
+        if b.shelf == "old" { parts.append("قرأته قديمًا") } else if b.shelf == "finished", let year = pileYear(b) { parts.append("أنهيته في " + year.primary) }
         return parts.joined(separator: "، ")
     }
     /// What an empty shelf says depends on which shelf it is and on what the other shelves hold.
+    /// The bookcase before the first book.
     private func emptyShelf(_ r: MihbaraHomeReading) -> some View {
-        let waiting = r.books.filter { $0.shelf == "want" }.count
-        let title: String, detail: String
-        if r.books.isEmpty { title = "أضف كتابك الأول"; detail = "ضع كتابًا من مكتبتك على الرف، واحفظ أين وصلت." }
-        else {
-            switch shelf {
-            case "reading":
-                title = "لا كتاب على طاولتك"
-                detail = waiting > 0 ? "عندك " + MihbaraCopy.books(waiting, service.digits) + " ينتظر؛ اختر واحدًا وابدأه." : "أضف كتابًا وابدأ من موضعك."
-            case "want": title = "لا كتب تنتظرك"; detail = "أضف كتابًا تنوي قراءته، ويبقى هنا حتى تبدأه."
-            default: title = "لم تُنهِ كتابًا هنا بعد"; detail = "حين تنهي كتابًا يستقر على هذا الرف مع تاريخ إنهائه."
-            }
-        }
-        return VStack(alignment: .leading, spacing: 6) {
-            Text(title).font(MadarTypography.cardTitle())
-            Text(detail).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-            if !r.books.isEmpty, shelf == "reading", waiting > 0 {
-                Button("افتح رفّ «أبي أقرأها»") { shelf = "want" }.font(MadarTypography.caption()).frame(minHeight: 44)
-                    .accessibilityIdentifier("mihbara-shelf-go-want")
-            }
+        VStack(alignment: .leading, spacing: 6) {
+            Text("أضف كتابك الأول").font(MadarTypography.cardTitle())
+            Text("ضع كتابًا من مكتبتك على الرف، واحفظ أين وصلت.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
         }.frame(maxWidth: .infinity, minHeight: 95, alignment: .leading)
     }
     private func shelfTotal(_ count: Int) -> String {
         count == 1 ? "كتاب واحد على رفّك" : MihbaraCopy.books(count, service.digits) + " على رفوفك"
     }
+    /// Owner, 21–22 Oct 2026: the desk is the stand in front of the bookcase. One large open book at your place, one
+    /// button that continues it, and the day's wird under the stand.
     private func desk(_ r: MihbaraHomeReading) -> some View {
-        let hadith = r.todayHadiths.first
-        let open = (r.opensAfterFajr || manuallyOpen || app.string("mihbara.rahlOpens") == "untilDone") && hadith != nil
-        return VStack(alignment: .leading, spacing: 22) {
-            HStack {
-                deskLabel("على الطاولة", title: true).lineLimit(1).minimumScaleFactor(0.8).layoutPriority(1)
-                Spacer(minLength: 4)
-                GlassEffectContainer(spacing: 7) {
-                    HStack(spacing: 7) {
-                        // Owner, 21 Oct 2026: «زر حمسني غبي احذفه». The suggestion sheet stays in code, with no way in.
-                        Button { sheet = .opening } label: {
-                            Image(systemName: "slider.horizontal.3").font(.system(size: 17, weight: .semibold))
-                                .foregroundStyle(theme.ink).frame(width: 46, height: 46)
-                        }
-                        .buttonStyle(.plain)
-                        .glassEffect(.regular.interactive(), in: Circle())
-                        .accessibilityLabel("وقت فتح ورد السنّة").accessibilityIdentifier("mihbara-opening-preference")
-                    }
-                }
+        VStack(spacing: 14) {
+            HStack(alignment: .top) {
                 Button { sheet = .notebook } label: {
                     Text("دفتر").font(.custom("ArefRuqaa-Regular", size: 18, relativeTo: .headline))
                         .foregroundStyle(theme.ink).frame(width: 58, height: 70)
@@ -465,61 +484,92 @@ struct MihbaraHomeView: View {
                         .overlay(alignment: .top) { Rectangle().fill(theme.color("goldUnderstandText").opacity(0.7)).frame(height: 3).padding(.horizontal, 5) }
                         .shadow(color: theme.ink.opacity(0.18), radius: 5, y: 4).rotationEffect(.degrees(-3))
                 }.buttonStyle(.plain).accessibilityLabel("الدفتر الخاص").accessibilityHint("ملاحظاتك الخاصة تبقى داخل المحبرة").accessibilityIdentifier("mihbara-notebook")
+                Spacer(minLength: 8)
+                if let b = tableBook, hasSavedPosition(b) { deskLabel("موضعك محفوظ").padding(.top, 12) }
+                Spacer(minLength: 8)
+                Button { sheet = .opening } label: {
+                    Image(systemName: "slider.horizontal.3").font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(theme.ink).frame(width: 46, height: 46)
+                }
+                .buttonStyle(.plain)
+                .glassEffect(.regular.interactive(), in: Circle())
+                .accessibilityLabel("وقت فتح ورد السنّة").accessibilityIdentifier("mihbara-opening-preference")
             }
-            if open, let h = hadith {
-                HStack { deskLabel("على الرَّحل، ورد اليوم أولًا"); Spacer(); Button("اطوه ⌃") { manuallyOpen = false; folded = true }.font(MadarTypography.caption()).padding(9).background(theme.color("desk"), in: .capsule).foregroundStyle(theme.color("onDesk")) }
-                if !folded {
-                    VStack(spacing: 0) {
-                        MihbaraOpenBook(
-                            theme: theme, sunnah: true,
-                            rightHeader: r.collection.title, rightTitle: h.title, rightText: excerpt(hadithMatn(h.text)), rightFooter: service.digits.string(h.number),
-                            leftHeader: "ورد اليوم", leftTitle: MihbaraCopy.hadiths(r.todayHadiths.count, service.digits),
-                            leftText: r.collection.hadiths.count - r.readCount <= 0 ? "أتممت الأربعين"
-                                : "بقي " + MihbaraCopy.hadiths(r.collection.hadiths.count - r.readCount, service.digits),
-                            leftFooter: service.digits.string(r.readCount) + " من " + service.digits.string(r.collection.hadiths.count),
-                            action: "افهمه"
-                        ) { sheet = .hadith(h.number) }
-                        ZStack { RoundedRectangle(cornerRadius: 7).fill(theme.color("desk")).frame(width: 225, height: 13).rotationEffect(.degrees(17)); RoundedRectangle(cornerRadius: 7).fill(theme.color("desk")).frame(width: 225, height: 13).rotationEffect(.degrees(-17)); Circle().fill(theme.color("goldUnderstand")).frame(width: 11) }.frame(height: 58).accessibilityHidden(true)
-                    }.transition(.opacity.combined(with: .scale(scale: 0.97)))
-                } else { Button("افتح ورد اليوم") { folded = false }.buttonStyle(.borderedProminent).tint(theme.color("sunnahLeather")) }
-            } else {
-                Button { manuallyOpen = true; folded = false; if let h = hadith { sheet = .hadith(h.number) } } label: {
-                    HStack { Image(systemName: r.completedToday > 0 ? "checkmark.seal" : "book.closed"); VStack(alignment: .leading, spacing: 4) { Text(r.completedToday > 0 ? "أتممت ورد اليوم" : r.readCount == 42 ? "أتممت الأربعين النووية" : "وردك بعد الفجر").font(MadarTypography.cardTitle()); if r.completedToday > 0 { Text("الحديث القادم في يومك الجديد").font(MadarTypography.caption()) } }; Spacer() }.padding(16).background(theme.color("sunnahLeather"), in: .rect(cornerRadius: 12)).foregroundStyle(theme.onAccent)
-                }.buttonStyle(.plain).disabled(hadith == nil).accessibilityIdentifier("mihbara-wird-closed")
-            }
-            HStack { deskLabel("كتاب القراءة"); Spacer(); if let b = tableBook, hasSavedPosition(b) { deskLabel("موضعك محفوظ") } }
             if let b = tableBook {
-                if b.isReadableEPUB || b.isReadablePDF {
-                    fileTableBook(b)
-                } else {
-                let currentPage = b.page.flatMap { $0 > 0 ? $0 : nil }
-                let nextPage: Int? = currentPage.flatMap { page -> Int? in
-                    guard b.pages.map({ page < $0 }) ?? true else { return nil }
-                    return page + 1
-                }
-                // The open book's left page says how much is left in real pages and time; its folio stays the next page when the total is unknown.
-                let remaining = b.shelf == "finished" ? nil : MihbaraCopy.remaining(pages: b.pages, read: currentPage, service.digits)
-                VStack(spacing: 12) {
-                MihbaraOpenBook(
-                    theme: theme, sunnah: false,
-                    rightHeader: b.author, rightTitle: b.title, rightText: b.pages.map { MihbaraCopy.pages($0, service.digits) } ?? "كتاب ورقي",
-                    rightFooter: currentPage.map(service.digits.string) ?? "",
-                    leftHeader: "موضعك", leftTitle: "وصلت إلى", leftText: currentPage.map { "صفحة " + service.digits.string($0) } ?? "بداية الكتاب",
-                    leftFooter: remaining ?? nextPage.map(service.digits.string) ?? "", action: currentPage == nil ? "ابدأ" : "أكمل"
-                ) { openBook(b) }
-                    if let currentPage, let total = b.pages, currentPage >= total, b.shelf == "reading" {
-                        Button { moveBook(b, to: "finished") } label: {
-                            Label("وصلت إلى آخره؟ انقله إلى «أنهيتها»", systemImage: "checkmark.circle").font(MadarTypography.caption())
-                                .padding(.horizontal, 14).frame(minHeight: 44).foregroundStyle(theme.color("onDesk"))
-                                .background(theme.color("desk"), in: .capsule)
-                        }.buttonStyle(.plain).accessibilityIdentifier("mihbara-book-mark-finished")
-                    }
-                }
-                }
+                if b.isReadableEPUB || b.isReadablePDF { fileTableBook(b) } else { paperTableBook(b) }
             } else {
-                Button { showingAddBook = true } label: { VStack(spacing: 12) { Image(systemName: "book.pages").font(.largeTitle); Text("مكان كتابك").font(MadarTypography.cardTitle()); Text("أضف كتابًا وابدأ من موضعك").font(MadarTypography.caption()) }.frame(maxWidth: .infinity, minHeight: 210).background(theme.surface, in: .rect(cornerRadius: 5)).overlay { RoundedRectangle(cornerRadius: 5).stroke(theme.line, style: .init(lineWidth: 1, dash: [4,4])) } }.buttonStyle(.plain).foregroundStyle(theme.ink)
+                // With books waiting, the empty stand points at them rather than at «أضف».
+                let waiting = r.books.filter { $0.shelf == "want" }.count
+                Button { if waiting > 0 { scrollTarget = "want" } else { showingAddBook = true } } label: { VStack(spacing: 12) { Image(systemName: "book.pages").font(.largeTitle); Text("مكان كتابك").font(MadarTypography.cardTitle()); Text(waiting > 0 ? "اختر كتابًا من «أبي أقرأها» (" + MihbaraCopy.books(waiting, service.digits) + ")، واضغطه مطوّلًا ثم «ضعه على الطاولة»" : "أضف كتابًا وابدأ من موضعك").font(MadarTypography.caption()).multilineTextAlignment(.center).padding(.horizontal, 16) }.frame(maxWidth: .infinity, minHeight: 210).background(theme.surface, in: .rect(cornerRadius: 5)).overlay { RoundedRectangle(cornerRadius: 5).stroke(theme.line, style: .init(lineWidth: 1, dash: [4,4])) } }.buttonStyle(.plain).foregroundStyle(theme.ink)
             }
-        }.padding(18).padding(.vertical, 8).background(LinearGradient(colors: [theme.color("wood").opacity(0.78), theme.color("wood")], startPoint: .top, endPoint: .bottom), in: .rect(topLeadingRadius: 26, bottomLeadingRadius: 12, bottomTrailingRadius: 12, topTrailingRadius: 26)).animation(reduceMotion ? nil : .smooth(duration: 0.35), value: open && !folded)
+            // The stand's crossed legs.
+            ZStack { RoundedRectangle(cornerRadius: 7).fill(theme.color("desk")).frame(width: 190, height: 12).rotationEffect(.degrees(13)); RoundedRectangle(cornerRadius: 7).fill(theme.color("desk")).frame(width: 190, height: 12).rotationEffect(.degrees(-13)); Circle().fill(theme.color("goldUnderstand")).frame(width: 10) }.frame(height: 44).accessibilityHidden(true)
+            wirdStrip(r)
+        }.padding(18).padding(.vertical, 6).background(LinearGradient(colors: [theme.color("wood").opacity(0.78), theme.color("wood")], startPoint: .top, endPoint: .bottom), in: .rect(topLeadingRadius: 26, bottomLeadingRadius: 12, bottomTrailingRadius: 12, topTrailingRadius: 26))
+    }
+    /// The day's wird under the stand: which hadith, its opening words, how far through the collection, and «افهمه».
+    @ViewBuilder private func wirdStrip(_ r: MihbaraHomeReading) -> some View {
+        let hadith = r.todayHadiths.first
+        let open = (r.opensAfterFajr || manuallyOpen || app.string("mihbara.rahlOpens") == "untilDone") && hadith != nil
+        if open, let h = hadith {
+            let left = r.collection.hadiths.count - r.readCount
+            Button { sheet = .hadith(h.number) } label: {
+                HStack(spacing: 12) {
+                    RoundedRectangle(cornerRadius: 3).fill(theme.color("sunnahLeather").gradient).frame(width: 30, height: 44)
+                        .overlay(alignment: .leading) { Rectangle().fill(theme.color("goldUnderstand")).frame(width: 3) }.accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("ورد اليوم: " + h.title).font(MadarTypography.cardTitle()).lineLimit(2)
+                        Text(excerpt(hadithMatn(h.text))).font(MadarTypography.caption()).lineLimit(1)
+                        Text(service.digits.string(r.readCount) + " من " + service.digits.string(r.collection.hadiths.count) + "، " + (left <= 0 ? "أتممت الأربعين" : "بقي " + MihbaraCopy.hadiths(left, service.digits)))
+                            .font(MadarTypography.fine())
+                    }
+                    Spacer(minLength: 4)
+                    Text("افهمه").font(MadarTypography.caption().weight(.semibold)).padding(.horizontal, 12).frame(minHeight: 36)
+                        .foregroundStyle(RoomTheme(room: "mihbara", dark: false).ink).background(theme.color("goldUnderstand"), in: .capsule)
+                }
+                .padding(12).frame(maxWidth: .infinity, alignment: .leading)
+                .background(theme.color("desk"), in: .rect(cornerRadius: 14)).foregroundStyle(theme.color("onDesk"))
+            }.buttonStyle(.plain).accessibilityIdentifier("mihbara-wird-open")
+        } else {
+            Button { manuallyOpen = true; if let h = hadith { sheet = .hadith(h.number) } } label: {
+                HStack { Image(systemName: r.completedToday > 0 ? "checkmark.seal" : "book.closed"); VStack(alignment: .leading, spacing: 4) { Text(r.completedToday > 0 ? "أتممت ورد اليوم" : r.readCount == 42 ? "أتممت الأربعين النووية" : "وردك بعد الفجر").font(MadarTypography.cardTitle()); if r.completedToday > 0 { Text("الحديث القادم في يومك الجديد").font(MadarTypography.caption()) } }; Spacer() }.padding(16).background(theme.color("sunnahLeather"), in: .rect(cornerRadius: 12)).foregroundStyle(theme.onAccent)
+            }.buttonStyle(.plain).disabled(hadith == nil).accessibilityIdentifier("mihbara-wird-closed")
+        }
+    }
+    /// The stand's one action, under the open book: where you continue, in pages.
+    private func continueButton(_ title: String, _ b: MihbaraBook) -> some View {
+        Button { openBook(b) } label: {
+            Text(title).font(MadarTypography.body().weight(.semibold)).padding(.horizontal, 22).frame(minHeight: 48)
+                .foregroundStyle(theme.onAccent).background(theme.accent, in: .capsule)
+                .shadow(color: .black.opacity(0.25), radius: 5, y: 3)
+        }.buttonStyle(.plain).accessibilityIdentifier("mihbara-book-continue")
+    }
+    private func finishedHint(_ b: MihbaraBook) -> some View {
+        Button { moveBook(b, to: "finished") } label: {
+            Label("وصلت إلى آخره؟ انقله إلى «أنهيتها»", systemImage: "checkmark.circle").font(MadarTypography.caption())
+                .padding(.horizontal, 14).frame(minHeight: 44).foregroundStyle(theme.color("onDesk"))
+                .background(theme.color("desk"), in: .capsule)
+        }.buttonStyle(.plain).accessibilityIdentifier("mihbara-book-mark-finished")
+    }
+    /// A paper book on the stand: the right page names it, the left says where you are and what is left.
+    private func paperTableBook(_ b: MihbaraBook) -> some View {
+        let currentPage = b.page.flatMap { $0 > 0 ? $0 : nil }
+        let nextPage: Int? = currentPage.flatMap { page -> Int? in
+            guard b.pages.map({ page < $0 }) ?? true else { return nil }
+            return page + 1
+        }
+        let remaining = b.shelf == "finished" ? nil : MihbaraCopy.remaining(pages: b.pages, read: currentPage, service.digits)
+        return VStack(spacing: 12) {
+            MihbaraOpenBook(
+                theme: theme, sunnah: false,
+                rightHeader: b.author, rightTitle: b.title, rightText: b.pages.map { MihbaraCopy.pages($0, service.digits) } ?? "كتاب ورقي",
+                rightFooter: currentPage.map(service.digits.string) ?? "",
+                leftHeader: "موضعك", leftTitle: "وصلت إلى", leftText: currentPage.map { "صفحة " + service.digits.string($0) } ?? "بداية الكتاب",
+                leftFooter: remaining ?? "", action: "", ribbon: false
+            ) { openBook(b) }
+            continueButton(currentPage == nil ? "ابدأ القراءة" : nextPage.map { "أكمل من صفحة " + service.digits.string($0) } ?? "أكمل", b)
+            if let currentPage, let total = b.pages, currentPage >= total, b.shelf == "reading" { finishedHint(b) }
+        }
     }
     private func hasSavedPosition(_ b: MihbaraBook) -> Bool {
         (b.isReadableEPUB || b.isReadablePDF) ? b.progress != nil : (b.page ?? 0) > 0
@@ -537,21 +587,21 @@ struct MihbaraHomeView: View {
         else if let percent { left = "بقي " + digits.string(100 - percent) + "٪" }
         else { left = "" }
         let nearlyDone = (percent ?? 0) >= 99 && b.shelf == "reading"
-        return VStack(spacing: 12) { MihbaraOpenBook(
-            theme: theme, sunnah: false,
-            rightHeader: b.author, rightTitle: b.title, rightText: kind,
-            rightFooter: total.map { MihbaraCopy.pages($0, digits) } ?? "",
-            leftHeader: "موضعك", leftTitle: percent == nil ? "لم تبدأه بعد" : "قرأت منه",
-            leftText: percent.map { digits.string($0) + "٪" } ?? "بداية الكتاب",
-            leftFooter: left, action: percent == nil ? "ابدأ" : "أكمل القراءة"
-        ) { openBook(b) }
-            if nearlyDone {
-                Button { moveBook(b, to: "finished") } label: {
-                    Label("وصلت إلى آخره؟ انقله إلى «أنهيتها»", systemImage: "checkmark.circle").font(MadarTypography.caption())
-                        .padding(.horizontal, 14).frame(minHeight: 44).foregroundStyle(theme.color("onDesk"))
-                        .background(theme.color("desk"), in: .capsule)
-                }.buttonStyle(.plain).accessibilityIdentifier("mihbara-book-mark-finished")
-            }
+        let action: String
+        if percent == nil { action = "ابدأ القراءة" }
+        else if let total, let read, read < total { action = "أكمل من صفحة " + digits.string(read + 1) }
+        else { action = "أكمل القراءة" }
+        return VStack(spacing: 12) {
+            MihbaraOpenBook(
+                theme: theme, sunnah: false,
+                rightHeader: b.author, rightTitle: b.title, rightText: kind,
+                rightFooter: total.map { MihbaraCopy.pages($0, digits) } ?? "",
+                leftHeader: "موضعك", leftTitle: percent == nil ? "لم تبدأه بعد" : "قرأت منه",
+                leftText: percent.map { digits.string($0) + "٪" } ?? "بداية الكتاب",
+                leftFooter: left, action: "", ribbon: false
+            ) { openBook(b) }
+            continueButton(action, b)
+            if nearlyDone { finishedHint(b) }
         }
     }
     private func sunnahDrawer(_ r: MihbaraHomeReading) -> some View {
@@ -638,7 +688,25 @@ struct MihbaraHomeView: View {
                 TextField("ابحث في كتبك…", text: $libraryQuery).font(MadarTypography.body()).padding(15).background(theme.surface, in: .capsule).accessibilityIdentifier("mihbara-library-search")
                 Picker("رفّ الكتب", selection: $libraryShelf) { Text("كل الكتب").tag("all"); Text("أقرؤها الآن").tag("reading"); Text("أبي أقرأها").tag("want"); Text("أنهيتها").tag("finished"); Text("قديمًا").tag("old") }.pickerStyle(.menu)
                 libraryStatus(r)
-                ForEach(r.books) { b in
+                // Owner, 21 Oct 2026: the «قديمًا» cabinet is a section here now, after the three shelves.
+                ForEach(Self.librarySections, id: \.shelf) { section in
+                    let books = r.books.filter { $0.shelf == section.shelf }
+                    if !books.isEmpty {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(section.title).font(MadarTypography.section())
+                            if let note = section.note { Text(note).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
+                        }.padding(.top, 6).accessibilityAddTraits(.isHeader).accessibilityIdentifier("mihbara-library-section-" + section.shelf)
+                        ForEach(books) { b in libraryRow(b) }
+                    }
+                }
+            }.padding(20)
+        }.background(theme.background).foregroundStyle(theme.ink)
+    }
+    private static let librarySections: [(shelf: String, title: String, note: String?)] = [
+        ("reading", "أقرؤها الآن", nil), ("want", "أبي أقرأها", nil), ("finished", "أنهيتها", nil),
+        ("old", "قديمًا", "كتب قرأتها من زمان، تستقر أيضًا أسفل «أنهيتها» في الغرفة."),
+    ]
+    private func libraryRow(_ b: MihbaraBook) -> some View {
                     Button { openBook(b) } label: {
                         HStack(spacing: 12) {
                             Image(systemName: b.isReadablePDF ? "doc.text" : b.isReadableEPUB ? "book" : "book.closed").font(.title3).foregroundStyle(theme.secondaryInk).frame(width: 28)
@@ -656,9 +724,6 @@ struct MihbaraHomeView: View {
                     }.buttonStyle(.plain).opacity(libraryMatches(b) ? 1 : 0.3)
                         .contextMenu { bookMenu(b) }
                         .accessibilityIdentifier("mihbara-library-book-" + b.id.uuidString)
-                }
-            }.padding(20)
-        }.background(theme.background).foregroundStyle(theme.ink)
     }
 
     private func foldedForSearch(_ text: String) -> String {
@@ -957,7 +1022,7 @@ private struct MihbaraOldBooksCabinet: View {
 }
 
 struct MihbaraOpenBook: View {
-    var theme: RoomTheme; var sunnah: Bool; var rightHeader: String; var rightTitle: String; var rightText: String; var rightFooter: String; var leftHeader: String; var leftTitle: String; var leftText: String; var leftFooter: String; var action: String; var open: () -> Void
+    var theme: RoomTheme; var sunnah: Bool; var rightHeader: String; var rightTitle: String; var rightText: String; var rightFooter: String; var leftHeader: String; var leftTitle: String; var leftText: String; var leftFooter: String; var action: String; var ribbon = true; var open: () -> Void
     @Environment(\.dynamicTypeSize) private var type
     var body: some View {
         VStack(spacing: 0) {
@@ -968,7 +1033,7 @@ struct MihbaraOpenBook: View {
                     page(header: rightHeader, title: rightTitle, text: rightText, footer: rightFooter)
                     page(header: leftHeader, title: leftTitle, text: leftText, footer: leftFooter)
                 }.padding(sunnah ? 6 : 2).background(sunnah ? theme.color("sunnahLeather") : theme.surface, in: .rect(cornerRadius: 5)).shadow(color: theme.ink.opacity(0.25), radius: 9, y: 9)
-                HStack { Spacer(); Button(action, action: open).font(MadarTypography.section()).frame(width: 50, height: 56).foregroundStyle(sunnah ? theme.color("goldUnderstandText") : theme.background).background(sunnah ? theme.color("notebookYellow") : theme.color("ribbonRead"), in: .rect(bottomLeadingRadius: 12, bottomTrailingRadius: 2)).offset(y: -6).accessibilityIdentifier(sunnah ? "mihbara-wird-open" : "mihbara-book-continue") }.padding(.horizontal, 12).frame(height: 24)
+                if ribbon { HStack { Spacer(); Button(action, action: open).font(MadarTypography.section()).frame(width: 50, height: 56).foregroundStyle(sunnah ? theme.color("goldUnderstandText") : theme.background).background(sunnah ? theme.color("notebookYellow") : theme.color("ribbonRead"), in: .rect(bottomLeadingRadius: 12, bottomTrailingRadius: 2)).offset(y: -6).accessibilityIdentifier(sunnah ? "mihbara-wird-open" : "mihbara-book-continue") }.padding(.horizontal, 12).frame(height: 24) }
             }
         }
     }

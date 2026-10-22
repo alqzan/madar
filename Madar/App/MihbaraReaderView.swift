@@ -141,6 +141,11 @@ struct MihbaraReaderView: View {
     @State private var publication: Publication?
     @State private var localURL: URL?
     @State private var initialLocator: Locator?
+    /// The page-break anchor where a tapped volume begins, kept until the reader has turned to it.
+    @State private var volumeAnchor: String?
+    /// The volume's first page once the reader reached it: while it is on screen it names the page, even though
+    /// the screen begins with the end of the previous volume.
+    @State private var volumeLanding: String?
     @State private var currentLocator: Locator?
     @State private var navigatorController: EPUBNavigatorViewController?
     @State private var focusPositionLabel: String?
@@ -294,6 +299,10 @@ struct MihbaraReaderView: View {
                         },
                         onReady: { navigator in
                             navigatorController = navigator
+                            if let anchor = volumeAnchor {
+                                volumeAnchor = nil
+                                Task { await settle(on: anchor, in: navigator) }
+                            }
                             applyFocusMode()
                             synchronizeAutoScroll()
                             if let currentLocator { resolvePrintPageMarker(for: currentLocator) }
@@ -667,6 +676,7 @@ struct MihbaraReaderView: View {
                    let key = BookVolumes.key(labels[page]), let index = BookVolumes.order(labels).firstIndex(of: key),
                    volumeStarts.indices.contains(index), let start = volumeStarts[index] {
                     startLocator = start
+                    volumeAnchor = start.locations.fragments.first
                 }
             }
             initialLocator = startLocator
@@ -712,6 +722,31 @@ struct MihbaraReaderView: View {
         return (publication, firstLocator, result, positionCount, volumeStarts)
     }
 
+    /// Readium's jump to a page-break anchor lands one page short in right-to-left books when the anchor falls
+    /// mid-chapter (M6-UX-V, 22 Oct 2026: `#p-2` sat on the next column, 382 pt off screen). Once the opening
+    /// jump has settled, turn pages until the anchor is on screen; the page turns report the location as usual.
+    @MainActor private func settle(on anchor: String, in navigator: EPUBNavigatorViewController) async {
+        let id = anchor.replacingOccurrences(of: "'", with: "")
+        let script = "(function(){var e=document.getElementById('\(id)');if(!e)return null;var c=Math.floor(e.getBoundingClientRect().left/window.innerWidth);var rtl=getComputedStyle(document.documentElement).direction==='rtl';return [rtl?-c:c,window.scrollX];})()"
+        var lastScroll: Double?
+        for _ in 0..<20 {
+            try? await Task.sleep(for: .milliseconds(250))
+            guard case .success(let value) = await navigator.evaluateJavaScript(script),
+                  let pair = value as? [NSNumber], pair.count == 2 else { continue }
+            // Wait for the opening jump to finish: two equal readings in a row.
+            let scroll = pair[1].doubleValue
+            defer { lastScroll = scroll }
+            guard scroll == lastScroll else { continue }
+            let steps = pair[0].intValue
+            if steps == 0 {
+                volumeLanding = id
+                if let currentLocator { resolvePrintPageMarker(for: currentLocator) }
+                return
+            }
+            if steps > 0 { await navigator.goForward() } else { await navigator.goBackward() }
+        }
+    }
+
     @MainActor private func locationChanged(_ locator: Locator, explicitJump: Bool) {
         let now = Date()
         recordInteraction(at: now)
@@ -733,8 +768,10 @@ struct MihbaraReaderView: View {
         guard locator.locations.fragments.isEmpty, let navigatorController else { return }
         let ids = printPages.filter { $0.href.isEquivalentTo(locator.href.removingFragment()) }.compactMap(\.fragment)
         guard !ids.isEmpty, let idsJSON = try? JSONEncoder().encode(ids), let idsList = String(data: idsJSON, encoding: .utf8) else { return }
+        let landing = volumeLanding.flatMap { ids.contains($0) ? $0 : nil } ?? ""
         let script = """
         (() => {
+          const landing = document.getElementById('\(landing)');
           const rtl = getComputedStyle(document.documentElement).direction === 'rtl';
           let before = null, firstVisible = null;
           for (const id of \(idsList)) {
@@ -745,6 +782,7 @@ struct MihbaraReaderView: View {
             const later = r.top >= window.innerHeight || (rtl ? r.right <= 0 : r.left >= window.innerWidth);
             if (earlier) before = id;
             else if (!later && firstVisible === null) firstVisible = id;
+            if (element === landing && !earlier && !later) return id;
           }
           return before ?? firstVisible;
         })()

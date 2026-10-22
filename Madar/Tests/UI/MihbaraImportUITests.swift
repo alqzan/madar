@@ -347,11 +347,8 @@ import UIKit
         XCTAssertTrue(subtitle.waitForExistence(timeout: 15), app.debugDescription)
         for _ in 0..<20 where !subtitle.label.hasPrefix("الجزء الثاني") { usleep(500_000) }
         attach(app, "M6-UX-V-reader-after-tap-L")
-        // Blocker (M6-UX-V, 22 Oct): a Turath file holds 30 printed pages, so a volume can begin mid-chapter. The reader opens
-        // that chapter but does not reach the page anchor, so the screen still shows volume 1.
-        XCTExpectFailure("M6-UX-V: the reader opens the chapter, not the page anchor where volume 2 begins") {
-            XCTAssertTrue(subtitle.label.hasPrefix("الجزء الثاني"), "Reader subtitle: \(subtitle.label)")
-        }
+        // A Turath file holds 30 printed pages, so volume 2 begins mid-chapter here: the reader must turn to that page.
+        XCTAssertTrue(subtitle.label.hasPrefix("الجزء الثاني"), "Reader subtitle: \(subtitle.label)")
         attach(app, "M6-UX-V-reader-second-volume-L")
     }
 
@@ -382,6 +379,19 @@ import UIKit
         let finished = app.buttons["mihbara-shelf-finished"]; XCTAssertTrue(finished.waitForExistence(timeout: 5), app.debugDescription)
         finished.tap(); sleep(1)
         attach(app, "bindings-finished-L")
+        // Owner, 21 Oct 2026: «قديمًا» joined «أنهيتها»; piles are labelled by year, and books read long ago come last.
+        let years = app.staticTexts.matching(identifier: "mihbara-pile-year")
+        XCTAssertGreaterThanOrEqual(years.count, 2, app.debugDescription)
+        XCTAssertTrue(app.staticTexts["قديمًا"].exists, "The old books lie under «أنهيتها».\n\(app.debugDescription)")
+        for _ in 0..<3 { app.swipeUp(velocity: .slow) }
+        sleep(1); attach(app, "bindings-finished-old-L")
+        let library = app.buttons["mihbara-library"]
+        for _ in 0..<6 where !library.isHittable { app.swipeUp(velocity: .slow) }
+        library.tap()
+        let oldSection = app.descendants(matching: .any)["mihbara-library-section-old"]
+        for _ in 0..<8 where !oldSection.exists || !oldSection.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(oldSection.exists, "«كل كتبي» has a «قديمًا» section.\n\(app.debugDescription)")
+        attach(app, "library-old-section-L")
     }
 
     /// M6-T01: search Turath's catalogue, download a book (fixture data, no network), review it and read it.

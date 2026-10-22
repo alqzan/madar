@@ -38,13 +38,12 @@ import XCTest
     func testHomeWirdExplicitUnderstandingUndoAndRelaunch() {
         continueAfterFailure = false; let app = app("home"); app.launch(); open(app)
         XCTAssertFalse(app.buttons["tab-customize"].isHittable)
-        XCTAssertTrue(app.staticTexts["خزانة «قديمًا»"].waitForExistence(timeout:8))
+        XCTAssertTrue(app.buttons["mihbara-shelf-finished"].waitForExistence(timeout:8))
         shot(app,"M6-V01-home-L")
         var wird = app.buttons["mihbara-wird-open"]; reach(app,wird)
-        XCTAssertTrue(app.staticTexts["بقي ٣٠ حديثًا"].exists)
-        XCTAssertTrue(app.staticTexts["١٢ من ٤٢"].exists)
-        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format:"label CONTAINS %@","لا يؤمن أحدكم")).firstMatch.exists)
-        app.coordinate(withNormalizedOffset: CGVector(dx:0.5,dy:0.66)).press(forDuration:0.1,thenDragTo:app.coordinate(withNormalizedOffset: CGVector(dx:0.5,dy:0.637)))
+        // Owner, 22 Oct 2026 («٢»): the wird is one strip under the stand: hadith, opening words, progress.
+        XCTAssertTrue(wird.label.contains("١٢ من ٤٢، بقي ٣٠ حديثًا"), wird.label)
+        XCTAssertTrue(wird.label.contains("لا يؤمن أحدكم"), wird.label)
         XCTAssertTrue(wird.isHittable)
         shot(app,"M6-V01-desk-L"); wird.tap()
         XCTAssertTrue(app.textViews["mihbara-hadith-text"].waitForExistence(timeout:8)); XCTAssertTrue(String(describing: app.textViews["mihbara-hadith-text"].value).contains("لا يؤمن أحدكم")); shot(app,"M6-V01-hadith-L")
@@ -179,7 +178,7 @@ import XCTest
         let wantShelfTab = app.buttons["mihbara-shelf-want"]
         XCTAssertTrue(wantShelfTab.isHittable, app.debugDescription)
         wantShelfTab.tap()
-        let book = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "mihbara-book-")).firstMatch
+        let book = app.otherElements["mihbara-wall-want"].buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "mihbara-book-")).firstMatch
         XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); book.tap()
         let prompt = app.buttons["mihbara-paper-index-prompt"]
         XCTAssertTrue(prompt.waitForExistence(timeout: 8), app.debugDescription)
@@ -217,7 +216,7 @@ import XCTest
         app.buttons["mihbara-paper-start"].tap()
         undo(app)
 
-        let savedBook = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "mihbara-book-")).firstMatch
+        let savedBook = app.buttons["mihbara-book-continue"]
         XCTAssertTrue(savedBook.waitForExistence(timeout: 8), app.debugDescription); savedBook.tap()
         XCTAssertTrue(app.buttons["mihbara-paper-index-prompt"].waitForExistence(timeout: 8), app.debugDescription)
     }
@@ -243,7 +242,7 @@ import XCTest
         for _ in 0..<6 { homeScroll.swipeDown(velocity: .slow) }
         let wantShelfTab = app.buttons["mihbara-shelf-want"]
         XCTAssertTrue(wantShelfTab.isHittable, app.debugDescription); wantShelfTab.tap()
-        let book = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "mihbara-book-")).firstMatch
+        let book = app.otherElements["mihbara-wall-want"].buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "mihbara-book-")).firstMatch
         XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); book.tap()
 
         let details = app.buttons["mihbara-paper-index-details"]
@@ -352,8 +351,9 @@ import XCTest
         continueAfterFailure = false
         let fixtureURL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "arabic-reader-poc", withExtension: "epub"))
         let app = app("reader", epub: try Data(contentsOf: fixtureURL)); app.launch(); open(app)
-        let book = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "كتاب اختبار القارئ")).firstMatch
-        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); book.tap()
+        // The book being read sits open on the desk (owner, 21 Oct), not on the shelf.
+        let book = app.buttons["mihbara-book-continue"]
+        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); reach(app, book); book.tap()
         XCTAssertTrue(app.buttons["mihbara-reader-close"].waitForExistence(timeout: 20), app.debugDescription)
         XCTAssertTrue(app.staticTexts["كتاب اختبار القارئ"].exists)
         XCTAssertTrue(app.staticTexts["تأمل في القراءة"].firstMatch.waitForExistence(timeout: 8), app.debugDescription)
@@ -431,7 +431,7 @@ import XCTest
         app.buttons["mihbara-reader-contents-close"].tap()
         app.buttons["mihbara-reader-close"].tap()
         XCTAssertTrue(app.buttons["mihbara-add-paper"].waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertTrue(app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "كتاب اختبار القارئ")).firstMatch.exists)
+        XCTAssertTrue(app.buttons["mihbara-book-continue"].waitForExistence(timeout: 8))
     }
 
     func testArabicExpandedReaderSettingsPersistAcrossRelaunchAndUndoReset() throws {
@@ -441,8 +441,8 @@ import XCTest
         let storeID = UUID().uuidString
         let app = app("reader", epub: epub, storeID: storeID)
         app.launch(); open(app)
-        var book = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "كتاب اختبار القارئ")).firstMatch
-        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); book.tap()
+        var book = app.buttons["mihbara-book-continue"]
+        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); reach(app, book); book.tap()
         XCTAssertTrue(app.buttons["mihbara-reader-settings"].waitForExistence(timeout: 20), app.debugDescription)
         app.buttons["mihbara-reader-settings"].tap()
         let more = app.buttons["mihbara-reader-more"]
@@ -467,8 +467,8 @@ import XCTest
         XCTAssertTrue(app.descendants(matching: .any)["mihbara-reader-progress"].waitForExistence(timeout: 8), app.debugDescription)
 
         app.terminate(); app.launch(); open(app)
-        book = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "كتاب اختبار القارئ")).firstMatch
-        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); book.tap()
+        book = app.buttons["mihbara-book-continue"]
+        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); reach(app, book); book.tap()
         XCTAssertTrue(app.buttons["mihbara-reader-settings"].waitForExistence(timeout: 20), app.debugDescription)
         app.buttons["mihbara-reader-settings"].tap()
         let reopenedMore = app.buttons["mihbara-reader-more"]
@@ -509,8 +509,8 @@ import XCTest
         continueAfterFailure = false
         let fixtureURL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "arabic-reader-poc", withExtension: "epub"))
         let app = app("reader", epub: try Data(contentsOf: fixtureURL)); app.launch(); open(app)
-        let book = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "كتاب اختبار القارئ")).firstMatch
-        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); book.tap()
+        let book = app.buttons["mihbara-book-continue"]
+        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); reach(app, book); book.tap()
         useReaderMode(app, "scroll")
         var paragraph = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "القراءة باب يدخل")).firstMatch
         XCTAssertTrue(paragraph.waitForExistence(timeout: 20), app.debugDescription)
@@ -590,8 +590,8 @@ import XCTest
         continueAfterFailure = false
         let fixtureURL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "arabic-reader-poc", withExtension: "epub"))
         let app = app("reader", epub: try Data(contentsOf: fixtureURL)); app.launch(); open(app)
-        let book = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "كتاب اختبار القارئ")).firstMatch
-        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); book.tap()
+        let book = app.buttons["mihbara-book-continue"]
+        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); reach(app, book); book.tap()
         useReaderMode(app, "scroll")
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "اقْرَأْ")).firstMatch.waitForExistence(timeout: 20), app.debugDescription)
         sleep(1); shot(app, "M6-V09-verse-L")
@@ -627,8 +627,8 @@ import XCTest
         continueAfterFailure = false
         let fixtureURL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "arabic-reader-poc", withExtension: "epub"))
         let app = app("reader", epub: try Data(contentsOf: fixtureURL)); app.launch(); open(app)
-        let book = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "كتاب اختبار القارئ")).firstMatch
-        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); book.tap()
+        let book = app.buttons["mihbara-book-continue"]
+        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); reach(app, book); book.tap()
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "القراءة باب يدخل")).firstMatch.waitForExistence(timeout: 20), app.debugDescription)
         sleep(3); shot(app, "M6-V10-open-L")
         app.buttons["mihbara-reader-settings"].tap()
@@ -696,8 +696,8 @@ import XCTest
         continueAfterFailure = false
         let fixtureURL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "english-import-poc", withExtension: "epub"))
         let app = app("reader", epub: try Data(contentsOf: fixtureURL)); app.launch(); open(app)
-        let book = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "كتاب اختبار القارئ")).firstMatch
-        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); book.tap()
+        let book = app.buttons["mihbara-book-continue"]
+        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); reach(app, book); book.tap()
         let paragraph = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "This is original synthetic fixture text")).firstMatch
         XCTAssertTrue(paragraph.waitForExistence(timeout: 20), app.debugDescription)
 
@@ -741,8 +741,8 @@ import XCTest
         continueAfterFailure = false
         let fixtureURL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "arabic-reader-poc", withExtension: "epub"))
         let app = app("reader", epub: try Data(contentsOf: fixtureURL)); app.launch(); open(app)
-        let book = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "كتاب اختبار القارئ")).firstMatch
-        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); book.tap()
+        let book = app.buttons["mihbara-book-continue"]
+        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); reach(app, book); book.tap()
         let paragraph = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "القراءة باب يدخل")).firstMatch
         XCTAssertTrue(paragraph.waitForExistence(timeout: 20), app.debugDescription)
         app.buttons["mihbara-reader-settings"].tap()
@@ -784,8 +784,8 @@ import XCTest
         continueAfterFailure = false
         let fixtureURL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "arabic-reader-poc", withExtension: "epub"))
         let app = app("reader", epub: try Data(contentsOf: fixtureURL)); app.launch(); open(app)
-        let book = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "كتاب اختبار القارئ")).firstMatch
-        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); book.tap()
+        let book = app.buttons["mihbara-book-continue"]
+        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); reach(app, book); book.tap()
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "القراءة باب يدخل")).firstMatch.waitForExistence(timeout: 20), app.debugDescription)
         let listen = app.buttons["mihbara-reader-listen"]
         XCTAssertTrue(listen.waitForExistence(timeout: 8), app.debugDescription); listen.tap()
@@ -823,8 +823,8 @@ import XCTest
         continueAfterFailure = false
         let fixtureURL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "english-import-poc", withExtension: "epub"))
         let app = app("reader", epub: try Data(contentsOf: fixtureURL)); app.launch(); open(app)
-        let book = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "كتاب اختبار القارئ")).firstMatch
-        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); book.tap()
+        let book = app.buttons["mihbara-book-continue"]
+        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); reach(app, book); book.tap()
         let paragraph = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "This is original synthetic fixture text")).firstMatch
         XCTAssertTrue(paragraph.waitForExistence(timeout: 20), app.debugDescription)
         sleep(1)
@@ -866,8 +866,8 @@ import XCTest
         continueAfterFailure = false
         let fixtureURL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "english-import-poc", withExtension: "epub"))
         let app = app("reader", epub: try Data(contentsOf: fixtureURL)); app.launch(); open(app)
-        let book = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "كتاب اختبار القارئ")).firstMatch
-        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); book.tap()
+        let book = app.buttons["mihbara-book-continue"]
+        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); reach(app, book); book.tap()
         XCTAssertTrue(app.buttons["mihbara-reader-close"].waitForExistence(timeout: 20), app.debugDescription)
         sleep(4); shot(app, "M6-V13-reader-L")
         app.buttons["mihbara-reader-settings"].tap()

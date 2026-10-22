@@ -27,7 +27,7 @@ extension AppSession {
             for (k, item) in Self.bindingShelf.enumerated() {
                 var seed = 0, id = StableIdentity.uuid(for: "binding-\(k)-0")
                 while BookBindings.indices(for: [id])[id] != k { seed += 1; id = StableIdentity.uuid(for: "binding-\(k)-\(seed)") }
-                let b = Book(); b.id = id; b.title = item.title; b.author = item.author; b.pages = item.pages; b.shelf = k < 14 ? "want" : "finished"
+                let b = Book(); b.id = id; b.title = item.title; b.author = item.author; b.pages = item.pages; b.shelf = k < 14 ? "want" : k < 18 ? "finished" : "old"
                 if k >= 14 { b.finishedAt = now.addingTimeInterval(-Double(k) * 86400 * 30) }
                 b.updatedAt = now.addingTimeInterval(-Double(k) * 60); c.insert(b)
             }
