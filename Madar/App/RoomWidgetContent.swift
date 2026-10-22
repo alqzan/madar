@@ -242,21 +242,29 @@ enum WidgetCopy {
         let word=(3...10).contains(n%100) ? few : many
         return withDigits ? digits.string(n)+" "+word : word
     }
-    /// Built-in unit names agree with their number (the dual is genitive, since it always follows «من»); a custom unit the owner typed is kept as written.
-    private static func unitForms(_ unit:String?)->(one:String,two:String,few:String,many:String)? {
-        switch unit {
-        case "minutes":("دقيقة واحدة","دقيقتين","دقائق","دقيقة")
-        case "exerciseMinutes":("دقيقة حركة","دقيقتي حركة","دقائق حركة","دقيقة حركة")
-        case "steps":("خطوة واحدة","خطوتين","خطوات","خطوة")
-        case "pages":("صفحة واحدة","صفحتين","صفحات","صفحة")
-        case nil:("مرة واحدة","مرتين","مرات","مرة")
-        default:nil
+    /// Unit names in Arabic number agreement: one, two, 3–10, 11 and up. Built-in units plus the units people commonly
+    /// type themselves, so «٨ كوب» reads «٨ أكواب»; any other unit the owner typed follows the number unchanged.
+    static let unitTable:[String:[String]]=["minutes":["دقيقة واحدة","دقيقتان","دقائق","دقيقة"],"exerciseMinutes":["دقيقة حركة واحدة","دقيقتا حركة","دقائق حركة","دقيقة حركة"],
+        "steps":["خطوة واحدة","خطوتان","خطوات","خطوة"],"pages":["صفحة واحدة","صفحتان","صفحات","صفحة"],"":["مرة واحدة","مرتان","مرات","مرة"],
+        "كوب":["كوب واحد","كوبان","أكواب","كوبًا"],"كأس":["كأس واحدة","كأسان","كؤوس","كأسًا"],"لتر":["لتر واحد","لتران","لترات","لترًا"],
+        "صفحة":["صفحة واحدة","صفحتان","صفحات","صفحة"],"دقيقة":["دقيقة واحدة","دقيقتان","دقائق","دقيقة"],"ساعة":["ساعة واحدة","ساعتان","ساعات","ساعة"],
+        "ركعة":["ركعة واحدة","ركعتان","ركعات","ركعة"],"مرة":["مرة واحدة","مرتان","مرات","مرة"],"خطوة":["خطوة واحدة","خطوتان","خطوات","خطوة"],
+        "آية":["آية واحدة","آيتان","آيات","آية"],"كيلو":["كيلو واحد","كيلوان","كيلوات","كيلو"],"تمرين":["تمرين واحد","تمرينان","تمارين","تمرينًا"]]
+    /// After «من» the dual is genitive: «١ من كوبين»، «١ من دقيقتي حركة».
+    static func unitCount(_ count:Int,_ unit:String?,_ digits:MadarNumberFormatter,genitive:Bool=false)->String {
+        guard let forms=unitTable[(unit ?? "").trimmingCharacters(in:.whitespaces)] else { return digits.string(count)+" "+(unit ?? "") }
+        if count==2 && genitive {
+            var words=forms[1].split(separator:" ").map(String.init)
+            if words[0].hasSuffix("ان") { words[0]=String(words[0].dropLast(2))+"ين" } else if words[0].hasSuffix("تا") { words[0]=String(words[0].dropLast())+"ي" }
+            return words.joined(separator:" ")
         }
+        return agree(count,digits,one:forms[0],two:forms[1],few:forms[2],many:forms[3])
     }
+    /// Before anything is logged, the goal itself («الهدف: ٨ أكواب») rather than «٠ من ٨».
     static func habitProgress(value:Int,target:Int,measure:HabitMeasure,unit:String?,digits:MadarNumberFormatter)->String {
         if target==1 && (measure == .once || unit == nil){return value>=1 ? "تمّت" : "لم تتم بعد"}
-        guard let forms=unitForms(unit) else{return digits.string(value)+" من "+digits.string(target)+" "+(["exerciseMinutes":"دقيقة حركة"][unit ?? ""] ?? unit ?? "")}
-        return digits.string(value)+" من "+agree(target,digits,one:forms.one,two:forms.two,few:forms.few,many:forms.many)
+        if value==0 { return "الهدف: "+unitCount(target,unit == nil ? "" : unit,digits) }
+        return digits.string(value)+" من "+unitCount(target,unit == nil ? "" : unit,digits,genitive:true)
     }
     static func periodProgress(met:Int,total:Int,digits:MadarNumberFormatter)->String {
         if total==0{return "لا استحقاق"}

@@ -192,24 +192,15 @@ struct HabitMiniRing:View {
 /// «٣ من ٨ أكواب»; before anything is logged, the goal alone («الهدف: ٨ أكواب») rather than «٠ من ٨».
 func habitProgressText(_ value:Int,_ target:Int,_ unit:String?,_ digits:MadarNumberFormatter)->String {
     guard let unit, !unit.isEmpty else {
-        if value > 0 { return digits.string(value)+" من "+digits.string(target) }
+        if value > 0 { return digits.string(value)+" من "+(target == 2 ? "مرتين" : digits.string(target)) }
         return target == 1 ? "لم تتمّها بعد" : "الهدف: "+arabicCount(target,["مرة واحدة","مرتان","مرات","مرة"],digits)
     }
-    return value == 0 ? "الهدف: "+habitUnitCount(target,unit,digits) : digits.string(value)+" من "+habitUnitCount(target,unit,digits)
+    return value == 0 ? "الهدف: "+habitUnitCount(target,unit,digits) : digits.string(value)+" من "+habitUnitCount(target,unit,digits,genitive:true)
 }
 func habitUnitName(_ unit:String)->String { ["minutes":"دقيقة","exerciseMinutes":"دقيقة حركة","steps":"خطوة","pages":"صفحة"][unit] ?? unit }
-/// A count with its unit in Arabic number agreement («دقيقتان»، «٨ صفحات»، «١٥ خطوة») for the built-in units;
-/// a unit the user typed has no known plural, so it follows the number unchanged. Nominative only.
-func habitUnitCount(_ count:Int,_ unit:String?,_ digits:MadarNumberFormatter)->String {
-    let known:[String:[String]]=["minutes":["دقيقة واحدة","دقيقتان","دقائق","دقيقة"],"exerciseMinutes":["دقيقة حركة واحدة","دقيقتا حركة","دقائق حركة","دقيقة حركة"],
-        "steps":["خطوة واحدة","خطوتان","خطوات","خطوة"],"pages":["صفحة واحدة","صفحتان","صفحات","صفحة"],"":["مرة واحدة","مرتان","مرات","مرة"],
-        // Units people commonly type themselves, so «٨ كوب» reads «٨ أكواب».
-        "كوب":["كوب واحد","كوبان","أكواب","كوبًا"],"كأس":["كأس واحدة","كأسان","كؤوس","كأسًا"],"لتر":["لتر واحد","لتران","لترات","لترًا"],
-        "صفحة":["صفحة واحدة","صفحتان","صفحات","صفحة"],"دقيقة":["دقيقة واحدة","دقيقتان","دقائق","دقيقة"],"ساعة":["ساعة واحدة","ساعتان","ساعات","ساعة"],
-        "ركعة":["ركعة واحدة","ركعتان","ركعات","ركعة"],"مرة":["مرة واحدة","مرتان","مرات","مرة"],"خطوة":["خطوة واحدة","خطوتان","خطوات","خطوة"],
-        "آية":["آية واحدة","آيتان","آيات","آية"],"كيلو":["كيلو واحد","كيلوان","كيلوات","كيلو"],"تمرين":["تمرين واحد","تمرينان","تمارين","تمرينًا"]]
-    guard let forms=known[(unit ?? "").trimmingCharacters(in:.whitespaces)] else { return digits.string(count)+" "+(unit ?? "") }
-    return arabicCount(count,forms,digits)
+/// A count with its unit in Arabic number agreement; the table lives in `WidgetCopy` so the widget says the same.
+func habitUnitCount(_ count:Int,_ unit:String?,_ digits:MadarNumberFormatter,genitive:Bool=false)->String {
+    WidgetCopy.unitCount(count,unit,digits,genitive:genitive)
 }
 /// Arabic number agreement from four forms: one, two, plural (٣–١٠), and the singular after ١١ and above.
 func arabicCount(_ count:Int,_ forms:[String],_ digits:MadarNumberFormatter)->String {

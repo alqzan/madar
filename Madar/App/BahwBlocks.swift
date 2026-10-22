@@ -123,7 +123,7 @@ struct BahwBlockView: View {
             return current.met ? "تمّت" : "لم تتمّها بعد"
         }
         guard current.target > 0 else { return row.statusTitle }
-        return digits.string(current.value) + " من " + habitUnitCount(current.target, current.rule.unit, digits)
+        return habitProgressText(current.value, current.target, current.rule.unit, digits)
     }
     private func activateHabit(_ row: HabitReading) {
         if row.source == "walking" { service.session.habitsOpen = true }
@@ -198,7 +198,7 @@ struct BahwBlockView: View {
         let rows = (try? HabitRepository(context: ModelContext(service.session.container)).readings(at:service.now)) ?? []
         let met = rows.filter { $0.summary.current?.met == true }.count
         return VStack(alignment:.leading,spacing:size == .wide ? 4 : 10) {
-            Button { service.session.habitsOpen = true } label: { HStack { title(room.accent); Spacer();if !rows.isEmpty {Text(digits.string(met)+" من "+digits.string(rows.count)).font(label).foregroundStyle(room.accent)} }.frame(minHeight:44) }.buttonStyle(.plain).accessibilityIdentifier("bahw-habits-open").disabled(!interactive)
+            Button { service.session.habitsOpen = true } label: { HStack { title(room.accent); Spacer();if met > 0 {Text(digits.string(met)+" من "+digits.string(rows.count)).font(label).foregroundStyle(room.accent)} }.frame(minHeight:44) }.buttonStyle(.plain).accessibilityIdentifier("bahw-habits-open").disabled(!interactive)
             if rows.isEmpty {
                 // Improvement 16 Oct: no «٠ من ٠»; the four period rings at rest show what a habit becomes, and the action is a real button.
                 Spacer(minLength:0)
@@ -273,7 +273,7 @@ struct BahwBlockView: View {
                 VStack(spacing: 2) { Text(model.nextName ?? "الصلاة").font(small).foregroundStyle(room.secondaryInk); Text(model.nextTime ?? "").font(big).minimumScaleFactor(0.6) }.frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 VStack(alignment: .leading, spacing: size == .small ? 8 : 6) {
-                    HStack { title(room.accent).accessibilityLabel("الصلاة في " + service.session.cityName); Spacer(); Text(digits.string(model.done) + " من " + digits.string(5)).font(small).foregroundStyle(room.secondaryInk).accessibilityIdentifier("bahw-salah-done") }
+                    HStack { title(room.accent).accessibilityLabel("الصلاة في " + service.session.cityName); Spacer(); if model.done > 0 { Text(digits.string(model.done) + " من " + digits.string(5)).font(small).foregroundStyle(room.secondaryInk).accessibilityIdentifier("bahw-salah-done") } }
                     HStack(alignment: .bottom, spacing: size == .small ? 4 : 10) {
                         ForEach(model.arches) { arch in
                             VStack(spacing: 4) {

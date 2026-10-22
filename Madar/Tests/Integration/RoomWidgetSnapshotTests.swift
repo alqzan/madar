@@ -17,7 +17,7 @@ import MadarPrayer
         try await app.executeDiaryCommand("habit.save",payload:["id":.string(id.uuidString),"name":.string("الماء"),"rule":encoded])
         for _ in 0..<2{try await app.executeDiaryCommand("habit.complete",payload:["id":.string(id.uuidString)])}
         let now=app.prayerNow(),envelope=try XCTUnwrap(app.snapshotStore.read("habits",as:RoomWidgetSnapshot.self,now:now))
-        XCTAssertEqual(envelope.payload.rows.count,1);XCTAssertEqual(envelope.payload.rows.first?.value,"٢ من ٢ كوب");XCTAssertEqual(envelope.payload.rows.first?.done,true)
+        XCTAssertEqual(envelope.payload.rows.count,1);XCTAssertEqual(envelope.payload.rows.first?.value,"٢ من كوبين");XCTAssertEqual(envelope.payload.rows.first?.done,true)
         XCTAssertNil(app.snapshotStore.read("habits",as:RoomWidgetSnapshot.self,now:now.addingTimeInterval(4000)))
         for room in BuiltRoomWidget.allCases where room != .mihbara{XCTAssertNotNil(app.snapshotStore.read(room.rawValue,as:RoomWidgetSnapshot.self,now:now))}
         XCTAssertNotNil(app.snapshotStore.read(BuiltRoomWidget.mihbara.rawValue,as:MihbaraSnapshot.self,now:now))
@@ -41,7 +41,9 @@ import MadarPrayer
         XCTAssertEqual(WidgetCopy.habitProgress(value:1,target:2,measure:.count,unit:nil,digits:d),"١ من مرتين")
         XCTAssertEqual(WidgetCopy.habitProgress(value:200,target:8000,measure:.count,unit:"steps",digits:d),"٢٠٠ من ٨٠٠٠ خطوة")
         XCTAssertEqual(WidgetCopy.habitProgress(value:5,target:30,measure:.duration,unit:"minutes",digits:d),"٥ من ٣٠ دقيقة")
-        XCTAssertEqual(WidgetCopy.habitProgress(value:0,target:8,measure:.count,unit:"كوب",digits:d),"٠ من ٨ كوب")
+        XCTAssertEqual(WidgetCopy.habitProgress(value:0,target:8,measure:.count,unit:"كوب",digits:d),"الهدف: ٨ أكواب")
+        XCTAssertEqual(WidgetCopy.habitProgress(value:1,target:2,measure:.count,unit:"كوب",digits:d),"١ من كوبين")
+        XCTAssertEqual(WidgetCopy.habitProgress(value:3,target:15,measure:.count,unit:"كوب",digits:d),"٣ من ١٥ كوبًا")
         XCTAssertEqual(WidgetCopy.periodProgress(met:0,total:1,digits:d),"عادة واحدة تنتظرك")
         XCTAssertEqual(WidgetCopy.periodProgress(met:0,total:2,digits:d),"عادتان تنتظرانك")
         XCTAssertEqual(WidgetCopy.periodProgress(met:0,total:3,digits:d),"٣ عادات تنتظرك")
