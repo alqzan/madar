@@ -19,7 +19,8 @@ struct MoneyScrollChart: View {
                     .shadow(color: theme.color("rod2").opacity(0.18), radius: 4, y: 1)
                 if visible {
                     Canvas { context, size in
-                        let chart = CGRect(x: rod + 8, y: 24, width: paperWidth - 16, height: size.height - 72)
+                        // The foot keeps three bands apart: due diamonds on the baseline, the day's spend hanging under it, then the dates.
+                        let chart = CGRect(x: rod + 8, y: 24, width: paperWidth - 16, height: size.height - 90)
                         let last = max(1, cycle.curve.count - 1)
                         let maxAmount = max(1, cycle.curve.map { max($0.accruedMinor, $0.spentMinor) }.max() ?? 1)
                         func x(_ day: Int) -> CGFloat { chart.maxX - CGFloat(day - 1) / CGFloat(last) * chart.width }
@@ -27,15 +28,16 @@ struct MoneyScrollChart: View {
                         let todayX = x(min(cycle.elapsedDays, cycle.curve.count))
                         context.fill(Path(CGRect(x: todayX - 5, y: 10, width: 10, height: size.height - 20)), with: .color(theme.color("reserve").opacity(0.10)))
                         context.draw(Text("اليوم").font(.custom("thmanyahseriftext-Regular", size: 11)).foregroundStyle(theme.secondaryInk), at: CGPoint(x: todayX, y: 18))
+                        var baseline = Path(); baseline.move(to: .init(x: chart.minX, y: chart.maxY)); baseline.addLine(to: .init(x: chart.maxX, y: chart.maxY))
+                        context.stroke(baseline, with: .color(theme.line), style: .init(lineWidth: 1, dash: [2, 4]))
                         for obligation in obligations {
                             let index = MadarCalendarDays.distance(from: cycle.startDay, to: obligation.due) + 1
                             if index >= 1 && index <= cycle.curve.count {
-                                let rect = CGRect(x: x(index) - 5, y: chart.maxY + 12, width: 10, height: 12)
+                                let rect = CGRect(x: x(index) - 5, y: chart.maxY - 6, width: 10, height: 12)
+                                context.fill(DiamondMark().path(in: rect), with: .color(theme.surface))
                                 context.stroke(DiamondMark().path(in: rect), with: .color(theme.color("reserveText")), lineWidth: 0.8)
                             }
                         }
-                        var baseline = Path(); baseline.move(to: .init(x: chart.minX, y: chart.maxY)); baseline.addLine(to: .init(x: chart.maxX, y: chart.maxY))
-                        context.stroke(baseline, with: .color(theme.line), style: .init(lineWidth: 1, dash: [2, 4]))
                         var guide = Path(), actual = Path()
                         for point in cycle.curve {
                             let end = CGPoint(x: x(point.day), y: y(point.accruedMinor))
@@ -44,8 +46,8 @@ struct MoneyScrollChart: View {
                                 let p = CGPoint(x: x(point.day), y: y(point.spentMinor))
                                 if point.day == 1 { actual.move(to: p) } else { actual.addLine(to: p) }
                                 let width = max(2, min(6, chart.width / CGFloat(last) * 0.6))
-                                let height = max(1, min(17, CGFloat(max(0, cycle.spent[point.day] ?? 0)) / CGFloat(maxAmount) * chart.height))
-                                context.fill(Path(CGRect(x: x(point.day) - width / 2, y: chart.maxY + 7 - height, width: width, height: height)), with: .color(theme.secondaryInk))
+                                let height = max(1, min(12, CGFloat(max(0, cycle.spent[point.day] ?? 0)) / CGFloat(maxAmount) * chart.height))
+                                context.fill(Path(CGRect(x: x(point.day) - width / 2, y: chart.maxY + 8, width: width, height: height)), with: .color(theme.secondaryInk))
                             }
                         }
                         context.stroke(guide, with: .color(theme.color("reserveText")), style: .init(lineWidth: 1.1, dash: [3, 4]))
