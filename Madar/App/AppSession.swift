@@ -118,6 +118,7 @@ final class AppSession {
         try preparePrayerStreakShowcaseFixture()
         try prepareQuranHomeFixture(group: group)
         try prepareDiaryHomeFixture(group: group)
+        try prepareLegacyTrial()
         try prepareHabitFixture(group: group)
         try prepareMoneyFixture(group: group)
         try prepareMihbaraFixture(group: group)

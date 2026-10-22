@@ -50,6 +50,9 @@ public struct DayOneEntryPlan: Codable, Equatable, Sendable {
     public let media: [DayOneMediaRef]
     /// SHA-256 of the entry object re-serialised with sorted keys (key order and whitespace do not matter).
     public let hash: String
+    /// The old Madar app's stored day («madarLegacyDay», yyyy-MM-dd), set only by the legacy conversion. MIGRATION.md:
+    /// the old date is never recomputed, so it wins over the day boundary. Day One's own exports never carry it.
+    public var legacyDay: String? = nil
 }
 
 public struct DayOneSkip: Codable, Equatable, Sendable, Error {
@@ -162,7 +165,7 @@ public enum DayOneParser {
         return .success(.init(sourceID: uuid, journal: journal, createdAt: created, modifiedAt: date(object["modifiedDate"]), timeZoneID: zoneID, dateOnly: dateOnly,
                               text: text, tags: tags, starred: object["starred"] as? Bool ?? false, place: place,
                               latitude: number(location?["latitude"]) ?? number(center?["latitude"]), longitude: number(location?["longitude"]) ?? number(center?["longitude"]),
-                              media: unique, hash: hash(object)))
+                              media: unique, hash: hash(object), legacyDay: object["madarLegacyDay"] as? String))
     }
 
     public static func hash(_ object: [String: Any]) -> String {
@@ -199,6 +202,7 @@ public enum DayOneDayKey {
     public static func resolve(_ entry: DayOneEntryPlan, boundary: DayBoundary, home: ActivePlace, prayerDay: (ActivePlace, GregorianDay) -> PrayerDay?) -> Resolved {
         let zoneID = entry.timeZoneID ?? home.timeZoneID, zone = TimeZone(identifier: zoneID) ?? home.timeZone
         let civil = GregorianDay.containing(entry.createdAt, in: zone)
+        if let legacy = entry.legacyDay, let day = try? GregorianDay(legacy) { return .init(day: day, timeZoneID: zoneID, policy: "legacy@0") }
         if entry.dateOnly || boundary == .midnight { return .init(day: civil, timeZoneID: zoneID, policy: "midnight@1") }
         let place: ActivePlace?
         if let lat = entry.latitude, let lon = entry.longitude { place = try? ActivePlace(latitude: lat, longitude: lon, timeZoneID: zoneID) }

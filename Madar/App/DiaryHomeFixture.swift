@@ -128,4 +128,43 @@ extension AppSession {
     }
 }
 private extension TimeZone { static let riyadh = TimeZone(identifier: "Asia/Riyadh")! }
+
+/// Owner trial, 22 Oct 2026: the old Madar backup's diary, converted to a Day One ZIP, goes through the shipped Day One
+/// importer into this UI-test store only (MADAR_UI_STORE_ID). It writes a counts-only report, never entry text.
+extension AppSession {
+    func prepareLegacyTrial() throws {
+        guard ProcessInfo.processInfo.environment["MADAR_UI_LEGACY_DIARY_ZIP"] != nil,
+              ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"] != nil else { return }
+        let c = ModelContext(container)
+        guard !(try c.fetch(FetchDescriptor<DeviceSetting>())).contains(where: { $0.key == "sys.legacyTrial" }) else { return }
+        for key in ["sys.legacyTrial", "sys.onboardingCompleted"] { let marker = DeviceSetting(); marker.key = key; marker.valueJSON = Data("true".utf8); c.insert(marker) }
+        _ = try SettingsStore(context: c).stage(["core.faceIDLock": .string("none")])
+        try c.save()
+    }
+    func runLegacyDiaryTrialIfRequested() async {
+        let env = ProcessInfo.processInfo.environment
+        guard let path = env["MADAR_UI_LEGACY_DIARY_ZIP"], env["MADAR_UI_STORE_ID"] != nil else { return }
+        let report = URL(fileURLWithPath: env["MADAR_UI_LEGACY_REPORT"] ?? path + ".report.json")
+        guard !FileManager.default.fileExists(atPath: report.path) else { return }
+        let service = AppDiaryImportService(app: self)
+        var out: [String: Any] = [:]
+        do {
+            let start = Date()
+            let draft = try await service.open(URL(fileURLWithPath: path))
+            let preview = try service.preview(draft, choice: .automatic)
+            out["plan"] = ["entries": draft.plan.entries.count, "skipped": Dictionary(grouping: draft.plan.skipped, by: \.reason.rawValue).mapValues(\.count)]
+            out["preview"] = ["add": preview.add, "same": preview.same, "update": preview.update, "keepBoth": preview.keepBoth, "days": preview.days.count,
+                              "mediaFound": preview.mediaFound, "mediaMissing": preview.mediaMissing, "projects": preview.projects.count]
+            let previewSeconds = Date().timeIntervalSince(start)
+            let receipt = try await service.commit(draft, choice: .automatic) { _, _ in }
+            out["receipt"] = ["status": receipt.status, "added": receipt.summary.added, "updated": receipt.summary.updated, "days": receipt.summary.days, "missingMedia": receipt.summary.missing.count]
+            out["seconds"] = ["preview": previewSeconds, "total": Date().timeIntervalSince(start)]
+            service.discard(draft)
+            let entries = try ModelContext(container).fetch(FetchDescriptor<Entry>())
+            out["store"] = ["entries": entries.count, "legacyPolicy": entries.filter { $0.dayPolicy == "legacy@0" }.count,
+                            "days": Set(entries.map(\.dayKey)).count]
+        } catch { out["error"] = String(describing: error) }
+        if let data = try? JSONSerialization.data(withJSONObject: out, options: [.prettyPrinted, .sortedKeys]) { try? data.write(to: report) }
+    }
+}
 #endif

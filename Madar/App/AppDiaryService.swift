@@ -21,7 +21,13 @@ struct DiaryDisplayDay: Identifiable {
     var originals: [String: String] = [:]
     /// Written lines the owner may edit (text entries; voice keeps its own transcript editor).
     var editable: Set<String> = []
-    var excerpt: String { lines.first(where: { $0.kind == "normal" || $0.kind == "late" })?.text ?? lines.first?.text ?? "صفحة بلا كتابة" }
+    /// The first line with words: an imported photo-only entry has an empty text and must not hide the next line.
+    var excerpt: String {
+        let written = lines.filter { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        return written.first(where: { $0.kind == "normal" || $0.kind == "late" })?.text ?? written.first?.text ?? "صفحة بلا كتابة"
+    }
+    /// Photos an import referenced but did not contain (N01: shown as missing, never invented).
+    var missingPhotos: Int { media.filter { $0.kind == "missing" && $0.contentType == "photo" }.count }
 }
 struct DiaryHomeSnapshot {
     let today: GregorianDay

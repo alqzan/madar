@@ -24,22 +24,26 @@ public struct DiaryAutoLine: Identifiable, Codable, Equatable, Sendable {
         return try MadarDay.resolve(instant: now, place: place, boundary: DayBoundary(rawValue: settings.value(for: "core.dayStart").string ?? "") ?? .fajr, prayerDays: days).date
     }
     public static func live(day: GregorianDay, context: ModelContext) throws -> [DiaryAutoLine] {
-        let hidden = try context.fetch(FetchDescriptor<HiddenAutoLine>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
-        let pinned = try context.fetch(FetchDescriptor<Entry>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.source == "autoPinned" }
-        func visible(_ kind: String, _ id: UUID) -> Bool {
-            !hidden.contains { $0.eventKind == kind && $0.eventID == id } && !pinned.contains { $0.pinnedEventKind == kind && $0.pinnedEventID == id }
-        }
-        var lines: [DiaryAutoLine] = []
+        try live(days: [day.description], context: context)[day.description] ?? []
+    }
+    /// The auto lines of many days from one read of each table (owner trial, 22 Oct 2026: 2,263 imported days froze the
+    /// app when every day re-read every table). Each day's lines are exactly those `live(day:)` gives.
+    public static func live(days: Set<String>, context: ModelContext) throws -> [String: [DiaryAutoLine]] {
+        guard !days.isEmpty else { return [:] }
+        let hiddenKeys = Set(try context.fetch(FetchDescriptor<HiddenAutoLine>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }.map { "\($0.eventKind)|\($0.eventID?.uuidString ?? "")" })
+        let pinnedKeys = Set(try context.fetch(FetchDescriptor<Entry>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.source == "autoPinned" }.map { "\($0.pinnedEventKind ?? "")|\($0.pinnedEventID?.uuidString ?? "")" })
+        func visible(_ kind: String, _ id: UUID) -> Bool { let key = kind + "|" + id.uuidString; return !hiddenKeys.contains(key) && !pinnedKeys.contains(key) }
+        var lines: [String: [DiaryAutoLine]] = [:]
         let names = ["fajr": "الفجر", "dhuhr": "الظهر", "asr": "العصر", "maghrib": "المغرب", "isha": "العشاء"]
-        for row in try context.fetch(FetchDescriptor<PrayerLog>()) where row.dayKey == day.description && row.deletedAt == nil && row.mergedInto == nil && visible("salah", row.id) {
+        for row in try context.fetch(FetchDescriptor<PrayerLog>()) where days.contains(row.dayKey) && row.deletedAt == nil && row.mergedInto == nil && visible("salah", row.id) {
             guard ["jamaah", "alone", "qada"].contains(row.status) else { continue }
-            lines.append(.init(id: "salah." + row.id.uuidString, at: row.eventAt,
+            lines[row.dayKey, default: []].append(.init(id: "salah." + row.id.uuidString, at: row.eventAt,
                 text: "صلّيت " + (names[row.prayer] ?? "الصلاة") + (row.status == "jamaah" ? " جماعة" : row.status == "qada" ? " قضاءً" : " وحدي"), kind: "salah"))
         }
-        for row in try context.fetch(FetchDescriptor<HifzSession>()) where row.dayKey == day.description && row.deletedAt == nil && row.mergedInto == nil && visible("quran", row.id) {
+        for row in try context.fetch(FetchDescriptor<HifzSession>()) where days.contains(row.dayKey) && row.deletedAt == nil && row.mergedInto == nil && visible("quran", row.id) {
             guard row.kind != "drill" else { continue }
             let text = row.kind == "hifz" ? "حفظت من القرآن" : row.kind == "qiyam" ? "راجعت من محفوظي في القيام" : "راجعت من محفوظي"
-            lines.append(.init(id: "quran." + row.id.uuidString, at: row.endedAt, text: text, kind: "quran"))
+            lines[row.dayKey, default: []].append(.init(id: "quran." + row.id.uuidString, at: row.endedAt, text: text, kind: "quran"))
         }
         let books=try context.fetch(FetchDescriptor<Book>()).sorted{$0.updatedAt>$1.updatedAt}
         let settings = try SettingsStore(context: context)
@@ -50,7 +54,7 @@ public struct DiaryAutoLine: Identifiable, Codable, Equatable, Sendable {
             if !title.isEmpty {bookTitles[book.id]=title}
         }
         let readingSessions=try context.fetch(FetchDescriptor<ReadingSession>())
-        for row in readingSessions where row.dayKey == day.description && row.activeSeconds >= 60 && row.deletedAt == nil && row.mergedInto == nil && visible("mihbara",row.id) {
+        for row in readingSessions where days.contains(row.dayKey) && row.activeSeconds >= 60 && row.deletedAt == nil && row.mergedInto == nil && visible("mihbara",row.id) {
             let title=row.bookID.flatMap{bookTitles[$0]} ?? "كتابك"
             let text:String
             if row.pagesCounted > 0 {
@@ -62,17 +66,17 @@ public struct DiaryAutoLine: Identifiable, Codable, Equatable, Sendable {
                 let unit=minutes == 1 ? "دقيقة واحدة" : minutes == 2 ? "دقيقتين" : (3...10).contains(remainder) ? digits.string(minutes)+" دقائق" : digits.string(minutes)+" دقيقة"
                 text="قرأت "+unit+" من "+title
             }
-            lines.append(.init(id:"mihbara."+row.id.uuidString,at:row.end ?? row.updatedAt,text:text,kind:"mihbara"))
+            lines[row.dayKey, default: []].append(.init(id:"mihbara."+row.id.uuidString,at:row.end ?? row.updatedAt,text:text,kind:"mihbara"))
         }
         let money = MoneyRepository(context: context)
-        for row in try money.confirmedTransactions() where row.dayKey == day.description && row.showInDiary && visible("mal", row.id) {
+        for row in try money.confirmedTransactions() where days.contains(row.dayKey) && row.showInDiary && visible("mal", row.id) {
             let charge = try money.effect(of: row, includingExcluded: true).budgetChargeMinor
             guard charge != 0, let exponent = CurrencyExponents.specified.exponent(row.homeCurrency) else { continue }
             let amount = digits.amount(minorUnits: Int64(abs(charge)), fractionDigits: exponent, signed: false)
             let currency = row.homeCurrency == "SAR" ? "ر.س" : row.homeCurrency
-            lines.append(.init(id: "mal." + row.id.uuidString, at: row.eventAt, text: (charge > 0 ? "صرفت " : "استعدت ") + amount + " " + currency, kind: "mal"))
+            lines[row.dayKey, default: []].append(.init(id: "mal." + row.id.uuidString, at: row.eventAt, text: (charge > 0 ? "صرفت " : "استعدت ") + amount + " " + currency, kind: "mal"))
         }
-        return lines.sorted { $0.at == $1.at ? $0.id < $1.id : $0.at < $1.at }
+        return lines.mapValues { $0.sorted { $0.at == $1.at ? $0.id < $1.id : $0.at < $1.at } }
     }
     /// RD1: keep the first closed-day snapshot. Initial historical pages get a baseline on first observation.
     public static func freeze(_ day: GregorianDay, context: ModelContext, now: Date, writer: String) throws {
@@ -87,8 +91,14 @@ public struct DiaryAutoLine: Identifiable, Codable, Equatable, Sendable {
         guard !keys.isEmpty else { return }
         let frozen = Set(try context.fetch(FetchDescriptor<DeviceSetting>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }.map(\.key))
         let current = try today(context: context, now: now)
-        for key in keys where !frozen.contains("sys.diaryAutoLines." + key) {
-            if let day = try? GregorianDay(key), day < current { try freeze(day, context: context, now: now, writer: writer) }
+        let open = Set(keys.filter { key in !frozen.contains("sys.diaryAutoLines." + key) && ((try? GregorianDay(key)).map { $0 < current } ?? false) })
+        guard !open.isEmpty else { return }
+        // One read of each table for all the days, then the same snapshot `freeze` keeps for each.
+        let all = try live(days: open, context: context)
+        let encoder = JSONEncoder()
+        for key in open.sorted() {
+            let row = DeviceSetting(); row.key = "sys.diaryAutoLines." + key; row.valueJSON = try encoder.encode(all[key] ?? [])
+            row.createdAt = now; row.updatedAt = now; row.writerID = writer; context.insert(row)
         }
     }
 }

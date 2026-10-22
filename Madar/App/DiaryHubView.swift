@@ -132,7 +132,7 @@ struct DiaryHubView: View {
                 }.frame(maxHeight: .infinity, alignment: .top)
             }.padding(4).frame(maxWidth: .infinity, minHeight: 96, alignment: .topLeading)
                 .overlay { RoundedRectangle(cornerRadius: 12).stroke(current.year == selectedYear && current.month == month ? theme.ink : .clear) }
-        }.buttonStyle(.plain).accessibilityLabel(grid.monthName(year: selectedYear, month: month) + " " + service.digits.string(selectedYear)).accessibilityIdentifier("diary-month-" + String(month))
+        }.buttonStyle(.plain).accessibilityLabel(grid.monthName(year: selectedYear, month: month) + " " + service.digits.string(selectedYear) + "، " + alternateMonthTitle(month)).accessibilityIdentifier("diary-month-" + String(month))
     }
     private func monthPage(_ archive: DiaryArchiveSnapshot, month: Int) -> some View {
         let days = grid.days(year: selectedYear, month: month), written = Set(archive.days.filter { $0.writings > 0 || !$0.photoIDs.isEmpty }.map(\.day))

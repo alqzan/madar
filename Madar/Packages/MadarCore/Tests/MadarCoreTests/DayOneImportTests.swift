@@ -77,6 +77,18 @@ struct DayOneImportTests {
         #expect(try key("D4000000000000000000000000000004", .fajr) == .init(day: try GregorianDay("2025-05-02"), timeZoneID: "Asia/Tokyo", policy: "midnight@1"))
     }
 
+    @Test func oldMadarDayIsKeptOverTheDayBoundary() throws {
+        // MIGRATION.md: the old app's stored date is never recomputed. B is 04:10 in Riyadh on 2 March, before Fajr, so
+        // the fajr boundary alone gives 1 March; an old Madar row stored on 2 March stays on 2 March.
+        var legacy = try entry("B2000000000000000000000000000002")
+        #expect(legacy.legacyDay == nil)
+        legacy.legacyDay = "2025-03-02"
+        let resolved = DayOneDayKey.resolve(legacy, boundary: .fajr, home: .riyadh) { PrayerTimesEngine.calculate(day: $1, place: $0) }
+        #expect(resolved == .init(day: try GregorianDay("2025-03-02"), timeZoneID: "Asia/Riyadh", policy: "legacy@0"))
+        let parsed = DayOneParser.entry(["uuid": "L1", "creationDate": "2025-03-02T01:10:00Z", "timeZone": "Asia/Riyadh", "text": "سطر", "madarLegacyDay": "2025-03-02"], journal: "Journal", byStem: [:])
+        #expect((try? parsed.get())?.legacyDay == "2025-03-02")
+    }
+
     @Test func hashIgnoresKeyOrderAndChangesWithContent() {
         let a: [String: Any] = ["uuid": "X", "text": "سطر", "tags": ["أ"], "creationDate": "2025-01-01T00:00:00Z"]
         let reordered: [String: Any] = ["creationDate": "2025-01-01T00:00:00Z", "tags": ["أ"], "text": "سطر", "uuid": "X"]

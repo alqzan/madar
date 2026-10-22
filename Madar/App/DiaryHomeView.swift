@@ -145,7 +145,13 @@ struct DiaryHomeView: View {
                 LinearGradient(colors: [.black.opacity(0.08), .black.opacity(0.62)], startPoint: .top, endPoint: .bottom)
             } else {
                 theme.surface
-                VStack(spacing: 12) { Image(systemName: "book.closed").font(.system(size: 46, weight: .ultraLight)); Text("صفحة تنتظر ما تعيشه").font(DiaryType.writing) }
+                // Owner trial, 22 Oct 2026: a past page whose photos did not come with the import says so, instead of
+                // «صفحة تنتظر ما تعيشه», which reads as if nothing was lived that day.
+                let past = page.day != snapshot.today, missing = page.missingPhotos
+                VStack(spacing: 12) {
+                    Image(systemName: past && missing > 0 ? "photo.on.rectangle.angled" : "book.closed").font(.system(size: 46, weight: .ultraLight))
+                    Text(past && missing > 0 ? (missing == 1 ? "صورة هذا اليوم لم تُنقل" : "صور هذا اليوم لم تُنقل") : past ? "من دفترك ذاك اليوم" : "صفحة تنتظر ما تعيشه").font(DiaryType.writing)
+                }
                     .foregroundStyle(theme.color("ink3Text")).frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             VStack(alignment: .leading, spacing: 9) {

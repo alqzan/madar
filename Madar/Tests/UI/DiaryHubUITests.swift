@@ -20,5 +20,28 @@ import XCTest
         app.terminate(); app.launch(); XCTAssertTrue(app.buttons["diary-days"].waitForExistence(timeout: 25)); app.buttons["diary-days"].tap()
         XCTAssertTrue(app.staticTexts["diary-hub-year"].waitForExistence(timeout: 10)); XCTAssertEqual(app.staticTexts["diary-hub-year"].label,"١٤٤٨")
     }
+    /// Owner trial, 22 Oct 2026. Runs only when TEST_RUNNER_MADAR_TRIAL_ZIP names the converted old-Madar diary; it
+    /// imports into a fresh UI-test store through the shipped Day One importer and captures the rooms at real volume.
+    func testOwnerLegacyDiaryTrial() throws {
+        let env = ProcessInfo.processInfo.environment
+        guard let zip = env["MADAR_TRIAL_ZIP"] else { throw XCTSkip("Owner data trial only") }
+        let report = zip + ".report.json"; try? FileManager.default.removeItem(atPath: report)
+        let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_LEGACY_DIARY_ZIP": zip, "MADAR_UI_LEGACY_REPORT": report,
+            "MADAR_UI_TRAVEL_FIX": "24.7136,46.6753,الرياض,SA,Asia/Riyadh", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
+        app.launch()
+        let deadline = Date().addingTimeInterval(600)
+        while !FileManager.default.fileExists(atPath: report) && Date() < deadline { _ = app.wait(for: .runningForeground, timeout: 2); Thread.sleep(forTimeInterval: 2) }
+        XCTAssertTrue(FileManager.default.fileExists(atPath: report), "No trial report")
+        let notes = app.buttons["tab-notes"]; XCTAssertTrue(notes.waitForExistence(timeout: 20), app.debugDescription); notes.tap()
+        let next = app.buttons["diary-welcome-next"]
+        if next.waitForExistence(timeout: 5) { capture(app, "TRIAL-diary-welcome-L"); for _ in 0..<6 where next.exists { next.tap(); _ = app.buttons["diary-days"].waitForExistence(timeout: 2) } }
+        XCTAssertTrue(app.buttons["diary-days"].waitForExistence(timeout: 20), app.debugDescription); capture(app, "TRIAL-diary-home-L")
+        app.swipeUp(velocity: .slow); capture(app, "TRIAL-diary-home-s1-L"); app.swipeDown(velocity: .slow); app.swipeDown(velocity: .slow)
+        let opened = Date(); app.buttons["diary-days"].tap()
+        XCTAssertTrue(app.buttons["diary-calendar-scale-year"].waitForExistence(timeout: 30)); capture(app, "TRIAL-diary-hub-L")
+        add(XCTAttachment(string: "hub opened in \(Date().timeIntervalSince(opened)) s"))
+        app.buttons["diary-hub-timeline"].tap(); _ = app.buttons.firstMatch.waitForExistence(timeout: 10); capture(app, "TRIAL-diary-timeline-L")
+        app.buttons["diary-hub-photos"].tap(); capture(app, "TRIAL-diary-photos-L")
+    }
     private func capture(_ app: XCUIApplication,_ name:String) { let shot = XCTAttachment(screenshot:app.screenshot()); shot.name=name; shot.lifetime = .keepAlways; add(shot) }
 }

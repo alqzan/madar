@@ -205,6 +205,9 @@ struct MadarRootView: View {
         .preferredColorScheme(forcedColorScheme)
         .animation(themeAnimation, value: session.string("core.theme"))
         .task {
+            #if DEBUG
+            await session.runLegacyDiaryTrialIfRequested()
+            #endif
             do {
                 try await session.drainInbox()
                 try (session.syncService as? AppSyncService)?.processLocalHistory()
