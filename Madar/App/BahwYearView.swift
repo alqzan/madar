@@ -117,7 +117,7 @@ struct BahwYearView: View {
         }
         .background(lobby.background.ignoresSafeArea()).foregroundStyle(lobby.ink)
         .environment(\.roomTheme, lobby)
-        .toolbarVisibility(.hidden, for: .navigationBar).toolbarVisibility(.hidden, for: .tabBar)
+        .toolbarVisibility(.hidden, for: .navigationBar).toolbarVisibility(.hidden, for: .tabBar).hidesRoomAccessory(session, id: "bahw-year")
         .sheet(item: $editing) { draft in BahwDaySheet(session: session, draft: draft).presentationDetents([.large]) }
     }
 

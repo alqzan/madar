@@ -23,14 +23,24 @@ struct TabShell<Content: View>: View {
     private let bottomShortcuts: Set<String> = ["notes", "customize"]
 
     var body: some View {
-        baseTabView
-        .tabViewBottomAccessory {
-            GlassRoomShortcuts(tabs: tabs, persistentShortcutIDs: bottomShortcuts,
-                               selection: $selection, session: session,
-                               ink: theme.ink, secondaryInk: theme.secondaryInk,
-                               prayerAccent: RoomTheme(room: "salah", dark: theme.dark).accent)
+        accessorized.tint(theme.accent)
+    }
+
+    /// A focused flow that hides the tab bar (`hidesRoomAccessory`) also hides the accessory, which otherwise
+    /// floats over its bottom action (the expense «سجّل»). iOS 26.0 has no switch; those flows pad their bottom instead.
+    @ViewBuilder private var accessorized: some View {
+        if #available(iOS 26.1, *) {
+            baseTabView.tabViewBottomAccessory(isEnabled: session.accessoryHiders.isEmpty) { shortcuts }
+        } else {
+            baseTabView.tabViewBottomAccessory { shortcuts }
         }
-        .tint(theme.accent)
+    }
+
+    private var shortcuts: some View {
+        GlassRoomShortcuts(tabs: tabs, persistentShortcutIDs: bottomShortcuts,
+                           selection: $selection, session: session,
+                           ink: theme.ink, secondaryInk: theme.secondaryInk,
+                           prayerAccent: RoomTheme(room: "salah", dark: theme.dark).accent)
     }
 
     /// The room under the bar's highlight while the diary or «خصّص» is open from the accessory.
@@ -63,6 +73,25 @@ struct TabShell<Content: View>: View {
         .tabBarMinimizeBehavior(.onScrollDown)
     }
 
+}
+
+extension View {
+    /// Hides the room accessory while this full-screen flow is on screen (see `TabShell.accessorized`).
+    func hidesRoomAccessory(_ session: AppSession, id: String) -> some View {
+        modifier(RoomAccessoryHider(session: session, id: id))
+    }
+}
+
+private struct RoomAccessoryHider: ViewModifier {
+    let session: AppSession
+    let id: String
+    func body(content: Content) -> some View {
+        Group {
+            if #available(iOS 26.1, *) { content } else { content.safeAreaPadding(.bottom, 72) }
+        }
+        .onAppear { session.accessoryHiders.insert(id) }
+        .onDisappear { session.accessoryHiders.remove(id) }
+    }
 }
 
 private struct GlassRoomShortcuts: View {

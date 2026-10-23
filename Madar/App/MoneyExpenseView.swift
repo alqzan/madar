@@ -83,7 +83,7 @@ struct MoneyExpenseView: View {
                 else { ProgressView().frame(height: 250) }
             }.padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 20).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.plain)
-            .environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar, .tabBar)
+            .environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar, .tabBar).hidesRoomAccessory(app, id: "money-expense")
             .scrollDismissesKeyboard(.interactively)
             .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تم") { editing = false } } }
             .task { load(); if let seed { raw = seed.amount; merchant = seed.merchant; commandID = seed.id; if seed.homeCurrency { foreign = false } } }.accessibilityIdentifier("money-expense")

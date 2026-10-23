@@ -53,6 +53,8 @@ final class AppSession {
     var errorMessage: String?
     var onboardingComplete = false
     var selectedTab = "foundation"
+    /// Focused full-screen flows (the expense keypad, the year) that hide the tab bar also hide the glass accessory.
+    var accessoryHiders: Set<String> = []
     private(set) var prayerRevision = 0
     private(set) var prayerWriteInProgress = false
     var settingsQuery = ""

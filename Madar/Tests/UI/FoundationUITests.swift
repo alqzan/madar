@@ -1418,6 +1418,13 @@ import XCTest
             if element.isHittable { break }
             app.swipeUp()
         }
+        // The undo toast, glass accessory and tab bar float over the lowest ~200 pt; XCUITest still calls a row
+        // under them hittable, so its tap lands on the toast. Lift such a row above that band before tapping.
+        let floor = app.frame.height - 200
+        if element.isHittable, element.frame.maxY > floor, element.frame.height < floor / 2 {
+            let start = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: app.frame.width / 2, dy: floor - 20))
+            start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 0, dy: -(element.frame.maxY - floor + 60))))
+        }
         XCTAssertTrue(element.isHittable, app.debugDescription)
     }
     private func attachScreenshot(_ app: XCUIApplication, named name: String) {

@@ -12,7 +12,7 @@ import XCTest
         for key in ["4", "8", "0", "0"] { app.buttons["money-expense-key-" + key].tap() }
         app.buttons["money-expense-merchant-مقهى الزاوية"].tap()
         let save = app.buttons["money-expense-save"]; for _ in 0..<3 where !save.isHittable { app.swipeUp(velocity: .slow) }; save.tap()
-        XCTAssertTrue(app.buttons["money-big-mode-mixed"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["money-big-mode-mixed"].waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(app.staticTexts["money-big-effect"].label.contains("لا يقل"))
         shot(app, "M5-V18-mixed-L")
         app.buttons["money-big-mode-installments"].tap(); shot(app, "M5-V18-installments-L")
