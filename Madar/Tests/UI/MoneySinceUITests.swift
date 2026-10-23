@@ -17,7 +17,8 @@ import XCTest
         XCTAssertTrue(app.descendants(matching: .any)["money-since-silent"].exists, "Last Shortcut message four days ago")
         let secondaryDay = app.staticTexts["money-since-secondary-day-2026-10-16"]
         XCTAssertTrue(secondaryDay.waitForExistence(timeout: 5))
-        XCTAssertTrue(secondaryDay.label.contains("١٦"), secondaryDay.label)
+        // 16 October is the primary Gregorian day; 5 Jumada I is the secondary Hijri day.
+        XCTAssertEqual(secondaryDay.label, "٥")
         XCTAssertTrue(app.buttons["money-since-day-2026-10-16"].label.contains("أكتوبر"))
         shot(app, "M5-V06-since-L"); app.swipeUp(velocity: .slow); shot(app, "M5-V06-since-s1-L")
         app.swipeUp(velocity: .slow); shot(app, "M5-V06-since-s2-L")
