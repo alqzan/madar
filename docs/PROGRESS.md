@@ -361,6 +361,14 @@ M0-M6 software is integrated; M5 has its bounded software gate. M7 remains open 
 
 # Handovers
 
+## Handover — accessory over «سجّل», heart sheet, money parser trial, default categories — 2026-10-23 — Claude
+- **Works now (main):** focused full-screen flows (expense keypad, year) hide the glass accessory on iOS 26.1+ (72 pt fallback on 26.0, unverified), so «سجّل» is tappable. The heart question opens in the prayer room's paper sheet. The six design categories are seeded once into an empty store (`money.seedCategories`, UUIDv5 ids, epoch stamp, reviewed). `LegacyMoneyTrialTests` proves the parser on the owner's 131 stored messages (all match; the 14 last4 differences are the old app's error).
+- **Verified:** heart flow 1/1; BigExpense, BahwYear, lobby year 3/3; FoundationUITests 38/40 (1 skipped; notification prompt fails only because an earlier test granted permission on the same simulator); 4 of the 7 old failures pass (backup, drill, covered review, drag); MoneyPersistence 52/52 + seed test; MadarCore 138/138; Expense 2/2, FirstRun 1/1 on the final build.
+- **Blocked (queue item 16):** Quran plan/qiyam/coach UI tests: a presentation nested in a full-screen cover is drawn but the accessibility tree shows the level below (VoiceOver likely affected, unverified). Bisect: first bad `a902569`; reverting its settings slice there passes, but on main a second cause remains. Two diagnoses spent.
+- **Next:** queue item 17, money import slice 1 (dev-only DEBUG hook, shipped intake for the 131, direct writer only for the 402, match old categories onto the seeded six by name, golden fixture, then one review). Then slice 2 (cycle settings) and the Quran/prayer/habit owner data. Fresh serial simulator `435913E3-49FF-4E72-B727-8078C969D189`, derived data `Madar/Artifacts/TakeoverDerivedData`.
+- **Owner:** whether to keep the six category names; v1 import entry point stays an idea; device signing still needs App-Group profiles.
+- **Model/effort:** claude-opus-5-5, effort not exposed. **Usage:** 32% of the five-hour window at handover; context near its limit.
+
 ## Handover — Claude takeover, diary delivery and full UI results — 2026-10-23 — Codex
 - **Works now:** batched export prepares 2,263 stored owner-copy days in 0.632 s; all remain legacy@0, missing media stays explicit. Restored diary opens without welcome or settings writes; empty photo placeholders do not displace real excerpts. Removed the duplicate notes spacer. Gregorian-first night shows the advanced Hijri «ليلة» date. Three synthetic habits proposals are in `docs/design/habits-options.html`; native redesign waits for owner choice.
 - **Verified:** `prepare-workspace.py` passed; Core DayOne 9/9, command diary/import 14/14, Data 78/78, native DiaryExport/DiaryService 6/6. Latest `xcodebuild test` builds app/widget/tests on iOS 26.5. Original full UI: 178 passed, 22 failed, 4 skipped / 204 (`Artifacts/Claude-takeover-all-ui-20261023-r1.xcresult`). Serial fresh-simulator r1: 12/13; its restored top-only frame assertion was corrected to check actual scroll reachability, then r2 passed that flow. Serial r2: 5/7 (restored, secure typing, notification prompt, EPUB reader, mastered Quran review pass; heart and mixed expense fail). Foundation RU3 + widget snapshots 8/8 in `M3-takeover-rechecks-20261023-r2`. `git diff --check` clean.
@@ -431,11 +439,3 @@ Owner, 22 Oct: a handover may be longer than 7 lines. What matters is that the n
 
 **Model/effort:** claude-opus-5-5, effort not exposed.
 **Usage:** the owner reported about 10% left; stopped new work to commit and hand over.
-
-## Handover — volume opens at its page, the wall bookcase and the stand — 2026-10-22 — Claude
-- **Works now:** tapping a volume opens its first page (Readium stopped one RTL column short; the reader now turns to the anchor). «قديمًا» lies under «أنهيتها» in piles by year, and «كل كتبي» has sections. The room is the owner's layout ٢: a wall bookcase with named shelves, and the stand with one open book, «أكمل من صفحة …» and the wird strip.
-- **Verified:** Mihbara home + import UI 30/32 (`m6uxr-wall-r1`); after fixes, paper card 1/1 (`r2`) and shelf, wird and empty-shelf 3/3 (`r3`); volume test without the expected-failure wrapper (`m6uxv-fix2`); app build.
-- **Differences left:** shelves with one book are tall and mostly empty; the stand sits below the bookcase, so on first open the book is below the fold.
-- **Not verified:** owner iPhone (dark checked on the simulator). M6-V14 word card passes with a 0.8 s press (the 1.2 s simulator press grew the selection).
-- **Next:** owner looks at the room; check a real long press on the iPhone (M6-V14).
-- **Model/effort:** claude-opus-5-5, effort not exposed. **Usage:** not exposed.

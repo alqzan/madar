@@ -414,3 +414,11 @@ Differences left: native glass back capsule; description wraps one word earlier;
 Not verified: a real Day One export round-trip (owner's step; never read here), multi-GB export memory on device, owner iPhone, dark mode.
 Next: owner round-trip with a real export; M5-V14.
 Model/effort: Claude Opus 5.5 / not exposed. Usage: not exposed.
+
+## Handover — volume opens at its page, the wall bookcase and the stand — 2026-10-22 — Claude
+- **Works now:** tapping a volume opens its first page (Readium stopped one RTL column short; the reader now turns to the anchor). «قديمًا» lies under «أنهيتها» in piles by year, and «كل كتبي» has sections. The room is the owner's layout ٢: a wall bookcase with named shelves, and the stand with one open book, «أكمل من صفحة …» and the wird strip.
+- **Verified:** Mihbara home + import UI 30/32 (`m6uxr-wall-r1`); after fixes, paper card 1/1 (`r2`) and shelf, wird and empty-shelf 3/3 (`r3`); volume test without the expected-failure wrapper (`m6uxv-fix2`); app build.
+- **Differences left:** shelves with one book are tall and mostly empty; the stand sits below the bookcase, so on first open the book is below the fold.
+- **Not verified:** owner iPhone (dark checked on the simulator). M6-V14 word card passes with a 0.8 s press (the 1.2 s simulator press grew the selection).
+- **Next:** owner looks at the room; check a real long press on the iPhone (M6-V14).
+- **Model/effort:** claude-opus-5-5, effort not exposed. **Usage:** not exposed.
