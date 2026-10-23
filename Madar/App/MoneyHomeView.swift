@@ -214,15 +214,22 @@ struct MoneyHomeView: View {
                 Capsule().fill(theme.color("rod2")).frame(width: 14)
                 VStack(alignment: .leading, spacing: 10) {
                     Image(systemName: "sparkle").foregroundStyle(theme.color("reserveText"))
-                    Text("صفحة مالك الأولى").font(MadarTypography.title())
-                    Text(reading.hasAccounts ? "حساباتك هنا. يظهر يومك ومنحنى الصرف بعد بدء دورتك." : "سيجتمع هنا يومك، وما تدّخره، وما يستحق قريبًا. تبدأ الأرقام من بياناتك.")
+                    Text(reading.hasAccounts ? "مالك جاهز لدورته" : "صفحة مالك الأولى").font(MadarTypography.title())
+                    Text(reading.hasAccounts ? "حساباتك وحركاتك هنا. يظهر يومك ومنحنى الصرف حين يصل راتبك وتبدأ دورتك." : "سيجتمع هنا يومك، وما تدّخره، وما يستحق قريبًا. تبدأ الأرقام من بياناتك.")
                         .font(MadarTypography.body()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
                 }.padding(22).frame(maxWidth: .infinity, minHeight: 200).background(theme.surface)
                 Capsule().fill(theme.color("rod2")).frame(width: 14)
             }.accessibilityIdentifier("money-empty")
-            Button("إعداد استقبال رسائل البنك") { guideOpen = true }.font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 48).background(theme.ink, in: Capsule()).foregroundStyle(theme.background).accessibilityIdentifier("money-guide-open")
-            Button("أضف حسابك يدويًا") { accountsOpen = true }.font(MadarTypography.body()).frame(minHeight: 44).accessibilityIdentifier("money-first-account")
-            Button("ابدأ برسالة الراتب") { messagesOpen = true }.font(MadarTypography.body()).frame(minHeight: 44).accessibilityIdentifier("money-first-salary")
+            // With accounts already here, the one missing step is the salary that opens the cycle: it leads, and
+            // adding an account is no longer offered as if the room were empty (owner data trial, 23 Oct).
+            if reading.hasAccounts {
+                Button("ابدأ دورتك برسالة الراتب") { messagesOpen = true }.font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 48).background(theme.ink, in: Capsule()).foregroundStyle(theme.background).accessibilityIdentifier("money-first-salary")
+                Button("إعداد استقبال رسائل البنك") { guideOpen = true }.font(MadarTypography.body()).frame(minHeight: 44).accessibilityIdentifier("money-guide-open")
+            } else {
+                Button("إعداد استقبال رسائل البنك") { guideOpen = true }.font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 48).background(theme.ink, in: Capsule()).foregroundStyle(theme.background).accessibilityIdentifier("money-guide-open")
+                Button("أضف حسابك يدويًا") { accountsOpen = true }.font(MadarTypography.body()).frame(minHeight: 44).accessibilityIdentifier("money-first-account")
+                Button("ابدأ برسالة الراتب") { messagesOpen = true }.font(MadarTypography.body()).frame(minHeight: 44).accessibilityIdentifier("money-first-salary")
+            }
             if reading.hasAccounts {
                 Button { basisOpen = true } label: {
                     HStack { Text("في حسابك"); Spacer(); Text(figure: amount(reading.basis.inAccountMinor)).font(MadarTypography.cardTitle()); Image(systemName: "chevron.left").font(.caption) }.frame(minHeight: 44)

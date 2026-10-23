@@ -680,6 +680,18 @@ final class AppSession {
     }
     private var moneySeed: Task<Void, Never>?
 
+    #if DEBUG
+    /// Owner money trial only (item 17): one command through the bus without the per-command reload and reminder
+    /// re-plan; the caller reloads once at the end. Returns the bus status.
+    func executeTrialCommand(_ name: String, payload: [String: MadarCore.JSONValue], id: UUID) async throws -> String {
+        guard beginWrite() else { throw BackupOperationError.busy }
+        defer { pendingWrites -= 1 }
+        let now = prayerNow()
+        let result = try await bus.execute(.init(commandID: id, name: name, payload: .object(payload), issuedAt: now), now: now)
+        return result.status == .applied ? "applied" : result.status == .duplicate ? "duplicate" : "rejected:" + (result.reason ?? "")
+    }
+    #endif
+
     func executeMoneyCommand(_ name: String, payload: [String: MadarCore.JSONValue] = [:], id: UUID = UUID()) async throws {
         guard lockController?.canPresent(.app) ?? protectedDataAuthorized else { throw DataError.authenticationFailed }
         guard beginWrite() else { throw BackupOperationError.busy }

@@ -422,3 +422,66 @@ Model/effort: Claude Opus 5.5 / not exposed. Usage: not exposed.
 - **Not verified:** owner iPhone (dark checked on the simulator). M6-V14 word card passes with a 0.8 s press (the 1.2 s simulator press grew the selection).
 - **Next:** owner looks at the room; check a real long press on the iPhone (M6-V14).
 - **Model/effort:** claude-opus-5-5, effort not exposed. **Usage:** not exposed.
+
+## Handover — owner data trial, diary freeze fixed, Gregorian first — 2026-10-22 — Claude
+Owner, 22 Oct: a handover may be longer than 7 lines. What matters is that the next agent understands. Details below.
+
+**Works now (all committed on main)**
+- **Habits:**
+  - Every open manual habit row logs in one tap (`habit-quick-<uuid>`).
+  - Progress reads «الهدف: ٨ أكواب» before the first log, never «٠ من ٨».
+  - One Arabic count table is shared by the room, the lobby and the widget: `WidgetCopy.unitCount`. After «من» the dual is genitive: «١ من كوبين».
+  - The lobby hides «٠ من ٥» (prayer) and «٠ من N» (habits) until something is logged.
+- **Money home:**
+  - The scroll's due diamonds sit on the baseline, clear of the dates.
+  - «سجّل مصروفًا» is a filled button under «لك الآن».
+  - The other eight doors are a drawer grid. It must stay a non-lazy `Grid`: a `LazyVGrid` hid off-screen doors from 23 UI tests.
+- **Lobby test:** fixed for the five-room bar. المال and المحبرة are tabs; the diary and «خصّص» ride the accessory.
+- **Calendar (owner decision):** `core.firstCalendar` now defaults to `gregorian` in all three schema copies. Only the Quran room forces Hijri first (`AppQuranService+Week.swift`, `+DayClose`, `+Year`, `AppQuranService.swift:208`). Both dates always show.
+- **Owner data trial (diary):**
+  - The owner put `madar-backup-2026-10-22.json` in `Madar/Artifacts/owner-data/`. That folder is git-ignored. Never commit its content, never put diary text, names, amounts or bank strings in board or DECISIONS rows, and never point a helper agent at it.
+  - `Madar/scripts/legacy-diary-to-dayone.py` converts `journalEntries` to a Day One ZIP. Each entry carries `madarLegacyDay`, the old stored date.
+  - `DayOneParser` reads that key into `DayOneEntryPlan.legacyDay`, and `DayOneDayKey.resolve` returns it with policy `legacy@0` (MIGRATION.md: the old date is never recomputed). Real Day One exports never carry the key.
+  - The DEBUG hook `runLegacyDiaryTrialIfRequested` (in `DiaryHomeFixture.swift`, called from the root `.task`) runs only with `MADAR_UI_LEGACY_DIARY_ZIP` and a UI-test store. It sends the ZIP through the shipped `AppDiaryImportService` and writes a counts-only report next to the ZIP.
+  - Run it with: `TEST_RUNNER_MADAR_TRIAL_ZIP=<abs zip> xcodebuild test … -only-testing:MadarUITests/DiaryHubUITests/testOwnerLegacyDiaryTrial`
+  - Result: 2,263 added in 26 s, 7 empty entries skipped, 2,097 photos missing, all 2,263 on `legacy@0`.
+- **Freeze fixed:** finishing the diary welcome ran `DiaryLineRenderer.freezeBeforeSourceChange`, which re-read every table for every day. With 2,263 days that was more than 3 minutes on the main thread. It now uses `DiaryLineRenderer.live(days:)`, one read per table. Each day's lines are unchanged.
+- **Diary home:** a past page whose imported photos are missing says «صور هذا اليوم لم تُنقل». The excerpt skips empty photo-only lines.
+
+**Verified (commands run, results seen)**
+- HabitsUITests 2/2.
+- RoomWidgetSnapshotTests 7/7.
+- BahwLobby at-risk and five-tab tests.
+- MoneyHome, Log, Outside, Reconcile and Zakat: 14/14 after the drawer fix.
+- QuranHomeUITests 3/3.
+- MadarCore DayOneImportTests 9/9.
+- MadarCommands diary, money and book tests 22/22.
+- MadarDataTests 78/78. The settings count was stale at 137; it is 140.
+- The owner diary trial passed.
+
+**Not verified**
+- **Money suites after the drawer grid:** Accounts, Analysis, Cards, Cashback, Goal, Expense, BigExpense and Settings. Their run was cut off. All 23 earlier failures were "door not found", caused by the lazy grid, so they should now pass.
+- **UI tests after the Gregorian default:** not run at all. Tests that assert Hijri-first labels (for example a hub year «١٤٤٨») will fail. Update them to the owner's rule. Never revert the default.
+- **Not run in the UI:** the missing-photo hero and the diary-month VoiceOver label (it now adds the other calendar).
+
+**Next, in order**
+1. Run the full UI suite once. Fix the tests the Gregorian default broke, and the money suites listed above.
+2. **Diary export:** `AppDiaryExportService.exportPages` still loops per day (`day(date)`, `live(day:)`, `index.documents` filter). Batch it like `live(days:)`, and time it with the owner trial.
+3. **Diary welcome:** it shows even when the store already has thousands of entries. Consider skipping it when entries exist.
+4. **Owner trial, money:** a money data card, so it needs one review pass (owner, 16 Oct). The data has 533 transactions:
+   - 131 from 21 Sep onward carry `rawText`. Re-parse them with the bank parser and compare.
+   - 402 from 3 Jul to 21 Sep have Latin merchant notes, no time and no text. The owner says he never typed expenses, so import them as automatic rows without message text, never as «يدوي».
+   - 9 account strings must map to 3 credit cards.
+   - 25 categories, most custom with random IDs.
+   - 11 inbox events, 2 without a trusted amount: these need the owner's decision.
+   - `dailyBudget`, `salaryDay`, `monthlyIncome` and `incomePct` map to cycle settings.
+   - Amounts have at most 2 decimals: convert to Int halalas through Decimal.
+5. **Then:** Quran memorisation (plan unit «ربع», balanced intensity; 70 sessions, 53 reviews, 45 mistakes, 15 tombstones in `deletedRecords`). Prayer: 113 days of جماعة/منفردة/فائتة/لم; RP1 applies, and unlogged never becomes missed; carry `qadaBacklog` as a number only. Then 1 habit with 16 logs, 1 future letter, 2 countdowns and 2 reserves.
+
+**Owner**
+- The device run and the review wait a few days.
+- Open question, not blocking: what fed the old app's money before 21 Sep (Apple Pay automation?).
+- Ideas waiting on the owner: whether v1 ships an «استيراد من مدار القديم» entry point. Keep it dev-only until he says yes.
+
+**Model/effort:** claude-opus-5-5, effort not exposed.
+**Usage:** the owner reported about 10% left; stopped new work to commit and hand over.

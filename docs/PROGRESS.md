@@ -54,7 +54,7 @@ Agents take the first unfinished step and continue down the list in the same ses
 
 16. low — test tooling only (owner 23 Oct: VoiceOver dropped forever, so the stale tree is not a user defect; the screens draw and work). Nested presentations go stale in the accessibility tree (Claude 23 Oct). A cover/sheet opened from inside another full-screen cover (plan → setup, qiyam session → «جلستك محفوظة», coach → methods) is drawn correctly (screenshots prove it), but the XCUITest snapshot still shows the level below (home or plan), so `QuranPlanSetupUITests`, `QuranQiyamUITests` and `QuranCoachUITests` fail deterministically (plan 0/3 on main, `Claude-cont-plan-x3-20261023.log`). VoiceOver users likely hit the same stale tree — unverified. Bisect from the 15 Oct pass: first bad `a902569` [M5-V20]; reverting only its settings schema + `SettingsStore` validation there passes, but removing the 8 later money keys on main still fails, so main has a second cause. No CPU spin, one window, no alert, no presentation warnings. Two diagnosis attempts spent; next agent: bisect again from `a902569` with the settings slice reverted, or inspect how `session.values`/schema size reaches the Quran covers. The other four of the seven original failures now pass serially (backup, drill, covered review, drag).
 
-17. in progress — Owner money trial, import slice 1 (Claude 23 Oct; money data card → one review pass before it is done). Dev-only, like the diary trial: DEBUG hook + env var + UI-test store only, counts-only report to ignored `owner-data`, never a registered command or URL/Shortcut entry point (v1 import entry point is an owner idea). Shipped paths first: 131 texted rows through the real intake (`receivedAt` = old date+time) then `confirmTransaction` with the mapped category; 11 inbox events keep the owner's «ignored»; cards/accounts via `saveCard`/`saveAccount`; merchant rules via `saveMerchantRule`. Direct writer only for the 402 text-less rows: `dayKey` = old stored date (legacy policy, never recomputed), `source` bank with no message, explicit method (no silent cash), Decimal → Int halalas in production code, skip ids in the old `deleted` map, natural-key dedupe after import (21 Sep overlap), second run adds 0. Categories: v1 has no UI to create or rename a category (only limits), and a fresh store is now seeded with the six design categories (`money.seedCategories`); the importer must match the old 25 onto the seeded rows by normalised name and list the rest for the owner — never create a second «بقالة». Golden synthetic fixture with hand-worked expectations. Slice 2 later: cycle settings (`dailyBudget`, `salaryDay`, `incomePct`).
+17. done (slice 1) — Owner money trial, import slice 1 (Claude 23 Oct, one money review applied). Dev-only: `LegacyMoneyImport` (pure planner, MadarMoney, golden synthetic fixture 5/5) + `App/LegacyMoneyTrial.swift` (DEBUG, isolated UI-test store, env `MADAR_TRIAL_MONEY`, counts-only report to ignored `owner-data`) + `MoneyOwnerTrialUITests` (skips without the backup). Real backup on the simulator: the owner's 25 categories created (only one name equals a seeded six, so a store with categories is never seeded), 3 bank accounts + 1 holding account «مصدر الحركات الأقدم» for the 402 rows without message (marked automatic, owner 22 Oct), 9 cards from what the messages name, 187 merchant rules, 131 messages through the real intake, 533 movements; 494 confirmed, 39 wait in review (38 from one mada card whose bank has three accounts, 1 possible duplicate); 532 keep the old day, 1 before Fajr moved to the previous day; a second run adds 0 (receipts replay). Money first page with accounts now leads to «ابدأ دورتك برسالة الراتب». Owner decisions: opening balances (all zero, so «في حسابك» is negative), which account the mada card draws on. Slice 2 next: cycle settings (`dailyBudget`, `salaryDay`, `incomePct`); the old data has no salary message, so a cycle needs the owner's salary.
 
 **Owner — only what needs your account, identity or phone**
 - Owner 20 Oct: no paid Apple Developer account yet — continue on the simulator; step 10 waits until there is one. Support/privacy contact postponed («أجّلها»). Go-deeper time: every room («كلها»).
@@ -361,6 +361,14 @@ M0-M6 software is integrated; M5 has its bounded software gate. M7 remains open 
 
 # Handovers
 
+## Handover — owner money import trial, VoiceOver dropped — 2026-10-23 (2) — Claude
+- **Works now:** item 17 slice 1. The owner's old money backup imports into an isolated UI-test store: 25 own categories, 4 accounts, 9 cards, 187 rules, 533 movements (494 confirmed, 39 in review). A second run adds 0. The money first page leads to the salary once accounts exist. Owner: VoiceOver dropped forever; item 16 is test tooling only.
+- **Verified:** `swift test --filter LegacyMoneyImport` 5/5; `MoneyOwnerTrialUITests` passed (`Claude-money-trial-20261023-r9.xcresult`, report `owner-data/money-import-*`); `MoneyFirstRunUITests` passed (r8). One money review pass (Sonnet): day check, cards keyed by bank and last four, debit card linked only to a bank's single account, no auto-confirm of a possible duplicate. All applied.
+- **Differences left:** the empty envelopes block (dotted square, two diamonds) looks unfinished with no envelopes; «في حسابك» is negative until opening balances are set.
+- **Not verified:** owner iPhone; any store other than the UI-test store (the hook is DEBUG plus env plus UI-test store only).
+- **Next:** item 17 slice 2 (cycle settings: `dailyBudget`, `salaryDay`; there is no salary message in the old data, so the cycle starts with the owner's salary), then the owner's Quran, prayer and habit data. Owner decisions to add to the list: opening balances, which account the mada card draws on, the source of the rows before 21 Sep.
+- **Model/effort:** claude-opus-5-5, effort not exposed. **Usage:** about 50% of the 5-hour window at the last reading.
+
 ## Handover — accessory over «سجّل», heart sheet, money parser trial, default categories — 2026-10-23 — Claude
 - **Works now (main):** focused full-screen flows (expense keypad, year) hide the glass accessory on iOS 26.1+ (72 pt fallback on 26.0, unverified), so «سجّل» is tappable. The heart question opens in the prayer room's paper sheet. The six design categories are seeded once into an empty store (`money.seedCategories`, UUIDv5 ids, epoch stamp, reviewed). `LegacyMoneyTrialTests` proves the parser on the owner's 131 stored messages (all match; the 14 last4 differences are the old app's error).
 - **Verified:** heart flow 1/1; BigExpense, BahwYear, lobby year 3/3; FoundationUITests 38/40 (1 skipped; notification prompt fails only because an earlier test granted permission on the same simulator); 4 of the 7 old failures pass (backup, drill, covered review, drag); MoneyPersistence 52/52 + seed test; MadarCore 138/138; Expense 2/2, FirstRun 1/1 on the final build.
@@ -376,66 +384,3 @@ M0-M6 software is integrated; M5 has its bounded software gate. M7 remains open 
 - **Not verified / reproduced:** heart flow still fails scrolling to the answer in `FoundationUITests.test_M1T06_OptionalHeartSaveSkipUndoAndRelaunch` (`scrollTo` line 1421); mixed expense still lacks expected mode after save (`MoneyBigExpenseUITests` line 15). No repair claimed for either. Nine of the original 22 have no later pass: these two, backup confirmation/fixture isolation (software keyboard), Quran coach, drill, plan setup, qiyam, covered-review resume/grade, and dragging covered ayahs. Mastered-review serial pass does not establish all Quran flows. No signed owner-iPhone/cloud/distribution acceptance. Export timing measures page preparation, not full-PDF render/share.
 - **Next:** recheck the seven original cases not included in serial r2, one UI run at a time, `-parallel-testing-enabled NO -collect-test-diagnostics never`; diagnose the two reproduced failures without weakening assertions. Fresh serial simulator is `435913E3-49FF-4E72-B727-8078C969D189`, iPhone 17 Pro/iOS 26.5; latest derived data `Madar/Artifacts/TakeoverDerivedData`. Quran busy previously spans `AppQuranService.start` and serialized notification refresh; instrument narrow stages if it repeats, do not bypass sanctity/locks. Then continue real-money import from Claude’s handover; no money import or cloud upload was started here. Private source/report files remain ignored in `Artifacts/owner-data`; never send their contents to helpers. Device signing still needs App-Group-capable provisioning. No iOS 27 run.
 - **Model/effort:** not exposed. **Usage:** 92% five-hour used at the final pre-commit check; no new cards started. Preserve the remaining reserve for final delivery, and stop at about 95% as the owner requested.
-
-## Handover — owner data trial, diary freeze fixed, Gregorian first — 2026-10-22 — Claude
-Owner, 22 Oct: a handover may be longer than 7 lines. What matters is that the next agent understands. Details below.
-
-**Works now (all committed on main)**
-- **Habits:**
-  - Every open manual habit row logs in one tap (`habit-quick-<uuid>`).
-  - Progress reads «الهدف: ٨ أكواب» before the first log, never «٠ من ٨».
-  - One Arabic count table is shared by the room, the lobby and the widget: `WidgetCopy.unitCount`. After «من» the dual is genitive: «١ من كوبين».
-  - The lobby hides «٠ من ٥» (prayer) and «٠ من N» (habits) until something is logged.
-- **Money home:**
-  - The scroll's due diamonds sit on the baseline, clear of the dates.
-  - «سجّل مصروفًا» is a filled button under «لك الآن».
-  - The other eight doors are a drawer grid. It must stay a non-lazy `Grid`: a `LazyVGrid` hid off-screen doors from 23 UI tests.
-- **Lobby test:** fixed for the five-room bar. المال and المحبرة are tabs; the diary and «خصّص» ride the accessory.
-- **Calendar (owner decision):** `core.firstCalendar` now defaults to `gregorian` in all three schema copies. Only the Quran room forces Hijri first (`AppQuranService+Week.swift`, `+DayClose`, `+Year`, `AppQuranService.swift:208`). Both dates always show.
-- **Owner data trial (diary):**
-  - The owner put `madar-backup-2026-10-22.json` in `Madar/Artifacts/owner-data/`. That folder is git-ignored. Never commit its content, never put diary text, names, amounts or bank strings in board or DECISIONS rows, and never point a helper agent at it.
-  - `Madar/scripts/legacy-diary-to-dayone.py` converts `journalEntries` to a Day One ZIP. Each entry carries `madarLegacyDay`, the old stored date.
-  - `DayOneParser` reads that key into `DayOneEntryPlan.legacyDay`, and `DayOneDayKey.resolve` returns it with policy `legacy@0` (MIGRATION.md: the old date is never recomputed). Real Day One exports never carry the key.
-  - The DEBUG hook `runLegacyDiaryTrialIfRequested` (in `DiaryHomeFixture.swift`, called from the root `.task`) runs only with `MADAR_UI_LEGACY_DIARY_ZIP` and a UI-test store. It sends the ZIP through the shipped `AppDiaryImportService` and writes a counts-only report next to the ZIP.
-  - Run it with: `TEST_RUNNER_MADAR_TRIAL_ZIP=<abs zip> xcodebuild test … -only-testing:MadarUITests/DiaryHubUITests/testOwnerLegacyDiaryTrial`
-  - Result: 2,263 added in 26 s, 7 empty entries skipped, 2,097 photos missing, all 2,263 on `legacy@0`.
-- **Freeze fixed:** finishing the diary welcome ran `DiaryLineRenderer.freezeBeforeSourceChange`, which re-read every table for every day. With 2,263 days that was more than 3 minutes on the main thread. It now uses `DiaryLineRenderer.live(days:)`, one read per table. Each day's lines are unchanged.
-- **Diary home:** a past page whose imported photos are missing says «صور هذا اليوم لم تُنقل». The excerpt skips empty photo-only lines.
-
-**Verified (commands run, results seen)**
-- HabitsUITests 2/2.
-- RoomWidgetSnapshotTests 7/7.
-- BahwLobby at-risk and five-tab tests.
-- MoneyHome, Log, Outside, Reconcile and Zakat: 14/14 after the drawer fix.
-- QuranHomeUITests 3/3.
-- MadarCore DayOneImportTests 9/9.
-- MadarCommands diary, money and book tests 22/22.
-- MadarDataTests 78/78. The settings count was stale at 137; it is 140.
-- The owner diary trial passed.
-
-**Not verified**
-- **Money suites after the drawer grid:** Accounts, Analysis, Cards, Cashback, Goal, Expense, BigExpense and Settings. Their run was cut off. All 23 earlier failures were "door not found", caused by the lazy grid, so they should now pass.
-- **UI tests after the Gregorian default:** not run at all. Tests that assert Hijri-first labels (for example a hub year «١٤٤٨») will fail. Update them to the owner's rule. Never revert the default.
-- **Not run in the UI:** the missing-photo hero and the diary-month VoiceOver label (it now adds the other calendar).
-
-**Next, in order**
-1. Run the full UI suite once. Fix the tests the Gregorian default broke, and the money suites listed above.
-2. **Diary export:** `AppDiaryExportService.exportPages` still loops per day (`day(date)`, `live(day:)`, `index.documents` filter). Batch it like `live(days:)`, and time it with the owner trial.
-3. **Diary welcome:** it shows even when the store already has thousands of entries. Consider skipping it when entries exist.
-4. **Owner trial, money:** a money data card, so it needs one review pass (owner, 16 Oct). The data has 533 transactions:
-   - 131 from 21 Sep onward carry `rawText`. Re-parse them with the bank parser and compare.
-   - 402 from 3 Jul to 21 Sep have Latin merchant notes, no time and no text. The owner says he never typed expenses, so import them as automatic rows without message text, never as «يدوي».
-   - 9 account strings must map to 3 credit cards.
-   - 25 categories, most custom with random IDs.
-   - 11 inbox events, 2 without a trusted amount: these need the owner's decision.
-   - `dailyBudget`, `salaryDay`, `monthlyIncome` and `incomePct` map to cycle settings.
-   - Amounts have at most 2 decimals: convert to Int halalas through Decimal.
-5. **Then:** Quran memorisation (plan unit «ربع», balanced intensity; 70 sessions, 53 reviews, 45 mistakes, 15 tombstones in `deletedRecords`). Prayer: 113 days of جماعة/منفردة/فائتة/لم; RP1 applies, and unlogged never becomes missed; carry `qadaBacklog` as a number only. Then 1 habit with 16 logs, 1 future letter, 2 countdowns and 2 reserves.
-
-**Owner**
-- The device run and the review wait a few days.
-- Open question, not blocking: what fed the old app's money before 21 Sep (Apple Pay automation?).
-- Ideas waiting on the owner: whether v1 ships an «استيراد من مدار القديم» entry point. Keep it dev-only until he says yes.
-
-**Model/effort:** claude-opus-5-5, effort not exposed.
-**Usage:** the owner reported about 10% left; stopped new work to commit and hand over.

@@ -151,6 +151,9 @@ private struct MadarSceneContent: View {
                 let warnings = try await backup.coordinator.recoverPendingLifecycle()
                 guard warnings.isEmpty else { throw DataError.invalidValue(warnings.joined(separator: "\n")) }
             }
+#if DEBUG
+            await opened.runLegacyMoneyTrialIfRequested()
+#endif
             session = opened; startupError = nil
             await opened.reconcileSpotlightIndex()
             do { try await opened.drainInbox() }
