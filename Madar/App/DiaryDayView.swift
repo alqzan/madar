@@ -54,8 +54,8 @@ struct DiaryDayView: View {
                     DiaryTravelHeader(page:travel,subtitle:service.bothDates(shownDay,calendar:first),distance:service.kilometres(travel.kilometres),digits:service.digits)
                 } else {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(service.weekday(shownDay) + "، " + service.dateTitle(shownDay, calendar: first == .hijri ? .gregorian : .hijri) + (friday ? "، " + service.dateTitle(shownDay,calendar:first):""))
-                        .font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
+                    Text(service.weekday(shownDay) + "، " + (first == .gregorian && appearance?.night == true ? "ليلة " : "") + service.dateTitle(first == .gregorian ? appearance?.hijriDisplayDay ?? shownDay : shownDay, calendar: first == .hijri ? .gregorian : .hijri) + (friday ? "، " + service.dateTitle(shownDay,calendar:first):""))
+                        .font(DiaryType.label).foregroundStyle(theme.color("ink3Text")).accessibilityIdentifier("diary-day-secondary-date")
                     Text(friday ? "جمعة مباركة" : (first == .hijri && appearance?.night == true ? "ليلة " : "") + service.dateTitle(first == .hijri ? appearance?.hijriDisplayDay ?? shownDay : shownDay, calendar: first)).foregroundStyle(friday ? theme.accent:theme.ink).font(.custom("thmanyahserifdisplay-Bold", size: 32, relativeTo: .largeTitle)).accessibilityIdentifier("diary-day-title")
                     if !friday { HStack(spacing: 6) {
                         dateChoice("اليوم", id: "today", value: today)
