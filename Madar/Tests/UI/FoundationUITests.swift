@@ -730,6 +730,7 @@ import XCTest
             app.launchEnvironment["MADAR_UI_STORE_ID"] = UUID().uuidString
             app.launchEnvironment["MADAR_UI_SIZE"] = size
             app.launchEnvironment["MADAR_UI_THEME"] = theme
+            app.launchEnvironment["MADAR_UI_NOW"] = "2026-10-15T12:00:00+03:00"
             app.launch(); finishOnboarding(app)
             let content = app.scrollViews.firstMatch
             XCTAssertTrue(content.waitForExistence(timeout: 10), app.debugDescription)
@@ -809,12 +810,14 @@ import XCTest
             app.buttons["tab-customize"].tap()
             let changes = app.staticTexts["customization-changes"]
             XCTAssertTrue(changes.waitForExistence(timeout: 10))
-            XCTAssertEqual(changes.label, "كما اتفقنا")
-            attachScreenshot(app, named: "M0-RU3-zero-\(size)")
+            // Ordinary UI stores explicitly set the app lock to none; that is
+            // one saved change from the owner's biometric-default setting.
+            XCTAssertEqual(changes.label, "تعديل واحد عن المتفق عليه")
+            attachScreenshot(app, named: "M0-RU3-fixture-baseline-\(size)")
             let edits = [
-                ("core.theme", "light", "تعديل واحد عن المتفق عليه"),
-                ("core.firstCalendar", "gregorian", "تعديلان عن المتفق عليه"),
-                ("core.numerals", "western", "\u{2068}3\u{2069} تعديلات عن المتفق عليه")
+                ("core.theme", "light", "تعديلان عن المتفق عليه"),
+                ("core.firstCalendar", "hijri", "\u{2068}٣\u{2069} تعديلات عن المتفق عليه"),
+                ("core.numerals", "western", "\u{2068}4\u{2069} تعديلات عن المتفق عليه")
             ]
             for (key, value, expected) in edits {
                 let search = app.textFields["settings-search"]
@@ -958,10 +961,15 @@ import XCTest
         search.tap(); search.typeText("core.faceIDLock\n")
         let wholeApp = app.buttons["option-core.faceIDLock-app"]
         XCTAssertTrue(wholeApp.waitForExistence(timeout: 10)); wholeApp.tap()
-        XCTAssertTrue(app.buttons["lock-authenticate"].waitForExistence(timeout: 10), app.debugDescription)
+        let gate = app.descendants(matching: .any)["protected-lock-screen"]
+        let cover = app.buttons["scene-lock-authenticate"]
+        XCTAssertTrue(gate.waitForExistence(timeout: 10) || cover.exists, app.debugDescription)
         XCTAssertFalse(app.buttons["tab-customize"].exists)
-        app.terminate(); app.launch()
-        XCTAssertTrue(app.buttons["lock-authenticate"].waitForExistence(timeout: 10), app.debugDescription)
+        app.terminate()
+        // Keep the saved scope: ordinary UI launches otherwise explicitly stage none.
+        app.launchEnvironment["MADAR_UI_PRESERVE_FACE_ID_DEFAULT"] = "1"
+        app.launch()
+        XCTAssertTrue(gate.waitForExistence(timeout: 10) || cover.exists, app.debugDescription)
         XCTAssertFalse(app.buttons["tab-customize"].exists)
         let screenshot = XCTAttachment(screenshot: app.screenshot()); screenshot.name = "M0-lock-native-persisted"; screenshot.lifetime = .keepAlways; add(screenshot)
     }
@@ -1184,9 +1192,12 @@ import XCTest
         let newSearch = app.textFields["settings-search"]
         newSearch.tap(); newSearch.typeText("core.theme\n")
         XCTAssertTrue(app.buttons["option-core.theme-dark"].isSelected)
-        app.buttons["reset-settings"].tap()
+        app.buttons["settings-clear-search"].tap()
+        let resetSettings = app.buttons["reset-settings"]
+        scrollTo(resetSettings, in: app); resetSettings.tap()
         app.buttons["أعِد الافتراضي"].firstMatch.tap()
         XCTAssertTrue(app.buttons["undo-button"].waitForExistence(timeout: 10))
+        scrollTo(newSearch, in: app); newSearch.tap(); newSearch.typeText("core.theme\n")
         XCTAssertTrue(app.buttons["option-core.theme-auto"].isSelected)
         app.buttons["undo-button"].tap()
         let selectedAgain = app.buttons["option-core.theme-dark"]
@@ -1200,6 +1211,7 @@ import XCTest
         app.launchEnvironment["MADAR_UI_STORE_ID"] = UUID().uuidString
         app.launchEnvironment["MADAR_UI_SIZE"] = "L"
         app.launchEnvironment["MADAR_UI_THEME"] = "light"
+        app.launchEnvironment["MADAR_UI_NOW"] = "2026-10-15T12:00:00+03:00"
         app.launch(); finishOnboarding(app)
         let settings = app.buttons["tab-customize"]
         XCTAssertTrue(settings.waitForExistence(timeout: 15), app.debugDescription)
@@ -1247,10 +1259,13 @@ import XCTest
         settings.tap()
         filterSettings("core.numerals")
         XCTAssertTrue(app.buttons["option-core.numerals-western"].isSelected)
-        app.buttons["reset-settings"].tap()
+        app.buttons["settings-clear-search"].tap()
+        let resetSettings = app.buttons["reset-settings"]
+        scrollTo(resetSettings, in: app); resetSettings.tap()
         let reset = app.buttons["أعِد الافتراضي"].firstMatch
         XCTAssertTrue(reset.waitForExistence(timeout: 10), app.debugDescription)
         reset.tap()
+        filterSettings("core.numerals")
         let arabicIndic = app.buttons["option-core.numerals-arabicIndic"]
         XCTAssertTrue(arabicIndic.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(arabicIndic.isSelected)
