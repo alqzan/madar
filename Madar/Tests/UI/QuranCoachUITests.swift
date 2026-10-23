@@ -27,7 +27,7 @@ import XCTest
         waitLabel(advance, contains: "١ من ٥")
         app.buttons["quran-session-hint"].tap()
         app.buttons["quran-session-method"].tap()
-        XCTAssertTrue(app.buttons["quran-method-completeAyah"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["quran-method-completeAyah"].waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertFalse(app.buttons["quran-method-voice"].exists)
         attach(app, "M2-V02-methods-L")
         app.buttons["quran-method-completeAyah"].tap()

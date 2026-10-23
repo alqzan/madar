@@ -5,7 +5,7 @@ import XCTest
         let app=XCUIApplication();app.launchEnvironment=["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light","MADAR_UI_NOW":"2026-10-15T15:00:00+03:00","MADAR_UI_QURAN_FIXTURE":"home"]
         app.launch();XCTAssertTrue(app.buttons["quran-streak"].waitForExistence(timeout:25));app.buttons["quran-streak"].tap()
         XCTAssertTrue(app.buttons["quran-plan-edit"].waitForExistence(timeout:10));app.buttons["quran-plan-edit"].tap()
-        XCTAssertTrue(app.buttons["quran-setup-continue"].waitForExistence(timeout:10));capture(app,"M2-V13-start-L")
+        XCTAssertTrue(app.buttons["quran-setup-continue"].waitForExistence(timeout:10),app.debugDescription);capture(app,"M2-V13-start-L")
         app.buttons["quran-setup-custom"].tap()
         XCTAssertTrue(app.steppers["quran-setup-page"].waitForExistence(timeout:5));app.buttons["quran-setup-next"].tap()
         app.buttons["quran-setup-unit-quarter"].tap();capture(app,"M2-V13-amount-L");app.buttons["quran-setup-next"].tap()
