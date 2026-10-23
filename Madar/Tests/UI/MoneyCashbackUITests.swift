@@ -21,12 +21,12 @@ import XCTest
         XCTAssertTrue(app.buttons["money-cashback-card-بطاقة مدى"].label.contains("غير معروفة"))
         XCTAssertFalse(app.buttons["اعتمد النقل"].exists, "No entry point that stores nothing")
         sleep(2); shot(app, "M5-V16-cb-1-L")
-        // The months: Jumada I 1448 is still gathering; choosing Muharram names it in both calendars.
+        // Owner default: Gregorian first. October is gathering; January names both calendars.
         XCTAssertTrue(app.descendants(matching: .any)["money-cashback-selected"].firstMatch.label.contains("يتجمّع"))
         app.swipeUp(velocity: .slow)
-        let muharram = app.buttons["money-cashback-month-0"]; XCTAssertTrue(muharram.waitForExistence(timeout: 5)); muharram.tap()
+        let january = app.buttons["money-cashback-month-0"]; XCTAssertTrue(january.waitForExistence(timeout: 5)); january.tap()
         let selected = app.descendants(matching: .any)["money-cashback-selected"].firstMatch
-        XCTAssertTrue(selected.label.contains("محرم") && (selected.label.contains("يونيو") || selected.label.contains("يوليو")))
+        XCTAssertTrue(selected.label.contains("يناير") && selected.label.contains("رجب"), selected.label)
         let chip = app.buttons["money-cashback-chip-بقالة"]; XCTAssertTrue(chip.waitForExistence(timeout: 5)); chip.tap()
         XCTAssertTrue(app.descendants(matching: .any)["money-cashback-chip-detail"].firstMatch.label.contains("بطاقة السفر"))
         shot(app, "M5-V16-cb-1-s1-L")
