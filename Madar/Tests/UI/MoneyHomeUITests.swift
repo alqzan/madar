@@ -40,7 +40,19 @@ import XCTest
     func testEmptyAndHiddenAmountsAreHonest() throws {
         continueAfterFailure = false; var app = app("empty"); open(app)
         XCTAssertTrue(app.descendants(matching: .any)["money-empty"].exists); XCTAssertFalse(app.staticTexts["money-available"].exists)
-        shot(app, "M5-V01-empty-L"); app.terminate()
+        shot(app, "M5-V01-empty-L")
+        let create = app.buttons["money-envelope-empty-create"]
+        XCTAssertTrue(create.exists)
+        for _ in 0..<8 {
+            if create.frame.minY > 80 && create.frame.maxY < app.frame.maxY - 220 { break }
+            if create.frame.minY <= 80 { app.swipeDown(velocity: .slow) } else { app.swipeUp(velocity: .slow) }
+        }
+        XCTAssertLessThan(create.frame.maxY, app.frame.maxY - 220, "Capture the actual card above the floating bar")
+        XCTAssertEqual(app.staticTexts["money-reserve"].label, "لم يبدأ بعد")
+        XCTAssertEqual(app.staticTexts["money-surplus"].label, "يتجمع مع دوراتك")
+        shot(app, "M5-18-empty-envelope-L"); create.tap()
+        XCTAssertTrue(app.buttons["money-goal-edit"].waitForExistence(timeout: 10))
+        app.terminate()
         app = self.app("hidden"); open(app)
         XCTAssertEqual(app.staticTexts["money-available"].label, "•••")
         let chart = app.descendants(matching: .any)["money-scroll-chart"]

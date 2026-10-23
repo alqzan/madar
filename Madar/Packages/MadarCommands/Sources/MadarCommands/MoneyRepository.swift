@@ -103,7 +103,7 @@ import MadarPrayer
     public func homeAccountBalances(at now: Date = .now, rates: [String: String] = [:]) throws -> [(account: Account, homeMinor: Int)] {
         let home = try SettingsStore(context: context).value(for: "core.currency").string ?? "SAR"
         let rates = try manualRates(at: now).merging(rates) { _, explicit in explicit }
-        return try liveAccounts().filter { $0.ownership == "mine" && $0.tracked }.map { account in
+        return try liveAccounts().filter { $0.ownership == "mine" && $0.tracked && $0.balanceAt != nil }.map { account in
             let amount = try accountBalance(account, at: now)
             if account.currency == home { return (account, amount) }
             guard let rate = rates[account.currency] else { throw MoneyCommandError.missingRate }

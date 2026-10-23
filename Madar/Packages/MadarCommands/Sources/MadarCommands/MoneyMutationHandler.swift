@@ -388,8 +388,9 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
         // string cannot carry its sub-second part back.
         let fixedCheckpoint = try existing != nil && MoneyAccountRules.hasMovements(id, in: context)
         let originalAt = row.balanceAt
+        let establishing = originalAt == nil && p["establishBalance"] == .bool(true)
         if fixedCheckpoint {
-            guard row.currency == text(p, "currency"), row.balanceMinor == amount,
+            guard row.currency == text(p, "currency"), (establishing || row.balanceMinor == amount),
                   row.kind == text(p, "kind"), row.ownership == text(p, "ownership"), row.tracked == (p["tracked"] != .bool(false)) else { throw MoneyCommandError.invalidReference }
             if let stored = row.balanceAt {
                 guard abs(stored.timeIntervalSince(at)) < 1 else { throw MoneyCommandError.invalidReference }
@@ -397,7 +398,7 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             }
         }
         row.id = id; row.name = text(p, "name"); row.bank = text(p, "bank"); row.kind = text(p, "kind"); row.ownership = text(p, "ownership")
-        row.currency = text(p, "currency"); row.balanceMinor = amount; row.balanceAt = fixedCheckpoint ? originalAt : at; row.last4 = optionalText(p, "last4")
+        row.currency = text(p, "currency"); row.balanceMinor = amount; row.balanceAt = fixedCheckpoint && !establishing ? originalAt : at; row.last4 = optionalText(p, "last4")
         row.senderIDs = strings(p["senderIDs"]); row.tracked = p["tracked"] != .bool(false); row.zakatInclude = p["zakatInclude"] != .bool(false)
         if existing == nil { row.createdAt = now; context.insert(row) }; try touch(row, now, writer)
     }

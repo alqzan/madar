@@ -21,7 +21,7 @@ struct MoneyAccountSheet: View {
         let exp = CurrencyExponents.specified.exponent(original.currency) ?? 2
         var scale = 1; for _ in 0..<exp { scale *= 10 }
         let n = abs(original.openingMinor), fraction = String(n % scale)
-        _balance = State(initialValue: (original.openingMinor < 0 ? "-" : "") + String(n / scale) + (exp > 0 ? "." + String(repeating: "0", count: max(0, exp - fraction.count)) + fraction : ""))
+        _balance = State(initialValue: !original.openingKnown ? "" : (original.openingMinor < 0 ? "-" : "") + String(n / scale) + (exp > 0 ? "." + String(repeating: "0", count: max(0, exp - fraction.count)) + fraction : ""))
         _senders = State(initialValue: original.senderIDs.joined(separator: "\n"))
     }
     var body: some View {
@@ -37,16 +37,15 @@ struct MoneyAccountSheet: View {
                     Text(draft.ownership == "mine" ? "يدخل رصيده في النقد ولك فعلًا." : "يبقى ظاهرًا بجذر مقطوع، خارج النقد ولك فعلًا والزكاة، ورسائله تُتجاهل.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                     if draft.kind == "wallet" { Toggle("أتتبع رصيد المحفظة", isOn: $draft.tracked).disabled(draft.fixedCheckpoint).accessibilityIdentifier("money-account-tracked") }
                     HStack { Text("العملة"); Spacer(); Picker("العملة", selection: $draft.currency) { ForEach(CurrencyExponents.specified.exponents.keys.sorted(), id: \.self) { Text($0).tag($0) } }.labelsHidden().disabled(draft.fixedCheckpoint).accessibilityIdentifier("money-account-currency") }
-                    field("رصيد البداية، بعملة الحساب") { TextField("٠", text: $balance).keyboardType(.numbersAndPunctuation).focused($editing).disabled(draft.fixedCheckpoint).accessibilityIdentifier("money-account-opening") }
-                    if !draft.fixedCheckpoint { DatePicker("تاريخ هذا الرصيد", selection: $draft.openingAt, in: ...app.prayerNow(), displayedComponents: [.date, .hourAndMinute]) }
-                    if draft.openingKnown || !draft.fixedCheckpoint {
-                        MadarDateLabel(app.dateLabels(.containing(draft.openingAt, in: app.activePlace.timeZone)), primaryFont: MadarTypography.caption(), secondaryFont: MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
-                    } else { Text("رصيد البداية بلا وقت محفوظ؛ يبقى كما هو.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
-                    if draft.fixedCheckpoint { Text("توجد حركات أو مطابقة على هذا الحساب؛ رصيد البداية ونوعه وملكيته ثابتة لحفظ دفتره. تصحيح الرصيد من «المطابقة».").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-account-checkpoint-fixed") }
+                    field(draft.openingKnown ? "رصيد البداية، بعملة الحساب" : "رصيد البنك عند المطابقة") { TextField("٠", text: $balance).keyboardType(.numbersAndPunctuation).focused($editing).disabled(draft.fixedCheckpoint && draft.openingKnown).accessibilityIdentifier("money-account-opening") }
+                    if !draft.fixedCheckpoint || !draft.openingKnown { DatePicker("تاريخ هذا الرصيد", selection: $draft.openingAt, in: ...app.prayerNow(), displayedComponents: [.date, .hourAndMinute]) }
+                    MadarDateLabel(app.dateLabels(.containing(draft.openingAt, in: app.activePlace.timeZone)), primaryFont: MadarTypography.caption(), secondaryFont: MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                    if !draft.openingKnown { Text("لم يُعرف رصيدها بعد. أدخل رصيد البنك ووقت المطابقة ليبدأ الحساب منه؛ الحركات الأقدم تبقى محفوظة.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
+                    if draft.fixedCheckpoint && draft.openingKnown { Text("توجد حركات أو مطابقة على هذا الحساب؛ رصيد البداية ونوعه وملكيته ثابتة لحفظ دفتره. تصحيح الرصيد من «المطابقة».").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-account-checkpoint-fixed") }
                     Toggle("أدخله في حساب الزكاة", isOn: $draft.zakatInclude).accessibilityIdentifier("money-account-zakat")
                     field("أسماء مرسلي رسائل البنك، اسم في كل سطر") { TextField("أسماء المرسل", text: $senders, axis: .vertical).lineLimit(2...5).focused($editing).accessibilityIdentifier("money-account-senders") }
                     if let failure { Text(failure).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")) }
-                    Button(action: save) { Text(saving ? "جارٍ الحفظ…" : "احفظ الحساب").font(MadarTypography.cardTitle()).frame(maxWidth: .infinity, minHeight: 54).background(theme.ink).foregroundStyle(theme.background) }.disabled(saving || draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty).accessibilityIdentifier("money-account-save")
+                    Button(action: save) { Text(saving ? "جارٍ الحفظ…" : "احفظ الحساب").font(MadarTypography.cardTitle()).frame(maxWidth: .infinity, minHeight: 54).background(theme.ink).foregroundStyle(theme.background) }.disabled(saving || draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || (!draft.openingKnown && balance.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)).accessibilityIdentifier("money-account-save")
                 }.padding(20)
             }.scrollDismissesKeyboard(.interactively).background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.plain)
                 .toolbar(.hidden, for: .navigationBar).toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تم") { editing = false }.accessibilityIdentifier("money-account-keyboard-done") } }
@@ -61,7 +60,8 @@ struct MoneyAccountSheet: View {
         guard let exponent = CurrencyExponents.specified.exponent(draft.currency), let minor = MoneyAmountInput.minor(negative ? String(raw.dropFirst()) : raw, exponent: exponent) else { failure = "راجع مبلغ رصيد البداية."; return }
         let last4 = draft.last4.map { c in c.wholeNumberValue.map(String.init) ?? String(c) }.joined()
         let aliases = Array(Set(senders.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty })).sorted()
-        let payload: [String: MadarCore.JSONValue] = ["id": .string(draft.id.uuidString), "name": .string(draft.name.trimmingCharacters(in: .whitespacesAndNewlines)), "bank": .string(draft.bank.trimmingCharacters(in: .whitespacesAndNewlines)), "last4": .string(last4), "kind": .string(draft.kind), "ownership": .string(draft.ownership), "currency": .string(draft.currency), "balanceMinor": .string(String(draft.fixedCheckpoint ? original.openingMinor : minor * (negative ? -1 : 1))), "balanceAt": .string(ISO8601DateFormatter().string(from: draft.openingAt)), "senderIDs": .array(aliases.map { .string($0) }), "tracked": .bool(draft.tracked), "zakatInclude": .bool(draft.zakatInclude)]
+        var payload: [String: MadarCore.JSONValue] = ["id": .string(draft.id.uuidString), "name": .string(draft.name.trimmingCharacters(in: .whitespacesAndNewlines)), "bank": .string(draft.bank.trimmingCharacters(in: .whitespacesAndNewlines)), "last4": .string(last4), "kind": .string(draft.kind), "ownership": .string(draft.ownership), "currency": .string(draft.currency), "balanceMinor": .string(String(draft.fixedCheckpoint && draft.openingKnown ? original.openingMinor : minor * (negative ? -1 : 1))), "balanceAt": .string(ISO8601DateFormatter().string(from: draft.openingAt)), "senderIDs": .array(aliases.map { .string($0) }), "tracked": .bool(draft.tracked), "zakatInclude": .bool(draft.zakatInclude)]
+        if !draft.openingKnown { payload["establishBalance"] = .bool(true) }
         saving = true
         Task { do { try await app.executeMoneyCommand("money.saveAccount", payload: payload); dismiss() } catch { saving = false; failure = "لم يُحفظ الحساب. راجع آخر أربعة أرقام واسم البنك؛ يجب أن يميّزا حسابًا واحدًا." } }
     }

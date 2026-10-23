@@ -221,7 +221,7 @@ public enum BankMessageParser {
         if let stated = labelledAmount(t, ["بما يعادل", "ما يعادل", "equivalent", "المبلغ بالريال"], exponents), stated.currency == homeCurrency, result.currency != homeCurrency {
             result.statedHomeMinor = stated.minor
         }
-        result.balanceMinor = labelledAmount(t, ["الرصيد", "Balance"], exponents)?.minor
+        result.balanceMinor = labelledAmount(t, ["الرصيد المتوفر", "الرصيد", "رصيد", "Balance"], exponents)?.minor
         result.last4 = first(#"\*\s?(\d{4})\b|\b(\d{4})\s?\*"#, in: t)
             // Al Rajhi: «بطاقة:1234;مدى», «عبر:1234;مدى».
             ?? first(#"(?:بطاقة|ببطاقة|عبر)\s*:?\s*(\d{4})(?!\d)"#, in: t)

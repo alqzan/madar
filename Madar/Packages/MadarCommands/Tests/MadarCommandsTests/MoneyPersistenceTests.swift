@@ -1154,3 +1154,30 @@ import MadarInbox
         #expect(allocations.count == 1 && allocations[0].target == .reserve && allocations[0].amountMinor == 1_200)
     }
 }
+
+extension MoneyPersistenceTests {
+    @Test func unknownCashIsExcludedUntilExplicitBalanceAndUndoRestoresUnknown() async throws {
+        let f = try MoneyFixture(); defer { f.clean() }; try await f.setup()
+        let context = ModelContext(f.container)
+        let account = try #require(try context.fetch(FetchDescriptor<Account>()).first { $0.id == f.bank })
+        account.balanceAt = nil; account.balanceMinor = 0; try context.save()
+        let movement = MoneyTransaction(); movement.kind = "expense"; movement.reviewState = "ok"
+        movement.fromAccountID = f.bank; movement.amountMinor = 4200; movement.homeAmountMinor = 4200
+        movement.currency = "SAR"; movement.homeCurrency = "SAR"; movement.eventAt = f.now.addingTimeInterval(-300)
+        context.insert(movement); try context.save()
+        // Only the known cash wallet (100.00) enters cash; never the fictitious -42.00 account balance.
+        #expect(try f.basis().inAccountMinor == 10000)
+        var payload: [String: MadarCore.JSONValue] = ["id": .string(f.bank.uuidString), "name": .string("Renamed"), "bank": .string("Bank"), "kind": .string("current"),
+            "ownership": .string("mine"), "currency": .string("SAR"), "balanceMinor": .string("0"), "balanceAt": .string(ISO8601DateFormatter().string(from: f.now)), "last4": .string("1111")]
+        #expect(try await f.run("money.saveAccount", payload).status == .applied)
+        #expect(try ModelContext(f.container).fetch(FetchDescriptor<Account>()).first { $0.id == f.bank }?.balanceAt == nil)
+        payload["establishBalance"] = .bool(true); payload["balanceMinor"] = .string("9000")
+        let result = try await f.run("money.saveAccount", payload)
+        #expect(result.status == .applied)
+        #expect(try f.basis().inAccountMinor == 19000)
+        let token = try #require(result.undoToken)
+        #expect(try await f.run("system.undo", ["undoToken": .string(token.uuidString)]).status == .applied)
+        #expect(try f.basis().inAccountMinor == 10000)
+        #expect(try ModelContext(f.container).fetch(FetchDescriptor<MoneyTransaction>()).contains { $0.id == movement.id && $0.deletedAt == nil })
+    }
+}

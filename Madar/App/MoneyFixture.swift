@@ -215,6 +215,7 @@ extension AppSession {
             }
         }
         if variant == "accounts" {
+            if ProcessInfo.processInfo.environment["MADAR_UI_UNKNOWN_BALANCE"] == "1" { account.balanceAt = nil; account.balanceMinor = 0 }
             let wallet = Account(); wallet.name = "المحفظة الرقمية"; wallet.kind = "wallet"; wallet.balanceAt = cycle.start; c.insert(wallet)
             let other = Account(); other.name = "حساب آخر"; other.bank = "بنك الاختبار"; other.last4 = "9999"; other.ownership = "notMine"; other.balanceMinor = 1_420_000; other.balanceAt = cycle.start; c.insert(other); try c.save()
         }

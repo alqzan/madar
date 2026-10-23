@@ -4,6 +4,7 @@ import SwiftData
 import MadarCore
 import MadarData
 import MadarMoney
+import MadarCommands
 
 /// Owner money trial (item 17, 23 Oct 2026). Runs only in a DEBUG build, only in an isolated UI-test store, and only
 /// when MADAR_TRIAL_MONEY names the old backup on this Mac. Never a registered command, URL or Shortcut. Writes a
@@ -39,7 +40,7 @@ extension AppSession {
                 case let .saveAccount(command, id, kind, bank, last4, at):
                     let shownBank = bank.map { $0.uppercased() }
                     var p: [String: MadarCore.JSONValue] = ["id": .string(id.uuidString), "kind": .string("current"), "ownership": .string("mine"), "currency": .string("SAR"),
-                        "name": .string(kind == "earlier" ? "مصدر الحركات الأقدم" : "حساب " + (shownBank ?? "") + (last4.map { " " + arabic($0) } ?? "")),
+                        "name": .string(kind == "earlier" ? "بطاقة غير معروفة — رسائلها غير محفوظة" : kind == "unidentified" ? "حساب بطاقة مدى — رقمه غير معروف" : "حساب " + (shownBank ?? "") + (last4.map { " " + arabic($0) } ?? "")),
                         "balanceMinor": .string("0"), "balanceAt": .string(ISO8601DateFormatter().string(from: at)), "tracked": .bool(true)]
                     if let shownBank { p["bank"] = .string(shownBank); p["senderIDs"] = .array([.string(bank!)]) }
                     if let last4 { p["last4"] = .string(last4) }
@@ -64,6 +65,18 @@ extension AppSession {
                     if let row = try fresh.fetch(FetchDescriptor<MoneyTransaction>()).first(where: { $0.id == command }), row.source == "manual" {
                         row.source = "bank"; row.updatedAt = Date(); try fresh.save(); count("earlier.automatic")
                     }
+                    // The old rows have no card digits. Only an unambiguous merchant match supplies a card.
+                    if let cardID = plan.earlierCards[command] {
+                        let patch = ModelContext(container)
+                        if let row = try patch.fetch(FetchDescriptor<MoneyTransaction>()).first(where: { $0.id == command }),
+                           let card = try patch.fetch(FetchDescriptor<Card>()).first(where: { $0.id == cardID }), card.kind == "credit" || card.accountID != nil {
+                            let account = card.kind == "credit" ? nil : card.accountID
+                            if row.cardID != card.id || row.method != "card" || row.fromAccountID != account {
+                                row.cardID = card.id; row.method = "card"; row.fromAccountID = account
+                                row.updatedAt = now; try patch.save(); count("earlier.cardLinked")
+                            }
+                        }
+                    }
                 case let .ingest(command, text, sender, at, transaction, category):
                     _ = await run(MoneyCommandPayload.intakeName, ["text": .string(text), "sender": .string(sender), "receivedAt": .string(ISO8601DateFormatter().string(from: at))], command, "message")
                     let fresh = ModelContext(container)
@@ -78,6 +91,27 @@ extension AppSession {
                     _ = await run("money.confirmTransaction", ["id": .string(transaction.uuidString)], StableIdentity.uuid(for: "LegacyConfirm:" + transaction.uuidString), "confirm")
                 }
             }
+            // Establish each checkpoint after intake/confirmation, so possible duplicates never enter its arithmetic.
+            // This DEBUG hook runs only in the isolated trial store. No real store or owner data is migrated here.
+            let balances = ModelContext(container)
+            let movements = try MoneyRepository(context: balances).confirmedTransactions()
+            let creditIDs = Set(try balances.fetch(FetchDescriptor<Card>()).filter { $0.kind == "credit" }.map(\.id))
+            for account in try balances.fetch(FetchDescriptor<Account>()) where account.deletedAt == nil {
+                guard let evidence = plan.balanceEvidence[account.id], movements.contains(where: { $0.id == evidence.transactionID }) else {
+                    account.balanceAt = nil; account.balanceMinor = 0; count("balance.unknown"); continue
+                }
+                let deltas = movements.filter { $0.eventAt <= evidence.at }.compactMap { row -> Int? in
+                    if row.cardID.map(creditIDs.contains) == true && ["expense", "fee", "refund", "cashback"].contains(row.kind) { return nil }
+                    let amount = row.currency == account.currency ? row.amountMinor : row.homeCurrency == account.currency ? row.homeAmountMinor : nil
+                    guard let amount else { return nil }
+                    return (row.toAccountID == account.id ? amount : 0) - (row.fromAccountID == account.id ? amount : 0)
+                }
+                guard let opening = LegacyMoneyImport.openingBalance(printed: evidence.amountMinor, signedMovements: deltas) else { throw MoneyCommandError.invalidAmount }
+                account.balanceMinor = opening
+                account.balanceAt = movements.map(\.eventAt).min()?.addingTimeInterval(-1) ?? evidence.at
+                count("balance.known")
+            }
+            try balances.save()
             try reload(); try publishSnapshot()
             let check = ModelContext(container)
             counts["store.transactions"] = try check.fetch(FetchDescriptor<MoneyTransaction>()).filter { $0.deletedAt == nil }.count
@@ -93,6 +127,7 @@ extension AppSession {
                 counts[row.dayKey == old ? "day.same" : "day.shifted", default: 0] += 1
             }
             counts["store.unconfirmed"] = try check.fetch(FetchDescriptor<MoneyTransaction>()).filter { $0.deletedAt == nil && $0.reviewState != "ok" }.count
+            counts["store.possibleDuplicates"] = try check.fetch(FetchDescriptor<MoneyTransaction>()).filter { $0.deletedAt == nil && $0.reviewState == "possibleDuplicate" }.count
         } catch { counts["failed"] = 1; counts["failed." + String(describing: type(of: error))] = 1 }
         let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let stamp = env["MADAR_TRIAL_RUN"] ?? "run"

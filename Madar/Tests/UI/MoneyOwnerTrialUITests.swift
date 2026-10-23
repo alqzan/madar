@@ -21,8 +21,17 @@ import XCTest
         app.launch()
         let first = try report(backup, stamp + "-first")
         XCTAssertNil(first["failed"]); XCTAssertGreaterThan(first["store.transactions"] ?? 0, 0)
+        XCTAssertEqual(first["store.unconfirmed", default: 0], first["store.possibleDuplicates", default: 0], "Only real possible duplicates may wait")
         let start = app.buttons["first-run-continue"]
-        if start.waitForExistence(timeout: 60) { start.tap(); if start.waitForExistence(timeout: 5) { start.tap() } }
+        if start.waitForExistence(timeout: 60) {
+            let skip = app.buttons["first-run-skip"]
+            if skip.exists { skip.tap() }
+            let cityStart = app.buttons.matching(identifier: "first-run-continue").matching(NSPredicate(format: "label == %@", "ابدأ يومك")).firstMatch
+            XCTAssertTrue(cityStart.waitForExistence(timeout: 10)); cityStart.tap()
+            // The tab bar exists behind the cover. Wait for the onboarding write and actual dismissal,
+            // rather than tapping an underlying tab while a large imported store is still saving.
+            XCTAssertTrue(start.waitForNonExistence(timeout: 120), "Onboarding must close before room navigation")
+        }
         let tab = app.buttons["tab-customize"]; XCTAssertTrue(tab.waitForExistence(timeout: 60), app.debugDescription); tab.tap()
         let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 20), app.debugDescription); search.tap(); search.typeText("المال"); app.buttons["money-open"].tap()
         XCTAssertTrue(app.buttons["money-expense-open"].waitForExistence(timeout: 20), app.debugDescription)
@@ -33,5 +42,9 @@ import XCTest
         let second = try report(backup, stamp + "-second")
         XCTAssertEqual(second["store.transactions"], first["store.transactions"], "A second import must add nothing")
         XCTAssertEqual(second["store.categories"], first["store.categories"])
+        XCTAssertEqual(second["store.unconfirmed"], first["store.unconfirmed"])
+        XCTAssertEqual(second["balance.known"], first["balance.known"])
+        XCTAssertEqual(second["balance.unknown"], first["balance.unknown"])
+        XCTAssertEqual(second["earlier.cardLinked", default: 0], 0, "Replay must not rewrite the old rows' card links or edit dates")
     }
 }

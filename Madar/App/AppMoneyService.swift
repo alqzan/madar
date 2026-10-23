@@ -31,6 +31,8 @@ struct MoneyHomeReading {
     var basis: Basis
     var currency: String
     var hasAccounts: Bool
+    var unknownBalanceCount: Int
+    var knownBalanceCount: Int
     var pendingCount: Int
     var reserveMinor: Int
     var surplusMinor: Int
@@ -153,8 +155,10 @@ struct MoneyHomeReading {
         let history = Dictionary(grouping: allocations.filter { $0.target == "surplus" || $0.targetID.map { id in envelopes.contains { $0.id == id && $0.role == "surplus" } } == true }, by: { $0.cycleID })
             .sorted { ($0.value.map(\.createdAt).min() ?? .distantPast) < ($1.value.map(\.createdAt).min() ?? .distantPast) }.suffix(6).map { $0.value.reduce(0) { $0 + $1.amountMinor } }
         let reserveReading = ReserveEngine.read(balanceMinor: reserve, dailyMinor: cycle?.headline.todayAllowanceMinor, cycleLengthDays: length, obligationsPerCycleMinor: cycleObligations)
-        return .init(cycle: cycle, basis: basis, currency: currency, hasAccounts: !accounts.isEmpty, pendingCount: try repo.pendingDecisionCount(),
-            reserveMinor: reserve, surplusMinor: surplus, reserveRunway: reserveReading.runway, reserveDailies: reserveReading.wholeDailies, obligationsPerCycleMinor: cycleObligations,
+        return .init(cycle: cycle, basis: basis, currency: currency, hasAccounts: !accounts.isEmpty,
+            unknownBalanceCount: accounts.filter { $0.ownership == "mine" && $0.tracked && $0.balanceAt == nil }.count,
+            knownBalanceCount: accounts.filter { $0.ownership == "mine" && $0.tracked && $0.balanceAt != nil }.count,
+            pendingCount: try repo.pendingDecisionCount(), reserveMinor: reserve, surplusMinor: surplus, reserveRunway: reserveReading.runway, reserveDailies: reserveReading.wholeDailies, obligationsPerCycleMinor: cycleObligations,
             surplusHistory: history, envelopes: goals, limits: limits.sorted { $0.title < $1.title }, obligations: due)
     }
 }

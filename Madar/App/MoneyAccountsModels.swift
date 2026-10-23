@@ -55,7 +55,7 @@ extension AppMoneyService {
                 return MoneyAccountRules.matches(a, sender: m.sender, last4: parsed.last4)
             }
             let latest = matching.compactMap { m -> (Date, Int)? in
-                guard let data = m.parsedJSON, let p = try? JSONDecoder().decode(MoneyParsedFields.self, from: data), let balance = p.balanceMinor, p.currency == a.currency else { return nil }
+                guard let data = m.parsedJSON, let p = try? JSONDecoder().decode(MoneyParsedFields.self, from: data), p.cardKind != "credit", p.cardKind != "prepaid", let balance = p.balanceMinor, p.currency == a.currency else { return nil }
                 return (p.eventAt ?? m.receivedAt, balance)
             }.max { $0.0 < $1.0 }
             let evidence = latest.flatMap { pair -> (at: Date, printedMinor: Int, bookMinor: Int)? in
@@ -65,8 +65,8 @@ extension AppMoneyService {
             let edit = MoneyAccountEdit(id: a.id, isNew: false, name: a.name, bank: a.bank, last4: a.last4 ?? "", kind: a.kind, ownership: a.ownership,
                 currency: a.currency, openingMinor: a.balanceMinor, openingAt: a.balanceAt ?? now, senderIDs: a.senderIDs, tracked: a.tracked, zakatInclude: a.zakatInclude,
                 fixedCheckpoint: try MoneyAccountRules.hasMovements(a.id, in: context), openingKnown: a.balanceAt != nil)
-            rows.append(.init(id: "account:" + a.id.uuidString, accountID: a.id, name: a.name, subtitle: Self.accountKind(a.kind), amountMinor: try? repo.accountBalance(a, at: now), currency: a.currency, side: .cash,
-                counted: a.ownership == "mine" && a.tracked, messageCount: matching.count, source: source, edit: edit))
+            rows.append(.init(id: "account:" + a.id.uuidString, accountID: a.id, name: a.name, subtitle: Self.accountKind(a.kind), amountMinor: a.balanceAt == nil ? nil : try? repo.accountBalance(a, at: now), currency: a.currency, side: .cash,
+                counted: a.ownership == "mine" && a.tracked && a.balanceAt != nil, messageCount: matching.count, source: source, edit: edit))
         }
         let debts = try repo.cardDebts(at: now)
         let cards = try context.fetch(FetchDescriptor<Card>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }

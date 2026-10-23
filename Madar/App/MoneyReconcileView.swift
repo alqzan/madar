@@ -23,6 +23,7 @@ struct MoneyReconcileView: View {
     @State private var saving = false
     @State private var note: String?
     @State private var messagesOpen = false
+    @State private var unknownAccount: MoneyAccountEdit?
     @FocusState private var typing: Bool
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
     private var service: AppMoneyService { .init(app: app) }
@@ -48,7 +49,16 @@ struct MoneyReconcileView: View {
             VStack(alignment: .leading, spacing: 16) {
                 header
                 if let reading {
-                    if reading.rows.isEmpty { emptyPage }
+                    ForEach(reading.unknownAccounts) { account in
+                        Button { unknownAccount = account } label: {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(account.name).font(MadarTypography.cardTitle())
+                                Text("لم يُعرف رصيدها بعد").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                                Label("أدخل رصيد البنك", systemImage: "plus.circle").font(MadarTypography.body())
+                            }.frame(maxWidth: .infinity, alignment: .leading).padding(16).background(theme.surface, in: .rect(cornerRadius: 12))
+                        }.buttonStyle(.plain).accessibilityIdentifier("money-reconcile-unknown-" + account.id.uuidString)
+                    }
+                    if reading.rows.isEmpty && reading.unknownAccounts.isEmpty { emptyPage }
                     else if let row {
                         status(row)
                         identity(row, reading: reading)
@@ -71,6 +81,7 @@ struct MoneyReconcileView: View {
         .toolbarVisibility(.hidden, for: .navigationBar)
         .task { load() }.onChange(of: app.prayerRevision) { load() }
         .sheet(item: $source) { MoneySourceView(app: app, detail: $0, visible: visible).environment(\.roomTheme, theme) }
+        .sheet(item: $unknownAccount, onDismiss: load) { MoneyAccountSheet(app: app, original: $0) }
         .navigationDestination(isPresented: $messagesOpen) { MoneyMessagesView(app: app, revealed: $revealed) }
         .onChange(of: messagesOpen) { if !messagesOpen { load() } }
     }

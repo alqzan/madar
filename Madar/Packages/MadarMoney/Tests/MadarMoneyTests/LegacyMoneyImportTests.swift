@@ -92,3 +92,63 @@ import Testing
         #expect(b.createCategories.isEmpty && a.steps == b.steps)
     }
 }
+
+extension LegacyMoneyImportTests {
+    private func importPlan(_ rows: [[String: Any]], keys: Keys) throws -> LegacyMoneyImport.Plan {
+        let data = try JSONSerialization.data(withJSONObject: ["transactions": rows])
+        return try LegacyMoneyImport.plan(backup: data, existing: [], timeZone: Self.riyadh, uuid: keys.uuid)
+    }
+    private func purchase(_ id: String, _ card: String, _ merchant: String, account: String? = nil, credit: Bool = false, balance: Int? = nil) -> [String: Any] {
+        var text = "شراء عبر نقاط البيع بـ SAR 10.00\nمن \(merchant)\nبطاقة \(credit ? "ائتمانية" : "مدى") \(card)*\n"
+        if let account { text += "حساب \(account)*\n" }
+        if let balance { text += "الرصيد المتوفر: SAR \(balance).00\n" }
+        text += "2026-09-30 12:00"
+        return ["id": id, "date": "2026-09-30", "time": "12:00", "amount": 10, "bank": "SAB", "rawText": text,
+                "balanceKind": credit ? "credit_available" : "unknown"]
+    }
+    @Test func debitUsesExplicitAccountAmongSeveralAccounts() throws {
+        let keys = Keys()
+        let plan = try importPlan([purchase("a", "1111", "Cafe", account: "2222"), purchase("b", "3333", "Shop", account: "4444")], keys: keys)
+        let linked = plan.steps.compactMap { step -> UUID? in
+            if case let .saveCard(_, _, last4, _, _, account) = step, last4 == "1111" { return account }; return nil
+        }
+        #expect(linked == [keys.uuid("LegacyAccount:SAB|2222")])
+        #expect(plan.counts["card.unlinked"] == nil)
+        #expect(LegacyMoneyImport.fundingLast4(in: "بطاقة 1111*\nإلى حساب 9999*\nحساب ٢٢٢٢*") == "2222")
+    }
+    @Test func onlyCashEvidenceEstablishesOpeningBalance() throws {
+        let keys = Keys()
+        let plan = try importPlan([purchase("d", "1111", "Cafe", account: "2222", balance: 90),
+                                   purchase("c", "3333", "Shop", account: "4444", credit: true, balance: 700)], keys: keys)
+        #expect(plan.balanceEvidence.count == 1)
+        #expect(plan.balanceEvidence[keys.uuid("LegacyAccount:SAB|2222")]?.amountMinor == 9000)
+        // Opening 100.00, spend 20.00, receive 10.00, printed 90.00.
+        #expect(LegacyMoneyImport.openingBalance(printed: 9000, signedMovements: [-2000, 1000]) == 10000)
+        #expect(LegacyMoneyImport.openingBalance(printed: Int.max, signedMovements: [-1]) == nil)
+        let unknown = try importPlan([purchase("u", "5555", "Other", account: "6666")], keys: Keys())
+        #expect(unknown.balanceEvidence.isEmpty)
+    }
+    @Test func earlierRowsUseUniqueMerchantAndLeaveAmbiguityUnknown() throws {
+        let keys = Keys()
+        let old: [[String: Any]] = [
+            ["id": "e1", "date": "2026-07-03", "amount": 10, "note": "Cafe"],
+            ["id": "e2", "date": "2026-07-03", "amount": 10, "note": "Shared"],
+            ["id": "e3", "date": "2026-07-03", "amount": 10, "note": "Unseen"]]
+        let plan = try importPlan(old + [purchase("m1", "1111", "Cafe"), purchase("m2", "1111", "Shared"), purchase("m3", "3333", "Shared")], keys: keys)
+        #expect(plan.earlierCards == [keys.uuid("LegacyExpense:e1"): keys.uuid("LegacyCard:SAB|1111")])
+        #expect(plan.counts["earlier.cardUnknown"] == 2)
+    }
+}
+
+extension LegacyMoneyImportTests {
+    @Test func unnamedDebitFundingIsSeparateFromSeveralNamedAccounts() throws {
+        let keys = Keys()
+        let plan = try importPlan([purchase("a", "1111", "Cafe", account: "2222"), purchase("b", "3333", "Shop", account: "4444"),
+                                   purchase("c", "5555", "Market", balance: 50)], keys: keys)
+        let unnamed = keys.uuid("LegacyAccount:unidentified:SAB|5555")
+        #expect(plan.steps.contains { if case .saveAccount(_, unnamed, "unidentified", "SAB", nil, _) = $0 { true } else { false } })
+        #expect(plan.steps.contains { if case .saveCard(_, _, "5555", "SAB", "debit", unnamed) = $0 { true } else { false } })
+        #expect(plan.balanceEvidence[unnamed] == nil)
+        #expect(plan.counts["account.unidentifiedFunding"] == 1)
+    }
+}

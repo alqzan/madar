@@ -2,8 +2,9 @@ import XCTest
 
 @MainActor final class MoneyAccountsUITests: XCTestCase {
     private func shot(_ app: XCUIApplication, _ name: String) { Thread.sleep(forTimeInterval: 0.6); let a = XCTAttachment(screenshot: app.screenshot()); a.name = name; a.lifetime = .keepAlways; add(a) }
-    private func open(_ fixture: String) -> XCUIApplication {
+    private func open(_ fixture: String, unknownBalance: Bool = false) -> XCUIApplication {
         let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": fixture, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-17T12:00:00+03:00"]
+        if unknownBalance { app.launchEnvironment["MADAR_UI_UNKNOWN_BALANCE"] = "1" }
         app.launch(); let tab = app.buttons["tab-customize"]; XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
         let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("المال"); app.buttons["money-open"].tap()
         let door = app.buttons["money-accounts-open"]; XCTAssertTrue(door.waitForExistence(timeout: 10)); for _ in 0..<8 where !door.isHittable { app.swipeUp(velocity: .slow) }; door.tap()
@@ -39,5 +40,27 @@ import XCTest
         let hidden = open("hidden"); XCTAssertTrue(hidden.staticTexts["money-accounts-net"].label.contains("•••")); shot(hidden, "M5-V19-hidden-L")
         hidden.buttons["money-accounts-reveal"].tap(); XCTAssertFalse(hidden.staticTexts["money-accounts-net"].label.contains("•••")); hidden.terminate()
         let empty = open("empty"); XCTAssertTrue(empty.staticTexts["money-accounts-empty"].exists); shot(empty, "M5-V19-empty-L")
+    }
+    func testUnknownBalanceOffersExplicitBankCheckpoint() {
+        continueAfterFailure = false
+        let app = open("accounts", unknownBalance: true)
+        XCTAssertTrue(app.staticTexts["لم يُعرف رصيدها بعد"].firstMatch.waitForExistence(timeout: 10))
+        shot(app, "M5-18-unknown-account-L")
+        let reconcile = app.buttons["money-accounts-unknown-reconcile"]
+        for _ in 0..<8 where !reconcile.isHittable { app.swipeUp(velocity: .slow) }
+        reconcile.tap()
+        let unknown = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "money-reconcile-unknown-")).firstMatch
+        XCTAssertTrue(unknown.waitForExistence(timeout: 10)); unknown.tap()
+        let field = app.textFields["money-account-opening"]
+        XCTAssertTrue(field.waitForExistence(timeout: 10)); XCTAssertTrue(field.isEnabled)
+        XCTAssertFalse(app.buttons["money-account-save"].isEnabled, "An unknown balance must not silently become zero")
+        field.tap(); field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 12) + "900")
+        app.buttons["money-account-keyboard-done"].tap()
+        let save = app.buttons["money-account-save"]
+        for _ in 0..<6 where !save.isHittable { app.swipeUp(velocity: .slow) }
+        save.tap()
+        XCTAssertTrue(app.staticTexts["money-reconcile-expected"].waitForExistence(timeout: 10))
+        XCTAssertFalse(unknown.exists)
+        shot(app, "M5-18-established-balance-L")
     }
 }

@@ -15,6 +15,7 @@ struct MoneyAccountsView: View {
     @State private var selectedSource: MoneyAccountRow?
     @State private var errorMessage: String?
     @State private var appeared = false
+    @State private var reconcileOpen = false
     private var service: AppMoneyService { .init(app: app) }
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
     private var visible: Bool { revealed || !app.bool("core.hideMoneyUntilTouch") }
@@ -31,6 +32,10 @@ struct MoneyAccountsView: View {
                     tree(r)
                     if !visible { Button("أظهر الأرقام") { revealed = true }.frame(minHeight: 44).accessibilityIdentifier("money-accounts-reveal") }
                     ledger(r)
+                    if r.rows.contains(where: { $0.side == .cash && $0.amountMinor == nil }) {
+                        Text("لم يُعرف رصيدها بعد؛ الحسابات المجهولة لا تدخل في المجموع.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                        Button("المطابقة مع البنك") { reconcileOpen = true }.frame(minHeight: 44).accessibilityIdentifier("money-accounts-unknown-reconcile")
+                    }
                     if let basis = r.basis {
                         HStack { Text(figure: "كاش " + amount(basis.inAccountMinor) + "، عليك " + amount(basis.owedMinor)).font(MadarTypography.caption()); Spacer(); Text(figure: amount(basis.netMinor)).font(MadarTypography.cardTitle()).foregroundStyle(theme.color("surplusText")) }.padding(12).background(theme.surface)
                     } else { Text("لا نجمع عملات مختلفة بلا سعر صرف. أرصدة الحسابات أدناه بعملاتها.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
@@ -46,6 +51,7 @@ struct MoneyAccountsView: View {
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.plain).toolbar(.hidden, for: .navigationBar, .tabBar)
             .task { load(); withAnimation(reduceMotion ? nil : .easeOut(duration: 0.5)) { appeared = true } }.onChange(of: app.prayerRevision) { load() }
             .sheet(item: $selected) { MoneyAccountSheet(app: app, original: $0) }.sheet(item: $selectedSource) { source($0) }
+            .navigationDestination(isPresented: $reconcileOpen) { MoneyReconcileView(app: app, revealed: $revealed) }
             .accessibilityIdentifier("money-accounts")
     }
     private func tree(_ r: MoneyAccountsReading) -> some View {
@@ -67,7 +73,7 @@ struct MoneyAccountsView: View {
             VStack(alignment: .leading, spacing: 16) { ForEach(r.rows) { row in
                 VStack(alignment: .leading, spacing: 6) {
                     Button(row.name) { if let edit = row.edit { selected = edit } else { selectedSource = row } }.font(MadarTypography.cardTitle()).frame(minHeight: 44)
-                    Text(row.subtitle + (row.counted ? "، يُحتسب" : "، خارج الحساب")).font(MadarTypography.body())
+                    Text(row.amountMinor == nil ? "لم يُعرف رصيدها بعد" : row.subtitle + (row.counted ? "، يُحتسب" : "، خارج الحساب")).font(MadarTypography.body())
                     Text(figure: row.amountMinor.map { amount($0, currency: row.currency) } ?? "—").font(MadarTypography.body())
                     Button("مصدر الرصيد") { selectedSource = row }.frame(minHeight: 44)
                 }
@@ -79,11 +85,11 @@ struct MoneyAccountsView: View {
                 HStack(spacing: 5) {
                     Circle().fill(tint(row)).frame(width: 7, height: 7)
                     Button { if let edit = row.edit { selected = edit } else { selectedSource = row } } label: {
-                        VStack(alignment: .leading, spacing: 2) { Text(row.name).font(.custom("thmanyahserifdisplay-Bold", size: 18, relativeTo: .headline)); Text(row.subtitle + (row.currency == app.string("core.currency") ? "" : "، " + row.currency)).font(MadarTypography.fine()).foregroundStyle(tint(row)) }.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        VStack(alignment: .leading, spacing: 2) { Text(row.name).font(.custom("thmanyahserifdisplay-Bold", size: 18, relativeTo: .headline)); Text(row.amountMinor == nil ? "لم يُعرف رصيدها بعد" : row.subtitle + (row.currency == app.string("core.currency") ? "" : "، " + row.currency)).font(MadarTypography.fine()).foregroundStyle(tint(row)) }.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                     }.accessibilityIdentifier("money-account-" + row.name)
                     Text(figure: row.amountMinor.map { (row.side == .cash ? "" : "(") + amount($0, currency: row.currency) + (row.side == .cash ? "" : ")") } ?? "—").font(.custom("thmanyahserifdisplay-Bold", size: 18, relativeTo: .headline)).foregroundStyle(row.counted ? theme.ink : theme.secondaryInk).frame(width: 90).strikethrough(!row.counted)
                     Image(systemName: row.counted ? "checkmark.square" : "square").font(.system(size: 20)).foregroundStyle(row.counted ? theme.color("surplusText") : theme.secondaryInk).frame(width: 38).accessibilityLabel(row.counted ? "يُحتسب" : "خارج الحساب")
-                    Button { selectedSource = row } label: { VStack(spacing: 2) { Circle().fill(row.counted ? theme.color("surplusText") : theme.color("reserveText")).frame(width: 5, height: 5); Text(row.counted ? "تُحتسب" : "تُتجاهل").font(MadarTypography.fine()) }.frame(width: 55, height: 44) }.accessibilityLabel("مصدر " + row.name).accessibilityIdentifier("money-account-source-" + row.name)
+                    Button { selectedSource = row } label: { VStack(spacing: 2) { Circle().fill(row.counted ? theme.color("surplusText") : theme.color("reserveText")).frame(width: 5, height: 5); Text(row.amountMinor == nil ? "مجهول" : row.counted ? "تُحتسب" : "تُتجاهل").font(MadarTypography.fine()) }.frame(width: 55, height: 44) }.accessibilityLabel("مصدر " + row.name).accessibilityIdentifier("money-account-source-" + row.name)
                 }.padding(.vertical, 8).padding(.horizontal, 8).frame(minHeight: 60).overlay(alignment: .top) { Rectangle().fill(theme.line).frame(height: 0.7) }
                 .overlay(alignment: .leading) { if !dynamicType.isAccessibilitySize { Rectangle().fill(tint(row)).frame(width: row.counted ? 2 : 1).opacity(row.counted ? 0.7 : 0.25) } }
             }
@@ -117,7 +123,8 @@ struct MoneyAccountsView: View {
                 Text(service.time(s.at)).font(MadarTypography.caption())
                 if case .messageDiffers(_, let printed, let difference) = s { Text(figure: "ورد في الرسالة " + amount(printed, currency: r.currency) + "؛ الفرق عن الدفتر " + amount(abs(difference), currency: r.currency)).font(MadarTypography.body()) }
             } else { Text("من دفتر الحركات والكشوف؛ لا نضع رصيدًا بدلًا عن البنك.").font(MadarTypography.body()) }
-            if !r.counted { Text("هذا الجذر خارج النقد ولك فعلًا والزكاة. رسائله لا تدخل المصروفات.").font(MadarTypography.body()) }
+            if r.amountMinor == nil { Text("الرصيد مجهول؛ الحركات محفوظة، والحساب خارج مجموع الأرصدة حتى المطابقة مع البنك.").font(MadarTypography.body()) }
+            else if !r.counted { Text("هذا الجذر خارج النقد ولك فعلًا والزكاة. رسائله لا تدخل المصروفات.").font(MadarTypography.body()) }
         }.padding(24) }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).presentationDetents([.medium, .large])
     }
     private func sourceTitle(_ source: AccountBalanceSource) -> String { switch source { case .entered: "رصيد بداية أدخلته"; case .reconciled: "من مطابقة اعتمدتها"; case .message: "رصيد رسالة يطابق الدفتر"; case .messageDiffers: "رصيد رسالة يختلف عن الدفتر" } }

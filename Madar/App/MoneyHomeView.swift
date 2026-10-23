@@ -95,6 +95,10 @@ struct MoneyHomeView: View {
                         else { MoneyScrollChart(cycle: cycle, app: app, visible: amountsVisible, obligations: reading.obligations).frame(height: 224) }
                         headline(reading, cycle: cycle)
                     } else { firstPage(reading) }
+                    if reading.unknownBalanceCount > 0 {
+                        Text("بعض الحسابات لم يُعرف رصيدها بعد؛ لا تدخل في المجموع.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                        Button("المطابقة مع البنك") { reconcileOpen = true }.font(MadarTypography.body()).frame(minHeight: 44).accessibilityIdentifier("money-unknown-balance-reconcile")
+                    }
                     expenseButton
                     envelopeSection(reading)
                     lowerDesk(reading)
@@ -232,8 +236,8 @@ struct MoneyHomeView: View {
             }
             if reading.hasAccounts {
                 Button { basisOpen = true } label: {
-                    HStack { Text("في حسابك"); Spacer(); Text(figure: amount(reading.basis.inAccountMinor)).font(MadarTypography.cardTitle()); Image(systemName: "chevron.left").font(.caption) }.frame(minHeight: 44)
-                }.buttonStyle(.plain).accessibilityLabel("على أي أساس، في حسابك " + amount(reading.basis.inAccountMinor))
+                    HStack { Text(reading.unknownBalanceCount > 0 ? "الأرصدة المعروفة" : "في حسابك"); Spacer(); Text(figure: reading.knownBalanceCount == 0 && reading.unknownBalanceCount > 0 ? "—" : amount(reading.basis.inAccountMinor)).font(MadarTypography.cardTitle()); Image(systemName: "chevron.left").font(.caption) }.frame(minHeight: 44)
+                }.buttonStyle(.plain).accessibilityLabel(reading.knownBalanceCount == 0 && reading.unknownBalanceCount > 0 ? "على أي أساس، لم يُعرف رصيد الحسابات بعد" : "على أي أساس، الأرصدة المعروفة " + amount(reading.basis.inAccountMinor))
                 if !amountsVisible { Button("أظهر الأرقام") { revealed = true }.frame(minHeight: 44).accessibilityIdentifier("money-reveal") }
             }
         }
@@ -245,27 +249,37 @@ struct MoneyHomeView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("الاحتياطي").font(.custom("thmanyahserifdisplay-Bold", size: 18, relativeTo: .headline)).foregroundStyle(theme.color("reserveText"))
                     HStack(alignment: .firstTextBaseline, spacing: 7) {
-                        Text(figure: amount(reading.reserveMinor)).font(MadarTypography.cardTitle()).accessibilityIdentifier("money-reserve")
+                        Text(figure: amountsVisible && reading.envelopes.isEmpty && reading.reserveMinor == 0 ? "لم يبدأ بعد" : amount(reading.reserveMinor)).font(MadarTypography.cardTitle()).accessibilityIdentifier("money-reserve")
                         if amountsVisible, let runway = reading.reserveRunway {
                             Text(service.days(runway.days)).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                         }
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading)
-                if !dynamicType.isAccessibilitySize && amountsVisible {
+                if !dynamicType.isAccessibilitySize && amountsVisible && reading.reserveMinor > 0 {
                     MoneyReserveSquares(days: reading.reserveDailies ?? 0).frame(width: 152, height: 42)
                 }
             }
             HStack(spacing: 14) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("الفائض").font(.custom("thmanyahserifdisplay-Bold", size: 18, relativeTo: .headline)).foregroundStyle(theme.color("surplusText"))
-                    Text(figure: amount(reading.surplusMinor)).font(MadarTypography.cardTitle()).accessibilityIdentifier("money-surplus")
+                    Text(figure: amountsVisible && reading.envelopes.isEmpty && reading.surplusMinor == 0 ? "يتجمع مع دوراتك" : amount(reading.surplusMinor)).font(MadarTypography.cardTitle()).accessibilityIdentifier("money-surplus")
                 }.frame(maxWidth: .infinity, alignment: .leading)
-                if !dynamicType.isAccessibilitySize && amountsVisible {
+                if !dynamicType.isAccessibilitySize && amountsVisible && reading.surplusHistory.contains(where: { $0 != 0 }) {
                     MoneyWaterfall(values: reading.surplusHistory).frame(width: 152, height: 38)
                 }
             }
             if reading.envelopes.isEmpty {
-                Text("لم تُضف مظروفًا بعد").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).padding(.vertical, 4)
+                Button { goalOpen = true } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "envelope.open").font(.title2).foregroundStyle(theme.color("accentText"))
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("لشيء تخطّط له").font(MadarTypography.body())
+                            Text("أضف مظروفًا وخصّص له من مالك").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                        }
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.left").font(.caption)
+                    }.padding(14).frame(maxWidth: .infinity, minHeight: 64).background(theme.surface, in: .rect(cornerRadius: 12))
+                }.buttonStyle(.plain).accessibilityIdentifier("money-envelope-empty-create")
             } else {
                 ForEach(reading.envelopes) { envelope in MoneyEnvelopeLine(envelope: envelope, app: app, visible: amountsVisible) }
             }

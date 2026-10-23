@@ -181,11 +181,11 @@ public enum MoneyCommandPayload {
             }
             return true
         case "money.saveAccount":
-            return Set(p.keys).isSubset(of: ["id", "name", "bank", "kind", "ownership", "currency", "balanceMinor", "balanceAt", "last4", "senderIDs", "tracked", "zakatInclude"])
+            return Set(p.keys).isSubset(of: ["id", "name", "bank", "kind", "ownership", "currency", "balanceMinor", "balanceAt", "last4", "senderIDs", "tracked", "zakatInclude", "establishBalance"])
                 && id("id") && text("name") && optionalText("bank") && choices("kind", ["current", "savings", "cash", "wallet"])
                 && choices("ownership", ["mine", "notMine"]) && text("currency", max: 3) && integer(p["balanceMinor"]) != nil
                 && date(p["balanceAt"]) != nil && optionalText("last4", max: 4)
-                && ["tracked", "zakatInclude"].allSatisfy { p[$0] == nil || p[$0] == .bool(true) || p[$0] == .bool(false) }
+                && ["tracked", "zakatInclude", "establishBalance"].allSatisfy { p[$0] == nil || p[$0] == .bool(true) || p[$0] == .bool(false) }
                 && (p["senderIDs"] == nil || { if case .array(let list) = p["senderIDs"] { list.count <= 20 && list.allSatisfy { if case .string(let s) = $0 { !s.isEmpty && s.count <= 80 } else { false } } } else { false } }())
         case "money.saveCard":
             return Set(p.keys).isSubset(of: ["id", "name", "bank", "last4", "kind", "accountID", "aliases"])

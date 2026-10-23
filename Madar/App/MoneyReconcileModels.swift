@@ -36,6 +36,7 @@ struct MoneyReconcileRow: Identifiable {
 }
 
 struct MoneyReconcileReading {
+    var unknownAccounts: [MoneyAccountEdit]
     var today: GregorianDay
     var rows: [MoneyReconcileRow]
     /// «لم يُستحق بعد من يومياتك» (L04): part of the balance, neither surplus nor difference.
@@ -86,7 +87,7 @@ extension AppMoneyService {
             if let newest = confirmed.filter({ touches($0) && $0.messageID != nil }).max(by: { $0.eventAt < $1.eventAt }),
                newest.eventAt > (last?.at ?? .distantPast),
                let message = messages.first(where: { $0.id == newest.messageID }), let data = message.parsedJSON,
-               let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: Any], let balance = (parsed["balanceMinor"] as? NSNumber)?.intValue, balance >= 0,
+               let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: Any], parsed["cardKind"] as? String != "credit", parsed["cardKind"] as? String != "prepaid", let balance = (parsed["balanceMinor"] as? NSNumber)?.intValue, balance >= 0,
                try repo.accountBalance(account, at: newest.eventAt) == item.homeMinor {
                 suggestion = .init(observedMinor: balance, at: newest.eventAt, day: day(newest), text: message.text)
             }
@@ -129,6 +130,7 @@ extension AppMoneyService {
                 inMinor: paidMinor, outMinor: remainingMinor, suggestion: nil, pending: []))
         }
         let other = try context.fetch(FetchDescriptor<MadarData.Category>()).contains { $0.deletedAt == nil && $0.mergedInto == nil && $0.name == "أخرى" }
-        return .init(today: today, rows: rows, notYetAccruedMinor: home.cycle.map { ReconciliationEngine.notYetAccrued(elapsedDays: $0.elapsedDays, $0.input) }, hasOtherCategory: other)
+        let unknown = try loadAccounts().rows.filter { $0.side == .cash && $0.amountMinor == nil }.compactMap(\.edit)
+        return .init(unknownAccounts: unknown, today: today, rows: rows, notYetAccruedMinor: home.cycle.map { ReconciliationEngine.notYetAccrued(elapsedDays: $0.elapsedDays, $0.input) }, hasOtherCategory: other)
     }
 }
