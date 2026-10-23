@@ -7,7 +7,7 @@ public enum MoneyCommandPayload {
     public static let intakeName = "money.ingestBankMessage"
     public static let names: Set<String> = [intakeName, "money.pasteBankMessages", "money.logExpense",
         "money.confirmTransaction", "money.deleteTransaction", "money.saveAccount", "money.saveCard", "money.accruePlans", "money.setReserveGoal", "money.repayEnvelopeNow", "money.setEnvelopeSaving", "money.adoptRepayment",
-        "money.applyStatement", "money.ignoreMessage", "money.confirmClear", "money.markVisit",
+        "money.applyStatement", "money.ignoreMessage", "money.confirmClear", "money.markVisit", "money.seedCategories",
         "money.categorize", "money.saveMerchantRule", "money.forgetMerchantRule", "money.confirmSalary", "money.saveObligation", "money.setCategoryLimit", "money.setCategoryPreferredCard", "money.setBudgetExclusion", "money.reconcile", "money.setCardCashback", "money.distributeBigExpense", "money.configureTrip", "money.fundTrip", "money.repriceTrip", "money.saveZakat", "money.prepareGoal"]
     /// §7.5 maxRepayCycles: the longest salary repayment (the envelope sheet offers 1–6).
     public static let maxRepaySalaries = 12
@@ -96,7 +96,7 @@ public enum MoneyCommandPayload {
             guard Set(p.keys) == ["ids"], case .array(let rows) = p["ids"], !rows.isEmpty, rows.count <= 100 else { return false }
             let ids = rows.compactMap { if case .string(let raw) = $0 { UUID(uuidString: raw) } else { nil } }
             return ids.count == rows.count && Set(ids).count == ids.count
-        case "money.accruePlans", "money.markVisit": return p.isEmpty
+        case "money.accruePlans", "money.markVisit", "money.seedCategories": return p.isEmpty
         case "money.categorize":
             return Set(p.keys) == ["id", "categoryID", "remember"] && id("id") && optionalID("categoryID") && (p["remember"] == .bool(true) || p["remember"] == .bool(false))
         case "money.saveMerchantRule":

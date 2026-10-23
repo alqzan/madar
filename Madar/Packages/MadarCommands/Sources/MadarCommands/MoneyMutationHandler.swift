@@ -34,6 +34,15 @@ public struct MoneyParsedFields: Codable, Sendable {
     }
 }
 
+/// The six categories of the approved design (`mal/12-Z-R18-cat-1`), seeded once into an empty store.
+public enum MoneyDefaultCategories {
+    public static let all: [(slug: String, name: String)] = [("dining", "مطاعم وقهوة"), ("grocery", "بقالة"), ("fuel", "بنزين"),
+                                                              ("shopping", "تسوق"), ("subscriptions", "اشتراكات"), ("other", "أخرى")]
+    public static func id(_ slug: String) -> UUID { StableIdentity.uuid(for: "Category:" + slug) }
+    /// Older than any real write, so a seed never beats an edit or a deletion in last-writer-wins.
+    public static let seedStamp = Date(timeIntervalSince1970: 0)
+}
+
 struct MoneyStagedResult { var inverse: Data?; var duplicate: Bool }
 private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var after: [DataRecord]; var reserveGoalID: UUID? = nil }
 
@@ -60,6 +69,19 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             let key = "sys.moneyLastVisit", value = Data(("\"" + ISO8601DateFormatter().string(from: now) + "\"").utf8)
             let row = try context.fetch(FetchDescriptor<DeviceSetting>()).first { $0.key == key && $0.deletedAt == nil } ?? { let r = DeviceSetting(); r.key = key; r.createdAt = now; context.insert(r); return r }()
             row.valueJSON = value; try touch(row, now, writer)
+            return .init(inverse: nil, duplicate: false)
+        }
+        if name == "money.seedCategories" {
+            // §11 seeded rows: the default categories carry UUIDv5(seedNS, "Category:<slug>"), so two devices that seed
+            // offline make the same rows. Only a store with no category at all (live or deleted) is seeded: a restore,
+            // an import or the user's own deletions are never overridden. Never undone, like any seed. A seeded row is
+            // stamped at the epoch, so any real edit or tombstone of the same id — from any device — wins the merge.
+            guard try context.fetch(FetchDescriptor<MadarData.Category>()).isEmpty else { return .init(inverse: nil, duplicate: false) }
+            for (order, item) in MoneyDefaultCategories.all.enumerated() {
+                let row = MadarData.Category(); row.id = MoneyDefaultCategories.id(item.slug); row.name = item.name; row.order = order
+                row.createdAt = MoneyDefaultCategories.seedStamp; row.updatedAt = MoneyDefaultCategories.seedStamp; row.writerID = writer
+                context.insert(row)
+            }
             return .init(inverse: nil, duplicate: false)
         }
         let before = try records(context)

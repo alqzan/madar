@@ -663,6 +663,23 @@ final class AppSession {
         return outcome.status == .applied || outcome.status == .duplicate
     }
     #endif
+    /// The six default categories, only while the store has no category at all (the handler checks again inside its
+    /// transaction). One shared attempt: the money home and the expense screen can both ask at once, and a busy writer
+    /// is retried briefly so the first expense screen does not open with no categories.
+    func seedMoneyDefaults() async {
+        if let moneySeed { return await moneySeed.value }
+        guard ((try? ModelContext(container).fetchCount(FetchDescriptor<MadarData.Category>())) ?? 1) == 0 else { return }
+        let task = Task { @MainActor in
+            for attempt in 0..<5 {
+                do { try await executeMoneyCommand("money.seedCategories"); return }
+                catch BackupOperationError.busy where attempt < 4 { try? await Task.sleep(for: .milliseconds(200)) }
+                catch { return }
+            }
+        }
+        moneySeed = task; await task.value; moneySeed = nil
+    }
+    private var moneySeed: Task<Void, Never>?
+
     func executeMoneyCommand(_ name: String, payload: [String: MadarCore.JSONValue] = [:], id: UUID = UUID()) async throws {
         guard lockController?.canPresent(.app) ?? protectedDataAuthorized else { throw DataError.authenticationFailed }
         guard beginWrite() else { throw BackupOperationError.busy }

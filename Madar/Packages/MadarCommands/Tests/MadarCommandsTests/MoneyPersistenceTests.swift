@@ -821,6 +821,30 @@ import MadarInbox
         #expect(try await f.run("money.setCategoryPreferredCard", ["categoryID": .string(UUID().uuidString), "cardID": .null]).status == .rejected)
     }
     /// «منذ آخر زيارة»: the visit marker is one device row, updated in place, with no undo.
+    /// §11 seeded rows: the design's six categories, UUIDv5(seedNS, "Category:<slug>") worked out with Python's uuid5.
+    @Test func defaultCategoriesSeedOnceIntoAnEmptyStoreOnly() async throws {
+        let f = try MoneyFixture(); defer { f.clean() }
+        #expect(try await f.run("money.seedCategories", [:]).status == .applied)
+        let rows = try ModelContext(f.container).fetch(FetchDescriptor<MadarData.Category>()).sorted { $0.order < $1.order }
+        #expect(rows.map(\.name) == ["مطاعم وقهوة", "بقالة", "بنزين", "تسوق", "اشتراكات", "أخرى"])
+        #expect(rows.map(\.id.uuidString) == ["B568F315-2139-5DFF-B10F-F2F89052F257", "26B8632C-9AA9-5CE0-AEDE-4760AE674D04",
+            "D2CB3CF3-C553-504F-9343-3A75C7C63FAA", "A679403D-BB8C-55BD-9640-E8CD0CFD1BF2", "B2EAF182-D412-5031-93A2-A876545B6290",
+            "DAA1D930-CBC1-5926-B244-6C858570F75D"])
+        // Seeds are stamped at the epoch so a real edit or tombstone of the same id always wins the merge.
+        #expect(rows.allSatisfy { $0.deletedAt == nil && $0.updatedAt == Date(timeIntervalSince1970: 0) })
+        // A second run (another command id) adds nothing.
+        #expect(try await f.run("money.seedCategories", [:]).status == .applied)
+        #expect(try ModelContext(f.container).fetch(FetchDescriptor<MadarData.Category>()).count == 6)
+        #expect(!MoneyCommandPayload.validate(name: "money.seedCategories", payload: ["name": .string("x")]))
+
+        // A store that already has a category, even a deleted one, is never seeded.
+        let g = try MoneyFixture(); defer { g.clean() }
+        let context = ModelContext(g.container), own = MadarData.Category()
+        own.name = "مصروفات البيت"; own.deletedAt = g.now; context.insert(own); try context.save()
+        #expect(try await g.run("money.seedCategories", [:]).status == .applied)
+        #expect(try ModelContext(g.container).fetch(FetchDescriptor<MadarData.Category>()).map(\.name) == ["مصروفات البيت"])
+    }
+
     @Test func markVisitKeepsOneDeviceRowAtTheCommandTime() async throws {
         let f = try MoneyFixture(); defer { f.clean() }
         let first = try await f.run("money.markVisit", [:]); #expect(first.status == .applied); #expect(first.undoToken == nil)

@@ -135,6 +135,7 @@ struct MoneyHomeView: View {
         .onChange(of: expenseOpen) { if !expenseOpen { load() } }
         .sheet(isPresented: $basisOpen) { MoneyBasisView(app: app, revealed: $revealed) }
         .task {
+            await app.seedMoneyDefaults()
             do { try await app.executeMoneyCommand("money.accruePlans") } catch { }
             load()
             // §7.5 «بعد غياب»: «منذ آخر زيارة» opens first; otherwise this visit is the new mark.
