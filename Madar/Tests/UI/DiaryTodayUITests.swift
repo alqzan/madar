@@ -8,11 +8,45 @@ import XCTest
         continueAfterFailure = false
         let app = launch("welcome")
         XCTAssertTrue(app.buttons["diary-welcome-next"].waitForExistence(timeout: 25)); capture(app, "M3-V05-welcome-L")
-        for _ in 0..<4 { app.buttons["diary-welcome-next"].tap() }
-        XCTAssertTrue(app.buttons["diary-write"].waitForExistence(timeout: 10))
+        for (index, title) in ["دفتر يكتب معك", "ما تعيشه، بأسلوب المذكرات", "للذكرى أكثر من تقويم", "سطر واحد يكفي للبداية"].enumerated() {
+            let heading = app.staticTexts["diary-welcome-title"]
+            expectation(for: NSPredicate(format: "label == %@", title), evaluatedWith: heading)
+            let next = app.buttons["diary-welcome-next"]
+            expectation(for: NSPredicate(format: "enabled == true"), evaluatedWith: next)
+            waitForExpectations(timeout: 10)
+            capture(app, "M3-V05-welcome-step-\(index + 1)-L")
+            next.tap()
+        }
+        XCTAssertTrue(app.buttons["diary-write"].waitForExistence(timeout: 10), app.debugDescription)
         app.terminate(); app.launch()
         XCTAssertTrue(app.buttons["diary-write"].waitForExistence(timeout: 25)); XCTAssertFalse(app.buttons["diary-welcome-next"].exists)
         app.buttons["diary-write"].tap(); XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 8))
+    }
+    func testRestoredDiaryOpensWithoutWelcomeAndNamesItsMissingPhoto() throws {
+        continueAfterFailure = false
+        let app = launch("restored")
+        XCTAssertTrue(app.buttons["diary-days"].waitForExistence(timeout: 25))
+        XCTAssertFalse(app.buttons["diary-welcome-next"].exists)
+        let excerpt = app.staticTexts.matching(NSPredicate(format: "label == %@", "ذكرى مستوردة بقيت بتاريخها")).firstMatch
+        XCTAssertTrue(excerpt.exists)
+        XCTAssertTrue(app.staticTexts["صورة هذا اليوم لم تُنقل"].exists)
+        let write = app.buttons["diary-write"]
+        let accessory = app.descendants(matching: .any)["tab-accessory-next-prayer"]
+        XCTAssertLessThanOrEqual(write.frame.maxY, accessory.frame.minY, "Writing stays above the native accessory")
+        XCTAssertLessThanOrEqual(accessory.frame.minY - write.frame.maxY, 24, "No duplicate bottom spacer")
+        capture(app, "M3-restored-diary-L")
+        app.swipeUp(velocity: .slow)
+        XCTAssertLessThanOrEqual(excerpt.frame.maxY, write.frame.minY, "The complete memory excerpt can scroll clear of the writing bar")
+        capture(app, "M3-restored-diary-s1-L")
+        app.terminate(); app.launch()
+        XCTAssertTrue(app.buttons["diary-days"].waitForExistence(timeout: 25))
+        XCTAssertFalse(app.buttons["diary-welcome-next"].exists)
+        app.buttons["diary-days"].tap()
+        let month = app.buttons["diary-month-10"]
+        XCTAssertTrue(month.waitForExistence(timeout: 10))
+        XCTAssertTrue(month.label.contains("أكتوبر"))
+        XCTAssertTrue(month.label.contains("ربيع"), "Month accessibility includes the other calendar")
+        capture(app, "M3-restored-hub-L")
     }
     func testTodayPaperSourcesYesterdayYearAndLateWriting() throws {
         continueAfterFailure = false

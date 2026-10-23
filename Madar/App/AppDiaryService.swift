@@ -55,7 +55,14 @@ struct DiaryHomeSnapshot {
     func hasWelcomed() throws -> Bool {
         try authorizeRead()
         let key = "sys.diaryWelcomeSeen"
-        return try ModelContext(app.container).fetch(FetchDescriptor<DeviceSetting>(predicate: #Predicate { $0.key == key && $0.deletedAt == nil && $0.mergedInto == nil })).first?.valueJSON == Data("true".utf8)
+        let context = ModelContext(app.container)
+        if try context.fetch(FetchDescriptor<DeviceSetting>(predicate: #Predicate { $0.key == key && $0.deletedAt == nil && $0.mergedInto == nil })).first?.valueJSON == Data("true".utf8) { return true }
+        // An imported/restored diary already belongs to its writer. Open it without
+        // an introduction or changing the saved source choices and calendar match.
+        var existing = FetchDescriptor<Entry>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil })
+        existing.fetchLimit = 1
+        existing.propertiesToFetch = [\.id]
+        return try !context.fetch(existing).isEmpty
     }
     func currentDay() throws -> GregorianDay {
         try authorizeRead()

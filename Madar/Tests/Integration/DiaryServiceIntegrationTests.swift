@@ -49,4 +49,28 @@ import MadarCommands
         XCTAssertEqual(try context.fetch(FetchDescriptor<DeviceSetting>()).filter { $0.key == "sys.diaryWelcomeSeen" }.count, 1)
     }
 
+    func testRestoredDiarySkipsWelcomeWithoutWritingOrReadingBehindTheLock() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "DiaryRestoredWelcome-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root.appending(path: "Data"))
+        let app = try AppSession(container: container, groupDirectory: root), service = AppDiaryService(app: app)
+        XCTAssertThrowsError(try service.hasWelcomed())
+        app.authorizeProtectedData()
+        let context = ModelContext(container)
+        let removed = Entry(); removed.deletedAt = .now; context.insert(removed)
+        let merged = Entry(); merged.mergedInto = removed.id; context.insert(merged)
+        try context.save()
+        XCTAssertFalse(try service.hasWelcomed(), "Tombstones and merged rows are not a restored diary")
+        let restored = Entry(); restored.dayKey = "2024-03-11"; restored.dayPolicy = "legacy@0"; restored.source = "dayOne"; restored.text = "نص مستورد"; context.insert(restored)
+        try context.save()
+        let settings = app.values
+        XCTAssertTrue(try service.hasWelcomed())
+        XCTAssertEqual(app.values, settings)
+        XCTAssertEqual(try context.fetch(FetchDescriptor<DeviceSetting>()).filter { $0.key == "sys.diaryWelcomeSeen" }.count, 0)
+        XCTAssertEqual(restored.dayKey, "2024-03-11")
+        XCTAssertEqual(restored.dayPolicy, "legacy@0")
+        app.redactProtectedData()
+        XCTAssertThrowsError(try service.hasWelcomed())
+    }
+
 }

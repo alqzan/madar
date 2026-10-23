@@ -201,7 +201,7 @@ struct DiaryHomeView: View {
     private func thatDay(_ day: DiaryDisplayDay) -> some View {
         VStack(alignment: .leading, spacing: 13) {
             HStack { Text("ذاك اليوم").font(.custom("thmanyahsans-Bold", size: 13, relativeTo: .subheadline)); Text("كتبه مدار وكتبته أنت").font(DiaryType.label).foregroundStyle(theme.color("ink3Text")); Spacer() }
-            ForEach(Array(day.lines.filter { app.bool("notes.showAutoSections") || !["salah", "quran"].contains($0.kind) }.prefix(3))) { line in
+            ForEach(Array(day.lines.filter { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && (app.bool("notes.showAutoSections") || !["salah", "quran"].contains($0.kind)) }.prefix(3))) { line in
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
                     Text(service.time(line.at, zone: line.tzID)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text")).frame(width: 48, alignment: .leading)
                     Text(line.markdown == true ? DayOneMarkdown.plain(line.text) : line.text).font(.custom("thmanyahseriftext-Regular", size: 16, relativeTo: .body)).italic().lineSpacing(5).fixedSize(horizontal: false, vertical: true)

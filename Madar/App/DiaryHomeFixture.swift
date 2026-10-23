@@ -10,7 +10,7 @@ import MadarDesign
 extension AppSession {
     func prepareDiaryHomeFixture(group: URL) throws {
         let env = ProcessInfo.processInfo.environment
-        guard let variant = env["MADAR_UI_DIARY_FIXTURE"], ["home", "empty", "echoes", "margin", "welcome", "today", "editor", "return", "travel", "letters"].contains(variant), let id = env["MADAR_UI_STORE_ID"],
+        guard let variant = env["MADAR_UI_DIARY_FIXTURE"], ["home", "empty", "echoes", "margin", "welcome", "restored", "today", "editor", "return", "travel", "letters"].contains(variant), let id = env["MADAR_UI_STORE_ID"],
               group.lastPathComponent == id, group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         selectedTab = "notes"
         let context = ModelContext(container)
@@ -18,7 +18,18 @@ extension AppSession {
         let settings = try SettingsStore(context: context)
         _ = try settings.stage(["core.faceIDLock": .string("none"), "core.dayStart": .string("midnight")])
         for key in ["sys.onboardingCompleted", "sys.diaryFixture"] { let row = DeviceSetting(); row.key = key; row.valueJSON = Data("true".utf8); context.insert(row) }
-        if variant != "welcome" { let marker = DeviceSetting(); marker.key = "sys.diaryWelcomeSeen"; marker.valueJSON = Data("true".utf8); context.insert(marker) }
+        if variant != "welcome" && variant != "restored" { let marker = DeviceSetting(); marker.key = "sys.diaryWelcomeSeen"; marker.valueJSON = Data("true".utf8); context.insert(marker) }
+        if variant == "restored" {
+            let today = GregorianDay.containing(prayerUITestClock(.now), in: .riyadh)
+            let day = try GregorianDay(year: today.year - 1, month: today.month, day: today.day)
+            let missing = Media(); missing.kind = "photo"; missing.contentType = "image/jpeg"; missing.state = "missing"; context.insert(missing)
+            let photo = Entry(); photo.dayKey = day.description; photo.source = "dayOne"; photo.dayPolicy = "legacy@0"
+            photo.text = ""; photo.eventAt = day.date(in: .riyadh); photo.attachmentMediaIDs = [missing.id]; context.insert(photo)
+            let text = Entry(); text.dayKey = day.description; text.source = "dayOne"; text.dayPolicy = "legacy@0"
+            text.text = "ذكرى مستوردة بقيت بتاريخها"; text.eventAt = photo.eventAt.addingTimeInterval(60); context.insert(text)
+            let page = DayPage(); page.dayKey = day.description; page.origin = "dayOne"; context.insert(page)
+            try context.save(); return
+        }
         if variant == "echoes" || variant == "margin" { _ = try settings.stage(["notes.homeShape": .string(variant)]) }
         if variant == "letters" {
             // N04: one letter due since yesterday, one sealed today, and a project whose keyword today's line mentions.

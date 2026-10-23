@@ -191,10 +191,14 @@ struct MadarRootView: View {
                     else { BahwLobbyView(session: session) }
                 }
                 .safeAreaInset(edge: .bottom, spacing: 0) {
-                    Color.clear
-                        .frame(height: dynamicType.isAccessibilitySize ? 88 : 72)
-                        .allowsHitTesting(false)
-                        .accessibilityHidden(true)
+                    // Diary already reserves its writing bar above the native
+                    // accessory; a second spacer hid the end of the memory card.
+                    if tab != "notes" {
+                        Color.clear
+                            .frame(height: dynamicType.isAccessibilitySize ? 88 : 72)
+                            .allowsHitTesting(false)
+                            .accessibilityHidden(true)
+                    }
                 }
             }
         }
