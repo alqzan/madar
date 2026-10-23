@@ -163,6 +163,10 @@ extension AppSession {
             let entries = try ModelContext(container).fetch(FetchDescriptor<Entry>())
             out["store"] = ["entries": entries.count, "legacyPolicy": entries.filter { $0.dayPolicy == "legacy@0" }.count,
                             "days": Set(entries.map(\.dayKey)).count]
+            let exportStart = Date()
+            let exported = try AppDiaryService(app: self).exportPages(.init())
+            out["export"] = ["days": exported.count, "lines": exported.reduce(0) { $0 + $1.lines.count },
+                             "media": exported.reduce(0) { $0 + $1.media.count }, "seconds": Date().timeIntervalSince(exportStart)]
         } catch { out["error"] = String(describing: error) }
         if let data = try? JSONSerialization.data(withJSONObject: out, options: [.prettyPrinted, .sortedKeys]) { try? data.write(to: report) }
     }

@@ -7,6 +7,69 @@ import MadarData
 import MadarCommands
 @testable import Madar
 @MainActor final class DiaryExportIntegrationTests:XCTestCase {
+    func testBatchKeepsRevisionsMarginsOpenedLettersAndEmptyFrozenDays() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "DiaryExportBatch-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root.appending(path: "Data"))
+        let app = try AppSession(container: container, groupDirectory: root)
+        app.authorizeProtectedData()
+        let service = AppDiaryService(app: app), context = ModelContext(container)
+        let first = try GregorianDay("2024-03-11"), second = first.adding(days: 1)
+        let original = Entry(); original.dayKey = first.description; original.text = "ORIGINAL-REPLACED"; context.insert(original)
+        let revision = Entry(); revision.dayKey = first.description; revision.text = "**النص المصحح**"; revision.textFormat = "markdown"
+        revision.source = "revision"; revision.sourceID = original.id.uuidString; context.insert(revision)
+        let deleted = Entry(); deleted.dayKey = first.description; deleted.text = "DO-NOT-EXPORT-DELETED"; deleted.deletedAt = .now; context.insert(deleted)
+        let merged = Entry(); merged.dayKey = first.description; merged.text = "DO-NOT-EXPORT-MERGED"; merged.mergedInto = revision.id; context.insert(merged)
+        let margin = MarginNote(); margin.targetDayKey = first.description; margin.writtenDayKey = second.description; margin.text = "هامش من الغد"; context.insert(margin)
+        let intention = Niyya(); intention.dayKey = second.description; intention.text = "نية محفوظة"; context.insert(intention)
+        let page = DayPage(); page.dayKey = second.description; page.questionAnswer = "جواب محفوظ"; context.insert(page)
+        let opened = Letter(); opened.state = "opened"; opened.openedAt = first.date(in: app.activePlace.timeZone); opened.text = "رسالة مفتوحة"; context.insert(opened)
+        for state in ["sealed", "eligible"] {
+            let letter = Letter(); letter.state = state; letter.text = "DO-NOT-EXPORT-" + state; context.insert(letter)
+        }
+        let frozen = DeviceSetting(); frozen.key = "sys.diaryAutoLines." + first.description; frozen.valueJSON = Data("[]".utf8); context.insert(frozen)
+        for day in [first, second] {
+            let prayer = PrayerLog(); prayer.dayKey = day.description; prayer.prayer = "fajr"; prayer.status = "alone"; context.insert(prayer)
+        }
+        let future = Entry(); future.dayKey = "2200-01-01"; future.text = "DO-NOT-EXPORT-FUTURE"; context.insert(future)
+        try context.save()
+        var options = DiaryExportOptions(); options.year = 2024; options.month = 3
+        let pages = try service.exportPages(options)
+        XCTAssertEqual(pages.map(\.day), [first, second])
+        XCTAssertEqual(pages[0].lines.filter { $0.kind == "normal" }.map(\.text), [DayOneMarkdown.readable("**النص المصحح**")])
+        XCTAssertEqual(pages[0].lines.filter { $0.kind == "margin" }.map(\.text), ["هامش من الغد"])
+        XCTAssertEqual(pages[0].lines.filter { $0.kind == "letter" }.map(\.text), ["رسالة مفتوحة"])
+        XCTAssertFalse(pages[0].lines.contains { $0.kind == "salah" }, "An empty frozen snapshot replaces the live source")
+        XCTAssertTrue(pages[1].lines.contains { $0.kind == "salah" && $0.text == "صلّيت الفجر وحدي" })
+        XCTAssertEqual(pages[1].lines.filter { $0.kind == "intention" }.map(\.text), ["نية محفوظة"])
+        XCTAssertEqual(pages[1].lines.filter { $0.id.hasSuffix("answer") }.map(\.text), ["جواب محفوظ"])
+        XCTAssertTrue(pages[1].lines.contains { $0.kind == "margin" && $0.text.hasPrefix("كتبت في هامش ") && $0.text.hasSuffix("هامش من الغد") })
+        XCTAssertFalse(pages.flatMap(\.lines).contains { $0.text.contains("DO-NOT") || $0.text.contains("ORIGINAL") })
+        options.sources = false; options.margins = false
+        XCTAssertFalse(try service.exportPages(options).flatMap(\.lines).contains { ["salah", "margin"].contains($0.kind) })
+    }
+
+    func testBatchExportsThousandsOfStoredDaysWithoutChangingTheirKeys() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "DiaryExportVolume-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root.appending(path: "Data"))
+        let app = try AppSession(container: container, groupDirectory: root)
+        app.authorizeProtectedData()
+        let context = ModelContext(container), first = try GregorianDay("2010-01-01")
+        for offset in 0..<2263 {
+            let entry = Entry(); entry.dayKey = first.adding(days: offset).description
+            entry.text = "صفحة محفوظة \(offset)"; entry.dayPolicy = "legacy@0"; context.insert(entry)
+        }
+        try context.save()
+        let start = Date(), pages = try AppDiaryService(app: app).exportPages(.init())
+        XCTAssertEqual(pages.count, 2263)
+        XCTAssertEqual(pages.first?.day.description, "2010-01-01")
+        XCTAssertEqual(pages.last?.day.description, "2016-03-12")
+        XCTAssertEqual(pages.first?.lines.map(\.text), ["صفحة محفوظة 0"])
+        XCTAssertEqual(pages.last?.lines.map(\.text), ["صفحة محفوظة 2262"])
+        add(XCTAttachment(string: "2263 synthetic stored days: exportPages \(Date().timeIntervalSince(start)) seconds"))
+    }
+
     func testFrozenSourcesMediaSealedExclusionAndOutputFormats() async throws {
         let root=FileManager.default.temporaryDirectory.appending(path:"DiaryExportTest-\(UUID())");defer{try? FileManager.default.removeItem(at:root)}
         let container=try MadarContainerFactory.makeLocal(at:root.appending(path:"Data")),app=try AppSession(container:container,groupDirectory:root),service=AppDiaryService(app:app)

@@ -32,6 +32,13 @@ import XCTest
         let deadline = Date().addingTimeInterval(600)
         while !FileManager.default.fileExists(atPath: report) && Date() < deadline { _ = app.wait(for: .runningForeground, timeout: 2); Thread.sleep(forTimeInterval: 2) }
         XCTAssertTrue(FileManager.default.fileExists(atPath: report), "No trial report")
+        let result = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: report))) as? [String: Any])
+        XCTAssertNil(result["error"], "The local trial reported an error; inspect its private report on this Mac")
+        let store = try XCTUnwrap(result["store"] as? [String: Int])
+        XCTAssertGreaterThan(store["entries"] ?? 0, 0)
+        XCTAssertEqual(store["legacyPolicy"], store["entries"], "Every imported entry retains its stored legacy day")
+        let exported = try XCTUnwrap(result["export"] as? [String: Any])
+        XCTAssertEqual(exported["days"] as? Int, store["days"], "The whole imported diary must be exportable")
         let notes = app.buttons["tab-notes"]; XCTAssertTrue(notes.waitForExistence(timeout: 20), app.debugDescription); notes.tap()
         let next = app.buttons["diary-welcome-next"]
         if next.waitForExistence(timeout: 5) { capture(app, "TRIAL-diary-welcome-L"); for _ in 0..<6 where next.exists { next.tap(); _ = app.buttons["diary-days"].waitForExistence(timeout: 2) } }

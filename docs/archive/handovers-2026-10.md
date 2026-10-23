@@ -24,3 +24,11 @@ Usage: 45% five-hour / 22% weekly at the last check.
 - **Not verified:** owner iPhone; dark mode of the spines; the tab change on iPad (sidebar).
 - **Next (owner answered, all «yes» to the proposal):** M6-UX-R (merge «قديمًا» into «أنهيتها»; cabinet into «كل كتبي»; the desk becomes one open book with the wird), M6-UX-V (tapping a volume opens it), M6-UX-T (title edit and size at import).
 - **Model/effort:** claude-opus-5-5, effort not exposed. **Usage:** about 83% of the five-hour window at handover.
+
+## Handover — set titles across volumes, open a volume, rename and size — 2026-10-22 — Claude
+- **Works now:** a set's volumes stand upright with the short name written once, large and horizontal, across all of them (owner's «زا في مجلد ثم د في مجلد»); tapping a volume opens it (saved place or its first chapter) and the reader header names it; «غيّر الاسم» on the shelf menu (`book.rename`, undoable); the import review shows the shelf name and the size. The diary welcome no longer hides the room bar (it trapped first-time users).
+- **Verified:** `swift test` BookVolumesTests 4/4, BookMutationTests 10/10, BookTitleTests 12/12; UI `QuranHomeUITests/testFirstUseShows…` passed (it failed before), `testTurathSearchDownloadsABookIntoTheLibrary` passed, `testEPUBPreviewUsesFileMetadata…` with rename passed, `testTappingASecondVolumeOpensThatVolume` passed with its known gap marked; `git diff --check` clean.
+- **Differences left:** a volume that begins mid-chapter opens at that chapter, not its first page (blocker in M6-UX-V). The spine title overlaps the 1 pt gap between volumes, as on a printed set.
+- **Not verified:** owner iPhone; dark mode of the spines; long real sets of 8+ volumes.
+- **Next:** owner looks at the shelf; M6-UX-V blocker; M6-UX-R needs two or three layout proposals before code.
+- **Model/effort:** claude-opus-5-5, effort not exposed; helpers Haiku and Sonnet (read-only). **Usage:** not exposed.

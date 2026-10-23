@@ -30,26 +30,88 @@ struct DiaryExportArtifact: Identifiable {
 extension AppDiaryService {
     func exportPages(_ options:DiaryExportOptions) throws -> [DiaryExportPage] {
         try authorizeRead()
-        let context=ModelContext(app.container),index=try searchIndex()
+        let context = ModelContext(app.container)
+        // Read each diary table once. Calling day() for every exported date made
+        // a large imported diary repeatedly scan its store.
+        let entries = Self.visible(try context.fetch(FetchDescriptor<Entry>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil }, sortBy: [SortDescriptor(\.eventAt)])))
+        let pages = try context.fetch(FetchDescriptor<DayPage>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil }))
+        let margins = try context.fetch(FetchDescriptor<MarginNote>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil }))
+        let intentions = try context.fetch(FetchDescriptor<Niyya>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil }))
+        // Fetch only opened letters: sealed and eligible letters never enter an export.
+        let letters = try context.fetch(FetchDescriptor<Letter>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil && $0.state == "opened" }))
+        let entriesByDay = Dictionary(grouping: entries, by: \.dayKey)
+        let pagesByDay = Dictionary(grouping: pages, by: \.dayKey)
+        let intentionsByDay = Dictionary(grouping: intentions, by: \.dayKey)
+        let lettersByDay = Dictionary(grouping: letters) { GregorianDay.containing($0.openedAt ?? $0.createdAt, in: app.activePlace.timeZone).description }
+        var marginsByDay: [String: [MarginNote]] = [:]
+        for margin in margins {
+            marginsByDay[margin.targetDayKey, default: []].append(margin)
+            if margin.writtenDayKey != margin.targetDayKey { marginsByDay[margin.writtenDayKey, default: []].append(margin) }
+        }
         let snapshots=try context.fetch(FetchDescriptor<DeviceSetting>(predicate:#Predicate{$0.deletedAt == nil && $0.mergedInto == nil})).filter{$0.key.hasPrefix("sys.diaryAutoLines.")}
         var frozen:[String:[DiaryDisplayLine]]=[:]
         for row in snapshots {frozen[String(row.key.dropFirst("sys.diaryAutoLines.".count))]=try JSONDecoder().decode([DiaryDisplayLine].self,from:row.valueJSON)}
-        var keys=Set(try archive().days.map(\.day.description)+index.documents.map(\.day.description)+Array(frozen.keys))
+        var keys = Set(entriesByDay.keys)
+        keys.formUnion(pages.filter { $0.photoMediaID != nil || $0.questionAnswer != nil }.map(\.dayKey))
+        keys.formUnion(margins.map(\.writtenDayKey))
+        keys.formUnion(intentionsByDay.keys)
+        keys.formUnion(lettersByDay.keys)
+        keys.formUnion(frozen.keys)
         if options.sources {
             keys.formUnion(try context.fetch(FetchDescriptor<PrayerLog>(predicate:#Predicate{$0.deletedAt == nil && $0.mergedInto == nil})).map(\.dayKey))
             keys.formUnion(try context.fetch(FetchDescriptor<HifzSession>(predicate:#Predicate{$0.deletedAt == nil && $0.mergedInto == nil})).map(\.dayKey))
         }
         let today=try currentDay()
-        return try keys.compactMap{try? GregorianDay($0)}.filter{$0<=today && (options.year==nil || $0.year==options.year) && (options.month==nil || $0.month==options.month)}.sorted().compactMap { date in
-            let page=try day(date)
-            var lines=page.lines.filter{["normal","late","ghad"].contains($0.kind) || (options.margins && $0.kind=="margin")}
-            if options.sources {lines += try frozen[date.description] ?? DiaryLineRenderer.live(day:date,context:context)}
-            for doc in index.documents where doc.day==date && (["letter","intention"].contains(doc.kind) || doc.id.hasSuffix("answer")) {
-                lines.append(.init(id:doc.id,at:date.date(in:app.activePlace.timeZone),text:doc.text,kind:doc.kind))
+        let dates = keys.compactMap{try? GregorianDay($0)}.filter{$0<=today && (options.year==nil || $0.year==options.year) && (options.month==nil || $0.month==options.month)}.sorted()
+        let selectedKeys = Set(dates.map(\.description))
+        let liveKeys = selectedKeys.subtracting(frozen.keys)
+        let live = options.sources ? try DiaryLineRenderer.live(days: liveKeys, context: context) : [:]
+        var mediaIDs = Set(entries.filter { selectedKeys.contains($0.dayKey) }.flatMap { $0.attachmentMediaIDs + ($0.mediaID.map { [$0] } ?? []) })
+        mediaIDs.formUnion(pages.filter { selectedKeys.contains($0.dayKey) }.compactMap(\.photoMediaID))
+        // Fetch referenced media in bounded batches; unrelated photo bytes stay out of memory.
+        var mediaByID: [UUID: Media] = [:]
+        let ids = Array(mediaIDs)
+        for start in stride(from: 0, to: ids.count, by: 400) {
+            let batch = Array(ids[start..<min(start + 400, ids.count)])
+            for row in try context.fetch(FetchDescriptor<Media>(predicate: #Predicate { batch.contains($0.id) && $0.deletedAt == nil && $0.mergedInto == nil })) where mediaByID[row.id] == nil {
+                mediaByID[row.id] = row
             }
-            var media=page.media
-            let key=date.description
-            if let id=try context.fetch(FetchDescriptor<DayPage>(predicate:#Predicate{$0.dayKey == key && $0.deletedAt == nil && $0.mergedInto == nil})).first?.photoMediaID,!media.contains(where:{$0.id==id}),let row=try context.fetch(FetchDescriptor<Media>(predicate:#Predicate{$0.id == id && $0.deletedAt == nil && $0.mergedInto == nil})).first,let data=row.data {media.append(.init(id:id,entryID:"page",kind:"photo",contentType:row.contentType,data:data,duration:nil))}
+        }
+        return try dates.compactMap { date in
+            let key = date.description, written = entriesByDay[key] ?? []
+            var lines: [DiaryDisplayLine] = written.filter { ["normal", "late", "ghad"].contains($0.ink) }.map { row in
+                let markdown = row.textFormat == "markdown"
+                return .init(id: row.id.uuidString, at: row.eventAt, text: markdown ? DayOneMarkdown.readable(row.text) : row.text, kind: row.ink,
+                             tzID: row.source == "dayOne" && !row.tzID.isEmpty ? row.tzID : nil, markdown: markdown ? true : nil)
+            }
+            if options.margins {
+                for margin in marginsByDay[key] ?? [] {
+                    let text = margin.targetDayKey == key ? margin.text : "كتبت في هامش " + dateTitle(try GregorianDay(margin.targetDayKey), calendar: .gregorian) + ": " + margin.text
+                    lines.append(.init(id: "margin." + margin.id.uuidString, at: margin.writtenAt, text: text, kind: "margin"))
+                }
+            }
+            // Frozen lines (including an empty snapshot) replace live lines. Export
+            // source selection is independent of the home screen's auto-line toggles.
+            if options.sources { lines += frozen[key] ?? live[key] ?? [] }
+            let at = date.date(in: app.activePlace.timeZone)
+            for row in intentionsByDay[key] ?? [] { lines.append(.init(id: row.id.uuidString, at: at, text: row.text, kind: "intention")) }
+            for row in lettersByDay[key] ?? [] { lines.append(.init(id: row.id.uuidString, at: at, text: row.text, kind: "letter")) }
+            for row in pagesByDay[key] ?? [] {
+                if let answer = row.questionAnswer, !answer.isEmpty { lines.append(.init(id: row.id.uuidString + "answer", at: at, text: answer, kind: "writing")) }
+            }
+            var media: [DiaryDisplayMedia] = []
+            for entry in written {
+                for id in entry.attachmentMediaIDs + (entry.mediaID.map { [$0] } ?? []) {
+                    guard let row = mediaByID[id] else { continue }
+                    if let data = row.data { media.append(.init(id: id, entryID: entry.id.uuidString, kind: row.kind, contentType: row.contentType, data: data, duration: row.durationS)) }
+                    else if row.state == "missing" { media.append(.init(id: id, entryID: entry.id.uuidString, kind: "missing", contentType: row.kind, data: Data(), duration: nil)) }
+                }
+            }
+            // A standalone page photo is exported even when hidden on the home screen.
+            let page = pagesByDay[key]?.max { $0.updatedAt < $1.updatedAt }
+            if let id = page?.photoMediaID, !media.contains(where: { $0.id == id }), let row = mediaByID[id], let data = row.data {
+                media.append(.init(id: id, entryID: "page", kind: "photo", contentType: row.contentType, data: data, duration: nil))
+            }
             lines=lines.filter{!$0.text.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty}
             guard !lines.isEmpty || !media.isEmpty else{return nil}
             return .init(day:date,title:bothDates(date,calendar:FirstCalendar(rawValue:app.string("core.firstCalendar")) ?? .hijri),lines:lines.sorted{$0.at == $1.at ? $0.id<$1.id : $0.at<$1.at},media:media)
