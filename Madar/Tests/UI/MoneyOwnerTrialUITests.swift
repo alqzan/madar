@@ -22,6 +22,10 @@ import XCTest
         let first = try report(backup, stamp + "-first")
         XCTAssertNil(first["failed"]); XCTAssertGreaterThan(first["store.transactions"] ?? 0, 0)
         XCTAssertEqual(first["store.unconfirmed", default: 0], first["store.possibleDuplicates", default: 0], "Only real possible duplicates may wait")
+        XCTAssertEqual(first["settings.persisted"], 1)
+        XCTAssertEqual(first["settings.archiveMatches"], 1)
+        XCTAssertGreaterThan(first["settings.mapped", default: 0], 0)
+        XCTAssertEqual(first["store.cycles"], 0, "Income settings cannot create a salary or cycle")
         let start = app.buttons["first-run-continue"]
         if start.waitForExistence(timeout: 60) {
             let skip = app.buttons["first-run-skip"]
@@ -46,5 +50,11 @@ import XCTest
         XCTAssertEqual(second["balance.known"], first["balance.known"])
         XCTAssertEqual(second["balance.unknown"], first["balance.unknown"])
         XCTAssertEqual(second["earlier.cardLinked", default: 0], 0, "Replay must not rewrite the old rows' card links or edit dates")
+        XCTAssertEqual(second["cycleSettings.duplicate"], 1)
+        XCTAssertEqual(second["settings.persisted"], 1)
+        XCTAssertEqual(second["settings.archiveMatches"], 1)
+        XCTAssertEqual(second["store.settings"], first["store.settings"])
+        XCTAssertEqual(second["store.importLinks"], first["store.importLinks"])
+        XCTAssertEqual(second["store.cycles"], 0)
     }
 }

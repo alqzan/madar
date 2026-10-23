@@ -152,3 +152,60 @@ extension LegacyMoneyImportTests {
         #expect(plan.counts["account.unidentifiedFunding"] == 1)
     }
 }
+
+extension LegacyMoneyImportTests {
+    private func settingsPlan(_ root: [String: Any], keys: Keys = Keys()) throws -> LegacyMoneyImport.Plan {
+        try LegacyMoneyImport.plan(backup: JSONSerialization.data(withJSONObject: root), existing: [], timeZone: Self.riyadh, uuid: keys.uuid)
+    }
+    @Test func legacyFixedDailyAndGregorianSalaryDayAreSettingsOnly() throws {
+        let plan = try settingsPlan(["dailyBudget": ["amount": 12.3, "startDate": "2026-07-03", "carryAdjust": 7.5], "salaryDay": 31, "budgetWindow": "salary"])
+        let settings = try #require(plan.cycleSettings)
+        #expect(settings.daily == .init(mode: "fixed", amountMinor: 1230, percentBp: nil))
+        #expect(settings.salaryDay == 31 && settings.gregorian)
+        #expect(plan.steps.isEmpty, "Configuration cannot manufacture a salary or an opening cycle")
+        let archive = try #require(JSONSerialization.jsonObject(with: settings.archive) as? [String: Any])
+        let daily = try #require(archive["dailyBudget"] as? [String: Any])
+        #expect(daily["startDate"] as? String == "2026-07-03")
+        #expect(daily["carryAdjust"] as? Double == 7.5)
+    }
+    @Test func percentProvenancePreservesResolvedAmountWithoutInventingIncome() throws {
+        let plan = try settingsPlan(["dailyBudget": ["amount": 120.37, "incomePct": 30.25, "monthlyIncome": 12000], "monthlyIncome": 15000, "salaryDay": 27, "budgetWindow": "month"])
+        let settings = try #require(plan.cycleSettings)
+        // 30.25% = 3025 basis points. The old resolved 120.37 is retained, never replaced by a recomputation
+        // from either of the two income values (which are settings, not evidence of a salary credit).
+        #expect(settings.daily == .init(mode: "percent", amountMinor: 12037, percentBp: 3025))
+        #expect(plan.steps.isEmpty)
+        let archive = try #require(JSONSerialization.jsonObject(with: settings.archive) as? [String: Any])
+        #expect(archive["monthlyIncome"] as? Int == 15000)
+        #expect((archive["dailyBudget"] as? [String: Any])?["monthlyIncome"] as? Int == 12000)
+        #expect(archive["budgetWindow"] as? String == "month")
+    }
+    @Test func invalidOrUnsetLegacySettingsStayRawNeverCoercedToZero() throws {
+        for budget in [["amount": 0], ["amount": "12"], ["amount": 12, "incomePct": true], ["amount": 12, "incomePct": 101], ["amount": 12, "incomePct": 0.001]] as [[String: Any]] {
+            let plan = try settingsPlan(["dailyBudget": budget, "salaryDay": 1.5, "monthlyIncome": 12000])
+            let settings = try #require(plan.cycleSettings)
+            #expect(settings.daily == nil && settings.salaryDay == nil && !settings.gregorian)
+            #expect(!settings.archive.isEmpty && plan.steps.isEmpty)
+        }
+        let zeroPercent = try settingsPlan(["dailyBudget": ["amount": 12, "incomePct": 0]])
+        #expect(zeroPercent.cycleSettings?.daily == .init(mode: "fixed", amountMinor: 1200, percentBp: nil))
+        #expect(try settingsPlan([:]).cycleSettings == nil)
+    }
+    @Test func categoryWindowAloneDoesNotOverwriteCycleCalendar() throws {
+        let plan = try settingsPlan(["budgetWindow": "month"])
+        let settings = try #require(plan.cycleSettings)
+        #expect(!settings.gregorian && settings.salaryDay == nil && settings.daily == nil)
+        let archive = try #require(JSONSerialization.jsonObject(with: settings.archive) as? [String: Any])
+        #expect(archive["budgetWindow"] as? String == "month")
+        #expect(plan.steps.isEmpty)
+    }
+    @Test func settingsArchiveAndCommandsAreStableAcrossKeyOrderAndReplay() throws {
+        let keys = Keys()
+        let a = try settingsPlan(["dailyBudget": ["amount": 12.3], "salaryDay": 27], keys: keys)
+        let b = try settingsPlan(["salaryDay": 27, "dailyBudget": ["amount": 12.3]], keys: keys)
+        #expect(a.cycleSettings == b.cycleSettings)
+        let changed = try settingsPlan(["salaryDay": 28, "dailyBudget": ["amount": 12.3]], keys: keys)
+        #expect(changed.cycleSettings?.command != a.cycleSettings?.command)
+        #expect(changed.cycleSettings?.archiveID != a.cycleSettings?.archiveID)
+    }
+}

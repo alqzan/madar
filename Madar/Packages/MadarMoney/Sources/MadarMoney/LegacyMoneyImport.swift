@@ -28,6 +28,64 @@ public enum LegacyMoneyImport {
         public var counts: [String: Int] = [:]
         public var earlierCards: [UUID: UUID] = [:]
         public var balanceEvidence: [UUID: BalanceEvidence] = [:]
+        public var cycleSettings: CycleSettings?
+    }
+
+    public struct DailyAllowance: Equatable, Sendable {
+        public var mode: String
+        public var amountMinor: Int?
+        public var percentBp: Int?
+    }
+    public struct CycleSettings: Equatable, Sendable {
+        public var daily: DailyAllowance?
+        public var salaryDay: Int?
+        /// Old salary dates were Gregorian. No salary event or cycle is inferred from these settings.
+        public var gregorian: Bool
+        public var command: UUID
+        public var archiveID: UUID
+        /// Keeps all original settings, including the old carry/start/income/window fields with no exact v1 target.
+        public var archive: Data
+    }
+
+    private static func settings(_ data: Data, plan: inout Plan, uuid: (String) -> UUID) throws -> CycleSettings? {
+        guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+        let keys = ["dailyBudget", "monthlyIncome", "salaryDay", "budgetWindow"]
+        let original = root.filter { keys.contains($0.key) }
+        guard !original.isEmpty else { return nil }
+        let archive = try JSONSerialization.data(withJSONObject: original, options: [.sortedKeys])
+        // Decoding an individual fragment rejects booleans/strings instead of coercing them into money or dates.
+        func decode<T: Decodable>(_ type: T.Type, _ value: Any?) -> T? {
+            guard let value, let bytes = try? JSONSerialization.data(withJSONObject: value, options: [.fragmentsAllowed]) else { return nil }
+            return try? JSONDecoder().decode(type, from: bytes)
+        }
+        func dailyMinor(_ value: Any?) -> Int? {
+            // Same upper bound as SettingsStore's daily allowance contract (1e13 minor units).
+            guard let amount = decode(Double.self, value), amount.isFinite, amount > 0, amount <= 100_000_000_000 else { return nil }
+            return minor(amount)
+        }
+        var daily: DailyAllowance?
+        if let budget = original["dailyBudget"] as? [String: Any] {
+            let amount = dailyMinor(budget["amount"])
+            let rawPercent = budget["incomePct"]
+            let pct = decode(Double.self, rawPercent)
+            if rawPercent == nil || rawPercent is NSNull || pct == 0 {
+                if let amount { daily = .init(mode: "fixed", amountMinor: amount, percentBp: nil) }
+            } else if let pct, pct > 0, pct <= 100, let bp = minor(pct), bp > 0 {
+                // Preserve the resolved old daily amount as provenance; percentage mode uses percentBp and the
+                // native cycle length when a real salary arrives. Never recompute from a monthly income setting.
+                daily = .init(mode: "percent", amountMinor: amount, percentBp: bp)
+            }
+            plan.counts[daily.map { "settings.daily." + $0.mode } ?? "settings.daily.archivedOnly", default: 0] += 1
+        } else if original["dailyBudget"] != nil { plan.counts["settings.daily.archivedOnly", default: 0] += 1 }
+        let day = decode(Int.self, original["salaryDay"]).flatMap { (1...31).contains($0) ? $0 : nil }
+        if day != nil { plan.counts["settings.salaryDay", default: 0] += 1 }
+        else if original["salaryDay"] != nil { plan.counts["settings.salaryDay.archivedOnly", default: 0] += 1 }
+        // The old category-cap window is not evidence of the salary calendar.
+        let gregorian = day != nil
+        plan.counts["settings.archivedFields"] = original.count
+        let identity = archive.base64EncodedString()
+        return .init(daily: daily, salaryDay: day, gregorian: gregorian,
+                     command: uuid("LegacyMoneyCycleSettings:" + identity), archiveID: uuid("LegacyMoneyCycleArchive:" + identity), archive: archive)
     }
 
     public struct BalanceEvidence: Equatable, Sendable {
@@ -89,6 +147,8 @@ public enum LegacyMoneyImport {
         let backup = try JSONDecoder().decode(Backup.self, from: data)
         let deleted = Set((backup.deleted ?? [:]).keys)
         var plan = Plan()
+        let importedSettings = try settings(data, plan: &plan, uuid: uuid)
+        plan.cycleSettings = importedSettings
         func count(_ key: String) { plan.counts[key, default: 0] += 1 }
 
         // Categories: an existing row of the same name is reused, the rest are created with ids from the old ids.

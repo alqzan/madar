@@ -35,6 +35,29 @@ extension AppSession {
                 count(key + "." + status); return status
             }
             func arabic(_ digits: String) -> String { String(digits.map { c in c.wholeNumberValue.map { Character(UnicodeScalar(0x0660 + $0)!) } ?? c }) }
+            var cycleExpected: [String: MadarCore.JSONValue] = [:]
+            if let settings = plan.cycleSettings {
+                // Archive source configuration, including unsupported carry/start/income/window fields, before
+                // applying the exact native settings. It is local to this DEBUG UI-test store, never a new import UI.
+                if try context.fetch(FetchDescriptor<ImportLink>()).contains(where: { $0.id == settings.archiveID }) {
+                    count("settings.archiveExisting")
+                } else {
+                    let link = ImportLink(); link.id = settings.archiveID; link.source = "myDream"; link.sourceModel = "MoneyCycleSettings"
+                    link.sourceID = settings.archiveID.uuidString; link.targetModel = "Setting"; link.unmappedJSON = settings.archive
+                    link.createdAt = now; link.updatedAt = now; link.importedAt = now; link.writerID = "madar.app.trial"
+                    context.insert(link); try context.save(); count("settings.archiveCreated")
+                }
+                if let daily = settings.daily {
+                    cycleExpected["mal.dailyAllowance"] = .object(["mode": .string(daily.mode),
+                        "amountMinor": daily.amountMinor.map { .number(Double($0)) } ?? .null,
+                        "percentBp": daily.percentBp.map { .number(Double($0)) } ?? .null])
+                }
+                if let day = settings.salaryDay { cycleExpected["mal.salaryDay"] = .number(Double(day)) }
+                if settings.gregorian { cycleExpected["mal.cycleCalendar"] = .string("gregorian") }
+                if !cycleExpected.isEmpty {
+                    _ = await run("settings.set", ["settings": .object(cycleExpected)], settings.command, "cycleSettings")
+                }
+            }
             for step in plan.steps {
                 switch step {
                 case let .saveAccount(command, id, kind, bank, last4, at):
@@ -128,6 +151,17 @@ extension AppSession {
             }
             counts["store.unconfirmed"] = try check.fetch(FetchDescriptor<MoneyTransaction>()).filter { $0.deletedAt == nil && $0.reviewState != "ok" }.count
             counts["store.possibleDuplicates"] = try check.fetch(FetchDescriptor<MoneyTransaction>()).filter { $0.deletedAt == nil && $0.reviewState == "possibleDuplicate" }.count
+            counts["store.cycles"] = try check.fetch(FetchDescriptor<Cycle>()).filter { $0.deletedAt == nil }.count
+            counts["store.settings"] = try check.fetch(FetchDescriptor<Setting>()).filter { $0.deletedAt == nil }.count
+            counts["store.importLinks"] = try check.fetch(FetchDescriptor<ImportLink>()).filter { $0.deletedAt == nil }.count
+            counts["settings.mapped"] = cycleExpected.count
+            let storedSettings = try SettingsStore(context: check)
+            counts["settings.persisted"] = try cycleExpected.allSatisfy { key, value in
+                try storedSettings.value(for: key) == JSONDecoder().decode(MadarData.JSONValue.self, from: JSONEncoder().encode(value))
+            } ? 1 : 0
+            if let settings = plan.cycleSettings {
+                counts["settings.archiveMatches"] = try check.fetch(FetchDescriptor<ImportLink>()).contains { $0.id == settings.archiveID && $0.deletedAt == nil && $0.unmappedJSON == settings.archive } ? 1 : 0
+            }
         } catch { counts["failed"] = 1; counts["failed." + String(describing: type(of: error))] = 1 }
         let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let stamp = env["MADAR_TRIAL_RUN"] ?? "run"
