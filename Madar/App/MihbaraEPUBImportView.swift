@@ -63,8 +63,8 @@ struct MihbaraEPUBImportView: View {
     private static let indexPreview = 8
     private var service: AppMihbaraService { .init(app: app) }
     private var digits: MadarNumberFormatter { service.digits }
-    // The index preview keeps the page short; only the full index needs the pinned button (it hid the shelf row).
-    private var needsPersistentImportAction: Bool { showingFullIndex && (inspection?.outline.count ?? 0) > 12 }
+    // Long books keep the import action visible from the first preview, including while the scan adds findings.
+    private var needsPersistentImportAction: Bool { (inspection?.outline.count ?? 0) > 12 }
 
     private var languageLabel: String {
         guard let code = inspection?.languageCode else { return "غير محددة في الملف" }
@@ -280,6 +280,13 @@ struct MihbaraEPUBImportView: View {
                 + (scan.emptyChapters.isEmpty ? (scan.unreadChapters == 0 ? "؛ كل فصل فيه نص." : "؛ الفصول المقروءة فيها نص.") : "؛ " + count(scan.emptyChapters.count, ("فصل واحد", "فصلان", "فصول", "فصلًا")) + " بلا نص.")
                 + (scan.unreadChapters > 0 ? " تعذّر فحص " + count(scan.unreadChapters, ("فصل واحد", "فصلين", "فصول", "فصلًا")) + "." : ""),
                 detected: scan.emptyChapters.isEmpty && scan.unreadChapters == 0).accessibilityIdentifier("mihbara-epub-scan-text")
+            if !scan.suspectTextChapters.isEmpty {
+                row("نص يحتاج مراجعة", detail: "في " + count(scan.suspectTextChapters.count, ("فصل واحد", "فصلين", "فصول", "فصلًا"))
+                    + " رموز استبدال أو ترميز غير معتاد؛ راجع الملف الأصلي قبل الإضافة. الفصول: "
+                    + scan.suspectTextChapters.prefix(5).map { digits.string($0) }.joined(separator: "، ")
+                    + (scan.suspectTextChapters.count > 5 ? "…" : ".") + " يبقى الملف كما هو.", detected: false)
+                    .accessibilityIdentifier("mihbara-epub-scan-encoding")
+            }
             if scan.tocEntries > 0 {
                 row("روابط الفهرس", detail: (scan.brokenTOC.isEmpty ? "كل عناوين الفهرس تصل إلى مواضعها"
                     : count(scan.brokenTOC.count, ("عنوان واحد", "عنوانان", "عناوين", "عنوانًا")) + " لا يصل إلى موضعه: " + scan.brokenTOC.prefix(3).joined(separator: "، ") + (scan.brokenTOC.count > 3 ? "…" : ""))
@@ -288,14 +295,18 @@ struct MihbaraEPUBImportView: View {
             }
             if scan.pageLabels > 0 {
                 row("أرقام الصفحات", detail: scan.pageGaps == 0 && scan.pageRepeats == 0 && scan.pageOutOfOrder == 0 && scan.unverifiedPageLinks == 0 ? "الأرقام وروابطها متتابعة بلا نقص ولا تكرار."
-                    : [scan.pageGaps > 0 ? "تنقص " + count(scan.pageGaps, ("صفحة واحدة", "صفحتان", "صفحات", "صفحةً")) : nil,
+                    : [scan.pageGaps > 0 ? "تتجاوز قائمة الترقيم " + count(scan.pageGaps, ("رقمًا واحدًا", "رقمين", "أرقام", "رقمًا")) + "؛ لا يثبت ذلك نقص نص الكتاب" : nil,
                        scan.pageRepeats > 0 ? "يتكرر " + count(scan.pageRepeats, ("رقم واحد", "رقمان", "أرقام", "رقمًا")) : nil,
                        scan.pageOutOfOrder > 0 ? "تحتاج بعض الأرقام أو روابطها إلى مراجعة الترتيب" : nil,
                        scan.unverifiedPageLinks > 0 ? "تعذّر التحقق من " + count(scan.unverifiedPageLinks, ("رابط صفحة واحد", "رابطي صفحتين", "روابط صفحات", "رابط صفحة")) : nil].compactMap { $0 }.joined(separator: "، ") + ".",
                     detected: scan.pageGaps == 0 && scan.pageRepeats == 0 && scan.pageOutOfOrder == 0 && scan.unverifiedPageLinks == 0).accessibilityIdentifier("mihbara-epub-scan-pages")
             }
-            if scan.verses > 0 {
-                row("الآيات", detail: count(scan.verses, ("آية واحدة", "آيتان", "آيات", "آيةً")) + " تُعرض بخط المصحف.", detected: true).accessibilityIdentifier("mihbara-epub-scan-verses")
+            if scan.verses + scan.unmarkedVerses > 0 {
+                row("الآيات", detail: count(scan.verses + scan.unmarkedVerses, ("موضع واحد", "موضعان", "مواضع", "موضعًا")) + " بخط المصحف."
+                    + (scan.unmarkedVerses > 0 ? " منها نص مطابق لآيات كاملة بلا أقواس؛ تبقى كتابته الأصلية." : ""), detected: true).accessibilityIdentifier("mihbara-epub-scan-verses")
+            }
+            if !scan.quotationScanAvailable {
+                row("مطابقة الآيات", detail: "تعذّر فحص الآيات بلا أقواس؛ تبقى الآيات بين ﴿ ﴾ بخط المصحف.", detected: false)
             }
         } else if scanDone {
             row("القراءة الكاملة", detail: "تعذّر فحص الكتاب كاملًا؛ يمكنك إضافته كما هو.", detected: false)

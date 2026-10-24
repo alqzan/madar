@@ -196,6 +196,7 @@
 		71F0444B1B00BCB75485D981 /* StartPrayerActivityIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8E97AEF232F2E84BCBB4F00 /* StartPrayerActivityIntent.swift */; };
 		72A3BA6D3EEBEC5B9ABBDEF7 /* MoneyRulesUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0ADCA88400F37F2BE67A373A /* MoneyRulesUITests.swift */; };
 		738F3EBC7827BEBEE7E0F7F4 /* DiarySearchUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA46B4CDAC5516908264FB88 /* DiarySearchUITests.swift */; };
+		73B38C28A7EA53C636C2BA89 /* MihbaraQuotationScriptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B91224D2ACB382FDF05CB706 /* MihbaraQuotationScriptTests.swift */; };
 		740CAD4E569693058CB2D453 /* QuranQiyamIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D192D1904C8C2A99A656EFAF /* QuranQiyamIntegrationTests.swift */; };
 		74FD6AB907A73C84CA714668 /* PrayerSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A7D4FC457636377F6EF5D76 /* PrayerSettingsView.swift */; };
 		7530BFBEDEE8F704CABBABFB /* QuranWeekUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3237B7C9B144CCBD5293A068 /* QuranWeekUITests.swift */; };
@@ -709,6 +710,7 @@
 		B6B644CCC83C35ABDC3339CE /* scan-order-poc.epub */ = {isa = PBXFileReference; path = "scan-order-poc.epub"; sourceTree = "<group>"; };
 		B824AE40F77475D638431FF6 /* MoneyEnvelopesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyEnvelopesView.swift; sourceTree = "<group>"; };
 		B8265DEB75EC6FB6E7BBCA1D /* MoneyCategoriesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyCategoriesView.swift; sourceTree = "<group>"; };
+		B91224D2ACB382FDF05CB706 /* MihbaraQuotationScriptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MihbaraQuotationScriptTests.swift; sourceTree = "<group>"; };
 		BBFFF71C3E962BAE2E738136 /* QuranHomeFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranHomeFixture.swift; sourceTree = "<group>"; };
 		BCC3742CED8746688EB29C55 /* HabitFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HabitFixture.swift; sourceTree = "<group>"; };
 		BD01076802F7C86446475EE9 /* AppQuranService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppQuranService.swift; sourceTree = "<group>"; };
@@ -1307,6 +1309,7 @@
 				D469796404360B49B02BC5E1 /* DiaryYearbookIntegrationTests.swift */,
 				1C903CE9D436A9E7A19EEE2C /* ExportPrivacyTests.swift */,
 				092A021D5BC8018E0BEEF6F1 /* MihbaraHomeIntegrationTests.swift */,
+				B91224D2ACB382FDF05CB706 /* MihbaraQuotationScriptTests.swift */,
 				F3A1EE2CAC2998D3F4B62E24 /* MoneyAnalysisIntegrationTests.swift */,
 				C4CB5FDECF30C984FC9DD666 /* MoneyCardsIntegrationTests.swift */,
 				586A38914534D9DBCBC3BBE8 /* MoneyCashbackIntegrationTests.swift */,
@@ -1651,6 +1654,7 @@
 				ACF8D45E7B47DF98E40E506D /* DiaryYearbookIntegrationTests.swift in Sources */,
 				16A45A0199AD6A2B5E9EC744 /* ExportPrivacyTests.swift in Sources */,
 				C31CBACA57AF34A8B80AB681 /* MihbaraHomeIntegrationTests.swift in Sources */,
+				73B38C28A7EA53C636C2BA89 /* MihbaraQuotationScriptTests.swift in Sources */,
 				13D02594BC0853EEDBD5F57D /* MoneyAnalysisIntegrationTests.swift in Sources */,
 				560BA2515095DCE353F47348 /* MoneyCardsIntegrationTests.swift in Sources */,
 				433B3A47FD29D2A8496DB89D /* MoneyCashbackIntegrationTests.swift in Sources */,

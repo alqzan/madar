@@ -295,6 +295,11 @@ import UIKit
         XCTAssertTrue(pages.label.contains("يتكرر رقم واحد"), pages.label)
         XCTAssertTrue(pages.label.contains("تعذّر التحقق"), pages.label)
         XCTAssertFalse(pages.label.contains("بلا نقص ولا تكرار"), pages.label)
+        let encoding = app.descendants(matching: .any)["mihbara-epub-scan-encoding"]
+        XCTAssertTrue(encoding.exists && encoding.label.contains("ترميز غير معتاد"), app.debugDescription)
+        let verses = app.descendants(matching: .any)["mihbara-epub-scan-verses"]
+        XCTAssertTrue(verses.exists && verses.label.contains("آيات كاملة بلا أقواس"), app.debugDescription)
+        for _ in 0..<5 where !verses.isHittable { app.swipeUp(velocity: .slow) }
         XCTAssertTrue(app.descendants(matching: .any)["mihbara-epub-import-size"].label.contains("عدد صفحات المطبوع غير متحقق"))
         XCTAssertTrue(app.buttons["mihbara-epub-import-confirm"].isEnabled, "The scan reports faults; it does not block the owner's import choice")
         attach(app, "M6-21-scan-order-warning-L")
@@ -569,7 +574,10 @@ import UIKit
         XCTAssertTrue(confirm.waitForExistence(timeout: 60), "The real book download/conversion did not finish")
         XCTAssertEqual(app.textFields["mihbara-epub-import-title"].value as? String, "صيد الخاطر")
         XCTAssertEqual(app.textFields["mihbara-epub-import-author"].value as? String, "ابن الجوزي")
-        XCTAssertTrue(confirm.isHittable, "Long real outlines keep the import action visible")
+        let scanFinished = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: confirm)
+        XCTAssertEqual(XCTWaiter.wait(for: [scanFinished], timeout: 120), .completed, app.debugDescription)
+        XCTAssertTrue(app.descendants(matching: .any)["mihbara-epub-scan-text"].exists, app.debugDescription)
+        XCTAssertTrue(confirm.isHittable, "Long real outlines keep the import action visible after the full scan")
         attach(app, "M6-T01-live-import-L"); confirm.tap()
         let wantShelf = app.buttons["mihbara-shelf-want"]; XCTAssertTrue(wantShelf.waitForExistence(timeout: 20)); wantShelf.tap()
         let imported = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "صيد الخاطر")).firstMatch

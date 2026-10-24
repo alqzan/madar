@@ -349,10 +349,22 @@ public enum EPUBBookFiles {
 private final class EPUBXMLNode {
     let name: String
     let attributes: [String: String]
-    var text = ""
+    enum Content { case text(String), element(EPUBXMLNode) }
+    var content: [Content] = []
     var children: [EPUBXMLNode] = []
     init(name: String, attributes: [String: String]) { self.name = name; self.attributes = attributes }
-    var stringValue: String { text + children.map(\.stringValue).joined() }
+    var stringValue: String { content.map { part in
+        switch part { case .text(let value): value; case .element(let node): node.stringValue }
+    }.joined() }
+    /// Inline markup stays in place; block boundaries prevent accidental ayah matches across paragraphs.
+    var scanText: String {
+        if ["head", "script", "style", "code", "pre", "svg"].contains(name) { return "\n" }
+        let value = content.map { part in
+            switch part { case .text(let value): value; case .element(let node): node.scanText }
+        }.joined()
+        return ["p", "li", "blockquote", "h1", "h2", "h3", "h4", "h5", "h6", "div", "dd", "dt", "figcaption", "br"].contains(name) ? "\n" + value + "\n" : value
+    }
+    func appendText(_ value: String) { content.append(.text(value)) }
     func attribute(_ name: String) -> String? { attributes.first(where: { $0.key == name || $0.key.hasSuffix(":" + name) })?.value }
     func first(named name: String) -> EPUBXMLNode? { children.first(where: { $0.name == name }) }
     func descendants(named name: String, matching predicate: ((EPUBXMLNode) -> Bool)? = nil) -> [EPUBXMLNode] {
@@ -371,12 +383,12 @@ private final class EPUBXMLTreeBuilder: NSObject, XMLParserDelegate {
     private var stack: [EPUBXMLNode] = []
     func parser(_ parser: XMLParser, didStartElement elementName: String, namespaceURI: String?, qualifiedName qName: String?, attributes attributeDict: [String: String] = [:]) {
         let node = EPUBXMLNode(name: elementName.split(separator: ":").last.map(String.init) ?? elementName, attributes: attributeDict)
-        if let parent = stack.last { parent.children.append(node) } else { root = node }
+        if let parent = stack.last { parent.children.append(node); parent.content.append(.element(node)) } else { root = node }
         stack.append(node)
     }
     func parser(_ parser: XMLParser, didEndElement elementName: String, namespaceURI: String?, qualifiedName qName: String?) { if !stack.isEmpty { stack.removeLast() } }
-    func parser(_ parser: XMLParser, foundCharacters string: String) { stack.last?.text += string }
-    func parser(_ parser: XMLParser, foundCDATA CDATABlock: Data) { if let value = String(data: CDATABlock, encoding: .utf8) { stack.last?.text += value } }
+    func parser(_ parser: XMLParser, foundCharacters string: String) { stack.last?.appendText(string) }
+    func parser(_ parser: XMLParser, foundCDATA CDATABlock: Data) { if let value = String(data: CDATABlock, encoding: .utf8) { stack.last?.appendText(value) } }
     func parser(_ parser: XMLParser, foundInternalEntityDeclarationWithName name: String, value: String?) {
         hasInternalEntities = true
         parser.abortParsing()
@@ -396,6 +408,10 @@ public struct EPUBBookScan: Equatable, Sendable {
     public var words = 0
     /// Marked Quran verses (﴿…﴾).
     public var verses = 0
+    public var unmarkedVerses = 0
+    public var quotationScanAvailable = false
+    /// Replacement/private-use/control glyphs or common misdecoded Arabic byte sequences; review hints only.
+    public var suspectTextChapters: [Int] = []
     public var tocEntries = 0
     /// Index entries whose target file or anchor does not exist, by title.
     public var brokenTOC: [String] = []
@@ -409,7 +425,7 @@ public struct EPUBBookScan: Equatable, Sendable {
     public var pageOutOfOrder = 0
     public var unverifiedPageLinks = 0
     public var isComplete: Bool {
-        emptyChapters.isEmpty && unreadChapters == 0 && brokenTOC.isEmpty && tocOutOfOrder == 0
+        emptyChapters.isEmpty && unreadChapters == 0 && suspectTextChapters.isEmpty && brokenTOC.isEmpty && tocOutOfOrder == 0
             && pageGaps == 0 && pageRepeats == 0 && pageOutOfOrder == 0 && unverifiedPageLinks == 0
     }
     public init() {}
@@ -424,6 +440,8 @@ extension EPUBBookFiles {
 
     public static func scan(file: URL, progress: (Double) -> Void = { _ in }) throws -> EPUBBookScan {
         var result = EPUBBookScan()
+        let quotationIndex = try? QuranQuotationIndex.bundled()
+        result.quotationScanAvailable = quotationIndex != nil
         let archive = try ZIPReader(url: file)
         try validate(archive)
         guard let containerMember = archive.member("META-INF/container.xml") else { throw DataError.invalidValue("ملف EPUB ناقص: لا يوجد مسار الحزمة.") }
@@ -460,11 +478,13 @@ extension EPUBBookFiles {
             }
             collect(node); anchors[path] = ids
             let body = node.descendants(named: "body").first ?? node
-            let text = body.stringValue
+            let text = body.scanText
+            if BookTextIntegrity.needsInspection(text) { result.suspectTextChapters.append(index + 1) }
+            result.unmarkedVerses += quotationIndex?.unmarkedCount(in: text) ?? 0
             let words = text.split(whereSeparator: { $0.isWhitespace }).count
             result.words += words
             result.paragraphs += body.descendants(named: "p").filter { !$0.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.count
-            result.verses += text.filter { $0 == "﴿" }.count
+            result.verses += (try? NSRegularExpression(pattern: "﴿[^﴾]*﴾").numberOfMatches(in: text, range: NSRange(text.startIndex..., in: text))) ?? 0
             let hasImage = !body.descendants(named: "img").isEmpty || !body.descendants(named: "image").isEmpty || !body.descendants(named: "svg").isEmpty
             if words == 0 && !hasImage { result.emptyChapters.append(index + 1) }
         }

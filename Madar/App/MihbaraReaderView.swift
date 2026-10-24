@@ -640,12 +640,12 @@ struct MihbaraReaderView: View {
     }
 
     private var printPageLabel: String {
-        guard let last = printPages.last else { return "موضع من الكتاب" }
+        guard !printPages.isEmpty else { return "موضع من الكتاب" }
         guard let ordinal = pageCoordinate(printLocator), printPages.indices.contains(ordinal - 1) else {
             return "موضع من الكتاب؛ صفحة المطبوع غير معروفة هنا"
         }
         let current = printPages[ordinal - 1]
-        return "ص \(digits.localized(current.label)) من \(digits.localized(last.label)) في المطبوع"
+        return "ص \(digits.localized(current.label)) بحسب الملف"
     }
 
     /// «الجزء الثاني، باب …» in a set, so the reader always knows which volume the page is in.
@@ -1796,7 +1796,6 @@ private struct MihbaraReaderSettingsSheet: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 9) {
-                header
                 themeRow
                 sizeRow
                 fontRow
@@ -1816,12 +1815,16 @@ private struct MihbaraReaderSettingsSheet: View {
         .foregroundStyle(ink)
         .background(paper.ignoresSafeArea())
         .safeAreaInset(edge: .top) {
-            if hasSettingsUndo {
-                UndoToast(message: app.undoMessage, undo: app.undo)
-                    .accessibilityIdentifier("mihbara-reader-undo")
-                    .padding(.horizontal, 12)
-                    .padding(.top, 4)
-            }
+            VStack(spacing: 0) {
+                if hasSettingsUndo {
+                    UndoToast(message: app.undoMessage, undo: app.undo)
+                        .accessibilityIdentifier("mihbara-reader-undo")
+                        .padding(.horizontal, 12).padding(.top, 4)
+                }
+                // Changing a font can preserve a scrolled content offset. The close
+                // action stays outside that scrolling content and below the undo toast.
+                header.padding(.horizontal, 18).padding(.vertical, 8)
+            }.background(paper)
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
@@ -2201,6 +2204,8 @@ private struct MihbaraEPUBNavigator: UIViewControllerRepresentable {
         }
         func navigator(_ navigator: EPUBNavigatorViewController, setupUserScripts userContentController: WKUserContentController) {
             userContentController.add(self, name: "madarReaderDocumentReady")
+            let quotations = QuranQuotationScript.source(index: try? QuranQuotationIndex.bundled())
+            userContentController.addUserScript(WKUserScript(source: quotations, injectionTime: .atDocumentStart, forMainFrameOnly: true))
             let source = """
             (() => {
               const apply = () => {
@@ -2224,40 +2229,6 @@ private struct MihbaraEPUBNavigator: UIViewControllerRepresentable {
                 return true;
               };
               if (!apply()) new MutationObserver((_, observer) => { if (apply()) observer.disconnect(); }).observe(document, {childList:true, subtree:true});
-              // Qur'an quotations: every run from ﴿ to ﴾, even across inline tags, takes the verse colour.
-              const verses = () => {
-                if (!document.body || document.body.dataset.madarAyah) return;
-                document.body.dataset.madarAyah = '1';
-                const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
-                  acceptNode: (node) => node.parentElement && node.parentElement.closest('script, style, .madar-ayah') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT
-                });
-                const nodes = [];
-                while (walker.nextNode()) nodes.push(walker.currentNode);
-                let inside = false;
-                for (const node of nodes) {
-                  const text = node.nodeValue;
-                  if (!inside && !text.includes('﴿')) continue;
-                  const parts = [];
-                  let start = 0;
-                  for (let i = 0; i < text.length; i++) {
-                    if (!inside && text[i] === '﴿') { if (i > start) parts.push([text.slice(start, i), false]); start = i; inside = true; }
-                    else if (inside && text[i] === '﴾') { parts.push([text.slice(start, i + 1), true]); start = i + 1; inside = false; }
-                  }
-                  if (start < text.length) parts.push([text.slice(start), inside]);
-                  if (!parts.some(([, verse]) => verse)) continue;
-                  const fragment = document.createDocumentFragment();
-                  for (const [value, verse] of parts) {
-                    if (!verse) { fragment.appendChild(document.createTextNode(value)); continue; }
-                    const span = document.createElement('span');
-                    span.className = 'madar-ayah';
-                    span.textContent = value;
-                    fragment.appendChild(span);
-                  }
-                  node.parentNode.replaceChild(fragment, node);
-                }
-              };
-              if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', verses); else verses();
-
               // Owner, 24 Oct 2026: focus skipped headings, counted a quote and its paragraph twice, and missed books
               // whose text sits in plain divs. A focus block is now the innermost text block, in reading order.
               const focusSelector = 'p, li, blockquote, h1, h2, h3, h4, h5, h6, div, dd, dt, figcaption';

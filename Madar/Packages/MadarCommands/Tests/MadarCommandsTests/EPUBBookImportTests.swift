@@ -266,4 +266,18 @@ import MadarData
         #expect(!scan.isComplete)
     }
 
+    @Test func fullScanPreservesMixedContentOrderAndFlagsSuspiciousEncoding() throws {
+        var entries = validEntries()
+        entries[4].bytes = Data(#"<html><body><p>قال: لقد <em>خلقنا الإنسان</em> في أحسن تقويم.</p><p>﴿إن <b>مع العسر</b> يسرا﴾</p><p>قل هو الله أحد</p><p>لقد خلقنا الإنسان</p><p>في أحسن تقويم</p><p>Ø§Ù„ÙƒØªØ§Ø¨</p><p>رمز � مفقود</p><script>لقد خلقنا الإنسان في أحسن تقويم</script></body></html>"#.utf8)
+        let folder = try root(); defer { try? FileManager.default.removeItem(at: folder) }
+        let file = folder.appendingPathComponent("text-scan.epub"); let bytes = archive(entries); try bytes.write(to: file)
+        let scan = try EPUBBookFiles.scan(file: file)
+        #expect(scan.quotationScanAvailable)
+        #expect(scan.unmarkedVerses == 1, "The complete ayah spans an inline tag; split paragraphs and short phrases do not match")
+        #expect(scan.verses == 1)
+        #expect(scan.suspectTextChapters == [1])
+        #expect(!scan.isComplete)
+        #expect(try Data(contentsOf: file) == bytes, "A finding never rewrites the source")
+    }
+
 }

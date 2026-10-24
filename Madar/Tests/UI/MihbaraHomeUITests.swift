@@ -362,7 +362,7 @@ import XCTest
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "القراءة باب يدخل")).firstMatch.waitForExistence(timeout: 12), app.debugDescription)
         let printPage = app.staticTexts["mihbara-reader-print-page"]
         XCTAssertTrue(printPage.waitForExistence(timeout: 5), app.debugDescription)
-        XCTAssertTrue(printPage.label.contains("في المطبوع"), printPage.label)
+        XCTAssertTrue(printPage.label.contains("بحسب الملف"), printPage.label)
         XCTAssertTrue(printPage.label.contains("٤٥٣"), printPage.label)
         XCTAssertTrue(app.descendants(matching: .any)["mihbara-reader-progress"].exists)
         XCTAssertTrue(app.buttons["mihbara-reader-settings"].exists)
@@ -586,6 +586,21 @@ import XCTest
         XCTAssertFalse(card.exists)
         XCTAssertTrue(app.descendants(matching: .any)["mihbara-reader-toast"].waitForExistence(timeout: 5), app.debugDescription)
         sleep(1); shot(app, "M6-V08-saved-L")
+    }
+
+    func testReaderShowsUnmarkedAyahWithItsOriginalInlineText() throws {
+        continueAfterFailure = false
+        let fixture = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "scan-order-poc", withExtension: "epub"))
+        let app = app("reader", epub: try Data(contentsOf: fixture)); app.launch(); open(app)
+        let book = app.buttons["mihbara-book-continue"]
+        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); reach(app, book); book.tap()
+        useReaderMode(app, "scroll")
+        let verse = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "لَقَدْ")).firstMatch
+        XCTAssertTrue(verse.waitForExistence(timeout: 20), app.debugDescription)
+        let text = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "تَقْوِيمٍ")).firstMatch
+        XCTAssertTrue(text.exists, app.debugDescription)
+        shot(app, "M6-21-unmarked-ayah-reader-L")
+        app.buttons["mihbara-reader-close"].tap()
     }
 
     func testReaderColoursVersesAndOpensFootnoteInPlace() throws {
