@@ -103,6 +103,12 @@ targets:
           - thmanyahseriftext-Bold.otf
           - Amiri-Regular.ttf
           - Amiri-Bold.ttf
+          - Literata-Variable.ttf
+          - SourceSerif4-Variable.ttf
+          - AtkinsonHyperlegible-Regular.ttf
+          - AtkinsonHyperlegible-Bold.ttf
+          - IBMPlexSerif-Regular.ttf
+          - IBMPlexSerif-Bold.ttf
     entitlements:
       path: App/Madar.entitlements
       properties:
@@ -167,6 +173,8 @@ targets:
       - path: Tests/Fixtures/Mihbara/arabic-reader-poc.epub
         buildPhase: resources
       - path: Tests/Fixtures/Mihbara/english-import-poc.epub
+        buildPhase: resources
+      - path: Tests/Fixtures/Mihbara/scan-order-poc.epub
         buildPhase: resources
     dependencies:
       - target: Madar

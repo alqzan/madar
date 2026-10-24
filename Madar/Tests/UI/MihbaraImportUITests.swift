@@ -274,6 +274,33 @@ import UIKit
         attach(app, "M6-PDF-flow-reader-L")
     }
 
+    func testEPUBScanExplainsReversedAnchorsAndPageLinks() throws {
+        continueAfterFailure = false
+        let fixture = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "scan-order-poc", withExtension: "epub"))
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MIHBARA_FIXTURE": "empty",
+            "MADAR_UI_NOW": "2026-10-18T12:00:00+03:00", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
+            "MADAR_UI_MIHBARA_IMPORT_EPUB": try Data(contentsOf: fixture).base64EncodedString()]
+        app.launch()
+        let customize = app.buttons["tab-customize"]; XCTAssertTrue(customize.waitForExistence(timeout: 20)); customize.tap()
+        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 8)); search.tap(); search.typeText("المحبرة")
+        let door = app.buttons["mihbara-open"]; XCTAssertTrue(door.waitForExistence(timeout: 8)); door.tap()
+        let add = app.buttons["mihbara-add-paper"]; XCTAssertTrue(add.waitForExistence(timeout: 8)); add.tap()
+        let toc = app.descendants(matching: .any)["mihbara-epub-scan-toc"]
+        XCTAssertTrue(toc.waitForExistence(timeout: 20), app.debugDescription)
+        XCTAssertTrue(toc.label.contains("بعضها ليس بترتيب الكتاب"), toc.label)
+        let pages = app.descendants(matching: .any)["mihbara-epub-scan-pages"]
+        for _ in 0..<5 where !pages.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(pages.label.contains("تحتاج بعض الأرقام أو روابطها إلى مراجعة الترتيب"), pages.label)
+        XCTAssertTrue(pages.label.contains("يتكرر رقم واحد"), pages.label)
+        XCTAssertTrue(pages.label.contains("تعذّر التحقق"), pages.label)
+        XCTAssertFalse(pages.label.contains("بلا نقص ولا تكرار"), pages.label)
+        XCTAssertTrue(app.descendants(matching: .any)["mihbara-epub-import-size"].label.contains("عدد صفحات المطبوع غير متحقق"))
+        XCTAssertTrue(app.buttons["mihbara-epub-import-confirm"].isEnabled, "The scan reports faults; it does not block the owner's import choice")
+        attach(app, "M6-21-scan-order-warning-L")
+        app.terminate()
+    }
+
     func testEPUBPreviewUsesFileMetadataAndAddsAnOfflineBook() throws {
         continueAfterFailure = false
         let fixture = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "english-import-poc", withExtension: "epub"))

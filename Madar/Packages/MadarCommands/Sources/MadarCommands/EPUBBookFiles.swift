@@ -405,7 +405,13 @@ public struct EPUBBookScan: Equatable, Sendable {
     /// Printed page numbers skipped inside a run (a jump of 50 or more is a new volume, not a gap).
     public var pageGaps = 0
     public var pageRepeats = 0
-    public var isComplete: Bool { emptyChapters.isEmpty && unreadChapters == 0 && brokenTOC.isEmpty && pageGaps == 0 && pageRepeats == 0 }
+    /// Page-list entries whose number or target moves backwards in the book.
+    public var pageOutOfOrder = 0
+    public var unverifiedPageLinks = 0
+    public var isComplete: Bool {
+        emptyChapters.isEmpty && unreadChapters == 0 && brokenTOC.isEmpty && tocOutOfOrder == 0
+            && pageGaps == 0 && pageRepeats == 0 && pageOutOfOrder == 0 && unverifiedPageLinks == 0
+    }
     public init() {}
 }
 
@@ -439,15 +445,19 @@ extension EPUBBookFiles {
             $0.attribute("idref").flatMap { manifest[$0]?.path }
         }
         result.chapters = spinePaths.count
-        var anchors: [String: Set<String>] = [:]
+        var anchors: [String: [String: Int]] = [:]
         for (index, path) in spinePaths.enumerated() {
             try Task.checkCancellation()
             progress(Double(index) / Double(max(1, spinePaths.count)) * 0.9)
             guard let path, let member = archive.member(path), member.size <= scanDocumentLimit, let node = try? xml(archive, member, maximum: scanDocumentLimit) else {
                 result.unreadChapters += 1; continue
             }
-            var ids = Set<String>()
-            func collect(_ node: EPUBXMLNode) { if let id = node.attribute("id") { ids.insert(id) }; node.children.forEach(collect) }
+            var ids: [String: Int] = [:], offset = 0
+            func collect(_ node: EPUBXMLNode) {
+                offset += 1
+                if let id = node.attribute("id"), ids[id] == nil { ids[id] = offset }
+                node.children.forEach(collect)
+            }
             collect(node); anchors[path] = ids
             let body = node.descendants(named: "body").first ?? node
             let text = body.stringValue
@@ -459,49 +469,84 @@ extension EPUBBookFiles {
             if words == 0 && !hasImage { result.emptyChapters.append(index + 1) }
         }
         // The index: every entry must reach a real chapter and anchor, in reading order.
-        var outline: [EPUBBookOutlineItem] = [], outlineBase = folder, labels: [String] = []
+        var outline: [EPUBBookOutlineItem] = [], outlineBase = folder
+        var pageEntries: [EPUBBookOutlineItem] = [], pageBase = folder
         if let nav = manifest.values.first(where: { $0.properties.contains("nav") }), let node = try? xml(archive, path: nav.path, maximum: metadataMemberLimit) {
             outlineBase = (nav.path as NSString).deletingLastPathComponent
             let navs = node.descendants(named: "nav")
             if let toc = navs.first(where: { $0.attribute("type")?.split(whereSeparator: { $0.isWhitespace }).contains("toc") == true }) { outline = self.anchors(in: toc, depth: 0) }
             if let list = navs.first(where: { $0.attribute("type")?.split(whereSeparator: { $0.isWhitespace }).contains("page-list") == true }) {
-                labels = list.descendants(named: "a").map { $0.stringValue.trimmingCharacters(in: .whitespacesAndNewlines) }
+                pageEntries = self.anchors(in: list, depth: 0)
+                pageBase = (nav.path as NSString).deletingLastPathComponent
             }
         }
-        if outline.isEmpty || labels.isEmpty, let tocID = spine?.attribute("toc"), let ncx = manifest[tocID], let node = try? xml(archive, path: ncx.path, maximum: metadataMemberLimit) {
+        if outline.isEmpty || pageEntries.isEmpty, let tocID = spine?.attribute("toc"), let ncx = manifest[tocID], let node = try? xml(archive, path: ncx.path, maximum: metadataMemberLimit) {
             if outline.isEmpty, let map = node.descendants(named: "navMap").first { outline = ncxItems(map, depth: 0); outlineBase = (ncx.path as NSString).deletingLastPathComponent }
-            if labels.isEmpty { labels = node.descendants(named: "pageTarget").map { $0.stringValue.trimmingCharacters(in: .whitespacesAndNewlines) } }
+            if pageEntries.isEmpty {
+                pageEntries = node.descendants(named: "pageTarget").compactMap { target in
+                    guard let href = target.first(named: "content")?.attribute("src") else { return nil }
+                    let label = target.first(named: "navLabel")?.stringValue ?? ""
+                    return EPUBBookOutlineItem(title: label.trimmingCharacters(in: .whitespacesAndNewlines), href: href, depth: 0)
+                }
+                pageBase = (ncx.path as NSString).deletingLastPathComponent
+            }
+        }
+        // DOM offsets distinguish two targets inside the same spine document.
+        typealias Position = (chapter: Int, anchor: Int)
+        func position(_ href: String, base: String) -> Position? {
+            let parts = href.split(separator: "#", maxSplits: 1, omittingEmptySubsequences: false)
+            let fragment = parts.count == 2 ? String(parts[1]).removingPercentEncoding ?? String(parts[1]) : ""
+            guard let path = archivePath(for: href, base: base), let chapter = spinePaths.firstIndex(of: path) else { return nil }
+            if fragment.isEmpty { return (chapter, 0) }
+            guard let anchor = anchors[path]?[fragment] else { return nil }
+            return (chapter, anchor)
+        }
+        func precedes(_ lhs: Position, _ rhs: Position) -> Bool {
+            lhs.chapter < rhs.chapter || (lhs.chapter == rhs.chapter && lhs.anchor < rhs.anchor)
         }
         result.tocEntries = outline.count
-        var lastPosition = -1
+        var lastPosition: Position?
         for entry in outline {
-            let parts = entry.href.split(separator: "#", maxSplits: 1, omittingEmptySubsequences: false)
-            let fragment = parts.count == 2 ? String(parts[1]).removingPercentEncoding ?? String(parts[1]) : ""
-            guard let path = archivePath(for: entry.href, base: outlineBase), let position = spinePaths.firstIndex(of: path) else { result.brokenTOC.append(entry.title); continue }
-            if !fragment.isEmpty, let ids = anchors[path], !ids.contains(fragment) { result.brokenTOC.append(entry.title); continue }
-            if position < lastPosition { result.tocOutOfOrder += 1 }
-            lastPosition = max(lastPosition, position)
+            guard let current = position(entry.href, base: outlineBase) else { result.brokenTOC.append(entry.title); continue }
+            if let lastPosition, precedes(current, lastPosition) { result.tocOutOfOrder += 1 }
+            if let previous = lastPosition {
+                if precedes(previous, current) { lastPosition = current }
+            } else { lastPosition = current }
         }
-        let pages = pageCheck(labels)
-        result.pageLabels = labels.count; result.pageGaps = pages.gaps; result.pageRepeats = pages.repeats
+        let pages = pageCheck(pageEntries.map(\.title))
+        var outOfOrder = pages.outOfOrder
+        lastPosition = nil
+        for (index, entry) in pageEntries.enumerated() {
+            guard let current = position(entry.href, base: pageBase) else { result.unverifiedPageLinks += 1; continue }
+            if let lastPosition, precedes(current, lastPosition) { outOfOrder.insert(index) }
+            if let previous = lastPosition {
+                if precedes(previous, current) { lastPosition = current }
+            } else { lastPosition = current }
+        }
+        result.pageLabels = pageEntries.count; result.pageGaps = pages.gaps; result.pageRepeats = pages.repeats
+        result.pageOutOfOrder = outOfOrder.count
         progress(1)
         return result
     }
 
     /// Printed page labels in reading order: Western or Arabic-Indic numerals, optionally «ج/ص». A repeat is the same label
     /// twice; a gap is a skipped number inside one run.
-    static func pageCheck(_ labels: [String]) -> (gaps: Int, repeats: Int) {
+    static func pageCheck(_ labels: [String]) -> (gaps: Int, repeats: Int, outOfOrder: Set<Int>) {
         let digits: [Character: Character] = ["٠": "0", "١": "1", "٢": "2", "٣": "3", "٤": "4", "٥": "5", "٦": "6", "٧": "7", "٨": "8", "٩": "9"]
         var seen = Set<String>(), repeats = 0, gaps = 0, previous: (volume: String, page: Int)?
-        for label in labels {
-            if !seen.insert(label).inserted { repeats += 1; continue }
-            let latin = String(label.map { digits[$0] ?? $0 })
+        var outOfOrder = Set<Int>()
+        for (index, label) in labels.enumerated() {
+            let latin = String(label.map { digits[$0] ?? $0 }).trimmingCharacters(in: .whitespacesAndNewlines)
             let parts = latin.split(separator: "/").map { $0.trimmingCharacters(in: .whitespaces) }
             guard let page = parts.last.flatMap({ Int($0.filter(\.isNumber)) }) else { previous = nil; continue }
             let volume = parts.count > 1 ? parts.dropLast().joined(separator: "/") : ""
-            if let previous, previous.volume == volume, page > previous.page + 1, page - previous.page < 50 { gaps += page - previous.page - 1 }
+            if !seen.insert("\(volume)/\(page)").inserted { repeats += 1; continue }
+            if let previous, previous.volume == volume {
+                if page > previous.page + 1, page - previous.page < 50 { gaps += page - previous.page - 1 }
+                if page < previous.page { outOfOrder.insert(index) }
+            }
             previous = (volume, page)
         }
-        return (gaps, repeats)
+        return (gaps, repeats, outOfOrder)
     }
 }

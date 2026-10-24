@@ -281,15 +281,18 @@ struct MihbaraEPUBImportView: View {
                 + (scan.unreadChapters > 0 ? " تعذّر فحص " + count(scan.unreadChapters, ("فصل واحد", "فصلين", "فصول", "فصلًا")) + "." : ""),
                 detected: scan.emptyChapters.isEmpty && scan.unreadChapters == 0).accessibilityIdentifier("mihbara-epub-scan-text")
             if scan.tocEntries > 0 {
-                row("روابط الفهرس", detail: scan.brokenTOC.isEmpty ? "كل عناوين الفهرس تصل إلى مواضعها" + (scan.tocOutOfOrder > 0 ? "، وبعضها ليس بترتيب الكتاب." : ".")
-                    : count(scan.brokenTOC.count, ("عنوان واحد", "عنوانان", "عناوين", "عنوانًا")) + " لا يصل إلى موضعه: " + scan.brokenTOC.prefix(3).joined(separator: "، ") + (scan.brokenTOC.count > 3 ? "…" : "."),
-                    detected: scan.brokenTOC.isEmpty).accessibilityIdentifier("mihbara-epub-scan-toc")
+                row("روابط الفهرس", detail: (scan.brokenTOC.isEmpty ? "كل عناوين الفهرس تصل إلى مواضعها"
+                    : count(scan.brokenTOC.count, ("عنوان واحد", "عنوانان", "عناوين", "عنوانًا")) + " لا يصل إلى موضعه: " + scan.brokenTOC.prefix(3).joined(separator: "، ") + (scan.brokenTOC.count > 3 ? "…" : ""))
+                    + (scan.tocOutOfOrder > 0 ? "، وبعضها ليس بترتيب الكتاب." : "."),
+                    detected: scan.brokenTOC.isEmpty && scan.tocOutOfOrder == 0).accessibilityIdentifier("mihbara-epub-scan-toc")
             }
             if scan.pageLabels > 0 {
-                row("أرقام الصفحات", detail: scan.pageGaps == 0 && scan.pageRepeats == 0 ? "متتابعة بلا نقص ولا تكرار."
+                row("أرقام الصفحات", detail: scan.pageGaps == 0 && scan.pageRepeats == 0 && scan.pageOutOfOrder == 0 && scan.unverifiedPageLinks == 0 ? "الأرقام وروابطها متتابعة بلا نقص ولا تكرار."
                     : [scan.pageGaps > 0 ? "تنقص " + count(scan.pageGaps, ("صفحة واحدة", "صفحتان", "صفحات", "صفحةً")) : nil,
-                       scan.pageRepeats > 0 ? "يتكرر " + count(scan.pageRepeats, ("رقم واحد", "رقمان", "أرقام", "رقمًا")) : nil].compactMap { $0 }.joined(separator: "، ") + ".",
-                    detected: scan.pageGaps == 0 && scan.pageRepeats == 0).accessibilityIdentifier("mihbara-epub-scan-pages")
+                       scan.pageRepeats > 0 ? "يتكرر " + count(scan.pageRepeats, ("رقم واحد", "رقمان", "أرقام", "رقمًا")) : nil,
+                       scan.pageOutOfOrder > 0 ? "تحتاج بعض الأرقام أو روابطها إلى مراجعة الترتيب" : nil,
+                       scan.unverifiedPageLinks > 0 ? "تعذّر التحقق من " + count(scan.unverifiedPageLinks, ("رابط صفحة واحد", "رابطي صفحتين", "روابط صفحات", "رابط صفحة")) : nil].compactMap { $0 }.joined(separator: "، ") + ".",
+                    detected: scan.pageGaps == 0 && scan.pageRepeats == 0 && scan.pageOutOfOrder == 0 && scan.unverifiedPageLinks == 0).accessibilityIdentifier("mihbara-epub-scan-pages")
             }
             if scan.verses > 0 {
                 row("الآيات", detail: count(scan.verses, ("آية واحدة", "آيتان", "آيات", "آيةً")) + " تُعرض بخط المصحف.", detected: true).accessibilityIdentifier("mihbara-epub-scan-verses")
@@ -320,6 +323,9 @@ struct MihbaraEPUBImportView: View {
     /// «٤ مجلدات، ١٬٢٠٠ صفحة مطبوعة؛ الملف ٣٫٢ م.ب» — the size the shelf will show, from the moment of download.
     private func sizeLine(_ value: EPUBBookInspection) -> String {
         let file = "الملف " + digits.localized(ByteCountFormatter.string(fromByteCount: Int64(value.sizeBytes), countStyle: .file))
+        if let scan, scan.pageGaps > 0 || scan.pageRepeats > 0 || scan.pageOutOfOrder > 0 || scan.unverifiedPageLinks > 0 {
+            return file + "؛ عدد صفحات المطبوع غير متحقق."
+        }
         guard let shape = printedShape, let pages = shape.pages, pages > 0 else { return file + "؛ لا يذكر الملف عدد صفحات المطبوع." }
         let printed = MihbaraCopy.pages(pages, digits) + " مطبوعة"
         return (shape.volumes > 1 ? (MihbaraBookCovers.sizeWord(shape, digits) ?? "") + "، " + printed : printed) + "؛ " + file

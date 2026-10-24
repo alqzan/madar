@@ -331,6 +331,7 @@
 		D403301C975C88240EB92A70 /* MoneyEnvelopeDetailUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEEEE01FACAB930747207AE /* MoneyEnvelopeDetailUITests.swift */; };
 		D42D965F67207DA336C2B9FD /* AppQuranService+History.swift in Sources */ = {isa = PBXBuildFile; fileRef = 536586BCDBC61C002DDD0579 /* AppQuranService+History.swift */; };
 		D54A04C289C8A41C4DF864F3 /* DiaryYearbookView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48E43B1113B23E0C3CB98D51 /* DiaryYearbookView.swift */; };
+		D56655E2F2BD1FEBDE0D0B42 /* scan-order-poc.epub in Resources */ = {isa = PBXBuildFile; fileRef = B6B644CCC83C35ABDC3339CE /* scan-order-poc.epub */; };
 		D5ECFF4CA89A7D774FE1B8DA /* DiaryTodayUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F2989DAFF327646B3C614EA /* DiaryTodayUITests.swift */; };
 		D6E9021FF34A9148836244D4 /* MoneyAccountsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FF3A5ABCDDB3153D93E2D90 /* MoneyAccountsView.swift */; };
 		D74E4C19B6B9ED7AC8C905D3 /* MoneyZakatEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29178AB5956D38D4E991BEBA /* MoneyZakatEditor.swift */; };
@@ -705,6 +706,7 @@
 		B5265ABF3C9DFCE44A071263 /* QuranYearView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranYearView.swift; sourceTree = "<group>"; };
 		B5DC3D2395EF3C228E3454A0 /* DiaryDayOneImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryDayOneImportView.swift; sourceTree = "<group>"; };
 		B6AAA53BBACA4E9D860DB658 /* AppDiaryExportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDiaryExportService.swift; sourceTree = "<group>"; };
+		B6B644CCC83C35ABDC3339CE /* scan-order-poc.epub */ = {isa = PBXFileReference; path = "scan-order-poc.epub"; sourceTree = "<group>"; };
 		B824AE40F77475D638431FF6 /* MoneyEnvelopesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyEnvelopesView.swift; sourceTree = "<group>"; };
 		B8265DEB75EC6FB6E7BBCA1D /* MoneyCategoriesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyCategoriesView.swift; sourceTree = "<group>"; };
 		BBFFF71C3E962BAE2E738136 /* QuranHomeFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranHomeFixture.swift; sourceTree = "<group>"; };
@@ -907,6 +909,7 @@
 			children = (
 				8FD6BC425BFCE32221434C0C /* arabic-reader-poc.epub */,
 				482B47B06449FE9AC7232053 /* english-import-poc.epub */,
+				B6B644CCC83C35ABDC3339CE /* scan-order-poc.epub */,
 			);
 			path = Mihbara;
 			sourceTree = "<group>";
@@ -1608,6 +1611,7 @@
 				1440A0ECB247647341D7C97B /* arabic-reader-poc.epub in Resources */,
 				9718E129D0BA1C83119E3CA6 /* dayone-synthetic.zip in Resources */,
 				B4BBACECE399D157E8A1EBF4 /* english-import-poc.epub in Resources */,
+				D56655E2F2BD1FEBDE0D0B42 /* scan-order-poc.epub in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

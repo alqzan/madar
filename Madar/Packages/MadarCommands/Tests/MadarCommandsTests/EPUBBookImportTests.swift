@@ -216,4 +216,54 @@ import MadarData
         #expect(scan.words == 2)
         #expect(!scan.isComplete)
     }
+    @Test func fullScanChecksTargetsWithinOneChapterAndNormalizesPageDigits() throws {
+        var entries = validEntries()
+        entries[3].bytes = Data(#"<html xmlns:epub="http://www.idpf.org/2007/ops"><body><nav epub:type="toc"><ol><li><a href="chapter.xhtml#later">Later</a></li><li><a href="chapter.xhtml#early">Early</a></li></ol></nav><nav epub:type="page-list"><ol><li><a href="chapter.xhtml#later">1</a></li><li><a href="chapter.xhtml#early">2</a></li><li><a href="chapter.xhtml#end">٢</a></li><li><a href="chapter.xhtml#missing">3</a></li></ol></nav></body></html>"#.utf8)
+        entries[4].bytes = Data(#"<html><body><h1 id="early">First</h1><p id="later">Second</p><p id="end">Last</p></body></html>"#.utf8)
+        let folder = try root(); defer { try? FileManager.default.removeItem(at: folder) }
+        let file = folder.appendingPathComponent("local-order.epub"); try archive(entries).write(to: file)
+        let scan = try EPUBBookFiles.scan(file: file)
+        #expect(scan.tocOutOfOrder == 1, "The TOC returns from the second block to the first in the same file")
+        #expect(scan.brokenTOC.isEmpty)
+        #expect(scan.pageOutOfOrder == 1, "Page 2's target precedes page 1, despite increasing labels")
+        #expect(scan.pageRepeats == 1, "2 and ٢ are the same printed label")
+        #expect(scan.pageGaps == 0)
+        #expect(scan.unverifiedPageLinks == 1)
+        #expect(!scan.isComplete)
+    }
+
+    @Test func orderedSameChapterTargetsRemainCompleteAndResetPagesForNewVolumes() throws {
+        var entries = validEntries()
+        entries[3].bytes = Data(#"<html xmlns:epub="http://www.idpf.org/2007/ops"><body><nav epub:type="toc"><ol><li><a href="chapter.xhtml#early">Early</a></li><li><a href="chapter.xhtml#later">Later</a></li></ol></nav><nav epub:type="page-list"><ol><li><a href="chapter.xhtml#early">١/٩</a></li><li><a href="chapter.xhtml#later">٢/١</a></li></ol></nav></body></html>"#.utf8)
+        entries[4].bytes = Data(#"<html><body><h1 id="early">First</h1><p id="later">Second</p></body></html>"#.utf8)
+        let folder = try root(); defer { try? FileManager.default.removeItem(at: folder) }
+        let file = folder.appendingPathComponent("correct-order.epub"); try archive(entries).write(to: file)
+        let scan = try EPUBBookFiles.scan(file: file)
+        #expect(scan.tocOutOfOrder == 0)
+        #expect(scan.pageOutOfOrder == 0)
+        #expect(scan.pageGaps == 0)
+        #expect(scan.pageRepeats == 0)
+        #expect(scan.unverifiedPageLinks == 0)
+        #expect(scan.isComplete)
+        let descending = EPUBBookFiles.pageCheck(["٣", "٢", "1"])
+        #expect(descending.outOfOrder == [1, 2])
+    }
+
+    @Test func legacyNCXPageTargetsUseTheSameDocumentOrder() throws {
+        var entries = validEntries()
+        entries[2].bytes = Data(#"<package><manifest><item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/><item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/></manifest><spine toc="ncx"><itemref idref="chapter"/></spine></package>"#.utf8)
+        entries[3] = Entry(path: "OEBPS/toc.ncx", bytes: Data(#"<ncx><navMap><navPoint><navLabel><text>Last</text></navLabel><content src="chapter.xhtml#later"/></navPoint><navPoint><navLabel><text>First</text></navLabel><content src="chapter.xhtml#early"/></navPoint></navMap><pageList><pageTarget><navLabel><text>1</text></navLabel><content src="chapter.xhtml#later"/></pageTarget><pageTarget><navLabel><text>2</text></navLabel><content src="chapter.xhtml#early"/></pageTarget></pageList></ncx>"#.utf8))
+        entries[4].bytes = Data(#"<html><body><p id="early">First</p><p id="later">Last</p></body></html>"#.utf8)
+        let folder = try root(); defer { try? FileManager.default.removeItem(at: folder) }
+        let file = folder.appendingPathComponent("ncx-order.epub"); try archive(entries).write(to: file)
+        let scan = try EPUBBookFiles.scan(file: file)
+        #expect(scan.tocEntries == 2)
+        #expect(scan.tocOutOfOrder == 1)
+        #expect(scan.pageLabels == 2)
+        #expect(scan.pageOutOfOrder == 1)
+        #expect(scan.pageGaps == 0)
+        #expect(scan.unverifiedPageLinks == 0)
+        #expect(!scan.isComplete)
+    }
+
 }
