@@ -199,6 +199,26 @@ extension LegacyMoneyImportTests {
         #expect(archive["budgetWindow"] as? String == "month")
         #expect(plan.steps.isEmpty)
     }
+    @Test func salaryConfirmationAndOffsetAreArchivedWithoutCreatingSalaryFacts() throws {
+        // Both are top-level fields in the pinned AppData. A confirmation date is not a bank
+        // credit, and the old offset toggle has no exact equivalent in native cycle rules.
+        let root: [String: Any] = ["lastSalaryConfirm": "2026-07-27", "autoOffset": false]
+        let plan = try settingsPlan(root)
+        let settings = try #require(plan.cycleSettings)
+        let archive = try #require(JSONSerialization.jsonObject(with: settings.archive) as? [String: Any])
+        #expect(Set(archive.keys) == ["lastSalaryConfirm", "autoOffset"])
+        #expect(archive["lastSalaryConfirm"] as? String == "2026-07-27")
+        #expect(archive["autoOffset"] as? Bool == false)
+        #expect(settings.daily == nil && settings.salaryDay == nil && !settings.gregorian)
+        #expect(plan.steps.isEmpty)
+        #expect(plan.counts["settings.archivedFields"] == 2)
+        let cleared = try settingsPlan(["lastSalaryConfirm": NSNull(), "autoOffset": true])
+        let clearedSettings = try #require(cleared.cycleSettings)
+        let clearedArchive = try #require(JSONSerialization.jsonObject(with: clearedSettings.archive) as? [String: Any])
+        #expect(clearedArchive["lastSalaryConfirm"] is NSNull)
+        #expect(clearedArchive["autoOffset"] as? Bool == true)
+        #expect(cleared.steps.isEmpty)
+    }
     @Test func settingsArchiveAndCommandsAreStableAcrossKeyOrderAndReplay() throws {
         let keys = Keys()
         let a = try settingsPlan(["dailyBudget": ["amount": 12.3], "salaryDay": 27], keys: keys)

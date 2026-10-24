@@ -49,7 +49,7 @@ public enum LegacyMoneyImport {
 
     private static func settings(_ data: Data, plan: inout Plan, uuid: (String) -> UUID) throws -> CycleSettings? {
         guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
-        let keys = ["dailyBudget", "monthlyIncome", "salaryDay", "budgetWindow"]
+        let keys = ["dailyBudget", "monthlyIncome", "salaryDay", "budgetWindow", "lastSalaryConfirm", "autoOffset"]
         let original = root.filter { keys.contains($0.key) }
         guard !original.isEmpty else { return nil }
         let archive = try JSONSerialization.data(withJSONObject: original, options: [.sortedKeys])

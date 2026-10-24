@@ -13,6 +13,11 @@ import XCTest
     func testOwnerLegacyMoneyTrial() throws {
         continueAfterFailure = false
         guard let backup = ProcessInfo.processInfo.environment["MADAR_TRIAL_MONEY"] else { throw XCTSkip("Owner data trial only") }
+        let original = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: backup))) as? [String: Any])
+        // Count source fields independently of the planner so an omitted archive field cannot pass
+        // merely because the persisted archive matches the planner's own incomplete output.
+        let settingsFields: Set<String> = ["dailyBudget", "monthlyIncome", "salaryDay", "budgetWindow", "lastSalaryConfirm", "autoOffset"]
+        let originalSettingsCount = Set(original.keys).intersection(settingsFields).count
         let store = UUID().uuidString, stamp = String(Int(Date().timeIntervalSince1970))
         for run in ["first", "second"] { try? FileManager.default.removeItem(at: URL(fileURLWithPath: backup).deletingLastPathComponent().appendingPathComponent("money-import-\(stamp)-\(run).json")) }
         let app = XCUIApplication()
@@ -24,6 +29,8 @@ import XCTest
         XCTAssertEqual(first["store.unconfirmed", default: 0], first["store.possibleDuplicates", default: 0], "Only real possible duplicates may wait")
         XCTAssertEqual(first["settings.persisted"], 1)
         XCTAssertEqual(first["settings.archiveMatches"], 1)
+        XCTAssertEqual(first["settings.archivedFields"], originalSettingsCount)
+        XCTAssertEqual(first["cycleSettings.applied"], 1)
         XCTAssertGreaterThan(first["settings.mapped", default: 0], 0)
         XCTAssertEqual(first["store.cycles"], 0, "Income settings cannot create a salary or cycle")
         let start = app.buttons["first-run-continue"]
@@ -50,9 +57,12 @@ import XCTest
         XCTAssertEqual(second["balance.known"], first["balance.known"])
         XCTAssertEqual(second["balance.unknown"], first["balance.unknown"])
         XCTAssertEqual(second["earlier.cardLinked", default: 0], 0, "Replay must not rewrite the old rows' card links or edit dates")
-        XCTAssertEqual(second["cycleSettings.duplicate"], 1)
+        // Re-delivering the same command returns its original receipt outcome (applied),
+        // rather than a new natural-key duplicate outcome. The counts below prove no growth.
+        XCTAssertEqual(second["cycleSettings.applied"], first["cycleSettings.applied"])
         XCTAssertEqual(second["settings.persisted"], 1)
         XCTAssertEqual(second["settings.archiveMatches"], 1)
+        XCTAssertEqual(second["settings.archivedFields"], originalSettingsCount)
         XCTAssertEqual(second["store.settings"], first["store.settings"])
         XCTAssertEqual(second["store.importLinks"], first["store.importLinks"])
         XCTAssertEqual(second["store.cycles"], 0)
