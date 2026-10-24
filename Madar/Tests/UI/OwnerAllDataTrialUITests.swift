@@ -100,5 +100,20 @@ import XCTest
         // The lobby with every room's data.
         let bahwTab = app.tabBars.buttons["البهو"].firstMatch, bahw = bahwTab.waitForExistence(timeout: 5) ? bahwTab : app.buttons["البهو"].firstMatch
         if bahw.waitForExistence(timeout: 10) { bahw.tap(); Thread.sleep(forTimeInterval: 2); shot(app, "TRIAL-bahw-L"); for i in 1...3 { app.swipeUp(velocity: .slow); shot(app, "TRIAL-bahw-s\(i)-L") } } else { add(XCTAttachment(string: "lobby tab not found: " + app.tabBars.buttons.allElementsBoundByIndex.map(\.label).joined(separator: "|"))) }
+        // Prayer and Quran homes, then the habits room from the lobby (Claude, 24 Oct tour).
+        for (tab, name) in [("الصلاة", "prayer"), ("القرآن", "quran")] {
+            let button = app.tabBars.buttons[tab].firstMatch
+            guard button.waitForExistence(timeout: 10) else { add(XCTAttachment(string: "no tab \(tab)")); continue }
+            button.tap(); Thread.sleep(forTimeInterval: 2); clearAlert(app, name); shot(app, "TRIAL-\(name)-home-L")
+            for i in 1...4 { app.swipeUp(velocity: .slow); shot(app, "TRIAL-\(name)-home-s\(i)-L") }
+            for _ in 0..<6 { app.swipeDown(velocity: .fast) }
+        }
+        if bahwTab.exists { bahwTab.tap(); Thread.sleep(forTimeInterval: 1) }
+        let habits = app.descendants(matching: .any).matching(identifier: "bahw-block-habits").firstMatch
+        for _ in 0..<6 where !(habits.exists && habits.isHittable) { app.swipeDown(velocity: .fast) }
+        if habits.waitForExistence(timeout: 10) {
+            let header = app.buttons["bahw-habits-open"]; if header.exists { header.tap() } else { habits.tap() }
+            if app.staticTexts["habits-title"].waitForExistence(timeout: 10) { shot(app, "TRIAL-habits-L"); app.swipeUp(velocity: .slow); shot(app, "TRIAL-habits-s1-L") }
+        } else { add(XCTAttachment(string: "no habits block")) }
     }
 }

@@ -28,7 +28,7 @@ struct DiarySearchView: View {
                             Button {chips.removeAll{$0.id==chip.id}} label:{Image(systemName:"xmark")}.accessibilityLabel("حذف فلتر "+chip.label).accessibilityIdentifier("diary-search-remove-"+chip.label)
                         }.font(DiaryType.label).padding(.horizontal,12).frame(minHeight:44).background(theme.surface,in:.capsule).overlay{Capsule().stroke(theme.line)} } }}.scrollIndicators(.hidden)
                         if chips.contains(where:{if case .words=$0.rule {true}else{false}}) { Text("بحثت عن الكلمات: "+chips.compactMap{if case .words(let words)=$0.rule {words}else{nil}}.joined(separator:"، ")).font(DiaryType.label).foregroundStyle(theme.color("ink3Text")) }
-                        Text("النتائج: "+service.digits.string(results.count)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
+                        Text(arabicCount(results.count,["نتيجة واحدة","نتيجتان","نتائج","نتيجة"],service.digits)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
                         if results.isEmpty {
                             VStack(alignment: .leading, spacing: 12) {
                                 Text("لا أيام تطابق هذا البحث").font(DiaryType.heading).accessibilityIdentifier("diary-search-empty")

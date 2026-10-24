@@ -26,7 +26,7 @@ struct HabitEditorView:View {
             ScrollView {
                 VStack(alignment:.leading,spacing:18) {
                     section("العادة") {
-                        TextField("اسم العادة",text:$name).font(MadarTypography.body()).frame(minHeight:44).accessibilityIdentifier("habit-name")
+                        TextField("اسم العادة",text:$name,prompt:Text("ورد قبل النوم")).font(MadarTypography.body()).frame(minHeight:44).accessibilityIdentifier("habit-name")
                         if reading == nil { Picker("تسجيلها",selection:$source) { Text("أسجّلها هنا").tag("custom");Text("الجماعة من الصلاة").tag("jamaah");Text("المراجعة من القرآن").tag("review");Text("سطر اليوم من المذكرات").tag("diaryLine");if HabitHealthStore.available {Text("المشي من الصحة").tag("walking")} }.pickerStyle(.menu).frame(minHeight:44).accessibilityIdentifier("habit-source") }
                         else if let title=reading?.sourceTitle { Text("تُقرأ من "+title).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
                     }
