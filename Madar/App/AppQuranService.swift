@@ -264,7 +264,7 @@ import MadarPrayer
                     let marker = (ayah.uthmaniText as NSString).substring(from: tokens[word.wordIndex].utf16Range.upperBound).trimmingCharacters(in: .whitespacesAndNewlines)
                     if !marker.isEmpty {
                         guard let printedMark = glyphs["\(ayah.id):end"] else { throw QuranPlanError.invalidPages }
-                        parts.append(marker); words.append(QuranUIWord(ayahID: ayah.id, index: nil, text: marker, printedGlyphs: printedMark))
+                        parts.append(marker); words.append(QuranUIWord(ayahID: ayah.id, index: nil, text: marker, printedGlyphs: printedMark, ayahNumberLabel: numerals.string(ayah.ayahNumber)))
                     }
                 }
             }

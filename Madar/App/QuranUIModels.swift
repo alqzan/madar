@@ -131,7 +131,7 @@ enum QuranUICommand: Sendable {
     case cancelRecovery
     case raisePages(juz: Int)
 }
-struct QuranUIWord: Sendable { var ayahID: Int; var index: Int?; var text: String; var ayahWordCount = 0; var printedGlyphs: String? }
+struct QuranUIWord: Sendable { var ayahID: Int; var index: Int?; var text: String; var ayahWordCount = 0; var printedGlyphs: String?; var ayahNumberLabel: String? }
 struct QuranUILine: Identifiable, Sendable { var id: Int; var glyphs: String; var semanticText: String; var words: [QuranUIWord] = []; var centered = false; var surahOpening = false }
 struct QuranUIPage: Sendable {
     var page: Int

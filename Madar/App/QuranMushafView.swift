@@ -22,7 +22,9 @@ struct QuranMushafView: View {
             ZStack {
                 theme.color("mushafPaper").ignoresSafeArea()
                 if let page {
-                    QuranCoachPage(page: page, coach: reading(page), stage: .grading, reveal: { _ in }, readingTap: { tools.toggle() })
+                    QuranCoachPage(page: page, coach: reading(page), stage: .grading, reveal: { _ in }, readingTap: { tools.toggle() }, medinaStyle: true)
+                        .frame(width: geometry.size.width, height: min(geometry.size.height, geometry.size.width * 1.64))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .scaleEffect(scale).offset(offset(in: geometry.size))
                         .gesture(MagnifyGesture().updating($magnification) { value, state, _ in state = value.magnification }.onEnded { value in zoom = min(3, max(1, zoom * value.magnification)); if zoom == 1 { pan = .zero } })
                         .simultaneousGesture(DragGesture(minimumDistance: 20).updating($dragging) { value, state, _ in if scale > 1 { state = value.translation } }.onEnded { value in
