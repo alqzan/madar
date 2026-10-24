@@ -170,7 +170,7 @@ import MadarPrayer
             percentageLabel: numerals.percent(coverage.percent), streakLabel: "سلسلة " + dayCount(streak.days), hifzAmounts: amounts, streakDays: streak.days, balanceTitle: balance,
             balanceExplanation: "تتبع الخطة حاجة المراجعة ومقدار حفظك", hifzLevel: QuranUILevel(rawValue: snapshot.hifzLevel.rawValue)!,
             reviewLevel: QuranUILevel(rawValue: snapshot.reviewLevel.rawValue)!, steps: steps, recentDays: heat, plan: plan, surahs: surahs, draft: draft,
-            missedDayKey: missedDay?.description, missedDayTitle: missedDay.map { "فاتك وِرد " + app.dateLabels($0, first: .hijri, weekday: true).combined },
+            missedDayKey: missedDay?.description, missedDayTitle: missedDay.map { "فاتك وِرد " + app.dateLabels($0, first: .hijri, compact: true, weekday: true).combined },
             summary: ["في صدرك " + coverageTitle], history: QuranUIHistory(weekSummary: [weeklySummary], yearSummary: [], allSummary: [], days: heat, coverage: [], sessions: historySessions),
             strengthTitle: "مؤشر وصفي من تقييمك ومواعيد المراجعة", strength: strength,
             recovery: QuranUIRecovery(distantLabel: faceCount(snapshot.pages.filter(\.isFar).count) + " بعيدة", activeTitle: snapshot.recovery == nil ? nil : "خطة استرداد", canCreate: snapshot.pages.contains(where: \.isFar), previews: [:]),
