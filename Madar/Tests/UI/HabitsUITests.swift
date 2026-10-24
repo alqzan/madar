@@ -33,18 +33,21 @@ import XCTest
         XCTAssertTrue(app.buttons["habit-archived"].waitForExistence(timeout:5));if !app.buttons["استعدها"].exists {app.buttons["habit-archived"].tap()};app.buttons["استعدها"].tap()
         XCTAssertTrue(row().waitForExistence(timeout:5))
     }
-    func testOrbitAndAllFrequencyListsMatchDefaultBoards() throws {
+    func testTodayStepAndAllHabitsLists() throws {
         continueAfterFailure=false;let app=app("showcase");open(app);shot(app,"M4-V02-Adat-L")
-        app.swipeUp(velocity:.slow);shot(app,"M4-V02-Adat-s1-L");app.swipeUp(velocity:.slow);shot(app,"M4-V02-Adat-s2-L")
-        // Each period card shows only its own habits (owner 20 Oct).
-        app.swipeDown(velocity:.fast);app.swipeDown(velocity:.fast)
-        for (kind,habit) in [("weekly","الاتصال بالأخوال"),("monthly","صدقة الشهر"),("yearly","العمرة")] {
-            let card=app.buttons["habits-period-"+kind];XCTAssertTrue(card.waitForExistence(timeout:5),app.debugDescription);card.tap()
-            XCTAssertTrue(card.isSelected,kind)
-            XCTAssertTrue(app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@",habit)).firstMatch.waitForExistence(timeout:5),kind)
-            XCTAssertFalse(app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@","الماء،")).firstMatch.exists,kind)
-            shot(app,"M4-V02-Adat-"+kind+"-L")
+        // Owner 24 Oct «خطوة اليوم»: «اليوم» holds what is due now; the yearly habit waits in «كل عاداتي».
+        let today=app.buttons["habits-view-today"],all=app.buttons["habits-view-all"]
+        XCTAssertTrue(today.waitForExistence(timeout:5),app.debugDescription);XCTAssertTrue(today.isSelected)
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@","الماء،")).firstMatch.exists)
+        XCTAssertFalse(app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@","العمرة")).firstMatch.exists)
+        app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@","الماء،")).firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["habit-progress"].waitForExistence(timeout:5));shot(app,"M4-V02-detail-L");app.buttons["تمّ"].tap()
+        all.tap();XCTAssertTrue(all.isSelected)
+        for habit in ["الماء،","الاتصال بالأخوال","صدقة الشهر","العمرة"] {
+            XCTAssertTrue(app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@",habit)).firstMatch.waitForExistence(timeout:5),habit)
         }
-        XCTAssertFalse(app.segmentedControls["عرض العادات"].exists) // RA8: alternate designs are v2.
+        for kind in ["daily","weekly","monthly","yearly"] { XCTAssertTrue(app.descendants(matching:.any)["habits-group-"+kind].exists,kind) }
+        shot(app,"M4-V02-Adat-all-L");app.swipeUp(velocity:.slow);shot(app,"M4-V02-Adat-all-s1-L")
+        XCTAssertFalse(app.segmentedControls["عرض العادات"].exists) // RA8: alternate designs are v2; this is a filter.
     }
 }
