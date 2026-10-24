@@ -153,6 +153,8 @@ private struct MadarSceneContent: View {
             }
 #if DEBUG
             await opened.runLegacyMoneyTrialIfRequested()
+            await opened.runLegacyQuranTrialIfRequested()
+            await opened.runLegacyPrayerTrialIfRequested()
 #endif
             session = opened; startupError = nil
             await opened.reconcileSpotlightIndex()

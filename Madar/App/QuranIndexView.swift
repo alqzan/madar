@@ -22,7 +22,7 @@ struct QuranIndexView: View {
                         VStack(spacing:4) { Image(systemName:option.icon).font(.system(size:18));Text(option.title).font(quranFont(11)) }.frame(maxWidth:.infinity,minHeight:52).foregroundStyle(unit == option ? theme.onAccent : theme.ink).background(unit == option ? theme.accent : .clear,in:Capsule())
                     }.buttonStyle(.plain).accessibilityIdentifier("quran-index-unit-"+option.id).accessibilityAddTraits(unit == option ? .isSelected : [])
                 } }.padding(4).background(theme.color("track"),in:Capsule())
-                HStack { Text("في صدرك").font(quranFont(12));Text(service.numerals.string(items.filter(\.memorized).count)).font(quranSerif(25));Text(unit.title).font(quranFont(12));Spacer();Text("المس لتفاصيله").font(quranFont(11)).foregroundStyle(theme.secondaryInk) }
+                HStack { let held=items.filter(\.memorized).count,form=unit.counted(held);Text("في صدرك").font(quranFont(12));if form.number {Text(service.numerals.string(held)).font(quranSerif(25))};Text(form.noun).font(form.number ? quranFont(12) : quranSerif(20));Spacer();Text("المس لتفاصيله").font(quranFont(11)).foregroundStyle(theme.secondaryInk) }
                 if unit == .ayah { TextField("ابحث في الآيات",text:$query).font(quranFont(15)).padding(12).background(theme.surface,in:.rect(cornerRadius:14)).accessibilityIdentifier("quran-index-search") }
                 if unit == .surah && !type.isAccessibilitySize {
                     QuranSurahRopes(items:items,choose:{ selected=$0 })

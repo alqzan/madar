@@ -46,10 +46,12 @@ struct QuranStrengthView:View {
     }
     private func tubes(_ parts:[QuranUIStrengthPart])->some View {
         GeometryReader {proxy in
-            let gap:CGFloat=5,w=(proxy.size.width-CGFloat(parts.count-1)*gap)/CGFloat(parts.count)
+            // A tube keeps tube proportions with few parts memorised (owner trial: one juz drew a full-width blob).
+            let gap:CGFloat=5,w=min(56,(proxy.size.width-CGFloat(parts.count-1)*gap)/CGFloat(parts.count))
+            let inset=(proxy.size.width-CGFloat(parts.count)*w-CGFloat(parts.count-1)*gap)/2
             Canvas {context,size in
                 for (i,p) in parts.enumerated() {
-                    let r=CGRect(x:size.width-CGFloat(i+1)*w-CGFloat(i)*gap,y:0,width:w,height:size.height-24),path=Path(roundedRect:r,cornerRadius:w/2)
+                    let r=CGRect(x:size.width-inset-CGFloat(i+1)*w-CGFloat(i)*gap,y:0,width:w,height:size.height-24),path=Path(roundedRect:r,cornerRadius:w/2)
                     context.fill(path,with:.color(theme.color("track")))
                     var water=context;water.clip(to:path);water.fill(Path(CGRect(x:r.minX,y:r.maxY-r.height*CGFloat(p.strength)/100,width:w,height:r.height*CGFloat(p.strength)/100)),with:.color(waterColor(p.strength)))
                     var threshold=Path();threshold.move(to:CGPoint(x:r.minX,y:r.maxY-r.height*0.7));threshold.addLine(to:CGPoint(x:r.maxX,y:r.maxY-r.height*0.7));context.stroke(threshold,with:.color(theme.secondaryInk),style:StrokeStyle(lineWidth:0.8,dash:[2,2]))
@@ -57,7 +59,7 @@ struct QuranStrengthView:View {
                     if p.scheduled,let projected=p.projected {var level=Path();level.move(to:CGPoint(x:r.minX,y:r.maxY-r.height*CGFloat(projected)/100));level.addLine(to:CGPoint(x:r.maxX,y:r.maxY-r.height*CGFloat(projected)/100));context.stroke(level,with:.color(theme.ink),style:StrokeStyle(lineWidth:1.5,dash:[2,2]))}
                     context.draw(Text(service.numerals.string(p.id)).font(quranFont(11)).foregroundStyle(theme.secondaryInk),at:CGPoint(x:r.midX,y:r.maxY+14))
                 }
-            }.onTapGesture {point in let index=Int((proxy.size.width-point.x)/(w+gap));if parts.indices.contains(index) {selected=parts[index].id}}
+            }.onTapGesture {point in let offset=proxy.size.width-inset-point.x,index=Int(offset/(w+gap));if offset>=0,parts.indices.contains(index) {selected=parts[index].id}}
                 .accessibilityLabel("أنابيب الأجزاء، الحد المرجعي سبعون بالمئة")
         }.frame(height:280)
     }

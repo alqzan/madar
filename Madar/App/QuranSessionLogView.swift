@@ -34,9 +34,13 @@ struct QuranSessionLogView: View {
                         }
                     }
                     if records.isEmpty { Text("لا جلسات مسجّلة").font(quranFont(15)).padding(20) }
-                    ForEach(records) { record in
+                    let list = records
+                    ForEach(Array(list.enumerated()), id: \.element.id) { index, record in
                         VStack(alignment: .leading, spacing: 8) {
-                            MadarDateLabel(record.day).font(quranFont(12, bold: true)).foregroundStyle(theme.secondaryInk)
+                            // One date per day (owner trial: eight reviews on one day repeated the same date eight times).
+                            if index == 0 || list[index - 1].day != record.day {
+                                MadarDateLabel(record.day).font(quranFont(12, bold: true)).foregroundStyle(theme.secondaryInk)
+                            }
                             QuranPaperCard {
                                 VStack(alignment: .leading, spacing: 12) {
                                     Button {

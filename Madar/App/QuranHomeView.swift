@@ -43,11 +43,17 @@ struct QuranHomeView: View {
                             .accessibilityIdentifier("quran-resume")
                     }
                     if let key = state.missedDayKey {
-                        card { VStack(alignment: .leading, spacing: 12) {
-                            Text("لو فاتك يوم").font(bodyFont(16, bold: true))
-                            ForEach(QuranUIMissChoice.allCases) { choice in
-                                Button(choice.title) { run { try await service.perform(.resolveMissed(dayKey: key, choice: choice)); try await refresh() } }
-                                    .font(bodyFont(14)).frame(minHeight: 44).foregroundStyle(theme.color("reviewText"))
+                        // Owner trial: the card said only «لو فاتك يوم» with three plain lines; it now names the day and asks.
+                        card { VStack(alignment: .leading, spacing: 10) {
+                            Text(state.missedDayTitle ?? "فاتك وِرد").font(bodyFont(16, bold: true)).fixedSize(horizontal: false, vertical: true)
+                            Text("ماذا نفعل بنصيبه؟").font(bodyFont(13)).foregroundStyle(theme.secondaryInk)
+                            HStack(spacing: 8) {
+                                ForEach(QuranUIMissChoice.allCases) { choice in
+                                    Button(choice.shortTitle) { run { try await service.perform(.resolveMissed(dayKey: key, choice: choice)); try await refresh() } }
+                                        .font(bodyFont(13, bold: true)).frame(maxWidth: .infinity, minHeight: 44)
+                                        .foregroundStyle(theme.color("reviewText")).background(theme.color("reviewTint"), in: Capsule())
+                                        .accessibilityLabel(choice.title).accessibilityIdentifier("quran-missed-" + choice.rawValue)
+                                }
                             }
                         } }
                     }

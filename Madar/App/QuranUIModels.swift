@@ -28,6 +28,7 @@ enum QuranUIMissChoice: String, CaseIterable, Identifiable, Sendable {
     case spread, double, skip
     var id: String { rawValue }
     var title: String { switch self { case .spread: "وزّعه على ثلاثة أيام"; case .double: "ضاعف اليوم"; case .skip: "تجاوزه" } }
+    var shortTitle: String { switch self { case .spread: "وزّعه"; case .double: "ضاعفه اليوم"; case .skip: "تجاوزه" } }
 }
 struct QuranUIRange: Sendable { var fromPage: Int; var toPage: Int }
 struct QuranUISurah: Identifiable, Sendable { var id: Int; var title: String; var firstAyah: Int; var ayahCount: Int }
@@ -44,6 +45,17 @@ enum QuranUIIndexUnit: String, CaseIterable, Identifiable, Sendable {
     case surah, ayah, juz, hizb, page
     var id: String { rawValue }
     var title: String { switch self { case .surah: "السور"; case .ayah: "الآيات"; case .juz: "الأجزاء"; case .hizb: "الأحزاب"; case .page: "الأوجه" } }
+    /// Counted noun after a number (owner trial: «في صدرك ١ السور» read as a label, not a count).
+    func counted(_ n: Int) -> (number: Bool, noun: String) {
+        let forms: (String, String, String, String) = switch self {
+        case .surah: ("سورة واحدة", "سورتان", "سور", "سورةً")
+        case .ayah: ("آية واحدة", "آيتان", "آيات", "آيةً")
+        case .juz: ("جزء واحد", "جزءان", "أجزاء", "جزءًا")
+        case .hizb: ("حزب واحد", "حزبان", "أحزاب", "حزبًا")
+        case .page: ("وجه واحد", "وجهان", "أوجه", "وجهًا")
+        }
+        switch n { case 1: return (false, forms.0); case 2: return (false, forms.1); case 0, 3...10: return (true, forms.2); default: return (true, forms.3) }
+    }
     var icon: String { switch self { case .surah: "line.3.horizontal.decrease"; case .ayah: "rosette"; case .juz: "square.grid.2x2"; case .hizb: "square.grid.3x3"; case .page: "doc" } }
 }
 struct QuranUIIndexItem: Identifiable, Sendable { var id: String; var title: String; var subtitle: String; var firstPage: Int; var fraction: Double; var memorized: Bool; var reviewed: Bool; var due: Bool; var isToday: Bool; var weight: Int = 1; var searchText: String = "" }

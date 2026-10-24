@@ -23,7 +23,7 @@ extension AppQuranService {
             if case .estimated(let day) = QuranProgressEngine.forecast(remainingPages: Double(604 - completed), dailyPages: rate, startingOn: start, restDay: value.restDay) {
                 actual = displayDate(day); forecastDay = day
             } else { actual = "لم تتضح الوتيرة بعد" }
-        } else { actual = "بعد خمسة أيام حفظ وخمسين آية" }
+        } else { actual = "تتضح بعد خمسة أيام حفظ وخمسين آية في " + numerals.string(28) + " يومًا" }
         var planned = "ابدأ خطة الحفظ لتقدير الموعد"
         if let p = value.plan {
             let forecast = try forecast(QuranUIPlanInput(startAyah: p.plan.startAyah, unit: QuranUIUnit(rawValue: p.plan.unit.rawValue)!, amount: p.plan.amount, rhythm: QuranUIRhythm(rawValue: p.plan.intensity.rawValue)!, restDay: value.restDay.rawValue, missPolicy: p.missPolicy), snapshot: value)

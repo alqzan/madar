@@ -78,7 +78,7 @@ struct QuranJourneyView: View {
                 context.stroke(path, with: .color(theme.color("review")), lineWidth: 2)
                 if let last = v.points.last {
                     let p = point(last); context.fill(Path(ellipseIn: CGRect(x: p.x - 4, y: p.y - 4, width: 8, height: 8)), with: .color(theme.color("review")))
-                    context.draw(Text("اليوم").font(quranFont(11)).foregroundStyle(theme.secondaryInk), at: CGPoint(x: p.x, y: min(size.height - 16, p.y + 14)))
+                    context.draw(Text("اليوم").font(quranFont(11)).foregroundStyle(theme.secondaryInk), at: CGPoint(x: min(max(p.x, 18), size.width - 18), y: min(size.height - 16, p.y + 14)))
                     if v.forecastDay != nil { var tail = Path(); tail.move(to: p); tail.addLine(to: CGPoint(x: 0, y: size.height)); context.stroke(tail, with: .color(theme.color("hifz")), style: StrokeStyle(lineWidth: 2, dash: [4, 4])) }
                 }
             }.frame(height: 150).accessibilityLabel("تبقّى " + service.faceCount(v.remaining) + " من القرآن")

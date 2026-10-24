@@ -277,7 +277,8 @@ public struct QuranStagedResult: Sendable {
         return rows.filter { $0.fields["mergedInto"] == .null }
     }
 
-    private static func rebuildCache(_ repository: QuranRepository, at now: Date, writer: String) throws {
+    /// Also used by the DEBUG owner trial after inserting legacy rows directly.
+    public static func rebuildCache(_ repository: QuranRepository, at now: Date, writer: String) throws {
         let snapshot = try repository.snapshot(at: now), context = repository.context
         let rows = try context.fetch(FetchDescriptor<PageSchedule>()).filter { $0.mergedInto == nil }
         for old in rows where !snapshot.coverage.completedPages.contains(old.page) && old.deletedAt == nil {

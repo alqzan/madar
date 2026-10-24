@@ -34,6 +34,14 @@ import MadarPrayer
             return "\(numerals.string(value)) \(counted)"
         }
     }
+    /// Share of a face covered by a day's hifz when no face was completed that day (0…0.9, never a full face).
+    func partialFaceShare(_ sessions: [QuranSessionFact], catalog: QuranResourceCatalog) -> Double {
+        let ayahs = Set(sessions.flatMap { Array($0.ayahs.first...$0.ayahs.last) })
+        guard let page = ayahs.min().flatMap({ catalog.ayah(id: $0)?.page }) else { return 0 }
+        let onPage = catalog.ayahs(on: page).map(\.id)
+        guard !onPage.isEmpty else { return 0 }
+        return min(0.9, Double(onPage.filter(ayahs.contains).count) / Double(onPage.count))
+    }
     func faceCount(_ value: Int) -> String { count(value, singular: "وجه واحد", dual: "وجهان", plural: "أوجه") }
     func dayCount(_ value: Int) -> String { count(value, singular: "يوم واحد", dual: "يومان", plural: "أيام") }
     func range(_ portion: QuranAyahRange, catalog: QuranResourceCatalog) throws -> QuranUIRange {
@@ -87,7 +95,9 @@ import MadarPrayer
             let sessions = snapshot.sessions.filter { $0.dayKey == key }
             let memorized = snapshot.completedOn.values.filter { $0 == key }.count
             let reviewed = Set(sessions.filter { [.review, .free, .qiyam].contains($0.kind) }.flatMap { $0.grades.map(\.page) }).count
-            heat.append(QuranUIHeatDay(id: key.description, title: numerals.string(key.day), hifzFraction: Double(memorized),
+            // A day that memorised only part of a face still shows, in proportion to that face (owner trial: ayah 128 alone left the day blank).
+            let partial = memorized > 0 ? 0 : partialFaceShare(sessions.filter { $0.kind == .hifz }, catalog: catalog)
+            heat.append(QuranUIHeatDay(id: key.description, title: numerals.string(key.day), hifzFraction: Double(memorized) + partial,
                 reviewFraction: Double(reviewed) / 8, accessibilityLabel: displayDate(key) + "، حفظ " + faceCount(memorized) + "، مراجعة " + faceCount(reviewed)))
         }
         let weekStart = today.adding(days: -6)
@@ -101,7 +111,9 @@ import MadarPrayer
         }
         let activeDays = Set(snapshot.activities.filter(\.countsForStreak).map(\.dayKey))
         let completedDays = eligibleWeekDays.filter { activeDays.contains($0) }.count
-        let weeklySummary = firstHifzDay == nil || firstHifzDay == today ? "أول يوم" : "آخر " + numerals.string(7) + " أيام: حفظت " + faceCount(memorizedThisWeek) + "، راجعت " + faceCount(reviewedThisWeek)
+        let weekHifzAyahs = Set(snapshot.sessions.filter { $0.kind == .hifz && $0.dayKey >= weekStart && $0.dayKey <= today }.flatMap { Array($0.ayahs.first...$0.ayahs.last) }).count
+        let memorizedText = memorizedThisWeek > 0 || weekHifzAyahs == 0 ? faceCount(memorizedThisWeek) : count(weekHifzAyahs, singular: "آية واحدة", dual: "آيتين", plural: "آيات")
+        let weeklySummary = firstHifzDay == nil || firstHifzDay == today ? "أول يوم" : "آخر " + numerals.string(7) + " أيام: حفظت " + memorizedText + "، راجعت " + faceCount(reviewedThisWeek)
             + "، " + serviceWeekRatio(completedDays, eligibleWeekDays.count)
         let historySessions = snapshot.sessions.reversed().map { fact in
             QuranUIHistorySession(id: fact.id, title: fact.kind == .hifz ? "حفظ" : "مراجعة", dateLabel: displayDate(fact.dayKey),
@@ -158,7 +170,7 @@ import MadarPrayer
             percentageLabel: numerals.percent(coverage.percent), streakLabel: "سلسلة " + dayCount(streak.days), hifzAmounts: amounts, streakDays: streak.days, balanceTitle: balance,
             balanceExplanation: "تتبع الخطة حاجة المراجعة ومقدار حفظك", hifzLevel: QuranUILevel(rawValue: snapshot.hifzLevel.rawValue)!,
             reviewLevel: QuranUILevel(rawValue: snapshot.reviewLevel.rawValue)!, steps: steps, recentDays: heat, plan: plan, surahs: surahs, draft: draft,
-            missedDayKey: missedDay?.description, missedDayTitle: missedDay.map { "لو فاتك يوم " + displayDate($0) },
+            missedDayKey: missedDay?.description, missedDayTitle: missedDay.map { "فاتك وِرد " + app.dateLabels($0, first: .hijri, weekday: true).combined },
             summary: ["في صدرك " + coverageTitle], history: QuranUIHistory(weekSummary: [weeklySummary], yearSummary: [], allSummary: [], days: heat, coverage: [], sessions: historySessions),
             strengthTitle: "مؤشر وصفي من تقييمك ومواعيد المراجعة", strength: strength,
             recovery: QuranUIRecovery(distantLabel: faceCount(snapshot.pages.filter(\.isFar).count) + " بعيدة", activeTitle: snapshot.recovery == nil ? nil : "خطة استرداد", canCreate: snapshot.pages.contains(where: \.isFar), previews: [:]),
