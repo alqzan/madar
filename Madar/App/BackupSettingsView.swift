@@ -21,6 +21,11 @@ struct BackupUIStatus: Sendable {
     let keyConfigured: Bool
     var estimatedBytes: Int? = nil
     var excludedBooks: [BackupUIExcludedBook] = []
+    var folderName: String? = nil
+    var folderCopiedAt: Date? = nil
+    var folderUploadConfirmed: Bool? = nil
+    var folderMessage: String? = nil
+    var canUndoFolderChange = false
 }
 struct BackupUIExcludedBook: Sendable, Hashable { let title: String; let bytes: Int; let fromTurath: Bool }
 struct BackupUIProgress: Sendable {
@@ -56,6 +61,10 @@ struct BackupRestoreResult: Sendable { let restoredCount: Int; let skippedCount:
 @MainActor protocol BackupUIService: AnyObject {
     func status() async throws -> BackupUIStatus
     func setSchedule(_ schedule: BackupUISchedule) async throws
+    func chooseFolder(_ folder: URL) async throws
+    func clearFolder() async throws
+    func undoFolderChange() async throws
+    func retryFolderDelivery() async throws
     func exportPlain(progress: @escaping @MainActor @Sendable (BackupUIProgress) -> Void) async throws -> URL
     func export(passphrase: String, progress: @escaping @MainActor @Sendable (BackupUIProgress) -> Void) async throws -> URL
     func validateExport(file: URL) throws
@@ -108,6 +117,27 @@ struct BackupRestoreResult: Sendable { let restoredCount: Int; let skippedCount:
     }
     func setSchedule(_ schedule: BackupUISchedule) {
         run(initial: "يحفظ موعد النسخ…") { [self] _, _ in try await service.setSchedule(schedule); status = try await service.status() }
+    }
+    func chooseFolder(_ folder: URL) {
+        run(initial: "يحفظ مجلد النسخ…") { [self] _, _ in
+            do { try await service.chooseFolder(folder); status = try await service.status() }
+            catch {
+                status = try? await service.status()
+                errorMessage = "تعذّر الوصول إلى مجلد النسخ. النسخ الأصلية محفوظة داخل مدار؛ جرّب مجلدًا آخر أو أعد المحاولة."
+            }
+        }
+    }
+    func clearFolder() {
+        run(initial: "يوقف النسخ إلى المجلد…") { [self] _, _ in try await service.clearFolder(); status = try await service.status() }
+    }
+    func undoFolderChange() {
+        run(initial: "يعيد المجلد السابق…") { [self] _, _ in try await service.undoFolderChange(); status = try await service.status() }
+    }
+    func retryFolder() {
+        run(initial: "ينسخ الملفات المشفّرة إلى المجلد…") { [self] _, _ in
+            do { try await service.retryFolderDelivery() } catch { }
+            status = try await service.status()
+        }
     }
     func export() {
         guard canExport else { return }
@@ -200,6 +230,7 @@ struct BackupSettingsView: View {
     let time: (Date) -> String
     @State private var model: BackupSettingsModel
     @State private var importing = false
+    @State private var choosingFolder = false
     @State private var confirmingRestore = false
     @FocusState private var focusedPassword: Int?
     @Environment(\.roomTheme) private var theme
@@ -214,6 +245,7 @@ struct BackupSettingsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 statusCard
+                folderCard
                 encryptedCard
                 restoreCard
                 plainCard
@@ -239,6 +271,9 @@ struct BackupSettingsView: View {
             .onDisappear { model.close() }
             .fileImporter(isPresented: $importing, allowedContentTypes: [UTType(filenameExtension: "madarbackup") ?? .data], allowsMultipleSelection: false) { result in
                 switch result { case .success(let urls): model.selectedFile = urls.first; model.dismissPreview(); case .failure(let error): model.errorMessage = error.localizedDescription }
+            }
+            .fileImporter(isPresented: $choosingFolder, allowedContentTypes: [.folder], allowsMultipleSelection: false) { result in
+                if case .success(let urls) = result, let folder = urls.first { model.chooseFolder(folder) }
             }
             .confirmationDialog(model.restoreMode == .replace ? "استبدل بيانات مدار بهذه النسخة؟" : "ادمج النسخة مع بيانات مدار؟", isPresented: $confirmingRestore, titleVisibility: .visible) {
                 Button(model.restoreMode == .replace ? "استبدل بعد نسخة أمان" : "ادمج النسخة", role: model.restoreMode == .replace ? .destructive : nil, action: model.restore)
@@ -307,6 +342,43 @@ struct BackupSettingsView: View {
                     }.accessibilityElement(children: .combine)
                 }
             } else { ProgressView("يقرأ حالة النسخ…").frame(maxWidth: .infinity, minHeight: 80) }
+        }
+    }
+    private var folderCard: some View {
+        MadarCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Label("نسخة في «الملفات»", systemImage: "folder.badge.shieldcheckmark").font(MadarTypography.section())
+                if let status = model.status, let name = status.folderName {
+                    Text(name).font(MadarTypography.body()).accessibilityIdentifier("backup-folder-name")
+                    if let copied = status.folderCopiedAt {
+                        Text("آخر نسخة إلى المجلد").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                        let labels = dates(copied)
+                        MadarDateLabel(.init(primary: labels.primary + "، " + time(copied), secondary: labels.secondary))
+                    } else if status.automaticCount + status.manualCount == 0 {
+                        note("لم تُنسخ ملفات إلى هذا المجلد بعد. أنشئ نسخة مشفّرة أولًا.")
+                    } else { note("لم تصل نسخة إلى هذا المجلد بعد.") }
+                    if status.folderUploadConfirmed == true {
+                        note("أكّد iCloud رفع آخر نسخة.").accessibilityIdentifier("backup-folder-uploaded")
+                    } else if status.folderUploadConfirmed == false {
+                        note("النسخة في مجلد iCloud؛ لم يكتمل رفعها بعد.")
+                    } else if status.folderCopiedAt != nil { note("نُسخت الملفات إلى المجلد في التاريخ أعلاه، ولا تتوفر معلومات مؤكدة عن رفعها للسحابة.") }
+                    if let message = status.folderMessage { note(message).accessibilityIdentifier("backup-folder-message") }
+                    HStack {
+                        Button("أعد المحاولة", action: model.retryFolder).accessibilityIdentifier("backup-folder-retry")
+                        Spacer()
+                        Button("غيّر المجلد") { choosingFolder = true }.accessibilityIdentifier("backup-folder-change")
+                    }.font(MadarTypography.caption()).frame(minHeight: 44)
+                    Button("أوقف النسخ إلى المجلد", action: model.clearFolder).font(MadarTypography.caption()).frame(minHeight: 44)
+                        .accessibilityIdentifier("backup-folder-clear")
+                } else {
+                    note("اختر مجلدًا في iCloud Drive لتبقى نسخة مشفّرة عند فقدان الجهاز. المجلد في «على الـ iPhone» يبقى على الجهاز نفسه.")
+                    Button("اختر مجلدًا في الملفات") { choosingFolder = true }.buttonStyle(MadarPrimaryButton()).accessibilityIdentifier("backup-folder-choose")
+                }
+                note("تُنسخ الملفات المشفّرة فقط، بعد إنشائها وعند فتح مدار. نحتفظ بآخر أربع نسخ تلقائية وكل اليدوية. تغيير المجلد أو إيقافه يبقي الملفات السابقة.")
+                if model.status?.canUndoFolderChange == true {
+                    Button("تراجع عن تغيير المجلد", action: model.undoFolderChange).font(MadarTypography.caption()).frame(minHeight: 44).accessibilityIdentifier("backup-folder-undo")
+                }
+            }.disabled(model.busy)
         }
     }
     private func nextLine(_ status: BackupUIStatus) -> String? {

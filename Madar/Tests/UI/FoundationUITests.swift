@@ -879,6 +879,25 @@ import XCTest
         attachScreenshot(app, named: "M0-native-bar-after-scroll")
         app.terminate()
     }
+    func testBackupFolderPickerCancellationKeepsLocalBackupSettings() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
+        app.launch(); openBackupSettings(app)
+        let choose = app.buttons["backup-folder-choose"]
+        scrollBackupForm(to: choose, in: app, towardsTop: true)
+        XCTAssertTrue(choose.isHittable, app.debugDescription)
+        attachScreenshot(app, named: "B01-backup-folder-choice-L")
+        choose.tap()
+        let cancel = app.buttons.matching(NSPredicate(format: "label IN %@", ["Cancel", "إلغاء"])).firstMatch
+        XCTAssertTrue(cancel.waitForExistence(timeout: 10), app.debugDescription)
+        cancel.tap()
+        XCTAssertTrue(choose.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(app.descendants(matching: .any)["backup-folder-name"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["backup-folder-uploaded"].exists)
+        attachScreenshot(app, named: "B01-backup-folder-cancelled-L")
+    }
+
     func test_M0S2_SecurePasswordTypingTransport() throws {
         continueAfterFailure = false
         let app = XCUIApplication()

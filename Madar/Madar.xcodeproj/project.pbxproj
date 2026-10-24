@@ -41,6 +41,7 @@
 		16A1717B36C0799E38DF6D4B /* MoneyEnvelopesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B824AE40F77475D638431FF6 /* MoneyEnvelopesView.swift */; };
 		16A45A0199AD6A2B5E9EC744 /* ExportPrivacyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C903CE9D436A9E7A19EEE2C /* ExportPrivacyTests.swift */; };
 		1764F689DFAB85FA3DAE1867 /* QuranHistoryUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63C2867CBF08CA3E17CCA630 /* QuranHistoryUITests.swift */; };
+		1874253CCE5D1CFB70106FE0 /* BackupFolderServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69131FC804F685E615C3A0DB /* BackupFolderServiceTests.swift */; };
 		188EE40FE4D74FF7D7738992 /* MadarDesign in Frameworks */ = {isa = PBXBuildFile; productRef = D7349BC32E9D9D10CE3C790A /* MadarDesign */; };
 		19324DE7D0A3DB449A018ACD /* Amiri-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 95E7A16CBC55D306C7FDC034 /* Amiri-Bold.ttf */; };
 		19409A51DF63C644A973DDD8 /* AppQuranService+Week.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF404D35EAC947A55FC89756 /* AppQuranService+Week.swift */; };
@@ -602,6 +603,7 @@
 		67132767D78828B97D501C09 /* DiaryTravelUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryTravelUITests.swift; sourceTree = "<group>"; };
 		6764E0E9D2FA97372D563051 /* DiaryHubView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryHubView.swift; sourceTree = "<group>"; };
 		68E6E87340ED90E80146719D /* CustomizationCopy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomizationCopy.swift; sourceTree = "<group>"; };
+		69131FC804F685E615C3A0DB /* BackupFolderServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupFolderServiceTests.swift; sourceTree = "<group>"; };
 		693A9339530A3EDDA16FBF05 /* DiaryExportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryExportView.swift; sourceTree = "<group>"; };
 		6987008C8E518D4E5ECE5A2E /* AppPrivacyService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPrivacyService.swift; sourceTree = "<group>"; };
 		698F695ACB91C7284480267F /* QuranDrillUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuranDrillUITests.swift; sourceTree = "<group>"; };
@@ -1291,6 +1293,7 @@
 			children = (
 				D3F6E4B2C320BA85D0C94586 /* AppInboxLifecycleTests.swift */,
 				C105008888548BF995BA7B6D /* AppServiceIntegrationTests.swift */,
+				69131FC804F685E615C3A0DB /* BackupFolderServiceTests.swift */,
 				896679F4C7AE5B3F333F22E9 /* BahwPrayerIntegrationTests.swift */,
 				980BEF9FA1185D7404A6E08E /* CaptureIntentIntegrationTests.swift */,
 				0E84CCAE8F551CE20CBE2B23 /* CommandIntegrationTests.swift */,
@@ -1636,6 +1639,7 @@
 			files = (
 				8C394D8C60E8C0E6316C36FE /* AppInboxLifecycleTests.swift in Sources */,
 				6E9C8889C99E331FEFFD9F6A /* AppServiceIntegrationTests.swift in Sources */,
+				1874253CCE5D1CFB70106FE0 /* BackupFolderServiceTests.swift in Sources */,
 				38441C6214CA9DD82E2B16F0 /* BahwPrayerIntegrationTests.swift in Sources */,
 				C8273836B4F26F3C228F43D4 /* CaptureIntentIntegrationTests.swift in Sources */,
 				1696EFC63E82D4D32AD91261 /* CommandIntegrationTests.swift in Sources */,

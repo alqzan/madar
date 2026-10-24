@@ -2,6 +2,7 @@ import Foundation
 import SwiftData
 import MadarData
 import MadarSync
+import MadarCore
 import WidgetKit
 
 @MainActor final class AppBackupService: BackupUIService {
@@ -15,6 +16,10 @@ import WidgetKit
     private var restoreTicket: PrivacyAuthorization?
     private var exportID: UUID?
     private var exportTicket: PrivacyAuthorization?
+    private var folderTask: Task<BackupFolderResult, Error>?
+    private var folderMessage: String?
+    private struct FolderUndo { let configuration: BackupFolderConfiguration? }
+    private var folderUndo: FolderUndo?
     private var artifactTickets: [URL: PrivacyAuthorization] = [:]
     private var artifactFeatures: [URL: Set<MadarProtectedFeature>] = [:]
     private weak var observedController: MadarLockController?
@@ -54,12 +59,17 @@ import WidgetKit
     func status() async throws -> BackupUIStatus {
         guard let session else { throw DataError.invalidValue("session unavailable") }
         let actual = try coordinator.status(), catalog = try coordinator.catalog()
+        let folder = try folderConfiguration()
+        let uploaded: Bool?
+        if let folder { uploaded = await BackupFolderDelivery.uploadStatus(folder) } else { uploaded = nil }
         return BackupUIStatus(schedule: BackupUISchedule(rawValue: session.string("core.backup")) ?? .weekly,
             lastSuccess: actual.lastSuccessAt, lastResult: Self.resultLabel(actual.lastResult), localOnly: actual.localOnly,
             automaticCount: catalog.filter { $0.kind == .automatic }.count,
             manualCount: catalog.filter { $0.kind == .manual }.count, keyConfigured: try coordinator.hasConfiguredKey(),
             estimatedBytes: try? coordinator.estimatedBytes(),
-            excludedBooks: (actual.excludedBooks ?? []).map { BackupUIExcludedBook(title: $0.title, bytes: $0.bytes, fromTurath: $0.fromTurath) })
+            excludedBooks: (actual.excludedBooks ?? []).map { BackupUIExcludedBook(title: $0.title, bytes: $0.bytes, fromTurath: $0.fromTurath) },
+            folderName: folder?.folderName, folderCopiedAt: folder?.lastCopiedAt,
+            folderUploadConfirmed: uploaded, folderMessage: folderMessage, canUndoFolderChange: folderUndo != nil)
     }
     func setSchedule(_ schedule: BackupUISchedule) async throws {
         guard let session else { throw DataError.invalidValue("session unavailable") }
@@ -103,6 +113,7 @@ import WidgetKit
             } else {
                 file = try await coordinator.exportPlain(progress: reporter(guardedProgress), cancellation: token, authorization: authorization)
             }
+            if passphrase != nil { try? await retryFolderDelivery() }
             guard let ticket = granted else { throw PrivacyAuthorizationError.stale }
             try validate(ticket, controller: controller, operation: id)
             artifactTickets[file] = ticket; artifactFeatures[file] = ticket.features
@@ -194,12 +205,14 @@ import WidgetKit
         }
         let result = try await coordinator.restore(preview: preview, mode: mode == .merge ? .merge : .replace,
             progress: reporter(progress), cancellation: token, authorization: authorization, validation: validation)
+        try? await retryFolderDelivery()
         previewPasswords.removeValue(forKey: previewID)
         previews.removeValue(forKey: previewID)
         try? FileManager.default.removeItem(at: preview.fileURL)
         return BackupRestoreResult(restoredCount: result.restoredCount, skippedCount: result.skippedCount, warnings: result.warnings)
     }
     func cancel() async {
+        folderTask?.cancel()
         exportCancellation?.cancel(); cancellation.cancel(); restoreID = nil; restoreTicket = nil; clearPreviews()
     }
     private func clearPreviews() {
@@ -213,6 +226,63 @@ import WidgetKit
         let raw = session.string("core.backup")
         let schedule: BackupSchedule = raw == "daily" ? .daily : raw == "weekly" ? .weekly : .off
         _ = try await coordinator.performScheduledBackupIfDue(schedule: schedule)
+        try? await retryFolderDelivery()
+    }
+    func chooseFolder(_ folder: URL) async throws {
+        guard folderTask == nil else { throw BackupOperationError.busy }
+        let configuration = try BackupFolderDelivery.select(folder)
+        let previous = try folderConfiguration()
+        try saveFolderConfiguration(configuration)
+        folderUndo = .init(configuration: previous)
+        folderMessage = nil
+        try await retryFolderDelivery()
+    }
+    func clearFolder() async throws {
+        folderTask?.cancel(); _ = try? await folderTask?.value
+        let previous = try folderConfiguration()
+        try saveFolderConfiguration(nil); folderMessage = nil
+        folderUndo = .init(configuration: previous)
+    }
+    func undoFolderChange() async throws {
+        guard folderTask == nil, let undo = folderUndo else { return }
+        try saveFolderConfiguration(undo.configuration); folderUndo = nil; folderMessage = nil
+    }
+    func retryFolderDelivery() async throws {
+        guard folderTask == nil, let configuration = try folderConfiguration() else { return }
+        let receipts = try coordinator.catalog()
+        guard !receipts.isEmpty else { return }
+        let directory = coordinator.backupDirectory
+        let task = Task { try await BackupFolderDelivery.deliver(receipts, from: directory, to: configuration) }
+        folderTask = task
+        defer { folderTask = nil }
+        do {
+            let result = try await task.value
+            guard try folderConfiguration()?.ownerID == configuration.ownerID else { return }
+            try saveFolderConfiguration(result.configuration)
+            folderMessage = result.preservedChangedFiles > 0 ? "بقيت نسخة قديمة تغيّرت في المجلد، فلم نحذفها." : nil
+        } catch {
+            folderMessage = "تعذّر نسخ الملفات إلى المجلد المختار. النسخ الأصلية محفوظة داخل مدار؛ ستُعاد المحاولة عند فتحه."
+            throw error
+        }
+    }
+    private func folderConfiguration() throws -> BackupFolderConfiguration? {
+        let key = "sys.backupFolder"
+        let context = ModelContext(coordinator.store.container)
+        let row = try context.fetch(FetchDescriptor<DeviceSetting>(predicate: #Predicate { $0.key == key && $0.deletedAt == nil && $0.mergedInto == nil })).first
+        guard let data = row?.valueJSON, data != Data("null".utf8) else { return nil }
+        return try JSONDecoder().decode(BackupFolderConfiguration.self, from: data)
+    }
+    private func saveFolderConfiguration(_ configuration: BackupFolderConfiguration?) throws {
+        let lease = StoreLease(lockURL: coordinator.store.commandLockURL); try lease.acquire(); defer { lease.release() }
+        let context = ModelContext(try coordinator.store.containerForTransaction()); context.autosaveEnabled = false
+        context.author = "backup.folder"
+        let key = "sys.backupFolder"
+        let row = try context.fetch(FetchDescriptor<DeviceSetting>(predicate: #Predicate { $0.key == key && $0.mergedInto == nil })).first ?? DeviceSetting()
+        if row.modelContext == nil { row.id = StableIdentity.uuid(for: "DeviceSetting:" + key); context.insert(row) }
+        row.key = key; row.valueJSON = try JSONEncoder().encode(configuration)
+        row.writerID = try SettingsStore(context: context).writerIDForWrite()
+        row.updatedAt = StableIdentity.monotonic(now: .now, previous: row.updatedAt); row.deletedAt = nil; row.restoredAt = row.updatedAt
+        try context.save()
     }
     private static func resultLabel(_ raw: String) -> String? {
         switch raw { case "success": "آخر عملية نسخ نجحت."; case "failed": "لم تكتمل آخر محاولة نسخ."; case "cancelled": "أُلغيت آخر محاولة نسخ."; default: nil }
