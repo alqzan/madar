@@ -116,4 +116,16 @@ struct NotificationBudgetTests {
             #expect(reserved.reservation.scheduledAt == clock("05:02"))
         }
     }
+    /// Owner real-data trial, 24 Oct 2026: a policy another write published moments after a refresh read its clock is
+    /// still the current policy; one from an hour ahead is not.
+    @Test func policyPublishedJustAfterTheRefreshClockIsStillValid() throws {
+        let (store, root) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
+        let day = try GregorianDay("2026-10-09"), base = day.date(in: ActivePlace.riyadh.timeZone)
+        let prayers = [PrayerDay(day: day, place: .riyadh, fajr: base.addingTimeInterval(4*3600+31*60), sunrise: base.addingTimeInterval(5*3600+48*60),
+            dhuhr: base.addingTimeInterval(11*3600+41*60), asr: base.addingTimeInterval(15*3600+2*60), maghrib: base.addingTimeInterval(17*3600+32*60), isha: base.addingTimeInterval(19*3600+2*60))]
+        try store.publish(.init(generatedAt: clock("10:02"), validUntil: clock("23:59"), activityEnabled: true, remindersEnabled: true, dailyBudget: 4,
+            quietFromMinutes: nil, dayBoundary: .fajr, prayerDays: prayers))
+        try store.reserve(.init(id: "room.one", dayKey: "2026-10-09", scheduledAt: clock("12:30")), now: clock("10:00"))
+        #expect(throws: NotificationBudgetError.unavailable) { try store.reserve(.init(id: "room.two", dayKey: "2026-10-09", scheduledAt: clock("12:30")), now: clock("09:00")) }
+    }
 }

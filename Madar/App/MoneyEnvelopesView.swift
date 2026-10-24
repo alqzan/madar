@@ -35,8 +35,13 @@ struct MoneyEnvelopesView: View {
                     reserve(reading)
                     VStack(alignment: .leading, spacing: 10) {
                         HStack { Text("الفائض").font(MadarTypography.cardTitle()).foregroundStyle(theme.color("surplusText")); Text(figure: amount(reading.home.surplusMinor)).font(MadarTypography.cardTitle()); Spacer() }
-                        Text("كيف تجمّع من الدورات").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
-                        if visible && !dynamicType.isAccessibilitySize && reading.home.surplusMinor >= 0 {
+                        if reading.waterfall.isEmpty {
+                            // Trial walk, 24 Oct 2026: with no closed cycle the chart drew only a bare «الآن» axis.
+                            Text("يتجمّع الفائض مما يبقى في نهاية كل دورة؛ لم تُغلق دورة بعد.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-surplus-empty")
+                        } else {
+                            Text("كيف تجمّع من الدورات").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                        }
+                        if !reading.waterfall.isEmpty && visible && !dynamicType.isAccessibilitySize && reading.home.surplusMinor >= 0 {
                             MoneySurplusChart(points: reading.waterfall, current: reading.home.surplusMinor, next: reading.home.cycle?.expectedEndDay, app: app).frame(height: 148)
                         }
                     }.padding(.top, 8)

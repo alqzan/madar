@@ -138,7 +138,7 @@ struct DiaryHomeSnapshot {
         var attachments: [DiaryDisplayMedia] = []
         for (entry, id) in mediaLinks {
             if let row = try context.fetch(FetchDescriptor<Media>(predicate: #Predicate { $0.id == id && $0.deletedAt == nil && $0.mergedInto == nil })).first {
-                if let data = row.data { attachments.append(.init(id: row.id, entryID: entry, kind: row.kind, contentType: row.contentType, data: data, duration: row.durationS)) }
+                if let data = row.data { attachments.append(.init(id: row.id, entryID: entry, kind: row.kind, contentType: row.contentType, data: data, duration: row.durationS, assetID: DiaryPhotoLink.assetID(sourceID: row.sourceID))) }
                 // N01: an attachment the export did not contain is shown as missing, never invented.
                 else if row.state == "missing" { attachments.append(.init(id: row.id, entryID: entry, kind: "missing", contentType: row.kind, data: Data(), duration: nil)) }
             }

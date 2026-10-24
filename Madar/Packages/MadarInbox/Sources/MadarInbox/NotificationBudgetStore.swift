@@ -125,8 +125,11 @@ public struct NotificationBudgetStore: Sendable {
     public func cancel(id: String, now: Date, requestFailed: Bool = false) throws {
         try transaction { state in state.reservations.removeAll { $0.id == id && (requestFailed || $0.scheduledAt > now) } }
     }
+    static let publishSkew: TimeInterval = 5 * 60
     private func validPolicy(_ state: State, now: Date) throws -> NotificationBudgetPolicy {
-        guard let policy = state.policy, policy.generatedAt <= now, policy.validUntil > now,
+        // A refresh reads its clock before awaiting the notification centre; another write can publish a newer
+        // policy meanwhile (owner real-data trial, 24 Oct 2026). A few minutes ahead is that race, not a future policy.
+        guard let policy = state.policy, policy.generatedAt <= now.addingTimeInterval(Self.publishSkew), policy.validUntil > now,
               !policy.prayerDays.isEmpty else { throw NotificationBudgetError.unavailable }
         return policy
     }

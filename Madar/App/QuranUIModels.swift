@@ -24,6 +24,11 @@ enum QuranUIRhythm: String, CaseIterable, Identifiable, Sendable {
     var id: String { rawValue }
     var title: String { switch self { case .light: "خفيف"; case .balanced: "متوازن"; case .intense: "مكثّف" } }
 }
+/// Owner, 24 Oct 2026: any day can be the rest day; the week runs Saturday → Friday.
+enum QuranUIRestDays {
+    static let days: [(String, String)] = [("saturday","السبت"),("sunday","الأحد"),("monday","الاثنين"),("tuesday","الثلاثاء"),("wednesday","الأربعاء"),("thursday","الخميس"),("friday","الجمعة")]
+    static func title(_ key: String) -> String { key == "none" ? "بلا" : days.first { $0.0 == key }?.1 ?? "" }
+}
 enum QuranUIMissChoice: String, CaseIterable, Identifiable, Sendable {
     case spread, double, skip
     var id: String { rawValue }

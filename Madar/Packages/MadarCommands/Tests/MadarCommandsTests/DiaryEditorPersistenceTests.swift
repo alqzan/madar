@@ -56,4 +56,15 @@ import MadarData
         let denied = try await bus.execute(.init(name: "diary.saveDraft", payload: .object([:]), source: .widget, issuedAt: now), now: now)
         #expect(denied.status == .needsApp)
     }
+    /// Owner, 24 Oct 2026: a library-linked photo keeps the small copy as its data and the asset as its natural key.
+    @Test func linkedPhotoStoresTheAssetAsSourceID() async throws {
+        let (container, bus, root) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
+        let now = date("2026-10-24T12:00:00+03:00"), id = UUID()
+        let directory = root.appending(path: "DiaryStaging"); try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let bytes = Data("abc".utf8); try bytes.write(to: directory.appending(path: id.uuidString + ".blob"))
+        let result = try await bus.execute(.init(commandID: id, name: "diary.appendMedia", payload: .object(["fileID": .string(id.uuidString), "kind": .string("photo"), "contentType": .string("image/jpeg"), "caption": .string(""), "day": .string("today"), "writingDayKey": .string("2026-10-24"), "assetID": .string("ABC-123/L0/001")]), issuedAt: now), now: now)
+        #expect(result.status == .applied)
+        let photo = try #require(ModelContext(container).fetch(FetchDescriptor<Media>()).first)
+        #expect(photo.sourceID == "photos:ABC-123/L0/001"); #expect(photo.data == bytes); #expect(photo.kind == "photo")
+    }
 }

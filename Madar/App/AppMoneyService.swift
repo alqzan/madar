@@ -67,6 +67,10 @@ struct MoneyHomeReading {
         let formatted = digits.string(count)
         return String(localized: "money.coverage", defaultValue: "\(count) \(formatted)", table: "Money", locale: Locale(identifier: "ar"))
     }
+    /// Arabic counting: «رسالة واحدة»، «رسالتان»، «٣ رسائل»، «١١ رسالةً». Forms are (one, two, 3–10, 11+).
+    func counted(_ count: Int, _ forms: (String, String, String, String)) -> String {
+        switch count { case 1: forms.0; case 2: forms.1; case 0, 3...10: digits.string(count) + " " + forms.2; default: digits.string(count) + " " + forms.3 }
+    }
     func pending(_ count: Int) -> String {
         let formatted = digits.string(count)
         return String(localized: "money.pending", defaultValue: "\(count) \(formatted)", table: "Money", locale: Locale(identifier: "ar"))

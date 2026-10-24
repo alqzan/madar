@@ -3,7 +3,7 @@ import Foundation
 public enum DiaryEditorCommand: Codable, Equatable, Sendable {
     case saveDraft(id: UUID, text: String, day: String, target: String?, writingDay: String)
     case commitDraft(UUID)
-    case appendMedia(file: UUID, kind: String, type: String, caption: String, day: String, writingDay: String, duration: Int?)
+    case appendMedia(file: UUID, kind: String, type: String, caption: String, day: String, writingDay: String, duration: Int?, asset: String? = nil)
     case transcript(entry: UUID, text: String)
     case intention(id: UUID, day: String, text: String)
     case intentionResult(id: UUID, result: String?)
@@ -33,12 +33,15 @@ public enum DiaryEditorCommand: Codable, Equatable, Sendable {
         case "diary.commitDraft":
             guard Set(value.keys) == ["id"], let id = uuid("id") else { return nil }; return .commitDraft(id)
         case "diary.appendMedia":
-            guard Set(value.keys).isSubset(of: ["fileID", "kind", "contentType", "caption", "day", "durationS", "writingDayKey"]), let id = uuid("fileID"), let kind = value["kind"]?.string, ["photo", "audio", "video", "document"].contains(kind),
+            guard Set(value.keys).isSubset(of: ["fileID", "kind", "contentType", "caption", "day", "durationS", "writingDayKey", "assetID"]), let id = uuid("fileID"), let kind = value["kind"]?.string, ["photo", "audio", "video", "document"].contains(kind),
                 let type = value["contentType"]?.string, !type.isEmpty, let caption = value["caption"]?.string, let day = value["day"]?.string, ["today", "yesterday"].contains(day) else { return nil }
             guard let writingDay = value["writingDayKey"]?.string, (try? GregorianDay(writingDay)) != nil else { return nil }
             let duration = value["durationS"]?.number
             guard value["durationS"] == nil || duration.map({ $0 >= 0 && $0 < Double(Int.max) && $0.rounded() == $0 }) == true else { return nil }
-            return .appendMedia(file: id, kind: kind, type: type, caption: caption, day: day, writingDay: writingDay, duration: duration.map(Int.init))
+            // Owner, 24 Oct 2026: a photo can stay in the Photos library; Madar keeps its identifier and a small copy.
+            let asset = value["assetID"]?.string
+            guard value["assetID"] == nil || (kind == "photo" && asset.map { !$0.isEmpty && $0.count <= 200 } == true) else { return nil }
+            return .appendMedia(file: id, kind: kind, type: type, caption: caption, day: day, writingDay: writingDay, duration: duration.map(Int.init), asset: asset)
         case "diary.setIntention":
             guard Set(value.keys) == ["id","dayKey","text"],let id=uuid("id"),let day=value["dayKey"]?.string,(try? GregorianDay(day)) != nil,let text=value["text"]?.string,!text.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty else{return nil}
             return .intention(id:id,day:day,text:text)
@@ -109,4 +112,14 @@ public enum DiarySpeechPolicy {
 private extension JSONValue {
     var string: String? { if case .string(let value) = self { value } else { nil } }
     var number: Double? { if case .number(let value) = self { value } else { nil } }
+}
+
+/// Owner, 24 Oct 2026: a diary photo linked to the Photos library stores `Media.sourceID = "photos:<local identifier>"`
+/// and only a small copy in `Media.data`, so the day still shows it if the original is deleted or on another device.
+public enum DiaryPhotoLink {
+    public static let prefix = "photos:"
+    public static func assetID(sourceID: String?) -> String? {
+        guard let sourceID, sourceID.hasPrefix(prefix) else { return nil }
+        return String(sourceID.dropFirst(prefix.count))
+    }
 }

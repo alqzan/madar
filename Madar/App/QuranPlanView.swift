@@ -26,7 +26,7 @@ struct QuranPlanView: View {
                                 line; row("وتيرة المراجعة المعتادة", detail: p.rhythm.title)
                                 line
                             }
-                            choiceRow("يوم الراحة", key: "quran.restDay", options: [("friday","الجمعة"),("saturday","السبت"),("none","بلا")])
+                            choiceRow("يوم الراحة", key: "quran.restDay", options: QuranUIRestDays.days + [("none","بلا")])
                             line; choiceRow("التذكير", key: "quran.wirdReminder", options: [("afterFajr","بعد الفجر"),("afterAsr","بعد العصر"),("afterIsha","بعد العشاء"),("off","بلا")])
                             line; choiceRow("جدول المراجعة", key: "quran.reviewSchedule", options: [("spaced","متباعدة"),("fixedJuzDaily","جزء يوميًا"),("fixedManzilWeekly","المنازل الأسبوعية")])
                         }
@@ -79,7 +79,7 @@ struct QuranPlanView: View {
                 if let error { Text(error).font(quranFont(13)) }
             }.padding(16)
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.color("review")).disabled(busy || app.settingsWriteInProgress)
-            .safeAreaInset(edge: .bottom) { if app.undoToken != nil { UndoToast(message: app.undoMessage, undo: app.undo).accessibilityIdentifier("quran-plan-undo") } }
+            .safeAreaInset(edge: .bottom) { if app.undoToastVisible { UndoToast(message: app.undoMessage, undo: app.undo).accessibilityIdentifier("quran-plan-undo") } }
             .fullScreenCover(isPresented: $showSetup, onDismiss: load) { QuranPlanSetupView(service: service, close: { showSetup = false }) }
             .task { load() }.onChange(of: app.settingsWriteInProgress) { if !app.settingsWriteInProgress { load() } }.onChange(of: app.undoToken?.id) { load() }
             .alert("لم تكتمل العملية", isPresented: Binding(get: { app.errorMessage != nil }, set: { if !$0 { app.errorMessage = nil } })) { Button("تمّ") { app.errorMessage = nil } } message: { Text(app.errorMessage ?? "") }

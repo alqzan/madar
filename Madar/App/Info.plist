@@ -41,6 +41,8 @@
 	<string>يعرف مدار أنك خارج مدينتك ليسألك عن السفر. لا يُحفظ موقعك ولا يغادر جهازك.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>سجّل صوتك واحفظه في صفحة يومك على هذا الجهاز.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>يعرض مدار صور يومك من تطبيق الصور لتضيف منها ما تشاء، ويحفظ رابطها ونسخة صغيرة منها فقط.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>حوّل التسجيل الذي تختاره إلى نص. لا يُرسل الصوت إلى Apple دون موافقتك داخل مدار.</string>
 	<key>NSSupportsLiveActivities</key>

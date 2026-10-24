@@ -117,7 +117,7 @@ extension AppSession {
         ]
         if let shortened { payload["shortened"] = .bool(shortened) }
         if prayer == .dhuhr, cell.isFriday { payload["fridayKind"] = .string((fridayKind ?? .dhuhr).rawValue) }
-        logCapturedPrayer(payload: .object(payload), undoMessage: "سُجّلت " + Self.prayerName(prayer, friday: payload["fridayKind"] == .string("jumuah")) + (status == "jamaah" ? " جماعة" : " منفردًا") + " · التراجع متاح لعشر دقائق")
+        logCapturedPrayer(payload: .object(payload), undoMessage: "سُجّلت " + Self.prayerName(prayer, friday: payload["fridayKind"] == .string("jumuah")) + (status == "jamaah" ? " جماعة" : " منفردًا") + "")
     }
 
     static func prayerName(_ prayer: Prayer, friday: Bool) -> String {

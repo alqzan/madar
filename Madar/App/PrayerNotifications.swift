@@ -383,10 +383,12 @@ final class PrayerNotificationCoordinator {
             var date = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: candidate.dueAt); date.timeZone = timeZone
             do {
                 try session.notificationBudget.reserve(.init(id: candidate.id, dayKey: candidate.dayKey, scheduledAt: candidate.dueAt), now: now)
-            } catch NotificationBudgetError.full {
+            } catch let error as NotificationBudgetError where error == .full || error == .disabled {
+                // Owner real-data trial, 24 Oct 2026: with reminders off (or not yet allowed) a room reminder is
+                // simply not scheduled; it is not a failure to show the user.
                 center.removePendingNotificationRequests(withIdentifiers: [candidate.id])
                 try session.notificationBudget.cancel(id: candidate.id, now: now)
-                try updateLedger(requestID: candidate.id, dayKey: candidate.dayKey, dueAt: candidate.dueAt, state: "dropped", reason: "budget")
+                try updateLedger(requestID: candidate.id, dayKey: candidate.dayKey, dueAt: candidate.dueAt, state: "dropped", reason: error == .full ? "budget" : "disabled")
                 continue
             }
             if !current.contains(where: { $0.identifier == candidate.id && Self.matches($0, dueAt: candidate.dueAt) && $0.content.title == content.title && $0.content.body == content.body }) {

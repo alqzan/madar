@@ -84,7 +84,7 @@ struct DiaryCustomizeView: View {
                     .font(DiaryType.label).foregroundStyle(theme.color("ink3Text")).padding(.vertical, 12)
             }.padding(16).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }.background(theme.background).foregroundStyle(theme.ink).toolbarVisibility(.hidden, for: .navigationBar)
-            .safeAreaInset(edge: .bottom) { if app.undoToken != nil { UndoToast(message: app.undoMessage, undo: app.undo) } }
+            .safeAreaInset(edge: .bottom) { if app.undoToastVisible { UndoToast(message: app.undoMessage, undo: app.undo) } }
             .confirmationDialog("أعِد إعدادات المذكرات؟", isPresented: $confirmReset, titleVisibility: .visible) {
                 Button("أعِد الافتراضي", role: .destructive) { app.reset(keys) }.accessibilityIdentifier("diary-customize-reset-confirm")
             } message: { Text("يعود الشكل والترتيب والإعدادات. البيانات لا تُمسّ.") }

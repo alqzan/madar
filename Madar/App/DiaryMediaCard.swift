@@ -11,6 +11,7 @@ struct DiaryMediaCard: View {
     @Bindable var app: AppSession
     let media: DiaryDisplayMedia
     let transcript: String
+    var missingCount = 1
     @Environment(\.roomTheme) private var theme
     @State private var preview: DiaryPreview?
     @State private var error: String?
@@ -28,7 +29,7 @@ struct DiaryMediaCard: View {
                     Button { togglePlayback() } label: { Image(systemName: playing ? "pause.fill" : "play.fill").frame(width: 44, height: 44).foregroundStyle(theme.onAccent).background(theme.accent, in: .circle) }
                         .buttonStyle(.plain).accessibilityLabel(playing ? "أوقف الصوت مؤقتًا" : "شغّل التسجيل").accessibilityIdentifier("diary-play-" + media.id.uuidString)
                     ProgressView(value: playback.activeID == media.id ? playback.position : 0).tint(theme.accent)
-                    Text(media.duration.map { AppDiaryService(app: app).digits.string($0) + " ثانية" } ?? "تسجيل صوتي").font(MadarTypography.fine())
+                    Text(media.duration.map(seconds) ?? "تسجيل صوتي").font(MadarTypography.fine())
                 }.padding(10).background(theme.surface, in: .capsule)
                 if let voice {
                     DisclosureGroup("التسجيل والنص") {
@@ -39,7 +40,7 @@ struct DiaryMediaCard: View {
                 }
             } else if media.kind == "missing" {
                 // N01: the export referenced this file but did not contain it; the entry keeps the marker.
-                Label("مرفق ناقص: " + (["photo": "صورة", "audio": "تسجيل صوتي", "video": "مقطع"][media.contentType] ?? "ملف") + " لم يكن في ملف داي ون", systemImage: "exclamationmark.circle")
+                Label(missingText, systemImage: "exclamationmark.circle")
                     .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).padding(.horizontal, 14).frame(minHeight: 44)
                     .overlay { RoundedRectangle(cornerRadius: 10).stroke(theme.line, style: StrokeStyle(lineWidth: 1, dash: [4, 3])) }
                     .accessibilityIdentifier("diary-media-missing")
@@ -54,6 +55,18 @@ struct DiaryMediaCard: View {
             .sheet(isPresented: $editingTranscript) { DiaryTranscriptEditor(app: app, media: media, original: transcript).environment(\.roomTheme, theme) }
             .onDisappear { if playback.activeID == media.id { playback.stop() }; voice?.cancelConversion(); voice?.cancelDownload() }
     }
+    /// «ثانية واحدة»، «ثانيتان»، «٥ ثوانٍ»، «٤٠ ثانيةً».
+    private func seconds(_ n: Int) -> String {
+        let digits = AppDiaryService(app: app).digits
+        switch n { case 1: return "ثانية واحدة"; case 2: return "ثانيتان"; case 0, 3...10: return digits.string(n) + " ثوانٍ"; default: return digits.string(n) + (n % 100 >= 11 ? " ثانيةً" : " ثانية") }
+    }
+    private var missingText: String {
+        let digits = AppDiaryService(app: app).digits
+        guard missingCount > 1 else { return "مرفق ناقص: " + (["photo": "صورة", "audio": "تسجيل صوتي", "video": "مقطع"][media.contentType] ?? "ملف") + " لم يكن في ملف داي ون" }
+        let noun = media.contentType == "photo" ? (missingCount == 2 ? "صورتان" : missingCount <= 10 ? digits.string(missingCount) + " صور" : digits.string(missingCount) + " صورةً")
+            : (missingCount == 2 ? "مرفقان" : missingCount <= 10 ? digits.string(missingCount) + " مرفقات" : digits.string(missingCount) + " مرفقًا")
+        return "مرفقات ناقصة: " + noun + " لم تكن في ملف داي ون"
+    }
     private func togglePlayback() {
         do {
             try AppDiaryService(app: app).authorizeRead()
@@ -61,6 +74,15 @@ struct DiaryMediaCard: View {
         } catch { self.error = "تعذّر تشغيل الصوت. الملف محفوظ." }
     }
     private func open() {
+        if let id = media.assetID, let asset = DiaryPhotoLibrary.asset(id) {
+            Task {
+                if let data = await DiaryPhotoLibrary.data(asset) { show(data) } else { show(media.data) }
+            }
+            return
+        }
+        show(media.data)
+    }
+    private func show(_ data: Data) {
         do {
             try AppDiaryService(app: app).authorizeRead()
             let ext = UTType(mimeType: media.contentType)?.preferredFilenameExtension ?? "data"
@@ -69,7 +91,7 @@ struct DiaryMediaCard: View {
             let original = String((transcript as NSString).lastPathComponent.prefix(100))
             let name = media.kind == "document" && !original.isEmpty && original != "." && original != ".." ? original : "مرفق." + ext
             let url = root.appending(path: name)
-            try media.data.write(to: url, options: [.atomic, .completeFileProtection]); preview = .init(id: media.id, url: url)
+            try data.write(to: url, options: [.atomic, .completeFileProtection]); preview = .init(id: media.id, url: url)
         } catch { self.error = "تعذّر فتح المرفق. يمكنك إعادة المحاولة." }
     }
 }

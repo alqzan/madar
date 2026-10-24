@@ -83,4 +83,22 @@ struct PDFBookEPUBTests {
         // PDFKit keeps an in-memory outline; the shared definition reads it with one-based pages.
         #expect(PDFBookFiles.outline(of: document) == [.init(title: "أول", page: 1), .init(title: "ثالث", page: 3)])
     }
+    /// Owner, 24 Oct 2026: running headers and bare page numbers leave the text, and a paragraph that crosses a
+    /// page break stays one paragraph.
+    @Test func runningHeadersAndPageNumbersLeaveAndParagraphsCrossPages() throws {
+        let pages = [
+            "كتاب الأدب\nأول الكلام في هذا الباب أن\n١",
+            "كتاب الأدب\nالقراءة تحتاج إلى صبر.\nفصل آخر تام.\n٢",
+            "كتاب الأدب\nثالث الصفحات كاملة.\n- ٣ -",
+        ]
+        let cleaned = PDFBookEPUB.withoutRunningLines(pages)
+        #expect(cleaned[0] == "أول الكلام في هذا الباب أن")
+        #expect(cleaned[1] == "القراءة تحتاج إلى صبر.\nفصل آخر تام.")
+        #expect(cleaned[2] == "ثالث الصفحات كاملة.")
+        let epub = try PDFBookEPUB.build(title: "كتاب", author: "", language: "ar", sourceHash: "x", pages: pages.map { .init(text: $0, optical: false, unreliable: false) }, outline: [])
+        let chapter = text(epub) // a stored (uncompressed) ZIP: the chapter text is readable as is
+        #expect(chapter.contains("<p>أول الكلام في هذا الباب أن <span id=\"p-2\""), "page 1's open paragraph continues over the marker")
+        #expect(chapter.contains("aria-label=\"٢\"></span>القراءة تحتاج إلى صبر.</p>"))
+        #expect(!chapter.contains("كتاب الأدب"))
+    }
 }

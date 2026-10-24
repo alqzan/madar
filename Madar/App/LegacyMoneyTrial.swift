@@ -69,7 +69,7 @@ extension AppSession {
                     if let last4 { p["last4"] = .string(last4) }
                     _ = await run("money.saveAccount", p, command, "account")
                 case let .saveCard(command, id, last4, bank, kind, account):
-                    var p: [String: MadarCore.JSONValue] = ["id": .string(id.uuidString), "name": .string("بطاقة " + arabic(last4)), "bank": .string(bank.uppercased()),
+                    var p: [String: MadarCore.JSONValue] = ["id": .string(id.uuidString), "name": .string((kind == "credit" ? "بطاقة ائتمانية " : "بطاقة مدى ") + bank.uppercased() + " ‹" + arabic(last4) + "›"), "bank": .string(bank.uppercased()),
                                                            "last4": .string(last4), "kind": .string(kind), "aliases": .array([.string(bank)])]
                     if let account { p["accountID"] = .string(account.uuidString) }
                     _ = await run("money.saveCard", p, command, "card")

@@ -50,6 +50,16 @@ final class AppSession {
     private(set) var values: [String: JSONValue] = [:]
     private(set) var undoToken: AppUndoToken?
     private(set) var undoMessage = ""
+    /// Owner, 24 Oct 2026: «التراجع متاح… يتكرر وصاير مزعج مره ويطول». The toast shows for a few seconds; the undo
+    /// itself stays valid until its token expires.
+    private(set) var undoToastVisible = false
+    /// UI tests that cross a sheet before reaching the toast lengthen it with MADAR_UI_UNDO_SECONDS (DEBUG only).
+    static var undoToastSeconds: Double {
+        #if DEBUG
+        if let text = ProcessInfo.processInfo.environment["MADAR_UI_UNDO_SECONDS"], let seconds = Double(text) { return seconds }
+        #endif
+        return 6
+    }
     var errorMessage: String?
     var onboardingComplete = false
     var selectedTab = "foundation"
@@ -83,6 +93,7 @@ final class AppSession {
         return self.lockController?.canPresent(.app) == true ? nil : .init(status: .needsUnlock)
     })
     private var expiryTask: Task<Void, Never>?
+    private var toastTask: Task<Void, Never>?
     @ObservationIgnored private var spotlightBookSnapshot: [AppSpotlightBookRecord]?
     @ObservationIgnored private var spotlightDomainsClearedWhileDisabled = false
     @ObservationIgnored private var spotlightReconciliationRevision: UInt64 = 0
@@ -216,7 +227,7 @@ final class AppSession {
             "fridayKind": fridayKind.map { .string($0.rawValue) } ?? .null
         ])
         sendPrayerCommand(name: "prayer.log", payload: payload,
-            undoMessage: status == .missed ? "سُجّلت فائتة · التراجع متاح لعشر دقائق" : "سُجّلت الصلاة · التراجع متاح لعشر دقائق", completion: completion)
+            undoMessage: status == .missed ? "سُجّلت فائتة" : "سُجّلت الصلاة", completion: completion)
     }
     func oldMissedRequiresRestore(_ reference: PrayerReference) throws -> Bool {
         try PrayerRepository(context: ModelContext(container)).oldMissedRequiresRestore(reference)
@@ -225,7 +236,7 @@ final class AppSession {
         sendPrayerCommand(name: "prayer.addOldMissed", payload: .object([
             "dayKey": .string(reference.day.description), "prayer": .string(reference.prayer.rawValue),
             "fridayKind": fridayKind.map { .string($0.rawValue) } ?? .null, "restoreDeleted": .bool(restoreDeleted)
-        ]), undoMessage: "أُضيفت الفائتة القديمة · التراجع متاح لعشر دقائق", completion: completion)
+        ]), undoMessage: "أُضيفت الفائتة القديمة", completion: completion)
     }
     func qiyamRequiresRestore(_ night: GregorianDay) throws -> Bool {
         try PrayerRepository(context: ModelContext(container)).nightRequiresRestore(night)
@@ -233,33 +244,33 @@ final class AppSession {
     func recordQiyamNight(_ night: GregorianDay, rakaat: Int, witr: Bool, restoreDeleted: Bool = false, completion: ((Bool) -> Void)? = nil) {
         sendPrayerCommand(name: "prayer.logQiyam", payload: .object([
             "nightKey": .string(night.description), "rakaat": .number(Double(rakaat)), "witr": .bool(witr), "restoreDeleted": .bool(restoreDeleted)
-        ]), undoMessage: "حُفظ قيام الليلة · التراجع متاح لعشر دقائق", completion: completion)
+        ]), undoMessage: "حُفظ قيام الليلة", completion: completion)
     }
     func answerPrayerHeart(_ reference: PrayerReference, heart: PrayerHeart?, completion: ((Bool) -> Void)? = nil) {
         sendPrayerCommand(name: "prayer.setHeart", payload: .object([
             "dayKey": .string(reference.day.description), "prayer": .string(reference.prayer.rawValue),
             "heart": heart.map { .string($0.rawValue) } ?? .null
-        ]), undoMessage: "حُفظت إجابة القلب · التراجع متاح لعشر دقائق", completion: completion)
+        ]), undoMessage: "حُفظت إجابة القلب", completion: completion)
     }
     /// P04: the tracking start moves once, up to 30 days before the first run. The engine enforces both limits.
     func editPrayerTrackingStart(_ day: GregorianDay, completion: ((Bool) -> Void)? = nil) {
         sendPrayerCommand(name: "prayer.editTrackingStart", payload: .object(["dayKey": .string(day.description)]),
-            undoMessage: "عُدّلت بداية التتبّع · التراجع متاح لعشر دقائق", completion: completion)
+            undoMessage: "عُدّلت بداية التتبّع", completion: completion)
     }
     /// RP4/RP7: the owner answered the one question. The method is stored first; times then use it for this trip only.
     func startPrayerTrip(city: String, country: String, place: ActivePlace, homeKm: Double?, method: PrayerCalculationMethod, completion: ((Bool) -> Void)? = nil) {
         set(.string(method.rawValue), key: "salah.tripMethod") { [self] in
             var payload: [String: MadarCore.JSONValue] = ["city": .string(city), "country": .string(country), "lat": .number(place.latitude), "lon": .number(place.longitude), "tzID": .string(place.timeZoneID)]
             if let homeKm { payload["homeKm"] = .number(homeKm) }
-            sendPrayerCommand(name: "prayer.startTrip", payload: .object(payload), undoMessage: "بدأت الرحلة · التراجع متاح لعشر دقائق", completion: completion)
+            sendPrayerCommand(name: "prayer.startTrip", payload: .object(payload), undoMessage: "بدأت الرحلة", completion: completion)
         }
     }
     func endPrayerTrip(_ id: UUID, completion: ((Bool) -> Void)? = nil) {
-        sendPrayerCommand(name: "prayer.endTrip", payload: .object(["tripID": .string(id.uuidString)]), undoMessage: "انتهت الرحلة · التراجع متاح لعشر دقائق", completion: completion)
+        sendPrayerCommand(name: "prayer.endTrip", payload: .object(["tripID": .string(id.uuidString)]), undoMessage: "انتهت الرحلة", completion: completion)
     }
     func logPrayerPair(day: GregorianDay, pair: PrayerPair, status: PrayerStoredStatus, shortened: Bool, mode: PrayerPairMode, completion: ((Bool) -> Void)? = nil) {
         sendPrayerCommand(name: "prayer.logPair", payload: .object(["dayKey": .string(day.description), "pair": .string(pair.rawValue), "status": .string(status.rawValue), "shortened": .bool(shortened), "mode": .string(mode.rawValue)]),
-            undoMessage: "سُجّلت الصلاتان · التراجع متاح لعشر دقائق", completion: completion)
+            undoMessage: "سُجّلت الصلاتان", completion: completion)
     }
     func makeUpPrayer(_ reference: PrayerReference, fridayKind: FridayPrayerKind? = nil, completion: ((Bool) -> Void)? = nil) {
         let at = prayerNow()
@@ -270,7 +281,7 @@ final class AppSession {
             "at": .string(formatter.string(from: at)),
             "fridayKind": fridayKind.map { .string($0.rawValue) } ?? .null
         ])
-        sendPrayerCommand(name: "prayer.makeUp", payload: payload, undoMessage: "قُضيت الصلاة · التراجع متاح لعشر دقائق", completion: completion)
+        sendPrayerCommand(name: "prayer.makeUp", payload: payload, undoMessage: "قُضيت الصلاة", completion: completion)
     }
     func resolvePrayerGap(_ resolutions: [PrayerGapResolution]) {
         guard !resolutions.isEmpty else { return }
@@ -283,7 +294,7 @@ final class AppSession {
             ])
         }
         sendPrayerCommand(name: "prayer.resolveGap", payload: .object(["resolutions": .array(values)]),
-            undoMessage: "حُلّت الفترة · التراجع متاح لعشر دقائق")
+            undoMessage: "حُلّت الفترة")
     }
     /// Capture's prayer report uses the same command, undo and refresh as a tap on the arch.
     func logCapturedPrayer(payload: MadarCore.JSONValue, undoMessage: String) {
@@ -500,7 +511,7 @@ final class AppSession {
         execute(name: "settings.set", values: defaults, message: "عادت الإعدادات المتفق عليها", completion: completion)
     }
     func applyPreset(_ settings: [String: JSONValue], completion: (() -> Void)? = nil) {
-        execute(name: "settings.applyPreset", values: settings, message: "طُبّق النمط · التراجع متاح دقيقة", completion: completion)
+        execute(name: "settings.applyPreset", values: settings, message: "طُبّق النمط", completion: completion)
     }
     func savePreset(name: String, completion: (() -> Void)? = nil) {
         guard beginWrite() else { return }
@@ -542,7 +553,7 @@ final class AppSession {
                 try await withSerializedPrayerNotificationMutation {
                     let result = try await bus.execute(CommandEnvelope(name: "system.undo", payload: .object(["undoToken": .string(token.id.uuidString)])))
                     guard result.status == .applied else { throw DataError.undoExpired }
-                    try reload(); undoToken = nil; expiryTask?.cancel(); try publishSnapshot()
+                    try reload(); undoToken = nil; undoToastVisible = false; expiryTask?.cancel(); try publishSnapshot()
                     await reconcileSpotlightIndex()
                     WidgetCenter.shared.reloadAllTimelines()
                 }
@@ -650,7 +661,7 @@ final class AppSession {
             return result
         }
         if let id = result.undoToken, let receipt = try ModelContext(container).fetch(FetchDescriptor<MadarData.CommandReceipt>()).first(where: { $0.commandID == id }), let deadline = receipt.undoExpiresAt {
-            showUndo(AppUndoToken(id: id, expiresAt: deadline), message: "حُفظ التغيير · التراجع متاح لعشر دقائق")
+            showUndo(AppUndoToken(id: id, expiresAt: deadline), message: "حُفظ التغيير")
         }
         return result
     }
@@ -704,10 +715,10 @@ final class AppSession {
             // A confirmed spend can cross a category's 80% line (M5-V10); re-plan room reminders through the one arbiter.
             Task { await refreshPrayerNotifications() }
         }
-        if let token = result.undoToken { showUndo(.init(id: token, expiresAt: now.addingTimeInterval(600)), message: name == "money.confirmSalary" ? "فُتحت الدورة · التراجع متاح لعشر دقائق" : name == "money.logExpense" ? "سُجّل المصروف · التراجع متاح لعشر دقائق" : "حُفظ التغيير · التراجع متاح لعشر دقائق") }
+        if let token = result.undoToken { showUndo(.init(id: token, expiresAt: now.addingTimeInterval(600)), message: name == "money.confirmSalary" ? "فُتحت الدورة" : name == "money.logExpense" ? "سُجّل المصروف" : "حُفظ التغيير") }
     }
 
-    func executeBookCommand(_ name: String, payload: [String: MadarCore.JSONValue], id: UUID = UUID(), undoMessage: String = "حُفظ في المحبرة، والتراجع متاح") async throws {
+    func executeBookCommand(_ name: String, payload: [String: MadarCore.JSONValue], id: UUID = UUID(), undoMessage: String = "حُفظ في المحبرة") async throws {
         guard lockController?.canPresent(.app) ?? protectedDataAuthorized else { throw DataError.authenticationFailed }
         guard beginWrite() else { throw BackupOperationError.busy }
         defer { pendingWrites -= 1 }
@@ -738,7 +749,7 @@ final class AppSession {
         let reschedules = name.hasPrefix("habit.") || ["diary.setIntention", "diary.sealLetter", "diary.openLetter", "diary.rescheduleLetter", "diary.refreshLetters"].contains(name)
         let result = reschedules ? try await withSerializedPrayerNotificationMutation { try await run() } : try await run()
         if let id = result.undoToken {
-            showUndo(AppUndoToken(id: id, expiresAt: now.addingTimeInterval(600)), message: name.hasPrefix("habit.") ? "حُفظت العادة · التراجع متاح لعشر دقائق" : name == "bahw.saveUpcomingDay" ? "حُفظ اليوم · التراجع متاح لعشر دقائق" : name == "bahw.deleteUpcomingDay" ? "حُذف اليوم · التراجع متاح لعشر دقائق" : name.contains("Intention") ? "حُفظت النيّة · التراجع متاح لعشر دقائق" : "حُفظ السطر · التراجع متاح لعشر دقائق")
+            showUndo(AppUndoToken(id: id, expiresAt: now.addingTimeInterval(600)), message: name.hasPrefix("habit.") ? "حُفظت العادة" : name == "bahw.saveUpcomingDay" ? "حُفظ اليوم" : name == "bahw.deleteUpcomingDay" ? "حُذف اليوم" : name.contains("Intention") ? "حُفظت النيّة" : "حُفظ السطر")
         }
     }
     /// M3-V09: a Day One import (or its undo) is one app-process write (RA2), gated like a diary command so
@@ -839,20 +850,25 @@ final class AppSession {
     }
     func redactProtectedData() {
         protectedDataAuthorized = false
-        undoToken = nil; expiryTask?.cancel()
+        undoToken = nil; undoToastVisible = false; expiryTask?.cancel()
     }
     func authorizeProtectedData() { protectedDataAuthorized = true }
     func bindContainer(_ replacement: ModelContainer) {
         container = replacement; store = SettingsStore(context: ModelContext(replacement), schema: schema)
-        undoToken = nil; expiryTask?.cancel()
+        undoToken = nil; undoToastVisible = false; expiryTask?.cancel()
     }
     private func showUndo(_ token: AppUndoToken, message: String) {
-        undoToken = token; undoMessage = message; expiryTask?.cancel()
+        undoToken = token; undoMessage = message; undoToastVisible = true; expiryTask?.cancel(); toastTask?.cancel()
+        toastTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(Self.undoToastSeconds))
+            guard !Task.isCancelled else { return }
+            if self?.undoToken?.id == token.id { self?.undoToastVisible = false }
+        }
         expiryTask = Task { [weak self] in
             let delay = max(0, token.expiresAt.timeIntervalSince(self?.prayerNow() ?? .now))
             try? await Task.sleep(for: .seconds(delay))
             guard !Task.isCancelled else { return }
-            if self?.undoToken?.id == token.id { self?.undoToken = nil }
+            if self?.undoToken?.id == token.id { self?.undoToken = nil; self?.undoToastVisible = false }
         }
     }
     var homeCity: [String: JSONValue] { if case .object(let place) = values["core.homeCity"] { place } else { [:] } }

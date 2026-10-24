@@ -87,14 +87,26 @@ struct QuranPlanSetupView: View {
             }
             Text("الإيقاع يضبط التدريب ومواعيد المراجعة؛ درجة الحفظ المعتادة تضبط مقدار يومك.").font(quranFont(13)).foregroundStyle(theme.secondaryInk)
         case 3:
-            ForEach([("friday","الجمعة"),("saturday","السبت"),("none","بلا يوم راحة")], id: \.0) { key, title in option(title, detail: key == "none" ? "الحفظ كل يوم" : "يوم للمراجعة دون حفظ جديد", selected: p.restDay == key, id: "quran-setup-rest-" + key) { input?.restDay = key } }
+            Text("يوم للمراجعة دون حفظ جديد").font(quranFont(13)).foregroundStyle(theme.secondaryInk)
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 8) {
+                ForEach(QuranUIRestDays.days, id: \.0) { key, title in
+                    let selected = p.restDay == key
+                    Button { input?.restDay = key } label: {
+                        Text(title).font(quranFont(14, bold: selected)).frame(maxWidth: .infinity, minHeight: 48)
+                            .foregroundStyle(selected ? theme.onAccent : theme.ink)
+                            .background(selected ? theme.accent : theme.surface, in: .rect(cornerRadius: 16))
+                            .overlay { RoundedRectangle(cornerRadius: 16).stroke(selected ? .clear : theme.line, lineWidth: 1) }
+                    }.buttonStyle(.plain).accessibilityIdentifier("quran-setup-rest-" + key).accessibilityAddTraits(selected ? .isSelected : [])
+                }
+            }
+            option("بلا يوم راحة", detail: "الحفظ كل يوم", selected: p.restDay == "none", id: "quran-setup-rest-none") { input?.restDay = "none" }
         default:
             QuranPaperCard {
                 VStack(alignment: .leading, spacing: 16) {
                     Text(startTitle(p.startAyah)).font(quranSerif(24))
                     Text(QuranPlanCopy.amount(p, digits: service.numerals) + " في يوم الحفظ").font(quranFont(16, bold: true))
                     Text("إيقاع " + p.rhythm.title).font(quranFont(15))
-                    Text("الراحة: " + (["friday":"الجمعة","saturday":"السبت","none":"بلا"][p.restDay] ?? "")).font(quranFont(15))
+                    Text("الراحة: " + QuranUIRestDays.title(p.restDay)).font(quranFont(15))
                     Text("تُحفظ نسخة جديدة من الخطة، وتبقى جلساتك السابقة مرتبطة بنسختها.").font(quranFont(13)).foregroundStyle(theme.secondaryInk)
                 }
             }

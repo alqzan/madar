@@ -66,7 +66,7 @@ extension AppDiaryService {
         let entries = Self.visible(try context.fetch(FetchDescriptor<Entry>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil }, sortBy: [SortDescriptor(\.eventAt)])))
         let pages = try context.fetch(FetchDescriptor<DayPage>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil }))
         let margins = try context.fetch(FetchDescriptor<MarginNote>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil }))
-        var descriptor = FetchDescriptor<Media>(predicate: #Predicate { $0.kind == "photo" && $0.deletedAt == nil && $0.mergedInto == nil }); descriptor.propertiesToFetch = [\.id]
+        var descriptor = FetchDescriptor<Media>(predicate: #Predicate { $0.kind == "photo" && $0.state != "missing" && $0.deletedAt == nil && $0.mergedInto == nil }); descriptor.propertiesToFetch = [\.id]
         let photos = Set(try context.fetch(descriptor).map(\.id))
         let niyyas=try context.fetch(FetchDescriptor<Niyya>(predicate:#Predicate{$0.deletedAt==nil && $0.mergedInto==nil}))
         let grouped = Dictionary(grouping: entries, by: \.dayKey), keys = Set(entries.map(\.dayKey) + pages.filter { $0.photoMediaID != nil || $0.questionAnswer != nil }.map(\.dayKey) + margins.map(\.writtenDayKey)+niyyas.map(\.dayKey))

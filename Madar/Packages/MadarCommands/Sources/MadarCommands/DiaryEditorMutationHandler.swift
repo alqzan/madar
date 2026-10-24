@@ -25,7 +25,7 @@ import MadarData
             let inverse = try DiaryMutationHandler.stage(text: text, day: target["day"] ?? "today", targetDay: target["targetDayKey"].flatMap { $0.isEmpty ? nil : $0 }, id: id, context: context, now: now, writer: writer, storedDay: try GregorianDay(target["writingDayKey"] ?? draft.dayKey))
             draft.deletedAt = now; draft.deletionBarrierAt = now; draft.updatedAt = StableIdentity.monotonic(now: now, previous: draft.updatedAt); draft.writerID = writer
             return inverse
-        case .appendMedia(let file, let kind, let type, let caption, let day, let writingDay, let duration):
+        case .appendMedia(let file, let kind, let type, let caption, let day, let writingDay, let duration, let asset):
             guard try context.fetchCount(FetchDescriptor<Media>(predicate: #Predicate { $0.id == file })) == 0 else { throw DataError.invalidValue("media already exists") }
             let url = root.appending(path: file.uuidString + (kind == "audio" ? ".m4a" : ".blob"))
             let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
@@ -33,6 +33,8 @@ import MadarData
             let data = try Data(contentsOf: url, options: .mappedIfSafe); guard !data.isEmpty else { throw DataError.invalidValue("ملف فارغ") }
             let media = Media(); media.id = file; media.kind = kind; media.contentType = type; media.data = data; media.sizeBytes = data.count
             media.sha256 = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined(); media.durationS = duration
+            // A linked photo: `data` is the small copy and the natural key is the library asset (Media.naturalKeyRule).
+            media.sourceID = asset.map { DiaryPhotoLink.prefix + $0 }
             media.createdAt = now; media.updatedAt = now; media.writerID = writer; context.insert(media)
             return try DiaryMutationHandler.stage(text: caption, day: day, targetDay: nil, id: id, context: context, now: now, writer: writer, mediaIDs: kind == "audio" ? [] : [file], audioID: kind == "audio" ? file : nil, storedDay: try GregorianDay(writingDay))
         case .intention(let id,let day,let text): return try DiaryMutationHandler.setIntention(id:id,day:day,text:text,context:context,now:now,writer:writer)

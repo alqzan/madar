@@ -37,7 +37,7 @@ struct QuranStrengthView:View {
                 if let error {Text(error).font(quranFont(13)).foregroundStyle(theme.color("dueText"))}
             }.padding(16)
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.color("review")).disabled(busy)
-            .safeAreaInset(edge:.bottom) {if app.undoToken != nil {UndoToast(message:app.undoMessage,undo:app.undo).accessibilityIdentifier("quran-strength-undo")}}
+            .safeAreaInset(edge:.bottom) {if app.undoToastVisible {UndoToast(message:app.undoMessage,undo:app.undo).accessibilityIdentifier("quran-strength-undo")}}
             .task {load()}.onChange(of:app.undoToken?.id) {load()}
             .sheet(isPresented:$recovery) {recoverySheet}
             .sheet(isPresented:$details) {faceDetails}

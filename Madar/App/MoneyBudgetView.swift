@@ -28,12 +28,12 @@ struct MoneyBudgetView: View {
                 if let reading {
                     summary(reading)
                     if !visible { Button("أظهر الأرقام") { revealed = true }.frame(minHeight: 44).accessibilityIdentifier("money-budget-reveal") }
-                    let days = Array(Set(reading.rows.map(\.day))).sorted(by: >)
+                    let byDay = Dictionary(grouping: reading.rows, by: \.day), days = byDay.keys.sorted(by: >)
                     ForEach(days, id: \.description) { day in
                         VStack(alignment: .leading, spacing: 0) {
                             MadarDateLabel(app.dateLabels(day, compact: true, weekday: true), primaryFont: MadarTypography.section(), secondaryFont: MadarTypography.fine())
                                 .foregroundStyle(theme.ink).padding(.top, 6).padding(.bottom, 7)
-                            ForEach(reading.rows.filter { $0.day == day }) { row in movement(row) }
+                            ForEach(byDay[day] ?? []) { row in movement(row) }
                         }
                     }
                     if reading.rows.isEmpty {

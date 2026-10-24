@@ -255,7 +255,7 @@ struct MoneyMessagesView: View {
                 Button { run("money.confirmClear", ["ids": .array(clear.map { .string($0.uuidString) })]) } label: {
                     VStack(spacing: 2) {
                         Text("اعتمد الواضح (" + service.digits.string(clear.count) + ")").font(.custom("thmanyahsans-Bold", size: 17, relativeTo: .headline))
-                        if left > 0 { Text("ويبقى " + service.digits.string(left) + " لقرارك").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
+                        if left > 0 { Text("ويبقى " + service.counted(left, ("قرار واحد", "قراران", "قرارات", "قرارًا")) + " لقرارك").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
                     }.frame(maxWidth: .infinity, minHeight: 60).overlay { Rectangle().stroke(theme.color("reserveText"), lineWidth: 1.2) }
                 }.buttonStyle(.plain).accessibilityIdentifier("money-confirm-clear")
             }

@@ -152,7 +152,7 @@ struct DiaryHubView: View {
         }
     }
     private func timeline(_ days: [DiaryDaySummary]) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
+        LazyVStack(alignment: .leading, spacing: 0) {
             if days.isEmpty { Text("لا كتابة في هذه الفترة. يمكنك فتح أي يوم من التقويم.").font(DiaryType.writing).padding(.vertical, 24) }
             ForEach(days) { day in
                 Button { reader = day.day } label: { VStack(alignment: .leading, spacing: 7) { Text(service.weekday(day.day) + "، " + service.bothDates(day.day, calendar: grid.first)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text")); Text(day.excerpt).font(DiaryType.writing).lineLimit(3).multilineTextAlignment(.leading) }.padding(16).frame(maxWidth: .infinity, alignment: .leading) }.buttonStyle(.plain).accessibilityIdentifier("diary-hub-day-" + day.id)

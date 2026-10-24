@@ -24,7 +24,7 @@ public enum QuranCommandPayload {
                   let start = number("startAyah"), start.rounded() == start, (1...6236).contains(start),
                   let amount = number("amount"), amount.isFinite, amount > 0 else { return false }
             return ["ayah", "quarter", "half", "page"].contains(string("unit") ?? "") && ["light", "balanced", "intense"].contains(string("rhythm") ?? "")
-                && ["friday", "saturday", "none"].contains(string("restDay") ?? "") && ["ask", "spread", "double", "skip"].contains(string("missPolicy") ?? "")
+                && ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "none"].contains(string("restDay") ?? "") && ["ask", "spread", "double", "skip"].contains(string("missPolicy") ?? "")
         case "quran.setTodayLevel": return keys(["kind", "level"]) && ["hifz", "review"].contains(string("kind") ?? "") && ["simple", "medium", "deep", "max"].contains(string("level") ?? "")
         case "quran.forceNewHifz", "quran.cancelRecovery", "quran.freezeTest": return payload.isEmpty
         case "quran.resolveMissedDay": return keys(["dayKey", "choice"]) && string("dayKey").flatMap { try? GregorianDay($0) } != nil && ["spread", "double", "skip", "postpone"].contains(string("choice") ?? "")

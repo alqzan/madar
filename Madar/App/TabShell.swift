@@ -250,7 +250,7 @@ struct MadarRootView: View {
             await session.refreshPrayerNotifications()
         }
         .overlay(alignment: .bottom) {
-            if session.undoToken != nil { UndoToast(message: session.undoMessage, undo: session.undo).padding(.bottom, 86) }
+            if session.undoToastVisible { UndoToast(message: session.undoMessage, undo: session.undo).padding(.bottom, 86) }
         }
         .fullScreenCover(isPresented: Binding(get: { !session.onboardingComplete }, set: { _ in })) { FirstRunView(session: session).environment(\.roomTheme, theme) }
         .alert("لم تكتمل العملية", isPresented: Binding(get: { session.errorMessage != nil }, set: { if !$0 { session.errorMessage = nil } })) {

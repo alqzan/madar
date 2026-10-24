@@ -53,11 +53,12 @@ import MadarCore
         #expect(row(plan, "2026-07-03", .dhuhr)?.fridayKind == nil)
     }
 
-    @Test func fridayNoonAloneIsDhuhrJamaahIsNotGuessed() throws {
+    @Test func fridayNoonAloneIsDhuhrOtherwiseJumuah() throws {
+        // Owner, 24 Oct 2026: the old app's recorded Friday noons were Jumu'ah, except «منفردة», which cannot be.
         let plan = try run(["prayerLogs": [["date": "2026-07-03", "prayers": ["الظهر": "منفردة"]], ["date": "2026-07-10", "prayers": ["الظهر": "جماعة"]]]])
         #expect(row(plan, "2026-07-03", .dhuhr)?.fridayKind == .dhuhr)
-        #expect(row(plan, "2026-07-10", .dhuhr)?.status == .jamaah && row(plan, "2026-07-10", .dhuhr)?.fridayKind == nil)
-        #expect(plan.counts["friday.kindUnknown"] == 1)
+        #expect(row(plan, "2026-07-10", .dhuhr)?.status == .jamaah && row(plan, "2026-07-10", .dhuhr)?.fridayKind == .jumuah)
+        #expect(plan.counts["friday.jumuahByOwner"] == 1)
     }
 
     @Test func eventTimesAreTheDayAdhanAndRunIsDeterministic() throws {

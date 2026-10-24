@@ -12,11 +12,16 @@ public enum QuranDayLevel: String, Codable, CaseIterable, Sendable {
 }
 
 public enum QuranRestDay: String, Codable, Sendable {
-    case friday, saturday, none
+    // Owner, 24 Oct 2026: any day of the week can be the rest day.
+    case sunday, monday, tuesday, wednesday, thursday, friday, saturday, none
+    /// Calendar weekday, 1 = Sunday … 7 = Saturday; nil for «بلا».
+    public var weekday: Int? {
+        switch self { case .sunday: 1; case .monday: 2; case .tuesday: 3; case .wednesday: 4; case .thursday: 5; case .friday: 6; case .saturday: 7; case .none: nil }
+    }
     public func contains(_ day: GregorianDay) -> Bool {
+        guard let weekday else { return false }
         var calendar = Calendar(identifier: .gregorian); calendar.timeZone = .gmt
-        let weekday = calendar.component(.weekday, from: day.date(in: .gmt))
-        return (self == .friday && weekday == 6) || (self == .saturday && weekday == 7)
+        return calendar.component(.weekday, from: day.date(in: .gmt)) == weekday
     }
 }
 

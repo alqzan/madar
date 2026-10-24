@@ -200,7 +200,7 @@ struct MoneyObligationsView: View {
                     }
                 }.environment(\.layoutDirection, .rightToLeft).accessibilityLabel("دفعت " + service.digits.string(paid) + " من " + service.digits.string(total))
                 HStack(spacing: 4) {
-                    Text("دفعت " + service.digits.string(paid) + " من " + service.digits.string(total) + "، يبقى " + amount(due.remainingMinor ?? 0) + (due.lastDue == nil ? "" : "، آخره"))
+                    Text("دفعت " + service.digits.string(paid) + " من " + service.digits.string(total) + (due.remainingMinor.map { "، يبقى " + amount($0) } ?? "، والمتبقي غير معروف") + (due.lastDue == nil ? "" : "، آخره"))
                     if let last = due.lastDue { MadarDateLabel(app.dateLabels(last, compact: true), primaryFont: MadarTypography.fine(), secondaryFont: MadarTypography.fine()) }
                 }.font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-obligation-progress")
             } else if let schedule = due.schedule {

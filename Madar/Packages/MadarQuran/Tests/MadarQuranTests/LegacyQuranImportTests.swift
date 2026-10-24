@@ -86,10 +86,10 @@ import Testing
         #expect(word.ayahId == 2 && word.wordIndex == 0 && word.legacyHits == 1 && word.legacyStreak == 1)
         #expect(plan.spots.contains { $0.sourceID == "m-wrong" } == false)
         #expect(plan.archives.contains { $0.sourceModel == "HifzMistake" && $0.sourceID == "m-wrong" })
-        // Closed by hand in the old app: stays closed (seeded at MISTAKE_MASTERY = 2) with its date.
+        // Closed by hand in the old app (one pass): owner, 24 Oct 2026 — back to the drills, its one pass kept.
         let hand = try #require(plan.spots.first { $0.sourceID == "m-hand" })
-        #expect(hand.wordIndex == nil && hand.legacyHits == 2 && hand.legacyStreak == 2 && hand.legacyLastDrillAt != nil)
-        #expect(plan.counts["mistake.resolvedByHand"] == 1)
+        #expect(hand.wordIndex == nil && hand.legacyHits == 2 && hand.legacyStreak == 1 && hand.legacyLastDrillAt == nil)
+        #expect(plan.counts["mistake.reopenedFromHand"] == 1 && plan.counts["mistake.open"] == 2)
     }
 
     @Test func everythingElseIsArchivedAndTheRunIsDeterministic() throws {

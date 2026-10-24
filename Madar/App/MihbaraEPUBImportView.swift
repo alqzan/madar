@@ -57,6 +57,9 @@ struct MihbaraEPUBImportView: View {
     @State private var finished = false
     @State private var confirmedMetadata = false
     @State private var showingFullIndex = false
+    @State private var scan: EPUBBookScan?
+    @State private var scanProgress = 0.0
+    @State private var scanDone = false
     private static let indexPreview = 8
     private var service: AppMihbaraService { .init(app: app) }
     private var digits: MadarNumberFormatter { service.digits }
@@ -107,6 +110,7 @@ struct MihbaraEPUBImportView: View {
                         let pageList = value.hasPageList ? "توجد قائمة صفحات للمصدر المطبوع" : "لا توجد قائمة صفحات مطبوعة"
                         let notes = value.hasFootnotes == true ? "اكتُشفت حواشٍ" : value.hasFootnotes == false ? "لم تُكتشف حواشٍ" : "تعذّر حسم وجود الحواشي"
                         row("الصور والجداول", detail: "تبقى ضمن الملف كما حفظها؛ \(pageList)؛ \(notes).", detected: true)
+                        scanRows
                     }
                 }
 
@@ -237,7 +241,7 @@ struct MihbaraEPUBImportView: View {
     private var confirmButton: some View {
         Button(saving ? "يُضاف…" : "أضفه إلى مكتبتي") { confirm() }
             .buttonStyle(MadarPrimaryButton())
-            .disabled(saving || title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || title.count > 300 || author.count > 300)
+            .disabled(saving || !scanDone || title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || title.count > 300 || author.count > 300)
             .accessibilityIdentifier("mihbara-epub-import-confirm")
     }
 
@@ -269,6 +273,50 @@ struct MihbaraEPUBImportView: View {
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
+    /// Owner, 24 Oct 2026: the whole book is read before it reaches the shelf, and what was found is said plainly.
+    @ViewBuilder private var scanRows: some View {
+        if let scan {
+            row("القراءة الكاملة", detail: count(scan.chapters, ("فصل واحد", "فصلان", "فصول", "فصلًا")) + "، " + count(scan.words, ("كلمة واحدة", "كلمتان", "كلمات", "كلمةً"))
+                + (scan.emptyChapters.isEmpty ? "؛ كل فصل فيه نص." : "؛ " + count(scan.emptyChapters.count, ("فصل واحد", "فصلان", "فصول", "فصلًا")) + " بلا نص.")
+                + (scan.unreadChapters > 0 ? " تعذّر فحص " + count(scan.unreadChapters, ("فصل واحد", "فصلين", "فصول", "فصلًا")) + "." : ""),
+                detected: scan.emptyChapters.isEmpty && scan.unreadChapters == 0).accessibilityIdentifier("mihbara-epub-scan-text")
+            if scan.tocEntries > 0 {
+                row("روابط الفهرس", detail: scan.brokenTOC.isEmpty ? "كل عناوين الفهرس تصل إلى مواضعها" + (scan.tocOutOfOrder > 0 ? "، وبعضها ليس بترتيب الكتاب." : ".")
+                    : count(scan.brokenTOC.count, ("عنوان واحد", "عنوانان", "عناوين", "عنوانًا")) + " لا يصل إلى موضعه: " + scan.brokenTOC.prefix(3).joined(separator: "، ") + (scan.brokenTOC.count > 3 ? "…" : "."),
+                    detected: scan.brokenTOC.isEmpty).accessibilityIdentifier("mihbara-epub-scan-toc")
+            }
+            if scan.pageLabels > 0 {
+                row("أرقام الصفحات", detail: scan.pageGaps == 0 && scan.pageRepeats == 0 ? "متتابعة بلا نقص ولا تكرار."
+                    : [scan.pageGaps > 0 ? "تنقص " + count(scan.pageGaps, ("صفحة واحدة", "صفحتان", "صفحات", "صفحةً")) : nil,
+                       scan.pageRepeats > 0 ? "يتكرر " + count(scan.pageRepeats, ("رقم واحد", "رقمان", "أرقام", "رقمًا")) : nil].compactMap { $0 }.joined(separator: "، ") + ".",
+                    detected: scan.pageGaps == 0 && scan.pageRepeats == 0).accessibilityIdentifier("mihbara-epub-scan-pages")
+            }
+            if scan.verses > 0 {
+                row("الآيات", detail: count(scan.verses, ("آية واحدة", "آيتان", "آيات", "آيةً")) + " تُعرض بخط المصحف.", detected: true).accessibilityIdentifier("mihbara-epub-scan-verses")
+            }
+        } else if scanDone {
+            row("القراءة الكاملة", detail: "تعذّر فحص الكتاب كاملًا؛ يمكنك إضافته كما هو.", detected: false)
+        } else if inspection != nil, error == nil {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("يقرأ الكتاب كاملًا قبل إضافته…").font(MadarTypography.body())
+                ProgressView(value: scanProgress).tint(theme.ink)
+            }.accessibilityElement(children: .combine).accessibilityIdentifier("mihbara-epub-scan-progress")
+        }
+    }
+    private func count(_ n: Int, _ forms: (String, String, String, String)) -> String {
+        switch n { case 1: forms.0; case 2: forms.1; case 0, 3...10: digits.string(n) + " " + forms.2; default: digits.string(n) + " " + forms.3 }
+    }
+    @MainActor private func runScan() async {
+        let file = EPUBBookFiles.stagedURL(id: fileID, root: app.bookStagingDirectory)
+        let report = Task.detached(priority: .userInitiated) { () -> EPUBBookScan? in
+            try? EPUBBookFiles.scan(file: file) { value in Task { @MainActor in scanProgress = value } }
+        }
+        let value = await report.value
+        guard !Task.isCancelled else { return }
+        // A scan that cannot run never blocks a book that already passed the import checks.
+        scan = value; scanDone = true
+    }
+
     /// «٤ مجلدات، ١٬٢٠٠ صفحة مطبوعة؛ الملف ٣٫٢ م.ب» — the size the shelf will show, from the moment of download.
     private func sizeLine(_ value: EPUBBookInspection) -> String {
         let file = "الملف " + digits.localized(ByteCountFormatter.string(fromByteCount: Int64(value.sizeBytes), countStyle: .file))
@@ -293,6 +341,7 @@ struct MihbaraEPUBImportView: View {
             language = value.appLanguage ?? "ar"
             cover = Self.thumbnail(value.coverData)
             confirmedMetadata = false
+            await runScan()
         } catch {
             EPUBBookFiles.discard(id: fileID, root: app.bookStagingDirectory)
             if case DataError.invalidValue(let message) = error { self.error = message }

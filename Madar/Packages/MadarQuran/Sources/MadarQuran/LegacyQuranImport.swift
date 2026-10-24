@@ -181,12 +181,12 @@ public enum LegacyQuranImport {
             let hits = (row["hits"] as? [String])?.count ?? 0
             let lastDrill = at(row["lastDrill"], hour: 12)
             let streak = (row["okStreak"] as? NSNumber)?.intValue ?? 0
-            // The old app could close a spot by hand (resolved without two passes). Native closes a spot only at the
-            // mastery threshold, so a resolved spot is seeded at it; an open spot stays below it. Raw values archived.
-            let resolved = (row["resolved"] as? Bool) == true
+            // The old app could close a spot by hand (resolved without two passes). Owner, 24 Oct 2026: those return to
+            // the drills until two passes close them. A spot closed by two passes stays closed. Raw values archived.
+            let resolved = (row["resolved"] as? Bool) == true && streak >= QuranMistakeEngine.masteryThreshold
+            if (row["resolved"] as? Bool) == true && !resolved { count("mistake.reopenedFromHand") }
             let seededStreak = resolved ? QuranMistakeEngine.masteryThreshold : min(max(0, streak), QuranMistakeEngine.masteryThreshold - 1)
             let closedAt = resolved ? (lastDrill ?? at(row["updatedAt"], hour: 12)) : lastDrill
-            if resolved && streak < QuranMistakeEngine.masteryThreshold { count("mistake.resolvedByHand") }
             result.spots.append(SpotRow(id: uuid("myDream:MistakeSpot:\(legacyID)"), sourceID: legacyID, ayahId: ayahID, wordIndex: wordIndex,
                 legacyHits: hits, legacyLastDrillAt: closedAt, legacyStreak: seededStreak,
                 updatedAt: at(row["updatedAt"], hour: 12) ?? closedAt ?? Date(timeIntervalSince1970: 0), raw: json(row)))

@@ -79,10 +79,11 @@ public enum LegacyPrayerImport {
                 let prayed = [.jamaah, .alone, .qada].contains(status)
                 let heart = prayed ? heart(legacy: hearts[name]) : nil
                 if prayed && hearts[name] != nil && heart == nil { count("archived.unknownHeart") }
-                // Friday noon: «منفردة» cannot be Jumu'ah, so it is Dhuhr. A jamaah/qada Friday noon is not guessed.
+                // Friday noon: «منفردة» cannot be Jumu'ah, so it is Dhuhr. Owner, 24 Oct 2026: every other recorded
+                // Friday noon in the old app (جماعة/فائتة/قضاء) was Jumu'ah.
                 var friday: FridayPrayerKind?
                 if isFriday && prayer == .dhuhr && status != .unrecordedHistory {
-                    if status == .alone { friday = .dhuhr; count("friday.dhuhrFromAlone") } else { count("friday.kindUnknown") }
+                    if status == .alone { friday = .dhuhr; count("friday.dhuhrFromAlone") } else { friday = .jumuah; count("friday.jumuahByOwner") }
                 }
                 result.logs.append(LogRow(id: uuid("myDream:PrayerLog:\(day):\(prayer.rawValue)"), dayKey: day.description, prayer: prayer,
                     status: status, heart: heart, eventAt: times.time(for: prayer), loggedAt: status == .unrecordedHistory ? nil : stamp, fridayKind: friday))

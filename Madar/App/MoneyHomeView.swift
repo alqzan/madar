@@ -197,7 +197,7 @@ struct MoneyHomeView: View {
                 Spacer(minLength: 12)
                 VStack(alignment: .trailing, spacing: 7) {
                     Text("لك فعلًا").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                    Text(figure: amount(reading.basis.netMinor)).font(MadarTypography.cardTitle()).accessibilityIdentifier("money-net")
+                    Text(figure: reading.knownBalanceCount == 0 && reading.unknownBalanceCount > 0 ? "—" : amount(reading.basis.netMinor)).font(MadarTypography.cardTitle()).accessibilityIdentifier("money-net")
                     Text(reading.currency == "SAR" ? "ريال سعودي" : reading.currency).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                 }
             }

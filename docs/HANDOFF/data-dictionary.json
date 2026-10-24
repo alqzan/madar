@@ -5809,7 +5809,7 @@
    },
    "diary.appendMedia": {
     "intent": null,
-    "payload": "{fileID: UUID, kind: photo|audio|video|document, contentType: String, caption: String, day: today|yesterday, writingDayKey: YYYY-MM-DD, durationS?: Int >= 0}",
+    "payload": "{fileID: UUID, kind: photo|audio|video|document, contentType: String, caption: String, day: today|yesterday, writingDayKey: YYYY-MM-DD, durationS?: Int >= 0, assetID?: String (photo only; Photos-library local identifier, stored as Media.sourceID \"photos:<id>\" with a small copy in data — owner 24 Oct 2026)}",
     "kind": "append Entry and referenced Media from private staged UUID file; sha256; original audio before transcription",
     "auth": "app-only + diary unlocked"
    },

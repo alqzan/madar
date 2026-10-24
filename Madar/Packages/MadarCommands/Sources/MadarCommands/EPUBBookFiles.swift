@@ -382,3 +382,121 @@ private final class EPUBXMLTreeBuilder: NSObject, XMLParserDelegate {
         parser.abortParsing()
     }
 }
+
+/// Owner, 24 Oct 2026: «ابي مدار يسوي سكان كامل للكتاب قبل مايضيفه حتى لو ياخذ وقت… ويتاكد من كل شي كامل فيه».
+/// A full read of every chapter before the book reaches the shelf. The EPUB itself stays unchanged (R05/R06);
+/// what the scan finds is shown in the import review, and the reader applies its own repairs (verses in the Quran font).
+public struct EPUBBookScan: Equatable, Sendable {
+    public var chapters = 0
+    /// Spine documents with no readable text and no image, by their position in the reading order (1-based).
+    public var emptyChapters: [Int] = []
+    /// Spine documents too large or malformed to read here.
+    public var unreadChapters = 0
+    public var paragraphs = 0
+    public var words = 0
+    /// Marked Quran verses (﴿…﴾).
+    public var verses = 0
+    public var tocEntries = 0
+    /// Index entries whose target file or anchor does not exist, by title.
+    public var brokenTOC: [String] = []
+    /// Index entries that point backwards in the reading order.
+    public var tocOutOfOrder = 0
+    public var pageLabels = 0
+    /// Printed page numbers skipped inside a run (a jump of 50 or more is a new volume, not a gap).
+    public var pageGaps = 0
+    public var pageRepeats = 0
+    public var isComplete: Bool { emptyChapters.isEmpty && unreadChapters == 0 && brokenTOC.isEmpty && pageGaps == 0 && pageRepeats == 0 }
+    public init() {}
+}
+
+extension EPUBBookFiles {
+    private static let scanDocumentLimit = 8 * 1024 * 1024
+
+    public static func scan(id: UUID, root: URL, progress: (Double) -> Void = { _ in }) throws -> EPUBBookScan {
+        try scan(file: stagedURL(id: id, root: root), progress: progress)
+    }
+
+    public static func scan(file: URL, progress: (Double) -> Void = { _ in }) throws -> EPUBBookScan {
+        var result = EPUBBookScan()
+        let archive = try ZIPReader(url: file)
+        try validate(archive)
+        guard let containerMember = archive.member("META-INF/container.xml") else { throw DataError.invalidValue("ملف EPUB ناقص: لا يوجد مسار الحزمة.") }
+        let container = try xml(archive, containerMember, maximum: 64 * 1024)
+        guard let packagePath = container.descendants(named: "rootfile").first?.attribute("full-path"), safeArchivePath(packagePath),
+              let packageMember = archive.member(packagePath) else { throw DataError.invalidValue("مسار حزمة EPUB غير صالح.") }
+        let package = try xml(archive, packageMember, maximum: metadataMemberLimit)
+        guard let packageNode = package.name == "package" ? package : package.descendants(named: "package").first else { throw DataError.invalidValue("حزمة EPUB غير صالحة.") }
+        let folder = (packagePath as NSString).deletingLastPathComponent
+        var manifest: [String: (path: String, mediaType: String, properties: Set<String>)] = [:]
+        for item in packageNode.first(named: "manifest")?.children.filter({ $0.name == "item" }) ?? [] {
+            guard let itemID = item.attribute("id"), let href = item.attribute("href"), let path = archivePath(for: href, base: folder) else { continue }
+            manifest[itemID] = (path, item.attribute("media-type") ?? "", Set((item.attribute("properties") ?? "").split(whereSeparator: \.isWhitespace).map(String.init)))
+        }
+        let spine = packageNode.first(named: "spine")
+        let spinePaths = (spine?.children.filter { $0.name == "itemref" }.compactMap { $0.attribute("idref") } ?? []).compactMap { manifest[$0]?.path }
+        result.chapters = spinePaths.count
+        var anchors: [String: Set<String>] = [:]
+        for (index, path) in spinePaths.enumerated() {
+            progress(Double(index) / Double(max(1, spinePaths.count)) * 0.9)
+            guard let member = archive.member(path), member.size <= scanDocumentLimit, let node = try? xml(archive, member, maximum: scanDocumentLimit) else {
+                result.unreadChapters += 1; continue
+            }
+            var ids = Set<String>()
+            func collect(_ node: EPUBXMLNode) { if let id = node.attribute("id") { ids.insert(id) }; node.children.forEach(collect) }
+            collect(node); anchors[path] = ids
+            let body = node.descendants(named: "body").first ?? node
+            let text = body.stringValue
+            let words = text.split(whereSeparator: { $0.isWhitespace }).count
+            result.words += words
+            result.paragraphs += body.descendants(named: "p").filter { !$0.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.count
+            result.verses += text.filter { $0 == "﴿" }.count
+            let hasImage = !body.descendants(named: "img").isEmpty || !body.descendants(named: "image").isEmpty || !body.descendants(named: "svg").isEmpty
+            if words == 0 && !hasImage { result.emptyChapters.append(index + 1) }
+        }
+        // The index: every entry must reach a real chapter and anchor, in reading order.
+        var outline: [EPUBBookOutlineItem] = [], outlineBase = folder, labels: [String] = []
+        if let nav = manifest.values.first(where: { $0.properties.contains("nav") }), let node = try? xml(archive, path: nav.path, maximum: metadataMemberLimit) {
+            outlineBase = (nav.path as NSString).deletingLastPathComponent
+            let navs = node.descendants(named: "nav")
+            if let toc = navs.first(where: { $0.attribute("type")?.split(whereSeparator: { $0.isWhitespace }).contains("toc") == true }) { outline = self.anchors(in: toc, depth: 0) }
+            if let list = navs.first(where: { $0.attribute("type")?.split(whereSeparator: { $0.isWhitespace }).contains("page-list") == true }) {
+                labels = list.descendants(named: "a").map { $0.stringValue.trimmingCharacters(in: .whitespacesAndNewlines) }
+            }
+        }
+        if outline.isEmpty || labels.isEmpty, let tocID = spine?.attribute("toc"), let ncx = manifest[tocID], let node = try? xml(archive, path: ncx.path, maximum: metadataMemberLimit) {
+            if outline.isEmpty, let map = node.descendants(named: "navMap").first { outline = ncxItems(map, depth: 0); outlineBase = (ncx.path as NSString).deletingLastPathComponent }
+            if labels.isEmpty { labels = node.descendants(named: "pageTarget").map { $0.stringValue.trimmingCharacters(in: .whitespacesAndNewlines) } }
+        }
+        result.tocEntries = outline.count
+        var lastPosition = -1
+        for entry in outline {
+            let parts = entry.href.split(separator: "#", maxSplits: 1, omittingEmptySubsequences: false)
+            let fragment = parts.count == 2 ? String(parts[1]).removingPercentEncoding ?? String(parts[1]) : ""
+            guard let path = archivePath(for: entry.href, base: outlineBase), let position = spinePaths.firstIndex(of: path) else { result.brokenTOC.append(entry.title); continue }
+            if !fragment.isEmpty, let ids = anchors[path], !ids.contains(fragment) { result.brokenTOC.append(entry.title); continue }
+            if position < lastPosition { result.tocOutOfOrder += 1 }
+            lastPosition = max(lastPosition, position)
+        }
+        let pages = pageCheck(labels)
+        result.pageLabels = labels.count; result.pageGaps = pages.gaps; result.pageRepeats = pages.repeats
+        progress(1)
+        return result
+    }
+
+    /// Printed page labels in reading order: Western or Arabic-Indic numerals, optionally «ج/ص». A repeat is the same label
+    /// twice; a gap is a skipped number inside one run.
+    static func pageCheck(_ labels: [String]) -> (gaps: Int, repeats: Int) {
+        let digits: [Character: Character] = ["٠": "0", "١": "1", "٢": "2", "٣": "3", "٤": "4", "٥": "5", "٦": "6", "٧": "7", "٨": "8", "٩": "9"]
+        var seen = Set<String>(), repeats = 0, gaps = 0, previous: (volume: String, page: Int)?
+        for label in labels {
+            if !seen.insert(label).inserted { repeats += 1; continue }
+            let latin = String(label.map { digits[$0] ?? $0 })
+            let parts = latin.split(separator: "/").map { $0.trimmingCharacters(in: .whitespaces) }
+            guard let page = parts.last.flatMap({ Int($0.filter(\.isNumber)) }) else { previous = nil; continue }
+            let volume = parts.count > 1 ? parts.dropLast().joined(separator: "/") : ""
+            if let previous, previous.volume == volume, page > previous.page + 1, page - previous.page < 50 { gaps += page - previous.page - 1 }
+            previous = (volume, page)
+        }
+        return (gaps, repeats)
+    }
+}

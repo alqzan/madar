@@ -155,7 +155,7 @@ public enum DayOneParser {
         for tag in object["tags"] as? [String] ?? [] { let t = tag.trimmingCharacters(in: .whitespacesAndNewlines); if !t.isEmpty && !tags.contains(t) { tags.append(t) } }
         let location = object["location"] as? [String: Any]
         let center = (location?["region"] as? [String: Any])?["center"] as? [String: Any]
-        let place = [location?["placeName"], location?["localityName"], location?["administrativeArea"]].compactMap { ($0 as? String)?.trimmingCharacters(in: .whitespaces) }.first { !$0.isEmpty }
+        let place = placeName([location?["placeName"], location?["localityName"], location?["administrativeArea"]].map { $0 as? String })
         var dateOnly = object["isAllDay"] as? Bool ?? false
         if !dateOnly, let zoneID, let zone = TimeZone(identifier: zoneID) {
             var calendar = Calendar(identifier: .gregorian); calendar.timeZone = zone
@@ -168,6 +168,18 @@ public enum DayOneParser {
                               media: unique, hash: hash(object), legacyDay: object["madarLegacyDay"] as? String))
     }
 
+    /// Owner data trial, 24 Oct 2026: Day One's placeName is often a national address («6339 الرين، 19433 - 4090»).
+    /// A name with digits is an address, so the locality or region reads better. With only an address, its words are kept
+    /// («الرين») and its building and postal numbers dropped; an address of numbers alone gives no place.
+    static func placeName(_ candidates: [String?]) -> String? {
+        let names = candidates.compactMap { $0?.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        if let name = names.first(where: { !$0.contains { $0.isNumber } }) { return name }
+        guard let address = names.first else { return nil }
+        let parts = address.split(whereSeparator: { $0 == "،" || $0 == "," }).map { part in
+            part.split(separator: " ").filter { word in !word.allSatisfy { $0.isNumber || $0 == "-" || $0 == "–" } }.joined(separator: " ")
+        }.filter { !$0.isEmpty }
+        return parts.isEmpty ? nil : parts.joined(separator: "، ")
+    }
     public static func hash(_ object: [String: Any]) -> String {
         let data = (try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys, .withoutEscapingSlashes])) ?? Data()
         return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()

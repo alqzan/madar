@@ -1609,16 +1609,36 @@
    "scope": "sync",
    "options": [
     {
+     "value": "saturday",
+     "label": "السبت"
+    },
+    {
+     "value": "sunday",
+     "label": "الأحد"
+    },
+    {
+     "value": "monday",
+     "label": "الاثنين"
+    },
+    {
+     "value": "tuesday",
+     "label": "الثلاثاء"
+    },
+    {
+     "value": "wednesday",
+     "label": "الأربعاء"
+    },
+    {
+     "value": "thursday",
+     "label": "الخميس"
+    },
+    {
      "value": "friday",
      "label": "الجمعة"
     },
     {
      "value": "none",
      "label": "بلا"
-    },
-    {
-     "value": "saturday",
-     "label": "السبت"
     }
    ],
    "note": "خطة الحفظ نفسها (الاتجاه، الوحدة، المقدار، الإيقاع، «لو فاتك يوم») في نموذج HifzPlan وحده (§١١)، لا في الإعدادات؛ أيام الحفظ = الأسبوع عدا يوم الراحة (بلا = كل الأيام)",

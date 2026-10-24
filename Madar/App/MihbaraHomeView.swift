@@ -69,7 +69,7 @@ struct MihbaraHomeView: View {
         .background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
         .environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar)
         .safeAreaInset(edge: .bottom) {
-            if app.undoToken != nil && sheet == nil {
+            if app.undoToastVisible && sheet == nil {
                 UndoToast(message: app.undoMessage, undo: app.undo)
                     .accessibilityIdentifier("mihbara-undo")
             }
@@ -464,13 +464,15 @@ struct MihbaraHomeView: View {
     /// What an empty shelf says depends on which shelf it is and on what the other shelves hold.
     /// The bookcase before the first book.
     private func emptyShelf(_ r: MihbaraHomeReading) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("أضف كتابك الأول").font(MadarTypography.cardTitle())
-            Text("ضع كتابًا من مكتبتك على الرف، واحفظ أين وصلت.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-        }.frame(maxWidth: .infinity, minHeight: 95, alignment: .leading)
+        Button { showingAddBook = true } label: {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("أضف كتابك الأول").font(MadarTypography.cardTitle())
+                Text("ضع كتابًا من مكتبتك على الرف، واحفظ أين وصلت.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+            }.frame(maxWidth: .infinity, minHeight: 95, alignment: .leading).contentShape(.rect)
+        }.buttonStyle(.plain).accessibilityIdentifier("mihbara-empty-shelf-add")
     }
     private func shelfTotal(_ count: Int) -> String {
-        count == 1 ? "كتاب واحد على رفّك" : MihbaraCopy.books(count, service.digits) + " على رفوفك"
+        count == 0 ? "" : count == 1 ? "كتاب واحد على رفّك" : MihbaraCopy.books(count, service.digits) + " على رفوفك"
     }
     /// Owner, 21–22 Oct 2026: the desk is the stand in front of the bookcase. One large open book at your place, one
     /// button that continues it, and the day's wird under the stand.
@@ -845,7 +847,7 @@ private struct MihbaraRahlOpeningView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
-                if app.undoToken != nil {
+                if app.undoToastVisible {
                     UndoToast(message: app.undoMessage, undo: app.undo)
                         .accessibilityIdentifier("mihbara-undo")
                 }
@@ -920,7 +922,7 @@ private struct MihbaraNotebookContent: View {
             ToolbarItem(placement: .principal) { Text("دفتر المحبرة").font(MadarTypography.section()) }
             ToolbarItem(placement: .topBarTrailing) { Button("تمّ") { dismiss() }.accessibilityIdentifier("mihbara-notebook-close") }
         }
-        .safeAreaInset(edge: .bottom) { if app.undoToken != nil { UndoToast(message: app.undoMessage, undo: { app.undo(); load() }).accessibilityIdentifier("mihbara-undo") } }
+        .safeAreaInset(edge: .bottom) { if app.undoToastVisible { UndoToast(message: app.undoMessage, undo: { app.undo(); load() }).accessibilityIdentifier("mihbara-undo") } }
         .task { load() }
         .onChange(of: app.undoToken?.id) { load() }
         .onDisappear { notes.removeAll(); editor = nil }

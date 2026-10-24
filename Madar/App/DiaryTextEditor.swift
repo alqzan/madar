@@ -2,6 +2,7 @@ import SwiftUI
 import MadarCore
 import MadarDesign
 import PhotosUI
+import Photos
 import UniformTypeIdentifiers
 
 struct DiaryTextEditor: View {
@@ -54,9 +55,12 @@ struct DiaryTextEditor: View {
                         .padding(.horizontal, 30).padding(.top, 10).focused($focused).disabled(saving).accessibilityIdentifier("diary-editor-text")
                     if text.isEmpty { Text("اكتب ما تيسّر…").font(.custom("thmanyahseriftext-Regular", size: 21, relativeTo: .body)).foregroundStyle(theme.color("ink3Text")).padding(.horizontal, 38).padding(.top, 19).allowsHitTesting(false) }
                 }
+                if margin == nil, let writingDay {
+                    DiaryDayPhotos(app: app, day: writingDay) { asset in await linkLibraryPhoto(asset) }.padding(.horizontal, 16)
+                }
                 if margin == nil {
                     HStack(spacing: 8) {
-                        PhotosPicker(selection: $photo, matching: .images) { Label("صورة", systemImage: "photo").font(MadarTypography.caption()).frame(minHeight: 44) }.labelStyle(.iconOnly).accessibilityIdentifier("diary-editor-photo")
+                        PhotosPicker(selection: $photo, matching: .images, photoLibrary: .shared()) { Label("صورة", systemImage: "photo").font(MadarTypography.caption()).frame(minHeight: 44) }.labelStyle(.iconOnly).accessibilityIdentifier("diary-editor-photo")
                         Button { focused = false; choosingFile = true } label: { Label("مرفق", systemImage: "doc").font(MadarTypography.caption()).frame(minHeight: 44) }.labelStyle(.iconOnly).accessibilityIdentifier("diary-editor-file")
                         if let voice, focused { recordButton(voice, large: false) }
                         Spacer(minLength: 0)
@@ -78,7 +82,7 @@ struct DiaryTextEditor: View {
                             Spacer()
                             recordButton(voice, large: true)
                             Spacer()
-                            PhotosPicker(selection: $photo, matching: .images) { Label("صورة", systemImage: "photo").font(MadarTypography.caption()).padding(.horizontal, 12).frame(minHeight: 44).overlay { Capsule().stroke(theme.line) } }
+                            PhotosPicker(selection: $photo, matching: .images, photoLibrary: .shared()) { Label("صورة", systemImage: "photo").font(MadarTypography.caption()).padding(.horizontal, 12).frame(minHeight: 44).overlay { Capsule().stroke(theme.line) } }
                         }
                         Text(voice.recording ? "اضغط لإيقاف التسجيل وحفظ الصوت" : "اضغط وتكلّم").font(MadarTypography.fine()).frame(maxWidth: .infinity)
                         HStack {
@@ -87,7 +91,7 @@ struct DiaryTextEditor: View {
                     }.padding(.horizontal, 16).padding(.vertical, 8)
                 }
                 HStack {
-                    Text(AppDiaryService(app: app).digits.string(text.split(whereSeparator: { $0.isWhitespace }).count) + " كلمة").font(MadarTypography.fine())
+                    Text(wordCount(text.split(whereSeparator: { $0.isWhitespace }).count)).font(MadarTypography.fine())
                     Spacer()
                     Text(draftStatus).font(MadarTypography.fine()).accessibilityIdentifier("diary-draft-status")
                     if day == "yesterday" { Text("كُتبت لاحقًا").font(MadarTypography.caption()).foregroundStyle(theme.color("late")) }
@@ -124,7 +128,12 @@ struct DiaryTextEditor: View {
         .onChange(of: photo) { _, item in Task {
             guard let item else { return }; importing = true
             defer { importing = false }
-            do { if let data = try await item.loadTransferable(type: Data.self) { try await add(data, kind: "photo", type: item.supportedContentTypes.first?.preferredMIMEType ?? "image/jpeg") } else { failure = "تعذّر فتح الصورة. اخترها مرة أخرى." } }
+            do {
+                guard let data = try await item.loadTransferable(type: Data.self) else { failure = "تعذّر فتح الصورة. اخترها مرة أخرى."; return }
+                // A library photo is linked: its identifier and a small copy, never a second full image.
+                if let id = item.itemIdentifier, let copy = DiaryPhotoLibrary.smallCopy(of: data) { try await add(copy, kind: "photo", type: "image/jpeg", assetID: id) }
+                else { try await add(data, kind: "photo", type: item.supportedContentTypes.first?.preferredMIMEType ?? "image/jpeg") }
+            }
             catch { failure = error.localizedDescription }
         } }
         .fileImporter(isPresented: $choosingFile, allowedContentTypes: [.data]) { result in Task {
@@ -135,7 +144,7 @@ struct DiaryTextEditor: View {
         } }
         .onChange(of: voice?.lastMedia?.id) { _, id in if id != nil { attachmentSaved = true; editorUndo = true } }
         .onChange(of: scenePhase) { _, phase in if phase == .active { voice?.refreshMicrophoneAuthorization() } else { Task { draftTask?.cancel(); if loaded { try? await persistDraft() }; await voice?.stop() } } }
-        .safeAreaInset(edge: .bottom) { if editorUndo, app.undoToken != nil { UndoToast(message: app.undoMessage, undo: app.undo) } }
+        .safeAreaInset(edge: .bottom) { if editorUndo, app.undoToastVisible { UndoToast(message: app.undoMessage, undo: app.undo) } }
         .interactiveDismissDisabled(!text.isEmpty || saving || importing || voice?.recording == true || voice?.savingAudio == true)
         .onDisappear { draftTask?.cancel(); voice?.cancelConversion(); voice?.cancelDownload(); if let voice { Task { await voice.stop() } } }
     }
@@ -164,10 +173,10 @@ struct DiaryTextEditor: View {
         do { await voice?.stop(); if loaded { try await persistDraft() }; dismiss() }
         catch { failure = error.localizedDescription; saving = false }
     }
-    private func add(_ data: Data, kind: String, type: String, caption: String = "") async throws {
+    private func add(_ data: Data, kind: String, type: String, caption: String = "", assetID: String? = nil) async throws {
         guard let writingDay else { throw CocoaError(.coderInvalidValue) }; importing = true
         defer { importing = false }
-        _ = try await AppDiaryService(app: app).appendMedia(data: data, kind: kind, contentType: type, caption: caption, day: day, writingDay: writingDay)
+        _ = try await AppDiaryService(app: app).appendMedia(data: data, kind: kind, contentType: type, caption: caption, day: day, writingDay: writingDay, assetID: assetID)
         attachmentSaved = true; editorUndo = true; draftStatus = "حُفظ المرفق في الصفحة"
     }
     private func save() async {
@@ -180,5 +189,15 @@ struct DiaryTextEditor: View {
             }
             dismiss()
         } catch { failure = error.localizedDescription; saving = false }
+    }
+    private func linkLibraryPhoto(_ asset: PHAsset) async {
+        guard let data = await DiaryPhotoLibrary.data(asset), let copy = DiaryPhotoLibrary.smallCopy(of: data) else { failure = "تعذّر فتح الصورة من تطبيق الصور."; return }
+        do { try await add(copy, kind: "photo", type: "image/jpeg", assetID: asset.localIdentifier) } catch { failure = error.localizedDescription }
+    }
+    /// «كلمة واحدة»، «كلمتان»، «٥ كلمات»، «١١ كلمةً»; nothing before the first word.
+    private func wordCount(_ n: Int) -> String {
+        let digits = AppDiaryService(app: app).digits
+        if n == 0 { return "" }; if n == 1 { return "كلمة واحدة" }; if n == 2 { return "كلمتان" }
+        switch n % 100 { case 3...10: return digits.string(n) + " كلمات"; case 11...99: return digits.string(n) + " كلمةً"; default: return digits.string(n) + " كلمة" }
     }
 }

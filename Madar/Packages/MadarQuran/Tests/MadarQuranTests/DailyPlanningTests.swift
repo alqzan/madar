@@ -8,6 +8,15 @@ final class DailyPlanningTests: XCTestCase {
                       grade: QuranReviewRating = .mastered, today: String = "2026-10-17") throws -> QuranPlanningPage {
         try QuranPlanningPage(page: n, lastReviewed: day(last), nextDue: day(due), grade: grade, today: day(today))
     }
+    /// Owner, 24 Oct 2026: any weekday can rest. 2026-10-18 is a Sunday … 2026-10-24 a Saturday (Gregorian calendar fact).
+    func testEveryWeekdayCanBeTheRestDay() throws {
+        let week: [(QuranRestDay, String)] = [(.sunday, "2026-10-18"), (.monday, "2026-10-19"), (.tuesday, "2026-10-20"), (.wednesday, "2026-10-21"),
+                                              (.thursday, "2026-10-22"), (.friday, "2026-10-23"), (.saturday, "2026-10-24")]
+        for (rest, key) in week {
+            for (_, other) in week { XCTAssertEqual(rest.contains(try day(other)), other == key, "\(rest) on \(other)") }
+        }
+        XCTAssertFalse(QuranRestDay.none.contains(try day("2026-10-23")))
+    }
     private func coverage() throws -> QuranCoverage {
         try QuranCoverageEngine.summarize(sessions: [], pages: [])
     }

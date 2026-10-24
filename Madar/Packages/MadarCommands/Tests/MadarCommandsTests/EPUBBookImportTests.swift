@@ -172,4 +172,33 @@ import MadarData
         #expect(try context.fetchCount(FetchDescriptor<Book>()) == 0)
         #expect(try context.fetchCount(FetchDescriptor<Media>()) == 0)
     }
+    /// Owner, 24 Oct 2026: the full scan before a book reaches the shelf. The fixture holds one fault of each kind;
+    /// the expected values are counted by hand from it.
+    @Test func fullScanFindsEmptyChaptersBrokenIndexPagesAndVerses() throws {
+        let container = Data(#"<container><rootfiles><rootfile full-path="OEBPS/package.opf"/></rootfiles></container>"#.utf8)
+        let opf = Data(#"<package version="3.0" dir="rtl"><metadata><title>كتاب</title><language>ar</language></metadata><manifest><item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/><item id="a" href="a.xhtml" media-type="application/xhtml+xml"/><item id="b" href="b.xhtml" media-type="application/xhtml+xml"/><item id="c" href="c.xhtml" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="a"/><itemref idref="b"/><itemref idref="c"/></spine></package>"#.utf8)
+        let nav = Data(#"<html xmlns:epub="http://www.idpf.org/2007/ops"><body><nav epub:type="toc"><ol><li><a href="a.xhtml#start">الأول</a></li><li><a href="c.xhtml">الثالث</a></li><li><a href="a.xhtml#nowhere">مكسور</a></li><li><a href="missing.xhtml">مفقود</a></li></ol></nav><nav epub:type="page-list"><ol><li><a href="a.xhtml">١</a></li><li><a href="a.xhtml">٢</a></li><li><a href="c.xhtml">٤</a></li><li><a href="c.xhtml">٤</a></li><li><a href="c.xhtml">٢٠٠</a></li></ol></nav></body></html>"#.utf8)
+        let a = Data(#"<html><body><h1 id="start">باب</h1><p>قال تعالى ﴿إن مع العسر يسرا﴾ وهذا</p><p>نص ثان</p><p> </p></body></html>"#.utf8)
+        let b = Data(#"<html><body><p>  </p></body></html>"#.utf8)
+        let c = Data(#"<html><body><p>﴿الحمد لله﴾</p></body></html>"#.utf8)
+        let entries = [Entry(path: "mimetype", bytes: Data("application/epub+zip".utf8)), Entry(path: "META-INF/container.xml", bytes: container),
+                       Entry(path: "OEBPS/package.opf", bytes: opf), Entry(path: "OEBPS/nav.xhtml", bytes: nav),
+                       Entry(path: "OEBPS/a.xhtml", bytes: a), Entry(path: "OEBPS/b.xhtml", bytes: b), Entry(path: "OEBPS/c.xhtml", bytes: c)]
+        let folder = try root(); defer { try? FileManager.default.removeItem(at: folder) }
+        let file = folder.appendingPathComponent("scan.epub"); try archive(entries).write(to: file)
+        var steps: [Double] = []
+        let scan = try EPUBBookFiles.scan(file: file) { steps.append($0) }
+        #expect(scan.chapters == 3)
+        #expect(scan.emptyChapters == [2])
+        #expect(scan.unreadChapters == 0)
+        #expect(scan.paragraphs == 3)
+        #expect(scan.verses == 2)
+        #expect(scan.tocEntries == 4)
+        #expect(scan.brokenTOC == ["مكسور", "مفقود"])
+        #expect(scan.pageLabels == 5)
+        #expect(scan.pageRepeats == 1)
+        #expect(scan.pageGaps == 1, "٢ then ٤ skips ٣; ٢٠٠ is a new run, not 195 missing pages")
+        #expect(scan.isComplete == false)
+        #expect(steps.last == 1)
+    }
 }

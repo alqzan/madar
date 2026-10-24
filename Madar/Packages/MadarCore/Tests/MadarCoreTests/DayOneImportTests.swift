@@ -53,6 +53,17 @@ struct DayOneImportTests {
         #expect(e.media[0].path == "photos/1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f.jpeg")
     }
 
+    @Test func addressPlaceNamesGiveWayToTheLocality() {
+        #expect(DayOneParser.placeName(["6339 الرين، 19433 - 4090", "الرياض", "منطقة الرياض"]) == "الرياض")
+        #expect(DayOneParser.placeName(["١٢ شارع", nil, "منطقة الرياض"]) == "منطقة الرياض")
+        #expect(DayOneParser.placeName(["Hyde Park", "London", nil]) == "Hyde Park")
+        // Only an address: its words stay, building and postal numbers go; numbers alone give no place.
+        #expect(DayOneParser.placeName(["6339 الرين، 19433 - 4090", nil, " "]) == "الرين")
+        #expect(DayOneParser.placeName(["٤٢١٠ شارع نهر النيل، حي الملز، 12629", nil, nil]) == "شارع نهر النيل، حي الملز")
+        #expect(DayOneParser.placeName(["7702 2788", nil, nil]) == nil)
+        #expect(DayOneParser.placeName([nil, nil, nil]) == nil)
+    }
+
     @Test func missingVideoAndPDFFoundInPdfsFolder() throws {
         let e = try entry("B2000000000000000000000000000002")
         #expect(e.media.map(\.kind) == ["video", "doc"])

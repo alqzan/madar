@@ -96,7 +96,12 @@ struct DiaryDayView: View {
                         if let page {
                             ForEach(page.lines.filter{$0.kind != "intention"}) { line in
                                 lineRow(line, page: page)
-                                ForEach(page.media.filter { $0.entryID == line.id }) { media in DiaryMediaCard(app: app, media: media, transcript: line.text) }
+                                let attached = page.media.filter { $0.entryID == line.id }
+                                ForEach(attached.filter { $0.kind != "missing" }) { media in DiaryMediaCard(app: app, media: media, transcript: line.text) }
+                                // Owner real-data trial, 24 Oct 2026: one line for the entry's missing files, not one per file.
+                                if let first = attached.first(where: { $0.kind == "missing" }) {
+                                    DiaryMediaCard(app: app, media: first, transcript: line.text, missingCount: attached.filter { $0.kind == "missing" }.count)
+                                }
                             }
                             ForEach(0..<sealedHere,id:\.self){_ in
                                 HStack(alignment:.center,spacing:12){

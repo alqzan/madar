@@ -37,13 +37,15 @@ struct MoneyAccountsView: View {
                         Button("المطابقة مع البنك") { reconcileOpen = true }.frame(minHeight: 44).accessibilityIdentifier("money-accounts-unknown-reconcile")
                     }
                     if let basis = r.basis {
+                        if !(r.rows.contains { $0.side == .cash && $0.amountMinor == nil } && !r.rows.contains { $0.side == .cash && $0.amountMinor != nil }) {
                         HStack { Text(figure: "كاش " + amount(basis.inAccountMinor) + "، عليك " + amount(basis.owedMinor)).font(MadarTypography.caption()); Spacer(); Text(figure: amount(basis.netMinor)).font(MadarTypography.cardTitle()).foregroundStyle(theme.color("surplusText")) }.padding(12).background(theme.surface)
+                        }
                     } else { Text("لا نجمع عملات مختلفة بلا سعر صرف. أرصدة الحسابات أدناه بعملاتها.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
                     if r.rows.isEmpty { Text("من هنا تبدأ الجذور. أضف حسابك ورصيده، ثم تصله رسائل البنك.").font(MadarTypography.body()).padding(.vertical, 20).accessibilityIdentifier("money-accounts-empty") }
                     HStack(spacing: 8) {
                         Label(r.shortcutAt == nil ? "لم تصل رسالة عبر الاختصار بعد" : "رسائل عبر الاختصار", systemImage: r.shortcutAt == nil ? "tray" : "checkmark.circle").font(MadarTypography.caption())
                         Spacer(minLength: 0)
-                        Text(service.digits.string(r.shortcutCount) + " رسالة وصلت").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                        Text(service.counted(r.shortcutCount, ("وصلت رسالة واحدة", "وصلت رسالتان", "رسائل وصلت", "رسالةً وصلت"))).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                     }.padding(14).frame(maxWidth: .infinity).overlay { Capsule().stroke(theme.line, lineWidth: 1) }
                 } else if let errorMessage { Text(errorMessage); Button("أعِد المحاولة", action: load) }
                 else { ProgressView().frame(height: 250) }
@@ -63,7 +65,7 @@ struct MoneyAccountsView: View {
             }
             VStack(spacing: 5) {
                 Text("لك فعلًا").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                displayFigure(r.basis.map { amount($0.netMinor) } ?? "—", "thmanyahserifdisplay-Black", size: 42, relativeTo: .largeTitle).foregroundStyle(theme.color("surplusText")).accessibilityIdentifier("money-accounts-net")
+                displayFigure(r.basis.flatMap { b in r.rows.contains { $0.side == .cash && $0.amountMinor == nil } && !r.rows.contains { $0.side == .cash && $0.amountMinor != nil } ? nil : amount(b.netMinor) } ?? "—", "thmanyahserifdisplay-Black", size: 42, relativeTo: .largeTitle).foregroundStyle(theme.color("surplusText")).accessibilityIdentifier("money-accounts-net")
                 Text("الجذور تغذّي، والديون تسحب").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
             }.padding(15).frame(maxWidth: 210).background(theme.background).clipShape(.rect(cornerRadius: 16)).overlay { RoundedRectangle(cornerRadius: 16).stroke(theme.color("reserveText"), lineWidth: 1) }.padding(.bottom, 18)
         }.frame(maxWidth: .infinity).frame(minHeight: dynamicType.isAccessibilitySize ? 150 : 170)
@@ -99,11 +101,11 @@ struct MoneyAccountsView: View {
                     GeometryReader { proxy in
                     Canvas { context, size in
                         for (index, row) in r.rows.enumerated() {
-                            let x = size.width - 3 - CGFloat(min(index, 8)) * 2.5
+                            let x = size.width - 3 - CGFloat(min(index, 8)) * 1.5
                             let y = CGFloat(34 + 31 + index * 60 + 30)
                             var p = Path(); p.move(to: .init(x: proxy.size.width / 2, y: 0))
                             p.addCurve(to: .init(x: x, y: 34), control1: .init(x: size.width * 0.7, y: 22), control2: .init(x: x, y: 22))
-                            p.addLine(to: .init(x: x, y: min(y, size.height - 16))); p.addLine(to: .init(x: proxy.size.width - 16, y: min(y, size.height - 16)))
+                            p.addLine(to: .init(x: x, y: min(y, size.height - 16))); p.addLine(to: .init(x: proxy.size.width - 2, y: min(y, size.height - 16)))
                             context.stroke(p, with: .color(tint(row).opacity(0.7)), style: StrokeStyle(lineWidth: row.counted ? 1.4 : 1, dash: row.counted ? [] : [2, 3]))
                         }
                     }.frame(width: proxy.size.width + 12, height: proxy.size.height + 34).offset(y: -34)
@@ -116,7 +118,7 @@ struct MoneyAccountsView: View {
     private func source(_ r: MoneyAccountRow) -> some View {
         ScrollView { VStack(alignment: .leading, spacing: 16) {
             Text(r.name).font(MadarTypography.title()); Text(r.subtitle).font(MadarTypography.body())
-            Text(service.digits.string(r.messageCount) + " رسالة مرتبطة").font(MadarTypography.body())
+            Text(service.counted(r.messageCount, ("رسالة واحدة مرتبطة", "رسالتان مرتبطتان", "رسائل مرتبطة", "رسالةً مرتبطة"))).font(MadarTypography.body())
             if let s = r.source {
                 Text(sourceTitle(s)).font(MadarTypography.cardTitle())
                 MadarDateLabel(app.dateLabels(.containing(s.at, in: app.activePlace.timeZone)), primaryFont: MadarTypography.body(), secondaryFont: MadarTypography.caption())

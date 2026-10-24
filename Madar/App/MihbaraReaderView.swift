@@ -13,6 +13,7 @@ import MadarDesign
 import MadarData
 import MadarCommands
 import MadarPrayer
+import MadarQuran
 
 /// Retained by the app session, rather than a reader subtree that an app lock can remove.
 @MainActor final class MihbaraReadingSaveCoordinator {
@@ -329,6 +330,8 @@ struct MihbaraReaderView: View {
                         }
                     }.frame(maxWidth: .infinity, maxHeight: .infinity).padding(28)
                 }
+                // Owner, 24 Oct 2026: the listening player covered the last lines. Its room is reserved under the text.
+                if speechController.isActive && !isReaderCardVisible { Color.clear.frame(height: 136).accessibilityHidden(true) }
                 if !isReaderCardVisible {
                     if readerFocus { focusFooter } else { footer }
                 }
@@ -349,8 +352,15 @@ struct MihbaraReaderView: View {
         }
         .task { await openPublication() }
         .onChange(of: app.values[settingsKey]) {
+            // Owner, 24 Oct 2026: changing the font used to leave the reader somewhere else in a longer book. Keep the
+            // reading place: submit, let Readium reflow, return to the same locator, then re-apply focus on the new layout.
+            let place = currentLocator
             navigatorController?.submitPreferences(readerPreferences)
-            applyFocusMode()
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(450))
+                if let place, let navigator = navigatorController { _ = await navigator.go(to: place, options: .init(animated: false)) }
+                applyFocusMode()
+            }
         }
         .onChange(of: autoScrollSpeed) { _, speed in
             if speed == .off {
@@ -466,6 +476,7 @@ struct MihbaraReaderView: View {
                     .lineLimit(1)
                     .accessibilityIdentifier("mihbara-reader-subtitle")
             }
+            .padding(.horizontal, 112)
             .frame(maxWidth: .infinity)
             HStack(spacing: 12) {
                 Button(action: finishAndClose) {
@@ -827,7 +838,7 @@ struct MihbaraReaderView: View {
             listeningPlayer
         } else if shouldShowAutoScrollPlayer {
             autoScrollPlayer
-        } else if let token = app.undoToken, token.id == readerUndoID, !showingReaderSettings {
+        } else if app.undoToastVisible, let token = app.undoToken, token.id == readerUndoID, !showingReaderSettings {
             UndoToast(message: app.undoMessage, undo: app.undo)
                 .accessibilityIdentifier("mihbara-reader-toast")
                 .padding(.bottom, 64)
@@ -1057,6 +1068,13 @@ struct MihbaraReaderView: View {
             guard case .success(let value) = await navigatorController.evaluateJavaScript(script),
                   self.navigatorController === navigatorController,
                   readerFocus else { return }
+            if let edge = value as? String, edge.hasPrefix("edge:") {
+                let moved = edge == "edge:next" ? await navigatorController.goForward(options: .init(animated: false)) : await navigatorController.goBackward(options: .init(animated: false))
+                guard moved else { return }
+                try? await Task.sleep(for: .milliseconds(450))
+                applyFocusMode()
+                return
+            }
             focusPositionLabel = focusPositionLabel(from: value)
         }
     }
@@ -1206,7 +1224,7 @@ struct MihbaraReaderView: View {
                 "id": .string(UUID().uuidString), "word": .string(card.word), "language": .string(language),
                 "bookID": .string(book.id.uuidString), "bookTitle": .string(book.title),
                 "locator": .string(locator), "context": .string(String(card.paragraphText.prefix(4000)))
-            ], undoMessage: "أُضيفت إلى كلماتي · التراجع متاح لعشر دقائق")
+            ], undoMessage: "أُضيفت إلى كلماتي")
             wordAlreadySaved = true
             readerUndoID = app.undoToken?.id
             closeWordCard()
@@ -1263,7 +1281,7 @@ struct MihbaraReaderView: View {
             let commandID = UUID()
             if card.color == color, let id = card.highlightID {
                 try await app.executeBookCommand("highlight.delete", payload: ["id": .string(id.uuidString)], id: commandID,
-                                                 undoMessage: "أُزيل التظليل · التراجع متاح لعشر دقائق")
+                                                 undoMessage: "أُزيل التظليل")
             } else {
                 guard let locator = try? card.paragraph.jsonString() else { return }
                 var payload: [String: MadarCore.JSONValue] = [
@@ -1272,7 +1290,7 @@ struct MihbaraReaderView: View {
                 ]
                 if let label = card.pageLabel { payload["pageLabel"] = .string(label) }
                 try await app.executeBookCommand("highlight.save", payload: payload, id: commandID,
-                                                 undoMessage: "ظُلّلت الفقرة · التراجع متاح لعشر دقائق")
+                                                 undoMessage: "ظُلّلت الفقرة")
             }
             readerUndoID = app.undoToken?.id
             reloadHighlights()
@@ -1287,7 +1305,7 @@ struct MihbaraReaderView: View {
         ]
         if let page = card.page { payload["page"] = .number(Double(page)) }
         do {
-            try await app.executeBookCommand("notebook.savePage", payload: payload, undoMessage: "دُوّنت الملاحظة في دفتر الكتاب · التراجع متاح لعشر دقائق")
+            try await app.executeBookCommand("notebook.savePage", payload: payload, undoMessage: "دُوّنت الملاحظة في دفتر الكتاب")
             readerUndoID = app.undoToken?.id
             noteDraft = nil
             closeWordCard()
@@ -1772,7 +1790,7 @@ private struct MihbaraReaderSettingsSheet: View {
     private var well: SwiftUI.Color { ink.opacity(0.06) }
     private var digits: MadarNumberFormatter { AppMihbaraService(app: app).digits }
     private var hasSettingsUndo: Bool {
-        guard let token = app.undoToken, let undoTokenID else { return false }
+        guard app.undoToastVisible, let token = app.undoToken, let undoTokenID else { return false }
         return token.id == undoTokenID
     }
 
@@ -2076,7 +2094,12 @@ private struct MihbaraEPUBNavigator: UIViewControllerRepresentable {
             guard !faces.isEmpty else { return nil }
             return CSSFontFamilyDeclaration(fontFamily: font.family, fontFaces: faces).eraseToAnyHTMLFontFamilyDeclaration()
         }
-        return arabic + english
+        // Owner, 24 Oct 2026: «القرآن يخليه بخط لحاله». Verses inside a book use the Mushaf's own Uthmani Hafs font.
+        var quran: [AnyHTMLFontFamilyDeclaration] = []
+        if let url = QuranResourceCatalog.bundledFontURL().flatMap(FileURL.init(url:)) {
+            quran = [CSSFontFamilyDeclaration(fontFamily: FontFamily(rawValue: "MadarHafs"), fontFaces: [CSSFontFace(file: url, preload: false, style: .normal, weight: .standard(.normal))]).eraseToAnyHTMLFontFamilyDeclaration()]
+        }
+        return arabic + english + quran
     }
 
     func makeCoordinator() -> Coordinator {
@@ -2236,12 +2259,17 @@ private struct MihbaraEPUBNavigator: UIViewControllerRepresentable {
               };
               if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', verses); else verses();
 
-              const focusBlocks = () => Array.from(document.body?.querySelectorAll('p, li, blockquote') ?? [])
+              // Owner, 24 Oct 2026: focus skipped headings, counted a quote and its paragraph twice, and missed books
+              // whose text sits in plain divs. A focus block is now the innermost text block, in reading order.
+              const focusSelector = 'p, li, blockquote, h1, h2, h3, h4, h5, h6, div, dd, dt, figcaption';
+              const focusBlocks = () => Array.from(document.body?.querySelectorAll(focusSelector) ?? [])
                 // Empty page-break paragraphs still receive a line box in some EPUBs. Treating
                 // one as a reading paragraph leaves every visible line dimmed at that boundary.
                 .filter(block => !block.closest('[hidden], [aria-hidden="true"]')
+                  && !Array.from(block.querySelectorAll(focusSelector)).some(inner => (inner.innerText || '').trim().length > 0)
                   && block.getBoundingClientRect().height > 0
-                  && (block.innerText || '').trim().length > 0);
+                  && (block.innerText || '').trim().length > 0)
+                .map(block => { block.classList.add('madar-focus-block'); return block; });
               const focusDescription = (block, blocks) => {
                 if (!block || !blocks.length) return '';
                 const index = blocks.indexOf(block);
@@ -2302,7 +2330,8 @@ private struct MihbaraEPUBNavigator: UIViewControllerRepresentable {
                 const active = blocks.find(block => block.classList.contains('madar-focus-active')) || nearestFocusBlock(blocks);
                 const index = blocks.indexOf(active);
                 const next = blocks[index + direction];
-                if (!next) return focusDescription(active, blocks);
+                // At the chapter edge Swift turns to the next or previous chapter and focus continues there.
+                if (!next) return direction > 0 ? 'edge:next' : 'edge:previous';
                 const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
                 scrollFocusBlock(next, behavior);
                 return setFocusBlock(next, blocks);
@@ -3074,14 +3103,14 @@ enum MihbaraReaderTheme: String, CaseIterable, Identifiable {
     static var pageCSS: String {
         [MihbaraReaderTheme.paper, .warm, .calm, .night, .black].map { theme in
             let h = theme.hex, root = ":root[style*=\"\(h.bg)\"]"
-            return "\(root) body span.madar-ayah.madar-ayah.madar-ayah { color: \(h.verse) !important; } "
+            return "\(root) body span.madar-ayah.madar-ayah.madar-ayah { color: \(h.verse) !important; font-family: 'MadarHafs', serif !important; font-size: 1.12em !important; line-height: inherit; } "
                 + "\(root) body a[role~='doc-noteref'][role~='doc-noteref'] { background: \(h.accent) !important; color: \(h.onAccent) !important; }"
-                + "\(root) body[data-madar-focus='true'] :is(p, li, blockquote) { color: \(h.ink2) !important; } "
-                + "\(root) body[data-madar-focus='true'] :is(p, li, blockquote).madar-focus-active { color: \(h.ink) !important; }"
+                + "\(root) body[data-madar-focus='true'] .madar-focus-block { color: \(h.ink2) !important; } "
+                + "\(root) body[data-madar-focus='true'] .madar-focus-block.madar-focus-active { color: \(h.ink) !important; }"
                 + "\(root) body[data-madar-focus='true'] { padding-bottom: 8rem !important; } "
-                + "\(root) body :is(p, li, blockquote).madar-speech-active { background-color: \(h.highlight[1]) !important; border-radius: .32em; box-decoration-break: clone; -webkit-box-decoration-break: clone; } "
-                + "\(root) body :is(p, li, blockquote).madar-auto-scroll-active { background-color: \(h.highlight[1]) !important; border-radius: .32em; box-decoration-break: clone; -webkit-box-decoration-break: clone; } "
-                + "@media (prefers-reduced-motion: no-preference) { \(root) body[data-madar-focus='true'] :is(p, li, blockquote) { transition: color .18s ease; } }"
+                + "\(root) body .madar-focus-block.madar-speech-active { background-color: \(h.highlight[1]) !important; border-radius: .32em; box-decoration-break: clone; -webkit-box-decoration-break: clone; } "
+                + "\(root) body .madar-focus-block.madar-auto-scroll-active { background-color: \(h.highlight[1]) !important; border-radius: .32em; box-decoration-break: clone; -webkit-box-decoration-break: clone; } "
+                + "@media (prefers-reduced-motion: no-preference) { \(root) body[data-madar-focus='true'] .madar-focus-block { transition: color .18s ease; } }"
         }.joined(separator: "\n")
     }
 }
