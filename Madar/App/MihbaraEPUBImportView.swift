@@ -277,7 +277,7 @@ struct MihbaraEPUBImportView: View {
     @ViewBuilder private var scanRows: some View {
         if let scan {
             row("القراءة الكاملة", detail: count(scan.chapters, ("فصل واحد", "فصلان", "فصول", "فصلًا")) + "، " + count(scan.words, ("كلمة واحدة", "كلمتان", "كلمات", "كلمةً"))
-                + (scan.emptyChapters.isEmpty ? "؛ كل فصل فيه نص." : "؛ " + count(scan.emptyChapters.count, ("فصل واحد", "فصلان", "فصول", "فصلًا")) + " بلا نص.")
+                + (scan.emptyChapters.isEmpty ? (scan.unreadChapters == 0 ? "؛ كل فصل فيه نص." : "؛ الفصول المقروءة فيها نص.") : "؛ " + count(scan.emptyChapters.count, ("فصل واحد", "فصلان", "فصول", "فصلًا")) + " بلا نص.")
                 + (scan.unreadChapters > 0 ? " تعذّر فحص " + count(scan.unreadChapters, ("فصل واحد", "فصلين", "فصول", "فصلًا")) + "." : ""),
                 detected: scan.emptyChapters.isEmpty && scan.unreadChapters == 0).accessibilityIdentifier("mihbara-epub-scan-text")
             if scan.tocEntries > 0 {

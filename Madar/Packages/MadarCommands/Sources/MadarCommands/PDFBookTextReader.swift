@@ -100,7 +100,17 @@ public actor PDFBookTextReader {
         return try autoreleasepool {
             try Task.checkCancellation()
             if !optical, let text = page.string?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty {
-                return PDFBookPageText(index: index, text: text, source: .embedded)
+                let bounds = page.bounds(for: .cropBox)
+                let lines = page.selection(for: bounds)?.selectionsByLine().compactMap { selection -> PDFTextReadingOrder.Line? in
+                    guard let text = selection.string, !text.isEmpty else { return nil }
+                    let box = selection.bounds(for: page)
+                    return .init(text: text, bounds: CGRect(x: box.minX, y: bounds.maxY - box.maxY, width: box.width, height: box.height))
+                } ?? []
+                let ordered = PDFTextReadingOrder.text(lines, rightToLeft: language.hasPrefix("ar"))
+                // Some PDFs expose only part of the text as selectable geometry.
+                // In that case preserve the complete original layer.
+                let characters: (String) -> [Unicode.Scalar] = { $0.unicodeScalars.filter { !CharacterSet.whitespacesAndNewlines.contains($0) }.sorted { $0.value < $1.value } }
+                return PDFBookPageText(index: index, text: page.rotation == 0 && !ordered.isEmpty && characters(ordered) == characters(text) ? ordered : text, source: .embedded)
             }
             let request = VNRecognizeTextRequest()
             request.recognitionLevel = .accurate
@@ -115,7 +125,12 @@ public actor PDFBookTextReader {
             try Task.checkCancellation()
             // Preserve each recognized line's characters. Reversing Arabic text
             // corrupts its logical order; the source image stays authoritative.
-            let text = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: "\n")
+            let lines = (request.results ?? []).compactMap { observation -> PDFTextReadingOrder.Line? in
+                guard let text = observation.topCandidates(1).first?.string else { return nil }
+                let box = observation.boundingBox
+                return .init(text: text, bounds: CGRect(x: box.minX, y: 1 - box.maxY, width: box.width, height: box.height))
+            }
+            let text = PDFTextReadingOrder.text(lines, rightToLeft: language.hasPrefix("ar"))
             return PDFBookPageText(index: index, text: text, source: .optical)
         }
     }

@@ -112,19 +112,31 @@ public enum PDFBookEPUB {
     static func withoutRunningLines(_ texts: [String]) -> [String] {
         let pageNumber = try! NSRegularExpression(pattern: #"^[\s\-–—()\[\]{}<>«»ـ]*[0-9٠-٩]{1,4}[\s\-–—()\[\]{}<>«»ـ]*$"#)
         func key(_ line: String) -> String { line.filter { !$0.isNumber && !$0.isWhitespace } }
-        func edges(_ lines: [String]) -> [String] { let kept = lines.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }; return Array(kept.prefix(2) + kept.suffix(2)) }
+        func edges(_ lines: [String]) -> [String] {
+            let kept = lines.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+            // A short page is not made entirely of headers. Never treat the
+            // second/penultimate body line as an edge merely because it repeats.
+            guard kept.count >= 2 else { return [] }
+            return Array(kept.prefix(1) + kept.suffix(1))
+        }
         let split = texts.map { $0.replacingOccurrences(of: "\r\n", with: "\n").components(separatedBy: "\n") }
         var seen: [String: Int] = [:]
-        for lines in split { for k in Set(edges(lines).map(key)) where k.count >= 3 { seen[k, default: 0] += 1 } }
+        for lines in split {
+            let candidates = edges(lines).filter { !closes($0.trimmingCharacters(in: .whitespaces)) && $0.count <= 120 }
+            for k in Set(candidates.map(key)) where k.count >= 3 { seen[k, default: 0] += 1 }
+        }
         let threshold = max(3, texts.count / 5)
         let running = Set(seen.filter { $0.value >= threshold }.keys)
         return split.map { lines in
             let edge = Set(edges(lines))
-            return lines.filter { line in
+            let kept = lines.filter { line in
                 let range = NSRange(line.startIndex..., in: line)
-                if pageNumber.firstMatch(in: line, range: range) != nil { return false }
-                return !(edge.contains(line) && running.contains(key(line)))
-            }.joined(separator: "\n")
+                if edge.contains(line), pageNumber.firstMatch(in: line, range: range) != nil { return false }
+                return !(edge.contains(line) && !closes(line.trimmingCharacters(in: .whitespaces)) && running.contains(key(line)))
+            }
+            // Repetition is evidence, not proof. If it would erase the whole
+            // page, preserve its source text rather than manufacture a gap.
+            return (kept.allSatisfy { $0.trimmingCharacters(in: .whitespaces).isEmpty } ? lines : kept).joined(separator: "\n")
         }
     }
 

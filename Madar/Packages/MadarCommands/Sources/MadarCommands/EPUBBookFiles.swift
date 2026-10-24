@@ -433,12 +433,17 @@ extension EPUBBookFiles {
             manifest[itemID] = (path, item.attribute("media-type") ?? "", Set((item.attribute("properties") ?? "").split(whereSeparator: \.isWhitespace).map(String.init)))
         }
         let spine = packageNode.first(named: "spine")
-        let spinePaths = (spine?.children.filter { $0.name == "itemref" }.compactMap { $0.attribute("idref") } ?? []).compactMap { manifest[$0]?.path }
+        // Keep a slot for every reading-order entry, even a broken idref. Dropping
+        // it with compactMap would report a shorter, falsely complete book.
+        let spinePaths: [String?] = (spine?.children.filter { $0.name == "itemref" } ?? []).map {
+            $0.attribute("idref").flatMap { manifest[$0]?.path }
+        }
         result.chapters = spinePaths.count
         var anchors: [String: Set<String>] = [:]
         for (index, path) in spinePaths.enumerated() {
+            try Task.checkCancellation()
             progress(Double(index) / Double(max(1, spinePaths.count)) * 0.9)
-            guard let member = archive.member(path), member.size <= scanDocumentLimit, let node = try? xml(archive, member, maximum: scanDocumentLimit) else {
+            guard let path, let member = archive.member(path), member.size <= scanDocumentLimit, let node = try? xml(archive, member, maximum: scanDocumentLimit) else {
                 result.unreadChapters += 1; continue
             }
             var ids = Set<String>()

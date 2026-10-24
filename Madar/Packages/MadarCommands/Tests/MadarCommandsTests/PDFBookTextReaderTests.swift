@@ -57,6 +57,26 @@ struct PDFBookTextReaderTests {
         await #expect(throws: PDFBookTextReader.Failure.self) { try await broken.pageCount() }
     }
 
+    @Test func embeddedColumnsUseTheirBoundsRatherThanTheirPDFPaintOrder() async throws {
+        let bytes = NSMutableData()
+        var rect = CGRect(x: 0, y: 0, width: 500, height: 500)
+        let consumer = try #require(CGDataConsumer(data: bytes))
+        let pdf = try #require(CGContext(consumer: consumer, mediaBox: &rect, nil))
+        pdf.beginPDFPage(nil)
+        // Deliberately paint the left column first and the right one backwards.
+        for (text, point) in [("LEFT FIRST", CGPoint(x: 20, y: 420)), ("RIGHT SECOND", CGPoint(x: 280, y: 390)),
+                              ("LEFT SECOND", CGPoint(x: 20, y: 390)), ("RIGHT FIRST", CGPoint(x: 280, y: 420))] {
+            pdf.textPosition = point
+            let string = NSAttributedString(string: text, attributes: [NSAttributedString.Key(kCTFontAttributeName as String): CTFontCreateWithName("Arial" as CFString, 16, nil)])
+            CTLineDraw(CTLineCreateWithAttributedString(string), pdf)
+        }
+        pdf.endPDFPage(); pdf.closePDF()
+        let rtl = try await PDFBookTextReader(data: bytes as Data, language: "ar").page(at: 0)
+        let ltr = try await PDFBookTextReader(data: bytes as Data, language: "en").page(at: 0)
+        #expect(rtl.text.split(whereSeparator: \.isWhitespace).joined(separator: " ") == "RIGHT FIRST RIGHT SECOND LEFT FIRST LEFT SECOND")
+        #expect(ltr.text.split(whereSeparator: \.isWhitespace).joined(separator: " ") == "LEFT FIRST LEFT SECOND RIGHT FIRST RIGHT SECOND")
+    }
+
     @Test func searchIgnoresArabicMarksAlefFormsAndLineBreaksButRejectsEmptyQuery() {
         let page = PDFBookPageText(index: 0, text: "إِنَّ القِراءةَ\nبابُ المَعرفة", source: .optical)
         #expect(page.contains("ان القراءة باب"))

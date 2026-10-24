@@ -101,4 +101,13 @@ struct PDFBookEPUBTests {
         #expect(chapter.contains("aria-label=\"٢\"></span>القراءة تحتاج إلى صبر.</p>"))
         #expect(!chapter.contains("كتاب الأدب"))
     }
+
+    @Test func repeatedBodySentencesAndStandaloneBodyNumbersArePreserved() {
+        let pages = (1...3).map { "الصفحة رقم \($0)\nالقراءة باب إلى المعرفة، والكتاب صاحب لا يمل." }
+        #expect(PDFBookEPUB.withoutRunningLines(pages) == Array(repeating: "القراءة باب إلى المعرفة، والكتاب صاحب لا يمل.", count: 3))
+        let numbered = "كتاب الأدب\nالكلام الأول\n١٢\nالكلام الأخير.\n١"
+        #expect(PDFBookEPUB.withoutRunningLines([numbered, numbered, numbered]).allSatisfy { $0.contains("\n١٢\n") })
+        let ambiguous = Array(repeating: "كلام أول\nكلام ثان", count: 3)
+        #expect(PDFBookEPUB.withoutRunningLines(ambiguous) == ambiguous)
+    }
 }

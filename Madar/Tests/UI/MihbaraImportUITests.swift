@@ -197,7 +197,7 @@ import UIKit
                 canvas.beginPage()
                 let text = "الصفحة رقم \(page)\n\nالقراءة باب إلى المعرفة، والكتاب صاحب لا يمل."
                 (text as NSString).draw(in: CGRect(x: 20, y: 35, width: 260, height: 320), withAttributes: [
-                    .font: UIFont.systemFont(ofSize: 21), .foregroundColor: UIColor.darkText, .paragraphStyle: paragraph
+                    .font: UIFont(name: "Arial", size: 24)!, .foregroundColor: UIColor.darkText, .paragraphStyle: paragraph
                 ])
             }
         }
@@ -236,6 +236,9 @@ import UIKit
         let importConfirm = app.buttons["mihbara-epub-import-confirm"]
         XCTAssertTrue(importConfirm.waitForExistence(timeout: 20), app.debugDescription)
         XCTAssertEqual(app.textFields["mihbara-epub-import-title"].value as? String, "كتاب منساب")
+        XCTAssertTrue(app.descendants(matching: .any)["mihbara-epub-scan-text"].waitForExistence(timeout: 20), app.debugDescription)
+        XCTAssertTrue(app.descendants(matching: .any)["mihbara-epub-scan-pages"].exists, app.debugDescription)
+        XCTAssertTrue(importConfirm.isEnabled, "Adding waits for the full scan to finish.")
         attach(app, "M6-PDF-flow-review-L")
         for _ in 0..<8 where !importConfirm.isHittable { app.swipeUp(velocity: .slow) }
         importConfirm.tap()
@@ -246,6 +249,29 @@ import UIKit
         let both = XCTNSPredicateExpectation(predicate: NSPredicate(format: "count >= 2"), object: copies)
         XCTAssertEqual(XCTWaiter.wait(for: [both], timeout: 12), .completed, app.debugDescription)
         attach(app, "M6-PDF-flow-shelf-L")
+        // Walk the converted EPUB itself, rather than treating a second shelf
+        // entry as proof that the flowing text can actually be read.
+        for index in 0..<2 {
+            copies.element(boundBy: index).tap()
+            if app.buttons["mihbara-reader-close"].waitForExistence(timeout: 8) { break }
+            let closePDF = app.buttons["mihbara-pdf-close"]
+            XCTAssertTrue(closePDF.waitForExistence(timeout: 5), app.debugDescription); closePDF.tap()
+        }
+        XCTAssertTrue(app.buttons["mihbara-reader-close"].waitForExistence(timeout: 10), app.debugDescription)
+        let contents = app.buttons["mihbara-reader-contents"]
+        XCTAssertTrue(contents.exists, app.debugDescription)
+        contents.tap()
+        let firstPage = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "صفحة ١")).firstMatch
+        XCTAssertTrue(firstPage.waitForExistence(timeout: 8), app.debugDescription); firstPage.tap()
+        // Arial's embedded PDF layer uses Arabic presentation forms. Compare
+        // their Unicode equivalents, without changing the preserved source text.
+        let body = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            app.webViews.staticTexts.allElementsBoundByIndex.contains {
+                $0.label.precomposedStringWithCompatibilityMapping.contains("القراءة باب إلى المعرفة")
+            }
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [body], timeout: 15), .completed, app.debugDescription)
+        attach(app, "M6-PDF-flow-reader-L")
     }
 
     func testEPUBPreviewUsesFileMetadataAndAddsAnOfflineBook() throws {
@@ -266,6 +292,9 @@ import UIKit
         let title = app.textFields["mihbara-epub-import-title"]
         XCTAssertEqual(title.value as? String, "A Book About Reading")
         XCTAssertEqual(app.textFields["mihbara-epub-import-author"].value as? String, "Madar Fixture Author")
+        XCTAssertTrue(app.descendants(matching: .any)["mihbara-epub-scan-text"].waitForExistence(timeout: 20), app.debugDescription)
+        XCTAssertTrue(app.descendants(matching: .any)["mihbara-epub-scan-toc"].exists, app.debugDescription)
+        XCTAssertTrue(confirm.isEnabled, app.debugDescription)
         // A long index shows its first eight headings; the rest opens on request.
         XCTAssertTrue(app.descendants(matching: .any)["mihbara-epub-import-toc-8"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["mihbara-epub-import-toc-10"].exists)

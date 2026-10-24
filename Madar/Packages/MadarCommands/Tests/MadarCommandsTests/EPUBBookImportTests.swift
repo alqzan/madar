@@ -201,4 +201,19 @@ import MadarData
         #expect(scan.isComplete == false)
         #expect(steps.last == 1)
     }
+
+    @Test func fullScanCountsUnresolvedSpineEntriesAsUnreadInsteadOfDroppingThem() throws {
+        let container = Data(#"<container><rootfiles><rootfile full-path="package.opf"/></rootfiles></container>"#.utf8)
+        let opf = Data(#"<package><manifest><item id="a" href="a.xhtml" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="a"/><itemref idref="missing"/><itemref/></spine></package>"#.utf8)
+        let entries = [Entry(path: "mimetype", bytes: Data("application/epub+zip".utf8)),
+                       Entry(path: "META-INF/container.xml", bytes: container), Entry(path: "package.opf", bytes: opf),
+                       Entry(path: "a.xhtml", bytes: Data("<html><body><p>نص مقروء</p></body></html>".utf8))]
+        let folder = try root(); defer { try? FileManager.default.removeItem(at: folder) }
+        let file = folder.appendingPathComponent("missing-spine.epub"); try archive(entries).write(to: file)
+        let scan = try EPUBBookFiles.scan(file: file)
+        #expect(scan.chapters == 3)
+        #expect(scan.unreadChapters == 2)
+        #expect(scan.words == 2)
+        #expect(!scan.isComplete)
+    }
 }
