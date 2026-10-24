@@ -59,14 +59,17 @@ enum DiaryPhotoLibrary {
 struct DiaryDayPhotos: View {
     @Bindable var app: AppSession
     let day: GregorianDay
-    let link: (PHAsset) async -> Void
+    let link: (PHAsset) async -> Bool
     @Environment(\.roomTheme) private var theme
+    @Environment(\.scenePhase) private var scenePhase
     @State private var status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
     @State private var assets: [PHAsset] = []
     @State private var linked: Set<String> = []
     @State private var busy: String?
     var body: some View {
-        Group {
+        // Keep a real container even when authorization is already granted and the
+        // initial asset list is empty; Group has no child to run the loading task on.
+        VStack(alignment: .leading, spacing: 0) {
             if status == .notDetermined {
                 Button { Task { status = await PHPhotoLibrary.requestAuthorization(for: .readWrite); load() } } label: {
                     Label("اعرض صور هذا اليوم من تطبيق الصور", systemImage: "photo.on.rectangle.angled").font(MadarTypography.caption()).frame(minHeight: 44)
@@ -79,7 +82,9 @@ struct DiaryDayPhotos: View {
                     }
                 }.accessibilityIdentifier("diary-day-photos")
             }
-        }.task(id: day.description) { load() }
+        }
+        .task(id: day.description) { load() }
+        .onChange(of: scenePhase) { _, phase in if phase == .active { load() } }
     }
     private var visible: [PHAsset] { assets.filter { !linked.contains($0.localIdentifier) } }
     private func load() {
@@ -88,7 +93,10 @@ struct DiaryDayPhotos: View {
     }
     private func pick(_ asset: PHAsset) {
         guard busy == nil else { return }; busy = asset.localIdentifier
-        Task { await link(asset); linked.insert(asset.localIdentifier); busy = nil }
+        Task {
+            if await link(asset) { linked.insert(asset.localIdentifier) }
+            busy = nil
+        }
     }
 }
 private struct DiaryDayPhotoThumb: View {

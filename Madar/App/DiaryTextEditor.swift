@@ -190,9 +190,10 @@ struct DiaryTextEditor: View {
             dismiss()
         } catch { failure = error.localizedDescription; saving = false }
     }
-    private func linkLibraryPhoto(_ asset: PHAsset) async {
-        guard let data = await DiaryPhotoLibrary.data(asset), let copy = DiaryPhotoLibrary.smallCopy(of: data) else { failure = "تعذّر فتح الصورة من تطبيق الصور."; return }
-        do { try await add(copy, kind: "photo", type: "image/jpeg", assetID: asset.localIdentifier) } catch { failure = error.localizedDescription }
+    private func linkLibraryPhoto(_ asset: PHAsset) async -> Bool {
+        guard let data = await DiaryPhotoLibrary.data(asset), let copy = DiaryPhotoLibrary.smallCopy(of: data) else { failure = "تعذّر فتح الصورة من تطبيق الصور."; return false }
+        do { try await add(copy, kind: "photo", type: "image/jpeg", assetID: asset.localIdentifier); return true }
+        catch { failure = error.localizedDescription; return false }
     }
     /// «كلمة واحدة»، «كلمتان»، «٥ كلمات»، «١١ كلمةً»; nothing before the first word.
     private func wordCount(_ n: Int) -> String {

@@ -1,6 +1,54 @@
 import XCTest
 
 @MainActor final class DiaryEditorUITests: XCTestCase {
+    /// Seed with scripts/seed-diary-photos.swift; the following day's photo must
+    /// never enter this day's suggestions. Only synthetic simulator assets are used.
+    func testDayPhotosLinkOnce() throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["MADAR_TEST_PHOTOS_SEEDED"] == "1", "Requires the explicit synthetic simulator Photos fixture")
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.resetAuthorizationStatus(for: .photos)
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": "empty",
+            "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2001-04-17T15:00:00+03:00"]
+        app.launch()
+        XCTAssertTrue(app.buttons["diary-write"].waitForExistence(timeout: 25), app.debugDescription)
+        app.buttons["diary-write"].tap()
+        let hideKeyboard = app.buttons["diary-editor-hide-keyboard"]
+        if hideKeyboard.waitForExistence(timeout: 5) { hideKeyboard.tap() }
+        let permission = app.buttons["diary-day-photos-allow"]
+        if permission.waitForExistence(timeout: 3) {
+            permission.tap()
+            let system = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+            let allow = system.buttons.matching(NSPredicate(format: "label CONTAINS[c] 'full' OR label CONTAINS 'كامل' OR label CONTAINS 'كل الصور' OR label CONTAINS 'جميع الصور'")).firstMatch
+            XCTAssertTrue(allow.waitForExistence(timeout: 8), system.debugDescription)
+            for _ in 0..<3 where allow.exists {
+                allow.tap()
+                if allow.waitForNonExistence(timeout: 3) { break }
+            }
+            XCTAssertFalse(allow.exists, system.debugDescription)
+            app.activate()
+        }
+        let photos = app.buttons.matching(identifier: "diary-day-photo")
+        XCTAssertTrue(photos.firstMatch.waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertEqual(photos.count, 1, "Only the chosen day's asset is suggested")
+        capture(app, "M3-20-day-photos-before-L")
+        photos.firstMatch.tap()
+        XCTAssertTrue(photos.firstMatch.waitForNonExistence(timeout: 15), app.debugDescription)
+        capture(app, "M3-20-day-photos-linked-L")
+        app.buttons["diary-editor-save"].tap()
+        XCTAssertTrue(app.buttons["diary-today"].waitForExistence(timeout: 10)); app.buttons["diary-today"].tap()
+        XCTAssertTrue(app.buttons["افتح الصورة"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertEqual(app.buttons.matching(NSPredicate(format: "label == %@", "افتح الصورة")).count, 1)
+        capture(app, "M3-20-day-photo-saved-L")
+        app.terminate(); app.launch()
+        XCTAssertTrue(app.buttons["diary-write"].waitForExistence(timeout: 25)); app.buttons["diary-write"].tap()
+        if hideKeyboard.waitForExistence(timeout: 5) { hideKeyboard.tap() }
+        XCTAssertTrue(app.textViews["diary-editor-text"].waitForExistence(timeout: 10))
+        XCTAssertFalse(photos.firstMatch.exists, "A linked asset must not be suggested again after relaunch")
+        capture(app, "M3-20-day-photos-reopened-L")
+        app.terminate()
+    }
+
     private func launch(_ fixture: String) -> XCUIApplication {
         let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": fixture, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00"]
         app.launch(); XCTAssertTrue(app.buttons["diary-write"].waitForExistence(timeout: 25)); return app
@@ -66,5 +114,8 @@ import XCTest
         app.textViews["diary-editor-text"].typeText("كتبت دون ميكروفون"); app.buttons["diary-editor-save"].tap()
         app.buttons["diary-today"].tap(); XCTAssertTrue(app.staticTexts["كتبت دون ميكروفون"].waitForExistence(timeout: 10))
     }
-    private func capture(_ app: XCUIApplication, _ name: String) { let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = name; shot.lifetime = .keepAlways; add(shot) }
+    private func capture(_ app: XCUIApplication, _ name: String) {
+        let image = app.screenshot(), shot = XCTAttachment(screenshot: image); shot.name = name; shot.lifetime = .keepAlways; add(shot)
+        if let dir = ProcessInfo.processInfo.environment["MADAR_SHOT_DIR"] { try? image.pngRepresentation.write(to: URL(fileURLWithPath: dir).appendingPathComponent(name + ".png")) }
+    }
 }

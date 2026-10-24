@@ -3,9 +3,23 @@ import SwiftData
 import MadarCore
 import MadarData
 import MadarCommands
+import UIKit
 @testable import Madar
 
 @MainActor final class DiaryServiceIntegrationTests: XCTestCase {
+    func testLibraryPhotoKeepsOnlyASmallDecodableCopy() throws {
+        let format = UIGraphicsImageRendererFormat(); format.scale = 1
+        let source = UIGraphicsImageRenderer(size: CGSize(width: 1920, height: 1080), format: format).jpegData(withCompressionQuality: 0.9) { canvas in
+            UIColor.systemBlue.setFill(); canvas.fill(CGRect(x: 0, y: 0, width: 1920, height: 1080))
+        }
+        let copy = try XCTUnwrap(DiaryPhotoLibrary.smallCopy(of: source))
+        let thumbnail = try XCTUnwrap(UIImage(data: copy)?.cgImage)
+        XCTAssertEqual(thumbnail.width, 640); XCTAssertEqual(thumbnail.height, 360)
+        XCTAssertLessThan(copy.count, source.count)
+        XCTAssertEqual(UIImage(data: source)?.cgImage?.width, 1920, "The original stays intact")
+        XCTAssertNil(DiaryPhotoLibrary.smallCopy(of: Data("not an image".utf8)))
+    }
+
     func testGateAppendMarginAndClosedSourceSnapshot() async throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "DiaryService-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }
