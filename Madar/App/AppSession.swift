@@ -53,10 +53,13 @@ final class AppSession {
     /// Owner, 24 Oct 2026: «التراجع متاح… يتكرر وصاير مزعج مره ويطول». The toast shows for a few seconds; the undo
     /// itself stays valid until its token expires.
     private(set) var undoToastVisible = false
-    /// UI tests that cross a sheet before reaching the toast lengthen it with MADAR_UI_UNDO_SECONDS (DEBUG only).
+    /// UI tests reach the toast after several steps, so a UI-test store keeps it two minutes unless
+    /// MADAR_UI_UNDO_SECONDS says otherwise (DEBUG only). The app itself shows it for six seconds.
     static var undoToastSeconds: Double {
         #if DEBUG
-        if let text = ProcessInfo.processInfo.environment["MADAR_UI_UNDO_SECONDS"], let seconds = Double(text) { return seconds }
+        let environment = ProcessInfo.processInfo.environment
+        if let text = environment["MADAR_UI_UNDO_SECONDS"], let seconds = Double(text) { return seconds }
+        if environment["MADAR_UI_STORE_ID"] != nil { return 120 }
         #endif
         return 6
     }

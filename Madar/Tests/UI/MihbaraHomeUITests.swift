@@ -310,11 +310,13 @@ import XCTest
         XCTAssertTrue(afterFajr.waitForExistence(timeout:8)); shot(app,"M6-V02-opening-L")
         XCTAssertEqual(afterFajr.value as? String, "محدد")
         untilDone.tap(); XCTAssertEqual(untilDone.value as? String, "محدد")
-        undo(app); XCTAssertEqual(afterFajr.value as? String, "محدد")
+        // The undo runs a command first, so wait for the restored choice rather than reading it at once.
+        undo(app); XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == 'محدد'"), object: afterFajr)], timeout: 5), .completed)
         manual.tap(); XCTAssertEqual(manual.value as? String, "محدد")
+        func selected(_ element: XCUIElement) -> XCTWaiter.Result { XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == 'محدد'"), object: element)], timeout: 5) }
         app.buttons["mihbara-rahlOpens-reset"].tap()
-        XCTAssertEqual(afterFajr.value as? String, "محدد")
-        undo(app); XCTAssertEqual(manual.value as? String, "محدد")
+        XCTAssertEqual(selected(afterFajr), .completed)
+        undo(app); XCTAssertEqual(selected(manual), .completed)
         app.buttons["mihbara-rahlOpens-close"].tap(); app.terminate(); app.launch(); open(app)
         reach(app, preferences); preferences.tap()
         XCTAssertEqual(app.buttons["mihbara-rahlOpens-manual"].value as? String, "محدد")

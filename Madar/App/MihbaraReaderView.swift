@@ -352,13 +352,12 @@ struct MihbaraReaderView: View {
         }
         .task { await openPublication() }
         .onChange(of: app.values[settingsKey]) {
-            // Owner, 24 Oct 2026: changing the font used to leave the reader somewhere else in a longer book. Keep the
-            // reading place: submit, let Readium reflow, return to the same locator, then re-apply focus on the new layout.
-            let place = currentLocator
+            // Owner, 24 Oct 2026: «ويطول اذا غيرت الخط». Readium keeps the reading place across a preferences change by
+            // itself; a go(to:) here counted as a jump and disturbed the open settings sheet. Focus is re-applied only
+            // after the reflow, on the new layout, instead of on the stale one.
             navigatorController?.submitPreferences(readerPreferences)
             Task { @MainActor in
                 try? await Task.sleep(for: .milliseconds(450))
-                if let place, let navigator = navigatorController { _ = await navigator.go(to: place, options: .init(animated: false)) }
                 applyFocusMode()
             }
         }

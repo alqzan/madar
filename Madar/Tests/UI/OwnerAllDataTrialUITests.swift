@@ -98,7 +98,7 @@ import XCTest
         shot(app, "TRIAL-mihbara-home-L"); app.swipeUp(velocity: .slow); shot(app, "TRIAL-mihbara-home-s1-L")
 
         // The lobby with every room's data.
-        let bahw = app.tabBars.buttons["البهو"].firstMatch
-        if bahw.exists { bahw.tap(); Thread.sleep(forTimeInterval: 2); shot(app, "TRIAL-bahw-L"); for i in 1...3 { app.swipeUp(velocity: .slow); shot(app, "TRIAL-bahw-s\(i)-L") } }
+        let bahwTab = app.tabBars.buttons["البهو"].firstMatch, bahw = bahwTab.waitForExistence(timeout: 5) ? bahwTab : app.buttons["البهو"].firstMatch
+        if bahw.waitForExistence(timeout: 10) { bahw.tap(); Thread.sleep(forTimeInterval: 2); shot(app, "TRIAL-bahw-L"); for i in 1...3 { app.swipeUp(velocity: .slow); shot(app, "TRIAL-bahw-s\(i)-L") } } else { add(XCTAttachment(string: "lobby tab not found: " + app.tabBars.buttons.allElementsBoundByIndex.map(\.label).joined(separator: "|"))) }
     }
 }

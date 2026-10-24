@@ -54,11 +54,11 @@ struct MoneyHomeView: View {
                 }
                 GridRow {
                     drawer("البطاقات", "creditcard", "money-cards-open") { cardsOpen = true }
-                    drawer("الحسابات", "tree", "money-accounts-open") { accountsOpen = true }
+                    drawer("الحسابات", "tree", "money-accounts-open", fact: accountsFact) { accountsOpen = true }
                 }
                 GridRow {
-                    drawer("المطابقة مع البنك", "checkmark.seal", "money-reconcile-open") { reconcileOpen = true }
-                    drawer("جهّز لشيء قادم", "sparkles", "money-goal-open") { goalOpen = true }
+                    drawer("المطابقة مع البنك", "checkmark.seal", "money-reconcile-open", fact: reconcileFact) { reconcileOpen = true }
+                    drawer("جهّز لشيء قادم", "sparkles", "money-goal-open", fact: goalFact) { goalOpen = true }
                 }
                 GridRow {
                     drawer("الاسترداد النقدي", "drop", "money-cashback-open") { cashbackOpen = true }
@@ -70,11 +70,25 @@ struct MoneyHomeView: View {
             }.buttonStyle(.plain).accessibilityIdentifier("money-settings-open")
         }.padding(.top, 8)
     }
-    private func drawer(_ title: String, _ symbol: String, _ id: String, action: @escaping () -> Void) -> some View {
+    // «تعمّق وحسّن», all-data walk 24 Oct 2026: a drawer with something in it says one fact; counts only, never amounts.
+    private var accountsFact: String? {
+        guard let r = reading, r.hasAccounts else { return nil }
+        return service.counted(r.knownBalanceCount + r.unknownBalanceCount, ("حساب واحد", "حسابان", "حسابات", "حسابًا"))
+    }
+    private var reconcileFact: String? {
+        guard let n = reading?.pendingCount, n > 0 else { return nil }
+        return service.counted(n, ("قرار واحد ينتظرك", "قراران ينتظرانك", "قرارات تنتظرك", "قرارًا ينتظرك"))
+    }
+    private var goalFact: String? {
+        guard let n = reading?.envelopes.count, n > 0 else { return nil }
+        return service.counted(n, ("هدف واحد", "هدفان", "أهداف", "هدفًا"))
+    }
+    private func drawer(_ title: String, _ symbol: String, _ id: String, fact: String? = nil, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(alignment: .leading, spacing: 8) {
                 Image(systemName: symbol).font(.system(size: 18, weight: .regular)).foregroundStyle(theme.color("reserveText"))
                 Text(title).font(MadarTypography.body()).lineLimit(2).minimumScaleFactor(0.85).multilineTextAlignment(.leading)
+                if let fact { Text(fact).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).lineLimit(1).minimumScaleFactor(0.85) }
                 // The drawer's brass pull.
                 Capsule().fill(theme.color("reserveText").opacity(0.55)).frame(width: 22, height: 3).frame(maxWidth: .infinity).accessibilityHidden(true)
             }
@@ -83,7 +97,7 @@ struct MoneyHomeView: View {
             .background(theme.surface, in: .rect(cornerRadius: 14))
             .overlay { RoundedRectangle(cornerRadius: 14).stroke(theme.color("reserveText").opacity(0.45), lineWidth: 1) }
             .contentShape(.rect(cornerRadius: 14))
-        }.buttonStyle(.plain).accessibilityLabel(title).accessibilityIdentifier(id)
+        }.buttonStyle(.plain).accessibilityLabel(title).accessibilityValue(fact ?? "").accessibilityIdentifier(id)
     }
     var body: some View {
         ScrollView {
