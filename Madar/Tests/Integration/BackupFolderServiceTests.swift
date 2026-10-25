@@ -7,6 +7,45 @@ import UniformTypeIdentifiers
 @testable import Madar
 
 @MainActor final class BackupFolderServiceTests: XCTestCase {
+    func testIncrementalRestoreRebindsTheOpenAppAndKeepsHabitMemories() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("BackupSetRebind-" + UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = try ManagedDataStore(root: root.appendingPathComponent("Data"))
+        let app = try AppSession(container: store.container, managedStore: store, groupDirectory: root)
+        ExportPrivacyTestHarness.install(on: app)
+        let service = AppBackupService(session: app, store: store, backupDirectory: root.appendingPathComponent("Backups"), keyStore: MemoryBackupKeyStore())
+        let context = ModelContext(store.container)
+        let entry = Entry(); entry.dayKey = "2026-10-21"; entry.text = "ذكرى من النسخة"; context.insert(entry)
+        let habit = Habit(); habit.name = "عادة من النسخة"; context.insert(habit)
+        let policy = HabitPolicy(); policy.habitID = habit.id; policy.effectiveFrom = "2026-10-01"; policy.frequency = "daily"; context.insert(policy)
+        let event = HabitEvent(); event.habitID = habit.id; event.entryID = entry.id; event.dayKey = entry.dayKey; event.periodKey = entry.dayKey; event.delta = 1; context.insert(event)
+        let media = Media(), bytes = Data("synthetic attachment".utf8)
+        media.data = bytes; media.sizeBytes = bytes.count; media.sha256 = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+        context.insert(media); entry.mediaID = media.id; try context.save()
+        let entryID = entry.id, mediaID = media.id, eventID = event.id
+        let password = "synthetic restore password"
+        try await service.coordinator.configurePassphrase(password)
+        let receipt = try await service.coordinator.export(kind: .automatic)
+        XCTAssertEqual(receipt.fileURL.pathExtension, "madarbackupset")
+        // The open app currently shows a later edit and an extra line; replacement must rebind its real session.
+        entry.text = "كتابة بعد النسخة"; entry.updatedAt = Date()
+        let extra = Entry(); extra.text = "سطر محلي إضافي"; context.insert(extra); try context.save()
+        let extraID = extra.id, generation = store.binding.generationID
+        let preview = try await service.previewRestore(file: receipt.fileURL, passphrase: password, progress: { _ in })
+        XCTAssertEqual(try ModelContext(app.container).fetch(FetchDescriptor<Entry>()).first { $0.id == entryID }?.text, "كتابة بعد النسخة", "Preview must not mutate the app")
+        _ = try await service.restore(previewID: preview.id, mode: .replace, progress: { _ in })
+        XCTAssertNotEqual(store.binding.generationID, generation)
+        XCTAssertTrue(app.container === store.container)
+        XCTAssertFalse(app.maintenanceInProgress)
+        let check = ModelContext(app.container)
+        let restoredEntry = try XCTUnwrap(check.fetch(FetchDescriptor<Entry>()).first { $0.id == entryID })
+        XCTAssertEqual(restoredEntry.text, "ذكرى من النسخة"); XCTAssertEqual(restoredEntry.mediaID, mediaID)
+        XCTAssertNotNil(try check.fetch(FetchDescriptor<Entry>()).first { $0.id == extraID }?.deletedAt)
+        XCTAssertEqual(try check.fetch(FetchDescriptor<Media>()).first { $0.id == mediaID }?.data, bytes)
+        XCTAssertEqual(try check.fetch(FetchDescriptor<HabitEvent>()).first { $0.id == eventID }?.entryID, entryID)
+        XCTAssertFalse(try service.coordinator.catalog().filter { $0.kind == .automatic }.isEmpty)
+    }
+
     func testIncrementalPackageCopiesIntoRestoreCacheAndPreviewsWithoutChangingStore() async throws {
         let type = try XCTUnwrap(UTType(filenameExtension: "madarbackupset", conformingTo: .package))
         XCTAssertEqual(type.identifier, "com.alqzan.madar2.backupset"); XCTAssertTrue(type.conforms(to: .package))

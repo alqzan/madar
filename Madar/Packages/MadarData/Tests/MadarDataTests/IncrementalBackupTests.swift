@@ -27,6 +27,47 @@ import Testing
         row.data = beta; row.sizeBytes = beta.count; row.sha256 = BackupCodec.hash(beta); row.updatedAt = .now
         try context.save()
     }
+    /// Explicit opt-in only. Writes generated encrypted media into a fresh subfolder of the chosen provider,
+    /// never reads its existing contents, and removes only that subfolder when the trial ends.
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["MADAR_TRIAL_BACKUP_FOLDER"] != nil, "Chosen-provider trial only"))
+    func chosenProviderPackageRestoresAfterLocalRemoval() async throws {
+        try await chosenProviderTrial(requireCloudUpload: false)
+    }
+
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["MADAR_TRIAL_BACKUP_FOLDER"] != nil && ProcessInfo.processInfo.environment["MADAR_TRIAL_REQUIRE_CLOUD_UPLOAD"] == "1", "Requires an account exposing actual cloud-upload metadata"))
+    func chosenProviderConfirmsActualCloudUpload() async throws {
+        try await chosenProviderTrial(requireCloudUpload: true)
+    }
+
+    private func chosenProviderTrial(requireCloudUpload: Bool) async throws {
+        let path = try #require(ProcessInfo.processInfo.environment["MADAR_TRIAL_BACKUP_FOLDER"])
+        let chosen = URL(fileURLWithPath: path).appendingPathComponent("Madar-Verification-" + UUID().uuidString)
+        try FileManager.default.createDirectory(at: chosen, withIntermediateDirectories: false)
+        defer { try? FileManager.default.removeItem(at: chosen) }
+        let (root, _, source, _, _) = try await fixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let receipt = try await source.export(kind: .automatic)
+        let selected = try BackupFolderDelivery.select(chosen)
+        let delivery = try await BackupFolderDelivery.deliver([receipt], from: source.backupDirectory, to: selected)
+        let external = chosen.appendingPathComponent("Madar-" + selected.ownerID.uuidString).appendingPathComponent(receipt.fileURL.lastPathComponent)
+        #expect(try BackupArtifact.fingerprint(file: external) == receipt.sha256)
+        try FileManager.default.removeItem(at: source.backupDirectory)
+        let target = try ManagedDataStore(root: root.appendingPathComponent("Recovered"))
+        let recovery = BackupCoordinator(store: target, backupDirectory: root.appendingPathComponent("Safety"), keyStore: MemoryBackupKeyStore())
+        try await recovery.configurePassphrase(password)
+        let preview = try await recovery.preview(file: external, passphrase: password)
+        _ = try await recovery.restore(preview: preview, mode: .merge)
+        let rows = try RecordBridge.all(ModelContext(target.container)).filter { $0.model == "Media" }
+        #expect(rows.count == 2)
+        #expect(rows.allSatisfy { (try? $0.decode("data", as: Data.self)) == alpha })
+        guard requireCloudUpload else { return }
+        var uploaded = delivery.uploadedToICloud
+        for _ in 0..<45 where uploaded != true {
+            try await Task.sleep(for: .seconds(2))
+            uploaded = await BackupFolderDelivery.uploadStatus(delivery.configuration)
+        }
+        #expect(uploaded == true, "Provider copy and recovery passed; the OS must separately confirm actual cloud upload")
+    }
     @Test func mediaIsEncryptedOncePerHashReusedAndEachSetStaysIndependent() async throws {
         let (root, store, coordinator, keys, id) = try await fixture(); defer { try? FileManager.default.removeItem(at: root) }
         let start = try #require(try keys.load()).nextNonceCounter
