@@ -64,4 +64,26 @@ import MadarData
         XCTAssertNil(again["sessions.created"])
         XCTAssertEqual(try RecordBridge.all(ModelContext(store.container)).count, before)
     }
+    /// The same bank account and card the owner already added here are reused, never duplicated, and a second move adds nothing.
+    func testOwnerAccountAndCardAreReusedNotDuplicated() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("LegacyMoveMoney-" + UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = try ManagedDataStore(root: root)
+        let session = try AppSession(container: store.container, managedStore: store, groupDirectory: root)
+        let context = ModelContext(store.container)
+        let account = Account(); account.name = "حسابي"; account.bank = "SAB"; account.last4 = "9999"; context.insert(account)
+        let card = Card(); card.name = "بطاقتي"; card.bank = "SAB"; card.last4 = "1234"; context.insert(card)
+        try context.save()
+        let backup = Data(#"{"accounts":[{"id":"a1","kind":"card","last4":"1234","bank":"sab","fundingKind":"credit"},{"id":"a2","kind":"account","last4":"9999","bank":"sab"}],"transactions":[{"id":"t-man","date":"2026-07-03","amount":12.3}]}"#.utf8)
+        let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-10-25T12:00:00+03:00"))
+        _ = try await session.importLegacyMoney(backup, now: now)
+        let check = ModelContext(store.container)
+        XCTAssertEqual(try check.fetch(FetchDescriptor<Account>()).filter { $0.deletedAt == nil && $0.last4 == "9999" }.map(\.id), [account.id])
+        XCTAssertEqual(try check.fetch(FetchDescriptor<Card>()).filter { $0.deletedAt == nil && $0.last4 == "1234" }.map(\.id), [card.id])
+        XCTAssertEqual(try check.fetch(FetchDescriptor<Account>()).first { $0.id == account.id }?.name, "حسابي", "The owner's own name stays")
+        XCTAssertEqual(try check.fetch(FetchDescriptor<MoneyTransaction>()).filter { $0.deletedAt == nil && $0.amountMinor == 1230 }.count, 1, "The old spend must arrive")
+        let before = try RecordBridge.all(check).filter { $0.model != "CommandReceipt" }.count
+        _ = try await session.importLegacyMoney(backup, now: now.addingTimeInterval(60))
+        XCTAssertEqual(try RecordBridge.all(ModelContext(store.container)).filter { $0.model != "CommandReceipt" }.count, before)
+    }
 }
