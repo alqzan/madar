@@ -2221,6 +2221,10 @@ private struct MihbaraEPUBNavigator: UIViewControllerRepresentable {
                     h1:lang(ar)::before { content: 'فصل'; display: block; color: #6A6052; font-size: .56em; font-weight: 400; margin-bottom: .32em; }
                     h1::after { content: ''; display: block; width: 3.8em; border-top: 1px solid #B7AA95; margin: .58em auto 0; }
                     p { margin-block: .7em !important; }
+                    /* Owner's «أربعون», 25 Oct: a first-line indent pushed an image in an RTL paragraph past the page edge,
+                       and a full-height cover spilled into a blank second page. Media stays inside one page. */
+                    img, svg, video { max-width: 100% !important; max-height: 92vh !important; height: auto; object-fit: contain; break-inside: avoid; }
+                    :is(p, div):has(> img, > svg, > a > img, > span > img) { text-indent: 0 !important; }
                     \(MihbaraReaderTheme.pageCSS)
                     a[role~='doc-noteref'] { display: inline-flex !important; align-items: center; justify-content: center; box-sizing: border-box; width: 1.45em; height: 1.45em; padding: 0 0 .12em 0 !important; margin-inline: .12em; border-radius: 50%; background: #9E2F25 !important; color: #FAF6EA !important; font-size: .7em; font-weight: 700; line-height: 1 !important; text-indent: 0 !important; vertical-align: .35em; text-decoration: none !important; }
                   `;

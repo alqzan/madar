@@ -244,6 +244,17 @@ struct MihbaraAddBookView: View {
                 }
                 catch { app.errorMessage = "لم تُجهز عينة الاستيراد." }
             }
+            // Owner-book trial: a real book is too large for a launch-environment string, so the test passes its path.
+            if root.deletingLastPathComponent().deletingLastPathComponent().lastPathComponent == "UITestStores",
+               let path = ProcessInfo.processInfo.environment["MADAR_UI_MIHBARA_IMPORT_EPUB_PATH"], pendingBookFile == nil {
+                let file = root.deletingLastPathComponent().appendingPathComponent("كتاب التجربة.epub")
+                do {
+                    if !FileManager.default.fileExists(atPath: file.path) {
+                        try FileManager.default.copyItem(at: URL(fileURLWithPath: path), to: file); pendingBookFile = file; previewingEPUB = true
+                    }
+                }
+                catch { app.errorMessage = "لم تُجهز عينة الاستيراد." }
+            }
             #endif
         }
     }

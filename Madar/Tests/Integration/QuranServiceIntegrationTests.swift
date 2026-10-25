@@ -157,7 +157,7 @@ import MadarCommands
         XCTAssertEqual(result.recentDays.count, 1)
         let nextDay = AppQuranService(session: app, clock: { service.clock().addingTimeInterval(86_400) })
         let tomorrow = try await nextDay.load()
-        XCTAssertTrue(tomorrow.history.weekSummary.first?.contains("١ من ٢ أيام الحفظ") == true)
+        XCTAssertTrue(tomorrow.history.weekSummary.first?.contains("أيام الورد المتمّة: ١ من ٢") == true)
         let sessions = try ModelContext(app.container).fetch(FetchDescriptor<HifzSession>())
         XCTAssertEqual(sessions.filter { $0.deletedAt == nil }.count, 1)
         XCTAssertEqual(sessions.first?.mistakes, 1)

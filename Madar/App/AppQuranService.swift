@@ -50,7 +50,7 @@ import MadarPrayer
         return QuranUIRange(fromPage: first, toPage: last)
     }
     func serviceWeekRatio(_ completed: Int, _ eligible: Int) -> String {
-        numerals.string(completed) + " من " + numerals.string(eligible) + " أيام الحفظ"
+        "أيام الورد المتمّة: " + numerals.string(completed) + " من " + numerals.string(eligible)
     }
     func portionTitle(_ portion: QuranAyahRange, catalog: QuranResourceCatalog) -> String {
         guard let first = catalog.ayah(id: portion.first), let last = catalog.ayah(id: portion.last) else { return "" }

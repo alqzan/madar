@@ -197,7 +197,11 @@ import XCTest
             for i in 1...4 { app.swipeUp(velocity: .slow); shot(app, "TRIAL-\(name)-home-s\(i)-L") }
             for _ in 0..<6 { app.swipeDown(velocity: .fast) }
         }
-        if bahwTab.exists { bahwTab.tap(); Thread.sleep(forTimeInterval: 1) }
+        // After a long scroll the tab bar can collapse to icons, so the labelled tab is gone; scroll back and use the
+        // dock's lobby button when the labelled tab is missing.
+        for _ in 0..<4 where !bahwTab.exists { app.swipeDown(velocity: .fast) }
+        if bahwTab.exists { bahwTab.tap() } else if bahw.exists { bahw.tap() }
+        Thread.sleep(forTimeInterval: 1)
         let habits = app.descendants(matching: .any).matching(identifier: "bahw-block-habits").firstMatch
         for _ in 0..<6 where !(habits.exists && habits.isHittable) { app.swipeDown(velocity: .fast) }
         if habits.waitForExistence(timeout: 10) {
@@ -205,5 +209,52 @@ import XCTest
             XCTAssertTrue(app.staticTexts["habits-title"].waitForExistence(timeout: 10), "The habits room must actually open")
             if app.staticTexts["habits-title"].exists { shot(app, "TRIAL-habits-L"); app.swipeUp(velocity: .slow); shot(app, "TRIAL-habits-s1-L") }
         } else { XCTFail("Required habits block is missing") }
+    }
+
+    /// Owner's real book (25 Oct, «أربعون»): import through the scan, then read. Private; skipped without the file.
+    func testOwnerBookImportAndRead() throws {
+        guard let book = ProcessInfo.processInfo.environment["MADAR_TRIAL_BOOK"] else { throw XCTSkip("Owner book trial only") }
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MIHBARA_FIXTURE": "empty",
+            "MADAR_UI_NOW": "2026-10-25T20:00:00+03:00", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
+            "MADAR_UI_MIHBARA_IMPORT_EPUB_PATH": book]
+        app.launch()
+        let customize = app.buttons["tab-customize"]; XCTAssertTrue(customize.waitForExistence(timeout: 20)); customize.tap()
+        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 8)); search.tap(); search.typeText("المحبرة")
+        let door = app.buttons["mihbara-open"]; XCTAssertTrue(door.waitForExistence(timeout: 8)); door.tap()
+        let add = app.buttons["mihbara-add-paper"]; XCTAssertTrue(add.waitForExistence(timeout: 8)); add.tap()
+        let confirm = app.buttons["mihbara-epub-import-confirm"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 240), app.debugDescription)
+        _ = app.descendants(matching: .any)["mihbara-epub-scan-text"].waitForExistence(timeout: 120)
+        shot(app, "BOOK-scan-L")
+        for i in 1...4 { app.swipeUp(velocity: .slow); shot(app, "BOOK-scan-s\(i)-L") }
+        for _ in 0..<8 where !confirm.isHittable { app.swipeUp(velocity: .slow) }
+        confirm.tap()
+        let wantShelf = app.buttons["mihbara-shelf-want"]
+        XCTAssertTrue(wantShelf.waitForExistence(timeout: 120), app.debugDescription)
+        shot(app, "BOOK-shelf-L"); wantShelf.tap()
+        let imported = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "أربعون")).firstMatch
+        XCTAssertTrue(imported.waitForExistence(timeout: 15), app.debugDescription)
+        shot(app, "BOOK-want-L"); imported.tap()
+        XCTAssertTrue(app.buttons["mihbara-reader-close"].waitForExistence(timeout: 60), app.debugDescription)
+        Thread.sleep(forTimeInterval: 4); shot(app, "BOOK-reader-0-L")
+        // Record what the page really holds after each turn, so a blank capture is told apart from a slow draw.
+        func page(_ name: String) {
+            Thread.sleep(forTimeInterval: 3); shot(app, name)
+            let texts = app.webViews.firstMatch.staticTexts.allElementsBoundByIndex.prefix(8).map(\.label).joined(separator: " | ")
+            let images = app.webViews.firstMatch.images.count
+            let a = XCTAttachment(string: "texts: " + texts + "\nimages: \(images)"); a.name = name + "-text"; a.lifetime = .keepAlways; self.add(a)
+        }
+        for i in 1...5 { app.swipeRight(); page("BOOK-reader-next\(i)-L") }
+        app.swipeLeft(); page("BOOK-reader-back-L")
+        let contents = app.buttons["mihbara-reader-contents"]
+        if !contents.exists { app.tap() }
+        if contents.waitForExistence(timeout: 5) {
+            contents.tap(); Thread.sleep(forTimeInterval: 2); shot(app, "BOOK-contents-L")
+            let chapter = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "مع قرآني")).firstMatch
+            if chapter.waitForExistence(timeout: 5) { chapter.tap(); Thread.sleep(forTimeInterval: 3); shot(app, "BOOK-chapter1-L") }
+            else { app.swipeUp(velocity: .slow); shot(app, "BOOK-contents-s1-L") }
+        } else { shot(app, "BOOK-no-contents-L") }
     }
 }

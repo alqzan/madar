@@ -41,7 +41,14 @@ struct DiaryHomeView: View {
     private var service: AppDiaryService { AppDiaryService(app: app) }
     private var memory: DiaryDisplayDay? {
         guard let snapshot else { return nil }
-        return snapshot.days.first { $0.day == (selected ?? snapshot.selection.days.first) }
+        return snapshot.days.first { $0.day == (selected ?? opening(snapshot)) }
+    }
+    /// Tour 25 Oct on the owner's data: the nearest year was a page with neither words nor a moved photo, so the
+    /// memory opened on «صورة هذا اليوم لم تُنقل». It now opens on the nearest year that has something to show.
+    private func opening(_ snapshot: DiaryHomeSnapshot) -> GregorianDay? {
+        snapshot.selection.days.first { day in
+            snapshot.days.first { $0.day == day }.map { page in page.photo != nil || page.lines.contains { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } } ?? false
+        } ?? snapshot.selection.days.first
     }
     var body: some View {
         VStack(spacing: 0) {
@@ -148,11 +155,15 @@ struct DiaryHomeView: View {
                 // Owner trial, 22 Oct 2026: a past page whose photos did not come with the import says so, instead of
                 // «صفحة تنتظر ما تعيشه», which reads as if nothing was lived that day.
                 let past = page.day != snapshot.today, missing = page.missingPhotos
+                // A page with words lets its words lead; the centred note would sit under a long excerpt (tour 25 Oct).
+                let worded = page.lines.contains { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+                if !worded {
                 VStack(spacing: 12) {
                     Image(systemName: past && missing > 0 ? "photo.on.rectangle.angled" : "book.closed").font(.system(size: 46, weight: .ultraLight))
                     Text(past && missing > 0 ? (missing == 1 ? "صورة هذا اليوم لم تُنقل" : "صور هذا اليوم لم تُنقل") : past ? "من دفترك ذاك اليوم" : "صفحة تنتظر ما تعيشه").font(DiaryType.writing)
                 }
                     .foregroundStyle(theme.color("ink3Text")).frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
             }
             VStack(alignment: .leading, spacing: 9) {
                 if !snapshot.selection.days.isEmpty {
@@ -314,7 +325,7 @@ struct DiaryHomeView: View {
     private func refresh() async {
         do {
             var value = try service.home()
-            let displayed = app.string("notes.homeShape") == "echoes" ? value.echoes.compactMap(\.day) : [selected ?? value.selection.days.first].compactMap { $0 }
+            let displayed = app.string("notes.homeShape") == "echoes" ? value.echoes.compactMap(\.day) : [selected ?? opening(value)].compactMap { $0 }
             for day in Set(displayed) { try await service.prepareClosedDay(day) }
             value = try service.home()
             snapshot = value; failure = nil

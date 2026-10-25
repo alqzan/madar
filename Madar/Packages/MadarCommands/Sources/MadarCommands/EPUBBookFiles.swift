@@ -119,8 +119,11 @@ public enum EPUBBookFiles {
         do { archive = try ZIPReader(url: file) }
         catch { throw DataError.invalidValue("ملف EPUB تالف أو غير مدعوم.") }
         try validate(archive)
-        guard let mimetype = archive.members.first, mimetype.path == "mimetype", mimetype.method == 0,
-              try archive.read(mimetype) == Data("application/epub+zip".utf8) else {
+        // The OCF rule puts an uncompressed «mimetype» first, but books re-zipped by common tools (the owner's
+        // «أربعون», 25 Oct) move or compress it, and Apple Books still opens them. A «mimetype» anywhere must say
+        // EPUB; a missing one is accepted because the container and package checks below still prove the book.
+        if let mimetype = archive.member("mimetype"),
+           String(decoding: try archive.read(mimetype), as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines) != "application/epub+zip" {
             throw DataError.invalidValue("ملف EPUB غير مكتمل؛ لم نجد توقيع EPUB الصحيح.")
         }
         guard let containerMember = archive.member("META-INF/container.xml") else { throw DataError.invalidValue("ملف EPUB ناقص: لا يوجد مسار الحزمة.") }

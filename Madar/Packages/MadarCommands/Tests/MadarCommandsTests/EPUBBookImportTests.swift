@@ -90,6 +90,19 @@ import MadarData
         EPUBBookFiles.discard(id: inspection.id, root: root.appendingPathComponent("Staging"))
     }
 
+    /// Owner's «أربعون» (25 Oct): re-zipped with «mimetype» after other files; Apple Books opens it, so Madar must too.
+    @Test func acceptsMovedOrMissingMimetypeButNotAWrongOne() throws {
+        let root = try root(); defer { try? FileManager.default.removeItem(at: root) }
+        var moved = validEntries(); moved.append(moved.removeFirst())
+        let movedSource = root.appendingPathComponent("moved.epub"); try archive(moved).write(to: movedSource)
+        #expect(try EPUBBookFiles.stage(source: movedSource, root: root.appendingPathComponent("Staging")).title == "Test Book")
+        let missingSource = root.appendingPathComponent("missing.epub"); try archive(Array(validEntries().dropFirst())).write(to: missingSource)
+        #expect(try EPUBBookFiles.stage(source: missingSource, root: root.appendingPathComponent("Staging")).title == "Test Book")
+        var wrong = validEntries(); wrong[0].bytes = Data("application/zip".utf8)
+        let wrongSource = root.appendingPathComponent("wrong.epub"); try archive(wrong).write(to: wrongSource)
+        #expect(throws: DataError.self) { try EPUBBookFiles.stage(source: wrongSource, root: root.appendingPathComponent("Staging")) }
+    }
+
     @Test func readsEPUB2NCXNavigation() throws {
         let root = try root(); defer { try? FileManager.default.removeItem(at: root) }
         var entries = validEntries()
