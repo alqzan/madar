@@ -179,16 +179,21 @@ import XCTest
         // Mihbara (the old backup holds no books, reading logs or benefits).
         let mihbara = app.tabBars.buttons["المحبرة"].firstMatch
         XCTAssertTrue(mihbara.waitForExistence(timeout: 20)); mihbara.tap(); Thread.sleep(forTimeInterval: 2)
+        XCTAssertTrue(app.buttons["mihbara-add-paper"].waitForExistence(timeout: 20), "The Mihbara home must actually open")
         shot(app, "TRIAL-mihbara-home-L"); app.swipeUp(velocity: .slow); shot(app, "TRIAL-mihbara-home-s1-L")
 
         // The lobby with every room's data.
         let bahwTab = app.tabBars.buttons["البهو"].firstMatch, bahw = bahwTab.waitForExistence(timeout: 5) ? bahwTab : app.buttons["البهو"].firstMatch
-        if bahw.waitForExistence(timeout: 10) { bahw.tap(); Thread.sleep(forTimeInterval: 2); shot(app, "TRIAL-bahw-L"); for i in 1...3 { app.swipeUp(velocity: .slow); shot(app, "TRIAL-bahw-s\(i)-L") } } else { add(XCTAttachment(string: "lobby tab not found: " + app.tabBars.buttons.allElementsBoundByIndex.map(\.label).joined(separator: "|"))) }
+        XCTAssertTrue(bahw.waitForExistence(timeout: 10), "The lobby is a required room")
+        if bahw.exists { bahw.tap(); Thread.sleep(forTimeInterval: 2); shot(app, "TRIAL-bahw-L"); for i in 1...3 { app.swipeUp(velocity: .slow); shot(app, "TRIAL-bahw-s\(i)-L") } }
         // Prayer and Quran homes, then the habits room from the lobby (Claude, 24 Oct tour).
         for (tab, name) in [("الصلاة", "prayer"), ("القرآن", "quran")] {
             let button = app.tabBars.buttons[tab].firstMatch
             guard button.waitForExistence(timeout: 10) else { XCTFail("Required room tab missing: " + tab); continue }
-            button.tap(); Thread.sleep(forTimeInterval: 2); clearAlert(app, name); shot(app, "TRIAL-\(name)-home-L")
+            button.tap(); Thread.sleep(forTimeInterval: 2); clearAlert(app, name)
+            let marker = app.descendants(matching: .any).matching(identifier: name == "prayer" ? "prayer-today-header" : "quran-coverage-title").firstMatch
+            XCTAssertTrue(marker.waitForExistence(timeout: 20), "The " + name + " home must actually open; a tab tap alone is not proof")
+            shot(app, "TRIAL-\(name)-home-L")
             for i in 1...4 { app.swipeUp(velocity: .slow); shot(app, "TRIAL-\(name)-home-s\(i)-L") }
             for _ in 0..<6 { app.swipeDown(velocity: .fast) }
         }
@@ -197,7 +202,8 @@ import XCTest
         for _ in 0..<6 where !(habits.exists && habits.isHittable) { app.swipeDown(velocity: .fast) }
         if habits.waitForExistence(timeout: 10) {
             let header = app.buttons["bahw-habits-open"]; if header.exists { header.tap() } else { habits.tap() }
-            if app.staticTexts["habits-title"].waitForExistence(timeout: 10) { shot(app, "TRIAL-habits-L"); app.swipeUp(velocity: .slow); shot(app, "TRIAL-habits-s1-L") }
+            XCTAssertTrue(app.staticTexts["habits-title"].waitForExistence(timeout: 10), "The habits room must actually open")
+            if app.staticTexts["habits-title"].exists { shot(app, "TRIAL-habits-L"); app.swipeUp(velocity: .slow); shot(app, "TRIAL-habits-s1-L") }
         } else { XCTFail("Required habits block is missing") }
     }
 }
