@@ -310,6 +310,10 @@ struct BackupSettingsView: View {
                         }
                     }
                     if let next = nextLine(status) { note(next).accessibilityIdentifier("backup-next") }
+                    if status.schedule != .manual {
+                        note("يحاول مدار النسخ في الخلفية عندما يسمح الجهاز، ويُستدرك عند فتحه. موعد التنفيذ غير مضمون.")
+                            .accessibilityIdentifier("backup-background-policy")
+                    }
                     if let result = status.lastResult, status.lastResult != "آخر عملية نسخ نجحت." { Text(result).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
                     Divider().overlay(theme.line)
                     HStack {
@@ -384,11 +388,11 @@ struct BackupSettingsView: View {
     private func nextLine(_ status: BackupUIStatus) -> String? {
         guard status.schedule != .manual else { return "النسخ يدوي فقط؛ اضغط «انسخ الآن» متى شئت." }
         guard status.keyConfigured else { return nil }
-        guard let last = status.lastSuccess else { return "تُنسخ أول نسخة تلقائية في المرة القادمة التي تفتح فيها مدار." }
+        guard let last = status.lastSuccess else { return "تنتظر أول نسخة تلقائية فرصةً في الخلفية أو فتح مدار." }
         let next = last.addingTimeInterval(status.schedule == .daily ? 86_400 : 7 * 86_400)
-        if next <= .now { return "حلّ موعد النسخة التالية؛ تُنسخ حين تفتح مدار." }
+        if next <= .now { return "حلّ موعد النسخة التالية؛ ستُحاوَل في الخلفية أو عند فتح مدار." }
         let labels = dates(next)
-        return "النسخة التالية: " + labels.primary + (labels.secondary.isEmpty ? "" : "، " + labels.secondary)
+        return "موعد المحاولة التالية: " + labels.primary + (labels.secondary.isEmpty ? "" : "، " + labels.secondary)
     }
 
     @ViewBuilder private var encryptedCard: some View {

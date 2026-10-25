@@ -92,6 +92,8 @@ targets:
         NSPhotoLibraryUsageDescription: يعرض مدار صور يومك من تطبيق الصور لتضيف منها ما تشاء، ويحفظ رابطها ونسخة صغيرة منها فقط.
         NSSpeechRecognitionUsageDescription: حوّل التسجيل الذي تختاره إلى نص. لا يُرسل الصوت إلى Apple دون موافقتك داخل مدار.
         NSSupportsLiveActivities: true
+        BGTaskSchedulerPermittedIdentifiers: [com.alqzan.madar2.backup]
+        UIBackgroundModes: [processing]
         UIAppFonts:
           - thmanyahsans-Light.otf
           - thmanyahsans-Regular.otf

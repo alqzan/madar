@@ -788,9 +788,20 @@ final class PrayerNotificationCoordinator {
 
 @MainActor
 final class MadarApplicationDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
-    let prayerNotifications = PrayerNotificationCoordinator()
+    let runtime = MadarRuntime()
+    var prayerNotifications: PrayerNotificationCoordinator { runtime.prayerNotifications }
+    private lazy var backgroundBackups = AppBackupBackgroundTasks { [weak self] in
+        guard let self else { throw DataError.invalidValue("session unavailable") }
+        await runtime.load()
+        guard let service = runtime.session?.backupService as? AppBackupService else {
+            throw DataError.invalidValue("session unavailable")
+        }
+        return service
+    }
 
     func application(_ application: UIApplication, willFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        runtime.backgroundBackups = backgroundBackups
+        backgroundBackups.register()
         prayerNotifications.install(delegate: self)
         return true
     }

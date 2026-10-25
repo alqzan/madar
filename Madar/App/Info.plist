@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>com.alqzan.madar2.backup</string>
+	</array>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>ar</string>
 	<key>CFBundleExecutable</key>
@@ -65,6 +69,10 @@
 		<string>AtkinsonHyperlegible-Bold.ttf</string>
 		<string>IBMPlexSerif-Regular.ttf</string>
 		<string>IBMPlexSerif-Bold.ttf</string>
+	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>processing</string>
 	</array>
 </dict>
 </plist>

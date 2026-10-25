@@ -4,19 +4,18 @@ import MadarData
 import MadarCore
 import MadarDesign
 import CoreSpotlight
+import Observation
 
 @main
 struct MadarApp: App {
     @UIApplicationDelegateAdaptor(MadarApplicationDelegate.self) private var appDelegate
-    var body: some Scene { WindowGroup { MadarSceneContent(prayerNotifications: appDelegate.prayerNotifications) } }
+    var body: some Scene { WindowGroup { MadarSceneContent(runtime: appDelegate.runtime) } }
 }
 
 private struct MadarSceneContent: View {
-    let prayerNotifications: PrayerNotificationCoordinator
-    @State private var session: AppSession?
-    @State private var startupError: String?
-    @State private var pendingURL: URL?
-    @State private var pendingSpotlightBookID: UUID?
+    let runtime: MadarRuntime
+    private var session: AppSession? { runtime.session }
+    private var startupError: String? { runtime.startupError }
     var body: some View {
             Group {
                 #if DEBUG
@@ -28,7 +27,7 @@ private struct MadarSceneContent: View {
             }
             .environment(\.layoutDirection, .rightToLeft)
             .environment(\.locale, Locale(identifier: "ar_SA"))
-            .task { if session == nil && startupError == nil && ProcessInfo.processInfo.environment["MADAR_UI_GALLERY"] != "1" { await load() } }
+            .task { if session == nil && startupError == nil && ProcessInfo.processInfo.environment["MADAR_UI_GALLERY"] != "1" { await runtime.load() } }
             .onChange(of: scenePhase) { _, phase in
                 guard let session else { return }
                 session.privacyPresenter?.transition(phase)
@@ -61,13 +60,13 @@ private struct MadarSceneContent: View {
             }
             .onOpenURL { url in
                 if let session { session.open(url) }
-                else { pendingURL = url }
+                else { runtime.pendingURL = url }
             }
             .onContinueUserActivity(CSSearchableItemActionType) { activity in
                 guard let identifier = activity.userInfo?[CSSearchableItemActivityIdentifier] as? String,
                       let bookID = UUID(uuidString: identifier) else { return }
                 if let session { session.openSpotlightBook(bookID) }
-                else { pendingSpotlightBookID = bookID }
+                else { runtime.pendingSpotlightBookID = bookID }
             }
     }
     private var mainContent: some View {
@@ -95,11 +94,32 @@ private struct MadarSceneContent: View {
                         Label("تعذّر فتح مدار", systemImage: "externaldrive.badge.exclamationmark")
                     } description: {
                         Text("لم يُفتح مخزن البيانات. بياناتك محفوظة، ويمكنك إعادة المحاولة.\n\(startupError)")
-                    } actions: { Button("أعِد المحاولة") { Task { await load() } } }
+                    } actions: { Button("أعِد المحاولة") { Task { await runtime.load() } } }
                 } else { ProgressView("يفتح مدار…") }
         }
     }
-    @MainActor private func load() async {
+    @Environment(\.scenePhase) private var scenePhase
+}
+
+/// The scene and a cold background launch share one in-flight store opening.
+@Observable @MainActor final class MadarRuntime {
+    let prayerNotifications = PrayerNotificationCoordinator()
+    private(set) var session: AppSession?
+    private(set) var startupError: String?
+    var pendingURL: URL?
+    var pendingSpotlightBookID: UUID?
+    @ObservationIgnored weak var backgroundBackups: AppBackupBackgroundTasks?
+    @ObservationIgnored private var loading: Task<Void, Never>?
+
+    func load() async {
+        if session != nil { return }
+        if let loading { await loading.value; return }
+        let task = Task { await openSession() }
+        loading = task
+        await task.value
+        loading = nil
+    }
+    private func openSession() async {
         do {
             guard var group = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.alqzan.madar2") else { throw DataError.missingAppGroup }
             var backupKeyService = "com.alqzan.madar2.backup"
@@ -145,6 +165,7 @@ private struct MadarSceneContent: View {
             opened.lockController = MadarLockController(scope: MadarLockScope(rawValue: opened.string("core.faceIDLock")) ?? .app, service: AppPrivacyService(session: opened))
             await opened.attachPrayerNotifications(prayerNotifications)
             let backup = AppBackupService(session: opened, store: managed, backupDirectory: group.appending(path: "Backups", directoryHint: .isDirectory), keyStore: KeychainBackupKeyStore(service: backupKeyService))
+            backup.backgroundTasks = backgroundBackups
             opened.backupService = backup
             opened.syncService = AppSyncService(session: opened, store: managed, backup: backup)
             if managed.recoveryRequiresRefresh {
@@ -157,6 +178,7 @@ private struct MadarSceneContent: View {
             await opened.runLegacyPrayerTrialIfRequested()
 #endif
             session = opened; startupError = nil
+            await backgroundBackups?.reschedule(using: backup)
             await opened.reconcileSpotlightIndex()
             do { try await opened.drainInbox() }
             catch BackupOperationError.busy { }
@@ -166,5 +188,5 @@ private struct MadarSceneContent: View {
             await MadarIntentHandoff.shared.attach { [weak opened] request in await opened?.handleIntentRequest(request) ?? false }
         } catch { startupError = error.localizedDescription }
     }
-    @Environment(\.scenePhase) private var scenePhase
+
 }

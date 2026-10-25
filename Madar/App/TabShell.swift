@@ -256,6 +256,9 @@ struct MadarRootView: View {
         .alert("لم تكتمل العملية", isPresented: Binding(get: { session.errorMessage != nil }, set: { if !$0 { session.errorMessage = nil } })) {
             Button("حسنًا") { session.errorMessage = nil }
         } message: { Text(session.errorMessage ?? "") }
+        .onChange(of: session.string("core.backup")) { _, _ in
+            Task { await (session.backupService as? AppBackupService)?.refreshBackgroundSchedule() }
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active && !session.maintenanceInProgress {
                 do { try session.reload(); try session.publishSnapshot() }

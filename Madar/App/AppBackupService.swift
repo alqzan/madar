@@ -7,7 +7,9 @@ import WidgetKit
 
 @MainActor final class AppBackupService: BackupUIService {
     private weak var session: AppSession?
+    weak var backgroundTasks: AppBackupBackgroundTasks?
     let coordinator: BackupCoordinator
+    private let scheduledProgress: @Sendable (BackupProgress) -> Void
     private var previews: [UUID: RestorePreview] = [:]
     private var previewPasswords: [UUID: String] = [:]
     private var cancellation = BackupCancellation()
@@ -27,11 +29,13 @@ import WidgetKit
     private var revocationObservers: [UUID: @MainActor (Bool) -> Void] = [:]
     private let presentShare: @MainActor (URL, PrivacyAuthorization) throws -> Void
     init(session: AppSession, store: ManagedDataStore, backupDirectory: URL, keyStore: any BackupKeyStore = KeychainBackupKeyStore(service: "com.alqzan.madar2.backup"),
+         scheduledProgress: @escaping @Sendable (BackupProgress) -> Void = { _ in },
          sharePresentation: (@MainActor (URL, PrivacyAuthorization) throws -> Void)? = nil,
          deriveCredential: @escaping @Sendable (String) async throws -> BackupCredential = { passphrase in
              try await Task.detached(priority: .userInitiated) { try BackupCredential.derive(passphrase: passphrase) }.value
          }) {
         self.session = session
+        self.scheduledProgress = scheduledProgress
         presentShare = sharePresentation ?? { [weak session] file, ticket in
             guard let presenter = session?.privacyPresenter else { throw PrivacyAuthorizationError.stale }
             try presenter.present(file: file, authorization: ticket)
@@ -74,6 +78,7 @@ import WidgetKit
     func setSchedule(_ schedule: BackupUISchedule) async throws {
         guard let session else { throw DataError.invalidValue("session unavailable") }
         try await session.applySettingsAndWait(["core.backup": .string(schedule.rawValue)])
+        await refreshBackgroundSchedule()
     }
     func export(passphrase: String, progress: @escaping @MainActor @Sendable (BackupUIProgress) -> Void) async throws -> URL {
         try await protectedExport(passphrase: passphrase, progress: progress)
@@ -113,7 +118,7 @@ import WidgetKit
             } else {
                 file = try await coordinator.exportPlain(progress: reporter(guardedProgress), cancellation: token, authorization: authorization)
             }
-            if passphrase != nil { try? await retryFolderDelivery() }
+            if passphrase != nil { try? await retryFolderDelivery(); await refreshBackgroundSchedule() }
             guard let ticket = granted else { throw PrivacyAuthorizationError.stale }
             try validate(ticket, controller: controller, operation: id)
             artifactTickets[file] = ticket; artifactFeatures[file] = ticket.features
@@ -206,6 +211,7 @@ import WidgetKit
         let result = try await coordinator.restore(preview: preview, mode: mode == .merge ? .merge : .replace,
             progress: reporter(progress), cancellation: token, authorization: authorization, validation: validation)
         try? await retryFolderDelivery()
+        await refreshBackgroundSchedule()
         previewPasswords.removeValue(forKey: previewID)
         previews.removeValue(forKey: previewID)
         try? FileManager.default.removeItem(at: preview.fileURL)
@@ -220,13 +226,35 @@ import WidgetKit
         for preview in previews.values { try? FileManager.default.removeItem(at: preview.fileURL) }
         previews.removeAll()
     }
-    func runScheduledBackup() async throws {
+    func nextBackgroundBackupDate(now: Date = .now) throws -> Date? {
+        guard let session, try coordinator.hasConfiguredKey() else { return nil }
+        let schedule = BackupSchedule(rawValue: session.string("core.backup")) ?? .off
+        guard let interval = schedule.interval else { return nil }
+        let due = try coordinator.status().lastSuccessAt?.addingTimeInterval(interval) ?? now
+        // An overdue/failed attempt gets a bounded retry, never a tight resubmission loop.
+        return max(due, now.addingTimeInterval(15 * 60))
+    }
+    func refreshBackgroundSchedule() async { await backgroundTasks?.reschedule(using: self) }
+    func runScheduledBackup(cancellation token: BackupCancellation = BackupCancellation()) async throws {
         guard let session else { return }
-        guard try coordinator.hasConfiguredKey() else { return }
-        let raw = session.string("core.backup")
-        let schedule: BackupSchedule = raw == "daily" ? .daily : raw == "weekly" ? .weekly : .off
-        _ = try await coordinator.performScheduledBackupIfDue(schedule: schedule)
-        try? await retryFolderDelivery()
+        try token.check()
+        guard try coordinator.hasConfiguredKey() else { await refreshBackgroundSchedule(); return }
+        let schedule = BackupSchedule(rawValue: session.string("core.backup")) ?? .off
+        do {
+            _ = try await coordinator.performScheduledBackupIfDue(schedule: schedule, progress: scheduledProgress, cancellation: token)
+            try token.check()
+            await withTaskCancellationHandler {
+                try? await retryFolderDelivery()
+            } onCancel: { [weak self] in
+                token.cancel()
+                Task { @MainActor in self?.folderTask?.cancel() }
+            }
+            try token.check()
+            await refreshBackgroundSchedule()
+        } catch {
+            await refreshBackgroundSchedule()
+            throw error
+        }
     }
     func chooseFolder(_ folder: URL) async throws {
         guard folderTask == nil else { throw BackupOperationError.busy }

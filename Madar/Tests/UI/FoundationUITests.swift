@@ -884,6 +884,8 @@ import XCTest
         let app = XCUIApplication()
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
         app.launch(); openBackupSettings(app)
+        XCTAssertTrue(app.staticTexts["backup-background-policy"].waitForExistence(timeout: 10))
+        attachScreenshot(app, named: "B01-background-policy-L")
         let choose = app.buttons["backup-folder-choose"]
         scrollBackupForm(to: choose, in: app, towardsTop: true)
         XCTAssertTrue(choose.isHittable, app.debugDescription)
