@@ -89,7 +89,8 @@ import XCTest
         let next = app.buttons["bahw-habits-next"]
         XCTAssertTrue(next.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertTrue(next.label.contains("التالي: الماء"), next.label)
-        XCTAssertTrue(next.label.contains("فاتتك فترة في الماء"), next.label)
+        // The same habit is named once (tour 25 Oct): its miss joins its step.
+        XCTAssertTrue(next.label.contains("فاتتك فترة، "), next.label); XCTAssertFalse(next.label.contains("في الماء"), next.label)
         capture(app, "M4-V01-habit-wide-after-L")
 
         habits.press(forDuration: 0.7)

@@ -234,35 +234,44 @@ struct HabitsRoomView: View {
         let p = row.summary.current, met = p?.met == true
         let share = Double(p?.value ?? 0)/Double(max(1,p?.target ?? 1))
         return HStack(spacing:0) {
+            leading(row,share:share,met:met).padding(.leading,10)
             Button { detail = row } label: {
                 HStack(spacing:12) {
-                    if !dynamicTypeSize.isAccessibilitySize { HabitRingGlyph(share:share,done:met,symbol:row.source == nil ? nil : row.symbol).frame(width:36,height:36) }
                     VStack(alignment:.leading,spacing:4) {
                         HStack(spacing:6) { Text(row.name).font(MadarTypography.section()); if row.summary.streak > 1 { HabitFlame(count:row.summary.streak,frequency:p?.rule.frequency ?? .daily,digits:digits) }; if let source=row.sourceTitle { Text(source).font(MadarTypography.fine()).padding(.horizontal,6).padding(.vertical,2).background(theme.background,in:.capsule) } }
                         if !progress(row).isEmpty { Text(progress(row)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
                         if row.paused || row.isNow || row.summary.atRisk { Label(row.statusTitle,systemImage:row.paused ? "pause.circle" : "circle.lefthalf.filled").font(MadarTypography.fine()).foregroundStyle(theme.accent) }
                     }
                     Spacer(minLength:0)
-                }.padding(.leading,14).padding(.vertical,13).frame(minHeight:70).contentShape(.rect)
+                }.padding(.leading,10).padding(.vertical,13).frame(minHeight:70).contentShape(.rect)
             }.buttonStyle(.plain).accessibilityIdentifier("habit-row-"+row.id.uuidString).accessibilityLabel(row.name+"، "+progress(row)+"، "+row.statusTitle)
             // A day forgotten is one long-press away (item 26), without opening the habit.
             .contextMenu { if row.source == nil, !row.archived, let p = row.summary.current, p.rule.measure != .health, (row.summary.periods.first?.start).map({ $0 < today }) == true { Button("فعلتها في يوم سابق",systemImage:"calendar.badge.clock") { pastDay = row } } }
             trailing(row).padding(.trailing,10)
         }
     }
-    /// One tap per habit: a manual habit still open gets its own button; a finished once-habit shows a quiet mark instead.
+    /// A once-habit's ring is its own checkbox: one circle per row, tapped to finish (tour 25 Oct: the ring
+    /// beside an empty tap circle read as two of the same). Count habits keep the ring as progress and a «+».
+    @ViewBuilder private func leading(_ row:HabitReading,share:Double,met:Bool)->some View {
+        if let p=row.summary.current, row.source == nil, !row.paused, p.target > 0, p.rule.measure == .once, !met {
+            Button { perform("habit.complete",["id":.string(row.id.uuidString),"delta":.number(1)]) } label: {
+                Circle().stroke(theme.accent,lineWidth:2).frame(width:32,height:32).frame(width:44,height:44).contentShape(.circle)
+            }.buttonStyle(.plain)
+            .accessibilityLabel(quickLogLabel(row.name,.once))
+            .accessibilityIdentifier("habit-quick-"+row.id.uuidString)
+        } else if !dynamicTypeSize.isAccessibilitySize {
+            HabitRingGlyph(share:share,done:met,symbol:row.source == nil ? nil : row.symbol).frame(width:36,height:36).frame(width:44,height:44)
+        }
+    }
+    /// Count and duration habits log from a «+»; a once-habit logs from its ring.
     @ViewBuilder private func trailing(_ row:HabitReading)->some View {
-        if row.source == nil, !row.paused, let p=row.summary.current, p.target > 0, !(p.met && p.rule.measure == .once) {
+        if row.source == nil, !row.paused, let p=row.summary.current, p.target > 0, p.rule.measure != .once {
             Button { perform("habit.complete",["id":.string(row.id.uuidString),"delta":.number(p.rule.measure == .duration ? 15 : 1)]) } label: {
-                Group {
-                    if p.rule.measure == .once { Circle().stroke(theme.accent,lineWidth:1.6).frame(width:34,height:34) }
-                    else { Image(systemName:"plus").font(.system(size:16,weight:.semibold)).foregroundStyle(p.met ? theme.accent : theme.onAccent).frame(width:38,height:38).background(p.met ? theme.accentFill.opacity(0.14) : theme.accentFill,in:.circle) }
-                }.frame(width:44,height:44).contentShape(.circle)
+                Image(systemName:"plus").font(.system(size:16,weight:.semibold)).foregroundStyle(p.met ? theme.accent : theme.onAccent).frame(width:38,height:38).background(p.met ? theme.accentFill.opacity(0.14) : theme.accentFill,in:.circle)
+                    .frame(width:44,height:44).contentShape(.circle)
             }.buttonStyle(.plain)
             .accessibilityLabel(quickLogLabel(row.name,p.rule.measure))
             .accessibilityIdentifier("habit-quick-"+row.id.uuidString)
-        } else if row.summary.current?.met == true {
-            Image(systemName:"checkmark").font(.system(size:15,weight:.semibold)).foregroundStyle(theme.onAccent).frame(width:34,height:34).background(theme.accentFill,in:.circle).frame(width:44,height:44).accessibilityHidden(true)
         }
     }
     private func quickLogLabel(_ name:String,_ measure:HabitMeasure)->String {

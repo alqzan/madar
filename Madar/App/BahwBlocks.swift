@@ -160,7 +160,9 @@ struct BahwBlockView: View {
                     }
                 }
                 Text(row.name).font(small).lineLimit(2).multilineTextAlignment(.center)
-                Text(progress).font(MadarTypography.fine()).foregroundStyle(room.secondaryInk).lineLimit(1)
+                // Tour 25 Oct: an empty ring already says «not yet»; the line below speaks only when it adds something.
+                if row.summary.streak > 1, current?.met != true { HabitFlame(count: row.summary.streak, frequency: current?.rule.frequency ?? .daily, digits: digits) }
+                else if progress != "لم تتمّها بعد" { Text(progress).font(MadarTypography.fine()).foregroundStyle(room.secondaryInk).lineLimit(1) }
             }
             .frame(maxWidth: .infinity, minHeight: 74)
             .contentShape(.rect(cornerRadius: 12))
@@ -481,11 +483,16 @@ private struct BahwHabitsWide: View {
                     VStack(alignment: .leading, spacing: 2) {
                         if let next {
                             Text("التالي: " + next.name).font(.custom("thmanyahsans-Bold", size: 12, relativeTo: .caption)).lineLimit(1)
-                            Text(step(for: next)).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(theme.secondaryInk).lineLimit(1)
+                            // The same habit is named once: its misses join its step instead of a third line.
+                            if missed?.id == next.id, let missed {
+                                Text(missedCount(missed) + "، " + step(for: next) + (next.summary.current?.rule.frequency == .daily ? " اليوم" : "")).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(theme.accent).lineLimit(1)
+                            } else {
+                                Text(step(for: next)).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(theme.secondaryInk).lineLimit(1)
+                            }
                         } else {
                             Text("اكتمل ما يستحق في هذه الفترة").font(.custom("thmanyahsans-Regular", size: 12, relativeTo: .caption)).lineLimit(1)
                         }
-                        if let missed {
+                        if let missed, missed.id != next?.id {
                             Text(missedText(for: missed)).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(theme.accent).lineLimit(1)
                         }
                     }
@@ -506,6 +513,11 @@ private struct BahwHabitsWide: View {
         if current.rule.measure == .once { return "أكملها" }
         let remaining = max(0, current.target - current.value)
         return "بقي " + habitUnitCount(remaining, current.rule.unit, digits)
+    }
+
+    private func missedCount(_ row: HabitReading) -> String {
+        let count = row.summary.consecutiveMisses
+        return count == 1 ? "فاتتك فترة" : count == 2 ? "فاتتك فترتان" : "فاتتك " + digits.string(count) + " فترات"
     }
 
     private func missedText(for row: HabitReading) -> String {
