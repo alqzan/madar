@@ -41,16 +41,26 @@ struct HabitRhythmBand:View {
         }
     }
 
-    // MARK: Day: steps that rise as habits finish
+    // MARK: Day: the last seven days as steps
 
+    /// Each of the last seven days is a step whose height is how much of that day's daily habits was done; the room's
+    /// hero already counts today, so the band shows the week of days behind it.
+    private var lastSeven:[(day:GregorianDay,share:Double)] {
+        let due = rows.filter { !$0.paused }
+        guard !due.isEmpty else { return [] }
+        return (0..<7).reversed().map { back in
+            let day = today.adding(days:-back)
+            let done = due.filter { r in r.times.contains { $0.day == day } }.count
+            return (day,Double(done)/Double(due.count))
+        }
+    }
     private var steps:some View {
-        let due = rows.filter { !$0.paused && ($0.summary.current?.target ?? 0) > 0 }, n = max(1,due.count)
-        return HStack(alignment:.bottom,spacing:5) {
-            ForEach(Array(due.enumerated()),id:\.offset) { i,row in
-                let met = row.summary.current?.met == true
-                RoundedRectangle(cornerRadius:5).fill(met ? theme.accentFill : .clear)
-                    .overlay { RoundedRectangle(cornerRadius:5).stroke(met ? theme.accentFill : theme.line,lineWidth:1.4) }
-                    .frame(height:22+CGFloat(i)*50/CGFloat(n))
+        HStack(alignment:.bottom,spacing:4) {
+            ForEach(lastSeven,id:\.day) { item in
+                let isToday = item.day == today, full = item.share >= 1
+                RoundedRectangle(cornerRadius:4).fill(item.share > 0 ? theme.accentFill.opacity(full ? 1 : 0.55) : .clear)
+                    .overlay { RoundedRectangle(cornerRadius:4).stroke(isToday ? theme.accent : full ? theme.accentFill : theme.line,lineWidth:isToday ? 1.6 : 1) }
+                    .frame(height:12+64*max(0.06,item.share))
             }
         }.frame(maxHeight:.infinity,alignment:.bottom)
     }
@@ -118,10 +128,10 @@ struct HabitRhythmBand:View {
         let open = rows.filter { !$0.paused && $0.summary.current.map { $0.target > 0 && !$0.met } == true }
         switch frequency {
         case .daily:
-            let due = rows.filter { !$0.paused && ($0.summary.current?.target ?? 0) > 0 }
-            guard !due.isEmpty else { return "لا عادة يومية اليوم" }
-            let done = due.count - open.count
-            return done == due.count ? "خطوات اليوم كلها تمّت" : "اليوم "+digits.string(done)+" من "+digits.string(due.count)+"، تليها "+(open.first?.name ?? "")
+            let week = lastSeven
+            guard !week.isEmpty else { return "لا عادة يومية جارية" }
+            let full = week.filter { $0.share >= 1 }.count
+            return full == 0 ? "أسبوعك خطوات صغيرة؛ يكفي أن تبدأ" : full == 7 ? "سبعة أيام تامة، ما شاء الله" : "في آخر سبعة أيام، "+arabicCount(full,["يوم واحد تمّ كله","يومان تمّا كلهما","أيام تمّت كلها","يومًا تمّت كلها"],digits)
         case .weekly:
             guard let next = open.first, let p = next.summary.current else { return "عادات الأسبوع تمّت" }
             return "هذا الأسبوع "+next.name+"، "+habitProgressText(p.value,p.target,p.rule.unit,digits)
