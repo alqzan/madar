@@ -29,6 +29,10 @@ struct LegacyMoveReceipt: Codable, Equatable {
     var at: Date, fileName: String, outcomes: [LegacyMoveOutcome], undoneAt: Date?
     var added: Int { outcomes.reduce(0) { $0 + $1.added } }
 }
+struct LegacyMoveUndo {
+    let plan: ImportUndo.Plan
+    let isPartial: Bool
+}
 
 /// Item 24 (owner's go, 25 Oct 2026): file → preview per room → «انقل» → result with one undo. Undo compares record
 /// snapshots, so commands, direct rows and settings all revert together, and rows changed after the move are kept.
@@ -41,8 +45,40 @@ struct LegacyMoveReceipt: Codable, Equatable {
         return base.appending(path: "LegacyMove", directoryHint: .isDirectory)
     }
     private var undoURL: URL { folder.appending(path: "undo.json") }
-    /// `complete` is nil while a move runs; a file left that way (the move was cut short) undoes against the store as it is.
-    private struct UndoFile: Codable { var receipt: LegacyMoveReceipt; var before: [DataRecord]; var after: [DataRecord]; var complete: Bool? }
+    /// Only confirmed changes belong to undo. Never treat the whole live store after a crash as imported data.
+    private struct UndoFile: Codable {
+        var receipt: LegacyMoveReceipt
+        var before: [DataRecord]
+        var after: [DataRecord]
+        var complete: Bool?
+        var recoveryIncomplete: Bool?
+        var version: Int?
+
+        /// Older receipts captured the entire store across replays and cannot prove which rows were imported.
+        var confirmed: Self {
+            guard version != 2 else { return self }
+            return Self(receipt: receipt, before: [], after: [], complete: complete, recoveryIncomplete: true, version: 2)
+        }
+
+        /// Accumulate changes across rooms and repeated moves, excluding native writes made between them.
+        func recording(from start: [DataRecord], to end: [DataRecord]) -> Self {
+            func key(_ row: DataRecord) -> String { row.model + ":" + row.id.uuidString + ":" + (row.fields["mergedInto"]?.string ?? "") }
+            func map(_ rows: [DataRecord]) -> [String: DataRecord] { Dictionary(rows.map { (key($0), $0) }, uniquingKeysWith: { a, _ in a }) }
+            let old = map(before), saved = map(after), current = map(start), next = map(end)
+            let tracked = Set(old.keys).union(saved.keys).filter { old[$0] != saved[$0] }
+            let changed = Set(current.keys).union(next.keys).filter { current[$0] != next[$0] }
+            var result = self
+            result.before = []; result.after = []
+            for k in tracked.union(changed).sorted() {
+                // If a later move changes an owner's intervening edit, that edit becomes its undo baseline.
+                let previous = tracked.contains(k) && !(changed.contains(k) && saved[k] != current[k]) ? old[k] : current[k]
+                let imported = changed.contains(k) ? next[k] : saved[k]
+                if let previous { result.before.append(previous) }
+                if let imported { result.after.append(imported) }
+            }
+            return result
+        }
+    }
 
     static let models: [String: Set<String>] = ["prayer": ["PrayerLog", "QadaItem"], "quran": ["HifzSession", "MistakeSpot", "HifzPlan"],
         "habits": ["Habit", "HabitEvent"], "personal": ["Letter", "UpcomingDay"], "money": ["MoneyTransaction", "Account", "Card"]]
@@ -119,23 +155,30 @@ struct LegacyMoveReceipt: Codable, Equatable {
             let current = try RecordBridge.all(ModelContext(app.container), syncedOnly: false)
             // An earlier move not yet undone keeps its «before», so one undo always returns to the store before any move.
             let earlier = (try? Data(contentsOf: undoURL)).flatMap { try? JSONDecoder().decode(UndoFile.self, from: $0) }
-            let before = earlier.flatMap { $0.receipt.undoneAt == nil ? $0.before : nil } ?? current
             // Written before the first room, so a move cut short (killed, disk full) can still be undone.
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true, attributes: [.protectionKey: FileProtectionType.complete])
             let url = undoURL
             func save(_ file: UndoFile) throws { try JSONEncoder().encode(file).write(to: url, options: [.atomic, .completeFileProtection]) }
             let started = LegacyMoveReceipt(at: now, fileName: preview.fileName, outcomes: [], undoneAt: nil)
-            try save(UndoFile(receipt: earlier?.receipt.undoneAt == nil ? earlier?.receipt ?? started : started, before: before, after: earlier?.after ?? current, complete: nil))
+            var journal = earlier.flatMap { $0.receipt.undoneAt == nil ? $0.confirmed : nil }
+                ?? UndoFile(receipt: started, before: [], after: [], complete: nil, recoveryIncomplete: false, version: 2)
+            if earlier != nil && earlier?.complete != true { journal.recoveryIncomplete = true }
+            journal.complete = nil
+            try save(journal)
             let zone = app.activePlace.timeZone, writer = AppSession.legacyMoveWriter
             var outcomes: [LegacyMoveOutcome] = []
             func summarize(_ room: LegacyMoveRoom, _ counts: [String: Int]) -> LegacyMoveOutcome {
                 var o = LegacyMoveOutcome(id: room.id, title: room.title)
                 o.keptNative = counts.filter { $0.key.hasSuffix(".keptNative") }.values.reduce(0, +)
                 o.waiting = counts.filter { $0.key.hasPrefix("message.state.") && !$0.key.hasSuffix(".ok") }.values.reduce(0, +)
+                if counts.contains(where: { ($0.key.contains(".rejected:") || $0.key.contains(".error.")) && $0.value > 0 }) {
+                    o.failed = "لم تُنقل بعض البيانات؛ بقيت سجلاتك الحالية كما هي."
+                }
                 return o
             }
             for room in preview.rooms where !room.isEmpty {
                 progress(room.title)
+                let roomBefore = try RecordBridge.all(ModelContext(app.container), syncedOnly: false)
                 do {
                     let counts: [String: Int]
                     switch room.id {
@@ -149,6 +192,9 @@ struct LegacyMoveReceipt: Codable, Equatable {
                 } catch {
                     var o = LegacyMoveOutcome(id: room.id, title: room.title); o.failed = error.localizedDescription; outcomes.append(o)
                 }
+                // A crash can lose at most the in-flight room's checkpoint. A known completed room is always undoable.
+                journal = journal.recording(from: roomBefore, to: try RecordBridge.all(ModelContext(app.container), syncedOnly: false))
+                try save(journal)
             }
             let after = try RecordBridge.all(ModelContext(app.container), syncedOnly: false)
             // «Added» is what the owner can now see: live rows of the room's own records that were not there before.
@@ -161,7 +207,8 @@ struct LegacyMoveReceipt: Codable, Equatable {
             }
             let receipt = LegacyMoveReceipt(at: now, fileName: preview.fileName, outcomes: outcomes, undoneAt: nil)
             let shown = receipt.added > 0 || earlier?.receipt.undoneAt != nil || earlier == nil ? receipt : earlier!.receipt
-            try save(UndoFile(receipt: shown, before: before, after: after, complete: true))
+            journal.receipt = shown; journal.complete = true
+            try save(journal)
             return receipt
         }
     }
@@ -172,12 +219,12 @@ struct LegacyMoveReceipt: Codable, Equatable {
         return file.receipt.undoneAt == nil ? file.receipt : nil
     }
 
-    func undo() async throws -> ImportUndo.Plan {
-        let file = try JSONDecoder().decode(UndoFile.self, from: Data(contentsOf: undoURL))
+    func undo() async throws -> LegacyMoveUndo {
+        let file = try JSONDecoder().decode(UndoFile.self, from: Data(contentsOf: undoURL)).confirmed
         return try await app.performLegacyMove { now in
             let context = ModelContext(app.container)
             let current = try RecordBridge.all(context, syncedOnly: false)
-            let plan = try ImportUndo.plan(before: file.before, after: file.complete == true ? file.after : current, current: current, now: now)
+            let plan = try ImportUndo.plan(before: file.before, after: file.after, current: current, now: now)
             for row in plan.writes { try RecordBridge.upsert(row, in: context) }
             func tag(_ r: DataRecord) -> String { r.model + r.id.uuidString + (r.fields["mergedInto"]?.string ?? "") }
             let gone = Set(plan.removals.map(tag)), ids = Set(plan.removals.map(\.id))
@@ -201,7 +248,7 @@ struct LegacyMoveReceipt: Codable, Equatable {
             }
             // The snapshots are the owner's data; once undone they are no longer needed on disk.
             try? FileManager.default.removeItem(at: undoURL)
-            return plan
+            return LegacyMoveUndo(plan: plan, isPartial: file.complete != true || file.recoveryIncomplete == true)
         }
     }
 }

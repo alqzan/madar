@@ -85,8 +85,11 @@ private struct ReceiptWire: Codable {
             // stable across reopen; managed production callers always supply the real pointer.
             let generationID = activeGeneration ?? request.generationID ?? StableIdentity.uuid(for: "CommandGeneration:\(lockDirectory.standardizedFileURL.resolvingSymlinksInPath().path)")
             let namespaces = try context.fetch(FetchDescriptor<DeviceSetting>()).filter { $0.key.hasPrefix("sys.commandReceiptScope:") && $0.deletedAt == nil && $0.mergedInto == nil }
+            // Import/replay can hold thousands of receipts. Index once instead of scanning all scopes for every
+            // receipt; keep every duplicate in its group so ambiguous scopes still fail closed.
+            let namespacesByKey = Dictionary(grouping: namespaces, by: \.key)
             func namespace(_ row: MadarData.CommandReceipt) -> ReceiptNamespace? {
-                let matches = namespaces.filter { $0.key == "sys.commandReceiptScope:\(row.id.uuidString)" }
+                let matches = namespacesByKey["sys.commandReceiptScope:\(row.id.uuidString)"] ?? []
                 guard matches.count == 1, let value = try? JSONDecoder().decode(ReceiptNamespace.self, from: matches[0].valueJSON), value.version == 1 else { return nil }
                 return value
             }

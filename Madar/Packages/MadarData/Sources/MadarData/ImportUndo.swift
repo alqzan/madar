@@ -35,6 +35,13 @@ public enum ImportUndo {
         for row in current where row.isLive && new[key(row)] != row {
             for (field, value) in row.fields where field != "id" { collect(value) }
         }
+        // A later native event keeps its imported habit. Keep that habit's rules and pauses too, or the event would
+        // survive but the habit would lose the period/target used to interpret it. Old imported events still undo.
+        for row in current where row.isLive && ["HabitPolicy", "HabitPause"].contains(row.model) {
+            if let habit = row.fields["habitID"]?.string, referenced.contains(habit.uppercased()) {
+                referenced.insert(row.id.uuidString.uppercased())
+            }
+        }
         var plan = Plan()
         for (k, imported) in new where old[k] != imported {
             guard let present = live[k] else { continue }

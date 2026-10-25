@@ -245,6 +245,36 @@ import MadarInbox
         #expect(!((try inbox.wasCommitted(commandID: first.command.commandID, generationID: generation))))
     }
 
+    @Test func indexedReceiptScopesStillRejectDuplicateMalformedAndFutureScopes() async throws {
+        for invalid in ["duplicate", "malformed", "future"] {
+            let (container, adapter, _) = try fixture()
+            let bus = CommandBus(adapter: adapter), command = prayer(generation: UUID()).command
+            let initial = try await bus.execute(command)
+            #expect(initial.status == .applied)
+            let context = ModelContext(container)
+            let receipt = try #require(try context.fetch(FetchDescriptor<MadarData.CommandReceipt>()).first { $0.commandID == command.commandID })
+            let scope = try #require(try context.fetch(FetchDescriptor<DeviceSetting>()).first { $0.key == "sys.commandReceiptScope:\(receipt.id.uuidString)" })
+            let original = scope.valueJSON
+            var duplicate: DeviceSetting?
+            if invalid == "duplicate" {
+                let row = DeviceSetting(); row.key = scope.key; row.valueJSON = original; context.insert(row); duplicate = row
+            } else if invalid == "malformed" { scope.valueJSON = Data("not JSON".utf8) }
+            else {
+                var value = try #require(JSONSerialization.jsonObject(with: original) as? [String: Any])
+                value["version"] = 2; scope.valueJSON = try JSONSerialization.data(withJSONObject: value)
+            }
+            try context.save()
+            let rejected = try await bus.execute(command)
+            #expect(rejected.status == .needsApp); #expect(rejected.reason == "receiptGenerationUnknown")
+            #expect(try context.fetchCount(FetchDescriptor<PrayerLog>()) == 1)
+            if let duplicate { duplicate.deletedAt = Date() } else { scope.valueJSON = original }
+            try context.save()
+            let recovered = try await bus.execute(command)
+            #expect(recovered.status == initial.status)
+            #expect(try context.fetchCount(FetchDescriptor<MadarData.CommandReceipt>()) == 1)
+        }
+    }
+
     @Test func test_M0S1_scopedReceiptReopensAfterSaveBeforeRefresh() async throws {
         let (container, adapter, inbox) = try fixture(), generation = UUID(), first = prayer(generation: UUID())
         _ = try inbox.enqueue(.init(expectedGenerationID: generation, command: first.command))

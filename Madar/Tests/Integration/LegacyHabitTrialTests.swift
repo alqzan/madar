@@ -3,6 +3,7 @@ import SwiftData
 import MadarCore
 import MadarData
 import MadarCommands
+import CryptoKit
 @testable import Madar
 
 @MainActor final class LegacyHabitTrialTests: XCTestCase {
@@ -61,6 +62,54 @@ import MadarCommands
         try weeklyContext.save()
         let separate = try LegacyHabitTrial.apply(plan, to: weeklyStore.container, zone: zone)
         XCTAssertEqual(separate["habits.created"], 1, "a weekly habit never absorbs old daily times")
+    }
+
+    /// The native diary link survives both an old-app merge and a real encrypted package restore, including replay.
+    func testNativeMemorySurvivesLegacyMoveAndEncryptedRestore() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("HabitMemoryRestore-" + UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = try ManagedDataStore(root: root.appendingPathComponent("Source"))
+        let context = ModelContext(store.container)
+        let habit = Habit(); habit.name = "عادة تجريبية"; habit.kind = "custom"; context.insert(habit)
+        let policy = HabitPolicy(); policy.habitID = habit.id; policy.effectiveFrom = "2026-10-01"; policy.frequency = "daily"; context.insert(policy)
+        let entry = Entry(); entry.dayKey = "2026-10-22"; entry.text = "ذكرى اصطناعية محفوظة"; context.insert(entry)
+        let event = HabitEvent(); event.habitID = habit.id; event.dayKey = entry.dayKey; event.periodKey = entry.dayKey
+        event.delta = 1; event.entryID = entry.id; context.insert(event)
+        let media = Media(); let bytes = Data("synthetic diary attachment".utf8)
+        media.data = bytes; media.sizeBytes = bytes.count; media.sha256 = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined(); context.insert(media)
+        try context.save()
+        let ids = (habit.id, entry.id, event.id, media.id)
+        let backup = Data(#"{"habits":[{"id":"h","name":"عادة تجريبية","logs":["2026-10-21","2026-10-22","2026-10-23"]}]}"#.utf8)
+        _ = try LegacyHabitTrial.importBackup(backup, to: store.container, zone: zone, now: Date())
+        let expected = try records(store.container)
+        let coordinator = BackupCoordinator(store: store, backupDirectory: root.appendingPathComponent("Backups"), keyStore: MemoryBackupKeyStore())
+        let password = "synthetic memory password"
+        try await coordinator.configurePassphrase(password)
+        let receipt = try await coordinator.export(kind: .automatic)
+        XCTAssertEqual(receipt.fileURL.pathExtension, "madarbackupset")
+        for mode in [RestoreMode.merge, .replace] {
+            let targetRoot = root.appendingPathComponent(UUID().uuidString)
+            let target = try ManagedDataStore(root: targetRoot)
+            let restore = BackupCoordinator(store: target, backupDirectory: root.appendingPathComponent("Safety-" + UUID().uuidString), keyStore: MemoryBackupKeyStore())
+            try await restore.configurePassphrase(password)
+            let preview = try await restore.preview(file: receipt.fileURL, passphrase: password)
+            _ = try await restore.restore(preview: preview, mode: mode)
+            // Reopen from disk rather than trusting the context used for restoration.
+            let reopened = try ManagedDataStore(root: targetRoot), check = ModelContext(reopened.container)
+            let events = try check.fetch(FetchDescriptor<HabitEvent>()).filter { $0.habitID == ids.0 }
+            XCTAssertEqual(events.map(\.dayKey).sorted(), ["2026-10-21", "2026-10-22", "2026-10-23"])
+            let remembered = try XCTUnwrap(events.first { $0.dayKey == "2026-10-22" })
+            XCTAssertEqual(remembered.id, ids.2); XCTAssertEqual(remembered.entryID, ids.1)
+            XCTAssertEqual(try check.fetch(FetchDescriptor<Entry>()).first { $0.id == ids.1 }?.text, "ذكرى اصطناعية محفوظة")
+            XCTAssertEqual(try check.fetch(FetchDescriptor<Media>()).first { $0.id == ids.3 }?.data, bytes)
+            let beforeReplay = try records(reopened.container)
+            _ = try LegacyHabitTrial.importBackup(backup, to: reopened.container, zone: zone, now: Date().addingTimeInterval(86400))
+            XCTAssertEqual(try records(reopened.container), beforeReplay, "Legacy replay after restore must keep the linked memory unchanged")
+            XCTAssertEqual(Set(expected.map { $0.model + $0.id.uuidString }), Set(beforeReplay.map { $0.model + $0.id.uuidString }))
+            let replay = try await restore.preview(file: receipt.fileURL, passphrase: password)
+            XCTAssertEqual(replay.additions, 0)
+            if mode == .merge { XCTAssertEqual(replay.updates, 0) }
+        }
     }
     func testImportPreservesDaysDeletionFreezeAndReplayAfterNativeEdit() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("LegacyHabitTrial-" + UUID().uuidString)

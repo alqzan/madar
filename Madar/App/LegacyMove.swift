@@ -129,7 +129,8 @@ extension AppSession {
         var counts: [String: Int] = [:]
         func count(_ key: String) { counts[key, default: 0] += 1 }
         let context = ModelContext(container)
-        let existing = try context.fetch(FetchDescriptor<MadarData.Category>()).filter { $0.deletedAt == nil }
+        let storedCategories = try context.fetch(FetchDescriptor<MadarData.Category>())
+        let existing = storedCategories.filter { $0.deletedAt == nil && $0.mergedInto == nil }
             .map { LegacyMoneyImport.Category(id: $0.id, name: $0.name, order: $0.order) }
         let zone = activePlace.timeZone
         let plan = try LegacyMoneyImport.plan(backup: backup, existing: existing, timeZone: zone, uuid: StableIdentity.uuid(for:))
@@ -142,20 +143,35 @@ extension AppSession {
         }
         try context.save()
         // The same bank account or card the owner already added natively is reused, never duplicated.
-        let liveAccounts = try context.fetch(FetchDescriptor<Account>()).filter { $0.deletedAt == nil }
-        let liveCards = try context.fetch(FetchDescriptor<Card>()).filter { $0.deletedAt == nil }
+        let storedAccounts = try context.fetch(FetchDescriptor<Account>())
+        let storedCards = try context.fetch(FetchDescriptor<Card>())
+        let liveAccounts = storedAccounts.filter { $0.deletedAt == nil && $0.mergedInto == nil }
+        let liveCards = storedCards.filter { $0.deletedAt == nil && $0.mergedInto == nil }
+        let identityRows = try storedAccounts.map { try $0.record() } + storedCards.map { try $0.record() } + storedCategories.map { try $0.record() }
+        // Device receipts are deliberately absent after restore. Stable source identities (including tombstones)
+        // still prove that a row arrived before: replay must not rename it, reset its balance or resurrect it.
+        let accountIDs = Set(storedAccounts.map(\.id)), cardIDs = Set(storedCards.map(\.id))
+        let storedMovements = try context.fetch(FetchDescriptor<MoneyTransaction>())
+        let movementIDs = Set(storedMovements.map(\.id))
+        let movementStates = Dictionary(storedMovements.filter { $0.deletedAt == nil && $0.mergedInto == nil }.map { ($0.id, $0.reviewState) }, uniquingKeysWith: { first, _ in first })
+        let rulePatterns = Set(try context.fetch(FetchDescriptor<MerchantRule>()).map(\.pattern))
         var accountMap: [UUID: UUID] = [:], cardMap: [UUID: UUID] = [:], createdAccounts: Set<UUID> = []
         for case let .saveAccount(_, id, _, bank, last4, _) in plan.steps {
+            let resolved = RowMerger.resolve(id: id, model: "Account", rows: identityRows)
+            if resolved != id { accountMap[id] = resolved; continue }
             guard let bank, let last4, !liveAccounts.contains(where: { $0.id == id }),
                   let native = liveAccounts.first(where: { $0.bank.uppercased() == bank.uppercased() && $0.last4 == last4 }) else { continue }
             accountMap[id] = native.id
         }
         for case let .saveCard(_, id, last4, bank, _, _) in plan.steps {
+            let resolved = RowMerger.resolve(id: id, model: "Card", rows: identityRows)
+            if resolved != id { cardMap[id] = resolved; continue }
             guard !liveCards.contains(where: { $0.id == id }),
                   let native = liveCards.first(where: { $0.last4 == last4 && $0.bank.uppercased() == bank.uppercased() }) else { continue }
             cardMap[id] = native.id
         }
-        func account(_ id: UUID) -> UUID { accountMap[id] ?? id }
+        func account(_ id: UUID) -> UUID { RowMerger.resolve(id: accountMap[id] ?? id, model: "Account", rows: identityRows) }
+        func category(_ id: UUID) -> UUID { RowMerger.resolve(id: id, model: "Category", rows: identityRows) }
         func run(_ name: String, _ payload: [String: MadarCore.JSONValue], _ id: UUID, _ key: String) async -> String {
             let status: String
             do { status = try await executeImportCommand(name, payload: payload, id: id) } catch { status = "error." + String(describing: error).prefix(60) }
@@ -193,7 +209,7 @@ extension AppSession {
         for step in plan.steps {
             switch step {
             case let .saveAccount(command, id, kind, bank, last4, at):
-                guard accountMap[id] == nil else { count("account.keptNative"); continue }
+                guard accountMap[id] == nil, !accountIDs.contains(id) else { count("account.keptNative"); continue }
                 let shownBank = bank.map { $0.uppercased() }
                 var p: [String: MadarCore.JSONValue] = ["id": .string(id.uuidString), "kind": .string("current"), "ownership": .string("mine"), "currency": .string("SAR"),
                     "name": .string(kind == "earlier" ? "بطاقة غير معروفة — رسائلها غير محفوظة" : kind == "unidentified" ? "حساب بطاقة مدى — رقمه غير معروف" : "حساب " + (shownBank ?? "") + (last4.map { " " + arabic($0) } ?? "")),
@@ -202,19 +218,21 @@ extension AppSession {
                 if let last4 { p["last4"] = .string(last4) }
                 if await run("money.saveAccount", p, command, "account") == "applied" { createdAccounts.insert(id) }
             case let .saveCard(command, id, last4, bank, kind, linked):
-                guard cardMap[id] == nil else { count("card.keptNative"); continue }
+                guard cardMap[id] == nil, !cardIDs.contains(id) else { count("card.keptNative"); continue }
                 var p: [String: MadarCore.JSONValue] = ["id": .string(id.uuidString), "name": .string((kind == "credit" ? "بطاقة ائتمانية " : "بطاقة مدى ") + bank.uppercased() + " ‹" + arabic(last4) + "›"), "bank": .string(bank.uppercased()),
                                                        "last4": .string(last4), "kind": .string(kind), "aliases": .array([.string(bank)])]
                 if let linked { p["accountID"] = .string(account(linked).uuidString) }
                 _ = await run("money.saveCard", p, command, "card")
-            case let .saveRule(command, merchant, category):
-                _ = await run("money.saveMerchantRule", ["merchant": .string(merchant), "categoryID": .string(category.uuidString), "ignore": .bool(false)], command, "rule")
-            case let .logExpense(command, amount, merchant, category, at, from):
+            case let .saveRule(command, merchant, sourceCategory):
+                guard !rulePatterns.contains(BankDedupe.normalize(merchant)) else { count("rule.keptNative"); continue }
+                _ = await run("money.saveMerchantRule", ["merchant": .string(merchant), "categoryID": .string(category(sourceCategory).uuidString), "ignore": .bool(false)], command, "rule")
+            case let .logExpense(command, amount, merchant, sourceCategory, at, from):
+                guard !movementIDs.contains(command) else { count("earlier.keptNative"); continue }
                 var p: [String: MadarCore.JSONValue] = ["amountMinor": .string(String(amount)), "currency": .string("SAR"), "method": .string("transfer"),
                                                        "fromAccountID": .string(account(from).uuidString), "showInDiary": .bool(false),
                                                        "eventAt": .string(ISO8601DateFormatter().string(from: at))]
                 if let merchant { p["merchant"] = .string(merchant) }
-                if let category { p["categoryID"] = .string(category.uuidString) }
+                if let sourceCategory { p["categoryID"] = .string(category(sourceCategory).uuidString) }
                 _ = await run("money.logExpense", p, command, "earlier")
                 // Owner, 22 Oct: these rows came from an automatic source, never typed by hand. The shipped command
                 // can only write «manual», so the move marks the row automatic, without message text.
@@ -224,7 +242,7 @@ extension AppSession {
                 }
                 // The old rows have no card digits. Only an unambiguous merchant match supplies a card.
                 if let planned = plan.earlierCards[command] {
-                    let cardID = cardMap[planned] ?? planned
+                    let cardID = RowMerger.resolve(id: cardMap[planned] ?? planned, model: "Card", rows: identityRows)
                     let patch = ModelContext(container)
                     if let row = try patch.fetch(FetchDescriptor<MoneyTransaction>()).first(where: { $0.id == command }),
                        let card = try patch.fetch(FetchDescriptor<Card>()).first(where: { $0.id == cardID }), card.kind == "credit" || card.accountID != nil {
@@ -235,15 +253,20 @@ extension AppSession {
                         }
                     }
                 }
-            case let .ingest(command, text, sender, at, transaction, category):
+            case let .ingest(command, text, sender, at, transaction, sourceCategory):
+                guard !movementIDs.contains(transaction) else {
+                    count("message.keptNative")
+                    if let state = movementStates[transaction] { count("message.state." + state) }
+                    continue
+                }
                 _ = await run(MoneyCommandPayload.intakeName, ["text": .string(text), "sender": .string(sender), "receivedAt": .string(ISO8601DateFormatter().string(from: at))], command, "message")
                 let fresh = ModelContext(container)
                 guard let row = try fresh.fetch(FetchDescriptor<MoneyTransaction>()).first(where: { $0.id == transaction }) else { count("message.noMovement"); continue }
                 count("message.state." + row.reviewState)
                 // A possible duplicate is never confirmed for the owner; it waits in review like any other.
                 guard row.reviewState != "ok", row.reviewState != "possibleDuplicate" else { continue }
-                if let category, row.categoryID != category {
-                    _ = await run("money.categorize", ["id": .string(transaction.uuidString), "categoryID": .string(category.uuidString), "remember": .bool(false)],
+                if let sourceCategory, row.categoryID != category(sourceCategory) {
+                    _ = await run("money.categorize", ["id": .string(transaction.uuidString), "categoryID": .string(category(sourceCategory).uuidString), "remember": .bool(false)],
                                   StableIdentity.uuid(for: "LegacyCategorize:" + transaction.uuidString), "categorize")
                 }
                 _ = await run("money.confirmTransaction", ["id": .string(transaction.uuidString)], StableIdentity.uuid(for: "LegacyConfirm:" + transaction.uuidString), "confirm")

@@ -14,7 +14,8 @@ struct LegacyMoveView: View {
     @State private var moving: String?
     @State private var receipt: LegacyMoveReceipt?
     @State private var last: LegacyMoveReceipt?
-    @State private var undone: ImportUndo.Plan?
+    @State private var undone: LegacyMoveUndo?
+    @State private var scroll = ScrollPosition(edge: .top)
     @State private var confirmUndo = false
     @State private var failure: String?
     @State private var diaryOpen = false
@@ -27,7 +28,7 @@ struct LegacyMoveView: View {
                 Text("من مدار القديم").font(.custom("thmanyahserifdisplay-Bold", size: 32, relativeTo: .largeTitle)).accessibilityAddTraits(.isHeader)
                 Text("اختر النسخة الاحتياطية التي صدّرتها من مدار القديم. ترى ما في كل غرفة قبل أن يُكتب شيء، وما عندك هنا يبقى كما هو ولا يتكرر.")
                     .font(MadarTypography.body()).foregroundStyle(theme.secondaryInk).lineSpacing(6).fixedSize(horizontal: false, vertical: true)
-                if let moving { progressCard(moving) }
+                if moving != nil { EmptyView() }
                 else if let undone { undoneCard(undone) }
                 else if let receipt { resultCards(receipt) }
                 else if let preview { previewCards(preview) }
@@ -43,8 +44,23 @@ struct LegacyMoveView: View {
             }
             .padding(.horizontal, 21).padding(.top, 4).padding(.bottom, 120).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }
+        .scrollPosition($scroll)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if moving == nil, receipt == nil, undone == nil, let preview {
+                Button("انقل إلى مدار") { commit(preview) }
+                    .buttonStyle(MadarPrimaryButton()).accessibilityIdentifier("legacy-move-commit")
+                    .padding(.horizontal, 21).padding(.vertical, 12)
+                    .frame(maxWidth: 620).frame(maxWidth: .infinity).background(theme.background)
+            }
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if let moving { progressCard(moving).padding(.horizontal, 21).padding(.vertical, 8).background(theme.background) }
+        }
         .background(theme.background).foregroundStyle(theme.ink).navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(moving != nil)
+        .toolbarVisibility(.hidden, for: .tabBar).hidesRoomAccessory(app, id: "legacy-move")
+        .onChange(of: preview?.id) { scroll.scrollTo(edge: .top) }
+        .onChange(of: receipt) { scroll.scrollTo(edge: .top) }
         .fileImporter(isPresented: $choosing, allowedContentTypes: [.json, .data]) { result in
             switch result { case .success(let url): read(url); case .failure: failure = "لم يُفتح الملف. جرّب اختياره مرة أخرى." }
         }
@@ -88,7 +104,6 @@ struct LegacyMoveView: View {
             }
             Text("كل غرفة تُنقل وحدها. الصلاة المسجّلة هنا في يومها، والعادة بالاسم نفسه، والحساب برقمه، تبقى كما هي وتأخذ تاريخها القديم معها. الرسائل البنكية تمرّ بالمراجعة كأنها وصلت الآن.")
                 .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
-            Button("انقل إلى مدار") { commit(p) }.buttonStyle(MadarPrimaryButton()).accessibilityIdentifier("legacy-move-commit")
             Button("اختر ملفًا آخر") { preview = nil; choose() }.frame(maxWidth: .infinity, minHeight: 44).accessibilityIdentifier("legacy-move-other")
         }
     }
@@ -103,7 +118,7 @@ struct LegacyMoveView: View {
     private func resultCards(_ r: LegacyMoveReceipt) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             card {
-                Text(r.added == 0 ? "كل ما في الملف عندك من قبل؛ لم يتكرر شيء." : "انتقلت غرفك إلى مدار.")
+                Text(r.outcomes.contains { $0.failed != nil } ? "انتقل ما أمكن؛ بعض البيانات لم تُنقل." : r.added == 0 ? "كل ما في الملف عندك من قبل؛ لم يتكرر شيء." : "انتقلت غرفك إلى مدار.")
                     .font(MadarTypography.section()).fixedSize(horizontal: false, vertical: true).accessibilityIdentifier("legacy-move-result")
                 ForEach(r.outcomes) { o in
                     Divider().overlay(theme.line)
@@ -133,11 +148,16 @@ struct LegacyMoveView: View {
         }.accessibilityElement(children: .contain).accessibilityIdentifier("legacy-move-last")
     }
 
-    private func undoneCard(_ plan: ImportUndo.Plan) -> some View {
+    private func undoneCard(_ result: LegacyMoveUndo) -> some View {
         card {
-            Text("رجعت بياناتك كما كانت قبل النقل.").font(MadarTypography.section()).accessibilityIdentifier("legacy-move-undone")
-            if plan.keptChanged > 0 {
-                Text("وما عدّلته بعد النقل بقي كما هو (" + digits.string(plan.keptChanged) + ").").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+            Text(result.isPartial ? "تراجعت عن التغييرات التي أمكن التحقق منها." : "رجعت بياناتك كما كانت قبل النقل.").font(MadarTypography.section()).accessibilityIdentifier("legacy-move-undone")
+            if result.isPartial {
+                Text("قد يبقى جزء من النقل السابق: سجلّه غير مكتمل أو من إصدار أقدم. أبقينا البيانات غير الموثّقة كما هي لحمايتها.")
+                    .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("legacy-move-partial-undo")
+            }
+            if result.plan.keptChanged > 0 {
+                Text("وما عدّلته بعد النقل بقي كما هو (" + digits.string(result.plan.keptChanged) + ").").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
             }
             Button("ابدأ من جديد") { undone = nil; preview = nil; receipt = nil; last = service.lastMove() }.frame(minHeight: 44).accessibilityIdentifier("legacy-move-restart")
         }
@@ -175,7 +195,9 @@ struct LegacyMoveView: View {
         }.frame(minHeight: 44).accessibilityElement(children: .combine)
     }
     private func outcomeLines(_ o: LegacyMoveOutcome) -> [String] {
-        if o.failed != nil { return ["لم تُنقل؛ بقيت الغرف الأخرى. جرّب النقل مرة أخرى."] }
+        if o.failed != nil {
+            return (o.added > 0 ? ["وصل " + service.phrase(o.parts)] : []) + ["لم يكتمل نقلها؛ سجلاتك الحالية محفوظة، وبقيت الغرف الأخرى. جرّب النقل مرة أخرى."]
+        }
         var lines: [String] = [o.added == 0 ? "لا جديد؛ كله عندك من قبل" : "وصل " + service.phrase(o.parts)]
         if o.keptNative > 0 { lines.append("وما كان عندك هنا بقي كما هو (" + digits.string(o.keptNative) + ")") }
         if o.waiting > 0 { lines.append(service.counted(o.waiting, ["رسالة تنتظر", "رسالتان تنتظران", "رسائل تنتظر", "رسالة تنتظر"]) + " مراجعتك في المال") }

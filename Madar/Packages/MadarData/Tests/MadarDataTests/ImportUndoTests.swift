@@ -43,6 +43,17 @@ struct ImportUndoTests {
         #expect(plan.removals.isEmpty); #expect(plan.keptChanged == 1)
     }
 
+    @Test func usedHabitKeepsItsRulesButUndoesOldImportedTimes() throws {
+        let habit = try row("Habit", a, "imported")
+        var policy = try row("HabitPolicy", b, "daily"); policy.fields["habitID"] = .string(a.lowercased())
+        var oldTime = try row("HabitEvent", c, "old"); oldTime.fields["habitID"] = .string(a)
+        var nativeTime = try row("HabitEvent", d, "new"); nativeTime.fields["habitID"] = .string(a)
+        let plan = try ImportUndo.plan(before: [], after: [habit, policy, oldTime], current: [habit, policy, oldTime, nativeTime], now: now)
+        #expect(plan.removals.map(\.model) == ["HabitEvent"])
+        #expect(plan.removals.first?.id.uuidString == c)
+        #expect(plan.keptChanged == 2)
+    }
+
     @Test func emptyImportPlansNothing() throws {
         let rows = [try row("Setting", a, "same")]
         #expect(try ImportUndo.plan(before: rows, after: rows, current: rows, now: now).isEmpty)
