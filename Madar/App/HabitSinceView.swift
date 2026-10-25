@@ -51,17 +51,20 @@ struct HabitSinceSection:View {
             Text("مراتك").font(MadarTypography.section())
             GeometryReader { geo in
                 let w = geo.size.width
-                ZStack(alignment:.leading) {
-                    Capsule().fill(theme.line).frame(height:2)
+                ZStack(alignment:.topLeading) {
+                    Capsule().fill(theme.line).frame(height:2).offset(y:25)
                     ForEach(reading.times,id:\.day) { time in
                         let x = CGFloat(HabitRhythmMath.days(first,time.day))/CGFloat(total)*(w-12)
                         Circle().fill(time.entryID == nil ? theme.accent : theme.accentFill).frame(width:12,height:12)
                             .overlay { if time.entryID != nil { Circle().stroke(theme.surface,lineWidth:2).padding(-2) } }
-                            .offset(x:x)
+                            .offset(x:x,y:20)
                     }
-                    Circle().stroke(theme.accent,lineWidth:1.5).frame(width:14,height:14).offset(x:w-13)
-                }.frame(maxHeight:.infinity).environment(\.layoutDirection,.leftToRight).scaleEffect(x:-1)
-            }.frame(height:18)
+                    // Today sits above the same date axis. Even a time logged today remains a separate filled mark.
+                    Capsule().fill(theme.accent.opacity(0.5)).frame(width:1,height:17).offset(x:w-6,y:8)
+                    Circle().fill(theme.surface).frame(width:14,height:14)
+                        .overlay { Circle().stroke(theme.accent,lineWidth:1.5) }.offset(x:w-13,y:0)
+                }.frame(maxWidth:.infinity,maxHeight:.infinity,alignment:.topLeading).environment(\.layoutDirection,.leftToRight).scaleEffect(x:-1)
+            }.frame(height:34)
             HStack {
                 Text(digits.string(first.year).replacingOccurrences(of:"٬",with:"")).font(MadarTypography.fine())
                 Spacer()
