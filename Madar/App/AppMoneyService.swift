@@ -33,6 +33,8 @@ struct MoneyHomeReading {
     var hasAccounts: Bool
     var unknownBalanceCount: Int
     var knownBalanceCount: Int
+    /// Empty cash is zero; accounts without any bank checkpoint are unknown.
+    var hasKnownBalance: Bool { knownBalanceCount > 0 || unknownBalanceCount == 0 }
     var pendingCount: Int
     var reserveMinor: Int
     var surplusMinor: Int

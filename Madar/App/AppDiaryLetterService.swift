@@ -52,12 +52,22 @@ extension AppDiaryService {
     func waitingFor(_ trigger: DiaryLetterTrigger, value: String?, target: String?) -> String {
         switch trigger {
         case .date: return value.flatMap { try? GregorianDay($0) }.map { "تُفتح في " + bothDates($0, calendar: FirstCalendar(rawValue: app.string("core.firstCalendar")) ?? .hijri) } ?? "تُفتح في يومها"
-        case .hijriDate: return value.map { "تُفتح في " + hijriTitle($0) } ?? "تُفتح في يومها"
+        case .hijriDate:
+            // Both calendars (owner, 15 Oct): the Hijri day leads, its Gregorian day beneath it.
+            guard let value else { return "تُفتح في يومها" }
+            return "تُفتح في " + (hijriDay(value).map { bothDates($0, calendar: .hijri) } ?? hijriTitle(value))
         case .tripStart: return "تُفتح حين تصل في سفرك القادم"
         case .tripEnd: return "تُفتح حين تعود من سفرك"
         case .projectFinished: return target.map { "تُفتح حين ينتهي «" + $0 + "»" } ?? "تُفتح حين ينتهي مشروعها"
         case .ramadanStart: return "تُفتح في أول يوم من رمضان القادم"
         }
+    }
+    /// The Gregorian day of a stored `yyyy-MM-dd` Hijri key, under the active Hijri source.
+    func hijriDay(_ key: String) -> GregorianDay? {
+        let parts = key.split(separator: "-").compactMap { Int($0) }
+        guard parts.count == 3, let floor = try? GregorianDay(year: 1900, month: 1, day: 1) else { return nil }
+        return MadarUpcomingRule(calendar: .hijri, year: parts[0], month: parts[1], day: parts[2], repeats: .none)
+            .next(onOrAfter: floor, AppBahwService(session: app).calendarDays)
     }
     func hijriTitle(_ key: String) -> String {
         let parts = key.split(separator: "-").compactMap { Int($0) }

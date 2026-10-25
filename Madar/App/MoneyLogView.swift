@@ -146,7 +146,7 @@ struct MoneyLogView: View {
             .accessibilityIdentifier("money-log-day-" + d.id)
     }
     private func dayList(_ days: [MoneyLogDay]) -> some View {
-        VStack(spacing: 10) { ForEach(days) { d in Button { selected = d.day } label: { HStack { MadarDateLabel(app.dateLabels(d.day)); Spacer(); Text(figure: amount(d.spentMinor) + " من " + (d.dailyMinor.map(amount) ?? "غير معروف")) }.font(MadarTypography.body()).frame(minHeight: 44) }.buttonStyle(.plain) } }
+        VStack(spacing: 10) { ForEach(days) { d in Button { selected = d.day } label: { HStack { MadarDateLabel(app.dateLabels(d.day)); Spacer(); Text(figure: amount(d.spentMinor) + " من " + (d.dailyMinor.map(amount) ?? "غير معروف")) }.font(MadarTypography.body()).frame(minHeight: 44).contentShape(.rect) }.buttonStyle(.plain) } }
     }
     private func weekday(_ day: GregorianDay, formatter: DateFormatter) -> String {
         formatter.locale = Locale(identifier: "ar_SA"); formatter.timeZone = app.activePlace.timeZone; formatter.dateFormat = "EEE"

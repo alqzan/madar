@@ -26,14 +26,18 @@ struct MoneyBasisView: View {
                                 MoneyCashView(app: app, reading: reading, revealed: $revealed)
                             } label: {
                                 VStack(alignment: .leading, spacing: 0) {
-                                    Text("لك فعلًا، في حسابك " + amount(reading.home.basis.inAccountMinor)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                                    Text(reading.home.hasKnownBalance ? "لك فعلًا، في حسابك " + amount(reading.home.basis.inAccountMinor) : "لم يُعرف رصيد الحسابات بعد").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                                     HStack(alignment: .firstTextBaseline, spacing: 8) {
-                                        Text(figure: amount(reading.home.basis.netMinor)).font(.custom("thmanyahserifdisplay-Black", size: 44, relativeTo: .largeTitle))
+                                        Text(figure: visible && !reading.home.hasKnownBalance ? "—" : amount(reading.home.basis.netMinor)).font(.custom("thmanyahserifdisplay-Black", size: 44, relativeTo: .largeTitle)).accessibilityIdentifier("money-basis-net")
                                         Image(systemName: "arrow.up.left").font(.caption)
                                     }
                                 }.frame(maxWidth: .infinity, alignment: .trailing).contentShape(.rect)
                             }.buttonStyle(.plain).accessibilityIdentifier("money-cash-open")
-                            if visible && !dynamicType.isAccessibilitySize && reading.home.basis.netMinor > 0
+                            if reading.home.unknownBalanceCount > 0 {
+                                Text(reading.home.hasKnownBalance ? "الأرقام تخص الأرصدة المعروفة فقط؛ الحسابات التي تنتظر مطابقة لا تدخل في المجموع." : "المحجوز واليومية من السجلات؛ النقد والصافي وغير المخصّص ينتظرون مطابقة مع البنك.")
+                                    .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                            }
+                            if visible && reading.home.hasKnownBalance && !dynamicType.isAccessibilitySize && reading.home.basis.netMinor > 0
                                 && reading.reserved.allSatisfy({ $0.amountMinor >= 0 })
                                 && (reading.explanation.cycleRemainderMinor ?? 0) >= 0
                                 && (reading.explanation.availableNowMinor ?? 0) >= 0 {
@@ -63,18 +67,18 @@ struct MoneyBasisView: View {
     }
     private func basisList(_ reading: MoneyBasisReading) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            basisRow("غير مخصّص", reading.explanation.unallocatedMinor, "money-basis-unallocated")
+            basisRow("غير مخصّص", reading.explanation.unallocatedMinor, "money-basis-unallocated", known: reading.home.hasKnownBalance)
             basisRow("المحجوز", reading.explanation.reservedMinor, "money-basis-reserved")
             if let value = reading.explanation.availableNowMinor { basisRow("لك الآن", value, "money-basis-current") }
             if let value = reading.explanation.futureDailyMinor { basisRow("يومياتك القادمة", value, "money-basis-future") }
-            if let value = reading.explanation.cycleRemainderMinor { basisRow(value < 0 ? "فرق التمويل" : "فائض الدورة", value, "money-basis-remainder") }
+            if let value = reading.explanation.cycleRemainderMinor { basisRow(reading.home.hasKnownBalance && value < 0 ? "فرق التمويل" : "فائض الدورة", value, "money-basis-remainder", known: reading.home.hasKnownBalance) }
             ForEach(reading.reserved) { piece in
-                Button { source = piece.detail } label: { HStack { Text(piece.title); Spacer(); Text(figure: amount(piece.amountMinor)) }.frame(minHeight: 44) }.buttonStyle(.plain)
+                Button { source = piece.detail } label: { HStack { Text(piece.title); Spacer(); Text(figure: amount(piece.amountMinor)) }.frame(minHeight: 44).contentShape(.rect) }.buttonStyle(.plain)
             }
         }
     }
-    private func basisRow(_ title: String, _ value: Int, _ id: String) -> some View {
-        HStack { Text(title); Spacer(); Text(figure: amount(value)).font(MadarTypography.cardTitle()).accessibilityIdentifier(id) }.font(MadarTypography.body())
+    private func basisRow(_ title: String, _ value: Int, _ id: String, known: Bool = true) -> some View {
+        HStack { Text(title); Spacer(); Text(figure: visible && !known ? "—" : amount(value)).font(MadarTypography.cardTitle()).accessibilityIdentifier(id) }.font(MadarTypography.body())
     }
     private func amount(_ value: Int) -> String { visible ? service.amount(value) : "•••" }
 }

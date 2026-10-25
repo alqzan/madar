@@ -12,6 +12,37 @@ import XCTest
         let money = app.buttons["money-open"]; XCTAssertTrue(money.waitForExistence(timeout: 5)); money.tap()
         XCTAssertTrue(app.staticTexts["money-title"].waitForExistence(timeout: 10), app.debugDescription)
     }
+    /// Owner-data walk 25 Oct: after the drawer pages, the basis sheet stopped opening. Open each page, come back,
+    /// and require the basis sheet after every one, from the money tab as the walk does.
+    func testBasisSheetStillOpensAfterEveryDrawerPage() throws {
+        continueAfterFailure = true
+        let app = app("showcase")
+        let tab = app.tabBars.buttons["المال"].firstMatch
+        if tab.waitForExistence(timeout: 15) { tab.tap() }
+        if !app.buttons["money-expense-open"].waitForExistence(timeout: 8) { open(app) }
+        func top() { for _ in 0..<6 { app.swipeDown(velocity: .fast) } }
+        func basis(after page: String) {
+            top()
+            let open = app.buttons.matching(identifier: "money-basis-open").firstMatch
+            XCTAssertTrue(open.waitForExistence(timeout: 10), page); open.tap()
+            let close = app.buttons["money-page-close"]
+            guard close.waitForExistence(timeout: 8) else { XCTFail("Basis sheet did not open after " + page); shot(app, "basis-blocked-after-" + page); return }
+            close.tap(); _ = close.waitForNonExistence(timeout: 5)
+        }
+        basis(after: "launch")
+        for page in ["accounts", "categories", "envelopes", "obligations", "cards", "analysis", "reconcile", "cashback", "goal", "zakat", "settings"] {
+            top()
+            let door = app.buttons["money-\(page)-open"]
+            for _ in 0..<8 where !door.isHittable || door.frame.maxY > app.windows.firstMatch.frame.maxY * 0.7 { app.swipeUp(velocity: .slow) }
+            guard door.exists, door.isHittable else { XCTFail("Unreachable " + page); continue }
+            door.tap(); Thread.sleep(forTimeInterval: 1.5)
+            let close = app.buttons["money-\(page)-close"], back = app.buttons["money-\(page)-back"]
+            for _ in 0..<8 where !close.isHittable && !back.isHittable { app.swipeDown(velocity: .fast) }
+            if close.exists && close.isHittable { close.tap() } else if back.exists && back.isHittable { back.tap() } else { XCTFail("No close on " + page); continue }
+            Thread.sleep(forTimeInterval: 1)
+            basis(after: page)
+        }
+    }
     func shot(_ app: XCUIApplication, _ name: String) { let a = XCTAttachment(screenshot: app.screenshot()); a.name = name; a.lifetime = .keepAlways; add(a) }
     private func assertChartDates(_ chart: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
         let dateRange = chart.label.components(separatedBy: "؛").first ?? chart.label
@@ -83,6 +114,32 @@ import XCTest
         XCTAssertTrue(debt.exists); debt.tap(); XCTAssertTrue(app.descendants(matching: .any)["money-source"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["تقريبًا، تاريخ القفل مقدّر"].exists)
         shot(app, "M5-V02-card-source-L")
+    }
+
+    func testUnknownBalancesStayUnknownInBasisCashAndTheirSources() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": "showcase", "MADAR_UI_ALL_BALANCES_UNKNOWN": "1", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-16T15:00:00+03:00"]
+        app.launch(); open(app)
+        XCTAssertEqual(app.staticTexts["money-net"].label, "—")
+        app.buttons["money-basis-open"].tap()
+        let cash = app.buttons["money-cash-open"]; XCTAssertTrue(cash.waitForExistence(timeout: 10))
+        shot(app, "M5-V02-unknown-basis-L")
+        XCTAssertTrue(cash.label.contains("—"), cash.label)
+        XCTAssertEqual(app.staticTexts["money-basis-unallocated"].label, "—")
+        XCTAssertEqual(app.staticTexts["money-basis-remainder"].label, "—")
+        cash.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["money-cash"].waitForExistence(timeout: 10))
+        XCTAssertEqual(app.staticTexts["money-cash-total"].label, "—")
+        XCTAssertEqual(app.staticTexts["money-cash-net"].label, "—")
+        shot(app, "M5-V02-unknown-cash-L")
+        let account = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "money-source-account:")).firstMatch
+        for _ in 0..<5 where !account.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(account.exists); XCTAssertTrue(account.label.contains("لم يُعرف رصيدها بعد"), account.label)
+        shot(app, "M5-V02-unknown-cash-s1-L")
+        account.tap()
+        XCTAssertTrue(app.staticTexts["لم يُعرف رصيدها بعد"].waitForExistence(timeout: 10))
+        shot(app, "M5-V02-unknown-source-L")
     }
 
     func testNegativeNetUsesExplicitAmountsWithoutAPositiveColumn() throws {

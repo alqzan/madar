@@ -269,6 +269,10 @@ extension AppSession {
             }
             try c.save()
         }
+        if ProcessInfo.processInfo.environment["MADAR_UI_ALL_BALANCES_UNKNOWN"] == "1" {
+            for row in try c.fetch(FetchDescriptor<Account>()) where row.ownership == "mine" && row.tracked { row.balanceAt = nil }
+            try c.save()
+        }
     }
 
     /// Synthetic texts through the real intake (parser, dedupe, duplicate flag), as the Shortcut would send them.

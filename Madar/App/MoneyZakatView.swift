@@ -30,7 +30,7 @@ struct MoneyZakatView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                HStack { Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1) } }.accessibilityLabel("إغلاق"); Text("الزكاة").font(MadarTypography.title()); Spacer(); if !visible { Button("أظهر الأرقام") { revealed = true }.font(MadarTypography.caption()).accessibilityIdentifier("money-zakat-reveal") } }
+                HStack { Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1) } }.accessibilityLabel("إغلاق").accessibilityIdentifier("money-zakat-close"); Text("الزكاة").font(MadarTypography.title()); Spacer(); if !visible { Button("أظهر الأرقام") { revealed = true }.font(MadarTypography.caption()).accessibilityIdentifier("money-zakat-reveal") } }
                 if let r = reading, let input, let result {
                     hawlArc
                     if !dynamicType.isAccessibilitySize {

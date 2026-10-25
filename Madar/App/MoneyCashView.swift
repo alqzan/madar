@@ -16,17 +16,20 @@ struct MoneyCashView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 MoneyPageHeader(title: "على أي أساس", close: { dismiss() })
-                Text("حسابك يبيّن النقد، و«لك فعلًا» يخصم ما عليك في البطاقات والأقساط.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                if visible && !dynamicType.isAccessibilitySize && reading.home.basis.inAccountMinor > 0 && reading.home.basis.netMinor >= 0 {
+                Text(reading.home.hasKnownBalance ? "حسابك يبيّن النقد، و«لك فعلًا» يخصم ما عليك في البطاقات والأقساط." : "لا يُحسب النقد ولا «لك فعلًا» قبل تأكيد أول رصيد من البنك.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                if reading.home.unknownBalanceCount > 0 && reading.home.hasKnownBalance {
+                    Text("الأرقام تخص الأرصدة المعروفة فقط؛ الحسابات التي تنتظر مطابقة لا تدخل في المجموع.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                }
+                if visible && reading.home.hasKnownBalance && !dynamicType.isAccessibilitySize && reading.home.basis.inAccountMinor > 0 && reading.home.basis.netMinor >= 0 {
                     MoneyCashColumns(reading: reading, app: app, onSource: { source = $0 }).frame(height: 450)
                 } else {
-                    HStack { Text("في حسابك"); Spacer(); Text(figure: amount(reading.home.basis.inAccountMinor)) }
-                    HStack { Text("لك فعلًا"); Spacer(); Text(figure: amount(reading.home.basis.netMinor)) }
-                    if reading.home.basis.netMinor < 0 { Text("ما عليك أكثر من النقد المسجّل.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
+                    HStack { Text("في حسابك"); Spacer(); Text(figure: balanceAmount(reading.home.basis.inAccountMinor)).accessibilityIdentifier("money-cash-total") }
+                    HStack { Text("لك فعلًا"); Spacer(); Text(figure: balanceAmount(reading.home.basis.netMinor)).accessibilityIdentifier("money-cash-net") }
+                    if reading.home.hasKnownBalance && reading.home.basis.netMinor < 0 { Text("ما عليك أكثر من النقد المسجّل.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
                 }
                 VStack(alignment: .leading, spacing: 8) {
                     Text("يومك وحدودك يسجّلان الشراء يومه، ولو بالائتمان؛ والسداد ينقص النقد والدين معًا، فلا يُحسب مصروفًا مرة أخرى.")
-                    Text("من «لك فعلًا» محجوز " + amount(reading.home.basis.reservedMinor) + "، وغير مخصّص " + amount(reading.home.basis.unallocatedMinor) + ".")
+                    Text(reading.home.hasKnownBalance ? "من «لك فعلًا» محجوز " + amount(reading.home.basis.reservedMinor) + "، وغير مخصّص " + amount(reading.home.basis.unallocatedMinor) + "." : "المحجوز المسجّل " + amount(reading.home.basis.reservedMinor) + "؛ يتضح غير المخصّص بعد معرفة رصيد البنك.")
                 }.font(MadarTypography.body()).fixedSize(horizontal: false, vertical: true).padding(16).frame(maxWidth: .infinity, alignment: .leading)
                     .background(theme.surface).overlay(alignment: .leading) { Rectangle().fill(theme.color("surplusText")).frame(width: 3) }
                 Text("مصادر النقد").font(MadarTypography.cardTitle())
@@ -50,11 +53,12 @@ struct MoneyCashView: View {
                     if let date = item.date { MadarDateLabel(app.dateLabels(date, compact: true), primaryFont: MadarTypography.fine(), secondaryFont: MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
                 }
                 Spacer()
-                Text(figure: amount(item.amountMinor)).font(MadarTypography.cardTitle())
+                Text(figure: visible ? item.valueText ?? service.amount(item.amountMinor) : "•••").font(MadarTypography.cardTitle())
                 Image(systemName: "chevron.left").font(.caption).padding(.top, 5)
             }.padding(.vertical, 10).frame(minHeight: 44).overlay(alignment: .bottom) { Rectangle().fill(theme.line).frame(height: 1) }
         }.buttonStyle(.plain).accessibilityIdentifier("money-source-" + item.id)
     }
+    private func balanceAmount(_ value: Int) -> String { visible && !reading.home.hasKnownBalance ? "—" : amount(value) }
     private func amount(_ value: Int) -> String { visible ? service.amount(value) : "•••" }
 }
 

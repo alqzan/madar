@@ -173,7 +173,7 @@ struct MoneyCashbackView: View {
             }
             if dynamicType.isAccessibilitySize {
                 ForEach(r.months) { m in
-                    Button { selectedMonth = m.id } label: { HStack { Text(m.labels.primary); Spacer(); Text(whole(r.jar.monthTotals[m.id])) }.font(MadarTypography.body()).frame(minHeight: 44) }.buttonStyle(.plain)
+                    Button { selectedMonth = m.id } label: { HStack { MadarDateLabel(m.labels, primaryFont: MadarTypography.body()); Spacer(); Text(whole(r.jar.monthTotals[m.id])) }.font(MadarTypography.body()).frame(minHeight: 44).contentShape(.rect) }.buttonStyle(.plain)
                 }
             } else {
                 HStack(alignment: .bottom, spacing: r.months.count > 8 ? 4 : 10) {

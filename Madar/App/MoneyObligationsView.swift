@@ -113,7 +113,7 @@ struct MoneyObligationsView: View {
         return Group {
             if dynamicType.isAccessibilitySize {
                 VStack(alignment: .leading, spacing: 8) {
-                    ForEach(r.cycle) { due in Button { selected = due.id } label: { HStack { Text(due.name); Spacer(); Text(figure: amount(due.amountMinor)) } }.buttonStyle(.plain) }
+                    ForEach(r.cycle) { due in Button { selected = due.id } label: { HStack { Text(due.name); Spacer(); Text(figure: amount(due.amountMinor)) }.contentShape(.rect) }.buttonStyle(.plain) }
                 }
             } else {
                 GeometryReader { proxy in

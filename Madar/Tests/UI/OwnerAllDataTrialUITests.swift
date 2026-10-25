@@ -22,7 +22,7 @@ import XCTest
     private func visit(_ app: XCUIApplication, _ base: String) {
         let open = app.buttons["money-\(base)-open"]
         for _ in 0..<6 where !open.isHittable { app.swipeUp(velocity: .slow) }
-        guard open.exists, open.isHittable else { add(XCTAttachment(string: "not reachable: \(base)")); return }
+        guard open.exists, open.isHittable else { XCTFail("Required money page is unreachable: \(base)"); return }
         open.tap(); Thread.sleep(forTimeInterval: 1.5); shot(app, "TRIAL-money-\(base)-L")
         app.swipeUp(velocity: .slow); shot(app, "TRIAL-money-\(base)-s1-L")
         let close = app.buttons["money-\(base)-close"]
@@ -34,6 +34,90 @@ import XCTest
         else { app.swipeDown(velocity: .fast) }
         _ = app.buttons["money-expense-open"].waitForExistence(timeout: 5)
         for _ in 0..<6 { app.swipeDown(velocity: .fast) }
+    }
+    private func reach(_ app: XCUIApplication, _ id: String) -> XCUIElement {
+        let element = app.buttons.matching(identifier: id).firstMatch
+        for _ in 0..<10 where !element.isHittable { app.swipeUp(velocity: .slow) }
+        // isHittable is true under the floating tab bar too, so keep the target in the upper part of the screen.
+        let bottom = app.windows.firstMatch.frame.maxY * 0.7
+        for _ in 0..<4 where element.exists && element.frame.maxY > bottom { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(element.waitForExistence(timeout: 15), "Missing required route: " + id)
+        XCTAssertTrue(element.isHittable, "Offscreen required route: " + id)
+        return element
+    }
+    private func close(_ app: XCUIApplication, _ id: String) {
+        let element = app.buttons.matching(identifier: id).firstMatch
+        for _ in 0..<12 where !element.isHittable { app.swipeDown(velocity: .fast) }
+        XCTAssertTrue(element.waitForExistence(timeout: 10)); XCTAssertTrue(element.isHittable)
+        if element.exists && element.isHittable { element.tap() }
+    }
+    private func homeTop(_ app: XCUIApplication) {
+        XCTAssertTrue(app.buttons["money-expense-open"].waitForExistence(timeout: 15))
+        for _ in 0..<8 { app.swipeDown(velocity: .fast) }
+    }
+    private func visitNestedMoneyPages(_ app: XCUIApplication) {
+        homeTop(app)
+        reach(app, "money-basis-open").tap()
+        let cash = app.buttons["money-cash-open"]
+        guard cash.waitForExistence(timeout: 15) else { XCTFail("Basis sheet did not open"); shot(app, "TRIAL-money-basis-missing-L"); return }
+        XCTAssertTrue(cash.label.contains("—"), "Actual source has no confirmed bank checkpoint")
+        shot(app, "TRIAL-money-basis-L"); app.swipeUp(velocity: .slow); shot(app, "TRIAL-money-basis-s1-L")
+        for _ in 0..<6 where !cash.isHittable { app.swipeDown(velocity: .fast) }
+        cash.tap()
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "money-cash").firstMatch.waitForExistence(timeout: 15))
+        XCTAssertEqual(app.staticTexts["money-cash-total"].label, "—"); XCTAssertEqual(app.staticTexts["money-cash-net"].label, "—")
+        shot(app, "TRIAL-money-cash-L"); app.swipeUp(velocity: .slow); shot(app, "TRIAL-money-cash-s1-L")
+        close(app, "money-page-close") // Cash -> basis, then dismiss the basis sheet.
+        XCTAssertTrue(cash.waitForExistence(timeout: 10)); close(app, "money-page-close")
+        homeTop(app)
+        reach(app, "money-pending").tap()
+        XCTAssertTrue(app.staticTexts["money-messages-title"].waitForExistence(timeout: 15))
+        reach(app, "money-budget-open").tap()
+        XCTAssertTrue(app.staticTexts["money-budget-excluded-total"].waitForExistence(timeout: 15))
+        shot(app, "TRIAL-money-budget-L"); app.swipeUp(velocity: .slow); shot(app, "TRIAL-money-budget-s1-L")
+        close(app, "money-budget-close"); XCTAssertTrue(app.staticTexts["money-messages-title"].waitForExistence(timeout: 10))
+        close(app, "money-messages-close")
+        homeTop(app)
+        reach(app, "money-log-open").tap()
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "money-log-arcade").firstMatch.waitForExistence(timeout: 15))
+        shot(app, "TRIAL-money-log-L"); app.swipeUp(velocity: .slow); shot(app, "TRIAL-money-log-s1-L")
+        for _ in 0..<8 where !app.buttons["money-log-search-open"].isHittable { app.swipeDown(velocity: .fast) }
+        app.buttons["money-log-search-open"].tap()
+        let field = app.textFields["money-log-search"]
+        XCTAssertTrue(field.waitForExistence(timeout: 10)); field.tap(); field.typeText("غيرموجود\n")
+        XCTAssertTrue(app.staticTexts["money-log-empty"].waitForExistence(timeout: 10)); shot(app, "TRIAL-money-log-search-L")
+        app.buttons["مسح البحث"].tap(); close(app, "money-log-close"); homeTop(app)
+    }
+    /// A tab tap can leave the lobby in front, so trust only the money-home marker and fall back to the
+    /// customise search route that MoneyHomeUITests uses.
+    private func openMoney(_ app: XCUIApplication) {
+        let mal = app.tabBars.buttons["المال"].firstMatch
+        if mal.waitForExistence(timeout: 20) { mal.tap() }
+        if !app.buttons["money-expense-open"].waitForExistence(timeout: 10) {
+            let more = app.buttons["tab-customize"]; XCTAssertTrue(more.waitForExistence(timeout: 60), app.debugDescription); more.tap()
+            let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 20)); search.tap(); search.typeText("المال")
+            let open = app.buttons["money-open"]; XCTAssertTrue(open.waitForExistence(timeout: 10)); open.tap()
+        }
+        XCTAssertTrue(app.buttons["money-expense-open"].waitForExistence(timeout: 30), app.debugDescription)
+    }
+    /// Strict walk r3/r4: with the owner's money (accounts, no cycle) «على أي أساس» did not open. Money only, straight to it.
+    func testOwnerMoneyBasisOpens() throws {
+        let env = ProcessInfo.processInfo.environment
+        guard let backup = env["MADAR_TRIAL_BACKUP"] else { throw XCTSkip("Owner data trial only") }
+        let stamp = "basis-" + String(Int(Date().timeIntervalSince1970))
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_TRIAL_MONEY": backup, "MADAR_TRIAL_RUN": stamp,
+                                 "MADAR_UI_TRAVEL_FIX": "24.7136,46.6753,الرياض,SA,Asia/Riyadh", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
+        app.launch()
+        _ = try report(URL(fileURLWithPath: backup).deletingLastPathComponent().appendingPathComponent("money-import-\(stamp).json"), timeout: 600)
+        clearAlert(app, "basis-import")
+        let start = app.buttons["first-run-continue"]
+        if start.waitForExistence(timeout: 5) { for _ in 0..<4 where start.exists && start.isHittable { start.tap(); Thread.sleep(forTimeInterval: 1) } }
+        openMoney(app)
+        let basis = reach(app, "money-basis-open"); shot(app, "BASIS-before-L"); basis.tap()
+        let opened = app.buttons["money-page-close"].waitForExistence(timeout: 10)
+        shot(app, "BASIS-after-L")
+        XCTAssertTrue(opened, app.debugDescription)
     }
     func testOwnerAllDataTrial() throws {
         continueAfterFailure = true
@@ -62,16 +146,12 @@ import XCTest
 
         clearAlert(app, "after-import")
         // Money room.
-        let mal = app.tabBars.buttons["المال"].firstMatch
-        if mal.waitForExistence(timeout: 20) { mal.tap() } else {
-            let more = app.buttons["tab-customize"]; XCTAssertTrue(more.waitForExistence(timeout: 60), app.debugDescription); more.tap()
-            let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 20)); search.tap(); search.typeText("المال"); app.buttons["money-open"].tap()
-        }
-        XCTAssertTrue(app.buttons["money-expense-open"].waitForExistence(timeout: 30), app.debugDescription)
+        openMoney(app)
         clearAlert(app, "money"); shot(app, "TRIAL-money-home-L")
         for i in 1...5 { app.swipeUp(velocity: .slow); shot(app, "TRIAL-money-home-s\(i)-L") }
         for _ in 0..<8 { app.swipeDown(velocity: .fast) }
-        for base in ["accounts", "cash", "budget", "categories", "envelopes", "obligations", "log-search", "basis"] { visit(app, base) }
+        for base in ["accounts", "categories", "envelopes", "obligations", "cards", "analysis", "reconcile", "cashback", "goal", "zakat", "settings"] { visit(app, base) }
+        visitNestedMoneyPages(app)
 
         // Diary.
         clearAlert(app, "diary")
@@ -107,7 +187,7 @@ import XCTest
         // Prayer and Quran homes, then the habits room from the lobby (Claude, 24 Oct tour).
         for (tab, name) in [("الصلاة", "prayer"), ("القرآن", "quran")] {
             let button = app.tabBars.buttons[tab].firstMatch
-            guard button.waitForExistence(timeout: 10) else { add(XCTAttachment(string: "no tab \(tab)")); continue }
+            guard button.waitForExistence(timeout: 10) else { XCTFail("Required room tab missing: " + tab); continue }
             button.tap(); Thread.sleep(forTimeInterval: 2); clearAlert(app, name); shot(app, "TRIAL-\(name)-home-L")
             for i in 1...4 { app.swipeUp(velocity: .slow); shot(app, "TRIAL-\(name)-home-s\(i)-L") }
             for _ in 0..<6 { app.swipeDown(velocity: .fast) }
@@ -118,6 +198,6 @@ import XCTest
         if habits.waitForExistence(timeout: 10) {
             let header = app.buttons["bahw-habits-open"]; if header.exists { header.tap() } else { habits.tap() }
             if app.staticTexts["habits-title"].waitForExistence(timeout: 10) { shot(app, "TRIAL-habits-L"); app.swipeUp(velocity: .slow); shot(app, "TRIAL-habits-s1-L") }
-        } else { add(XCTAttachment(string: "no habits block")) }
+        } else { XCTFail("Required habits block is missing") }
     }
 }

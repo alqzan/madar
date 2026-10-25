@@ -26,7 +26,7 @@ struct DiaryExportView:View {
                         if options.year != nil {Picker("الشهر الميلادي",selection:$options.month){Text("السنة كاملة").tag(Int?.none);ForEach(1...12,id:\.self){Text(service.digits.string($0)).tag(Optional($0))}}.font(DiaryType.label).accessibilityIdentifier("diary-export-month")}
                         Text("الصيغة").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
                         ForEach([("pdf","PDF","الصفحات بالهوامش والصور"),("markdown","Markdown","ملف لكل يوم والمرفقات الأصلية في أرشيف"),("json","JSON لداي ون","نص وصور، وبقية المرفقات محفوظة في الأرشيف")],id:\.0){id,title,subtitle in
-                            Button{options.format=id}label:{HStack{VStack(alignment:.leading,spacing:4){Text(title).font(MadarTypography.body());Text(subtitle).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))};Spacer();Image(systemName:options.format==id ? "checkmark.circle.fill":"circle").foregroundStyle(options.format==id ? theme.accent:theme.line)}.frame(minHeight:54)}.buttonStyle(.plain).accessibilityIdentifier("diary-export-format-"+id)
+                            Button{options.format=id}label:{HStack{VStack(alignment:.leading,spacing:4){Text(title).font(MadarTypography.body());Text(subtitle).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))};Spacer();Image(systemName:options.format==id ? "checkmark.circle.fill":"circle").foregroundStyle(options.format==id ? theme.accent:theme.line)}.frame(minHeight:54).contentShape(.rect)}.buttonStyle(.plain).accessibilityIdentifier("diary-export-format-"+id)
                             if id != "json" {Divider().overlay(theme.line)}
                         }
                     }

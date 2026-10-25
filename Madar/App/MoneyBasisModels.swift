@@ -37,10 +37,16 @@ extension AppMoneyService {
         let future = home.cycle.map { ReconciliationEngine.notYetAccrued(elapsedDays: $0.elapsedDays, $0.input) }
         let explanation = BasisBreakdownEngine.explain(home.basis, futureDailyMinor: future, availableNowMinor: home.cycle?.headline.availableNowMinor)
         let zone = app.activePlace.timeZone
-        let accountRows = try repo.homeAccountBalances(at: now).map { item in
+        var accountRows = try repo.homeAccountBalances(at: now).map { item in
             MoneySourceDetail(id: "account:" + item.account.id.uuidString, title: item.account.name, amountMinor: item.homeMinor,
                 explanation: "آخر رصيد أكّدته، مضافًا إليه الداخل ومطروحًا منه الخارج المسجّل بعده. لا تنقص مشتريات الائتمان الكاش قبل السداد." + (item.account.currency != home.currency ? " حُوّل من " + currencyName(item.account.currency) + " بسعر يدوي " + localizedRate((try? repo.manualRates(at: now)[item.account.currency]) ?? "—") + " لكل وحدة؛ يمكنك تحديثه من الرحلة." : ""),
                 date: item.account.balanceAt.map { .containing($0, in: zone) })
+        }
+        // A missing checkpoint is a fact to explain, never a zero balance.
+        accountRows += try context.fetch(FetchDescriptor<Account>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.ownership == "mine" && $0.tracked && $0.balanceAt == nil }.map { account in
+            MoneySourceDetail(id: "account:" + account.id.uuidString, title: account.name, amountMinor: 0,
+                explanation: "لم يُسجّل لهذا الحساب رصيد أكّده البنك بعد. الحركات وحدها لا تكشف رصيد البداية؛ أجرِ مطابقة مع البنك من الحسابات.",
+                valueText: "لم يُعرف رصيدها بعد")
         }
         let messages = try context.fetch(FetchDescriptor<BankMessage>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
         var debts: [MoneySourceDetail] = []

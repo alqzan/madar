@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 import MadarCore
 import MadarData
 import MadarDesign
@@ -13,6 +14,8 @@ struct MoneyHomeView: View {
     @Environment(\.dynamicTypeSize) private var dynamicType
     @Environment(\.scenePhase) private var scenePhase
     @State private var reading: MoneyHomeReading?
+    @State private var cardCount = 0
+    @State private var hawlKey: String?
     @State private var failure: String?
     @State private var revealed = false
     @State private var basisOpen = false
@@ -53,7 +56,7 @@ struct MoneyHomeView: View {
                     drawer("التحليل", "chart.bar.xaxis", "money-analysis-open") { analysisOpen = true }
                 }
                 GridRow {
-                    drawer("البطاقات", "creditcard", "money-cards-open") { cardsOpen = true }
+                    drawer("البطاقات", "creditcard", "money-cards-open", fact: cardsFact) { cardsOpen = true }
                     drawer("الحسابات", "tree", "money-accounts-open", fact: accountsFact) { accountsOpen = true }
                 }
                 GridRow {
@@ -62,7 +65,7 @@ struct MoneyHomeView: View {
                 }
                 GridRow {
                     drawer("الاسترداد النقدي", "drop", "money-cashback-open") { cashbackOpen = true }
-                    drawer("الزكاة", "scalemass", "money-zakat-open") { zakatOpen = true }
+                    drawer("الزكاة", "scalemass", "money-zakat-open", fact: zakatFact) { zakatOpen = true }
                 }
             }
             Button { settingsOpen = true } label: {
@@ -82,6 +85,14 @@ struct MoneyHomeView: View {
     private var goalFact: String? {
         guard let n = reading?.envelopes.count, n > 0 else { return nil }
         return service.counted(n, ("هدف واحد", "هدفان", "أهداف", "هدفًا"))
+    }
+    private var cardsFact: String? {
+        cardCount > 0 ? service.counted(cardCount, ("بطاقة واحدة", "بطاقتان", "بطاقات", "بطاقة")) : nil
+    }
+    /// Go deeper, 25 Oct 2026: the zakat drawer anticipates the hawl instead of sitting silent.
+    private var zakatFact: String? {
+        guard let key = hawlKey, let hawl = MoneyHawl.read(key, app: app) else { return nil }
+        return hawl.daysLeft == 0 ? "حولك اليوم" : "حولك بعد " + service.days(hawl.daysLeft)
     }
     private func drawer(_ title: String, _ symbol: String, _ id: String, fact: String? = nil, action: @escaping () -> Void) -> some View {
         Button(action: action) {
@@ -211,7 +222,7 @@ struct MoneyHomeView: View {
                 Spacer(minLength: 12)
                 VStack(alignment: .trailing, spacing: 7) {
                     Text("لك فعلًا").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                    Text(figure: reading.knownBalanceCount == 0 && reading.unknownBalanceCount > 0 ? "—" : amount(reading.basis.netMinor)).font(MadarTypography.cardTitle()).accessibilityIdentifier("money-net")
+                    Text(figure: !reading.hasKnownBalance ? "—" : amount(reading.basis.netMinor)).font(MadarTypography.cardTitle()).accessibilityIdentifier("money-net")
                     Text(reading.currency == "SAR" ? "ريال سعودي" : reading.currency).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                 }
             }
@@ -250,8 +261,8 @@ struct MoneyHomeView: View {
             }
             if reading.hasAccounts {
                 Button { basisOpen = true } label: {
-                    HStack { Text(reading.unknownBalanceCount > 0 ? "الأرصدة المعروفة" : "في حسابك"); Spacer(); Text(figure: reading.knownBalanceCount == 0 && reading.unknownBalanceCount > 0 ? "—" : amount(reading.basis.inAccountMinor)).font(MadarTypography.cardTitle()); Image(systemName: "chevron.left").font(.caption) }.frame(minHeight: 44)
-                }.buttonStyle(.plain).accessibilityLabel(reading.knownBalanceCount == 0 && reading.unknownBalanceCount > 0 ? "على أي أساس، لم يُعرف رصيد الحسابات بعد" : "على أي أساس، الأرصدة المعروفة " + amount(reading.basis.inAccountMinor))
+                    HStack { Text(reading.unknownBalanceCount > 0 ? "الأرصدة المعروفة" : "في حسابك"); Spacer(); Text(figure: !reading.hasKnownBalance ? "—" : amount(reading.basis.inAccountMinor)).font(MadarTypography.cardTitle()); Image(systemName: "chevron.left").font(.caption) }.frame(minHeight: 44).contentShape(.rect) // the whole row, Spacer included (owner-data walk 25 Oct)
+                }.buttonStyle(.plain).accessibilityLabel(!reading.hasKnownBalance ? "على أي أساس، لم يُعرف رصيد الحسابات بعد" : "على أي أساس، الأرصدة المعروفة " + amount(reading.basis.inAccountMinor)).accessibilityIdentifier("money-basis-open")
                 if !amountsVisible { Button("أظهر الأرقام") { revealed = true }.frame(minHeight: 44).accessibilityIdentifier("money-reveal") }
             }
         }
@@ -373,6 +384,10 @@ struct MoneyHomeView: View {
     }
     private func amount(_ value: Int) -> String { amountsVisible ? service.amount(value) : "•••" }
     private func load() {
+        let context = ModelContext(app.container)
+        cardCount = ((try? context.fetch(FetchDescriptor<Card>())) ?? []).filter { $0.deletedAt == nil && $0.mergedInto == nil }.count
+        hawlKey = ((try? context.fetch(FetchDescriptor<ZakatProfile>())) ?? []).filter { $0.deletedAt == nil && $0.mergedInto == nil }
+            .sorted { $0.id.uuidString < $1.id.uuidString }.first?.hawlStartHijri
         do { reading = try service.load(); failure = nil }
         catch MoneyCommandError.missingRate { failure = "يلزم سعر تحويل يدوي لجمع أرصدتك بعملة البيت."; reading = nil }
         catch { failure = "تعذّرت قراءة البيانات الآن. أعد المحاولة."; reading = nil }

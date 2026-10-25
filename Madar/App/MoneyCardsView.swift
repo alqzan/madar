@@ -161,7 +161,7 @@ struct MoneyCardsView: View {
             if c.purchases.isEmpty { Text("لا حركات مؤكّدة في هذه الفترة.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk) }
             ForEach(c.purchases) { movement($0) }
             if let best = reading?.cards.filter({ $0.kind == "credit" && $0.graceDays != nil }).max(by: { ($0.graceDays ?? 0) < ($1.graceDays ?? 0) }), let grace = best.graceDays {
-                Button { tab = "متى يخرج النقد" } label: { HStack { Text("للشراء اليوم: " + best.name); Spacer(); Text("مهلة " + service.days(grace) + " تقريبًا") }.font(MadarTypography.caption()).padding(16).overlay { Capsule().stroke(theme.color("reserveText"), lineWidth: 1) } }.buttonStyle(.plain)
+                Button { tab = "متى يخرج النقد" } label: { HStack { Text("للشراء اليوم: " + best.name); Spacer(); Text("مهلة " + service.days(grace) + " تقريبًا") }.font(MadarTypography.caption()).padding(16).overlay { Capsule().stroke(theme.color("reserveText"), lineWidth: 1) }.contentShape(.rect) }.buttonStyle(.plain)
             }
         }
     }
@@ -210,7 +210,7 @@ struct MoneyCardsView: View {
                 Image(systemName: "diamond.fill").font(.system(size: 7)).foregroundStyle(theme.color("bills"))
                 VStack(alignment: .leading, spacing: 5) { Text(row.merchant).font(MadarTypography.body()); Text(row.budgeted ? "احتُسب في الميزانية يوم الشراء" : "خارج الميزانية").font(MadarTypography.fine()).foregroundStyle(theme.color("surplusText")) }
                 Spacer(minLength: 2); dates(row.day); Text(figure: amount(row.amountMinor)).font(MadarTypography.body())
-            }.padding(.vertical, 11).overlay(alignment: .bottom) { Rectangle().fill(theme.line).frame(height: 0.7) }
+            }.padding(.vertical, 11).overlay(alignment: .bottom) { Rectangle().fill(theme.line).frame(height: 0.7) }.contentShape(.rect)
         }.buttonStyle(.plain).accessibilityIdentifier("money-card-movement-" + row.merchant)
     }
     private func dates(_ day: GregorianDay) -> some View {
@@ -286,7 +286,7 @@ struct MoneyCardsView: View {
             } else { Text("لا مبالغ مستحقة معروفة بعد.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk) }
             Text("المواعيد المعروفة").font(MadarTypography.cardTitle())
             ForEach(r.dues) { due in
-                Button { selectedDue = due.id } label: { HStack { Text(due.name); Spacer(); dates(due.day); Text(figure: amount(due.amountMinor)) }.font(MadarTypography.caption()).padding(.vertical, 8) }.buttonStyle(.plain)
+                Button { selectedDue = due.id } label: { HStack { Text(due.name); Spacer(); dates(due.day); Text(figure: amount(due.amountMinor)) }.font(MadarTypography.caption()).padding(.vertical, 8).contentShape(.rect) }.buttonStyle(.plain)
             }
             Text("التغطية من النقد الموجود الآن بعد المواعيد السابقة فقط، دون افتراض راتب قادم. لا يُحجز المال ولا يُسجّل سداد من هذه الصفحة.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
         }.accessibilityElement(children: .contain).accessibilityIdentifier("money-card-calendar")
@@ -315,7 +315,7 @@ struct MoneyCardsView: View {
         VStack(alignment: .leading, spacing: 16) {
             if let payment = c.payment {
                 Button { source = payment.detail } label: {
-                    HStack { Image(systemName: "arrow.left.arrow.right").foregroundStyle(theme.color("reserveText")); VStack(alignment: .leading, spacing: 5) { Text("سداد " + c.name).font(MadarTypography.cardTitle()); Text("تحويل، ليس مصروفًا جديدًا").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk); dates(payment.day) }; Spacer(); Text(figure: amount(payment.amountMinor)).font(.custom("thmanyahserifdisplay-Bold", size: 28, relativeTo: .title)) }.padding(16).overlay { RoundedRectangle(cornerRadius: 13).stroke(theme.color("reserveText"), lineWidth: 1) }
+                    HStack { Image(systemName: "arrow.left.arrow.right").foregroundStyle(theme.color("reserveText")); VStack(alignment: .leading, spacing: 5) { Text("سداد " + c.name).font(MadarTypography.cardTitle()); Text("تحويل، ليس مصروفًا جديدًا").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk); dates(payment.day) }; Spacer(); Text(figure: amount(payment.amountMinor)).font(.custom("thmanyahserifdisplay-Bold", size: 28, relativeTo: .title)) }.padding(16).overlay { RoundedRectangle(cornerRadius: 13).stroke(theme.color("reserveText"), lineWidth: 1) }.contentShape(.rect(cornerRadius: 13))
                 }.buttonStyle(.plain).accessibilityIdentifier("money-card-payment-source")
                 if !c.matchedPurchases.isEmpty {
                     let total = c.matchedPurchases.reduce(0) { $0 + $1.amountMinor }

@@ -38,7 +38,7 @@ struct MoneyGoalView: View {
     private func shown(_ n: Int) -> String { visible ? service.amount(n) : "•••" }
     var body: some View {
         ScrollView { VStack(spacing: 18) {
-            HStack { Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44).overlay { Circle().stroke(theme.color("reserveText")) } }; Text("جهّز لشيء قادم").font(MadarTypography.title()); Spacer() }
+            HStack { Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44).overlay { Circle().stroke(theme.color("reserveText")) } }.accessibilityIdentifier("money-goal-close"); Text("جهّز لشيء قادم").font(MadarTypography.title()); Spacer() }
             if let reading {
                 if !visible { Button("المس لإظهار الأرقام") { revealed = true }.frame(minHeight: 44).accessibilityIdentifier("money-goal-reveal") }
                 ScrollView(.horizontal) { HStack { ForEach(["هدية", "دراسة", "سفرة", "أثاث", "سيارة"], id: \.self) { title in Button(title) { name = title }.font(MadarTypography.caption()).padding(.horizontal, 18).frame(minHeight: 42).background(name == title ? theme.ink : .clear, in: Capsule()).foregroundStyle(name == title ? theme.background : theme.ink).overlay { Capsule().stroke(theme.color("reserveText").opacity(0.25)) } } } }.scrollIndicators(.hidden)
@@ -110,7 +110,7 @@ struct MoneyGoalView: View {
     private func field(_ title: String, raw: Binding<String>, id: String) -> some View { VStack(alignment: .leading, spacing: 4) { Text(title).font(MadarTypography.caption()); TextField(title, text: raw).keyboardType(.decimalPad).accessibilityIdentifier(id) } }
     private var payments: some View { ScrollView { VStack(alignment: .leading, spacing: 12) {
         Text("دفعات مسجلة لهذا الشيء").font(MadarTypography.cardTitle()); Text("اختر ما دفعته نقدًا أو بالبطاقة أو التقسيط. يبقى المصروف كما سجلته؛ المظروف الجديد للمتبقي فقط.").font(MadarTypography.caption())
-        ForEach(reading?.paid ?? []) { item in Button { if paid.contains(item.id) { paid.remove(item.id) } else { paid.insert(item.id) } } label: { HStack { Image(systemName: paid.contains(item.id) ? "checkmark.circle.fill" : "circle"); VStack(alignment: .leading) { Text(item.title); if let day = try? GregorianDay(item.dayKey) { MadarDateLabel(app.dateLabels(day), primaryFont: MadarTypography.fine(), secondaryFont: MadarTypography.fine()) } }; Spacer(); Text(shown(item.amountMinor)) }.frame(minHeight: 50) }.accessibilityIdentifier("money-goal-paid-" + item.id.uuidString) }
+        ForEach(reading?.paid ?? []) { item in Button { if paid.contains(item.id) { paid.remove(item.id) } else { paid.insert(item.id) } } label: { HStack { Image(systemName: paid.contains(item.id) ? "checkmark.circle.fill" : "circle"); VStack(alignment: .leading) { Text(item.title); if let day = try? GregorianDay(item.dayKey) { MadarDateLabel(app.dateLabels(day), primaryFont: MadarTypography.fine(), secondaryFont: MadarTypography.fine()) } }; Spacer(); Text(shown(item.amountMinor)) }.frame(minHeight: 50).contentShape(.rect) }.accessibilityIdentifier("money-goal-paid-" + item.id.uuidString) }
         Button("تم") { upfront = service.moneyInput(min(target, minor(upfront))); daily = service.moneyInput(min(rest, minor(daily))); selected = -1; paidOpen = false }.frame(minHeight: 44).accessibilityIdentifier("money-goal-paid-done")
     }.padding(22) }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.plain) }
     private var confirmation: some View { VStack(alignment: .leading, spacing: 18) {
