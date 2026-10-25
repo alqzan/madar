@@ -90,4 +90,17 @@ import XCTest
         XCTAssertTrue(app.buttons["habit-past-save"].waitForExistence(timeout:5));app.buttons["إلغاء"].tap()
         XCTAssertTrue(app.buttons["habit-past-save"].waitForNonExistence(timeout:5))
     }
+    func testOverdueYearlyHabitShowsTheGentleNudge() throws {
+        continueAfterFailure = false
+        let app = app("sinceOverdue"); open(app)
+        app.buttons["habits-view-all"].tap()
+        let gift = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "إهداء من تحب")).firstMatch
+        for _ in 0..<8 where !gift.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(gift.isHittable); gift.tap()
+        let since = app.staticTexts["habit-since"]
+        XCTAssertTrue(since.waitForExistence(timeout: 10)); XCTAssertEqual(since.label, "منذ سنة")
+        XCTAssertTrue(app.staticTexts["مرّت سنة ولم تفعلها؛ لعلّ هذا وقتها"].exists)
+        XCTAssertTrue(app.staticTexts["أهديت أمي عطرها الذي تحبه، وفرحت به كثيرًا."].exists)
+        shot(app, "I26-year-overdue-L")
+    }
 }

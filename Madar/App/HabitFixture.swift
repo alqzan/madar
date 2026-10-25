@@ -11,7 +11,8 @@ extension AppSession {
         guard try context.fetchCount(FetchDescriptor<Habit>()) == 0 else{return}
         let settings=try SettingsStore(context:context);_ = try settings.stage(["core.dayStart":.string("midnight"),"core.faceIDLock":.string("none")])
         let marker=DeviceSetting();marker.key="sys.onboardingCompleted";marker.valueJSON=Data("true".utf8);context.insert(marker)
-        let atRisk = variant == "atRisk", since = variant == "since"
+        let atRisk = variant == "atRisk", overdue = variant == "sinceOverdue"
+        let since = variant == "since" || overdue
         guard variant == "showcase" || atRisk || since else{try context.save();return}
         let today=GregorianDay.containing(prayerNow(),in:activePlace.timeZone)
         let names=["الماء","أذكار الصباح","مذاكرة","الاتصال بالأخوال","زيارة الوالدين","صدقة الشهر",since ? "إهداء من تحب" : "العمرة"]
@@ -21,9 +22,10 @@ extension AppSession {
             if since && index == 6 {
                 // Item 26 «ج»: a yearly habit kept by «آخر مرة», two times long ago with that day's diary lines.
                 p.effectiveFrom=today.adding(days:-700).description
-                for (offset,line) in [(240,"أهديت أمي عطرها الذي تحبه، وفرحت به كثيرًا."),(600,"اشتريت لأبي كتابًا كان يبحث عنه.")] {
+                let latestOffset = overdue ? 400 : 240
+                for (offset,line) in [(latestOffset,"أهديت أمي عطرها الذي تحبه، وفرحت به كثيرًا."),(600,"اشتريت لأبي كتابًا كان يبحث عنه.")] {
                     let d=today.adding(days:-offset),entry=Entry();entry.id=StableIdentity.uuid(for:"habit-since-entry-\(offset)");entry.dayKey=d.description;entry.text=line;entry.eventAt=d.date(in:ActivePlace.riyadh.timeZone).addingTimeInterval(64800);entry.createdAt=entry.eventAt;entry.tzID="Asia/Riyadh";entry.dayPolicy="midnight@1";context.insert(entry)
-                    let event=HabitEvent();event.habitID=habit.id;event.dayKey=d.description;event.periodKey=String(format:"g:%04d",d.year);event.delta=1;event.entryID=offset == 240 ? entry.id : nil;event.eventAt=entry.eventAt;event.tzID="Asia/Riyadh";event.dayPolicy="midnight@1";context.insert(event)
+                    let event=HabitEvent();event.habitID=habit.id;event.dayKey=d.description;event.periodKey=String(format:"g:%04d",d.year);event.delta=1;event.entryID=offset == latestOffset ? entry.id : nil;event.eventAt=entry.eventAt;event.tzID="Asia/Riyadh";event.dayPolicy="midnight@1";context.insert(event)
                 }
                 let quiet=Entry();quiet.dayKey=today.adding(days:-3).description;quiet.text="مشيت مع أخي بعد العصر.";quiet.eventAt=today.adding(days:-3).date(in:ActivePlace.riyadh.timeZone).addingTimeInterval(57600);quiet.tzID="Asia/Riyadh";quiet.dayPolicy="midnight@1";context.insert(quiet)
                 continue
