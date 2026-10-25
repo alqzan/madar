@@ -35,6 +35,10 @@ struct HabitSinceSection:View {
     private var rhythm:String? {
         guard let p = reading.summary.current, p.target > 0, p.rule.frequency == .monthly || p.rule.frequency == .yearly else { return nil }
         if p.met { return "تمّت في فترتها؛ "+(p.rule.frequency == .yearly ? "تعود في سنتها القادمة" : "تعود في شهرها القادم") }
+        // The gentle nudge the owner asked for: a whole rhythm has passed since the last time.
+        if let last = reading.lastTime, HabitRhythmMath.days(last.day,today) >= (p.rule.frequency == .yearly ? 365 : 30) {
+            return p.rule.frequency == .yearly ? "مرّت سنة ولم تفعلها؛ لعلّ هذا وقتها" : "مرّ شهر ولم تفعلها؛ لعلّ هذا وقتها"
+        }
         let left = HabitRhythmMath.days(today,p.end) // `end` is the next period's first day
         let ahead = left < 14 ? arabicCount(left,["يوم","يومان","أيام","يومًا"],digits) : left < 60 ? arabicCount(left/7,["أسبوع","أسبوعان","أسابيع","أسبوعًا"],digits) : arabicCount(left/30,["شهر","شهران","أشهر","شهرًا"],digits)
         return "إيقاعها "+(p.rule.frequency == .yearly ? "سنة" : "شهر")+"، بقي "+(left < 14 ? "" : "نحو ")+ahead

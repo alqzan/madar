@@ -133,6 +133,7 @@ struct HabitRhythmBand:View {
             let row = rows.first { $0.summary.current?.met != true } ?? rows.first
             guard let row else { return "" }
             guard let last = row.lastTime else { return row.name+"، لم تسجّلها بعد" }
+            if row.summary.current?.met != true, HabitRhythmMath.days(last.day,today) >= 365 { return row.name+"، مرّت سنة ولم تفعلها" }
             return row.name+"، آخر مرة "+habitSince(last.day,today,digits)
         }
     }
