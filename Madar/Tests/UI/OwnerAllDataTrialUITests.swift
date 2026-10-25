@@ -311,7 +311,9 @@ import XCTest
         let names = XCTAttachment(string: entries.allElementsBoundByIndex.map(\.label).joined(separator: "\n")); names.name = "PDF-contents"; names.lifetime = .keepAlways; self.add(names)
         // Each printed chapter keeps its own title (an id from the link alone repeated one title for a shared page).
         let labels = entries.allElementsBoundByIndex.map(\.label)
-        XCTAssertTrue(labels.contains { $0.contains("لحظةُ البدايةِ") }, labels.joined(separator: " | "))
+        for chapter in ["لحظةُ البدايةِ", "ما الفرقُ بينَ العملِ", "هل يمكنُ أنْ يحوّلَ", "أصحابُ المشاريعِ"] {
+            XCTAssertTrue(labels.contains { $0.contains(chapter) }, chapter + ": " + labels.joined(separator: " | "))
+        }
         XCTAssertEqual(labels.filter { $0.hasPrefix("مشروع إغاثة الفقراء") }.count, 1, labels.joined(separator: " | "))
         let intro = entries.matching(NSPredicate(format: "label BEGINSWITH %@", "المقدمة")).firstMatch
         XCTAssertTrue(intro.exists, app.debugDescription); intro.tap()

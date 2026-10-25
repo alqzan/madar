@@ -245,7 +245,9 @@ public enum PDFBookEPUB {
         var previous = 0
         for k in raw.indices {
             guard var n = raw[k].number else { continue }
-            while n > texts.count || n < previous, n >= 10, n % 10 == 0 { n /= 10 }
+            // …also when it runs past the next title's number («٠٧٠٠» before «١١» is ٧, not ٧٠).
+            let next = raw[(k + 1)...].lazy.compactMap(\.number).first { $0 <= texts.count }
+            while n > texts.count || n < previous || next.map({ n > $0 }) == true, n >= 10, n % 10 == 0 { n /= 10 }
             if n > texts.count || n < previous { raw[k].number = nil } else { raw[k].number = n; previous = n }
         }
         func headingPage(_ title: String, from: Int, to: Int) -> Int? {

@@ -89,12 +89,13 @@ struct PDFBookEPUBTests {
     }
 
     /// The owner's contents page as the phone read it: titles run together on one line, leader dots read as
-    /// digits («٢..٠», «٠٤٠٠»), Latin digits, and one number misread. Expected pages are the heading pages.
+    /// digits («٢..٠», «٠٤٠٠» — ٤, not ٤٠, in a 60-page book), Latin digits, and one number misread. Expected pages are the heading pages.
     @Test func aContentsPageReadWithMergedTitlesAndGarbledNumbersStillFindsEveryChapter() {
-        var pages = Array(repeating: "نص عادي في صفحة من الكتاب لا عنوان فيه.", count: 16)
+        var pages = Array(repeating: "نص عادي في صفحة من الكتاب لا عنوان فيه.", count: 60)
         pages[1] = "إضاءة\nنص."; pages[3] = "المقدمة\nنص."; pages[5] = "١ - البداية\nنص."
-        pages[7] = "٢ - الطريق الطويل\nنص."; pages[9] = "٣ - الثمرة\nنص."; pages[11] = "٤ - الخاتمة\nنص."
+        pages[7] = "٢ - الطريق الطويل\nنص."; pages[9] = "٣ - الثمرة\nنص."
         pages[14] = "الفهرس\nإضاءة\nالمقدمة\n١ - البداية ٢ - الطريق الطويل ٣ - الثمرة\n٤ - الخاتمة\n٢..٠\n٠٤٠٠\n6\n٣\n١٠\n١٢"
+        pages[11] = "١٤\nالخا\nنص."   // The heading split over lines: only its printed number places it.
         let expected: [PDFBookEPUB.PrintedEntry] = [
             .init(title: "إضاءة", page: 1), .init(title: "المقدمة", page: 3), .init(title: "١ - البداية", page: 5),
             .init(title: "٢ - الطريق الطويل", page: 7), .init(title: "٣ - الثمرة", page: 9), .init(title: "٤ - الخاتمة", page: 11)
