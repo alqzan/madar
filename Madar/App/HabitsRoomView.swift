@@ -104,7 +104,8 @@ struct HabitsRoomView: View {
     }
     private func daysLeft(_ p:HabitPeriodResult)->Int {
         var calendar = Calendar(identifier:.gregorian); calendar.timeZone = .gmt
-        return (calendar.dateComponents([.day],from:today.date(in:.gmt),to:p.end.date(in:.gmt)).day ?? 0) + 1
+        // `end` is the next period's first day, so today counts and `end` does not.
+        return calendar.dateComponents([.day],from:today.date(in:.gmt),to:p.end.date(in:.gmt)).day ?? 0
     }
     private var todayRows: [HabitReading] { active.filter(dueToday).sorted { priority($0) < priority($1) } }
     private var openToday: [HabitReading] { todayRows.filter { $0.summary.current?.met != true } }
@@ -211,6 +212,7 @@ struct HabitsRoomView: View {
                     Spacer()
                     if let left = windowLeft(f,rows) { Text(left).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
                 }.padding(.top,10).accessibilityElement(children:.combine).accessibilityIdentifier("habits-group-"+f.rawValue)
+                if !dynamicTypeSize.isAccessibilitySize { HabitRhythmBand(frequency:f,rows:rows,today:today,digits:digits) }
                 rowsBlock(rows)
             }
         }

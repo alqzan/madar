@@ -144,7 +144,7 @@ public struct CommandBus: Sendable {
         case let name where HabitCommand.names.contains(name):
             guard let parsed = HabitCommand.parse(name, payload) else { return .init(status: .rejected, reason: "invalidPayload") }
             // A queued completion names its period; the transaction rejects it once that period has closed.
-            if envelope.source != .app, case .complete(_, _, nil) = parsed { return .init(status: .rejected, reason: "invalidPayload") }
+            if envelope.source != .app, case .complete(_, _, nil, nil, _) = parsed { return .init(status: .rejected, reason: "invalidPayload") }
             operation = .habit(parsed); semantics = .upsert; naturalKey = nil
         case let name where DiaryEditorCommand.names.contains(name):
             guard let parsed = DiaryEditorCommand.parse(name, payload) else { return .init(status: .rejected, reason: "invalidPayload") }

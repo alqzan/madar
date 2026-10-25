@@ -2,7 +2,7 @@ import Foundation
 
 public enum HabitCommand: Codable, Equatable, Sendable {
     case save(id: UUID, name: String, source: String?, rule: HabitRule, homeOnly: Bool, reminder: String)
-    case complete(id: UUID, delta: Int, periodKey: String?)
+    case complete(id: UUID, delta: Int, periodKey: String?, day: GregorianDay? = nil, entryID: UUID? = nil)
     case pause(id: UUID, from: GregorianDay, until: GregorianDay?, trip: Bool)
     case health(id: UUID, unit: String, values: [String:Int])
     case resume(UUID)
@@ -26,11 +26,14 @@ public enum HabitCommand: Codable, Equatable, Sendable {
             guard ["dot","push","none"].contains(reminder), value["homeOnly"] == nil || value["homeOnly"]?.bool != nil else { return nil }
             return .save(id: id, name: text, source: source, rule: rule, homeOnly: value["homeOnly"]?.bool ?? false, reminder: reminder)
         case "habit.complete":
-            guard Set(value.keys).isSubset(of: ["id","habitID","delta","periodKey"]) else { return nil }
+            guard Set(value.keys).isSubset(of: ["id","habitID","delta","periodKey","day","entryID"]) else { return nil }
             guard value["id"] == nil || value["habitID"] == nil, value["delta"] == nil || value["delta"]?.number != nil, value["periodKey"] == nil || value["periodKey"]?.string != nil else {return nil}
             let n = value["delta"]?.number ?? 1
             guard n > 0, n <= 100000, n.rounded() == n else { return nil }
-            return .complete(id: id, delta: Int(n), periodKey: value["periodKey"]?.string)
+            // «فعلتها في يوم سابق» names the day; a diary line of that day may be linked to the time (item 26).
+            let day = value["day"]?.string.flatMap { try? GregorianDay($0) }, entry = value["entryID"]?.string.flatMap(UUID.init(uuidString:))
+            guard value["day"] == nil || day != nil, value["entryID"] == nil || entry != nil, day == nil || value["periodKey"] == nil else { return nil }
+            return .complete(id: id, delta: Int(n), periodKey: value["periodKey"]?.string, day: day, entryID: entry)
         case "habit.pause":
             guard Set(value.keys).isSubset(of: ["id","from","until","trip"]), let from = value["from"]?.string.flatMap({ try? GregorianDay($0) }) else { return nil }
             let until = value["until"]?.string.flatMap { try? GregorianDay($0) }

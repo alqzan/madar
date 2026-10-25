@@ -50,4 +50,36 @@ import XCTest
         shot(app,"M4-V02-Adat-all-L");app.swipeUp(velocity:.slow);shot(app,"M4-V02-Adat-all-s1-L")
         XCTAssertFalse(app.segmentedControls["عرض العادات"].exists) // RA8: alternate designs are v2; this is a filter.
     }
+    /// Item 26 «ب مع ج»: each rhythm draws itself in «كل عاداتي»; a yearly habit opens on «منذ آخر مرة» with both dates and
+    /// its diary line, and «فعلتها في يوم سابق» logs a past day linked to that day's line.
+    func testRhythmBandsSinceLastTimeAndPastDay() throws {
+        continueAfterFailure=false;let app=app("since");open(app)
+        app.buttons["habits-view-all"].tap()
+        for kind in ["daily","weekly","monthly","yearly"] {
+            let band=app.descendants(matching:.any)["habits-band-"+kind]
+            for _ in 0..<4 where !band.exists { app.swipeUp(velocity:.slow) }
+            XCTAssertTrue(band.waitForExistence(timeout:5),kind)
+        }
+        XCTAssertTrue(app.descendants(matching:.any)["habits-band-yearly"].label.contains("آخر مرة منذ ٧ أشهر"),app.descendants(matching:.any)["habits-band-yearly"].label)
+        app.swipeDown(velocity:.fast);app.swipeDown(velocity:.fast);shot(app,"I26-bands-L");app.swipeUp(velocity:.slow);shot(app,"I26-bands-s1-L")
+        let gift=app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@","إهداء من تحب")).firstMatch
+        for _ in 0..<4 where !gift.isHittable { app.swipeUp(velocity:.slow) }
+        gift.tap()
+        let since=app.staticTexts["habit-since"];XCTAssertTrue(since.waitForExistence(timeout:5));XCTAssertEqual(since.label,"منذ ٧ أشهر")
+        XCTAssertTrue(app.staticTexts["أهديت أمي عطرها الذي تحبه، وفرحت به كثيرًا."].exists)
+        shot(app,"I26-since-L");app.swipeUp(velocity:.slow);shot(app,"I26-since-s1-L")
+        let past=app.buttons["habit-past-day"];for _ in 0..<3 where !past.isHittable { app.swipeUp(velocity:.slow) }
+        past.tap()
+        XCTAssertTrue(app.buttons["habit-past-save"].waitForExistence(timeout:5));shot(app,"I26-past-day-L")
+        // Three days ago holds one diary line; pick that day, link the line, save.
+        let day=app.datePickers["habit-past-date"].buttons.matching(NSPredicate(format:"label CONTAINS %@","12")).firstMatch
+        XCTAssertTrue(day.waitForExistence(timeout:5),app.debugDescription);day.tap()
+        let line=app.buttons["habit-past-line"];XCTAssertTrue(line.waitForExistence(timeout:5));line.tap();XCTAssertTrue(line.isSelected)
+        shot(app,"I26-past-day-line-L");app.buttons["habit-past-save"].tap()
+        XCTAssertTrue(app.buttons["habit-past-save"].waitForNonExistence(timeout:10))
+        let again=app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@","إهداء من تحب")).firstMatch
+        XCTAssertTrue(again.waitForExistence(timeout:10));again.tap()
+        XCTAssertTrue(since.waitForExistence(timeout:5));XCTAssertEqual(since.label,"منذ ٣ أيام")
+        XCTAssertTrue(app.staticTexts["مشيت مع أخي بعد العصر."].exists);shot(app,"I26-since-after-L")
+    }
 }

@@ -37,15 +37,30 @@ private struct HabitUndo: Codable {
             if let origin=try HabitContextProvenance.ensureOrigin(habit:row,context:context,now:now,writer:writer),existing==nil {
                 inverse.changes.append(.init(before:nil,after:try origin.record()))
             }
-        case .complete(let identity, let delta, let periodKey):
+        case .complete(let identity, let delta, let periodKey, let day, let entryID):
             let row = try habit(identity); guard row.archivedAt == nil, row.kind == "custom" else { throw DataError.invalidValue("العادة المربوطة تُسجّل في غرفتها") }
             let reading = try HabitRepository(context: context).readings(at: now).first { $0.id == identity }
-            guard let reading, !reading.paused, let current = reading.summary.current, current.target > 0 else { throw DataError.invalidValue("العادة مستثناة اليوم") }
-            guard periodKey == nil || periodKey == current.key else {throw DataError.invalidValue("انتهت هذه الفترة؛ افتح العادات للتسجيل") }
-            if current.rule.measure == .once && current.met { return nil }
             let prayers = try PrayerRepository(context: context), event = HabitEvent()
-            event.id = id; event.habitID = identity; event.dayKey = today.description; event.periodKey = current.key
-            event.eventAt = now; event.tzID = prayers.place(at: now).timeZoneID
+            let target: HabitPeriodResult, logDay: GregorianDay
+            if let day, day != today {
+                // A past day is logged in the period that held it; a day after today or before the habit began is refused.
+                guard day < today else { throw DataError.invalidValue("لا يُسجّل يوم لم يأتِ بعد") }
+                guard let reading, let period = reading.summary.periods.last(where: { $0.start <= day && day < $0.end }), period.target > 0 else { throw DataError.invalidValue("هذا اليوم قبل بداية العادة") }
+                target = period; logDay = day
+                event.eventAt = day.date(in: prayers.place(at: now).timeZone).addingTimeInterval(43200)
+            } else {
+                guard let reading, !reading.paused, let current = reading.summary.current, current.target > 0 else { throw DataError.invalidValue("العادة مستثناة اليوم") }
+                guard periodKey == nil || periodKey == current.key else {throw DataError.invalidValue("انتهت هذه الفترة؛ افتح العادات للتسجيل") }
+                target = current; logDay = today; event.eventAt = now
+            }
+            // A finished once-habit takes no second tap in its period, but a remembered earlier day is still a time of
+            // its own («آخر مرة»): it is kept unless that day already holds one.
+            if target.rule.measure == .once && target.met {
+                guard logDay != today, reading?.times.contains(where: { $0.day == logDay }) == false else { return nil }
+            }
+            let current = target
+            event.id = id; event.habitID = identity; event.dayKey = logDay.description; event.periodKey = current.key; event.entryID = entryID
+            event.tzID = prayers.place(at: now).timeZoneID
             let settings = try SettingsStore(context: context); event.dayPolicy = ((try settings.value(for:"core.dayStart")).string ?? "fajr") + "@1"
             event.unit = current.rule.unit
             event.delta = current.rule.measure == .once ? 1 : delta; event.createdAt = now; event.updatedAt = now; event.writerID = writer

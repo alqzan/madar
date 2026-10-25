@@ -12,6 +12,9 @@ struct HabitDetailView:View {
     let edit:()->Void
     @Environment(\.dismiss) private var dismiss
     @State private var busy=false
+    @State private var pastDay=false
+    /// A month or a year apart, the habit is kept by «آخر مرة» (item 26 «ج»): that leads the page.
+    private var keptBySince:Bool { reading.source == nil && [.monthly,.yearly].contains(reading.summary.current?.rule.frequency) }
     private var theme:RoomTheme{.init(room:"bahw",dark:session.string("core.theme") == "dark")}
     /// «تُقاس يوميًا»: the adverb, not the adjective «يومية».
     private func measured(_ f:HabitFrequency)->String { switch f {case .daily:"يوميًا";case .weekly:"أسبوعيًا";case .monthly:"شهريًا";case .yearly:"سنويًا"} }
@@ -21,19 +24,21 @@ struct HabitDetailView:View {
         ScrollView {
             VStack(alignment:.leading,spacing:18) {
                 HStack { Text(reading.name).font(MadarTypography.title());Spacer();Button("تمّ"){dismiss()}.frame(minHeight:44) }
+                if keptBySince { HabitSinceSection(session:session,reading:reading) }
                 if let current=reading.summary.current { hero(current) }
                 actions
                 if let current=reading.summary.current { history(current) }
                 Text("الحذف يحفظ سجلك؛ تستعيد العادة من «عادات محذوفة».").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
             }.padding(22)
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.accent).environment(\.roomTheme,theme)
+        .sheet(isPresented:$pastDay) { HabitPastDaySheet(session:session,reading:reading) { dismiss() } }
     }
     /// The period at a glance: its arch filling with progress, what is left, and the one action that moves it.
     private func hero(_ current:HabitPeriodResult)->some View {
         VStack(alignment:.leading,spacing:14) {
             HStack(alignment:.center,spacing:16) {
                 VStack(alignment:.leading,spacing:6) {
-                    Text(current.target == 0 ? "سجلك محفوظ" : habitProgressText(current.value,current.target,current.rule.unit,digits)).font(MadarTypography.cardTitle()).accessibilityIdentifier("habit-progress")
+                    Text(current.target == 0 ? "سجلك محفوظ" : habitProgressText(current.rule.measure == .once ? min(current.value,current.target) : current.value,current.target,current.rule.unit,digits)).font(MadarTypography.cardTitle()).accessibilityIdentifier("habit-progress")
                     if let state = stateLine(current) { Text(state).font(MadarTypography.section()).foregroundStyle(theme.accent) }
                     if reading.summary.streak > 1 { HabitFlame(count:reading.summary.streak,frequency:current.rule.frequency,digits:digits).scaleEffect(1.25,anchor:.leading) }
                 }
@@ -62,9 +67,11 @@ struct HabitDetailView:View {
             } label: { filled("افتح "+(reading.sourceTitle ?? "غرفتها")) }.buttonStyle(.plain).accessibilityIdentifier("habit-owner")
         } else if !reading.paused && current.target > 0 {
             let doneOnce = current.met && current.rule.measure == .once
-            Button { perform("habit.complete",["id":.string(reading.id.uuidString),"delta":.number(current.rule.measure == .duration ? 15 : 1)]) } label: {
+            // A «آخر مرة» habit done in its period needs no greyed «تمّت»: the ring and «منذ آخر مرة» already say it.
+            if !(doneOnce && keptBySince) { Button { perform("habit.complete",["id":.string(reading.id.uuidString),"delta":.number(current.rule.measure == .duration ? 15 : 1)]) } label: {
                 filled(current.rule.measure == .duration ? "أضف "+digits.string(15)+" دقيقة" : current.rule.measure == .count ? "أضف "+habitOneMore(current.rule.unit) : doneOnce ? "تمّت" : "أتممتها").opacity(doneOnce ? 0.55 : 1)
-            }.buttonStyle(.plain).disabled(busy || doneOnce).accessibilityIdentifier("habit-complete")
+            }.buttonStyle(.plain).disabled(busy || doneOnce).accessibilityIdentifier("habit-complete") }
+            if current.rule.measure != .health, let start = reading.summary.periods.first?.start, start < AppBahwService(session:session).today { Button { pastDay = true } label: { outline(Label("فعلتها في يوم سابق",systemImage:"calendar.badge.clock")) }.buttonStyle(.plain).accessibilityIdentifier("habit-past-day") }
             if let minimum=current.rule.minimum,current.value<minimum { Button { perform("habit.complete",["id":.string(reading.id.uuidString),"delta":.number(Double(minimum-current.value))]) } label: { outline(Text("سجّل أقلّ القليل: "+habitUnitCount(minimum,current.rule.unit,digits))) }.buttonStyle(.plain).accessibilityIdentifier("habit-minimum") }
         }
     }

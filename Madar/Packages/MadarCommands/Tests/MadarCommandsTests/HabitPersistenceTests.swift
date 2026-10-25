@@ -38,6 +38,40 @@ import MadarData
         #expect(stale.status == .rejected); #expect(stale.reason == "انتهت هذه الفترة؛ افتح العادات للتسجيل")
 
     }
+    /// Item 26 «فعلتها في يوم سابق»: a past day lands in the period that held it with its diary line; a day to come or
+    /// before the habit began is refused, and a day plus a period key is not a valid payload.
+    @Test func pastDayIsLoggedInItsOwnPeriodWithItsDiaryLine() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("HabitPast-\(UUID())"); defer { try? FileManager.default.removeItem(at:root) }
+        let container = try MadarContainerFactory.makeLocal(at:root), bus = CommandBus(adapter:DurableCommandAdapter(container:container,lockDirectory:root,transactionClock:{$0}))
+        let later = now.addingTimeInterval(2 * 86400)
+        func run(_ name:String,_ p:[String:MadarCore.JSONValue],at date:Date) async throws -> CommandOutcome { try await bus.execute(.init(name:name,payload:.object(p),issuedAt:date),now:date) }
+        let habit = UUID(), entry = UUID()
+        _ = try await run("habit.save",payload(habit,HabitRule(effectiveFrom:try GregorianDay("2026-10-15"))),at:now)
+        let id: MadarCore.JSONValue = .string(habit.uuidString)
+        #expect(try await run("habit.complete",["id":id,"day":.string("2026-10-16"),"entryID":.string(entry.uuidString)],at:later).status == .applied)
+        let event = try #require(try ModelContext(container).fetch(FetchDescriptor<HabitEvent>()).first { $0.delta != 0 })
+        #expect(event.dayKey == "2026-10-16"); #expect(event.periodKey == "2026-10-16"); #expect(event.entryID == entry)
+        let reading = try #require(try HabitRepository(context:ModelContext(container)).readings(at:later).first)
+        #expect(reading.summary.periods.first { $0.key == "2026-10-16" }?.met == true)
+        #expect(reading.summary.current?.met == false)
+        #expect(reading.lastTime == HabitTime(day: try GregorianDay("2026-10-16"), entryID: entry))
+        #expect(try await run("habit.complete",["id":id],at:later).status == .applied)
+        let both = try #require(try HabitRepository(context:ModelContext(container)).readings(at:later).first)
+        #expect(both.times.map(\.day.description) == ["2026-10-17","2026-10-16"]); #expect(both.lastTime?.entryID == nil)
+        #expect(try await run("habit.complete",["id":id,"day":.string("2026-10-18")],at:later).status == .rejected)
+        #expect(try await run("habit.complete",["id":id,"day":.string("2026-10-14")],at:later).status == .rejected)
+        #expect(HabitCommand.parse("habit.complete",["id":id,"day":.string("2026-10-16"),"periodKey":.string("2026-10-16")]) == nil)
+        #expect(HabitCommand.parse("habit.complete",["id":id,"day":.string("yesterday")]) == nil)
+        // A yearly habit already done this year still keeps an earlier remembered day, once.
+        let gift = UUID(); var yearly = HabitRule(effectiveFrom:try GregorianDay("2026-10-15")); yearly.frequency = .yearly; yearly.yearMonth = 12; yearly.yearDay = 15
+        _ = try await run("habit.save",payload(gift,yearly),at:now)
+        let g: MadarCore.JSONValue = .string(gift.uuidString)
+        #expect(try await run("habit.complete",["id":g],at:later).status == .applied)
+        #expect(try await run("habit.complete",["id":g,"day":.string("2026-10-15")],at:later).status == .applied)
+        _ = try await run("habit.complete",["id":g,"day":.string("2026-10-15")],at:later)
+        let kept = try #require(try HabitRepository(context:ModelContext(container)).readings(at:later).first { $0.id == gift })
+        #expect(kept.times.map(\.day.description) == ["2026-10-17","2026-10-15"]); #expect(kept.summary.current?.met == true)
+    }
     @Test func pauseResumeAndPolicyEditsAreDatedAndUndoable() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("HabitPause-\(UUID())"); defer { try? FileManager.default.removeItem(at:root) }
         let container = try MadarContainerFactory.makeLocal(at:root), bus = CommandBus(adapter:DurableCommandAdapter(container:container,lockDirectory:root,transactionClock:{$0}))
