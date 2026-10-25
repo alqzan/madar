@@ -391,7 +391,7 @@ M0-M6 software is integrated; M5 has its bounded software gate. M7 remains open 
 - **Not verified:** the «مرّت سنة» nudge on screen (the fixture's last time is 240 days ago); the owner's iPhone; old-Madar habits after the move (they have no entryID).
 - **Next:** (1) the owner reviews B/C; (2) item 24 native-wins is covered for prayer, Quran and money (`LegacyMoveNativeWinsTests` 3/3); habits had its own test; (3) a long-press on a room row now opens «فعلتها في يوم سابق» (r6).
 - **Model/effort:** claude-opus-5-5, effort not exposed; no reviewer (no migration in this slice).
-- **Usage:** five-hour ~81% used at handover time, weekly 73%.
+- **Usage:** five-hour ~85% used at handover time, weekly 74%. After this handover: native-wins tests for prayer, Quran and money (3/3), long-press for a past day, and the seven-day daily band.
 
 ## Handover — M5-V02 and M4-V03 committed, «انقل من مدار القديم» built — 2026-10-25 — Claude
 - **Works now:** on main: `c1c2311` M5-V02 (unknown balances «—»; the basis sheet opens with real data: an untappable Spacer gap in plain-button rows, fixed app-wide with `.contentShape`; drawer facts for cards/zakat; letters waiting for a Hijri date and the cashback AX row show both calendars). `2a7e676` M4-V03 «واصل العدّ بعد الموعد» (V11). `5484bf8`+`cdb600f`+this commit, item 24: Customize → «انقل من مدار القديم»: per-room preview → room-by-room move → result naming real things → one undo; «راجعها الآن» opens the bank messages left for review; diary via the Day One card. Real importers live in `App/LegacyMove.swift` (prayer, Quran, money) and the Habit/Personal enums (now outside DEBUG); DEBUG trials call them. Undo = `ImportUndo` (MadarData) over before/after record snapshots in `<store>/LegacyMove/undo.json`.
