@@ -18,6 +18,13 @@ import MadarCommands
         var done = 0, total = 0
         var state = State.running
         var summary: PDFBookEPUB.Summary?
+        var started = Date()
+
+        /// Seconds left at the pace so far, once a few pages have been read.
+        var secondsLeft: Int? {
+            guard state == .running, done >= 5, total > done else { return nil }
+            return Int((Date().timeIntervalSince(started) / Double(done) * Double(total - done)).rounded(.up))
+        }
     }
 
     private(set) var jobs: [Job] = []

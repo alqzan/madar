@@ -290,6 +290,9 @@ import UIKit
         XCTAssertTrue(convert.waitForExistence(timeout: 15), app.debugDescription); convert.tap()
         XCTAssertTrue(app.descendants(matching: .any)["mihbara-pdf-flow-progress"].waitForExistence(timeout: 15), app.debugDescription)
         XCTAssertFalse(app.buttons["mihbara-pdf-flow-open"].exists, "120 scanned pages must still be converting")
+        // After a few pages the card says how long is left at the pace so far.
+        XCTAssertTrue(app.staticTexts["mihbara-pdf-flow-time-left"].waitForExistence(timeout: 30), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["mihbara-pdf-flow-time-left"].label.hasPrefix("باقي"), app.debugDescription)
         app.terminate()
         app.launch(); openRoom()
         XCTAssertTrue(app.descendants(matching: .any)["mihbara-pdf-flow-progress"].waitForExistence(timeout: 20), app.debugDescription)

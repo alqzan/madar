@@ -86,6 +86,17 @@ struct MihbaraConversionCard: View {
     let onOpen: ((UUID) -> Void)?
     @Environment(\.roomTheme) private var theme
 
+    /// «باقي نحو ٣ دقائق» with the Arabic count forms; under a minute says so.
+    private func timeLeft(_ seconds: Int) -> String {
+        let minutes = (seconds + 59) / 60
+        switch minutes {
+        case ...1: return seconds < 60 ? "باقي أقل من دقيقة" : "باقي نحو دقيقة"
+        case 2: return "باقي نحو دقيقتين"
+        case 3...10: return "باقي نحو \(digits.string(minutes)) دقائق"
+        default: return "باقي نحو \(digits.string(minutes)) دقيقة"
+        }
+    }
+
     var body: some View {
         MadarCard {
             VStack(alignment: .leading, spacing: 10) {
@@ -95,6 +106,10 @@ struct MihbaraConversionCard: View {
                     Text(job.total == 0 ? "يفتح الملف…" : "يقرأ الصفحة \(digits.string(min(job.done + 1, job.total))) من \(digits.string(job.total))")
                         .font(MadarTypography.caption()).contentTransition(.numericText())
                     ProgressView(value: Double(job.done), total: Double(max(job.total, 1))).tint(theme.color("accentText"))
+                    if let left = job.secondsLeft {
+                        Text(timeLeft(left)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                            .accessibilityIdentifier("mihbara-pdf-flow-time-left")
+                    }
                     Text("تنقّل في التطبيق كما تشاء؛ يكمل وحده ويضعه على رفّه.")
                         .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
                     Button("إيقاف") { MihbaraConversions.shared.cancel(job.id, app: app) }.font(MadarTypography.caption()).frame(minHeight: 44)
