@@ -104,6 +104,16 @@ struct PDFBookEPUBTests {
         #expect(found == expected, "\(found.map { "\($0.page) \($0.title)" })")
     }
 
+    /// The owner's scan reads a section break as «* * #», «#» or «*»: each becomes one centred «* * *».
+    @Test func sectionBreaksReadAsStrayMarksBecomeOneBreak() throws {
+        let pages = ["نص الفقرة الأولى في الصفحة.\n* * #\nنص الفقرة الثانية بعد الفاصل.", "#\nنص في الصفحة التالية."]
+            .map { PDFBookEPUB.Page(text: $0, optical: true, unreliable: false) }
+        let body = text(try PDFBookEPUB.build(title: "ت", author: "", language: "ar", sourceHash: "h", pages: pages, outline: []))
+        #expect(body.components(separatedBy: PDFBookEPUB.sectionBreak).count == 3)
+        #expect(!body.contains("* * #") && !body.contains("<p>#</p>"))
+        #expect(PDFBookEPUB.isOrnament("* *") && !PDFBookEPUB.isOrnament("٥ * ٣") && !PDFBookEPUB.isOrnament(" "))
+    }
+
     /// A page that opens on a heading, or follows a page ending on a short line, starts a new paragraph.
     @Test func headingsAndShortLastLinesDoNotRunIntoTheNextPage() throws {
         let pages = [

@@ -101,13 +101,14 @@ public enum PDFBookEPUB {
                     continue
                 }
                 // A page that opens on a heading (a short first line) starts afresh; the open paragraph ends.
-                if open, let first = list.first, isHeading(first) { body += "</p>"; open = false }
+                if open, let first = list.first, isHeading(first) || isOrnament(first) { body += "</p>"; open = false }
                 if open {
                     let first = list.removeFirst()
                     body += " " + marker + TurathEPUB.escape(first)
                     if !list.isEmpty || closes(first) { body += "</p>"; open = false }
                 } else { body += marker }
                 for (k, paragraph) in list.enumerated() {
+                    if isOrnament(paragraph) { body += sectionBreak; continue }
                     // Only a page that ends on a full line carries its last paragraph over to the next page.
                     if k == list.count - 1 && !closes(paragraph) && endsOnFullLine(texts[index]) { body += "<p>" + TurathEPUB.escape(paragraph); open = true }
                     else { body += "<p>\(TurathEPUB.escape(paragraph))</p>" }
@@ -163,6 +164,12 @@ public enum PDFBookEPUB {
     }
 
     // MARK: - The book's printed contents
+
+    /// A section break the scan read as stars and stray marks («* * #», «#»): one centred «* * *».
+    static func isOrnament(_ paragraph: String) -> Bool {
+        !paragraph.isEmpty && paragraph.allSatisfy { "*#•✱✳⁂ ".contains($0) } && paragraph.contains { $0 != " " }
+    }
+    static let sectionBreak = "<p class=\"madar-break\" style=\"text-align: center\">* * *</p>"
 
     public struct PrintedEntry: Equatable, Sendable { public let title: String; public let page: Int }
 
@@ -325,6 +332,7 @@ public enum PDFBookEPUB {
         func flush() { if !current.isEmpty { out.append(current.joined(separator: " ")); current = [] } }
         for line in lines {
             guard !line.isEmpty else { flush(); continue }
+            if isOrnament(line) { flush(); out.append(line); continue }
             current.append(line)
             if let last = line.last, closers.contains(last) { flush() }
             else if typical != .max, line.count * 10 < typical * 7 { flush() }
