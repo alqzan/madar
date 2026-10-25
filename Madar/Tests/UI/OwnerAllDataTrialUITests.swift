@@ -324,6 +324,21 @@ import XCTest
         page("PDF-epub-intro-L")
         XCTAssertEqual(found, .completed, "Source page 9, in «المقدمة», prints «فأحببتُ أوَّلاً أن يكون»")
         XCTAssertFalse(app.webViews.staticTexts.allElementsBoundByIndex.contains { $0.label.contains("صفحة ٥: لم يُستخرج") }, "The basmala page is a picture")
+        // The printed contents page inside the book is the parsed contents: its chapter links open the chapter.
+        if !app.buttons["mihbara-reader-contents"].exists { app.tap() }
+        app.buttons["mihbara-reader-contents"].tap()
+        let lastEntry = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "mihbara-reader-toc-")).allElementsBoundByIndex.last
+        XCTAssertNotNil(lastEntry, app.debugDescription); lastEntry?.tap()
+        let chapterLink = app.webViews.links.matching(NSPredicate(format: "label CONTAINS %@", "لحظةُ البدايةِ")).firstMatch
+        for _ in 0..<12 where !chapterLink.exists { app.swipeRight(); Thread.sleep(forTimeInterval: 1.5) }
+        page("PDF-epub-printed-contents-L")
+        XCTAssertTrue(chapterLink.exists, "The printed contents page must list chapter ١ as a link")
+        chapterLink.tap()
+        let chapterOne = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            String(app.staticTexts["mihbara-reader-print-page"].label.unicodeScalars.filter { !"\u{2066}\u{2067}\u{2068}\u{2069}".unicodeScalars.contains($0) }).contains("١٢")
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [chapterOne], timeout: 10), .completed, "Chapter ١ starts on file page ١٢")
+        page("PDF-epub-chapter1-from-contents-L")
         // Owner: «خل دائما فيه خيار لعرضه PDF» — the original opens at the same page.
         // The page on screen, from the footer («ص ٢ بحسب الملف»), must be the page the original opens on.
         let isolates = CharacterSet(charactersIn: "\u{2066}\u{2067}\u{2068}\u{2069}")
