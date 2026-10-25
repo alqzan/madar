@@ -181,9 +181,18 @@ struct LegacyMoveReceipt: Codable, Equatable {
             for row in plan.writes { try RecordBridge.upsert(row, in: context) }
             func tag(_ r: DataRecord) -> String { r.model + r.id.uuidString + (r.fields["mergedInto"]?.string ?? "") }
             let gone = Set(plan.removals.map(tag)), ids = Set(plan.removals.map(\.id))
+            // `instances` lists synced models only; the bus's receipts are device-only. A receipt left behind would make the
+            // next move skip every money command as a duplicate, so device rows the move created go too.
+            @MainActor func remove<T: MadarRecordModel>(_ type: T.Type) throws {
+                for row in try context.fetch(FetchDescriptor<T>()) where ids.contains(row.id) {
+                    if gone.contains(tag(try row.record())) { context.delete(row) }
+                }
+            }
             for instance in try RecordBridge.instances(context) where ids.contains(instance.id) {
                 if gone.contains(tag(try instance.record())) { context.delete(instance) }
             }
+            try remove(CommandReceipt.self); try remove(DeviceSetting.self); try remove(NotificationLedger.self)
+            try remove(PageSchedule.self); try remove(SessionDraft.self); try remove(ProcessingJob.self)
             try context.save()
             // Quran's derived cache follows the sessions that remain.
             if let catalog = try? QuranResources.catalog() {

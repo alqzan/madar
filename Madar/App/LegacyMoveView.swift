@@ -109,6 +109,11 @@ struct LegacyMoveView: View {
                     Divider().overlay(theme.line)
                     roomRow(o.title, symbol(o.id), outcomeLines(o), muted: o.added == 0 && o.failed == nil)
                         .accessibilityIdentifier("legacy-move-outcome-" + o.id)
+                    if o.id == "money", o.waiting > 0, o.failed == nil {
+                        Button { app.moneyOpensMessages = true; app.moneyOpen = true } label: {
+                            Label("راجعها الآن", systemImage: "tray.full").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 44)
+                        }.buttonStyle(.bordered).tint(theme.color("accentText")).accessibilityIdentifier("legacy-move-review-money")
+                    }
                 }
             }
             HStack(spacing: 12) {

@@ -167,6 +167,7 @@ struct MoneyHomeView: View {
             await app.seedMoneyDefaults()
             do { try await app.executeMoneyCommand("money.accruePlans") } catch { }
             load()
+            if app.moneyOpensMessages { app.moneyOpensMessages = false; messagesOpen = true; return }
             // §7.5 «بعد غياب»: «منذ آخر زيارة» opens first; otherwise this visit is the new mark.
             guard !visitChecked, let reading else { return }
             visitChecked = true

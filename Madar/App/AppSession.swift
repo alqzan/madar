@@ -21,6 +21,8 @@ final class AppSession {
     /// M4-V03: «السنة وما يهمّك» pushed from the lobby (`madar://bahw/year`).
     var yearOpen = false
     var moneyOpen = false
+    /// One-shot: the money room opens straight on the bank messages (after the old-Madar move left some for review).
+    var moneyOpensMessages = false
     var mihbaraOpen = false
     var mihbaraBookToOpen: UUID?
     var moneyExpenseSeed: MoneyExpenseSeed?

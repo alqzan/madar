@@ -58,5 +58,11 @@ import XCTest
         tap(app, "legacy-move-restart"); tap(app, "legacy-move-choose")
         XCTAssertEqual(move(app), "انتقلت غرفك إلى مدار.", "After undo the same file must move again")
         XCTAssertTrue(app.descendants(matching: .any)["legacy-move-outcome-prayer"].label.contains("وصل"))
+        let money = app.descendants(matching: .any)["legacy-move-outcome-money"]
+        XCTAssertTrue(money.label.contains("حرك"), "Undo must clear the bus receipts so money moves again: " + money.label)
+        // Messages left for review are one tap away from the result.
+        tap(app, "legacy-move-review-money")
+        XCTAssertTrue(app.descendants(matching: .any)["money-messages-shortcut"].waitForExistence(timeout: 30), "«راجعها الآن» must open the bank messages")
+        shot(app, "L01-move-review-money-L")
     }
 }
