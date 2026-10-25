@@ -29,6 +29,39 @@ import MadarCommands
             XCTAssertEqual(try records(store.container), before, "replay across a boundary must keep the first observation")
         }
     }
+    /// Item 24: a plain daily habit the owner already keeps under the same name takes the old days; nothing duplicates,
+    /// and a day the owner already logged is not logged twice. A weekly habit of the same name keeps its own rules.
+    func testNativeDailyHabitWithTheSameNameTakesTheOldDays() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("LegacyHabitNative-" + UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = try ManagedDataStore(root: root), context = ModelContext(store.container)
+        func native(_ name: String, _ frequency: String) -> Habit {
+            let habit = Habit(); habit.name = name; habit.kind = "custom"; context.insert(habit)
+            let policy = HabitPolicy(); policy.habitID = habit.id; policy.effectiveFrom = "2026-10-01"; policy.frequency = frequency; context.insert(policy)
+            return habit
+        }
+        let daily = native(" عادة تجريبية ", "daily")
+        let logged = HabitEvent(); logged.habitID = daily.id; logged.dayKey = "2026-10-22"; logged.periodKey = "2026-10-22"; logged.delta = 1; context.insert(logged)
+        try context.save()
+        let plan = try LegacyHabitImport.plan(backup: Data(raw.utf8), observedDay: try GregorianDay("2026-10-25"), zone: zone, uuid: StableIdentity.uuid(for:))
+        let counts = try LegacyHabitTrial.apply(plan, to: store.container, zone: zone)
+        XCTAssertEqual(counts["habits.created"], nil); XCTAssertEqual(counts["habits.keptNative"], 1)
+        XCTAssertEqual(counts["events.keptNative"], 1, "2026-10-22 was already logged natively")
+        let check = ModelContext(store.container)
+        XCTAssertEqual(try check.fetch(FetchDescriptor<Habit>()).count, 1)
+        let days = try check.fetch(FetchDescriptor<HabitEvent>()).filter { $0.habitID == daily.id }.map(\.dayKey).sorted()
+        XCTAssertEqual(days, ["2026-10-21", "2026-10-22", "2026-10-23"])
+        XCTAssertTrue(try check.fetch(FetchDescriptor<HabitPause>()).isEmpty, "the native habit keeps its own freeze state")
+
+        let other = FileManager.default.temporaryDirectory.appendingPathComponent("LegacyHabitWeekly-" + UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: other) }
+        let weeklyStore = try ManagedDataStore(root: other), weeklyContext = ModelContext(weeklyStore.container)
+        let weekly = Habit(); weekly.name = "عادة تجريبية"; weekly.kind = "custom"; weeklyContext.insert(weekly)
+        let policy = HabitPolicy(); policy.habitID = weekly.id; policy.effectiveFrom = "2026-10-01"; policy.frequency = "weekly"; weeklyContext.insert(policy)
+        try weeklyContext.save()
+        let separate = try LegacyHabitTrial.apply(plan, to: weeklyStore.container, zone: zone)
+        XCTAssertEqual(separate["habits.created"], 1, "a weekly habit never absorbs old daily times")
+    }
     func testImportPreservesDaysDeletionFreezeAndReplayAfterNativeEdit() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("LegacyHabitTrial-" + UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
