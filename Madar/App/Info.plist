@@ -74,5 +74,25 @@
 	<array>
 		<string>processing</string>
 	</array>
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.alqzan.madar2.backupset</string>
+			<key>UTTypeDescription</key>
+			<string>نسخة مدار التلقائية</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>com.apple.package</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>madarbackupset</string>
+				</array>
+			</dict>
+		</dict>
+	</array>
 </dict>
 </plist>

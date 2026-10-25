@@ -903,6 +903,43 @@ import XCTest
         attachScreenshot(app, named: "B01-backup-folder-cancelled-L")
     }
 
+    func testBackupProgressAndCancellationStayVisibleFromTheBottomOfThePage() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_BACKUP_HOLD": "1"]
+        app.launch(); openBackupSettings(app)
+        let location = app.staticTexts.matching(identifier: "backup-storage-location").firstMatch
+        scrollBackupForm(to: location, in: app, towardsTop: true)
+        XCTAssertTrue(location.label.contains("ستُحفظ"))
+        let export = app.buttons["plain-export-now"]
+        scrollBackupForm(to: export, in: app); XCTAssertTrue(export.isHittable); export.tap()
+        let cancel = app.buttons["backup-cancel"]
+        XCTAssertTrue(cancel.waitForExistence(timeout: 10)); XCTAssertTrue(elementIsOnscreenAndHittable(cancel, in: app))
+        attachScreenshot(app, named: "B01-visible-progress-L")
+        cancel.tap()
+        let result = app.staticTexts["backup-result"]
+        XCTAssertTrue(result.waitForExistence(timeout: 10)); XCTAssertTrue(result.label.contains("أُلغي"))
+        XCTAssertTrue(elementIsOnscreenAndHittable(result, in: app)); attachScreenshot(app, named: "B01-visible-cancel-result-L")
+        app.buttons["backup-result-dismiss"].tap(); XCTAssertTrue(result.waitForNonExistence(timeout: 5))
+    }
+
+    func testBackupRestorePickerAcceptsFileAndPackageTypesAndCancellationKeepsData() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
+        app.launch(); openBackupSettings(app)
+        let select = app.buttons["restore-select-file"]
+        scrollBackupForm(to: select, in: app)
+        XCTAssertTrue(elementIsOnscreenAndHittable(select, in: app)); select.tap()
+        let cancel = app.buttons.matching(NSPredicate(format: "label IN %@", ["Cancel", "إلغاء"])).firstMatch
+        XCTAssertTrue(cancel.waitForExistence(timeout: 10)); attachScreenshot(app, named: "B01-restore-picker-L")
+        cancel.tap()
+        XCTAssertTrue(select.waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["restore-confirm"].exists)
+        XCTAssertFalse(app.alerts.firstMatch.exists)
+        attachScreenshot(app, named: "B01-restore-picker-cancelled-L")
+    }
+
     func test_M0S2_SecurePasswordTypingTransport() throws {
         continueAfterFailure = false
         let app = XCUIApplication()

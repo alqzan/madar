@@ -83,10 +83,9 @@ import Darwin
     }
     public func preview(file: URL, passphrase: String, progress: @escaping @Sendable (BackupProgress) -> Void = { _ in }, cancellation: BackupCancellation = BackupCancellation()) async throws -> RestorePreview {
         let value = try await background(cancellation) {
-            try cancellation.check(); let data = try Self.readBounded(file)
-            progress(.init(phase:.reading,completedUnits:Int64(data.count),totalUnits:Int64(data.count)))
-            let validated = try BackupCodec.validateContents(data,passphrase:passphrase,cancellation:cancellation,progress:progress)
-            return (validated,BackupCodec.hash(data))
+            try cancellation.check()
+            let validated = try BackupArtifact.validateContents(file: file, passphrase: passphrase, cancellation: cancellation, progress: progress)
+            return (validated, try BackupArtifact.fingerprint(file: file))
         }
         try cancellation.check(); try BackupCodec.validateTypedRows(value.0.records)
         let lease = StoreLease(lockURL:store.commandLockURL); try lease.acquire(); defer { lease.release() }
@@ -107,11 +106,11 @@ import Darwin
         do {
             guard !store.isCloudBacked else { throw BackupOperationError.cloudRestoreUnsupported }
             try await authorization(); try validation(); try cancellation.check()
-            let fileHash = try await background(cancellation) { BackupCodec.hash(try Self.readBounded(preview.fileURL)) }
+            let fileHash = try await background(cancellation) { try BackupArtifact.fingerprint(file: preview.fileURL) }
             try validation(); try cancellation.check()
             guard fileHash == preview.fileHash, preview.generationID == store.binding.generationID else { throw BackupOperationError.stalePreview }
             let current = try currentRecords(); guard try RecordFingerprint.hash(current) == preview.currentFingerprint else { throw BackupOperationError.stalePreview }
-            if let passphrase { let verified = try await background(cancellation) { try BackupCodec.validateContents(Self.readBounded(preview.fileURL),passphrase:passphrase,cancellation:cancellation,progress:progress) }; guard try RecordFingerprint.hash(verified.records) == RecordFingerprint.hash(preview.validated.records) else { throw BackupOperationError.stalePreview } }
+            if let passphrase { let verified = try await background(cancellation) { try BackupArtifact.validateContents(file: preview.fileURL,passphrase:passphrase,cancellation:cancellation,progress:progress) }; guard try RecordFingerprint.hash(verified.records) == RecordFingerprint.hash(preview.validated.records) else { throw BackupOperationError.stalePreview } }
             try validation(); try cancellation.check()
             guard try hasConfiguredKey() else { throw BackupOperationError.backupNotConfigured }
             progress(.init(phase:.automaticBackup,completedUnits:0,totalUnits:1))
@@ -196,30 +195,59 @@ import Darwin
     private func currentRecords() throws -> [DataRecord] { let context = ModelContext(store.container); context.autosaveEnabled = false; return try RecordBridge.all(context) }
     private func exportUnderLease(kind: BackupKind, passphrase: String?, progress: @escaping @Sendable (BackupProgress) -> Void, cancellation: BackupCancellation, now: Date) async throws -> BackupReceipt {
         try cancellation.check(); let rows = try currentRecords(); try RecordValidator.validate(rows)
-        let credential: BackupCredential; let prefix: Data
-        if let passphrase { credential = try await background(cancellation) { try BackupCredential.derive(passphrase:passphrase) }; prefix = BackupCodec.random(count:4) }
-        else { guard var stored = try keyStore.load() else { throw BackupOperationError.backupNotConfigured }; prefix = try stored.reserveNoncePrefix(); try keyStore.save(stored); credential = stored }
-        let directory = backupDirectory; let id = UUID(); let generationID = store.binding.generationID
         let fitted = BackupBookFiles.fitting(rows,budget:bookBudget); let archived = fitted.records
-        let receipt = try await background(cancellation) {
-            let archive = try BackupCodec.archive(records:archived,now:now); try cancellation.check()
-            let encrypted = try BackupCodec.seal(archive:archive,credential:credential,noncePrefix:prefix,now:now,cancellation:cancellation,progress:progress)
-            // Verify bytes before making a finished file visible or pruning previous automatic backups.
-            _ = try BackupCodec.validateContents(encrypted,credential:credential,cancellation:cancellation)
-            try FileManager.default.createDirectory(at:directory,withIntermediateDirectories:true,attributes:[.posixPermissions:0o700])
-            let formatter = ISO8601DateFormatter(); formatter.formatOptions = [.withFullDate]; let name = "Madar-\(formatter.string(from:now))-\(id.uuidString).madarbackup"
-            let destination = directory.appendingPathComponent(name); let partial = directory.appendingPathComponent(name+".partial")
-            defer { try? FileManager.default.removeItem(at:partial) }
-            guard FileManager.default.createFile(atPath:partial.path,contents:nil,attributes:[.posixPermissions:0o600]) else { throw DataError.invalidBackup }
-            let handle = try FileHandle(forWritingTo:partial)
-            do {
-                let size = 64*1024; var offset = 0
-                while offset < encrypted.count { try cancellation.check(); let end = min(offset+size,encrypted.count); try handle.write(contentsOf:encrypted.subdata(in:offset..<end)); offset = end; progress(.init(phase:.writing,completedUnits:Int64(offset),totalUnits:Int64(encrypted.count))) }
-                try handle.synchronize(); try handle.close(); try cancellation.check()
-                guard rename(partial.path,destination.path) == 0 else { throw DataError.invalidBackup }
-                let fd = open(directory.path,O_RDONLY); if fd >= 0 { _ = fsync(fd); close(fd) }
-            } catch { try? handle.close(); throw error }
-            return BackupReceipt(id:id,fileURL:destination,createdAt:now,kind:kind,generationID:generationID,sha256:BackupCodec.hash(encrypted),counts:Self.counts(rows))
+        let incremental = kind == .automatic && archived.contains { $0.model == "Media" && $0.fields["data"] != .null }
+        let credential: BackupCredential; let prefixes: [Data]
+        let count = incremental ? BackupArtifact.envelopeCount(records: archived) : 1
+        if let passphrase {
+            var fresh = try await background(cancellation) { try BackupCredential.derive(passphrase:passphrase) }
+            prefixes = try (0..<count).map { _ in try fresh.reserveNoncePrefix() }; credential = fresh
+        } else {
+            guard var stored = try keyStore.load() else { throw BackupOperationError.backupNotConfigured }
+            prefixes = try (0..<count).map { _ in try stored.reserveNoncePrefix() }
+            try keyStore.save(stored); credential = stored
+        }
+        let prefix = prefixes[0]
+        let directory = backupDirectory; let id = UUID(); let generationID = store.binding.generationID
+        let previous = incremental ? try catalog().first(where: { $0.fileURL.pathExtension == "madarbackupset" })?.fileURL : nil
+        let receipt: BackupReceipt
+        if incremental {
+            receipt = try await background(cancellation) {
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+                let formatter = ISO8601DateFormatter(); formatter.formatOptions = [.withFullDate]
+                let destination = directory.appendingPathComponent("Madar-\(formatter.string(from: now))-\(id.uuidString).madarbackupset")
+                let partial = destination.appendingPathExtension("partial")
+                defer { try? FileManager.default.removeItem(at: partial) }
+                try BackupArtifact.writePackage(records: archived, to: partial, previous: previous, credential: credential,
+                                                prefixes: prefixes, now: now, cancellation: cancellation, progress: progress)
+                let hash = try BackupArtifact.fingerprint(file: partial)
+                try cancellation.check()
+                guard rename(partial.path, destination.path) == 0 else { throw DataError.invalidBackup }
+                let fd = open(directory.path, O_RDONLY); if fd >= 0 { _ = fsync(fd); close(fd) }
+                return BackupReceipt(id: id, fileURL: destination, createdAt: now, kind: kind, generationID: generationID,
+                                     sha256: hash, counts: Self.counts(rows))
+            }
+        } else {
+            receipt = try await background(cancellation) {
+                let archive = try BackupCodec.archive(records:archived,now:now); try cancellation.check()
+                let encrypted = try BackupCodec.seal(archive:archive,credential:credential,noncePrefix:prefix,now:now,cancellation:cancellation,progress:progress)
+                // Verify bytes before making a finished file visible or pruning previous automatic backups.
+                _ = try BackupCodec.validateContents(encrypted,credential:credential,cancellation:cancellation)
+                try FileManager.default.createDirectory(at:directory,withIntermediateDirectories:true,attributes:[.posixPermissions:0o700])
+                let formatter = ISO8601DateFormatter(); formatter.formatOptions = [.withFullDate]; let name = "Madar-\(formatter.string(from:now))-\(id.uuidString).madarbackup"
+                let destination = directory.appendingPathComponent(name); let partial = directory.appendingPathComponent(name+".partial")
+                defer { try? FileManager.default.removeItem(at:partial) }
+                guard FileManager.default.createFile(atPath:partial.path,contents:nil,attributes:[.posixPermissions:0o600]) else { throw DataError.invalidBackup }
+                let handle = try FileHandle(forWritingTo:partial)
+                do {
+                    let size = 64*1024; var offset = 0
+                    while offset < encrypted.count { try cancellation.check(); let end = min(offset+size,encrypted.count); try handle.write(contentsOf:encrypted.subdata(in:offset..<end)); offset = end; progress(.init(phase:.writing,completedUnits:Int64(offset),totalUnits:Int64(encrypted.count))) }
+                    try handle.synchronize(); try handle.close(); try cancellation.check()
+                    guard rename(partial.path,destination.path) == 0 else { throw DataError.invalidBackup }
+                    let fd = open(directory.path,O_RDONLY); if fd >= 0 { _ = fsync(fd); close(fd) }
+                } catch { try? handle.close(); throw error }
+                return BackupReceipt(id:id,fileURL:destination,createdAt:now,kind:kind,generationID:generationID,sha256:BackupCodec.hash(encrypted),counts:Self.counts(rows))
+            }
         }
         var entries = try catalog(); entries.append(receipt)
         try DurableFiles.encode(entries,to:catalogURL)

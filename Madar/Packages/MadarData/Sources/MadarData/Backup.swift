@@ -25,10 +25,10 @@ public enum BackupCodec {
         let credential = try BackupCredential.derive(passphrase:passphrase)
         return try seal(archive:archive,credential:credential,noncePrefix:random(count:4),appVersion:appVersion,now:now)
     }
-    static func seal(archive: Data, credential: BackupCredential, noncePrefix: Data, appVersion: String = "0.1", now: Date = Date(), cancellation: BackupCancellation = BackupCancellation(), progress: @Sendable (BackupProgress) -> Void = { _ in }) throws -> Data {
+    static func seal(archive: Data, credential: BackupCredential, noncePrefix: Data, appVersion: String = "0.1", now: Date = Date(), formatVersion: Int = 1, cancellation: BackupCancellation = BackupCancellation(), progress: @Sendable (BackupProgress) -> Void = { _ in }) throws -> Data {
         guard archive.count <= maximumBytes, credential.salt.count == 16, credential.keyData.count == 32, noncePrefix.count == 4 else { throw DataError.invalidBackup }
         let count = max(1,(archive.count+chunkSize-1)/chunkSize)
-        let header = BackupHeader(magic:"MADARBK",formatVersion:1,appVersion:appVersion,storeSchemaVersion:MadarSchema.version,createdAt:now,kdf:.init(alg:"PBKDF2-HMAC-SHA256",iterations:600000,salt:credential.salt),cipher:"AES-256-GCM",chunkSize:chunkSize,chunkCount:count,noncePrefix:noncePrefix)
+        let header = BackupHeader(magic:"MADARBK",formatVersion:formatVersion,appVersion:appVersion,storeSchemaVersion:MadarSchema.version,createdAt:now,kdf:.init(alg:"PBKDF2-HMAC-SHA256",iterations:600000,salt:credential.salt),cipher:"AES-256-GCM",chunkSize:chunkSize,chunkCount:count,noncePrefix:noncePrefix)
         let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]; let headerBytes = try encoder.encode(header)
         let key = SymmetricKey(data:credential.keyData)
         var output = integer(UInt64(headerBytes.count),bytes:4); output.append(headerBytes)
@@ -71,6 +71,18 @@ public enum BackupCodec {
         try validateTypedRows(result.records); return result
     }
     static func validateContents(_ backup: Data, passphrase: String? = nil, credential: BackupCredential? = nil, cancellation: BackupCancellation = BackupCancellation(), progress: @Sendable (BackupProgress) -> Void = { _ in }) throws -> ValidatedBackup {
+        let opened = try openArchive(backup, passphrase: passphrase, credential: credential, cancellation: cancellation, progress: progress)
+        guard let bytes = opened.files["manifest.json"] else { throw DataError.invalidBackup }
+        let manifest = try JSONDecoder().decode(BackupManifest.self, from: bytes)
+        guard manifest.storeSchemaVersion == opened.header.storeSchemaVersion else { throw DataError.invalidBackup }
+        let sourceModels = try SchemaCompatibility.modelNames(version: opened.header.storeSchemaVersion)
+        return try validateFiles(opened.files, manifest: manifest, sourceModels: sourceModels, cancellation: cancellation, progress: progress)
+    }
+    /// Shared authenticated envelope. Version 2 is used only by the self-contained
+    /// incremental package index; a naked index cannot be restored as a v1 file.
+    static func openArchive(_ backup: Data, passphrase: String? = nil, credential: BackupCredential? = nil,
+                            formatVersion: Int = 1, cancellation: BackupCancellation = BackupCancellation(),
+                            progress: @Sendable (BackupProgress) -> Void = { _ in }) throws -> (files: [String: Data], header: BackupHeader, credential: BackupCredential) {
         try cancellation.check()
         guard backup.count <= maximumBytes else { throw DataError.invalidBackup }
         var offset = 0
@@ -78,9 +90,8 @@ public enum BackupCodec {
         func size() throws -> Int { Int(try take(4).reduce(UInt64(0)) { ($0<<8)|UInt64($1) }) }
         let headerLength = try size(); guard (1...65536).contains(headerLength) else { throw DataError.invalidBackup }
         let headerBytes = try take(headerLength); let header = try JSONDecoder().decode(BackupHeader.self,from:headerBytes)
-        guard header.magic == "MADARBK", header.formatVersion == 1, header.cipher == "AES-256-GCM", header.kdf.alg == "PBKDF2-HMAC-SHA256", header.kdf.iterations == 600000, header.kdf.salt.count == 16, header.noncePrefix.count == 4, header.chunkSize == chunkSize, (1...512).contains(header.chunkCount) else { throw DataError.unsupportedBackup }
+        guard header.magic == "MADARBK", header.formatVersion == formatVersion, header.cipher == "AES-256-GCM", header.kdf.alg == "PBKDF2-HMAC-SHA256", header.kdf.iterations == 600000, header.kdf.salt.count == 16, header.noncePrefix.count == 4, header.chunkSize == chunkSize, (1...512).contains(header.chunkCount) else { throw DataError.unsupportedBackup }
         guard header.storeSchemaVersion <= MadarSchema.version else { throw DataError.newerStore }
-        let sourceModels = try SchemaCompatibility.modelNames(version:header.storeSchemaVersion)
         let key: SymmetricKey
         if let passphrase { key = try derive(passphrase:passphrase,salt:header.kdf.salt,iterations:header.kdf.iterations) }
         else if let credential, credential.salt == header.kdf.salt, credential.keyData.count == 32 { key = SymmetricKey(data:credential.keyData) }
@@ -96,11 +107,8 @@ public enum BackupCodec {
             progress(.init(phase:.decrypting,completedUnits:Int64(index+1),totalUnits:Int64(header.chunkCount)))
         }
         guard offset == backup.count else { throw DataError.invalidBackup }
-        let files = try decodeArchive(archive)
-        guard let bytes = files["manifest.json"] else { throw DataError.invalidBackup }
-        let manifest = try JSONDecoder().decode(BackupManifest.self,from:bytes)
-        guard manifest.storeSchemaVersion == header.storeSchemaVersion else { throw DataError.invalidBackup }
-        return try validateFiles(files, manifest: manifest, sourceModels: sourceModels, cancellation: cancellation, progress: progress)
+        let openedCredential = BackupCredential(salt: header.kdf.salt, keyData: key.withUnsafeBytes { Data($0) }, nextNonceCounter: 0)
+        return (try decodeArchive(archive), header, openedCredential)
     }
     static func validateFiles(_ files: [String: Data], manifest: BackupManifest, sourceModels: [String], cancellation: BackupCancellation = BackupCancellation(), progress: @Sendable (BackupProgress) -> Void = { _ in }) throws -> ValidatedBackup {
         guard manifest.formatVersion == 1, Set(manifest.counts.keys) == Set(sourceModels), Set(manifest.files.map(\.path)).count == manifest.files.count, Set(files.keys) == Set(manifest.files.map(\.path)+["manifest.json"]) else { throw DataError.invalidBackup }

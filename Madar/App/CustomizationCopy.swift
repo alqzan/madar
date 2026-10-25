@@ -10,6 +10,12 @@ enum CustomizationCopy {
 }
 
 enum BackupCopy {
+    static func storage(hasLocalBackup: Bool, hasFolderCopy: Bool) -> String {
+        let local = hasLocalBackup ? "النسخ الداخلية تُحذف إن حذفت التطبيق." : "ستُحفظ النسخ داخل مدار على هذا الجهاز."
+        if hasFolderCopy { return local + " حُفظت نسخة أيضًا في المجلد المختار في «الملفات»؛ حالة الرفع موضّحة أدناه." }
+        return local + " احفظ نسخة في مجلد خارج مدار أو على حاسوبك."
+    }
+
     static func restoreConfirmation(mode: BackupUIRestoreMode, keyConfigured: Bool) -> String {
         let message: String
         switch mode {

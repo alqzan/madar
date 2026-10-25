@@ -200,6 +200,7 @@ struct BackupRestoreResult: Sendable { let restoredCount: Int; let skippedCount:
         if let revocationObserver { service.removeExportObserver(revocationObserver) }; revocationObserver = nil
         if !wasProtected { Task { [service] in await service.cancel() } }
     }
+    func dismissResult() { resultMessage = nil; restoreResult = nil }
     func cancel() {
         guard busy else { return }
         operation?.cancel()
@@ -213,6 +214,12 @@ struct BackupRestoreResult: Sendable { let restoredCount: Int; let skippedCount:
             guard let self else { return }
             defer { if operationID == id { busy = false; progress = nil; operation = nil; protectedOperation = false } }
             do {
+                #if DEBUG
+                // Controlled UI-state fixture, in an isolated test store only.
+                if ProcessInfo.processInfo.environment["MADAR_UI_BACKUP_HOLD"] == "1", ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"] != nil {
+                    try await Task.sleep(for: .seconds(20))
+                }
+                #endif
                 try await action({ [weak self] update in
                     guard let self, operationID == id else { return }
                     progress = update
@@ -229,8 +236,9 @@ struct BackupSettingsView: View {
     let dates: (Date) -> MadarDateLabels
     let time: (Date) -> String
     @State private var model: BackupSettingsModel
-    @State private var importing = false
-    @State private var choosingFolder = false
+    private enum FilePurpose { case restore, folder }
+    @State private var filePurpose = FilePurpose.restore
+    @State private var choosingFile = false
     @State private var confirmingRestore = false
     @FocusState private var focusedPassword: Int?
     @Environment(\.roomTheme) private var theme
@@ -249,31 +257,44 @@ struct BackupSettingsView: View {
                 encryptedCard
                 restoreCard
                 plainCard
-                if let progress = model.progress {
-                    MadarCard {
-                        VStack(alignment: .leading, spacing: 12) {
-                            if let done = progress.completedUnits, let total = progress.totalUnits, total > 0 {
-                                ProgressView(progress.message, value: Double(done), total: Double(total))
-                            } else { ProgressView(progress.message) }
-                            Button("إلغاء الإجراء", role: .cancel, action: model.cancel).frame(minHeight: 44).accessibilityIdentifier("backup-cancel")
-                        }
-                    }.accessibilityElement(children: .contain).accessibilityIdentifier("backup-progress")
-                }
-                if let result = resultCopy { MadarCard { Text(result).font(MadarTypography.body()).accessibilityIdentifier("backup-result") } }
             }
             .padding(16).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }
         .scrollDismissesKeyboard(.interactively)
+        .safeAreaInset(edge: .top, spacing: 8) {
+            if let progress = model.progress {
+                MadarCard {
+                    VStack(alignment: .leading, spacing: 8) {
+                        if let done = progress.completedUnits, let total = progress.totalUnits, total > 0 {
+                            ProgressView(progress.message, value: Double(done), total: Double(total))
+                        } else { ProgressView(progress.message) }
+                        Button("إلغاء الإجراء", role: .cancel, action: model.cancel).frame(minHeight: 44).accessibilityIdentifier("backup-cancel")
+                    }
+                }.accessibilityElement(children: .contain).accessibilityIdentifier("backup-progress")
+                    .padding(.horizontal, 16).padding(.top, 8)
+            } else if let result = resultCopy {
+                MadarCard {
+                    HStack(alignment: .top, spacing: 8) {
+                        Text(result).font(MadarTypography.body()).frame(maxWidth: .infinity, alignment: .leading).accessibilityIdentifier("backup-result")
+                        Button(action: model.dismissResult) { Image(systemName: "xmark").frame(width: 44, height: 44) }
+                            .accessibilityLabel("أخفِ النتيجة").accessibilityIdentifier("backup-result-dismiss")
+                    }
+                }.padding(.horizontal, 16).padding(.top, 8)
+            }
+        }
         .background(theme.background).foregroundStyle(theme.ink)
         .navigationTitle("النسخ والاستعادة").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); keyboardDoneButton } }
             .task { await model.refresh() }
             .onDisappear { model.close() }
-            .fileImporter(isPresented: $importing, allowedContentTypes: [UTType(filenameExtension: "madarbackup") ?? .data], allowsMultipleSelection: false) { result in
-                switch result { case .success(let urls): model.selectedFile = urls.first; model.dismissPreview(); case .failure(let error): model.errorMessage = error.localizedDescription }
-            }
-            .fileImporter(isPresented: $choosingFolder, allowedContentTypes: [.folder], allowsMultipleSelection: false) { result in
-                if case .success(let urls) = result, let folder = urls.first { model.chooseFolder(folder) }
+            .fileImporter(isPresented: $choosingFile, allowedContentTypes: filePurpose == .folder ? [.folder] : [UTType(filenameExtension: "madarbackup") ?? .data, UTType(exportedAs: "com.alqzan.madar2.backupset", conformingTo: .package)], allowsMultipleSelection: false) { result in
+                switch result {
+                case .success(let urls):
+                    if filePurpose == .folder {
+                        if let folder = urls.first { model.chooseFolder(folder) }
+                    } else { model.selectedFile = urls.first; model.dismissPreview() }
+                case .failure(let error): model.errorMessage = error.localizedDescription
+                }
             }
             .confirmationDialog(model.restoreMode == .replace ? "استبدل بيانات مدار بهذه النسخة؟" : "ادمج النسخة مع بيانات مدار؟", isPresented: $confirmingRestore, titleVisibility: .visible) {
                 Button(model.restoreMode == .replace ? "استبدل بعد نسخة أمان" : "ادمج النسخة", role: model.restoreMode == .replace ? .destructive : nil, action: model.restore)
@@ -342,7 +363,8 @@ struct BackupSettingsView: View {
                     }
                     HStack(alignment: .top, spacing: 8) {
                         Image(systemName: "internaldrive").foregroundStyle(theme.secondaryInk).accessibilityHidden(true)
-                        note("النسخ محفوظة داخل مدار على هذا الجهاز، وتُحذف إن حذفت التطبيق. احفظ نسخة يدوية في «الملفات» أو على حاسوبك.")
+                        note(BackupCopy.storage(hasLocalBackup: status.lastSuccess != nil || status.automaticCount + status.manualCount > 0, hasFolderCopy: status.folderCopiedAt != nil))
+                            .accessibilityIdentifier("backup-storage-location")
                     }.accessibilityElement(children: .combine)
                 }
             } else { ProgressView("يقرأ حالة النسخ…").frame(maxWidth: .infinity, minHeight: 80) }
@@ -370,13 +392,13 @@ struct BackupSettingsView: View {
                     HStack {
                         Button("أعد المحاولة", action: model.retryFolder).accessibilityIdentifier("backup-folder-retry")
                         Spacer()
-                        Button("غيّر المجلد") { choosingFolder = true }.accessibilityIdentifier("backup-folder-change")
+                        Button("غيّر المجلد") { filePurpose = .folder; choosingFile = true }.accessibilityIdentifier("backup-folder-change")
                     }.font(MadarTypography.caption()).frame(minHeight: 44)
                     Button("أوقف النسخ إلى المجلد", action: model.clearFolder).font(MadarTypography.caption()).frame(minHeight: 44)
                         .accessibilityIdentifier("backup-folder-clear")
                 } else {
                     note("اختر مجلدًا في iCloud Drive لتبقى نسخة مشفّرة عند فقدان الجهاز. المجلد في «على الـ iPhone» يبقى على الجهاز نفسه.")
-                    Button("اختر مجلدًا في الملفات") { choosingFolder = true }.buttonStyle(MadarPrimaryButton()).accessibilityIdentifier("backup-folder-choose")
+                    Button("اختر مجلدًا في الملفات") { filePurpose = .folder; choosingFile = true }.buttonStyle(MadarPrimaryButton()).accessibilityIdentifier("backup-folder-choose")
                 }
                 note("تُنسخ الملفات المشفّرة فقط، بعد إنشائها وعند فتح مدار. نحتفظ بآخر أربع نسخ تلقائية وكل اليدوية. تغيير المجلد أو إيقافه يبقي الملفات السابقة.")
                 if model.status?.canUndoFolderChange == true {
@@ -421,7 +443,7 @@ struct BackupSettingsView: View {
             VStack(alignment: .leading, spacing: 12) {
                 heading("استعادة نسخة", "arrow.counterclockwise")
                 note("الفحص والمعاينة لا يغيران بياناتك. تبدأ الاستعادة بعد اختيارك وتأكيدك.")
-                Button("اختر ملف النسخة") { importing = true }.frame(minHeight: 44).disabled(model.busy).accessibilityIdentifier("restore-select-file")
+                Button("اختر ملف النسخة") { filePurpose = .restore; choosingFile = true }.frame(minHeight: 44).disabled(model.busy).accessibilityIdentifier("restore-select-file")
                 if let file = model.selectedFile { Text(file.lastPathComponent).font(MadarTypography.caption()) }
                 SecureField("كلمة مرور النسخة", text: $model.restorePassphrase).textContentType(.password).focused($focusedPassword, equals: 3).submitLabel(.done).onSubmit { focusedPassword = nil }
                     .padding(12).background(theme.background, in: .rect(cornerRadius: 12)).accessibilityIdentifier("restore-password")

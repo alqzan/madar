@@ -93,6 +93,12 @@ targets:
         NSSpeechRecognitionUsageDescription: حوّل التسجيل الذي تختاره إلى نص. لا يُرسل الصوت إلى Apple دون موافقتك داخل مدار.
         NSSupportsLiveActivities: true
         BGTaskSchedulerPermittedIdentifiers: [com.alqzan.madar2.backup]
+        UTExportedTypeDeclarations:
+          - UTTypeIdentifier: com.alqzan.madar2.backupset
+            UTTypeDescription: نسخة مدار التلقائية
+            UTTypeConformsTo: [com.apple.package]
+            UTTypeTagSpecification:
+              public.filename-extension: [madarbackupset]
         UIBackgroundModes: [processing]
         UIAppFonts:
           - thmanyahsans-Light.otf

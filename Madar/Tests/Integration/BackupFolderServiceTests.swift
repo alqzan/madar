@@ -2,9 +2,33 @@ import XCTest
 import SwiftData
 import MadarCore
 import MadarData
+import CryptoKit
+import UniformTypeIdentifiers
 @testable import Madar
 
 @MainActor final class BackupFolderServiceTests: XCTestCase {
+    func testIncrementalPackageCopiesIntoRestoreCacheAndPreviewsWithoutChangingStore() async throws {
+        let type = try XCTUnwrap(UTType(filenameExtension: "madarbackupset", conformingTo: .package))
+        XCTAssertEqual(type.identifier, "com.alqzan.madar2.backupset"); XCTAssertTrue(type.conforms(to: .package))
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("BackupSetService-" + UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = try ManagedDataStore(root: root.appendingPathComponent("Data"))
+        let session = try AppSession(container: store.container, managedStore: store, groupDirectory: root)
+        let service = AppBackupService(session: session, store: store, backupDirectory: root.appendingPathComponent("Backups"), keyStore: MemoryBackupKeyStore())
+        let context = ModelContext(store.container), media = Media(), bytes = Data([1, 2, 3, 4])
+        media.data = bytes; media.sizeBytes = bytes.count; media.sha256 = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+        context.insert(media); try context.save()
+        try await service.coordinator.configurePassphrase("synthetic long password")
+        let receipt = try await service.coordinator.export(kind: .automatic)
+        XCTAssertEqual(receipt.fileURL.pathExtension, "madarbackupset")
+        let before = try RecordBridge.all(ModelContext(store.container)), generation = store.binding.generationID
+        let preview = try await service.previewRestore(file: receipt.fileURL, passphrase: "synthetic long password", progress: { _ in })
+        XCTAssertEqual(preview.fileName, receipt.fileURL.lastPathComponent)
+        XCTAssertEqual(preview.additions, 0); XCTAssertEqual(preview.updates, 0); XCTAssertEqual(preview.deletions, 0)
+        XCTAssertEqual(store.binding.generationID, generation)
+        XCTAssertEqual(try RecordBridge.all(ModelContext(store.container)), before)
+        await service.cancel()
+    }
     func testDeviceOnlyFolderPersistsCopiesEncryptedBackupAndUndoKeepsFiles() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("BackupFolderService-" + UUID().uuidString)
         let store = try ManagedDataStore(root: root.appendingPathComponent("Data"))

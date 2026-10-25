@@ -160,7 +160,7 @@ import Testing
         #expect(rows.filter { $0.fields["mergedInto"] == .null && $0.id != extraID }.allSatisfy { ($0.date("updatedAt") ?? .distantPast) >= now })
         #expect(store.binding.generationID != oldGeneration); #expect(store.binding.deviceStoreURL == deviceURL)
         #expect(try result.container.mainContext.fetch(FetchDescriptor<DeviceSetting>()).first { $0.id == deviceID }?.record() == deviceBefore)
-        let safety = try BackupCodec.validate(Data(contentsOf:result.automaticBackup.fileURL),passphrase:"correct long password")
+        let safety = try BackupArtifact.validate(file:result.automaticBackup.fileURL,passphrase:"correct long password")
         #expect(safety.records.contains { $0.id == extraID && $0.isLive })
     }
     @Test func interruptedRestoreBeforeCommitRetainsOldAndAfterCommitRecoversHooks() async throws {
@@ -196,7 +196,9 @@ import Testing
         let manual = try await coordinator.export(kind:.manual,now:now); let manualBytes = try Data(contentsOf:manual.fileURL)
         for day in 1...6 { _ = try await coordinator.export(kind:.automatic,now:now.addingTimeInterval(Double(day)*86400)) }
         #expect(try coordinator.catalog().filter { $0.kind == .automatic }.count == 4); #expect(try coordinator.catalog().filter { $0.kind == .manual }.count == 1)
-        #expect(try keys.load()!.nextNonceCounter == initial+7)
+        // Fixture has a photo and audio: index + two distinct media envelopes per automatic set.
+        let finalCounter = try keys.load()!.nextNonceCounter
+        #expect(finalCounter == initial + 19)
         #expect(try await coordinator.performScheduledBackupIfDue(schedule:.weekly,now:now.addingTimeInterval(7*86400)) == nil)
         #expect(try await coordinator.performScheduledBackupIfDue(schedule:.daily,now:now.addingTimeInterval(7*86400)) != nil)
         let cancel = BackupCancellation()

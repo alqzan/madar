@@ -1,5 +1,6 @@
 import XCTest
 import SwiftData
+import CryptoKit
 import MadarData
 @testable import Madar
 
@@ -36,6 +37,9 @@ import MadarData
     func testColdLaunchCreatesOneEncryptedBackupAndRepeatIsNotDue() async throws {
         let (session, service) = try await fixture()
         try await service.coordinator.configurePassphrase("synthetic long password")
+        let context = ModelContext(session.container), media = Media(), data = Data([1, 2, 3, 4])
+        media.data = data; media.sizeBytes = data.count; media.sha256 = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        context.insert(media); try context.save()
         try await session.applySettingsAndWait(["core.backup": .string("daily")])
         let scheduler = FakeBackupScheduler()
         var loads = 0
@@ -47,6 +51,7 @@ import MadarData
         XCTAssertEqual(first.results, [true]); XCTAssertEqual(loads, 1)
         let receipt = try XCTUnwrap(service.coordinator.catalog().first)
         XCTAssertEqual(receipt.kind, .automatic)
+        XCTAssertEqual(receipt.fileURL.pathExtension, "madarbackupset")
         let preview = try await service.coordinator.preview(file: receipt.fileURL, passphrase: "synthetic long password")
         XCTAssertEqual(preview.counts, receipt.counts)
         XCTAssertEqual(scheduler.pending, receipt.createdAt.addingTimeInterval(86_400))
@@ -88,6 +93,9 @@ import MadarData
             }
         }
         try await service.coordinator.configurePassphrase("synthetic long password")
+        let context = ModelContext(session.container), media = Media(), data = Data([1, 2, 3, 4])
+        media.data = data; media.sizeBytes = data.count; media.sha256 = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        context.insert(media); try context.save()
         let previous = try await service.coordinator.export(kind: .manual, now: .now.addingTimeInterval(-2 * 86_400))
         let bytes = try Data(contentsOf: previous.fileURL)
         try await session.applySettingsAndWait(["core.backup": .string("daily")])

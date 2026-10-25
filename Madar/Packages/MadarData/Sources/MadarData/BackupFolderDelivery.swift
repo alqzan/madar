@@ -55,8 +55,7 @@ public enum BackupFolderDelivery {
             guard let folder = try? URL(resolvingBookmarkData: configuration.bookmark, options: .withoutUI, bookmarkDataIsStale: &stale) else { return nil }
             let access = folder.startAccessingSecurityScopedResource(); defer { if access { folder.stopAccessingSecurityScopedResource() } }
             let file = folder.appendingPathComponent("Madar-" + configuration.ownerID.uuidString).appendingPathComponent(latest.name)
-            guard let values = try? file.resourceValues(forKeys: [.isUbiquitousItemKey, .ubiquitousItemIsUploadedKey]), values.isUbiquitousItem == true else { return nil }
-            return values.ubiquitousItemIsUploaded
+            return cloudStatus(file)
         }.value
     }
 
@@ -80,7 +79,7 @@ public enum BackupFolderDelivery {
             try Task.checkCancellation()
             let source = receipt.fileURL, name = source.lastPathComponent
             guard source.isFileURL, source.deletingLastPathComponent().resolvingSymlinksInPath() == sourceDirectory.resolvingSymlinksInPath(),
-                  name.hasSuffix(".madarbackup"), name.contains(receipt.id.uuidString),
+                  (name.hasSuffix(".madarbackup") || name.hasSuffix(".madarbackupset")), name.contains(receipt.id.uuidString),
                   try source.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink != true,
                   try encryptedHeader(at: source), try hash(source) == receipt.sha256 else { throw BackupFolderError.invalidSource }
             let target = directory.appendingPathComponent(name)
@@ -113,16 +112,15 @@ public enum BackupFolderDelivery {
         let automatic = receipts.filter { $0.kind == .automatic }
         let cutoff = automatic.count >= 4 ? automatic.map(\.createdAt).min() : nil
         for file in owned.values where file.kind == .automatic && !active.contains(file.id) && cutoff.map({ file.createdAt < $0 }) == true {
-            guard file.name == (file.name as NSString).lastPathComponent, file.name.contains(file.id.uuidString), file.name.hasSuffix(".madarbackup") else { throw BackupFolderError.invalidSource }
+            guard file.name == (file.name as NSString).lastPathComponent, file.name.contains(file.id.uuidString), (file.name.hasSuffix(".madarbackup") || file.name.hasSuffix(".madarbackupset")) else { throw BackupFolderError.invalidSource }
             let target = directory.appendingPathComponent(file.name)
             if try !removeUnchanged(at: target, expectedHash: file.sha256) { preserved += 1; continue }
             owned.removeValue(forKey: file.id)
         }
         result.owned = owned.values.sorted { $0.id.uuidString < $1.id.uuidString }
         if copiedAny || (result.lastCopiedAt == nil && !receipts.isEmpty) { result.lastCopiedAt = now }
-        let cloud = try? lastFile?.resourceValues(forKeys: [.isUbiquitousItemKey, .ubiquitousItemIsUploadedKey])
         return .init(configuration: result,
-                     uploadedToICloud: cloud?.isUbiquitousItem == true ? cloud?.ubiquitousItemIsUploaded : nil,
+                     uploadedToICloud: lastFile.flatMap(cloudStatus),
                      preservedChangedFiles: preserved)
     }
 
@@ -134,8 +132,12 @@ public enum BackupFolderDelivery {
         coordinator.coordinate(writingItemAt: target, options: .forDeleting, error: &coordinationError) { coordinated in
             do {
                 guard FileManager.default.fileExists(atPath: coordinated.path) else { removed = true; return }
-                guard try coordinated.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink != true,
-                      try hash(coordinated) == expectedHash else { return }
+                guard try coordinated.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink != true else { return }
+                let currentHash: String
+                do { currentHash = try hash(coordinated) }
+                catch is CancellationError { throw CancellationError() }
+                catch { return } // An unreadable or structurally changed package belongs to the provider now.
+                guard currentHash == expectedHash else { return }
                 try FileManager.default.removeItem(at: coordinated); removed = true
             } catch { deletionError = error }
         }
@@ -144,18 +146,16 @@ public enum BackupFolderDelivery {
         return removed
     }
 
-    private static func hash(_ file: URL) throws -> String {
-        let handle = try FileHandle(forReadingFrom: file); defer { try? handle.close() }
-        var digest = SHA256()
-        while let bytes = try handle.read(upToCount: 64 * 1024), !bytes.isEmpty { try Task.checkCancellation(); digest.update(data: bytes) }
-        return digest.finalize().map { String(format: "%02x", $0) }.joined()
+    private static func cloudStatus(_ file: URL) -> Bool? {
+        guard let files = try? BackupArtifact.artifactFiles(file) else { return nil }
+        var uploaded = true
+        for (_, child) in files {
+            guard let values = try? child.resourceValues(forKeys: [.isUbiquitousItemKey, .ubiquitousItemIsUploadedKey]),
+                  values.isUbiquitousItem == true, let complete = values.ubiquitousItemIsUploaded else { return nil }
+            uploaded = uploaded && complete
+        }
+        return uploaded
     }
-    private static func encryptedHeader(at file: URL) throws -> Bool {
-        let handle = try FileHandle(forReadingFrom: file); defer { try? handle.close() }
-        guard let length = try handle.read(upToCount: 4), length.count == 4 else { return false }
-        let size = length.reduce(0) { ($0 << 8) | Int($1) }
-        guard (1...65536).contains(size), let data = try handle.read(upToCount: size), data.count == size,
-              let header = try? JSONDecoder().decode(BackupHeader.self, from: data) else { return false }
-        return header.magic == "MADARBK" && header.cipher == "AES-256-GCM" && header.formatVersion == 1
-    }
+    private static func hash(_ file: URL) throws -> String { try BackupArtifact.fingerprint(file: file) }
+    private static func encryptedHeader(at file: URL) throws -> Bool { try BackupArtifact.encryptedHeader(file: file) }
 }
