@@ -65,6 +65,43 @@ struct PDFBookEPUBTests {
         #expect(!body.contains(">صفحة ٢</a>"))
     }
 
+    /// Owner, 25 Oct 2026: a scanned book's printed contents page is its index. Hand-worked fixture: every
+    /// heading sits one file page after its printed number, and the last page's numbers came as a column.
+    @Test func aScannedBookTakesItsIndexFromItsPrintedContentsPage() throws {
+        var pages = Array(repeating: "نص عادي في صفحة من الكتاب لا عنوان فيه.", count: 12)
+        pages[2] = "المقدمة\nنص المقدمة."
+        pages[4] = "البداية\nنص الفصل الأول."
+        pages[6] = "الطريق الطويل\nنص الفصل الثاني."
+        pages[8] = "٣ - الخاتمة\nنص الخاتمة."
+        pages[10] = "الفهرس\nالمقدمة.....٢\n١ - البداية\n٤\n٢ - الطريق الطويل......٦"
+        pages[11] = "٣ - الخاتمة\nأولاً: الشكر\nثانياً: الدعاء\n٨\n٨\n٩"
+        let expected: [PDFBookEPUB.PrintedEntry] = [
+            .init(title: "المقدمة", page: 2), .init(title: "١ - البداية", page: 4), .init(title: "٢ - الطريق الطويل", page: 6),
+            .init(title: "٣ - الخاتمة", page: 8), .init(title: "أولاً: الشكر", page: 8), .init(title: "ثانياً: الدعاء", page: 9)
+        ]
+        #expect(PDFBookEPUB.printedContents(pages) == expected)
+        let body = text(try PDFBookEPUB.build(title: "ت", author: "", language: "ar", sourceHash: "h",
+            pages: pages.map { PDFBookEPUB.Page(text: $0, optical: true, unreliable: false) }, outline: []))
+        #expect(body.contains("<a href=\"c1.xhtml#p-5\">١ - البداية</a>"))
+        #expect(!body.contains(">صفحة ١١</a>"))
+        // No contents page: the index keeps listing every tenth page.
+        #expect(PDFBookEPUB.printedContents(Array(pages.prefix(10))).isEmpty)
+    }
+
+    /// A page that opens on a heading, or follows a page ending on a short line, starts a new paragraph.
+    @Test func headingsAndShortLastLinesDoNotRunIntoTheNextPage() throws {
+        let pages = [
+            "سطر طويل أول يملأ عرض الصفحة كله تقريبا هنا\nسطر طويل ثان يملأ عرض الصفحة كله تقريبا هنا\nهاتف ٢٢٢٩",
+            "عنوان الكتاب\nسطر طويل يبدأ به النص الجديد في هذه الصفحة هنا\nوسطر طويل آخر يملأ العرض ويستمر إلى التالية",
+            "عنوان الفصل\nثم يبدأ نص جديد طويل في الصفحة الثالثة هنا\nويستمر النص في سطر آخر طويل حتى نهايته."
+        ].map { PDFBookEPUB.Page(text: $0, optical: true, unreliable: false) }
+        let body = text(try PDFBookEPUB.build(title: "ت", author: "", language: "ar", sourceHash: "h", pages: pages, outline: []))
+        #expect(body.contains("هاتف ٢٢٢٩</p>"))
+        #expect(body.contains("<p>عنوان الكتاب</p>"))
+        #expect(body.contains("إلى التالية</p><span id=\"p-3\""))
+        #expect(body.contains("<p>عنوان الفصل</p>"))
+    }
+
     @Test func bookmarksReadWithOneBasedPages() throws {
         let bytes = NSMutableData()
         var rect = CGRect(x: 0, y: 0, width: 400, height: 400)

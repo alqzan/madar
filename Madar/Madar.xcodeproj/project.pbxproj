@@ -277,6 +277,7 @@
 		A0D9A31CE8D0BAAC37474B40 /* AppQuranService+Qiyam.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65E4E79D7D71F6C863BFFA03 /* AppQuranService+Qiyam.swift */; };
 		A11A36D051873A05917A2712 /* PrayerStreaksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5BEB0146B6B405B7B607BD4 /* PrayerStreaksView.swift */; };
 		A163C7A38F3EFF65E9B4F6F3 /* HabitsOwnerTrialUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA530E4BA116CCB75DEC74FA /* HabitsOwnerTrialUITests.swift */; };
+		A1C62C35076D26EF8096C725 /* MihbaraConversions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4292483746D1F6C1FCB9A9FD /* MihbaraConversions.swift */; };
 		A27D85A804CB1861488745C1 /* PrayerCopyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D1D0B8393143F3C03CF8C19 /* PrayerCopyTests.swift */; };
 		A2DDB78E4B7498CD651D360F /* DiaryMarginUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42DA4C49434D107B02E1810F /* DiaryMarginUITests.swift */; };
 		A4449F78D3AF004852413A17 /* MoneyReconcileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D61EF73C792AC67AE1D74FE3 /* MoneyReconcileView.swift */; };
@@ -552,6 +553,7 @@
 		41D68577D1E6FA5223FD92FE /* HabitRhythmTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HabitRhythmTests.swift; sourceTree = "<group>"; };
 		420D1F4F6AE179838E2A03D7 /* MoneyLogModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyLogModels.swift; sourceTree = "<group>"; };
 		422D5DF771CC4FB56EC5F357 /* HabitsUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HabitsUITests.swift; sourceTree = "<group>"; };
+		4292483746D1F6C1FCB9A9FD /* MihbaraConversions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MihbaraConversions.swift; sourceTree = "<group>"; };
 		42DA4C49434D107B02E1810F /* DiaryMarginUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryMarginUITests.swift; sourceTree = "<group>"; };
 		43015F2877F12AC88306D1A6 /* HabitSinceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HabitSinceView.swift; sourceTree = "<group>"; };
 		43A5C6A40CB96FDF39DD29CA /* NextPrayerWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextPrayerWidget.swift; sourceTree = "<group>"; };
@@ -1063,6 +1065,7 @@
 				CB9BE21293412A1EFB5907A7 /* MadarLock.swift */,
 				AFEBA17862D0A1AC37BFE4D3 /* MihbaraBookCover.swift */,
 				670B069E4D100AE42B2DF468 /* MihbaraBookSheets.swift */,
+				4292483746D1F6C1FCB9A9FD /* MihbaraConversions.swift */,
 				066E8B7BB7CD19C46D956B89 /* MihbaraEPUBImportView.swift */,
 				DC6FBB06EF42EA00A0C3D132 /* MihbaraEPUBLoader.swift */,
 				F4A55221B883574B87CDF5CF /* MihbaraFixture.swift */,
@@ -1931,6 +1934,7 @@
 				67F42646D352F586E7340024 /* MadarPrayerShortcuts.swift in Sources */,
 				BD5C4F57A3F671523F4B0969 /* MihbaraBookCover.swift in Sources */,
 				5F0293729AFFDD7733BD9227 /* MihbaraBookSheets.swift in Sources */,
+				A1C62C35076D26EF8096C725 /* MihbaraConversions.swift in Sources */,
 				21DC9186078C32801708C8F8 /* MihbaraEPUBImportView.swift in Sources */,
 				9CBB0A68661B27FAB2625599 /* MihbaraEPUBLoader.swift in Sources */,
 				D8F98F014EC441B2917DE1CB /* MihbaraFixture.swift in Sources */,

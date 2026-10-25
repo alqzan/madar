@@ -4,24 +4,17 @@ import MadarDesign
 import MadarCommands
 
 /// Owner, 21 October 2026: a PDF can become a flowing book in two ways. Turath first, because its text is
-/// edited, indexed and footnoted; otherwise the device reads every page (OCR for scanned pages) and
-/// builds an EPUB that goes through the usual import review. The PDF itself stays in the library unchanged.
+/// edited, indexed and footnoted; otherwise the device reads every page (OCR for scanned pages) in the
+/// background (`MihbaraConversions`). The PDF itself stays unchanged as the book's original.
 struct MihbaraPDFFlowView: View {
     let app: AppSession
     let book: MihbaraBook
     let onImported: () -> Void
     @Environment(\.dismiss) private var dismiss
     @Environment(\.roomTheme) private var theme
-    @State private var phase = Phase.choosing
-    @State private var done = 0
-    @State private var total = 0
-    @State private var converted: URL?
-    @State private var summary: PDFBookEPUB.Summary?
-    @State private var reviewing = false
-    @State private var jobID: UUID?
-    private var digits: MadarNumberFormatter { AppMihbaraService(app: app).digits }
-
-    enum Phase: Equatable { case choosing, converting, ready, failed(String) }
+    private var conversions: MihbaraConversions { .shared }
+    private var job: MihbaraConversions.Job? { conversions.job(for: book.id) }
+    private var running: Bool { job?.state == .running }
 
     var body: some View {
         NavigationStack {
@@ -33,7 +26,7 @@ struct MihbaraPDFFlowView: View {
                             Text(book.title).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).lineLimit(1)
                         }
                         HStack {
-                            Button { jobID = nil; dismiss() } label: { Label("رجوع", systemImage: "chevron.right").font(MadarTypography.caption()).frame(minHeight: 44) }
+                            Button { dismiss() } label: { Label("رجوع", systemImage: "chevron.right").font(MadarTypography.caption()).frame(minHeight: 44) }
                                 .accessibilityIdentifier("mihbara-pdf-flow-back")
                             Spacer()
                         }
@@ -46,12 +39,13 @@ struct MihbaraPDFFlowView: View {
                     } label: {
                         option("ابحث عنه في تراث", "إن كان في المكتبة الشاملة فنسخته أدق: نص محقق وفهرس وحواشٍ.", "books.vertical.fill", "desk", "onDesk")
                     }
-                    .buttonStyle(.plain).disabled(phase == .converting).accessibilityIdentifier("mihbara-pdf-flow-turath")
+                    .buttonStyle(.plain).disabled(running).accessibilityIdentifier("mihbara-pdf-flow-turath")
 
-                    Button { start() } label: {
-                        option("حوّله على جهازك", "نقرأ نص كل صفحة، والصفحات المصوّرة نقرؤها ضوئيًا. لا يخرج شيء من جهازك.", "text.page.fill", "navy", "onNavy")
+                    // Owner, 25 Oct 2026: the conversion runs while the person moves around the app.
+                    Button { conversions.start(book, app: app); dismiss() } label: {
+                        option("حوّله على جهازك", "نقرأ كل صفحة على جهازك، والمصوّرة ضوئيًا، وتتنقل في التطبيق وهو يعمل. يصير الكتاب منسابًا على رفّه، والـPDF أصله.", "text.page.fill", "navy", "onNavy")
                     }
-                    .buttonStyle(.plain).disabled(phase == .converting || phase == .ready).accessibilityIdentifier("mihbara-pdf-flow-device")
+                    .buttonStyle(.plain).disabled(running).accessibilityIdentifier("mihbara-pdf-flow-device")
 
                     status
                 }
@@ -59,16 +53,6 @@ struct MihbaraPDFFlowView: View {
             }
             .foregroundStyle(theme.ink).background(theme.background.ignoresSafeArea())
             .environment(\.layoutDirection, .rightToLeft).toolbarVisibility(.hidden, for: .navigationBar)
-            .navigationDestination(isPresented: $reviewing) {
-                if let converted {
-                    MihbaraEPUBImportView(app: app, source: converted) {
-                        try? FileManager.default.removeItem(at: converted)
-                        reviewing = false; dismiss(); onImported()
-                    }
-                }
-            }
-            .task(id: jobID) { if let jobID { await convert(jobID) } }
-            .onDisappear { jobID = nil }
         }
     }
 
@@ -90,32 +74,49 @@ struct MihbaraPDFFlowView: View {
     }
 
     @ViewBuilder private var status: some View {
-        switch phase {
-        case .choosing: EmptyView()
-        case .converting:
-            MadarCard {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text(total == 0 ? "يفتح الملف…" : "يقرأ الصفحة \(digits.string(min(done + 1, total))) من \(digits.string(total))")
-                        .font(MadarTypography.section()).contentTransition(.numericText())
-                    ProgressView(value: Double(done), total: Double(max(total, 1))).tint(theme.color("accentText"))
-                    Text("الصفحات المصوّرة أبطأ قليلًا. أبقِ هذه الصفحة مفتوحة.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                    Button("إيقاف") { jobID = nil; phase = .choosing }.font(MadarTypography.caption()).frame(minHeight: 44)
+        if let job { MihbaraConversionCard(job: job, digits: AppMihbaraService(app: app).digits, onOpen: nil) }
+    }
+}
+
+/// A conversion in the room: its progress while it runs, and «افتحه» once the book is on its shelf.
+struct MihbaraConversionCard: View {
+    let job: MihbaraConversions.Job
+    let digits: MadarNumberFormatter
+    let onOpen: ((UUID) -> Void)?
+    @Environment(\.roomTheme) private var theme
+
+    var body: some View {
+        MadarCard {
+            VStack(alignment: .leading, spacing: 10) {
+                switch job.state {
+                case .running:
+                    Text("يحوّل «\(job.title)» إلى كتاب منساب").font(MadarTypography.section())
+                    Text(job.total == 0 ? "يفتح الملف…" : "يقرأ الصفحة \(digits.string(min(job.done + 1, job.total))) من \(digits.string(job.total))")
+                        .font(MadarTypography.caption()).contentTransition(.numericText())
+                    ProgressView(value: Double(job.done), total: Double(max(job.total, 1))).tint(theme.color("accentText"))
+                    Text("تنقّل في التطبيق كما تشاء؛ يكمل وحده ويضعه على رفّه.")
+                        .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
+                    Button("إيقاف") { MihbaraConversions.shared.cancel(job.id) }.font(MadarTypography.caption()).frame(minHeight: 44)
                         .accessibilityIdentifier("mihbara-pdf-flow-cancel")
+                case .finished(let bookID):
+                    Label("صار «\(job.title)» كتابًا منسابًا", systemImage: "checkmark.circle").font(MadarTypography.section())
+                    if let summary = job.summary {
+                        Text(readyLine(summary)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
+                    }
+                    HStack(spacing: 12) {
+                        if let bookID, let onOpen {
+                            Button("افتحه") { MihbaraConversions.shared.dismiss(job.id); onOpen(bookID) }.buttonStyle(MadarPrimaryButton())
+                                .accessibilityIdentifier("mihbara-pdf-flow-open")
+                        }
+                        Button("حسنًا") { MihbaraConversions.shared.dismiss(job.id) }.font(MadarTypography.caption()).frame(minHeight: 44)
+                    }
+                case .failed(let message):
+                    Text(message).font(MadarTypography.caption()).fixedSize(horizontal: false, vertical: true).accessibilityIdentifier("mihbara-pdf-flow-error")
+                    Button("حسنًا") { MihbaraConversions.shared.dismiss(job.id) }.font(MadarTypography.caption()).frame(minHeight: 44)
                 }
             }
-            .accessibilityElement(children: .contain).accessibilityIdentifier("mihbara-pdf-flow-progress")
-        case .ready:
-            MadarCard {
-                VStack(alignment: .leading, spacing: 10) {
-                    Label("صار جاهزًا", systemImage: "checkmark.circle").font(MadarTypography.section())
-                    if let summary { Text(readyLine(summary)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true) }
-                    Button("راجعه وأضفه إلى المكتبة") { reviewing = true }.buttonStyle(MadarPrimaryButton())
-                        .accessibilityIdentifier("mihbara-pdf-flow-review")
-                }
-            }
-        case .failed(let message):
-            MadarCard { Text(message).font(MadarTypography.caption()).fixedSize(horizontal: false, vertical: true).accessibilityIdentifier("mihbara-pdf-flow-error") }
         }
+        .accessibilityElement(children: .contain).accessibilityIdentifier("mihbara-pdf-flow-progress")
     }
 
     private func readyLine(_ s: PDFBookEPUB.Summary) -> String {
@@ -123,73 +124,6 @@ struct MihbaraPDFFlowView: View {
         if s.opticalPages > 0 { parts.append("\(digits.string(s.opticalPages)) منها قُرئت من صورها") }
         if s.picturedPages > 0 { parts.append("\(digits.string(s.picturedPages)) بلا نص بقيت بصورتها كالغلاف والزخارف") }
         if !s.skippedPages.isEmpty { parts.append("\(digits.string(s.skippedPages.count)) لم يُستخرج نصها، ومكانها ملاحظة برقمها") }
-        return parts.joined(separator: "، ") + "."
-    }
-
-    private func start() {
-        guard phase != .converting else { return }
-        done = 0; total = 0; summary = nil; phase = .converting; jobID = UUID()
-    }
-
-    private var authorized: Bool { app.lockController?.canPresent(.app) ?? app.protectedDataAuthorized }
-
-    @MainActor private func convert(_ id: UUID) async {
-        do {
-            guard authorized else { return }
-            let bytes = try AppMihbaraService(app: app).pdfData(for: book)
-            let reader = PDFBookTextReader(data: bytes, language: book.language)
-            total = try await reader.pageCount()
-            var pages: [PDFBookEPUB.Page] = []
-            var pictures = 0
-            /// A page without words keeps its picture (cover, basmala, ornament) instead of a «not extracted» note.
-            func picture(_ index: Int) async throws -> (jpeg: Data?, blank: Bool) {
-                guard pictures < PDFBookEPUB.maximumPictures else { return (jpeg: nil, blank: false) }
-                let result: (jpeg: Data?, blank: Bool) = (try? await reader.pagePicture(at: index)) ?? (jpeg: nil, blank: false)
-                if result.jpeg != nil { pictures += 1 }
-                return result
-            }
-            for index in 0..<total {
-                let label = try await reader.pageLabel(at: index)
-                do {
-                    var page = try await reader.page(at: index)
-                    // Garbled embedded Arabic: read the page image instead of showing broken words.
-                    if page.hasUnreliableArabicMapping, let optical = try? await reader.page(at: index, optical: true),
-                       !optical.text.isEmpty { page = optical }
-                    let wordless = page.hasUnreliableArabicMapping || PDFBookEPUB.paragraphs(page.text).isEmpty
-                    // A scanned book's first page is its cover: keep it as a picture, not its OCR'd title and stamps.
-                    let cover = index == 0 && page.source == .optical
-                    if wordless || cover {
-                        let shot = try await picture(index)
-                        pages.append(cover && shot.jpeg != nil ? .init(text: "", optical: true, unreliable: false, label: label, image: shot.jpeg)
-                                     : .init(page, label: label, image: shot.jpeg, blank: shot.blank))
-                    } else { pages.append(.init(page, label: label)) }
-                }
-                catch is CancellationError { throw CancellationError() }
-                // A page OCR cannot read becomes its picture, or an honest gap with its number, not a failed book.
-                catch {
-                    let shot = try await picture(index)
-                    pages.append(.init(text: "", optical: false, unreliable: true, label: label, image: shot.jpeg, blank: shot.blank))
-                }
-                try Task.checkCancellation()
-                guard jobID == id, authorized else { return }
-                done = index + 1
-            }
-            let outline = try await reader.outline()
-            let title = book.title, author = book.author, language = book.language, hash = book.fileHash ?? book.id.uuidString
-            let epub = try await Task.detached(priority: .userInitiated) {
-                try PDFBookEPUB.build(title: title, author: author, language: language, sourceHash: hash, pages: pages, outline: outline)
-            }.value
-            guard jobID == id else { return }
-            let folder = app.bookStagingDirectory.deletingLastPathComponent().appendingPathComponent("PDFConversions")
-            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-            let name = title.components(separatedBy: CharacterSet(charactersIn: "/:\\")).joined(separator: "-").prefix(80)
-            let file = folder.appendingPathComponent((name.isEmpty ? "book" : String(name)) + ".epub")
-            try epub.write(to: file, options: [.atomic, .completeFileProtection])
-            converted = file; summary = PDFBookEPUB.summary(pages); phase = .ready
-        } catch is CancellationError {
-        } catch {
-            guard jobID == id else { return }
-            phase = .failed("تعذّر تحويل هذا الملف. يبقى PDF كما هو وتستطيع قراءته بصفحاته.")
-        }
+        return parts.joined(separator: "، ") + ". والـPDF أصله تفتحه من «الأصل»."
     }
 }

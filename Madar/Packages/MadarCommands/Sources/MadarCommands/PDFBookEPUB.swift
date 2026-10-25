@@ -100,13 +100,16 @@ public enum PDFBookEPUB {
                     body += marker + "<p class=\"madar-page-gap\">صفحة \(escaped): لم يُستخرج نصها بدقة؛ راجعها في ملف PDF الأصلي.</p>"
                     continue
                 }
+                // A page that opens on a heading (a short first line) starts afresh; the open paragraph ends.
+                if open, let first = list.first, isHeading(first) { body += "</p>"; open = false }
                 if open {
                     let first = list.removeFirst()
                     body += " " + marker + TurathEPUB.escape(first)
                     if !list.isEmpty || closes(first) { body += "</p>"; open = false }
                 } else { body += marker }
                 for (k, paragraph) in list.enumerated() {
-                    if k == list.count - 1 && !closes(paragraph) { body += "<p>" + TurathEPUB.escape(paragraph); open = true }
+                    // Only a page that ends on a full line carries its last paragraph over to the next page.
+                    if k == list.count - 1 && !closes(paragraph) && endsOnFullLine(texts[index]) { body += "<p>" + TurathEPUB.escape(paragraph); open = true }
                     else { body += "<p>\(TurathEPUB.escape(paragraph))</p>" }
                 }
             }
@@ -114,13 +117,18 @@ public enum PDFBookEPUB {
             files.append(("OEBPS/c\(n + 1).xhtml", TurathEPUB.xhtml(title: title, body: "<section>\(body)</section>")))
         }
         files += pictures.map { ("OEBPS/" + $0.0, $0.1) }
-        // The PDF's bookmarks become the index; without bookmarks the index lists every tenth page.
+        // The PDF's bookmarks become the index; without them, the book's printed contents page; without that,
+        // every tenth page.
         var toc = "<li><a href=\"info.xhtml\">عن هذه النسخة</a></li>"
         let href = { (page: Int) -> String in
             let clamped = min(max(page, 0), pages.count - 1)
             return "c\(clamped / pagesPerDocument + 1).xhtml#p-\(clamped + 1)"
         }
-        if outline.isEmpty {
+        let printed = outline.isEmpty ? printedContents(pages.map(\.text)) : []
+        if !printed.isEmpty {
+            // Owner, 25 Oct 2026 («سحب الفهرس خطأ مع انه موجود واضح»): the book's own printed contents.
+            toc += printed.map { "<li><a href=\"\(href($0.page))\">\(TurathEPUB.escape($0.title))</a></li>" }.joined()
+        } else if outline.isEmpty {
             for start in stride(from: 0, to: pages.count, by: 10) { toc += "<li><a href=\"\(href(start))\">صفحة \(digits(start + 1))</a></li>" }
         } else {
             toc += outline.prefix(2_000).map { "<li><a href=\"\(href($0.page - 1))\">\(TurathEPUB.escape($0.title))</a></li>" }.joined()
@@ -139,6 +147,121 @@ public enum PDFBookEPUB {
             + "<dc:language>\(lang)</dc:language><meta property=\"dcterms:modified\">2000-01-01T00:00:00Z</meta></metadata><manifest>\(manifest)</manifest><spine\(rtl ? " page-progression-direction=\"rtl\"" : "")>\(spine)</spine></package>"
         files.append(("OEBPS/package.opf", Data(opf.utf8)))
         return try StoredZIP.encode(files)
+    }
+
+    static func isHeading(_ paragraph: String) -> Bool {
+        paragraph.count <= 30 && paragraph.split(separator: " ").count <= 5 && !closes(paragraph)
+    }
+
+    /// The page's last line is about as long as its typical line (the paragraph runs on), not a short closing line.
+    static func endsOnFullLine(_ text: String) -> Bool {
+        let lines = text.components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        guard let last = lines.last else { return false }
+        let lengths = lines.map(\.count).sorted()
+        guard lengths.count >= 3 else { return true }
+        return last.count * 10 >= lengths[lengths.count * 3 / 4] * 7
+    }
+
+    // MARK: - The book's printed contents
+
+    public struct PrintedEntry: Equatable, Sendable { public let title: String; public let page: Int }
+
+    /// Letters only, without vowel marks, tatweel or the spellings OCR confuses (أ/إ/آ, ى/ي, ة/ه).
+    static func letters(_ text: String) -> String {
+        var out = ""
+        for scalar in text.unicodeScalars {
+            switch scalar.value {
+            case 0x064B...0x065F, 0x0670, 0x0640: continue
+            case 0x0622, 0x0623, 0x0625, 0x0671: out.append("ا")
+            case 0x0649, 0x0626: out.append("ي")
+            case 0x0629: out.append("ه")
+            case 0x0624: out.append("و")
+            default: if CharacterSet.letters.contains(scalar) { out.unicodeScalars.append(scalar) }
+            }
+        }
+        return out
+    }
+
+    static func similar(_ a: String, _ b: String) -> Bool {
+        guard a.count >= 4, b.count >= 4 else { return a == b && !a.isEmpty }
+        if a.contains(b) || b.contains(a) { return min(a.count, b.count) * 10 >= max(a.count, b.count) * 6 }
+        func pairs(_ s: String) -> [String: Int] {
+            let c = Array(s); var out: [String: Int] = [:]
+            for i in 0..<(c.count - 1) { out[String(c[i...i + 1]), default: 0] += 1 }
+            return out
+        }
+        let x = pairs(a), y = pairs(b)
+        let shared = x.reduce(0) { $0 + min($1.value, y[$1.key] ?? 0) }
+        return Double(2 * shared) / Double(a.count + b.count - 2) >= 0.7
+    }
+
+    /// The book's own contents page (a scanned book has no PDF bookmarks): each title with the zero-based
+    /// page it opens on. Printed page numbers are shifted to file pages by the offset the chapter headings
+    /// agree on; an entry without a usable number is placed by its heading. Fewer than three entries: none.
+    public static func printedContents(_ texts: [String]) -> [PrintedEntry] {
+        let heads: Set<String> = ["الفهرس", "فهرسالموضوعات", "فهرسالمحتويات", "المحتويات", "محتوياتالكتاب"]
+        func lines(_ i: Int) -> [String] { texts[i].components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty } }
+        func number(_ raw: String) -> Int? {
+            let digits = raw.compactMap { $0.wholeNumberValue.map(String.init) ?? ($0 == "." || $0 == "٫" ? "." : nil) }.joined()
+            guard let first = digits.split(separator: ".").first, !first.isEmpty else { return nil }
+            return Int(first)
+        }
+        // Title lines with their printed numbers, from the contents page and the pages that continue it.
+        guard let start = texts.indices.last(where: { i in lines(i).prefix(2).contains { heads.contains(letters($0)) } }) else { return [] }
+        var raw: [(title: String, number: Int?)] = []
+        var index = start
+        while index < texts.count {
+            var found = 0, numbers: [Int] = [], run = 0, longestRun = 0
+            let first = raw.count
+            for line in lines(index) where !heads.contains(letters(line)) {
+                let name = line.drop { $0 == "-" || $0 == " " }
+                let wordy = letters(String(name)).count >= 3
+                let tail = line.reversed().prefix { $0.isNumber || $0 == "." || $0 == " " || $0 == "…" }
+                if wordy {
+                    var title = String(line.dropLast(tail.count)).trimmingCharacters(in: CharacterSet(charactersIn: " .…"))
+                    if title.hasPrefix("-") { title = String(title.dropFirst()).trimmingCharacters(in: .whitespaces) }
+                    raw.append((title, number(String(tail.reversed())))); found += 1; run = 0
+                } else if let n = number(line) {
+                    numbers.append(n); run += 1; longestRun = max(longestRun, run)
+                    if let last = raw.indices.last, raw[last].number == nil { raw[last].number = n }
+                }
+            }
+            // OCR read the page numbers as their own column: the page's titles take them in order.
+            let untitled = raw.indices.filter { $0 >= first && raw[$0].number == nil || ($0 >= first && numbers.contains(raw[$0].number ?? -1) && longestRun >= 3) }
+            if longestRun >= 3, abs(untitled.count - numbers.count) <= 1 {
+                for (k, n) in zip(untitled, numbers) { raw[k].number = n }
+            }
+            if index > start && found < 3 { break }
+            index += 1
+        }
+        let contents = start..<index
+        // Read a number OCR padded with leader dots («٥٥٠٠» for ٥٥) back to the plausible page.
+        var previous = 0
+        for k in raw.indices {
+            guard var n = raw[k].number else { continue }
+            while n > texts.count || n < previous, n >= 10, n % 10 == 0 { n /= 10 }
+            if n > texts.count || n < previous { raw[k].number = nil } else { raw[k].number = n; previous = n }
+        }
+        func headingPage(_ title: String, from: Int, to: Int) -> Int? {
+            let key = letters(title.drop { $0.isNumber || $0 == " " || $0 == "-" }.description)
+            guard key.count >= 4 else { return nil }
+            return (max(0, from)..<min(texts.count, to)).first { i in
+                !contents.contains(i) && lines(i).prefix(2).contains { similar(letters($0), key) }
+            }
+        }
+        // The shift between printed and file pages, by vote of the headings found near their printed page.
+        var votes: [Int: Int] = [:]
+        for entry in raw { if let n = entry.number, let page = headingPage(entry.title, from: n - 4, to: n + 8) { votes[page - (n - 1), default: 0] += 1 } }
+        let offset = votes.max { $0.value == $1.value ? abs($0.key) > abs($1.key) : $0.value < $1.value }.flatMap { $0.value >= 2 ? $0.key : nil }
+        var out: [PrintedEntry] = []
+        for entry in raw {
+            let page: Int?
+            if let n = entry.number, let offset { page = n - 1 + offset }
+            else { page = headingPage(entry.title, from: out.last?.page ?? 0, to: contents.lowerBound) }
+            guard let page, (0..<texts.count).contains(page), page >= (out.last?.page ?? 0), !entry.title.isEmpty else { continue }
+            out.append(PrintedEntry(title: entry.title, page: page))
+        }
+        return out.count >= 3 ? out : []
     }
 
     static let closers: Set<Character> = [".", "!", "?", "؟", ":", "…", "»", "\"", "”", "۔", ")"]

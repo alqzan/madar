@@ -30,6 +30,7 @@ import UIKit
         XCTAssertEqual(title.value as? String, "ملف اختبار مصوّر")
         attach(app, "M6-V17-preview-s1-L")
         confirm.tap()
+        keepAsPDF(app)
         let addBook = app.buttons["mihbara-add-paper"]
         let addBookVisible = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: addBook)
         XCTAssertEqual(XCTWaiter.wait(for: [addBookVisible], timeout: 15), .completed, app.debugDescription)
@@ -76,6 +77,7 @@ import UIKit
         XCTAssertEqual(title.value as? String, "ملف اختبار مصوّر")
         attach(app, "M6-V17-preview-s1-L")
         confirm.tap()
+        keepAsPDF(app)
         let addBook = app.buttons["mihbara-add-paper"]
         let addBookVisible = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: addBook)
         XCTAssertEqual(XCTWaiter.wait(for: [addBookVisible], timeout: 15), .completed, app.debugDescription)
@@ -149,6 +151,7 @@ import UIKit
         for _ in 0..<6 where !confirm.isHittable { app.swipeUp(velocity: .slow) }
         XCTAssertTrue(confirm.isHittable)
         confirm.tap()
+        keepAsPDF(app)
 
         let addBook = app.buttons["mihbara-add-paper"]
         let visible = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: addBook)
@@ -215,49 +218,18 @@ import UIKit
         XCTAssertTrue(confirm.waitForExistence(timeout: 20), app.debugDescription)
         for _ in 0..<6 where !confirm.isHittable { app.swipeUp(velocity: .slow) }
         confirm.tap()
-        let addBook = app.buttons["mihbara-add-paper"]
-        let visible = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: addBook)
-        XCTAssertEqual(XCTWaiter.wait(for: [visible], timeout: 15), .completed, app.debugDescription)
-        addBook.tap()
-        app.buttons["mihbara-add-back"].tap()
-        app.buttons["mihbara-shelf-want"].tap()
-        let imported = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "كتاب منساب")).firstMatch
-        XCTAssertTrue(imported.waitForExistence(timeout: 8), app.debugDescription); imported.tap()
-        XCTAssertTrue(app.buttons["mihbara-pdf-flow"].waitForExistence(timeout: 12), app.debugDescription)
-        app.buttons["mihbara-pdf-flow"].tap()
-        XCTAssertTrue(app.buttons["mihbara-pdf-flow-turath"].waitForExistence(timeout: 8), app.debugDescription)
-        attach(app, "M6-PDF-flow-choice-L")
-        app.buttons["mihbara-pdf-flow-device"].tap()
-        let review = app.buttons["mihbara-pdf-flow-review"]
-        XCTAssertTrue(review.waitForExistence(timeout: 60), app.debugDescription)
+        // Owner, 25 Oct 2026: adding a PDF offers the conversion; it runs while the room stays usable.
+        let convert = app.alerts.buttons["حوّله"].firstMatch
+        XCTAssertTrue(convert.waitForExistence(timeout: 15), app.debugDescription)
+        attach(app, "M6-PDF-flow-offer-L")
+        convert.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["mihbara-pdf-flow-progress"].waitForExistence(timeout: 15), app.debugDescription)
+        let open = app.buttons["mihbara-pdf-flow-open"]
+        XCTAssertTrue(open.waitForExistence(timeout: 90), app.debugDescription)
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "٣ صفحات")).firstMatch.exists, app.debugDescription)
         attach(app, "M6-PDF-flow-ready-L")
-        review.tap()
-        let importConfirm = app.buttons["mihbara-epub-import-confirm"]
-        XCTAssertTrue(importConfirm.waitForExistence(timeout: 20), app.debugDescription)
-        XCTAssertEqual(app.textFields["mihbara-epub-import-title"].value as? String, "كتاب منساب")
-        XCTAssertTrue(app.descendants(matching: .any)["mihbara-epub-scan-text"].waitForExistence(timeout: 20), app.debugDescription)
-        XCTAssertTrue(app.descendants(matching: .any)["mihbara-epub-scan-pages"].exists, app.debugDescription)
-        XCTAssertTrue(importConfirm.isEnabled, "Adding waits for the full scan to finish.")
-        attach(app, "M6-PDF-flow-review-L")
-        for _ in 0..<8 where !importConfirm.isHittable { app.swipeUp(velocity: .slow) }
-        importConfirm.tap()
-        XCTAssertTrue(app.buttons["mihbara-pdf-close"].waitForExistence(timeout: 15), app.debugDescription)
-        XCTAssertFalse(app.buttons["mihbara-pdf-flow-device"].exists)
-        app.buttons["mihbara-pdf-close"].tap()
-        let copies = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "كتاب منساب"))
-        let both = XCTNSPredicateExpectation(predicate: NSPredicate(format: "count >= 2"), object: copies)
-        XCTAssertEqual(XCTWaiter.wait(for: [both], timeout: 12), .completed, app.debugDescription)
-        attach(app, "M6-PDF-flow-shelf-L")
-        // Walk the converted EPUB itself, rather than treating a second shelf
-        // entry as proof that the flowing text can actually be read.
-        for index in 0..<2 {
-            copies.element(boundBy: index).tap()
-            if app.buttons["mihbara-reader-close"].waitForExistence(timeout: 8) { break }
-            let closePDF = app.buttons["mihbara-pdf-close"]
-            XCTAssertTrue(closePDF.waitForExistence(timeout: 5), app.debugDescription); closePDF.tap()
-        }
-        XCTAssertTrue(app.buttons["mihbara-reader-close"].waitForExistence(timeout: 10), app.debugDescription)
+        open.tap()
+        XCTAssertTrue(app.buttons["mihbara-reader-close"].waitForExistence(timeout: 15), app.debugDescription)
         let contents = app.buttons["mihbara-reader-contents"]
         XCTAssertTrue(contents.exists, app.debugDescription)
         contents.tap()
@@ -272,6 +244,14 @@ import UIKit
         }, object: nil)
         XCTAssertEqual(XCTWaiter.wait(for: [body], timeout: 15), .completed, app.debugDescription)
         attach(app, "M6-PDF-flow-reader-L")
+        // «الكتاب تكرر مرتين»: the converted book stands for its PDF; the PDF stays reachable as «الأصل».
+        XCTAssertTrue(app.buttons["mihbara-reader-original-pdf"].exists, app.debugDescription)
+        app.buttons["mihbara-reader-close"].tap()
+        app.buttons["mihbara-shelf-want"].tap()
+        let copies = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "كتاب منساب"))
+        XCTAssertTrue(copies.firstMatch.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertEqual(copies.count, 1, app.debugDescription)
+        attach(app, "M6-PDF-flow-shelf-L")
     }
 
     func testEPUBScanExplainsReversedAnchorsAndPageLinks() throws {
@@ -690,5 +670,11 @@ import UIKit
     private func attach(_ app: XCUIApplication, _ name: String) {
         let s = app.screenshot(), attachment = XCTAttachment(screenshot: s); attachment.name = name; attachment.lifetime = .keepAlways; add(attachment)
         if let dir = ProcessInfo.processInfo.environment["MADAR_SHOT_DIR"] { try? s.pngRepresentation.write(to: URL(fileURLWithPath: dir).appendingPathComponent(name + ".png")) }
+    }
+
+    /// Adding a PDF offers the conversion (owner, 25 Oct 2026); these flows keep the PDF as it is.
+    private func keepAsPDF(_ app: XCUIApplication) {
+        let keep = app.alerts.buttons["أبقه PDF"].firstMatch
+        if keep.waitForExistence(timeout: 15) { keep.tap() }
     }
 }

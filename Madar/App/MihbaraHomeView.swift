@@ -33,6 +33,7 @@ struct MihbaraHomeView: View {
     @State private var pendingMotivationBook: UUID?
     @State private var slotBook: MihbaraBook?
     @State private var pendingSlotBook: MihbaraBook?
+    @State private var offerConversion: MihbaraBook?
     private var theme: RoomTheme { .init(room: "mihbara", dark: colorScheme == .dark) }
     private var service: AppMihbaraService { .init(app: app) }
     private var tableBook: MihbaraBook? { reading?.books.first { $0.id == tableID } ?? reading?.books.first { $0.shelf == "reading" } }
@@ -51,6 +52,7 @@ struct MihbaraHomeView: View {
                     }
                     if let r = reading {
                         MadarDateLabel(app.dateLabels(r.day)).foregroundStyle(theme.secondaryInk)
+                        conversionCards
                         shelfView(r)
                         VStack(spacing: 0) {
                             desk(r)
@@ -74,7 +76,8 @@ struct MihbaraHomeView: View {
                     .accessibilityIdentifier("mihbara-undo")
             }
         }
-        .task { load(); openSpotlightBookIfNeeded() }
+        .task { load(); openSpotlightBookIfNeeded(); MihbaraConversions.shared.onFinished = { load() } }
+        .modifier(MihbaraConversionOffer(app: app, book: $offerConversion))
         .onChange(of: app.mihbaraBookToOpen) { _, _ in openSpotlightBookIfNeeded() }
         .onChange(of: app.undoToken?.id) { load() }
         .confirmationDialog("اختر كتابًا يرجع إلى أبي أقرأها", isPresented: Binding(get: { slotBook != nil }, set: { if !$0 { slotBook = nil } }), titleVisibility: .visible, presenting: slotBook) { incoming in
@@ -119,12 +122,12 @@ struct MihbaraHomeView: View {
             Text("على الرف: «" + BookTitle.parts(renameTitle.isEmpty ? (renaming?.title ?? "") : renameTitle).short + "»")
         }
         .fullScreenCover(item: $readerRoute, onDismiss: load) { route in
-            if let book = reading?.books.first(where: { $0.id == route.bookID && ($0.isReadableEPUB || $0.isReadablePDF) }) {
+            if let book = readableBook(route.bookID) {
                 Group {
                     if book.isReadablePDF { MihbaraPDFReaderView(app: app, book: book, startPage: route.page) { readerRoute = nil } }
                     else {
                         MihbaraReaderView(app: app, book: book, volume: route.volume,
-                            originalPDF: { hash in reading?.books.first { $0.isReadablePDF && $0.fileHash == hash }?.id },
+                            originalPDF: originalPDFID,
                             openOriginal: { id, page in readerRoute = MihbaraReaderRoute(bookID: id, page: page) }) { readerRoute = nil }
                     }
                 }.environment(\.roomTheme, theme)
@@ -142,7 +145,9 @@ struct MihbaraHomeView: View {
                         app: app,
                         readingBooks: reading.books.filter { $0.shelf == "reading" },
                         onPaperBookSaved: { showingAddBook = false; load() },
-                        onPDFImported: { pendingBookFile = nil; showingAddBook = false; load() },
+                        onPDFImported: {
+                            pendingBookFile = nil; showingAddBook = false; load(); offerNewestPDF()
+                        },
                         onEPUBImported: { pendingBookFile = nil; showingAddBook = false; load() },
                         pendingBookFile: $pendingBookFile,
                         pendingGoodreadsFile: $pendingGoodreadsFile
@@ -151,6 +156,25 @@ struct MihbaraHomeView: View {
                 .environment(\.roomTheme, theme)
             }
         }
+    }
+    /// PDFs converting in the background, and those just finished («افتحه»).
+    private var conversionCards: some View {
+        ForEach(MihbaraConversions.shared.jobs) { job in
+            MihbaraConversionCard(job: job, digits: service.digits) { id in readerRoute = MihbaraReaderRoute(bookID: id) }
+        }
+    }
+    private func readableBook(_ id: UUID) -> MihbaraBook? {
+        guard let book = reading?.book(id), book.isReadableEPUB || book.isReadablePDF else { return nil }
+        return book
+    }
+    /// The PDF just added is offered for conversion (owner's choice, never automatic).
+    private func offerNewestPDF() {
+        let pdfs = (reading?.books ?? []).filter { $0.isReadablePDF && MihbaraConversions.shared.job(for: $0.id) == nil }
+        offerConversion = pdfs.max { $0.updated < $1.updated }
+    }
+    private func originalPDFID(_ hash: String) -> UUID? {
+        let all: [MihbaraBook] = (reading?.originals ?? []) + (reading?.books ?? [])
+        return all.first { $0.isReadablePDF && $0.fileHash == hash }?.id
     }
     private func load() {
         do {
@@ -799,6 +823,21 @@ struct MihbaraHomeView: View {
 
 }
 private enum MihbaraSheet: Identifiable { case library, book(UUID), hadith(Int), opening, notebook, motivation; var id: String { String(describing: self) } }
+/// Owner, 25 Oct 2026: «اول ما احمل بي دي اف يقولي ترا بحوله لك ولي انا الخيار».
+private struct MihbaraConversionOffer: ViewModifier {
+    let app: AppSession
+    @Binding var book: MihbaraBook?
+    func body(content: Content) -> some View {
+        content.alert("نحوّله كتابًا منسابًا؟", isPresented: Binding(get: { book != nil }, set: { if !$0 { book = nil } })) {
+            Button("حوّله") { if let book { MihbaraConversions.shared.start(book, app: app) }; book = nil }
+                .accessibilityIdentifier("mihbara-offer-convert")
+            Button("أبقه PDF", role: .cancel) { book = nil }
+        } message: {
+            Text("يقرأ مدار صفحاته على جهازك ويكبر خطه لشاشتك، وتتنقل في التطبيق وهو يعمل. ويبقى الـPDF أصله تفتحه من «الأصل».")
+        }
+    }
+}
+
 private struct MihbaraReaderRoute: Identifiable { let bookID: UUID; var volume: Int? = nil; var page: Int? = nil; var id: String { bookID.uuidString + "-\(volume ?? -1)-\(page ?? -1)" } }
 
 private struct MihbaraMotivationCard: View {

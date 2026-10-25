@@ -38,6 +38,10 @@ struct MihbaraCollection: Codable {
 }
 struct MihbaraHomeReading {
     var books: [MihbaraBook]; var collection: MihbaraCollection; var todayHadiths: [MihbaraHadith]; var readCount: Int; var completedToday: Int; var opensAfterFajr: Bool; var day: GregorianDay
+    /// PDFs that became a flowing book: off the shelves (one book, not two), still opened through «الأصل».
+    var originals: [MihbaraBook] = []
+    /// Any book the room knows, the originals included (reader routes and «الأصل»).
+    func book(_ id: UUID) -> MihbaraBook? { books.first { $0.id == id } ?? originals.first { $0.id == id } }
 }
 struct MihbaraMotivationCue: Identifiable {
     let id: String
@@ -63,6 +67,13 @@ struct MihbaraMotivationCue: Identifiable {
             books.append(MihbaraBook(id: row.id, title: row.title, author: row.author, shelf: row.shelf, pages: row.pages, page: page, finished: row.finishedAt, updated: row.updatedAt, kind: row.kind, format: row.format, mediaID: row.mediaID, fileHash: row.fileHash, locatorJSON: row.kind == "file" ? row.locatorJSON : nil, isbn13: row.isbn13, tocJSON: row.tocJSON, turathID: row.turathID, language: row.language))
         }
         books.sort { $0.updated == $1.updated ? $0.id.uuidString < $1.id.uuidString : $0.updated > $1.updated }
+        // Owner, 25 Oct 2026 («الكتاب تكرر مرتين في مكتبتي»): a converted book stands for its PDF.
+        var links = MihbaraConversions.links(app)
+        let before = links
+        let converted = Set(books.compactMap { MihbaraConversions.sourcePDFHash(of: $0, app: app, cache: &links) })
+        if links != before { MihbaraConversions.save(links, app: app) }
+        let originals = books.filter { $0.isReadablePDF && $0.fileHash.map(converted.contains) == true }
+        books.removeAll { book in originals.contains { $0.id == book.id } }
         let collection = try MihbaraCollection.load()
         let rows = try c.fetch(FetchDescriptor<HadithProgress>()).filter { $0.collectionID == collection.collectionID && $0.deletedAt == nil && $0.mergedInto == nil }
         let read = Set(rows.filter { $0.readAt != nil }.map(\.number))
@@ -73,7 +84,7 @@ struct MihbaraMotivationCue: Identifiable {
         let numbers = MihbaraReading.nextHadith(numbers: collection.hadiths.map(\.number), read: read, readToday: today, count: Int(app.number("mihbara.wirdCount")))
         let prayer = try PrayerRepository(context: c), civil = GregorianDay.containing(now, in: app.activePlace.timeZone)
         let fajr = prayer.occurrence(.init(day: civil, prayer: .fajr))?.time
-        return .init(books: books, collection: collection, todayHadiths: collection.hadiths.filter { numbers.contains($0.number) }, readCount: read.count, completedToday: today.count, opensAfterFajr: fajr.map { now >= $0 } ?? false, day: day)
+        return .init(books: books, collection: collection, todayHadiths: collection.hadiths.filter { numbers.contains($0.number) }, readCount: read.count, completedToday: today.count, opensAfterFajr: fajr.map { now >= $0 } ?? false, day: day, originals: originals)
     }
 
     /// RMI3: a book line comes only from the user's own page-linked note. When none exists,
