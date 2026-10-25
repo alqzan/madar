@@ -2440,49 +2440,49 @@
           "field": "id",
           "optional": false,
           "type": "string",
-          "disposition": "preserveRawUntilRoomMigration",
-          "target": "Media(kind=doc): original export archive",
-          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+          "disposition": "mappedAndRawArchived",
+          "target": "UpcomingDay.id: stable myDream source identity; ImportLink retains original id",
+          "validation": "Pinned source daily-date contract; malformed rows raw-archived and reported; stable replay preserves native edits and tombstones. DEBUG isolated trial only; countUpAfter=true unsupported."
         },
         {
           "field": "title",
           "optional": false,
           "type": "string",
-          "disposition": "preserveRawUntilRoomMigration",
-          "target": "Media(kind=doc): original export archive",
-          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+          "disposition": "mappedAndRawArchived",
+          "target": "UpcomingDay.title",
+          "validation": "Pinned source daily-date contract; malformed rows raw-archived and reported; stable replay preserves native edits and tombstones. DEBUG isolated trial only; countUpAfter=true unsupported."
         },
         {
           "field": "date",
           "optional": false,
           "type": "string",
-          "disposition": "preserveRawUntilRoomMigration",
-          "target": "Media(kind=doc): original export archive",
-          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+          "disposition": "mappedAndRawArchived",
+          "target": "One-off Gregorian UpcomingDay year/month/day, repeats=none; display ring begins on observation day",
+          "validation": "Pinned source daily-date contract; malformed rows raw-archived and reported; stable replay preserves native edits and tombstones. DEBUG isolated trial only; countUpAfter=true unsupported."
         },
         {
           "field": "emoji",
           "optional": true,
           "type": "string",
-          "disposition": "preserveRawUntilRoomMigration",
-          "target": "Media(kind=doc): original export archive",
-          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+          "disposition": "archived",
+          "target": "ImportLink.unmappedJSON only; no native emoji field",
+          "validation": "Pinned source daily-date contract; malformed rows raw-archived and reported; stable replay preserves native edits and tombstones. DEBUG isolated trial only; countUpAfter=true unsupported."
         },
         {
           "field": "countUpAfter",
           "optional": true,
           "type": "boolean",
-          "disposition": "preserveRawUntilRoomMigration",
-          "target": "Media(kind=doc): original export archive",
-          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+          "disposition": "archived",
+          "target": "Absent/false uses pinned one-off default; true remains entirely archived pending owner-approved model support",
+          "validation": "Pinned source daily-date contract; malformed rows raw-archived and reported; stable replay preserves native edits and tombstones. DEBUG isolated trial only; countUpAfter=true unsupported."
         },
         {
           "field": "updatedAt",
           "optional": true,
           "type": "number",
-          "disposition": "preserveRawUntilRoomMigration",
-          "target": "Media(kind=doc): original export archive",
-          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+          "disposition": "mappedAndRawArchived",
+          "target": "UpcomingDay.updatedAt; only explicit newer source edit clears a tombstone",
+          "validation": "Pinned source daily-date contract; malformed rows raw-archived and reported; stable replay preserves native edits and tombstones. DEBUG isolated trial only; countUpAfter=true unsupported."
         }
       ]
     },
@@ -2493,65 +2493,65 @@
           "field": "id",
           "optional": false,
           "type": "string",
-          "disposition": "preserveRawUntilRoomMigration",
-          "target": "Media(kind=doc): original export archive",
-          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+          "disposition": "mappedAndRawArchived",
+          "target": "Letter.id: stable myDream source identity; ImportLink retains original id",
+          "validation": "Pinned source daily-date contract; malformed rows raw-archived and reported; stable replay preserves native edits and tombstones. DEBUG isolated trial only; countUpAfter=true unsupported."
         },
         {
           "field": "writtenDate",
           "optional": false,
           "type": "string",
-          "disposition": "preserveRawUntilRoomMigration",
-          "target": "Media(kind=doc): original export archive",
-          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+          "disposition": "mappedAndRawArchived",
+          "target": "Letter.createdAt: home-zone noon anchor for original Gregorian day; no original clock claimed",
+          "validation": "Pinned source daily-date contract; malformed rows raw-archived and reported; stable replay preserves native edits and tombstones. DEBUG isolated trial only; countUpAfter=true unsupported."
         },
         {
           "field": "deliveryDate",
           "optional": false,
           "type": "string",
-          "disposition": "preserveRawUntilRoomMigration",
-          "target": "Media(kind=doc): original export archive",
-          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+          "disposition": "mappedAndRawArchived",
+          "target": "Letter.triggerKind=date, triggerValue=original day and openAt day cache; standard eligibility engine",
+          "validation": "Pinned source daily-date contract; malformed rows raw-archived and reported; stable replay preserves native edits and tombstones. DEBUG isolated trial only; countUpAfter=true unsupported."
         },
         {
           "field": "title",
           "optional": true,
           "type": "string",
-          "disposition": "preserveRawUntilRoomMigration",
-          "target": "Media(kind=doc): original export archive",
-          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+          "disposition": "archived",
+          "target": "ImportLink.unmappedJSON only; not concatenated into content",
+          "validation": "Pinned source daily-date contract; malformed rows raw-archived and reported; stable replay preserves native edits and tombstones. DEBUG isolated trial only; countUpAfter=true unsupported."
         },
         {
           "field": "content",
           "optional": false,
           "type": "string",
-          "disposition": "preserveRawUntilRoomMigration",
-          "target": "Media(kind=doc): original export archive",
-          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+          "disposition": "mappedAndRawArchived",
+          "target": "Letter.text unchanged; withheld from cards, diary search and diary text export until opened",
+          "validation": "Pinned source daily-date contract; malformed rows raw-archived and reported; stable replay preserves native edits and tombstones. DEBUG isolated trial only; countUpAfter=true unsupported."
         },
         {
           "field": "opened",
           "optional": true,
           "type": "boolean",
-          "disposition": "preserveRawUntilRoomMigration",
-          "target": "Media(kind=doc): original export archive",
-          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+          "disposition": "mappedAndRawArchived",
+          "target": "Letter.state opened only for explicit true, otherwise sealed",
+          "validation": "Pinned source daily-date contract; malformed rows raw-archived and reported; stable replay preserves native edits and tombstones. DEBUG isolated trial only; countUpAfter=true unsupported."
         },
         {
           "field": "openedDate",
           "optional": true,
           "type": "string",
-          "disposition": "preserveRawUntilRoomMigration",
-          "target": "Media(kind=doc): original export archive",
-          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+          "disposition": "mappedAndRawArchived",
+          "target": "Letter.openedAt only when explicitly opened and a valid original day exists; unknown stays nil",
+          "validation": "Pinned source daily-date contract; malformed rows raw-archived and reported; stable replay preserves native edits and tombstones. DEBUG isolated trial only; countUpAfter=true unsupported."
         },
         {
           "field": "updatedAt",
           "optional": true,
           "type": "number",
-          "disposition": "preserveRawUntilRoomMigration",
-          "target": "Media(kind=doc): original export archive",
-          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+          "disposition": "mappedAndRawArchived",
+          "target": "Letter.updatedAt; only explicit newer source edit clears a tombstone",
+          "validation": "Pinned source daily-date contract; malformed rows raw-archived and reported; stable replay preserves native edits and tombstones. DEBUG isolated trial only; countUpAfter=true unsupported."
         }
       ]
     },

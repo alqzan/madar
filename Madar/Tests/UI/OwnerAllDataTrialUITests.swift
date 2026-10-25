@@ -43,14 +43,14 @@ import XCTest
         let stamp = "all-" + String(Int(Date().timeIntervalSince1970))
         let diaryReport = folder.appendingPathComponent("diary-import-\(stamp).json")
         let app = XCUIApplication()
-        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_TRIAL_MONEY": backup, "MADAR_TRIAL_QURAN": backup, "MADAR_TRIAL_PRAYER": backup, "MADAR_TRIAL_HABITS": backup,
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_TRIAL_MONEY": backup, "MADAR_TRIAL_QURAN": backup, "MADAR_TRIAL_PRAYER": backup, "MADAR_TRIAL_HABITS": backup, "MADAR_TRIAL_PERSONAL": backup,
                                  "MADAR_UI_LEGACY_DIARY_ZIP": zip, "MADAR_UI_LEGACY_REPORT": diaryReport.path, "MADAR_TRIAL_RUN": stamp,
                                  "MADAR_UI_TRAVEL_FIX": "24.7136,46.6753,الرياض,SA,Asia/Riyadh", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
         app.launch()
-        for room in ["money", "quran", "prayer", "habits"] {
+        for room in ["money", "quran", "prayer", "habits", "personal"] {
             let r = try report(folder.appendingPathComponent("\(room)-import-\(stamp).json"), timeout: 1200)
             XCTAssertNil(r["failed"], "\(room): \(r)")
-            if room == "habits" {
+            if room == "habits" || room == "personal" {
                 XCTAssertEqual(r["replay.created"] as? Int, 0)
                 XCTAssertEqual(r["replay.unchanged"] as? Int, 1)
             }
@@ -86,7 +86,7 @@ import XCTest
         app.buttons["diary-days"].tap()
         if app.buttons["diary-calendar-scale-year"].waitForExistence(timeout: 30) {
             shot(app, "TRIAL-diary-hub-L")
-            for tab in ["diary-hub-timeline", "diary-hub-photos"] where app.buttons[tab].exists { app.buttons[tab].tap(); Thread.sleep(forTimeInterval: 1.5); shot(app, "TRIAL-" + tab + "-L") }
+            for tab in ["diary-hub-timeline", "diary-hub-photos", "diary-hub-letters"] where app.buttons[tab].exists { app.buttons[tab].tap(); Thread.sleep(forTimeInterval: 1.5); shot(app, "TRIAL-" + tab + "-L") }
             if app.buttons["diary-hub-close"].exists { app.buttons["diary-hub-close"].tap() } else { app.swipeDown(velocity: .fast) }
         }
         let search = app.buttons["diary-search"]

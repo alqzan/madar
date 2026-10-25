@@ -177,6 +177,7 @@ private struct MadarSceneContent: View {
             await opened.runLegacyQuranTrialIfRequested()
             await opened.runLegacyPrayerTrialIfRequested()
             await opened.runLegacyHabitTrialIfRequested()
+            await opened.runLegacyPersonalTrialIfRequested()
 #endif
             session = opened; startupError = nil
             await backgroundBackups?.reschedule(using: backup)
