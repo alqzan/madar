@@ -127,7 +127,7 @@ struct DiaryHubView: View {
         return Button { self.month = month } label: {
             VStack(alignment: .leading, spacing: 8) {
                 Text(grid.monthName(year: selectedYear, month: month)).font(.custom("thmanyahseriftext-Bold", size: 13, relativeTo: .caption))
-                Text(alternateMonthTitle(month)).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
+                Text(alternateMonthTitle(month)).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).lineLimit(1).minimumScaleFactor(0.7)
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 2), count: 7), spacing: 2) {
                     ForEach(0..<grid.leading(days), id: \.self) { _ in Color.clear.aspectRatio(1, contentMode: .fit) }
                     ForEach(days, id: \.description) { day in
