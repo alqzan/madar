@@ -2199,49 +2199,49 @@
           "field": "id",
           "optional": false,
           "type": "string",
-          "disposition": "preserveRawUntilRoomMigration",
-          "target": "Media(kind=doc): original export archive",
-          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+          "disposition": "mappedAndRawArchived",
+          "target": "Habit.id: stable myDream identity; original id in ImportLink",
+          "validation": "Pinned daily-checkbox contract; full original row in ImportLink; golden mapping/deletion tests and replay without native edits being overwritten. DEBUG isolated trial only."
         },
         {
           "field": "name",
           "optional": false,
           "type": "string",
-          "disposition": "preserveRawUntilRoomMigration",
-          "target": "Media(kind=doc): original export archive",
-          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+          "disposition": "mappedAndRawArchived",
+          "target": "Habit.name",
+          "validation": "Pinned daily-checkbox contract; full original row in ImportLink; golden mapping/deletion tests and replay without native edits being overwritten. DEBUG isolated trial only."
         },
         {
           "field": "icon",
           "optional": false,
           "type": "string",
-          "disposition": "preserveRawUntilRoomMigration",
-          "target": "Media(kind=doc): original export archive",
-          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+          "disposition": "mappedAndRawArchived",
+          "target": "Habit.icon",
+          "validation": "Pinned daily-checkbox contract; full original row in ImportLink; golden mapping/deletion tests and replay without native edits being overwritten. DEBUG isolated trial only."
         },
         {
           "field": "color",
           "optional": false,
           "type": "string",
-          "disposition": "preserveRawUntilRoomMigration",
-          "target": "Media(kind=doc): original export archive",
-          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+          "disposition": "mappedAndRawArchived",
+          "target": "Habit.color",
+          "validation": "Pinned daily-checkbox contract; full original row in ImportLink; golden mapping/deletion tests and replay without native edits being overwritten. DEBUG isolated trial only."
         },
         {
           "field": "logs",
           "optional": false,
           "type": "string[]",
-          "disposition": "preserveRawUntilRoomMigration",
-          "target": "Media(kind=doc): original export archive",
-          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+          "disposition": "mappedAndRawArchived",
+          "target": "HabitEvent: one +1 per distinct Gregorian day, stored legacy@0; habitlog tombstones retained",
+          "validation": "Pinned daily-checkbox contract; full original row in ImportLink; golden mapping/deletion tests and replay without native edits being overwritten. DEBUG isolated trial only."
         },
         {
           "field": "updatedAt",
           "optional": true,
           "type": "number",
-          "disposition": "preserveRawUntilRoomMigration",
-          "target": "Media(kind=doc): original export archive",
-          "validation": "Before room import: explicit mapping, preview and counts; never silently discard unknown data."
+          "disposition": "mappedAndRawArchived",
+          "target": "Habit.updatedAt: explicit source ms; deletion/restoration compares only an explicit source edit",
+          "validation": "Pinned daily-checkbox contract; full original row in ImportLink; golden mapping/deletion tests and replay without native edits being overwritten. DEBUG isolated trial only."
         }
       ]
     },

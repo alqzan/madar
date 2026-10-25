@@ -43,13 +43,17 @@ import XCTest
         let stamp = "all-" + String(Int(Date().timeIntervalSince1970))
         let diaryReport = folder.appendingPathComponent("diary-import-\(stamp).json")
         let app = XCUIApplication()
-        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_TRIAL_MONEY": backup, "MADAR_TRIAL_QURAN": backup, "MADAR_TRIAL_PRAYER": backup,
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_TRIAL_MONEY": backup, "MADAR_TRIAL_QURAN": backup, "MADAR_TRIAL_PRAYER": backup, "MADAR_TRIAL_HABITS": backup,
                                  "MADAR_UI_LEGACY_DIARY_ZIP": zip, "MADAR_UI_LEGACY_REPORT": diaryReport.path, "MADAR_TRIAL_RUN": stamp,
                                  "MADAR_UI_TRAVEL_FIX": "24.7136,46.6753,الرياض,SA,Asia/Riyadh", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
         app.launch()
-        for room in ["money", "quran", "prayer"] {
+        for room in ["money", "quran", "prayer", "habits"] {
             let r = try report(folder.appendingPathComponent("\(room)-import-\(stamp).json"), timeout: 1200)
             XCTAssertNil(r["failed"], "\(room): \(r)")
+            if room == "habits" {
+                XCTAssertEqual(r["replay.created"] as? Int, 0)
+                XCTAssertEqual(r["replay.unchanged"] as? Int, 1)
+            }
             add(XCTAttachment(string: "\(room): \(r.filter { $0.key.hasPrefix("store.") })"))
         }
         let diary = try report(diaryReport, timeout: 900)
