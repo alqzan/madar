@@ -125,7 +125,7 @@ extension AppSession {
     }
 
     /// Money goes through the command bus, so intake, review and duplicate detection behave as for a new message.
-    func importLegacyMoney(_ backup: Data, now: Date) async throws -> [String: Int] {
+    func importLegacyMoney(_ backup: Data, now: Date, progress: @escaping @MainActor (Int, Int) -> Void = { _, _ in }) async throws -> [String: Int] {
         var counts: [String: Int] = [:]
         func count(_ key: String) { counts[key, default: 0] += 1 }
         let context = ModelContext(container)
@@ -200,13 +200,29 @@ extension AppSession {
             let store = SettingsStore(context: ModelContext(container), schema: schema)
             for key in cycleExpected.keys {
                 guard let definition = schema.settings.first(where: { $0.key == key }), let current = try? store.value(for: key) else { continue }
-                if current != definition.defaultValue { cycleExpected[key] = nil; count("settings.keptNative") }
+                if let expected = cycleExpected[key], try current.canonicalData() == expected.canonicalData() {
+                    cycleExpected[key] = nil; count("settings.alreadyMatched")
+                } else if current != definition.defaultValue { cycleExpected[key] = nil; count("settings.keptNative") }
             }
             if !cycleExpected.isEmpty {
                 _ = await run("settings.set", ["settings": .object(cycleExpected)], settings.command, "cycleSettings")
             }
         }
+        let movementTotal = plan.steps.filter { step in
+            switch step { case .logExpense, .ingest: true; default: false }
+        }.count
+        var reviewed = 0
         for step in plan.steps {
+            let isMovement: Bool
+            switch step { case .logExpense, .ingest: isMovement = true; default: isMovement = false }
+            // The previous batch's progress can paint before the next batch starts; no command transaction is open.
+            if isMovement && reviewed > 0 && reviewed.isMultiple(of: 10) { await Task.yield() }
+            defer {
+                if isMovement {
+                    reviewed += 1
+                    if reviewed == 1 || reviewed.isMultiple(of: 10) || reviewed == movementTotal { progress(reviewed, movementTotal) }
+                }
+            }
             switch step {
             case let .saveAccount(command, id, kind, bank, last4, at):
                 guard accountMap[id] == nil, !accountIDs.contains(id) else { count("account.keptNative"); continue }

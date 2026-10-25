@@ -12,6 +12,7 @@ struct LegacyMoveView: View {
     @State private var choosing = false
     @State private var preview: LegacyMovePreview?
     @State private var moving: String?
+    @State private var movementProgress: (reviewed: Int, total: Int)?
     @State private var receipt: LegacyMoveReceipt?
     @State private var last: LegacyMoveReceipt?
     @State private var undone: LegacyMoveUndo?
@@ -110,7 +111,15 @@ struct LegacyMoveView: View {
 
     private func progressCard(_ room: String) -> some View {
         card {
-            HStack(spacing: 12) { ProgressView(); Text(room.isEmpty ? "يرجع بياناتك كما كانت…" : "ينقل " + room + "…").font(MadarTypography.body()) }
+            if let movementProgress, movementProgress.total > 0, !room.isEmpty {
+                Text("ينقل " + room + "…").font(MadarTypography.body())
+                ProgressView(value: Double(movementProgress.reviewed), total: Double(movementProgress.total))
+                    .tint(theme.color("accentText"))
+                Text("الحركات المفحوصة: " + digits.string(movementProgress.reviewed) + " من " + digits.string(movementProgress.total))
+                    .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+            } else {
+                HStack(spacing: 12) { ProgressView(); Text(room.isEmpty ? "يرجع بياناتك كما كانت…" : "ينقل " + room + "…").font(MadarTypography.body()) }
+            }
             Text("ابقَ في مدار حتى يكتمل النقل.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
         }.accessibilityElement(children: .combine).accessibilityIdentifier("legacy-move-progress")
     }
@@ -150,7 +159,7 @@ struct LegacyMoveView: View {
 
     private func undoneCard(_ result: LegacyMoveUndo) -> some View {
         card {
-            Text(result.isPartial ? "تراجعت عن التغييرات التي أمكن التحقق منها." : "رجعت بياناتك كما كانت قبل النقل.").font(MadarTypography.section()).accessibilityIdentifier("legacy-move-undone")
+            Text(result.isPartial ? (result.plan.isEmpty ? "أبقينا بياناتك كما هي لحمايتها." : "تراجعت عن التغييرات التي أمكن التحقق منها.") : "رجعت بياناتك كما كانت قبل النقل.").font(MadarTypography.section()).accessibilityIdentifier("legacy-move-undone")
             if result.isPartial {
                 Text("قد يبقى جزء من النقل السابق: سجلّه غير مكتمل أو من إصدار أقدم. أبقينا البيانات غير الموثّقة كما هي لحمايتها.")
                     .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
@@ -224,15 +233,18 @@ struct LegacyMoveView: View {
         catch { failure = (error as? LocalizedError)?.errorDescription ?? "لم يُقرأ الملف. تأكد أنه نسخة مدار القديم كما صدّرها." }
     }
     private func commit(_ p: LegacyMovePreview) {
-        failure = nil; moving = p.rooms.first { !$0.isEmpty }?.title ?? ""
+        failure = nil; movementProgress = nil; moving = p.rooms.first { !$0.isEmpty }?.title ?? ""
         Task { @MainActor in
             defer { moving = nil }
-            do { receipt = try await service.commit(p) { moving = $0 }; preview = nil; last = service.lastMove() }
+            do {
+                receipt = try await service.commit(p, progress: { moving = $0 }, movementProgress: { movementProgress = ($0, $1) })
+                preview = nil; last = service.lastMove()
+            }
             catch { failure = "لم يكتمل النقل. " + error.localizedDescription }
         }
     }
     private func undo() {
-        failure = nil; moving = ""
+        failure = nil; movementProgress = nil; moving = ""
         Task { @MainActor in
             defer { moving = nil }
             do { undone = try await service.undo(); receipt = nil; last = nil }

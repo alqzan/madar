@@ -9,6 +9,45 @@ import CryptoKit
 /// Item 24 «انقل من مدار القديم» against a store that already holds the owner's own records: what the owner logged here
 /// wins, a prayer logged here is never owed again as qada (RP1), an earlier tracking start stays, and a second move adds nothing.
 @MainActor final class LegacyMoveNativeWinsTests: XCTestCase {
+    func testMoneySettingsReplayWithAnAlreadyDefaultCalendarNeedsNoNewCommand() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("MoveSettingsReplay-" + UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = try ManagedDataStore(root: root)
+        let app = try AppSession(container: store.container, managedStore: store, groupDirectory: root)
+        app.authorizeProtectedData()
+        let service = AppLegacyMoveService(app: app)
+        let data = Data(#"{"dailyBudget":{"amount":80},"salaryDay":27}"#.utf8)
+        let preview = LegacyMovePreview(fileName: "synthetic.json", data: data, rooms: service.preview(data))
+        _ = try await service.commit(preview, progress: { _ in })
+        let settings = try SettingsStore(context: ModelContext(store.container))
+        XCTAssertEqual(try settings.value(for: "mal.salaryDay"), .number(27))
+        XCTAssertEqual(try settings.value(for: "mal.cycleCalendar"), .string("gregorian"))
+        XCTAssertEqual(try settings.value(for: "mal.dailyAllowance"), .object(["mode": .string("fixed"), "amountMinor": .number(8000), "percentBp": .null]))
+        func rows() throws -> [DataRecord] { try RecordBridge.all(ModelContext(store.container)).sorted { ($0.model, $0.id.uuidString) < ($1.model, $1.id.uuidString) } }
+        let before = try rows()
+        let replay = try await service.commit(preview, progress: { _ in })
+        XCTAssertTrue(replay.outcomes.allSatisfy { $0.failed == nil }, "Matching settings are not an incomplete move")
+        XCTAssertEqual(try rows(), before)
+    }
+
+    func testMovementProgressFinishesForBothNewAndAlreadyPresentMovements() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("MoveProgress-" + UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = try ManagedDataStore(root: root)
+        let app = try AppSession(container: store.container, managedStore: store, groupDirectory: root)
+        app.authorizeProtectedData()
+        let service = AppLegacyMoveService(app: app)
+        let data = Data(#"{"transactions":[{"id":"p1","date":"2026-07-03","amount":12.3},{"id":"p2","date":"2026-07-04","amount":45}]}"#.utf8)
+        let preview = LegacyMovePreview(fileName: "synthetic.json", data: data, rooms: service.preview(data))
+        for expectedAdded in [true, false] {
+            var reports: [(Int, Int)] = []
+            let result = try await service.commit(preview, progress: { _ in }, movementProgress: { reports.append(($0, $1)) })
+            XCTAssertEqual(result.added > 0, expectedAdded)
+            XCTAssertEqual(reports.last?.0, 2); XCTAssertEqual(reports.last?.1, 2)
+            XCTAssertTrue(reports.allSatisfy { $0.0 > 0 && $0.0 <= $0.1 && $0.1 == 2 })
+        }
+    }
+
     /// Item 24 + B-01: all five old-app rooms, a native diary memory and its attachment cross a real encrypted restore.
     func testEveryRoomMoveReopensRestoresAndReplaysWithoutGrowth() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("EveryRoomRestore-" + UUID().uuidString)

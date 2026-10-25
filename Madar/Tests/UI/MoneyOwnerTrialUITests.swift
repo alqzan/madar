@@ -54,12 +54,14 @@ import XCTest
         XCTAssertEqual(second["store.transactions"], first["store.transactions"], "A second import must add nothing")
         XCTAssertEqual(second["store.categories"], first["store.categories"])
         XCTAssertEqual(second["store.unconfirmed"], first["store.unconfirmed"])
-        XCTAssertEqual(second["balance.known"], first["balance.known"])
-        XCTAssertEqual(second["balance.unknown"], first["balance.unknown"])
+        XCTAssertEqual(second["store.knownBalances"], first["store.knownBalances"])
+        XCTAssertEqual(second["store.unknownBalances"], first["store.unknownBalances"])
         XCTAssertEqual(second["earlier.cardLinked", default: 0], 0, "Replay must not rewrite the old rows' card links or edit dates")
-        // Re-delivering the same command returns its original receipt outcome (applied),
-        // rather than a new natural-key duplicate outcome. The counts below prove no growth.
-        XCTAssertEqual(second["cycleSettings.applied"], first["cycleSettings.applied"])
+        // Already-matching settings need no command. Reusing its id with only the still-default subset would
+        // conflict with the first payload; retained state and zero refusals prove the replay, not attempted writes.
+        XCTAssertEqual(second["cycleSettings.applied", default: 0], 0)
+        XCTAssertGreaterThan(second["settings.alreadyMatched", default: 0], 0)
+        XCTAssertFalse(second.keys.contains { $0.contains(".rejected:") || $0.contains(".error.") })
         XCTAssertEqual(second["settings.persisted"], 1)
         XCTAssertEqual(second["settings.archiveMatches"], 1)
         XCTAssertEqual(second["settings.archivedFields"], originalSettingsCount)

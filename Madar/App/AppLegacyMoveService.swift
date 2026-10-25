@@ -150,7 +150,8 @@ struct LegacyMoveUndo {
     }
 
     /// Every room runs on its own; one that fails leaves the others moved and says so. Undo covers the whole run.
-    func commit(_ preview: LegacyMovePreview, progress: @escaping @MainActor (String) -> Void) async throws -> LegacyMoveReceipt {
+    func commit(_ preview: LegacyMovePreview, progress: @escaping @MainActor (String) -> Void,
+                movementProgress: @escaping @MainActor (Int, Int) -> Void = { _, _ in }) async throws -> LegacyMoveReceipt {
         try await app.performLegacyMove { now in
             let current = try RecordBridge.all(ModelContext(app.container), syncedOnly: false)
             // An earlier move not yet undone keeps its «before», so one undo always returns to the store before any move.
@@ -186,7 +187,7 @@ struct LegacyMoveUndo {
                     case "quran": counts = try app.importLegacyQuran(preview.data, fileName: preview.fileName, writer: writer, now: now)
                     case "habits": counts = try LegacyHabitTrial.importBackup(preview.data, to: app.container, zone: zone, now: now, writer: writer)
                     case "personal": counts = try LegacyPersonalTrial.importBackup(preview.data, to: app.container, zone: zone, now: now, writer: writer)
-                    default: counts = try await app.importLegacyMoney(preview.data, now: now)
+                    default: counts = try await app.importLegacyMoney(preview.data, now: now, progress: movementProgress)
                     }
                     outcomes.append(summarize(room, counts))
                 } catch {

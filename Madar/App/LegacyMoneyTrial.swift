@@ -45,6 +45,9 @@ extension AppSession {
             counts["store.unconfirmed"] = try check.fetch(FetchDescriptor<MoneyTransaction>()).filter { $0.deletedAt == nil && $0.reviewState != "ok" }.count
             counts["store.possibleDuplicates"] = try check.fetch(FetchDescriptor<MoneyTransaction>()).filter { $0.deletedAt == nil && $0.reviewState == "possibleDuplicate" }.count
             counts["store.cycles"] = try check.fetch(FetchDescriptor<Cycle>()).filter { $0.deletedAt == nil }.count
+            let accounts = try check.fetch(FetchDescriptor<Account>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
+            counts["store.knownBalances"] = accounts.filter { $0.balanceAt != nil }.count
+            counts["store.unknownBalances"] = accounts.filter { $0.balanceAt == nil }.count
             counts["store.settings"] = try check.fetch(FetchDescriptor<Setting>()).filter { $0.deletedAt == nil }.count
             counts["store.importLinks"] = try check.fetch(FetchDescriptor<ImportLink>()).filter { $0.deletedAt == nil }.count
             counts["settings.mapped"] = cycleExpected.count
