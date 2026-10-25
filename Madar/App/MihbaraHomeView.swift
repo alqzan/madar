@@ -236,7 +236,14 @@ struct MihbaraHomeView: View {
         let readingBooks = shelfBooks(r.books, "reading").filter { $0.id != tableBook?.id }
         let want = shelfBooks(r.books, "want"), finished = shelfBooks(r.books, "finished")
         return VStack(alignment: .leading, spacing: 14) {
-            HStack { Text("مكتبتك").font(MadarTypography.cardTitle()); Spacer(); Button { showingAddBook = true } label: { Label("أضف كتابًا", systemImage: "plus") }.accessibilityIdentifier("mihbara-add-paper") }
+            HStack {
+                Text("مكتبتك").font(MadarTypography.cardTitle())
+                Spacer()
+                Button { showingAddBook = true } label: {
+                    if r.books.isEmpty { Image(systemName: "plus").frame(width: 44, height: 44) }
+                    else { Label("أضف كتابًا", systemImage: "plus") }
+                }.accessibilityLabel("أضف كتابًا").accessibilityIdentifier("mihbara-add-paper")
+            }
             if r.books.isEmpty {
                 emptyShelf(r)
                 MihbaraShelfPlank().padding(.top, -14)
@@ -504,7 +511,20 @@ struct MihbaraHomeView: View {
                 // With books waiting, the empty stand points at them rather than at «أضف». With no book at all, the shelf above
                 // already invites the first one, so the stand says what it is for (all-data walk, 24 Oct 2026).
                 let waiting = r.books.filter { $0.shelf == "want" }.count
-                Button { if waiting > 0 { scrollTarget = "want" } else { showingAddBook = true } } label: { VStack(spacing: 12) { Image(systemName: "book.pages").font(.largeTitle); Text("مكان كتابك").font(MadarTypography.cardTitle()); Text(waiting > 0 ? "اختر كتابًا من «أبي أقرأها» (" + MihbaraCopy.books(waiting, service.digits) + ")، واضغطه مطوّلًا ثم «ضعه على الطاولة»" : r.books.isEmpty ? "هنا يوضع الكتاب الذي تقرؤه، وتكمل منه حيث وقفت" : "أضف كتابًا وابدأ من موضعك").font(MadarTypography.caption()).multilineTextAlignment(.center).padding(.horizontal, 16) }.frame(maxWidth: .infinity, minHeight: 210).background(theme.surface, in: .rect(cornerRadius: 5)).overlay { RoundedRectangle(cornerRadius: 5).stroke(theme.line, style: .init(lineWidth: 1, dash: [4,4])) } }.buttonStyle(.plain).foregroundStyle(theme.ink)
+                let placeholder = VStack(spacing: 12) {
+                    Image(systemName: "book.pages").font(.largeTitle)
+                    Text("مكان كتابك").font(MadarTypography.cardTitle())
+                    Text(waiting > 0 ? "اختر كتابًا من «أبي أقرأها» (" + MihbaraCopy.books(waiting, service.digits) + ")، واضغطه مطوّلًا ثم «ضعه على الطاولة»" : r.books.isEmpty ? "هنا يوضع الكتاب الذي تقرؤه، وتكمل منه حيث وقفت" : "أضف كتابًا وابدأ من موضعك")
+                        .font(MadarTypography.caption()).multilineTextAlignment(.center).padding(.horizontal, 16)
+                }.frame(maxWidth: .infinity, minHeight: 210).background(theme.surface, in: .rect(cornerRadius: 5))
+                    .overlay { RoundedRectangle(cornerRadius: 5).stroke(theme.line, style: .init(lineWidth: 1, dash: [4,4])) }
+                    .foregroundStyle(theme.ink)
+                if r.books.isEmpty {
+                    placeholder.accessibilityIdentifier("mihbara-empty-stand")
+                } else {
+                    Button { if waiting > 0 { scrollTarget = "want" } else { showingAddBook = true } } label: { placeholder }
+                        .buttonStyle(.plain)
+                }
             }
             // The stand's crossed legs.
             ZStack { RoundedRectangle(cornerRadius: 7).fill(theme.color("desk")).frame(width: 190, height: 12).rotationEffect(.degrees(13)); RoundedRectangle(cornerRadius: 7).fill(theme.color("desk")).frame(width: 190, height: 12).rotationEffect(.degrees(-13)); Circle().fill(theme.color("goldUnderstand")).frame(width: 10) }.frame(height: 44).accessibilityHidden(true)
