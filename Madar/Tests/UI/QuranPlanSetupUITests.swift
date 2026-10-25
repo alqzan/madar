@@ -4,7 +4,14 @@ import XCTest
         continueAfterFailure=false
         let app=XCUIApplication();app.launchEnvironment=["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light","MADAR_UI_NOW":"2026-10-15T15:00:00+03:00","MADAR_UI_QURAN_FIXTURE":"home"]
         app.launch();XCTAssertTrue(app.buttons["quran-streak"].waitForExistence(timeout:25));app.buttons["quran-streak"].tap()
-        XCTAssertTrue(app.buttons["quran-plan-edit"].waitForExistence(timeout:10));app.buttons["quran-plan-edit"].tap()
+        let edit = app.buttons["quran-plan-edit"]
+        XCTAssertTrue(edit.waitForExistence(timeout:10))
+        // The plan remains disabled while the launch's queued write finishes.
+        // XCUITest can call it hittable before it is enabled; that tap never reaches the action.
+        expectation(for: NSPredicate(format: "isEnabled == true"), evaluatedWith: edit)
+        waitForExpectations(timeout: 15)
+        capture(app,"M2-V12-before-edit-L")
+        edit.tap()
         XCTAssertTrue(app.buttons["quran-setup-continue"].waitForExistence(timeout:10),app.debugDescription);capture(app,"M2-V13-start-L")
         app.buttons["quran-setup-custom"].tap()
         XCTAssertTrue(app.steppers["quran-setup-page"].waitForExistence(timeout:5));app.buttons["quran-setup-next"].tap()
