@@ -5,8 +5,8 @@ import MadarData
 
 /// §7.1 B03: a user «يوم يهمّك» stores its rule only. Saves and deletes carry an inverse for undo; deletes are tombstones.
 @MainActor enum BahwUpcomingHandler {
-    static func save(_ id: UUID, title: String, calendar: String, year: Int?, month: Int, day: Int, repeats: String, countFrom: String, context: ModelContext, now: Date, writer: String) throws -> Data? {
-        func apply(_ row: UpcomingDay) { row.title = title; row.calendar = calendar; row.year = year; row.month = month; row.day = day; row.repeats = repeats; row.countFromDayKey = countFrom }
+    static func save(_ id: UUID, title: String, calendar: String, year: Int?, month: Int, day: Int, repeats: String, countFrom: String, countUpAfter: Bool = false, context: ModelContext, now: Date, writer: String) throws -> Data? {
+        func apply(_ row: UpcomingDay) { row.title = title; row.calendar = calendar; row.year = year; row.month = month; row.day = day; row.repeats = repeats; row.countFromDayKey = countFrom; row.countUpAfter = countUpAfter }
         if let row = try context.fetch(FetchDescriptor<UpcomingDay>()).first(where: { $0.id == id }) {
             guard row.deletedAt == nil, row.mergedInto == nil else { throw DataError.invalidValue("missing upcoming day") }
             let before = try row.record()

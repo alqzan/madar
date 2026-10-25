@@ -67,6 +67,37 @@ import XCTest
         app.terminate(); app.launch(); open(); app.buttons["أيامي"].tap()
         XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "bahw-matter-موعد بعيد").firstMatch.waitForExistence(timeout: 10))
     }
+    /// Owner, 25 Oct: a passed one-time day with «واصل العدّ بعد الموعد» stays and shows the days since it.
+    func testPassedOneTimeDayKeepsCountingWhenAsked() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_HABIT_FIXTURE": "empty",
+            "MADAR_UI_NOW": "2026-10-25T12:00:00+03:00", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_UNDO_SECONDS": "6"]
+        app.launch()
+        let block = app.descendants(matching: .any)["bahw-block-year"]
+        XCTAssertTrue(block.waitForExistence(timeout: 25))
+        for _ in 0..<6 where !block.isHittable { app.swipeUp(velocity: .slow) }
+        block.tap(); XCTAssertTrue(app.descendants(matching: .any)["bahw-year-hero"].waitForExistence(timeout: 10))
+        app.buttons["bahw-add-day"].tap()
+        let title = app.textFields["bahw-day-title"]; XCTAssertTrue(title.waitForExistence(timeout: 10))
+        title.tap(); title.typeText("أول يوم\n")
+        app.segmentedControls["bahw-day-repeats"].buttons["مرة واحدة"].tap()
+        let decrement = app.buttons["bahw-day-year-Decrement"]; XCTAssertTrue(decrement.waitForExistence(timeout: 5)); decrement.tap()
+        let toggle = app.switches["bahw-day-count-up"]; XCTAssertTrue(toggle.waitForExistence(timeout: 5))
+        // Without the option a passed one-time day has no occurrence to preview; with it, the day itself shows.
+        XCTAssertFalse(app.staticTexts.matching(identifier: "bahw-day-date-preview").firstMatch.exists)
+        toggle.switches.firstMatch.exists ? toggle.switches.firstMatch.tap() : toggle.tap()
+        XCTAssertEqual(toggle.value as? String, "1")
+        XCTAssertTrue(app.staticTexts.matching(identifier: "bahw-day-date-preview").firstMatch.waitForExistence(timeout: 5))
+        capture(app, "M4-V03-count-up-editor-L")
+        app.buttons["bahw-day-save"].tap(); app.buttons["أيامي"].tap()
+        let saved = app.descendants(matching: .any).matching(identifier: "bahw-matter-أول يوم").firstMatch
+        XCTAssertTrue(saved.waitForExistence(timeout: 10))
+        // 25 Oct 2025 to 25 Oct 2026 is 365 whole days.
+        XCTAssertTrue(saved.label.contains("٣٦٥") && saved.label.contains("مضت"), saved.label)
+        _ = app.buttons["تراجع"].waitForNonExistence(timeout: 8)
+        capture(app, "M4-V03-count-up-saved-L")
+    }
     private func finishOnboarding(_ app: XCUIApplication) {
         if app.buttons["first-run-skip"].waitForExistence(timeout: 2) { app.buttons["first-run-skip"].tap() }
         let start = app.buttons["first-run-continue"]

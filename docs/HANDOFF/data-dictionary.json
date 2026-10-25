@@ -422,6 +422,13 @@
      "optional": false,
      "default": "",
      "unit": "yyyy-MM-dd"
+    },
+    {
+     "name": "countUpAfter",
+     "type": "Bool",
+     "optional": false,
+     "default": false,
+     "note": "Owner-approved 25 Oct 2026: one-time day continues with whole elapsed Madar days after its occurrence; repeating rules keep the existing countdown."
     }
    ]
   },
@@ -5815,7 +5822,7 @@
    },
    "bahw.saveUpcomingDay": {
     "intent": null,
-    "payload": "{id: UUID, title: String, calendar: hijri|greg, year?: Int, month: Int, day: Int, repeats: none|yearly|monthly, countFromDayKey: yyyy-MM-dd}",
+    "payload": "{id: UUID, title: String, calendar: hijri|greg, year?: Int, month: Int, day: Int, repeats: none|yearly|monthly, countFromDayKey: yyyy-MM-dd, countUpAfter?: Bool (one-time only)}",
     "kind": "§7.1 B03: create or edit a user UpcomingDay rule with undo",
     "auth": "app-only"
    },
@@ -5940,5 +5947,5 @@
    "execution": "Immediately on press, within undo window"
   }
  },
- "storeSchemaVersion": 10
+ "storeSchemaVersion": 11
 }

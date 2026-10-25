@@ -28,10 +28,12 @@ struct LegacyPersonalImportTests {
         #expect(restored.letters[0].provenance.deletionBarrierAt == Date(timeIntervalSince1970: 1_700_000_000))
         #expect(restored.letters[0].provenance.restoredAt == Date(timeIntervalSince1970: 1_700_000_001))
     }
-    @Test func oneOffDayKeepsItsYearAndCountUpStaysArchived() throws {
-        let p = try plan(#"{"countdownEvents":[{"id":"a","title":"موعد","date":"2026-11-19","emoji":"🌿"},{"id":"b","title":"عد صاعد","date":"2026-11-20","countUpAfter":true}]}"#)
-        #expect(p.days.count == 1 && p.days[0].day.description == "2026-11-19")
-        #expect(p.counts["archived.countUpAfter"] == 1 && p.archives.count == 2)
+    @Test func oneOffDayKeepsItsYearAndCountUpMapsToItsOption() throws {
+        let p = try plan(#"{"countdownEvents":[{"id":"a","title":"موعد","date":"2026-11-19","emoji":"🌿"},{"id":"b","title":"عد صاعد","date":"2026-11-20","countUpAfter":true},{"id":"c","title":"علم غريب","date":"2026-11-21","countUpAfter":"yes"}]}"#)
+        #expect(p.days.map(\.sourceID) == ["a", "b"])
+        #expect(p.days[0].day.description == "2026-11-19" && !p.days[0].countUpAfter)
+        #expect(p.days[1].day.description == "2026-11-20" && p.days[1].countUpAfter)
+        #expect(p.counts["countUpAfter"] == 1 && p.counts["skipped.countUpAfter"] == 1 && p.archives.count == 3)
     }
     @Test func malformedCollectionCannotReportAValidEmptyImport() {
         #expect(throws: CoreError.invalidCommand) { try plan(#"{"futureLetters":{"bad":"shape"}}"#) }

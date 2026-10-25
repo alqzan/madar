@@ -41,6 +41,10 @@ struct BahwUpcomingItem: Identifiable, Equatable {
     let daysLeft: Int
     let closed: Double
     let hijri: Bool
+    /// Set once a one-time day that keeps counting (`countUpAfter`) has passed: whole days since it.
+    var elapsedDays: Int? = nil
+    /// The number the ring shows: days left, or days since for a day that keeps counting.
+    var count: Int { elapsedDays ?? daysLeft }
 }
 
 @MainActor struct AppBahwService {
@@ -109,8 +113,10 @@ struct BahwUpcomingItem: Identifiable, Equatable {
         if let rows = try? ModelContext(session.container).fetch(FetchDescriptor<UpcomingDay>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil })) {
             for row in rows {
                 let rule = MadarUpcomingRule(calendar: row.calendar == "hijri" ? .hijri : .gregorian, year: row.year, month: row.month, day: row.day,
-                                             repeats: MadarUpcomingRule.Repeats(rawValue: row.repeats) ?? .yearly, countFrom: try? GregorianDay(row.countFromDayKey))
-                if let ring = rule.ring(today: day, days) { items.append(.init(id: row.id.uuidString, title: row.title, day: ring.next, daysLeft: ring.daysLeft, closed: ring.closed, hijri: rule.calendar == .hijri)) }
+                                             repeats: MadarUpcomingRule.Repeats(rawValue: row.repeats) ?? .yearly, countFrom: try? GregorianDay(row.countFromDayKey), countUpAfter: row.countUpAfter)
+                if let counter = rule.counter(today: day, days) {
+                    items.append(.init(id: row.id.uuidString, title: row.title, day: counter.occurrence, daysLeft: counter.daysLeft, closed: counter.closed, hijri: rule.calendar == .hijri, elapsedDays: counter.elapsedDays))
+                }
             }
         }
         let seasons: [(String, Int, Int)] = [("رمضان", 9, 1), ("عيد الفطر", 10, 1), ("يوم عرفة", 12, 9), ("عيد الأضحى", 12, 10)]
@@ -119,7 +125,30 @@ struct BahwUpcomingItem: Identifiable, Equatable {
             guard let ring = rule.ring(today: day, days), !items.contains(where: { $0.title == title && $0.day == ring.next }) else { continue }
             items.append(.init(id: "season-\(month)-\(date)", title: title, day: ring.next, daysLeft: ring.daysLeft, closed: ring.closed, hijri: true))
         }
-        return Array(items.sorted { $0.daysLeft == $1.daysLeft ? $0.title < $1.title : $0.daysLeft < $1.daysLeft }.prefix(limit))
+        return Array(items.sorted { Self.nearestFirst(($0.elapsedDays, $0.daysLeft, $0.title), ($1.elapsedDays, $1.daysLeft, $1.title)) }.prefix(limit))
+    }
+    /// Days still ahead come first, nearest first; days that keep counting follow, the most recent first.
+    static func nearestFirst(_ a: (Int?, Int, String), _ b: (Int?, Int, String)) -> Bool {
+        switch (a.0, b.0) {
+        case (nil, .some): return true
+        case (.some, nil): return false
+        case let (.some(x), .some(y)) where x != y: return x < y
+        case (nil, nil) where a.1 != b.1: return a.1 < b.1
+        default: return a.2 < b.2
+        }
+    }
+    /// «مضى» wording under a count-up number, agreeing with the count.
+    func sinceCount(_ n: Int) -> String {
+        n == 1 ? "يوم مضى" : n == 2 ? "يومان مضيا" : dayCount(n) + " مضت"
+    }
+    /// «مضى يوم»، «مضى يومان»، «مضت ٥ أيام»، «مضى ٤٠ يومًا»: no digit beside the singular or dual word.
+    func sincePhrase(_ n: Int) -> String {
+        n == 1 ? "مضى يوم" : n == 2 ? "مضى يومان" : ((3...10).contains(n % 100) ? "مضت " : "مضى ") + digits.string(n) + " " + dayCount(n)
+    }
+    /// One line for a day: «بعد ٥ أيام» ahead, «اليوم» on it, «مضى ٤٠ يومًا» after it when it keeps counting.
+    func countPhrase(daysLeft: Int, elapsed: Int?) -> String {
+        if let elapsed { return sincePhrase(elapsed) }
+        return daysLeft == 0 ? "اليوم" : daysLeft == 1 ? "بعد يوم" : daysLeft == 2 ? "بعد يومين" : "بعد " + digits.string(daysLeft) + " " + dayCount(daysLeft)
     }
 
     /// One visual scale for all lobby countdowns; recurrence-cycle progress stays unchanged in the year room.

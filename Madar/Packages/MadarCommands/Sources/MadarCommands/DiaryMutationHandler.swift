@@ -143,6 +143,8 @@ struct DiaryInverse: Codable {
                 row.title = try before.decode("title", as: String.self); row.calendar = try before.decode("calendar", as: String.self); row.year = try before.decode("year", as: Int?.self)
                 row.month = try before.decode("month", as: Int.self); row.day = try before.decode("day", as: Int.self); row.repeats = try before.decode("repeats", as: String.self)
                 row.countFromDayKey = try before.decode("countFromDayKey", as: String.self)
+                // Receipts written before V11 carry no countUpAfter key; that day did not count up.
+                row.countUpAfter = (try? before.decode("countUpAfter", as: Bool.self)) ?? false
                 row.deletedAt = try before.decode("deletedAt", as: Date?.self); row.deletionBarrierAt = try before.decode("deletionBarrierAt", as: Date?.self)
                 if row.deletedAt == nil { row.restoredAt = now }
                 row.updatedAt = StableIdentity.monotonic(now: now, previous: row.updatedAt); row.writerID = writer

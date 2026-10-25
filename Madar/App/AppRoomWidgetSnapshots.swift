@@ -39,7 +39,7 @@ extension AppSession {
         payloads[.year] = .init(datePrimary:date.primary,dateSecondary:date.secondary,heading:"عامك، يومًا بيوم",emptyTitle:"افتح السنة",rows:yearRows)
         let upcoming=locked ? [] : service.upcoming(limit:7).map { item->RoomWidgetSnapshot.Row in
             let labels=dateLabels(item.day)
-            return .init(id:item.id,title:item.title,value:WidgetCopy.daysLeft(item.daysLeft,digits:digits,dayCount:service.dayCount),detail:labels.primary,secondDate:labels.secondary,share:item.closed,route:BuiltRoomWidget.upcoming.route)
+            return .init(id:item.id,title:item.title,value:item.elapsedDays.map(service.sincePhrase) ?? WidgetCopy.daysLeft(item.daysLeft,digits:digits,dayCount:service.dayCount),detail:labels.primary,secondDate:labels.secondary,share:item.closed,route:BuiltRoomWidget.upcoming.route)
         }
         payloads[.upcoming] = .init(datePrimary:date.primary,dateSecondary:date.secondary,heading:"كم بقي",emptyTitle:"أضف يومًا تنتظره",rows:upcoming,locked:locked)
         let diaryRows=locked || !bool("notes.widgetContent") ? [] : diaryWidgetRows(today:today)

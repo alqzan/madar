@@ -84,6 +84,36 @@ import Testing
         let corrected = MadarCalendarDays(zone: riyadh.zone, source: .sighting, offset: 1)
         #expect(ramadan.next(onOrAfter: day("2020-10-25"), corrected) == day("2027-03-07"))
     }
+    @Test func oneTimeCountUpStartsOnlyAfterTheNamedDayAndDefaultsOff() throws {
+        // Owner-approved 25 October behavior: 24th -> one day left, 25th -> today,
+        // 26th -> one day elapsed, 30th -> five days elapsed. No wall-clock duration.
+        let rule = MadarUpcomingRule(calendar: .gregorian, year: 2026, month: 10, day: 25, repeats: .none,
+                                     countFrom: day("2026-10-22"), countUpAfter: true)
+        let before = try #require(rule.counter(today: day("2026-10-24"), riyadh))
+        #expect(before.occurrence == day("2026-10-25") && before.daysLeft == 1 && before.elapsedDays == nil)
+        #expect(abs(before.closed - 2.0 / 3.0) < 0.0001)
+        let today = try #require(rule.counter(today: day("2026-10-25"), riyadh))
+        #expect(today.daysLeft == 0 && today.elapsedDays == nil && today.closed == 1)
+        #expect(rule.counter(today: day("2026-10-26"), riyadh)?.elapsedDays == 1)
+        let after = try #require(rule.counter(today: day("2026-10-30"), riyadh))
+        #expect(after.occurrence == day("2026-10-25") && after.daysLeft == 0 && after.elapsedDays == 5 && after.closed == 1)
+        #expect(rule.next(onOrAfter: day("2026-10-30"), riyadh) == nil, "next keeps its future-only contract")
+        let off = MadarUpcomingRule(calendar: .gregorian, year: 2026, month: 10, day: 25, repeats: .none)
+        #expect(!off.countUpAfter && off.counter(today: day("2026-10-26"), riyadh) == nil)
+        let recurring = MadarUpcomingRule(calendar: .gregorian, month: 10, day: 25, repeats: .yearly, countUpAfter: true)
+        #expect(recurring.counter(today: day("2026-10-30"), riyadh)?.daysLeft == 360)
+        #expect(recurring.counter(today: day("2026-10-30"), riyadh)?.elapsedDays == nil)
+    }
+    @Test func countUpUsesTheClampedAndCorrectedCalendarOccurrence() throws {
+        let ramadan = MadarUpcomingRule(calendar: .hijri, year: 1448, month: 9, day: 30, repeats: .none, countUpAfter: true)
+        #expect(ramadan.counter(today: day("2027-03-10"), riyadh)?.elapsedDays == 2)
+        let sighting = MadarCalendarDays(zone: riyadh.zone, source: .sighting, offset: 1)
+        #expect(ramadan.counter(today: day("2027-03-10"), sighting)?.elapsedDays == 3)
+        let short = MadarUpcomingRule(calendar: .gregorian, year: 2031, month: 2, day: 29, repeats: .none, countUpAfter: true)
+        #expect(short.counter(today: day("2031-03-01"), riyadh)?.elapsedDays == 1)
+        let leap = MadarUpcomingRule(calendar: .gregorian, year: 2028, month: 2, day: 29, repeats: .none, countUpAfter: true)
+        #expect(leap.counter(today: day("2028-03-01"), riyadh)?.elapsedDays == 1)
+    }
     @Test func ringRestartsAfterEachOccurrence() throws {
         // countStart = max(countFromDayKey, the day after the previous occurrence): after an occurrence a new count begins.
         let rule = MadarUpcomingRule(calendar: .gregorian, month: 1, day: 10, repeats: .monthly, countFrom: day("2026-01-01"))

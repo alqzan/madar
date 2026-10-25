@@ -20,6 +20,7 @@ enum SchemaCompatibility {
         case 7: MadarSchemaV7.syncedNames
         case 8: MadarSchemaV8.syncedNames
         case 9: MadarSchemaV9.syncedNames
+        case 10: MadarSchemaV10.syncedNames
         case MadarSchema.version: MadarSchema.syncedNames
         default: throw version > MadarSchema.version ? DataError.newerStore : DataError.unsupportedBackup
         }
@@ -67,6 +68,8 @@ enum SchemaCompatibility {
             if version < 9, row.model == "Reconciliation" { row.fields["obligationID"] = .null }
             // V10 (M5-V16): a category may guide future purchases to a preferred card; history stays unchanged.
             if version < 10, row.model == "Category" { row.fields["preferredCardID"] = .null }
+            // V11: old one-time days keep their original disappear-after-date behavior.
+            if version < 11, row.model == "UpcomingDay" { row.fields["countUpAfter"] = .bool(false) }
             return row
         }
     }

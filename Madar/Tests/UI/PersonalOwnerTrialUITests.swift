@@ -24,8 +24,9 @@ import XCTest
         app.launch()
         let first = try report(output)
         XCTAssertNil(first["failed"]); XCTAssertEqual(first["store.letters"], letters.count)
-        XCTAssertEqual(first["store.days"], ordinary.count)
-        XCTAssertEqual(first["archived.countUpAfter"] ?? 0, days.count - ordinary.count)
+        // Count-up events now import as days with countUpAfter (owner, 25 Oct).
+        XCTAssertEqual(first["store.days"], days.count)
+        XCTAssertEqual(first["countUpAfter"] ?? 0, days.count - ordinary.count)
         XCTAssertEqual(first["replay.created"], 0); XCTAssertEqual(first["replay.unchanged"], 1)
         let diary = app.buttons["diary-days"]; XCTAssertTrue(diary.waitForExistence(timeout: 30)); diary.tap()
         app.buttons["diary-hub-letters"].tap()

@@ -198,7 +198,7 @@ struct BahwBlockView: View {
         let rows = (try? HabitRepository(context: ModelContext(service.session.container)).readings(at:service.now)) ?? []
         let met = rows.filter { $0.summary.current?.met == true }.count
         return VStack(alignment:.leading,spacing:size == .wide ? 4 : 10) {
-            Button { service.session.habitsOpen = true } label: { HStack { title(room.accent); Spacer();if met > 0 {Text(digits.string(met)+" من "+digits.string(rows.count)).font(label).foregroundStyle(room.accent)} }.frame(minHeight:44) }.buttonStyle(.plain).accessibilityIdentifier("bahw-habits-open").disabled(!interactive)
+            Button { service.session.habitsOpen = true } label: { HStack { title(room.accent); Spacer();if met > 0 {Text(digits.string(met)+" من "+digits.string(rows.count)).font(label).foregroundStyle(room.accent)} }.frame(minHeight:44).contentShape(.rect) }.buttonStyle(.plain).accessibilityIdentifier("bahw-habits-open").disabled(!interactive)
             if rows.isEmpty {
                 // Improvement 16 Oct: no «٠ من ٠»; the four period rings at rest show what a habit becomes, and the action is a real button.
                 Spacer(minLength:0)
@@ -411,7 +411,7 @@ struct BahwBlockView: View {
             VStack(alignment: .leading, spacing: 6) {
                 title(lobby.accent)
                 HStack { ring(first, diameter: 66); VStack(alignment: .leading) { Text(first.title).font(label); MadarDateLabel(service.session.dateLabels(first.day, compact: true)).foregroundStyle(lobby.secondaryInk) } }
-                ForEach(items.dropFirst()) { item in Text(item.title + " بعد " + digits.string(item.daysLeft) + " " + service.dayCount(item.daysLeft)).font(small).foregroundStyle(lobby.secondaryInk).lineLimit(1) }
+                ForEach(items.dropFirst()) { item in Text(item.title + " " + service.countPhrase(daysLeft: item.daysLeft, elapsed: item.elapsedDays)).font(small).foregroundStyle(lobby.secondaryInk).lineLimit(1) }
             }
         } else {
             VStack(alignment: .leading, spacing: 10) {
@@ -423,25 +423,25 @@ struct BahwBlockView: View {
                             Text(item.title).font(label).lineLimit(1).minimumScaleFactor(0.79)
                             MadarDateLabel(service.session.dateLabels(item.day, compact: true)).foregroundStyle(lobby.secondaryInk)
                         }.frame(maxWidth: .infinity).accessibilityElement(children: .ignore)
-                            .accessibilityLabel(item.title + " بعد " + digits.string(item.daysLeft) + " " + service.dayCount(item.daysLeft)).accessibilityIdentifier("bahw-upcoming-item")
+                            .accessibilityLabel(item.title + " " + service.countPhrase(daysLeft: item.daysLeft, elapsed: item.elapsedDays)).accessibilityIdentifier("bahw-upcoming-item")
                     }
                 }
                 // Large: the rest of `bahw.upcomingCount` as lines.
                 ForEach(items.dropFirst(4)) { item in
-                    HStack { Text(item.title).font(label); Spacer(); Text(digits.string(item.daysLeft) + " " + service.dayCount(item.daysLeft)).font(small).foregroundStyle(lobby.secondaryInk) }
+                    HStack { Text(item.title).font(label); Spacer(); Text(item.elapsedDays.map(service.sincePhrase) ?? (item.daysLeft == 0 ? "اليوم" : digits.string(item.daysLeft) + " " + service.dayCount(item.daysLeft))).font(small).foregroundStyle(lobby.secondaryInk) }
                         .accessibilityElement(children: .combine).accessibilityIdentifier("bahw-upcoming-item")
                 }
             }
         }
     }
-    /// The ring closes as the day nears; the number inside is the days left.
+    /// The ring closes as the day nears; the number inside is the days left, or the days since for a day that keeps counting (full ring).
     private func ring(_ item: BahwUpcomingItem, diameter: CGFloat) -> some View {
         ZStack {
             Circle().stroke(lobby.line, lineWidth: 5)
             Circle().trim(from: 0, to: service.upcomingCloseness(daysLeft: item.daysLeft)).stroke(lobby.color("clay"), style: .init(lineWidth: 5, lineCap: .round)).rotationEffect(.degrees(-90))
             VStack(spacing: 0) {
-                Text(digits.string(item.daysLeft)).font(.custom("thmanyahserifdisplay-Bold", size: diameter * 0.34, relativeTo: .title2)).minimumScaleFactor(0.51)
-                Text(service.dayCount(item.daysLeft)).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(lobby.secondaryInk)
+                Text(digits.string(item.count)).font(.custom("thmanyahserifdisplay-Bold", size: diameter * 0.34, relativeTo: .title2)).minimumScaleFactor(0.51)
+                Text(item.elapsedDays.map(service.sinceCount) ?? (item.daysLeft == 0 ? "اليوم" : service.dayCount(item.daysLeft))).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(lobby.secondaryInk)
             }
         }.frame(width: diameter, height: diameter).accessibilityHidden(true)
     }

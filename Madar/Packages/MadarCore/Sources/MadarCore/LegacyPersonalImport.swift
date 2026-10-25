@@ -13,6 +13,7 @@ public enum LegacyPersonalImport {
     }
     public struct DayRow: Equatable, Sendable {
         public let id: UUID, sourceID: String, title: String, day: GregorianDay, provenance: Provenance
+        public var countUpAfter = false
     }
     public struct Archive: Equatable, Sendable {
         public let model: String, sourceID: String, json: Data
@@ -75,16 +76,18 @@ public enum LegacyPersonalImport {
                     result.letters.append(.init(id: uuid("myDream:Letter:" + id), sourceID: id, text: text,
                         writtenDay: written, deliveryDay: delivery, opened: opened, openedDay: openedDay, provenance: meta))
                 } else {
-                    // Count-up requires an owner-approved model field. Archive its
-                    // complete source instead of silently changing that behavior.
-                    if boolean(row["countUpAfter"]) == true { count("archived.countUpAfter"); continue }
+                    // Owner, 25 Oct: count-up maps to UpcomingDay.countUpAfter; the raw
+                    // source stays archived beside it. A non-boolean flag is still skipped.
                     if row["countUpAfter"] != nil, boolean(row["countUpAfter"]) == nil { count("skipped.countUpAfter"); continue }
+                    let countUp = boolean(row["countUpAfter"]) == true
                     guard let title = row["title"] as? String, !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                           let day = (row["date"] as? String).flatMap({ try? GregorianDay($0) }),
                           let meta = provenance(row, id: id, fallback: observedDay) else { count("skipped.day"); continue }
                     // Pinned source default: hide after occurrence when the optional
                     // countUpAfter flag is absent. No recurrence is inferred.
-                    result.days.append(.init(id: uuid("myDream:UpcomingDay:" + id), sourceID: id, title: title, day: day, provenance: meta))
+                    var mapped = DayRow(id: uuid("myDream:UpcomingDay:" + id), sourceID: id, title: title, day: day, provenance: meta)
+                    mapped.countUpAfter = countUp; if countUp { count("countUpAfter") }
+                    result.days.append(mapped)
                 }
             }
         }

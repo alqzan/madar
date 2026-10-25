@@ -18,7 +18,7 @@ public enum DiaryEditorCommand: Codable, Equatable, Sendable {
     case deleteProject(UUID)
     case linkEntry(entry: UUID, project: UUID?)
     // §7.1 B03 «يوم تنتظره»: the row stores the rule; occurrences are derived.
-    case saveUpcomingDay(id: UUID, title: String, calendar: String, year: Int?, month: Int, day: Int, repeats: String, countFrom: String)
+    case saveUpcomingDay(id: UUID, title: String, calendar: String, year: Int?, month: Int, day: Int, repeats: String, countFrom: String, countUpAfter: Bool)
     case deleteUpcomingDay(UUID)
     public static let names: Set<String> = ["diary.saveDraft", "diary.commitDraft", "diary.appendMedia", "diary.setTranscript", "diary.setIntention", "diary.setIntentionResult", "diary.editEntry", "diary.sealLetter", "diary.refreshLetters", "diary.openLetter", "diary.rescheduleLetter", "diary.saveProject", "diary.finishProject", "diary.deleteProject", "diary.linkEntry", "bahw.saveUpcomingDay", "bahw.deleteUpcomingDay"]
     public static func parse(_ name: String, _ value: [String: JSONValue]) -> Self? {
@@ -77,7 +77,7 @@ public enum DiaryEditorCommand: Codable, Equatable, Sendable {
         case "diary.finishProject":
             guard Set(value.keys).isSubset(of: ["id", "reflection"]), let id = uuid("id") else { return nil }; return .finishProject(id: id, reflection: value["reflection"]?.string)
         case "bahw.saveUpcomingDay":
-            guard Set(value.keys).isSubset(of: ["id", "title", "calendar", "year", "month", "day", "repeats", "countFromDayKey"]), let id = uuid("id"),
+            guard Set(value.keys).isSubset(of: ["id", "title", "calendar", "year", "month", "day", "repeats", "countFromDayKey", "countUpAfter"]), let id = uuid("id"),
                   let title = value["title"]?.string?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty, title.count <= 80,
                   let calendar = value["calendar"]?.string, ["hijri", "greg"].contains(calendar), let repeats = value["repeats"]?.string, ["none", "yearly", "monthly"].contains(repeats),
                   case .number(let m) = value["month"], case .number(let d) = value["day"], (1...12).contains(Int(m)), (1...(calendar == "hijri" ? 30 : 31)).contains(Int(d)),
@@ -85,7 +85,11 @@ public enum DiaryEditorCommand: Codable, Equatable, Sendable {
             var year: Int? = nil
             if case .number(let y) = value["year"] { year = Int(y) } else if value["year"] != nil && value["year"] != .null { return nil }
             guard repeats != "none" || year != nil else { return nil }
-            return .saveUpcomingDay(id: id, title: title, calendar: calendar, year: year, month: Int(m), day: Int(d), repeats: repeats, countFrom: from)
+            // Owner, 25 Oct: only a one-time day may keep counting after it passes.
+            var countUp = false
+            if case .bool(let flag) = value["countUpAfter"] { countUp = flag } else if value["countUpAfter"] != nil && value["countUpAfter"] != .null { return nil }
+            guard !countUp || repeats == "none" else { return nil }
+            return .saveUpcomingDay(id: id, title: title, calendar: calendar, year: year, month: Int(m), day: Int(d), repeats: repeats, countFrom: from, countUpAfter: countUp)
         case "bahw.deleteUpcomingDay": guard Set(value.keys) == ["id"], let id = uuid("id") else { return nil }; return .deleteUpcomingDay(id)
         case "diary.deleteProject": guard Set(value.keys) == ["id"], let id = uuid("id") else { return nil }; return .deleteProject(id)
         case "diary.linkEntry":

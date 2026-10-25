@@ -102,8 +102,9 @@ public struct MadarUpcomingRule: Equatable, Sendable {
     public let day: Int
     public let repeats: Repeats
     public let countFrom: GregorianDay?
-    public init(calendar: FirstCalendar, year: Int? = nil, month: Int, day: Int, repeats: Repeats, countFrom: GregorianDay? = nil) {
-        self.calendar = calendar; self.year = year; self.month = month; self.day = day; self.repeats = repeats; self.countFrom = countFrom
+    public let countUpAfter: Bool
+    public init(calendar: FirstCalendar, year: Int? = nil, month: Int, day: Int, repeats: Repeats, countFrom: GregorianDay? = nil, countUpAfter: Bool = false) {
+        self.calendar = calendar; self.year = year; self.month = month; self.day = day; self.repeats = repeats; self.countFrom = countFrom; self.countUpAfter = countUpAfter
     }
     public func matches(_ candidate: GregorianDay, _ days: MadarCalendarDays) -> Bool {
         let (y, m, d, last): (Int, Int, Int, Bool)
@@ -116,23 +117,27 @@ public struct MadarUpcomingRule: Equatable, Sendable {
     /// A one-time rule names its exact year, however far ahead it is. Recurring
     /// rules need only the next calendar year to find their next occurrence.
     public func next(onOrAfter today: GregorianDay, _ days: MadarCalendarDays) -> GregorianDay? {
-        if repeats == .none, let year {
-            guard (1...9999).contains(year), (1...12).contains(month), (1...(calendar == .hijri ? 30 : 31)).contains(day) else { return nil }
-            var source = Calendar(identifier: calendar == .hijri ? .islamicUmmAlQura : .gregorian)
-            source.timeZone = days.zone
-            guard let first = source.date(from: DateComponents(year: year, month: month, day: 1, hour: 12)),
-                  let length = source.range(of: .day, in: .month, for: first)?.count,
-                  let target = source.date(from: DateComponents(year: year, month: month, day: min(day, length), hour: 12)) else { return nil }
-            var civil = Calendar(identifier: .gregorian); civil.timeZone = days.zone
-            let offset = calendar == .hijri && days.source == .sighting ? min(2, max(-2, days.offset)) : 0
-            guard let corrected = civil.date(byAdding: .day, value: -offset, to: target) else { return nil }
-            let parts = civil.dateComponents([.year, .month, .day], from: corrected)
-            guard let y = parts.year, let m = parts.month, let d = parts.day,
-                  let result = try? GregorianDay(year: y, month: m, day: d), result >= today,
-                  matches(result, days) else { return nil }
+        if repeats == .none, year != nil {
+            guard let result = oneTimeOccurrence(days), result >= today else { return nil }
             return result
         }
         return (0...400).lazy.map { today.adding(days: $0) }.first { matches($0, days) }
+    }
+    private func oneTimeOccurrence(_ days: MadarCalendarDays) -> GregorianDay? {
+        guard repeats == .none, let year else { return nil }
+        guard (1...9999).contains(year), (1...12).contains(month), (1...(calendar == .hijri ? 30 : 31)).contains(day) else { return nil }
+        var source = Calendar(identifier: calendar == .hijri ? .islamicUmmAlQura : .gregorian)
+        source.timeZone = days.zone
+        guard let first = source.date(from: DateComponents(year: year, month: month, day: 1, hour: 12)),
+              let length = source.range(of: .day, in: .month, for: first)?.count,
+              let target = source.date(from: DateComponents(year: year, month: month, day: min(day, length), hour: 12)) else { return nil }
+        var civil = Calendar(identifier: .gregorian); civil.timeZone = days.zone
+        let offset = calendar == .hijri && days.source == .sighting ? min(2, max(-2, days.offset)) : 0
+        guard let corrected = civil.date(byAdding: .day, value: -offset, to: target) else { return nil }
+        let parts = civil.dateComponents([.year, .month, .day], from: corrected)
+        guard let y = parts.year, let m = parts.month, let d = parts.day,
+              let result = try? GregorianDay(year: y, month: m, day: d), matches(result, days) else { return nil }
+        return result
     }
     public func previous(before day: GregorianDay, _ days: MadarCalendarDays) -> GregorianDay? {
         guard repeats != .none else { return nil }
@@ -145,4 +150,23 @@ public struct MadarUpcomingRule: Equatable, Sendable {
         let span = MadarCalendarDays.distance(from: start, to: next), done = MadarCalendarDays.distance(from: start, to: today)
         return (next, MadarCalendarDays.distance(from: today, to: next), span > 0 ? min(1, max(0, Double(done) / Double(span))) : 1)
     }
+    /// Owner, 25 Oct: a one-off may continue counting after its occurrence.
+    /// Recurring rules retain the existing countdown to their next occurrence.
+    public func counter(today: GregorianDay, _ days: MadarCalendarDays) -> MadarUpcomingCounter? {
+        if let ring = ring(today: today, days) {
+            return .init(occurrence: ring.next, daysLeft: ring.daysLeft, elapsedDays: nil, closed: ring.closed)
+        }
+        guard countUpAfter, let occurrence = oneTimeOccurrence(days), occurrence < today else { return nil }
+        return .init(occurrence: occurrence, daysLeft: 0, elapsedDays: MadarCalendarDays.distance(from: occurrence, to: today), closed: 1)
+    }
+
+}
+
+
+public struct MadarUpcomingCounter: Equatable, Sendable {
+    public let occurrence: GregorianDay
+    public let daysLeft: Int
+    /// nil before/on the occurrence; whole Madar days since it afterwards.
+    public let elapsedDays: Int?
+    public let closed: Double
 }

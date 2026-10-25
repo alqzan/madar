@@ -1,6 +1,6 @@
 import Foundation
 import SwiftData
-// Generated from Specification/data-dictionary.json (schema V10). UUID foreign keys intentionally avoid ownership relationships.
+// Generated from Specification/data-dictionary.json (schema V11). UUID foreign keys intentionally avoid ownership relationships.
 @MainActor public protocol MadarRecordModel: PersistentModel { var id: UUID { get set }; func record() throws -> DataRecord; func apply(_ record: DataRecord) throws }
 @Model public final class Setting {
     public var id: UUID = UUID()
@@ -218,6 +218,7 @@ extension Trip: MadarRecordModel {
     public var day: Int = 1
     public var repeats: String = "none"
     public var countFromDayKey: String = ""
+    public var countUpAfter: Bool = false
     public init() {}
 }
 extension UpcomingDay: MadarRecordModel {
@@ -238,6 +239,7 @@ extension UpcomingDay: MadarRecordModel {
             "day": JSONValue.encode(day),
             "repeats": JSONValue.encode(repeats),
             "countFromDayKey": JSONValue.encode(countFromDayKey),
+            "countUpAfter": JSONValue.encode(countUpAfter),
         ])
     }
     public func apply(_ record: DataRecord) throws {
@@ -256,6 +258,7 @@ extension UpcomingDay: MadarRecordModel {
         day = try record.decode("day", as: Int.self)
         repeats = try record.decode("repeats", as: String.self)
         countFromDayKey = try record.decode("countFromDayKey", as: String.self)
+        countUpAfter = try record.fields["countUpAfter"]?.decode(Bool.self) ?? false
     }
 }
 @Model public final class ImportBatch {

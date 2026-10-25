@@ -16,6 +16,9 @@ struct BahwMatter: Identifiable, Equatable {
     let hijri: Bool
     let tone: String
     let rowID: UUID?
+    /// Whole days since a passed one-time day that keeps counting (`countUpAfter`).
+    var elapsedDays: Int? = nil
+    var count: Int { elapsedDays ?? daysLeft }
 }
 /// The day strip: from the `core.dayStart` boundary to the next one, with the prayers as segment marks.
 struct BahwDayModel: Equatable {
@@ -38,9 +41,9 @@ extension AppBahwService {
         if let rows = try? ModelContext(session.container).fetch(FetchDescriptor<UpcomingDay>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil })) {
             for row in rows {
                 let rule = MadarUpcomingRule(calendar: row.calendar == "hijri" ? .hijri : .gregorian, year: row.year, month: row.month, day: row.day,
-                                             repeats: MadarUpcomingRule.Repeats(rawValue: row.repeats) ?? .yearly, countFrom: try? GregorianDay(row.countFromDayKey))
-                if let ring = rule.ring(today: day, days) {
-                    items.append(.init(id: row.id.uuidString, title: row.title, kind: .mine, day: ring.next, daysLeft: ring.daysLeft, closed: ring.closed, hijri: rule.calendar == .hijri, tone: "sepia", rowID: row.id))
+                                             repeats: MadarUpcomingRule.Repeats(rawValue: row.repeats) ?? .yearly, countFrom: try? GregorianDay(row.countFromDayKey), countUpAfter: row.countUpAfter)
+                if let counter = rule.counter(today: day, days) {
+                    items.append(.init(id: row.id.uuidString, title: row.title, kind: .mine, day: counter.occurrence, daysLeft: counter.daysLeft, closed: counter.closed, hijri: rule.calendar == .hijri, tone: "sepia", rowID: row.id, elapsedDays: counter.elapsedDays))
                 }
             }
         }
@@ -55,7 +58,7 @@ extension AppBahwService {
         if let ring = end.ring(today: day, days) {
             items.append(.init(id: "year-end", title: "نهاية " + digits.string(ring.next.year) + "م", kind: .year, day: ring.next, daysLeft: ring.daysLeft, closed: ring.closed, hijri: false, tone: "gregorianInk", rowID: nil))
         }
-        return items.sorted { $0.daysLeft == $1.daysLeft ? $0.title < $1.title : $0.daysLeft < $1.daysLeft }
+        return items.sorted { Self.nearestFirst(($0.elapsedDays, $0.daysLeft, $0.title), ($1.elapsedDays, $1.daysLeft, $1.title)) }
     }
     func dayModel() -> BahwDayModel? {
         let place = session.activePlace, boundary = DayBoundary(rawValue: session.string("core.dayStart")) ?? .fajr
@@ -277,8 +280,8 @@ struct BahwYearView: View {
     @ViewBuilder private func matterRow(_ item: BahwMatter) -> some View {
         let content = HStack(alignment: .center, spacing: 14) {
             VStack(spacing: 0) {
-                Text(digits.string(item.daysLeft)).font(.custom("thmanyahserifdisplay-Bold", size: 38, relativeTo: .largeTitle)).foregroundStyle(lobby.color(item.tone)).lineLimit(1).minimumScaleFactor(0.6)
-                Text(item.daysLeft == 0 ? "اليوم" : service.dayCount(item.daysLeft)).font(MadarTypography.caption()).foregroundStyle(lobby.secondaryInk)
+                Text(digits.string(item.count)).font(.custom("thmanyahserifdisplay-Bold", size: 38, relativeTo: .largeTitle)).foregroundStyle(lobby.color(item.tone)).lineLimit(1).minimumScaleFactor(0.6)
+                Text(item.elapsedDays.map(service.sinceCount) ?? (item.daysLeft == 0 ? "اليوم" : service.dayCount(item.daysLeft))).font(MadarTypography.caption()).foregroundStyle(lobby.secondaryInk)
             }.frame(width: 70)
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 6) {
@@ -286,7 +289,7 @@ struct BahwYearView: View {
                     Text(item.title).font(MadarTypography.section()).lineLimit(1)
                 }
                 MadarDateLabel(session.dateLabels(item.day)).foregroundStyle(lobby.secondaryInk)
-                if let approximation = service.approx(item.daysLeft) { Text(approximation).font(MadarTypography.fine()).foregroundStyle(lobby.secondaryInk) }
+                if let approximation = service.approx(item.count) { Text((item.elapsedDays == nil ? "" : "مضى ") + approximation).font(MadarTypography.fine()).foregroundStyle(lobby.secondaryInk) }
                 GeometryReader { geometry in
                     ZStack(alignment: .leading) {
                         Capsule().fill(lobby.line).frame(height: 5)
@@ -324,6 +327,7 @@ struct BahwDayDraft: Identifiable {
     var repeats = "yearly"
     var year: Int
     var countFrom: String?
+    var countUpAfter = false
     @MainActor init(service: AppBahwService) {
         id = UUID(); existing = false
         let today = service.today
@@ -335,7 +339,7 @@ struct BahwDayDraft: Identifiable {
         self.id = id; existing = true; title = matter.title
         let row = try? ModelContext(service.session.container).fetch(FetchDescriptor<UpcomingDay>()).first { $0.id == id }
         hijri = row?.calendar == "hijri"; month = row?.month ?? 1; day = row?.day ?? 1; repeats = row?.repeats ?? "yearly"
-        countFrom = row?.countFromDayKey
+        countFrom = row?.countFromDayKey; countUpAfter = row?.countUpAfter ?? false
         year = row?.year ?? (hijri ? service.calendarDays.hijri(service.today).year : service.today.year)
     }
 }
@@ -380,6 +384,16 @@ struct BahwDaySheet: View {
                             }
                         }
                     }
+                    if draft.repeats == "none" {
+                        // Owner, 25 Oct: a one-time day may keep counting the days since it.
+                        Toggle(isOn: $draft.countUpAfter) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("واصل العدّ بعد الموعد").font(MadarTypography.body())
+                                Text(draft.countUpAfter ? "يبقى بعد يومه ويعدّ: مضى كذا يومًا" : "يختفي بعد يومه").font(MadarTypography.caption()).foregroundStyle(lobby.secondaryInk)
+                            }
+                        }.padding(14).background(lobby.surface, in: .rect(cornerRadius: 16)).overlay { RoundedRectangle(cornerRadius: 16).stroke(lobby.line) }
+                            .accessibilityIdentifier("bahw-day-count-up")
+                    }
                     if let next = previewOccurrence { MadarDateLabel(session.dateLabels(next)).accessibilityIdentifier("bahw-day-date-preview") }
                     Text("يُحسب الموعد من القاعدة كل مرة، وإن لم يكن في الشهر هذا اليوم فآخر يوم فيه.").font(MadarTypography.caption()).foregroundStyle(lobby.secondaryInk)
                     if let failure { Text(failure).font(MadarTypography.caption()).foregroundStyle(lobby.ink) }
@@ -403,14 +417,14 @@ struct BahwDaySheet: View {
     private var previewOccurrence: GregorianDay? {
         let service = AppBahwService(session: session)
         let rule = MadarUpcomingRule(calendar: draft.hijri ? .hijri : .gregorian, year: draft.year, month: draft.month, day: draft.day,
-                                     repeats: MadarUpcomingRule.Repeats(rawValue: draft.repeats) ?? .yearly)
-        return rule.ring(today: service.today, service.calendarDays)?.next
+                                     repeats: MadarUpcomingRule.Repeats(rawValue: draft.repeats) ?? .yearly, countUpAfter: draft.repeats == "none" && draft.countUpAfter)
+        return rule.counter(today: service.today, service.calendarDays)?.occurrence
     }
     private func save() {
         let today = AppBahwService(session: session).today
         var payload: [String: MadarCore.JSONValue] = ["id": .string(draft.id.uuidString), "title": .string(draft.title), "calendar": .string(draft.hijri ? "hijri" : "greg"),
                                             "month": .number(Double(draft.month)), "day": .number(Double(draft.day)), "repeats": .string(draft.repeats), "countFromDayKey": .string(draft.countFrom.flatMap { $0.isEmpty ? nil : $0 } ?? today.description)]
-        if draft.repeats == "none" { payload["year"] = .number(Double(draft.year)) }
+        if draft.repeats == "none" { payload["year"] = .number(Double(draft.year)); payload["countUpAfter"] = .bool(draft.countUpAfter) }
         Task {
             do { try await session.executeDiaryCommand("bahw.saveUpcomingDay", payload: payload); dismiss() }
             catch { failure = "لم يُحفظ اليوم. " + error.localizedDescription }

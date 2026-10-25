@@ -262,7 +262,7 @@ import Testing
     @Test func test_M0S1_RA4_originalV1ArchiveMapsOnlyAfterAuthentication() throws {
         let bytes = try Data(contentsOf:resources.appendingPathComponent("source-v1.madarbackup"))
         let backup = try BackupCodec.validate(bytes,passphrase:"legacy fixture password")
-        #expect(MadarSchema.version == 10)
+        #expect(MadarSchema.version == 11)
         #expect(backup.records.contains { $0.model == "MoneyTransaction" })
         #expect(!backup.records.contains { $0.model == "Transaction" })
         let expected = try expectedRows().filter { MadarSchema.syncedNames.contains($0.model) }
@@ -285,7 +285,7 @@ import Testing
     @Test func test_M0S1_RA4_originalSQLiteIsAdoptedWithoutLosingAnyRow() throws {
         let base = try fixtureDirectory(); defer { try? FileManager.default.removeItem(at:base) }
         let managed = try ManagedDataStore.adoptLegacy(from:base.appendingPathComponent("Flat"),at:base.appendingPathComponent("Managed"))
-        #expect(MadarSchema.version == 10)
+        #expect(MadarSchema.version == 11)
         #expect(try RecordFingerprint.hash(RecordBridge.all(managed.container.mainContext,syncedOnly:false)) == RecordFingerprint.hash(expectedRows()))
         #expect(try managed.container.mainContext.fetchCount(FetchDescriptor<DeviceSetting>()) == 2)
         #expect(try managed.container.mainContext.fetchCount(FetchDescriptor<CommandReceipt>()) == 1)
@@ -372,7 +372,7 @@ import Testing
         let upgraded = try ManagedDataStore(root: root)
         #expect(upgraded.binding.generationID != oldID)
         #expect(try stableGenerationHashes(generation) == sourceHash)
-        #expect(try MadarContainerFactory.storeVersionForAdoption(at: upgraded.binding.syncedDirectory) == 10)
+        #expect(try MadarContainerFactory.storeVersionForAdoption(at: upgraded.binding.syncedDirectory) == 11)
         let context = upgraded.container.mainContext
         let entry = try #require(context.fetch(FetchDescriptor<Entry>()).first)
         #expect(entry.dayKey == "2025-07-14" && entry.text == "synthetic Day One memory" && entry.source == "dayOne")
@@ -425,7 +425,7 @@ import Testing
         let upgraded = try ManagedDataStore(root: root)
         #expect(upgraded.binding.generationID != oldID)
         #expect(try stableGenerationHashes(generation) == sourceHash)
-        #expect(try MadarContainerFactory.storeVersionForAdoption(at: upgraded.binding.syncedDirectory) == 10)
+        #expect(try MadarContainerFactory.storeVersionForAdoption(at: upgraded.binding.syncedDirectory) == 11)
 
         let context = upgraded.container.mainContext
         let record = try #require(context.fetch(FetchDescriptor<Reconciliation>()).first { $0.id == reconciliationID })
@@ -479,7 +479,7 @@ import Testing
         let upgraded = try ManagedDataStore(root: root)
         #expect(upgraded.binding.generationID != oldID)
         #expect(try stableGenerationHashes(generation) == sourceHash)
-        #expect(try MadarContainerFactory.storeVersionForAdoption(at: upgraded.binding.syncedDirectory) == 10)
+        #expect(try MadarContainerFactory.storeVersionForAdoption(at: upgraded.binding.syncedDirectory) == 11)
 
         let context = upgraded.container.mainContext
         let category = try #require(context.fetch(FetchDescriptor<MadarData.Category>()).first { $0.id == categoryID })
@@ -494,6 +494,61 @@ import Testing
         let reopened = try ManagedDataStore(root: root)
         #expect(reopened.binding.generationID == upgraded.binding.generationID)
         #expect(try reopened.container.mainContext.fetch(FetchDescriptor<MadarData.Category>()).first { $0.id == categoryID }?.preferredCardID == nil)
+    }
+
+    /// Owner-approved count-up field defaults false; the source V10 generation is immutable.
+    @Test func schemaV10UpgradeDefaultsCountUpAndPreservesDatesTombstonesAndReopen() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("MadarV11-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let oldID = UUID(), generation = root.appendingPathComponent("Generations/\(oldID.uuidString)")
+        try FileManager.default.createDirectory(at: generation, withIntermediateDirectories: true)
+        let liveID = UUID(), deadID = UUID(), stamp = Date(timeIntervalSince1970: 1_797_000_000)
+        var before: [DataRecord] = []
+        do {
+            let old = try ModelContainer(for: MadarSchemaV10.schema, configurations: [
+                ModelConfiguration("synced", schema: Schema(MadarSchemaV10.syncedTypes), url: generation.appendingPathComponent("Madar.store"), cloudKitDatabase: .none),
+                ModelConfiguration("deviceOnly", schema: Schema(MadarSchemaV10.deviceTypes), url: root.appendingPathComponent("Device.store"), cloudKitDatabase: .none)])
+            old.mainContext.autosaveEnabled = false
+            for id in [liveID, deadID] {
+                let row = MadarFrozenUpcomingDayV10.UpcomingDay()
+                row.id = id; row.title = id == liveID ? "موعد محفوظ" : "موعد محذوف"; row.calendar = "greg"
+                row.year = 2030; row.month = 11; row.day = 19; row.repeats = "none"; row.countFromDayKey = "2026-10-25"
+                row.createdAt = stamp; row.updatedAt = stamp; row.writerID = "synthetic-v10"
+                if id == deadID { row.deletedAt = stamp; row.deletionBarrierAt = stamp }
+                old.mainContext.insert(row)
+                let shape = UpcomingDay(); shape.id = row.id; shape.title = row.title; shape.calendar = row.calendar
+                shape.year = row.year; shape.month = row.month; shape.day = row.day; shape.repeats = row.repeats; shape.countFromDayKey = row.countFromDayKey
+                shape.createdAt = stamp; shape.updatedAt = stamp; shape.writerID = row.writerID
+                shape.deletedAt = row.deletedAt; shape.deletionBarrierAt = row.deletionBarrierAt
+                var record = try shape.record(); record.fields.removeValue(forKey: "countUpAfter"); before.append(record)
+            }
+            try old.mainContext.save()
+        }
+        try DurableFiles.encode(10, to: generation.appendingPathComponent("SchemaVersion.json"))
+        try DurableFiles.encode(1, to: root.appendingPathComponent("DeviceSchemaVersion.json"))
+        try DurableFiles.encode(GenerationReady(version: 1, generationID: oldID, recordsHash: RecordFingerprint.hash(before), createdAt: stamp), to: generation.appendingPathComponent("GenerationReady.json"))
+        try DurableFiles.encode(ManagedPointer(version: 1, generationID: oldID, previousGenerationID: nil, accountHash: nil, cloudKitContainerIdentifier: nil), to: root.appendingPathComponent("ActiveGeneration.json"))
+        let sourceHash = try stableGenerationHashes(generation)
+        let upgraded = try ManagedDataStore(root: root)
+        #expect(upgraded.binding.generationID != oldID)
+        #expect(try stableGenerationHashes(generation) == sourceHash)
+        #expect(try MadarContainerFactory.storeVersionForAdoption(at: upgraded.binding.syncedDirectory) == 11)
+        let rows = try upgraded.container.mainContext.fetch(FetchDescriptor<UpcomingDay>())
+        #expect(rows.count == 2 && rows.allSatisfy { !$0.countUpAfter })
+        #expect(rows.first { $0.id == liveID }?.title == "موعد محفوظ")
+        #expect(rows.first { $0.id == deadID }?.deletionBarrierAt == stamp)
+        let expected = try SchemaCompatibility.currentRecords(before, from: 10)
+        #expect(expected.allSatisfy { $0.fields["countUpAfter"] == .bool(false) })
+        #expect(try RecordFingerprint.hash(RecordBridge.all(upgraded.container.mainContext)) == RecordFingerprint.hash(expected))
+        let reopened = try ManagedDataStore(root: root)
+        #expect(reopened.binding.generationID == upgraded.binding.generationID)
+        let live = try #require(reopened.container.mainContext.fetch(FetchDescriptor<UpcomingDay>()).first { $0.id == liveID })
+        #expect(live.year == 2030 && live.month == 11 && live.day == 19 && live.countFromDayKey == "2026-10-25")
+        live.countUpAfter = true; try reopened.container.mainContext.save()
+        let sealed = try BackupCodec.export(records: RecordBridge.all(reopened.container.mainContext), passphrase: "synthetic count-up password")
+        let checked = try BackupCodec.validate(sealed, passphrase: "synthetic count-up password")
+        #expect(checked.records.first { $0.id == liveID }?.fields["countUpAfter"] == .bool(true))
+        #expect(try stableGenerationHashes(generation) == sourceHash)
     }
 
     @Test func schemaV2BackupValidationAndMergeRetainsPrayerLogWithoutFridayKind() async throws {

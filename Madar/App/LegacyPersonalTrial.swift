@@ -39,6 +39,7 @@ import MadarCommands
         for source in plan.days where !dayIDs.contains(source.id) {
             let row = UpcomingDay(); row.id = source.id; row.title = source.title; row.calendar = "greg"
             row.year = source.day.year; row.month = source.day.month; row.day = source.day.day; row.repeats = "none"
+            row.countUpAfter = source.countUpAfter
             // Source has no ring-count baseline. Only the new display begins now;
             // the original event date and archived source stay unchanged.
             row.countFromDayKey = observedDay.description
@@ -47,7 +48,15 @@ import MadarCommands
         }
         for source in plan.archives {
             let id = StableIdentity.uuid(for: "myDream:ImportLink:\(source.model):\(source.sourceID)")
-            guard !linkIDs.contains(id) else { continue }
+            if linkIDs.contains(id) {
+                // Imports before V11 archived count-up events without a day; link the day this run created.
+                if source.model == "CountdownEvent", let target = plan.days.first(where: { $0.sourceID == source.sourceID }),
+                   let link = try context.fetch(FetchDescriptor<ImportLink>()).first(where: { $0.id == id }), link.targetID == nil {
+                    link.targetModel = "UpcomingDay"; link.targetID = target.id; link.updatedAt = now; link.writerID = writer
+                    counts["links.retargeted", default: 0] += 1
+                }
+                continue
+            }
             let row = ImportLink(); row.id = id; row.source = "myDream"; row.sourceModel = source.model
             row.sourceID = source.sourceID; row.unmappedJSON = source.json
             if let target = plan.letters.first(where: { $0.sourceID == source.sourceID }), source.model == "FutureLetter" {
