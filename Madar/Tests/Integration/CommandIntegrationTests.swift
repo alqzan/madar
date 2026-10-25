@@ -75,7 +75,7 @@ import MadarData
         let (container, first, directory) = try fixture()
         let otherContainer = try MadarContainerFactory.makeLocal(at: directory)
         let second = CommandBus(adapter: DurableCommandAdapter(container: otherContainer, lockDirectory: directory, transactionClock: { $0 }))
-        let command = CommandEnvelope(name: "settings.set", payload: .object(["settings": .object(["core.firstCalendar": .string("gregorian")])]))
+        let command = CommandEnvelope(name: "settings.set", payload: .object(["settings": .object(["core.firstCalendar": .string("hijri")])]))
         async let a = first.execute(command)
         async let b = second.execute(command)
         _ = try await (a, b)
@@ -132,7 +132,7 @@ import MadarData
             active = replacement
             lease.release()
         }
-        let command = CommandEnvelope(name: "settings.set", payload: .object(["settings": .object(["core.firstCalendar": .string("gregorian")])]))
+        let command = CommandEnvelope(name: "settings.set", payload: .object(["settings": .object(["core.firstCalendar": .string("hijri")])]))
         let outcome = try await bus.execute(command)
         try await transition.value
         XCTAssertEqual(outcome.status, .applied)

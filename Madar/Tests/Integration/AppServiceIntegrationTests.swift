@@ -133,7 +133,7 @@ import MadarCore
         let managed = try ManagedDataStore(root: root.appending(path: "Data"), commandLockURL: root.appending(path: "CommandBus.lock"))
         let session = try AppSession(container: managed.container, managedStore: managed, groupDirectory: root)
         let backup = AppBackupService(session: session, store: managed, backupDirectory: root.appending(path: "Backups"), keyStore: MemoryBackupKeyStore())
-        try await session.applySettingsAndWait(["core.firstCalendar": .string("gregorian"), "core.faceIDLock": .string("app")])
+        try await session.applySettingsAndWait(["core.firstCalendar": .string("hijri"), "core.faceIDLock": .string("app")])
         ExportPrivacyTestHarness.install(on: session)
         let file = try await backup.exportPlain(progress: { _ in })
         let validated = try PortableExportCodec.validate(Data(contentsOf: file))
@@ -143,8 +143,8 @@ import MadarCore
         let status = try await backup.status()
         XCTAssertFalse(status.keyConfigured); XCTAssertEqual(status.manualCount, 0)
         XCTAssertFalse(session.maintenanceInProgress)
-        try await session.applySettingsAndWait(["core.firstCalendar": .string("hijri")])
-        XCTAssertEqual(session.string("core.firstCalendar"), "hijri")
+        try await session.applySettingsAndWait(["core.firstCalendar": .string("gregorian")])
+        XCTAssertEqual(session.string("core.firstCalendar"), "gregorian")
     }
 
     func testStalePreviewDoesNotChangeGenerationOrCreateSafetyBackup() async throws {
@@ -155,7 +155,7 @@ import MadarCore
         ExportPrivacyTestHarness.install(on: session)
         let file = try await backup.export(passphrase: "test-only-passphrase", progress: { _ in })
         let preview = try await backup.previewRestore(file: file, passphrase: "test-only-passphrase", progress: { _ in })
-        try await session.applySettingsAndWait(["core.firstCalendar": .string("gregorian")])
+        try await session.applySettingsAndWait(["core.firstCalendar": .string("hijri")])
         let originalGeneration = managed.binding.generationID
         do { _ = try await backup.restore(previewID: preview.id, mode: .replace, progress: { _ in }); XCTFail("stale preview accepted") }
         catch { XCTAssertEqual(error as? BackupOperationError, .stalePreview) }

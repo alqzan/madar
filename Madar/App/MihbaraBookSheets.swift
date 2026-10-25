@@ -430,11 +430,12 @@ struct MihbaraBookCard: View {
                         }
                     }
                     if book.shelf != "reading" { Button("ضعه على الطاولة") { moveToReading() }.buttonStyle(MadarPrimaryButton()).accessibilityIdentifier("mihbara-put-on-table") }
-                    Text("وصلت إلى").font(MadarTypography.cardTitle())
-                    HStack { Text("صفحة"); TextField("رقم الصفحة", text: $page).keyboardType(.numberPad).padding(14).background(theme.surface, in: .rect(cornerRadius: 12)).accessibilityIdentifier("mihbara-book-page"); if let total = book.pages { Text("من " + digits.string(total)) } }.font(MadarTypography.body())
-                    Text("هذا يحفظ موضعك. جلسة القراءة تُحسب من وقت نشاطك في القارئ.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                    Toggle("أنهيت الكتاب", isOn: $finish).font(MadarTypography.section()).accessibilityIdentifier("mihbara-book-finished")
-                    Button("احفظ موضعي") { savePosition() }.buttonStyle(MadarPrimaryButton()).disabled(saving).accessibilityIdentifier("mihbara-book-save-position")
+                    Label("ملف الكتاب غير متاح للقراءة على هذا الجهاز.", systemImage: "doc.badge.ellipsis")
+                        .font(MadarTypography.body()).accessibilityIdentifier("mihbara-book-file-unavailable")
+                    Text("يُحفظ موضع الكتاب الإلكتروني من داخل القارئ.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    if book.shelf != "finished" {
+                        Button("أنهيت الكتاب") { move("finished") }.buttonStyle(MadarPrimaryButton()).disabled(saving).accessibilityIdentifier("mihbara-book-mark-finished")
+                    }
                     Button("أعده إلى أبي أقرأها") { move("want") }.frame(minHeight: 44).accessibilityIdentifier("mihbara-book-to-want")
                 }
             }.padding(22)

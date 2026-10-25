@@ -181,6 +181,15 @@ struct DiaryLetterComposer: View {
     @State private var failure: String?
     @State private var saving = false
     private var service: AppDiaryService { .init(app: app) }
+    private var pickerOffset: Int { choice?.trigger == .hijriDate ? service.letterPickerOffset : 0 }
+    private var pickerDate: Binding<Date> {
+        Binding(get: { service.letterPickerDate(date, by: pickerOffset) },
+                set: { date = service.letterPickerDate($0, by: -pickerOffset) })
+    }
+    private var firstDate: Date {
+        let today = (try? service.currentDay()) ?? GregorianDay.containing(app.prayerNow(), in: app.activePlace.timeZone)
+        return service.letterPickerDate(today.adding(days: 1).date(in: app.activePlace.timeZone), by: pickerOffset)
+    }
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -196,8 +205,10 @@ struct DiaryLetterComposer: View {
                         }.buttonStyle(.plain).accessibilityIdentifier("diary-letter-trigger-" + item.id).accessibilityAddTraits(choice == item ? .isSelected : [])
                     }
                     if choice?.trigger == .date || choice?.trigger == .hijriDate {
-                        DatePicker("اليوم", selection: $date, in: Date().addingTimeInterval(86_400)..., displayedComponents: .date)
-                            .environment(\.calendar, Calendar(identifier: choice?.trigger == .hijriDate ? .islamicUmmAlQura : .gregorian)).font(DiaryType.writing)
+                        DatePicker("اليوم", selection: pickerDate, in: firstDate..., displayedComponents: .date)
+                            .environment(\.calendar, service.letterPickerCalendar(hijri: choice?.trigger == .hijriDate))
+                            .environment(\.timeZone, app.activePlace.timeZone).font(DiaryType.writing)
+                            .accessibilityIdentifier("diary-letter-date")
                         MadarDateLabel(app.dateLabels(GregorianDay.containing(date, in: app.activePlace.timeZone)))
                     }
                     Text("لا يدخل نصّها البحث ولا الودجات ولا الإشعارات قبل أن تُفتح.").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
@@ -208,8 +219,11 @@ struct DiaryLetterComposer: View {
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) { Button("إلغاء") { dismiss() } }
                     ToolbarItem(placement: .confirmationAction) {
-                        Button("اختمها") { Task { guard let choice else { return }; saving = true; defer { saving = false }
-                            do { try await service.sealLetter(text, choice: choice, date: date); dismiss() } catch { failure = error.localizedDescription } } }
+                        Button("اختمها") {
+                            guard !saving, let choice else { return }; saving = true
+                            Task { defer { saving = false }
+                                do { try await service.sealLetter(text, choice: choice, date: date); dismiss() } catch { failure = error.localizedDescription } }
+                        }
                             .disabled(saving || choice == nil || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty).accessibilityIdentifier("diary-letter-seal")
                     }
                 }.toolbarBackground(theme.background, for: .navigationBar).tint(theme.accent)

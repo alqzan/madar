@@ -324,7 +324,7 @@ import WidgetKit
             ("الصور والصوت والملفات", ["Media"]),
             ("المال", ["Account", "Card", "Statement", "CashbackEntry", "MoneyTransaction", "Allocation", "Reconciliation", "BankMessage", "Cycle", "CyclePolicy", "Envelope", "EnvelopePlan", "Obligation", "InstallmentItem", "Category", "CategoryLimit", "MerchantRule", "ZakatProfile"]),
             ("المحبرة", ["Book", "ReadingSession", "Highlight", "NotebookNote", "HadithProgress", "UserWord"]),
-            ("العادات", ["Habit", "HabitPolicy", "HabitPause", "HabitLog"]),
+            ("العادات", ["Habit", "HabitPolicy", "HabitPause", "HabitLog", "HabitEvent"]),
             ("السفر والأيام القادمة", ["Trip", "UpcomingDay"]),
             ("الودجات", ["WidgetConfig"]),
             ("سجل النقل", ["ImportBatch", "ImportLink"])

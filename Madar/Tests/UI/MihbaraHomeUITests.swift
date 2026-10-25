@@ -1,6 +1,17 @@
 import XCTest
 
 @MainActor final class MihbaraHomeUITests: XCTestCase {
+    func testUnavailableFileExplainsItsStateWithoutOfferingAPaperPositionSave() throws {
+        continueAfterFailure = false
+        let app = app("missingFile"); app.launch(); open(app)
+        let read = app.buttons["mihbara-book-continue"]; reach(app, read); read.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["mihbara-book-file-unavailable"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.textFields["mihbara-book-page"].exists)
+        XCTAssertFalse(app.buttons["mihbara-book-save-position"].exists)
+        shot(app, "Final-missing-book-L")
+        app.buttons["mihbara-book-mark-finished"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["mihbara-book-file-unavailable"].waitForNonExistence(timeout: 10))
+    }
     private func app(_ fixture: String, epub: Data? = nil, paperIndex: Bool = false, storeID: String? = nil) -> XCUIApplication {
         let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID":storeID ?? UUID().uuidString,"MADAR_UI_MIHBARA_FIXTURE":fixture,"MADAR_UI_NOW":"2026-10-17T12:00:00+03:00","MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light"]
         if let epub { app.launchEnvironment["MADAR_UI_MIHBARA_EPUB_BASE64"] = epub.base64EncodedString() }

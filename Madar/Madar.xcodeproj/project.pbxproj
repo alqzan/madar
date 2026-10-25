@@ -273,6 +273,7 @@
 		9FC6B026A10D39B53B8CB17C /* DiaryPhotoLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5219589675789A4DFFDA07ED /* DiaryPhotoLibrary.swift */; };
 		A01A8ABA6A4D23426DE586B4 /* AppBackupBackgroundTasks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CBD6993AEFD01597EAFD5EB /* AppBackupBackgroundTasks.swift */; };
 		A04F5C188C09BF1D8C769F7D /* SyncSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AAF9DA5CBAEE9C391B62E8A /* SyncSettingsView.swift */; };
+		A0561536CAB91FAF9E90D622 /* HabitRhythmTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41D68577D1E6FA5223FD92FE /* HabitRhythmTests.swift */; };
 		A0D9A31CE8D0BAAC37474B40 /* AppQuranService+Qiyam.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65E4E79D7D71F6C863BFFA03 /* AppQuranService+Qiyam.swift */; };
 		A11A36D051873A05917A2712 /* PrayerStreaksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5BEB0146B6B405B7B607BD4 /* PrayerStreaksView.swift */; };
 		A163C7A38F3EFF65E9B4F6F3 /* HabitsOwnerTrialUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA530E4BA116CCB75DEC74FA /* HabitsOwnerTrialUITests.swift */; };
@@ -548,6 +549,7 @@
 		3F2989DAFF327646B3C614EA /* DiaryTodayUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryTodayUITests.swift; sourceTree = "<group>"; };
 		3FF6E4771F76AE9E6020594D /* MihbaraHomeUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MihbaraHomeUITests.swift; sourceTree = "<group>"; };
 		417D810C18B9D81E74D00117 /* nawawi40.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = nawawi40.json; sourceTree = "<group>"; };
+		41D68577D1E6FA5223FD92FE /* HabitRhythmTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HabitRhythmTests.swift; sourceTree = "<group>"; };
 		420D1F4F6AE179838E2A03D7 /* MoneyLogModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyLogModels.swift; sourceTree = "<group>"; };
 		422D5DF771CC4FB56EC5F357 /* HabitsUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HabitsUITests.swift; sourceTree = "<group>"; };
 		42DA4C49434D107B02E1810F /* DiaryMarginUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryMarginUITests.swift; sourceTree = "<group>"; };
@@ -1357,6 +1359,7 @@
 				9CB01E6837C74E167DE5E222 /* DiaryTravelIntegrationTests.swift */,
 				D469796404360B49B02BC5E1 /* DiaryYearbookIntegrationTests.swift */,
 				1C903CE9D436A9E7A19EEE2C /* ExportPrivacyTests.swift */,
+				41D68577D1E6FA5223FD92FE /* HabitRhythmTests.swift */,
 				07E5B58AA5B0B1DDDE4BDE66 /* LegacyHabitTrialTests.swift */,
 				472B1CBA95C9D6F4CB205E81 /* LegacyMoveNativeWinsTests.swift */,
 				1225DCC15EC207F81AE50852 /* LegacyPersonalTrialTests.swift */,
@@ -1709,6 +1712,7 @@
 				2C9554D2ACAEB6F56BDF9E15 /* DiaryTravelIntegrationTests.swift in Sources */,
 				ACF8D45E7B47DF98E40E506D /* DiaryYearbookIntegrationTests.swift in Sources */,
 				16A45A0199AD6A2B5E9EC744 /* ExportPrivacyTests.swift in Sources */,
+				A0561536CAB91FAF9E90D622 /* HabitRhythmTests.swift in Sources */,
 				52430EB75D09E6A03E8C2296 /* LegacyHabitTrialTests.swift in Sources */,
 				D4427180CF7E563DD2809A57 /* LegacyMoveNativeWinsTests.swift in Sources */,
 				A728D23CC6DFF5D4A5049EA8 /* LegacyPersonalTrialTests.swift in Sources */,

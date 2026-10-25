@@ -48,6 +48,8 @@ struct DiaryProjectEditor: View {
     @State private var intention = ""
     @State private var keyword = ""
     @State private var failure: String?
+    @State private var identity = UUID()
+    @State private var saving = false
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 14) {
@@ -60,10 +62,16 @@ struct DiaryProjectEditor: View {
             }.padding(18).background(theme.background).foregroundStyle(theme.ink)
                 .navigationTitle("مشروع جديد").navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItem(placement: .cancellationAction) { Button("إلغاء") { dismiss() } }
+                    ToolbarItem(placement: .cancellationAction) { Button("إلغاء") { dismiss() }.disabled(saving) }
                     ToolbarItem(placement: .confirmationAction) {
-                        Button("احفظ") { Task { do { try await AppDiaryService(app: app).saveProject(name: name, intention: intention, keyword: keyword.isEmpty ? name : keyword); dismiss() } catch { failure = error.localizedDescription } } }
-                            .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty).accessibilityIdentifier("diary-project-save")
+                        Button("احفظ") {
+                            guard !saving else { return }; saving = true
+                            Task { defer { saving = false }
+                                do { try await AppDiaryService(app: app).saveProject(identity, name: name, intention: intention, keyword: keyword.isEmpty ? name : keyword); dismiss() }
+                                catch { failure = error.localizedDescription }
+                            }
+                        }
+                            .disabled(saving || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty).accessibilityIdentifier("diary-project-save")
                     }
                 }.toolbarBackground(theme.background, for: .navigationBar).tint(theme.accent)
         }

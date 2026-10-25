@@ -9,6 +9,7 @@ import MadarCore
         let root = FileManager.default.temporaryDirectory.appending(path: "DateLabels-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }
         let container = try MadarContainerFactory.makeLocal(at: root), context = ModelContext(container)
+        _ = try SettingsStore(context: context).stage(["core.firstCalendar": .string("hijri"), "core.numerals": .string("arabicIndic")])
         let entry = Entry(); entry.dayKey = "2026-10-09"; entry.text = "يوم محفوظ"; context.insert(entry); try context.save()
         let app = try AppSession(container: container, groupDirectory: root), day = try GregorianDay("2026-10-09")
         app.authorizeProtectedData()

@@ -46,12 +46,18 @@ struct HabitRhythmBand:View {
     /// Each of the last seven days is a step whose height is how much of that day's daily habits was done; the room's
     /// hero already counts today, so the band shows the week of days behind it.
     private var lastSeven:[(day:GregorianDay,share:Double)] {
-        let due = rows.filter { !$0.paused }
-        guard !due.isEmpty else { return [] }
+        Self.dailySteps(summaries: rows.map(\.summary), today: today)
+    }
+    /// Use the rule and exclusions of each historical day, including partial count/duration progress.
+    static func dailySteps(summaries: [HabitSummary], today: GregorianDay) -> [(day: GregorianDay, share: Double)] {
+        guard !summaries.isEmpty else { return [] }
         return (0..<7).reversed().map { back in
             let day = today.adding(days:-back)
-            let done = due.filter { r in r.times.contains { $0.day == day } }.count
-            return (day,Double(done)/Double(due.count))
+            let due = summaries.compactMap { summary in
+                summary.periods.last { $0.rule.frequency == .daily && $0.start <= day && day < $0.end }
+            }.filter { $0.target > 0 }
+            let progress = due.reduce(0.0) { $0 + min(1, max(0, Double($1.value) / Double($1.target))) }
+            return (day, due.isEmpty ? 0 : progress / Double(due.count))
         }
     }
     private var steps:some View {

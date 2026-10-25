@@ -6,6 +6,23 @@ import XCTest
     }
     private func open(_ app:XCUIApplication){let block=app.descendants(matching:.any).matching(identifier:"bahw-block-habits").firstMatch;XCTAssertTrue(block.waitForExistence(timeout:20));let header=app.buttons["bahw-habits-open"]; if header.exists { header.tap() } else { block.tap() };XCTAssertTrue(app.staticTexts["habits-title"].waitForExistence(timeout:10))}
     private func shot(_ app:XCUIApplication,_ name:String){let a=XCTAttachment(screenshot:app.screenshot());a.name=name;a.lifetime = .keepAlways;add(a)}
+    func testPartialDurationIsNotACompleteDayAndPastSaveNamesItsAmount() throws {
+        continueAfterFailure = false
+        let app = app("partialDuration"); open(app)
+        app.buttons["habits-view-all"].tap()
+        let band = app.descendants(matching: .any)["habits-band-daily"]
+        XCTAssertTrue(band.waitForExistence(timeout: 5)); XCTAssertEqual(band.label, "أسبوعك خطوات صغيرة؛ يكفي أن تبدأ")
+        shot(app, "Final-habits-partial-L")
+        let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "قراءة هادئة،")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 5)); row.press(forDuration: 1)
+        app.buttons["فعلتها في يوم سابق"].tap()
+        let save = app.buttons["habit-past-save"]
+        XCTAssertTrue(save.waitForExistence(timeout: 5)); XCTAssertTrue(save.label.contains("١٥"), save.label)
+        XCTAssertTrue(save.label.contains("دقيقة"), save.label); shot(app, "Final-habits-past-amount-L")
+        save.tap(); XCTAssertTrue(save.waitForNonExistence(timeout: 10))
+        XCTAssertTrue(band.waitForExistence(timeout: 5)); XCTAssertEqual(band.label, "أسبوعك خطوات صغيرة؛ يكفي أن تبدأ")
+        shot(app, "Final-habits-past-saved-L")
+    }
     func testEmptyAddCompleteFreezeRestoreAndRelaunch() throws {
         continueAfterFailure=false;let app=app("empty");open(app)
         XCTAssertTrue(app.buttons["habit-first"].exists);shot(app,"M4-V02-empty-L");app.buttons["habit-first"].tap()

@@ -12,7 +12,7 @@ import MadarSnapshots
         defer { try? FileManager.default.removeItem(at: root) }
         let container = try MadarContainerFactory.makeLocal(at: root), app = try AppSession(container: container, groupDirectory: root)
         app.authorizeProtectedData()
-        try await app.applySettingsAndWait(["core.dayStart": .string("midnight"), "notes.widgetContent": .bool(true)])
+        try await app.applySettingsAndWait(["core.dayStart": .string("midnight"), "notes.widgetContent": .bool(true), "core.faceIDLock": .string("none")])
         XCTAssertTrue(app.moneyWidgetPayload(hidden: true, at: app.prayerNow()).rows.isEmpty, "First day has no invented zero balances")
         let now = app.prayerNow(), today = AppBahwService(session: app).today, c = ModelContext(container)
         let account = Account(); account.balanceMinor = 500037; account.balanceAt = now.addingTimeInterval(-86400); c.insert(account)

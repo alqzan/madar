@@ -11,6 +11,7 @@ import MadarCore
         let root = FileManager.default.temporaryDirectory.appending(path: "MoneyCashback-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }
         let container = try MadarContainerFactory.makeLocal(at: root), c = ModelContext(container)
+        _ = try SettingsStore(context: c).stage(["core.firstCalendar": .string("hijri")])
         func at(_ s: String) -> Date { ISO8601DateFormatter().date(from: s + "T12:00:00+03:00")! }
         let owned = Account(); owned.balanceMinor = 1_000_000; owned.balanceAt = at("2026-06-01"); c.insert(owned)
         let other = Account(); other.ownership = "notMine"; c.insert(other)

@@ -96,11 +96,25 @@ extension AppDiaryService {
         let zone = app.activePlace.timeZone
         switch choice.trigger {
         case .date: payload["value"] = .string(GregorianDay.containing(date, in: zone).description)
-        case .hijriDate: payload["value"] = .string(DiaryLetters.hijriKey(HijriCalendar.date(for: date, timeZone: zone)))
+        case .hijriDate: payload["value"] = .string(DiaryLetters.hijriKey(HijriCalendar.date(for: date, timeZone: zone,
+            source: HijriSource(rawValue: app.string("core.hijriSource")) ?? .ummAlQura,
+            sightingOffset: Int(app.number("core.hijriOffset")))))
         default: break
         }
         if let target = choice.target { payload["targetID"] = .string(target.uuidString) }
         try await command("diary.sealLetter", payload)
+    }
+    /// DatePicker uses Umm al-Qura; shift only its displayed date for the owner's sighting correction.
+    var letterPickerOffset: Int {
+        app.string("core.hijriSource") == "sighting" ? min(2, max(-2, Int(app.number("core.hijriOffset")))) : 0
+    }
+    func letterPickerCalendar(hijri: Bool) -> Calendar {
+        var calendar = Calendar(identifier: hijri ? .islamicUmmAlQura : .gregorian)
+        calendar.timeZone = app.activePlace.timeZone
+        return calendar
+    }
+    func letterPickerDate(_ date: Date, by days: Int) -> Date {
+        letterPickerCalendar(hijri: false).date(byAdding: .day, value: days, to: date) ?? date
     }
     /// Opens once and returns the text; reading an opened letter again changes nothing.
     func openLetter(_ id: UUID) async throws -> String {

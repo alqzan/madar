@@ -41,7 +41,7 @@ import MadarMoney
         app.authorizeProtectedData()
         let applied=await app.handleIntentRequest(.capture(text:"فكرة: خطة قراءة جديدة",id:id))
         XCTAssertTrue(applied)
-        XCTAssertEqual(app.selectedTab,"customize");XCTAssertTrue(app.mihbaraOpen);XCTAssertNotNil(app.undoToken)
+        XCTAssertEqual(app.selectedTab,"mihbara");XCTAssertFalse(app.mihbaraOpen);XCTAssertNotNil(app.undoToken)
         let rows=try ModelContext(container).fetch(FetchDescriptor<NotebookNote>()),note=try XCTUnwrap(rows.first{$0.id==id})
         XCTAssertTrue(note.isPrivate);XCTAssertEqual(note.link,"general");XCTAssertEqual(note.text,"خطة قراءة جديدة")
         XCTAssertEqual(try ModelContext(container).fetchCount(FetchDescriptor<Entry>()),0)

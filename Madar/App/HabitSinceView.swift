@@ -128,6 +128,12 @@ struct HabitPastDaySheet:View {
     private var today:GregorianDay { AppBahwService(session:session).today }
     private var first:GregorianDay { reading.summary.periods.first?.start ?? today }
     private var day:GregorianDay { GregorianDay.containing(date,in:.gmt) }
+    private var selectedRule: HabitRule? { reading.summary.periods.last { $0.start <= day && day < $0.end }?.rule }
+    private var delta: Int { selectedRule?.measure == .duration ? 15 : 1 }
+    private var saveTitle: String {
+        guard let rule = selectedRule, rule.measure != .once else { return "سجّلها في يومها" }
+        return "أضف " + habitUnitCount(delta, rule.unit, AppBahwService(session: session).digits) + " في يومها"
+    }
     private func gmt(_ d:GregorianDay)->Date { d.date(in:.gmt) }
     var body:some View {
         ScrollView {
@@ -153,7 +159,7 @@ struct HabitPastDaySheet:View {
                             }
                         }
                     }
-                    Button { log() } label: { Text("سجّلها في يومها").font(MadarTypography.section()).frame(maxWidth:.infinity,minHeight:48).background(theme.accentFill,in:.capsule).foregroundStyle(theme.onAccent) }
+                    Button { log() } label: { Text(saveTitle).font(MadarTypography.section()).frame(maxWidth:.infinity,minHeight:48).background(theme.accentFill,in:.capsule).foregroundStyle(theme.onAccent) }
                         .buttonStyle(.plain).disabled(busy).accessibilityIdentifier("habit-past-save")
                 } else {
                     Text("بدأت العادة اليوم؛ لا يوم قبله في سجلها.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
@@ -166,8 +172,9 @@ struct HabitPastDaySheet:View {
     }
     private var dayLines:[Entry] { ((try? HabitDiaryLines.heads(ModelContext(session.container))) ?? []).filter { $0.dayKey == day.description }.sorted { $0.createdAt < $1.createdAt } }
     private func log() {
+        guard !busy else { return }
         busy = true
-        var payload:[String:MadarCore.JSONValue] = ["id":.string(reading.id.uuidString),"day":.string(day.description)]
+        var payload:[String:MadarCore.JSONValue] = ["id":.string(reading.id.uuidString),"day":.string(day.description),"delta":.number(Double(delta))]
         if let entry { payload["entryID"] = .string(entry.uuidString) }
         Task { do { try await session.executeDiaryCommand("habit.complete",payload:payload); dismiss(); done() } catch { session.errorMessage = error.localizedDescription }; busy = false }
     }

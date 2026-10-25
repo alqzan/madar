@@ -11,6 +11,14 @@ extension AppSession {
         guard try context.fetchCount(FetchDescriptor<Habit>()) == 0 else{return}
         let settings=try SettingsStore(context:context);_ = try settings.stage(["core.dayStart":.string("midnight"),"core.faceIDLock":.string("none")])
         let marker=DeviceSetting();marker.key="sys.onboardingCompleted";marker.valueJSON=Data("true".utf8);context.insert(marker)
+        if variant == "partialDuration" {
+            let today = GregorianDay.containing(prayerNow(), in: activePlace.timeZone)
+            let habit = Habit(); habit.name = "قراءة هادئة"; habit.startDate = today.adding(days: -6).date(in: activePlace.timeZone); context.insert(habit)
+            let policy = HabitPolicy(); policy.habitID = habit.id; policy.effectiveFrom = today.adding(days: -6).description
+            policy.frequency = "daily"; policy.measure = "duration"; policy.unit = "minutes"; policy.target = 30; context.insert(policy)
+            let event = HabitEvent(); event.habitID = habit.id; event.dayKey = today.adding(days: -1).description; event.periodKey = event.dayKey; event.delta = 1; event.unit = "minutes"; context.insert(event)
+            try context.save(); return
+        }
         let atRisk = variant == "atRisk", overdue = variant == "sinceOverdue"
         let since = variant == "since" || overdue
         guard variant == "showcase" || atRisk || since else{try context.save();return}

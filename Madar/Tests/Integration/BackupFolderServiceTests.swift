@@ -32,6 +32,9 @@ import UniformTypeIdentifiers
         let extra = Entry(); extra.text = "سطر محلي إضافي"; context.insert(extra); try context.save()
         let extraID = extra.id, generation = store.binding.generationID
         let preview = try await service.previewRestore(file: receipt.fileURL, passphrase: password, progress: { _ in })
+        let habits = try XCTUnwrap(preview.counts.first { $0.id == "Habit" })
+        XCTAssertEqual(habits.saved, 3, "The habit, its policy and its remembered event are all in the backup")
+        XCTAssertEqual(habits.current, 3)
         XCTAssertEqual(try ModelContext(app.container).fetch(FetchDescriptor<Entry>()).first { $0.id == entryID }?.text, "كتابة بعد النسخة", "Preview must not mutate the app")
         _ = try await service.restore(previewID: preview.id, mode: .replace, progress: { _ in })
         XCTAssertNotEqual(store.binding.generationID, generation)

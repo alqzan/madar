@@ -32,3 +32,13 @@ Usage: 45% five-hour / 22% weekly at the last check.
 - **Not verified:** owner iPhone; dark mode of the spines; long real sets of 8+ volumes.
 - **Next:** owner looks at the shelf; M6-UX-V blocker; M6-UX-R needs two or three layout proposals before code.
 - **Model/effort:** claude-opus-5-5, effort not exposed; helpers Haiku and Sonnet (read-only). **Usage:** not exposed.
+
+
+## Handover — item 26 habits «ب مع ج» built — 2026-10-25 — Claude
+- **Works now:** on main, item 26. `fc19557`: schema V12 adds `HabitEvent.entryID`. `1c2e5ab` and this commit: `habit.complete` takes an optional past `day` and `entryID`. A past day is logged in its own period; a day to come or before the start is refused; a remembered earlier day still counts for a once-habit already done. `HabitReading.times`/`lastTime`. «كل عاداتي» draws each rhythm (`App/HabitRhythmBands.swift`). A monthly or yearly habit opens on «منذ آخر مرة» (`App/HabitSinceView.swift`): both dates, rhythm line or «مرّت سنة ولم تفعلها», a timeline of times, diary lines of those days, and «فعلتها في يوم سابق» with a date picker and an optional line of that day. Period `end` is exclusive, so the room's «بقي …» no longer counts one day too many.
+- **Verified:** HabitPersistenceTests 9/9; MadarCommands 210/210; MadarCore 156/156; HabitsUITests 3/3 (`Madar/Artifacts/I26-r3.xcresult`, then `I26-r5.xcresult` after the nudge); `git diff --check` clean.
+- **Differences left:** there is no canonical board for B/C; the reference is the mockup artifact https://claude.ai/artifact/2TVXJFtf6x4h7XxgbwGr79. The daily band now shows the last seven days as steps (height = share of daily habits done), not today again (r7). On the timeline, the today mark sits on top of a time logged in the last few days.
+- **Not verified:** the «مرّت سنة» nudge on screen (the fixture's last time is 240 days ago); the owner's iPhone; old-Madar habits after the move (they have no entryID).
+- **Next:** (1) the owner reviews B/C; (2) item 24 native-wins is covered for prayer, Quran and money (`LegacyMoveNativeWinsTests` 3/3); habits had its own test; (3) a long-press on a room row now opens «فعلتها في يوم سابق» (r6).
+- **Model/effort:** claude-opus-5-5, effort not exposed; no reviewer (no migration in this slice).
+- **Usage:** five-hour ~85% used at handover time, weekly 74%. After this handover: native-wins tests for prayer, Quran and money (3/3), long-press for a past day, and the seven-day daily band.

@@ -8,9 +8,10 @@ import MadarCommands
     func testFarProjectionRaiseDedupeRecoveryCancelAndUndo() async throws {
         let root=FileManager.default.temporaryDirectory.appending(path:"QuranStrength-\(UUID())"),container=try MadarContainerFactory.makeLocal(at:root.appending(path:"Data")),context=ModelContext(container)
         _ = try SettingsStore(context:context).stage(["core.dayStart":.string("midnight")])
-        let now=ISO8601DateFormatter().date(from:"2026-10-15T15:00:00+03:00")!,catalog=try QuranResources.catalog()
+        let catalog=try QuranResources.catalog()
         let row=HifzSession();row.fromAyah=1;row.toAyah=catalog.ayahs(on:2).last!.id;row.pages=[1,2];row.dayKey="2026-08-01";row.endedAt=ISO8601DateFormatter().date(from:"2026-08-01T12:00:00+03:00")!;context.insert(row);try context.save()
-        let app=try AppSession(container:container,groupDirectory:root),service=AppQuranService(session:app,clock:{now})
+        // Reads and writes use the app clock; a separately frozen projection day cannot observe today's commands.
+        let app=try AppSession(container:container,groupDirectory:root),service=AppQuranService(session:app)
         var board=try service.strengthBoard();XCTAssertEqual(board.far,2);XCTAssertEqual(board.parts.count,1);XCTAssertEqual(board.parts[0].projected,85);XCTAssertEqual(board.options.map(\.daily),[1,1,1]);XCTAssertNil(board.active)
         XCTAssertEqual(try service.snapshot().sessions.count,1)
         try await service.perform(.raisePages(juz:1));try await service.perform(.raisePages(juz:1))
