@@ -17,6 +17,12 @@ struct GenerationReady: Codable { let version: Int; let generationID: UUID; let 
     public private(set) var container: ModelContainer
     public private(set) var binding: ManagedStoreBinding
     public private(set) var isBusy = false
+    /// The container this signed build may mirror to (nil: local only). Fixed for the store's life.
+    public let provisionedContainer: String?
+    /// The active pointer names this build's container: the person turned sync on for this generation. The store
+    /// still opens on the device first; the mirror attaches only after the iCloud account is confirmed the same
+    /// (`bindCloudMirror`), because CloudKit mirroring opened under a changed account can purge local rows.
+    public private(set) var mirrorBound = false
     public var isCloudBacked: Bool { binding.cloudEnabled }
     public var recoveryRequiresRefresh: Bool { journal()?.hooksPending ?? false }
     var pointerURL: URL { root.appendingPathComponent("ActiveGeneration.json") }
@@ -26,6 +32,7 @@ struct GenerationReady: Codable { let version: Int; let generationID: UUID; let 
     }
     init(root: URL, commandLockURL: URL? = nil, cloudKitContainerIdentifier: String? = nil, accountHash: String? = nil, migrationInterruption: LegacyGenerationMigration.Checkpoint?) throws {
         self.root = root; self.commandLockURL = commandLockURL ?? root.appendingPathComponent("CommandBus.lock")
+        provisionedContainer = MadarCloudMirror.provisionedContainerIdentifier
         try FileManager.default.createDirectory(at:root,withIntermediateDirectories:true,attributes:[.posixPermissions:0o700])
         let lease = StoreLease(lockURL:self.commandLockURL); try lease.acquire(failIfMaintenance:false); defer { lease.release() }
         let pointerURL = root.appendingPathComponent("ActiveGeneration.json")
@@ -52,9 +59,10 @@ struct GenerationReady: Codable { let version: Int; let generationID: UUID; let 
         pointer = try LegacyGenerationMigration.migrate(pointer:pointer,root:root,interruption:migrationInterruption)
         let directory = root.appendingPathComponent("Generations/\(pointer.generationID.uuidString)",isDirectory:true)
         guard FileManager.default.fileExists(atPath:directory.appendingPathComponent("GenerationReady.json").path) else { throw BackupOperationError.invalidManagedStore }
-        // The pointer's legacy cloud identifier is compatibility metadata, not a v1 capability.
+        // Always opens on the device; a bound pointer is remembered and re-attached after the account check.
+        mirrorBound = MadarCloudMirror.target(pointerIdentifier:pointer.cloudKitContainerIdentifier,provisioned:provisionedContainer) != .local
         binding = .init(generationID:pointer.generationID,syncedDirectory:directory,deviceStoreURL:root.appendingPathComponent("Device.store"),accountHash:pointer.accountHash,cloudEnabled:false)
-        container = try MadarContainerFactory.make(at:directory,deviceStoreURL:binding.deviceStoreURL,cloudKitContainerIdentifier:pointer.cloudKitContainerIdentifier); container.mainContext.autosaveEnabled = false
+        container = try MadarContainerFactory.make(at:directory,deviceStoreURL:binding.deviceStoreURL); container.mainContext.autosaveEnabled = false
         try recoverInterruptedOperation(pointer:pointer)
         try lease.endMaintenance()
     }
@@ -134,7 +142,8 @@ struct GenerationReady: Codable { let version: Int; let generationID: UUID; let 
         guard pointer.generationID != binding.generationID else { return }
         let directory = generationDirectory(pointer.generationID)
         guard FileManager.default.fileExists(atPath:directory.appendingPathComponent("GenerationReady.json").path) else { throw BackupOperationError.invalidManagedStore }
-        let replacement = try MadarContainerFactory.make(at:directory,deviceStoreURL:binding.deviceStoreURL,cloudKitContainerIdentifier:pointer.cloudKitContainerIdentifier); replacement.mainContext.autosaveEnabled = false
+        let replacement = try MadarContainerFactory.make(at:directory,deviceStoreURL:binding.deviceStoreURL); replacement.mainContext.autosaveEnabled = false
+        mirrorBound = MadarCloudMirror.target(pointerIdentifier:pointer.cloudKitContainerIdentifier,provisioned:provisionedContainer) != .local
         container = replacement; binding = .init(generationID:pointer.generationID,syncedDirectory:directory,deviceStoreURL:binding.deviceStoreURL,accountHash:pointer.accountHash,cloudEnabled:false)
     }
     public func containerForTransaction() throws -> ModelContainer { try refreshIfNeeded(); return container }
@@ -151,6 +160,25 @@ struct GenerationReady: Codable { let version: Int; let generationID: UUID; let 
         let replacement = try MadarContainerFactory.make(at:generationDirectory(id),deviceStoreURL:binding.deviceStoreURL); replacement.mainContext.autosaveEnabled = false
         try DurableFiles.encode(pointer,to:pointerURL)
         container = replacement; binding = .init(generationID:id,syncedDirectory:generationDirectory(id),deviceStoreURL:binding.deviceStoreURL,accountHash:pointer.accountHash,cloudEnabled:false)
+    }
+    /// Turns the private-database mirror on or off for the active generation without copying or
+    /// rotating it: the same Madar.store gains or loses its CloudKit configuration. Callers hold
+    /// CommandBus.lock with writers paused and a verified backup checkpoint.
+    public func bindCloudMirror(enabled: Bool, accountHash: String?) throws {
+        guard !isBusy, journal() == nil else { throw BackupOperationError.invalidManagedStore }
+        let current = try JSONDecoder().decode(ManagedPointer.self,from:Data(contentsOf:pointerURL))
+        guard current.version == 1, current.generationID == binding.generationID else { throw BackupOperationError.invalidManagedStore }
+        let identifier = enabled ? provisionedContainer : nil
+        if enabled && identifier == nil { throw BackupOperationError.cloudRestoreUnsupported }
+        let pointer = ManagedPointer(version:1,generationID:current.generationID,previousGenerationID:current.previousGenerationID,accountHash:accountHash,cloudKitContainerIdentifier:identifier)
+        let directory = generationDirectory(pointer.generationID)
+        // The old container stays active until the replacement opens and the pointer is durable; a failure
+        // leaves both exactly as they were. The caller hands the new container to every holder (bindContainer).
+        let replacement = try MadarContainerFactory.make(at:directory,deviceStoreURL:binding.deviceStoreURL,cloudKitContainerIdentifier:identifier,provisionedContainer:provisionedContainer)
+        replacement.mainContext.autosaveEnabled = false
+        try DurableFiles.encode(pointer,to:pointerURL)
+        container = replacement; mirrorBound = identifier != nil
+        binding = .init(generationID:pointer.generationID,syncedDirectory:directory,deviceStoreURL:binding.deviceStoreURL,accountHash:accountHash,cloudEnabled:identifier != nil)
     }
     private func recoverInterruptedOperation(pointer: ManagedPointer) throws {
         guard FileManager.default.fileExists(atPath:journalURL.path) else { return }

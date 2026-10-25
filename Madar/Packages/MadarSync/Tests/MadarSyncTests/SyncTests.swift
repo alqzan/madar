@@ -126,6 +126,21 @@ private actor Accounts: CloudAccountProviding {
         // The test verifies the decision boundary, not a real CloudKit rotation.
         #expect(!manager.isCloudBacked)
     }
+    /// A store that has never met an account binds the first one without a choice or checkpoint,
+    /// and stays local: turning sync on is a separate, explicit step.
+    @Test func firstAccountBindsLocallyWithoutChoiceOrCheckpoint() async throws {
+        let directory = root(); defer { try? FileManager.default.removeItem(at: directory) }
+        let manager = try ManagedDataStore(root: directory)
+        try prayer(ModelContext(manager.container))
+        let adapter = LifecycleProbe(manager); adapter.preference = true
+        let sync = SyncCoordinator(adapter: adapter, accountProvider: Accounts(.available(hash: "account-A")), provisioning: .init(appGroupAvailable: true, verifiedEntitlements: true, cloudKitContainerIdentifier: "iCloud.test.probe"))
+        await sync.refreshAccount()
+        #expect(sync.health.phase == .localOnly); #expect(sync.pendingAccountHash == nil); #expect(adapter.suspensions == 0)
+        let request = try #require(adapter.requests.first)
+        #expect(adapter.requests.count == 1 && request.accountHash == "account-A" && !request.cloudEnabled && request.dataChoice == .keepDevice && request.checkpoint == nil)
+        #expect(sync.observedAccount == .available(hash: "account-A"))
+        #expect(try RecordBridge.all(ModelContext(manager.container)).count == 1)
+    }
     @Test func returningToOriginalAccountReleasesPendingTransition() async throws {
         let directory = root(); defer { try? FileManager.default.removeItem(at: directory) }
         let manager = try ManagedDataStore(root: directory, accountHash: "account-A")

@@ -257,4 +257,105 @@ import XCTest
             else { app.swipeUp(velocity: .slow); shot(app, "BOOK-contents-s1-L") }
         } else { shot(app, "BOOK-no-contents-L") }
     }
+
+    /// Owner's scanned PDF (25 Oct, «مشروع العمر», 163 image-only pages): import, convert on the device through
+    /// OCR, review, add the flowing copy, then read. Expected text is printed on the source's page 9. Private; skipped without the file.
+    func testOwnerPDFConvertsAndReads() throws {
+        guard let book = ProcessInfo.processInfo.environment["MADAR_TRIAL_PDF"] else { throw XCTSkip("Owner PDF trial only") }
+        continueAfterFailure = false
+        let title = "مشروع العمر"
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MIHBARA_FIXTURE": "empty",
+            "MADAR_UI_NOW": "2026-10-25T20:00:00+03:00", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
+            "MADAR_UI_MIHBARA_IMPORT_PDF_PATH": book, "MADAR_UI_MIHBARA_IMPORT_PDF_NAME": title]
+        app.launch()
+        let customize = app.buttons["tab-customize"]; XCTAssertTrue(customize.waitForExistence(timeout: 20)); customize.tap()
+        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 8)); search.tap(); search.typeText("المحبرة")
+        let door = app.buttons["mihbara-open"]; XCTAssertTrue(door.waitForExistence(timeout: 8)); door.tap()
+        let add = app.buttons["mihbara-add-paper"]; XCTAssertTrue(add.waitForExistence(timeout: 8)); add.tap()
+        let confirm = app.buttons["mihbara-import-confirm"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 120), app.debugDescription)
+        shot(app, "PDF-preview-L"); app.swipeUp(velocity: .slow); shot(app, "PDF-preview-s1-L")
+        for _ in 0..<6 where !confirm.isHittable { app.swipeUp(velocity: .slow) }
+        confirm.tap()
+        let addBook = app.buttons["mihbara-add-paper"]
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: addBook)], timeout: 60), .completed, app.debugDescription)
+        addBook.tap(); app.buttons["mihbara-add-back"].tap()
+        app.buttons["mihbara-shelf-want"].tap()
+        let imported = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", title)).firstMatch
+        XCTAssertTrue(imported.waitForExistence(timeout: 15), app.debugDescription); shot(app, "PDF-shelf-L"); imported.tap()
+        XCTAssertTrue(app.buttons["mihbara-pdf-flow"].waitForExistence(timeout: 30), app.debugDescription)
+        Thread.sleep(forTimeInterval: 2); shot(app, "PDF-reader-L")
+        app.buttons["mihbara-pdf-flow"].tap()
+        XCTAssertTrue(app.buttons["mihbara-pdf-flow-device"].waitForExistence(timeout: 10), app.debugDescription)
+        shot(app, "PDF-flow-choice-L"); app.buttons["mihbara-pdf-flow-device"].tap()
+        Thread.sleep(forTimeInterval: 20); shot(app, "PDF-flow-progress-L")
+        let started = Date()
+        let review = app.buttons["mihbara-pdf-flow-review"]
+        let ready = review.waitForExistence(timeout: 1800)
+        let seconds = Int(Date().timeIntervalSince(started)) + 20
+        let timing = XCTAttachment(string: "conversion seconds: \(seconds)"); timing.name = "PDF-flow-seconds"; timing.lifetime = .keepAlways; self.add(timing)
+        if !ready, app.descendants(matching: .any)["mihbara-pdf-flow-error"].exists { shot(app, "PDF-flow-error-L") }
+        XCTAssertTrue(ready, app.debugDescription)
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "١٦٣")).firstMatch.exists, "All 163 pages must be counted")
+        shot(app, "PDF-flow-ready-L"); review.tap()
+        let importConfirm = app.buttons["mihbara-epub-import-confirm"]
+        XCTAssertTrue(importConfirm.waitForExistence(timeout: 120), app.debugDescription)
+        XCTAssertEqual(app.textFields["mihbara-epub-import-title"].value as? String, title)
+        XCTAssertTrue(app.descendants(matching: .any)["mihbara-epub-scan-text"].waitForExistence(timeout: 240), app.debugDescription)
+        shot(app, "PDF-review-L")
+        for i in 1...4 { app.swipeUp(velocity: .slow); shot(app, "PDF-review-s\(i)-L") }
+        for _ in 0..<8 where !importConfirm.isHittable { app.swipeUp(velocity: .slow) }
+        importConfirm.tap()
+        XCTAssertTrue(app.buttons["mihbara-pdf-close"].waitForExistence(timeout: 60), app.debugDescription)
+        app.buttons["mihbara-pdf-close"].tap()
+        let copies = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", title))
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "count >= 2"), object: copies)], timeout: 30), .completed, app.debugDescription)
+        shot(app, "PDF-shelf-both-L")
+        for index in 0..<2 {
+            copies.element(boundBy: index).tap()
+            if app.buttons["mihbara-reader-close"].waitForExistence(timeout: 15) { break }
+            let closePDF = app.buttons["mihbara-pdf-close"]
+            XCTAssertTrue(closePDF.waitForExistence(timeout: 5), app.debugDescription); closePDF.tap()
+        }
+        XCTAssertTrue(app.buttons["mihbara-reader-close"].waitForExistence(timeout: 30), app.debugDescription)
+        Thread.sleep(forTimeInterval: 3); shot(app, "PDF-epub-0-L")
+        func page(_ name: String) {
+            Thread.sleep(forTimeInterval: 3); shot(app, name)
+            let texts = app.webViews.firstMatch.staticTexts.allElementsBoundByIndex.prefix(8).map(\.label).joined(separator: " | ")
+            let a = XCTAttachment(string: "texts: " + texts); a.name = name + "-text"; a.lifetime = .keepAlways; self.add(a)
+        }
+        for i in 1...3 { app.swipeRight(); page("PDF-epub-next\(i)-L") }
+        let contents = app.buttons["mihbara-reader-contents"]
+        if !contents.exists { app.tap() }
+        XCTAssertTrue(contents.waitForExistence(timeout: 5), app.debugDescription)
+        contents.tap(); Thread.sleep(forTimeInterval: 2); shot(app, "PDF-contents-L")
+        // Without bookmarks the index lists every tenth page; «صفحة ١» opens the first part (pages 1–30).
+        let first = app.buttons.matching(NSPredicate(format: "label MATCHES %@", ".*صفحة ١([^٠-٩].*)?")).firstMatch
+        XCTAssertTrue(first.waitForExistence(timeout: 8), app.debugDescription); first.tap()
+        let body = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            app.webViews.staticTexts.allElementsBoundByIndex.contains { $0.label.precomposedStringWithCompatibilityMapping.contains("فأحببتُ أوَّلاً أن يكون") }
+        }, object: nil)
+        let found = XCTWaiter.wait(for: [body], timeout: 20)
+        page("PDF-epub-page1-L")
+        XCTAssertEqual(found, .completed, "Source page 9 prints «فأحببتُ أوَّلاً أن يكون»; the OCR copy must carry it")
+        // The cover (page 1) and the basmala (page 5) have no words: they are pictures, not «not extracted» notes.
+        XCTAssertGreaterThanOrEqual(app.webViews.images.count, 1, "The cover must appear as its picture")
+        XCTAssertFalse(app.webViews.staticTexts.allElementsBoundByIndex.contains { $0.label.contains("صفحة ٥: لم يُستخرج") }, "The basmala page is a picture")
+        // Owner: «خل دائما فيه خيار لعرضه PDF» — the original opens at the same page.
+        // The page on screen, from the footer («ص ٢ بحسب الملف»), must be the page the original opens on.
+        let isolates = CharacterSet(charactersIn: "\u{2066}\u{2067}\u{2068}\u{2069}")
+        let plain = { (text: String) in String(text.unicodeScalars.filter { !isolates.contains($0) }) }
+        let footer = plain(app.staticTexts["mihbara-reader-print-page"].label)
+        let shownPage = footer.components(separatedBy: " ").dropFirst().first ?? ""
+        XCTAssertFalse(shownPage.isEmpty, footer)
+        let original = app.buttons["mihbara-reader-original-pdf"]
+        XCTAssertTrue(original.waitForExistence(timeout: 5), app.debugDescription); original.tap()
+        XCTAssertTrue(app.buttons["mihbara-pdf-close"].waitForExistence(timeout: 20), app.debugDescription)
+        let samePage = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            app.staticTexts.allElementsBoundByIndex.contains { plain($0.label).contains("صفحة الملف \(shownPage) من ١٦٣") }
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [samePage], timeout: 10), .completed, "Original must open on page \(shownPage)")
+        shot(app, "PDF-original-L")
+    }
 }

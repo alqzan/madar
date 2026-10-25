@@ -121,6 +121,7 @@ struct MihbaraPDFFlowView: View {
     private func readyLine(_ s: PDFBookEPUB.Summary) -> String {
         var parts = [MihbaraCopy.pages(s.pages, digits)]
         if s.opticalPages > 0 { parts.append("\(digits.string(s.opticalPages)) منها قُرئت من صورها") }
+        if s.picturedPages > 0 { parts.append("\(digits.string(s.picturedPages)) بلا نص بقيت بصورتها كالغلاف والزخارف") }
         if !s.skippedPages.isEmpty { parts.append("\(digits.string(s.skippedPages.count)) لم يُستخرج نصها، ومكانها ملاحظة برقمها") }
         return parts.joined(separator: "، ") + "."
     }
@@ -139,6 +140,14 @@ struct MihbaraPDFFlowView: View {
             let reader = PDFBookTextReader(data: bytes, language: book.language)
             total = try await reader.pageCount()
             var pages: [PDFBookEPUB.Page] = []
+            var pictures = 0
+            /// A page without words keeps its picture (cover, basmala, ornament) instead of a «not extracted» note.
+            func picture(_ index: Int) async throws -> (jpeg: Data?, blank: Bool) {
+                guard pictures < PDFBookEPUB.maximumPictures else { return (jpeg: nil, blank: false) }
+                let result: (jpeg: Data?, blank: Bool) = (try? await reader.pagePicture(at: index)) ?? (jpeg: nil, blank: false)
+                if result.jpeg != nil { pictures += 1 }
+                return result
+            }
             for index in 0..<total {
                 let label = try await reader.pageLabel(at: index)
                 do {
@@ -146,11 +155,21 @@ struct MihbaraPDFFlowView: View {
                     // Garbled embedded Arabic: read the page image instead of showing broken words.
                     if page.hasUnreliableArabicMapping, let optical = try? await reader.page(at: index, optical: true),
                        !optical.text.isEmpty { page = optical }
-                    pages.append(.init(page, label: label))
+                    let wordless = page.hasUnreliableArabicMapping || PDFBookEPUB.paragraphs(page.text).isEmpty
+                    // A scanned book's first page is its cover: keep it as a picture, not its OCR'd title and stamps.
+                    let cover = index == 0 && page.source == .optical
+                    if wordless || cover {
+                        let shot = try await picture(index)
+                        pages.append(cover && shot.jpeg != nil ? .init(text: "", optical: true, unreliable: false, label: label, image: shot.jpeg)
+                                     : .init(page, label: label, image: shot.jpeg, blank: shot.blank))
+                    } else { pages.append(.init(page, label: label)) }
                 }
                 catch is CancellationError { throw CancellationError() }
-                // A page OCR cannot read becomes an honest gap with its number, not a failed book.
-                catch { pages.append(.init(text: "", optical: false, unreliable: true, label: label)) }
+                // A page OCR cannot read becomes its picture, or an honest gap with its number, not a failed book.
+                catch {
+                    let shot = try await picture(index)
+                    pages.append(.init(text: "", optical: false, unreliable: true, label: label, image: shot.jpeg, blank: shot.blank))
+                }
                 try Task.checkCancellation()
                 guard jobID == id, authorized else { return }
                 done = index + 1

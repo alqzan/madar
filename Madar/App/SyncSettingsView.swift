@@ -2,6 +2,7 @@ import Foundation
 import Observation
 import SwiftUI
 import MadarDesign
+import MadarCore
 
 enum SyncUIAvailability: Sendable {
     case available, noAccount, restricted, localBuild, quotaFull, unavailable
@@ -57,37 +58,56 @@ struct SyncUIStatus: Sendable {
 struct SyncSettingsView: View {
     @State private var model: SyncSettingsModel
     @Environment(\.scenePhase) private var scenePhase
-    init(service: any SyncUIService) { _model = State(initialValue: SyncSettingsModel(service: service)) }
+    @Environment(\.roomTheme) private var theme
+    let dates: (Date) -> MadarDateLabels
+    let time: (Date) -> String
+    init(service: any SyncUIService, dates: @escaping (Date) -> MadarDateLabels, time: @escaping (Date) -> String) {
+        _model = State(initialValue: SyncSettingsModel(service: service)); self.dates = dates; self.time = time
+    }
     var body: some View {
-        Form {
-            Section {
-                if let status = model.status {
-                    Toggle("زامن عبر iCloud", isOn: Binding(get: { status.enabled }, set: model.setEnabled))
-                        .disabled(model.busy || !canConfigure(status.availability))
-                        .accessibilityIdentifier("sync-enabled")
-                    Text(statusLine(status)).accessibilityIdentifier("sync-status")
-                    if let instant = status.lastSyncedAt {
-                        Text("آخر مزامنة: \(instant.formatted(.dateTime.locale(Locale(identifier: "ar_SA")).day().month().year().hour().minute()))")
-                    } else { Text("لا معلومات عن آخر مزامنة.") }
-                    if let message = status.observedMessage { Text(message) }
-                } else { ProgressView("يقرأ حالة المزامنة…") }
-                if model.busy { ProgressView("يحدّث الاتصال…") }
-            } header: { Text("البيانات والمزامنة") } footer: { Text("تبقى بياناتك على الجهاز عند إيقاف المزامنة. لا يُحذف شيء من iCloud، والأجهزة الأخرى تحتفظ بنسخها.") }
-        }.navigationTitle("المزامنة")
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                MadarCard {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Label { Text("iCloud").font(MadarTypography.section()) } icon: { Image(systemName: "icloud").foregroundStyle(theme.color("accentText")) }
+                        if let status = model.status {
+                            Toggle("زامن عبر iCloud", isOn: Binding(get: { status.enabled }, set: model.setEnabled))
+                                .font(MadarTypography.body()).frame(minHeight: 44)
+                                .disabled(model.busy || !canConfigure(status.availability))
+                                .accessibilityIdentifier("sync-enabled")
+                            Text(statusLine(status)).font(MadarTypography.body()).accessibilityIdentifier("sync-status")
+                            if let instant = status.lastSyncedAt {
+                                let labels = dates(instant)
+                                Text("آخر مزامنة").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                                MadarDateLabel(.init(primary: labels.primary + "، " + time(instant), secondary: labels.secondary))
+                            }
+                            if let message = status.observedMessage { Text(message).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
+                        } else { ProgressView("يقرأ حالة المزامنة…") }
+                        if model.busy { ProgressView("يحدّث الاتصال…") }
+                    }
+                }
+                Text("قبل أول رفع يحفظ مدار نسخة احتياطية مشفّرة. إيقاف المزامنة يُبقي بياناتك على هذا الجهاز، ولا يحذف شيئًا من iCloud.")
+                    .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(16).frame(maxWidth: 620).frame(maxWidth: .infinity)
+        }
+        .background(theme.background).foregroundStyle(theme.ink)
+        .navigationTitle("المزامنة").navigationBarTitleDisplayMode(.inline)
             .task { await model.refresh() }
             .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await model.refresh() } } }
             .sheet(item: Binding(get: { model.status?.accountChange }, set: { _ in })) { change in
                 NavigationStack {
                     VStack(alignment: .leading, spacing: 24) {
                         Text("تغيّر حساب iCloud").font(MadarTypography.title())
-                        Text("حُفظت نسخة أمان في \(change.safetyBackupAt.formatted(.dateTime.day().month().year().hour().minute())). اختر بياناتك لهذا الحساب.")
+                        let labels = dates(change.safetyBackupAt)
+                        Text("حُفظت نسخة أمان. تبقى بيانات هذا الجهاز وتُرفع إلى الحساب الجديد.")
+                        MadarDateLabel(.init(primary: labels.primary + "، " + time(change.safetyBackupAt), secondary: labels.secondary))
                         Button("أبقِ بيانات هذا الجهاز في الحساب الجديد") { model.resolve(.keepDeviceData) }
                             .buttonStyle(MadarPrimaryButton()).disabled(model.busy).accessibilityIdentifier("sync-account-keep-device")
-                        Button("استعمل بيانات الحساب الجديد") { model.resolve(.useNewAccountData) }
-                            .frame(minHeight: 44).disabled(model.busy).accessibilityIdentifier("sync-account-use-new")
                         if model.busy { ProgressView("ينفّذ اختيارك…") }
                         Spacer()
                     }.padding(24).font(MadarTypography.body())
+                    .background(theme.background).foregroundStyle(theme.ink)
                 }.interactiveDismissDisabled()
             }
             .alert("لم تكتمل العملية", isPresented: Binding(get: { model.errorMessage != nil }, set: { if !$0 { model.errorMessage = nil } })) {
@@ -101,7 +121,7 @@ struct SyncSettingsView: View {
         switch status.availability {
         case .available: status.enabled ? "المزامنة مفعّلة." : "المزامنة متوقفة؛ بياناتك على هذا الجهاز محفوظة."
         case .noAccount, .restricted, .unavailable: "iCloud غير متاح — بياناتك على هذا الجهاز فقط."
-        case .localBuild: "هذه النسخة تعمل محليًا؛ اتصال iCloud غير مهيّأ."
+        case .localBuild: "هذه النسخة تعمل على الجهاز فقط."
         case .quotaFull: "مساحة iCloud ممتلئة. الحفظ على هذا الجهاز مستمر."
         }
     }

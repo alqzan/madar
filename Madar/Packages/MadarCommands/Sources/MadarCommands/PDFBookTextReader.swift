@@ -2,6 +2,8 @@ import Foundation
 import CoreGraphics
 import PDFKit
 import Vision
+import ImageIO
+import UniformTypeIdentifiers
 import MadarCore
 
 public struct PDFBookPageText: Equatable, Sendable, Identifiable {
@@ -119,20 +121,66 @@ public actor PDFBookTextReader {
             let primary = language.hasPrefix("ar") ? "ar-SA" : "en-US"
             guard supported.contains(primary) else { throw Failure.unsupportedLanguage }
             request.recognitionLanguages = [primary] + (primary != "en-US" && supported.contains("en-US") ? ["en-US"] : [])
-            let image = try Self.render(page)
+            let image = try Self.render(page, margin: 0.06)
             try Task.checkCancellation()
             try VNImageRequestHandler(cgImage: image).perform([request])
             try Task.checkCancellation()
             // Preserve each recognized line's characters. Reversing Arabic text
             // corrupts its logical order; the source image stays authoritative.
             let lines = (request.results ?? []).compactMap { observation -> PDFTextReadingOrder.Line? in
-                guard let text = observation.topCandidates(1).first?.string else { return nil }
+                guard let raw = observation.topCandidates(1).first?.string else { return nil }
+                let text = language.hasPrefix("ar") ? Self.withoutStraySymbols(raw) : raw
+                guard !text.isEmpty else { return nil }
                 let box = observation.boundingBox
                 return .init(text: text, bounds: CGRect(x: box.minX, y: 1 - box.maxY, width: box.width, height: box.height))
             }
             let text = PDFTextReadingOrder.text(lines, rightToLeft: language.hasPrefix("ar"))
             return PDFBookPageText(index: index, text: text, source: .optical)
         }
+    }
+
+    /// A page as a JPEG picture (long side `maxSide` points), or nil with `blank` true when nothing is
+    /// printed on it. Used for pages whose content is not text: a cover, a calligraphic basmala, an ornament.
+    public func pagePicture(at index: Int, maxSide: CGFloat = 1400) throws -> (jpeg: Data?, blank: Bool) {
+        let count = try pageCount()
+        guard (0..<count).contains(index), let page = document?.page(at: index) else { throw Failure.unreadable }
+        return try autoreleasepool {
+            try Task.checkCancellation()
+            let image = try Self.render(page, longSide: maxSide)
+            if Self.isBlank(image) { return (nil, true) }
+            let data = NSMutableData()
+            guard let destination = CGImageDestinationCreateWithData(data, UTType.jpeg.identifier as CFString, 1, nil) else { throw Failure.cannotRenderPage }
+            CGImageDestinationAddImage(destination, image, [kCGImageDestinationLossyCompressionQuality: 0.72] as CFDictionary)
+            guard CGImageDestinationFinalize(destination) else { throw Failure.cannotRenderPage }
+            return (data as Data, false)
+        }
+    }
+
+    /// Vision reads bold Arabic parentheses as `%`, `#`, `$`, `&` or a lone quote («' شروع العمر '»). Those
+    /// marks never occur in Arabic prose, so an Arabic OCR line drops them; no letter is guessed or added.
+    static func withoutStraySymbols(_ line: String) -> String {
+        guard line.unicodeScalars.contains(where: { (0x0600...0x06FF).contains($0.value) }) else { return line }
+        var kept = line.replacingOccurrences(of: #"[%#$&@^~|\\*•]"#, with: " ", options: .regularExpression)
+        // A straight quote that opens or closes nothing (no partner on the line) is noise.
+        for quote in ["'", "\""] where kept.components(separatedBy: quote).count == 2 {
+            kept = kept.replacingOccurrences(of: quote, with: " ")
+        }
+        return kept.replacingOccurrences(of: #"[ \t]{2,}"#, with: " ", options: .regularExpression)
+            .replacingOccurrences(of: #" ([،,.:؛!؟])"#, with: "$1", options: .regularExpression)
+            .trimmingCharacters(in: .whitespaces)
+    }
+
+    /// Fewer than one pixel in a thousand noticeably darker than paper: a blank page (scan noise allowed).
+    static func isBlank(_ image: CGImage) -> Bool {
+        let side = 96
+        guard let context = CGContext(data: nil, width: side, height: side, bitsPerComponent: 8, bytesPerRow: side,
+                                      space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue) else { return false }
+        context.interpolationQuality = .medium
+        context.draw(image, in: CGRect(x: 0, y: 0, width: side, height: side))
+        guard let pixels = context.data?.assumingMemoryBound(to: UInt8.self) else { return false }
+        var dark = 0
+        for i in 0..<(side * side) where pixels[i] < 200 { dark += 1 }
+        return dark * 1000 < side * side
     }
 
     /// The printed page label when the PDF carries one ("iv", "12"), else nil.
@@ -149,20 +197,29 @@ public actor PDFBookTextReader {
         return document.map(PDFBookFiles.outline(of:)) ?? []
     }
 
-    private static func render(_ page: PDFPage) throws -> CGImage {
-        let bounds = page.bounds(for: .cropBox)
-        guard bounds.width.isFinite, bounds.height.isFinite, bounds.width > 0, bounds.height > 0,
+    /// The page drawn so its long side is `longSide` pixels, inside a white margin of `margin` of that side.
+    /// `getDrawingTransform` never scales a page up, so the scale is applied separately: before 25 Oct 2026 a
+    /// 410×613-point scan reached Vision at its native size in the corner of a large canvas. Measured on the
+    /// owner's scanned book (page 9): 2048 px with a 6% margin restores every line, the line-initial alif and the
+    /// verse reference; 3000 px and above make Vision miss lines.
+    private static func render(_ page: PDFPage, longSide: CGFloat = 2048, margin: CGFloat = 0) throws -> CGImage {
+        let box = page.bounds(for: .cropBox)
+        guard box.width.isFinite, box.height.isFinite, box.width > 0, box.height > 0,
               let ref = page.pageRef else { throw Failure.cannotRenderPage }
-        // At most 2048² RGBA pixels; one page and one Vision request at a time.
-        let scale = 2048 / max(bounds.width, bounds.height)
-        let width = max(1, Int((bounds.width * scale).rounded(.up)))
-        let height = max(1, Int((bounds.height * scale).rounded(.up)))
+        let turned = abs(page.rotation) % 180 == 90
+        let shown = turned ? CGSize(width: box.height, height: box.width) : box.size
+        // At most 2048² RGBA pixels plus the margin; one page and one Vision request at a time.
+        let scale = longSide / max(shown.width, shown.height), pad = (longSide * margin).rounded()
+        let width = max(1, Int((shown.width * scale + 2 * pad).rounded(.up)))
+        let height = max(1, Int((shown.height * scale + 2 * pad).rounded(.up)))
         guard let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
                                       space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { throw Failure.cannotRenderPage }
-        let rect = CGRect(x: 0, y: 0, width: width, height: height)
         context.setFillColor(gray: 1, alpha: 1)
-        context.fill(rect)
-        context.concatenate(ref.getDrawingTransform(.cropBox, rect: rect, rotate: 0, preserveAspectRatio: true))
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        context.interpolationQuality = .high
+        context.translateBy(x: pad, y: pad)
+        context.scaleBy(x: scale, y: scale)
+        context.concatenate(ref.getDrawingTransform(.cropBox, rect: CGRect(origin: .zero, size: shown), rotate: 0, preserveAspectRatio: true))
         context.drawPDFPage(ref)
         guard let image = context.makeImage() else { throw Failure.cannotRenderPage }
         return image

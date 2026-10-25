@@ -224,7 +224,7 @@ public enum TurathEPUB {
 
     static func xhtml(title: String, body: String) -> Data {
         Data(("<?xml version=\"1.0\" encoding=\"UTF-8\"?><html xmlns=\"http://www.w3.org/1999/xhtml\" xmlns:epub=\"http://www.idpf.org/2007/ops\" xml:lang=\"ar\" lang=\"ar\" dir=\"rtl\"><head><title>\(escape(title))</title>"
-              + "<style>.madar-title{font-weight:bold}h2{font-size:1.15em;margin:1.2em 0 .5em}.madar-page-notes{font-size:.82em;opacity:.85;border-top:1px solid currentColor;margin-top:.8em;padding-top:.4em}.madar-page-notes p{margin:.2em 0}.madar-source{font-size:.85em;margin-top:2em}</style>"
+              + "<style>.madar-title{font-weight:bold}h2{font-size:1.15em;margin:1.2em 0 .5em}.madar-page-notes{font-size:.82em;opacity:.85;border-top:1px solid currentColor;margin-top:.8em;padding-top:.4em}.madar-page-notes p{margin:.2em 0}.madar-source{font-size:.85em;margin-top:2em}.madar-page-picture{margin:1em 0;text-align:center;page-break-inside:avoid;break-inside:avoid}.madar-page-picture img{max-width:100%;max-height:85vh;height:auto}</style>"
               + "</head><body>\(body)</body></html>").utf8)
     }
 }

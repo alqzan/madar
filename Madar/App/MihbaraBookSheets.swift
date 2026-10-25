@@ -91,6 +91,14 @@ struct MihbaraAddBookView: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("mihbara-add-source-file")
+                    // Each importer sits on its own button: stacked on one view, SwiftUI honours only the last.
+                    .fileImporter(isPresented: $importingBook, allowedContentTypes: bookTypes, allowsMultipleSelection: false) { result in
+                        handle(result, assign: {
+                            pendingBookFile = $0
+                            if $0.pathExtension.lowercased() == "epub" { previewingEPUB = true }
+                            else { previewingPDF = true }
+                        })
+                    }
 
                     NavigationLink {
                         MihbaraTurathView(app: app, onImported: onEPUBImported)
@@ -132,6 +140,9 @@ struct MihbaraAddBookView: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("mihbara-add-source-goodreads")
+                    .fileImporter(isPresented: $importingGoodreads, allowedContentTypes: [.commaSeparatedText], allowsMultipleSelection: false) { result in
+                        handle(result, assign: { pendingGoodreadsFile = $0 })
+                    }
                 }
 
                 VStack(alignment: .leading, spacing: 10) {
@@ -187,16 +198,6 @@ struct MihbaraAddBookView: View {
         .environment(\.layoutDirection, .rightToLeft)
         .toolbarVisibility(.hidden, for: .navigationBar)
         .statusBarHidden(true)
-        .fileImporter(isPresented: $importingBook, allowedContentTypes: bookTypes, allowsMultipleSelection: false) { result in
-            handle(result, assign: {
-                pendingBookFile = $0
-                if $0.pathExtension.lowercased() == "epub" { previewingEPUB = true }
-                else { previewingPDF = true }
-            })
-        }
-        .fileImporter(isPresented: $importingGoodreads, allowedContentTypes: [.commaSeparatedText], allowsMultipleSelection: false) { result in
-            handle(result, assign: { pendingGoodreadsFile = $0 })
-        }
         .navigationDestination(isPresented: $previewingPDF) {
             if let pendingBookFile {
                 MihbaraPDFImportView(app: app, source: pendingBookFile) {
@@ -251,6 +252,18 @@ struct MihbaraAddBookView: View {
                 do {
                     if !FileManager.default.fileExists(atPath: file.path) {
                         try FileManager.default.copyItem(at: URL(fileURLWithPath: path), to: file); pendingBookFile = file; previewingEPUB = true
+                    }
+                }
+                catch { app.errorMessage = "لم تُجهز عينة الاستيراد." }
+            }
+            // Owner PDF trial: same as the EPUB path, through the PDF preview and on-device conversion.
+            if root.deletingLastPathComponent().deletingLastPathComponent().lastPathComponent == "UITestStores",
+               let path = ProcessInfo.processInfo.environment["MADAR_UI_MIHBARA_IMPORT_PDF_PATH"], pendingBookFile == nil {
+                let name = String((ProcessInfo.processInfo.environment["MADAR_UI_MIHBARA_IMPORT_PDF_NAME"] ?? "كتاب التجربة").prefix(80)).replacingOccurrences(of: "/", with: "-")
+                let file = root.deletingLastPathComponent().appendingPathComponent("\(name).pdf")
+                do {
+                    if !FileManager.default.fileExists(atPath: file.path) {
+                        try FileManager.default.copyItem(at: URL(fileURLWithPath: path), to: file); pendingBookFile = file; previewingPDF = true
                     }
                 }
                 catch { app.errorMessage = "لم تُجهز عينة الاستيراد." }

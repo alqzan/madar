@@ -72,6 +72,13 @@ struct CustomizeMadar: View {
                                 time: { session.backupTime($0) })
                         }.frame(minHeight: 44).font(MadarTypography.section()).accessibilityIdentifier("backup-settings-link")
                     }
+                    // Only a build signed for iCloud shows sync (no entry point to an unconfigured feature).
+                    if AppSyncService.isProvisioned, let sync = session.syncService {
+                        NavigationLink("المزامنة عبر iCloud") {
+                            SyncSettingsView(service: sync, dates: { session.dateLabels(GregorianDay.containing($0, in: session.activePlace.timeZone)) }, time: { session.backupTime($0) })
+                        }
+                            .frame(minHeight: 44).font(MadarTypography.section()).accessibilityIdentifier("sync-settings-link")
+                    }
                     NavigationLink("انقل من مدار القديم") { LegacyMoveView(app: session) }
                         .frame(minHeight: 44).font(MadarTypography.section()).accessibilityIdentifier("legacy-move-link")
                 }

@@ -35,6 +35,8 @@
 	<string>1</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>MadarCloudKitContainer</key>
+	<string>$(MADAR_CLOUDKIT_CONTAINER)</string>
 	<key>NSCameraUsageDescription</key>
 	<string>امسح باركود الكتاب وصوّر صفحة الفهرس على هذا الجهاز.</string>
 	<key>NSFaceIDUsageDescription</key>
@@ -73,18 +75,19 @@
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>processing</string>
+		<string>remote-notification</string>
 	</array>
 	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>
-			<key>UTTypeIdentifier</key>
-			<string>com.alqzan.madar2.backupset</string>
-			<key>UTTypeDescription</key>
-			<string>نسخة مدار التلقائية</string>
 			<key>UTTypeConformsTo</key>
 			<array>
 				<string>com.apple.package</string>
 			</array>
+			<key>UTTypeDescription</key>
+			<string>نسخة مدار التلقائية</string>
+			<key>UTTypeIdentifier</key>
+			<string>com.alqzan.madar2.backupset</string>
 			<key>UTTypeTagSpecification</key>
 			<dict>
 				<key>public.filename-extension</key>

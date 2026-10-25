@@ -118,4 +118,15 @@ struct PDFBookTextReaderTests {
         let marks = PDFBookPageText(index: 1, text: "ـ إِنَّ ـ القِراءةَ\tبابُ المَعرفة", source: .optical)
         #expect(marks.excerpt(matching: "ان القراءة باب") == "إِنَّ القِراءةَ بابُ المَعرفة")
     }
+
+    /// Lines Vision returned for the owner's scanned «مشروع العمر», page 9 (25 Oct 2026). Expected values are
+    /// the printed words with only the impossible marks removed; missing letters are not invented.
+    @Test func ocrStraySymbolsLeaveArabicLinesWithoutGuessingLetters() {
+        #expect(PDFBookTextReader.withoutStraySymbols("حياتك% والذي يعدُّ كتابُ مشروع العمر! #هو الترجمةَ") == "حياتك والذي يعدُّ كتابُ مشروع العمر! هو الترجمةَ")
+        #expect(PDFBookTextReader.withoutStraySymbols("وقد بلغتْ منِّي هذه الكلمة ' شروع العمر 'كلَّ مَبْلَغ،") == "وقد بلغتْ منِّي هذه الكلمة ' شروع العمر 'كلَّ مَبْلَغ،")
+        #expect(PDFBookTextReader.withoutStraySymbols("وقد بلغتْ منِّي هذه الكلمة مشروع العمر% كلَّ مَبْلَغ ،") == "وقد بلغتْ منِّي هذه الكلمة مشروع العمر كلَّ مَبْلَغ،")
+        #expect(PDFBookTextReader.withoutStraySymbols("كتابُ (مشروع العمر )' هو") == "كتابُ (مشروع العمر ) هو")
+        #expect(PDFBookTextReader.withoutStraySymbols("100% of C# & more") == "100% of C# & more")
+        #expect(PDFBookTextReader.withoutStraySymbols("الْأَرْضِ وَاسْتَعْمَرَكُمْ فِيهَا [هود: ٦١]") == "الْأَرْضِ وَاسْتَعْمَرَكُمْ فِيهَا [هود: ٦١]")
+    }
 }

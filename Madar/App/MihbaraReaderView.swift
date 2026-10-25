@@ -134,12 +134,18 @@ struct MihbaraReaderView: View {
     let book: MihbaraBook
     /// The volume of a set whose spine was tapped (0-based); nil opens the saved place.
     var volume: Int? = nil
+    /// Owner, 25 Oct 2026: «خل دائما فيه خيار لعرضه PDF». For a book converted on this device, finds the
+    /// original PDF on the shelf from the EPUB's identifier (`urn:madar:pdf:<file hash>`).
+    var originalPDF: ((String) -> UUID?)? = nil
+    /// Closes this reader and opens that PDF at a 0-based page.
+    var openOriginal: ((UUID, Int) -> Void)? = nil
     let close: () -> Void
 
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var publication: Publication?
+    @State private var originalPDFID: UUID?
     @State private var localURL: URL?
     @State private var initialLocator: Locator?
     /// The page-break anchor where a tapped volume begins, kept until the reader has turned to it.
@@ -475,7 +481,7 @@ struct MihbaraReaderView: View {
                     .lineLimit(1)
                     .accessibilityIdentifier("mihbara-reader-subtitle")
             }
-            .padding(.horizontal, 112)
+            .padding(.horizontal, originalPDFID != nil && openOriginal != nil && !footerShowsPage ? 156 : 112)
             .frame(maxWidth: .infinity)
             HStack(spacing: 12) {
                 Button(action: finishAndClose) {
@@ -488,6 +494,14 @@ struct MihbaraReaderView: View {
                 .accessibilityIdentifier("mihbara-reader-close")
                 Spacer(minLength: 0)
                 HStack(spacing: 12) {
+                    if let originalPDFID, openOriginal != nil, !footerShowsPage {
+                        Button { showOriginal(originalPDFID) } label: {
+                            Image(systemName: "doc.richtext").font(.system(size: 18, weight: .regular))
+                                .frame(width: 32, height: 44).contentShape(Rectangle())
+                        }
+                        .accessibilityLabel("اعرض الأصل PDF في هذه الصفحة")
+                        .accessibilityIdentifier("mihbara-reader-original-pdf")
+                    }
                     Button(action: toggleNarration) {
                         Image(systemName: speechController.isActive ? (isSpeaking ? "pause.fill" : "play.fill") : "headphones").font(.system(size: 18, weight: .regular))
                             .frame(width: 32, height: 44).contentShape(Rectangle())
@@ -596,6 +610,16 @@ struct MihbaraReaderView: View {
                     Text(printPageLabel)
                         .font(MadarTypography.caption()).lineLimit(1).minimumScaleFactor(0.85)
                         .accessibilityIdentifier("mihbara-reader-print-page")
+                    // A converted book's page beside its original: «الأصل» opens the PDF on this very page.
+                    if let originalPDFID, openOriginal != nil {
+                        Button { showOriginal(originalPDFID) } label: {
+                            Label("الأصل", systemImage: "doc.richtext").font(MadarTypography.caption())
+                                .frame(minHeight: 44).contentShape(Rectangle())
+                        }
+                        .foregroundStyle(palette.accent)
+                        .accessibilityLabel("اعرض الأصل PDF في هذه الصفحة")
+                        .accessibilityIdentifier("mihbara-reader-original-pdf")
+                    }
                     Spacer(minLength: 4)
                     if readerFooter == .full || speechController.isActive {
                         Text(speechController.isActive ? (isSpeaking ? "تُقرأ الفقرة بصوت \(isEnglish ? "إنجليزي" : "عربي")" : "القراءة الصوتية متوقفة مؤقتًا") : (readingClock?.activeSeconds ?? 0) >= 60 ? "الجلسة بدأت · تُسجَّل وحدها" : "تُسجَّل الجلسة بعد دقيقة نشاط")
@@ -608,6 +632,9 @@ struct MihbaraReaderView: View {
         .overlay(alignment: .top) { Rectangle().fill(palette.line).frame(height: 1) }
         .background(paper)
     }
+
+    /// The page row of the footer is on screen (Arabic book, footer not reduced to its bar).
+    private var footerShowsPage: Bool { !isEnglish && readerFooter != .none && readerFooter != .bar }
 
     private var footerLabel: String {
         guard isEnglish else { return printPageLabel }
@@ -672,6 +699,9 @@ struct MihbaraReaderView: View {
 
             let opened = try await MihbaraEPUBLoader.open(at: file)
             isEnglish = opened.metadata.languages.first?.lowercased().hasPrefix("en") ?? false
+            if let identifier = opened.metadata.identifier, identifier.hasPrefix("urn:madar:pdf:") {
+                originalPDFID = originalPDF?(String(identifier.dropFirst("urn:madar:pdf:".count)))
+            }
 
             let saved = readiumLocator(book.locatorJSON)
             let now = Date()
@@ -1441,6 +1471,19 @@ struct MihbaraReaderView: View {
         queueSessionSave(at: date)
         beginSegment(at: date)
         readingClock = ActiveReadingClock(startedAt: date, foreground: false)
+    }
+
+    /// The converted book's page markers are the PDF's pages in order, so the page on screen is the same page there.
+    @MainActor private func showOriginal(_ id: UUID) {
+        let page = (pageCoordinate(printLocator) ?? 1) - 1
+        guard !isClosing else { return }
+        isClosing = true
+        pauseReader(at: Date())
+        Task { @MainActor in
+            await saveCoordinator.waitForCurrentAttempt()
+            isClosing = false
+            openOriginal?(id, page)
+        }
     }
 
     @MainActor private func finishAndClose() {

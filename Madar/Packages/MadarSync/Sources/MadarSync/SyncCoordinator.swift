@@ -9,6 +9,8 @@ import MadarData
     public private(set) var pendingAccountHash: String?
     public private(set) var checkpoint: VerifiedSyncCheckpoint?
     public private(set) var lastHistoryReport: HistoryDrainReport?
+    /// The last account state read from iCloud (nil until read; never inferred).
+    public private(set) var observedAccount: CloudAccount?
     private let adapter: any SyncLifecycleAdapter
     private let accountProvider: any CloudAccountProviding
     private let provisioning: SyncProvisioning
@@ -35,13 +37,18 @@ import MadarData
         guard provisioning.mayOpenCloudMirror else { set(.localOnly, "المزامنة السحابية غير مهيأة — بياناتك على هذا الجهاز فقط"); return }
         set(.checkingAccount, "يتحقق مدار من حساب iCloud")
         do {
-            let account = try await accountProvider.account(); knownAccount = account
+            let account = try await accountProvider.account(); knownAccount = account; observedAccount = account
             let binding = adapter.binding
             let preference = try pendingPreference ?? adapter.syncPreference
             switch account {
             case .available(let hash):
                 guard !hash.isEmpty else { throw SyncFailure.unknownAccount }
-                if binding.accountHash != hash {
+                if binding.accountHash == nil {
+                    // First account this store has met: nothing to choose between. Bind it while still
+                    // local; mirroring starts only when the person turns sync on.
+                    try await adapter.activate(.init(accountHash: hash, cloudEnabled: false, dataChoice: .keepDevice, checkpoint: nil, generationBefore: binding.generationID, requestedDevicePreference: preference))
+                    set(.localOnly, "المزامنة مطفأة — بياناتك محفوظة على هذا الجهاز")
+                } else if binding.accountHash != hash {
                     if checkpoint == nil {
                         set(.transitioning, "يحفظ مدار نسخة قبل تغيير الحساب")
                         let saved = try await adapter.checkpointAndSuspend(reason: .accountChange)

@@ -110,4 +110,28 @@ struct PDFBookEPUBTests {
         let ambiguous = Array(repeating: "كلام أول\nكلام ثان", count: 3)
         #expect(PDFBookEPUB.withoutRunningLines(ambiguous) == ambiguous)
     }
+
+    /// Owner's scanned book, 25 Oct 2026: page 5 is a calligraphic basmala with no words. It must appear as its
+    /// picture, never as «لم يُستخرج نصها بدقة»; a blank page adds nothing; a pictured first page is the cover.
+    @Test func wordlessPagesKeepTheirPictureBlankPagesVanishAndThePicturedFirstPageIsTheCover() throws {
+        let jpeg = Data([0xFF, 0xD8, 0xFF, 0xD9])
+        let pages = [
+            PDFBookEPUB.Page(text: "", optical: true, unreliable: false, image: jpeg),
+            PDFBookEPUB.Page(text: "", optical: true, unreliable: false, blank: true),
+            PDFBookEPUB.Page(text: "", optical: true, unreliable: false, image: jpeg),
+            PDFBookEPUB.Page(text: "إضاءة.", optical: true, unreliable: false),
+            PDFBookEPUB.Page(text: "", optical: true, unreliable: false)
+        ]
+        #expect(PDFBookEPUB.summary(pages) == .init(pages: 5, opticalPages: 5, skippedPages: [5], picturedPages: 2))
+        let epub = try PDFBookEPUB.build(title: "مشروع العمر", author: "", language: "ar", sourceHash: String(repeating: "b", count: 64), pages: pages, outline: [])
+        let all = text(epub)
+        #expect(all.contains("<img src=\"images/p1.jpg\""))
+        #expect(all.contains("<img src=\"images/p3.jpg\""))
+        #expect(!all.contains("images/p2.jpg"))
+        #expect(all.contains("href=\"images/p1.jpg\" media-type=\"image/jpeg\" properties=\"cover-image\""))
+        #expect(all.contains("href=\"images/p3.jpg\" media-type=\"image/jpeg\"/>"))
+        #expect(!all.contains("صفحة ١: لم يُستخرج") && !all.contains("صفحة ٢: لم يُستخرج") && !all.contains("صفحة ٣: لم يُستخرج"))
+        #expect(all.contains("صفحة ٥: لم يُستخرج نصها بدقة"))
+        #expect(all.contains("id=\"p-2\""))
+    }
 }

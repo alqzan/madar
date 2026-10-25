@@ -121,8 +121,12 @@ struct MihbaraHomeView: View {
         .fullScreenCover(item: $readerRoute, onDismiss: load) { route in
             if let book = reading?.books.first(where: { $0.id == route.bookID && ($0.isReadableEPUB || $0.isReadablePDF) }) {
                 Group {
-                    if book.isReadablePDF { MihbaraPDFReaderView(app: app, book: book) { readerRoute = nil } }
-                    else { MihbaraReaderView(app: app, book: book, volume: route.volume) { readerRoute = nil } }
+                    if book.isReadablePDF { MihbaraPDFReaderView(app: app, book: book, startPage: route.page) { readerRoute = nil } }
+                    else {
+                        MihbaraReaderView(app: app, book: book, volume: route.volume,
+                            originalPDF: { hash in reading?.books.first { $0.isReadablePDF && $0.fileHash == hash }?.id },
+                            openOriginal: { id, page in readerRoute = MihbaraReaderRoute(bookID: id, page: page) }) { readerRoute = nil }
+                    }
                 }.environment(\.roomTheme, theme)
             } else {
                 VStack(spacing: 16) {
@@ -795,7 +799,7 @@ struct MihbaraHomeView: View {
 
 }
 private enum MihbaraSheet: Identifiable { case library, book(UUID), hadith(Int), opening, notebook, motivation; var id: String { String(describing: self) } }
-private struct MihbaraReaderRoute: Identifiable { let bookID: UUID; var volume: Int? = nil; var id: String { bookID.uuidString + "-\(volume ?? -1)" } }
+private struct MihbaraReaderRoute: Identifiable { let bookID: UUID; var volume: Int? = nil; var page: Int? = nil; var id: String { bookID.uuidString + "-\(volume ?? -1)-\(page ?? -1)" } }
 
 private struct MihbaraMotivationCard: View {
     let cues: [MihbaraMotivationCue]

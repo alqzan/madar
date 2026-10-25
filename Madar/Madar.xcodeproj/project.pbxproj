@@ -697,6 +697,7 @@
 		97C5186966B3BE345A9B38A1 /* DiarySeasonIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiarySeasonIntegrationTests.swift; sourceTree = "<group>"; };
 		980BEF9FA1185D7404A6E08E /* CaptureIntentIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureIntentIntegrationTests.swift; sourceTree = "<group>"; };
 		98A5EBAFEC75637270AA4DE7 /* MoneyZakatDrawings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyZakatDrawings.swift; sourceTree = "<group>"; };
+		990746A78E8A5E2A1598BEAD /* Madar-CloudKit.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "Madar-CloudKit.entitlements"; sourceTree = "<group>"; };
 		99F71A4EDE8E264501B5E13C /* LegacyMove.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyMove.swift; sourceTree = "<group>"; };
 		9B031AA8A32A509374B4BC38 /* BahwYearUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BahwYearUITests.swift; sourceTree = "<group>"; };
 		9CB01E6837C74E167DE5E222 /* DiaryTravelIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryTravelIntegrationTests.swift; sourceTree = "<group>"; };
@@ -1052,6 +1053,7 @@
 				48A9033F6B4316E4E096BA9A /* LegacyPrayerTrial.swift */,
 				3AF30ADC512139E6B75364EF /* LegacyQuranTrial.swift */,
 				B19809D08DBE59B8044905EC /* LockWidgetGallery.swift */,
+				990746A78E8A5E2A1598BEAD /* Madar-CloudKit.entitlements */,
 				D3146E3E67CC7456B5F8DDAD /* Madar.entitlements */,
 				52096FB2E7F5C96D70BD4B80 /* MadarApp.swift */,
 				7884A40C087DAC3CED8FC2B8 /* MadarComponentGallery.swift */,
@@ -2292,7 +2294,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = App/Madar.entitlements;
+				CODE_SIGN_ENTITLEMENTS = "$(MADAR_APP_ENTITLEMENTS)";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = App/Info.plist;
@@ -2304,6 +2306,8 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				MADAR_APP_ENTITLEMENTS = App/Madar.entitlements;
+				MADAR_CLOUDKIT_CONTAINER = "";
 				PRODUCT_BUNDLE_IDENTIFIER = com.alqzan.madar2;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -2333,7 +2337,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = App/Madar.entitlements;
+				CODE_SIGN_ENTITLEMENTS = "$(MADAR_APP_ENTITLEMENTS)";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = App/Info.plist;
@@ -2345,6 +2349,8 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				MADAR_APP_ENTITLEMENTS = App/Madar.entitlements;
+				MADAR_CLOUDKIT_CONTAINER = "";
 				PRODUCT_BUNDLE_IDENTIFIER = com.alqzan.madar2;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";

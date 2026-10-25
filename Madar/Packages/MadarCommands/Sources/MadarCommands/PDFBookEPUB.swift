@@ -11,23 +11,39 @@ public enum PDFBookEPUB {
         public let unreliable: Bool
         /// The printed page label when it differs from the page's position.
         public let label: String?
-        public init(text: String, optical: Bool, unreliable: Bool, label: String? = nil) {
-            self.text = text; self.optical = optical; self.unreliable = unreliable; self.label = label
+        /// The page as a picture (JPEG), for a page whose content is not text: a cover, a calligraphic
+        /// basmala, an ornament or a figure. Shown in place of the text; never for a blank page.
+        public let image: Data?
+        /// A page with nothing on it. It keeps its page number and adds nothing to the reading.
+        public let blank: Bool
+        public init(text: String, optical: Bool, unreliable: Bool, label: String? = nil, image: Data? = nil, blank: Bool = false) {
+            self.text = text; self.optical = optical; self.unreliable = unreliable; self.label = label; self.image = image; self.blank = blank
         }
-        public init(_ page: PDFBookPageText, label: String? = nil) {
-            self.init(text: page.text, optical: page.source == .optical, unreliable: page.hasUnreliableArabicMapping, label: label)
+        public init(_ page: PDFBookPageText, label: String? = nil, image: Data? = nil, blank: Bool = false) {
+            self.init(text: page.text, optical: page.source == .optical, unreliable: page.hasUnreliableArabicMapping, label: label, image: image, blank: blank)
         }
+        /// Shown as its picture rather than as text.
+        var pictured: Bool { image != nil && (unreliable || PDFBookEPUB.paragraphs(text).isEmpty) }
+        var gap: Bool { !blank && image == nil && (unreliable || PDFBookEPUB.paragraphs(text).isEmpty) }
     }
 
     public struct Summary: Sendable, Equatable {
         public let pages: Int, opticalPages: Int, skippedPages: [Int]
+        /// Pages kept as their picture (cover, basmala, ornaments).
+        public let picturedPages: Int
+        public init(pages: Int, opticalPages: Int, skippedPages: [Int], picturedPages: Int = 0) {
+            self.pages = pages; self.opticalPages = opticalPages; self.skippedPages = skippedPages; self.picturedPages = picturedPages
+        }
     }
+    /// A converted book carries at most this many page pictures; any further pictureless page keeps its honest note.
+    public static let maximumPictures = 40
 
     static let pagesPerDocument = 30
 
     public static func summary(_ pages: [Page]) -> Summary {
         Summary(pages: pages.count, opticalPages: pages.filter(\.optical).count,
-                skippedPages: pages.indices.filter { pages[$0].unreliable || paragraphs(pages[$0].text).isEmpty }.map { $0 + 1 })
+                skippedPages: pages.indices.filter { pages[$0].gap }.map { $0 + 1 },
+                picturedPages: pages.filter(\.pictured).count)
     }
 
     public static func build(title: String, author: String, language: String, sourceHash: String,
@@ -45,12 +61,16 @@ public enum PDFBookEPUB {
         if summary.opticalPages > 0 {
             info += "<p class=\"madar-source\">صفحات قُرئت من صورها: \(digits(summary.opticalPages)) من \(digits(summary.pages)). قد تختلف فيها كلمات قليلة عن الأصل.</p>"
         }
+        if summary.picturedPages > 0 {
+            info += "<p class=\"madar-source\">صفحات بلا نص بقيت بصورتها كما في الأصل (الغلاف والزخارف): \(digits(summary.picturedPages)).</p>"
+        }
         if !summary.skippedPages.isEmpty {
             info += "<p class=\"madar-source\">صفحات لم يُستخرج نصها بدقة: \(digits(summary.skippedPages.count)). مكان كل منها ملاحظة برقمها لتراجعها في PDF.</p>"
         }
         info += "</section>"
         files.append(("OEBPS/info.xhtml", TurathEPUB.xhtml(title: "عن هذه النسخة", body: info)))
         var pageList = ""
+        var pictures: [(String, Data)] = []
         let texts = withoutRunningLines(pages.map(\.text))
         for (n, range) in chunks.enumerated() {
             // Owner, 24 Oct 2026 («ترتيب الفكرات والصفحات»): a paragraph that runs over a page break stays one
@@ -62,6 +82,18 @@ public enum PDFBookEPUB {
                 let escaped = TurathEPUB.escape(label)
                 let marker = "<span id=\"p-\(ordinal)\" epub:type=\"pagebreak\" role=\"doc-pagebreak\" title=\"\(escaped)\" aria-label=\"\(escaped)\"></span>"
                 pageList += "<li><a href=\"c\(n + 1).xhtml#p-\(ordinal)\">\(escaped)</a></li>"
+                if page.pictured, let image = page.image {
+                    if open { body += "</p>"; open = false }
+                    let name = "images/p\(ordinal).jpg"
+                    pictures.append((name, image))
+                    body += marker + "<figure class=\"madar-page-picture\"><img src=\"\(name)\" alt=\"صفحة \(escaped) كما في الأصل\"/></figure>"
+                    continue
+                }
+                if page.blank && paragraphs(texts[index]).isEmpty {
+                    if open { body += "</p>"; open = false }
+                    body += marker
+                    continue
+                }
                 var list = page.unreliable ? [] : paragraphs(texts[index])
                 if list.isEmpty {
                     if open { body += "</p>"; open = false }
@@ -81,6 +113,7 @@ public enum PDFBookEPUB {
             if open { body += "</p>" }
             files.append(("OEBPS/c\(n + 1).xhtml", TurathEPUB.xhtml(title: title, body: "<section>\(body)</section>")))
         }
+        files += pictures.map { ("OEBPS/" + $0.0, $0.1) }
         // The PDF's bookmarks become the index; without bookmarks the index lists every tenth page.
         var toc = "<li><a href=\"info.xhtml\">عن هذه النسخة</a></li>"
         let href = { (page: Int) -> String in
@@ -95,6 +128,11 @@ public enum PDFBookEPUB {
         files.append(("OEBPS/nav.xhtml", TurathEPUB.xhtml(title: "الفهرس", body: "<nav epub:type=\"toc\"><h1>الفهرس</h1><ol>\(toc)</ol></nav><nav epub:type=\"page-list\" hidden=\"\"><ol>\(pageList)</ol></nav>")))
         let manifest = "<item id=\"nav\" href=\"nav.xhtml\" media-type=\"application/xhtml+xml\" properties=\"nav\"/><item id=\"info\" href=\"info.xhtml\" media-type=\"application/xhtml+xml\"/>"
             + chunks.indices.map { "<item id=\"c\($0 + 1)\" href=\"c\($0 + 1).xhtml\" media-type=\"application/xhtml+xml\"/>" }.joined()
+            // A pictured first page is the book's cover on the shelf.
+            + pictures.enumerated().map { i, picture in
+                let cover = i == 0 && picture.0 == "images/p1.jpg" ? " properties=\"cover-image\"" : ""
+                return "<item id=\"img\(i + 1)\" href=\"\(picture.0)\" media-type=\"image/jpeg\"\(cover)/>"
+            }.joined()
         let spine = "<itemref idref=\"info\"/>" + chunks.indices.map { "<itemref idref=\"c\($0 + 1)\"/>" }.joined()
         let opf = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><package xmlns=\"http://www.idpf.org/2007/opf\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\" version=\"3.0\" unique-identifier=\"bookid\" xml:lang=\"\(lang)\"\(rtl ? " dir=\"rtl\"" : "")><metadata><dc:identifier id=\"bookid\">urn:madar:pdf:\(TurathEPUB.escape(sourceHash))</dc:identifier><dc:title>\(TurathEPUB.escape(title))</dc:title>"
             + (author.isEmpty ? "" : "<dc:creator>\(TurathEPUB.escape(author))</dc:creator>")
@@ -142,7 +180,7 @@ public enum PDFBookEPUB {
 
     /// Joins a page's printed lines into paragraphs. A line ends its paragraph when it is blank, ends with
     /// closing punctuation, or is clearly shorter than the page's typical line (the last line of a paragraph).
-    static func paragraphs(_ text: String) -> [String] {
+    public static func paragraphs(_ text: String) -> [String] {
         let lines = text.replacingOccurrences(of: "\r\n", with: "\n").components(separatedBy: "\n")
             .map { $0.split(whereSeparator: { $0 == " " || $0 == "\t" }).joined(separator: " ") }
         let lengths = lines.map(\.count).filter { $0 > 0 }.sorted()

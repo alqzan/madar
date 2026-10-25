@@ -9,6 +9,8 @@ import MadarCommands
 struct MihbaraPDFReaderView: View {
     let app: AppSession
     let book: MihbaraBook
+    /// Opens on this page (0-based) instead of the saved place: the original of a converted book, at the same page.
+    var startPage: Int? = nil
     let close: () -> Void
 
     @Environment(\.scenePhase) private var scenePhase
@@ -172,7 +174,7 @@ struct MihbaraPDFReaderView: View {
             guard let opened = PDFDocument(data: bytes), !opened.isLocked, opened.pageCount > 0,
                   opened.page(at: 0) != nil else { throw PDFReaderError.unreadable }
             document = opened
-            pageIndex = restoredIndex(count: opened.pageCount)
+            pageIndex = startPage.map { min(max($0, 0), opened.pageCount - 1) } ?? restoredIndex(count: opened.pageCount)
             let now = Date()
             sessionStart = now
             sessionStartIndex = pageIndex

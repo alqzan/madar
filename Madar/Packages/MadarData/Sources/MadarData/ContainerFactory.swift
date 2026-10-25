@@ -27,7 +27,7 @@ public enum MadarContainerFactory {
         let version = try storeVersion(at:directory)
         guard version == MadarSchema.version || (2..<MadarSchema.version).contains(version) else { throw DataError.legacyStoreRequiresAdoption }
     }
-    public static func make(at syncedDirectory: URL, deviceStoreURL: URL, cloudKitContainerIdentifier: String? = nil) throws -> ModelContainer {
+    public static func make(at syncedDirectory: URL, deviceStoreURL: URL, cloudKitContainerIdentifier: String? = nil, provisionedContainer: String? = nil) throws -> ModelContainer {
         try FileManager.default.createDirectory(at:syncedDirectory,withIntermediateDirectories:true)
         try FileManager.default.createDirectory(at:deviceStoreURL.deletingLastPathComponent(),withIntermediateDirectories:true)
         try preflightVersion(at:syncedDirectory)
@@ -42,8 +42,9 @@ public enum MadarContainerFactory {
         // metadata is not a version in that plan. Infer only that device metadata upgrade;
         // LegacyGenerationMigration validates it on an expendable clone before promotion.
         let migrationPlan: (any SchemaMigrationPlan.Type)? = try storeVersion(at: syncedDirectory) < MadarSchema.version ? MadarMigrationPlan.self : nil
+        let mirror = MadarCloudMirror.target(pointerIdentifier:cloudKitContainerIdentifier,provisioned:provisionedContainer)
         let container = try ModelContainer(for:MadarSchema.schema,migrationPlan:migrationPlan,configurations:[
-            ModelConfiguration("synced",schema:Schema(MadarSchema.syncedTypes),url:syncedDirectory.appendingPathComponent("Madar.store"),cloudKitDatabase:.none),
+            ModelConfiguration("synced",schema:Schema(MadarSchema.syncedTypes),url:syncedDirectory.appendingPathComponent("Madar.store"),cloudKitDatabase:mirror.database),
             ModelConfiguration("deviceOnly",schema:Schema(MadarSchema.deviceTypes),url:deviceStoreURL,cloudKitDatabase:.none)
         ])
         try DurableFiles.encode(MadarSchema.version,to:syncedDirectory.appendingPathComponent("SchemaVersion.json"))

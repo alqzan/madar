@@ -143,6 +143,8 @@ private struct MadarSceneContent: View {
             #endif
             let root = group.appending(path: "ManagedData", directoryHint: .isDirectory)
             let lockURL = group.appending(path: "CommandBus.lock")
+            // Nil unless this build is signed for iCloud: then no store ever opens a CloudKit mirror.
+            MadarCloudMirror.provisionedContainerIdentifier = AppSyncService.provisionedContainer
             let managed: ManagedDataStore
             if !FileManager.default.fileExists(atPath: root.appending(path: "ActiveGeneration.json").path), FileManager.default.fileExists(atPath: group.appending(path: "Madar.store").path) {
                 let version = try MadarContainerFactory.storeVersionForAdoption(at:group)

@@ -70,6 +70,10 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.alqzan.madar2
+        # Empty: local-only build that never opens CloudKit. `make cloud-device` sets it with Madar-CloudKit.entitlements.
+        MADAR_CLOUDKIT_CONTAINER: ''
+        MADAR_APP_ENTITLEMENTS: App/Madar.entitlements
+        CODE_SIGN_ENTITLEMENTS: $(MADAR_APP_ENTITLEMENTS)
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         INFOPLIST_KEY_CFBundleDisplayName: مدار
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.lifestyle
@@ -99,7 +103,8 @@ targets:
             UTTypeConformsTo: [com.apple.package]
             UTTypeTagSpecification:
               public.filename-extension: [madarbackupset]
-        UIBackgroundModes: [processing]
+        UIBackgroundModes: [processing, remote-notification]
+        MadarCloudKitContainer: $(MADAR_CLOUDKIT_CONTAINER)
         UIAppFonts:
           - thmanyahsans-Light.otf
           - thmanyahsans-Regular.otf
@@ -117,11 +122,8 @@ targets:
           - AtkinsonHyperlegible-Bold.ttf
           - IBMPlexSerif-Regular.ttf
           - IBMPlexSerif-Bold.ttf
-    entitlements:
-      path: App/Madar.entitlements
-      properties:
-        com.apple.security.application-groups: [group.com.alqzan.madar2]
-        com.apple.developer.healthkit: true
+    # App/Madar.entitlements (App Group + HealthKit) is kept as a file; CODE_SIGN_ENTITLEMENTS picks it or, in the
+    # paid iCloud build, App/Madar-CloudKit.entitlements through MADAR_APP_ENTITLEMENTS.
   MadarWidgets:
     type: app-extension
     platform: iOS
