@@ -34,6 +34,39 @@ import XCTest
         element("bahw-year-back").tap()
         XCTAssertTrue(element("bahw-greeting").waitForExistence(timeout: 5))
     }
+    func testOneTimeDayBeyondTwoYearsHasPreviewSavesAndRelaunches() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_HABIT_FIXTURE": "empty",
+            "MADAR_UI_NOW": "2026-10-25T12:00:00+03:00", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_UNDO_SECONDS": "6"]
+        func open() {
+            let block = app.descendants(matching: .any)["bahw-block-year"]
+            XCTAssertTrue(block.waitForExistence(timeout: 25))
+            for _ in 0..<6 where !block.isHittable { app.swipeUp(velocity: .slow) }
+            block.tap(); XCTAssertTrue(app.descendants(matching: .any)["bahw-year-hero"].waitForExistence(timeout: 10))
+        }
+        app.launch(); open()
+        app.buttons["bahw-add-day"].tap()
+        let title = app.textFields["bahw-day-title"]; XCTAssertTrue(title.waitForExistence(timeout: 10))
+        title.tap(); title.typeText("موعد بعيد\n")
+        app.segmentedControls["bahw-day-repeats"].buttons["مرة واحدة"].tap()
+        let increment = app.buttons["bahw-day-year-Increment"]
+        XCTAssertTrue(increment.waitForExistence(timeout: 5))
+        for _ in 0..<4 { increment.tap() }
+        let preview = app.staticTexts.matching(identifier: "bahw-day-date-preview")
+        XCTAssertTrue(preview.firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(preview.allElementsBoundByIndex.contains { $0.label.contains("٢٠٣٠") })
+        capture(app, "M4-V03-far-future-preview-L")
+        app.buttons["bahw-day-save"].tap(); app.buttons["أيامي"].tap()
+        let saved = app.descendants(matching: .any).matching(identifier: "bahw-matter-موعد بعيد").firstMatch
+        XCTAssertTrue(saved.waitForExistence(timeout: 10))
+        _ = app.buttons["تراجع"].waitForNonExistence(timeout: 8)
+        app.swipeUp(velocity: .slow)
+        XCTAssertTrue(saved.isHittable)
+        capture(app, "M4-V03-far-future-saved-L")
+        app.terminate(); app.launch(); open(); app.buttons["أيامي"].tap()
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "bahw-matter-موعد بعيد").firstMatch.waitForExistence(timeout: 10))
+    }
     private func finishOnboarding(_ app: XCUIApplication) {
         if app.buttons["first-run-skip"].waitForExistence(timeout: 2) { app.buttons["first-run-skip"].tap() }
         let start = app.buttons["first-run-continue"]

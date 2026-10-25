@@ -70,6 +70,20 @@ import Testing
         #expect(rule == MadarUpcomingRule(calendar: .hijri, month: 9, day: 1, repeats: .yearly))
     }
 
+    @Test func farFutureOneTimeDatesUseTheirStoredYear() throws {
+        // B03 places no 800-day horizon on a one-off. The Gregorian target is
+        // literal; the Ramadan 1448 clamp comes from the handoff's 8 March row.
+        let future = MadarUpcomingRule(calendar: .gregorian, year: 2035, month: 11, day: 19, repeats: .none)
+        #expect(future.next(onOrAfter: day("2026-10-25"), riyadh) == day("2035-11-19"))
+        #expect(future.next(onOrAfter: day("2035-11-19"), riyadh) == day("2035-11-19"))
+        #expect(future.next(onOrAfter: day("2035-11-20"), riyadh) == nil)
+        let short = MadarUpcomingRule(calendar: .gregorian, year: 2031, month: 2, day: 29, repeats: .none)
+        #expect(short.next(onOrAfter: day("2026-10-25"), riyadh) == day("2031-02-28"))
+        let ramadan = MadarUpcomingRule(calendar: .hijri, year: 1448, month: 9, day: 30, repeats: .none)
+        #expect(ramadan.next(onOrAfter: day("2020-10-25"), riyadh) == day("2027-03-08"))
+        let corrected = MadarCalendarDays(zone: riyadh.zone, source: .sighting, offset: 1)
+        #expect(ramadan.next(onOrAfter: day("2020-10-25"), corrected) == day("2027-03-07"))
+    }
     @Test func ringRestartsAfterEachOccurrence() throws {
         // countStart = max(countFromDayKey, the day after the previous occurrence): after an occurrence a new count begins.
         let rule = MadarUpcomingRule(calendar: .gregorian, month: 1, day: 10, repeats: .monthly, countFrom: day("2026-01-01"))

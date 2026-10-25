@@ -113,10 +113,26 @@ public struct MadarUpcomingRule: Equatable, Sendable {
         if repeats == .none, let year, y != year { return false }
         return d == day || (d < day && last)
     }
-    /// The first occurrence on or after `today`; nil when a one-time day has passed (searched within ~13 months).
+    /// A one-time rule names its exact year, however far ahead it is. Recurring
+    /// rules need only the next calendar year to find their next occurrence.
     public func next(onOrAfter today: GregorianDay, _ days: MadarCalendarDays) -> GregorianDay? {
-        let horizon = repeats == .none ? 800 : 400
-        return (0...horizon).lazy.map { today.adding(days: $0) }.first { matches($0, days) }
+        if repeats == .none, let year {
+            guard (1...9999).contains(year), (1...12).contains(month), (1...(calendar == .hijri ? 30 : 31)).contains(day) else { return nil }
+            var source = Calendar(identifier: calendar == .hijri ? .islamicUmmAlQura : .gregorian)
+            source.timeZone = days.zone
+            guard let first = source.date(from: DateComponents(year: year, month: month, day: 1, hour: 12)),
+                  let length = source.range(of: .day, in: .month, for: first)?.count,
+                  let target = source.date(from: DateComponents(year: year, month: month, day: min(day, length), hour: 12)) else { return nil }
+            var civil = Calendar(identifier: .gregorian); civil.timeZone = days.zone
+            let offset = calendar == .hijri && days.source == .sighting ? min(2, max(-2, days.offset)) : 0
+            guard let corrected = civil.date(byAdding: .day, value: -offset, to: target) else { return nil }
+            let parts = civil.dateComponents([.year, .month, .day], from: corrected)
+            guard let y = parts.year, let m = parts.month, let d = parts.day,
+                  let result = try? GregorianDay(year: y, month: m, day: d), result >= today,
+                  matches(result, days) else { return nil }
+            return result
+        }
+        return (0...400).lazy.map { today.adding(days: $0) }.first { matches($0, days) }
     }
     public func previous(before day: GregorianDay, _ days: MadarCalendarDays) -> GregorianDay? {
         guard repeats != .none else { return nil }

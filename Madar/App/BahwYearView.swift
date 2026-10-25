@@ -376,7 +376,7 @@ struct BahwDaySheet: View {
                         }
                         if draft.repeats == "none" {
                             field("السنة") {
-                                Stepper(digits.string(draft.year) + (draft.hijri ? "هـ" : "م"), value: $draft.year, in: (draft.hijri ? 1400...1500 : 1980...2080)).font(MadarTypography.body())
+                                Stepper(digits.string(draft.year) + (draft.hijri ? "هـ" : "م"), value: $draft.year, in: (draft.hijri ? 1400...1500 : 1980...2080)).font(MadarTypography.body()).accessibilityIdentifier("bahw-day-year")
                             }
                         }
                     }
