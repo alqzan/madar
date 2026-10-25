@@ -156,11 +156,14 @@ public actor PDFBookTextReader {
         }
     }
 
-    /// Vision reads bold Arabic parentheses as `%`, `#`, `$`, `&` or a lone quote («' شروع العمر '»). Those
+    /// Vision reads bold Arabic parentheses as `%`, `#`, `$`, `&` or a lone quote («' شروع العمر '»), ornaments as Latin letters. Those
     /// marks never occur in Arabic prose, so an Arabic OCR line drops them; no letter is guessed or added.
     static func withoutStraySymbols(_ line: String) -> String {
         guard line.unicodeScalars.contains(where: { (0x0600...0x06FF).contains($0.value) }) else { return line }
         var kept = line.replacingOccurrences(of: #"[%#$&@^~|\\*•]"#, with: " ", options: .regularExpression)
+        // Ornaments and rules read as Latin letters glued to an Arabic word («تميمةvVv», «لV») or a lone «V».
+        kept = kept.replacingOccurrences(of: #"(?<=[\x{0621}-\x{0652}])[A-Za-z]+|[A-Za-z]+(?=[\x{0621}-\x{064A}])"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"(?<![A-Za-z])[Vv]+(?![A-Za-z])"#, with: " ", options: .regularExpression)
         // A straight quote that opens or closes nothing (no partner on the line) is noise.
         for quote in ["'", "\""] where kept.components(separatedBy: quote).count == 2 {
             kept = kept.replacingOccurrences(of: quote, with: " ")

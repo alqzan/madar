@@ -127,6 +127,10 @@ struct PDFBookTextReaderTests {
         #expect(PDFBookTextReader.withoutStraySymbols("وقد بلغتْ منِّي هذه الكلمة مشروع العمر% كلَّ مَبْلَغ ،") == "وقد بلغتْ منِّي هذه الكلمة مشروع العمر كلَّ مَبْلَغ،")
         #expect(PDFBookTextReader.withoutStraySymbols("كتابُ (مشروع العمر )' هو") == "كتابُ (مشروع العمر ) هو")
         #expect(PDFBookTextReader.withoutStraySymbols("100% of C# & more") == "100% of C# & more")
+        // Owner's scan: ornaments read as Latin letters stuck to words; real Latin words and links stay.
+        #expect(PDFBookTextReader.withoutStraySymbols("كانت تميمةvVv في سرورهV") == "كانت تميمة في سروره")
+        #expect(PDFBookTextReader.withoutStraySymbols("الفصل V الأول") == "الفصل الأول")
+        #expect(PDFBookTextReader.withoutStraySymbols("زوروا www.alkalam-sy.com للمزيد") == "زوروا www.alkalam-sy.com للمزيد")
         #expect(PDFBookTextReader.withoutStraySymbols("الْأَرْضِ وَاسْتَعْمَرَكُمْ فِيهَا [هود: ٦١]") == "الْأَرْضِ وَاسْتَعْمَرَكُمْ فِيهَا [هود: ٦١]")
     }
 }

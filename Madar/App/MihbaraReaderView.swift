@@ -1689,17 +1689,21 @@ private struct MihbaraContentsSheet: View {
         .presentationDetents([.medium, .large])
     }
 
-    private static func flatten(_ links: [ReadiumShared.Link], depth: Int = 0) -> [MihbaraTOCItem] {
-        links.flatMap { link in
-            [MihbaraTOCItem(link: link, depth: depth)] + flatten(link.children, depth: depth + 1)
+    private static func flatten(_ links: [ReadiumShared.Link]) -> [MihbaraTOCItem] {
+        func walk(_ links: [ReadiumShared.Link], _ depth: Int) -> [(link: ReadiumShared.Link, depth: Int)] {
+            links.flatMap { [(link: $0, depth: depth)] + walk($0.children, depth + 1) }
         }
+        return walk(links, 0).enumerated().map { MihbaraTOCItem(link: $1.link, depth: $1.depth, order: $0) }
     }
 }
 
 private struct MihbaraTOCItem: Identifiable {
     let link: ReadiumShared.Link
     let depth: Int
-    var id: String { "\(depth)-\(link.href)" }
+    /// Position in the index: several entries can open the same page (a scanned book's printed contents),
+    /// and an id made from the link alone made SwiftUI repeat one entry's title in their place.
+    let order: Int
+    var id: String { "\(order)" }
 }
 
 /// `mihbara.readerAr.font` ids. Amiri (OFL) is the schema default; the Thmanyah faces are the

@@ -88,6 +88,21 @@ struct PDFBookEPUBTests {
         #expect(PDFBookEPUB.printedContents(Array(pages.prefix(10))).isEmpty)
     }
 
+    /// The owner's contents page as the phone read it: titles run together on one line, leader dots read as
+    /// digits («٢..٠», «٠٤٠٠»), Latin digits, and one number misread. Expected pages are the heading pages.
+    @Test func aContentsPageReadWithMergedTitlesAndGarbledNumbersStillFindsEveryChapter() {
+        var pages = Array(repeating: "نص عادي في صفحة من الكتاب لا عنوان فيه.", count: 16)
+        pages[1] = "إضاءة\nنص."; pages[3] = "المقدمة\nنص."; pages[5] = "١ - البداية\nنص."
+        pages[7] = "٢ - الطريق الطويل\nنص."; pages[9] = "٣ - الثمرة\nنص."; pages[11] = "٤ - الخاتمة\nنص."
+        pages[14] = "الفهرس\nإضاءة\nالمقدمة\n١ - البداية ٢ - الطريق الطويل ٣ - الثمرة\n٤ - الخاتمة\n٢..٠\n٠٤٠٠\n6\n٣\n١٠\n١٢"
+        let expected: [PDFBookEPUB.PrintedEntry] = [
+            .init(title: "إضاءة", page: 1), .init(title: "المقدمة", page: 3), .init(title: "١ - البداية", page: 5),
+            .init(title: "٢ - الطريق الطويل", page: 7), .init(title: "٣ - الثمرة", page: 9), .init(title: "٤ - الخاتمة", page: 11)
+        ]
+        let found = PDFBookEPUB.printedContents(pages)
+        #expect(found == expected, "\(found.map { "\($0.page) \($0.title)" })")
+    }
+
     /// A page that opens on a heading, or follows a page ending on a short line, starts a new paragraph.
     @Test func headingsAndShortLastLinesDoNotRunIntoTheNextPage() throws {
         let pages = [

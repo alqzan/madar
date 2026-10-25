@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import UIKit
 import MadarCore
 import MadarData
 import MadarCommands
@@ -21,6 +22,8 @@ import MadarCommands
 
     private(set) var jobs: [Job] = []
     private var tasks: [UUID: Task<Void, Never>] = [:]
+    /// Leaving the app mid-conversion asks iOS for the time it allows, instead of stopping at once.
+    private var background: [UUID: UIBackgroundTaskIdentifier] = [:]
     /// Called after a converted book joins the library, so an open room reloads.
     var onFinished: (() -> Void)?
 
@@ -30,15 +33,23 @@ import MadarCommands
         guard job(for: book.id)?.state != .running else { return }
         jobs.removeAll { $0.id == book.id }
         jobs.append(Job(id: book.id, title: book.title))
+        background[book.id] = UIApplication.shared.beginBackgroundTask(withName: "pdf-conversion") { [weak self] in
+            MainActor.assumeIsolated { self?.endBackground(book.id) }
+        }
         tasks[book.id] = Task { [weak self] in await self?.run(book, app: app) }
     }
 
     func cancel(_ bookID: UUID) {
-        tasks[bookID]?.cancel(); tasks[bookID] = nil
+        tasks[bookID]?.cancel(); tasks[bookID] = nil; endBackground(bookID)
         jobs.removeAll { $0.id == bookID }
     }
 
     func dismiss(_ bookID: UUID) { if job(for: bookID)?.state != .running { jobs.removeAll { $0.id == bookID } } }
+
+    private func endBackground(_ id: UUID) {
+        guard let task = background.removeValue(forKey: id), task != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(task)
+    }
 
     private func update(_ id: UUID, _ change: (inout Job) -> Void) {
         guard let index = jobs.firstIndex(where: { $0.id == id }) else { return }
@@ -70,7 +81,7 @@ import MadarCommands
         } catch {
             update(book.id) { $0.state = .failed("تعذّر تحويل «\(book.title)». يبقى PDF كما هو وتقرؤه بصفحاته.") }
         }
-        tasks[book.id] = nil
+        tasks[book.id] = nil; endBackground(book.id)
     }
 
     /// Reads every page (embedded text first, on-device OCR otherwise) and writes the EPUB to a private folder.

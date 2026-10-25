@@ -201,6 +201,11 @@ public enum PDFBookEPUB {
     public static func printedContents(_ texts: [String]) -> [PrintedEntry] {
         let heads: Set<String> = ["الفهرس", "فهرسالموضوعات", "فهرسالمحتويات", "المحتويات", "محتوياتالكتاب"]
         func lines(_ i: Int) -> [String] { texts[i].components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty } }
+        // OCR can read several numbered titles as one line («١ - البداية ٢ - الطريق»): one title each.
+        func titles(_ line: String) -> [String] {
+            line.replacingOccurrences(of: #"\s+(?=[٠-٩0-9]{1,3}\s*[-–]\s)"#, with: "\n", options: .regularExpression)
+                .components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        }
         func number(_ raw: String) -> Int? {
             let digits = raw.compactMap { $0.wholeNumberValue.map(String.init) ?? ($0 == "." || $0 == "٫" ? "." : nil) }.joined()
             guard let first = digits.split(separator: ".").first, !first.isEmpty else { return nil }
@@ -213,7 +218,7 @@ public enum PDFBookEPUB {
         while index < texts.count {
             var found = 0, numbers: [Int] = [], run = 0, longestRun = 0
             let first = raw.count
-            for line in lines(index) where !heads.contains(letters(line)) {
+            for line in lines(index).flatMap(titles) where !heads.contains(letters(line)) {
                 let name = line.drop { $0 == "-" || $0 == " " }
                 let wordy = letters(String(name)).count >= 3
                 let tail = line.reversed().prefix { $0.isNumber || $0 == "." || $0 == " " || $0 == "…" }
@@ -231,7 +236,8 @@ public enum PDFBookEPUB {
             if longestRun >= 3, abs(untitled.count - numbers.count) <= 1 {
                 for (k, n) in zip(untitled, numbers) { raw[k].number = n }
             }
-            if index > start && found < 3 { break }
+            // A page after the contents that lists fewer than three titles is the book's text, not more contents.
+            if index > start && found < 3 { raw.removeSubrange(first...); break }
             index += 1
         }
         let contents = start..<index
@@ -256,7 +262,12 @@ public enum PDFBookEPUB {
         var out: [PrintedEntry] = []
         for entry in raw {
             let page: Int?
-            if let n = entry.number, let offset { page = n - 1 + offset }
+            if let n = entry.number, let offset {
+                // A misread number sends a title past its chapter: its heading earlier wins.
+                let printed = n - 1 + offset, last = out.last?.page ?? 0
+                page = printed > last && headingPage(entry.title, from: printed - 1, to: printed + 2) == nil
+                    ? headingPage(entry.title, from: last, to: min(printed, contents.lowerBound)) ?? printed : printed
+            }
             else { page = headingPage(entry.title, from: out.last?.page ?? 0, to: contents.lowerBound) }
             guard let page, (0..<texts.count).contains(page), page >= (out.last?.page ?? 0), !entry.title.isEmpty else { continue }
             out.append(PrintedEntry(title: entry.title, page: page))
