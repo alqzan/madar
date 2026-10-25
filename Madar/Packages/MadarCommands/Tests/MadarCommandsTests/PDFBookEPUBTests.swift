@@ -83,6 +83,10 @@ struct PDFBookEPUBTests {
         let body = text(try PDFBookEPUB.build(title: "ت", author: "", language: "ar", sourceHash: "h",
             pages: pages.map { PDFBookEPUB.Page(text: $0, optical: true, unreliable: false) }, outline: []))
         #expect(body.contains("<a href=\"c1.xhtml#p-5\">١ - البداية</a>"))
+        // The printed contents page itself reads as the parsed contents with links, not its OCR columns.
+        #expect(body.contains("<nav class=\"madar-contents\"><h2>الفهرس</h2><ol><li><a href=\"c1.xhtml#p-3\">المقدمة</a></li>"))
+        #expect(!body.contains("المقدمة.....٢") && !body.contains("<p>٨</p>"))
+        #expect(body.contains("id=\"p-11\"") && body.contains("id=\"p-12\""))
         #expect(!body.contains(">صفحة ١١</a>"))
         // No contents page: the index keeps listing every tenth page.
         #expect(PDFBookEPUB.printedContents(Array(pages.prefix(10))).isEmpty)

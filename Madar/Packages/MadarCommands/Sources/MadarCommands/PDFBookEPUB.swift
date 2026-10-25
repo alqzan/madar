@@ -72,11 +72,28 @@ public enum PDFBookEPUB {
         var pageList = ""
         var pictures: [(String, Data)] = []
         let texts = withoutRunningLines(pages.map(\.text))
+        let href = { (page: Int) -> String in
+            let clamped = min(max(page, 0), pages.count - 1)
+            return "c\(clamped / pagesPerDocument + 1).xhtml#p-\(clamped + 1)"
+        }
+        let (printed, printedPages) = outline.isEmpty ? printedContentsPages(pages.map(\.text)) : ([], 0..<0)
         for (n, range) in chunks.enumerated() {
             // Owner, 24 Oct 2026 («ترتيب الفكرات والصفحات»): a paragraph that runs over a page break stays one
             // paragraph, with the page marker inside it, instead of being cut in two at every page.
             var body = "", open = false
             for index in range {
+                // The printed contents page, read as a column of titles and a column of garbled numbers, becomes
+                // the parsed contents with links; the later contents pages keep only their markers.
+                if printedPages.contains(index) {
+                    if open { body += "</p>"; open = false }
+                    let ordinal = index + 1, label = TurathEPUB.escape(pages[index].label.map { rtl ? TurathEPUB.arabicDigits($0) : $0 } ?? digits(ordinal))
+                    body += "<span id=\"p-\(ordinal)\" epub:type=\"pagebreak\" role=\"doc-pagebreak\" title=\"\(label)\" aria-label=\"\(label)\"></span>"
+                    pageList += "<li><a href=\"c\(n + 1).xhtml#p-\(ordinal)\">\(label)</a></li>"
+                    if index == printedPages.lowerBound {
+                        body += "<nav class=\"madar-contents\"><h2>الفهرس</h2><ol>" + printed.map { "<li><a href=\"\(href($0.page))\">\(TurathEPUB.escape($0.title))</a></li>" }.joined() + "</ol></nav>"
+                    }
+                    continue
+                }
                 let page = pages[index], ordinal = index + 1
                 let label = page.label.map { rtl ? TurathEPUB.arabicDigits($0) : $0 } ?? digits(ordinal)
                 let escaped = TurathEPUB.escape(label)
@@ -121,11 +138,6 @@ public enum PDFBookEPUB {
         // The PDF's bookmarks become the index; without them, the book's printed contents page; without that,
         // every tenth page.
         var toc = "<li><a href=\"info.xhtml\">عن هذه النسخة</a></li>"
-        let href = { (page: Int) -> String in
-            let clamped = min(max(page, 0), pages.count - 1)
-            return "c\(clamped / pagesPerDocument + 1).xhtml#p-\(clamped + 1)"
-        }
-        let printed = outline.isEmpty ? printedContents(pages.map(\.text)) : []
         if !printed.isEmpty {
             // Owner, 25 Oct 2026 («سحب الفهرس خطأ مع انه موجود واضح»): the book's own printed contents.
             toc += printed.map { "<li><a href=\"\(href($0.page))\">\(TurathEPUB.escape($0.title))</a></li>" }.joined()
@@ -205,7 +217,10 @@ public enum PDFBookEPUB {
     /// The book's own contents page (a scanned book has no PDF bookmarks): each title with the zero-based
     /// page it opens on. Printed page numbers are shifted to file pages by the offset the chapter headings
     /// agree on; an entry without a usable number is placed by its heading. Fewer than three entries: none.
-    public static func printedContents(_ texts: [String]) -> [PrintedEntry] {
+    public static func printedContents(_ texts: [String]) -> [PrintedEntry] { printedContentsPages(texts).entries }
+
+    /// The printed contents and the file pages it is printed on.
+    static func printedContentsPages(_ texts: [String]) -> (entries: [PrintedEntry], pages: Range<Int>) {
         let heads: Set<String> = ["الفهرس", "فهرسالموضوعات", "فهرسالمحتويات", "المحتويات", "محتوياتالكتاب"]
         func lines(_ i: Int) -> [String] { texts[i].components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty } }
         // OCR can read several numbered titles as one line («١ - البداية ٢ - الطريق»): one title each.
@@ -219,7 +234,7 @@ public enum PDFBookEPUB {
             return Int(first)
         }
         // Title lines with their printed numbers, from the contents page and the pages that continue it.
-        guard let start = texts.indices.last(where: { i in lines(i).prefix(2).contains { heads.contains(letters($0)) } }) else { return [] }
+        guard let start = texts.indices.last(where: { i in lines(i).prefix(2).contains { heads.contains(letters($0)) } }) else { return ([], 0..<0) }
         var raw: [(title: String, number: Int?)] = []
         var index = start
         while index < texts.count {
@@ -281,7 +296,7 @@ public enum PDFBookEPUB {
             guard let page, (0..<texts.count).contains(page), page >= (out.last?.page ?? 0), !entry.title.isEmpty else { continue }
             out.append(PrintedEntry(title: entry.title, page: page))
         }
-        return out.count >= 3 ? out : []
+        return out.count >= 3 ? (out, contents) : ([], 0..<0)
     }
 
     static let closers: Set<Character> = [".", "!", "?", "؟", ":", "…", "»", "\"", "”", "۔", ")"]
