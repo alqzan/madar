@@ -74,12 +74,13 @@ struct MihbaraPDFFlowView: View {
     }
 
     @ViewBuilder private var status: some View {
-        if let job { MihbaraConversionCard(job: job, digits: AppMihbaraService(app: app).digits, onOpen: nil) }
+        if let job { MihbaraConversionCard(app: app, job: job, digits: AppMihbaraService(app: app).digits, onOpen: nil) }
     }
 }
 
 /// A conversion in the room: its progress while it runs, and «افتحه» once the book is on its shelf.
 struct MihbaraConversionCard: View {
+    let app: AppSession
     let job: MihbaraConversions.Job
     let digits: MadarNumberFormatter
     let onOpen: ((UUID) -> Void)?
@@ -96,7 +97,7 @@ struct MihbaraConversionCard: View {
                     ProgressView(value: Double(job.done), total: Double(max(job.total, 1))).tint(theme.color("accentText"))
                     Text("تنقّل في التطبيق كما تشاء؛ يكمل وحده ويضعه على رفّه.")
                         .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
-                    Button("إيقاف") { MihbaraConversions.shared.cancel(job.id) }.font(MadarTypography.caption()).frame(minHeight: 44)
+                    Button("إيقاف") { MihbaraConversions.shared.cancel(job.id, app: app) }.font(MadarTypography.caption()).frame(minHeight: 44)
                         .accessibilityIdentifier("mihbara-pdf-flow-cancel")
                 case .finished(let bookID):
                     Label("صار «\(job.title)» كتابًا منسابًا", systemImage: "checkmark.circle").font(MadarTypography.section())

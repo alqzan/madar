@@ -36,12 +36,24 @@ import MadarCommands
         background[book.id] = UIApplication.shared.beginBackgroundTask(withName: "pdf-conversion") { [weak self] in
             MainActor.assumeIsolated { self?.endBackground(book.id) }
         }
+        Self.setPending(book.id, true, app: app)
         tasks[book.id] = Task { [weak self] in await self?.run(book, app: app) }
     }
 
-    func cancel(_ bookID: UUID) {
+    func cancel(_ bookID: UUID, app: AppSession) {
         tasks[bookID]?.cancel(); tasks[bookID] = nil; endBackground(bookID)
         jobs.removeAll { $0.id == bookID }
+        Self.setPending(bookID, false, app: app)
+    }
+
+    /// A conversion iOS stopped by closing the app starts again from the first page the next time the room
+    /// opens, while its PDF is still on a shelf (pages are read again; nothing half-written is kept).
+    func resume(_ books: [MihbaraBook], app: AppSession) {
+        let pending = Self.pending(app)
+        guard !pending.isEmpty else { return }
+        for book in books where pending.contains(book.id) && book.isReadablePDF && job(for: book.id) == nil { start(book, app: app) }
+        let known = Set(books.map(\.id))
+        for id in pending where !known.contains(id) { Self.setPending(id, false, app: app) }
     }
 
     func dismiss(_ bookID: UUID) { if job(for: bookID)?.state != .running { jobs.removeAll { $0.id == bookID } } }
@@ -81,6 +93,7 @@ import MadarCommands
         } catch {
             update(book.id) { $0.state = .failed("تعذّر تحويل «\(book.title)». يبقى PDF كما هو وتقرؤه بصفحاته.") }
         }
+        if job(for: book.id)?.state != .running { Self.setPending(book.id, false, app: app) }
         tasks[book.id] = nil; endBackground(book.id)
     }
 
@@ -147,6 +160,20 @@ import MadarCommands
 
     /// EPUB file hash → source PDF hash (or "" for an EPUB that did not come from a PDF). A cache only:
     /// every entry is re-derivable from the EPUB's own identifier `urn:madar:pdf:<hash>`.
+    private static func pendingURL(_ app: AppSession) -> URL { folder(app).appendingPathComponent("pending.json") }
+
+    static func pending(_ app: AppSession) -> Set<UUID> {
+        (try? JSONDecoder().decode(Set<UUID>.self, from: Data(contentsOf: pendingURL(app)))) ?? []
+    }
+
+    private static func setPending(_ id: UUID, _ on: Bool, app: AppSession) {
+        var all = pending(app)
+        guard all.contains(id) != on else { return }
+        if on { all.insert(id) } else { all.remove(id) }
+        try? FileManager.default.createDirectory(at: folder(app), withIntermediateDirectories: true)
+        try? JSONEncoder().encode(all).write(to: pendingURL(app), options: [.atomic, .completeFileProtection])
+    }
+
     static func links(_ app: AppSession) -> [String: String] {
         (try? JSONDecoder().decode([String: String].self, from: Data(contentsOf: linksURL(app)))) ?? [:]
     }

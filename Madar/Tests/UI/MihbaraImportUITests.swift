@@ -254,6 +254,56 @@ import UIKit
         attach(app, "M6-PDF-flow-shelf-L")
     }
 
+    /// Owner, 25 Oct 2026: «اقدر اتنقل بالتطبيق». A conversion iOS stopped by closing the app starts again
+    /// the next time the room opens, and still ends as one flowing book.
+    func testAConversionStoppedByClosingTheAppResumesWhenTheRoomOpens() throws {
+        continueAfterFailure = false
+        // Scanned pages (a picture of text) go through on-device OCR, slow enough to close the app mid-way.
+        let paragraph = NSMutableParagraphStyle(); paragraph.alignment = .right
+        let scan = UIGraphicsImageRenderer(size: CGSize(width: 600, height: 800)).image { _ in
+            UIColor.white.setFill(); UIRectFill(CGRect(x: 0, y: 0, width: 600, height: 800))
+            ("القراءة باب إلى المعرفة، والكتاب صاحب لا يمل.\nومن قرأ كثيرا عرف كثيرا." as NSString).draw(in: CGRect(x: 40, y: 70, width: 520, height: 640),
+                withAttributes: [.font: UIFont(name: "Arial", size: 40)!, .foregroundColor: UIColor.black, .paragraphStyle: paragraph])
+        }
+        let pdf = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 300, height: 400)).pdfData { canvas in
+            for _ in 1...120 { canvas.beginPage(); scan.draw(in: CGRect(x: 0, y: 0, width: 300, height: 400)) }
+        }
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("long-book.pdf")
+        try pdf.write(to: file)
+        let store = UUID().uuidString
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": store, "MADAR_UI_MIHBARA_FIXTURE": "empty",
+            "MADAR_UI_NOW": "2026-10-18T12:00:00+03:00", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
+            "MADAR_UI_MIHBARA_IMPORT_PDF_NAME": "كتاب طويل", "MADAR_UI_MIHBARA_IMPORT_PDF_PATH": file.path]
+        func openRoom() {
+            let customize = app.buttons["tab-customize"]; XCTAssertTrue(customize.waitForExistence(timeout: 20)); customize.tap()
+            let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 8)); search.tap(); search.typeText("المحبرة")
+            let door = app.buttons["mihbara-open"]; XCTAssertTrue(door.waitForExistence(timeout: 8)); door.tap()
+        }
+        app.launch(); openRoom()
+        let add = app.buttons["mihbara-add-paper"]; XCTAssertTrue(add.waitForExistence(timeout: 8)); add.tap()
+        let confirm = app.buttons["mihbara-import-confirm"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 60), app.debugDescription)
+        for _ in 0..<6 where !confirm.isHittable { app.swipeUp(velocity: .slow) }
+        confirm.tap()
+        let convert = app.alerts.buttons["حوّله"].firstMatch
+        XCTAssertTrue(convert.waitForExistence(timeout: 15), app.debugDescription); convert.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["mihbara-pdf-flow-progress"].waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertFalse(app.buttons["mihbara-pdf-flow-open"].exists, "120 scanned pages must still be converting")
+        app.terminate()
+        app.launch(); openRoom()
+        XCTAssertTrue(app.descendants(matching: .any)["mihbara-pdf-flow-progress"].waitForExistence(timeout: 20), app.debugDescription)
+        attach(app, "M6-PDF-flow-resumed-L")
+        XCTAssertTrue(app.buttons["mihbara-pdf-flow-open"].waitForExistence(timeout: 600), app.debugDescription)
+        app.buttons["mihbara-pdf-flow-open"].tap()
+        XCTAssertTrue(app.buttons["mihbara-reader-close"].waitForExistence(timeout: 20), app.debugDescription)
+        app.buttons["mihbara-reader-close"].tap()
+        app.buttons["mihbara-shelf-want"].tap()
+        let copies = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "كتاب طويل"))
+        XCTAssertTrue(copies.firstMatch.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertEqual(copies.count, 1, app.debugDescription)
+    }
+
     func testEPUBScanExplainsReversedAnchorsAndPageLinks() throws {
         continueAfterFailure = false
         let fixture = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "scan-order-poc", withExtension: "epub"))

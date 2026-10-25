@@ -160,7 +160,7 @@ struct MihbaraHomeView: View {
     /// PDFs converting in the background, and those just finished («افتحه»).
     private var conversionCards: some View {
         ForEach(MihbaraConversions.shared.jobs) { job in
-            MihbaraConversionCard(job: job, digits: service.digits) { id in readerRoute = MihbaraReaderRoute(bookID: id) }
+            MihbaraConversionCard(app: app, job: job, digits: service.digits) { id in readerRoute = MihbaraReaderRoute(bookID: id) }
         }
     }
     private func readableBook(_ id: UUID) -> MihbaraBook? {
@@ -180,6 +180,7 @@ struct MihbaraHomeView: View {
         do {
             reading = try service.load()
             let books = reading?.books ?? []
+            MihbaraConversions.shared.resume(books, app: app)
             Task { shapes = await service.bookShapes(books) }
         } catch { app.errorMessage = error.localizedDescription }
     }
