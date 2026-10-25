@@ -8,6 +8,7 @@ struct DiaryHubView: View {
     @Environment(\.roomTheme) private var theme
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var archive: DiaryArchiveSnapshot?
+    @State private var contentPosition = ScrollPosition(edge: .top)
     @State private var year: Int?
     @State private var month: Int?
     @State private var tab = "calendar"
@@ -45,6 +46,10 @@ struct DiaryHubView: View {
                         Button { exportOpen = true } label: { Label("تصدير المذكرات", systemImage: "square.and.arrow.up").font(DiaryType.label).frame(minHeight: 44) }.accessibilityIdentifier("diary-export")
                     }.padding(18)
                 }
+                .scrollPosition($contentPosition)
+                .onChange(of: month) { contentPosition.scrollTo(edge: .top) }
+                .onChange(of: selectedYear) { contentPosition.scrollTo(edge: .top) }
+                .onChange(of: tab) { contentPosition.scrollTo(edge: .top) }
             }.background(theme.background).foregroundStyle(theme.ink)
                 .fullScreenCover(isPresented: $bookOpen) { DiaryYearbookView(app: app).environment(\.roomTheme, theme) }
                 .fullScreenCover(isPresented: $exportOpen) { DiaryExportView(app: app).environment(\.roomTheme, theme) }

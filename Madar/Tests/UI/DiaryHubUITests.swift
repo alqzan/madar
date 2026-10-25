@@ -10,7 +10,11 @@ import XCTest
         XCTAssertTrue(app.buttons["diary-month-10"].waitForExistence(timeout: 10)); capture(app,"M3-V07-hub-L")
         monthScale.tap(); XCTAssertTrue(monthScale.isSelected); XCTAssertFalse(yearScale.isSelected)
         yearScale.tap(); XCTAssertTrue(yearScale.isSelected); XCTAssertFalse(monthScale.isSelected)
-        app.buttons["diary-month-10"].tap(); let day = app.buttons["diary-calendar-day-2026-10-15"]; XCTAssertTrue(day.waitForExistence(timeout: 5)); capture(app,"M3-V07-month-L"); day.tap()
+        let october = app.buttons["diary-month-10"]
+        for _ in 0..<4 where !october.isHittable { app.swipeUp(velocity: .slow) }
+        app.swipeUp(velocity: .slow)
+        capture(app, "M3-V07-year-october-L")
+        october.tap(); let day = app.buttons["diary-calendar-day-2026-10-15"]; XCTAssertTrue(day.waitForExistence(timeout: 5)); capture(app,"M3-V07-month-L"); day.tap()
         XCTAssertTrue(app.buttons["diary-day-write"].waitForExistence(timeout: 10)); app.buttons["diary-day-close"].tap()
         app.buttons["diary-hub-timeline"].tap(); XCTAssertTrue(app.buttons["diary-hub-day-2026-10-15"].waitForExistence(timeout: 10)); capture(app,"M3-V07-timeline-L")
         app.buttons["diary-hub-photos"].tap(); XCTAssertTrue(app.images.count > 0); capture(app,"M3-V07-photos-L")
