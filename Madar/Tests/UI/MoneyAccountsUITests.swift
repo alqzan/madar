@@ -2,9 +2,10 @@ import XCTest
 
 @MainActor final class MoneyAccountsUITests: XCTestCase {
     private func shot(_ app: XCUIApplication, _ name: String) { Thread.sleep(forTimeInterval: 0.6); let a = XCTAttachment(screenshot: app.screenshot()); a.name = name; a.lifetime = .keepAlways; add(a) }
-    private func open(_ fixture: String, unknownBalance: Bool = false) -> XCUIApplication {
+    private func open(_ fixture: String, unknownBalance: Bool = false, wrappedNames: Bool = false) -> XCUIApplication {
         let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": fixture, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-17T12:00:00+03:00"]
         if unknownBalance { app.launchEnvironment["MADAR_UI_UNKNOWN_BALANCE"] = "1" }
+        if wrappedNames { app.launchEnvironment["MADAR_UI_WRAPPED_ACCOUNTS"] = "1" }
         app.launch(); let tab = app.buttons["tab-customize"]; XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
         let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("المال"); app.buttons["money-open"].tap()
         let door = app.buttons["money-accounts-open"]; XCTAssertTrue(door.waitForExistence(timeout: 10)); for _ in 0..<8 where !door.isHittable { app.swipeUp(velocity: .slow) }; door.tap()
@@ -34,6 +35,18 @@ import XCTest
         XCTAssertTrue(app.buttons["money-account-حساب الأسرة"].waitForExistence(timeout: 10)); XCTAssertEqual(net.label, before)
         let undo = app.buttons["تراجع"]; XCTAssertTrue(undo.waitForExistence(timeout: 5)); undo.tap()
         XCTAssertFalse(app.buttons["money-account-حساب الأسرة"].exists); XCTAssertEqual(net.label, before)
+    }
+    func testWrappedAccountNamesAndScrolledRoots() {
+        continueAfterFailure = false
+        let app = open("accounts", wrappedNames: true)
+        shot(app, "M5-V19-wrapped-accounts-L")
+        let last = app.buttons["money-account-حساب آخر"]
+        for _ in 0..<8 where !last.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(last.isHittable)
+        shot(app, "M5-V19-wrapped-accounts-s1-L")
+        last.tap()
+        XCTAssertTrue(app.textFields["money-account-name"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.textFields["money-account-name"].value as? String, "حساب آخر")
     }
     func testHiddenAndEmpty() {
         continueAfterFailure = false

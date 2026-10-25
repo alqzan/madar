@@ -29,9 +29,11 @@ struct MoneyAccountsView: View {
                     Button(action: addAccount) { Image(systemName: "plus").frame(width: 44, height: 44) }.accessibilityLabel("أضف حسابًا").accessibilityIdentifier("money-accounts-add")
                 }
                 if let r = reading {
-                    tree(r)
                     if !visible { Button("أظهر الأرقام") { revealed = true }.frame(minHeight: 44).accessibilityIdentifier("money-accounts-reveal") }
-                    ledger(r)
+                    VStack(spacing: 0) {
+                        tree(r)
+                        ledger(r)
+                    }
                     if r.rows.contains(where: { $0.side == .cash && $0.amountMinor == nil }) {
                         Text("لم يُعرف رصيدها بعد؛ الحسابات المجهولة لا تدخل في المجموع.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                         Button("المطابقة مع البنك") { reconcileOpen = true }.frame(minHeight: 44).accessibilityIdentifier("money-accounts-unknown-reconcile")
@@ -57,18 +59,18 @@ struct MoneyAccountsView: View {
             .accessibilityIdentifier("money-accounts")
     }
     private func tree(_ r: MoneyAccountsReading) -> some View {
-        ZStack(alignment: .bottom) {
+        ZStack {
             if !dynamicType.isAccessibilitySize {
                 Ellipse().fill(theme.color("surplus").opacity(0.13)).frame(width: 224, height: 145).rotationEffect(.degrees(-12))
-                MoneyAccountCrown().fill(theme.color("surplus").opacity(0.16)).overlay { MoneyAccountCrown().stroke(theme.color("surplusText").opacity(0.45), lineWidth: 1) }.frame(width: 212, height: 180).scaleEffect(appeared ? 1 : 0.94)
-                Path { p in p.move(to: .init(x: 7, y: 105)); p.addLine(to: .init(x: 18, y: 0)); p.addLine(to: .init(x: 28, y: 105)); p.closeSubpath() }.fill(theme.color("reserveText")).frame(width: 36, height: 112).offset(y: 26)
+                MoneyAccountCrown().fill(theme.color("surplus").opacity(0.16)).overlay { MoneyAccountCrown().stroke(theme.color("surplusText").opacity(0.45), lineWidth: 1) }.frame(width: 234, height: 230).scaleEffect(appeared ? 1 : 0.94)
+                Path { p in p.move(to: .init(x: 7, y: 105)); p.addLine(to: .init(x: 18, y: 0)); p.addLine(to: .init(x: 28, y: 105)); p.closeSubpath() }.fill(theme.color("reserveText")).frame(width: 36, height: 80).offset(y: 85)
             }
             VStack(spacing: 5) {
                 Text("لك فعلًا").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                 displayFigure(r.basis.flatMap { b in r.rows.contains { $0.side == .cash && $0.amountMinor == nil } && !r.rows.contains { $0.side == .cash && $0.amountMinor != nil } ? nil : amount(b.netMinor) } ?? "—", "thmanyahserifdisplay-Black", size: 42, relativeTo: .largeTitle).foregroundStyle(theme.color("surplusText")).accessibilityIdentifier("money-accounts-net")
                 Text("الجذور تغذّي، والديون تسحب").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-            }.padding(15).frame(maxWidth: 210).background(theme.background).clipShape(.rect(cornerRadius: 16)).overlay { RoundedRectangle(cornerRadius: 16).stroke(theme.color("reserveText"), lineWidth: 1) }.padding(.bottom, 18)
-        }.frame(maxWidth: .infinity).frame(minHeight: dynamicType.isAccessibilitySize ? 150 : 170)
+            }.padding(15).frame(maxWidth: 240).background(theme.background).clipShape(.rect(cornerRadius: 16)).overlay { RoundedRectangle(cornerRadius: 16).stroke(theme.color("reserveText"), lineWidth: 1) }
+        }.frame(maxWidth: .infinity).frame(minHeight: dynamicType.isAccessibilitySize ? 150 : 250)
     }
     @ViewBuilder private func ledger(_ r: MoneyAccountsReading) -> some View {
         if dynamicType.isAccessibilitySize {
@@ -92,25 +94,32 @@ struct MoneyAccountsView: View {
                     Text(figure: row.amountMinor.map { (row.side == .cash ? "" : "(") + amount($0, currency: row.currency) + (row.side == .cash ? "" : ")") } ?? "—").font(.custom("thmanyahserifdisplay-Bold", size: 18, relativeTo: .headline)).foregroundStyle(row.counted ? theme.ink : theme.secondaryInk).frame(width: 90).strikethrough(!row.counted)
                     Image(systemName: row.counted ? "checkmark.square" : "square").font(.system(size: 20)).foregroundStyle(row.counted ? theme.color("surplusText") : theme.secondaryInk).frame(width: 38).accessibilityLabel(row.counted ? "يُحتسب" : "خارج الحساب")
                     Button { selectedSource = row } label: { VStack(spacing: 2) { Circle().fill(row.counted ? theme.color("surplusText") : theme.color("reserveText")).frame(width: 5, height: 5); Text(row.amountMinor == nil ? "مجهول" : row.counted ? "تُحتسب" : "تُتجاهل").font(MadarTypography.fine()) }.frame(width: 55, height: 44) }.accessibilityLabel("مصدر " + row.name).accessibilityIdentifier("money-account-source-" + row.name)
-                }.padding(.vertical, 8).padding(.horizontal, 8).frame(minHeight: 60).overlay(alignment: .top) { Rectangle().fill(theme.line).frame(height: 0.7) }
+                }.padding(.vertical, 8).padding(.horizontal, 8).frame(minHeight: 60)
+                .anchorPreference(key: MoneyAccountRowBounds.self, value: .bounds) { [row.id: $0] }
+                .overlay(alignment: .top) { Rectangle().fill(theme.line).frame(height: 0.7) }
                 .overlay(alignment: .leading) { if !dynamicType.isAccessibilitySize { Rectangle().fill(tint(row)).frame(width: row.counted ? 2 : 1).opacity(row.counted ? 0.7 : 0.25) } }
             }
-        }.padding(.horizontal, 6).background(theme.surface).overlay { Rectangle().stroke(theme.line, lineWidth: 1) }
-            .overlay {
-                if !dynamicType.isAccessibilitySize {
-                    GeometryReader { proxy in
+        }.padding(.horizontal, 6).padding(.leading, 24).background(theme.surface).overlay { Rectangle().stroke(theme.line, lineWidth: 1) }
+            .padding(.top, 24)
+            .overlayPreferenceValue(MoneyAccountRowBounds.self) { bounds in
+                GeometryReader { proxy in
                     Canvas { context, size in
                         for (index, row) in r.rows.enumerated() {
-                            let x = size.width - 3 - CGFloat(min(index, 8)) * 1.5
-                            let y = CGFloat(34 + 31 + index * 60 + 30)
-                            var p = Path(); p.move(to: .init(x: proxy.size.width / 2, y: 0))
-                            p.addCurve(to: .init(x: x, y: 34), control1: .init(x: size.width * 0.7, y: 22), control2: .init(x: x, y: 22))
-                            p.addLine(to: .init(x: x, y: min(y, size.height - 16))); p.addLine(to: .init(x: proxy.size.width - 2, y: min(y, size.height - 16)))
-                            context.stroke(p, with: .color(tint(row).opacity(0.7)), style: StrokeStyle(lineWidth: row.counted ? 1.4 : 1, dash: row.counted ? [] : [2, 3]))
+                            guard let anchor = bounds[row.id] else { continue }
+                            let frame = proxy[anchor]
+                            let rail = size.width - 5 - CGFloat(min(index, 8)) * 1.5
+                            var root = Path()
+                            root.move(to: .init(x: size.width / 2, y: 0))
+                            root.addCurve(to: .init(x: rail, y: 24),
+                                          control1: .init(x: size.width * 0.7, y: 12),
+                                          control2: .init(x: rail, y: 12))
+                            root.addLine(to: .init(x: rail, y: frame.midY))
+                            root.addLine(to: .init(x: frame.maxX + 2, y: frame.midY))
+                            context.stroke(root, with: .color(tint(row).opacity(0.7)),
+                                           style: StrokeStyle(lineWidth: row.counted ? 1.4 : 1, dash: row.counted ? [] : [2, 3]))
                         }
-                    }.frame(width: proxy.size.width + 12, height: proxy.size.height + 34).offset(y: -34)
-                    }.allowsHitTesting(false).accessibilityHidden(true)
-                }
+                    }
+                }.allowsHitTesting(false).accessibilityHidden(true)
             }
     }
     }
@@ -138,5 +147,13 @@ private struct MoneyAccountCrown: Shape {
     func path(in r: CGRect) -> Path {
         var p = Path(); let c = CGPoint(x: r.midX, y: r.midY)
         for i in 0..<16 { let a = Double(i) * .pi / 8 - .pi / 2, radius = i.isMultiple(of: 2) ? 0.5 : 0.37; let point = CGPoint(x: c.x + cos(a) * r.width * radius, y: c.y + sin(a) * r.height * radius); if i == 0 { p.move(to: point) } else { p.addLine(to: point) } }; p.closeSubpath(); return p
+    }
+}
+
+/// Resolve root endpoints from the laid-out rows: long names can make any row taller.
+private struct MoneyAccountRowBounds: PreferenceKey {
+    static let defaultValue: [String: Anchor<CGRect>] = [:]
+    static func reduce(value: inout [String: Anchor<CGRect>], nextValue: () -> [String: Anchor<CGRect>]) {
+        value.merge(nextValue(), uniquingKeysWith: { _, latest in latest })
     }
 }
