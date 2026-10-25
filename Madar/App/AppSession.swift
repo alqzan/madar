@@ -694,17 +694,26 @@ final class AppSession {
     }
     private var moneySeed: Task<Void, Never>?
 
-    #if DEBUG
-    /// Owner money trial only (item 17): one command through the bus without the per-command reload and reminder
-    /// re-plan; the caller reloads once at the end. Returns the bus status.
-    func executeTrialCommand(_ name: String, payload: [String: MadarCore.JSONValue], id: UUID) async throws -> String {
-        guard beginWrite() else { throw BackupOperationError.busy }
-        defer { pendingWrites -= 1 }
+    /// The old-Madar move (item 24) and its DEBUG trial: one command through the bus without the per-command reload and
+    /// reminder re-plan; the caller holds the write and reloads once at the end. Returns the bus status.
+    func executeImportCommand(_ name: String, payload: [String: MadarCore.JSONValue], id: UUID) async throws -> String {
         let now = prayerNow()
         let result = try await bus.execute(.init(commandID: id, name: name, payload: .object(payload), issuedAt: now), now: now)
         return result.status == .applied ? "applied" : result.status == .duplicate ? "duplicate" : "rejected:" + (result.reason ?? "")
     }
-    #endif
+    /// Quiesces every other writer for a whole old-Madar move or its undo, then reloads, republishes and refreshes widgets once.
+    func performLegacyMove<T>(_ body: (Date) async throws -> T) async throws -> T {
+        guard lockController?.canPresent(.app) ?? protectedDataAuthorized else { throw DataError.authenticationFailed }
+        // Every other writer (UI, inbox, backup) waits, so the before/after snapshots hold only the move's own rows.
+        try await quiesceWriters()
+        defer { resumeWriters() }
+        let now = prayerNow()
+        let result: T
+        do { result = try await body(now) } catch { try? reload(); try? publishSnapshot(); throw error }
+        try reload(); try publishSnapshot(); WidgetCenter.shared.reloadAllTimelines()
+        Task { await refreshPrayerNotifications() }
+        return result
+    }
 
     func executeMoneyCommand(_ name: String, payload: [String: MadarCore.JSONValue] = [:], id: UUID = UUID()) async throws {
         guard lockController?.canPresent(.app) ?? protectedDataAuthorized else { throw DataError.authenticationFailed }

@@ -72,6 +72,8 @@ struct CustomizeMadar: View {
                                 time: { session.backupTime($0) })
                         }.frame(minHeight: 44).font(MadarTypography.section()).accessibilityIdentifier("backup-settings-link")
                     }
+                    NavigationLink("انقل من مدار القديم") { LegacyMoveView(app: session) }
+                        .frame(minHeight: 44).font(MadarTypography.section()).accessibilityIdentifier("legacy-move-link")
                 }
             }
         }

@@ -1,31 +1,40 @@
-#if DEBUG
 import Foundation
 import SwiftData
 import MadarCore
 import MadarData
 import MadarCommands
 
-/// Development-only adapter. The production app has no legacy-file entry point.
+/// Also used by the old-Madar move (item 24) with its own writer id.
 /// Stable source identities protect native edits/tombstones on replay.
 @MainActor enum LegacyHabitTrial {
     static func importBackup(_ backup: Data, to container: ModelContainer, zone: TimeZone,
-                             now: Date = .now) throws -> [String: Int] {
+                             now: Date = .now, writer: String = "madar.app.legacyHabitTrial") throws -> [String: Int] {
         let observedDay = try DiaryLineRenderer.today(context: ModelContext(container), now: now)
         let plan = try LegacyHabitImport.plan(backup: backup, observedDay: observedDay, zone: zone,
                                               uuid: StableIdentity.uuid(for:))
-        return try apply(plan, to: container, zone: zone, now: now)
+        return try apply(plan, to: container, zone: zone, now: now, writer: writer)
     }
     static func apply(_ plan: LegacyHabitImport.Plan, to container: ModelContainer, zone: TimeZone,
-                      now: Date = .now) throws -> [String: Int] {
+                      now: Date = .now, writer: String = "madar.app.legacyHabitTrial") throws -> [String: Int] {
         let context = ModelContext(container); context.autosaveEnabled = false
-        let writer = "madar.app.legacyHabitTrial"
         var counts = plan.counts
-        let habitIDs = Set(try context.fetch(FetchDescriptor<Habit>()).map(\.id))
+        let habits = try context.fetch(FetchDescriptor<Habit>()), habitIDs = Set(habits.map(\.id))
+        // A habit the owner already keeps under the same name takes the old history; it is never duplicated.
+        func key(_ name: String) -> String { name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+        let planIDs = Set(plan.habits.map(\.id))
+        // Only a plain daily habit takes old daily times; a linked or weekly/monthly/yearly one keeps its own rules.
+        let dailyPolicies = Set(try context.fetch(FetchDescriptor<HabitPolicy>()).filter { $0.deletedAt == nil }
+            .sorted { $0.effectiveFrom < $1.effectiveFrom }.reduce(into: [UUID: String]()) { $0[$1.habitID ?? UUID()] = $1.frequency }
+            .filter { $0.value == "daily" }.keys)
+        let nativeByName = Dictionary(habits.filter { $0.deletedAt == nil && !planIDs.contains($0.id) && $0.kind == "custom" && dailyPolicies.contains($0.id) }.map { (key($0.name), $0.id) }, uniquingKeysWith: { a, _ in a })
+        let mapped = Dictionary(plan.habits.filter { !habitIDs.contains($0.id) && $0.deletedAt == nil }.compactMap { h in nativeByName[key(h.name)].map { (h.id, $0) } }, uniquingKeysWith: { a, _ in a })
         let policyIDs = Set(try context.fetch(FetchDescriptor<HabitPolicy>()).map(\.id))
-        let eventIDs = Set(try context.fetch(FetchDescriptor<HabitEvent>()).map(\.id))
+        let events = try context.fetch(FetchDescriptor<HabitEvent>()), eventIDs = Set(events.map(\.id))
+        let nativeDays = Set(events.filter { $0.deletedAt == nil }.map { ($0.habitID?.uuidString ?? "") + "|" + $0.dayKey })
         let pauseIDs = Set(try context.fetch(FetchDescriptor<HabitPause>()).map(\.id))
         let linkIDs = Set(try context.fetch(FetchDescriptor<ImportLink>()).map(\.id))
         for source in plan.habits {
+            if mapped[source.id] != nil { counts["habits.keptNative", default: 0] += 1; continue }
             if !habitIDs.contains(source.id) {
                 let row = Habit(); row.id = source.id; row.name = source.name; row.icon = source.icon; row.color = source.color
                 row.kind = "custom"; row.linkedSource = nil; row.reminder = "dot"; row.order = source.order
@@ -43,7 +52,11 @@ import MadarCommands
             }
         }
         for source in plan.events where !eventIDs.contains(source.id) {
-            let row = HabitEvent(); row.id = source.id; row.habitID = source.habitID
+            let habitID = mapped[source.habitID] ?? source.habitID
+            guard mapped[source.habitID] == nil || !nativeDays.contains(habitID.uuidString + "|" + source.day.description) else {
+                counts["events.keptNative", default: 0] += 1; continue
+            }
+            let row = HabitEvent(); row.id = source.id; row.habitID = habitID
             row.dayKey = source.day.description; row.periodKey = source.day.description; row.delta = 1
             // The old file stores a day, no clock. Noon is only an anchor for that
             // stored legacy day; it is never used to recalculate the day key.
@@ -53,7 +66,7 @@ import MadarCommands
             row.deletedAt = source.deletedAt; row.deletionBarrierAt = source.deletedAt; row.writerID = writer
             context.insert(row); counts["events.created", default: 0] += 1
         }
-        for source in plan.pauses where !pauseIDs.contains(source.id) {
+        for source in plan.pauses where !pauseIDs.contains(source.id) && mapped[source.habitID] == nil {
             let row = HabitPause(); row.id = source.id; row.habitID = source.habitID
             row.fromDayKey = source.observedFrom.description; row.reason = "freeze"
             row.createdAt = now; row.updatedAt = now; row.writerID = writer; context.insert(row)
@@ -76,6 +89,7 @@ import MadarCommands
     }
 }
 
+#if DEBUG
 extension AppSession {
     func runLegacyHabitTrialIfRequested() async {
         let env = ProcessInfo.processInfo.environment

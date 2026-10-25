@@ -15,35 +15,7 @@ extension AppSession {
         guard env["MADAR_UI_STORE_ID"] != nil, let path = env["MADAR_TRIAL_PRAYER"], !path.isEmpty else { return }
         var counts: [String: Int] = [:]
         do {
-            let home = ActivePlace.riyadh
-            let plan = try LegacyPrayerImport.plan(backup: Data(contentsOf: URL(fileURLWithPath: path)), home: home, uuid: StableIdentity.uuid(for:))
-            counts = plan.counts
-            let context = ModelContext(container), now = Date(), writer = "madar.app.trial"
-            let logIDs = Set(try context.fetch(FetchDescriptor<PrayerLog>()).map(\.id)), qadaIDs = Set(try context.fetch(FetchDescriptor<QadaItem>()).map(\.id))
-            let linkIDs = Set(try context.fetch(FetchDescriptor<ImportLink>()).map(\.id))
-            for log in plan.logs where !logIDs.contains(log.id) {
-                let row = PrayerLog(); row.id = log.id; row.dayKey = log.dayKey; row.prayer = log.prayer.rawValue; row.status = log.status.rawValue
-                row.heart = log.heart?.rawValue; row.eventAt = log.eventAt; row.loggedAt = log.loggedAt; row.fridayKind = log.fridayKind?.rawValue
-                row.tzID = home.timeZoneID; row.dayPolicy = "legacy@0"; row.source = "import"
-                row.createdAt = log.loggedAt ?? log.eventAt; row.updatedAt = row.createdAt; row.writerID = writer; context.insert(row)
-                counts["logs.created", default: 0] += 1
-            }
-            for item in plan.qada where !qadaIDs.contains(item.id) {
-                let row = QadaItem(); row.id = item.id; row.prayer = item.prayer.rawValue; row.originalDayKey = item.dayKey; row.madeUpAt = item.madeUpAt
-                row.createdAt = item.madeUpAt ?? now; row.updatedAt = row.createdAt; row.writerID = writer; context.insert(row)
-                counts["qada.created", default: 0] += 1
-            }
-            for archive in plan.archives {
-                let id = StableIdentity.uuid(for: "myDream:ImportLink:PrayerDay:\(archive.dayKey)")
-                guard !linkIDs.contains(id) else { continue }
-                let link = ImportLink(); link.id = id; link.source = "myDream"; link.sourceModel = "PrayerLog"; link.sourceID = archive.dayKey
-                link.targetModel = "PrayerLog"; link.unmappedJSON = archive.json
-                link.createdAt = now; link.updatedAt = now; link.importedAt = now; link.writerID = writer; context.insert(link)
-            }
-            if let start = plan.trackingStart {
-                try SettingsStore(context: context, schema: schema).prepare(.object(["dayKey": .string(start.description), "edits": .number(0)]), for: "salah.trackingStart")
-            }
-            try context.save()
+            counts = try importLegacyPrayer(Data(contentsOf: URL(fileURLWithPath: path)), writer: "madar.app.trial", now: Date())
             let check = ModelContext(container)
             counts["store.logs"] = try check.fetch(FetchDescriptor<PrayerLog>()).filter { $0.deletedAt == nil }.count
             counts["store.qadaOpen"] = try check.fetch(FetchDescriptor<QadaItem>()).filter { $0.deletedAt == nil && $0.madeUpAt == nil }.count

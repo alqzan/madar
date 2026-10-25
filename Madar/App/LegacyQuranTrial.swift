@@ -16,58 +16,8 @@ extension AppSession {
         guard env["MADAR_UI_STORE_ID"] != nil, let path = env["MADAR_TRIAL_QURAN"], !path.isEmpty else { return }
         var counts: [String: Int] = [:]
         do {
-            let catalog = try QuranResources.catalog(), zone = TimeZone(identifier: "Asia/Riyadh")!
-            let plan = try LegacyQuranImport.plan(backup: Data(contentsOf: URL(fileURLWithPath: path)), timeZone: zone, catalog: catalog, uuid: StableIdentity.uuid(for:))
-            counts = plan.counts
-            let context = ModelContext(container), now = Date(), writer = "madar.app.trial"
-            let links = Set(try context.fetch(FetchDescriptor<ImportLink>()).map(\.id))
-            let batchID = StableIdentity.uuid(for: "myDream:ImportBatch:quran")
-            func link(_ model: String, _ sourceID: String, target: String, _ targetID: UUID?, _ json: Data?) {
-                let id = StableIdentity.uuid(for: "myDream:ImportLink:\(model):\(sourceID)")
-                guard !links.contains(id) else { counts["replay.existing", default: 0] += 1; return }
-                let row = ImportLink(); row.id = id; row.source = "myDream"; row.sourceModel = model; row.sourceID = sourceID
-                row.targetModel = target; row.targetID = targetID; row.importBatchID = batchID; row.unmappedJSON = json
-                row.createdAt = now; row.updatedAt = now; row.importedAt = now; row.writerID = writer; context.insert(row)
-                counts["links.created", default: 0] += 1
-            }
-            if !(try context.fetch(FetchDescriptor<ImportBatch>()).contains { $0.id == batchID }) {
-                let batch = ImportBatch(); batch.id = batchID; batch.kind = "migration"; batch.fileName = URL(fileURLWithPath: path).lastPathComponent
-                batch.startedAt = now; batch.finishedAt = now; batch.status = "done"
-                batch.summaryJSON = (try? JSONEncoder().encode(plan.counts)) ?? Data()
-                batch.createdAt = now; batch.updatedAt = now; batch.writerID = writer; context.insert(batch)
-            }
-            let planIDs = Set(try context.fetch(FetchDescriptor<HifzPlan>()).map(\.id))
-            if let p = plan.plan, !planIDs.contains(p.id) {
-                let row = HifzPlan(); row.id = p.id; row.version = 1; row.startAyah = p.startAyah; row.unit = p.unit; row.amount = p.amount
-                row.rhythm = p.rhythm; row.frontierAyah = p.frontierAyah; row.activeFrom = p.activeFrom
-                row.createdAt = p.activeFrom; row.updatedAt = p.updatedAt; row.writerID = writer; context.insert(row)
-                link("HifzPlan.v1", p.sourceID, target: "HifzPlan", p.id, nil)
-            }
-            let sessionIDs = Set(try context.fetch(FetchDescriptor<HifzSession>()).map(\.id))
-            for s in plan.sessions where !sessionIDs.contains(s.id) {
-                let row = HifzSession(); row.id = s.id; row.planID = plan.plan?.id; row.dayKey = s.dayKey; row.endedAt = s.endedAt
-                row.tzID = zone.identifier; row.dayPolicy = "legacy@0"; row.kind = s.kind; row.fromAyah = s.fromAyah; row.toAyah = s.toAyah
-                row.pages = s.pages; row.source = "import"; row.createdAt = s.endedAt; row.updatedAt = s.updatedAt; row.writerID = writer
-                context.insert(row); link(s.sourceModel, s.sourceID, target: "HifzSession", s.id, s.raw)
-            }
-            let gradeIDs = Set(try context.fetch(FetchDescriptor<PageGrade>()).map(\.id))
-            let ended = Dictionary(uniqueKeysWithValues: plan.sessions.map { ($0.id, $0.endedAt) })
-            for g in plan.grades where !gradeIDs.contains(g.id) {
-                let row = PageGrade(); row.id = g.id; row.sessionID = g.sessionID; row.page = g.page; row.grade = g.grade; row.role = "regular"
-                row.createdAt = ended[g.sessionID] ?? now; row.updatedAt = row.createdAt; row.writerID = writer; context.insert(row)
-            }
-            let spotIDs = Set(try context.fetch(FetchDescriptor<MistakeSpot>()).map(\.id))
-            for m in plan.spots where !spotIDs.contains(m.id) {
-                let row = MistakeSpot(); row.id = m.id; row.ayahId = m.ayahId; row.wordIndex = m.wordIndex; row.legacyHits = m.legacyHits
-                row.legacyLastDrillAt = m.legacyLastDrillAt; row.legacyStreak = m.legacyStreak
-                row.createdAt = m.updatedAt; row.updatedAt = m.updatedAt; row.writerID = writer
-                context.insert(row); link("HifzMistake", m.sourceID, target: "MistakeSpot", m.id, m.raw)
-            }
-            for a in plan.archives { link(a.sourceModel, a.sourceID, target: "", nil, a.json) }
-            // The snapshot is the acceptance oracle: it throws on a completed face without hifz provenance.
-            let repository = try QuranRepository(context: context, catalog: catalog)
-            try QuranMutationHandler.rebuildCache(repository, at: now, writer: writer)
-            try context.save()
+            let catalog = try QuranResources.catalog(), now = Date(), batchID = StableIdentity.uuid(for: "myDream:ImportBatch:quran")
+            counts = try importLegacyQuran(Data(contentsOf: URL(fileURLWithPath: path)), fileName: URL(fileURLWithPath: path).lastPathComponent, writer: "madar.app.trial", now: now)
             let check = ModelContext(container), snapshot = try QuranRepository(context: check, catalog: catalog).snapshot(at: now)
             counts["store.sessions"] = try check.fetch(FetchDescriptor<HifzSession>()).filter { $0.deletedAt == nil }.count
             counts["store.grades"] = try check.fetch(FetchDescriptor<PageGrade>()).filter { $0.deletedAt == nil }.count

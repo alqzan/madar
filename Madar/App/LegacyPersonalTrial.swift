@@ -1,4 +1,3 @@
-#if DEBUG
 import Foundation
 import SwiftData
 import MadarCore
@@ -7,19 +6,24 @@ import MadarCommands
 
 @MainActor enum LegacyPersonalTrial {
     static func importBackup(_ backup: Data, to container: ModelContainer, zone: TimeZone,
-                             now: Date = .now) throws -> [String: Int] {
+                             now: Date = .now, writer: String = "madar.app.legacyPersonalTrial") throws -> [String: Int] {
         let observedDay = try DiaryLineRenderer.today(context: ModelContext(container), now: now)
         let plan = try LegacyPersonalImport.plan(backup: backup, observedDay: observedDay, zone: zone,
                                                  uuid: StableIdentity.uuid(for:))
-        return try apply(plan, to: container, zone: zone, observedDay: observedDay, now: now)
+        return try apply(plan, to: container, zone: zone, observedDay: observedDay, now: now, writer: writer)
     }
     static func apply(_ plan: LegacyPersonalImport.Plan, to container: ModelContainer, zone: TimeZone,
-                      observedDay: GregorianDay, now: Date = .now) throws -> [String: Int] {
+                      observedDay: GregorianDay, now: Date = .now, writer: String = "madar.app.legacyPersonalTrial") throws -> [String: Int] {
         let context = ModelContext(container); context.autosaveEnabled = false
-        let writer = "madar.app.legacyPersonalTrial"
         var counts = plan.counts
         let letterIDs = Set(try context.fetch(FetchDescriptor<Letter>()).map(\.id))
-        let dayIDs = Set(try context.fetch(FetchDescriptor<UpcomingDay>()).map(\.id))
+        let days = try context.fetch(FetchDescriptor<UpcomingDay>()), dayIDs = Set(days.map(\.id))
+        let letters = try context.fetch(FetchDescriptor<Letter>()).filter { $0.deletedAt == nil }
+        // The same day or letter the owner already wrote natively is kept once.
+        let gregorian = days.filter { $0.deletedAt == nil && $0.calendar == "greg" }
+        func title(_ t: String) -> String { t.trimmingCharacters(in: .whitespaces) }
+        // A native one-time day matches on its full date; a repeating one on its month and day.
+        let nativeDays = Set(gregorian.map { "\(title($0.title))|\($0.year.map(String.init) ?? "*")-\($0.month)-\($0.day)" })
         let linkIDs = Set(try context.fetch(FetchDescriptor<ImportLink>()).map(\.id))
         func stamp<T: MadarRecordModel>(_ row: T, _ meta: LegacyPersonalImport.Provenance, created: Date) throws {
             var record = try row.record()
@@ -28,6 +32,7 @@ import MadarCommands
             try record.set(meta.restoredAt, for: "restoredAt"); try record.set(writer, for: "writerID"); try row.apply(record)
         }
         for source in plan.letters where !letterIDs.contains(source.id) {
+            guard !letters.contains(where: { $0.text == source.text && $0.triggerValue == source.deliveryDay.description }) else { counts["letters.keptNative", default: 0] += 1; continue }
             let row = Letter(); row.id = source.id; row.text = source.text
             row.triggerKind = "date"; row.triggerValue = source.deliveryDay.description
             row.openAt = source.deliveryDay.date(in: zone)
@@ -37,6 +42,10 @@ import MadarCommands
             context.insert(row); counts["letters.created", default: 0] += 1
         }
         for source in plan.days where !dayIDs.contains(source.id) {
+            guard !nativeDays.contains("\(title(source.title))|\(source.day.year)-\(source.day.month)-\(source.day.day)"),
+                  !nativeDays.contains("\(title(source.title))|*-\(source.day.month)-\(source.day.day)") else {
+                counts["days.keptNative", default: 0] += 1; continue
+            }
             let row = UpcomingDay(); row.id = source.id; row.title = source.title; row.calendar = "greg"
             row.year = source.day.year; row.month = source.day.month; row.day = source.day.day; row.repeats = "none"
             row.countUpAfter = source.countUpAfter
@@ -72,6 +81,7 @@ import MadarCommands
     }
 }
 
+#if DEBUG
 extension AppSession {
     func runLegacyPersonalTrialIfRequested() async {
         let env = ProcessInfo.processInfo.environment
