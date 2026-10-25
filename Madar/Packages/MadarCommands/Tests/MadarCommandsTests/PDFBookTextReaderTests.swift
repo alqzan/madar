@@ -127,6 +127,10 @@ struct PDFBookTextReaderTests {
         #expect(PDFBookTextReader.withoutStraySymbols("وقد بلغتْ منِّي هذه الكلمة مشروع العمر% كلَّ مَبْلَغ ،") == "وقد بلغتْ منِّي هذه الكلمة مشروع العمر كلَّ مَبْلَغ،")
         #expect(PDFBookTextReader.withoutStraySymbols("كتابُ (مشروع العمر )' هو") == "كتابُ (مشروع العمر ) هو")
         #expect(PDFBookTextReader.withoutStraySymbols("100% of C# & more") == "100% of C# & more")
+        let line = { (text: String) in PDFTextReadingOrder.Line(text: text, bounds: .zero) }
+        let page = ["هل يمكن أن يحوّل", "MiPig a", "الإنسان ميوله", "www.alkalam-sy.com", "Chapter One Begins Here", "إلى مشروع ما"].map(line)
+        #expect(PDFBookTextReader.withoutLatinNoise(page).map(\.text) == ["هل يمكن أن يحوّل", "الإنسان ميوله", "www.alkalam-sy.com", "Chapter One Begins Here", "إلى مشروع ما"])
+        #expect(PDFBookTextReader.withoutLatinNoise(["Short title", "عنوان"].map(line)).count == 2)
         // Owner's scan: ornaments read as Latin letters stuck to words; real Latin words and links stay.
         #expect(PDFBookTextReader.withoutStraySymbols("كانت تميمةvVv في سرورهV") == "كانت تميمة في سروره")
         #expect(PDFBookTextReader.withoutStraySymbols("الفصل V الأول") == "الفصل الأول")

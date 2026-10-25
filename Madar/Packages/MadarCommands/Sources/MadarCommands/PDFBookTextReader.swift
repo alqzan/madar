@@ -134,7 +134,7 @@ public actor PDFBookTextReader {
                 let box = observation.boundingBox
                 return .init(text: text, bounds: CGRect(x: box.minX, y: 1 - box.maxY, width: box.width, height: box.height))
             }
-            let text = PDFTextReadingOrder.text(lines, rightToLeft: language.hasPrefix("ar"))
+            let text = PDFTextReadingOrder.text(language.hasPrefix("ar") ? Self.withoutLatinNoise(lines) : lines, rightToLeft: language.hasPrefix("ar"))
             return PDFBookPageText(index: index, text: text, source: .optical)
         }
     }
@@ -171,6 +171,18 @@ public actor PDFBookTextReader {
         return kept.replacingOccurrences(of: #"[ \t]{2,}"#, with: " ", options: .regularExpression)
             .replacingOccurrences(of: #" ([،,.:؛!؟])"#, with: "$1", options: .regularExpression)
             .trimmingCharacters(in: .whitespaces)
+    }
+
+    /// On an Arabic page, an ornament or seal reads as a short line of Latin letters («MiPig a»). A line of
+    /// at most two words with no Arabic, digit, link or address is dropped once the page has Arabic text.
+    static func withoutLatinNoise(_ lines: [PDFTextReadingOrder.Line]) -> [PDFTextReadingOrder.Line] {
+        let arabic = { (text: String) in text.unicodeScalars.contains { (0x0600...0x06FF).contains($0.value) } }
+        guard lines.filter({ arabic($0.text) }).count >= 3 else { return lines }
+        return lines.filter { line in
+            let text = line.text
+            if arabic(text) || text.contains(where: \.isNumber) || text.contains(".") || text.contains("@") { return true }
+            return text.split(separator: " ").count > 2
+        }
     }
 
     /// Fewer than one pixel in a thousand noticeably darker than paper: a blank page (scan noise allowed).
