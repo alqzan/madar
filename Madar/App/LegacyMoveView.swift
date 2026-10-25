@@ -41,7 +41,7 @@ struct LegacyMoveView: View {
                 }
                 diaryCard
             }
-            .padding(.horizontal, 21).padding(.top, 4).padding(.bottom, 32).frame(maxWidth: 620).frame(maxWidth: .infinity)
+            .padding(.horizontal, 21).padding(.top, 4).padding(.bottom, 120).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }
         .background(theme.background).foregroundStyle(theme.ink).navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(moving != nil)

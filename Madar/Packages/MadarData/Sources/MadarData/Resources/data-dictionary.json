@@ -4953,6 +4953,13 @@
             "saturday",
             "sunday"
           ]
+        },
+        {
+          "name": "entryID",
+          "type": "UUID?",
+          "optional": true,
+          "default": null,
+          "note": "Owner-approved 25 Oct 2026: optional link from a logged time to that day's diary Entry, shown as «من مذكراتك يومها». Nil by default; never required."
         }
       ]
     },
@@ -5947,5 +5954,5 @@
       "execution": "Immediately on press, within undo window"
     }
   },
-  "storeSchemaVersion": 11
+  "storeSchemaVersion": 12
 }
