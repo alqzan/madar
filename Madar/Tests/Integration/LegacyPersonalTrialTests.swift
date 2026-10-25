@@ -5,6 +5,30 @@ import MadarData
 @testable import Madar
 
 @MainActor final class LegacyPersonalTrialTests: XCTestCase {
+    func testNewRingBaselineUsesMadarBoundaryAndSourceLetterDaysStayLiteral() throws {
+        let cases = [("fajr", "02", "2026-10-24"), ("midnight", "02", "2026-10-25"),
+                     ("maghrib", "12", "2026-10-24"), ("maghrib", "20", "2026-10-25")]
+        let zone = TimeZone(identifier: "Asia/Riyadh")!
+        let backup = Data(#"{"futureLetters":[{"id":"l","content":"رسالة","writtenDate":"2026-10-25","deliveryDate":"2030-11-19","opened":false}],"countdownEvents":[{"id":"d","title":"موعد","date":"2030-11-19"}]}"#.utf8)
+        for (boundary, hour, expected) in cases {
+            let root = FileManager.default.temporaryDirectory.appendingPathComponent("PersonalBoundary-" + UUID().uuidString)
+            defer { try? FileManager.default.removeItem(at: root) }
+            let store = try ManagedDataStore(root: root), context = ModelContext(store.container)
+            _ = try SettingsStore(context: context).stage(["core.dayStart": .string(boundary)]); try context.save()
+            let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-10-25T\(hour):00:00+03:00"))
+            _ = try LegacyPersonalTrial.importBackup(backup, to: store.container, zone: zone, now: now)
+            XCTAssertEqual(try context.fetch(FetchDescriptor<UpcomingDay>()).first?.countFromDayKey, expected, boundary + hour)
+            let letter = try XCTUnwrap(context.fetch(FetchDescriptor<Letter>()).first)
+            XCTAssertEqual(GregorianDay.containing(letter.createdAt, in: zone).description, "2026-10-25")
+            XCTAssertEqual(letter.triggerValue, "2030-11-19")
+            func records() throws -> [DataRecord] {
+                try RecordBridge.all(ModelContext(store.container)).sorted { ($0.model, $0.id.uuidString) < ($1.model, $1.id.uuidString) }
+            }
+            let before = try records()
+            _ = try LegacyPersonalTrial.importBackup(backup, to: store.container, zone: zone, now: now.addingTimeInterval(86400))
+            XCTAssertEqual(try records(), before, "replay must not restart the ring")
+        }
+    }
     func testSealedSourceStaysOutOfCardsSearchExportAndReplayKeepsNativeEdits() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("PersonalTrial-" + UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }

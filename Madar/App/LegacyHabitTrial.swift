@@ -3,10 +3,18 @@ import Foundation
 import SwiftData
 import MadarCore
 import MadarData
+import MadarCommands
 
 /// Development-only adapter. The production app has no legacy-file entry point.
 /// Stable source identities protect native edits/tombstones on replay.
 @MainActor enum LegacyHabitTrial {
+    static func importBackup(_ backup: Data, to container: ModelContainer, zone: TimeZone,
+                             now: Date = .now) throws -> [String: Int] {
+        let observedDay = try DiaryLineRenderer.today(context: ModelContext(container), now: now)
+        let plan = try LegacyHabitImport.plan(backup: backup, observedDay: observedDay, zone: zone,
+                                              uuid: StableIdentity.uuid(for:))
+        return try apply(plan, to: container, zone: zone, now: now)
+    }
     static func apply(_ plan: LegacyHabitImport.Plan, to container: ModelContainer, zone: TimeZone,
                       now: Date = .now) throws -> [String: Int] {
         let context = ModelContext(container); context.autosaveEnabled = false
@@ -75,15 +83,13 @@ extension AppSession {
               managedStore?.root.deletingLastPathComponent().deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         var counts: [String: Int] = [:]
         do {
-            let day = GregorianDay.containing(prayerNow(), in: activePlace.timeZone)
-            let plan = try LegacyHabitImport.plan(backup: Data(contentsOf: URL(fileURLWithPath: path)),
-                observedDay: day, zone: activePlace.timeZone, uuid: StableIdentity.uuid(for:))
-            counts = try LegacyHabitTrial.apply(plan, to: container, zone: activePlace.timeZone)
+            let now = prayerNow(), backup = try Data(contentsOf: URL(fileURLWithPath: path))
+            counts = try LegacyHabitTrial.importBackup(backup, to: container, zone: activePlace.timeZone, now: now)
             func records() throws -> [DataRecord] {
                 try RecordBridge.all(ModelContext(container)).sorted { ($0.model, $0.id.uuidString) < ($1.model, $1.id.uuidString) }
             }
             let before = try records()
-            let replay = try LegacyHabitTrial.apply(plan, to: container, zone: activePlace.timeZone)
+            let replay = try LegacyHabitTrial.importBackup(backup, to: container, zone: activePlace.timeZone, now: now)
             counts["replay.created"] = replay.filter { $0.key.hasSuffix(".created") }.values.reduce(0, +)
             counts["replay.unchanged"] = try records() == before ? 1 : 0
             let context = ModelContext(container)

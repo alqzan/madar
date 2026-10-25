@@ -11,6 +11,24 @@ import MadarCommands
     private func records(_ container: ModelContainer) throws -> [DataRecord] {
         try RecordBridge.all(ModelContext(container)).sorted { ($0.model, $0.id.uuidString) < ($1.model, $1.id.uuidString) }
     }
+    func testNewFreezeUsesMadarBoundaryWhileSourceLogKeepsItsDay() throws {
+        let cases = [("fajr", "02", "2026-10-24"), ("midnight", "02", "2026-10-25"),
+                     ("maghrib", "12", "2026-10-24"), ("maghrib", "20", "2026-10-25")]
+        let backup = Data(#"{"habits":[{"id":"h","name":"عادة","logs":["2026-10-25"]}],"frozenHabits":["h"]}"#.utf8)
+        for (boundary, hour, expected) in cases {
+            let root = FileManager.default.temporaryDirectory.appendingPathComponent("HabitBoundary-" + UUID().uuidString)
+            defer { try? FileManager.default.removeItem(at: root) }
+            let store = try ManagedDataStore(root: root), context = ModelContext(store.container)
+            _ = try SettingsStore(context: context).stage(["core.dayStart": .string(boundary)]); try context.save()
+            let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-10-25T\(hour):00:00+03:00"))
+            _ = try LegacyHabitTrial.importBackup(backup, to: store.container, zone: zone, now: now)
+            XCTAssertEqual(try context.fetch(FetchDescriptor<HabitPause>()).first?.fromDayKey, expected, boundary + hour)
+            XCTAssertEqual(try context.fetch(FetchDescriptor<HabitEvent>()).first?.dayKey, "2026-10-25")
+            let before = try records(store.container)
+            _ = try LegacyHabitTrial.importBackup(backup, to: store.container, zone: zone, now: now.addingTimeInterval(86400))
+            XCTAssertEqual(try records(store.container), before, "replay across a boundary must keep the first observation")
+        }
+    }
     func testImportPreservesDaysDeletionFreezeAndReplayAfterNativeEdit() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("LegacyHabitTrial-" + UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
