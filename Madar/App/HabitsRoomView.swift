@@ -29,6 +29,7 @@ struct HabitsRoomView: View {
     @State private var deletingArchived: HabitReading?
     @State private var pendingEditor: HabitEditorIdentity?
     @State private var showAll = false
+    @State private var pastDay: HabitReading?
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -80,6 +81,7 @@ struct HabitsRoomView: View {
             Button("إلغاء",role:.cancel){deletingArchived=nil}
         } message:{Text("تختفي العادة وسياساتها وتسجيلاتها. يتاح التراجع لعشر دقائق.")}
         .sheet(item:$editor) { value in HabitEditorView(session:session,reading:value.reading,id:value.id) }
+        .sheet(item:$pastDay) { row in HabitPastDaySheet(session:session,reading:row) { reload() } }
         .sheet(item:$detail,onDismiss:{if let pendingEditor {editor=pendingEditor;self.pendingEditor=nil}}) { row in HabitDetailView(session:session,reading:row) { pendingEditor = .init(id:row.id,reading:row); detail=nil } }
     }
     private var empty: some View {
@@ -243,6 +245,8 @@ struct HabitsRoomView: View {
                     Spacer(minLength:0)
                 }.padding(.leading,14).padding(.vertical,13).frame(minHeight:70).contentShape(.rect)
             }.buttonStyle(.plain).accessibilityIdentifier("habit-row-"+row.id.uuidString).accessibilityLabel(row.name+"، "+progress(row)+"، "+row.statusTitle)
+            // A day forgotten is one long-press away (item 26), without opening the habit.
+            .contextMenu { if row.source == nil, !row.archived, let p = row.summary.current, p.rule.measure != .health, (row.summary.periods.first?.start).map({ $0 < today }) == true { Button("فعلتها في يوم سابق",systemImage:"calendar.badge.clock") { pastDay = row } } }
             trailing(row).padding(.trailing,10)
         }
     }

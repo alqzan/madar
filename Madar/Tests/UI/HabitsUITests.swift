@@ -81,5 +81,13 @@ import XCTest
         XCTAssertTrue(again.waitForExistence(timeout:10));again.tap()
         XCTAssertTrue(since.waitForExistence(timeout:5));XCTAssertEqual(since.label,"منذ ٣ أيام")
         XCTAssertTrue(app.staticTexts["مشيت مع أخي بعد العصر."].exists);shot(app,"I26-since-after-L")
+        // A forgotten day is a long-press away from the room's row.
+        app.buttons["تمّ"].tap()
+        let water=app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@","الماء،")).firstMatch
+        for _ in 0..<6 where !water.isHittable { app.swipeDown(velocity:.slow) }
+        water.press(forDuration:1.0)
+        let menu=app.buttons["فعلتها في يوم سابق"];XCTAssertTrue(menu.waitForExistence(timeout:5),app.debugDescription);menu.tap()
+        XCTAssertTrue(app.buttons["habit-past-save"].waitForExistence(timeout:5));app.buttons["إلغاء"].tap()
+        XCTAssertTrue(app.buttons["habit-past-save"].waitForNonExistence(timeout:5))
     }
 }
