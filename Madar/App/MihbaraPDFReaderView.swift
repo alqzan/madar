@@ -1,8 +1,10 @@
 import SwiftUI
 import PDFKit
+import SwiftData
 import MadarCore
 import MadarDesign
 import MadarCommands
+import MadarPrayer
 
 /// A PDF page is a file coordinate. Its label is shown separately because it is
 /// not evidence that the same number is printed on the photographed page.
@@ -23,6 +25,8 @@ struct MihbaraPDFReaderView: View {
     @State private var sessionStartIndex = 0
     @State private var sessionID = UUID()
     @State private var positionProgress = ReadingPositionProgress()
+    @State private var sessionDayStamp: String?
+    @State private var lastClockSample: Date?
     @State private var closing = false
     @State private var searching = false
     @State private var flowing = false
@@ -70,7 +74,7 @@ struct MihbaraPDFReaderView: View {
             .environment(\.layoutDirection, .rightToLeft)
             .onChange(of: tick.date) { _, now in
                 guard scenePhase == .active, canRead else { return }
-                readingClock?.advance(to: now)
+                advanceClock(to: now)
             }
         }
         .task { openPDF() }
@@ -176,9 +180,7 @@ struct MihbaraPDFReaderView: View {
             document = opened
             pageIndex = startPage.map { min(max($0, 0), opened.pageCount - 1) } ?? restoredIndex(count: opened.pageCount)
             let now = Date()
-            sessionStart = now
-            sessionStartIndex = pageIndex
-            positionProgress = .init(startingAt: pageIndex + 1, at: now)
+            beginSegment(at: now)
             readingClock = ActiveReadingClock(startedAt: now, foreground: scenePhase == .active && canRead)
         } catch { self.error = error.localizedDescription }
     }
@@ -200,6 +202,7 @@ struct MihbaraPDFReaderView: View {
     @MainActor private func pageChanged(_ index: Int, _ explicitJump: Bool) {
         guard (0..<pageCount).contains(index), index != pageIndex else { return }
         let now = Date()
+        advanceClock(to: now)
         readingClock?.interaction(at: now)
         positionProgress.observe(position: index + 1, at: now, explicitJump: explicitJump)
         pageIndex = index
@@ -226,19 +229,56 @@ struct MihbaraPDFReaderView: View {
 
     @MainActor private func resume(at now: Date) {
         guard document != nil, canRead, scenePhase == .active, readingClock == nil else { return }
-        sessionID = UUID()
-        sessionStart = now
-        sessionStartIndex = pageIndex
-        positionProgress = .init(startingAt: pageIndex + 1, at: now)
+        beginSegment(at: now)
         readingClock = ActiveReadingClock(startedAt: now)
     }
 
-    @MainActor private func pause(at now: Date) {
+    @MainActor private func dayStamp(at date: Date) -> String? {
+        let context = ModelContext(app.container)
+        guard let day = try? DiaryLineRenderer.today(context: context, now: date),
+              let prayers = try? PrayerRepository(context: context) else { return nil }
+        return day.description + "|" + prayers.place(at: date).timeZoneID + "|" + app.string("core.dayStart")
+    }
+
+    @MainActor private func beginSegment(at date: Date) {
+        sessionID = UUID()
+        sessionStart = date
+        sessionStartIndex = pageIndex
+        positionProgress = .init(startingAt: pageIndex + 1, at: date)
+        sessionDayStamp = dayStamp(at: date)
+        lastClockSample = date
+    }
+
+    @MainActor private func advanceClock(to date: Date) {
         guard var clock = readingClock else { return }
-        clock.setForeground(false, at: now)
-        readingClock = nil
-        saveLocator(pageIndex)
-        guard clock.activeSeconds >= 60, let start = sessionStart else { return }
+        let stamp = dayStamp(at: date)
+        let previousStamp = sessionDayStamp ?? lastClockSample.flatMap { dayStamp(at: $0) }
+        var split = false
+        if let previousStamp, let stamp, stamp != previousStamp, let lastClockSample,
+           let boundary = ReadingSessionBoundaryFinder.firstTransition(
+                from: previousStamp,
+                after: lastClockSample,
+                through: date,
+                stampAt: { self.dayStamp(at: $0) }
+           ) {
+            clock.advance(to: boundary.endsPreviousAt)
+            readingClock = clock
+            queueSessionSave(at: boundary.endsPreviousAt)
+            clock.startSegment(at: boundary.startsNextAt)
+            readingClock = clock
+            beginSegment(at: boundary.startsNextAt)
+            split = true
+        }
+        clock.advance(to: date)
+        readingClock = clock
+        if let stamp, sessionDayStamp == nil || stamp == sessionDayStamp || split {
+            sessionDayStamp = stamp
+            lastClockSample = date
+        }
+    }
+
+    @MainActor private func queueSessionSave(at date: Date) {
+        guard let clock = readingClock, clock.activeSeconds >= 60, let start = sessionStart else { return }
         let first = locator(sessionStartIndex), last = locator(pageIndex)
         let firstProgress = pageCount > 1 ? Double(sessionStartIndex) / Double(pageCount - 1) : 1.0
         let lastProgress = pageCount > 1 ? Double(pageIndex) / Double(pageCount - 1) : 1.0
@@ -246,13 +286,24 @@ struct MihbaraPDFReaderView: View {
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         saveCoordinator.enqueue(sessionID: sessionID, payload: [
             "id": .string(sessionID.uuidString), "bookID": .string(book.id.uuidString),
-            "start": .string(formatter.string(from: start)), "end": .string(formatter.string(from: now)),
+            "start": .string(formatter.string(from: start)), "end": .string(formatter.string(from: date)),
             "activeSeconds": .number(Double(min(86_400, clock.activeSeconds))),
             "fromPage": .number(0), "toPage": .number(0),
             "startLocator": .string(first), "endLocator": .string(last),
             "startProgression": .number(firstProgress), "endProgression": .number(lastProgress),
             "pagesCounted": .number(Double(positionProgress.pagesCounted))
         ])
+    }
+
+    @MainActor private func pause(at now: Date) {
+        advanceClock(to: now)
+        guard var clock = readingClock else { return }
+        clock.setForeground(false, at: now)
+        readingClock = nil
+        saveLocator(pageIndex)
+        readingClock = clock
+        queueSessionSave(at: now)
+        readingClock = nil
     }
 
     @MainActor private func finishAndClose() {

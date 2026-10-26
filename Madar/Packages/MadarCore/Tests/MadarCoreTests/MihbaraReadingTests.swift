@@ -93,6 +93,40 @@ import Testing
         #expect(clock.activeSeconds == 240)
     }
 
+    @Test func readingSessionBoundaryFindsDayOrPlaceChangeBetweenSamples() {
+        let boundary = Date(timeIntervalSince1970: 1_000)
+        let before = boundary.addingTimeInterval(-10), after = boundary.addingTimeInterval(10)
+        let oldStamp = "2026-10-25|Asia/Riyadh"
+        let result = ReadingSessionBoundaryFinder.firstTransition(
+            from: oldStamp,
+            after: before,
+            through: after,
+            stampAt: { $0 < boundary ? oldStamp : "2026-10-26|Europe/London" }
+        )
+
+        #expect(result != nil)
+        if let result {
+            #expect(result.endsPreviousAt < boundary)
+            #expect(result.startsNextAt == boundary)
+            #expect(result.startsNextAt.timeIntervalSince(result.endsPreviousAt) <= 0.002)
+        }
+    }
+
+    @Test func readingSessionBoundaryDoesNotGuessWhenAStampLookupFails() {
+        let start = Date(timeIntervalSince1970: 0), end = start.addingTimeInterval(10)
+        let result = ReadingSessionBoundaryFinder.firstTransition(
+            from: "day-one",
+            after: start,
+            through: end,
+            stampAt: { date in
+                if date == start { return "day-one" }
+                if date == end { return "day-two" }
+                return nil
+            }
+        )
+        #expect(result == nil)
+    }
+
     @Test func epubPolicyAllowsOnlyReadiumAssetsForStylesAndFontsAndStillBlocksScripts() {
         let directives = Dictionary(uniqueKeysWithValues: ReadingDocumentPolicy.content.split(separator: ";").map {
             let parts = $0.split(separator: " ").map(String.init)

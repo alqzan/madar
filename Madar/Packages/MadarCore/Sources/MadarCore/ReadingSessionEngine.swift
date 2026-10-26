@@ -145,6 +145,41 @@ public struct ReadingPositionProgress: Equatable, Sendable {
     }
 }
 
+/// The two instants that split a reading session across a day or place change.
+/// The small gap brackets the transition between periodic clock samples.
+public struct ReadingSessionBoundary: Equatable, Sendable {
+    public let endsPreviousAt: Date
+    public let startsNextAt: Date
+
+    public init(endsPreviousAt: Date, startsNextAt: Date) {
+        self.endsPreviousAt = endsPreviousAt
+        self.startsNextAt = startsNextAt
+    }
+}
+
+/// Locates the first change of the current day/place stamp between two samples.
+public enum ReadingSessionBoundaryFinder {
+    public static func firstTransition(
+        from previousStamp: String,
+        after lastSample: Date,
+        through currentSample: Date,
+        stampAt: (Date) -> String?
+    ) -> ReadingSessionBoundary? {
+        guard currentSample > lastSample,
+              stampAt(lastSample) == previousStamp,
+              let currentStamp = stampAt(currentSample), currentStamp != previousStamp else { return nil }
+
+        var lower = lastSample
+        var upper = currentSample
+        while upper.timeIntervalSince(lower) > 0.002 {
+            let middle = lower.addingTimeInterval(upper.timeIntervalSince(lower) / 2)
+            guard let middleStamp = stampAt(middle) else { return nil }
+            if middleStamp == previousStamp { lower = middle } else { upper = middle }
+        }
+        return ReadingSessionBoundary(endsPreviousAt: lower, startsNextAt: upper)
+    }
+}
+
 /// R01: navigator positions are never page numbers. An unknown printed total stays unknown.
 public enum ReadingPageEstimate {
     public static func page(progression: Double?, totalPages: Int?) -> Int? {
