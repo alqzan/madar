@@ -24,6 +24,27 @@ import XCTest
         app.terminate(); app.launch(); XCTAssertTrue(app.buttons["diary-days"].waitForExistence(timeout: 25)); app.buttons["diary-days"].tap()
         XCTAssertTrue(app.staticTexts["diary-hub-year"].waitForExistence(timeout: 10)); XCTAssertEqual(app.staticTexts["diary-hub-year"].label,"١٤٤٨")
     }
+    func testIndexYearsShowBothCalendars() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": "editor", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00"]
+        app.launch(); XCTAssertTrue(app.buttons["diary-days"].waitForExistence(timeout: 25)); app.buttons["diary-days"].tap()
+        XCTAssertTrue(app.buttons["diary-calendar-scale-year"].waitForExistence(timeout: 10)); capture(app, "M3-V07-index-calendar-L")
+        selectHubTab("index", app)
+        let gregorianYear = app.descendants(matching: .any)["diary-hub-index-year-2026"]
+        XCTAssertTrue(gregorianYear.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(gregorianYear.label.contains(" م") && gregorianYear.label.contains(" هـ"), gregorianYear.label)
+        capture(app, "M3-V07-index-gregorian-L")
+
+        selectHubTab("calendar", app)
+        let hijri = app.buttons["diary-calendar-hijri"]
+        for _ in 0..<5 where !hijri.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(hijri.isHittable, app.debugDescription); hijri.tap()
+        selectHubTab("index", app)
+        let hijriYear = app.descendants(matching: .any)["diary-hub-index-year-1448"]
+        XCTAssertTrue(hijriYear.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(hijriYear.label.contains(" هـ") && hijriYear.label.contains(" م"), hijriYear.label)
+        capture(app, "M3-V07-index-hijri-L")
+    }
     /// Owner trial, 22 Oct 2026. Runs only when TEST_RUNNER_MADAR_TRIAL_ZIP names the converted old-Madar diary; it
     /// imports into a fresh UI-test store through the shipped Day One importer and captures the rooms at real volume.
     func testOwnerLegacyDiaryTrial() throws {
@@ -55,4 +76,10 @@ import XCTest
         app.buttons["diary-hub-photos"].tap(); capture(app, "TRIAL-diary-photos-L")
     }
     private func capture(_ app: XCUIApplication,_ name:String) { let shot = XCTAttachment(screenshot:app.screenshot()); shot.name=name; shot.lifetime = .keepAlways; add(shot) }
+    private func selectHubTab(_ name: String, _ app: XCUIApplication) {
+        let tab = app.buttons["diary-hub-" + name]
+        for _ in 0..<6 where !tab.isHittable { app.swipeLeft() }
+        for _ in 0..<6 where !tab.isHittable { app.swipeRight() }
+        XCTAssertTrue(tab.isHittable, app.debugDescription); tab.tap()
+    }
 }

@@ -113,10 +113,7 @@ struct DiaryHubView: View {
         .accessibilityIdentifier(identifier)
     }
     private var alternateYearTitle: String {
-        guard let first = grid.days(year: selectedYear, month: 1).first, let last = grid.days(year: selectedYear, month: 12).last else { return "" }
-        let a = service.dateLabels(first, first: grid.first).secondary.split(separator: " ").suffix(2).joined(separator: " ")
-        let b = service.dateLabels(last, first: grid.first).secondary.split(separator: " ").suffix(2).joined(separator: " ")
-        return a == b ? a : a + " – " + b
+        alternateYearTitle(for: selectedYear)
     }
     private func alternateMonthTitle(_ month: Int) -> String {
         service.alternateMonthTitle(year: selectedYear, month: month)
@@ -194,8 +191,24 @@ struct DiaryHubView: View {
             Text("فهرس الأيام").font(DiaryType.heading)
             if years.isEmpty { Text("يبدأ فهرسك من أول صفحة تكتبها.").font(DiaryType.writing) }
             ForEach(years, id: \.self) { year in
-                DisclosureGroup(service.digits.string(year)) { timeline(archive.days.filter { grid.parts($0.day).year == year }) }.font(DiaryType.heading).padding(12).background(theme.surface, in: .rect(cornerRadius: 16))
+                let labels = indexYearLabels(year)
+                DisclosureGroup { timeline(archive.days.filter { grid.parts($0.day).year == year }) } label: {
+                    MadarDateLabel(labels, primaryFont: DiaryType.heading, secondaryFont: MadarTypography.fine())
+                }
+                .font(DiaryType.heading).padding(12).background(theme.surface, in: .rect(cornerRadius: 16))
+                .accessibilityElement(children: .combine).accessibilityLabel(labels.combined)
+                .accessibilityIdentifier("diary-hub-index-year-" + String(year))
             }
         }
+    }
+    private func indexYearLabels(_ year: Int) -> MadarDateLabels {
+        let primary = service.digits.string(year) + (grid.first == .gregorian ? " م" : " هـ")
+        return .init(primary: primary, secondary: alternateYearTitle(for: year))
+    }
+    private func alternateYearTitle(for year: Int) -> String {
+        guard let first = grid.days(year: year, month: 1).first, let last = grid.days(year: year, month: 12).last else { return "" }
+        let start = service.dateLabels(first, first: grid.first).secondary.split(separator: " ").suffix(2).joined(separator: " ")
+        let end = service.dateLabels(last, first: grid.first).secondary.split(separator: " ").suffix(2).joined(separator: " ")
+        return start == end ? start : start + " – " + end
     }
 }
