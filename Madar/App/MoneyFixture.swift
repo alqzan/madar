@@ -14,11 +14,11 @@ private struct UITestBankCorpusLine: Decodable {
 extension AppSession {
     /// Named synthetic stores only. Never reads or writes the owner's store.
     func prepareMoneyFixture(group: URL) throws {
-        guard let variant = ProcessInfo.processInfo.environment["MADAR_UI_MONEY_FIXTURE"], ["goal", "zakat", "zakatHidden", "travel", "travelMissing", "travelHidden", "accounts", "expense", "showcase", "empty", "hidden", "zero", "shortfall", "messages", "salarySourceFlow", "bankCorpus", "since", "rules", "salary", "budget", "cards", "cardsHidden", "analysis", "analysisHidden", "reconcile", "reconcileHidden", "cashback", "cashbackHidden", "subscriptions"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
+        guard let variant = ProcessInfo.processInfo.environment["MADAR_UI_MONEY_FIXTURE"], ["goal", "zakat", "zakatHidden", "travel", "travelMissing", "travelHidden", "accounts", "expense", "showcase", "empty", "hidden", "zero", "shortfall", "messages", "salarySourceFlow", "bankCorpus", "since", "rules", "salary", "budget", "cards", "cardsHidden", "analysis", "analysisHidden", "reconcile", "reconcileHidden", "cashback", "cashbackHidden", "subscriptions", "subscriptionsHidden"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         let c = ModelContext(container)
         guard !(try c.fetch(FetchDescriptor<DeviceSetting>())).contains(where: { $0.key == "sys.moneyFixture" }) else { return }
         for key in ["sys.moneyFixture", "sys.onboardingCompleted"] { let marker = DeviceSetting(); marker.key = key; marker.valueJSON = Data("true".utf8); c.insert(marker) }
-        _ = try SettingsStore(context: c).stage(["core.dayStart": .string("midnight"), "core.faceIDLock": .string("none"), "core.hideMoneyUntilTouch": .bool(["zakatHidden", "travelHidden", "hidden", "cardsHidden", "analysisHidden", "reconcileHidden", "cashbackHidden"].contains(variant))])
+        _ = try SettingsStore(context: c).stage(["core.dayStart": .string("midnight"), "core.faceIDLock": .string("none"), "core.hideMoneyUntilTouch": .bool(["zakatHidden", "travelHidden", "hidden", "cardsHidden", "analysisHidden", "reconcileHidden", "cashbackHidden", "subscriptionsHidden"].contains(variant))])
         if ProcessInfo.processInfo.environment["MADAR_UI_MONEY_BLOCK_SIZE"] == "4x4" {
             let store = try SettingsStore(context: c)
             var layout = try store.value(for: "bahw.layout").object ?? [:], sizes = layout["sizes"]?.object ?? [:]
@@ -257,7 +257,7 @@ extension AppSession {
             statement.parsedJSON = try JSONSerialization.data(withJSONObject: ["v": 1, "kind": "statement", "last4": "8844", "statementDueMinor": 425_000, "minimumDueMinor": 21_300, "dueDate": today.adding(days: 9).date(in: zone).timeIntervalSinceReferenceDate]); c.insert(statement)
             try c.save()
         }
-        if variant == "subscriptions" {
+        if variant == "subscriptions" || variant == "subscriptionsHidden" {
             var calendar = Calendar(identifier: .gregorian); calendar.timeZone = zone
             for month in [7, 8, 9] {
                 guard let eventAt = calendar.date(from: DateComponents(year: 2026, month: month, day: 18, hour: 12)) else { continue }

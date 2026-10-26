@@ -156,6 +156,40 @@ import XCTest
         XCTAssertFalse(app.buttons["money-obligation-row-منصة شاهد"].exists, app.debugDescription)
     }
 
+    func testHiddenSubscriptionSuggestionRequiresExplicitReveal() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": "subscriptionsHidden",
+            "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-16T20:00:00+03:00"]
+        app.launch()
+        let tab = app.buttons["tab-customize"]; XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
+        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("المال")
+        let money = app.buttons["money-open"]; XCTAssertTrue(money.waitForExistence(timeout: 5)); money.tap()
+        let open = app.buttons["money-obligations-open"]; XCTAssertTrue(open.waitForExistence(timeout: 10))
+        for _ in 0..<6 where !open.isHittable { app.swipeUp(velocity: .slow) }
+        open.tap()
+
+        let suggestion = app.buttons["money-subscription-suggestion"]
+        XCTAssertTrue(suggestion.waitForExistence(timeout: 10), app.debugDescription)
+        for _ in 0..<8 where !suggestion.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(suggestion.isHittable, app.debugDescription)
+        XCTAssertTrue(suggestion.label.contains("•••"), suggestion.label)
+        XCTAssertFalse(suggestion.label.contains("399"), suggestion.label)
+        shot(app, "M5-V09-subscription-suggestion-hidden-L")
+        suggestion.tap()
+
+        XCTAssertTrue(app.staticTexts["المبلغ المقترح مخفي حتى تُظهر الأرقام."].waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertFalse(app.textFields["money-obligation-amount"].exists, app.debugDescription)
+        XCTAssertTrue(app.buttons["money-obligation-reveal-suggested-amount"].exists, app.debugDescription)
+        shot(app, "M5-V09-subscription-suggestion-redacted-L")
+        app.buttons["money-obligation-reveal-suggested-amount"].tap()
+
+        let amount = app.textFields["money-obligation-amount"]
+        XCTAssertTrue(amount.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertEqual(amount.value as? String, "399")
+        XCTAssertTrue(app.staticTexts["money-obligation-monthly-peak"].waitForExistence(timeout: 5), app.debugDescription)
+        shot(app, "M5-V09-subscription-suggestion-revealed-L")
+    }
+
     /// M5-V25: a repeated confirmed bank charge becomes an obligation only after the owner confirms the review draft.
     func testConfirmingRepeatChargeCreatesSubscriptionOnShelf() throws {
         continueAfterFailure = false

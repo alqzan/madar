@@ -66,7 +66,7 @@ struct MoneyObligationsView: View {
             .task { load() }.onChange(of: app.prayerRevision) { load() }
             .sheet(item: $obligationSheet) { route in
                 if let reading {
-                    MoneyObligationSheet(app: app, ladder: reading.ladder, visible: visible, suggestion: route.suggestion)
+                    MoneyObligationSheet(app: app, ladder: reading.ladder, visible: visible, revealed: $revealed, suggestion: route.suggestion)
                         .environment(\.roomTheme, theme)
                 }
             }

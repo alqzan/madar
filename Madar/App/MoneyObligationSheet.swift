@@ -9,6 +9,7 @@ struct MoneyObligationSheet: View {
     let app: AppSession
     let ladder: [MoneyLadderMonth]
     let visible: Bool
+    @Binding var revealed: Bool
     let suggestion: SubscriptionSuggestionEngine.Suggestion?
     @Environment(\.dismiss) private var dismiss
     @Environment(\.roomTheme) private var theme
@@ -16,6 +17,7 @@ struct MoneyObligationSheet: View {
     @State private var kind = "bill"
     @State private var name = ""
     @State private var rawAmount = ""
+    @State private var amountWasEdited = false
     @State private var count = 12
     @State private var every = 1
     @State private var unit = RecurrenceUnit.month
@@ -24,15 +26,23 @@ struct MoneyObligationSheet: View {
     /// The decimal pad has no return key: «تم» above it, a scroll or a tap on the title closes it.
     private enum Field { case name, amount }
     @FocusState private var field: Field?
+    private let suggestedAmountInput: String?
 
-    init(app: AppSession, ladder: [MoneyLadderMonth], visible: Bool, suggestion: SubscriptionSuggestionEngine.Suggestion? = nil) {
+    private var numbersVisible: Bool { visible || revealed }
+
+    init(app: AppSession, ladder: [MoneyLadderMonth], visible: Bool, revealed: Binding<Bool>, suggestion: SubscriptionSuggestionEngine.Suggestion? = nil) {
         self.app = app
         self.ladder = ladder
         self.visible = visible
+        self._revealed = revealed
         self.suggestion = suggestion
+        let suggestedAmount = suggestion.map { Self.decimalInput($0.amountMinor, currency: $0.currency) }
+        self.suggestedAmountInput = suggestedAmount
         _kind = State(initialValue: suggestion == nil ? "bill" : "subscription")
         _name = State(initialValue: suggestion?.name ?? "")
-        _rawAmount = State(initialValue: suggestion.map { Self.decimalInput($0.amountMinor, currency: $0.currency) } ?? "")
+        // A suggested amount is passive account data. Keep it out of the editable field and
+        // accessibility tree until the user explicitly reveals the room's hidden numbers.
+        _rawAmount = State(initialValue: visible || revealed.wrappedValue ? suggestedAmount ?? "" : "")
         _firstDue = State(initialValue: suggestion?.nextDue ?? .now)
     }
 
@@ -105,8 +115,23 @@ struct MoneyObligationSheet: View {
                 field("الاسم") {
                     TextField(placeholder, text: $name).focused($field, equals: .name).accessibilityIdentifier("money-obligation-name")
                 }
-                field(recurring ? "المبلغ في كل مرة" : "مبلغ القسط") {
-                    TextField("٠", text: $rawAmount).keyboardType(.decimalPad).focused($field, equals: .amount).accessibilityIdentifier("money-obligation-amount")
+                if suggestion != nil && !numbersVisible {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("المبلغ المقترح مخفي حتى تُظهر الأرقام.")
+                            .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                        Button("أظهر الأرقام") {
+                            revealed = true
+                            if !amountWasEdited { rawAmount = suggestedAmountInput ?? "" }
+                        }
+                        .font(MadarTypography.caption()).frame(minHeight: 44)
+                        .accessibilityIdentifier("money-obligation-reveal-suggested-amount")
+                    }
+                } else {
+                    field(recurring ? "المبلغ في كل مرة" : "مبلغ القسط") {
+                        TextField("٠", text: $rawAmount).keyboardType(.decimalPad).focused($field, equals: .amount)
+                            .accessibilityIdentifier("money-obligation-amount")
+                            .onChange(of: rawAmount) { amountWasEdited = true }
+                    }
                 }
                 if !recurring {
                     Stepper(value: $count, in: 1...120) { Text(instalments(count)).font(MadarTypography.body()) }
@@ -114,7 +139,7 @@ struct MoneyObligationSheet: View {
                 }
                 rhythm
                 if amountMinor != nil, !ladder.isEmpty {
-                    if visible { ladderPreview }
+                    if numbersVisible { ladderPreview }
                     else {
                         Text("أرقامك مخفية؛ أظهرها من صفحة الالتزامات لترى أثر الإضافة.")
                             .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
