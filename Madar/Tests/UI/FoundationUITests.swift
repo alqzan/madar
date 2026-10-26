@@ -269,6 +269,10 @@ import XCTest
         attachScreenshot(app, named: "M1-V04-hali-L")
         let month = app.staticTexts["prayer-history-month"]
         scrollTo(month, in: app)
+        XCTAssertTrue(month.label.contains(" هـ"), month.label)
+        let span = app.staticTexts["prayer-history-month-span"]
+        XCTAssertTrue(span.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(span.label.contains(" م") && span.label.contains("٢٠٢٦"), span.label)
         app.swipeUp()
         attachScreenshot(app, named: "M1-V04-hali-scrolled-L")
         app.terminate()

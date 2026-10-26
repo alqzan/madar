@@ -1675,7 +1675,7 @@ private struct PrayerStatisticsView: View {
     }
     private var monthTitle: String {
         let names = ["محرم", "صفر", "ربيع الأول", "ربيع الآخر", "جمادى الأولى", "جمادى الآخرة", "رجب", "شعبان", "رمضان", "شوال", "ذو القعدة", "ذو الحجة"]
-        return names[month.month - 1] + " " + formatter.string(month.year)
+        return names[month.month - 1] + " " + formatter.string(month.year) + " هـ"
     }
 
     @Environment(\.dismiss) private var dismiss
@@ -1686,8 +1686,8 @@ private struct PrayerStatisticsView: View {
     private var monthSpan: String {
         guard let first = monthDays.first, let last = monthDays.last else { return "" }
         let f = DateFormatter(); f.locale = numeralLocale; f.timeZone = session.activePlace.timeZone
-        f.calendar = Calendar(identifier: .gregorian); f.dateFormat = "d MMMM"
-        func text(_ day: GregorianDay) -> String { f.string(from: day.date(in: session.activePlace.timeZone).addingTimeInterval(12 * 3600)) }
+        f.calendar = Calendar(identifier: .gregorian); f.dateFormat = "d MMMM yyyy"
+        func text(_ day: GregorianDay) -> String { f.string(from: day.date(in: session.activePlace.timeZone).addingTimeInterval(12 * 3600)) + " م" }
         return text(first) + " – " + text(last)
     }
     /// The Mizan's own count over the last 25 prayers: on time ÷ prayers whose time came (pending and unrecorded stay out).
@@ -1834,7 +1834,7 @@ private struct PrayerStatisticsView: View {
             HStack(alignment: .firstTextBaseline) {
                 Text(monthTitle).font(serif(26)).accessibilityIdentifier("prayer-history-month")
                 Spacer(minLength: 8)
-                Text(monthSpan).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
+                Text(monthSpan).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("prayer-history-month-span")
             }
             if typeSize.isAccessibilitySize {
                 ForEach(snapshot.history.filter { hijri($0.day).month == month.month && hijri($0.day).year == month.year }, id: \.day) { day in
