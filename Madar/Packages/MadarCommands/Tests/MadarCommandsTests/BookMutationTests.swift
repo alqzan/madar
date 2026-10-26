@@ -153,6 +153,35 @@ import MadarData
         #expect(BookCommand.parse("notebook.savePrivate", ["id": .string(id.uuidString), "text": .string("فكرة"), "isPrivate": .bool(false)]) == nil)
     }
 
+    @Test func goodreadsBookNoteEditDeleteAndUndoKeepItsBookLink() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "MihbaraGoodreadsNote-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root), context = ModelContext(container)
+        let bookID = UUID(), noteID = UUID()
+        let book = Book(); book.id = bookID; book.title = "رحلة Goodreads"; book.kind = "paper"
+        context.insert(book)
+        let note = NotebookNote(); note.id = noteID; note.isPrivate = true; note.link = "book"; note.targetID = bookID; note.text = "ملاحظة أصلية"
+        context.insert(note); try context.save()
+
+        let edited = try BookMutationHandler.stage(.savePrivateNote(id: noteID, text: "ملاحظة معدلة"), context: context,
+                                                   now: now.addingTimeInterval(1), writer: "fixture")
+        try context.save()
+        #expect(note.text == "ملاحظة معدلة" && note.isPrivate)
+        #expect(note.link == "book" && note.targetID == bookID)
+        try BookMutationHandler.undo(edited, context: context, now: now.addingTimeInterval(2), writer: "fixture")
+        try context.save()
+        #expect(note.text == "ملاحظة أصلية" && note.link == "book" && note.targetID == bookID)
+
+        let deleted = try BookMutationHandler.stage(.deletePrivateNote(id: noteID), context: context,
+                                                    now: now.addingTimeInterval(3), writer: "fixture")
+        try context.save()
+        #expect(note.deletedAt != nil)
+        try BookMutationHandler.undo(deleted, context: context, now: now.addingTimeInterval(4), writer: "fixture")
+        try context.save()
+        #expect(note.deletedAt == nil && note.text == "ملاحظة أصلية" && note.isPrivate)
+        #expect(note.link == "book" && note.targetID == bookID)
+    }
+
     @Test func savedWordsUpsertByNaturalKeyAndUndoWithoutLosingMeaning() throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "MihbaraWords-\(UUID())"); defer { try? FileManager.default.removeItem(at: root) }
         let container = try MadarContainerFactory.makeLocal(at: root), context = ModelContext(container)
@@ -220,5 +249,95 @@ import MadarData
         lines=try DiaryLineRenderer.live(day:day,context:context).filter{$0.kind=="mihbara"}
         #expect(lines.isEmpty,"Hiding the diary line does not delete the saved reading session")
         #expect(try context.fetch(FetchDescriptor<ReadingSession>()).count==2)
+    }
+
+    @Test func goodreadsImportUpdatesBySourceWithoutDuplicatingAndUndoRestoresImportState() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "GoodreadsImport-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let staging = root.appending(path: "BookStaging")
+        let source = root.appending(path: "goodreads.csv")
+        let csv = "Book Id,Title,Author,Additional Authors,ISBN,ISBN13,My Rating,Exclusive Shelf,Date Read,Read Count,My Review,Private Notes,Number of Pages,Year Published,Date Added,Bookshelves\r\n"
+            + "42,رحلة,أحمد,,,9780306406157,5,read,2023/12/31,2,\"السطر الأول\r\nالسطر الثاني\",ملاحظة خاصة,120,2020,2020/02/01,favorites"
+        try Data(csv.utf8).write(to: source)
+        let stage = try GoodreadsCSVFiles.stage(source: source, id: UUID(), root: staging)
+        let container = try MadarContainerFactory.makeLocal(at: root), context = ModelContext(container)
+        context.autosaveEnabled = false
+
+        func importCommand(_ id: UUID) throws -> BookCommand {
+            let payload: [String: MadarCore.JSONValue] = [
+                "id": .string(id.uuidString), "fileID": .string(stage.id.uuidString), "sha256": .string(stage.sha256),
+                "fileName": .string(stage.fileName), "cutoffYear": .number(2024), "missingDateShelf": .string("old"),
+                "selectedMatchesJSON": .string("{}")
+            ]
+            guard let command = BookCommand.parse("book.importGoodreads", payload) else { throw DataError.invalidValue("Goodreads test command rejected") }
+            return command
+        }
+
+        let firstBatch = UUID()
+        _ = try BookMutationHandler.stage(importCommand(firstBatch), context: context, now: now, writer: "fixture", stagingDirectory: staging)
+        try context.save()
+        let imported = try #require(context.fetch(FetchDescriptor<Book>()).first { $0.deletedAt == nil })
+        let importedNote = try #require(context.fetch(FetchDescriptor<NotebookNote>()).first { $0.deletedAt == nil })
+        let importedLink = try #require(context.fetch(FetchDescriptor<ImportLink>()).first { $0.deletedAt == nil })
+        #expect(imported.sourceGoodreadsID == "42"); #expect(imported.title == "رحلة"); #expect(imported.author == "أحمد")
+        #expect(imported.shelf == "old"); #expect(imported.rating == 5); #expect(imported.readCount == 2)
+        #expect(imported.review == "السطر الأول\r\nالسطر الثاني"); #expect(imported.finishedAt != nil)
+        #expect(importedNote.isPrivate && importedNote.link == "book" && importedNote.targetID == imported.id)
+        #expect(importedNote.text == "ملاحظة خاصة")
+        #expect(importedLink.source == "goodreads" && importedLink.sourceID == "42" && importedLink.targetID == imported.id)
+        let archived = try JSONDecoder().decode([String: String].self, from: #require(importedLink.unmappedJSON))
+        #expect(archived["Year Published"] == "2020" && archived["My Review"] == nil && archived["Private Notes"] == nil)
+
+        let secondBatch = UUID()
+        let secondUndo = try BookMutationHandler.stage(importCommand(secondBatch), context: context, now: now.addingTimeInterval(10), writer: "fixture", stagingDirectory: staging)
+        try context.save()
+        #expect(try context.fetch(FetchDescriptor<Book>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }.count == 1)
+        #expect(try context.fetch(FetchDescriptor<NotebookNote>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }.count == 1)
+        #expect(try context.fetch(FetchDescriptor<ImportLink>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }.count == 1)
+        #expect(importedLink.importBatchID == secondBatch)
+
+        try BookMutationHandler.undo(secondUndo, context: context, now: now.addingTimeInterval(11), writer: "fixture")
+        try context.save()
+        #expect(imported.deletedAt == nil && imported.title == "رحلة")
+        #expect(imported.importBatchID == firstBatch)
+        #expect(importedLink.deletedAt == nil && importedLink.importBatchID == firstBatch)
+        #expect(importedNote.deletedAt == nil && importedNote.text == "ملاحظة خاصة")
+        #expect(try context.fetch(FetchDescriptor<ImportBatch>()).first { $0.id == secondBatch }?.deletedAt != nil)
+
+    }
+
+    @Test func goodreadsMatchSuggestionUpdatesOnlyAfterAnExplicitChoice() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "GoodreadsMatch-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let staging = root.appending(path: "BookStaging"), source = root.appending(path: "match.csv")
+        let csv = "Book Id,Title,Author,Additional Authors,ISBN,ISBN13,My Rating,Exclusive Shelf,Date Read,Read Count,My Review,Private Notes,Number of Pages,Year Published,Date Added,Bookshelves\n"
+            + "314,عنوان Goodreads,مؤلف,,,9780306406157,0,to-read,,0,,,,2020,,"
+        try Data(csv.utf8).write(to: source)
+        let stage = try GoodreadsCSVFiles.stage(source: source, id: UUID(), root: staging)
+        let context = ModelContext(try MadarContainerFactory.makeLocal(at: root))
+        context.autosaveEnabled = false
+        let manual = Book(); manual.title = "عنوان كتبته يدويًا"; manual.author = "مؤلف"; manual.isbn13 = "9780306406157"; manual.shelf = "want"
+        context.insert(manual); try context.save()
+        let entry = try #require(GoodreadsCSV.parse(Data(csv.utf8)).first)
+        let candidate = GoodreadsBookCandidate(id: manual.id, title: manual.title, author: manual.author, isbn13: manual.isbn13, sourceGoodreadsID: nil, shelf: manual.shelf)
+        let suggestion = GoodreadsCSV.preview(entries: [entry], existing: [candidate])
+        #expect(suggestion.rows[0].targetBookID == nil)
+        #expect(suggestion.rows[0].suggestions.map(\.id) == [manual.id])
+
+        let selected = try JSONEncoder().encode([entry.rowKey: manual.id])
+        let batchID = UUID()
+        let payload: [String: MadarCore.JSONValue] = [
+            "id": .string(batchID.uuidString), "fileID": .string(stage.id.uuidString), "sha256": .string(stage.sha256),
+            "fileName": .string(stage.fileName), "cutoffYear": .number(2024), "missingDateShelf": .string("old"),
+            "selectedMatchesJSON": .string(String(decoding: selected, as: UTF8.self))
+        ]
+        let command = try #require(BookCommand.parse("book.importGoodreads", payload))
+        _ = try BookMutationHandler.stage(command, context: context, now: now, writer: "fixture", stagingDirectory: staging)
+        try context.save()
+        let live = try context.fetch(FetchDescriptor<Book>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
+        #expect(live.count == 1 && live[0].id == manual.id)
+        #expect(live[0].title == "عنوان Goodreads" && live[0].sourceGoodreadsID == "314")
     }
 }

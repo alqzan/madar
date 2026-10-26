@@ -6,6 +6,7 @@ public enum BookCommand: Codable, Equatable, Sendable {
     case updatePaper(id: UUID, title: String, author: String, pages: Int?, position: Int, isbn13: String?, tocJSON: Data?)
     case importPDF(id: UUID, fileID: UUID, sha256: String, title: String, author: String, language: String)
     case importEPUB(id: UUID, fileID: UUID, sha256: String, title: String, author: String, language: String, shelf: String, turathID: Int? = nil)
+    case importGoodreads(id: UUID, fileID: UUID, sha256: String, fileName: String, cutoffYear: Int, missingDateShelf: String, selectedMatchesJSON: Data)
     case deleteBook(id: UUID)
     case removeBookFile(id: UUID)
     case restoreBookFile(id: UUID, fileID: UUID, sha256: String)
@@ -26,7 +27,7 @@ public enum BookCommand: Codable, Equatable, Sendable {
     /// «أضف إلى كلماتي»: one saved word with its source paragraph and reading position.
     case saveUserWord(id: UUID, word: String, language: String, bookID: UUID, bookTitle: String, locatorJSON: Data, context: String)
     public static let highlightColors: Set<String> = ["yellow", "green", "rose"]
-    public static let names: Set<String> = ["book.savePaper", "book.updatePaper", "book.importPDF", "book.importEPUB", "book.delete", "book.removeFile", "book.restoreFile", "book.moveShelf", "book.rename", "book.setPosition", "book.setLocator", "reading.saveSession", "hadith.mark", "notebook.savePrivate", "notebook.deletePrivate", "highlight.save", "highlight.delete", "notebook.savePage", "word.save"]
+    public static let names: Set<String> = ["book.savePaper", "book.updatePaper", "book.importPDF", "book.importEPUB", "book.importGoodreads", "book.delete", "book.removeFile", "book.restoreFile", "book.moveShelf", "book.rename", "book.setPosition", "book.setLocator", "reading.saveSession", "hadith.mark", "notebook.savePrivate", "notebook.deletePrivate", "highlight.save", "highlight.delete", "notebook.savePage", "word.save"]
     public var isUndoable: Bool {
         if case .readingSession = self { return false }
         if case .removeBookFile = self { return false }
@@ -121,6 +122,21 @@ public enum BookCommand: Codable, Equatable, Sendable {
             else if let value = integer("turathID", max: 2_000_000_000), value > 0 { turathID = value }
             else { return nil }
             return .importEPUB(id: id, fileID: fileID, sha256: hash, title: title, author: author, language: language, shelf: shelf, turathID: turathID)
+        case "book.importGoodreads":
+            guard Set(p.keys) == ["id", "fileID", "sha256", "fileName", "cutoffYear", "missingDateShelf", "selectedMatchesJSON"],
+                  let fileID = text("fileID").flatMap(UUID.init(uuidString:)),
+                  let hash = text("sha256"), hash.count == 64, hash.allSatisfy({ "0123456789abcdef".contains($0) }),
+                  let fileName = text("fileName"), !fileName.isEmpty, fileName.count <= 255,
+                  fileName == URL(fileURLWithPath: fileName).lastPathComponent, !fileName.contains("\\"),
+                  let cutoffYear = integer("cutoffYear", max: 2100), (1900...2100).contains(cutoffYear),
+                  let missingDateShelf = text("missingDateShelf"), ["old", "finished"].contains(missingDateShelf),
+                  let selectedText = text("selectedMatchesJSON"), selectedText.utf8.count <= 1_000_000,
+                  let selectedData = selectedText.data(using: .utf8),
+                  let selections = try? JSONDecoder().decode([String: UUID].self, from: selectedData),
+                  selections.count <= 5_000, selections.keys.allSatisfy({ $0.count == 64 && $0.allSatisfy({ "0123456789abcdef".contains($0) }) }),
+                  Set(selections.values).count == selections.count else { return nil }
+            return .importGoodreads(id: id, fileID: fileID, sha256: hash, fileName: fileName, cutoffYear: cutoffYear,
+                                    missingDateShelf: missingDateShelf, selectedMatchesJSON: selectedData)
         case "book.delete":
             guard Set(p.keys) == ["id"] else { return nil }
             return .deleteBook(id: id)

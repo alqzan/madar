@@ -740,7 +740,7 @@ final class AppSession {
         let result = try await bus.execute(.init(commandID: id, name: name, payload: .object(payload), issuedAt: now), now: now)
         guard result.status == .applied || result.status == .duplicate else { throw DataError.invalidValue(result.reason ?? "تعذّر حفظ الكتاب") }
         try reload(); try publishSnapshot()
-        if ["book.importPDF", "book.importEPUB", "book.savePaper", "book.updatePaper", "book.delete"].contains(name) {
+        if ["book.importPDF", "book.importEPUB", "book.importGoodreads", "book.savePaper", "book.updatePaper", "book.delete"].contains(name) {
             await reconcileSpotlightIndex()
         }
         if let token = result.undoToken { showUndo(.init(id: token, expiresAt: now.addingTimeInterval(600)), message: undoMessage) }

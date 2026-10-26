@@ -31,6 +31,7 @@ struct MihbaraHomeView: View {
     @State private var libraryShelf = "all"
     @State private var pendingBookFile: URL?
     @State private var pendingGoodreadsFile: URL?
+    @State private var pendingGoodreadsStage: GoodreadsCSVStage?
     @State private var pendingMotivationBook: UUID?
     @State private var slotBook: MihbaraBook?
     @State private var pendingSlotBook: MihbaraBook?
@@ -161,7 +162,7 @@ struct MihbaraHomeView: View {
                 }.frame(maxWidth: .infinity, maxHeight: .infinity).background(theme.background).foregroundStyle(theme.ink)
             }
         }
-        .fullScreenCover(isPresented: $showingAddBook) {
+        .fullScreenCover(isPresented: $showingAddBook, onDismiss: discardPendingGoodreads) {
             if let reading {
                 NavigationStack {
                     MihbaraAddBookView(
@@ -172,8 +173,10 @@ struct MihbaraHomeView: View {
                             pendingBookFile = nil; showingAddBook = false; load(); offerNewestPDF()
                         },
                         onEPUBImported: { pendingBookFile = nil; showingAddBook = false; load() },
+                        onGoodreadsImported: { showingAddBook = false; load() },
                         pendingBookFile: $pendingBookFile,
-                        pendingGoodreadsFile: $pendingGoodreadsFile
+                        pendingGoodreadsFile: $pendingGoodreadsFile,
+                        pendingGoodreadsStage: $pendingGoodreadsStage
                     )
                 }
                 .environment(\.roomTheme, theme)
@@ -190,6 +193,11 @@ struct MihbaraHomeView: View {
         guard let book = reading?.book(id), book.isReadableEPUB || book.isReadablePDF else { return nil }
         guard service.hasLocalFile(for: book) else { return nil }
         return book
+    }
+    private func discardPendingGoodreads() {
+        if let stage = pendingGoodreadsStage { GoodreadsCSVFiles.discard(id: stage.id, root: app.bookStagingDirectory) }
+        pendingGoodreadsStage = nil
+        pendingGoodreadsFile = nil
     }
     /// The PDF just added is offered for conversion (owner's choice, never automatic).
     private func offerNewestPDF() {
@@ -1024,7 +1032,7 @@ private struct MihbaraRahlOpeningView: View {
 }
 
 private struct MihbaraNotebookContent: View {
-    struct Note: Identifiable { let id: UUID; let text: String; let updatedAt: Date }
+    struct Note: Identifiable { let id: UUID; let text: String; let updatedAt: Date; let bookTitle: String?; let isBookNote: Bool }
     struct Editor: Identifiable { let id: UUID; let text: String }
     let app: AppSession
     @Environment(\.roomTheme) private var theme
@@ -1044,7 +1052,14 @@ private struct MihbaraNotebookContent: View {
                 } else {
                     ForEach(notes) { note in
                         Button { editor = .init(id: note.id, text: note.text) } label: {
-                            VStack(alignment: .leading, spacing: 10) { Text(note.text).font(MadarTypography.body()).lineLimit(5).multilineTextAlignment(.leading); MadarDateLabel(app.dateLabels(GregorianDay.containing(note.updatedAt, in: app.activePlace.timeZone))).foregroundStyle(theme.secondaryInk) }
+                            VStack(alignment: .leading, spacing: 10) {
+                                if note.isBookNote {
+                                    Label(note.bookTitle.map { "من كتاب «\($0)»" } ?? "ملاحظة مرتبطة بكتاب", systemImage: "book.closed")
+                                        .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).lineLimit(2)
+                                }
+                                Text(note.text).font(MadarTypography.body()).lineLimit(5).multilineTextAlignment(.leading)
+                                MadarDateLabel(app.dateLabels(GregorianDay.containing(note.updatedAt, in: app.activePlace.timeZone))).foregroundStyle(theme.secondaryInk)
+                            }
                                 .frame(maxWidth: .infinity, alignment: .leading).padding(16).background(theme.surface, in: .rect(cornerRadius: 14))
                         }.buttonStyle(.plain).accessibilityIdentifier("mihbara-note-" + note.id.uuidString)
                     }
@@ -1068,9 +1083,19 @@ private struct MihbaraNotebookContent: View {
 
     private func load() {
         do {
-            let rows = try ModelContext(app.container).fetch(FetchDescriptor<NotebookNote>())
-            notes = rows.filter { $0.isPrivate && $0.link == "general" && $0.targetID == nil && $0.deletedAt == nil && $0.mergedInto == nil }
-                .map { Note(id: $0.id, text: $0.text, updatedAt: $0.updatedAt) }.sorted { $0.updatedAt > $1.updatedAt }
+            let context = ModelContext(app.container)
+            let rows = try context.fetch(FetchDescriptor<NotebookNote>())
+            let books = try context.fetch(FetchDescriptor<Book>())
+            let titles = books.reduce(into: [UUID: String]()) { result, book in
+                if book.deletedAt == nil && book.mergedInto == nil { result[book.id] = book.title }
+            }
+            notes = rows.filter {
+                $0.isPrivate && $0.deletedAt == nil && $0.mergedInto == nil
+                    && (($0.link == "general" && $0.targetID == nil) || ($0.link == "book" && $0.targetID.map { titles[$0] != nil } == true))
+            }.map {
+                Note(id: $0.id, text: $0.text, updatedAt: $0.updatedAt,
+                     bookTitle: $0.targetID.flatMap { titles[$0] }, isBookNote: $0.link == "book")
+            }.sorted { $0.updatedAt > $1.updatedAt }
             failure = nil
         } catch { notes.removeAll(); failure = "تعذّر فتح الملاحظات المحفوظة." }
     }

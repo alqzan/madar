@@ -12,6 +12,18 @@ private struct BookUndo: Codable {
     var importedMediaIDs: [UUID]? = nil
     var restoredMedia: [RestoredMedia]? = nil
 }
+private struct GoodreadsImportOptions: Codable {
+    let cutoffYear: Int
+    let missingDateShelf: String
+    let selectedMatches: [String: UUID]
+}
+private struct GoodreadsImportSummary: Codable {
+    let created: Int
+    let updated: Int
+    let rowCount: Int
+    let cutoffYear: Int
+    let missingDateShelf: String
+}
 @MainActor enum BookMutationHandler {
     static func stage(_ command: BookCommand, context: ModelContext, now: Date, writer: String, stagingDirectory: URL? = nil) throws -> Data {
         let books = try context.fetch(FetchDescriptor<Book>())
@@ -82,6 +94,110 @@ private struct BookUndo: Codable {
             if shelf == "finished" { row.finishedAt = now; row.readCount = 1 }
             if !inspection.outline.isEmpty { row.tocJSON = try JSONEncoder().encode(inspection.outline) }
             context.insert(row); try touch(row, before: nil)
+        case .importGoodreads(let id, let fileID, let sha256, let fileName, let cutoffYear, let missingDateShelf, let selectedMatchesJSON):
+            guard let stagingDirectory else { throw DataError.invalidValue("ملف Goodreads المؤقت غير موجود.") }
+            guard try context.fetch(FetchDescriptor<ImportBatch>()).allSatisfy({ $0.id != id }) else {
+                throw DataError.invalidValue("أُنجز استيراد هذا الملف بالفعل.")
+            }
+            let entries: [GoodreadsCSVEntry]
+            do {
+                let (data, actualHash) = try GoodreadsCSVFiles.read(id: fileID, root: stagingDirectory, expectedHash: sha256)
+                guard actualHash == sha256 else { throw GoodreadsCSVError.malformed }
+                entries = try GoodreadsCSV.parse(data)
+            } catch let error as GoodreadsCSVError {
+                throw DataError.invalidValue(error.localizedDescription)
+            } catch {
+                throw DataError.invalidValue("تعذّر فتح ملف Goodreads المؤقت؛ اختر الملف مرة أخرى.")
+            }
+            guard let selectedMatches = try? JSONDecoder().decode([String: UUID].self, from: selectedMatchesJSON) else {
+                throw DataError.invalidValue("اختيارات المطابقة غير صالحة؛ راجع المعاينة مرة أخرى.")
+            }
+            for entry in entries {
+                let deletedSource = books.contains {
+                    $0.deletedAt != nil && ((entry.goodreadsID != nil && $0.sourceGoodreadsID == entry.goodreadsID) || $0.id == entry.deterministicBookID)
+                }
+                guard !deletedSource else { throw DataError.invalidValue("يوجد كتاب مطابق حذفته سابقًا؛ لن يعيده الاستيراد تلقائيًا.") }
+            }
+            let activeBooks = books.filter { $0.deletedAt == nil && $0.mergedInto == nil }
+            let candidates = activeBooks.map {
+                GoodreadsBookCandidate(id: $0.id, title: $0.title, author: $0.author, isbn13: $0.isbn13,
+                                       sourceGoodreadsID: $0.sourceGoodreadsID, shelf: $0.shelf)
+            }
+            let preview = GoodreadsCSV.preview(entries: entries, existing: candidates, cutoffYear: cutoffYear,
+                                               missingDateShelf: missingDateShelf, selectedMatches: selectedMatches)
+            guard selectedMatches.allSatisfy({ key, id in
+                preview.rows.first(where: { $0.entry.rowKey == key })?.suggestions.contains(where: { $0.id == id }) == true
+            }) else { throw DataError.invalidValue("تغيّرت الكتب منذ فتح المعاينة؛ أعد اختيار المطابقة.") }
+            guard preview.rows.compactMap(\.targetBookID).count == Set(preview.rows.compactMap(\.targetBookID)).count else {
+                throw DataError.invalidValue("اختر كتابًا مختلفًا لكل صف قبل الاستيراد.")
+            }
+
+            let options = GoodreadsImportOptions(cutoffYear: cutoffYear, missingDateShelf: missingDateShelf, selectedMatches: selectedMatches)
+            let batch = ImportBatch(); batch.id = id; batch.kind = "goodreads"; batch.fileName = fileName; batch.fileHash = sha256
+            batch.startedAt = now; batch.finishedAt = now; batch.status = "applied"
+            batch.optionsJSON = try JSONEncoder().encode(options)
+            var createdCount = 0, updatedCount = 0
+            let batchChangeIndex = changes.count
+            context.insert(batch); try touch(batch, before: nil)
+
+            let importLinks = try context.fetch(FetchDescriptor<ImportLink>())
+            let notes = try context.fetch(FetchDescriptor<NotebookNote>())
+            for item in preview.rows {
+                let entry = item.entry
+                let targetID = item.targetBookID ?? entry.deterministicBookID
+                if let occupied = books.first(where: { $0.id == targetID }), occupied.deletedAt != nil || occupied.mergedInto != nil {
+                    throw DataError.invalidValue("يوجد كتاب محذوف بهذا المعرّف؛ لن ينشئ الاستيراد نسخة مكررة.")
+                }
+                let existing = activeBooks.first(where: { $0.id == targetID })
+                let bookRow = existing ?? Book()
+                let before = try existing?.record()
+                if existing == nil {
+                    bookRow.id = targetID; bookRow.createdAt = now; bookRow.kind = "paper"
+                    context.insert(bookRow); createdCount += 1
+                } else { updatedCount += 1 }
+                bookRow.title = entry.title; bookRow.author = entry.author
+                bookRow.shelf = item.targetShelf; bookRow.language = entry.language
+                if let isbn13 = entry.isbn13 { bookRow.isbn13 = isbn13 }
+                if let pages = entry.pages { bookRow.pages = pages }
+                if let sourceID = entry.goodreadsID { bookRow.sourceGoodreadsID = sourceID }
+                bookRow.rating = entry.rating; bookRow.review = entry.review; bookRow.readCount = entry.readCount
+                if let dateRead = entry.dateRead { bookRow.finishedAt = dateRead }
+                bookRow.importBatchID = id
+                try touch(bookRow, before: before)
+
+                let sourceID = entry.goodreadsID ?? entry.rowKey
+                let linkID = StableIdentity.uuid(for: "ImportLink:goodreads:\(sourceID)")
+                let oldLink = importLinks.first(where: { $0.id == linkID && $0.mergedInto == nil })
+                guard oldLink?.deletedAt == nil else { throw DataError.invalidValue("سجل ربط Goodreads محذوف؛ راجع المحبرة قبل إعادة الاستيراد.") }
+                let link = oldLink ?? ImportLink()
+                let linkBefore = try oldLink?.record()
+                if oldLink == nil { link.id = linkID; link.createdAt = now; context.insert(link) }
+                link.source = "goodreads"; link.sourceModel = "Book"; link.sourceID = sourceID
+                link.targetModel = "Book"; link.targetID = targetID; link.importBatchID = id; link.importedAt = now
+                link.unmappedJSON = try JSONEncoder().encode(entry.archivedFields)
+                try touch(link, before: linkBefore)
+
+                if let privateNote = entry.privateNote {
+                    let noteID = StableIdentity.uuid(for: "GoodreadsPrivateNote:\(targetID.uuidString)")
+                    let oldNote = notes.first(where: { $0.id == noteID && $0.mergedInto == nil })
+                    if let oldNote, oldNote.deletedAt != nil { throw DataError.invalidValue("الملاحظة المستوردة محذوفة؛ لن يستعيدها الملف تلقائيًا.") }
+                    let note = oldNote ?? NotebookNote()
+                    let noteBefore = try oldNote?.record()
+                    if oldNote == nil { note.id = noteID; note.createdAt = now; context.insert(note) }
+                    note.text = privateNote; note.link = "book"; note.targetID = targetID; note.isPrivate = true
+                    try touch(note, before: noteBefore)
+                }
+            }
+            let summary = GoodreadsImportSummary(created: createdCount, updated: updatedCount, rowCount: entries.count,
+                                                 cutoffYear: cutoffYear, missingDateShelf: missingDateShelf)
+            batch.summaryJSON = try JSONEncoder().encode(summary)
+            // Include the final batch values in the undo guard after its summary is written.
+            if changes.indices.contains(batchChangeIndex) {
+                var record = try batch.record()
+                try record.set(StableIdentity.monotonic(now: now, previous: record.date("updatedAt") ?? .distantPast), for: "updatedAt")
+                try record.set(writer, for: "writerID"); try batch.apply(record)
+                changes[batchChangeIndex] = .init(before: nil, after: record)
+            }
         case .savePaper(let id, let title, let author, let pages, let shelf, let replacing, let isbn13, let tocJSON):
             guard !books.contains(where: { $0.id == id }) else { throw DataError.invalidValue("الكتاب موجود؛ عدّله من بطاقته") }
             if shelf == "reading" { try slot(id, replacing: replacing) }
@@ -217,7 +333,9 @@ private struct BookUndo: Codable {
             guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, text.count <= 2000 else { throw DataError.invalidValue("نص الملاحظة غير صالح") }
             let notes = try context.fetch(FetchDescriptor<NotebookNote>())
             if let row = notes.filter({ $0.id == id && $0.mergedInto == nil }).max(by: { $0.updatedAt < $1.updatedAt }) {
-                guard row.isPrivate, row.link == "general", row.targetID == nil else { throw DataError.invalidValue("هذه الملاحظة مرتبطة بمكان آخر") }
+                let isGeneral = row.link == "general" && row.targetID == nil
+                let isBookNote = row.link == "book" && row.targetID.map { target in books.contains(where: { $0.id == target && $0.deletedAt == nil && $0.mergedInto == nil }) } == true
+                guard row.isPrivate, isGeneral || isBookNote else { throw DataError.invalidValue("هذه الملاحظة مرتبطة بمكان آخر") }
                 let before = try row.record()
                 if row.deletedAt != nil {
                     let barrier = row.deletionBarrierAt ?? row.deletedAt ?? .distantPast
@@ -231,7 +349,11 @@ private struct BookUndo: Codable {
             }
         case .deletePrivateNote(let id):
             let notes = try context.fetch(FetchDescriptor<NotebookNote>())
-            guard let row = notes.first(where: { $0.id == id && $0.deletedAt == nil && $0.mergedInto == nil && $0.isPrivate && $0.link == "general" && $0.targetID == nil }) else { throw DataError.invalidValue("الملاحظة الخاصة غير موجودة") }
+            guard let row = notes.first(where: {
+                guard $0.id == id, $0.deletedAt == nil, $0.mergedInto == nil, $0.isPrivate else { return false }
+                if $0.link == "general" { return $0.targetID == nil }
+                return $0.link == "book" && $0.targetID.map { target in books.contains(where: { $0.id == target && $0.deletedAt == nil && $0.mergedInto == nil }) } == true
+            }) else { throw DataError.invalidValue("الملاحظة الخاصة غير موجودة") }
             let before = try row.record(); row.deletedAt = now; row.deletionBarrierAt = now
             try touch(row, before: before)
         case .saveHighlight(let id, let bookID, let locatorJSON, let color, let pageLabel):
@@ -307,6 +429,8 @@ private struct BookUndo: Codable {
         records += try context.fetch(FetchDescriptor<NotebookNote>()).map { try $0.record() }
         records += try context.fetch(FetchDescriptor<Highlight>()).map { try $0.record() }
         records += try context.fetch(FetchDescriptor<UserWord>()).map { try $0.record() }
+        records += try context.fetch(FetchDescriptor<ImportBatch>()).map { try $0.record() }
+        records += try context.fetch(FetchDescriptor<ImportLink>()).map { try $0.record() }
         for change in state.changes { guard records.contains(change.after) else { throw DataError.invalidValue("تغيّر الكتاب بعد هذا الإجراء") } }
         let mediaRows = try context.fetch(FetchDescriptor<Media>())
         for expected in state.restoredMedia ?? [] {

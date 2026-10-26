@@ -81,6 +81,55 @@ import UIKit
         XCTAssertTrue(rows.firstMatch.label.contains("كتاب بلا ملف"), rows.firstMatch.label)
     }
 
+    func testGoodreadsCSVPreviewImportsBookAndLinkedPrivateNote() {
+        continueAfterFailure = false
+        let csv = "Book Id,Title,Author,Additional Authors,ISBN,ISBN13,My Rating,Exclusive Shelf,Date Read,Read Count,My Review,Private Notes,Number of Pages,Year Published,Date Added,Bookshelves\r\n"
+            + "9001,رحلة Goodreads,أحمد,,,9780306406157,4,currently-reading,,1,\"مراجعة متعددة\r\nالسطور\",ملاحظة من Goodreads,120,2020,2020/02/01,favorites"
+        let app = app("empty")
+        app.launchEnvironment["MADAR_UI_MIHBARA_IMPORT_GOODREADS"] = Data(csv.utf8).base64EncodedString()
+        app.launch(); open(app)
+        let addBook = app.buttons["mihbara-add-paper"]
+        reach(app, addBook); addBook.tap()
+
+        let importButton = app.buttons["mihbara-goodreads-import"]
+        XCTAssertTrue(importButton.waitForExistence(timeout: 20), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["رحلة Goodreads"].firstMatch.exists, app.debugDescription)
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "مراجعة متعددة")).firstMatch.exists, app.debugDescription)
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "ملاحظة من Goodreads")).firstMatch.exists, app.debugDescription)
+        shot(app, "M6-V17-goodreads-preview-L")
+        importButton.tap()
+
+        XCTAssertTrue(app.buttons["mihbara-add-paper"].waitForExistence(timeout: 20), app.debugDescription)
+        let notebook = app.buttons["mihbara-notebook"]
+        reach(app, notebook); notebook.tap()
+        shot(app, "M6-V17-goodreads-private-note-L")
+        let note = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND identifier != %@", "mihbara-note-", "mihbara-note-add")).firstMatch
+        XCTAssertTrue(note.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(note.label.contains("ملاحظة من Goodreads"), note.label)
+        XCTAssertTrue(note.label.contains("رحلة Goodreads"), note.label)
+
+        note.tap()
+        let editor = app.textViews["mihbara-note-text"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 8), app.debugDescription)
+        editor.tap(); editor.typeText(" — تم التعديل")
+        app.buttons["mihbara-note-save"].tap()
+        XCTAssertTrue(editor.waitForNonExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(note.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(note.label.contains("تم التعديل"), note.label)
+        XCTAssertTrue(note.label.contains("رحلة Goodreads"), note.label)
+
+        note.tap()
+        let delete = app.buttons["mihbara-note-delete"]
+        XCTAssertTrue(delete.waitForExistence(timeout: 5), app.debugDescription)
+        delete.tap()
+        XCTAssertTrue(note.waitForNonExistence(timeout: 8), app.debugDescription)
+        undo(app)
+        let restoredNote = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND identifier != %@", "mihbara-note-", "mihbara-note-add")).firstMatch
+        XCTAssertTrue(restoredNote.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(restoredNote.label.contains("تم التعديل"), restoredNote.label)
+        XCTAssertTrue(restoredNote.label.contains("رحلة Goodreads"), restoredNote.label)
+    }
+
     func testRemovingPDFKeepsTheBookButClearsUndo() {
         continueAfterFailure = false
         let app = app("empty", pdf: fixturePDF())

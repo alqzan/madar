@@ -1,8 +1,11 @@
 import SwiftUI
+import SwiftData
 import UIKit
 import UniformTypeIdentifiers
 import MadarCore
 import MadarDesign
+import MadarData
+import MadarCommands
 
 /// Copy for Mihbara amounts: real quantities in Arabic number agreement instead of abstract fractions.
 enum MihbaraCopy {
@@ -51,14 +54,18 @@ struct MihbaraAddBookView: View {
     let onPaperBookSaved: () -> Void
     let onPDFImported: () -> Void
     let onEPUBImported: () -> Void
+    let onGoodreadsImported: () -> Void
     @Binding var pendingBookFile: URL?
     @Binding var pendingGoodreadsFile: URL?
+    @Binding var pendingGoodreadsStage: GoodreadsCSVStage?
     @Environment(\.dismiss) private var dismiss
     @Environment(\.roomTheme) private var theme
     @State private var importingBook = false
     @State private var importingGoodreads = false
+    @State private var stagingGoodreads = false
     @State private var previewingPDF = false
     @State private var previewingEPUB = false
+    @State private var previewingGoodreads = false
 
     private var bookTypes: [UTType] {
         [.pdf, UTType("org.idpf.epub-container")!]
@@ -132,23 +139,26 @@ struct MihbaraAddBookView: View {
                     Button { importingGoodreads = true } label: {
                         MihbaraAddBookSourceCard(
                             title: "من Goodreads",
-                            subtitle: "استورد مكتبتك من ملف CSV",
+                            subtitle: stagingGoodreads ? "أفحص ملف CSV…" : "استورد مكتبتك من ملف CSV",
                             symbol: "g.circle.fill",
                             color: theme.color("sunnahLeather"),
                             foreground: theme.color("onAccent")
                         )
                     }
                     .buttonStyle(.plain)
+                    .disabled(stagingGoodreads)
                     .accessibilityIdentifier("mihbara-add-source-goodreads")
                     .fileImporter(isPresented: $importingGoodreads, allowedContentTypes: [.commaSeparatedText], allowsMultipleSelection: false) { result in
-                        handle(result, assign: { pendingGoodreadsFile = $0 })
+                        handleGoodreads(result)
                     }
                 }
 
                 VStack(alignment: .leading, spacing: 10) {
                     Text("وصل مؤخرًا").font(MadarTypography.section())
                     if let pendingGoodreadsFile {
-                        MihbaraRecentImportRow(name: pendingGoodreadsFile.lastPathComponent, kind: "CSV", theme: theme)
+                        Button { previewingGoodreads = pendingGoodreadsStage != nil } label: {
+                            MihbaraRecentImportRow(name: pendingGoodreadsFile.lastPathComponent, kind: "CSV", theme: theme)
+                        }.buttonStyle(.plain).disabled(pendingGoodreadsStage == nil).accessibilityIdentifier("mihbara-goodreads-reopen")
                     }
                     if let pendingBookFile {
                         Button {
@@ -216,6 +226,17 @@ struct MihbaraAddBookView: View {
                 }
             }
         }
+        .navigationDestination(isPresented: $previewingGoodreads) {
+            if let stage = pendingGoodreadsStage {
+                MihbaraGoodreadsImportView(app: app, stage: stage) {
+                    GoodreadsCSVFiles.discard(id: stage.id, root: app.bookStagingDirectory)
+                    pendingGoodreadsStage = nil
+                    pendingGoodreadsFile = nil
+                    previewingGoodreads = false
+                    onGoodreadsImported()
+                }
+            }
+        }
         .task {
             #if DEBUG
             let root = app.bookStagingDirectory
@@ -268,6 +289,16 @@ struct MihbaraAddBookView: View {
                 }
                 catch { app.errorMessage = "لم تُجهز عينة الاستيراد." }
             }
+            if root.deletingLastPathComponent().deletingLastPathComponent().lastPathComponent == "UITestStores",
+               let encoded = ProcessInfo.processInfo.environment["MADAR_UI_MIHBARA_IMPORT_GOODREADS"],
+               let bytes = Data(base64Encoded: encoded), bytes.count <= 1024 * 1024, pendingGoodreadsStage == nil {
+                let file = root.deletingLastPathComponent().appendingPathComponent("goodreads-ui-fixture.csv")
+                do {
+                    if !FileManager.default.fileExists(atPath: file.path) { try bytes.write(to: file, options: .atomic) }
+                    let staged = try GoodreadsCSVFiles.stage(source: file, id: UUID(), root: root)
+                    pendingGoodreadsFile = file; pendingGoodreadsStage = staged; previewingGoodreads = true
+                } catch { app.errorMessage = "لم تُجهز عينة Goodreads." }
+            }
             #endif
         }
     }
@@ -280,6 +311,28 @@ struct MihbaraAddBookView: View {
             let nsError = error as NSError
             if nsError.domain != NSCocoaErrorDomain || nsError.code != NSUserCancelledError {
                 app.errorMessage = "لم يُفتح الملف. \(error.localizedDescription)"
+            }
+        }
+    }
+
+    private func handleGoodreads(_ result: Result<[URL], Error>) {
+        switch result {
+        case .failure(let error): app.errorMessage = error.localizedDescription
+        case .success(let urls):
+            guard let source = urls.first else { return }
+            let root = app.bookStagingDirectory
+            stagingGoodreads = true
+            Task {
+                defer { stagingGoodreads = false }
+                do {
+                    let id = UUID()
+                    let stage = try await Task.detached(priority: .userInitiated) {
+                        try GoodreadsCSVFiles.stage(source: source, id: id, root: root)
+                    }.value
+                    pendingGoodreadsFile = source
+                    pendingGoodreadsStage = stage
+                    previewingGoodreads = true
+                } catch { app.errorMessage = error.localizedDescription }
             }
         }
     }
@@ -648,5 +701,244 @@ private struct MihbaraHadithText: UIViewRepresentable {
     func sizeThatFits(_ proposal: ProposedViewSize, uiView: UITextView, context: Context) -> CGSize? {
         guard let width = proposal.width else { return nil }
         return .init(width: width, height: uiView.sizeThatFits(.init(width: width, height: .greatestFiniteMagnitude)).height)
+    }
+}
+
+private struct MihbaraGoodreadsImportView: View {
+    let app: AppSession
+    let stage: GoodreadsCSVStage
+    let onImported: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.roomTheme) private var theme
+    @State private var entries: [GoodreadsCSVEntry] = []
+    @State private var candidates: [GoodreadsBookCandidate] = []
+    @State private var preview: GoodreadsPreview?
+    @State private var selectedMatches: [String: UUID] = [:]
+    @State private var cutoffYear = GoodreadsCSV.defaultCutoffYear
+    @State private var missingDateShelf = "old"
+    @State private var loading = true
+    @State private var saving = false
+    @State private var failure: String?
+
+    private var digits: MadarNumberFormatter { .init(style: app.string("core.numerals") == "western" ? .western : .hindi) }
+    private var targetsAreUnique: Bool {
+        guard let preview else { return false }
+        let targets = preview.rows.compactMap(\.targetBookID)
+        return targets.count == Set(targets).count
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("معاينة مكتبة Goodreads").font(MadarTypography.title())
+                    Text(stage.fileName).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).lineLimit(2)
+                }
+                if loading { ProgressView("أفحص الكتب…").tint(theme.ink).frame(maxWidth: .infinity, minHeight: 150) }
+                else if let failure {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("تعذّرت المعاينة").font(MadarTypography.cardTitle())
+                        Text(failure).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                        Button("العودة لاختيار الملف") { dismiss() }.buttonStyle(MadarPrimaryButton())
+                    }.padding(18).frame(maxWidth: .infinity, alignment: .leading).background(theme.surface, in: .rect(cornerRadius: 18))
+                } else if let preview {
+                    Text("أراجع الملف قبل إضافته. الكتب المطابقة لا تُدمج إلا بعد اختيارك.")
+                        .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    HStack(spacing: 9) {
+                        GoodreadsCountCard(title: "كتب جديدة", value: digits.string(preview.createCount), theme: theme)
+                        GoodreadsCountCard(title: "تحديثات", value: digits.string(preview.updateCount), theme: theme)
+                        GoodreadsCountCard(title: "تحتاج اختيارك", value: digits.string(preview.suggestionCount), theme: theme)
+                    }
+                    if entries.contains(where: { $0.exclusiveShelf == "read" && $0.dateRead != nil }) { cutoffCard }
+                    if entries.contains(where: { $0.exclusiveShelf == "read" && $0.dateRead == nil }) { missingDateCard }
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("الكتب في الملف").font(MadarTypography.section())
+                        LazyVStack(alignment: .leading, spacing: 10) {
+                            ForEach(preview.rows, id: \.entry.rowKey) { row in goodreadsRow(row) }
+                        }
+                    }
+                }
+            }.padding(18).frame(maxWidth: 680).frame(maxWidth: .infinity)
+        }
+        .background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
+        .environment(\.layoutDirection, .rightToLeft)
+        .toolbarVisibility(.hidden, for: .navigationBar)
+        .safeAreaInset(edge: .bottom) {
+            if !loading && failure == nil {
+                Button(action: importBooks) {
+                    HStack(spacing: 9) {
+                        if saving { ProgressView().tint(theme.background) }
+                        Text(saving ? "يُضاف إلى المحبرة…" : importButtonTitle)
+                    }.font(MadarTypography.body()).foregroundStyle(theme.background)
+                        .frame(maxWidth: .infinity).frame(height: 52).background(theme.ink, in: .rect(cornerRadius: 14))
+                }
+                .buttonStyle(.plain).disabled(saving || !targetsAreUnique || preview == nil)
+                .padding(.horizontal, 18).padding(.top, 10).padding(.bottom, 12).background(theme.background)
+                .accessibilityIdentifier("mihbara-goodreads-import")
+            }
+        }
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) { Button("رجوع") { dismiss() }.disabled(saving) }
+            ToolbarItem(placement: .principal) { Text("مكتبة Goodreads").font(MadarTypography.section()) }
+        }
+        .task(id: stage.id) { load() }
+        .onChange(of: cutoffYear) { _, _ in rebuildPreview() }
+        .onChange(of: missingDateShelf) { _, _ in rebuildPreview() }
+        .onChange(of: selectedMatches) { _, _ in rebuildPreview() }
+    }
+
+    private var cutoffCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("رفّ الكتب المقروءة").font(MadarTypography.cardTitle())
+            Text("ما قُرئ قبل سنة \(digits.string(cutoffYear)) يذهب إلى «قديمًا»، وما قُرئ فيها أو بعدها إلى «أنهيتها».")
+                .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+            HStack(spacing: 16) {
+                Button { cutoffYear = max(1900, cutoffYear - 1) } label: { Image(systemName: "minus.circle.fill").font(.title2) }
+                    .accessibilityLabel("سنة أقدم")
+                Text(digits.string(cutoffYear)).font(MadarTypography.title()).monospacedDigit().accessibilityIdentifier("mihbara-goodreads-cutoff-year")
+                Button { cutoffYear = min(2100, cutoffYear + 1) } label: { Image(systemName: "plus.circle.fill").font(.title2) }
+                    .accessibilityLabel("سنة أحدث")
+                Spacer(minLength: 0)
+            }.foregroundStyle(theme.color("accentText"))
+        }.padding(15).frame(maxWidth: .infinity, alignment: .leading).background(theme.surface, in: .rect(cornerRadius: 16))
+    }
+
+    private var missingDateCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("كتاب مقروء بلا تاريخ قراءة").font(MadarTypography.cardTitle())
+            Text("لا أضيف تاريخًا من عندي؛ اختر الرف الذي يناسب الكتب التي لم يذكر الملف تاريخها.")
+                .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+            HStack(spacing: 8) { missingDateChoice("قديمًا", value: "old"); missingDateChoice("أنهيتها", value: "finished") }
+        }.padding(15).frame(maxWidth: .infinity, alignment: .leading).background(theme.surface, in: .rect(cornerRadius: 16))
+    }
+
+    private func missingDateChoice(_ title: String, value: String) -> some View {
+        let selected = missingDateShelf == value
+        return Button { missingDateShelf = value } label: {
+            Text(title).font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 42)
+                .foregroundStyle(selected ? theme.background : theme.ink)
+                .background(selected ? theme.ink : theme.background, in: .rect(cornerRadius: 11))
+                .overlay { RoundedRectangle(cornerRadius: 11).stroke(theme.line, lineWidth: selected ? 0 : 1) }
+        }.buttonStyle(.plain).accessibilityIdentifier("mihbara-goodreads-missing-\(value)")
+    }
+
+    @ViewBuilder private func goodreadsRow(_ row: GoodreadsPreviewRow) -> some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(alignment: .top, spacing: 10) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(row.entry.title).font(MadarTypography.cardTitle()).lineLimit(3)
+                    Text(row.entry.author.isEmpty ? "المؤلف غير مذكور" : row.entry.author)
+                        .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).lineLimit(2)
+                }
+                Spacer(minLength: 0)
+                Text(shelfName(row.targetShelf)).font(MadarTypography.fine()).padding(.horizontal, 9).padding(.vertical, 6)
+                    .background(theme.background, in: .capsule)
+            }
+            HStack(spacing: 8) {
+                if let rating = row.entry.rating { Text("التقييم \(digits.string(rating))/٥") }
+                Text("قُرئت \(digits.string(row.entry.readCount)) مرات")
+                if let pages = row.entry.pages { Text("\(digits.string(pages)) صفحة") }
+            }.font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+            if let date = row.entry.dateRead {
+                MadarDateLabel(app.dateLabels(GregorianDay.containing(date, in: app.activePlace.timeZone)),
+                               primaryFont: MadarTypography.fine(), secondaryFont: MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+            } else if row.entry.exclusiveShelf == "read" {
+                Text(row.entry.dateReadText.isEmpty ? "بلا تاريخ قراءة؛ سيبقى التاريخ فارغًا" : "لم أتعرف على تاريخ القراءة؛ لن أضيف تاريخًا")
+                    .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+            }
+            if let review = row.entry.review, !review.isEmpty {
+                Text(review).font(MadarTypography.caption()).lineLimit(3).padding(10).frame(maxWidth: .infinity, alignment: .leading)
+                    .background(theme.background, in: .rect(cornerRadius: 10))
+                    .accessibilityIdentifier("mihbara-goodreads-review-\(row.entry.rowKey)")
+            }
+            if let note = row.entry.privateNote {
+                Label("ملاحظة خاصة: " + note, systemImage: "lock.fill").font(MadarTypography.fine())
+                    .lineLimit(3).foregroundStyle(theme.secondaryInk)
+                    .accessibilityIdentifier("mihbara-goodreads-private-note-\(row.entry.rowKey)")
+            }
+            if !row.suggestions.isEmpty && row.targetBookID == nil {
+                Menu {
+                    Button("أضفه ككتاب مستقل") { selectedMatches.removeValue(forKey: row.entry.rowKey) }
+                    ForEach(row.suggestions, id: \.id) { candidate in
+                        Button("حدّث «\(candidate.title)»") { selectedMatches[row.entry.rowKey] = candidate.id }
+                            .disabled(selectedMatches.contains(where: { $0.key != row.entry.rowKey && $0.value == candidate.id }))
+                    }
+                } label: {
+                    Label("قد يكون هذا الكتاب موجودًا — اختر المطابقة", systemImage: "arrow.triangle.merge")
+                        .font(MadarTypography.fine()).frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
+                        .foregroundStyle(theme.color("accentText"))
+                }.accessibilityIdentifier("mihbara-goodreads-match-\(row.entry.rowKey)")
+            } else if row.targetBookID != nil {
+                Label("سيُحدّث الكتاب الموجود", systemImage: "checkmark.circle")
+                    .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+            }
+        }.padding(14).frame(maxWidth: .infinity, alignment: .leading)
+            .background(theme.surface, in: .rect(cornerRadius: 15))
+            .overlay { RoundedRectangle(cornerRadius: 15).stroke(theme.line.opacity(0.7), lineWidth: 1) }
+            .accessibilityIdentifier("mihbara-goodreads-row-\(row.entry.rowKey)")
+    }
+
+    private func shelfName(_ shelf: String) -> String {
+        switch shelf { case "reading": "أقرأها"; case "want": "لاحقًا"; case "finished": "أنهيتها"; default: "قديمًا" }
+    }
+
+    private var importButtonTitle: String {
+        let noun = entries.count == 1 ? "كتابًا واحدًا" : entries.count == 2 ? "كتابين" : MihbaraCopy.books(entries.count, digits)
+        return "أضف \(noun) إلى المحبرة"
+    }
+
+    private func load() {
+        loading = true; failure = nil
+        do {
+            let (data, _) = try GoodreadsCSVFiles.read(id: stage.id, root: app.bookStagingDirectory, expectedHash: stage.sha256)
+            entries = try GoodreadsCSV.parse(data)
+            let stored = try ModelContext(app.container).fetch(FetchDescriptor<Book>())
+            candidates = stored.filter { $0.deletedAt == nil && $0.mergedInto == nil }.map {
+                GoodreadsBookCandidate(id: $0.id, title: $0.title, author: $0.author, isbn13: $0.isbn13,
+                                       sourceGoodreadsID: $0.sourceGoodreadsID, shelf: $0.shelf)
+            }
+            rebuildPreview()
+        } catch { failure = error.localizedDescription }
+        loading = false
+    }
+
+    private func rebuildPreview() {
+        guard !entries.isEmpty else { preview = nil; return }
+        preview = GoodreadsCSV.preview(entries: entries, existing: candidates, cutoffYear: cutoffYear,
+                                       missingDateShelf: missingDateShelf, selectedMatches: selectedMatches)
+    }
+
+    private func importBooks() {
+        guard preview != nil, targetsAreUnique else { return }
+        saving = true
+        Task {
+            do {
+                let selectedData = try JSONEncoder().encode(selectedMatches)
+                let payload: [String: MadarCore.JSONValue] = [
+                    "id": .string(UUID().uuidString), "fileID": .string(stage.id.uuidString),
+                    "sha256": .string(stage.sha256), "fileName": .string(stage.fileName),
+                    "cutoffYear": .number(Double(cutoffYear)), "missingDateShelf": .string(missingDateShelf),
+                    "selectedMatchesJSON": .string(String(decoding: selectedData, as: UTF8.self))
+                ]
+                try await app.executeBookCommand("book.importGoodreads", payload: payload, undoMessage: "أُضيفت كتب Goodreads إلى المحبرة")
+                GoodreadsCSVFiles.discard(id: stage.id, root: app.bookStagingDirectory)
+                onImported()
+            } catch { failure = error.localizedDescription }
+            saving = false
+        }
+    }
+}
+
+private struct GoodreadsCountCard: View {
+    let title: String
+    let value: String
+    let theme: RoomTheme
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(value).font(MadarTypography.cardTitle())
+            Text(title).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).lineLimit(2)
+        }.frame(maxWidth: .infinity, minHeight: 58, alignment: .leading).padding(10)
+            .background(theme.surface, in: .rect(cornerRadius: 13))
+            .overlay { RoundedRectangle(cornerRadius: 13).stroke(theme.line.opacity(0.7), lineWidth: 1) }
     }
 }
