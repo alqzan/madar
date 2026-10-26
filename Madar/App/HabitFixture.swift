@@ -9,7 +9,12 @@ extension AppSession {
         guard let variant=ProcessInfo.processInfo.environment["MADAR_UI_HABIT_FIXTURE"],group.deletingLastPathComponent().lastPathComponent == "UITestStores" else{return}
         let context=ModelContext(container)
         guard try context.fetchCount(FetchDescriptor<Habit>()) == 0 else{return}
-        let settings=try SettingsStore(context:context);_ = try settings.stage(["core.dayStart":.string("midnight"),"core.faceIDLock":.string("none")])
+        let settings=try SettingsStore(context:context)
+        var initialSettings: [String: JSONValue] = ["core.dayStart": .string("midnight"), "core.faceIDLock": .string("none")]
+        if let firstCalendar = ProcessInfo.processInfo.environment["MADAR_UI_FIRST_CALENDAR"], ["hijri", "gregorian"].contains(firstCalendar) {
+            initialSettings["core.firstCalendar"] = .string(firstCalendar)
+        }
+        _ = try settings.stage(initialSettings)
         let marker=DeviceSetting();marker.key="sys.onboardingCompleted";marker.valueJSON=Data("true".utf8);context.insert(marker)
         if variant == "partialDuration" {
             let today = GregorianDay.containing(prayerNow(), in: activePlace.timeZone)

@@ -66,13 +66,16 @@ struct HabitSinceSection:View {
                 }.frame(maxWidth:.infinity,maxHeight:.infinity,alignment:.topLeading).environment(\.layoutDirection,.leftToRight).scaleEffect(x:-1)
             }.frame(height:34)
             HStack {
-                Text(digits.string(first.year).replacingOccurrences(of:"٬",with:"")).font(MadarTypography.fine())
+                timelineYearLabel(first.year)
                 Spacer()
-                if years.count > 2 { Text(digits.string(years[years.count/2]).replacingOccurrences(of:"٬",with:"")).font(MadarTypography.fine()); Spacer() }
+                if years.count > 2 { timelineYearLabel(years[years.count/2]); Spacer() }
                 Text("اليوم").font(MadarTypography.fine())
             }.foregroundStyle(theme.secondaryInk)
             Text(arabicCount(reading.times.count,["مرة واحدة","مرتان","مرات","مرة"],digits)+" منذ أول تسجيل").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
         }.accessibilityElement(children:.combine)
+    }
+    private func timelineYearLabel(_ year: Int) -> some View {
+        MadarDateLabel(session.yearLabels(year), primaryFont: MadarTypography.caption(), secondaryFont: MadarTypography.fine())
     }
     /// The diary line linked to each of the last times, or that day's first line when none was linked.
     @ViewBuilder private var memories:some View {

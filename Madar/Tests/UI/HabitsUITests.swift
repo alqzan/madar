@@ -2,8 +2,10 @@ import XCTest
 import UIKit
 
 @MainActor final class HabitsUITests:XCTestCase {
-    private func app(_ fixture:String, appearance:String = "light", now:String = "2026-10-15T20:00:00+03:00")->XCUIApplication {
-        let app=XCUIApplication();app.launchEnvironment=["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_HABIT_FIXTURE":fixture,"MADAR_UI_NOW":now,"MADAR_UI_SIZE":"L","MADAR_UI_THEME":appearance];app.launch();return app
+    private func app(_ fixture:String, appearance:String = "light", now:String = "2026-10-15T20:00:00+03:00", firstCalendar: String? = nil)->XCUIApplication {
+        let app=XCUIApplication();var environment=["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_HABIT_FIXTURE":fixture,"MADAR_UI_NOW":now,"MADAR_UI_SIZE":"L","MADAR_UI_THEME":appearance]
+        if let firstCalendar { environment["MADAR_UI_FIRST_CALENDAR"] = firstCalendar }
+        app.launchEnvironment=environment;app.launch();return app
     }
     private func open(_ app:XCUIApplication){let block=app.descendants(matching:.any).matching(identifier:"bahw-block-habits").firstMatch;XCTAssertTrue(block.waitForExistence(timeout:20));let header=app.buttons["bahw-habits-open"]; if header.exists { header.tap() } else { block.tap() };XCTAssertTrue(app.staticTexts["habits-title"].waitForExistence(timeout:10))}
     private func shot(_ app:XCUIApplication,_ name:String){let a=XCTAttachment(screenshot:app.screenshot());a.name=name;a.lifetime = .keepAlways;add(a)}
@@ -228,6 +230,24 @@ import UIKit
         let menu=app.buttons["فعلتها في يوم سابق"];XCTAssertTrue(menu.waitForExistence(timeout:5),app.debugDescription);menu.tap()
         XCTAssertTrue(app.buttons["habit-past-save"].waitForExistence(timeout:5));app.buttons["إلغاء"].tap()
         XCTAssertTrue(app.buttons["habit-past-save"].waitForNonExistence(timeout:5))
+    }
+    func testSinceTimelineYearLabelsShowBothCalendarsInPreferenceOrder() throws {
+        continueAfterFailure = false
+        for (calendar, firstMarker) in [("hijri", "هـ"), ("gregorian", "م")] {
+            let app = app("since", firstCalendar: calendar); open(app)
+            app.buttons["habits-view-all"].tap()
+            let gift = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "إهداء من تحب")).firstMatch
+            for _ in 0..<8 where !gift.isHittable { app.swipeUp(velocity: .slow) }
+            XCTAssertTrue(gift.isHittable, app.debugDescription); gift.tap()
+            let hijri = app.staticTexts["١٤٤٦ هـ – ١٤٤٧ هـ"]
+            let gregorian = app.staticTexts["٢٠٢٥ م"]
+            XCTAssertTrue(hijri.waitForExistence(timeout: 5), app.debugDescription)
+            XCTAssertTrue(gregorian.exists, app.debugDescription)
+            if firstMarker == "هـ" { XCTAssertLessThan(hijri.frame.minY, gregorian.frame.minY) }
+            else { XCTAssertLessThan(gregorian.frame.minY, hijri.frame.minY) }
+            shot(app, "I26-since-years-\(calendar)-L")
+            app.terminate()
+        }
     }
     func testOverdueYearlyHabitShowsTheGentleNudge() throws {
         continueAfterFailure = false
