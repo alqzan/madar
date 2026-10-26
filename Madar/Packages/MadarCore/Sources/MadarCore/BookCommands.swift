@@ -6,6 +6,7 @@ public enum BookCommand: Codable, Equatable, Sendable {
     case updatePaper(id: UUID, title: String, author: String, pages: Int?, position: Int, isbn13: String?, tocJSON: Data?)
     case importPDF(id: UUID, fileID: UUID, sha256: String, title: String, author: String, language: String)
     case importEPUB(id: UUID, fileID: UUID, sha256: String, title: String, author: String, language: String, shelf: String, turathID: Int? = nil)
+    case deleteBook(id: UUID)
     case shelf(id: UUID, shelf: String, replacing: UUID?)
     /// Owner, 21 Oct 2026: rename a file book (EPUB or PDF) after import; paper books edit through `updatePaper`.
     case rename(id: UUID, title: String, author: String)
@@ -23,7 +24,7 @@ public enum BookCommand: Codable, Equatable, Sendable {
     /// «أضف إلى كلماتي»: one saved word with its source paragraph and reading position.
     case saveUserWord(id: UUID, word: String, language: String, bookID: UUID, bookTitle: String, locatorJSON: Data, context: String)
     public static let highlightColors: Set<String> = ["yellow", "green", "rose"]
-    public static let names: Set<String> = ["book.savePaper", "book.updatePaper", "book.importPDF", "book.importEPUB", "book.moveShelf", "book.rename", "book.setPosition", "book.setLocator", "reading.saveSession", "hadith.mark", "notebook.savePrivate", "notebook.deletePrivate", "highlight.save", "highlight.delete", "notebook.savePage", "word.save"]
+    public static let names: Set<String> = ["book.savePaper", "book.updatePaper", "book.importPDF", "book.importEPUB", "book.delete", "book.moveShelf", "book.rename", "book.setPosition", "book.setLocator", "reading.saveSession", "hadith.mark", "notebook.savePrivate", "notebook.deletePrivate", "highlight.save", "highlight.delete", "notebook.savePage", "word.save"]
     public var isUndoable: Bool {
         if case .readingSession = self { return false }
         return true
@@ -117,6 +118,9 @@ public enum BookCommand: Codable, Equatable, Sendable {
             else if let value = integer("turathID", max: 2_000_000_000), value > 0 { turathID = value }
             else { return nil }
             return .importEPUB(id: id, fileID: fileID, sha256: hash, title: title, author: author, language: language, shelf: shelf, turathID: turathID)
+        case "book.delete":
+            guard Set(p.keys) == ["id"] else { return nil }
+            return .deleteBook(id: id)
         case "book.updatePaper":
             guard Set(p.keys) == ["id", "title", "author", "pages", "position", "isbn13", "tocJSON"],
                   let title = text("title")?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty, title.count <= 300,

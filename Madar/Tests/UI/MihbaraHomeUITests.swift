@@ -136,6 +136,26 @@ import XCTest
         let fewer = XCTNSPredicateExpectation(predicate: NSPredicate(block: { _, _ in readingLabels.count == before - 1 }), object: nil)
         XCTAssertEqual(XCTWaiter.wait(for: [fewer], timeout: 8), .completed, "before \(before), after \(readingLabels.count)")
     }
+    func testDeletingBookHidesItFromShelvesAndUndoRestoresIt() {
+        continueAfterFailure = false; let app = app("home"); app.launch(); open(app)
+        let library = app.buttons["mihbara-library"]; reach(app, library); library.tap()
+        let book = app.staticTexts["رحلة القراءة"]
+        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription)
+        shot(app, "M6-J13-delete-before-L")
+        let row = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "mihbara-library-book-")).containing(NSPredicate(format: "label CONTAINS %@", "رحلة القراءة")).firstMatch
+        row.press(forDuration: 1.2)
+        let remove = app.buttons["mihbara-book-delete"]
+        XCTAssertTrue(remove.waitForExistence(timeout: 5), app.debugDescription); remove.tap()
+        let confirm = app.buttons["احذف من مكتبتي"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5), app.debugDescription)
+        shot(app, "M6-J13-delete-confirm-L")
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "يبقى عنوانه وسجل جلسات القراءة")).firstMatch.exists, app.debugDescription)
+        confirm.tap()
+        XCTAssertTrue(book.waitForNonExistence(timeout: 8), app.debugDescription)
+        shot(app, "M6-J13-delete-after-L")
+        undo(app)
+        XCTAssertTrue(app.staticTexts["رحلة القراءة"].waitForExistence(timeout: 8), app.debugDescription)
+    }
     func testEmptyShelfPaperAddAndUndo() {
         continueAfterFailure = false; let app = app("empty"); app.launch(); open(app); shot(app,"M6-V01-empty-L")
         app.buttons["mihbara-add-paper"].tap()

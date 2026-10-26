@@ -23,6 +23,7 @@ struct MihbaraHomeView: View {
     @State private var sunnahDrawerOpen = false
     @State private var readerRoute: MihbaraReaderRoute?
     @State private var renaming: MihbaraBook?
+    @State private var deletingBook: MihbaraBook?
     @State private var renameTitle = ""
     @State private var renameAuthor = ""
     @State private var manuallyOpen = false
@@ -83,6 +84,16 @@ struct MihbaraHomeView: View {
         .confirmationDialog("اختر كتابًا يرجع إلى أبي أقرأها", isPresented: Binding(get: { slotBook != nil }, set: { if !$0 { slotBook = nil } }), titleVisibility: .visible, presenting: slotBook) { incoming in
             ForEach((reading?.books ?? []).filter { $0.shelf == "reading" && $0.id != incoming.id }) { old in
                 Button(old.title) { moveBook(incoming, to: "reading", replacing: old.id) }
+            }
+        }
+        .confirmationDialog(deletingBook.map { "احذف «\($0.title)» من مكتبتك؟" } ?? "حذف الكتاب؟", isPresented: Binding(get: { deletingBook != nil }, set: { if !$0 { deletingBook = nil } }), titleVisibility: .visible) {
+            if let deletingBook {
+                Button("احذف من مكتبتي", role: .destructive) { deleteBook(deletingBook) }
+            }
+            Button("إلغاء", role: .cancel) { deletingBook = nil }
+        } message: {
+            if deletingBook != nil {
+                Text("يبقى عنوانه وسجل جلسات القراءة وتظليلاته وملفه محفوظة؛ يختفي الكتاب من رفوف المحبرة فقط.")
             }
         }
         .onChange(of: app.prayerRevision) { load() }.onChange(of: reading?.day) { folded = false; manuallyOpen = false }
@@ -223,6 +234,19 @@ struct MihbaraHomeView: View {
         if b.kind == "file" {
             Button { renameTitle = b.title; renameAuthor = b.author; renaming = b } label: { Label("غيّر الاسم", systemImage: "pencil") }
                 .accessibilityIdentifier("mihbara-book-rename")
+        }
+        if MihbaraConversions.shared.job(for: b.id)?.state != .running {
+            Button(role: .destructive) { deletingBook = b } label: { Label("احذف من مكتبتي", systemImage: "trash") }
+                .accessibilityIdentifier("mihbara-book-delete")
+        }
+    }
+    private func deleteBook(_ book: MihbaraBook) {
+        deletingBook = nil
+        Task {
+            do {
+                try await app.executeBookCommand("book.delete", payload: ["id": .string(book.id.uuidString)], undoMessage: "حُذف الكتاب من رفوف المحبرة")
+                load()
+            } catch { app.errorMessage = error.localizedDescription }
         }
     }
     private func rename() {

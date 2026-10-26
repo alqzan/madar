@@ -9,6 +9,7 @@ import CoreSpotlight
 
 @MainActor private final class SpotlightIndexProbe {
     private(set) var calls: [Bool] = []
+    private(set) var indexedBookIDs: [[UUID]] = []
     private(set) var indexed = false
     private var enableStarted = false
     private var disableStarted = false
@@ -19,8 +20,9 @@ import CoreSpotlight
     private var enableContinuation: CheckedContinuation<Void, Never>?
     private var disableContinuation: CheckedContinuation<Void, Never>?
 
-    func apply(enabled: Bool) async {
+    func apply(enabled: Bool, records: [AppSpotlightBookRecord]) async {
         calls.append(enabled)
+        indexedBookIDs.append(enabled ? records.map(\.id) : [])
         if enabled {
             enableStarted = true
             startWaiter?.resume()
@@ -127,6 +129,27 @@ import CoreSpotlight
         XCTAssertFalse(app.bool("core.spotlightIndex")); XCTAssertNil(app.errorMessage)
     }
 
+    func testDeletingBookReconcilesOptedInSpotlightIndex() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "MihbaraSpotlightDelete-\(UUID())"); defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root), context = ModelContext(container)
+        let book = Book(); book.title = "كتاب قابل للحذف"; context.insert(book); try context.save()
+        let probe = SpotlightIndexProbe()
+        let app = try AppSession(
+            container: container,
+            groupDirectory: root,
+            spotlightIndexOperation: { enabled, records in await probe.apply(enabled: enabled, records: records) }
+        )
+        app.authorizeProtectedData()
+        try await app.applySettingsAndWait(["core.spotlightIndex": .bool(true)])
+        XCTAssertEqual(probe.indexedBookIDs.last, [book.id])
+
+        try await app.executeBookCommand("book.delete", payload: ["id": .string(book.id.uuidString)])
+
+        XCTAssertEqual(probe.indexedBookIDs.last, [])
+        XCTAssertEqual(probe.calls.filter { $0 }.count, 2)
+        XCTAssertNil(app.errorMessage)
+    }
+
     func testDisablingSpotlightDuringPendingIndexFinishesWithDeletion() async throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "MihbaraSpotlightRace-\(UUID())"); defer { try? FileManager.default.removeItem(at: root) }
         let probe = SpotlightIndexProbe()
@@ -134,7 +157,7 @@ import CoreSpotlight
         let app = try AppSession(
             container: MadarContainerFactory.makeLocal(at: root),
             groupDirectory: root,
-            spotlightIndexOperation: { enabled, _ in await probe.apply(enabled: enabled) }
+            spotlightIndexOperation: { enabled, records in await probe.apply(enabled: enabled, records: records) }
         )
 
         let enableTask = Task { try await app.applySettingsAndWait(["core.spotlightIndex": .bool(true)]) }
@@ -160,7 +183,7 @@ import CoreSpotlight
         let app = try AppSession(
             container: container,
             groupDirectory: root,
-            spotlightIndexOperation: { enabled, _ in await probe.apply(enabled: enabled) }
+            spotlightIndexOperation: { enabled, records in await probe.apply(enabled: enabled, records: records) }
         )
         try await app.applySettingsAndWait(["core.spotlightIndex": .bool(true)])
         XCTAssertTrue(probe.indexed)
