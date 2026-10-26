@@ -46,6 +46,41 @@ import UIKit
         XCTAssertTrue(rows.firstMatch.label.contains("كتاب بلا ملف"), rows.firstMatch.label)
     }
 
+    func testMissingEPUBRestoresToItsOriginalBookAndOpens() throws {
+        continueAfterFailure = false
+        let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "arabic-reader-poc", withExtension: "epub"))
+        let epub = try Data(contentsOf: url)
+        let app = app("missingFile", epub: epub)
+        app.launchEnvironment["MADAR_UI_MIHBARA_IMPORT_EPUB"] = epub.base64EncodedString()
+        app.launch(); open(app)
+        let continueBook = app.buttons["mihbara-book-continue"]
+        reach(app, continueBook); continueBook.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["mihbara-book-file-unavailable"].waitForExistence(timeout: 8), app.debugDescription)
+        let restore = app.buttons["mihbara-book-file-restore-detail"]
+        XCTAssertTrue(restore.waitForExistence(timeout: 5), app.debugDescription)
+        shot(app, "M6-J27-epub-missing-L")
+        restore.tap()
+
+        let confirm = app.buttons["mihbara-epub-import-confirm"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 35), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["كتاب بلا ملف"].firstMatch.exists, app.debugDescription)
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "يعود هذا الملف إلى")).firstMatch.exists, app.debugDescription)
+        shot(app, "M6-J27-epub-restore-preview-L"); confirm.tap()
+
+        let restoredReader = app.buttons["mihbara-book-continue"]
+        XCTAssertTrue(restoredReader.waitForExistence(timeout: 15), app.debugDescription)
+        restoredReader.tap()
+        XCTAssertTrue(app.buttons["mihbara-reader-close"].waitForExistence(timeout: 20), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["كتاب بلا ملف"].firstMatch.exists, app.debugDescription)
+        let closeReader = app.buttons["mihbara-reader-close"]
+        closeReader.tap()
+        XCTAssertTrue(closeReader.waitForNonExistence(timeout: 10), app.debugDescription)
+        let library = app.buttons["mihbara-library"]; reach(app, library); library.tap()
+        let rows = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "mihbara-library-book-"))
+        XCTAssertEqual(rows.count, 1, "Restoring the exact EPUB must keep one copy of its original book.")
+        XCTAssertTrue(rows.firstMatch.label.contains("كتاب بلا ملف"), rows.firstMatch.label)
+    }
+
     func testRemovingPDFKeepsTheBookButClearsUndo() {
         continueAfterFailure = false
         let app = app("empty", pdf: fixturePDF())

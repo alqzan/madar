@@ -25,6 +25,14 @@ extension AppSession {
                 media.sizeBytes = bytes.count; media.sha256 = hash; c.insert(media)
                 book.format = "pdf"; book.mediaID = media.id; book.fileHash = hash; book.pages = 1; book.currentPage = 1
                 book.createdAt = now; book.updatedAt = now
+            } else if let encoded = ProcessInfo.processInfo.environment["MADAR_UI_MIHBARA_EPUB_BASE64"],
+                      let bytes = Data(base64Encoded: encoded), !bytes.isEmpty, bytes.count < 2 * 1024 * 1024 {
+                let hash = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+                let media = Media(); media.id = StableIdentity.uuid(for: "mihbara-missing-file-fixture-media")
+                media.kind = "doc"; media.contentType = "org.idpf.epub-container"; media.state = "missing"
+                media.sizeBytes = bytes.count; media.sha256 = hash; c.insert(media)
+                book.mediaID = media.id; book.fileHash = hash
+                book.createdAt = now; book.updatedAt = now
             }
             c.insert(book)
         }
