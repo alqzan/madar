@@ -15,6 +15,7 @@ struct MoneySalaryView: View {
     @Environment(\.dynamicTypeSize) private var dynamicType
     @State private var reading: MoneySalaryReading?
     @State private var failure: String?
+    @State private var confirmFailed = false
     @State private var selected: String?
     @State private var remainderTo: SalaryRemainder?
     @State private var revealed = false
@@ -238,11 +239,14 @@ struct MoneySalaryView: View {
 
     private func confirmButton(_ r: MoneySalaryReading) -> some View {
         let blocked = r.needsChoice && remainderTo == nil
-        return Button(action: confirm) {
+        return VStack(spacing: 4) { Button(action: confirm) {
             Text("اعتمد الراتب وافتح الدورة").font(.custom("thmanyahserifdisplay-Bold", size: 20, relativeTo: .headline)).foregroundStyle(theme.background)
                 .frame(maxWidth: .infinity, minHeight: 60).background(theme.ink.opacity(blocked || busy ? 0.4 : 1))
                 .shadow(color: theme.ink.opacity(0.18), radius: 8, y: 4)
         }.buttonStyle(.plain).disabled(blocked || busy).accessibilityIdentifier("money-salary-confirm").padding(.vertical, 6)
+            // A failed confirm used to reload silently; say so under the button.
+            if confirmFailed { Text("لم يُعتمد الراتب. حاول مرة أخرى.").font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")).accessibilityIdentifier("money-salary-confirm-failed") }
+        }
     }
 
     private func summary(_ r: MoneySalaryReading) -> some View {
@@ -351,7 +355,7 @@ struct MoneySalaryView: View {
         } label: {
             Image(systemName: symbol).font(.body).frame(maxWidth: .infinity, minHeight: 44).overlay { Rectangle().stroke(theme.ink, lineWidth: 1) }
         }.buttonStyle(.plain).disabled(busy || (delta < 0 && e.amountMinor == 0))
-            .accessibilityLabel((delta > 0 ? "زد " : "أنقص ") + e.name + " " + service.amount(abs(delta)))
+            .accessibilityLabel((delta > 0 ? "زد " : "أنقص ") + e.name + " " + (visible ? service.amount(abs(delta)) : "•••"))
     }
 
     // MARK: Actions
@@ -366,10 +370,10 @@ struct MoneySalaryView: View {
     private func confirm() {
         var payload: [String: MadarCore.JSONValue] = ["id": .string(salaryID.uuidString)]
         if let remainderTo { payload["remainderTo"] = .string(remainderTo == .reserve ? "reserve" : "surplus") }
-        busy = true
+        busy = true; confirmFailed = false
         Task {
             do { try await app.executeMoneyCommand("money.confirmSalary", payload: payload, id: commandID); busy = false; dismiss() }
-            catch { busy = false; commandID = UUID(); load(); if reading != nil { failure = nil } }
+            catch { busy = false; commandID = UUID(); load(); if reading != nil { failure = nil }; confirmFailed = true }
         }
     }
     private func run(_ name: String, _ payload: [String: MadarCore.JSONValue]) {

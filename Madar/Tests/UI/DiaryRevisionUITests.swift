@@ -18,5 +18,22 @@ import XCTest
         mark.tap();let original=app.staticTexts["diary-line-original"];XCTAssertTrue(original.waitForExistence(timeout:10))
         XCTAssertFalse(original.label.contains("وبقينا"));capture(app,"F01-original-L")
     }
+    // A typed change asks before it is thrown away; «أكمل التعديل» keeps it.
+    func testCancelAsksBeforeDiscardingAnEdit() throws {
+        continueAfterFailure=false
+        let app=XCUIApplication();app.launchEnvironment=["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_DIARY_FIXTURE":"today","MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light","MADAR_UI_NOW":"2026-10-15T15:00:00+03:00"];app.launch()
+        XCTAssertTrue(app.buttons["diary-today"].waitForExistence(timeout:25));app.buttons["diary-today"].tap()
+        XCTAssertTrue(app.buttons["diary-day-year"].waitForExistence(timeout:10));app.buttons["diary-day-year"].tap()
+        let line=app.staticTexts.containing(NSPredicate(format:"label BEGINSWITH %@","عشاء عند أهلي")).firstMatch
+        XCTAssertTrue(line.waitForExistence(timeout:10));line.press(forDuration:1.0)
+        XCTAssertTrue(app.buttons["عدّل السطر"].waitForExistence(timeout:5));app.buttons["عدّل السطر"].tap()
+        let field=app.textViews["diary-line-edit-text"];XCTAssertTrue(field.waitForExistence(timeout:10))
+        field.typeText(" تعديل")
+        app.buttons["diary-line-edit-cancel"].tap()
+        let keep=app.buttons["أكمل التعديل"];XCTAssertTrue(keep.waitForExistence(timeout:5));capture(app,"F01-discard-ask-L");keep.tap()
+        XCTAssertTrue(field.exists);XCTAssertTrue((field.value as? String ?? "").contains("تعديل"))
+        app.buttons["diary-line-edit-cancel"].tap();let discard=app.buttons["تجاهل التعديل"];XCTAssertTrue(discard.waitForExistence(timeout:5));discard.tap()
+        XCTAssertTrue(field.waitForNonExistence(timeout:10));XCTAssertFalse(app.buttons["diary-line-edited"].exists)
+    }
     private func capture(_ app:XCUIApplication,_ name:String){let a=XCTAttachment(screenshot:app.screenshot());a.name=name;a.lifetime = .keepAlways;add(a)}
 }

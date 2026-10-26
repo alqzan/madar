@@ -95,7 +95,7 @@ struct HabitDetailView:View {
         let periods = Array(reading.summary.periods.suffix(14))
         VStack(alignment:.leading,spacing:10) {
             let closed = periods.filter { $0.outcome != .waiting && $0.outcome != .excluded }
-            HStack { Text("آخر "+habitPeriodCount(14,current.rule.frequency,digits)).font(MadarTypography.section()); Spacer(); Text(digits.string(closed.filter(\.met).count)+" من "+digits.string(closed.count)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
+            HStack { Text("آخر "+habitPeriodCount(14,current.rule.frequency,digits)).font(MadarTypography.section()); Spacer(); if !closed.isEmpty { Text(digits.string(closed.filter(\.met).count)+" من "+digits.string(closed.count)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) } }
             if dynamicTypeSize.isAccessibilitySize {
                 ForEach(Array(periods.enumerated()),id:\.offset) { _,p in HStack { MadarDateLabel(session.dateLabels(p.start,compact:true)); Spacer(); Text(outcome(p)).font(MadarTypography.caption()) } }
             } else {

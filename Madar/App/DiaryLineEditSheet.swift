@@ -15,6 +15,7 @@ struct DiaryLineEditSheet: View {
     @State private var text = ""
     @State private var failure: String?
     @State private var saving = false
+    @State private var confirmDiscard = false
     @FocusState private var focused: Bool
     var body: some View {
         NavigationStack {
@@ -27,7 +28,7 @@ struct DiaryLineEditSheet: View {
             }.padding(18).background(theme.background).foregroundStyle(theme.ink)
                 .navigationTitle("عدّل السطر").navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItem(placement: .cancellationAction) { Button("إلغاء") { dismiss() } }
+                    ToolbarItem(placement: .cancellationAction) { Button("إلغاء") { if text == edit.text { dismiss() } else { confirmDiscard = true } }.accessibilityIdentifier("diary-line-edit-cancel") }
                     ToolbarItem(placement: .confirmationAction) {
                         Button("احفظ") { Task { saving = true; defer { saving = false }
                             do { try await AppDiaryService(app: app).edit(edit.id, text: text); saved(); dismiss() } catch { failure = error.localizedDescription } } }
@@ -35,6 +36,12 @@ struct DiaryLineEditSheet: View {
                     }
                 }.toolbarBackground(theme.background, for: .navigationBar).tint(theme.accent)
                 .onAppear { text = edit.text; focused = true }
+                // A typed change is not lost to a stray swipe or cancel.
+                .interactiveDismissDisabled(text != edit.text || saving)
+                .alert("تتجاهل تعديلك؟", isPresented: $confirmDiscard) {
+                    Button("تجاهل التعديل", role: .destructive) { dismiss() }
+                    Button("أكمل التعديل", role: .cancel) {}
+                }
         }
     }
 }

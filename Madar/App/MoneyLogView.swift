@@ -157,7 +157,7 @@ struct MoneyLogView: View {
             guard row.day == d.day else { return false }
             let matches = filter == "all" || filter == "cash" && row.cash || filter == "bnpl" && row.bnpl || filter == "transfers" && ["transfer", "cardPayment"].contains(row.kind) || row.cardID?.uuidString == filter
             func normalized(_ s: String) -> String { BankDedupe.normalize(s).folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "ar")).filter { $0.isLetter || $0.isNumber } }
-            return matches && (query.isEmpty || normalized(row.title + row.category + row.payment + service.amount(row.amountMinor)).contains(normalized(query)))
+            return matches && (query.isEmpty || normalized(row.title + row.category + row.payment + (visible ? service.amount(row.amountMinor) : "")).contains(normalized(query)))
         }
         return VStack(alignment: .leading, spacing: 14) {
             DoubleRule().stroke(theme.color("reserveText"), lineWidth: 0.8).frame(height: 3)
