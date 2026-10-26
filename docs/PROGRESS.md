@@ -158,10 +158,10 @@ M5 (16 Oct, updated 19 Oct): the owner delegates the Zakat wording/source review
 Owner standing rule (15 Oct): screens that match their design or better count as approved pending the owner's app trial (M3 matched screens included). Owner visually approved M2-V01–V17 and the prayer/Quran link on 15 October. OS gallery/Control invocation, real notification delivery, named human resource release sample, owner-iPhone and milestone gates remain separately unverified/deferred.
 
 Open owner questions, 27 Oct:
-- Honorific glyphs in scanned books: may Madar replace the calligraphic ﷺ / رضي الله عنه / رحمه الله glyphs that OCR as noise words with the honorific (or drop them)? It adds words the scan did not read (Ideas row «Honorifics in scanned books»).
-- Deleting the user’s CloudKit copy: a confirmed way to remove the synced records and media from the private iCloud database while keeping the device copy (Ideas row «Delete a user’s CloudKit copy»).
-- Ending a trip-linked habit pause when a trip is dismissed: should dismissal end the linked `HabitPause` on that Madar day, and what provenance is saved for replay (Ideas row «End a trip-linked habit pause when a trip is dismissed»)?
-- Money amounts in the diary export: keep them, drop the amount and keep «صرفت في …», or ask in the export sheet when «أخفِ المال خارج التطبيق» is on (Ideas row «Money amounts in diary export»)?
+- Honorific glyphs in scanned books: may Madar replace the calligraphic ﷺ / رضي الله عنه / رحمه الله glyphs that OCR as noise words with the honorific (or drop them)? It adds words the scan did not read (Ideas row «Honorifics in scanned books»). **Owner 27 Oct: replace with the correct honorific text — ready.**
+- Deleting the user’s CloudKit copy: a confirmed way to remove the synced records and media from the private iCloud database while keeping the device copy (Ideas row «Delete a user’s CloudKit copy»). **Owner 27 Oct: yes, a settings button with confirmation that deletes the iCloud copy only — ready.**
+- Ending a trip-linked habit pause when a trip is dismissed: should dismissal end the linked `HabitPause` on that Madar day, and what provenance is saved for replay (Ideas row «End a trip-linked habit pause when a trip is dismissed»)? **Owner 27 Oct: the habit resumes on the dismissal day — ready.**
+- Money amounts in the diary export: keep them, drop the amount and keep «صرفت في …», or ask in the export sheet when «أخفِ المال خارج التطبيق» is on (Ideas row «Money amounts in diary export»)? **Owner 27 Oct: keep the amounts (the export is the owner’s own file) — no change needed.**
 - J05 freeze-boundary field: the diary capture/freeze/margin schema decision (item 27 and the 26 Oct Codex handover) still awaits the owner.
 - Where did «صفحة ٩٤» appear? Row 30e («خلاني كأنني في صفحة ٩٤») needs the owner to say where it showed; no spontaneous jump to page 94 was reproduced on a fresh conversion.
 
