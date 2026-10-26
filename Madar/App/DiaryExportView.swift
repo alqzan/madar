@@ -21,7 +21,7 @@ struct DiaryExportView:View {
                     Text("تصدير المذكرات").font(DiaryType.title)
                     Text("كلّها أو سنة أو شهر").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
                     card {
-                        HStack{Text("الفترة");Spacer();Picker("السنة",selection:$options.year){Text("كل الأيام").tag(Int?.none);ForEach(years,id:\.self){Text(service.digits.string($0)).tag(Optional($0))}}.labelsHidden().accessibilityIdentifier("diary-export-year")}.font(DiaryType.label)
+                        HStack{Text("الفترة");Spacer();Picker("السنة",selection:$options.year){Text("كل الأيام").tag(Int?.none);ForEach(years,id:\.self){year in yearOption(year).tag(Optional(year))}}.labelsHidden().accessibilityIdentifier("diary-export-year")}.font(DiaryType.label)
                         if let year = options.year { MadarDateLabel(app.yearLabels(year)) }
                         if options.year != nil {Picker("الشهر الميلادي",selection:$options.month){Text("السنة كاملة").tag(Int?.none);ForEach(1...12,id:\.self){Text(service.digits.string($0)).tag(Optional($0))}}.font(DiaryType.label).accessibilityIdentifier("diary-export-month")}
                         Text("الصيغة").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
@@ -49,6 +49,13 @@ struct DiaryExportView:View {
                 .sheet(isPresented:$preview){if let artifact {DiaryQuickLook(url:artifact.url)}}
                 .onDisappear{clear()}
         }
+    }
+    private func yearOption(_ year:Int)->some View {
+        let labels=app.yearLabels(year)
+        let primary=Text(labels.primary).font(DiaryType.label)
+        let secondary=Text(labels.secondary).font(MadarTypography.fine()).foregroundColor(theme.secondaryInk)
+        return Text("\(primary)\n\(secondary)")
+            .accessibilityLabel(labels.combined)
     }
     private func ready(_ file:DiaryExportArtifact)->some View {
         VStack(alignment:.leading,spacing:12) {
