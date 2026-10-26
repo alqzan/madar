@@ -19,6 +19,19 @@ extension AppSession {
             let event = HabitEvent(); event.habitID = habit.id; event.dayKey = today.adding(days: -1).description; event.periodKey = event.dayKey; event.delta = 1; event.unit = "minutes"; context.insert(event)
             try context.save(); return
         }
+        if variant == "sameDayTrip" {
+            let today = GregorianDay.containing(prayerNow(), in: activePlace.timeZone)
+            _ = try settings.stage(["bahw.travelFreezesHome": .bool(true)])
+            let habit = Habit(); habit.name = "عادة البيت"; habit.homeOnly = true
+            habit.startDate = today.adding(days: -3).date(in: activePlace.timeZone); context.insert(habit)
+            let policy = HabitPolicy(); policy.habitID = habit.id; policy.effectiveFrom = today.adding(days: -3).description
+            policy.frequency = "daily"; policy.measure = "once"; policy.target = 1; context.insert(policy)
+            let trip = Trip(); trip.city = "الخبر"; trip.tzID = activePlace.timeZoneID; trip.lat = 26.4207; trip.lon = 50.0888
+            trip.start = today.date(in: activePlace.timeZone).addingTimeInterval(10 * 3600)
+            trip.end = today.date(in: activePlace.timeZone).addingTimeInterval(12 * 3600)
+            trip.createdAt = prayerNow(); trip.updatedAt = prayerNow(); context.insert(trip)
+            try context.save(); return
+        }
         if variant == "pausedLater" || variant == "pausedLaterMixed" {
             let today = GregorianDay.containing(prayerNow(), in: activePlace.timeZone)
             for (index, frequency) in ["daily", "weekly", "monthly"].enumerated() {

@@ -44,6 +44,15 @@ public struct HabitTime: Equatable, Sendable {
         row.monthDays = rule.monthDays; row.monthCalendar = rule.hijri ? "hijri" : "gregorian"; row.yearMonth = rule.yearMonth; row.yearDay = rule.yearDay
         row.windowAnchor = rule.windowAnchor?.rawValue; row.windowStartMin = rule.windowStart; row.windowEndMin = rule.windowEnd
     }
+    static func travelBreak(start: Date, end: Date?, timeZone: TimeZone) -> HabitBreak {
+        let from = GregorianDay.containing(start, in: timeZone)
+        let returnDay = end.map { GregorianDay.containing($0, in: timeZone) }
+        // Trips use half-open instants, but habits are evaluated in whole day buckets.
+        // Keep the travel day frozen when departure and return share one date instead of
+        // constructing an empty [day, day) break.
+        let until = returnDay == from ? from.adding(days: 1) : returnDay
+        return HabitBreak(from: from, until: until)
+    }
     public func readings(at now: Date, includeArchived: Bool = false, liveHealth: [UUID:Int] = [:]) throws -> [HabitReading] {
         let settings = try SettingsStore(context: context), prayers = try PrayerRepository(context: context), place = prayers.place(at: now)
         let today = try DiaryLineRenderer.today(context: context, now: now)
@@ -64,7 +73,7 @@ public struct HabitTime: Equatable, Sendable {
                 return .init(from: try GregorianDay(p.fromDayKey), until: until)
             }
             if habit.homeOnly, (try settings.value(for: "bahw.travelFreezesHome")) == .bool(true) {
-                breaks += trips.map { .init(from: GregorianDay.containing($0.start!, in: place.timeZone), until: $0.end.map { GregorianDay.containing($0, in: place.timeZone) }) }
+                breaks += trips.map { Self.travelBreak(start: $0.start!, end: $0.end, timeZone: place.timeZone) }
             }
             var facts = try events.filter { $0.habitID == habit.id && $0.delta != 0 }.map { HabitFact(id: $0.id, day: try GregorianDay($0.dayKey), periodKey: $0.periodKey, delta: $0.delta, unit: $0.unit) }
             facts += legacy.filter { $0.habitID == habit.id }.map { .init(id: $0.id, day: (try? GregorianDay($0.periodKey)) ?? GregorianDay.containing($0.eventAt, in: TimeZone(identifier: $0.tzID) ?? place.timeZone), periodKey: $0.periodKey, delta: $0.value) }

@@ -90,6 +90,14 @@ import UIKit
             app.terminate()
         }
     }
+    func testSameDayTripFreezesHomeOnlyHabit() throws {
+        continueAfterFailure = false
+        let app = app("sameDayTrip"); open(app)
+        let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "عادة البيت،")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 5), app.debugDescription)
+        shot(app, "M4-same-day-trip-home-only-L")
+        XCTAssertTrue(row.label.contains("مجمّدة"), row.label)
+    }
     func testPartialDurationIsNotACompleteDayAndPastSaveNamesItsAmount() throws {
         continueAfterFailure = false
         let app = app("partialDuration"); open(app)

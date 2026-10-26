@@ -90,6 +90,37 @@ import MadarData
         #expect(policies.map(\.target) == [2,4])
         #expect(HabitCommand.parse("habit.pause",["id":.string(id.uuidString),"from":.string("invalid")]) == nil)
     }
+    @Test func homeOnlyHabitIsFrozenForSameDayTravel() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("HabitSameDayTrip-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root)
+        let context = ModelContext(container)
+        _ = try SettingsStore(context: context).stage([
+            "core.dayStart": .string("midnight"),
+            "bahw.travelFreezesHome": .bool(true)
+        ], now: now)
+
+        let habit = Habit(); habit.id = UUID(); habit.name = "عادة البيت"; habit.homeOnly = true
+        habit.startDate = now; habit.createdAt = now; habit.updatedAt = now
+        context.insert(habit)
+        let policy = HabitPolicy(); policy.id = UUID(); policy.habitID = habit.id
+        policy.effectiveFrom = "2026-10-15"; policy.createdAt = now; policy.updatedAt = now
+        context.insert(policy)
+
+        let trip = Trip(); trip.id = UUID(); trip.city = "اختبار"; trip.tzID = "Asia/Riyadh"
+        trip.start = now.addingTimeInterval(-6 * 3600); trip.end = now.addingTimeInterval(-4 * 3600)
+        trip.createdAt = now; trip.updatedAt = now
+        context.insert(trip)
+        try context.save()
+
+        let today = try #require(HabitRepository(context: ModelContext(container)).readings(at: now).first)
+        #expect(today.paused)
+        #expect(today.summary.current?.outcome == .excluded)
+
+        let tomorrow = try #require(HabitRepository(context: ModelContext(container)).readings(at: now.addingTimeInterval(86_400)).first)
+        #expect(!tomorrow.paused)
+        #expect(tomorrow.summary.current?.outcome == .waiting)
+    }
     @Test func hijriPeriodKeysAndCalendarContextSurviveSettingsAndPortableRebuild() async throws {
         let root=FileManager.default.temporaryDirectory.appendingPathComponent("HabitCalendar-\(UUID())");defer{try? FileManager.default.removeItem(at:root)}
         let container=try MadarContainerFactory.makeLocal(at:root),bus=CommandBus(adapter:DurableCommandAdapter(container:container,lockDirectory:root,transactionClock:{$0}))
