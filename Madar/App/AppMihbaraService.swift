@@ -87,6 +87,40 @@ struct MihbaraMotivationCue: Identifiable {
         return .init(books: books, collection: collection, todayHadiths: collection.hadiths.filter { numbers.contains($0.number) }, readCount: read.count, completedToday: today.count, opensAfterFajr: fajr.map { now >= $0 } ?? false, day: day, originals: originals)
     }
 
+    func hasLocalFile(for book: MihbaraBook) -> Bool {
+        guard book.kind == "file", let mediaID = book.mediaID, let fileHash = book.fileHash else { return false }
+        let context = ModelContext(app.container)
+        let descriptor = FetchDescriptor<Media>(predicate: #Predicate { $0.id == mediaID })
+        guard let media = try? context.fetch(descriptor).first else { return false }
+        return media.deletedAt == nil && media.mergedInto == nil && media.kind == "doc"
+            && media.state == "ok" && media.sha256 == fileHash
+    }
+
+    /// A missing local file can be restored only to its original, live book and only
+    /// with the exact bytes recorded by its checksum and size.
+    func bookRestorableFromFile(sha256: String, sizeBytes: Int, formats: Set<String>) throws -> MihbaraBook? {
+        let context = ModelContext(app.container)
+        let books = try context.fetch(FetchDescriptor<Book>())
+        let matches = books.filter { $0.fileHash == sha256 && $0.mergedInto == nil }
+        guard !matches.isEmpty else { return nil }
+        guard matches.count == 1, let row = matches.first, row.deletedAt == nil,
+              row.kind == "file", formats.contains(row.format ?? ""), let mediaID = row.mediaID else {
+            throw DataError.invalidValue("هذا الكتاب عندك بالفعل، أو أُزيل سابقًا؛ لن يُضاف مكررًا.")
+        }
+        let descriptor = FetchDescriptor<Media>(predicate: #Predicate { $0.id == mediaID })
+        guard let media = try context.fetch(descriptor).first,
+              media.deletedAt == nil, media.mergedInto == nil, media.kind == "doc",
+              media.state == "missing",
+              media.sha256 == sha256, media.sizeBytes == sizeBytes else {
+            throw DataError.invalidValue("الكتاب عندك وملفه موجود، أو لم يطابق الملف النسخة المحفوظة.")
+        }
+        let page = row.currentPage
+        return MihbaraBook(id: row.id, title: row.title, author: row.author, shelf: row.shelf, pages: row.pages,
+                           page: page, finished: row.finishedAt, updated: row.updatedAt, kind: row.kind, format: row.format,
+                           mediaID: row.mediaID, fileHash: row.fileHash, locatorJSON: row.locatorJSON,
+                           isbn13: row.isbn13, tocJSON: row.tocJSON, turathID: row.turathID, language: row.language)
+    }
+
     /// RMI3: a book line comes only from the user's own page-linked note. When none exists,
     /// the home offers a short reading step and real progress instead of inventing a quotation.
     func motivationCues(for reading: MihbaraHomeReading, book: MihbaraBook?) throws -> [MihbaraMotivationCue] {

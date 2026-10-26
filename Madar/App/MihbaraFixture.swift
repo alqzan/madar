@@ -15,7 +15,18 @@ extension AppSession {
         _ = try SettingsStore(context: c).stage(["core.dayStart":.string("midnight"),"core.faceIDLock":.string("none")])
         let now = prayerNow()
         if variant == "missingFile" {
-            let book = Book(); book.title = "كتاب بلا ملف"; book.author = "نص اختباري"; book.kind = "file"; book.format = "epub"; book.shelf = "reading"; c.insert(book)
+            let book = Book(); book.id = StableIdentity.uuid(for: "mihbara-missing-file-fixture-book")
+            book.title = "كتاب بلا ملف"; book.author = "نص اختباري"; book.kind = "file"; book.format = "epub"; book.shelf = "reading"
+            if let encoded = ProcessInfo.processInfo.environment["MADAR_UI_MIHBARA_IMPORT_PDF"],
+               let bytes = Data(base64Encoded: encoded), !bytes.isEmpty, bytes.count < 1024 * 1024 {
+                let hash = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+                let media = Media(); media.id = StableIdentity.uuid(for: "mihbara-missing-file-fixture-media")
+                media.kind = "doc"; media.contentType = "com.adobe.pdf"; media.state = "missing"
+                media.sizeBytes = bytes.count; media.sha256 = hash; c.insert(media)
+                book.format = "pdf"; book.mediaID = media.id; book.fileHash = hash; book.pages = 1; book.currentPage = 1
+                book.createdAt = now; book.updatedAt = now
+            }
+            c.insert(book)
         }
         if variant == "home" {
             let r = Book(); r.id = StableIdentity.uuid(for: "mihbara-fixture-book"); r.title = "رحلة القراءة"; r.author = "من مكتبتك"; r.pages = 250; r.currentPage = 147; r.locatorJSON = try JSONEncoder().encode(PaperBookPosition(page: 147)); r.shelf = "reading"; r.updatedAt = now; c.insert(r)

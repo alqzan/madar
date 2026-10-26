@@ -7,14 +7,17 @@ import MadarPrayer
 
 private struct BookUndo: Codable {
     struct Change: Codable { var before: DataRecord?; var after: DataRecord }
+    struct RestoredMedia: Codable { var id: UUID; var updatedAt: Date; var sha256: String; var sizeBytes: Int }
     var changes: [Change]
     var importedMediaIDs: [UUID]? = nil
+    var restoredMedia: [RestoredMedia]? = nil
 }
 @MainActor enum BookMutationHandler {
     static func stage(_ command: BookCommand, context: ModelContext, now: Date, writer: String, stagingDirectory: URL? = nil) throws -> Data {
         let books = try context.fetch(FetchDescriptor<Book>())
         var changes: [BookUndo.Change] = []
         var importedMediaIDs: [UUID] = []
+        var restoredMedia: [BookUndo.RestoredMedia] = []
         func touch(_ row: any MadarRecordModel, before: DataRecord?) throws {
             var record = try row.record()
             try record.set(StableIdentity.monotonic(now: now, previous: record.date("updatedAt") ?? .distantPast), for: "updatedAt")
@@ -90,6 +93,58 @@ private struct BookUndo: Codable {
             let row = try book(id), before = try row.record()
             row.deletedAt = now; row.deletionBarrierAt = now
             try touch(row, before: before)
+        case .removeBookFile(let id):
+            let row = try book(id)
+            guard row.kind == "file", ["epub", "pdf", "pdfScanned"].contains(row.format ?? ""),
+                  let mediaID = row.mediaID, let fileHash = row.fileHash, fileHash.count == 64 else {
+                throw DataError.invalidValue("هذا الكتاب لا يملك ملفًا محليًا")
+            }
+            let mediaRows = try context.fetch(FetchDescriptor<Media>())
+            guard let media = mediaRows.first(where: { $0.id == mediaID && $0.deletedAt == nil && $0.mergedInto == nil }),
+                  media.kind == "doc", media.state == "ok", media.sha256 == fileHash else {
+                throw DataError.invalidValue("ملف الكتاب غير موجود أو تغيّرت بصمته")
+            }
+            // Media.data is external storage and may be hundreds of megabytes. Do not
+            // materialize it or put it in CommandReceipt undo JSON; this action is final.
+            media.data = nil; media.state = "missing"
+            media.updatedAt = StableIdentity.monotonic(now: now, previous: media.updatedAt); media.writerID = writer
+        case .restoreBookFile(let id, let fileID, let sha256):
+            guard let stagingDirectory else { throw DataError.invalidValue("ملف المعاينة غير موجود.") }
+            let row = try book(id)
+            guard row.kind == "file", row.fileHash == sha256, let mediaID = row.mediaID,
+                  let format = row.format, ["epub", "pdf", "pdfScanned"].contains(format) else {
+                throw DataError.invalidValue("لم يُعثر على كتاب بهذا الملف لاستعادة نسخته")
+            }
+            let mediaRows = try context.fetch(FetchDescriptor<Media>())
+            guard let media = mediaRows.first(where: { $0.id == mediaID && $0.deletedAt == nil && $0.mergedInto == nil }),
+                  media.kind == "doc", media.state == "missing",
+                  media.sha256 == sha256, media.sizeBytes > 0,
+                  mediaRows.allSatisfy({ $0.id != fileID }) else {
+                throw DataError.invalidValue("تغيّرت حالة ملف الكتاب؛ افتح مكتبته مجددًا")
+            }
+            let stagedURL: URL
+            let stagedHash: String
+            let stagedSize: Int
+            if format == "epub" {
+                let inspection = try EPUBBookFiles.inspect(id: fileID, root: stagingDirectory)
+                stagedURL = EPUBBookFiles.stagedURL(id: fileID, root: stagingDirectory)
+                stagedHash = inspection.sha256; stagedSize = inspection.sizeBytes
+            } else {
+                let inspection = try PDFBookFiles.inspect(id: fileID, root: stagingDirectory)
+                stagedURL = PDFBookFiles.stagedURL(id: fileID, root: stagingDirectory)
+                stagedHash = inspection.sha256; stagedSize = inspection.sizeBytes
+            }
+            guard stagedHash == sha256, stagedSize == media.sizeBytes else {
+                throw DataError.invalidValue("اختر النسخة الأصلية نفسها لإعادة ملف الكتاب")
+            }
+            let data = try Data(contentsOf: stagedURL, options: .mappedIfSafe)
+            guard data.count == stagedSize,
+                  SHA256.hash(data: data).map({ String(format: "%02x", $0) }).joined() == sha256 else {
+                throw DataError.invalidValue("تغيّر الملف بعد المعاينة؛ اختره مرة أخرى.")
+            }
+            media.data = data; media.state = "ok"
+            media.updatedAt = StableIdentity.monotonic(now: now, previous: media.updatedAt); media.writerID = writer
+            restoredMedia.append(.init(id: media.id, updatedAt: media.updatedAt, sha256: media.sha256, sizeBytes: media.sizeBytes))
         case .updatePaper(let id, let title, let author, let pages, let position, let isbn13, let tocJSON):
             let row = try book(id)
             guard row.kind == "paper" else { throw DataError.invalidValue("لا يمكن تعديل الفهرس إلا لكتاب ورقي") }
@@ -241,7 +296,8 @@ private struct BookUndo: Codable {
                 context.insert(row); try touch(row, before: nil)
             }
         }
-        return command.isUndoable ? try JSONEncoder().encode(BookUndo(changes: changes, importedMediaIDs: importedMediaIDs.isEmpty ? nil : importedMediaIDs)) : Data()
+        return command.isUndoable ? try JSONEncoder().encode(BookUndo(changes: changes, importedMediaIDs: importedMediaIDs.isEmpty ? nil : importedMediaIDs,
+                                                                      restoredMedia: restoredMedia.isEmpty ? nil : restoredMedia)) : Data()
     }
     static func undo(_ data: Data, context: ModelContext, now: Date, writer: String) throws {
         let state = try JSONDecoder().decode(BookUndo.self, from: data)
@@ -252,11 +308,23 @@ private struct BookUndo: Codable {
         records += try context.fetch(FetchDescriptor<Highlight>()).map { try $0.record() }
         records += try context.fetch(FetchDescriptor<UserWord>()).map { try $0.record() }
         for change in state.changes { guard records.contains(change.after) else { throw DataError.invalidValue("تغيّر الكتاب بعد هذا الإجراء") } }
+        let mediaRows = try context.fetch(FetchDescriptor<Media>())
+        for expected in state.restoredMedia ?? [] {
+            guard let media = mediaRows.first(where: { $0.id == expected.id && $0.deletedAt == nil && $0.mergedInto == nil }),
+                  media.state == "ok", media.updatedAt == expected.updatedAt,
+                  media.sha256 == expected.sha256, media.sizeBytes == expected.sizeBytes else {
+                throw DataError.invalidValue("تغيّر ملف الكتاب بعد استعادته")
+            }
+        }
         for id in state.importedMediaIDs ?? [] {
-            let rows = try context.fetch(FetchDescriptor<Media>())
-            guard let media = rows.first(where: { $0.id == id && $0.deletedAt == nil && $0.mergedInto == nil }) else { throw DataError.invalidValue("تغيّر ملف الكتاب بعد إضافته.") }
+            guard let media = mediaRows.first(where: { $0.id == id && $0.deletedAt == nil && $0.mergedInto == nil }) else { throw DataError.invalidValue("تغيّر ملف الكتاب بعد إضافته.") }
             media.deletedAt = now; media.deletionBarrierAt = now
             media.data = nil
+            media.updatedAt = StableIdentity.monotonic(now: now, previous: media.updatedAt); media.writerID = writer
+        }
+        for expected in state.restoredMedia ?? [] {
+            guard let media = mediaRows.first(where: { $0.id == expected.id }) else { throw DataError.invalidValue("ملف الكتاب غير موجود") }
+            media.data = nil; media.state = "missing"
             media.updatedAt = StableIdentity.monotonic(now: now, previous: media.updatedAt); media.writerID = writer
         }
         for change in state.changes.reversed() {

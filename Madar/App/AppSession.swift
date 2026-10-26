@@ -744,6 +744,7 @@ final class AppSession {
             await reconcileSpotlightIndex()
         }
         if let token = result.undoToken { showUndo(.init(id: token, expiresAt: now.addingTimeInterval(600)), message: undoMessage) }
+        else if BookCommand.parse(name, payload)?.isUndoable == false { clearUndo() }
     }
 
     var diaryStagingDirectory: URL { commandAdapter.diaryStagingDirectory }
@@ -884,6 +885,11 @@ final class AppSession {
             guard !Task.isCancelled else { return }
             if self?.undoToken?.id == token.id { self?.undoToken = nil; self?.undoToastVisible = false }
         }
+    }
+    private func clearUndo() {
+        undoToken = nil; undoToastVisible = false
+        expiryTask?.cancel(); expiryTask = nil
+        toastTask?.cancel(); toastTask = nil
     }
     var homeCity: [String: JSONValue] { if case .object(let place) = values["core.homeCity"] { place } else { [:] } }
     var cityName: String { if case .string(let name) = homeCity["name"] { name } else { "" } }

@@ -196,6 +196,47 @@ import MadarData
         #expect(try context.fetch(FetchDescriptor<Media>()).first?.data == nil)
     }
 
+    @Test func removedEPUBCanBeRestoredToTheSameBookAndRestoreUndoReturnsItToMissing() async throws {
+        let root = try root(); defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root.appendingPathComponent("Store"))
+        let adapter = DurableCommandAdapter(container: container, lockDirectory: root, transactionClock: { $0 })
+        let source = fixture(), inspection = try EPUBBookFiles.stage(source: source, root: adapter.bookStagingDirectory)
+        let original = try Data(contentsOf: source), now = ISO8601DateFormatter().date(from: "2026-10-17T12:00:00+03:00")!
+        let bookID = UUID(), mediaID = UUID(), context = ModelContext(container)
+        let media = Media(); media.id = mediaID; media.kind = "doc"; media.contentType = "org.idpf.epub-container"; media.data = original
+        media.sha256 = inspection.sha256; media.sizeBytes = original.count; context.insert(media)
+        let book = Book(); book.id = bookID; book.title = "عنوان الكتاب محفوظ"; book.author = "مؤلفه"; book.kind = "file"; book.format = "epub"
+        book.shelf = "reading"; book.mediaID = mediaID; book.fileHash = inspection.sha256; book.currentPage = 7
+        book.locatorJSON = Data(#"{"href":"OEBPS/chapter.xhtml","type":"application/xhtml+xml"}"#.utf8); context.insert(book)
+        let session = ReadingSession(); session.id = UUID(); session.bookID = bookID; session.start = now
+        session.end = now.addingTimeInterval(300); session.activeSeconds = 300; session.fromPage = 1; session.toPage = 7; session.pagesCounted = 6; context.insert(session)
+        let highlight = Highlight(); highlight.id = UUID(); highlight.bookID = bookID; highlight.locatorJSON = book.locatorJSON!; highlight.color = "yellow"; context.insert(highlight)
+        try context.save()
+
+        let bus = CommandBus(adapter: adapter), removePayload = MadarCore.JSONValue.object(["id": .string(bookID.uuidString)])
+        let removed = try await bus.execute(.init(name: "book.removeFile", payload: removePayload, issuedAt: now), now: now)
+        #expect(removed.status == .applied && removed.undoToken == nil)
+        #expect(try #require(context.fetch(FetchDescriptor<Media>()).first { $0.id == mediaID }).data == nil)
+
+        let restoreCommandID = UUID()
+        let restorePayload = MadarCore.JSONValue.object(["id": .string(bookID.uuidString), "fileID": .string(inspection.id.uuidString), "sha256": .string(inspection.sha256)])
+        #expect(BookCommand.parse("book.restoreFile", ["id": .string(bookID.uuidString), "fileID": .string(inspection.id.uuidString), "sha256": .string(inspection.sha256)]) == .restoreBookFile(id: bookID, fileID: inspection.id, sha256: inspection.sha256))
+        let restored = try await bus.execute(.init(commandID: restoreCommandID, name: "book.restoreFile", payload: restorePayload, issuedAt: now.addingTimeInterval(1)), now: now.addingTimeInterval(1))
+        #expect(restored.status == .applied && restored.undoToken != nil)
+        let restoredBook = try #require(context.fetch(FetchDescriptor<Book>()).first { $0.id == bookID })
+        let restoredMedia = try #require(context.fetch(FetchDescriptor<Media>()).first { $0.id == mediaID })
+        #expect(restoredBook.title == "عنوان الكتاب محفوظ" && restoredBook.currentPage == 7 && restoredBook.locatorJSON == book.locatorJSON)
+        #expect(restoredBook.deletedAt == nil && restoredMedia.state == "ok" && restoredMedia.data == original)
+        #expect(try #require(context.fetch(FetchDescriptor<ReadingSession>()).first { $0.id == session.id }).deletedAt == nil)
+        #expect(try #require(context.fetch(FetchDescriptor<Highlight>()).first { $0.id == highlight.id }).deletedAt == nil)
+
+        let undone = try await bus.execute(.init(name: "system.undo", payload: .object(["undoToken": .string(restoreCommandID.uuidString)]), issuedAt: now.addingTimeInterval(2)), now: now.addingTimeInterval(2))
+        #expect(undone.status == .applied)
+        #expect(try #require(context.fetch(FetchDescriptor<Media>()).first { $0.id == mediaID }).data == nil)
+        #expect(try #require(context.fetch(FetchDescriptor<Media>()).first { $0.id == mediaID }).state == "missing")
+        #expect(try #require(context.fetch(FetchDescriptor<Book>()).first { $0.id == bookID }).title == "عنوان الكتاب محفوظ")
+    }
+
     @Test func rejectsUnsafePathsEncryptedEntriesSymlinksAndZIPLimitsBeforeCopy() throws {
         let root = try root(); defer { try? FileManager.default.removeItem(at: root) }
         let staging = root.appendingPathComponent("Staging"), source = root.appendingPathComponent("invalid.epub")

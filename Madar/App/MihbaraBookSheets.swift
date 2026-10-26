@@ -380,7 +380,9 @@ struct MihbaraBookCard: View {
     let app: AppSession
     let book: MihbaraBook
     let books: [MihbaraBook]
+    let fileUnavailable: Bool
     let onTable: () -> Void
+    let onRestoreFile: () -> Void
     let onPaperIndexSaved: () -> Void
     /// The printed size from the file's page list, in the same words as the spine.
     var shape: MihbaraBookShape? = nil
@@ -443,9 +445,14 @@ struct MihbaraBookCard: View {
                         }
                     }
                     if book.shelf != "reading" { Button("ضعه على الطاولة") { moveToReading() }.buttonStyle(MadarPrimaryButton()).accessibilityIdentifier("mihbara-put-on-table") }
-                    Label("ملف الكتاب غير متاح للقراءة على هذا الجهاز.", systemImage: "doc.badge.ellipsis")
-                        .font(MadarTypography.body()).accessibilityIdentifier("mihbara-book-file-unavailable")
-                    Text("يُحفظ موضع الكتاب الإلكتروني من داخل القارئ.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    if fileUnavailable {
+                        Label("ملف الكتاب غير موجود على هذا الجهاز.", systemImage: "doc.badge.ellipsis")
+                            .font(MadarTypography.body()).accessibilityIdentifier("mihbara-book-file-unavailable")
+                        Text("اختر النسخة نفسها من «من ملف» لإعادته؛ يبقى اسم الكتاب وموضعك وسجل قراءتك محفوظًا.")
+                            .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                        Button("أعد استيراد الملف نفسه") { onRestoreFile() }
+                            .buttonStyle(MadarPrimaryButton()).accessibilityIdentifier("mihbara-book-file-restore-detail")
+                    }
                     if book.shelf != "finished" {
                         Button("أنهيت الكتاب") { move("finished") }.buttonStyle(MadarPrimaryButton()).disabled(saving).accessibilityIdentifier("mihbara-book-mark-finished")
                     }

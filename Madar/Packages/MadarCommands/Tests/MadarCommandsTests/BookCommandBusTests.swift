@@ -93,4 +93,30 @@ import MadarData
         #expect(try #require(context.fetch(FetchDescriptor<Book>()).first { $0.id == bookID }).deletedAt == nil)
         #expect(try #require(context.fetch(FetchDescriptor<Media>()).first { $0.id == mediaID }).data == bytes)
     }
+
+    @Test func removingBookFileKeepsBookAndReadingHistoryAndCannotBeUndone() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "BookFileRemove-\(UUID())"); defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root), context = ModelContext(container)
+        let now = ISO8601DateFormatter().date(from: "2026-10-17T12:00:00+03:00")!, bookID = UUID(), mediaID = UUID()
+        let bytes = Data("synthetic EPUB file to remove".utf8)
+        let hash = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+        let media = Media(); media.id = mediaID; media.kind = "doc"; media.contentType = "org.idpf.epub-container"; media.data = bytes; media.sizeBytes = bytes.count; media.sha256 = hash; context.insert(media)
+        let book = Book(); book.id = bookID; book.title = "كتاب يبقى بعد إزالة ملفه"; book.kind = "file"; book.format = "epub"; book.shelf = "want"; book.mediaID = mediaID; book.fileHash = hash; context.insert(book)
+        let session = ReadingSession(); session.id = UUID(); session.bookID = bookID; session.start = now; session.end = now.addingTimeInterval(120); session.activeSeconds = 120; session.fromPage = 1; session.toPage = 3; session.pagesCounted = 2; context.insert(session)
+        let highlight = Highlight(); highlight.id = UUID(); highlight.bookID = bookID; highlight.locatorJSON = Data(#"{"href":"Text/chapter.xhtml","type":"application/xhtml+xml"}"#.utf8); highlight.color = "yellow"; context.insert(highlight)
+        try context.save()
+
+        let bus = CommandBus(adapter: DurableCommandAdapter(container: container, lockDirectory: root, transactionClock: { $0 }))
+        #expect(BookCommand.parse("book.removeFile", ["id": .string(bookID.uuidString)]) == .removeBookFile(id: bookID))
+        #expect(BookCommand.parse("book.removeFile", ["id": .string(bookID.uuidString), "extra": .bool(true)]) == nil)
+        let removed = try await bus.execute(.init(name: "book.removeFile", payload: .object(["id": .string(bookID.uuidString)]), issuedAt: now), now: now)
+        #expect(removed.status == .applied); #expect(removed.undoToken == nil)
+
+        let retainedBook = try #require(context.fetch(FetchDescriptor<Book>()).first { $0.id == bookID })
+        #expect(retainedBook.deletedAt == nil); #expect(retainedBook.title == "كتاب يبقى بعد إزالة ملفه"); #expect(retainedBook.fileHash == hash)
+        #expect(try #require(context.fetch(FetchDescriptor<ReadingSession>()).first { $0.id == session.id }).deletedAt == nil)
+        #expect(try #require(context.fetch(FetchDescriptor<Highlight>()).first { $0.id == highlight.id }).deletedAt == nil)
+        let missingMedia = try #require(context.fetch(FetchDescriptor<Media>()).first { $0.id == mediaID })
+        #expect(missingMedia.data == nil); #expect(missingMedia.state == "missing"); #expect(missingMedia.sha256 == hash); #expect(missingMedia.sizeBytes == bytes.count)
+    }
 }

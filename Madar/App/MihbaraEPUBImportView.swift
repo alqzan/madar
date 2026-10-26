@@ -15,21 +15,25 @@ import MadarDesign
         do {
             try Task.checkCancellation()
             guard app.lockController?.canPresent(.app) ?? app.protectedDataAuthorized else { throw DataError.authenticationFailed }
-            let books = try ModelContext(app.container).fetch(FetchDescriptor<Book>())
-            guard !books.contains(where: { $0.fileHash == inspection.sha256 && $0.mergedInto == nil }) else {
-                throw DataError.invalidValue("هذا الكتاب عندك بالفعل، أو أُزيل سابقًا؛ لن يُضاف مكررًا.")
-            }
+            _ = try AppMihbaraService(app: app).bookRestorableFromFile(sha256: inspection.sha256, sizeBytes: inspection.sizeBytes, formats: ["epub"])
             return inspection
         } catch { EPUBBookFiles.discard(id: id, root: root); throw error }
     }
 
     func confirmEPUB(_ inspection: EPUBBookInspection, bookID: UUID, commandID: UUID, title: String, author: String, language: String, shelf: String, turathID: Int? = nil) async throws {
-        var payload: [String: MadarCore.JSONValue] = [
-            "id": .string(bookID.uuidString), "fileID": .string(inspection.id.uuidString), "sha256": .string(inspection.sha256),
-            "title": .string(title), "author": .string(author), "language": .string(language), "shelf": .string(shelf)
-        ]
-        if let turathID { payload["turathID"] = .number(Double(turathID)) }
-        try await app.executeBookCommand("book.importEPUB", payload: payload, id: commandID)
+        let service = AppMihbaraService(app: app)
+        if let existing = try service.bookRestorableFromFile(sha256: inspection.sha256, sizeBytes: inspection.sizeBytes, formats: ["epub"]) {
+            try await app.executeBookCommand("book.restoreFile", payload: [
+                "id": .string(existing.id.uuidString), "fileID": .string(inspection.id.uuidString), "sha256": .string(inspection.sha256)
+            ], id: commandID, undoMessage: "أُعيد ملف الكتاب")
+        } else {
+            var payload: [String: MadarCore.JSONValue] = [
+                "id": .string(bookID.uuidString), "fileID": .string(inspection.id.uuidString), "sha256": .string(inspection.sha256),
+                "title": .string(title), "author": .string(author), "language": .string(language), "shelf": .string(shelf)
+            ]
+            if let turathID { payload["turathID"] = .number(Double(turathID)) }
+            try await app.executeBookCommand("book.importEPUB", payload: payload, id: commandID)
+        }
         EPUBBookFiles.discard(id: inspection.id, root: app.bookStagingDirectory)
     }
 }
@@ -45,6 +49,7 @@ struct MihbaraEPUBImportView: View {
     @State private var bookID = UUID()
     @State private var commandID = UUID()
     @State private var inspection: EPUBBookInspection?
+    @State private var recoveryBook: MihbaraBook?
     @State private var printedShape: MihbaraBookShape?
     @State private var cover: UIImage?
     @State private var title = ""
@@ -111,6 +116,9 @@ struct MihbaraEPUBImportView: View {
                         let pageList = value.hasPageList ? "توجد قائمة صفحات للمصدر المطبوع" : "لا توجد قائمة صفحات مطبوعة"
                         let notes = value.hasFootnotes == true ? "اكتُشفت حواشٍ" : value.hasFootnotes == false ? "لم تُكتشف حواشٍ" : "تعذّر حسم وجود الحواشي"
                         row("الصور والجداول", detail: "تبقى ضمن الملف كما حفظها؛ \(pageList)؛ \(notes).", detected: true)
+                        if let recoveryBook {
+                            row("ملف كتابك", detail: "يعود هذا الملف إلى «\(recoveryBook.title)»؛ يبقى رفّه وموضعه وسجل قراءته كما هي.", detected: true)
+                        }
                         scanRows
                     }
                 }
@@ -137,24 +145,30 @@ struct MihbaraEPUBImportView: View {
                             .accessibilityLabel(value.hasCover ? "غلاف من ملف EPUB" : "لا توجد صورة غلاف في الملف")
 
                             VStack(alignment: .trailing, spacing: 8) {
-                                TextField("عنوان الكتاب", text: $title, prompt: Text("عنوان الكتاب").foregroundStyle(theme.secondaryInk), axis: .vertical)
-                                    .lineLimit(1...3).textFieldStyle(.plain).font(MadarTypography.cardTitle()).multilineTextAlignment(.trailing)
-                                    .accessibilityIdentifier("mihbara-epub-import-title")
-                                // The spine shows the name the book is known by; the full title stays on the book.
-                                if BookTitle.parts(title).short != title.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty {
-                                    Text("على الرف: «" + BookTitle.parts(title).short + "»").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
-                                        .accessibilityIdentifier("mihbara-epub-import-shelf-name")
+                                if let recoveryBook {
+                                    Text(recoveryBook.title).font(MadarTypography.cardTitle()).accessibilityIdentifier("mihbara-epub-recovery-title")
+                                    Text(recoveryBook.author).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                                    Text("يعود الملف إلى الكتاب نفسه؛ لا يتغير الاسم أو الرف أو موضعك.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                                } else {
+                                    TextField("عنوان الكتاب", text: $title, prompt: Text("عنوان الكتاب").foregroundStyle(theme.secondaryInk), axis: .vertical)
+                                        .lineLimit(1...3).textFieldStyle(.plain).font(MadarTypography.cardTitle()).multilineTextAlignment(.trailing)
+                                        .accessibilityIdentifier("mihbara-epub-import-title")
+                                    // The spine shows the name the book is known by; the full title stays on the book.
+                                    if BookTitle.parts(title).short != title.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty {
+                                        Text("على الرف: «" + BookTitle.parts(title).short + "»").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                                            .accessibilityIdentifier("mihbara-epub-import-shelf-name")
+                                    }
+                                    TextField("المؤلف، إن عُرف", text: $author, prompt: Text("المؤلف، إن عُرف").foregroundStyle(theme.secondaryInk))
+                                        .textFieldStyle(.plain).font(MadarTypography.body()).multilineTextAlignment(.trailing)
+                                        .accessibilityIdentifier("mihbara-epub-import-author")
+                                    Picker("لغة القراءة", selection: $language) {
+                                        Text("العربية").tag("ar")
+                                        Text("الإنجليزية").tag("en")
+                                    }
+                                    .font(MadarTypography.caption()).accessibilityIdentifier("mihbara-epub-import-language")
+                                    Text(value.direction == "rtl" ? "تُقرأ من اليمين إلى اليسار" : value.direction == "ltr" ? "تُقرأ من اليسار إلى اليمين" : "اتجاه القراءة غير محدد")
+                                        .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                                 }
-                                TextField("المؤلف، إن عُرف", text: $author, prompt: Text("المؤلف، إن عُرف").foregroundStyle(theme.secondaryInk))
-                                    .textFieldStyle(.plain).font(MadarTypography.body()).multilineTextAlignment(.trailing)
-                                    .accessibilityIdentifier("mihbara-epub-import-author")
-                                Picker("لغة القراءة", selection: $language) {
-                                    Text("العربية").tag("ar")
-                                    Text("الإنجليزية").tag("en")
-                                }
-                                .font(MadarTypography.caption()).accessibilityIdentifier("mihbara-epub-import-language")
-                                Text(value.direction == "rtl" ? "تُقرأ من اليمين إلى اليسار" : value.direction == "ltr" ? "تُقرأ من اليسار إلى اليمين" : "اتجاه القراءة غير محدد")
-                                    .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                             }
                             Spacer(minLength: 0)
                         }
@@ -163,7 +177,7 @@ struct MihbaraEPUBImportView: View {
                     .overlay { RoundedRectangle(cornerRadius: 18).stroke(theme.line.opacity(0.7), lineWidth: 1) }
                     .disabled(saving || confirmedMetadata)
 
-                    VStack(alignment: .trailing, spacing: 12) {
+                    if recoveryBook == nil { VStack(alignment: .trailing, spacing: 12) {
                         Text("أين تضعه؟").font(MadarTypography.section())
                         HStack(spacing: 8) {
                             shelfButton("reading", title: "أقرأها الآن")
@@ -184,6 +198,7 @@ struct MihbaraEPUBImportView: View {
                     .padding(14).background(theme.surface, in: .rect(cornerRadius: 18))
                     .overlay { RoundedRectangle(cornerRadius: 18).stroke(theme.line.opacity(0.7), lineWidth: 1) }
                     .disabled(saving || confirmedMetadata)
+                    }
 
                     HStack {
                         Text("الفهرس المستخرج").font(MadarTypography.section())
@@ -244,7 +259,7 @@ struct MihbaraEPUBImportView: View {
     }
 
     private var confirmButton: some View {
-        Button(saving ? "يُضاف…" : "أضفه إلى مكتبتي") { confirm() }
+        Button(saving ? (recoveryBook == nil ? "يُضاف…" : "يُعاد الملف…") : (recoveryBook == nil ? "أضفه إلى مكتبتي" : "أعد الملف إلى الكتاب")) { confirm() }
             .buttonStyle(MadarPrimaryButton())
             .disabled(saving || !scanDone || title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || title.count > 300 || author.count > 300)
             .accessibilityIdentifier("mihbara-epub-import-confirm")
@@ -376,6 +391,7 @@ struct MihbaraEPUBImportView: View {
         }
         do {
             let value = try await service.stageEPUB(source, id: fileID)
+            recoveryBook = try service.bookRestorableFromFile(sha256: value.sha256, sizeBytes: value.sizeBytes, formats: ["epub"])
             try Task.checkCancellation()
             guard !departed else { return }
             let publication = try await MihbaraEPUBLoader.open(at: EPUBBookFiles.stagedURL(id: fileID, root: app.bookStagingDirectory))
@@ -384,10 +400,14 @@ struct MihbaraEPUBImportView: View {
             guard !departed else { return }
             inspection = value
             printedShape = (try? EPUBBookFiles.printedShape(file: EPUBBookFiles.stagedURL(id: fileID, root: app.bookStagingDirectory))).map { MihbaraBookShape(pages: $0.pages, volumes: $0.volumes) }
-            if let readiumTitle = publication.metadata.title?.trimmingCharacters(in: .whitespacesAndNewlines), !readiumTitle.isEmpty { title = readiumTitle }
-            else { title = value.title }
-            author = value.author.isEmpty ? publication.metadata.authors.map(\.name).joined(separator: "، ") : value.author
-            language = value.appLanguage ?? "ar"
+            if let recoveryBook {
+                title = recoveryBook.title; author = recoveryBook.author; language = recoveryBook.language
+            } else {
+                if let readiumTitle = publication.metadata.title?.trimmingCharacters(in: .whitespacesAndNewlines), !readiumTitle.isEmpty { title = readiumTitle }
+                else { title = value.title }
+                author = value.author.isEmpty ? publication.metadata.authors.map(\.name).joined(separator: "، ") : value.author
+                language = value.appLanguage ?? "ar"
+            }
             cover = Self.thumbnail(value.coverData)
             confirmedMetadata = false
             try await runScan()

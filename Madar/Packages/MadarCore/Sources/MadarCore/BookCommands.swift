@@ -7,6 +7,8 @@ public enum BookCommand: Codable, Equatable, Sendable {
     case importPDF(id: UUID, fileID: UUID, sha256: String, title: String, author: String, language: String)
     case importEPUB(id: UUID, fileID: UUID, sha256: String, title: String, author: String, language: String, shelf: String, turathID: Int? = nil)
     case deleteBook(id: UUID)
+    case removeBookFile(id: UUID)
+    case restoreBookFile(id: UUID, fileID: UUID, sha256: String)
     case shelf(id: UUID, shelf: String, replacing: UUID?)
     /// Owner, 21 Oct 2026: rename a file book (EPUB or PDF) after import; paper books edit through `updatePaper`.
     case rename(id: UUID, title: String, author: String)
@@ -24,9 +26,10 @@ public enum BookCommand: Codable, Equatable, Sendable {
     /// «أضف إلى كلماتي»: one saved word with its source paragraph and reading position.
     case saveUserWord(id: UUID, word: String, language: String, bookID: UUID, bookTitle: String, locatorJSON: Data, context: String)
     public static let highlightColors: Set<String> = ["yellow", "green", "rose"]
-    public static let names: Set<String> = ["book.savePaper", "book.updatePaper", "book.importPDF", "book.importEPUB", "book.delete", "book.moveShelf", "book.rename", "book.setPosition", "book.setLocator", "reading.saveSession", "hadith.mark", "notebook.savePrivate", "notebook.deletePrivate", "highlight.save", "highlight.delete", "notebook.savePage", "word.save"]
+    public static let names: Set<String> = ["book.savePaper", "book.updatePaper", "book.importPDF", "book.importEPUB", "book.delete", "book.removeFile", "book.restoreFile", "book.moveShelf", "book.rename", "book.setPosition", "book.setLocator", "reading.saveSession", "hadith.mark", "notebook.savePrivate", "notebook.deletePrivate", "highlight.save", "highlight.delete", "notebook.savePage", "word.save"]
     public var isUndoable: Bool {
         if case .readingSession = self { return false }
+        if case .removeBookFile = self { return false }
         return true
     }
     public static func parse(_ name: String, _ p: [String: JSONValue]) -> Self? {
@@ -121,6 +124,14 @@ public enum BookCommand: Codable, Equatable, Sendable {
         case "book.delete":
             guard Set(p.keys) == ["id"] else { return nil }
             return .deleteBook(id: id)
+        case "book.removeFile":
+            guard Set(p.keys) == ["id"] else { return nil }
+            return .removeBookFile(id: id)
+        case "book.restoreFile":
+            guard Set(p.keys) == ["id", "fileID", "sha256"],
+                  let fileID = text("fileID").flatMap(UUID.init(uuidString:)),
+                  let hash = text("sha256"), hash.count == 64, hash.allSatisfy({ "0123456789abcdef".contains($0) }) else { return nil }
+            return .restoreBookFile(id: id, fileID: fileID, sha256: hash)
         case "book.updatePaper":
             guard Set(p.keys) == ["id", "title", "author", "pages", "position", "isbn13", "tocJSON"],
                   let title = text("title")?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty, title.count <= 300,

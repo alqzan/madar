@@ -1,4 +1,5 @@
 import XCTest
+import UIKit
 
 @MainActor final class MihbaraHomeUITests: XCTestCase {
     func testUnavailableFileExplainsItsStateWithoutOfferingAPaperPositionSave() throws {
@@ -12,9 +13,87 @@ import XCTest
         app.buttons["mihbara-book-mark-finished"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["mihbara-book-file-unavailable"].waitForNonExistence(timeout: 10))
     }
-    private func app(_ fixture: String, epub: Data? = nil, paperIndex: Bool = false, storeID: String? = nil) -> XCUIApplication {
+    func testMissingPDFRestoresToItsOriginalBookAndOpens() {
+        continueAfterFailure = false
+        let app = app("missingFile", pdf: fixturePDF())
+        app.launch(); open(app)
+        let continueBook = app.buttons["mihbara-book-continue"]
+        reach(app, continueBook); continueBook.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["mihbara-book-file-unavailable"].waitForExistence(timeout: 8), app.debugDescription)
+        let restore = app.buttons["mihbara-book-file-restore-detail"]
+        XCTAssertTrue(restore.waitForExistence(timeout: 5), app.debugDescription)
+        shot(app, "M6-J27-file-missing-L")
+        restore.tap()
+
+        let confirm = app.buttons["mihbara-import-confirm"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 20), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["كتاب بلا ملف"].firstMatch.exists, app.debugDescription)
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "يعود هذا الملف إلى")).firstMatch.exists, app.debugDescription)
+        reach(app, confirm); shot(app, "M6-J27-file-restore-preview-L"); confirm.tap()
+        keepPDF(app)
+
+        let restoredReader = app.buttons["mihbara-book-continue"]
+        XCTAssertTrue(restoredReader.waitForExistence(timeout: 15), app.debugDescription)
+        restoredReader.tap()
+        XCTAssertTrue(app.buttons["mihbara-pdf-close"].waitForExistence(timeout: 15), app.debugDescription)
+        let page = app.descendants(matching: .any)["mihbara-pdf-page"]
+        XCTAssertTrue(page.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(page.label.replacingOccurrences(of: "\u{2068}", with: "").replacingOccurrences(of: "\u{2069}", with: "").contains("١ من ١"), page.label)
+        app.buttons["mihbara-pdf-close"].tap()
+        let library = app.buttons["mihbara-library"]; reach(app, library); library.tap()
+        let rows = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "mihbara-library-book-"))
+        XCTAssertEqual(rows.count, 1, "Restoring the exact file must keep one copy of its original book.")
+        XCTAssertTrue(rows.firstMatch.label.contains("كتاب بلا ملف"), rows.firstMatch.label)
+    }
+
+    func testRemovingPDFKeepsTheBookButClearsUndo() {
+        continueAfterFailure = false
+        let app = app("empty", pdf: fixturePDF())
+        app.launch(); open(app)
+        app.buttons["mihbara-add-paper"].tap()
+        let importButton = app.buttons["mihbara-import-confirm"]
+        XCTAssertTrue(importButton.waitForExistence(timeout: 20), app.debugDescription)
+        reach(app, importButton); importButton.tap(); keepPDF(app)
+
+        let library = app.buttons["mihbara-library"]; reach(app, library); library.tap()
+        let row = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "mihbara-library-book-"))
+            .containing(NSPredicate(format: "label CONTAINS %@", "نسخة الملف")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 10), app.debugDescription)
+        row.press(forDuration: 1.2)
+        let remove = app.buttons["mihbara-book-file-remove"]
+        XCTAssertTrue(remove.waitForExistence(timeout: 5), app.debugDescription); remove.tap()
+        let confirm = app.buttons["احذف ملف الكتاب"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "لا يمكن التراجع")).firstMatch.exists, app.debugDescription)
+        confirm.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["mihbara-book-file-unavailable"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.buttons["mihbara-book-file-restore-detail"].exists, app.debugDescription)
+        app.buttons["تمّ"].tap()
+        XCTAssertFalse(app.buttons["mihbara-undo"].exists, "The file removal must clear the previous import's undo toast.")
+        let reopenedLibrary = app.buttons["mihbara-library"]; reach(app, reopenedLibrary); reopenedLibrary.tap()
+        let retainedRows = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "mihbara-library-book-"))
+        XCTAssertEqual(retainedRows.count, 1)
+        XCTAssertTrue(retainedRows.firstMatch.label.contains("نسخة الملف"), retainedRows.firstMatch.label)
+    }
+
+    private func fixturePDF() -> Data {
+        let format = UIGraphicsPDFRendererFormat()
+        format.documentInfo = [kCGPDFContextTitle as String: "نسخة الملف", kCGPDFContextAuthor as String: "اختبار المحبرة"]
+        return UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 300, height: 400), format: format).pdfData { canvas in
+            canvas.beginPage()
+            let paragraph = NSMutableParagraphStyle(); paragraph.alignment = .right
+            let content = ("نسخة الملف الأصلية\n\nيُستعاد الملف إلى سجل الكتاب نفسه.") as NSString
+            content.draw(in: CGRect(x: 22, y: 30, width: 256, height: 330), withAttributes: [.font: UIFont.systemFont(ofSize: 22), .foregroundColor: UIColor.darkText, .paragraphStyle: paragraph])
+        }
+    }
+    private func keepPDF(_ app: XCUIApplication) {
+        let keep = app.alerts.buttons["أبقه PDF"].firstMatch
+        if keep.waitForExistence(timeout: 15) { keep.tap() }
+    }
+    private func app(_ fixture: String, epub: Data? = nil, paperIndex: Bool = false, storeID: String? = nil, pdf: Data? = nil) -> XCUIApplication {
         let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID":storeID ?? UUID().uuidString,"MADAR_UI_MIHBARA_FIXTURE":fixture,"MADAR_UI_NOW":"2026-10-17T12:00:00+03:00","MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light"]
         if let epub { app.launchEnvironment["MADAR_UI_MIHBARA_EPUB_BASE64"] = epub.base64EncodedString() }
+        if let pdf { app.launchEnvironment["MADAR_UI_MIHBARA_IMPORT_PDF"] = pdf.base64EncodedString() }
         if paperIndex { app.launchEnvironment["MADAR_UI_MIHBARA_PAPER_INDEX_FIXTURE"] = "1" }
         return app
     }

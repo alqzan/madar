@@ -150,6 +150,31 @@ import CoreSpotlight
         XCTAssertNil(app.errorMessage)
     }
 
+    func testNonUndoableFileRemovalClearsAnOlderBookUndo() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "MihbaraFileRemoval-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root), context = ModelContext(container)
+        let bytes = Data("local PDF fixture".utf8), hash = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+        let media = Media(); media.kind = "doc"; media.contentType = "com.adobe.pdf"
+        media.data = bytes; media.sizeBytes = bytes.count; media.sha256 = hash; context.insert(media)
+        let book = Book(); book.title = "كتاب قابل لإزالة ملفه"; book.kind = "file"; book.format = "pdf"
+        book.mediaID = media.id; book.fileHash = hash; context.insert(book); try context.save()
+        let app = try AppSession(container: container, groupDirectory: root); app.authorizeProtectedData()
+
+        try await app.executeBookCommand("book.moveShelf", payload: ["id": .string(book.id.uuidString), "shelf": .string("finished")])
+        XCTAssertNotNil(app.undoToken)
+        XCTAssertTrue(app.undoToastVisible)
+
+        try await app.executeBookCommand("book.removeFile", payload: ["id": .string(book.id.uuidString)])
+
+        XCTAssertNil(app.undoToken, "A prior undo must not appear to reverse this final file removal.")
+        XCTAssertFalse(app.undoToastVisible)
+        let refreshed = try XCTUnwrap(try ModelContext(container).fetch(FetchDescriptor<Media>()).first { $0.id == media.id })
+        XCTAssertNil(refreshed.data)
+        XCTAssertEqual(refreshed.state, "missing")
+        XCTAssertNil(app.errorMessage)
+    }
+
     func testDisablingSpotlightDuringPendingIndexFinishesWithDeletion() async throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "MihbaraSpotlightRace-\(UUID())"); defer { try? FileManager.default.removeItem(at: root) }
         let probe = SpotlightIndexProbe()

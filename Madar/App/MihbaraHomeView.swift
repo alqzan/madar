@@ -23,7 +23,7 @@ struct MihbaraHomeView: View {
     @State private var sunnahDrawerOpen = false
     @State private var readerRoute: MihbaraReaderRoute?
     @State private var renaming: MihbaraBook?
-    @State private var deletingBook: MihbaraBook?
+    @State private var pendingRemoval: MihbaraRemovalConfirmation?
     @State private var renameTitle = ""
     @State private var renameAuthor = ""
     @State private var manuallyOpen = false
@@ -34,6 +34,7 @@ struct MihbaraHomeView: View {
     @State private var pendingMotivationBook: UUID?
     @State private var slotBook: MihbaraBook?
     @State private var pendingSlotBook: MihbaraBook?
+    @State private var restoreFileAfterSheet = false
     @State private var offerConversion: MihbaraBook?
     private var theme: RoomTheme { .init(room: "mihbara", dark: colorScheme == .dark) }
     private var service: AppMihbaraService { .init(app: app) }
@@ -86,14 +87,19 @@ struct MihbaraHomeView: View {
                 Button(old.title) { moveBook(incoming, to: "reading", replacing: old.id) }
             }
         }
-        .confirmationDialog(deletingBook.map { "احذف «\($0.title)» من مكتبتك؟" } ?? "حذف الكتاب؟", isPresented: Binding(get: { deletingBook != nil }, set: { if !$0 { deletingBook = nil } }), titleVisibility: .visible) {
-            if let deletingBook {
-                Button("احذف من مكتبتي", role: .destructive) { deleteBook(deletingBook) }
+        .confirmationDialog(removalTitle, isPresented: Binding(get: { pendingRemoval != nil }, set: { if !$0 { pendingRemoval = nil } }), titleVisibility: .visible) {
+            if let pendingRemoval {
+                switch pendingRemoval {
+                case .book(let book): Button("احذف من مكتبتي", role: .destructive) { deleteBook(book) }
+                case .file(let book): Button("احذف ملف الكتاب", role: .destructive) { removeBookFile(book) }
+                }
             }
-            Button("إلغاء", role: .cancel) { deletingBook = nil }
+            Button("إلغاء", role: .cancel) { pendingRemoval = nil }
         } message: {
-            if deletingBook != nil {
+            if case .book? = pendingRemoval {
                 Text("يبقى عنوانه وسجل جلسات القراءة وتظليلاته وملفه محفوظة؛ يختفي الكتاب من رفوف المحبرة فقط.")
+            } else if case .file? = pendingRemoval {
+                Text("يُزال محتوى الملف من مدار، ويبقى عنوان الكتاب وموضعه وجلسات القراءة والتظليلات. لا يمكن التراجع؛ أعد الملف باختيار النسخة نفسها من «من ملف». وإذا فُعّلت مزامنة iCloud مستقبلًا، ينعكس الحذف عليها.")
             }
         }
         .onChange(of: app.prayerRevision) { load() }.onChange(of: reading?.day) { folded = false; manuallyOpen = false }
@@ -102,14 +108,19 @@ struct MihbaraHomeView: View {
                 if let r = reading {
                     switch target {
                     case .library: library(r)
-                    case .book(let id): if let b = r.books.first(where: { $0.id == id }) {
-                        if b.kind == "file", ["pdf", "pdfScanned"].contains(b.format ?? "") { MihbaraImportedPDFSummary(book: b) }
+                    case .book(let id): if let b = r.book(id) {
+                        let fileUnavailable = !service.hasLocalFile(for: b)
+                        if b.kind == "file", ["pdf", "pdfScanned"].contains(b.format ?? "") {
+                            MihbaraImportedPDFSummary(book: b, fileUnavailable: fileUnavailable, onRestoreFile: requestBookFileRestore)
+                        }
                         else {
                             MihbaraBookCard(
                                 app: app,
                                 book: b,
                                 books: r.books,
+                                fileUnavailable: fileUnavailable,
                                 onTable: { tableID = id; sheet = nil },
+                                onRestoreFile: requestBookFileRestore,
                                 onPaperIndexSaved: { load() },
                                 shape: shapes[id]
                             )
@@ -145,6 +156,7 @@ struct MihbaraHomeView: View {
             } else {
                 VStack(spacing: 16) {
                     Text("ملف الكتاب غير متاح الآن").font(MadarTypography.body())
+                    Button("تفاصيل الكتاب واستعادة ملفه") { readerRoute = nil; sheet = .book(route.bookID) }.buttonStyle(MadarPrimaryButton())
                     Button("العودة إلى المحبرة") { readerRoute = nil }.buttonStyle(MadarPrimaryButton())
                 }.frame(maxWidth: .infinity, maxHeight: .infinity).background(theme.background).foregroundStyle(theme.ink)
             }
@@ -176,6 +188,7 @@ struct MihbaraHomeView: View {
     }
     private func readableBook(_ id: UUID) -> MihbaraBook? {
         guard let book = reading?.book(id), book.isReadableEPUB || book.isReadablePDF else { return nil }
+        guard service.hasLocalFile(for: book) else { return nil }
         return book
     }
     /// The PDF just added is offered for conversion (owner's choice, never automatic).
@@ -217,11 +230,16 @@ struct MihbaraHomeView: View {
         if let id = cue.bookID { pendingMotivationBook = id; sheet = nil }
     }
     private func sheetDismissed() {
+        if restoreFileAfterSheet {
+            restoreFileAfterSheet = false
+            showingAddBook = true
+        }
         openPendingMotivationBook()
         if let book = pendingSlotBook { pendingSlotBook = nil; slotBook = book }
     }
     /// A book can change shelf from where it sits: long-press its spine or its library row. The table holds three at most.
     @ViewBuilder private func bookMenu(_ b: MihbaraBook) -> some View {
+        let conversionRunning = MihbaraConversions.shared.job(for: b.id)?.state == .running
         if b.shelf != "reading" { Button { moveBook(b, to: "reading") } label: { Label(b.shelf == "finished" || b.shelf == "old" ? "أعد قراءته على الطاولة" : "ضعه على الطاولة", systemImage: "book.pages") } }
         if b.shelf == "reading" {
             Button { moveBook(b, to: "finished") } label: { Label("أنهيته", systemImage: "checkmark.circle") }
@@ -234,20 +252,49 @@ struct MihbaraHomeView: View {
         if b.kind == "file" {
             Button { renameTitle = b.title; renameAuthor = b.author; renaming = b } label: { Label("غيّر الاسم", systemImage: "pencil") }
                 .accessibilityIdentifier("mihbara-book-rename")
+            if !conversionRunning {
+                if service.hasLocalFile(for: b) {
+                    Button(role: .destructive) { pendingRemoval = .file(b) } label: { Label("احذف ملف الكتاب", systemImage: "doc.badge.minus") }
+                        .accessibilityIdentifier("mihbara-book-file-remove")
+                } else {
+                    Button { requestBookFileRestore() } label: { Label("أعد استيراد ملفه", systemImage: "arrow.down.doc") }
+                        .accessibilityIdentifier("mihbara-book-file-restore")
+                }
+            }
         }
-        if MihbaraConversions.shared.job(for: b.id)?.state != .running {
-            Button(role: .destructive) { deletingBook = b } label: { Label("احذف من مكتبتي", systemImage: "trash") }
+        if !conversionRunning {
+            Button(role: .destructive) { pendingRemoval = .book(b) } label: { Label("احذف من مكتبتي", systemImage: "trash") }
                 .accessibilityIdentifier("mihbara-book-delete")
         }
     }
     private func deleteBook(_ book: MihbaraBook) {
-        deletingBook = nil
+        pendingRemoval = nil
         Task {
             do {
                 try await app.executeBookCommand("book.delete", payload: ["id": .string(book.id.uuidString)], undoMessage: "حُذف الكتاب من رفوف المحبرة")
                 load()
             } catch { app.errorMessage = error.localizedDescription }
         }
+    }
+    private var removalTitle: String {
+        switch pendingRemoval {
+        case .book(let book): "احذف «\(book.title)» من مكتبتك؟"
+        case .file(let book): "احذف ملف «\(book.title)»؟"
+        case nil: "حذف الكتاب؟"
+        }
+    }
+    private func removeBookFile(_ book: MihbaraBook) {
+        pendingRemoval = nil
+        Task {
+            do {
+                try await app.executeBookCommand("book.removeFile", payload: ["id": .string(book.id.uuidString)])
+                load(); sheet = .book(book.id)
+            } catch { app.errorMessage = error.localizedDescription }
+        }
+    }
+    private func requestBookFileRestore() {
+        restoreFileAfterSheet = true
+        sheet = nil
     }
     private func rename() {
         guard let b = renaming else { return }
@@ -835,6 +882,7 @@ struct MihbaraHomeView: View {
 
     private func openBook(_ book: MihbaraBook, volume: Int? = nil) {
         guard book.isReadableEPUB || book.isReadablePDF else { sheet = .book(book.id); return }
+        guard service.hasLocalFile(for: book) else { sheet = .book(book.id); return }
         do {
             // A reader can close while its last locator is being committed. Refresh
             // the managed generation before constructing the next reader route.
@@ -847,6 +895,7 @@ struct MihbaraHomeView: View {
     }
 
 }
+private enum MihbaraRemovalConfirmation { case book(MihbaraBook), file(MihbaraBook) }
 private enum MihbaraSheet: Identifiable { case library, book(UUID), hadith(Int), opening, notebook, motivation; var id: String { String(describing: self) } }
 /// Owner, 25 Oct 2026: «اول ما احمل بي دي اف يقولي ترا بحوله لك ولي انا الخيار».
 private struct MihbaraConversionOffer: ViewModifier {

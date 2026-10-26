@@ -14,17 +14,23 @@ import MadarDesign
         }.value
         do {
             guard app.lockController?.canPresent(.app) ?? app.protectedDataAuthorized else { throw DataError.authenticationFailed }
-            let books = try ModelContext(app.container).fetch(FetchDescriptor<Book>())
-            guard !books.contains(where: { $0.fileHash == inspection.sha256 && $0.mergedInto == nil }) else { throw DataError.invalidValue("هذا الكتاب عندك بالفعل، أو أُزيل سابقًا؛ لن يُضاف مكررًا.") }
+            _ = try AppMihbaraService(app: app).bookRestorableFromFile(sha256: inspection.sha256, sizeBytes: inspection.sizeBytes, formats: ["pdf", "pdfScanned"])
             return inspection
         } catch { PDFBookFiles.discard(id: id, root: root); throw error }
     }
 
     func confirmPDF(_ inspection: PDFBookInspection, bookID: UUID, commandID: UUID, title: String, author: String, language: String) async throws {
-        try await app.executeBookCommand("book.importPDF", payload: [
-            "id": .string(bookID.uuidString), "fileID": .string(inspection.id.uuidString),
-            "sha256": .string(inspection.sha256), "title": .string(title), "author": .string(author), "language": .string(language)
-        ], id: commandID)
+        let service = AppMihbaraService(app: app)
+        if let existing = try service.bookRestorableFromFile(sha256: inspection.sha256, sizeBytes: inspection.sizeBytes, formats: ["pdf", "pdfScanned"]) {
+            try await app.executeBookCommand("book.restoreFile", payload: [
+                "id": .string(existing.id.uuidString), "fileID": .string(inspection.id.uuidString), "sha256": .string(inspection.sha256)
+            ], id: commandID, undoMessage: "أُعيد ملف الكتاب")
+        } else {
+            try await app.executeBookCommand("book.importPDF", payload: [
+                "id": .string(bookID.uuidString), "fileID": .string(inspection.id.uuidString),
+                "sha256": .string(inspection.sha256), "title": .string(title), "author": .string(author), "language": .string(language)
+            ], id: commandID)
+        }
         PDFBookFiles.discard(id: inspection.id, root: app.bookStagingDirectory)
     }
 }
@@ -39,6 +45,7 @@ struct MihbaraPDFImportView: View {
     @State private var bookID = UUID()
     @State private var commandID = UUID()
     @State private var inspection: PDFBookInspection?
+    @State private var recoveryBook: MihbaraBook?
     @State private var title = ""
     @State private var author = ""
     @State private var language = "ar"
@@ -89,6 +96,9 @@ struct MihbaraPDFImportView: View {
                         row("الفهرس", detail: value.outline.isEmpty ? "بلا فهرس إلكتروني قابل للتنقّل؛ لم نخمن فصول الكتاب." : "فهرس جاهز للتنقّل فيه " + arabicCount(value.outline.count, ["عنوان واحد", "عنوانان", "عناوين", "عنوانًا"], digits) + ".", detected: !value.outline.isEmpty)
                         row("أرقام الصفحات", detail: value.hasPageLabels ? "توجد تسميات صفحات؛ مطابقتها للمطبوع غير متحققة." : "فيه " + arabicCount(value.pages, ["صفحة واحدة", "صفحتان", "صفحات", "صفحة"], digits) + "؛ لم تُكتشف أرقام مطبوعة، فيُشار إليها بترتيبها في الملف.", detected: value.hasPageLabels)
                         row("الحواشي", detail: "لم تُكتشف بنية حواشٍ منفصلة؛ تبقى كما وردت في الصفحة.", detected: false)
+                        if let recoveryBook {
+                            row("ملف كتابك", detail: "يعود هذا الملف إلى «\(recoveryBook.title)»؛ يبقى رفّه وموضعه وسجل قراءته كما هي.", detected: true)
+                        }
                     }
                 }
 
@@ -97,17 +107,23 @@ struct MihbaraPDFImportView: View {
                 }
                 if inspection != nil {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("على رفّك").font(MadarTypography.section())
-                        TextField("عنوان الكتاب", text: $title, prompt: Text("عنوان الكتاب").foregroundStyle(theme.secondaryInk)).textFieldStyle(.plain).accessibilityIdentifier("mihbara-import-title")
-                        TextField("المؤلف، إن عُرف", text: $author, prompt: Text("المؤلف، إن عُرف").foregroundStyle(theme.secondaryInk)).textFieldStyle(.plain).accessibilityIdentifier("mihbara-import-author")
-                        Picker("لغة القراءة", selection: $language) { Text("العربية").tag("ar"); Text("الإنجليزية").tag("en") }
-                            .font(MadarTypography.caption()).accessibilityIdentifier("mihbara-import-language")
-                        Text("يبقى الأصل على جهازك. لا يُضاف شيء حتى تؤكد.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                        Text(recoveryBook == nil ? "على رفّك" : "الكتاب الموجود").font(MadarTypography.section())
+                        if let recoveryBook {
+                            Text(recoveryBook.title).font(MadarTypography.cardTitle())
+                            Text(recoveryBook.author).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                            Text("لن ينشأ كتاب مكرر؛ يعود الملف إلى سجلّك المحفوظ.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                        } else {
+                            TextField("عنوان الكتاب", text: $title, prompt: Text("عنوان الكتاب").foregroundStyle(theme.secondaryInk)).textFieldStyle(.plain).accessibilityIdentifier("mihbara-import-title")
+                            TextField("المؤلف، إن عُرف", text: $author, prompt: Text("المؤلف، إن عُرف").foregroundStyle(theme.secondaryInk)).textFieldStyle(.plain).accessibilityIdentifier("mihbara-import-author")
+                            Picker("لغة القراءة", selection: $language) { Text("العربية").tag("ar"); Text("الإنجليزية").tag("en") }
+                                .font(MadarTypography.caption()).accessibilityIdentifier("mihbara-import-language")
+                            Text("يبقى الأصل على جهازك. لا يُضاف شيء حتى تؤكد.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                        }
                     }.font(MadarTypography.body()).padding(14).background(theme.surface, in: .rect(cornerRadius: 16))
                         .overlay { RoundedRectangle(cornerRadius: 16).stroke(theme.line.opacity(0.7), lineWidth: 1) }
                         .disabled(saving || confirmedMetadata != nil)
-                    Button(saving ? "يُضاف…" : "أضفه إلى «أبي أقرأها»") { confirm() }
-                        .buttonStyle(MadarPrimaryButton()).disabled(saving || title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || title.count > 300 || author.count > 300)
+                    Button(saving ? (recoveryBook == nil ? "يُضاف…" : "يُعاد الملف…") : (recoveryBook == nil ? "أضفه إلى «أبي أقرأها»" : "أعد الملف إلى الكتاب")) { confirm() }
+                        .buttonStyle(MadarPrimaryButton()).disabled(saving || (recoveryBook == nil && (title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || title.count > 300 || author.count > 300)))
                         .accessibilityIdentifier("mihbara-import-confirm")
                 }
             }
@@ -140,8 +156,10 @@ struct MihbaraPDFImportView: View {
         do {
             let value = try await service.stagePDF(source, id: fileID)
             guard !Task.isCancelled else { PDFBookFiles.discard(id: fileID, root: app.bookStagingDirectory); return }
-            inspection = value; title = value.title; author = value.author
-            language = value.detectedLanguage == "en" ? "en" : "ar"
+            recoveryBook = try service.bookRestorableFromFile(sha256: value.sha256, sizeBytes: value.sizeBytes, formats: ["pdf", "pdfScanned"])
+            inspection = value
+            title = recoveryBook?.title ?? value.title; author = recoveryBook?.author ?? value.author
+            language = recoveryBook?.language ?? (value.detectedLanguage == "en" ? "en" : "ar")
         } catch {
             if case DataError.invalidValue(let message) = error { self.error = message }
             else { self.error = "تعذّر فتح الملف المحلي. اختره من الملفات مرة أخرى." }
@@ -168,6 +186,8 @@ struct MihbaraPDFImportView: View {
 
 struct MihbaraImportedPDFSummary: View {
     let book: MihbaraBook
+    let fileUnavailable: Bool
+    let onRestoreFile: () -> Void
     @Environment(\.dismiss) private var dismiss
     @Environment(\.roomTheme) private var theme
     var body: some View {
@@ -175,6 +195,12 @@ struct MihbaraImportedPDFSummary: View {
             HStack { Text(book.title).font(MadarTypography.title()); Spacer(); Button("تمّ") { dismiss() } }
             Text(book.author).font(MadarTypography.body())
             Text(book.format == "pdfScanned" ? "ملف PDF مصوّر من جهازك" : "ملف PDF من جهازك").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+            if fileUnavailable {
+                Text("ملف الكتاب غير موجود على هذا الجهاز. يبقى سجل قراءتك محفوظًا.").font(MadarTypography.body())
+                    .accessibilityIdentifier("mihbara-book-file-unavailable")
+                Button("أعد استيراد الملف نفسه") { onRestoreFile() }
+                    .buttonStyle(MadarPrimaryButton()).accessibilityIdentifier("mihbara-book-file-restore-detail")
+            }
             Spacer()
         }.padding(24).foregroundStyle(theme.ink).background(theme.background.ignoresSafeArea())
     }
