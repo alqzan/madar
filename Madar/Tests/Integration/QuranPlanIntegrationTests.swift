@@ -13,15 +13,50 @@ import MadarCommands
         p.unit = .ayah;XCTAssertEqual(QuranPlanCopy.amount(p,digits:.init()),"آيتان")
         p.unit = .page;p.amount=11;XCTAssertEqual(String(QuranPlanCopy.amount(p,digits:.init()).unicodeScalars.filter { !(0x2066...0x2069).contains($0.value) }),"١١ وجهًا")
     }
-    func testForecastIsOnlyVisibleForTheInputThatProducedIt() {
+    func testForecastIsOnlyVisibleForItsInputAndMadarDay() throws {
         let original = QuranUIPlanInput(startAyah: 1, unit: .page, amount: 1, rhythm: .balanced, restDay: "friday", missPolicy: "ask")
+        let day = try GregorianDay("2026-10-15")
         let forecast = QuranUIForecast(title: "موعد قديم", assumptions: "", warning: nil, portions: [])
-        let state = QuranUIForecastState(input: original, forecast: forecast)
-        XCTAssertEqual(state.visible(for: original)?.title, "موعد قديم")
+        let state = QuranUIForecastState(input: original, day: day, forecast: forecast)
+        XCTAssertEqual(state.visible(for: original, on: day)?.title, "موعد قديم")
 
         var changed = original
         changed.amount = 2
-        XCTAssertNil(state.visible(for: changed), "A prior estimate must disappear while the changed plan is recalculated.")
+        XCTAssertNil(state.visible(for: changed, on: day), "A prior estimate must disappear while the changed plan is recalculated.")
+        XCTAssertNil(state.visible(for: original, on: day.adding(days: 1)), "A prior estimate must disappear when Madar starts a new day.")
+    }
+    func testPlanForecastRecalculatesAfterMadarDayStarts() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "QuranForecastDay-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root.appending(path: "Data"))
+        let context = ModelContext(container)
+        var now = ISO8601DateFormatter().date(from: "2026-10-15T23:59:00+03:00")!
+        _ = try SettingsStore(context: context).stage(["core.dayStart": .string("midnight"), "quran.restDay": .string("none"), "quran.hifzLevel": .string("medium")], now: now)
+        let plan = HifzPlan(); plan.startAyah = 1; plan.unit = "page"; plan.amount = 1; plan.rhythm = "balanced"; plan.missPolicy = "ask"; plan.activeFrom = now
+        context.insert(plan)
+        try context.save()
+        let app = try AppSession(container: container, groupDirectory: root)
+        let service = AppQuranService(session: app, clock: { now })
+        let input = QuranUIPlanInput(startAyah: 1, unit: .page, amount: 1, rhythm: .balanced, restDay: "none", missPolicy: "ask")
+        let firstDay = try GregorianDay("2026-10-15"), firstFinish = try GregorianDay("2028-06-09")
+        let nextDay = try GregorianDay("2026-10-16"), nextFinish = try GregorianDay("2028-06-10")
+
+        let first = try await service.previewPlan(input, at: now)
+        XCTAssertEqual(service.forecastDay(at: now), firstDay)
+        XCTAssertEqual(first.title, app.dateLabels(firstFinish, first: .hijri).primary)
+        XCTAssertEqual(first.estimatedDays, 604)
+        let firstOverview = try service.planOverview(at: now)
+        XCTAssertEqual(firstOverview.day, firstDay)
+        XCTAssertEqual(firstOverview.forecasts["medium"]?.title, first.title)
+
+        now = ISO8601DateFormatter().date(from: "2026-10-16T00:01:00+03:00")!
+        let next = try await service.previewPlan(input, at: now)
+        XCTAssertEqual(service.forecastDay(at: now), nextDay)
+        XCTAssertEqual(next.title, app.dateLabels(nextFinish, first: .hijri).primary)
+        XCTAssertEqual(next.estimatedDays, 604)
+        let nextOverview = try service.planOverview(at: now)
+        XCTAssertEqual(nextOverview.day, nextDay)
+        XCTAssertEqual(nextOverview.forecasts["medium"]?.title, next.title)
     }
     func testForecastCountsTodayUntilWholeWirdIsComplete() async throws {
         let root=FileManager.default.temporaryDirectory.appending(path:"QuranPlan-\(UUID())")

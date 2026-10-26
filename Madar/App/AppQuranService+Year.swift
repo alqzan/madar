@@ -13,8 +13,8 @@ struct QuranUIYear: Sendable {
 }
 extension AppQuranService {
     func displayDate(_ day: GregorianDay) -> String { app.dateLabels(day, first: .hijri).combined }
-    func yearLog() throws -> QuranUIYear {
-        let value = try snapshot(), today = value.day.date
+    func yearLog(at instant: Date? = nil) throws -> QuranUIYear {
+        let value = try repository().snapshot(at: instant ?? clock()), today = value.day.date
         let zone = TimeZone(identifier: value.day.timeZoneID) ?? .gmt
         let names = ["محرم", "صفر", "ربيع الأول", "ربيع الآخر", "جمادى الأولى", "جمادى الآخرة", "رجب", "شعبان", "رمضان", "شوال", "ذو القعدة", "ذو الحجة"]
         let hifz = Dictionary(grouping: value.completedOn.values, by: { $0 }).mapValues(\.count)

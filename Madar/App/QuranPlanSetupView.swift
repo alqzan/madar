@@ -17,12 +17,12 @@ struct QuranPlanSetupView: View {
     @State private var busy = false
     @State private var error: String?
     private let titles = ["من أين تبدأ؟", "كم وردك؟", "كيف تتعلّم؟", "يوم الراحة", "هذه خطّتك"]
-    private var visibleForecast: QuranUIForecast? {
-        guard let input else { return nil }
-        return forecastState?.visible(for: input)
-    }
     var body: some View {
-        VStack(spacing: 0) {
+        TimelineView(.periodic(from: .now, by: 60)) { _ in
+            let evaluatedAt = service.currentTime()
+            let forecastDay = service.forecastDay(at: evaluatedAt)
+            let forecastKey = input.map { QuranUIForecastKey(input: $0, day: forecastDay) }
+            VStack(spacing: 0) {
             QuranScreenHeader(title: "خطة الحفظ") { if step > 0 { step -= 1 } else { close() } }.padding(.horizontal, 16)
             Text("تُقبل في قلبك من حيث أنت").font(quranFont(12)).foregroundStyle(theme.secondaryInk)
             HStack(spacing: 5) { ForEach(0..<4) { n in Capsule().fill(n <= step ? theme.color("hifz") : theme.color("track")).frame(height: 4) } }.padding(16).accessibilityLabel("الخطوة " + service.numerals.string(min(step + 1,4)) + " من أربع")
@@ -35,6 +35,7 @@ struct QuranPlanSetupView: View {
                 }.padding(16)
             }
             if let input {
+                let visibleForecast = forecastDay.flatMap { forecastState?.visible(for: input, on: $0) }
                 VStack(spacing: 10) {
                     QuranPaperCard {
                         VStack(alignment: .leading, spacing: 5) {
@@ -51,14 +52,25 @@ struct QuranPlanSetupView: View {
                     }.font(quranFont(16, bold: true)).frame(maxWidth: .infinity, minHeight: 52).foregroundStyle(theme.onAccent).background(theme.accent, in: Capsule()).accessibilityIdentifier("quran-setup-next")
                 }.padding(16)
             }
-        }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.color("review")).disabled(busy)
+            }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.color("review")).disabled(busy)
             .task {
                 do {
                     let p = try service.planInput(); input = p; initialStart = p.startAyah
                     page = try QuranResources.catalog().ayah(id: p.startAyah)?.page ?? 1
                 } catch { self.error = quranUserMessage(error) }
             }
-            .task(id: input) { guard let input else { return }; do { let result = try await service.previewPlan(input); try Task.checkCancellation(); forecastState = QuranUIForecastState(input: input, forecast: result) } catch is CancellationError { } catch { self.error = quranUserMessage(error) } }
+            .task(id: forecastKey) {
+                guard let input, let forecastKey else { forecastState = nil; return }
+                do {
+                    let result = try await service.previewPlan(input, at: evaluatedAt)
+                    try Task.checkCancellation()
+                    guard let day = forecastKey.day,
+                          service.forecastDay(at: service.currentTime()) == day else { return }
+                    forecastState = QuranUIForecastState(input: input, day: day, forecast: result)
+                    error = nil
+                } catch is CancellationError { } catch { self.error = quranUserMessage(error) }
+            }
+        }
     }
     @ViewBuilder private func content(_ p: QuranUIPlanInput) -> some View {
         switch step {

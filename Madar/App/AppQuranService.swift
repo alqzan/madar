@@ -16,6 +16,10 @@ import MadarPrayer
     var autoResolvedMissedDay: GregorianDay?
     let clock: @MainActor () -> Date
     init(session: AppSession, clock: @escaping @MainActor () -> Date = { prayerUITestClock(.now) }) { app = session; self.clock = clock }
+    func currentTime() -> Date { clock() }
+    func forecastDay(at instant: Date) -> GregorianDay? {
+        try? DiaryLineRenderer.today(context: ModelContext(app.container), now: instant)
+    }
     func repository() throws -> QuranRepository {
         guard !app.maintenanceInProgress else { throw BackupOperationError.busy }
         return try QuranRepository(context: ModelContext(app.container), catalog: QuranResources.catalog())
@@ -123,7 +127,7 @@ import MadarPrayer
         let plan = try snapshot.plan.map { record in
             let input = QuranUIPlanInput(startAyah: record.plan.startAyah, unit: QuranUIUnit(rawValue: record.plan.unit.rawValue)!, amount: record.plan.amount,
                 rhythm: QuranUIRhythm(rawValue: record.plan.intensity.rawValue)!, restDay: snapshot.restDay.rawValue, missPolicy: record.missPolicy)
-            return QuranUIPlan(title: "خطّتك", input: input, forecast: try forecast(input, snapshot: snapshot),
+            return QuranUIPlan(title: "خطّتك", input: input, forecast: try forecast(input, snapshot: snapshot, at: evaluatedAt),
                 nextAyah: try coverage.frontier(from: record.plan.startAyah) ?? 6236, versionLabel: "الخطة " + numerals.string(record.version))
         }
         let balance = switch snapshot.hifz?.balance { case .half: "نصف ورد"; case .consolidation: "تثبيت"; case .rest: "يوم راحة"; case .complete: "اكتمل نطاق الخطّة"; default: "ورد كامل" }
@@ -191,8 +195,15 @@ import MadarPrayer
         case .raisePages(let juz): try await command("quran.raisePages", ["juz": .number(Double(juz))])
         }
     }
-    func previewPlan(_ input: QuranUIPlanInput) async throws -> QuranUIForecast { try forecast(input, snapshot: snapshot()) }
-    func forecast(_ input: QuranUIPlanInput, snapshot: QuranDataSnapshot, using level: QuranDayLevel? = nil) throws -> QuranUIForecast {
+    func previewPlan(_ input: QuranUIPlanInput) async throws -> QuranUIForecast {
+        try await previewPlan(input, at: nil)
+    }
+    func previewPlan(_ input: QuranUIPlanInput, at instant: Date?) async throws -> QuranUIForecast {
+        let evaluatedAt = instant ?? clock()
+        return try forecast(input, snapshot: repository().snapshot(at: evaluatedAt), at: evaluatedAt)
+    }
+    func forecast(_ input: QuranUIPlanInput, snapshot: QuranDataSnapshot, using level: QuranDayLevel? = nil, at instant: Date? = nil) throws -> QuranUIForecast {
+        let evaluatedAt = instant ?? clock()
         guard let unit = QuranHifzUnit(rawValue: input.unit.rawValue), let rest = QuranRestDay(rawValue: input.restDay), input.amount.isFinite, input.amount > 0, (1...6236).contains(input.startAyah) else { throw QuranPlanError.invalidAmount }
         let remainingAyahs = (input.startAyah...6236).filter { !snapshot.coverage.coveredAyahs.contains($0) }.count
         let catalog = try QuranResources.catalog()
@@ -200,7 +211,7 @@ import MadarPrayer
         let unitFaces = unit == .ayah ? (remainingAyahs == 0 ? 0 : Double(remainingPages) / Double(remainingAyahs)) : (unit == .half ? 0.5 : unit == .quarter ? 0.25 : 1)
         var startingOn = snapshot.day.date
         if snapshot.sessions.contains(where: { $0.kind == .hifz && $0.dayKey == snapshot.day.date }) {
-            let before = try repository().snapshot(at: clock(), excludingSessionDay: snapshot.day.date)
+            let before = try repository().snapshot(at: evaluatedAt, excludingSessionDay: snapshot.day.date)
             if let start = try before.coverage.frontier(from: input.startAyah) {
                 let limit = (start...6236).first { before.coverage.coveredAyahs.contains($0) }.map { $0 - 1 } ?? 6236
                 let target = try QuranPortionEngine.portion(from: start, through: limit, unit: unit, amount: input.amount,

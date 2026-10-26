@@ -39,12 +39,15 @@ struct QuranUIRange: Sendable { var fromPage: Int; var toPage: Int }
 struct QuranUISurah: Identifiable, Sendable { var id: Int; var title: String; var firstAyah: Int; var ayahCount: Int }
 struct QuranUIPlanInput: Sendable, Hashable { var startAyah: Int; var unit: QuranUIUnit; var amount: Double; var rhythm: QuranUIRhythm; var restDay: String; var missPolicy: String }
 struct QuranUIForecast: Sendable { var title: String; var assumptions: String; var warning: String?; var portions: [String]; var estimatedDays: Int? = nil; var secondaryDate: String? = nil }
+struct QuranUIForecastKey: Hashable, Sendable { let input: QuranUIPlanInput; let day: GregorianDay? }
 struct QuranUIForecastState: Sendable {
     let input: QuranUIPlanInput
+    let day: GregorianDay
     let forecast: QuranUIForecast
 
-    func visible(for currentInput: QuranUIPlanInput) -> QuranUIForecast? {
-        input == currentInput ? forecast : nil
+    func visible(for currentInput: QuranUIPlanInput, on currentDay: GregorianDay?) -> QuranUIForecast? {
+        guard let currentDay, input == currentInput, day == currentDay else { return nil }
+        return forecast
     }
 }
 struct QuranUIPlan: Sendable { var title: String; var input: QuranUIPlanInput; var forecast: QuranUIForecast; var nextAyah: Int; var versionLabel: String }

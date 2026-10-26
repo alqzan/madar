@@ -12,10 +12,14 @@ struct QuranPlanView: View {
     private var app: AppSession { service.app }
     private let resetKeys = ["quran.hifzLevel", "quran.reviewLevel", "quran.restDay", "quran.wirdReminder", "quran.reviewSchedule"]
     var body: some View {
-        ScrollView {
+        TimelineView(.periodic(from: .now, by: 60)) { _ in
+            let evaluatedAt = service.currentTime()
+            let currentDay = service.forecastDay(at: evaluatedAt)
+            ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 QuranScreenHeader(title: "خطّتك", close: close)
                 if let overview {
+                    let forecasts = overview.day == currentDay ? overview.forecasts : [:]
                     QuranPaperCard {
                         VStack(spacing: 0) {
                             levelRow("درجة الحفظ المعتادة", key: "quran.hifzLevel")
@@ -37,15 +41,15 @@ struct QuranPlanView: View {
                             HStack { Text("موعد الختمة").font(quranFont(17, bold: true)); Spacer(); Text("تقدير لكل درجة").font(quranFont(11)).foregroundStyle(theme.secondaryInk) }
                             if let input = overview.input {
                                 let level = app.string("quran.hifzLevel")
-                                Text(overview.forecasts[level]?.title ?? "—").font(quranSerif(29)).accessibilityIdentifier("quran-plan-forecast")
-                                if let secondary = overview.forecasts[level]?.secondaryDate { Text(secondary).font(quranFont(12)).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("quran-plan-forecast-secondary") }
-                                Text(overview.forecasts[level]?.assumptions ?? "").font(quranFont(11)).foregroundStyle(theme.secondaryInk)
+                                Text(forecasts[level]?.title ?? (overview.day == currentDay ? "—" : "نحسب موعدك")).font(quranSerif(29)).accessibilityIdentifier("quran-plan-forecast")
+                                if let secondary = forecasts[level]?.secondaryDate { Text(secondary).font(quranFont(12)).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("quran-plan-forecast-secondary") }
+                                Text(forecasts[level]?.assumptions ?? "").font(quranFont(11)).foregroundStyle(theme.secondaryInk)
                                 ForEach(QuranUILevel.allCases) { item in
                                     HStack { Text(item.title).font(quranFont(12, bold: item.id == level)).frame(width: 48, alignment: .leading)
-                                        Capsule().fill(theme.color("hifz").opacity(item.id == level ? 1 : 0.4)).frame(width: 150 * CGFloat(overview.forecasts[item.id]?.estimatedDays ?? 0) / CGFloat(max(1, overview.forecasts.values.compactMap(\.estimatedDays).max() ?? 1)), height: 4)
-                                        Spacer(minLength: 4); VStack(alignment: .trailing, spacing: 2) { Text(overview.forecasts[item.id]?.title ?? "—").font(quranFont(12)); if let secondary = overview.forecasts[item.id]?.secondaryDate { Text(secondary).font(quranFont(11)).foregroundStyle(theme.secondaryInk) } } }
+                                        Capsule().fill(theme.color("hifz").opacity(item.id == level ? 1 : 0.4)).frame(width: 150 * CGFloat(forecasts[item.id]?.estimatedDays ?? 0) / CGFloat(max(1, forecasts.values.compactMap(\.estimatedDays).max() ?? 1)), height: 4)
+                                        Spacer(minLength: 4); VStack(alignment: .trailing, spacing: 2) { Text(forecasts[item.id]?.title ?? "—").font(quranFont(12)); if let secondary = forecasts[item.id]?.secondaryDate { Text(secondary).font(quranFont(11)).foregroundStyle(theme.secondaryInk) } } }
                                 }
-                                if let warning = overview.forecasts[level]?.warning { Text(warning).font(quranFont(13)).foregroundStyle(theme.color("dueText")) }
+                                if let warning = forecasts[level]?.warning { Text(warning).font(quranFont(13)).foregroundStyle(theme.color("dueText")) }
                                 Text(input.startAyah == 1 ? "ختم القرآن يتطلّب اكتمال الأوجه كلها، والفجوات معها." : "هذا موعد نطاق خطّتك؛ ختم القرآن لا يكون إلا بحفظ الأوجه كلها.").font(quranFont(12)).foregroundStyle(theme.secondaryInk)
                             } else { Text("ابدأ خطة الحفظ ليظهر تقديرك").font(quranFont(15)) }
                         }
@@ -80,9 +84,10 @@ struct QuranPlanView: View {
             }.padding(16)
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.color("review")).disabled(busy || app.settingsWriteInProgress)
             .safeAreaInset(edge: .bottom) { if app.undoToastVisible { UndoToast(message: app.undoMessage, undo: app.undo).accessibilityIdentifier("quran-plan-undo") } }
-            .fullScreenCover(isPresented: $showSetup, onDismiss: load) { QuranPlanSetupView(service: service, close: { showSetup = false }) }
-            .task { load() }.onChange(of: app.settingsWriteInProgress) { if !app.settingsWriteInProgress { load() } }.onChange(of: app.undoToken?.id) { load() }
+            .fullScreenCover(isPresented: $showSetup, onDismiss: { load(at: service.currentTime()) }) { QuranPlanSetupView(service: service, close: { showSetup = false }) }
+            .task(id: currentDay) { load(at: evaluatedAt) }.onChange(of: app.settingsWriteInProgress) { if !app.settingsWriteInProgress { load(at: service.currentTime()) } }.onChange(of: app.undoToken?.id) { load(at: service.currentTime()) }
             .alert("لم تكتمل العملية", isPresented: Binding(get: { app.errorMessage != nil }, set: { if !$0 { app.errorMessage = nil } })) { Button("تمّ") { app.errorMessage = nil } } message: { Text(app.errorMessage ?? "") }
+        }
     }
     private var line: some View { Divider().overlay(theme.line) }
     private func row(_ title: String, detail: String) -> some View { HStack { Circle().fill(theme.color("review")).frame(width: 5, height: 5); Text(title).font(quranFont(13, bold: true)); Spacer(); Text(detail).font(quranFont(12)).foregroundStyle(theme.secondaryInk) }.frame(minHeight: 46) }
@@ -90,6 +95,6 @@ struct QuranPlanView: View {
     private func choiceRow(_ title: String, key: String, options: [(String,String)]) -> some View {
         Menu { ForEach(options, id: \.0) { value, label in Button(label) { app.set(.string(value), key: key) }.accessibilityIdentifier("quran-plan-option-" + key + "-" + value) } } label: { row(title, detail: options.first { $0.0 == app.string(key) }?.1 ?? "—") }.accessibilityIdentifier("quran-plan-" + key)
     }
-    private func load() { do { overview = try service.planOverview() } catch { self.error = quranUserMessage(error) } }
+    private func load(at instant: Date? = nil) { do { overview = try service.planOverview(at: instant); error = nil } catch { self.error = quranUserMessage(error) } }
     private func run(_ work: @escaping @MainActor () async throws -> Void) { guard !busy else { return }; busy = true; Task { defer { busy = false }; do { try await work() } catch { self.error = quranUserMessage(error) } } }
 }
