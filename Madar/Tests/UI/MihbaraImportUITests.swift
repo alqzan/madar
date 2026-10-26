@@ -422,8 +422,32 @@ import UIKit
         let imported = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "A Book About Reading")).firstMatch
         XCTAssertTrue(imported.waitForExistence(timeout: 8), app.debugDescription)
         imported.tap()
-        XCTAssertTrue(app.buttons["mihbara-reader-close"].waitForExistence(timeout: 15), app.debugDescription)
-        app.buttons["mihbara-reader-close"].tap()
+        let readerClose = app.buttons["mihbara-reader-close"]
+        XCTAssertTrue(readerClose.waitForExistence(timeout: 15), app.debugDescription)
+        app.buttons["mihbara-reader-settings"].tap()
+        let scrollMode = app.buttons["mihbara-reader-mode-scroll"]
+        XCTAssertTrue(scrollMode.waitForExistence(timeout: 8), app.debugDescription)
+        if !scrollMode.isSelected { scrollMode.tap(); XCTAssertTrue(scrollMode.isSelected, app.debugDescription) }
+        app.buttons["mihbara-reader-settings-close"].tap()
+        let progress = app.descendants(matching: .any)["mihbara-reader-progress"]
+        XCTAssertTrue(progress.waitForExistence(timeout: 8), app.debugDescription)
+        let startingProgress = String(describing: progress.value ?? "")
+        let finalChapter = app.staticTexts["Closing the Book"]
+        for _ in 0..<12 where !finalChapter.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(finalChapter.isHittable, app.debugDescription)
+        let savedProgress = String(describing: progress.value ?? "")
+        XCTAssertNotEqual(savedProgress, startingProgress, "Scrolling should move the fixture EPUB's locator")
+        readerClose.tap()
+        let reopened = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "A Book About Reading")).firstMatch
+        XCTAssertTrue(reopened.waitForExistence(timeout: 8), app.debugDescription)
+        reopened.tap()
+        XCTAssertTrue(readerClose.waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertTrue(finalChapter.waitForExistence(timeout: 12), app.debugDescription)
+        let resumedProgress = app.descendants(matching: .any)["mihbara-reader-progress"]
+        XCTAssertTrue(resumedProgress.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertEqual(String(describing: resumedProgress.value ?? ""), savedProgress, "Reopening from the want shelf should restore the saved EPUB locator")
+        XCTAssertTrue(finalChapter.isHittable, "The reopened EPUB should resume at its saved chapter.\n\(app.debugDescription)")
+        readerClose.tap()
         // M6-UX-T: rename the book from its shelf menu; the shelf shows the new name.
         XCTAssertTrue(imported.waitForExistence(timeout: 8), app.debugDescription)
         imported.press(forDuration: 1.0)
