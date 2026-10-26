@@ -45,7 +45,17 @@ public enum EPUBBookFiles {
 
     public static func stagedURL(id: UUID, root: URL) -> URL { root.appendingPathComponent(id.uuidString).appendingPathExtension("epub") }
 
+    /// Keep synchronous file parsing off the caller's actor without detaching its lifetime or cancellation.
+    @concurrent public static func stageForPreview(source: URL, root: URL, id: UUID) async throws -> EPUBBookInspection {
+        try stage(source: source, root: root, id: id)
+    }
+
+    @concurrent public static func scanForPreview(file: URL, progress: @Sendable (Double) -> Void = { _ in }) async throws -> EPUBBookScan {
+        try scan(file: file, progress: progress)
+    }
+
     public static func stage(source: URL, root: URL, id: UUID = UUID()) throws -> EPUBBookInspection {
+        try Task.checkCancellation()
         let scoped = source.startAccessingSecurityScopedResource()
         defer { if scoped { source.stopAccessingSecurityScopedResource() } }
         let values = try source.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .contentTypeKey, .fileSizeKey])
@@ -63,6 +73,7 @@ public enum EPUBBookFiles {
 
         // Inspect the provider URL first so protected, malformed and oversized archives are rejected before copy.
         let preflight = try inspect(file: source, id: id, fileName: source.lastPathComponent)
+        try Task.checkCancellation()
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let destination = stagedURL(id: id, root: root)
         guard !FileManager.default.fileExists(atPath: destination.path) else { throw DataError.invalidValue("هذا الملف قيد المعاينة بالفعل.") }
@@ -76,6 +87,7 @@ public enum EPUBBookFiles {
         defer { try? input.close(); try? output.close() }
         var copied = 0
         while let chunk = try input.read(upToCount: 1024 * 1024), !chunk.isEmpty {
+            try Task.checkCancellation()
             copied += chunk.count
             guard copied <= maximumBytes else { throw DataError.invalidValue("الحد الأقصى للملف ٥٠٠ م.ب.") }
             try output.write(contentsOf: chunk)
@@ -84,6 +96,7 @@ public enum EPUBBookFiles {
         guard copied == sourceSize else { throw DataError.invalidValue("تغيّر الملف أثناء نسخه؛ اختره مرة أخرى.") }
         let staged = try inspect(file: destination, id: id, fileName: source.lastPathComponent)
         guard staged.sha256 == preflight.sha256 else { throw DataError.invalidValue("تغيّر الملف أثناء نسخه؛ اختره مرة أخرى.") }
+        try Task.checkCancellation()
         complete = true
         return staged
     }
@@ -109,6 +122,7 @@ public enum EPUBBookFiles {
         try input.seek(toOffset: 0)
         var digest = SHA256(), hashedBytes = 0
         while let chunk = try input.read(upToCount: 1024 * 1024), !chunk.isEmpty {
+            try Task.checkCancellation()
             hashedBytes += chunk.count
             guard hashedBytes <= maximumBytes else { throw DataError.invalidValue("الحد الأقصى للملف ٥٠٠ م.ب.") }
             digest.update(data: chunk)
@@ -442,6 +456,7 @@ extension EPUBBookFiles {
     }
 
     public static func scan(file: URL, progress: (Double) -> Void = { _ in }) throws -> EPUBBookScan {
+        try Task.checkCancellation()
         var result = EPUBBookScan()
         let quotationIndex = try? QuranQuotationIndex.bundled()
         result.quotationScanAvailable = quotationIndex != nil
@@ -470,6 +485,7 @@ extension EPUBBookFiles {
         for (index, path) in spinePaths.enumerated() {
             try Task.checkCancellation()
             progress(Double(index) / Double(max(1, spinePaths.count)) * 0.9)
+            try Task.checkCancellation()
             guard let path, let member = archive.member(path), member.size <= scanDocumentLimit, let node = try? xml(archive, member, maximum: scanDocumentLimit) else {
                 result.unreadChapters += 1; continue
             }
@@ -530,6 +546,7 @@ extension EPUBBookFiles {
         result.tocEntries = outline.count
         var lastPosition: Position?
         for entry in outline {
+            try Task.checkCancellation()
             guard let current = position(entry.href, base: outlineBase) else { result.brokenTOC.append(entry.title); continue }
             if let lastPosition, precedes(current, lastPosition) { result.tocOutOfOrder += 1 }
             if let previous = lastPosition {
@@ -540,6 +557,7 @@ extension EPUBBookFiles {
         var outOfOrder = pages.outOfOrder
         lastPosition = nil
         for (index, entry) in pageEntries.enumerated() {
+            try Task.checkCancellation()
             guard let current = position(entry.href, base: pageBase) else { result.unverifiedPageLinks += 1; continue }
             if let lastPosition, precedes(current, lastPosition) { outOfOrder.insert(index) }
             if let previous = lastPosition {
@@ -548,7 +566,9 @@ extension EPUBBookFiles {
         }
         result.pageLabels = pageEntries.count; result.pageGaps = pages.gaps; result.pageRepeats = pages.repeats
         result.pageOutOfOrder = outOfOrder.count
+        try Task.checkCancellation()
         progress(1)
+        try Task.checkCancellation()
         return result
     }
 

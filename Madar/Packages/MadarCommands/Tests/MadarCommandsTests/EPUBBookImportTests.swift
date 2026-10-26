@@ -77,6 +77,53 @@ import MadarData
         return .object(payload)
     }
 
+    @Test func canceledPreviewStagingLeavesSourceAndNoStagedCopy() async throws {
+        let folder = try root(); defer { try? FileManager.default.removeItem(at: folder) }
+        let source = fixture(), original = try Data(contentsOf: source), id = UUID()
+        let task = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return try await EPUBBookFiles.stageForPreview(source: source, root: folder, id: id)
+        }
+        do {
+            _ = try await task.value
+            Issue.record("Canceled preview staging must throw")
+        } catch is CancellationError { }
+        #expect(!FileManager.default.fileExists(atPath: EPUBBookFiles.stagedURL(id: id, root: folder).path))
+        #expect(try Data(contentsOf: source) == original)
+    }
+
+    @Test func cancelingPreviewScanStopsBeforeCompletionAndAllowsRetry() async throws {
+        let folder = try root(); defer { try? FileManager.default.removeItem(at: folder) }
+        let staged = try EPUBBookFiles.stage(source: fixture(), root: folder)
+        let file = EPUBBookFiles.stagedURL(id: staged.id, root: folder)
+        let original = try Data(contentsOf: file)
+        let started = AsyncStream<Void>.makeStream()
+        let resume = DispatchSemaphore(value: 0)
+        let task = Task {
+            defer { started.continuation.finish() }
+            return try await EPUBBookFiles.scanForPreview(file: file) { progress in
+                if progress == 0 {
+                    started.continuation.yield(())
+                    // Pause only the parser thread until its caller cancels; bound the wait on test failure.
+                    _ = resume.wait(timeout: .now() + 5)
+                }
+                #expect(progress < 1)
+            }
+        }
+        for await _ in started.stream { break }
+        task.cancel()
+        resume.signal()
+        do {
+            _ = try await task.value
+            Issue.record("Canceled scan must not return a partial report as complete")
+        } catch is CancellationError { }
+        #expect(try Data(contentsOf: file) == original)
+        let retry = try await EPUBBookFiles.scanForPreview(file: file)
+        #expect(retry.chapters == 1, "The fixture has one spine document containing ten headings")
+        EPUBBookFiles.discard(id: staged.id, root: folder)
+        #expect(!FileManager.default.fileExists(atPath: file.path))
+    }
+
     @Test func readsRealMetadataAndNavigationWithoutCreatingRecords() throws {
         let root = try root(); defer { try? FileManager.default.removeItem(at: root) }
         let inspection = try EPUBBookFiles.stage(source: fixture(), root: root.appendingPathComponent("Staging"))

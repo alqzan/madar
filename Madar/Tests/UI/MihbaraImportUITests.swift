@@ -307,6 +307,41 @@ import UIKit
         XCTAssertEqual(copies.count, 1, app.debugDescription)
     }
 
+    func testCancelEPUBScanReturnsToShelfWithoutAddingAndCanRetry() throws {
+        continueAfterFailure = false
+        let fixture = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "english-import-poc", withExtension: "epub"))
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MIHBARA_FIXTURE": "empty",
+            "MADAR_UI_NOW": "2026-10-18T12:00:00+03:00", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
+            "MADAR_UI_EPUB_SLOW_SCAN": "1", "MADAR_UI_MIHBARA_IMPORT_EPUB": try Data(contentsOf: fixture).base64EncodedString()]
+        app.launch()
+        let customize = app.buttons["tab-customize"]; XCTAssertTrue(customize.waitForExistence(timeout: 20)); customize.tap()
+        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 8)); search.tap(); search.typeText("المحبرة")
+        let door = app.buttons["mihbara-open"]; XCTAssertTrue(door.waitForExistence(timeout: 8)); door.tap()
+        app.buttons["mihbara-add-paper"].tap()
+        let progress = app.descendants(matching: .any)["mihbara-epub-scan-progress"]
+        XCTAssertTrue(progress.waitForExistence(timeout: 20), app.debugDescription)
+        XCTAssertFalse(app.buttons["mihbara-epub-import-confirm"].isEnabled)
+        attach(app, "M6-EPUB-scan-cancel-L")
+        XCTAssertTrue(progress.exists)
+        XCTAssertFalse(app.buttons["mihbara-epub-import-confirm"].isEnabled, "Cancel while the scan is still active")
+        app.buttons["mihbara-epub-import-back"].tap()
+        let addBack = app.buttons["mihbara-add-back"]
+        XCTAssertTrue(addBack.waitForExistence(timeout: 8), app.debugDescription); addBack.tap()
+        XCTAssertTrue(app.staticTexts["أضف كتابك الأول"].waitForExistence(timeout: 8), app.debugDescription)
+        app.buttons["mihbara-add-paper"].tap()
+        let reopen = app.buttons["mihbara-import-reopen"]
+        XCTAssertTrue(reopen.waitForExistence(timeout: 8), app.debugDescription); reopen.tap()
+        XCTAssertTrue(progress.waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertTrue(app.descendants(matching: .any)["mihbara-epub-scan-text"].waitForExistence(timeout: 30), app.debugDescription)
+        XCTAssertTrue(app.buttons["mihbara-epub-import-confirm"].isEnabled)
+        XCTAssertFalse(app.staticTexts["mihbara-epub-import-error"].exists)
+        app.buttons["mihbara-epub-import-back"].tap()
+        XCTAssertTrue(addBack.waitForExistence(timeout: 8)); addBack.tap()
+        XCTAssertTrue(app.staticTexts["أضف كتابك الأول"].waitForExistence(timeout: 8))
+        app.terminate()
+    }
+
     func testEPUBScanExplainsReversedAnchorsAndPageLinks() throws {
         continueAfterFailure = false
         let fixture = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "scan-order-poc", withExtension: "epub"))

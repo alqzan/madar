@@ -11,10 +11,9 @@ import MadarDesign
     func stageEPUB(_ source: URL, id: UUID) async throws -> EPUBBookInspection {
         guard app.lockController?.canPresent(.app) ?? app.protectedDataAuthorized else { throw DataError.authenticationFailed }
         let root = app.bookStagingDirectory
-        let inspection = try await Task.detached(priority: .userInitiated) {
-            try EPUBBookFiles.stage(source: source, root: root, id: id)
-        }.value
+        let inspection = try await EPUBBookFiles.stageForPreview(source: source, root: root, id: id)
         do {
+            try Task.checkCancellation()
             guard app.lockController?.canPresent(.app) ?? app.protectedDataAuthorized else { throw DataError.authenticationFailed }
             let books = try ModelContext(app.container).fetch(FetchDescriptor<Book>())
             guard !books.contains(where: { $0.fileHash == inspection.sha256 && $0.mergedInto == nil }) else {
@@ -60,6 +59,8 @@ struct MihbaraEPUBImportView: View {
     @State private var scan: EPUBBookScan?
     @State private var scanProgress = 0.0
     @State private var scanDone = false
+    @State private var inspecting = false
+    @State private var departed = false
     private static let indexPreview = 8
     private var service: AppMihbaraService { .init(app: app) }
     private var digits: MadarNumberFormatter { service.digits }
@@ -235,7 +236,11 @@ struct MihbaraEPUBImportView: View {
         }
         .interactiveDismissDisabled(saving)
         .task { await inspect() }
-        .onDisappear { if !saving && !finished { EPUBBookFiles.discard(id: fileID, root: app.bookStagingDirectory) } }
+        .onDisappear {
+            departed = true
+            // SwiftUI cancels .task. Let its parser return and close the publication before deleting its file.
+            if !inspecting && !saving && !finished { EPUBBookFiles.discard(id: fileID, root: app.bookStagingDirectory) }
+        }
     }
 
     private var confirmButton: some View {
@@ -320,15 +325,33 @@ struct MihbaraEPUBImportView: View {
     private func count(_ n: Int, _ forms: (String, String, String, String)) -> String {
         switch n { case 1: forms.0; case 2: forms.1; case 0, 3...10: digits.string(n) + " " + forms.2; default: digits.string(n) + " " + forms.3 }
     }
-    @MainActor private func runScan() async {
+    @MainActor private func runScan() async throws {
         let file = EPUBBookFiles.stagedURL(id: fileID, root: app.bookStagingDirectory)
-        let report = Task.detached(priority: .userInitiated) { () -> EPUBBookScan? in
-            try? EPUBBookFiles.scan(file: file) { value in Task { @MainActor in scanProgress = value } }
+        // A bounded delay makes cancellation observable in isolated UI tests, never in an owner store.
+        #if DEBUG
+        let slowScan = UUID(uuidString: ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"] ?? "") != nil
+            && ProcessInfo.processInfo.environment["MADAR_UI_EPUB_SLOW_SCAN"] == "1"
+        #else
+        let slowScan = false
+        #endif
+        do {
+            let value = try await EPUBBookFiles.scanForPreview(file: file) { value in
+                if slowScan { Thread.sleep(forTimeInterval: 4) }
+                Task { @MainActor in
+                    guard inspecting && !departed else { return }
+                    scanProgress = value
+                }
+            }
+            try Task.checkCancellation()
+            scan = value
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            try Task.checkCancellation()
+            // A failed scan never blocks a book that already passed the import checks.
+            scan = nil
         }
-        let value = await report.value
-        guard !Task.isCancelled else { return }
-        // A scan that cannot run never blocks a book that already passed the import checks.
-        scan = value; scanDone = true
+        scanDone = true
     }
 
     /// «٤ مجلدات، ١٬٢٠٠ صفحة مطبوعة؛ الملف ٣٫٢ م.ب» — the size the shelf will show, from the moment of download.
@@ -344,12 +367,21 @@ struct MihbaraEPUBImportView: View {
 
     @MainActor private func inspect() async {
         guard inspection == nil, error == nil else { return }
+        inspecting = true
+        defer {
+            inspecting = false
+            if !saving && !finished && (departed || Task.isCancelled) {
+                EPUBBookFiles.discard(id: fileID, root: app.bookStagingDirectory)
+            }
+        }
         do {
             let value = try await service.stageEPUB(source, id: fileID)
-            guard !Task.isCancelled else { EPUBBookFiles.discard(id: fileID, root: app.bookStagingDirectory); return }
+            try Task.checkCancellation()
+            guard !departed else { return }
             let publication = try await MihbaraEPUBLoader.open(at: EPUBBookFiles.stagedURL(id: fileID, root: app.bookStagingDirectory))
             defer { publication.close() }
-            guard !Task.isCancelled else { EPUBBookFiles.discard(id: fileID, root: app.bookStagingDirectory); return }
+            try Task.checkCancellation()
+            guard !departed else { return }
             inspection = value
             printedShape = (try? EPUBBookFiles.printedShape(file: EPUBBookFiles.stagedURL(id: fileID, root: app.bookStagingDirectory))).map { MihbaraBookShape(pages: $0.pages, volumes: $0.volumes) }
             if let readiumTitle = publication.metadata.title?.trimmingCharacters(in: .whitespacesAndNewlines), !readiumTitle.isEmpty { title = readiumTitle }
@@ -358,9 +390,10 @@ struct MihbaraEPUBImportView: View {
             language = value.appLanguage ?? "ar"
             cover = Self.thumbnail(value.coverData)
             confirmedMetadata = false
-            await runScan()
+            try await runScan()
         } catch {
             EPUBBookFiles.discard(id: fileID, root: app.bookStagingDirectory)
+            guard !Task.isCancelled && !departed else { return }
             if case DataError.invalidValue(let message) = error { self.error = message }
             else { self.error = "تعذّر فحص EPUB أو فتحه بالقارئ؛ لم يُنسخ إلى مكتبتك." }
         }
