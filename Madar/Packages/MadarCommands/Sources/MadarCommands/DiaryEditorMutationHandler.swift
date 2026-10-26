@@ -11,6 +11,7 @@ import MadarData
             let existing = try context.fetch(FetchDescriptor<SessionDraft>()).first { $0.id == id && $0.mergedInto == nil }
             guard existing == nil || existing?.kind.hasPrefix("diary.") == true else { throw DataError.invalidValue("diary draft required") }
             guard existing?.deletedAt == nil else { throw DataError.invalidValue("draft already completed") }
+            if existing == nil && text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return nil }
             let row = existing ?? SessionDraft(); row.id = id; row.kind = target.map { "diary.margin." + $0 } ?? "diary.text"
             if existing == nil { row.dayKey = writingDay }
             guard try GregorianDay(writingDay) <= DiaryLineRenderer.today(context: context, now: now) else { throw DataError.invalidValue("future diary day") }

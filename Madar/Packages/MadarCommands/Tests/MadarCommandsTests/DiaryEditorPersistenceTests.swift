@@ -12,6 +12,21 @@ import MadarData
         return (container, CommandBus(adapter: DurableCommandAdapter(container: container, lockDirectory: root, transactionClock: { $0 })), root)
     }
     private func date(_ value: String) -> Date { ISO8601DateFormatter().date(from: value)! }
+    @Test func blankDraftDoesNotCreateARecordAndCanReuseItsIdentityLater() async throws {
+        let (container, bus, root) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
+        let id = UUID(), now = date("2026-10-15T12:00:00+03:00")
+        let base: [String:MadarCore.JSONValue] = ["id": .string(id.uuidString), "text": .string("  \n"), "day": .string("today"), "writingDayKey": .string("2026-10-15")]
+        let empty = try await bus.execute(.init(name: "diary.saveDraft", payload: .object(base), issuedAt: now), now: now)
+        #expect(empty.status == .applied)
+        #expect(try ModelContext(container).fetchCount(FetchDescriptor<SessionDraft>()) == 0)
+
+        var content = base; content["text"] = .string("مسودة حقيقية")
+        let saved = try await bus.execute(.init(name: "diary.saveDraft", payload: .object(content), issuedAt: now), now: now.addingTimeInterval(1))
+        #expect(saved.status == .applied)
+        let rows = try ModelContext(container).fetch(FetchDescriptor<SessionDraft>())
+        #expect(rows.count == 1)
+        #expect(try JSONDecoder().decode(String.self, from: rows[0].provisionalJSON) == "مسودة حقيقية")
+    }
     @Test func longDraftCommitsOnceOnItsChosenDayAfterBoundaryChangeAndUndoes() async throws {
         let (container, bus, root) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
         let id = UUID(), now = date("2026-10-15T22:00:00+03:00"), later = date("2026-10-16T12:00:00+03:00"), text = String(repeating: "ذكرى ", count: 1000)

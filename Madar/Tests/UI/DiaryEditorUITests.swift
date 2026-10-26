@@ -53,6 +53,30 @@ import XCTest
         let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": fixture, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00"]
         app.launch(); XCTAssertTrue(app.buttons["diary-write"].waitForExistence(timeout: 25)); return app
     }
+    func testClosingBlankEditorDoesNotRestoreAnEmptyDraft() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication(); app.resetAuthorizationStatus(for: .microphone)
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": "empty", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00"]
+        app.launch(); XCTAssertTrue(app.buttons["diary-write"].waitForExistence(timeout: 25), app.debugDescription)
+        app.buttons["diary-write"].tap()
+        let text = app.textViews["diary-editor-text"]
+        XCTAssertTrue(text.waitForExistence(timeout: 10), app.debugDescription)
+        let hideKeyboard = app.buttons["diary-editor-hide-keyboard"]
+        if hideKeyboard.waitForExistence(timeout: 5) { hideKeyboard.tap() }
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5), app.debugDescription)
+        capture(app, "M3-V06-empty-before-L")
+        app.buttons["diary-editor-cancel"].tap()
+        XCTAssertTrue(app.buttons["diary-write"].waitForExistence(timeout: 10), app.debugDescription)
+
+        app.buttons["diary-write"].tap()
+        XCTAssertTrue(text.waitForExistence(timeout: 10), app.debugDescription)
+        if hideKeyboard.waitForExistence(timeout: 5) { hideKeyboard.tap() }
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5), app.debugDescription)
+        XCTAssertFalse(app.staticTexts["مسودة مستعادة"].exists, app.debugDescription)
+        XCTAssertTrue(app.staticTexts["اكتب ما تيسّر…"].exists, app.debugDescription)
+        capture(app, "M3-V06-empty-after-reopen-L")
+        app.buttons["diary-editor-cancel"].tap()
+    }
     func testDraftRelaunchAndPickerCancelKeepContent() throws {
         continueAfterFailure = false
         let app = launch("empty"); app.buttons["diary-write"].tap()

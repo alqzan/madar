@@ -14,6 +14,7 @@ struct DiaryTextEditor: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var text = ""
     @State private var draftID = UUID()
+    @State private var hasDraftRecord = false
     @State private var loaded = false
     @State private var draftTask: Task<Void, Never>?
     @State private var draftStatus = ""
@@ -112,7 +113,7 @@ struct DiaryTextEditor: View {
         .task {
             day = initialDay
             writingDay = (try? AppDiaryService(app: app).currentDay()).map { initialDay == "yesterday" ? $0.adding(days: -1) : $0 }
-            do { if let draft = try AppDiaryService(app: app).draft(margin: margin) { draftID = draft.id; text = draft.text; day = draft.day; writingDay = draft.writingDay; draftStatus = "مسودة مستعادة" } }
+            do { if let draft = try AppDiaryService(app: app).draft(margin: margin) { draftID = draft.id; hasDraftRecord = true; text = draft.text; day = draft.day; writingDay = draft.writingDay; draftStatus = draft.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : "مسودة مستعادة" } }
             catch { failure = error.localizedDescription }
             loaded = true
             if voice == nil { voice = DiaryVoiceController(app: app); await voice?.recoverRecordings() }
@@ -163,11 +164,16 @@ struct DiaryTextEditor: View {
         guard loaded, !saving else { return }
         draftTask?.cancel(); draftStatus = "تُحفظ المسودة…"
         draftTask = Task {
-            do { try await Task.sleep(for: .milliseconds(500)); try Task.checkCancellation(); try await persistDraft(); draftStatus = "المسودة محفوظة" }
+            do { try await Task.sleep(for: .milliseconds(500)); try Task.checkCancellation(); try await persistDraft(); draftStatus = text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : "المسودة محفوظة" }
             catch is CancellationError {} catch { draftStatus = "لم تُحفظ المسودة"; failure = error.localizedDescription }
         }
     }
-    private func persistDraft() async throws { guard let writingDay else { throw CocoaError(.coderInvalidValue) }; try await AppDiaryService(app: app).saveDraft(id: draftID, text: text, day: day, margin: margin, writingDay: writingDay) }
+    private func persistDraft() async throws {
+        guard let writingDay else { throw CocoaError(.coderInvalidValue) }
+        guard hasDraftRecord || !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        try await AppDiaryService(app: app).saveDraft(id: draftID, text: text, day: day, margin: margin, writingDay: writingDay)
+        hasDraftRecord = true
+    }
     private func close() async {
         draftTask?.cancel(); saving = true
         do { await voice?.stop(); if loaded { try await persistDraft() }; dismiss() }
