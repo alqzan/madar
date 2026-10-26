@@ -1,0 +1,194 @@
+diff --git a/Madar/Packages/MadarCommands/Sources/MadarCommands/MoneyAccountRules.swift b/Madar/Packages/MadarCommands/Sources/MadarCommands/MoneyAccountRules.swift
+new file mode 100644
+index 0000000..04e2a1d
+--- /dev/null
++++ b/Madar/Packages/MadarCommands/Sources/MadarCommands/MoneyAccountRules.swift
+@@ -0,0 +1,48 @@
++import Foundation
++import SwiftData
++import MadarCore
++import MadarData
++import MadarMoney
++
++/// M5-V19 / RM5: the account rules the intake, `money.saveAccount`, `money.removeAccount` and «الحسابات» share.
++@MainActor public enum MoneyAccountRules {
++    /// RM5: a message belongs to an account when its sender is the account's bank (or one of its sender names) and the
++    /// message names the account's last 4 digits.
++    public static func matches(_ account: Account, sender: String, last4: String?) -> Bool {
++        guard let last4, account.last4 == last4 else { return false }
++        let name = BankDedupe.normalize(sender)
++        return BankDedupe.normalize(account.bank) == name || account.senderIDs.map(BankDedupe.normalize).contains(name)
++    }
++
++    /// A live movement refers to the account, directly or through a card linked to it. Its opening balance, currency,
++    /// ownership, tracking and kind are then fixed: changing them would rewrite numbers already shown; reconciliation
++    /// owns later corrections.
++    public static func hasMovements(_ id: UUID, in context: ModelContext) throws -> Bool {
++        let cards = Set(try context.fetch(FetchDescriptor<Card>()).filter { $0.accountID == id }.map(\.id))
++        return try context.fetch(FetchDescriptor<MoneyTransaction>()).contains { row in
++            live(row) && (row.fromAccountID == id || row.toAccountID == id || row.cardID.map(cards.contains) == true)
++        }
++    }
++
++    /// An account can be removed only when nothing ever referred to it: no movement (live or undoable), no card, no
++    /// reconciliation and no sub-account. Otherwise removing it would drop a linked card's debt from «عليك» or orphan
++    /// a record an undo could bring back.
++    public static func removable(_ id: UUID, in context: ModelContext) throws -> Bool {
++        if try context.fetch(FetchDescriptor<MoneyTransaction>()).contains(where: { $0.fromAccountID == id || $0.toAccountID == id }) { return false }
++        let cards = try context.fetch(FetchDescriptor<Card>()).filter { $0.accountID == id }
++        if !cards.isEmpty { return false }
++        if try context.fetch(FetchDescriptor<Reconciliation>()).contains(where: { $0.accountID == id }) { return false }
++        return try !context.fetch(FetchDescriptor<Account>()).contains { $0.parentID == id }
++    }
++
++    /// Two live accounts at one bank with the same last 4 would both stop matching their messages (intake needs one match).
++    public static func duplicateLast4(_ last4: String?, bank: String, excluding id: UUID, in context: ModelContext) throws -> Bool {
++        guard let last4, !last4.isEmpty else { return false }
++        let name = BankDedupe.normalize(bank)
++        return try context.fetch(FetchDescriptor<Account>()).contains { other in
++            other.id != id && live(other) && other.last4 == last4 && BankDedupe.normalize(other.bank) == name
++        }
++    }
++
++    private static func live<T: MadarRecordModel>(_ row: T) -> Bool { (try? row.record().isLive) == true }
++}
+diff --git a/Madar/Packages/MadarCommands/Sources/MadarCommands/MoneyMutationHandler.swift b/Madar/Packages/MadarCommands/Sources/MadarCommands/MoneyMutationHandler.swift
+index dbf26f7..707ad54 100644
+--- a/Madar/Packages/MadarCommands/Sources/MadarCommands/MoneyMutationHandler.swift
++++ b/Madar/Packages/MadarCommands/Sources/MadarCommands/MoneyMutationHandler.swift
+@@ -128,6 +128,11 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var
+                 let row = Envelope(); row.name = "الاحتياطي"; row.role = "reserve"; row.targetMinor = amount; row.createdAt = now; context.insert(row); try touch(row, now, writer)
+             }
+         case "money.saveAccount": try saveAccount(p, context, now, writer)
++        case "money.removeAccount":
++            // M5-V19: only an account nothing ever referred to; a tombstone the app's undo restores.
++            guard let accountID = uuid(p, "id"), let row = try context.fetch(FetchDescriptor<Account>()).first(where: { $0.id == accountID && live($0) }) else { throw MoneyCommandError.missingRow }
++            guard try MoneyAccountRules.removable(accountID, in: context) else { throw MoneyCommandError.invalidReference }
++            try touch(row, now, writer, deleting: true)
+         case "money.saveCard": try saveCard(p, context, now, writer)
+         case "money.setCardCashback":
+             // M5-V16: the cashback rate entered by hand; its source becomes «entered» (Card.fieldSourcesJSON).
+@@ -278,16 +283,21 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var
+ 
+     private static func saveAccount(_ p: [String: MadarCore.JSONValue], _ context: ModelContext, _ now: Date, _ writer: String) throws {
+         guard let id = uuid(p, "id"), let amount = MoneyCommandPayload.integer(p["balanceMinor"]),
+-              let at = MoneyCommandPayload.date(p["balanceAt"]), at <= now else { throw MoneyCommandError.invalidAmount }
++              var at = MoneyCommandPayload.date(p["balanceAt"]), at <= now else { throw MoneyCommandError.invalidAmount }
+         try currency(text(p, "currency"))
+         let existing = try context.fetch(FetchDescriptor<Account>()).first { $0.id == id }
+         guard existing == nil || live(existing!) else { throw MoneyCommandError.invalidReference }
+         let row = existing ?? Account()
+         if let last4 = optionalText(p, "last4"), !last4.isEmpty, !fourDigits(last4) { throw MoneyCommandError.invalidReference }
++        // M5-V19: one bank cannot hold two live accounts with the same last 4 (intake needs exactly one match).
++        if try MoneyAccountRules.duplicateLast4(optionalText(p, "last4"), bank: text(p, "bank"), excluding: id, in: context) { throw MoneyCommandError.invalidReference }
+         // The initial checkpoint is immutable once movements refer to it; reconciliation owns later corrections.
+-        if existing != nil, try transactions(context).contains(where: { $0.fromAccountID == id || $0.toAccountID == id || $0.cardID.flatMap { card in try? context.fetch(FetchDescriptor<Card>()).first { $0.id == card }?.accountID } == id }) {
+-            guard row.currency == text(p, "currency"), row.balanceMinor == amount, row.balanceAt == at,
+-                  row.ownership == text(p, "ownership"), row.tracked == (p["tracked"] != .bool(false)) else { throw MoneyCommandError.invalidReference }
++        // M5-V19: the kind too (a cash wallet's purchases are read differently). The stored instant is kept: an ISO
++        // string cannot carry its sub-second part back.
++        if existing != nil, try MoneyAccountRules.hasMovements(id, in: context) {
++            guard row.currency == text(p, "currency"), row.balanceMinor == amount, let stored = row.balanceAt, abs(stored.timeIntervalSince(at)) < 1,
++                  row.kind == text(p, "kind"), row.ownership == text(p, "ownership"), row.tracked == (p["tracked"] != .bool(false)) else { throw MoneyCommandError.invalidReference }
++            at = stored
+         }
+         row.id = id; row.name = text(p, "name"); row.bank = text(p, "bank"); row.kind = text(p, "kind"); row.ownership = text(p, "ownership")
+         row.currency = text(p, "currency"); row.balanceMinor = amount; row.balanceAt = at; row.last4 = optionalText(p, "last4")
+@@ -482,11 +492,7 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var
+                 else { row.fromAccountID = card.accountID }
+             }
+         } else {
+-            let matching = accounts.filter { account in
+-                let bank = BankDedupe.normalize(account.bank) == BankDedupe.normalize(sender)
+-                    || account.senderIDs.map(BankDedupe.normalize).contains(BankDedupe.normalize(sender))
+-                return bank && parsed.last4 != nil && account.last4 == parsed.last4
+-            }
++            let matching = accounts.filter { MoneyAccountRules.matches($0, sender: sender, last4: parsed.last4) }
+             if matching.count == 1, let account = matching.first {
+                 if [.salary, .income, .transferIn, .refund, .reversal].contains(parsed.kind) { row.toAccountID = account.id }
+                 else { row.fromAccountID = account.id }
+diff --git a/Madar/Packages/MadarCommands/Tests/MadarCommandsTests/MoneyPersistenceTests.swift b/Madar/Packages/MadarCommands/Tests/MadarCommandsTests/MoneyPersistenceTests.swift
+index 29b40d6..fe17884 100644
+--- a/Madar/Packages/MadarCommands/Tests/MadarCommandsTests/MoneyPersistenceTests.swift
++++ b/Madar/Packages/MadarCommands/Tests/MadarCommandsTests/MoneyPersistenceTests.swift
+@@ -864,4 +864,58 @@ import MadarInbox
+         #expect(!MoneyCommandPayload.validate(name: "money.reconcile", payload: ["rows": .array([.object(["accountID": .string(f.bank.uuidString), "cardID": .string(f.credit.uuidString), "expectedMinor": .string("1"), "observedMinor": .string("1")])])]))
+         #expect(!MoneyCommandPayload.validate(name: "money.reconcile", payload: ["rows": .array([line("accountID", f.bank, 1, -1)])]))
+     }
++    /// M5-V19 «الحسابات»: F06 (an account that is not mine stays out of «لك فعلًا», its messages kept as ignored), RM5
++    /// (last 4 tells accounts of one bank apart) and the frozen checkpoint once movements refer to an account.
++    @Test func accountsOwnershipLast4AndRemoval() async throws {
++        let f = try MoneyFixture(); defer { f.clean() }; try await f.setup()
++        func account(_ id: UUID, name: String = "حساب الوالدة", bank: String = "Bank", kind: String = "current", ownership: String = "notMine", last4: String = "9999",
++                     balance: Int = 1_420_000, at: String = "2026-10-14T00:00:00Z") -> [String: MadarCore.JSONValue] {
++            ["id": .string(id.uuidString), "name": .string(name), "bank": .string(bank), "kind": .string(kind), "ownership": .string(ownership),
++             "currency": .string("SAR"), "balanceMinor": .string(String(balance)), "balanceAt": .string(at), "last4": .string(last4)]
++        }
++        let mother = UUID(), before = try f.basis()
++        #expect(try await f.run("money.saveAccount", account(mother)).status == .applied)
++        #expect(try f.basis() == before, "Not mine: out of cash and «لك فعلًا»")
++        // Its message is kept as ignored and writes no movement; the shared rule still attributes it to the account.
++        _ = try await f.ingest("حوالة واردة\nإلى: 9999*\nمن: سالم\nمبلغ: 120 SAR\n2026-10-16 11:40")
++        let c = ModelContext(f.container)
++        let message = try #require(try c.fetch(FetchDescriptor<BankMessage>()).first { $0.text.contains("9999") })
++        #expect(message.status == "ignored"); #expect(try c.fetch(FetchDescriptor<MoneyTransaction>()).isEmpty)
++        let parsed = try JSONDecoder().decode(MoneyParsedFields.self, from: try #require(message.parsedJSON))
++        let row = try #require(try c.fetch(FetchDescriptor<Account>()).first { $0.id == mother })
++        #expect(MoneyAccountRules.matches(row, sender: message.sender, last4: parsed.last4))
++        #expect(!MoneyAccountRules.matches(row, sender: "Other bank", last4: parsed.last4))
++        // No movement refers to it, so it may become mine (earlier ignored messages stay ignored).
++        #expect(try await f.run("money.saveAccount", account(mother, ownership: "mine")).status == .applied)
++        #expect(try f.basis().inAccountMinor == before.inAccountMinor + 1_420_000)
++        #expect(try c.fetch(FetchDescriptor<BankMessage>()).first { $0.id == message.id }?.status == "ignored")
++
++        // RM5: the same last 4 at the same bank is refused; at another bank it is a different account.
++        #expect(try await f.run("money.saveAccount", account(UUID(), name: "نسخة", last4: "9999")).status == .rejected)
++        #expect(try await f.run("money.saveAccount", account(UUID(), name: "بنك آخر", bank: "Other", last4: "9999")).status == .applied)
++
++        // The current account has movements through its cards: ownership, kind and the opening balance are fixed; a new name is fine.
++        _ = try await f.ingest("شراء مدى Apple Pay\nبطاقة *3333\n42.00 SAR\nلدى: مقهى\n2026-10-16 09:05")
++        let current = account(f.bank, name: "current", ownership: "mine", last4: "1111", balance: 2_000_000)
++        #expect(try MoneyAccountRules.hasMovements(f.bank, in: ModelContext(f.container)))
++        var flip = current; flip["ownership"] = .string("notMine")
++        var kind = current; kind["kind"] = .string("savings")
++        var rebased = current; rebased["balanceMinor"] = .string("1")
++        for payload in [flip, kind, rebased] { #expect(try await f.run("money.saveAccount", payload).status == .rejected) }
++        var renamed = current; renamed["name"] = .string("الراجحي الجاري")
++        #expect(try await f.run("money.saveAccount", renamed).status == .applied)
++
++        // Removal: only an account nothing ever referred to, with one undo; cards or movements keep it.
++        let spare = UUID()
++        #expect(try await f.run("money.saveAccount", account(spare, name: "حساب زائد", ownership: "mine", last4: "7777")).status == .applied)
++        #expect(try await f.run("money.removeAccount", ["id": .string(spare.uuidString)], source: .shortcut).status != .applied, "App only")
++        let removal = UUID()
++        #expect(try await f.run("money.removeAccount", ["id": .string(spare.uuidString)], id: removal).status == .applied)
++        #expect(try ModelContext(f.container).fetch(FetchDescriptor<Account>()).first { $0.id == spare }?.deletedAt != nil)
++        #expect(try await f.run("system.undo", ["undoToken": .string(removal.uuidString)]).status == .applied)
++        #expect(try ModelContext(f.container).fetch(FetchDescriptor<Account>()).first { $0.id == spare }?.deletedAt == nil)
++        #expect(try await f.run("money.removeAccount", ["id": .string(f.bank.uuidString)]).status == .rejected, "Cards and movements refer to it")
++        #expect(try await f.run("money.removeAccount", ["id": .string(f.cash.uuidString)]).status == .applied, "Nothing refers to the cash wallet yet")
++        #expect(!MoneyCommandPayload.validate(name: "money.removeAccount", payload: ["id": .string(spare.uuidString), "force": .bool(true)]))
++    }
+ }
+diff --git a/Madar/Packages/MadarCore/Sources/MadarCore/MoneyCommand.swift b/Madar/Packages/MadarCore/Sources/MadarCore/MoneyCommand.swift
+index f55500f..1eb889d 100644
+--- a/Madar/Packages/MadarCore/Sources/MadarCore/MoneyCommand.swift
++++ b/Madar/Packages/MadarCore/Sources/MadarCore/MoneyCommand.swift
+@@ -8,7 +8,7 @@ public enum MoneyCommandPayload {
+     public static let names: Set<String> = [intakeName, "money.pasteBankMessages", "money.logExpense",
+         "money.confirmTransaction", "money.deleteTransaction", "money.saveAccount", "money.saveCard", "money.accruePlans", "money.setReserveGoal", "money.repayEnvelopeNow", "money.setEnvelopeSaving", "money.adoptRepayment",
+         "money.applyStatement", "money.ignoreMessage", "money.confirmClear", "money.markVisit",
+-        "money.categorize", "money.saveMerchantRule", "money.forgetMerchantRule", "money.confirmSalary", "money.saveObligation", "money.setCategoryLimit", "money.setBudgetExclusion", "money.reconcile", "money.setCardCashback"]
++        "money.categorize", "money.saveMerchantRule", "money.forgetMerchantRule", "money.confirmSalary", "money.saveObligation", "money.setCategoryLimit", "money.setBudgetExclusion", "money.reconcile", "money.setCardCashback", "money.removeAccount"]
+     /// §7.5 maxRepayCycles: the longest salary repayment (the envelope sheet offers 1–6).
+     public static let maxRepaySalaries = 12
+     /// M5-X00: the budget-ignore stamp's optional reason.
+@@ -54,7 +54,7 @@ public enum MoneyCommandPayload {
+         case "money.setEnvelopeSaving": return Set(p.keys) == ["id", "amountMinor", "expectedMinor"] && id("id") && integer(p["expectedMinor"]) != nil && (integer(p["amountMinor"]).map { $0 >= 0 } ?? false)
+         case "money.adoptRepayment": return Set(p.keys) == ["id", "debtMinor", "salaries"] && id("id") && positive("debtMinor") && (integer(p["salaries"]).map { (1...maxRepaySalaries).contains($0) } ?? false)
+         case "money.repayEnvelopeNow": return Set(p.keys) == ["id", "source", "debtMinor"] && id("id") && choices("source", ["surplus", "reserve"]) && positive("debtMinor")
+-        case "money.applyStatement", "money.ignoreMessage": return Set(p.keys) == ["id"] && id("id")
++        case "money.applyStatement", "money.ignoreMessage", "money.removeAccount": return Set(p.keys) == ["id"] && id("id")
+         case "money.confirmClear":
+             guard Set(p.keys) == ["ids"], case .array(let rows) = p["ids"], !rows.isEmpty, rows.count <= 100 else { return false }
+             let ids = rows.compactMap { if case .string(let raw) = $0 { UUID(uuidString: raw) } else { nil } }

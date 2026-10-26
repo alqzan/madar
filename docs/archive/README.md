@@ -18,3 +18,4 @@ History only. Nothing here is an instruction. The current protocol is the root `
 | `AUTOMATION-PROMPT.md` | The stopped 13 Oct Codex automation prompt (moved from `docs/` on 27 Oct 2026) |
 | `CODEX-M2-BRIEF.md` | The 13 Oct one-session hint sheet for M2 Quran (moved from `docs/` on 27 Oct 2026) |
 | `MADAR-ROADMAP-AR-2026-10-13.png`, `.svg` | 13 Oct roadmap snapshots; `docs/MADAR-ROADMAP-AR.html` replaces them |
+| `drafts-2026-10-17-remove-unused-account.patch` | Unmerged 17 Oct Claude draft for removing an unused money account (board queue item 34) |
