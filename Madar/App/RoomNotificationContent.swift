@@ -182,6 +182,29 @@ import MadarPrayer
     }
 
     /// Fixed copy chosen at scheduling time. Whole-app protection keeps every body generic (§8 item 10); RU2: never a prayer-debt count.
+    /// Owner, 26 Oct (OR-06): a different qada line each day instead of one repeated sentence. Never a count (RU2).
+    static let qadaLines = [
+        "حان وقت القضاء. «مَنْ نَسِيَ صَلَاةً فَلْيُصَلِّ إِذَا ذَكَرَهَا»",
+        "صلاة واحدة تقضيها الآن خير من تأجيلها إلى الغد",
+        "«وَأَقِمِ الصَّلَاةَ لِذِكْرِي» — وقت مناسب لصلاة تقضيها",
+        "دقائق قليلة تكفي لصلاة من القضاء",
+        "ما زال الباب مفتوحًا؛ اقضِ صلاة الآن",
+        "قبل أن يشغلك يومك: صلاة من القضاء",
+        "خطوة صغيرة اليوم تخفّف ما عليك",
+        "صلِّ ما فاتك بهدوء، واحدة تكفي الآن",
+        "هذا وقتك الذي اخترته للقضاء",
+        "اقضِ صلاة، ثم أكمل يومك مطمئنًا",
+        "القليل الدائم يقضي الكثير؛ صلاة واحدة الآن",
+        "تذكير لطيف: صلاة من القضاء تنتظرك",
+        "لا تحمل همّ الكل؛ ابدأ بصلاة واحدة",
+        "وقت مناسب لتقضي صلاة قبل أن يمضي",
+        "كل صلاة تقضيها تقرّبك من إتمام ما عليك",
+    ]
+    static func qadaLine(_ dayKey: String) -> String {
+        // Stable per day (no Swift hash seeding): the same day always reads the same line.
+        let sum = dayKey.unicodeScalars.reduce(0) { ($0 * 31 + Int($1.value)) % 1_000_003 }
+        return qadaLines[sum % qadaLines.count]
+    }
     static func content(for candidate: NotificationCandidate, plan: NotificationPlan, session: AppSession, habitNames: [String: String]) -> UNMutableNotificationContent {
         let content = UNMutableNotificationContent(), id = candidate.id, digits = MadarNumberFormatter(style: session.string("core.numerals") == "western" ? .western : .hindi)
         let protected = session.string("core.faceIDLock") == "app"
@@ -199,7 +222,7 @@ import MadarPrayer
             content.userInfo = ["dayKey": candidate.dayKey, "room": "bahw"]
         } else if id.hasPrefix("qada.") {
             content.title = "القضاء"
-            content.body = protected ? "لديك تذكير في مدار" : "حان وقت القضاء. «مَنْ نَسِيَ صَلَاةً فَلْيُصَلِّ إِذَا ذَكَرَهَا»"
+            content.body = protected ? "لديك تذكير في مدار" : qadaLine(candidate.dayKey)
             content.userInfo = ["dayKey": candidate.dayKey, "room": "salah"]
         } else if id.hasPrefix("habits.") {
             let habitID = String(id.split(separator: ".").last ?? "")

@@ -76,9 +76,9 @@ import MadarCore
             _ = try SettingsStore(context: context).stage(["core.hideMoneyUntilTouch": .bool(hideMoney)])
             try context.save(); try app.reload()
             let body = RoomNotificationContent.content(for: candidate, plan: plan, session: app, habitNames: [:]).body
-            XCTAssertEqual(body, "اقترب أحد تصنيفاتك من حدّه لهذه الدورة")
-            XCTAssertNil(body.rangeOfCharacter(from: .decimalDigits))
-            XCTAssertFalse(body.contains(category.name))
+            // OR-25 (owner, 26 Oct): name the category and the 80% line; the only digits are that line, never an amount.
+            XCTAssertEqual(body, "بلغت ٨٠٪ من حد «مطاعم» لهذه الدورة")
+            XCTAssertNil(body.replacingOccurrences(of: "٨٠٪", with: "").rangeOfCharacter(from: .decimalDigits))
             XCTAssertFalse(body.contains("باقي"))
         }
     }
@@ -231,7 +231,11 @@ import MadarCore
         let (app, _, _, day) = try fixture(["core.faceIDLock": .string("none")])
         let qada = NotificationCandidate(id: "qada.2026-10-15", room: .salah, dueAt: day.fajr.addingTimeInterval(1800), dayKey: "2026-10-15")
         let plan = NotificationArbiter.plan(candidates: [], prayerDays: [day], now: day.fajr, timeZone: ActivePlace.riyadh.timeZone, policy: .init(staleNudgeEnabled: false))
-        XCTAssertTrue(RoomNotificationContent.content(for: qada, plan: plan, session: app, habitNames: [:]).body.hasPrefix("حان وقت القضاء."))
+        XCTAssertTrue(RoomNotificationContent.qadaLines.contains(RoomNotificationContent.content(for: qada, plan: plan, session: app, habitNames: [:]).body))
+        // OR-06: fifteen lines that change from day to day, none with a digit.
+        XCTAssertEqual(RoomNotificationContent.qadaLines.count, 15)
+        XCTAssertGreaterThan(Set((10...24).map { RoomNotificationContent.qadaLine("2026-10-\($0)") }).count, 5)
+        XCTAssertTrue(RoomNotificationContent.qadaLines.allSatisfy { $0.rangeOfCharacter(from: .decimalDigits) == nil })
         let body = RoomNotificationContent.content(for: qada, plan: plan, session: app, habitNames: [:]).body
         XCTAssertNil(body.rangeOfCharacter(from: .decimalDigits), "RU2: no prayer-debt count outside the app")
     }
