@@ -71,6 +71,11 @@ struct BahwLobbyView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     header.padding(.top, 8).padding(.bottom, 4)
+                    if !arranging, let day = session.bahwReturnPlanDay {
+                        BahwReturnPlanCard(day: day, digits: service.digits, theme: theme,
+                                           openQuran: { session.selectedTab = "quran" },
+                                           openHabits: { session.habitsOpen = true })
+                    }
                     let visible = layout.visible
                     let placements = BahwGrid.pack(visible.map { ($0.rawValue, layout.size($0)) })
                     BahwGridLayout(placements: placements) {
@@ -193,6 +198,59 @@ struct BahwLobbyView: View {
             .navigationTitle("الكتل المخفية").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarLeading) { Button("تم") { drawerOpen = false } } }
         }.environment(\.roomTheme, theme).tint(theme.accent)
+    }
+}
+
+private struct BahwReturnPlanCard: View {
+    let day: Int
+    let digits: MadarNumberFormatter
+    let theme: RoomTheme
+    let openQuran: () -> Void
+    let openHabits: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("أهلًا بك من جديد")
+                    .font(MadarTypography.section())
+                    .foregroundStyle(theme.ink)
+                Spacer(minLength: 8)
+                Text("اليوم \(digits.string(day)) من \(digits.string(3))")
+                    .font(MadarTypography.caption())
+                    .foregroundStyle(theme.secondaryInk)
+                    .accessibilityIdentifier("bahw-return-day")
+            }
+            Text("نصف وردك، وعادة واحدة تكفي اليوم.")
+                .font(MadarTypography.body())
+                .foregroundStyle(theme.secondaryInk)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("bahw-return-plan-copy")
+            HStack(spacing: 10) {
+                action("افتح القرآن", glyph: "MadarQuran", identifier: "bahw-return-quran", primary: true, action: openQuran)
+                action("افتح العادات", glyph: "MadarHabits", identifier: "bahw-return-habits", primary: false, action: openHabits)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(theme.surface, in: .rect(cornerRadius: 22))
+        .overlay { RoundedRectangle(cornerRadius: 22).stroke(theme.line, lineWidth: 1) }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("bahw-return-plan")
+    }
+
+    private func action(_ title: String, glyph: String, identifier: String, primary: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 7) {
+                MadarGlyph(glyph, size: 16)
+                Text(title).font(MadarTypography.caption()).multilineTextAlignment(.center)
+            }
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .foregroundStyle(primary ? theme.onAccent : theme.accent)
+            .background(primary ? theme.accentFill : .clear, in: .capsule)
+            .overlay { Capsule().stroke(primary ? Color.clear : theme.line, lineWidth: 1) }
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(identifier)
     }
 }
 

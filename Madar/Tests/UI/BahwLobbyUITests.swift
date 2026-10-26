@@ -35,6 +35,43 @@ import XCTest
         XCTAssertFalse(app.buttons["bahw-open-prayer"].exists)
         capture(app, "UX-02-direct-prayer-L")
     }
+
+    func testThreeDayReturnPlanPersistsLocallyAndOpensItsRooms() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = [
+            "MADAR_UI_STORE_ID": "bahw-return-\(UUID().uuidString)",
+            "MADAR_UI_RETURN_PLAN": "1",
+            "MADAR_UI_SIZE": "L",
+            "MADAR_UI_NOW": "2026-10-26T15:00:00+03:00",
+            "MADAR_UI_THEME": "light"
+        ]
+        app.launch()
+        finishOnboarding(app)
+        app.tabBars.buttons["البهو"].tap()
+
+        let card = app.descendants(matching: .any)["bahw-return-plan"]
+        let day = app.staticTexts["bahw-return-day"]
+        XCTAssertTrue(card.waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertEqual(day.label, "اليوم \u{2068}١\u{2069} من \u{2068}٣\u{2069}")
+        XCTAssertEqual(app.staticTexts["bahw-return-plan-copy"].label, "نصف وردك، وعادة واحدة تكفي اليوم.")
+        capture(app, "M4-V01-return-day1-L")
+
+        app.buttons["bahw-return-quran"].tap()
+        XCTAssertTrue(app.staticTexts["quran-coverage-title"].waitForExistence(timeout: 15), app.debugDescription)
+        app.tabBars.buttons["البهو"].tap()
+        XCTAssertTrue(card.waitForExistence(timeout: 5))
+        app.buttons["bahw-return-habits"].tap()
+        XCTAssertTrue(app.staticTexts["habits-title"].waitForExistence(timeout: 10), app.debugDescription)
+
+        app.terminate()
+        app.launch()
+        app.tabBars.buttons["البهو"].tap()
+        XCTAssertTrue(card.waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertEqual(day.label, "اليوم \u{2068}١\u{2069} من \u{2068}٣\u{2069}")
+        capture(app, "M4-V01-return-day1-reopened-L")
+    }
+
     func testMihbaraLobbyBlockOpensItsRoom() throws {
         continueAfterFailure = false
         let app = XCUIApplication()

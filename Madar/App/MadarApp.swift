@@ -46,6 +46,9 @@ private struct MadarSceneContent: View {
             .onChange(of: session?.lockController?.unlocked) { _, _ in
                 Task {
                     guard let session else { await MadarIntentHandoff.shared.flush(); return }
+                    if session.lockController?.canPresent(.app) == true {
+                        session.recordBahwReturnVisit()
+                    }
                     if session.lockController?.canPresent(.notes) ?? session.protectedDataAuthorized {
                         await session.refreshEligibleDiaryLettersForNotificationLifecycle()
                         await session.refreshPrayerNotifications()

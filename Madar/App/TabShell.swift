@@ -239,6 +239,10 @@ struct MadarRootView: View {
         .animation(themeAnimation, value: session.string("core.theme"))
         .task {
             #if DEBUG
+            session.seedBahwReturnPlanFixtureIfRequested()
+            #endif
+            session.recordBahwReturnVisit()
+            #if DEBUG
             await session.runLegacyDiaryTrialIfRequested()
             #endif
             do {
@@ -261,7 +265,11 @@ struct MadarRootView: View {
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active && !session.maintenanceInProgress {
-                do { try session.reload(); try session.publishSnapshot() }
+                do {
+                    try session.reload()
+                    try session.publishSnapshot()
+                    session.recordBahwReturnVisit()
+                }
                 catch { session.errorMessage = "تعذّر تحديث الواجهة. \(error.localizedDescription)" }
                 Task {
                     do {

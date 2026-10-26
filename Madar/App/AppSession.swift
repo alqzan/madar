@@ -15,6 +15,7 @@ struct AppUndoToken { let id: UUID; let expiresAt: Date }
 
 @MainActor @Observable
 final class AppSession {
+    private static let bahwReturnStateKey = "sys.bahwReturnPlan"
     let diaryPlayback = DiaryPlayback()
     var diaryRoute: Route?
     var quranRoute: Route?
@@ -42,6 +43,7 @@ final class AppSession {
     weak var privacyPresenter: ScenePrivacyPresenter?
     private(set) var protectedDataAuthorized = false
     private(set) var notificationAuthorization = "unknown"
+    private(set) var bahwReturnPlanDay: Int?
 #if DEBUG
     var notificationTestResult = ""
     var bankCorpusImportedInputCount = 0
@@ -156,6 +158,75 @@ final class AppSession {
         values = current
         prayerRevision &+= 1
     }
+    /// Records an authorized app visit. The state lives in a local DeviceSetting and is never sent to CloudKit.
+    func recordBahwReturnVisit() {
+        guard lockController?.canPresent(.app) ?? protectedDataAuthorized else { return }
+
+        let now = prayerNow()
+        let today = AppBahwService(session: self, evaluationDate: now).today
+        let context = ModelContext(container)
+        let key = Self.bahwReturnStateKey
+        do {
+            let rows = try context.fetch(FetchDescriptor<DeviceSetting>(predicate: #Predicate { $0.key == key }))
+            let existing = rows.filter { $0.mergedInto == nil }.max {
+                $0.updatedAt == $1.updatedAt ? $0.id.uuidString < $1.id.uuidString : $0.updatedAt < $1.updatedAt
+            }
+            let previous = existing.flatMap { try? JSONDecoder().decode(BahwReturnVisitState.self, from: $0.valueJSON) }
+            let next = BahwReturnPlanEngine.recordVisit(on: today, state: previous)
+            let nextDay = BahwReturnPlanEngine.dayNumber(on: today, state: next)
+
+            if next == previous {
+                bahwReturnPlanDay = nextDay
+                return
+            }
+
+            let row = existing ?? DeviceSetting()
+            if row.modelContext == nil {
+                row.id = StableIdentity.uuid(for: "DeviceSetting:\(key)")
+                context.insert(row)
+            }
+            let localStore = SettingsStore(context: context, schema: schema)
+            row.key = key
+            row.valueJSON = try JSONEncoder().encode(next)
+            row.writerID = try localStore.writerIDForWrite(now: now)
+            row.updatedAt = StableIdentity.monotonic(now: now, previous: row.updatedAt)
+            row.restoredAt = max(row.updatedAt, (row.deletionBarrierAt ?? .distantPast).addingTimeInterval(0.001))
+            row.deletedAt = nil
+            try context.save()
+            bahwReturnPlanDay = nextDay
+        } catch {
+            bahwReturnPlanDay = nil
+            errorMessage = "تعذّر حفظ خطة العودة على هذا الجهاز. حاول فتح البهو مرة أخرى."
+        }
+    }
+#if DEBUG
+    func seedBahwReturnPlanFixtureIfRequested() {
+        guard ProcessInfo.processInfo.environment["MADAR_UI_RETURN_PLAN"] == "1" else { return }
+        let key = Self.bahwReturnStateKey
+        let context = ModelContext(container)
+        do {
+            let rows = try context.fetch(FetchDescriptor<DeviceSetting>(predicate: #Predicate { $0.key == key }))
+            guard !rows.contains(where: { $0.deletedAt == nil && $0.mergedInto == nil }) else { return }
+            let today = AppBahwService(session: self, evaluationDate: prayerNow()).today
+            let state = BahwReturnVisitState(lastVisitedDay: today.adding(days: -3))
+            let row = rows.first ?? DeviceSetting()
+            if row.modelContext == nil {
+                row.id = StableIdentity.uuid(for: "DeviceSetting:\(key)")
+                context.insert(row)
+            }
+            let localStore = SettingsStore(context: context, schema: schema)
+            row.key = key
+            row.valueJSON = try JSONEncoder().encode(state)
+            row.writerID = try localStore.writerIDForWrite(now: prayerNow())
+            row.updatedAt = StableIdentity.monotonic(now: prayerNow(), previous: row.updatedAt)
+            row.restoredAt = row.updatedAt
+            row.deletedAt = nil
+            try context.save()
+        } catch {
+            errorMessage = "تعذّر تجهيز حالة العودة للاختبار."
+        }
+    }
+#endif
     func reconcileSpotlightIndex(reportFailure: Bool = false) async {
         spotlightReconciliationRevision &+= 1
         let revision = spotlightReconciliationRevision
