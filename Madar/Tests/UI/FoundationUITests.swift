@@ -374,6 +374,50 @@ import XCTest
         app.terminate()
     }
 
+    func testPrayerSheetReadFailureRetriesIntoTheRealQiyamFlow() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
+            "MADAR_UI_NOW": "2026-10-08T02:10:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-07",
+            "MADAR_UI_THEME": "light", "MADAR_UI_PRAYER_READ_FAILURE_ONCE": "1"]
+        app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+        let qiyam = app.buttons["prayer-qiyam"]; scrollTo(qiyam, in: app); qiyam.tap()
+        let retry = app.buttons["prayer-snapshot-retry"]
+        XCTAssertTrue(retry.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.buttons["prayer-snapshot-close"].exists)
+        XCTAssertFalse(app.buttons["prayer-qiyam-save"].exists)
+        attachScreenshot(app, named: "M1-read-failure-L")
+        retry.tap()
+        let plus = app.buttons["prayer-qiyam-plus"]
+        XCTAssertTrue(plus.waitForExistence(timeout: 10), app.debugDescription)
+        plus.tap(); XCTAssertEqual(app.staticTexts["prayer-qiyam-count"].label, "٢")
+        attachScreenshot(app, named: "M1-read-recovered-qiyam-L")
+        app.buttons["prayer-qiyam-save"].tap()
+        XCTAssertTrue(app.buttons["undo-button"].waitForExistence(timeout: 15), app.debugDescription)
+        app.buttons["undo-button"].tap()
+    }
+
+    func testPrayerCaptureRequestSurvivesReadFailureAndRetry() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
+            "MADAR_UI_NOW": "2026-10-07T16:20:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01",
+            "MADAR_UI_PRAYER_FIXTURE": "homeShowcase", "MADAR_UI_THEME": "light",
+            "MADAR_UI_PRAYER_READ_FAILURE_ONCE": "1", "MADAR_UI_PRAYER_OPEN_REQUEST": "asr"]
+        app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+        let retry = app.alerts.buttons["أعد المحاولة"]
+        XCTAssertTrue(retry.waitForExistence(timeout: 10), app.debugDescription)
+        attachScreenshot(app, named: "M1-request-read-failure-L")
+        retry.tap()
+        let alone = app.buttons["prayer-status-alone"]
+        XCTAssertTrue(alone.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(alone.isSelected, "Retry opens Asr's existing log, without recording a guessed status")
+        attachScreenshot(app, named: "M1-request-read-recovered-L")
+        app.buttons["prayer-status-jamaah"].tap()
+        XCTAssertTrue(app.buttons["undo-button"].waitForExistence(timeout: 15), app.debugDescription)
+        app.buttons["undo-button"].tap()
+    }
+
     /// M1-V07: the qiyam sheet, for comparison with screens/salah/07-S6-Qiyam(-s1).jpg.
     func test_M1V07_QiyamSheetMatchesCanonical() throws {
         continueAfterFailure = false

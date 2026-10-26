@@ -12,6 +12,11 @@ struct PrayerTodayView: View {
     @Environment(\.dynamicTypeSize) private var dynamicType
     @State private var selectedSheet: PrayerTodaySheet?
     @State private var locator = TravelLocator()
+    @State private var requestReadFailed = false
+    #if DEBUG
+    @State private var injectedReadFailure = false
+    @State private var injectedRequest = false
+    #endif
     @Environment(\.scenePhase) private var scenePhase
 
     @State private var onTrip = false
@@ -82,14 +87,27 @@ struct PrayerTodayView: View {
         }
         .environment(\.roomTheme, theme)
         .toolbarVisibility(.hidden, for: .navigationBar)
-        .onAppear { detectTravel(); refreshTrip() }
+        .onAppear {
+            detectTravel(); refreshTrip()
+            #if DEBUG
+            let env = ProcessInfo.processInfo.environment
+            if !injectedRequest, env["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil,
+               let prayer = env["MADAR_UI_PRAYER_OPEN_REQUEST"].flatMap(Prayer.init(rawValue:)) {
+                injectedRequest = true
+                session.prayerLogRequest = prayer
+            }
+            #endif
+        }
         .onChange(of: selectedSheet == nil) { _, _ in refreshTrip() }
         .onChange(of: session.prayerLogRequest, initial: true) { _, prayer in
             // «صليت المغرب» from Capture: the state was not said, so its log sheet asks instead of guessing.
             guard let prayer else { return }
-            session.prayerLogRequest = nil
-            if let cell = (try? session.prayerSnapshot(at: session.prayerNow()))?.today.cells.first(where: { $0.reference.prayer == prayer }) { choose(cell) }
+            openPrayerRequest(prayer)
         }
+        .alert("تعذّر فتح تسجيل الصلاة", isPresented: $requestReadFailed) {
+            Button("أعد المحاولة") { if let prayer = session.prayerLogRequest { openPrayerRequest(prayer) } }
+            Button("إلغاء", role: .cancel) { session.prayerLogRequest = nil }
+        } message: { Text("تعذّرت قراءة بيانات الصلاة. يمكنك المحاولة مرة أخرى.") }
         .onChange(of: scenePhase) { _, phase in if phase == .active { detectTravel() } }
         .sheet(item: $selectedSheet) { route in
             Group {
@@ -101,23 +119,23 @@ struct PrayerTodayView: View {
             case .pair(let day, let pair, let cell):
                 PrayerTravelPairSheet(session: session, day: day, pair: pair, alone: { selectedSheet = .log(cell) }, finished: { selectedSheet = nil })
             case .oldMissed:
-                if let snapshot = try? session.prayerSnapshot(at: session.prayerNow()) {
+                PrayerSnapshotSheet(revision: session.prayerRevision, load: sheetSnapshot, close: { selectedSheet = nil }) { snapshot in
                     PrayerOldMissedSheet(session: session, trackingStart: snapshot.tracking.day, finished: { selectedSheet = nil })
                 }
             case .qiyam:
-                if let snapshot = try? session.prayerSnapshot(at: session.prayerNow()) {
+                PrayerSnapshotSheet(revision: session.prayerRevision, load: sheetSnapshot, close: { selectedSheet = nil }) { snapshot in
                     PrayerNightLoggingSheet(session: session, snapshot: snapshot, finished: { selectedSheet = nil })
                 }
             case .heart(let cell):
                 PrayerHeartAnswerSheet(session: session, cell: cell, finished: { selectedSheet = nil })
             case .streaks:
-                if let snapshot = try? session.prayerSnapshot(at: session.prayerNow()) {
+                PrayerSnapshotSheet(revision: session.prayerRevision, load: sheetSnapshot, close: { selectedSheet = nil }) { snapshot in
                     PrayerStreaksSheet(snapshot: snapshot, levels: PrayerStreakLevel.shown(congregation: session.bool("salah.showMosqueStreak")),
                                        digits: digits, timeZone: session.activePlace.timeZone, openHali: { selectedSheet = .statistics })
                 }
             case .statistics:
                 NavigationStack {
-                    if let snapshot = try? session.prayerSnapshot(at: session.prayerNow()) {
+                    PrayerSnapshotSheet(revision: session.prayerRevision, load: sheetSnapshot, close: { selectedSheet = nil }) { snapshot in
                         PrayerStatisticsView(session: session, snapshot: snapshot) { choose($0) }
                     }
                 }
@@ -157,6 +175,29 @@ struct PrayerTodayView: View {
     }
 
     // MARK: Header and next prayer
+
+    private func sheetSnapshot() throws -> PrayerSnapshot {
+        #if DEBUG
+        let env = ProcessInfo.processInfo.environment
+        if !injectedReadFailure, env["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil,
+           env["MADAR_UI_PRAYER_READ_FAILURE_ONCE"] == "1" {
+            injectedReadFailure = true
+            throw CocoaError(.fileReadUnknown)
+        }
+        #endif
+        return try session.prayerSnapshot(at: session.prayerNow())
+    }
+
+    private func openPrayerRequest(_ prayer: Prayer) {
+        do {
+            guard let cell = try sheetSnapshot().today.cells.first(where: { $0.reference.prayer == prayer }) else {
+                requestReadFailed = true; return
+            }
+            session.prayerLogRequest = nil
+            requestReadFailed = false
+            choose(cell)
+        } catch { requestReadFailed = true }
+    }
 
     private func header(day prayerDay: GregorianDay?) -> some View {
         HStack(alignment: .top, spacing: 12) {
@@ -628,6 +669,40 @@ enum PrayerCopy {
 }
 
 // MARK: - Shared S1 pieces
+
+/// Keeps a failed read visible and retryable instead of presenting an empty prayer sheet.
+private struct PrayerSnapshotSheet<Content: View>: View {
+    let revision: Int
+    let load: () throws -> PrayerSnapshot
+    let close: () -> Void
+    @ViewBuilder let content: (PrayerSnapshot) -> Content
+    @Environment(\.roomTheme) private var theme
+    @State private var snapshot: PrayerSnapshot?
+    @State private var failed = false
+
+    var body: some View {
+        Group {
+            if let snapshot { content(snapshot) }
+            else if failed {
+                VStack(spacing: 20) {
+                    Image(systemName: "arrow.clockwise").font(.system(size: 28)).foregroundStyle(theme.accent)
+                    Text("تعذّر تحميل بيانات الصلاة").font(MadarTypography.title())
+                    Text("حاول مرة أخرى لفتح هذه الصفحة.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
+                    Button("أعد المحاولة", action: reload).buttonStyle(MadarPrimaryButton()).accessibilityIdentifier("prayer-snapshot-retry")
+                    Button("إغلاق", action: close).font(MadarTypography.body()).frame(minHeight: 44).accessibilityIdentifier("prayer-snapshot-close")
+                }
+                .multilineTextAlignment(.center).padding(24).frame(maxWidth: .infinity, maxHeight: .infinity)
+                .foregroundStyle(theme.ink).background(theme.background.ignoresSafeArea())
+            } else { ProgressView("تُفتح بيانات الصلاة…").frame(maxWidth: .infinity, maxHeight: .infinity).background(theme.background) }
+        }
+        .task(id: revision) { reload() }
+    }
+
+    private func reload() {
+        do { snapshot = try load(); failed = false }
+        catch { snapshot = nil; failed = true }
+    }
+}
 
 /// A paper card: the room background with a quiet hairline, as on S1.
 struct PrayerPaperCard<Content: View>: View {
