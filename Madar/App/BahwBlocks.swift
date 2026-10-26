@@ -86,11 +86,21 @@ struct BahwBlockView: View {
         let share: Double = group.isEmpty ? 0 : Double(met) / Double(group.count)
         let spoken: String = group.isEmpty ? "لا عادات" : digits.string(met) + " من " + digits.string(group.count)
         return Button { withAnimation(reduceMotion ? nil : .snappy) { habitPeriod = f } } label: {
-            VStack(spacing: 4) {
-                HabitMiniRing(share: share, theme: room).frame(width: 24, height: 24)
-                Text(f.arabic).font(selected ? label : small).foregroundStyle(selected ? room.accent : room.ink)
-                Capsule().fill(selected ? room.accentFill : Color.clear).frame(width: 18, height: 3)
-            }.frame(maxWidth: .infinity, minHeight: 44).contentShape(.rect).opacity(group.isEmpty ? 0.45 : 1)
+            VStack(spacing: 3) {
+                Text(f.arabic).font(selected ? label : small).lineLimit(1)
+                Capsule().fill(selected ? room.accentFill : room.line)
+                    .frame(height: selected ? 3 : 2)
+                    .overlay(alignment: .leading) {
+                        if !selected && !group.isEmpty {
+                            GeometryReader { proxy in
+                                Capsule().fill(room.accentFill).frame(width: proxy.size.width * share)
+                            }
+                        }
+                    }
+            }
+            .foregroundStyle(selected ? room.accent : room.secondaryInk)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .contentShape(.rect).opacity(group.isEmpty ? 0.45 : 1)
         }.buttonStyle(.plain).disabled(!interactive || group.isEmpty)
         .accessibilityLabel(f.arabic + "، " + spoken)
         .accessibilityAddTraits(selected ? .isSelected : []).accessibilityIdentifier("bahw-habits-period-" + f.rawValue)
@@ -143,14 +153,21 @@ struct BahwBlockView: View {
         let current = row.summary.current
         let share = Double(current?.value ?? 0) / Double(max(1, current?.target ?? 1))
         let progress = habitProgress(row)
+        let ringTheme: RoomTheme = switch row.source {
+        case "jamaah": .init(room: "salah", dark: dark)
+        case "review": .init(room: "quran", dark: dark)
+        case "diaryLine": .init(room: "notes", dark: dark)
+        case "reading", "hadith": .init(room: "mihbara", dark: dark)
+        default: room
+        }
         return Button { activateHabit(row) } label: {
             VStack(spacing: 2) {
                 ZStack(alignment: .topTrailing) {
-                    HabitMiniRing(share: share, theme: room).frame(width: 36, height: 36)
-                    if row.source != nil || current?.met == true {
-                        MadarGlyph(row.symbol, size: 16).frame(width: 36, height: 36)
+                    HabitMiniRing(share: share, theme: ringTheme).frame(width: 36, height: 36)
+                    if row.source != nil || current?.outcome == .complete {
+                        MadarGlyph(row.symbol, size: 16).foregroundStyle(ringTheme.accent).frame(width: 36, height: 36)
                     }
-                    if row.paused || (row.source != nil && current?.met == true) {
+                    if row.paused || (row.source != nil && current?.outcome == .complete) {
                         Image(systemName: row.paused ? "pause.fill" : "checkmark")
                             .font(.system(size: 8, weight: .bold))
                             .foregroundStyle(room.ink)
@@ -159,12 +176,12 @@ struct BahwBlockView: View {
                             .offset(x: 1, y: -1)
                     }
                 }
-                Text(row.name).font(small).lineLimit(2).multilineTextAlignment(.center)
+                Text(row.name).font(small).lineLimit(2, reservesSpace: true).multilineTextAlignment(.center)
                 // Tour 25 Oct: an empty ring already says «not yet»; the line below speaks only when it adds something.
                 if row.summary.streak > 1, current?.met != true { HabitFlame(count: row.summary.streak, frequency: current?.rule.frequency ?? .daily, digits: digits) }
-                else if progress != "لم تتمّها بعد" { Text(progress).font(MadarTypography.fine()).foregroundStyle(room.secondaryInk).lineLimit(1) }
+                else if progress != "لم تتمّها بعد" { Text(progress).font(MadarTypography.fine()).foregroundStyle(room.secondaryInk).lineLimit(2).multilineTextAlignment(.center) }
             }
-            .frame(maxWidth: .infinity, minHeight: 74)
+            .frame(maxWidth: .infinity, minHeight: 100)
             .contentShape(.rect(cornerRadius: 12))
         }
         .buttonStyle(.plain)
@@ -240,10 +257,9 @@ struct BahwBlockView: View {
                     }
                 } else {
                     HStack { ForEach(periods, id: \.self) { f in periodRing(f, rows: rows, selected: f == period) } }
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 6) {
+                    HStack(alignment: .top, spacing: 3) {
                         ForEach(Array(shown.prefix(6))) { row in habitRing(row) }
                     }
-                    .accessibilityIdentifier("bahw-habits-items")
                     Spacer(minLength: 0)
                     BahwHabitsWide(rows: rows, digits: digits, theme: room, interactive: interactive, showsPeriods: false) {
                         service.session.habitsOpen = true

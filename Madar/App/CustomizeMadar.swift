@@ -239,6 +239,11 @@ struct SettingControl: View {
                     .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            if definition.key == "bahw.reminder" {
+                Text("هذا اختيار البداية للعادات الجديدة. الإشعار للعادات التي تسجلها هنا، ويحتاج وقتًا للعادة وتفعيل تذكيرات الجهاز وسماح النظام.")
+                    .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
     private var offsetRange: ClosedRange<Int> {

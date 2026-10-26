@@ -30,6 +30,7 @@ struct HabitsRoomView: View {
     @State private var deletingArchived: HabitReading?
     @State private var pendingEditor: HabitEditorIdentity?
     @State private var showAll = false
+    @State private var selectedPeriod: HabitFrequency?
     @State private var pastDay: HabitReading?
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -53,6 +54,7 @@ struct HabitsRoomView: View {
                     else {
                         // Owner 24 Oct chose «خطوة اليوم»: one direct list with one tap per habit. The hero names
                         // the next useful step, «اليوم» holds only what is due now, «كل عاداتي» the whole picture.
+                        periodSummaries
                         hero
                         viewSwitch
                         if showAll { allList } else { todayList }
@@ -170,11 +172,40 @@ struct HabitsRoomView: View {
 
     // MARK: Lists
 
+    /// A compact overview of the four frequencies. Choosing one opens its own grouped list;
+    /// the Today/All switch remains available to return to either complete view.
+    private var periodSummaries: some View {
+        HStack(spacing: 6) {
+            ForEach([HabitFrequency.daily, .weekly, .monthly, .yearly], id: \.self) { frequency in
+                periodSummary(frequency)
+            }
+        }
+    }
+
+    private func periodSummary(_ frequency: HabitFrequency) -> some View {
+        let group = active.filter { $0.summary.current?.rule.frequency == frequency }
+        let rows = group.filter { !$0.paused && ($0.summary.current?.target ?? 0) > 0 }
+        let done = rows.filter { $0.summary.current?.met == true }.count
+        let count = rows.isEmpty ? (group.isEmpty ? "لا عادات" : "لا استحقاق") : digits.string(done) + " من " + digits.string(rows.count)
+        let title: String = switch frequency {
+        case .daily: "اليوم"
+        case .weekly: "الأسبوع"
+        case .monthly: "الشهر"
+        case .yearly: "السنة"
+        }
+        return HabitPeriodSummaryCard(title: title, count: count,
+                                      share: rows.isEmpty ? 0 : Double(done) / Double(rows.count),
+                                      selected: showAll && selectedPeriod == frequency, enabled: !group.isEmpty,
+                                      frequency: frequency, theme: theme, showsRing: !dynamicTypeSize.isAccessibilitySize) {
+            withAnimation(reduceMotion ? nil : .snappy) { showAll = true; selectedPeriod = frequency }
+        }
+    }
+
     private var viewSwitch: some View {
         HStack(spacing:6) {
             ForEach([false,true],id:\.self) { all in
-                let on = showAll == all
-                Button { withAnimation(reduceMotion ? nil : .snappy) { showAll = all } } label: {
+                let on = showAll == all && (!all || selectedPeriod == nil)
+                Button { withAnimation(reduceMotion ? nil : .snappy) { showAll = all; selectedPeriod = nil } } label: {
                     Text(all ? "كل عاداتي" : "اليوم").font(MadarTypography.caption()).frame(maxWidth:.infinity,minHeight:44)
                         .background(on ? theme.accentFill.opacity(0.16) : .clear,in:.capsule)
                         .overlay { Capsule().stroke(on ? theme.accentFill : theme.line,lineWidth:on ? 1.5 : 1) }
@@ -195,7 +226,14 @@ struct HabitsRoomView: View {
             Button { withAnimation(reduceMotion ? nil : .snappy) { showAll = true } } label: { Label("لا شيء مستحقّ اليوم؛ اعرض كل عاداتك",systemImage:"list.bullet").font(MadarTypography.caption()).frame(maxWidth:.infinity,minHeight:56) }
                 .buttonStyle(.plain).background(theme.surface,in:.rect(cornerRadius:20)).accessibilityIdentifier("habits-today-empty")
         } else {
-            rowsBlock(open)
+            ForEach([HabitFrequency.daily, .weekly, .monthly, .yearly], id: \.self) { frequency in
+                let group = open.filter { $0.summary.current?.rule.frequency == frequency }
+                if !group.isEmpty {
+                    Text(frequency.arabic).font(MadarTypography.section()).padding(.top, 4)
+                        .accessibilityIdentifier("habits-today-group-" + frequency.rawValue)
+                    rowsBlock(group)
+                }
+            }
             if !done.isEmpty {
                 Text("تمّت اليوم").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).padding(.top,open.isEmpty ? 0 : 10)
                 rowsBlock(done)
@@ -215,7 +253,7 @@ struct HabitsRoomView: View {
     @ViewBuilder private var allList: some View {
         ForEach([HabitFrequency.daily,.weekly,.monthly,.yearly],id:\.self) { f in
             let rows = active.filter { ($0.summary.current?.rule.frequency ?? .daily) == f }.sorted { priority($0) < priority($1) }
-            if !rows.isEmpty {
+            if !rows.isEmpty && (selectedPeriod == nil || selectedPeriod == f) {
                 HStack(alignment:.firstTextBaseline) {
                     Text(f == .daily ? "كل يوم" : f == .weekly ? "كل أسبوع" : f == .monthly ? "كل شهر" : "كل سنة").font(MadarTypography.section())
                     Spacer()
@@ -291,6 +329,40 @@ struct HabitsRoomView: View {
     private func progress(_ row:HabitReading)->String { guard let p=row.summary.current else{return "لا فترة بعد"}; return p.target == 0 ? "سجلك محفوظ" : p.rule.measure == .once && p.target == 1 ? (p.value >= 1 ? "تمّت" : "") : habitProgressText(p.value,p.target,p.rule.unit,digits) }
     private func reload() { do { readings=try HabitRepository(context:ModelContext(session.container)).readings(at:session.prayerNow(),includeArchived:true,liveHealth:liveHealth);if let id=session.habitRouteID {if let row=readings.first(where:{$0.id==id}) {if row.archived {showArchived=true}else{detail=row}};session.habitRouteID=nil} } catch { session.errorMessage=error.localizedDescription } }
     private func perform(_ name:String,_ payload:[String:MadarCore.JSONValue]) { Task { do {try await session.executeDiaryCommand(name,payload:payload);reload()}catch{session.errorMessage=error.localizedDescription} } }
+}
+
+private struct HabitPeriodSummaryCard: View {
+    let title: String
+    let count: String
+    let share: Double
+    let selected: Bool
+    let enabled: Bool
+    let frequency: HabitFrequency
+    let theme: RoomTheme
+    let showsRing: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title).font(MadarTypography.fine()).lineLimit(1)
+                    Text(count).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2))
+                        .foregroundStyle(theme.secondaryInk).lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                if showsRing { HabitMiniRing(share: share, theme: theme).frame(width: 22, height: 22) }
+            }
+            .padding(.horizontal, 8).frame(maxWidth: .infinity, minHeight: 58)
+            .background(theme.surface, in: .rect(cornerRadius: 14))
+            .overlay { RoundedRectangle(cornerRadius: 14).stroke(selected ? theme.accentFill : theme.line, lineWidth: selected ? 1.5 : 1) }
+            .contentShape(.rect(cornerRadius: 14))
+        }
+        .buttonStyle(.plain).disabled(!enabled)
+        .accessibilityLabel(frequency.arabic + "، " + count)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+        .accessibilityIdentifier("habits-period-" + frequency.rawValue)
+    }
 }
 /// A habit as its own small orbit: the ring closes as the period's progress grows; a finished habit
 /// fills softly and takes a star. Linked habits carry their room's glyph. (Owner 24 Oct: arches are the

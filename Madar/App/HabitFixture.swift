@@ -79,12 +79,13 @@ extension AppSession {
         }
         let atRisk = variant == "atRisk", overdue = variant == "sinceOverdue"
         let since = variant == "since" || overdue
-        guard variant == "showcase" || atRisk || since else{try context.save();return}
+        let lobbySix = variant == "lobbySix"
+        guard variant == "showcase" || atRisk || since || lobbySix else{try context.save();return}
         let today=GregorianDay.containing(prayerNow(),in:activePlace.timeZone)
         let names=["الماء","أذكار الصباح","مذاكرة","الاتصال بالأخوال","زيارة الوالدين","صدقة الشهر",since ? "إهداء من تحب" : "العمرة"]
         for (index,name) in names.enumerated(){
             let habit=Habit();habit.id=StableIdentity.uuid(for:"habit-fixture-\(index)");habit.name=name;habit.order=index;habit.startDate=today.adding(days:-20).date(in:ActivePlace.riyadh.timeZone);context.insert(habit)
-            let p=HabitPolicy();p.habitID=habit.id;p.effectiveFrom=today.adding(days:-20).description;p.frequency=index<3 ? "daily" : index<5 ? "weekly" : index==5 ? "monthly" : "yearly";p.measure=index==0 ? "count" : "once";p.target=index==0 ? 8 : 1;p.unit=index==0 ? "كوب" : nil;p.minimum=index==0 ? 1 : nil;p.monthCalendar="gregorian";p.yearMonth=12;p.yearDay=15;context.insert(p)
+            let p=HabitPolicy();p.habitID=habit.id;p.effectiveFrom=today.adding(days:-20).description;p.frequency=(lobbySix && index<6) || index<3 ? "daily" : index<5 ? "weekly" : index==5 ? "monthly" : "yearly";p.measure=index==0 ? "count" : "once";p.target=index==0 ? 8 : 1;p.unit=index==0 ? "كوب" : nil;p.minimum=index==0 ? 1 : nil;p.monthCalendar="gregorian";p.yearMonth=12;p.yearDay=15;context.insert(p)
             if since && index == 6 {
                 // Item 26 «ج»: a yearly habit kept by «آخر مرة», two times long ago with that day's diary lines.
                 p.effectiveFrom=today.adding(days:-700).description
@@ -97,7 +98,7 @@ extension AppSession {
                 continue
             }
             for offset in 1...18 where (offset+index)%5 != 0 && !(atRisk && index == 0 && offset == 1) {
-                let event=HabitEvent();event.habitID=habit.id;event.dayKey=today.adding(days:-offset).description;let d=today.adding(days:-offset);event.periodKey=index<3 ? d.description : index<5 ? MadarYear.week(d,start:.saturday).start.description : index==5 ? String(format:"g:%04d-%02d",d.year,d.month) : String(format:"g:%04d",d.year);event.delta=index==0 ? 8 : 1;event.eventAt=today.adding(days:-offset).date(in:ActivePlace.riyadh.timeZone).addingTimeInterval(43200);event.tzID="Asia/Riyadh";event.dayPolicy="midnight@1";context.insert(event)
+                let event=HabitEvent();event.habitID=habit.id;event.dayKey=today.adding(days:-offset).description;let d=today.adding(days:-offset);event.periodKey=(lobbySix && index<6) || index<3 ? d.description : index<5 ? MadarYear.week(d,start:.saturday).start.description : index==5 ? String(format:"g:%04d-%02d",d.year,d.month) : String(format:"g:%04d",d.year);event.delta=index==0 ? 8 : 1;event.eventAt=today.adding(days:-offset).date(in:ActivePlace.riyadh.timeZone).addingTimeInterval(43200);event.tzID="Asia/Riyadh";event.dayPolicy="midnight@1";context.insert(event)
             }
         }
         try context.save()

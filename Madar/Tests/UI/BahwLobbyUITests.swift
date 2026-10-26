@@ -142,6 +142,39 @@ import XCTest
         XCTAssertEqual(risk.label, "فاتتك فترة")
         capture(app, "M4-V01-habit-small-after-L")
     }
+
+    func testSixHabitRingsStayTappableAndPeriodChoiceKeepsProgress() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
+                                 "MADAR_UI_HABIT_FIXTURE": "lobbySix", "MADAR_UI_NOW": "2026-10-15T20:00:00+03:00", "MADAR_UI_THEME": "light"]
+        app.launch(); finishOnboarding(app)
+        let rings = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "bahw-habit-ring-"))
+        XCTAssertTrue(rings.firstMatch.waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertEqual(rings.count, 6, app.debugDescription)
+        let frames = rings.allElementsBoundByIndex.map(\.frame)
+        XCTAssertLessThan((frames.map(\.midY).max() ?? 0) - (frames.map(\.midY).min() ?? 0), 2)
+        for ring in rings.allElementsBoundByIndex {
+            XCTAssertTrue(ring.isHittable, ring.label)
+            XCTAssertGreaterThanOrEqual(ring.frame.width, 44, ring.label)
+            XCTAssertGreaterThanOrEqual(ring.frame.height, 44, ring.label)
+        }
+        capture(app, "OR-01-six-habits-L")
+
+        let water = rings.matching(NSPredicate(format: "label CONTAINS %@", "الماء")).firstMatch
+        water.tap()
+        let recorded = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", "١"), object: water)
+        XCTAssertEqual(XCTWaiter.wait(for: [recorded], timeout: 10), .completed, app.debugDescription)
+        XCTAssertFalse(app.staticTexts["habits-title"].exists, "A habit tap must record in the lobby.")
+        app.buttons["bahw-habits-period-yearly"].tap()
+        XCTAssertEqual(rings.count, 1, app.debugDescription)
+        app.buttons["bahw-habits-period-daily"].tap()
+        XCTAssertEqual(rings.count, 6, app.debugDescription)
+        XCTAssertTrue(water.label.contains("١"), water.label)
+        // Let the selected-period transition settle before the visual evidence is captured.
+        Thread.sleep(forTimeInterval: 0.7)
+        capture(app, "OR-01-six-habits-recorded-L")
+    }
     func testNextFajrAfterIsha() throws {
         continueAfterFailure = false
         let app = XCUIApplication()

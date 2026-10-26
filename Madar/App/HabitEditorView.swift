@@ -71,7 +71,15 @@ struct HabitEditorView:View {
                             }
                             Text("الوقت يتبع مدينتك النشطة؛ ونافذة الليل تتبع يوم مدار الذي بدأت فيه.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                         }
-                        Picker("التذكير",selection:$reminder){Text("نقطة في البهو").tag("dot");Text("بلا تذكير").tag("none")}.pickerStyle(.menu)
+                        Picker("التذكير",selection:$reminder){
+                            Text("نقطة في البهو").tag("dot")
+                            if source == "custom" || (reading != nil && reminder == "push") { Text("إشعار لطيف").tag("push") }
+                            Text("بلا تذكير").tag("none")
+                        }.pickerStyle(.menu).accessibilityIdentifier("habit-reminder")
+                        if reminder == "push" {
+                            Text(source == "custom" ? "حدّد وقت العادة واسمح بالإشعارات ليصل التذكير." : "الإشعار غير متاح للعادة المرتبطة؛ يمكنك اختيار نقطة البهو.")
+                                .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                        }
                         Toggle("للبيت فقط، تتوقف في السفر",isOn:$homeOnly).frame(minHeight:44)
                         Text("أيام إجازة").font(MadarTypography.caption());dayButtons($rule.restWeekdays)
                     }
@@ -82,9 +90,12 @@ struct HabitEditorView:View {
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.accent).environment(\.timeZone,session.activePlace.timeZone)
         .onAppear {
             name=reading?.name ?? "";source=reading?.source ?? "custom";rule=reading?.summary.current?.rule ?? HabitRule(effectiveFrom:AppBahwService(session:session).today)
-            rule.effectiveFrom=AppBahwService(session:session).today;monthDays=rule.monthDays.map{digits.string($0)}.joined(separator:"، ");minimumOn=rule.minimum != nil;windowOn=rule.windowStart != nil;homeOnly=reading?.homeOnly ?? false;reminder=reading?.reminder ?? (session.string("bahw.reminder") == "none" ? "none" : "dot")
+            rule.effectiveFrom=AppBahwService(session:session).today;monthDays=rule.monthDays.map{digits.string($0)}.joined(separator:"، ");minimumOn=rule.minimum != nil;windowOn=rule.windowStart != nil;homeOnly=reading?.homeOnly ?? false
+            let defaultReminder = session.string("bahw.reminder")
+            reminder=reading?.reminder ?? (["dot", "push", "none"].contains(defaultReminder) ? defaultReminder : "dot")
         }
         .onChange(of:source){old,value in
+            if reading == nil && value != "custom" && reminder == "push" { reminder = "dot" }
             if value == "custom",reading == nil {rule.measure = .once;rule.unit=nil;rule.target=1}
             let defaults=["jamaah":"الجماعة","review":"المراجعة","diaryLine":"سطر اليوم","walking":"المشي"]
             if let previous=defaults[old],name==previous {name=defaults[value] ?? ""}

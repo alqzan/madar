@@ -107,7 +107,7 @@ final class AppSession {
     @ObservationIgnored private var spotlightReconciliationTask: Task<Void, Never>?
     @ObservationIgnored private let spotlightIndexOperation: AppSpotlightIndexOperation
 
-    static let supportedKeys = ["core.dayStart", "core.firstCalendar", "core.hijriSource", "core.hijriOffset", "core.weekStart", "core.theme", "core.numerals", "core.homeCity", "core.faceIDLock", "core.spotlightIndex", "salah.askAfterAdhanMin", "salah.askReminder", "salah.liveActivity", "salah.showMosqueStreak", "salah.askHeart", "salah.method", "salah.asr", "salah.highLatitudeRule", "salah.offsets", "notif.thisDeviceReminders", "notif.quietAfterIsha", "notif.quietFrom", "bahw.yearWhich", "bahw.upcomingCount", "bahw.streakBreakAfter", "bahw.travelFreezesHome"]
+    static let supportedKeys = ["core.dayStart", "core.firstCalendar", "core.hijriSource", "core.hijriOffset", "core.weekStart", "core.theme", "core.numerals", "core.homeCity", "core.faceIDLock", "core.spotlightIndex", "salah.askAfterAdhanMin", "salah.askReminder", "salah.liveActivity", "salah.showMosqueStreak", "salah.askHeart", "salah.method", "salah.asr", "salah.highLatitudeRule", "salah.offsets", "notif.thisDeviceReminders", "notif.quietAfterIsha", "notif.quietFrom", "bahw.yearWhich", "bahw.upcomingCount", "bahw.streakBreakAfter", "bahw.reminder", "bahw.travelFreezesHome"]
 
     init(
         container: ModelContainer,

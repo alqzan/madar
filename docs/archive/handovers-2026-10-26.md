@@ -15,3 +15,12 @@
 - **Not verified:** `OwnerAllDataTrialUITests/testOwnerPDFConvertsAndReads` still drives the old review flow and must be updated to the offer → «افتحه» flow (same steps as `MihbaraImportUITests/testTextPDFConvertsOnDeviceIntoAFlowingBook`); conversion stops if iOS suspends or kills the app (no resume yet); owner's «صفحة ٩٤» not reproduced (row 30e); unclear bold words (30f).
 - **Next:** rows 30e/30f after the owner's notes, 31 Turath quote card, 32 owner-data walk; the owner is trying the whole app and will send long notes.
 - **Model/effort:** claude-opus-5-5, effort not exposed. **Usage:** five-hour about 55% at handover.
+
+## Handover — continued app improvements across rooms — 2026-10-26 — Codex
+- **Works now:** prayer polar-day manual logging, future prayers stay locked on a valid trip from a polar home, input-keyed Quran forecasts, same-day home-only travel freezes, PDF conversion checkpoints, and the lobby’s locally saved three-day return plan.
+- **Verified:** `MadarCore` return-plan tests 3/3; `BahwLobbyUITests/testThreeDayReturnPlanPersistsLocallyAndOpensItsRooms` 1/1 on iPhone 17 Pro/iOS 26.5, including Quran/habits routes and app relaunch; prior focused prayer, Quran, habits, and PDF checks remain as recorded; `git diff --check` clean.
+- **Differences left:** no canonical screenshot for the return state; default L/light evidence is in `Artifacts/codex-bahw-return-final-shots/`. Prayer engine fix has no visual change or canonical; PDF progress capture remains `Artifacts/codex-mihbara-checkpoint-r5-export/D0B359E0-234A-44C9-8A81-676C877E302C.png`.
+- **Not verified:** owner visual/device acceptance for the new card, CloudKit, signed release, or diary freeze-boundary behavior after prayer-setting changes.
+- **Next:** continue scanning item 27 for reproducible journey gaps; J05 freeze-boundary field decision still awaits the owner. No `ready` card is listed.
+- **Model/effort:** not exposed / not exposed. Helpers did bounded read-only scans of lobby return storage and dates; no owner data was delegated.
+- **Usage:** live check: 28% used in the five-hour window and 15% weekly; continue until about 5% allowance remains, preserving commit/handover reserve.

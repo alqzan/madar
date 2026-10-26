@@ -161,6 +161,35 @@ import UIKit
         shot(app,"M4-V02-Adat-all-L");app.swipeUp(velocity:.slow);shot(app,"M4-V02-Adat-all-s1-L")
         XCTAssertFalse(app.segmentedControls["عرض العادات"].exists) // RA8: alternate designs are v2; this is a filter.
     }
+    func testPeriodSummariesOpenTheirGroupsAndReturnToToday() throws {
+        continueAfterFailure = false
+        let app = app("showcase"); open(app)
+        let today = app.buttons["habits-view-today"], all = app.buttons["habits-view-all"]
+        XCTAssertTrue(today.isSelected, app.debugDescription)
+        for frequency in ["daily", "weekly", "monthly", "yearly"] {
+            XCTAssertTrue(app.buttons["habits-period-" + frequency].exists, frequency)
+        }
+        XCTAssertTrue(app.staticTexts["habits-today-group-daily"].exists, app.debugDescription)
+        shot(app, "OR-02-habits-today-L")
+        let weekly = app.buttons["habits-period-weekly"]
+        weekly.tap()
+        XCTAssertTrue(weekly.isSelected, app.debugDescription)
+        XCTAssertFalse(all.isSelected, "The whole-list filter is not selected while only one period is shown.")
+        XCTAssertTrue(app.descendants(matching: .any)["habits-group-weekly"].waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertFalse(app.descendants(matching: .any)["habits-group-daily"].exists)
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "الاتصال بالأخوال")).firstMatch.exists)
+        shot(app, "OR-02-habits-weekly-L")
+        all.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["habits-group-daily"].waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(app.descendants(matching: .any)["habits-group-weekly"].exists)
+        shot(app, "OR-02-habits-all-L")
+        app.swipeUp(velocity: .slow); shot(app, "OR-02-habits-all-s1-L")
+        app.swipeUp(velocity: .slow); shot(app, "OR-02-habits-all-s2-L")
+        app.swipeDown(velocity: .fast); app.swipeDown(velocity: .fast)
+        XCTAssertTrue(today.waitForExistence(timeout: 5)); today.tap()
+        XCTAssertTrue(today.isSelected)
+        XCTAssertTrue(app.staticTexts["habits-today-group-daily"].waitForExistence(timeout: 5))
+    }
     func testScheduledMonthlyAndYearlyHabitsAppearOnTheirDates() {
         continueAfterFailure = false
         let app = app("scheduledToday"); open(app)
