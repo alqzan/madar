@@ -36,6 +36,33 @@ import MadarMoney
         XCTAssertTrue(try AppDiaryService(app: app, clock: { .now }).home().todayPage.lines.contains { $0.text == "فكرة: كتاب عن الجيران" })
     }
 
+    func testCaptureRequestsSurviveStoreMaintenance() async throws {
+        let (app, container) = try session()
+        app.authorizeProtectedData()
+        let handoff = MadarIntentHandoff.shared
+        await handoff.attach { [weak app] request in await app?.handleIntentRequest(request) ?? false }
+        try await app.quiesceWriters()
+
+        let lineID = UUID()
+        let lineHeld = await handoff.submit(.diaryLine(text: "اتصلت بخالتي", day: "today", id: lineID))
+        XCTAssertFalse(lineHeld, "A diary write rejected by maintenance must remain held.")
+        XCTAssertEqual(try ModelContext(container).fetchCount(FetchDescriptor<Entry>()), 0)
+
+        let prayerHeld = await handoff.submit(.capture(text: "صلّيت الفجر جماعة", id: UUID()))
+        XCTAssertFalse(prayerHeld, "A prayer write rejected by maintenance must remain held.")
+        XCTAssertEqual(try ModelContext(container).fetchCount(FetchDescriptor<PrayerLog>()), 0)
+
+        app.resumeWriters()
+        for _ in 0..<100 {
+            let entries = try ModelContext(container).fetch(FetchDescriptor<Entry>())
+            let prayers = try ModelContext(container).fetch(FetchDescriptor<PrayerLog>())
+            if entries.contains(where: { $0.text == "اتصلت بخالتي" }) && prayers.contains(where: { $0.prayer == "fajr" && $0.status == "jamaah" }) { break }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        XCTAssertEqual(try ModelContext(container).fetch(FetchDescriptor<Entry>()).filter { $0.text == "اتصلت بخالتي" }.count, 1)
+        XCTAssertEqual(try ModelContext(container).fetch(FetchDescriptor<PrayerLog>()).filter { $0.prayer == "fajr" && $0.status == "jamaah" }.count, 1)
+    }
+
     func testMihbaraIdeaCaptureWritesOnePrivateNoteAndOpensItsRoom() async throws {
         let (app,container)=try session(),id=UUID()
         app.authorizeProtectedData()

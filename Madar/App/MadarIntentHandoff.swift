@@ -1,5 +1,6 @@
 import Foundation
 import MadarCore
+import MadarData
 import MadarPrayer
 import MadarCommands
 import MadarMoney
@@ -58,7 +59,10 @@ extension AppSession {
             habitRouteID = habitID; selectedTab = "foundation"; habitsOpen = true
             let reading = (try? HabitRepository(context: ModelContext(container)).readings(at: prayerNow()))?.first { $0.id == habitID }
             guard let current = reading?.summary.current else { errorMessage = "لم تعد هذه العادة متاحة."; return true }
-            do { try await executeDiaryCommand("habit.complete", payload: ["id": .string(habitID.uuidString), "delta": .number(current.rule.measure == .duration ? 15 : 1)], id: id) }
+            do {
+                try await executeDiaryCommand("habit.complete", payload: ["id": .string(habitID.uuidString), "delta": .number(current.rule.measure == .duration ? 15 : 1)], id: id)
+                clearRecoveredMaintenanceError()
+            } catch BackupOperationError.busy { return false }
             catch { errorMessage = error.localizedDescription }
             return true
         case .capture(let text, let id):
@@ -73,7 +77,7 @@ extension AppSession {
                 return await addDiaryLineFromIntent(text: line, day: "today", id: id)
             case .mihbaraIdea(let idea): return await saveMihbaraIdeaFromIntent(text: idea, id: id)
             case .logPrayer(let prayer, let status, let shortened, let fridayKind):
-                logPrayerFromCapture(prayer, status: status, shortened: shortened, fridayKind: fridayKind); return true
+                return logPrayerFromCapture(prayer, status: status, shortened: shortened, fridayKind: fridayKind)
             case .choosePrayerStatus(let prayer, _):
                 selectedTab = "prayer"; prayerLogRequest = prayer; return true
             }
@@ -84,7 +88,10 @@ extension AppSession {
         // Today's page shows the new line; while the diary is locked its gate shows instead and the line waits.
         open(URL(string: "madar://notes/today")!)
         guard lockController?.canPresent(.notes) ?? protectedDataAuthorized else { return false }
-        do { try await executeDiaryCommand("diary.appendLine", payload: ["text": .string(text), "day": .string(day)], id: id) }
+        do {
+            try await executeDiaryCommand("diary.appendLine", payload: ["text": .string(text), "day": .string(day)], id: id)
+            clearRecoveredMaintenanceError()
+        } catch BackupOperationError.busy { return false }
         catch { errorMessage = "لم يُضف السطر. \(error.localizedDescription)" }
         return true
     }
@@ -96,6 +103,7 @@ extension AppSession {
         guard lockController?.canPresent(.app) ?? protectedDataAuthorized else { return false }
         do {
             try await executeBookCommand("notebook.savePrivate", payload:["id":.string(id.uuidString),"text":.string(text)], id:id)
+            clearRecoveredMaintenanceError()
             return true
         } catch {
             errorMessage = "لم تُحفظ الفكرة في دفتر المحبرة. أعد المحاولة."
@@ -105,19 +113,19 @@ extension AppSession {
 
     /// The prayer day comes from the same snapshot as the prayer home (Fajr to the next Fajr).
     /// Friday Dhuhr said as «الظهر» is recorded as Dhuhr, never silently as Jumu'ah.
-    private func logPrayerFromCapture(_ prayer: Prayer, status: String, shortened: Bool?, fridayKind: FridayPrayerKind?) {
+    private func logPrayerFromCapture(_ prayer: Prayer, status: String, shortened: Bool?, fridayKind: FridayPrayerKind?) -> Bool {
         selectedTab = "prayer"
         guard let snapshot = try? prayerSnapshot(at: prayerNow()),
               let cell = snapshot.today.cells.first(where: { $0.reference.prayer == prayer }) else {
-            errorMessage = "تعذّر تحديد يوم الصلاة. افتح الصلاة وسجّلها من قوسها."; return
+            errorMessage = "تعذّر تحديد يوم الصلاة. افتح الصلاة وسجّلها من قوسها."; return true
         }
-        if fridayKind == .jumuah, !cell.isFriday { errorMessage = "اليوم ليس جمعة؛ سجّل الظهر من قوسها."; return }
+        if fridayKind == .jumuah, !cell.isFriday { errorMessage = "اليوم ليس جمعة؛ سجّل الظهر من قوسها."; return true }
         var payload: [String: MadarCore.JSONValue] = [
             "dayKey": .string(cell.reference.day.description), "prayer": .string(prayer.rawValue), "status": .string(status)
         ]
         if let shortened { payload["shortened"] = .bool(shortened) }
         if prayer == .dhuhr, cell.isFriday { payload["fridayKind"] = .string((fridayKind ?? .dhuhr).rawValue) }
-        logCapturedPrayer(payload: .object(payload), undoMessage: "سُجّلت " + Self.prayerName(prayer, friday: payload["fridayKind"] == .string("jumuah")) + (status == "jamaah" ? " جماعة" : " منفردًا") + "")
+        return logCapturedPrayer(payload: .object(payload), undoMessage: "سُجّلت " + Self.prayerName(prayer, friday: payload["fridayKind"] == .string("jumuah")) + (status == "jamaah" ? " جماعة" : " منفردًا") + "")
     }
 
     static func prayerName(_ prayer: Prayer, friday: Bool) -> String {

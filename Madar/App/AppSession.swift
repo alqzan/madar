@@ -374,16 +374,23 @@ final class AppSession {
             undoMessage: "حُلّت الفترة")
     }
     /// Capture's prayer report uses the same command, undo and refresh as a tap on the arch.
-    func logCapturedPrayer(payload: MadarCore.JSONValue, undoMessage: String) {
+    @discardableResult
+    func logCapturedPrayer(payload: MadarCore.JSONValue, undoMessage: String) -> Bool {
         sendPrayerCommand(name: "prayer.log", payload: payload, undoMessage: undoMessage)
     }
-    private func sendPrayerCommand(name: String, payload: MadarCore.JSONValue, undoMessage: String, completion: ((Bool) -> Void)? = nil) {
-        guard !prayerWriteInProgress, beginWrite() else { completion?(false); return }
+    @discardableResult
+    private func sendPrayerCommand(name: String, payload: MadarCore.JSONValue, undoMessage: String, completion: ((Bool) -> Void)? = nil) -> Bool {
+        guard !prayerWriteInProgress, beginWrite() else { completion?(false); return false }
         prayerWriteInProgress = true
         let now = prayerNow()
         Task {
             var succeeded = false
-            defer { pendingWrites -= 1; prayerWriteInProgress = false; completion?(succeeded) }
+            defer {
+                pendingWrites -= 1
+                prayerWriteInProgress = false
+                completion?(succeeded)
+                Task { await MadarIntentHandoff.shared.flush() }
+            }
             do {
                 succeeded = try await withSerializedPrayerNotificationMutation {
                     let command = CommandEnvelope(name: name, payload: payload, source: .app, issuedAt: now)
@@ -392,6 +399,7 @@ final class AppSession {
                         errorMessage = prayerFailure(result.reason)
                         return false
                     }
+                    clearRecoveredMaintenanceError()
                     try reload()
                     if let id = result.undoToken {
                         let context = ModelContext(container)
@@ -408,6 +416,7 @@ final class AppSession {
                 errorMessage = "لم يُسجّل التغيير. \(error.localizedDescription)"
             }
         }
+        return true
     }
     private func prayerFailure(_ reason: String?) -> String {
         switch reason {
@@ -679,9 +688,13 @@ final class AppSession {
     }
     private func beginWrite() -> Bool {
         guard !maintenanceInProgress else {
-            errorMessage = "مدار يحدّث مخزن البيانات. حاول بعد اكتمال العملية."; return false
+            errorMessage = Self.maintenanceBusyMessage; return false
         }
         pendingWrites += 1; return true
+    }
+    private static let maintenanceBusyMessage = "مدار يحدّث مخزن البيانات. حاول بعد اكتمال العملية."
+    func clearRecoveredMaintenanceError() {
+        if errorMessage == Self.maintenanceBusyMessage { errorMessage = nil }
     }
     func quiesceWriters() async throws {
         guard !maintenanceInProgress else { throw BackupOperationError.busy }
@@ -695,7 +708,8 @@ final class AppSession {
         Task {
             do {
                 guard try await drainInbox() else { return }
-            } catch { errorMessage = "لم يكتمل تحديث البيانات. \(error.localizedDescription)" }
+            } catch { errorMessage = "لم يكتمل تحديث البيانات. \(error.localizedDescription)"; return }
+            await MadarIntentHandoff.shared.flush()
         }
     }
     func beginNotificationStoreAccess() -> Bool {
