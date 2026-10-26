@@ -1535,8 +1535,14 @@ struct MihbaraReaderView: View {
 
     /// The converted book's page markers are the PDF's pages in order, so the page on screen is the same page there.
     @MainActor private func showOriginal(_ id: UUID) {
-        let page = (pageCoordinate(printLocator) ?? 1) - 1
         guard !isClosing else { return }
+        let sourcePageCount = printPages.isEmpty ? (book.pages ?? 0) : printPages.count
+        guard let page = ReadingSourcePage.zeroBasedPDFIndex(
+            forPrintedOrdinal: pageCoordinate(printLocator), pageCount: sourcePageCount
+        ) else {
+            readerAlert = "ما قدرت أحدد الصفحة المطبوعة لهذا الموضع. بقيت في الكتاب المنساب."
+            return
+        }
         isClosing = true
         pauseReader(at: Date())
         Task { @MainActor in

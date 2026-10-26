@@ -189,6 +189,14 @@ public enum ReadingPageEstimate {
     }
 }
 
+/// Resolves a known 1-based printed-page position to its zero-based page in the source PDF.
+public enum ReadingSourcePage {
+    public static func zeroBasedPDFIndex(forPrintedOrdinal ordinal: Int?, pageCount: Int) -> Int? {
+        guard let ordinal, pageCount > 0, (1...pageCount).contains(ordinal) else { return nil }
+        return ordinal - 1
+    }
+}
+
 /// R06: installed in the resource bytes before WebKit parses any author content.
 public enum ReadingDocumentPolicy {
     /// Readium serves its own bundled Readium CSS and reader fonts from `readium://assets`, a

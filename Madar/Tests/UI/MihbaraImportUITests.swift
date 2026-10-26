@@ -245,8 +245,16 @@ import UIKit
         XCTAssertEqual(XCTWaiter.wait(for: [body], timeout: 15), .completed, app.debugDescription)
         attach(app, "M6-PDF-flow-reader-L")
         // «الكتاب تكرر مرتين»: the converted book stands for its PDF; the PDF stays reachable as «الأصل».
-        XCTAssertTrue(app.buttons["mihbara-reader-original-pdf"].exists, app.debugDescription)
-        app.buttons["mihbara-reader-close"].tap()
+        let original = app.buttons["mihbara-reader-original-pdf"]
+        XCTAssertTrue(original.waitForExistence(timeout: 5), app.debugDescription)
+        original.tap()
+        XCTAssertTrue(app.buttons["mihbara-pdf-close"].waitForExistence(timeout: 15), app.debugDescription)
+        let originalPage = app.descendants(matching: .any)["mihbara-pdf-page"]
+        XCTAssertTrue(originalPage.waitForExistence(timeout: 8), app.debugDescription)
+        let bidiIsolates = CharacterSet(charactersIn: "\u{2066}\u{2067}\u{2068}\u{2069}")
+        let originalPageLabel = String(originalPage.label.unicodeScalars.filter { !bidiIsolates.contains($0) })
+        XCTAssertTrue(originalPageLabel.contains("١ من ٣"), originalPageLabel)
+        app.buttons["mihbara-pdf-close"].tap()
         app.buttons["mihbara-shelf-want"].tap()
         let copies = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "كتاب منساب"))
         XCTAssertTrue(copies.firstMatch.waitForExistence(timeout: 10), app.debugDescription)

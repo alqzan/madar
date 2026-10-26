@@ -79,6 +79,15 @@ import Testing
         #expect(ReadingPageEstimate.page(progression: .nan, totalPages: 200) == nil)
     }
 
+    @Test func originalPDFPageRequiresAKnownPrintedOrdinal() {
+        #expect(ReadingSourcePage.zeroBasedPDFIndex(forPrintedOrdinal: nil, pageCount: 3) == nil)
+        #expect(ReadingSourcePage.zeroBasedPDFIndex(forPrintedOrdinal: 1, pageCount: 3) == 0)
+        #expect(ReadingSourcePage.zeroBasedPDFIndex(forPrintedOrdinal: 3, pageCount: 3) == 2)
+        #expect(ReadingSourcePage.zeroBasedPDFIndex(forPrintedOrdinal: 0, pageCount: 3) == nil)
+        #expect(ReadingSourcePage.zeroBasedPDFIndex(forPrintedOrdinal: 4, pageCount: 3) == nil)
+        #expect(ReadingSourcePage.zeroBasedPDFIndex(forPrintedOrdinal: 1, pageCount: 0) == nil)
+    }
+
     @Test func coveredReaderCountsNoTimeAndNewDayDoesNotRenewIdleAllowance() {
         let start = Date(timeIntervalSince1970: 0)
         var clock = ActiveReadingClock(startedAt: start)
