@@ -247,7 +247,7 @@ struct MihbaraHomeView: View {
     }
     /// A book can change shelf from where it sits: long-press its spine or its library row. The table holds three at most.
     @ViewBuilder private func bookMenu(_ b: MihbaraBook) -> some View {
-        let conversionRunning = MihbaraConversions.shared.job(for: b.id)?.state == .running
+        let conversionRunning = MihbaraConversions.shared.job(for: b.id)?.state.isActive == true
         if b.shelf != "reading" { Button { moveBook(b, to: "reading") } label: { Label(b.shelf == "finished" || b.shelf == "old" ? "أعد قراءته على الطاولة" : "ضعه على الطاولة", systemImage: "book.pages") } }
         if b.shelf == "reading" {
             Button { moveBook(b, to: "finished") } label: { Label("أنهيته", systemImage: "checkmark.circle") }

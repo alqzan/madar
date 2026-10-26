@@ -12,7 +12,23 @@ import MadarCommands
     static let shared = MihbaraConversions()
 
     struct Job: Equatable, Identifiable {
-        enum State: Equatable { case running, finished(UUID?), failed(String) }
+        enum State: Equatable {
+            case running, assembling, staging, staged, canceling, committing, saving, finished(UUID?), failed(String)
+
+            var isActive: Bool {
+                switch self {
+                case .running, .assembling, .staging, .staged, .canceling, .committing, .saving: true
+                case .finished, .failed: false
+                }
+            }
+
+            var isCancellable: Bool {
+                switch self {
+                case .running, .assembling, .staging, .staged, .committing: true
+                case .canceling, .saving, .finished, .failed: false
+                }
+            }
+        }
         let id: UUID
         let title: String
         var done = 0, total = 0
@@ -37,7 +53,7 @@ import MadarCommands
     func job(for bookID: UUID) -> Job? { jobs.first { $0.id == bookID } }
 
     func start(_ book: MihbaraBook, app: AppSession) {
-        guard job(for: book.id)?.state != .running else { return }
+        guard job(for: book.id)?.state.isActive != true else { return }
         jobs.removeAll { $0.id == book.id }
         jobs.append(Job(id: book.id, title: book.title))
         background[book.id] = UIApplication.shared.beginBackgroundTask(withName: "pdf-conversion") { [weak self] in
@@ -48,8 +64,9 @@ import MadarCommands
     }
 
     func cancel(_ bookID: UUID, app: AppSession) {
-        tasks[bookID]?.cancel(); tasks[bookID] = nil; endBackground(bookID)
-        jobs.removeAll { $0.id == bookID }
+        guard job(for: bookID)?.state.isCancellable == true else { return }
+        update(bookID) { $0.state = .canceling }
+        tasks[bookID]?.cancel()
         Self.setPending(bookID, false, app: app)
     }
 
@@ -63,7 +80,7 @@ import MadarCommands
         for id in pending where !known.contains(id) { Self.setPending(id, false, app: app) }
     }
 
-    func dismiss(_ bookID: UUID) { if job(for: bookID)?.state != .running { jobs.removeAll { $0.id == bookID } } }
+    func dismiss(_ bookID: UUID) { if job(for: bookID)?.state.isActive != true { jobs.removeAll { $0.id == bookID } } }
 
     private func endBackground(_ id: UUID) {
         guard let task = background.removeValue(forKey: id), task != .invalid else { return }
@@ -81,11 +98,34 @@ import MadarCommands
         do {
             let (file, summary) = try await convert(book, app: app)
             defer { try? FileManager.default.removeItem(at: file) }
+            try Task.checkCancellation()
             guard authorized(app) else { throw DataError.authenticationFailed }
             let service = AppMihbaraService(app: app), stagingID = UUID()
+            update(book.id) { $0.state = .staging }
+            let inspection = try await service.stageEPUB(file, id: stagingID)
+            defer { EPUBBookFiles.discard(id: stagingID, root: app.bookStagingDirectory) }
+
+            update(book.id) { $0.state = .staged }
+#if DEBUG
+            // Deterministically exercise the cancel window after staging and before the durable import.
+            if UUID(uuidString: ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"] ?? "") != nil,
+               let milliseconds = Int(ProcessInfo.processInfo.environment["MADAR_UI_PDF_CONVERSION_STAGED_HOLD_MS"] ?? ""),
+               milliseconds > 0, milliseconds <= 30_000 {
+                try? await Task.sleep(for: .milliseconds(milliseconds))
+            }
+#endif
+            // Yield once so a pending «إيقاف» tap can cancel and discard this staged copy before saving it.
+            await Task.yield()
+            try Task.checkCancellation()
+            guard authorized(app) else { throw DataError.authenticationFailed }
+
+            update(book.id) { $0.state = .committing }
+            await Task.yield()
+            try Task.checkCancellation()
+            guard authorized(app) else { throw DataError.authenticationFailed }
+            update(book.id) { $0.state = .saving }
             let newID: UUID?
             do {
-                let inspection = try await service.stageEPUB(file, id: stagingID)
                 let id = UUID()
                 try await service.confirmEPUB(inspection, bookID: id, commandID: UUID(), title: book.title, author: book.author,
                                               language: book.language, shelf: book.shelf)
@@ -97,10 +137,12 @@ import MadarCommands
             update(book.id) { $0.state = .finished(newID); $0.summary = summary }
             onFinished?()
         } catch is CancellationError {
+            jobs.removeAll { $0.id == book.id }
+            Self.setPending(book.id, false, app: app)
         } catch {
             update(book.id) { $0.state = .failed("تعذّر تحويل «\(book.title)». يبقى PDF كما هو وتقرؤه بصفحاته.") }
         }
-        if job(for: book.id)?.state != .running { Self.setPending(book.id, false, app: app) }
+        Self.setPending(book.id, false, app: app)
         tasks[book.id] = nil; endBackground(book.id)
     }
 
@@ -147,14 +189,29 @@ import MadarCommands
             update(book.id) { $0.done = index + 1 }
         }
         let outline = try await reader.outline()
+        update(book.id) { $0.state = .assembling }
         let title = book.title, author = book.author, language = book.language, hash = book.fileHash ?? book.id.uuidString
         let epub = try await Task.detached(priority: .userInitiated) {
-            try PDFBookEPUB.build(title: title, author: author, language: language, sourceHash: hash, pages: pages, outline: outline)
+#if DEBUG
+            if UUID(uuidString: ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"] ?? "") != nil,
+               let milliseconds = Int(ProcessInfo.processInfo.environment["MADAR_UI_PDF_CONVERSION_BUILD_HOLD_MS"] ?? ""),
+               milliseconds > 0, milliseconds <= 30_000 {
+                try? await Task.sleep(for: .milliseconds(milliseconds))
+            }
+#endif
+            return try PDFBookEPUB.build(title: title, author: author, language: language, sourceHash: hash, pages: pages, outline: outline)
         }.value
+        try Task.checkCancellation()
         let folder = Self.folder(app)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let file = folder.appendingPathComponent(UUID().uuidString + ".epub")
-        try epub.write(to: file, options: [.atomic, .completeFileProtection])
+        do {
+            try epub.write(to: file, options: [.atomic, .completeFileProtection])
+            try Task.checkCancellation()
+        } catch {
+            try? FileManager.default.removeItem(at: file)
+            throw error
+        }
         return (file, PDFBookEPUB.summary(pages))
     }
 

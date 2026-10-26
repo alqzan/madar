@@ -254,6 +254,94 @@ import UIKit
         attach(app, "M6-PDF-flow-shelf-L")
     }
 
+    func testCancelAfterStagingKeepsTheOriginalPDFOnItsShelf() {
+        continueAfterFailure = false
+        let paragraph = NSMutableParagraphStyle(); paragraph.alignment = .right
+        let pdf = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 300, height: 400)).pdfData { canvas in
+            canvas.beginPage()
+            ("كتاب الإيقاف\n\nالقراءة باب إلى المعرفة، والكتاب صاحب لا يمل." as NSString).draw(
+                in: CGRect(x: 20, y: 35, width: 260, height: 320), withAttributes: [
+                    .font: UIFont(name: "Arial", size: 24)!, .foregroundColor: UIColor.darkText, .paragraphStyle: paragraph
+                ])
+        }
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MIHBARA_FIXTURE": "empty",
+            "MADAR_UI_NOW": "2026-10-18T12:00:00+03:00", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
+            "MADAR_UI_MIHBARA_IMPORT_PDF_NAME": "كتاب الإيقاف", "MADAR_UI_MIHBARA_IMPORT_PDF": pdf.base64EncodedString(),
+            "MADAR_UI_PDF_CONVERSION_STAGED_HOLD_MS": "15000"]
+        app.launch()
+        let customize = app.buttons["tab-customize"]; XCTAssertTrue(customize.waitForExistence(timeout: 20)); customize.tap()
+        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 8)); search.tap(); search.typeText("المحبرة")
+        let door = app.buttons["mihbara-open"]; XCTAssertTrue(door.waitForExistence(timeout: 8)); door.tap()
+        let add = app.buttons["mihbara-add-paper"]; XCTAssertTrue(add.waitForExistence(timeout: 8)); add.tap()
+        let confirm = app.buttons["mihbara-import-confirm"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 20), app.debugDescription)
+        for _ in 0..<6 where !confirm.isHittable { app.swipeUp(velocity: .slow) }
+        confirm.tap()
+        let convert = app.alerts.buttons["حوّله"].firstMatch
+        XCTAssertTrue(convert.waitForExistence(timeout: 15), app.debugDescription); convert.tap()
+
+        let staged = app.staticTexts["mihbara-pdf-flow-staged"]
+        XCTAssertTrue(staged.waitForExistence(timeout: 45), app.debugDescription)
+        attach(app, "M6-PDF-cancel-staged-L")
+        app.buttons["mihbara-pdf-flow-cancel"].tap()
+        let progress = app.descendants(matching: .any)["mihbara-pdf-flow-progress"]
+        let stopped = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: progress)
+        XCTAssertEqual(XCTWaiter.wait(for: [stopped], timeout: 15), .completed, app.debugDescription)
+
+        app.buttons["mihbara-shelf-want"].tap()
+        let original = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "mihbara-book-", "كتاب الإيقاف")).firstMatch
+        XCTAssertTrue(original.waitForExistence(timeout: 10), app.debugDescription)
+        original.tap()
+        XCTAssertTrue(app.buttons["mihbara-pdf-next"].waitForExistence(timeout: 12), "Cancel must leave the original PDF on its shelf.\n\(app.debugDescription)")
+        XCTAssertFalse(app.buttons["mihbara-reader-original-pdf"].exists, app.debugDescription)
+    }
+
+    func testCancelDuringEPUBAssemblyStopsBeforeStaging() {
+        continueAfterFailure = false
+        let paragraph = NSMutableParagraphStyle(); paragraph.alignment = .right
+        let pdf = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 300, height: 400)).pdfData { canvas in
+            canvas.beginPage()
+            ("كتاب ترتيب الصفحات\n\nالقراءة باب إلى المعرفة، والكتاب صاحب لا يمل." as NSString).draw(
+                in: CGRect(x: 20, y: 35, width: 260, height: 320), withAttributes: [
+                    .font: UIFont(name: "Arial", size: 24)!, .foregroundColor: UIColor.darkText, .paragraphStyle: paragraph
+                ])
+        }
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MIHBARA_FIXTURE": "empty",
+            "MADAR_UI_NOW": "2026-10-18T12:00:00+03:00", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
+            "MADAR_UI_MIHBARA_IMPORT_PDF_NAME": "كتاب ترتيب الصفحات", "MADAR_UI_MIHBARA_IMPORT_PDF": pdf.base64EncodedString(),
+            "MADAR_UI_PDF_CONVERSION_BUILD_HOLD_MS": "6000"]
+        app.launch()
+        let customize = app.buttons["tab-customize"]; XCTAssertTrue(customize.waitForExistence(timeout: 20)); customize.tap()
+        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 8)); search.tap(); search.typeText("المحبرة")
+        let door = app.buttons["mihbara-open"]; XCTAssertTrue(door.waitForExistence(timeout: 8)); door.tap()
+        let add = app.buttons["mihbara-add-paper"]; XCTAssertTrue(add.waitForExistence(timeout: 8)); add.tap()
+        let confirm = app.buttons["mihbara-import-confirm"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 20), app.debugDescription)
+        for _ in 0..<6 where !confirm.isHittable { app.swipeUp(velocity: .slow) }
+        confirm.tap()
+        let convert = app.alerts.buttons["حوّله"].firstMatch
+        XCTAssertTrue(convert.waitForExistence(timeout: 15), app.debugDescription); convert.tap()
+
+        let assembling = app.staticTexts["mihbara-pdf-flow-assembling"]
+        XCTAssertTrue(assembling.waitForExistence(timeout: 30), app.debugDescription)
+        app.buttons["mihbara-pdf-flow-cancel"].tap()
+        let canceling = app.staticTexts["mihbara-pdf-flow-canceling"]
+        XCTAssertTrue(canceling.waitForExistence(timeout: 5), app.debugDescription)
+        attach(app, "M6-PDF-cancel-assembling-L")
+        let progress = app.descendants(matching: .any)["mihbara-pdf-flow-progress"]
+        let stopped = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: progress)
+        XCTAssertEqual(XCTWaiter.wait(for: [stopped], timeout: 15), .completed, app.debugDescription)
+
+        app.buttons["mihbara-shelf-want"].tap()
+        let original = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "mihbara-book-", "كتاب ترتيب الصفحات")).firstMatch
+        XCTAssertTrue(original.waitForExistence(timeout: 10), app.debugDescription)
+        original.tap()
+        XCTAssertTrue(app.buttons["mihbara-pdf-next"].waitForExistence(timeout: 12), "Cancel must leave the original PDF on its shelf.\n\(app.debugDescription)")
+        XCTAssertFalse(app.buttons["mihbara-reader-original-pdf"].exists, app.debugDescription)
+    }
+
     /// Owner, 25 Oct 2026: «اقدر اتنقل بالتطبيق». A conversion iOS stopped by closing the app starts again
     /// the next time the room opens, and still ends as one flowing book.
     func testAConversionStoppedByClosingTheAppResumesWhenTheRoomOpens() throws {

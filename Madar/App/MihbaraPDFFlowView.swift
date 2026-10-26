@@ -14,7 +14,7 @@ struct MihbaraPDFFlowView: View {
     @Environment(\.roomTheme) private var theme
     private var conversions: MihbaraConversions { .shared }
     private var job: MihbaraConversions.Job? { conversions.job(for: book.id) }
-    private var running: Bool { job?.state == .running }
+    private var running: Bool { job?.state.isActive == true }
 
     var body: some View {
         NavigationStack {
@@ -114,6 +114,40 @@ struct MihbaraConversionCard: View {
                         .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
                     Button("إيقاف") { MihbaraConversions.shared.cancel(job.id, app: app) }.font(MadarTypography.caption()).frame(minHeight: 44)
                         .accessibilityIdentifier("mihbara-pdf-flow-cancel")
+                case .assembling:
+                    Text("يرتّب صفحات «\(job.title)» في كتاب منساب").font(MadarTypography.section())
+                        .accessibilityIdentifier("mihbara-pdf-flow-assembling")
+                    Text("اكتملت القراءة؛ نجهّز صفحات الكتاب على جهازك.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    ProgressView()
+                    cancelButton
+                case .staging:
+                    Text("يفحص نسخة «\(job.title)» الأخيرة").font(MadarTypography.section())
+                        .accessibilityIdentifier("mihbara-pdf-flow-staging")
+                    Text("يبقى ملف PDF الأصلي كما هو.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    ProgressView()
+                    cancelButton
+                case .staged:
+                    Text("اكتملت نسخة «\(job.title)»").font(MadarTypography.section())
+                        .accessibilityIdentifier("mihbara-pdf-flow-staged")
+                    Text("تُضاف إلى رفّك بعد التحقق الأخير.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    ProgressView()
+                    cancelButton
+                case .canceling:
+                    Text("يوقف التحويل").font(MadarTypography.section())
+                        .accessibilityIdentifier("mihbara-pdf-flow-canceling")
+                    Text("يبقى ملف PDF الأصلي وموضعه كما هما.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    ProgressView()
+                case .committing:
+                    Text("الكتاب جاهز لوضعه على رفّه").font(MadarTypography.section())
+                        .accessibilityIdentifier("mihbara-pdf-flow-committing")
+                    Text("ما زال بإمكانك إيقافه قبل الحفظ.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    ProgressView()
+                    cancelButton
+                case .saving:
+                    Text("يحفظ «\(job.title)» على رفّه").font(MadarTypography.section())
+                        .accessibilityIdentifier("mihbara-pdf-flow-saving")
+                    Text("يبقى ملف PDF الأصلي محفوظًا في المحبرة.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    ProgressView()
                 case .finished(let bookID):
                     Label("صار «\(job.title)» كتابًا منسابًا", systemImage: "checkmark.circle").font(MadarTypography.section())
                     if let summary = job.summary {
@@ -133,6 +167,12 @@ struct MihbaraConversionCard: View {
             }
         }
         .accessibilityElement(children: .contain).accessibilityIdentifier("mihbara-pdf-flow-progress")
+    }
+
+    private var cancelButton: some View {
+        Button("إيقاف") { MihbaraConversions.shared.cancel(job.id, app: app) }
+            .font(MadarTypography.caption()).frame(minHeight: 44)
+            .accessibilityIdentifier("mihbara-pdf-flow-cancel")
     }
 
     private func readyLine(_ s: PDFBookEPUB.Summary) -> String {
