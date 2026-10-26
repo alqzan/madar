@@ -8,6 +8,39 @@ import MadarCommands
 /// Owner, 25 Oct 2026: «اول ما احمل بي دي اف يقولي ترا بحوله لك ولي انا الخيار ولا يخليني اقعد بنفس المكان
 /// اقدر اتنقل بالتطبيق». A PDF converts while the person moves around the app; the result joins the library
 /// on the PDF's shelf as the same book, and the PDF stays its original («الأصل»), not a second copy.
+private struct PDFConversionCheckpointManifest: Codable {
+    /// Bump when page extraction or its saved representation changes.
+    var version: Int
+    var sourceHash: String
+    var language: String
+    var totalPages: Int
+    var completedPages: Int
+}
+
+private struct PDFConversionCheckpointPage: Codable {
+    var index: Int
+    var text: String
+    var optical: Bool
+    var unreliable: Bool
+    var label: String?
+    var image: Data?
+    var blank: Bool
+
+    init(index: Int, page: PDFBookEPUB.Page) {
+        self.index = index; text = page.text; optical = page.optical; unreliable = page.unreliable
+        label = page.label; image = page.image; blank = page.blank
+    }
+
+    var page: PDFBookEPUB.Page {
+        PDFBookEPUB.Page(text: text, optical: optical, unreliable: unreliable, label: label, image: image, blank: blank)
+    }
+}
+
+private struct PDFConversionLoadedCheckpoint {
+    var manifest: PDFConversionCheckpointManifest
+    var pages: [PDFBookEPUB.Page]
+}
+
 @MainActor @Observable final class MihbaraConversions {
     static let shared = MihbaraConversions()
 
@@ -68,16 +101,23 @@ import MadarCommands
         update(bookID) { $0.state = .canceling }
         tasks[bookID]?.cancel()
         Self.setPending(bookID, false, app: app)
+        Self.removeCheckpoint(bookID, app: app)
     }
 
-    /// A conversion iOS stopped by closing the app starts again from the first page the next time the room
-    /// opens, while its PDF is still on a shelf (pages are read again; nothing half-written is kept).
+    /// A conversion stopped by closing the app resumes after its last completed page.
     func resume(_ books: [MihbaraBook], app: AppSession) {
         let pending = Self.pending(app)
         guard !pending.isEmpty else { return }
-        for book in books where pending.contains(book.id) && book.isReadablePDF && job(for: book.id) == nil { start(book, app: app) }
-        let known = Set(books.map(\.id))
-        for id in pending where !known.contains(id) { Self.setPending(id, false, app: app) }
+        let byID = Dictionary(books.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        for id in pending {
+            if job(for: id)?.state.isActive == true { continue }
+            guard let book = byID[id], book.isReadablePDF else {
+                Self.setPending(id, false, app: app)
+                Self.removeCheckpoint(id, app: app)
+                continue
+            }
+            if job(for: id) == nil { start(book, app: app) }
+        }
     }
 
     func dismiss(_ bookID: UUID) { if job(for: bookID)?.state.isActive != true { jobs.removeAll { $0.id == bookID } } }
@@ -134,11 +174,14 @@ import MadarCommands
             } catch DataError.invalidValue(let message) where message.contains("عندك بالفعل") {
                 newID = nil   // Converted before: the same bytes are already in the library.
             }
+            Self.setPending(book.id, false, app: app)
+            Self.removeCheckpoint(book.id, app: app)
             update(book.id) { $0.state = .finished(newID); $0.summary = summary }
             onFinished?()
         } catch is CancellationError {
             jobs.removeAll { $0.id == book.id }
             Self.setPending(book.id, false, app: app)
+            Self.removeCheckpoint(book.id, app: app)
         } catch {
             update(book.id) { $0.state = .failed("تعذّر تحويل «\(book.title)». يبقى PDF كما هو وتقرؤه بصفحاته.") }
         }
@@ -153,8 +196,21 @@ import MadarCommands
         let reader = PDFBookTextReader(data: bytes, language: book.language)
         let total = try await reader.pageCount()
         update(book.id) { $0.total = total }
-        var pages: [PDFBookEPUB.Page] = []
-        var pictures = 0
+        guard let sourceHash = book.fileHash else { throw DataError.invalidValue("هذا الكتاب لا يملك ملفًا صالحًا للقراءة") }
+        var checkpoint = try Self.loadCheckpoint(bookID: book.id, sourceHash: sourceHash, language: book.language, total: total, app: app)
+        var pages = checkpoint.pages
+        var pictures = pages.filter { $0.image != nil }.count
+        let checkpointDirectory = Self.checkpointFolder(book.id, app: app)
+        update(book.id) { $0.done = pages.count }
+#if DEBUG
+        if !pages.isEmpty,
+           UUID(uuidString: ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"] ?? "") != nil,
+           let milliseconds = Int(ProcessInfo.processInfo.environment["MADAR_UI_PDF_CONVERSION_RESUME_HOLD_MS"] ?? ""),
+           milliseconds > 0, milliseconds <= 30_000 {
+            try? await Task.sleep(for: .milliseconds(milliseconds))
+            try Task.checkCancellation()
+        }
+#endif
         /// A page without words keeps its picture (cover, basmala, ornament) instead of a «not extracted» note.
         func picture(_ index: Int) async throws -> (jpeg: Data?, blank: Bool) {
             guard pictures < PDFBookEPUB.maximumPictures else { return (jpeg: nil, blank: false) }
@@ -162,8 +218,9 @@ import MadarCommands
             if result.jpeg != nil { pictures += 1 }
             return result
         }
-        for index in 0..<total {
+        for index in pages.count..<total {
             let label = try await reader.pageLabel(at: index)
+            let completedPage: PDFBookEPUB.Page
             do {
                 var page = try await reader.page(at: index)
                 // Garbled embedded Arabic: read the page image instead of showing broken words.
@@ -174,23 +231,36 @@ import MadarCommands
                 let cover = index == 0 && page.source == .optical
                 if wordless || cover {
                     let shot = try await picture(index)
-                    pages.append(cover && shot.jpeg != nil ? .init(text: "", optical: true, unreliable: false, label: label, image: shot.jpeg)
-                                 : .init(page, label: label, image: shot.jpeg, blank: shot.blank))
-                } else { pages.append(.init(page, label: label)) }
+                    completedPage = cover && shot.jpeg != nil ? .init(text: "", optical: true, unreliable: false, label: label, image: shot.jpeg)
+                                                               : .init(page, label: label, image: shot.jpeg, blank: shot.blank)
+                } else { completedPage = .init(page, label: label) }
             }
             catch is CancellationError { throw CancellationError() }
             // A page OCR cannot read becomes its picture, or an honest gap with its number, not a failed book.
             catch {
                 let shot = try await picture(index)
-                pages.append(.init(text: "", optical: false, unreliable: true, label: label, image: shot.jpeg, blank: shot.blank))
+                completedPage = .init(text: "", optical: false, unreliable: true, label: label, image: shot.jpeg, blank: shot.blank)
             }
             try Task.checkCancellation()
             guard authorized(app) else { throw DataError.authenticationFailed }
+            try Self.savePage(completedPage, index: index, manifest: &checkpoint.manifest, directory: checkpointDirectory)
+            pages.append(completedPage)
             update(book.id) { $0.done = index + 1 }
+#if DEBUG
+            if UUID(uuidString: ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"] ?? "") != nil,
+               Int(ProcessInfo.processInfo.environment["MADAR_UI_PDF_CONVERSION_HOLD_AFTER_PAGE"] ?? "") == index + 1,
+               let milliseconds = Int(ProcessInfo.processInfo.environment["MADAR_UI_PDF_CONVERSION_PAGE_HOLD_MS"] ?? ""),
+               milliseconds > 0, milliseconds <= 30_000 {
+                try? await Task.sleep(for: .milliseconds(milliseconds))
+                try Task.checkCancellation()
+            }
+#endif
         }
         let outline = try await reader.outline()
         update(book.id) { $0.state = .assembling }
-        let title = book.title, author = book.author, language = book.language, hash = book.fileHash ?? book.id.uuidString
+        let title = book.title, author = book.author, language = book.language, hash = sourceHash
+        let pagesToBuild = pages
+        let summary = PDFBookEPUB.summary(pagesToBuild)
         let epub = try await Task.detached(priority: .userInitiated) {
 #if DEBUG
             if UUID(uuidString: ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"] ?? "") != nil,
@@ -199,12 +269,10 @@ import MadarCommands
                 try? await Task.sleep(for: .milliseconds(milliseconds))
             }
 #endif
-            return try PDFBookEPUB.build(title: title, author: author, language: language, sourceHash: hash, pages: pages, outline: outline)
+            return try PDFBookEPUB.build(title: title, author: author, language: language, sourceHash: hash, pages: pagesToBuild, outline: outline)
         }.value
         try Task.checkCancellation()
-        let folder = Self.folder(app)
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let file = folder.appendingPathComponent(UUID().uuidString + ".epub")
+        let file = checkpointDirectory.appendingPathComponent("converted.epub")
         do {
             try epub.write(to: file, options: [.atomic, .completeFileProtection])
             try Task.checkCancellation()
@@ -212,7 +280,7 @@ import MadarCommands
             try? FileManager.default.removeItem(at: file)
             throw error
         }
-        return (file, PDFBookEPUB.summary(pages))
+        return (file, summary)
     }
 
     // MARK: - Converted book ↔ original PDF
@@ -220,6 +288,88 @@ import MadarCommands
     private static func folder(_ app: AppSession) -> URL {
         app.bookStagingDirectory.deletingLastPathComponent().appendingPathComponent("PDFConversions")
     }
+    private static func checkpointRoot(_ app: AppSession) -> URL {
+        folder(app).appendingPathComponent("checkpoints", isDirectory: true)
+    }
+    private static func checkpointFolder(_ bookID: UUID, app: AppSession) -> URL {
+        checkpointRoot(app).appendingPathComponent(bookID.uuidString.lowercased(), isDirectory: true)
+    }
+    private static func manifestURL(_ directory: URL) -> URL { directory.appendingPathComponent("manifest.json") }
+    private static func pageURL(_ index: Int, directory: URL) -> URL {
+        directory.appendingPathComponent(String(format: "page-%06d.json", index))
+    }
+    private static let checkpointVersion = 1
+
+    private static func preparePrivateDirectory(_ directory: URL) throws {
+        let manager = FileManager.default
+        try manager.createDirectory(at: directory, withIntermediateDirectories: true,
+                                    attributes: [.protectionKey: FileProtectionType.complete])
+        try manager.setAttributes([.protectionKey: FileProtectionType.complete], ofItemAtPath: directory.path)
+        var values = URLResourceValues(); values.isExcludedFromBackup = true
+        var writableDirectory = directory
+        try writableDirectory.setResourceValues(values)
+    }
+
+    private static func removeCheckpoint(_ bookID: UUID, app: AppSession) {
+        let root = checkpointRoot(app), directory = checkpointFolder(bookID, app: app)
+        guard directory.deletingLastPathComponent().standardizedFileURL == root.standardizedFileURL else { return }
+        try? FileManager.default.removeItem(at: directory)
+    }
+
+    private static func writeManifest(_ manifest: PDFConversionCheckpointManifest, directory: URL) throws {
+        try JSONEncoder().encode(manifest).write(to: manifestURL(directory), options: [.atomic, .completeFileProtection])
+    }
+
+    private static func loadCheckpoint(bookID: UUID, sourceHash: String, language: String, total: Int,
+                                       app: AppSession) throws -> PDFConversionLoadedCheckpoint {
+        let directory = checkpointFolder(bookID, app: app)
+        try preparePrivateDirectory(checkpointRoot(app))
+        if FileManager.default.fileExists(atPath: directory.path) {
+            try preparePrivateDirectory(directory)
+            // A process can die after EPUB assembly but before the shelf transaction. Rebuild it from
+            // the page checkpoints rather than leaving a second unmanaged copy beside them.
+            try? FileManager.default.removeItem(at: directory.appendingPathComponent("converted.epub"))
+            if let data = try? Data(contentsOf: manifestURL(directory)),
+               var manifest = try? JSONDecoder().decode(PDFConversionCheckpointManifest.self, from: data),
+               manifest.version == checkpointVersion, manifest.sourceHash == sourceHash,
+               manifest.language == language, manifest.totalPages == total,
+               (0...total).contains(manifest.completedPages) {
+                var pages: [PDFBookEPUB.Page] = []
+                for index in 0..<manifest.completedPages {
+                    guard let data = try? Data(contentsOf: pageURL(index, directory: directory)),
+                          let record = try? JSONDecoder().decode(PDFConversionCheckpointPage.self, from: data),
+                          record.index == index else { break }
+                    pages.append(record.page)
+                }
+                if manifest.completedPages != pages.count {
+                    manifest.completedPages = pages.count
+                    try writeManifest(manifest, directory: directory)
+                }
+                for name in (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? [] where name.hasPrefix("page-") {
+                    guard let index = Int(name.dropFirst(5).split(separator: ".").first ?? ""), index < pages.count else {
+                        try? FileManager.default.removeItem(at: directory.appendingPathComponent(name)); continue
+                    }
+                }
+                return PDFConversionLoadedCheckpoint(manifest: manifest, pages: pages)
+            }
+        }
+        removeCheckpoint(bookID, app: app)
+        try preparePrivateDirectory(directory)
+        let manifest = PDFConversionCheckpointManifest(version: checkpointVersion, sourceHash: sourceHash,
+                                                       language: language, totalPages: total, completedPages: 0)
+        try writeManifest(manifest, directory: directory)
+        return PDFConversionLoadedCheckpoint(manifest: manifest, pages: [])
+    }
+
+    private static func savePage(_ page: PDFBookEPUB.Page, index: Int,
+                                 manifest: inout PDFConversionCheckpointManifest, directory: URL) throws {
+        guard manifest.completedPages == index else { throw CocoaError(.fileWriteUnknown) }
+        let record = PDFConversionCheckpointPage(index: index, page: page)
+        try JSONEncoder().encode(record).write(to: pageURL(index, directory: directory), options: [.atomic, .completeFileProtection])
+        manifest.completedPages = index + 1
+        try writeManifest(manifest, directory: directory)
+    }
+
     private static func linksURL(_ app: AppSession) -> URL { folder(app).appendingPathComponent("links.json") }
 
     /// EPUB file hash → source PDF hash (or "" for an EPUB that did not come from a PDF). A cache only:

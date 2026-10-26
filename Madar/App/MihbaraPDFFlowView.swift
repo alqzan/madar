@@ -105,6 +105,7 @@ struct MihbaraConversionCard: View {
                     Text("يحوّل «\(job.title)» إلى كتاب منساب").font(MadarTypography.section())
                     Text(job.total == 0 ? "يفتح الملف…" : "يقرأ الصفحة \(digits.string(min(job.done + 1, job.total))) من \(digits.string(job.total))")
                         .font(MadarTypography.caption()).contentTransition(.numericText())
+                        .accessibilityIdentifier("mihbara-pdf-flow-page")
                     ProgressView(value: Double(job.done), total: Double(max(job.total, 1))).tint(theme.color("accentText"))
                     if let left = job.secondsLeft {
                         Text(timeLeft(left)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)

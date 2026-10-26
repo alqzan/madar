@@ -362,7 +362,9 @@ import UIKit
         let app = XCUIApplication()
         app.launchEnvironment = ["MADAR_UI_STORE_ID": store, "MADAR_UI_MIHBARA_FIXTURE": "empty",
             "MADAR_UI_NOW": "2026-10-18T12:00:00+03:00", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
-            "MADAR_UI_MIHBARA_IMPORT_PDF_NAME": "كتاب طويل", "MADAR_UI_MIHBARA_IMPORT_PDF_PATH": file.path]
+            "MADAR_UI_MIHBARA_IMPORT_PDF_NAME": "كتاب طويل", "MADAR_UI_MIHBARA_IMPORT_PDF_PATH": file.path,
+            "MADAR_UI_PDF_CONVERSION_HOLD_AFTER_PAGE": "5", "MADAR_UI_PDF_CONVERSION_PAGE_HOLD_MS": "30000",
+            "MADAR_UI_PDF_CONVERSION_RESUME_HOLD_MS": "10000"]
         func openRoom() {
             let customize = app.buttons["tab-customize"]; XCTAssertTrue(customize.waitForExistence(timeout: 20)); customize.tap()
             let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 8)); search.tap(); search.typeText("المحبرة")
@@ -378,12 +380,19 @@ import UIKit
         XCTAssertTrue(convert.waitForExistence(timeout: 15), app.debugDescription); convert.tap()
         XCTAssertTrue(app.descendants(matching: .any)["mihbara-pdf-flow-progress"].waitForExistence(timeout: 15), app.debugDescription)
         XCTAssertFalse(app.buttons["mihbara-pdf-flow-open"].exists, "120 scanned pages must still be converting")
-        // After a few pages the card says how long is left at the pace so far.
-        XCTAssertTrue(app.staticTexts["mihbara-pdf-flow-time-left"].waitForExistence(timeout: 30), app.debugDescription)
+        // Pause only after page five has been atomically saved, so termination is deterministic.
+        let pageStatus = app.staticTexts["mihbara-pdf-flow-page"]
+        XCTAssertTrue(pageStatus.waitForExistence(timeout: 60), app.debugDescription)
+        let reachedCheckpoint = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@", "٦", "١٢٠"), object: pageStatus)
+        XCTAssertEqual(XCTWaiter.wait(for: [reachedCheckpoint], timeout: 60), .completed, app.debugDescription)
+        XCTAssertTrue(pageStatus.label.contains("٦"), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["mihbara-pdf-flow-time-left"].waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(app.staticTexts["mihbara-pdf-flow-time-left"].label.hasPrefix("باقي"), app.debugDescription)
         app.terminate()
         app.launch(); openRoom()
-        XCTAssertTrue(app.descendants(matching: .any)["mihbara-pdf-flow-progress"].waitForExistence(timeout: 20), app.debugDescription)
+        XCTAssertTrue(pageStatus.waitForExistence(timeout: 20), app.debugDescription)
+        let resumedAtCheckpoint = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@", "٦", "١٢٠"), object: pageStatus)
+        XCTAssertEqual(XCTWaiter.wait(for: [resumedAtCheckpoint], timeout: 20), .completed, "The checkpoint must resume after five completed pages.\n\(app.debugDescription)")
         attach(app, "M6-PDF-flow-resumed-L")
         XCTAssertTrue(app.buttons["mihbara-pdf-flow-open"].waitForExistence(timeout: 600), app.debugDescription)
         app.buttons["mihbara-pdf-flow-open"].tap()
