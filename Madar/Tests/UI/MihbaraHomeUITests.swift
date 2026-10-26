@@ -130,6 +130,24 @@ import UIKit
         XCTAssertTrue(restoredNote.label.contains("رحلة Goodreads"), restoredNote.label)
     }
 
+    func testCancellingGoodreadsPickerReturnsWithoutAnError() {
+        continueAfterFailure = false
+        let app = app("empty"); app.launch(); open(app)
+        let addBook = app.buttons["mihbara-add-paper"]
+        reach(app, addBook); addBook.tap()
+        let source = app.buttons["mihbara-add-source-goodreads"]
+        XCTAssertTrue(source.waitForExistence(timeout: 8), app.debugDescription)
+        shot(app, "M6-V16-goodreads-cancel-before-L")
+        source.tap()
+        let cancel = app.buttons.matching(NSPredicate(format: "label IN %@", ["Cancel", "إلغاء"])).firstMatch
+        XCTAssertTrue(cancel.waitForExistence(timeout: 12), app.debugDescription)
+        cancel.tap()
+        XCTAssertTrue(source.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertFalse(app.alerts.firstMatch.exists, app.debugDescription)
+        XCTAssertTrue(app.staticTexts["لا يوجد ملف وصل مؤخرًا"].exists, app.debugDescription)
+        shot(app, "M6-V16-goodreads-cancel-after-L")
+    }
+
     func testRemovingPDFKeepsTheBookButClearsUndo() {
         continueAfterFailure = false
         let app = app("empty", pdf: fixturePDF())

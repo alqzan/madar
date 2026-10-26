@@ -317,7 +317,11 @@ struct MihbaraAddBookView: View {
 
     private func handleGoodreads(_ result: Result<[URL], Error>) {
         switch result {
-        case .failure(let error): app.errorMessage = error.localizedDescription
+        case .failure(let error):
+            let nsError = error as NSError
+            if nsError.domain != NSCocoaErrorDomain || nsError.code != NSUserCancelledError {
+                app.errorMessage = error.localizedDescription
+            }
         case .success(let urls):
             guard let source = urls.first else { return }
             let root = app.bookStagingDirectory
