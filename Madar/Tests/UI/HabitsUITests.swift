@@ -6,6 +6,22 @@ import XCTest
     }
     private func open(_ app:XCUIApplication){let block=app.descendants(matching:.any).matching(identifier:"bahw-block-habits").firstMatch;XCTAssertTrue(block.waitForExistence(timeout:20));let header=app.buttons["bahw-habits-open"]; if header.exists { header.tap() } else { block.tap() };XCTAssertTrue(app.staticTexts["habits-title"].waitForExistence(timeout:10))}
     private func shot(_ app:XCUIApplication,_ name:String){let a=XCTAttachment(screenshot:app.screenshot());a.name=name;a.lifetime = .keepAlways;add(a)}
+    func testPausedLongerHabitsAreNotClaimedAsCompleted() throws {
+        continueAfterFailure = false
+        for fixture in ["pausedLater", "pausedLaterMixed"] {
+            let app = app(fixture); open(app)
+            let later = app.buttons["habits-later"]
+            XCTAssertTrue(later.waitForExistence(timeout: 5), app.debugDescription)
+            shot(app, "M4-later-\(fixture)-L")
+            XCTAssertEqual(later.label, fixture == "pausedLater" ? "عاداتك الأخرى مجمّدة" : "عادات مكتملة وأخرى مجمّدة")
+            later.tap()
+            let paused = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "صلة الأرحام،")).firstMatch
+            XCTAssertTrue(paused.waitForExistence(timeout: 5), app.debugDescription)
+            XCTAssertTrue(paused.label.contains("مجمّدة"), paused.label)
+            shot(app, "M4-later-\(fixture)-all-L")
+            app.terminate()
+        }
+    }
     func testPartialDurationIsNotACompleteDayAndPastSaveNamesItsAmount() throws {
         continueAfterFailure = false
         let app = app("partialDuration"); open(app)

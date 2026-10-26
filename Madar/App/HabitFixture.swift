@@ -19,6 +19,23 @@ extension AppSession {
             let event = HabitEvent(); event.habitID = habit.id; event.dayKey = today.adding(days: -1).description; event.periodKey = event.dayKey; event.delta = 1; event.unit = "minutes"; context.insert(event)
             try context.save(); return
         }
+        if variant == "pausedLater" || variant == "pausedLaterMixed" {
+            let today = GregorianDay.containing(prayerNow(), in: activePlace.timeZone)
+            for (index, frequency) in ["daily", "weekly", "monthly"].enumerated() {
+                if index == 2 && variant != "pausedLaterMixed" { continue }
+                let habit = Habit(); habit.name = ["الماء", "صلة الأرحام", "صدقة الشهر"][index]
+                habit.startDate = today.adding(days: -20).date(in: activePlace.timeZone); context.insert(habit)
+                let policy = HabitPolicy(); policy.habitID = habit.id; policy.effectiveFrom = today.adding(days: -20).description
+                policy.frequency = frequency; policy.measure = "once"; policy.target = 1; policy.monthCalendar = "gregorian"; context.insert(policy)
+                if index == 1 {
+                    let pause = HabitPause(); pause.habitID = habit.id; pause.fromDayKey = today.adding(days: -3).description; context.insert(pause)
+                } else if index == 2 {
+                    let event = HabitEvent(); event.habitID = habit.id; event.dayKey = today.adding(days: -1).description
+                    event.periodKey = String(format: "g:%04d-%02d", today.year, today.month); event.delta = 1; context.insert(event)
+                }
+            }
+            try context.save(); return
+        }
         let atRisk = variant == "atRisk", overdue = variant == "sinceOverdue"
         let since = variant == "since" || overdue
         guard variant == "showcase" || atRisk || since else{try context.save();return}

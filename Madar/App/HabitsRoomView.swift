@@ -184,6 +184,8 @@ struct HabitsRoomView: View {
         let frozen = active.filter { $0.paused && $0.summary.current?.rule.frequency == .daily }
         let laterRows = active.filter { r in !rows.contains { $0.id == r.id } && !frozen.contains { $0.id == r.id } }
         let later = laterRows.count, laterOpen = laterRows.filter { $0.summary.current?.met != true && !$0.paused }.count
+        let laterPaused = laterRows.filter(\.paused).count
+        let settledLater = laterPaused == later ? "عاداتك الأخرى مجمّدة" : laterPaused > 0 ? "عادات مكتملة وأخرى مجمّدة" : "عاداتك الأخرى تمّت في فتراتها"
         if rows.isEmpty && frozen.isEmpty {
             Button { withAnimation(reduceMotion ? nil : .snappy) { showAll = true } } label: { Label("لا شيء مستحقّ اليوم؛ اعرض كل عاداتك",systemImage:"list.bullet").font(MadarTypography.caption()).frame(maxWidth:.infinity,minHeight:56) }
                 .buttonStyle(.plain).background(theme.surface,in:.rect(cornerRadius:20)).accessibilityIdentifier("habits-today-empty")
@@ -200,7 +202,7 @@ struct HabitsRoomView: View {
         }
         if later > 0 {
             Button { withAnimation(reduceMotion ? nil : .snappy) { showAll = true } } label: {
-                HStack { Text(laterOpen == 0 ? "عاداتك الأخرى تمّت في فتراتها" : laterOpen == 1 ? "عادة أخرى تنتظر في فترتها" : laterOpen == 2 ? "عادتان أخريان في فترتيهما" : arabicCount(laterOpen,["","","عادات","عادة"],digits)+" أخرى في فتراتها").font(MadarTypography.fine()); Image(systemName:"chevron.left").font(.caption) }
+                HStack { Text(laterOpen == 0 ? settledLater : laterOpen == 1 ? "عادة أخرى تنتظر في فترتها" : laterOpen == 2 ? "عادتان أخريان في فترتيهما" : arabicCount(laterOpen,["","","عادات","عادة"],digits)+" أخرى في فتراتها").font(MadarTypography.fine()); Image(systemName:"chevron.left").font(.caption) }
                     .foregroundStyle(theme.accent).frame(minHeight:44)
             }.buttonStyle(.plain).accessibilityIdentifier("habits-later")
         }
