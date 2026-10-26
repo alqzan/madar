@@ -691,6 +691,7 @@ final class AppSession {
     }
     func resumeWriters() {
         maintenanceInProgress = false
+        MihbaraReadingSaveCoordinator.storeMaintenanceEnded(for: self)
         Task {
             do {
                 guard try await drainInbox() else { return }

@@ -27,6 +27,7 @@ import MadarQuran
     }
     private var pendingLocators: [UUID: LocatorWrite] = [:]
     private var failedLocatorEpoch: Int?
+    private var lastWriteError: String?
     private var writing: Task<Void, Never>?
     private var wasAuthorized = false
 
@@ -35,6 +36,10 @@ import MadarQuran
         let coordinator = MihbaraReadingSaveCoordinator(app: app)
         owners.setObject(coordinator, forKey: app)
         return coordinator
+    }
+
+    static func storeMaintenanceEnded(for app: AppSession) {
+        owners.object(forKey: app)?.retryPendingWritesAfterMaintenance()
     }
 
     private init(app: AppSession) {
@@ -83,6 +88,18 @@ import MadarQuran
 
     func waitForCurrentAttempt() async { await writing?.value }
 
+    func retryPendingWritesAfterMaintenance() {
+        sessions.authorizedForegroundReturned()
+        failedLocatorEpoch = nil
+        flush()
+    }
+
+    private func clearRecoveredWriteError(in app: AppSession) {
+        guard let lastWriteError else { return }
+        self.lastWriteError = nil
+        if app.errorMessage == lastWriteError { app.errorMessage = nil }
+    }
+
     func flush() {
         guard writing == nil, canWrite, canAttempt, let app else { return }
         writing = Task { @MainActor [self] in
@@ -96,9 +113,11 @@ import MadarQuran
                     do {
                         try await app.executeBookCommand("reading.saveSession", payload: write.payload, id: write.commandID)
                         sessions.finish(commandID: write.commandID, acknowledged: true)
+                        clearRecoveredWriteError(in: app)
                     } catch {
                         sessions.finish(commandID: write.commandID, acknowledged: false)
-                        app.errorMessage = error.localizedDescription
+                        lastWriteError = error.localizedDescription
+                        app.errorMessage = lastWriteError
                         break
                     }
                 } else if !sessions.isEmpty {
@@ -111,9 +130,11 @@ import MadarQuran
                             pendingLocators[locator.bookID] = nil
                         }
                         failedLocatorEpoch = nil
+                        clearRecoveredWriteError(in: app)
                     } catch {
                         failedLocatorEpoch = epoch
-                        app.errorMessage = error.localizedDescription
+                        lastWriteError = error.localizedDescription
+                        app.errorMessage = lastWriteError
                         break
                     }
                 } else { break }

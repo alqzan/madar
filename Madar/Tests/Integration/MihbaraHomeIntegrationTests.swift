@@ -109,6 +109,51 @@ import CoreSpotlight
         XCTAssertTrue(try service.load(at: afterTripFajr).opensAfterFajr)
     }
 
+    func testReadingSavesRetryAfterStoreMaintenanceEnds() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "MihbaraMaintenanceRetry-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root.appending(path: "Data"))
+        let bytes = Data("synthetic EPUB".utf8)
+        let media = Media(); media.kind = "doc"; media.contentType = "org.idpf.epub-container"; media.data = bytes
+        media.sizeBytes = bytes.count; media.sha256 = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+        let bookID = UUID(), mediaID = media.id
+        let book = Book(); book.id = bookID; book.title = "كتاب اختباري"; book.kind = "file"; book.format = "epub"
+        book.mediaID = mediaID; book.fileHash = media.sha256; book.shelf = "reading"
+        let context = ModelContext(container); context.insert(media); context.insert(book); try context.save()
+
+        let app = try AppSession(container: container, groupDirectory: root)
+        app.authorizeProtectedData()
+        let coordinator = MihbaraReadingSaveCoordinator.forSession(app)
+        let start = ISO8601DateFormatter().date(from: "2026-10-26T12:00:00Z")!
+        let end = start.addingTimeInterval(120)
+        let startText = ISO8601DateFormatter().string(from: start), endText = ISO8601DateFormatter().string(from: end)
+        let locator = "{\"href\":\"Text/chapter.xhtml\",\"type\":\"application/xhtml+xml\",\"locations\":{\"position\":2,\"progression\":0.2,\"totalProgression\":0.2}}"
+        let sessionID = UUID()
+        let sessionPayload: [String:MadarCore.JSONValue] = [
+            "id": .string(sessionID.uuidString), "bookID": .string(bookID.uuidString),
+            "start": .string(startText), "end": .string(endText), "activeSeconds": .number(61),
+            "fromPage": .number(2), "toPage": .number(3), "startLocator": .string(locator), "endLocator": .string(locator),
+            "startProgression": .number(0.2), "endProgression": .number(0.3), "pagesCounted": .number(1)
+        ]
+
+        try await app.quiesceWriters()
+        coordinator.enqueue(sessionID: sessionID, payload: sessionPayload)
+        coordinator.enqueueLocatorJSON(locator, bookID: bookID)
+        await coordinator.waitForCurrentAttempt()
+        XCTAssertTrue(coordinator.hasPending, "The busy store must leave both reading writes queued.")
+
+        app.resumeWriters()
+        await coordinator.waitForCurrentAttempt()
+        XCTAssertFalse(coordinator.hasPending, "Ending maintenance must retry pending reading writes.")
+        XCTAssertNil(app.errorMessage, "A recovered maintenance failure must not leave a stale error on screen.")
+        let savedContext = ModelContext(container)
+        XCTAssertEqual(try savedContext.fetch(FetchDescriptor<Book>()).first?.locatorJSON, Data(locator.utf8))
+        let sessions = try savedContext.fetch(FetchDescriptor<ReadingSession>())
+        XCTAssertEqual(sessions.count, 1)
+        XCTAssertEqual(sessions.first?.id, sessionID)
+        XCTAssertEqual(sessions.first?.activeSeconds, 61)
+    }
+
     func testSpotlightBookRecordsContainOnlyLiveTitles() throws {
         let live = Book(); live.id = UUID(); live.title = "كتاب في المحبرة"; live.author = "اسم لا يُفهرس"
         let deleted = Book(); deleted.deletedAt = Date(); deleted.title = "كتاب محذوف"
