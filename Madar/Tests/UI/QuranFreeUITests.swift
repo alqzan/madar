@@ -45,12 +45,17 @@ import XCTest
         continueAfterFailure=false
         let app=XCUIApplication()
         app.launchEnvironment=["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light","MADAR_UI_NOW":"2026-10-15T15:00:00+03:00","MADAR_UI_QURAN_FIXTURE":"home","MADAR_UI_QURAN_INDEX_DELAY_ONCE":"1"]
+        app.launchArguments=["-AppleLanguages","(en)","-AppleLocale","en_US"]
         app.launch();XCTAssertTrue(app.staticTexts["quran-coverage-title"].waitForExistence(timeout:25))
         for _ in 0..<5 {if app.buttons["quran-tool-strength"].isHittable {break};app.swipeUp()};app.buttons["quran-tool-strength"].tap()
         XCTAssertTrue(app.staticTexts["quran-strength-mean"].waitForExistence(timeout:10))
         for _ in 0..<6 {if app.buttons["quran-strength-review"].isHittable {break};app.swipeUp()};app.buttons["quran-strength-review"].tap()
         let surahPreset=app.buttons["quran-free-preset-surah"]
         XCTAssertTrue(surahPreset.waitForExistence(timeout:10));surahPreset.tap()
+        let rightmostPreset=app.buttons["quran-free-preset-last"]
+        let leftmostPreset=app.buttons["quran-free-preset-range"]
+        XCTAssertTrue(rightmostPreset.waitForExistence(timeout:5));XCTAssertTrue(leftmostPreset.waitForExistence(timeout:5))
+        XCTAssertGreaterThan(rightmostPreset.frame.midX,leftmostPreset.frame.midX,"Arabic free-reading controls must remain right-to-left under an English system locale")
         let baqarah=app.buttons["quran-free-surah-2"]
         XCTAssertTrue(baqarah.waitForExistence(timeout:5));baqarah.tap()
         let summary=app.staticTexts["quran-free-range-summary"]
@@ -60,6 +65,12 @@ import XCTest
         let ready=NSPredicate(format:"isEnabled == true")
         expectation(for:ready,evaluatedWith:start);waitForExpectations(timeout:12)
         XCTAssertTrue(summary.label.contains("٢ إلى ٤٩"),"The initial strength range overwrote the chosen surah: \(summary.label)")
+        capture(app,"M2-V14-free-strength-choice-English-L")
+        start.tap()
+        let close=app.buttons["quran-session-close"]
+        let fullPage=app.buttons["quran-session-full-page"]
+        XCTAssertTrue(close.waitForExistence(timeout:15),app.debugDescription);XCTAssertTrue(fullPage.waitForExistence(timeout:10))
+        XCTAssertGreaterThan(close.frame.midX,fullPage.frame.midX,"Arabic session controls must stay in RTL order under an English system locale")
     }
     func testLastFiveFacePresetWaitsForDelayedIndex() throws {
         continueAfterFailure=false
