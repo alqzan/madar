@@ -344,6 +344,23 @@ import MadarData
         let state = try PrayerRepository(context: context).snapshot(now: time("2026-06-21T14:00:00+02:00"))
         #expect(!state.hasTimes && state.next == nil && state.pending.isEmpty && state.today.cells.allSatisfy { $0.time == nil })
     }
+    @Test func polarHomeUsesValidTripTimesAndKeepsFuturePrayerLocked() throws {
+        let container = try container(start: "2026-06-21T06:00:00+03:00"); let context = container.mainContext
+        let settings = try SettingsStore(context: context)
+        try settings.prepare(.object(["name": .string("Tromso"), "country": .string("NO"), "lat": .number(69.6492), "lon": .number(18.9553), "tz": .string("Europe/Oslo"), "currency": .string("NOK")]), for: "core.homeCity", now: time("2026-06-21T06:00:00+03:00"))
+        try context.save()
+        let riyadh = try ActivePlace(latitude: 24.7136, longitude: 46.6753, timeZoneID: "Asia/Riyadh")
+        try apply(.startTrip(city: "الرياض", country: "SA", place: riyadh, homeKm: 350), context, at: "2026-06-21T08:00:00+03:00")
+
+        let repository = try PrayerRepository(context: context)
+        let occurrence = try #require(repository.occurrence(ref("2026-06-21", .dhuhr)))
+        let tripID = try #require(context.fetch(FetchDescriptor<Trip>()).first?.id)
+        #expect(occurrence.tripID == tripID && occurrence.place.timeZoneID == "Asia/Riyadh")
+
+        let state = try repository.snapshot(now: time("2026-06-21T10:00:00+03:00"))
+        let dhuhr = try #require(state.today.cells.first { $0.reference.prayer == .dhuhr })
+        #expect(state.hasTimes && dhuhr.time != nil && dhuhr.status == .future && !dhuhr.canLog)
+    }
 }
 
 @Suite struct TravelRuleTests {

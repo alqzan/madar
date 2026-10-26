@@ -43,13 +43,28 @@ import MadarData
         return date < times.fajr ? civil.adding(days: -1) : civil
     }
     public func occurrence(_ ref: PrayerReference) -> PrayerOccurrence? {
-        guard let homeTimes = PrayerTimesEngine.calculate(day: ref.day, place: home, options: options) else { return nil }
+        guard let homeTimes = PrayerTimesEngine.calculate(day: ref.day, place: home, options: options) else {
+            return tripOccurrence(ref)
+        }
         let base = homeTimes.time(for: ref.prayer)
         if let trip = activeTrip(at: base), let times = PrayerTimesEngine.calculate(day: ref.day, place: trip.place, options: tripOptions) {
             let actual = times.time(for: ref.prayer)
             if trip.start <= actual && (trip.end == nil || actual < trip.end!) { return .init(reference: ref, time: actual, place: trip.place, tripID: trip.id) }
         }
         return .init(reference: ref, time: base, place: home, tripID: nil)
+    }
+    private func tripOccurrence(_ ref: PrayerReference) -> PrayerOccurrence? {
+        var earliest: PrayerOccurrence?
+        for row in trips {
+            guard let place = try? ActivePlace(latitude: row.lat, longitude: row.lon, timeZoneID: row.tzID),
+                  let times = PrayerTimesEngine.calculate(day: ref.day, place: place, options: tripOptions) else { continue }
+            let actual = times.time(for: ref.prayer)
+            guard let active = activeTrip(at: actual), active.id == row.id else { continue }
+            if earliest.map({ actual < $0.time }) ?? true {
+                earliest = .init(reference: ref, time: actual, place: place, tripID: row.id)
+            }
+        }
+        return earliest
     }
     public func missedWindowEnd(_ ref: PrayerReference) -> Date? {
         switch ref.prayer {
