@@ -117,6 +117,7 @@ enum HabitRhythmMath {
 
 /// «فعلتها في يوم سابق»: pick the day, optionally the diary line it belongs to, and log it in that day's period.
 struct HabitPastDaySheet:View {
+    @Environment(\.colorScheme) private var colorScheme
     @Bindable var session:AppSession
     let reading:HabitReading
     let done:()->Void
@@ -124,7 +125,7 @@ struct HabitPastDaySheet:View {
     @State private var date = Date()
     @State private var entry:UUID?
     @State private var busy = false
-    private var theme:RoomTheme{.init(room:"bahw",dark:session.string("core.theme") == "dark")}
+    private var theme:RoomTheme{.init(room:"bahw",dark:colorScheme == .dark)}
     private var today:GregorianDay { AppBahwService(session:session).today }
     private var first:GregorianDay { reading.summary.periods.first?.start ?? today }
     private var day:GregorianDay { GregorianDay.containing(date,in:.gmt) }

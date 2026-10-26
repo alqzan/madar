@@ -4,6 +4,7 @@ import MadarCommands
 import MadarDesign
 
 struct HabitEditorView:View {
+    @Environment(\.colorScheme) private var colorScheme
     @Bindable var session:AppSession
     let reading:HabitReading?
     let id:UUID
@@ -18,7 +19,7 @@ struct HabitEditorView:View {
     @State private var reminder="dot"
     @State private var busy=false
     @State private var issue:String?
-    private var theme:RoomTheme{.init(room:"bahw",dark:session.string("core.theme") == "dark")}
+    private var theme:RoomTheme{.init(room:"bahw",dark:colorScheme == .dark)}
     private var digits:MadarNumberFormatter{.init(style:session.string("core.numerals") == "western" ? .western : .hindi)}
     var body:some View {
         VStack(spacing:0) {

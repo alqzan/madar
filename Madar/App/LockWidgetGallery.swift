@@ -4,9 +4,10 @@ import MadarDesign
 import MadarSnapshots
 
 struct LockWidgetGallery:View {
+    @Environment(\.colorScheme) private var colorScheme
     @Bindable var session:AppSession
     @Environment(\.dismiss)private var dismiss
-    private var theme:RoomTheme{.init(room:"bahw",dark:session.string("core.theme")=="dark")}
+    private var theme:RoomTheme{.init(room:"bahw",dark:colorScheme == .dark)}
     private func value(_ room:BuiltRoomWidget)->RoomWidgetSnapshot?{session.snapshotStore.read(room.rawValue,as:RoomWidgetSnapshot.self,now:session.prayerNow())?.payload}
     private func mihbaraValue()->(MihbaraSnapshot?,Bool){let value=session.snapshotStore.read(BuiltRoomWidget.mihbara.rawValue,as:MihbaraSnapshot.self,now:session.prayerNow());return(value?.payload,value?.privacy.notesLocked == true)}
     private func preview(_ room:BuiltRoomWidget,family:WidgetFamily)->some View {
@@ -35,7 +36,7 @@ struct LockWidgetGallery:View {
                     Text("كل عنصر يفتح غرفته من دون عرض محتواها. تسجيل الصلاة ومؤقّت المراجعة متاحان أيضًا في المعرض.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                     Link(destination:URL(string:"madar://mal/add")!){Label("مصروف",systemImage:"plus.circle").font(MadarTypography.section()).frame(maxWidth:.infinity,minHeight:56).background(theme.surface,in:.rect(cornerRadius:20))}.buttonStyle(.plain).accessibilityIdentifier("control-preview-money")
                     Text("وضع الاستعداد").font(MadarTypography.section())
-                    HStack(spacing:12){preview(.habits,family:.systemSmall).padding(14).background(theme.surface,in:.rect(cornerRadius:24));preview(.mihbara,family:.systemSmall).padding(14).background(RoomTheme(room:"mihbara",dark:session.string("core.theme")=="dark").surface,in:.rect(cornerRadius:24))}.frame(height:180)
+                    HStack(spacing:12){preview(.habits,family:.systemSmall).padding(14).background(theme.surface,in:.rect(cornerRadius:24));preview(.mihbara,family:.systemSmall).padding(14).background(RoomTheme(room:"mihbara",dark:colorScheme == .dark).surface,in:.rect(cornerRadius:24))}.frame(height:180)
                 }.padding(16)
             }.clipped()
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.accent).toolbarVisibility(.hidden,for:.navigationBar)

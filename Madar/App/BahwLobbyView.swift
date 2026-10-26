@@ -57,12 +57,13 @@ struct BahwGridLayout: Layout {
 }
 
 struct BahwLobbyView: View {
+    @Environment(\.colorScheme) private var colorScheme
     @Bindable var session: AppSession
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var arranging = false
     @State private var drawerOpen = false
     @State private var wiggle = false
-    private var theme: RoomTheme { RoomTheme(room: "bahw", dark: session.string("core.theme") == "dark") }
+    private var theme: RoomTheme { RoomTheme(room: "bahw", dark: colorScheme == .dark) }
     private var service: AppBahwService { .init(session: session) }
     private var layout: BahwLayoutValue { BahwLayoutValue(session.values["bahw.layout"]) }
     var body: some View {
@@ -199,11 +200,12 @@ private struct BahwOpened: Identifiable { let block: BahwBlock; var id: String {
 
 /// A tap opens a sheet with the room's summary and a button into the room (§7.1 «التفاعل»).
 struct BahwBlockSheet: View {
+    @Environment(\.colorScheme) private var colorScheme
     @Bindable var session: AppSession
     let block: BahwBlock
     let open: () -> Void
     @Environment(\.dismiss) private var dismiss
-    private var theme: RoomTheme { RoomTheme(room: "bahw", dark: session.string("core.theme") == "dark") }
+    private var theme: RoomTheme { RoomTheme(room: "bahw", dark: colorScheme == .dark) }
     var body: some View {
         NavigationStack {
             ScrollView {

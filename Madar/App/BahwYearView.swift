@@ -94,12 +94,13 @@ extension AppBahwService {
 /// M4-V03 · `bahw/04-W3-Sana.jpg`: how much of the year has passed, and the days that matter. Only the strip view
 /// ships in v1 (`bahw.yearView` alternatives are v2), so no view switcher is shown.
 struct BahwYearView: View {
+    @Environment(\.colorScheme) private var colorScheme
     @Bindable var session: AppSession
     @Environment(\.dismiss) private var dismiss
     @State private var hijriHero: Bool?
     @State private var filter = 0
     @State private var editing: BahwDayDraft?
-    private var lobby: RoomTheme { RoomTheme(room: "bahw", dark: session.string("core.theme") == "dark") }
+    private var lobby: RoomTheme { RoomTheme(room: "bahw", dark: colorScheme == .dark) }
     private var service: AppBahwService { .init(session: session) }
     private var digits: MadarNumberFormatter { service.digits }
     private var which: String { session.string("bahw.yearWhich") }
@@ -345,11 +346,12 @@ struct BahwDayDraft: Identifiable {
 }
 
 struct BahwDaySheet: View {
+    @Environment(\.colorScheme) private var colorScheme
     @Bindable var session: AppSession
     @State var draft: BahwDayDraft
     @Environment(\.dismiss) private var dismiss
     @State private var failure: String?
-    private var lobby: RoomTheme { RoomTheme(room: "bahw", dark: session.string("core.theme") == "dark") }
+    private var lobby: RoomTheme { RoomTheme(room: "bahw", dark: colorScheme == .dark) }
     private var digits: MadarNumberFormatter { .init(style: session.string("core.numerals") == "western" ? .western : .hindi) }
     var body: some View {
         NavigationStack {

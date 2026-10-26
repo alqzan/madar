@@ -20,6 +20,7 @@ extension HabitReading {
 }
 struct HabitEditorIdentity: Identifiable { let id: UUID; var reading: HabitReading? = nil }
 struct HabitsRoomView: View {
+    @Environment(\.colorScheme) private var colorScheme
     @Bindable var session: AppSession
     @State private var readings: [HabitReading] = []
     @State private var liveHealth: [UUID:Int] = [:]
@@ -33,7 +34,7 @@ struct HabitsRoomView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    private var theme: RoomTheme { .init(room:"bahw",dark:session.string("core.theme") == "dark") }
+    private var theme: RoomTheme { .init(room:"bahw",dark:colorScheme == .dark) }
     private var digits: MadarNumberFormatter { .init(style:session.string("core.numerals") == "western" ? .western : .hindi) }
     private var active: [HabitReading] { readings.filter { !$0.archived } }
     private var today: GregorianDay { AppBahwService(session:session).today }

@@ -18,10 +18,11 @@ extension BahwBlockSize {
 }
 
 struct BahwCustomizePreview: View {
+    @Environment(\.colorScheme) private var colorScheme
     @Bindable var session: AppSession
     let changes: String
     let reset: () -> Void
-    private var lobby: RoomTheme { RoomTheme(room: "bahw", dark: session.string("core.theme") == "dark") }
+    private var lobby: RoomTheme { RoomTheme(room: "bahw", dark: colorScheme == .dark) }
     private var layout: BahwLayoutValue { BahwLayoutValue(session.values["bahw.layout"]) }
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -91,9 +92,10 @@ struct BahwCustomizePreview: View {
 }
 
 struct BahwBlocksSection: View {
+    @Environment(\.colorScheme) private var colorScheme
     @Bindable var session: AppSession
     @State private var expanded = true
-    private var lobby: RoomTheme { RoomTheme(room: "bahw", dark: session.string("core.theme") == "dark") }
+    private var lobby: RoomTheme { RoomTheme(room: "bahw", dark: colorScheme == .dark) }
     private var layout: BahwLayoutValue { BahwLayoutValue(session.values["bahw.layout"]) }
     private var rows: [BahwBlock] { layout.blocks.compactMap(BahwBlock.init(rawValue:)).filter { BahwBlock.built.contains($0) } }
     var body: some View {

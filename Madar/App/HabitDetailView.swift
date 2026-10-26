@@ -7,6 +7,7 @@ import MadarPrayer
 import MadarDesign
 
 struct HabitDetailView:View {
+    @Environment(\.colorScheme) private var colorScheme
     @Bindable var session:AppSession
     let reading:HabitReading
     let edit:()->Void
@@ -15,7 +16,7 @@ struct HabitDetailView:View {
     @State private var pastDay=false
     /// A month or a year apart, the habit is kept by «آخر مرة» (item 26 «ج»): that leads the page.
     private var keptBySince:Bool { reading.source == nil && [.monthly,.yearly].contains(reading.summary.current?.rule.frequency) }
-    private var theme:RoomTheme{.init(room:"bahw",dark:session.string("core.theme") == "dark")}
+    private var theme:RoomTheme{.init(room:"bahw",dark:colorScheme == .dark)}
     /// «تُقاس يوميًا»: the adverb, not the adjective «يومية».
     private func measured(_ f:HabitFrequency)->String { switch f {case .daily:"يوميًا";case .weekly:"أسبوعيًا";case .monthly:"شهريًا";case .yearly:"سنويًا"} }
     private var digits:MadarNumberFormatter{.init(style:session.string("core.numerals") == "western" ? .western : .hindi)}
