@@ -72,9 +72,9 @@ struct DiaryHomeSnapshot {
     }
     /// V12: the diary's day without a read authorization; reminder scheduling runs while the notes are locked.
     func diaryDay() throws -> GregorianDay {
-        let repository = try PrayerRepository(context: ModelContext(app.container)), now = clock(), place = repository.place(at: now)
+        let repository = try PrayerRepository(context: ModelContext(app.container)), now = clock(), place = repository.place(at: now), options = repository.calculationOptions(at: now)
         let civil = GregorianDay.containing(now, in: place.timeZone)
-        let days = [civil.adding(days: -1), civil].compactMap { PrayerTimesEngine.calculate(day: $0, place: place, options: repository.options) }
+        let days = [civil.adding(days: -1), civil].compactMap { PrayerTimesEngine.calculate(day: $0, place: place, options: options) }
         return try MadarDay.resolve(instant: now, place: place, boundary: DayBoundary(rawValue: app.string("core.dayStart")) ?? .fajr, prayerDays: days).date
     }
     func home(match: FirstCalendar? = nil) throws -> DiaryHomeSnapshot {

@@ -14,8 +14,8 @@ extension AppSession {
     /// Existing device-ledger requests seed the budget on upgrade, without moving owner records.
     func publishNotificationBudget(at now: Date) throws {
         let context = ModelContext(container), repository = try PrayerRepository(context: context)
-        let first = repository.prayerDay(at: now), place = repository.place(at: now)
-        let days = (0..<4).compactMap { PrayerTimesEngine.calculate(day: first.adding(days: $0), place: place, options: repository.options) }
+        let first = repository.prayerDay(at: now), place = repository.place(at: now), options = repository.calculationOptions(at: now)
+        let days = (0..<4).compactMap { PrayerTimesEngine.calculate(day: first.adding(days: $0), place: place, options: options) }
         let rows = try context.fetch(FetchDescriptor<NotificationLedger>()).filter {
             $0.deletedAt == nil && ["room", "digest", "nudge"].contains($0.requestClass) && ["submitted", "observed"].contains($0.state)
                 && $0.scheduledFor >= now.addingTimeInterval(-7 * 86400)

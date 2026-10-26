@@ -45,8 +45,7 @@ import MadarPrayer
         guard let key = zakatHawlKey(session: session),
               let hawl = MoneyHawl.read(key, at: now, app: session),
               let repository = try? PrayerRepository(context: ModelContext(session.container)) else { return [] }
-        let place = repository.place(at: now), trip = repository.activeTrip(at: now)
-        let options = trip == nil ? repository.options : repository.tripOptions
+        let place = repository.place(at: now), options = repository.calculationOptions(at: now)
         return [hawl.anniversary, hawl.followingAnniversary].compactMap { anniversary in
             let reminderDay = anniversary.adding(days: -leadDays)
             let relevantDays = (-1...2).compactMap { offset in
@@ -94,8 +93,7 @@ import MadarPrayer
     static func planningPrayerDays(session: AppSession, candidates: [NotificationCandidate], current: [PrayerDay], now: Date) -> [PrayerDay] {
         let annual = candidates.filter { $0.kind == .annualReminder && $0.id.hasPrefix("mal.zakat.") }
         guard !annual.isEmpty, let repository = try? PrayerRepository(context: ModelContext(session.container)) else { return current }
-        let place = repository.place(at: now), trip = repository.activeTrip(at: now)
-        let options = trip == nil ? repository.options : repository.tripOptions
+        let place = repository.place(at: now), options = repository.calculationOptions(at: now)
         var byDay = Dictionary(uniqueKeysWithValues: current.map { ($0.day, $0) })
         for candidate in annual {
             let civil = GregorianDay.containing(candidate.dueAt, in: place.timeZone)
@@ -293,8 +291,8 @@ import MadarPrayer
         }
         if id.hasPrefix("mal.reconcile.") {
             let repository = try PrayerRepository(context: ModelContext(session.container))
-            let place = repository.place(at: now), firstDay = repository.prayerDay(at: now)
-            let days = (0..<4).compactMap { PrayerTimesEngine.calculate(day: firstDay.adding(days: $0), place: place, options: repository.options) }
+            let place = repository.place(at: now), firstDay = repository.prayerDay(at: now), options = repository.calculationOptions(at: now)
+            let days = (0..<4).compactMap { PrayerTimesEngine.calculate(day: firstDay.adding(days: $0), place: place, options: options) }
             let candidates = reconciliationCandidates(session: session, prayerDays: days, now: now)
             return candidates.contains { $0.id == id }
         }

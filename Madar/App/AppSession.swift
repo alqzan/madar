@@ -1002,8 +1002,8 @@ final class AppSession {
         let instant = prayerNow()
         try pendingInbox.publishGeneration(inboxGeneration())
         try publishNotificationBudget(at: instant)
-        let place = activePlace, day = GregorianDay.containing(instant, in: place.timeZone)
-        let prayerSource=try PrayerRepository(context:ModelContext(container)),options=prayerSource.activeTrip(at:instant)==nil ? prayerSource.options : prayerSource.tripOptions
+        let prayerSource=try PrayerRepository(context:ModelContext(container)),place=prayerSource.place(at:instant),options=prayerSource.calculationOptions(at:instant)
+        let day = GregorianDay.containing(instant, in: place.timeZone)
         let prayers = [day.adding(days: -1), day].compactMap { PrayerTimesEngine.calculate(day: $0, place: place,options:options) }
         guard let key = try? MadarDay.resolve(instant: instant, place: place, boundary: DayBoundary(rawValue: string("core.dayStart")) ?? .fajr, prayerDays: prayers, hijriSource: HijriSource(rawValue: string("core.hijriSource")) ?? .ummAlQura, sightingOffset: Int(number("core.hijriOffset"))) else {
             try snapshotStore.remove("foundation")

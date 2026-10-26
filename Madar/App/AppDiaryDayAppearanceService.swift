@@ -7,8 +7,8 @@ import MadarPrayer
 extension AppDiaryService {
     func appearance(_ day:GregorianDay) throws -> DiaryDayAppearance? {
         try authorizeRead()
-        let now=clock(),repository=try PrayerRepository(context:ModelContext(app.container)),place=repository.place(at:now),civil=GregorianDay.containing(now,in:place.timeZone)
-        guard let prayers=PrayerTimesEngine.calculate(day:civil,place:place,options:repository.options) else{return nil}
+        let now=clock(),repository=try PrayerRepository(context:ModelContext(app.container)),place=repository.place(at:now),options=repository.calculationOptions(at:now),civil=GregorianDay.containing(now,in:place.timeZone)
+        guard let prayers=PrayerTimesEngine.calculate(day:civil,place:place,options:options) else{return nil}
         return try .init(day:day,currentDay:currentDay(),now:now,prayers:prayers,source:HijriSource(rawValue:app.string("core.hijriSource")) ?? .ummAlQura,offset:Int(app.number("core.hijriOffset")))
     }
     func returnAfterAbsence(_ day:GregorianDay) throws -> GregorianDay? {

@@ -26,4 +26,24 @@ import MadarData
         XCTAssertEqual(try service.travelStamps().map(\.city),["طوكيو"]);XCTAssertNotNil(try service.travelStamps().first?.departure)
         XCTAssertEqual(try ModelContext(container).fetchCount(FetchDescriptor<Trip>()),1)
     }
+
+    func testDiaryDayUsesTheActiveTripMethodAtFajr() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "DiaryTripMethod-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let instant = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-03-20T04:08:00+00:00"))
+        let container = try MadarContainerFactory.makeLocal(at: root.appending(path: "Data"))
+        let context = ModelContext(container), settings = try SettingsStore(context: context)
+        try settings.prepare(.string("fajr"), for: "core.dayStart", now: instant)
+        try settings.prepare(.string("mwl"), for: "salah.method", now: instant)
+        try settings.prepare(.string("egyptian"), for: "salah.tripMethod", now: instant)
+        try settings.prepare(.string("twilightAngle"), for: "salah.highLatitudeRule", now: instant)
+        let trip = Trip()
+        trip.city = "لندن"; trip.lat = 51.5074; trip.lon = -0.1278; trip.tzID = "Europe/London"
+        trip.mode = "manual"; trip.start = instant.addingTimeInterval(-3600)
+        context.insert(trip); try context.save()
+
+        let app = try AppSession(container: container, groupDirectory: root)
+        let service = AppDiaryService(app: app, clock: { instant })
+        XCTAssertEqual(try service.diaryDay(), try GregorianDay("2026-03-20"))
+    }
 }

@@ -20,14 +20,51 @@ struct CaptureIntent: AppIntent {
     static let heldDialog: IntentDialog = "افتح المذكرات ليُضاف السطر."
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        let applied = await MadarIntentHandoff.shared.submit(.capture(text: text, id: UUID()))
-        switch CaptureRouter.route(text) {
-        case .moneyExpense: return .result(dialog: "راجع المصروف واعتمده في مدار.")
-        case .mihbaraIdea: return .result(dialog: applied ? "حُفظت الفكرة في دفتر المحبرة." : "افتح المحبرة ليُضاف السطر إلى الدفتر.")
-        case .empty: return .result(dialog: "اكتب شيئًا لالتقاطه في مدار.")
-        case .tooLong: return .result(dialog: "النص أطول من سطر واحد في صفحة اليوم.")
-        case .logPrayer, .choosePrayerStatus: return .result(dialog: applied ? "أُضيف." : Self.heldDialog)
-        case .diaryLine: return .result(dialog: applied ? "أُضيف." : Self.heldDialog)
+        let route = CaptureRouter.route(text)
+        let handled = await MadarIntentHandoff.shared.submit(.capture(text: text, id: UUID()))
+        return .result(dialog: CaptureIntentResponse.make(route: route, handled: handled).dialog)
+    }
+}
+
+enum CaptureIntentResponse: Equatable {
+    case added
+    case reviewExpense
+    case heldExpense
+    case savedIdea
+    case heldIdea
+    case heldDiary
+    case choosePrayerStatus
+    case prayerRequestSent
+    case heldPrayer
+    case empty
+    case tooLong
+
+    var dialog: IntentDialog {
+        switch self {
+        case .added: "أُضيف."
+        case .reviewExpense: "راجع المصروف واعتمده في مدار."
+        case .heldExpense: "افتح المال وأكمل تأكيد المصروف."
+        case .savedIdea: "حُفظت الفكرة في دفتر المحبرة."
+        case .heldIdea: "افتح المحبرة ليُضاف السطر إلى الدفتر."
+        case .heldDiary: CaptureIntent.heldDialog
+        case .choosePrayerStatus: "اختر حالة الصلاة في مدار لإكمال تسجيلها."
+        case .prayerRequestSent: "وصل طلب تسجيل الصلاة إلى مدار."
+        case .heldPrayer: "افتح الصلاة وأكمل تسجيلها في مدار."
+        case .empty: "اكتب شيئًا لالتقاطه في مدار."
+        case .tooLong: "النص أطول من سطر واحد في صفحة اليوم."
+        }
+    }
+
+    static func make(route: CaptureRoute, handled: Bool) -> Self {
+        switch route {
+        case .moneyExpense: handled ? .reviewExpense : .heldExpense
+        case .mihbaraIdea: handled ? .savedIdea : .heldIdea
+        case .empty: .empty
+        case .tooLong: .tooLong
+        case .logPrayer: handled ? .prayerRequestSent : .heldPrayer
+        case .choosePrayerStatus: handled ? .choosePrayerStatus : .heldPrayer
+        case .diaryLine(_, kind: .idea): handled ? .savedIdea : .heldIdea
+        case .diaryLine: handled ? .added : .heldDiary
         }
     }
 }

@@ -37,9 +37,12 @@ import MadarData
         return .init(id: row.id, city: row.city, place: place, start: row.start!, end: row.end)
     }
     public func place(at date: Date) -> ActivePlace { activeTrip(at: date)?.place ?? home }
+    public func calculationOptions(at date: Date) -> PrayerCalculationOptions {
+        activeTrip(at: date) == nil ? options : tripOptions
+    }
     public func prayerDay(at date: Date) -> GregorianDay {
         let place = place(at: date); let civil = GregorianDay.containing(date, in: place.timeZone)
-        guard let times = PrayerTimesEngine.calculate(day: civil, place: place, options: options) else { return civil }
+        guard let times = PrayerTimesEngine.calculate(day: civil, place: place, options: calculationOptions(at: date)) else { return civil }
         return date < times.fajr ? civil.adding(days: -1) : civil
     }
     public func occurrence(_ ref: PrayerReference) -> PrayerOccurrence? {

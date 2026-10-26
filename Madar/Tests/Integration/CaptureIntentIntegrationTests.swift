@@ -78,6 +78,15 @@ import MadarMoney
         XCTAssertNotNil(app.errorMessage)
     }
 
+    func testCaptureDialogDoesNotSayPrayerWasAddedBeforeItsStateIsChosen() {
+        let incomplete = CaptureRouter.route("صليت المغرب")
+        XCTAssertEqual(CaptureIntentResponse.make(route: incomplete, handled: true), .choosePrayerStatus)
+        XCTAssertEqual(CaptureIntentResponse.make(route: incomplete, handled: false), .heldPrayer)
+
+        let complete = CaptureRouter.route("صليت الفجر جماعة")
+        XCTAssertEqual(CaptureIntentResponse.make(route: complete, handled: true), .prayerRequestSent)
+    }
+
     func testHabitShortcutsListOnlyCustomHabitsAndHideUnderAppLock() async throws {
         let (app, _) = try session()
         app.authorizeProtectedData()

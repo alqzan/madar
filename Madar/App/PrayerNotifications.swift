@@ -422,9 +422,10 @@ final class PrayerNotificationCoordinator {
     }
     private func prayerDays(repository: PrayerRepository, now: Date) -> [PrayerDay] {
         let place = repository.place(at: now)
+        let options = repository.calculationOptions(at: now)
         let firstDay = repository.prayerDay(at: now)
         return (0..<4).compactMap { offset in
-            PrayerTimesEngine.calculate(day: firstDay.adding(days: offset), place: place, options: repository.options)
+            PrayerTimesEngine.calculate(day: firstDay.adding(days: offset), place: place, options: options)
         }
     }
 

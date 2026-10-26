@@ -289,6 +289,27 @@ import MadarData
         let dhuhr = try #require(logs.first { $0.prayer == "dhuhr" })
         #expect(dhuhr.status == "jamaah" && dhuhr.eventAt == time("2026-10-07T12:11:00+03:00"))
     }
+    @Test func activeTripMethodControlsPrayerDayAtTheFajrBoundary() throws {
+        let container = try container(start: "2026-03-19T12:00:00+00:00")
+        let context = container.mainContext
+        let settings = try SettingsStore(context: context)
+        try settings.prepare(.string("mwl"), for: "salah.method", now: time("2026-03-19T12:00:00+00:00"))
+        try settings.prepare(.string("egyptian"), for: "salah.tripMethod", now: time("2026-03-19T12:00:00+00:00"))
+        try settings.prepare(.string("twilightAngle"), for: "salah.highLatitudeRule", now: time("2026-03-19T12:00:00+00:00"))
+        let trip = Trip()
+        trip.city = "لندن"; trip.lat = 51.5074; trip.lon = -0.1278; trip.tzID = "Europe/London"
+        trip.mode = "manual"; trip.start = time("2026-03-20T04:00:00+00:00")
+        context.insert(trip); try context.save()
+
+        let repository = try PrayerRepository(context: context)
+        let beforeTrip = time("2026-03-20T03:59:00+00:00")
+        let nearFajr = time("2026-03-20T04:08:00+00:00")
+        let expectedPrayerDay = try GregorianDay("2026-03-20")
+        #expect(repository.calculationOptions(at: beforeTrip).method == .mwl)
+        #expect(repository.calculationOptions(at: nearFajr).method == .egyptian)
+        // Independent MWL fixture in CoreTests pins London Fajr to 04:10 ±3 min; Egypt's 19.5° Fajr is earlier.
+        #expect(repository.prayerDay(at: nearFajr) == expectedPrayerDay)
+    }
     @Test func monthRatioGolden26Of30AndStrictStreakNotRepairedByQada() throws {
         // Hand-authored §7.2 example: 26 on time, 2 qada, 2 missed. No code-generated expectations.
         let container = try container(start: "2026-10-01T12:00:00+03:00"); let context = container.mainContext
