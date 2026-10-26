@@ -36,6 +36,18 @@ extension AppSession {
             }
             try context.save(); return
         }
+        if variant == "scheduledToday" {
+            let today = GregorianDay.containing(prayerNow(), in: activePlace.timeZone)
+            for (name, frequency) in [("صدقة شهرية محددة", "monthly"), ("موعد سنوي محدد", "yearly"), ("هدف شهري مرن", "monthly")] {
+                let habit = Habit(); habit.name = name; habit.startDate = today.adding(days: -35).date(in: ActivePlace.riyadh.timeZone); context.insert(habit)
+                let policy = HabitPolicy(); policy.habitID = habit.id; policy.effectiveFrom = today.adding(days: -35).description
+                policy.frequency = frequency; policy.measure = "once"; policy.target = 1; policy.monthCalendar = "gregorian"
+                if name == "صدقة شهرية محددة" { policy.monthDays = [today.day] }
+                else if frequency == "yearly" { policy.yearMonth = today.month; policy.yearDay = today.day }
+                context.insert(policy)
+            }
+            try context.save(); return
+        }
         let atRisk = variant == "atRisk", overdue = variant == "sinceOverdue"
         let since = variant == "since" || overdue
         guard variant == "showcase" || atRisk || since else{try context.save();return}

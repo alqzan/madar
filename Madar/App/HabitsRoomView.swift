@@ -101,8 +101,9 @@ struct HabitsRoomView: View {
         let left = daysLeft(p)
         switch p.rule.frequency {
         case .weekly: return p.dueDays.contains(today) || left <= 2
-        case .monthly: return left <= 7
-        default: return left <= 14
+        case .monthly: return (!p.rule.monthDays.isEmpty && p.dueDays.contains(today)) || left <= 7
+        case .yearly: return p.dueDays.contains(today) || left <= 14
+        case .daily: return true
         }
     }
     private func daysLeft(_ p:HabitPeriodResult)->Int {

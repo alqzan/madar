@@ -151,6 +151,16 @@ import UIKit
         shot(app,"M4-V02-Adat-all-L");app.swipeUp(velocity:.slow);shot(app,"M4-V02-Adat-all-s1-L")
         XCTAssertFalse(app.segmentedControls["عرض العادات"].exists) // RA8: alternate designs are v2; this is a filter.
     }
+    func testScheduledMonthlyAndYearlyHabitsAppearOnTheirDates() {
+        continueAfterFailure = false
+        let app = app("scheduledToday"); open(app)
+        let monthly = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "صدقة شهرية محددة")).firstMatch
+        let yearly = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "موعد سنوي محدد")).firstMatch
+        shot(app, "M4-V02-scheduled-due-after-L")
+        XCTAssertTrue(monthly.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(yearly.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertFalse(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "هدف شهري مرن")).firstMatch.exists, app.debugDescription)
+    }
     /// Item 26 «ب مع ج»: each rhythm draws itself in «كل عاداتي»; a yearly habit opens on «منذ آخر مرة» with both dates and
     /// its diary line, and «فعلتها في يوم سابق» logs a past day linked to that day's line.
     func testRhythmBandsSinceLastTimeAndPastDay() throws {
