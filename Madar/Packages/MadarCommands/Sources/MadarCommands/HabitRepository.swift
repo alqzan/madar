@@ -44,9 +44,15 @@ public struct HabitTime: Equatable, Sendable {
         row.monthDays = rule.monthDays; row.monthCalendar = rule.hijri ? "hijri" : "gregorian"; row.yearMonth = rule.yearMonth; row.yearDay = rule.yearDay
         row.windowAnchor = rule.windowAnchor?.rawValue; row.windowStartMin = rule.windowStart; row.windowEndMin = rule.windowEnd
     }
-    static func travelBreak(start: Date, end: Date?, timeZone: TimeZone) -> HabitBreak {
-        let from = GregorianDay.containing(start, in: timeZone)
-        let returnDay = end.map { GregorianDay.containing($0, in: timeZone) }
+    static func travelDay(at instant: Date, place: ActivePlace, boundary: DayBoundary, options: PrayerCalculationOptions) -> GregorianDay {
+        let civil = GregorianDay.containing(instant, in: place.timeZone)
+        guard boundary != .midnight else { return civil }
+        let days = [civil.adding(days: -1), civil].compactMap { PrayerTimesEngine.calculate(day: $0, place: place, options: options) }
+        return (try? MadarDay.resolve(instant: instant, place: place, boundary: boundary, prayerDays: days).date) ?? civil
+    }
+    static func travelBreak(start: Date, end: Date?, place: ActivePlace, boundary: DayBoundary, options: PrayerCalculationOptions) -> HabitBreak {
+        let from = travelDay(at: start, place: place, boundary: boundary, options: options)
+        let returnDay = end.map { travelDay(at: $0, place: place, boundary: boundary, options: options) }
         // Trips use half-open instants, but habits are evaluated in whole day buckets.
         // Keep the travel day frozen when departure and return share one date instead of
         // constructing an empty [day, day) break.
@@ -56,6 +62,7 @@ public struct HabitTime: Equatable, Sendable {
     public func readings(at now: Date, includeArchived: Bool = false, liveHealth: [UUID:Int] = [:]) throws -> [HabitReading] {
         let settings = try SettingsStore(context: context), prayers = try PrayerRepository(context: context), place = prayers.place(at: now)
         let today = try DiaryLineRenderer.today(context: context, now: now)
+        let boundary = DayBoundary(rawValue: try settings.value(for: "core.dayStart").string ?? "fajr") ?? .fajr
         let calendar = MadarCalendarDays(zone: place.timeZone, source: HijriSource(rawValue: (try settings.value(for: "core.hijriSource")).string ?? "ummAlQura") ?? .ummAlQura, offset: Int((try settings.value(for: "core.hijriOffset")).number ?? 0))
         let policies = try context.fetch(FetchDescriptor<HabitPolicy>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
         let events = try context.fetch(FetchDescriptor<HabitEvent>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
@@ -69,11 +76,19 @@ public struct HabitTime: Equatable, Sendable {
             let epochs=events.filter{$0.habitID==habit.id && $0.calendarSource != nil}.sorted { $0.dayKey == $1.dayKey ? $0.updatedAt < $1.updatedAt : $0.dayKey < $1.dayKey }
             var breaks = try pauses.filter { $0.habitID == habit.id }.map { p -> HabitBreak in
                 var until = try p.toDayKey.map(GregorianDay.init)
-                if let tripID = p.tripID, let end = trips.first(where: { $0.id == tripID })?.end { until = GregorianDay.containing(end, in: place.timeZone) }
+                if let tripID = p.tripID, let trip = trips.first(where: { $0.id == tripID }),
+                   let end = trip.end,
+                   let tripPlace = try? ActivePlace(latitude: trip.lat, longitude: trip.lon, timeZoneID: trip.tzID) {
+                    until = Self.travelDay(at: end, place: tripPlace, boundary: boundary, options: prayers.tripOptions)
+                }
                 return .init(from: try GregorianDay(p.fromDayKey), until: until)
             }
             if habit.homeOnly, (try settings.value(for: "bahw.travelFreezesHome")) == .bool(true) {
-                breaks += trips.map { Self.travelBreak(start: $0.start!, end: $0.end, timeZone: place.timeZone) }
+                breaks += trips.filter { !$0.dismissed }.compactMap { trip in
+                    guard let start = trip.start,
+                          let tripPlace = try? ActivePlace(latitude: trip.lat, longitude: trip.lon, timeZoneID: trip.tzID) else { return nil }
+                    return Self.travelBreak(start: start, end: trip.end, place: tripPlace, boundary: boundary, options: prayers.tripOptions)
+                }
             }
             var facts = try events.filter { $0.habitID == habit.id && $0.delta != 0 }.map { HabitFact(id: $0.id, day: try GregorianDay($0.dayKey), periodKey: $0.periodKey, delta: $0.delta, unit: $0.unit) }
             facts += legacy.filter { $0.habitID == habit.id }.map { .init(id: $0.id, day: (try? GregorianDay($0.periodKey)) ?? GregorianDay.containing($0.eventAt, in: TimeZone(identifier: $0.tzID) ?? place.timeZone), periodKey: $0.periodKey, delta: $0.value) }
@@ -122,7 +137,6 @@ public struct HabitTime: Equatable, Sendable {
                 weekStart: MadarWeekStart(rawValue: epochWeek) ?? .saturday, weekChanges: weekChanges, calendarChanges:calendarChanges,
                 breakAfter: Int((try settings.value(for: "bahw.streakBreakAfter")).number ?? 2), ownerStreak: ownerStreak)
             let civil = GregorianDay.containing(now, in: place.timeZone), options = prayers.activeTrip(at: now) == nil ? prayers.options : prayers.tripOptions
-            let boundary = DayBoundary(rawValue: try settings.value(for: "core.dayStart").string ?? "fajr") ?? .fajr
             let window = summary.current.flatMap { current in
                 [civil.adding(days: -1), civil].compactMap { day -> DateInterval? in
                     let anchor = PrayerTimesEngine.calculate(day: day, place: place, options: options)
