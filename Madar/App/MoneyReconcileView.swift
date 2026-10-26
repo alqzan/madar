@@ -81,7 +81,7 @@ struct MoneyReconcileView: View {
         .toolbarVisibility(.hidden, for: .navigationBar)
         .task { load() }.onChange(of: app.prayerRevision) { load() }
         .sheet(item: $source) { MoneySourceView(app: app, detail: $0, visible: visible).environment(\.roomTheme, theme) }
-        .sheet(item: $unknownAccount, onDismiss: load) { MoneyAccountSheet(app: app, original: $0) }
+        .sheet(item: $unknownAccount, onDismiss: load) { MoneyAccountSheet(app: app, original: $0, visible: visible, revealed: $revealed) }
         .navigationDestination(isPresented: $messagesOpen) { MoneyMessagesView(app: app, revealed: $revealed) }
         .onChange(of: messagesOpen) { if !messagesOpen { load() } }
     }

@@ -6,6 +6,8 @@ import MadarMoney
 struct MoneyAccountSheet: View {
     let app: AppSession
     let original: MoneyAccountEdit
+    let visible: Bool
+    @Binding var revealed: Bool
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @State private var draft: MoneyAccountEdit
@@ -16,8 +18,9 @@ struct MoneyAccountSheet: View {
     @FocusState private var editing: Bool
     private var service: AppMoneyService { .init(app: app) }
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
-    init(app: AppSession, original: MoneyAccountEdit) {
-        self.app = app; self.original = original; _draft = State(initialValue: original)
+    private var numbersVisible: Bool { visible || revealed }
+    init(app: AppSession, original: MoneyAccountEdit, visible: Bool, revealed: Binding<Bool>) {
+        self.app = app; self.original = original; self.visible = visible; self._revealed = revealed; _draft = State(initialValue: original)
         let exp = CurrencyExponents.specified.exponent(original.currency) ?? 2
         var scale = 1; for _ in 0..<exp { scale *= 10 }
         let n = abs(original.openingMinor), fraction = String(n % scale)
@@ -37,7 +40,15 @@ struct MoneyAccountSheet: View {
                     Text(draft.ownership == "mine" ? "يدخل رصيده في النقد ولك فعلًا." : "يبقى ظاهرًا بجذر مقطوع، خارج النقد ولك فعلًا والزكاة، ورسائله تُتجاهل.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                     if draft.kind == "wallet" { Toggle("أتتبع رصيد المحفظة", isOn: $draft.tracked).disabled(draft.fixedCheckpoint).accessibilityIdentifier("money-account-tracked") }
                     HStack { Text("العملة"); Spacer(); Picker("العملة", selection: $draft.currency) { ForEach(CurrencyExponents.specified.exponents.keys.sorted(), id: \.self) { Text($0).tag($0) } }.labelsHidden().disabled(draft.fixedCheckpoint).accessibilityIdentifier("money-account-currency") }
-                    field(draft.openingKnown ? "رصيد البداية، بعملة الحساب" : "رصيد البنك عند المطابقة") { TextField("٠", text: $balance).keyboardType(.numbersAndPunctuation).focused($editing).disabled(draft.fixedCheckpoint && draft.openingKnown).accessibilityIdentifier("money-account-opening") }
+                    if !original.isNew && original.openingKnown && !numbersVisible {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("رصيد البداية محفوظ ومخفي حتى تُظهر الأرقام.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                            Button("أظهر الأرقام") { revealed = true }.font(MadarTypography.caption()).frame(minHeight: 44)
+                                .accessibilityIdentifier("money-account-reveal-opening")
+                        }
+                    } else {
+                        field(draft.openingKnown ? "رصيد البداية، بعملة الحساب" : "رصيد البنك عند المطابقة") { TextField("٠", text: $balance).keyboardType(.numbersAndPunctuation).focused($editing).disabled(draft.fixedCheckpoint && draft.openingKnown).accessibilityIdentifier("money-account-opening") }
+                    }
                     if !draft.fixedCheckpoint || !draft.openingKnown { DatePicker("تاريخ هذا الرصيد", selection: $draft.openingAt, in: ...app.prayerNow(), displayedComponents: [.date, .hourAndMinute]) }
                     MadarDateLabel(app.dateLabels(.containing(draft.openingAt, in: app.activePlace.timeZone)), primaryFont: MadarTypography.caption(), secondaryFont: MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                     if !draft.openingKnown { Text("لم يُعرف رصيدها بعد. أدخل رصيد البنك ووقت المطابقة ليبدأ الحساب منه؛ الحركات الأقدم تبقى محفوظة.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }

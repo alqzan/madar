@@ -54,6 +54,23 @@ import XCTest
         hidden.buttons["money-accounts-reveal"].tap(); XCTAssertFalse(hidden.staticTexts["money-accounts-net"].label.contains("•••")); hidden.terminate()
         let empty = open("empty"); XCTAssertTrue(empty.staticTexts["money-accounts-empty"].exists); shot(empty, "M5-V19-empty-L")
     }
+    func testHiddenOpeningBalanceRequiresExplicitRevealInAccountSheet() {
+        continueAfterFailure = false
+        let app = open("hidden")
+        let account = app.buttons["money-account-الحساب الجاري"]
+        for _ in 0..<8 where !account.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(account.isHittable, app.debugDescription)
+        account.tap()
+        XCTAssertTrue(app.staticTexts["رصيد البداية محفوظ ومخفي حتى تُظهر الأرقام."].waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertFalse(app.textFields["money-account-opening"].exists, app.debugDescription)
+        shot(app, "M5-V19-account-editor-redacted-L")
+        app.buttons["money-account-reveal-opening"].tap()
+        let balance = app.textFields["money-account-opening"]
+        XCTAssertTrue(balance.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertEqual(balance.value as? String, "128500.00")
+        XCTAssertFalse(balance.isEnabled, "A revealed fixed checkpoint stays protected from editing.")
+        shot(app, "M5-V19-account-editor-revealed-L")
+    }
     func testUnknownBalanceOffersExplicitBankCheckpoint() {
         continueAfterFailure = false
         let app = open("accounts", unknownBalance: true)
