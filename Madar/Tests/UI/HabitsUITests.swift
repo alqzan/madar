@@ -2,8 +2,8 @@ import XCTest
 import UIKit
 
 @MainActor final class HabitsUITests:XCTestCase {
-    private func app(_ fixture:String, appearance:String = "light")->XCUIApplication {
-        let app=XCUIApplication();app.launchEnvironment=["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_HABIT_FIXTURE":fixture,"MADAR_UI_NOW":"2026-10-15T20:00:00+03:00","MADAR_UI_SIZE":"L","MADAR_UI_THEME":appearance];app.launch();return app
+    private func app(_ fixture:String, appearance:String = "light", now:String = "2026-10-15T20:00:00+03:00")->XCUIApplication {
+        let app=XCUIApplication();app.launchEnvironment=["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_HABIT_FIXTURE":fixture,"MADAR_UI_NOW":now,"MADAR_UI_SIZE":"L","MADAR_UI_THEME":appearance];app.launch();return app
     }
     private func open(_ app:XCUIApplication){let block=app.descendants(matching:.any).matching(identifier:"bahw-block-habits").firstMatch;XCTAssertTrue(block.waitForExistence(timeout:20));let header=app.buttons["bahw-habits-open"]; if header.exists { header.tap() } else { block.tap() };XCTAssertTrue(app.staticTexts["habits-title"].waitForExistence(timeout:10))}
     private func shot(_ app:XCUIApplication,_ name:String){let a=XCTAttachment(screenshot:app.screenshot());a.name=name;a.lifetime = .keepAlways;add(a)}
@@ -160,6 +160,26 @@ import UIKit
         XCTAssertTrue(monthly.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertTrue(yearly.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertFalse(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "هدف شهري مرن")).firstMatch.exists, app.debugDescription)
+    }
+    func testFixedMonthlyAndYearlyHabitsStayHiddenBeforeTheirDates() {
+        continueAfterFailure = false
+        let app = app("scheduledEarly", now: "2026-12-25T20:00:00+03:00"); open(app)
+        shot(app, "M4-V02-scheduled-early-L")
+        XCTAssertFalse(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "صدقة شهرية محددة")).firstMatch.exists, app.debugDescription)
+        XCTAssertFalse(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "موعد سنوي محدد")).firstMatch.exists, app.debugDescription)
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "هدف شهري مرن")).firstMatch.exists, app.debugDescription)
+    }
+    func testAtRiskFixedHabitsStayHiddenBeforeTheirDates() {
+        continueAfterFailure = false
+        let app = app("scheduledRisk", now: "2026-12-25T20:00:00+03:00"); open(app)
+        let monthly = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "صدقة شهرية محددة")).firstMatch
+        let yearly = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "موعد سنوي محدد")).firstMatch
+        shot(app, "M4-V02-scheduled-risk-early-L")
+        XCTAssertFalse(monthly.exists, app.debugDescription)
+        XCTAssertFalse(yearly.exists, app.debugDescription)
+        app.buttons["habits-view-all"].tap()
+        XCTAssertTrue(monthly.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(yearly.waitForExistence(timeout: 5), app.debugDescription)
     }
     /// Item 26 «ب مع ج»: each rhythm draws itself in «كل عاداتي»; a yearly habit opens on «منذ آخر مرة» with both dates and
     /// its diary line, and «فعلتها في يوم سابق» logs a past day linked to that day's line.

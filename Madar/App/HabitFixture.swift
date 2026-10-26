@@ -36,15 +36,26 @@ extension AppSession {
             }
             try context.save(); return
         }
-        if variant == "scheduledToday" {
+        if variant == "scheduledToday" || variant == "scheduledEarly" || variant == "scheduledRisk" {
             let today = GregorianDay.containing(prayerNow(), in: activePlace.timeZone)
             for (name, frequency) in [("صدقة شهرية محددة", "monthly"), ("موعد سنوي محدد", "yearly"), ("هدف شهري مرن", "monthly")] {
-                let habit = Habit(); habit.name = name; habit.startDate = today.adding(days: -35).date(in: ActivePlace.riyadh.timeZone); context.insert(habit)
-                let policy = HabitPolicy(); policy.habitID = habit.id; policy.effectiveFrom = today.adding(days: -35).description
+                let historyStart = variant == "scheduledRisk" ? today.adding(days: frequency == "monthly" ? -100 : -730) : today.adding(days: -35)
+                let habit = Habit(); habit.name = name; habit.startDate = historyStart.date(in: ActivePlace.riyadh.timeZone); context.insert(habit)
+                let policy = HabitPolicy(); policy.habitID = habit.id; policy.effectiveFrom = historyStart.description
                 policy.frequency = frequency; policy.measure = "once"; policy.target = 1; policy.monthCalendar = "gregorian"
-                if name == "صدقة شهرية محددة" { policy.monthDays = [today.day] }
-                else if frequency == "yearly" { policy.yearMonth = today.month; policy.yearDay = today.day }
+                if name == "صدقة شهرية محددة" { policy.monthDays = [variant == "scheduledEarly" || variant == "scheduledRisk" ? 31 : today.day] }
+                else if frequency == "yearly" {
+                    policy.yearMonth = variant == "scheduledEarly" || variant == "scheduledRisk" ? 12 : today.month
+                    policy.yearDay = variant == "scheduledEarly" || variant == "scheduledRisk" ? 31 : today.day
+                }
                 context.insert(policy)
+                if variant == "scheduledRisk", ["monthly", "yearly"].contains(frequency) {
+                    let eventDay = frequency == "monthly" ? (try GregorianDay(year: 2026, month: 10, day: 31)) : (try GregorianDay(year: 2024, month: 12, day: 31))
+                    let event = HabitEvent(); event.habitID = habit.id; event.dayKey = eventDay.description
+                    event.periodKey = frequency == "monthly" ? "g:2026-10" : "g:2024"
+                    event.delta = 1; event.eventAt = eventDay.date(in: ActivePlace.riyadh.timeZone).addingTimeInterval(43200)
+                    event.tzID = "Asia/Riyadh"; event.dayPolicy = "midnight@1"; context.insert(event)
+                }
             }
             try context.save(); return
         }

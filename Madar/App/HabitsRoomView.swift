@@ -91,18 +91,21 @@ struct HabitsRoomView: View {
 
     // MARK: What «اليوم» holds
 
-    /// Due now: every daily habit with a target today, and a longer habit still open when today is one of its
-    /// days or its window is closing (a week's last two days, a month's last week, a year's last two weeks).
+    /// Due now: every daily habit and longer habits on their scheduled days, with the existing weekly and
+    /// flexible-monthly closing windows.
     private func dueToday(_ r:HabitReading)->Bool {
         guard !r.paused, let p=r.summary.current, p.target > 0 else { return false }
         if p.rule.frequency == .daily { return true }
         if p.met { return false }
+        if p.rule.frequency == .yearly || (p.rule.frequency == .monthly && !p.rule.monthDays.isEmpty) {
+            return p.dueDays.contains(today)
+        }
         if r.isNow || r.summary.atRisk { return true }
         let left = daysLeft(p)
         switch p.rule.frequency {
         case .weekly: return p.dueDays.contains(today) || left <= 2
-        case .monthly: return (!p.rule.monthDays.isEmpty && p.dueDays.contains(today)) || left <= 7
-        case .yearly: return p.dueDays.contains(today) || left <= 14
+        case .monthly: return left <= 7
+        case .yearly: return false
         case .daily: return true
         }
     }
