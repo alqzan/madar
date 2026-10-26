@@ -196,25 +196,120 @@ struct MoneyCategorizeSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.roomTheme) private var theme
     @State private var remember = true
+    @State private var loading = true
+    @State private var categories: [MoneyRuleCategory] = []
+    @State private var loadFailure: String?
+    @State private var failure: String?
+    @State private var saving = false
+    @State private var pendingCategoryID: UUID?
+    @State private var pendingRemember = true
+    @State private var commandID = UUID()
+    @State private var injectedFailure = false
     private var service: AppMoneyService { .init(app: app) }
     var body: some View {
-        NavigationStack {
-            List {
-                Section {
-                    Toggle("تذكّر لهذا التاجر", isOn: $remember).accessibilityIdentifier("money-categorize-remember")
-                } footer: { Text("يصل «" + draft.title + "» بعدها بهذا التصنيف، وتبقى الموافقة لك.") }
-                Section("التصنيف") {
-                    ForEach((try? service.categories()) ?? []) { category in
-                        Button {
-                            Task { try? await app.executeMoneyCommand("money.categorize", payload: ["id": .string(draft.id.uuidString), "categoryID": .string(category.id.uuidString), "remember": .bool(remember)]); dismiss() }
-                        } label: {
-                            HStack { Label(category.name, systemImage: MoneyCategoryIcon.symbol(category.icon, name: category.name)); Spacer(); if draft.categoryID == category.id { Image(systemName: "checkmark") } }
-                        }.accessibilityIdentifier("money-categorize-" + category.name)
-                    }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack {
+                    Button { dismiss() } label: { Label("إلغاء", systemImage: "xmark").font(MadarTypography.caption()).frame(minHeight: 44) }
+                        .disabled(saving).accessibilityIdentifier("money-categorize-close")
+                    Spacer()
+                    Text("صنّف الحركة").font(MadarTypography.section()).accessibilityAddTraits(.isHeader)
                 }
-            }.scrollContentBackground(.hidden).background(theme.background).navigationTitle("صنّف " + draft.title).navigationBarTitleDisplayMode(.inline)
-                .toolbar { ToolbarItem(placement: .cancellationAction) { Button("إلغاء") { dismiss() } } }
-        }.presentationDetents([.medium, .large])
+                Text(draft.title).font(MadarTypography.cardTitle()).foregroundStyle(theme.secondaryInk)
+                VStack(alignment: .leading, spacing: 6) {
+                    Toggle("تذكّر لهذا التاجر", isOn: $remember).disabled(saving)
+                        .tint(theme.color("surplusText").mix(with: theme.ink, by: 0.35))
+                        .accessibilityIdentifier("money-categorize-remember")
+                    Text("يصل «" + draft.title + "» بعدها بهذا التصنيف، وتبقى الموافقة لك.")
+                        .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(14).background(theme.surface, in: .rect(cornerRadius: 16))
+                .overlay { RoundedRectangle(cornerRadius: 16).stroke(theme.line.opacity(0.7), lineWidth: 1) }
+                if let failure {
+                    Text(failure).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText"))
+                        .padding(12).frame(maxWidth: .infinity, alignment: .leading)
+                        .background(theme.surface, in: .rect(cornerRadius: 14)).accessibilityIdentifier("money-categorize-error")
+                }
+                if loading {
+                    ProgressView("يقرأ التصنيفات…").frame(maxWidth: .infinity, minHeight: 120)
+                } else if let loadFailure {
+                    Text(loadFailure).font(MadarTypography.body()).foregroundStyle(theme.color("dueText"))
+                    Button("أعِد المحاولة") { loadCategories() }.frame(minHeight: 44).accessibilityIdentifier("money-categorize-load-retry")
+                } else if categories.isEmpty {
+                    Text("لا توجد تصنيفات متاحة لهذه الحركة.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
+                } else {
+                    VStack(spacing: 0) {
+                        ForEach(Array(categories.enumerated()), id: \.element.id) { index, category in
+                            Button { save(category) } label: {
+                                HStack(spacing: 12) {
+                                    if saving && pendingCategoryID == category.id { ProgressView().tint(theme.color("reserveText")) }
+                                    else { Image(systemName: draft.categoryID == category.id ? "checkmark.circle.fill" : "circle")
+                                        .foregroundStyle(draft.categoryID == category.id ? theme.color("surplusText") : theme.secondaryInk) }
+                                    Label(category.name, systemImage: MoneyCategoryIcon.symbol(category.icon, name: category.name))
+                                        .font(MadarTypography.cardTitle())
+                                    Spacer()
+                                    if failure != nil && pendingCategoryID == category.id {
+                                        Label("حاول مرة أخرى", systemImage: "arrow.clockwise")
+                                            .font(MadarTypography.fine()).foregroundStyle(theme.color("dueText"))
+                                    } else if draft.categoryID == category.id {
+                                        Text("الحالي").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                                    }
+                                }
+                                .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading)
+                                .contentShape(.rect)
+                            }
+                            .buttonStyle(.plain).disabled(saving).accessibilityIdentifier("money-categorize-" + category.name)
+                            if index < categories.count - 1 { Rectangle().fill(theme.line.opacity(0.55)).frame(height: 1) }
+                        }
+                    }
+                    .padding(.horizontal, 14).background(theme.surface, in: .rect(cornerRadius: 16))
+                    .overlay { RoundedRectangle(cornerRadius: 16).stroke(theme.line.opacity(0.7), lineWidth: 1) }
+                }
+            }
+            .padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 24)
+            .frame(maxWidth: 620).frame(maxWidth: .infinity)
+        }
+        .foregroundStyle(theme.ink).background(theme.background.ignoresSafeArea())
+        .environment(\.layoutDirection, .rightToLeft).toolbarVisibility(.hidden, for: .navigationBar)
+        .task { loadCategories() }.interactiveDismissDisabled(saving)
+        .presentationDetents([.medium, .large])
+        .accessibilityIdentifier("money-categorize-sheet")
+    }
+
+    private func loadCategories() {
+        loading = true; loadFailure = nil
+        do { categories = try service.categories() }
+        catch { loadFailure = "تعذّرت قراءة التصنيفات. أعد المحاولة." }
+        loading = false
+    }
+
+    private func save(_ category: MoneyRuleCategory) {
+        guard !saving else { return }
+        if pendingCategoryID != category.id || pendingRemember != remember {
+            pendingCategoryID = category.id; pendingRemember = remember; commandID = UUID()
+        }
+        let commandID = commandID
+        let remember = remember
+        saving = true; failure = nil
+        Task { @MainActor in
+            do {
+                #if DEBUG
+                let environment = ProcessInfo.processInfo.environment
+                if !injectedFailure, UUID(uuidString: environment["MADAR_UI_STORE_ID"] ?? "") != nil,
+                   environment["MADAR_UI_MONEY_CATEGORIZE_FAILURE_ONCE"] == "1" {
+                    injectedFailure = true
+                    throw DataError.authenticationFailed
+                }
+                #endif
+                try await app.executeMoneyCommand("money.categorize", payload: [
+                    "id": .string(draft.id.uuidString), "categoryID": .string(category.id.uuidString), "remember": .bool(remember)
+                ], id: commandID)
+                dismiss()
+            } catch {
+                self.failure = "تعذّر حفظ التصنيف. بقي اختيارك هنا؛ حاول مرة أخرى."
+            }
+            saving = false
+        }
     }
 }
 

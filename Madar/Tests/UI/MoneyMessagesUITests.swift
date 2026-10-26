@@ -29,6 +29,50 @@ import XCTest
         return selected
     }
 
+    func testCategorizationFailureKeepsSheetAndRememberChoiceForRetry() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": "messages",
+            "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-16T20:00:00+03:00",
+            "MADAR_UI_MONEY_CATEGORIZE_FAILURE_ONCE": "1"]
+        app.launch()
+        let tab = app.buttons["tab-customize"]; XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
+        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("المال")
+        let money = app.buttons["money-open"]; XCTAssertTrue(money.waitForExistence(timeout: 5)); money.tap()
+        let tray = app.descendants(matching: .any)["money-pending"]; XCTAssertTrue(tray.waitForExistence(timeout: 10)); tray.tap()
+        let draft = app.otherElements["money-draft-مخبز الحي"].firstMatch
+        let chip = draft.buttons["money-draft-category"]
+        XCTAssertTrue(chip.waitForExistence(timeout: 10), app.debugDescription)
+        for _ in 0..<7 where !chip.isHittable { app.swipeUp(velocity: .slow) }
+        chip.tap()
+        let remember = app.switches["money-categorize-remember"]
+        XCTAssertTrue(remember.waitForExistence(timeout: 5))
+        XCTAssertEqual(remember.value as? String, "1")
+        shot(app, "M5-category-choice-L")
+        let grocery = app.buttons["money-categorize-بقالة"]
+        XCTAssertTrue(grocery.waitForExistence(timeout: 5)); grocery.tap()
+        let error = app.staticTexts["money-categorize-error"]
+        XCTAssertTrue(error.waitForExistence(timeout: 8), "A failed save must leave the sheet open for retry")
+        XCTAssertEqual(remember.value as? String, "1")
+        XCTAssertTrue(grocery.isEnabled)
+        XCTAssertTrue(grocery.label.contains("حاول مرة أخرى"), grocery.label)
+        shot(app, "M5-category-failure-L")
+        grocery.tap()
+        XCTAssertTrue(remember.waitForNonExistence(timeout: 10))
+        XCTAssertTrue(chip.waitForExistence(timeout: 5))
+        XCTAssertTrue(chip.label.contains("بقالة"), chip.label)
+        XCTAssertTrue(app.descendants(matching: .any)["money-messages-review"].label.contains("٦"), "Choosing a category never confirms the message")
+        shot(app, "M5-category-saved-L")
+        app.terminate()
+        app.launch()
+        let reopenedTab = app.buttons["tab-customize"]; XCTAssertTrue(reopenedTab.waitForExistence(timeout: 20)); reopenedTab.tap()
+        let reopenedSearch = app.textFields["settings-search"]; XCTAssertTrue(reopenedSearch.waitForExistence(timeout: 10)); reopenedSearch.tap(); reopenedSearch.typeText("المال")
+        app.buttons["money-open"].tap()
+        let reopenedTray = app.descendants(matching: .any)["money-pending"]; XCTAssertTrue(reopenedTray.waitForExistence(timeout: 10)); reopenedTray.tap()
+        XCTAssertTrue(chip.waitForExistence(timeout: 10))
+        XCTAssertTrue(chip.label.contains("بقالة"), "The successful retry persists the category")
+    }
+
     func testClearDraftsStatementAndLookAreDecidedHere() throws {
         continueAfterFailure = false
         let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": "messages",
