@@ -1,5 +1,38 @@
 import XCTest
 @MainActor final class QuranPlanSetupUITests:XCTestCase {
+    func testCustomStartingAyahSurvivesSwitchingStartModes() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
+            "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00", "MADAR_UI_QURAN_FIXTURE": "home"]
+        app.launch()
+        let streak = app.buttons["quran-streak"]
+        XCTAssertTrue(streak.waitForExistence(timeout: 25), app.debugDescription); streak.tap()
+        let edit = app.buttons["quran-plan-edit"]
+        XCTAssertTrue(edit.waitForExistence(timeout: 10), app.debugDescription)
+        expectation(for: NSPredicate(format: "isEnabled == true"), evaluatedWith: edit)
+        waitForExpectations(timeout: 15)
+        edit.tap()
+
+        let custom = app.buttons["quran-setup-custom"]
+        XCTAssertTrue(custom.waitForExistence(timeout: 10), app.debugDescription); custom.tap()
+        let ayahPicker = app.descendants(matching: .any)["quran-setup-ayah"]
+        XCTAssertTrue(ayahPicker.waitForExistence(timeout: 5), app.debugDescription); ayahPicker.tap()
+        let seventhAyah = app.buttons["الفَاتِحة ٧"].firstMatch
+        XCTAssertTrue(seventhAyah.waitForExistence(timeout: 5), app.debugDescription); seventhAyah.tap()
+        capture(app, "M2-V13-custom-ayah-before-toggle-L")
+
+        app.buttons["quran-setup-continue"].tap()
+        custom.tap()
+        expectation(for: NSPredicate(format: "selected == true"), evaluatedWith: custom)
+        waitForExpectations(timeout: 5)
+        capture(app, "M2-V13-custom-ayah-after-toggle-L")
+        for _ in 0..<4 { app.buttons["quran-setup-next"].tap() }
+        let selectedStart = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "الفَاتِحة ٧")).firstMatch
+        XCTAssertTrue(selectedStart.waitForExistence(timeout: 5), "Switching start modes must retain the chosen custom ayah.\n\(app.debugDescription)")
+        capture(app, "M2-V13-start-mode-toggle-summary-L")
+    }
+
     func testFourStepsSummarySaveNewVersionAndRetainHistory() throws {
         continueAfterFailure=false
         let app=XCUIApplication();app.launchEnvironment=["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light","MADAR_UI_NOW":"2026-10-15T15:00:00+03:00","MADAR_UI_QURAN_FIXTURE":"home"]

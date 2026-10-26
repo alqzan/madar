@@ -10,6 +10,7 @@ struct QuranPlanSetupView: View {
     @Environment(\.roomTheme) private var theme
     @State private var input: QuranUIPlanInput?
     @State private var initialStart = 1
+    @State private var customStartAyah = 1
     @State private var step = 0
     @State private var customStart = false
     @State private var page = 1
@@ -56,6 +57,7 @@ struct QuranPlanSetupView: View {
             .task {
                 do {
                     let p = try service.planInput(); input = p; initialStart = p.startAyah
+                    customStartAyah = p.startAyah
                     page = try QuranResources.catalog().ayah(id: p.startAyah)?.page ?? 1
                 } catch { self.error = quranUserMessage(error) }
             }
@@ -76,12 +78,15 @@ struct QuranPlanSetupView: View {
         switch step {
         case 0:
             option("أكمل بالترتيب المعتاد من موضعك", detail: "الفجوة الأولى تبقى أول الورد، وما في صدرك يبقى للمراجعة", selected: !customStart, id: "quran-setup-continue") { customStart = false; input?.startAyah = initialStart }
-            option("من موضع أختاره", detail: "حدّد الوجه والآية التي تبدأ منها", selected: customStart, id: "quran-setup-custom") { customStart = true; choosePage(page) }
+            option("من موضع أختاره", detail: "حدّد الوجه والآية التي تبدأ منها", selected: customStart, id: "quran-setup-custom") { customStart = true; input?.startAyah = customStartAyah }
             if customStart {
                 QuranPaperCard {
                     VStack(alignment: .leading, spacing: 12) {
                         Stepper("الوجه " + service.numerals.string(page), value: $page, in: 1...604).accessibilityIdentifier("quran-setup-page")
-                        Picker("بداية الورد", selection: binding(\.startAyah)) {
+                        Picker("بداية الورد", selection: Binding(
+                            get: { customStartAyah },
+                            set: { value in customStartAyah = value; input?.startAyah = value }
+                        )) {
                             ForEach(ayahs(page), id: \.id) { ayah in Text(ayah.surahNameArabic + " " + service.numerals.string(ayah.ayahNumber)).tag(ayah.id) }
                         }.accessibilityIdentifier("quran-setup-ayah")
                     }.font(quranFont(15))
@@ -133,6 +138,10 @@ struct QuranPlanSetupView: View {
     }
     private func binding<T>(_ key: WritableKeyPath<QuranUIPlanInput,T>) -> Binding<T> { Binding(get: { input![keyPath:key] }, set: { input?[keyPath:key] = $0 }) }
     private func ayahs(_ page: Int) -> [QuranAyahResourceRecord] { (try? QuranResources.catalog().ayahs(on: page)) ?? [] }
-    private func choosePage(_ number: Int) { if let first = ayahs(number).first { input?.startAyah = first.id } }
+    private func choosePage(_ number: Int) {
+        guard let first = ayahs(number).first else { return }
+        customStartAyah = first.id
+        input?.startAyah = first.id
+    }
     private func startTitle(_ id: Int) -> String { guard let ayah = try? QuranResources.catalog().ayah(id: id) else { return "" }; return "من " + ayah.surahNameArabic + " " + service.numerals.string(ayah.ayahNumber) }
 }
