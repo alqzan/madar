@@ -44,6 +44,24 @@ import Testing
         #expect(mediaFields["data"] == .null)
         #expect(expected.contains { $0.deletedAt != nil }); #expect(expected.contains { $0.fields["mergedInto"] != .null })
     }
+    @Test func goodreadsBookAndItsPrivateNoteKeepTheirLinkAcrossPortableRestore() throws {
+        let source = try MadarContainerFactory.makeInMemory(), sourceContext = source.mainContext
+        let bookID = UUID(), noteID = UUID()
+        let book = Book(); book.id = bookID; book.title = "رحلة Goodreads"; book.author = "أحمد"; book.kind = "paper"
+        book.shelf = "finished"; book.sourceGoodreadsID = "9001"
+        let note = NotebookNote(); note.id = noteID; note.text = "ملاحظة خاصة"; note.isPrivate = true; note.link = "general"; note.targetID = bookID
+        sourceContext.insert(book); sourceContext.insert(note); try sourceContext.save()
+
+        let expected = try RecordBridge.all(sourceContext)
+        let validated = try PortableExportCodec.validate(PortableExportCodec.export(records: expected))
+        let restored = try MadarContainerFactory.makeInMemory(), restoredContext = restored.mainContext
+        #expect(try BackupRestore.merge(validated, into: restoredContext) == expected.count)
+        let restoredBook = try #require(restoredContext.fetch(FetchDescriptor<Book>()).first { $0.id == bookID })
+        let restoredNote = try #require(restoredContext.fetch(FetchDescriptor<NotebookNote>()).first { $0.id == noteID })
+        #expect(restoredBook.sourceGoodreadsID == "9001" && restoredBook.title == "رحلة Goodreads")
+        #expect(restoredNote.isPrivate && restoredNote.text == "ملاحظة خاصة")
+        #expect(restoredNote.link == "general" && restoredNote.targetID == restoredBook.id)
+    }
     @Test func unsupportedVersionsCountsMissingFilesAndInvalidTypedRowsAreRejected() throws {
         let original = try PortableZIP.decode(PortableExportCodec.export(records: seeded()))
         for kind in 0..<8 {

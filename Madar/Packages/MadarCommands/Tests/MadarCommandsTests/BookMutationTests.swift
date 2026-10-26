@@ -160,17 +160,17 @@ import MadarData
         let bookID = UUID(), noteID = UUID()
         let book = Book(); book.id = bookID; book.title = "رحلة Goodreads"; book.kind = "paper"
         context.insert(book)
-        let note = NotebookNote(); note.id = noteID; note.isPrivate = true; note.link = "book"; note.targetID = bookID; note.text = "ملاحظة أصلية"
+        let note = NotebookNote(); note.id = noteID; note.isPrivate = true; note.link = "general"; note.targetID = bookID; note.text = "ملاحظة أصلية"
         context.insert(note); try context.save()
 
         let edited = try BookMutationHandler.stage(.savePrivateNote(id: noteID, text: "ملاحظة معدلة"), context: context,
                                                    now: now.addingTimeInterval(1), writer: "fixture")
         try context.save()
         #expect(note.text == "ملاحظة معدلة" && note.isPrivate)
-        #expect(note.link == "book" && note.targetID == bookID)
+        #expect(note.link == "general" && note.targetID == bookID)
         try BookMutationHandler.undo(edited, context: context, now: now.addingTimeInterval(2), writer: "fixture")
         try context.save()
-        #expect(note.text == "ملاحظة أصلية" && note.link == "book" && note.targetID == bookID)
+        #expect(note.text == "ملاحظة أصلية" && note.link == "general" && note.targetID == bookID)
 
         let deleted = try BookMutationHandler.stage(.deletePrivateNote(id: noteID), context: context,
                                                     now: now.addingTimeInterval(3), writer: "fixture")
@@ -179,7 +179,7 @@ import MadarData
         try BookMutationHandler.undo(deleted, context: context, now: now.addingTimeInterval(4), writer: "fixture")
         try context.save()
         #expect(note.deletedAt == nil && note.text == "ملاحظة أصلية" && note.isPrivate)
-        #expect(note.link == "book" && note.targetID == bookID)
+        #expect(note.link == "general" && note.targetID == bookID)
     }
 
     @Test func savedWordsUpsertByNaturalKeyAndUndoWithoutLosingMeaning() throws {
@@ -283,7 +283,7 @@ import MadarData
         #expect(imported.sourceGoodreadsID == "42"); #expect(imported.title == "رحلة"); #expect(imported.author == "أحمد")
         #expect(imported.shelf == "old"); #expect(imported.rating == 5); #expect(imported.readCount == 2)
         #expect(imported.review == "السطر الأول\r\nالسطر الثاني"); #expect(imported.finishedAt != nil)
-        #expect(importedNote.isPrivate && importedNote.link == "book" && importedNote.targetID == imported.id)
+        #expect(importedNote.isPrivate && importedNote.link == "general" && importedNote.targetID == imported.id)
         #expect(importedNote.text == "ملاحظة خاصة")
         #expect(importedLink.source == "goodreads" && importedLink.sourceID == "42" && importedLink.targetID == imported.id)
         let archived = try JSONDecoder().decode([String: String].self, from: #require(importedLink.unmappedJSON))

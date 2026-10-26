@@ -184,7 +184,7 @@ private struct GoodreadsImportSummary: Codable {
                     let note = oldNote ?? NotebookNote()
                     let noteBefore = try oldNote?.record()
                     if oldNote == nil { note.id = noteID; note.createdAt = now; context.insert(note) }
-                    note.text = privateNote; note.link = "book"; note.targetID = targetID; note.isPrivate = true
+                    note.text = privateNote; note.link = "general"; note.targetID = targetID; note.isPrivate = true
                     try touch(note, before: noteBefore)
                 }
             }
@@ -334,7 +334,7 @@ private struct GoodreadsImportSummary: Codable {
             let notes = try context.fetch(FetchDescriptor<NotebookNote>())
             if let row = notes.filter({ $0.id == id && $0.mergedInto == nil }).max(by: { $0.updatedAt < $1.updatedAt }) {
                 let isGeneral = row.link == "general" && row.targetID == nil
-                let isBookNote = row.link == "book" && row.targetID.map { target in books.contains(where: { $0.id == target && $0.deletedAt == nil && $0.mergedInto == nil }) } == true
+                let isBookNote = row.link == "general" && row.targetID.map { target in books.contains(where: { $0.id == target && $0.deletedAt == nil && $0.mergedInto == nil }) } == true
                 guard row.isPrivate, isGeneral || isBookNote else { throw DataError.invalidValue("هذه الملاحظة مرتبطة بمكان آخر") }
                 let before = try row.record()
                 if row.deletedAt != nil {
@@ -351,8 +351,10 @@ private struct GoodreadsImportSummary: Codable {
             let notes = try context.fetch(FetchDescriptor<NotebookNote>())
             guard let row = notes.first(where: {
                 guard $0.id == id, $0.deletedAt == nil, $0.mergedInto == nil, $0.isPrivate else { return false }
-                if $0.link == "general" { return $0.targetID == nil }
-                return $0.link == "book" && $0.targetID.map { target in books.contains(where: { $0.id == target && $0.deletedAt == nil && $0.mergedInto == nil }) } == true
+                if $0.link == "general" {
+                    return $0.targetID == nil || $0.targetID.map { target in books.contains(where: { $0.id == target && $0.deletedAt == nil && $0.mergedInto == nil }) } == true
+                }
+                return false
             }) else { throw DataError.invalidValue("الملاحظة الخاصة غير موجودة") }
             let before = try row.record(); row.deletedAt = now; row.deletionBarrierAt = now
             try touch(row, before: before)

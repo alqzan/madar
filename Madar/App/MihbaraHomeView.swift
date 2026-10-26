@@ -1091,10 +1091,12 @@ private struct MihbaraNotebookContent: View {
             }
             notes = rows.filter {
                 $0.isPrivate && $0.deletedAt == nil && $0.mergedInto == nil
-                    && (($0.link == "general" && $0.targetID == nil) || ($0.link == "book" && $0.targetID.map { titles[$0] != nil } == true))
+                    && $0.link == "general"
+                    && ($0.targetID == nil || $0.targetID.map { titles[$0] != nil } == true)
             }.map {
                 Note(id: $0.id, text: $0.text, updatedAt: $0.updatedAt,
-                     bookTitle: $0.targetID.flatMap { titles[$0] }, isBookNote: $0.link == "book")
+                     bookTitle: $0.targetID.flatMap { titles[$0] },
+                     isBookNote: $0.targetID.map { titles[$0] != nil } == true)
             }.sorted { $0.updatedAt > $1.updatedAt }
             failure = nil
         } catch { notes.removeAll(); failure = "تعذّر فتح الملاحظات المحفوظة." }
