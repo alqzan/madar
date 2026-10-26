@@ -107,7 +107,11 @@ final class PrayerNotificationCoordinator {
         defer { session.endNotificationStoreAccess() }
         await acquireLifecycleLock()
         defer { releaseLifecycleLock() }
-        try await refreshLocked(session: session, suppliedNow: suppliedNow)
+        do { try await refreshLocked(session: session, suppliedNow: suppliedNow) }
+        catch {
+            guard !isExpectedNoPrayerBoundary(error, session: session) else { return }
+            throw error
+        }
     }
 
     func withSerializedMutation<T>(_ operation: @MainActor () async throws -> T) async rethrows -> T {
@@ -119,7 +123,16 @@ final class PrayerNotificationCoordinator {
     func refreshAfterSerializedMutation() async {
         guard let session, session.notificationStoreAccessAvailable else { return }
         do { try await refreshLocked(session: session, suppliedNow: nil) }
-        catch { session.errorMessage = "تعذّر تحديث تذكيرات الصلاة. \(error.localizedDescription)" }
+        catch {
+            guard !isExpectedNoPrayerBoundary(error, session: session) else { return }
+            session.errorMessage = "تعذّر تحديث تذكيرات الصلاة. \(error.localizedDescription)"
+        }
+    }
+
+    /// Missing prayer boundaries are a normal polar-day state, not a notification failure.
+    private func isExpectedNoPrayerBoundary(_ error: Error, session: AppSession) -> Bool {
+        guard (error as? CoreError) == .missingPrayerTimes else { return false }
+        return (try? session.prayerSnapshot(at: session.prayerNow()).hasTimes) == false
     }
 
     func resumeAfterStoreMaintenance() async {

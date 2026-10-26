@@ -291,7 +291,7 @@ struct PrayerTodayView: View {
     // MARK: Riwaq
 
     private func riwaq(_ snapshot: PrayerSnapshot, now: Date) -> some View {
-        Group {
+        VStack(spacing: 8) {
             if dynamicType.isAccessibilitySize {
                 PrayerPaperCard(tinted: true) {
                     VStack(spacing: 8) {
@@ -303,23 +303,24 @@ struct PrayerTodayView: View {
                     ForEach(snapshot.today.cells, id: \.reference) { cell in prayerEntry(cell, snapshot: snapshot, now: now) }
                 }
             }
-        }
-        .overlay(alignment: .bottom) {
             if !snapshot.hasTimes {
-                Text("يمكنك اختيار المدينة من خصّص مدار عند توفر المواقيت.")
+                Text("اضغط قوس الصلاة لتسجيلها يدويًا.")
                     .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).padding(12)
+                    .accessibilityIdentifier("prayer-no-times")
             }
         }
     }
 
     @ViewBuilder private func prayerEntry(_ cell: PrayerCell, snapshot: PrayerSnapshot, now: Date) -> some View {
-        let canEdit = cell.canLog && cell.time != nil && [.pending, .jamaah, .alone, .missed].contains(cell.status)
+        let canEditStatus = [.pending, .jamaah, .alone, .missed].contains(cell.status)
+            || (cell.time == nil && cell.status == .future)
+        let canEdit = cell.canLog && canEditStatus
         let isNext = snapshot.next?.reference == cell.reference
         let arch = PrayerTodayArch(cell: cell, isNext: isNext,
             title: cell.isFriday && cell.reference.prayer == .dhuhr ? "الجمعة" : title(cell.reference.prayer),
             tall: cell.isFriday && cell.reference.prayer == .dhuhr && session.bool("salah.fridayTallArch"),
             timeLabel: (cell.prayerTime ?? cell.time).map { clock($0, timeZone: snapshot.activeTrip?.place.timeZone ?? session.activePlace.timeZone) } ?? "—",
-            note: pairNote(cell, snapshot: snapshot),
+            note: cell.time == nil && cell.status == .future ? "" : pairNote(cell, snapshot: snapshot),
             countdown: isNext && cell.status == .future ? cell.prayerTime.flatMap { PrayerCopy.countdown(until: $0, now: now, digits: digits) } : nil)
         if canEdit {
             Button { choose(cell) } label: { arch }
@@ -803,7 +804,11 @@ private struct PrayerTodayArch: View {
         case .future: "لم يحن"
         }
     }
-    var accessibilityText: String { "\(title)، \(timeLabel)، \(note ?? statusText)" }
+    var accessibilityText: String {
+        let detail = note.flatMap { $0.isEmpty ? nil : $0 }
+            ?? (cell.time == nil && cell.status == .future ? "سجّلها يدويًا" : statusText)
+        return "\(title)، \(timeLabel)، \(detail)"
+    }
     private var gold: Color { theme.color("goldMid") }
     private var logged: Bool { [.jamaah, .alone, .qada, .missed].contains(cell.status) }
     private var bodyFill: Color {
@@ -1942,7 +1947,7 @@ private struct PrayerStatisticsView: View {
         List {
             Section { MadarDateLabel(dateTitle(day.day)) }
             ForEach(day.cells) { cell in
-                if cell.canLog && cell.time != nil && cell.status != .future {
+                if cell.canLog && (cell.time == nil || cell.status != .future) {
                     Button { select(cell) } label: { Text(prayerTitle(cell.reference.prayer) + "، " + statusTitle(cell.status)).frame(minHeight: 44) }
                         .accessibilityIdentifier("prayer-history-log-\(cell.reference.prayer.rawValue)")
                 } else { Text(prayerTitle(cell.reference.prayer) + "، " + statusTitle(cell.status)).frame(minHeight: 44) }
@@ -2022,7 +2027,7 @@ private struct PrayerDayEditSheet: View {
     }
 
     private func row(_ cell: PrayerCell) -> some View {
-        let editable = cell.canLog && cell.time != nil && cell.status != .future
+        let editable = cell.canLog && (cell.time == nil || cell.status != .future)
         return HStack(spacing: 8) {
             Button { openLog(cell) } label: {
                 Text(prayerTitle(cell.reference.prayer)).font(PrayerHomeType.lead).frame(width: 58, alignment: .leading).frame(minHeight: 44)

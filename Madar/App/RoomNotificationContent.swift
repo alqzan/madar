@@ -152,7 +152,16 @@ import MadarPrayer
     /// Reads day keys, booleans and letter triggers only; no diary text is read for scheduling.
     static func diaryCandidates(session: AppSession, prayerDays: [PrayerDay], now: Date) throws -> [NotificationCandidate] {
         guard session.number("notes.dailyCap") > 0 else { return [] }
-        let diary = AppDiaryService(app: session, clock: { now }), today = try diary.diaryDay(), context = ModelContext(session.container)
+        let diary = AppDiaryService(app: session, clock: { now })
+        let today: GregorianDay
+        do { today = try diary.diaryDay() }
+        catch let error as CoreError {
+            // A polar day has no prayer boundary to anchor the shared day. Keep the
+            // room's reminders quiet rather than failing the whole notification refresh.
+            if error == .missingPrayerTimes { return [] }
+            throw error
+        }
+        let context = ModelContext(session.container)
         let intentions = Set(try context.fetch(FetchDescriptor<Niyya>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil })).map(\.dayKey))
         let letters = try context.fetch(FetchDescriptor<Letter>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil && $0.openedAt == nil }))
         var result: [NotificationCandidate] = []

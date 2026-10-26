@@ -131,6 +131,7 @@ final class AppSession {
         store = SettingsStore(context: container.mainContext, schema: schema)
         #if DEBUG
         try preparePrayerUITestTrackingStart()
+        try preparePrayerPolarNoTimesFixture()
         try preparePrayerStatisticsFixture()
         try preparePrayerHomeShowcaseFixture()
         try preparePrayerStreakShowcaseFixture()
@@ -354,6 +355,20 @@ final class AppSession {
         }
     }
     #if DEBUG
+    /// Isolated UI-test fixture for the contract that polar days have no invented times but remain manually loggable.
+    private func preparePrayerPolarNoTimesFixture() throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard UUID(uuidString: environment["MADAR_UI_STORE_ID"] ?? "") != nil,
+              environment["MADAR_UI_PRAYER_FIXTURE"] == "polarNoTimes" else { return }
+        try store.prepare(.object([
+            "name": .string("Tromsø"), "country": .string("NO"),
+            "lat": .number(69.6492), "lon": .number(18.9553),
+            "tz": .string("Europe/Oslo"), "currency": .string("NOK")
+        ]), for: "core.homeCity", now: prayerNow())
+        try store.prepare(.string("manual"), for: "core.travelMode", now: prayerNow())
+        try container.mainContext.save()
+    }
+
     private func preparePrayerStatisticsFixture() throws {
         guard ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"] != nil,
               ProcessInfo.processInfo.environment["MADAR_UI_PRAYER_FIXTURE"] == "ratio26of30" else { return }
