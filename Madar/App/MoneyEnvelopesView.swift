@@ -59,7 +59,7 @@ struct MoneyEnvelopesView: View {
         }.clipped().background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
             .environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar)
             .task { load() }.onChange(of: app.prayerRevision) { load() }
-            .sheet(isPresented: $targetOpen) { MoneyReserveTargetView(app: app, current: reading?.reserveTargetMinor) { load() }.environment(\.roomTheme, theme) }
+            .sheet(isPresented: $targetOpen) { MoneyReserveTargetView(app: app, current: reading?.reserveTargetMinor, visible: visible, revealed: $revealed) { load() }.environment(\.roomTheme, theme) }
             .navigationDestination(item: $selectedEnvelope) { id in MoneyEnvelopeDetailView(app: app, id: id, revealed: $revealed).environment(\.roomTheme, theme) }
             .accessibilityIdentifier("money-envelopes")
     }
@@ -168,6 +168,8 @@ struct MoneyEnvelopesView: View {
 struct MoneyReserveTargetView: View {
     let app: AppSession
     let current: Int?
+    let visible: Bool
+    @Binding var revealed: Bool
     var saved: () -> Void
     @Environment(\.roomTheme) private var theme
     @Environment(\.dismiss) private var dismiss
@@ -178,15 +180,24 @@ struct MoneyReserveTargetView: View {
         VStack(alignment: .leading, spacing: 18) {
             MoneyPageHeader(title: "هدف الاحتياطي", close: { dismiss() })
             Text("المبلغ الذي تريد أن يصل إليه احتياطك").font(MadarTypography.body())
-            TextField("المبلغ المستهدف", text: $input).keyboardType(.decimalPad).font(MadarTypography.cardTitle()).padding(16).overlay { RoundedRectangle(cornerRadius: 12).stroke(theme.color("reserveText"), lineWidth: 1) }.accessibilityIdentifier("money-reserve-target-input")
-            if let errorMessage { Text(errorMessage).font(MadarTypography.caption()) }
-            Button("احفظ الهدف") { save() }.buttonStyle(MadarPrimaryButton()).disabled(working).accessibilityIdentifier("money-reserve-target-save")
+            if current != nil && !numbersVisible {
+                // A saved goal stays hidden like every other amount until the user reveals the numbers.
+                Text("الهدف محفوظ ومخفي حتى تُظهر الأرقام.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                Button("أظهر الأرقام") { revealed = true }.font(MadarTypography.caption()).frame(minHeight: 44).accessibilityIdentifier("money-reserve-target-reveal")
+            } else {
+                TextField("المبلغ المستهدف", text: $input).keyboardType(.decimalPad).font(MadarTypography.cardTitle()).padding(16).overlay { RoundedRectangle(cornerRadius: 12).stroke(theme.color("reserveText"), lineWidth: 1) }.accessibilityIdentifier("money-reserve-target-input")
+                if let errorMessage { Text(errorMessage).font(MadarTypography.caption()) }
+                Button("احفظ الهدف") { save() }.buttonStyle(MadarPrimaryButton()).disabled(working).accessibilityIdentifier("money-reserve-target-save")
+            }
             Spacer(minLength: 0)
         }.padding(20).background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
             .presentationDetents([.medium]).presentationDragIndicator(.visible)
-            .task { if let current { input = AppMoneyService(app: app).amount(current, full: true) } }
+            .task { fill() }.onChange(of: numbersVisible) { fill() }
     }
+    private var numbersVisible: Bool { visible || revealed }
+    private func fill() { if let current, numbersVisible, input.isEmpty { input = AppMoneyService(app: app).amount(current, full: true) } }
     private func save() {
+        guard current == nil || numbersVisible else { return }
         let raw = BankMessageParser.clean(input).replacingOccurrences(of: ",", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
         guard let exp = CurrencyExponents.specified.exponent(app.string("core.currency")), let value = MoneyAmountInput.minor(raw, exponent: exp), value > 0 else { errorMessage = "أدخل مبلغًا موجبًا للهدف."; return }
         working = true

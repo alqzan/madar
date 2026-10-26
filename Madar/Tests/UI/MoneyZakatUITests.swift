@@ -23,6 +23,13 @@ import XCTest
         let empty=open("empty");XCTAssertTrue(empty.staticTexts["money-zakat-result"].label.contains("اختر أساس"));shot(empty,"M5-V22-first-L");empty.buttons["money-zakat-basis-silver"].tap();XCTAssertTrue(empty.staticTexts["money-zakat-result"].label.contains("الديون"));empty.terminate()
         let hidden=open("zakatHidden");XCTAssertEqual(hidden.staticTexts["money-zakat-result"].label,"•••");shot(hidden,"M5-V22-hidden-L");hidden.buttons["money-zakat-reveal"].tap();XCTAssertTrue(hidden.staticTexts["money-zakat-result"].label.contains("٣٬٢١٢"))
     }
+    func testHiddenEditorKeepsOtherAssetsHiddenUntilReveal(){
+        continueAfterFailure=false
+        let app=open("zakatHidden");let price=app.buttons["money-zakat-price"];for _ in 0..<4 where !price.isHittable{app.swipeUp(velocity:.slow)};price.tap()
+        let reveal=app.buttons["money-zakat-editor-reveal"];for _ in 0..<4 where !reveal.isHittable{app.swipeUp(velocity:.slow)};XCTAssertTrue(reveal.waitForExistence(timeout:5))
+        XCTAssertFalse(app.textFields["money-zakat-other"].exists);XCTAssertFalse(app.buttons["money-zakat-save"].isEnabled);shot(app,"M5-V22-editor-hidden-L")
+        reveal.tap();XCTAssertTrue(app.textFields["money-zakat-other"].waitForExistence(timeout:5))
+    }
 
     func testSourcesExplainTheChosenCalculationWithoutSelectingADebtRuling(){
         continueAfterFailure=false

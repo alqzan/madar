@@ -44,5 +44,21 @@ import XCTest
         app.buttons["money-envelopes-reveal"].tap()
         XCTAssertTrue(app.staticTexts["money-reserve-dailies"].label.contains("٢٥٠"))
     }
+    func testHiddenSavedReserveGoalNeedsRevealInSheet() throws {
+        continueAfterFailure = false; let app = make("hidden"); open(app)
+        app.buttons["money-envelopes-reveal"].tap()
+        app.buttons["money-reserve-mode-goal"].tap()
+        let input = app.textFields["money-reserve-target-input"]; XCTAssertTrue(input.waitForExistence(timeout: 5)); input.tap(); input.typeText("200000")
+        app.buttons["money-reserve-target-save"].tap(); XCTAssertTrue(input.waitForNonExistence(timeout: 10))
+        app.terminate(); app.launch(); open(app)
+        XCTAssertEqual(app.staticTexts["money-envelope-reserve"].label, "•••")
+        app.buttons["money-reserve-mode-goal"].tap()
+        let reveal = app.buttons["money-reserve-target-reveal"]; XCTAssertTrue(reveal.waitForExistence(timeout: 5))
+        XCTAssertFalse(input.exists); XCTAssertFalse(app.buttons["money-reserve-target-save"].exists)
+        shot(app, "M5-V03-target-hidden-L")
+        reveal.tap(); XCTAssertTrue(input.waitForExistence(timeout: 5))
+        let value = input.value as? String ?? ""
+        XCTAssertTrue(value.contains("٢٠٠") || value.contains("200"), value)
+    }
 
 }
