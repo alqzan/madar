@@ -115,8 +115,8 @@ import XCTest
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
-            "MADAR_UI_NOW": "2026-10-07T13:00:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01", "MADAR_UI_THEME": "light",
-            "MADAR_UI_TRAVEL_FIX": "41.0082,28.9784,إسطنبول,TR,Europe/Istanbul"]
+            "MADAR_UI_NOW": "2026-10-07T16:00:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01", "MADAR_UI_THEME": "light",
+            "MADAR_UI_TRAVEL_FIX": "51.5074,-0.1278,لندن,GB,Europe/London"]
         app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
         let pill = app.buttons["prayer-travel-pill"]
         XCTAssertTrue(pill.waitForExistence(timeout: 10), app.debugDescription)
@@ -129,7 +129,16 @@ import XCTest
         yes.tap()
         let trip = app.buttons["prayer-travel-pill"]
         XCTAssertTrue(trip.waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertTrue(NSPredicate(format: "label CONTAINS 'مسافر' AND label CONTAINS 'إسطنبول'").evaluate(with: trip), trip.label)
+        XCTAssertTrue(NSPredicate(format: "label CONTAINS 'مسافر' AND label CONTAINS 'لندن'").evaluate(with: trip), trip.label)
+        let fajr = app.descendants(matching: .any).matching(identifier: "prayer-arch-fajr").firstMatch
+        XCTAssertTrue(fajr.waitForExistence(timeout: 8), app.debugDescription)
+        let expectedClock = String(try XCTUnwrap(fajr.label.components(separatedBy: "، ").dropFirst().first))
+        fajr.tap()
+        let logClock = app.staticTexts["prayer-log-clock"]
+        XCTAssertTrue(logClock.waitForExistence(timeout: 8), app.debugDescription)
+        attachScreenshot(app, named: "M1-F02-trip-log-clock-L")
+        XCTAssertEqual(logClock.label, expectedClock, "The log sheet must use the same active-trip clock as the prayer arch")
+        app.buttons["prayer-status-alone"].tap()
         let dhuhr = app.descendants(matching: .any).matching(identifier: "prayer-arch-dhuhr").firstMatch
         XCTAssertTrue(dhuhr.label.contains("قصر"), dhuhr.label)
         attachScreenshot(app, named: "M1-F02-trip-L")

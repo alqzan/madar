@@ -29,6 +29,21 @@ import MadarData
         let deleted = try #require(ModelContext(container).fetch(FetchDescriptor<Entry>()).first)
         #expect(deleted.deletedAt != nil); #expect(deleted.text == "سطر عند الليل")
     }
+    @Test func automaticDiaryLinesKeepTheirStoredEventTimeZone() throws {
+        let (container, _, root) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
+        let context = ModelContext(container), day = try GregorianDay("2026-03-20"), eventAt = instant("2026-03-20T00:30:00Z")
+        let prayer = PrayerLog(); prayer.dayKey = day.description; prayer.prayer = "fajr"; prayer.status = "jamaah"
+        prayer.eventAt = eventAt; prayer.tzID = "Europe/London"; context.insert(prayer)
+        let session = HifzSession(); session.dayKey = day.description; session.kind = "hifz"; session.endedAt = eventAt
+        session.tzID = "Europe/London"; context.insert(session)
+        let reading = ReadingSession(); reading.dayKey = day.description; reading.end = eventAt; reading.activeSeconds = 120
+        reading.tzID = "Europe/London"; context.insert(reading)
+        try context.save()
+
+        let lines = try DiaryLineRenderer.live(day: day, context: context)
+        #expect(lines.count == 3)
+        #expect(lines.allSatisfy { $0.tzID == "Europe/London" })
+    }
     @Test func yesterdayIsLateAndMarginIsOneFactWithTwoDayReferences() async throws {
         let (container, bus, root) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
         let now = instant("2026-10-15T12:00:00+03:00")

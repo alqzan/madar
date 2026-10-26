@@ -14,6 +14,19 @@ import XCTest
         XCTAssertTrue(app.descendants(matching:.any).matching(identifier:"diary-passport-stamp").firstMatch.exists);capture(app,"M3-V15-stamps-L")
         app.buttons["diary-stamps-done"].tap();app.buttons["diary-day-write"].tap();XCTAssertTrue(app.textViews.firstMatch.waitForExistence(timeout:10))
     }
+    func testTripDayLineUsesItsSavedLocalClock() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": "travelClock",
+                                "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-03-20T00:30:00Z"]
+        app.launch()
+        let today = app.buttons["diary-today"]
+        XCTAssertTrue(today.waitForExistence(timeout: 25)); today.tap()
+        let localTime = app.staticTexts["diary-day-line-time"]
+        XCTAssertTrue(localTime.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertEqual(localTime.label, "١٢:٣٠ ص", "London's midnight entry must not fall back to Riyadh time")
+        capture(app, "M3-V15-trip-clock-L")
+    }
     // §7.3 «تقويم السفر · الإطار البريدي» and the return moment: the Cairo trip (10–14 September) is framed, and its return day folds into an envelope.
     func testTravelCalendarFramesAndReturnEnvelope() throws {
         continueAfterFailure=false

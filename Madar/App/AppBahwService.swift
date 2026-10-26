@@ -22,6 +22,7 @@ struct BahwQuranModel: Equatable {
 struct BahwDiaryModel: Equatable {
     let count: Int
     let last: Date?
+    let lastTZID: String?
     let photo: Data?
 }
 struct BahwYearModel: Equatable {
@@ -106,7 +107,8 @@ struct BahwUpcomingItem: Identifiable, Equatable {
         let service = AppDiaryService(app: session)
         guard let page = try? service.day(today) else { return nil }
         let lines = page.lines.filter { ["normal", "late", "margin"].contains($0.kind) }
-        return .init(count: lines.count, last: lines.map(\.at).max(), photo: page.photo)
+        let last = lines.max { $0.at < $1.at }
+        return .init(count: lines.count, last: last?.at, lastTZID: last?.tzID, photo: page.photo)
     }
     func year() -> BahwYearModel {
         let days = calendarDays, day = today
@@ -173,9 +175,9 @@ struct BahwUpcomingItem: Identifiable, Equatable {
         session.dateLabels(day, first: hijri ? .hijri : .gregorian, compact: true).primary
     }
 
-    func time(_ at: Date) -> String {
+    func time(_ at: Date, zone: String? = nil) -> String {
         let formatter = DateFormatter(); formatter.locale = Locale(identifier: "ar_SA@numbers=" + (session.string("core.numerals") == "western" ? "latn" : "arab"))
-        formatter.timeZone = session.activePlace.timeZone; formatter.dateFormat = "h:mm a"
+        formatter.timeZone = zone.flatMap(TimeZone.init(identifier:)) ?? session.activePlace.timeZone; formatter.dateFormat = "h:mm a"
         return formatter.string(from: at)
     }
 }

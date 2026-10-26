@@ -114,6 +114,11 @@ struct DiaryHomeSnapshot {
     func day(_ day: GregorianDay) throws -> DiaryDisplayDay {
         try authorizeRead()
         let context = ModelContext(app.container), key = day.description
+        let eventPlaces = try PrayerRepository(context: context)
+        func eventTimeZoneID(_ stored: String?, at instant: Date) -> String {
+            if let stored, TimeZone(identifier: stored) != nil { return stored }
+            return eventPlaces.place(at: instant).timeZoneID
+        }
         let all = try context.fetch(FetchDescriptor<Entry>(predicate: #Predicate { $0.dayKey == key && $0.deletedAt == nil && $0.mergedInto == nil }, sortBy: [SortDescriptor(\.eventAt)]))
         let chains = Self.revisionChains(all), entries = all.filter { chains.heads.contains($0.id) }
         let deletable = Set(entries.filter { head in
@@ -136,13 +141,14 @@ struct DiaryHomeSnapshot {
         var lines = entries.map { row in
             let markdown = row.textFormat == "markdown"
             return DiaryDisplayLine(id: row.id.uuidString, at: row.eventAt, text: markdown ? DayOneMarkdown.readable(row.text) : row.text, kind: row.ink,
-                                    tzID: row.source == "dayOne" && !row.tzID.isEmpty ? row.tzID : nil, markdown: markdown ? true : nil)
+                                    tzID: eventTimeZoneID(row.tzID, at: row.eventAt), markdown: markdown ? true : nil)
         }
-        for niyya in try context.fetch(FetchDescriptor<Niyya>(predicate:#Predicate{$0.dayKey==key && $0.deletedAt==nil && $0.mergedInto==nil})) {lines.append(.init(id:niyya.id.uuidString,at:niyya.createdAt,text:niyya.text,kind:"intention"))}
+        for niyya in try context.fetch(FetchDescriptor<Niyya>(predicate:#Predicate{$0.dayKey==key && $0.deletedAt==nil && $0.mergedInto==nil})) {lines.append(.init(id:niyya.id.uuidString,at:niyya.createdAt,text:niyya.text,kind:"intention",tzID:eventTimeZoneID(nil,at:niyya.createdAt)))}
         let margins = try context.fetch(FetchDescriptor<MarginNote>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
         for margin in margins where margin.targetDayKey == key || margin.writtenDayKey == key {
             let text = margin.targetDayKey == key ? margin.text : "كتبت في هامش " + dateTitle(try GregorianDay(margin.targetDayKey), calendar: .gregorian) + ": " + margin.text
-            lines.append(.init(id: "margin." + margin.id.uuidString, at: margin.writtenAt, text: text, kind: "margin"))
+            lines.append(.init(id: "margin." + margin.id.uuidString, at: margin.writtenAt, text: text, kind: "margin",
+                               tzID: eventTimeZoneID(margin.tzID, at: margin.writtenAt)))
         }
         let frozen = try context.fetch(FetchDescriptor<DeviceSetting>()).first { $0.key == "sys.diaryAutoLines." + key && $0.deletedAt == nil && $0.mergedInto == nil }
         do {
@@ -150,7 +156,11 @@ struct DiaryHomeSnapshot {
             if let frozen { auto = try JSONDecoder().decode([DiaryDisplayLine].self, from: frozen.valueJSON) }
             else { auto = try DiaryLineRenderer.live(day: day, context: context) }
             let enabled = app.values["notes.autoLines"]?.object ?? [:]
-            lines += auto.filter { enabled[$0.kind] == .bool(true) }
+            lines += auto.filter { enabled[$0.kind] == .bool(true) }.map { line in
+                var dated = line
+                dated.tzID = eventTimeZoneID(line.tzID, at: line.at)
+                return dated
+            }
         }
         let mediaLinks = entries.flatMap { entry in (entry.attachmentMediaIDs + (entry.mediaID.map { [$0] } ?? [])).map { (entry.id.uuidString, $0) } }
         var attachments: [DiaryDisplayMedia] = []

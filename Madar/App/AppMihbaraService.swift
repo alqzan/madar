@@ -82,8 +82,9 @@ struct MihbaraMotivationCue: Identifiable {
             return try DiaryLineRenderer.today(context: c, now: readAt) == day
         }.map(\.number))
         let numbers = MihbaraReading.nextHadith(numbers: collection.hadiths.map(\.number), read: read, readToday: today, count: Int(app.number("mihbara.wirdCount")))
-        let prayer = try PrayerRepository(context: c), civil = GregorianDay.containing(now, in: app.activePlace.timeZone)
-        let fajr = prayer.occurrence(.init(day: civil, prayer: .fajr))?.time
+        let prayer = try PrayerRepository(context: c), place = prayer.place(at: now)
+        let civil = GregorianDay.containing(now, in: place.timeZone), options = prayer.calculationOptions(at: now)
+        let fajr = PrayerTimesEngine.calculate(day: civil, place: place, options: options)?.fajr
         return .init(books: books, collection: collection, todayHadiths: collection.hadiths.filter { numbers.contains($0.number) }, readCount: read.count, completedToday: today.count, opensAfterFajr: fajr.map { now >= $0 } ?? false, day: day, originals: originals)
     }
 

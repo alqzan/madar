@@ -10,7 +10,7 @@ public struct DiaryAutoLine: Identifiable, Codable, Equatable, Sendable {
     public let at: Date
     public let text: String
     public let kind: String
-    /// Imported Day One lines show their time in the entry's own zone (N01/RD8); nil = the day's place.
+    /// A stored event zone keeps the event's own clock; nil asks the room to infer its place from the event date.
     public var tzID: String? = nil
     /// Text is Markdown (Day One import) and is rendered formatted.
     public var markdown: Bool? = nil
@@ -39,12 +39,14 @@ public struct DiaryAutoLine: Identifiable, Codable, Equatable, Sendable {
         for row in try context.fetch(FetchDescriptor<PrayerLog>()) where days.contains(row.dayKey) && row.deletedAt == nil && row.mergedInto == nil && visible("salah", row.id) {
             guard ["jamaah", "alone", "qada"].contains(row.status) else { continue }
             lines[row.dayKey, default: []].append(.init(id: "salah." + row.id.uuidString, at: row.eventAt,
-                text: "صلّيت " + (names[row.prayer] ?? "الصلاة") + (row.status == "jamaah" ? " جماعة" : row.status == "qada" ? " قضاءً" : " وحدي"), kind: "salah"))
+                text: "صلّيت " + (names[row.prayer] ?? "الصلاة") + (row.status == "jamaah" ? " جماعة" : row.status == "qada" ? " قضاءً" : " وحدي"), kind: "salah",
+                tzID: row.tzID.isEmpty ? nil : row.tzID))
         }
         for row in try context.fetch(FetchDescriptor<HifzSession>()) where days.contains(row.dayKey) && row.deletedAt == nil && row.mergedInto == nil && visible("quran", row.id) {
             guard row.kind != "drill" else { continue }
             let text = row.kind == "hifz" ? "حفظت من القرآن" : row.kind == "qiyam" ? "راجعت من محفوظي في القيام" : "راجعت من محفوظي"
-            lines[row.dayKey, default: []].append(.init(id: "quran." + row.id.uuidString, at: row.endedAt, text: text, kind: "quran"))
+            lines[row.dayKey, default: []].append(.init(id: "quran." + row.id.uuidString, at: row.endedAt, text: text, kind: "quran",
+                                                        tzID: row.tzID.isEmpty ? nil : row.tzID))
         }
         let books=try context.fetch(FetchDescriptor<Book>()).sorted{$0.updatedAt>$1.updatedAt}
         let settings = try SettingsStore(context: context)
@@ -67,7 +69,8 @@ public struct DiaryAutoLine: Identifiable, Codable, Equatable, Sendable {
                 let unit=minutes == 1 ? "دقيقة واحدة" : minutes == 2 ? "دقيقتين" : (3...10).contains(remainder) ? digits.string(minutes)+" دقائق" : digits.string(minutes)+" دقيقة"
                 text="قرأت "+unit+" من "+title
             }
-            lines[row.dayKey, default: []].append(.init(id:"mihbara."+row.id.uuidString,at:row.end ?? row.updatedAt,text:text,kind:"mihbara"))
+            lines[row.dayKey, default: []].append(.init(id:"mihbara."+row.id.uuidString,at:row.end ?? row.updatedAt,text:text,kind:"mihbara",
+                                                        tzID: row.tzID.isEmpty ? nil : row.tzID))
         }
         let money = MoneyRepository(context: context)
         for row in try money.confirmedTransactions() where days.contains(row.dayKey) && row.showInDiary && visible("mal", row.id) {
@@ -75,7 +78,9 @@ public struct DiaryAutoLine: Identifiable, Codable, Equatable, Sendable {
             guard charge != 0, let exponent = CurrencyExponents.specified.exponent(row.homeCurrency) else { continue }
             let amount = digits.amount(minorUnits: Int64(abs(charge)), fractionDigits: exponent, signed: false)
             let currency = row.homeCurrency == "SAR" ? "ر.س" : row.homeCurrency
-            lines[row.dayKey, default: []].append(.init(id: "mal." + row.id.uuidString, at: row.eventAt, text: (charge > 0 ? "صرفت " : "استعدت ") + amount + " " + currency, kind: "mal"))
+            lines[row.dayKey, default: []].append(.init(id: "mal." + row.id.uuidString, at: row.eventAt,
+                                                        text: (charge > 0 ? "صرفت " : "استعدت ") + amount + " " + currency, kind: "mal",
+                                                        tzID: row.tzID.isEmpty ? nil : row.tzID))
         }
         return lines.mapValues { $0.sorted { $0.at == $1.at ? $0.id < $1.id : $0.at < $1.at } }
     }

@@ -172,6 +172,7 @@
 		5F19DF294D80C995740B397F /* LogPrayerIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC96F32AC5E7E4164A325940 /* LogPrayerIntent.swift */; };
 		60094AE55F43930A7F40FAB1 /* MoneyCashbackUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 567CDB50E861F4A2AEA4E5B8 /* MoneyCashbackUITests.swift */; };
 		61008D4E1402C2503A5A3F54 /* MadarCore in Frameworks */ = {isa = PBXBuildFile; productRef = D04FCD79967981AED2E8C7FE /* MadarCore */; };
+		F7E2A1C4E9104FE9B63D5072 /* MadarPrayer in Frameworks */ = {isa = PBXBuildFile; productRef = C8C15F5A5D82490BB8C3331A /* MadarPrayer */; };
 		6139CAF2961B54A66E1BFDC6 /* IBMPlexSerif-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 030AE582330A995F61600449 /* IBMPlexSerif-Regular.ttf */; };
 		61D99411BB50BDC949A8439C /* QuranQiyamView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9B2FE6173FB90A086091968 /* QuranQiyamView.swift */; };
 		622DDEFF6296FADC2ED4F0A0 /* PrayerTravel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD8F17E41C4B94AE7A6B7D27 /* PrayerTravel.swift */; };
@@ -908,6 +909,7 @@
 				4F3EF1691B6E6DF5CE28B9D2 /* MadarCommands in Frameworks */,
 				BA97A7F98183C4ED46102954 /* MadarMoney in Frameworks */,
 				6A893B368DB2A8C55215C261 /* MadarInbox in Frameworks */,
+				F7E2A1C4E9104FE9B63D5072 /* MadarPrayer in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1521,6 +1523,7 @@
 				BB0D9BFDBBAFC58EE2999DE7 /* MadarCommands */,
 				2D180BADD727996FC6142423 /* MadarMoney */,
 				951241A7D8289BCE70C1F1EF /* MadarInbox */,
+				C8C15F5A5D82490BB8C3331A /* MadarPrayer */,
 			);
 			productName = MadarTests;
 			productReference = C8DFFB9BE72D3D9FD7BBBB92 /* MadarTests.xctest */;
@@ -2493,6 +2496,10 @@
 		2D180BADD727996FC6142423 /* MadarMoney */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = MadarMoney;
+		};
+		C8C15F5A5D82490BB8C3331A /* MadarPrayer */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MadarPrayer;
 		};
 		33781F34CD5C1A71FC795FC2 /* MadarCommands */ = {
 			isa = XCSwiftPackageProductDependency;

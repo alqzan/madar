@@ -4,6 +4,7 @@ import SwiftData
 import MadarCore
 import MadarData
 import MadarInbox
+import MadarPrayer
 @testable import Madar
 
 @MainActor final class PrayerActivityIntegrationTests: XCTestCase {
@@ -13,6 +14,44 @@ import MadarInbox
         addTeardownBlock { try? FileManager.default.removeItem(at: root) }
         let container = try MadarContainerFactory.makeLocal(at: root.appending(path: "Data"))
         return (try AppSession(container: container, groupDirectory: root), root)
+    }
+    func testPrayerNotificationScheduleReturnsToHomeAfterTripEnds() throws {
+        let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-03-19T10:00:00Z"))
+        let (app, _) = try fixture()
+        let context = ModelContext(app.container)
+        let settings = try SettingsStore(context: context)
+        try settings.prepare(.string("mwl"), for: "salah.method", now: now)
+        try settings.prepare(.string("egyptian"), for: "salah.tripMethod", now: now)
+        try settings.prepare(.string("twilightAngle"), for: "salah.highLatitudeRule", now: now)
+        let tripEnd = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-03-20T08:00:00Z"))
+        let trip = Trip()
+        trip.city = "لندن"; trip.lat = 51.5074; trip.lon = -0.1278; trip.tzID = "Europe/London"
+        trip.mode = "manual"; trip.start = now.addingTimeInterval(-2 * 60 * 60); trip.end = tripEnd
+        context.insert(trip)
+        try context.save()
+
+        let repository = try PrayerRepository(context: ModelContext(app.container))
+        let activePlace = repository.place(at: now)
+        let options = repository.calculationOptions(at: now)
+        let firstDay = repository.prayerDay(at: now)
+        let days = (0..<4).compactMap { offset in
+            PrayerTimesEngine.calculate(day: firstDay.adding(days: offset), place: activePlace, options: options)
+        }
+        let slots = try PrayerNotificationSchedule.slots(repository: repository, days: days, now: now)
+        let dhuhr = try XCTUnwrap(slots.first { $0.reference.day.description == "2026-03-20" && $0.prayer == .dhuhr })
+        XCTAssertGreaterThan(dhuhr.occurrence.time, tripEnd)
+        XCTAssertNil(dhuhr.occurrence.tripID)
+        XCTAssertEqual(dhuhr.occurrence.place.timeZoneID, repository.home.timeZoneID)
+
+        let tripEstimate = try XCTUnwrap(PrayerTimesEngine.calculate(day: dhuhr.reference.day, place: activePlace, options: options))
+        XCTAssertGreaterThan(abs(tripEstimate.dhuhr.timeIntervalSince(dhuhr.occurrence.time)), 60 * 60)
+        let windows = PrayerNotificationSchedule.sanctityWindows(for: slots)
+        let dhuhrWindow = try XCTUnwrap(windows.first { $0.prayer == .dhuhr && $0.start == dhuhr.occurrence.time })
+        XCTAssertEqual(dhuhrWindow.end, dhuhrWindow.start.addingTimeInterval(60 * 60), "Friday Dhuhr keeps its 60-minute sanctity window")
+        let candidate = try XCTUnwrap(PrayerNotificationSchedule.candidates(for: slots, sanctityWindows: windows,
+                                                                            askAfterAdhanMinutes: 30)
+            .first { $0.id == "salah.2026-03-20.dhuhr" })
+        XCTAssertEqual(candidate.dueAt, dhuhrWindow.end)
     }
     func testDefaultOffAndSettingsRepublishDisableExternalStarts() async throws {
         let (app, _) = try fixture()

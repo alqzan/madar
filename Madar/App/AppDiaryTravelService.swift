@@ -2,6 +2,7 @@ import Foundation
 import SwiftData
 import MadarCore
 import MadarData
+import MadarCommands
 import MadarPrayer
 
 /// M3-V15 · the diary only reads the shared §8 Trip. Prayer owns the arrival question and its undo (RP7).
@@ -58,9 +59,9 @@ extension AppDiaryService {
     }
     /// Every stored day a trip covers, up to today for an open trip («تقويم السفر»: travel days framed everywhere).
     func travelDays() throws -> Set<GregorianDay> {
-        let today=GregorianDay.containing(clock(),in:app.activePlace.timeZone)
+        let (repository,spans)=try travelSpans(), today=try DiaryLineRenderer.today(context:repository.context,now:clock())
         var days:Set<GregorianDay>=[]
-        for (_,span) in try travelSpans().spans {
+        for (_,span) in spans {
             var day=span.arrival
             while span.covers(day),day<=today,days.count<5000 {days.insert(day);day=day.adding(days:1)}
         }

@@ -10,7 +10,7 @@ import MadarDesign
 extension AppSession {
     func prepareDiaryHomeFixture(group: URL) throws {
         let env = ProcessInfo.processInfo.environment
-        guard let variant = env["MADAR_UI_DIARY_FIXTURE"], ["home", "empty", "echoes", "margin", "welcome", "restored", "today", "editor", "return", "travel", "letters"].contains(variant), let id = env["MADAR_UI_STORE_ID"],
+        guard let variant = env["MADAR_UI_DIARY_FIXTURE"], ["home", "empty", "echoes", "margin", "welcome", "restored", "today", "editor", "return", "travel", "travelClock", "letters"].contains(variant), let id = env["MADAR_UI_STORE_ID"],
               group.lastPathComponent == id, group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         selectedTab = "notes"
         let context = ModelContext(container)
@@ -55,6 +55,16 @@ extension AppSession {
             let media=Media();media.kind="photo";media.contentType="image/jpeg";media.data=Self.diaryFixturePhoto(variant:2);media.sizeBytes=media.data?.count ?? 0;context.insert(media)
             let photo=Entry();photo.dayKey=today.description;photo.text="البحر من جسر غلطة.";photo.attachmentMediaIDs=[media.id];photo.eventAt=base.addingTimeInterval(870*60);photo.tzID="Europe/Istanbul";photo.dayPolicy="midnight@1";context.insert(photo)
             try context.save();return
+        }
+        if variant == "travelClock" {
+            let now = prayerUITestClock(.now), london = TimeZone(identifier: "Europe/London")!
+            let trip = Trip(); trip.city = "لندن"; trip.country = "GB"; trip.lat = 51.5074; trip.lon = -0.1278
+            trip.tzID = london.identifier; trip.mode = "manual"; trip.start = now.addingTimeInterval(-24 * 60 * 60)
+            context.insert(trip)
+            let day = GregorianDay.containing(now, in: london)
+            let row = Entry(); row.dayKey = day.description; row.text = "سطر وقت الرحلة"; row.eventAt = now
+            row.tzID = london.identifier; row.dayPolicy = "midnight@1"; context.insert(row)
+            try context.save(); return
         }
         if variant == "return" {
             let day=GregorianDay.containing(prayerUITestClock(.now),in:.riyadh).adding(days:-5),row=Entry();row.dayKey=day.description;row.text="آخر سطر محفوظ قبل الانقطاع";row.tzID="Asia/Riyadh";row.eventAt=day.date(in:.riyadh).addingTimeInterval(12*3600);context.insert(row);try context.save();return

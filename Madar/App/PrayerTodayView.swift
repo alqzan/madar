@@ -116,8 +116,8 @@ struct PrayerTodayView: View {
                 PrayerTravelQuestionSheet(session: session, fix: fix, homeKm: km, finished: { selectedSheet = nil })
             case .trip(let trip):
                 PrayerTripSheet(session: session, trip: trip, finished: { selectedSheet = nil })
-            case .pair(let day, let pair, let cell):
-                PrayerTravelPairSheet(session: session, day: day, pair: pair, alone: { selectedSheet = .log(cell) }, finished: { selectedSheet = nil })
+            case .pair(let day, let pair, let cell, let timeZone):
+                PrayerTravelPairSheet(session: session, day: day, pair: pair, alone: { selectedSheet = .log(cell, timeZone) }, finished: { selectedSheet = nil })
             case .oldMissed:
                 PrayerSnapshotSheet(revision: session.prayerRevision, load: sheetSnapshot, close: { selectedSheet = nil }) { snapshot in
                     PrayerOldMissedSheet(session: session, trackingStart: snapshot.tracking.day, finished: { selectedSheet = nil })
@@ -143,9 +143,9 @@ struct PrayerTodayView: View {
                 PrayerQadaListSheet(session: session, dateLabel: qadaDate,
                     makeUp: { item in selectedSheet = .makeUp(item, isFridayNoon: item.isFriday, dateLabel: qadaDate(item.reference.day)) },
                     addOld: { selectedSheet = .oldMissed })
-            case .log(let cell):
+            case .log(let cell, let timeZone):
                 PrayerTodayLogSheet(cell: cell,
-                    clock: (cell.prayerTime ?? cell.time).map { clock($0, timeZone: session.activePlace.timeZone) } ?? "",
+                    clock: (cell.prayerTime ?? cell.time).map { clock($0, timeZone: timeZone) } ?? "",
                     askHeart: session.bool("salah.askHeart"), isSaving: session.prayerWriteInProgress,
                     save: { status, fridayKind, makeUpNow, done in
                         if status == .qada {
@@ -537,10 +537,11 @@ struct PrayerTodayView: View {
     }
 
     private func choose(_ cell: PrayerCell) {
+        let timeZone = (try? session.prayerSnapshot(at: session.prayerNow()))?.activeTrip?.place.timeZone ?? session.activePlace.timeZone
         if let pair = travelPair(for: cell), [.pending, .future].contains(cell.status) {
-            selectedSheet = .pair(cell.reference.day, pair, cell)
+            selectedSheet = .pair(cell.reference.day, pair, cell, timeZone)
         } else {
-            selectedSheet = .log(cell)
+            selectedSheet = .log(cell, timeZone)
         }
     }
 
@@ -1097,8 +1098,8 @@ private struct PrayerQadaListSheet: View {
 private enum PrayerTodaySheet: Identifiable {
     case travelQuestion(TravelFix, Double)
     case trip(PrayerTrip)
-    case pair(GregorianDay, PrayerPair, PrayerCell)
-    case log(PrayerCell)
+    case pair(GregorianDay, PrayerPair, PrayerCell, TimeZone)
+    case log(PrayerCell, TimeZone)
     case statistics
     case streaks
     case heart(PrayerCell)
@@ -1111,14 +1112,14 @@ private enum PrayerTodaySheet: Identifiable {
         switch self {
         case .travelQuestion: "travel-question"
         case .trip(let trip): "trip-\(trip.id.uuidString)"
-        case .pair(let day, let pair, _): "pair-\(day)-\(pair.rawValue)"
+        case .pair(let day, let pair, _, _): "pair-\(day)-\(pair.rawValue)"
         case .oldMissed: "old-missed"
         case .qadaList: "qada-list"
         case .qiyam: "qiyam"
         case .statistics: "statistics"
         case .streaks: "streaks"
         case .heart(let cell): "heart-\(cell.reference.naturalKey)"
-        case .log(let cell): "log-\(cell.reference.naturalKey)"
+        case .log(let cell, _): "log-\(cell.reference.naturalKey)"
         case .makeUp(let item, _, _): "makeup-\(item.id.uuidString)"
         case .recovery(let references, _, _): "recovery-\(references.first?.naturalKey ?? "empty")"
         }
@@ -1193,7 +1194,7 @@ private struct PrayerTodayLogSheet: View {
                 Text("صلّيتَ \(prayerTitle(cell.reference.prayer))؟")
                     .font(Font.custom("thmanyahserifdisplay-Bold", size: 28, relativeTo: .title))
                     .accessibilityAddTraits(.isHeader)
-                if !clock.isEmpty { Text(clock).font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk) }
+                if !clock.isEmpty { Text(clock).font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("prayer-log-clock") }
             }
             Spacer(minLength: 0)
         }

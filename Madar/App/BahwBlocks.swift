@@ -343,7 +343,7 @@ struct BahwBlockView: View {
                 }
                 title(room.accent)
                 Text(count == 0 ? "اكتب سطر اليوم" : service.lineCount(count)).font(.custom("thmanyahserifdisplay-Bold", size: 26, relativeTo: .title2)).lineLimit(2).minimumScaleFactor(0.7).accessibilityIdentifier("bahw-notes-count")
-                if let last = model?.last { Text("آخرها " + service.time(last) + (model?.photo != nil ? "، وصورة" : "")).font(small).foregroundStyle(room.secondaryInk).lineLimit(1) }
+                if let last = model?.last { Text("آخرها " + service.time(last, zone: model?.lastTZID) + (model?.photo != nil ? "، وصورة" : "")).font(small).foregroundStyle(room.secondaryInk).lineLimit(1) }
                 if model?.photo == nil { Spacer(minLength: 0) }
             }
         }

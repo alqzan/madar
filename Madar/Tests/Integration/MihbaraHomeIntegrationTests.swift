@@ -90,6 +90,25 @@ import CoreSpotlight
         XCTAssertEqual(result.status, .applied, result.reason ?? ""); XCTAssertEqual(try service.load().todayHadiths.first?.number, 1)
     }
 
+    func testHadithGateUsesTheActiveTripFajr() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "MihbaraTripFajr-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root), app = try AppSession(container: container, groupDirectory: root)
+        app.authorizeProtectedData()
+        try await app.applySettingsAndWait(["core.dayStart": .string("midnight"), "salah.method": .string("mwl"),
+                                            "salah.tripMethod": .string("egyptian"), "salah.highLatitudeRule": .string("twilightAngle")])
+        let context = ModelContext(container), trip = Trip()
+        trip.city = "لندن"; trip.lat = 51.5074; trip.lon = -0.1278; trip.tzID = "Europe/London"
+        trip.mode = "manual"; trip.start = ISO8601DateFormatter().date(from: "2026-03-20T02:00:00Z")
+        context.insert(trip); try context.save()
+        let service = AppMihbaraService(app: app)
+        let beforeTripFajr = ISO8601DateFormatter().date(from: "2026-03-20T03:00:00Z")!
+        let afterTripFajr = ISO8601DateFormatter().date(from: "2026-03-20T04:08:00Z")!
+        // Both instants are inside the trip. London MWL is 04:10 ±3 min; the selected Egyptian method opens earlier.
+        XCTAssertFalse(try service.load(at: beforeTripFajr).opensAfterFajr)
+        XCTAssertTrue(try service.load(at: afterTripFajr).opensAfterFajr)
+    }
+
     func testSpotlightBookRecordsContainOnlyLiveTitles() throws {
         let live = Book(); live.id = UUID(); live.title = "كتاب في المحبرة"; live.author = "اسم لا يُفهرس"
         let deleted = Book(); deleted.deletedAt = Date(); deleted.title = "كتاب محذوف"

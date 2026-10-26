@@ -84,29 +84,31 @@ public enum NotificationArbiter {
 
     /// An immediate-start Live Activity cannot safely wait out these windows while the app is open.
     public static func contextActivityWindowAllows(_ instant: Date, prayerDays: [PrayerDay], timeZone: TimeZone,
-                                                   policy: NotificationPolicy) -> Bool {
+                                                   policy: NotificationPolicy, occurrences suppliedOccurrences: [(Date, Prayer)]? = nil,
+                                                   sanctityWindows: [SanctityWindow]? = nil) -> Bool {
         guard policy.thisDeviceRemindersEnabled,
-              SanctityGuard(prayerDays: prayerDays).clamp(instant) == instant,
+              SanctityGuard(windows: sanctityWindows ?? prayerDays.flatMap(\.sanctityWindows)).clamp(instant) == instant,
               !isQuiet(instant, timeZone: timeZone, policy: policy) else { return false }
-        let occurrences = prayerDays.flatMap { day in Prayer.allCases.map { (day.time(for: $0), $0) } }.sorted { $0.0 < $1.0 }
+        let occurrences = (suppliedOccurrences ?? prayerDays.flatMap { day in Prayer.allCases.map { (day.time(for: $0), $0) } }).sorted { $0.0 < $1.0 }
         guard let next = occurrences.first(where: { $0.0 > instant }) else { return false }
         guard next.1 != .fajr,
               let nextIsha = occurrences.first(where: { $0.1 == .isha && $0.0 > instant }) else { return false }
         return nextIsha.0.timeIntervalSince(instant) > liveActivityMaximumDisplayedDuration
     }
 
-    public static func prayerAsk(day: PrayerDay, prayer: Prayer, askAfterAdhanMinutes: Int = 30, recorded: Bool = false) -> NotificationCandidate? {
+    public static func prayerAsk(day: PrayerDay, prayer: Prayer, askAfterAdhanMinutes: Int = 30, recorded: Bool = false,
+                                 sanctityWindows: [SanctityWindow]? = nil) -> NotificationCandidate? {
         guard !recorded else { return nil }
         let adhan = day.time(for: prayer)
         let windows = day.sanctityWindows
         let window = windows.first { $0.prayer == prayer }!
         let proposed = max(window.end, adhan.addingTimeInterval(Double(max(0, askAfterAdhanMinutes)) * 60))
-        let due = SanctityGuard(windows: windows).clamp(proposed)
+        let due = SanctityGuard(windows: sanctityWindows ?? windows).clamp(proposed)
         return .init(id: "salah.\(day.day).\(prayer.rawValue)", room: .salah, kind: .prayerAsk, dueAt: due, dayKey: day.day.description)
     }
-    public static func plan(candidates: [NotificationCandidate], prayerDays: [PrayerDay], now: Date, timeZone: TimeZone, policy: NotificationPolicy = .init(), existingPendingCount: Int = 0, deliveredCategoryCycles: Set<String> = [], disabledIDs: Set<String> = [], submittedBudgetByDay: [String: Int] = [:], submittedNotesByDay: [String: Int] = [:]) -> NotificationPlan {
+    public static func plan(candidates: [NotificationCandidate], prayerDays: [PrayerDay], now: Date, timeZone: TimeZone, policy: NotificationPolicy = .init(), existingPendingCount: Int = 0, deliveredCategoryCycles: Set<String> = [], disabledIDs: Set<String> = [], submittedBudgetByDay: [String: Int] = [:], submittedNotesByDay: [String: Int] = [:], sanctityWindows: [SanctityWindow]? = nil) -> NotificationPlan {
         guard policy.thisDeviceRemindersEnabled else { return .init(scheduled: [], droppedIDs: candidates.map(\.id), digestedIDs: []) }
-        let windows = prayerDays.flatMap(\.sanctityWindows).sorted { $0.start < $1.start }
+        let windows = (sanctityWindows ?? prayerDays.flatMap(\.sanctityWindows)).sorted { $0.start < $1.start }
         let sanctityGuard = SanctityGuard(windows: windows)
         let ordinaryEnd = now.addingTimeInterval(48 * 3600), prayerEnd = now.addingTimeInterval(96 * 3600)
         let annualEnd = now.addingTimeInterval(740 * 24 * 3600)
