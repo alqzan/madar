@@ -27,7 +27,7 @@ struct DiaryYearbookView:View {
         NavigationStack {
             ScrollView {
                 VStack(alignment:.leading,spacing:20) {
-                    HStack{Text("كتاب السنة").font(DiaryType.title);Spacer();Picker("السنة الميلادية",selection:Binding(get:{selectedYear},set:{year=$0})){ForEach(years,id:\.self){Text(service.digits.string($0)).tag($0)}}.labelsHidden().accessibilityIdentifier("diary-book-year")}
+                    HStack{Text("كتاب السنة").font(DiaryType.title);Spacer();Picker("السنة الميلادية",selection:Binding(get:{selectedYear},set:{year=$0})){ForEach(years,id:\.self){year in yearOption(year).tag(year)}}.labelsHidden().accessibilityIdentifier("diary-book-year")}
                     Text("سنة في كتاب واحد، وكل يوم يبدأ صفحة").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
                     cover.frame(maxWidth:.infinity)
                     if pages.isEmpty {Text("لم تكتب في هذه السنة بعد.").font(DiaryType.writing)} else {spread}
@@ -51,6 +51,13 @@ struct DiaryYearbookView:View {
                 .sheet(isPresented:$preview){if let artifact {DiaryQuickLook(url:artifact.url)}}
                 .onDisappear{clear()}
         }
+    }
+    private func yearOption(_ year:Int)->some View {
+        let labels=app.yearLabels(year)
+        let primary=Text(labels.primary).font(DiaryType.label)
+        let secondary=Text(labels.secondary).font(MadarTypography.fine()).foregroundColor(theme.secondaryInk)
+        return Text("\(primary)\n\(secondary)")
+            .accessibilityLabel(labels.combined)
     }
     private var cover:some View {
         VStack(spacing:20){Text("مذكرات").font(.custom("thmanyahserifdisplay-Bold",size:32,relativeTo:.largeTitle));Rectangle().fill(coverInk.opacity(0.6)).frame(width:60,height:1);VStack(spacing: 4) { Text(app.yearLabels(selectedYear).primary).font(.custom("thmanyahseriftext-Bold",size:26,relativeTo:.largeTitle)).multilineTextAlignment(.center).lineLimit(2).minimumScaleFactor(0.85).padding(.horizontal,12); Text(app.yearLabels(selectedYear).secondary).font(DiaryType.label) };Text("أيام محفوظة: "+service.digits.string(pages.count)).font(DiaryType.label)}
