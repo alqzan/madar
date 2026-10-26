@@ -84,7 +84,8 @@ import UIKit
     func testGoodreadsCSVPreviewImportsBookAndLinkedPrivateNote() {
         continueAfterFailure = false
         let csv = "Book Id,Title,Author,Additional Authors,ISBN,ISBN13,My Rating,Exclusive Shelf,Date Read,Read Count,My Review,Private Notes,Number of Pages,Year Published,Date Added,Bookshelves\r\n"
-            + "9001,رحلة Goodreads,أحمد,,,9780306406157,4,currently-reading,,1,\"مراجعة متعددة\r\nالسطور\",ملاحظة من Goodreads,120,2020,2020/02/01,favorites"
+            + "9001,رحلة Goodreads,أحمد,,,9780306406157,4,currently-reading,,1,\"مراجعة متعددة\r\nالسطور\",ملاحظة من Goodreads,120,2020,2020/02/01,favorites\r\n"
+            + "9002,كتاب مؤرخ,أحمد,,,,5,read,2020/02/01,1,,,,2020,2020/02/01,"
         let app = app("empty")
         app.launchEnvironment["MADAR_UI_MIHBARA_IMPORT_GOODREADS"] = Data(csv.utf8).base64EncodedString()
         app.launch(); open(app)
@@ -96,6 +97,9 @@ import UIKit
         XCTAssertTrue(app.staticTexts["رحلة Goodreads"].firstMatch.exists, app.debugDescription)
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "مراجعة متعددة")).firstMatch.exists, app.debugDescription)
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "ملاحظة من Goodreads")).firstMatch.exists, app.debugDescription)
+        let cutoff = app.descendants(matching: .any)["mihbara-goodreads-cutoff-year"]
+        XCTAssertTrue(cutoff.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(cutoff.label.contains("هـ") && cutoff.label.contains(" م"), cutoff.label)
         shot(app, "M6-V17-goodreads-preview-L")
         importButton.tap()
 

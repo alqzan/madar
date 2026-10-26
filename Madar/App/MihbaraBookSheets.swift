@@ -794,12 +794,14 @@ private struct MihbaraGoodreadsImportView: View {
     private var cutoffCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("رفّ الكتب المقروءة").font(MadarTypography.cardTitle())
-            Text("ما قُرئ قبل سنة \(digits.string(cutoffYear)) يذهب إلى «قديمًا»، وما قُرئ فيها أو بعدها إلى «أنهيتها».")
+            Text("ما قُرئ قبل السنة المحددة يذهب إلى «قديمًا»، وما قُرئ في السنة المحددة أو بعدها إلى «أنهيتها».")
                 .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
             HStack(spacing: 16) {
                 Button { cutoffYear = max(1900, cutoffYear - 1) } label: { Image(systemName: "minus.circle.fill").font(.title2) }
                     .accessibilityLabel("سنة أقدم")
-                Text(digits.string(cutoffYear)).font(MadarTypography.title()).monospacedDigit().accessibilityIdentifier("mihbara-goodreads-cutoff-year")
+                MadarDateLabel(app.yearLabels(cutoffYear), primaryFont: MadarTypography.title(), secondaryFont: MadarTypography.fine())
+                    .accessibilityElement(children: .combine).accessibilityLabel(app.yearLabels(cutoffYear).combined)
+                    .accessibilityIdentifier("mihbara-goodreads-cutoff-year")
                 Button { cutoffYear = min(2100, cutoffYear + 1) } label: { Image(systemName: "plus.circle.fill").font(.title2) }
                     .accessibilityLabel("سنة أحدث")
                 Spacer(minLength: 0)
