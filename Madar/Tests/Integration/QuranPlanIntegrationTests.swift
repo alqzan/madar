@@ -13,6 +13,16 @@ import MadarCommands
         p.unit = .ayah;XCTAssertEqual(QuranPlanCopy.amount(p,digits:.init()),"آيتان")
         p.unit = .page;p.amount=11;XCTAssertEqual(String(QuranPlanCopy.amount(p,digits:.init()).unicodeScalars.filter { !(0x2066...0x2069).contains($0.value) }),"١١ وجهًا")
     }
+    func testForecastIsOnlyVisibleForTheInputThatProducedIt() {
+        let original = QuranUIPlanInput(startAyah: 1, unit: .page, amount: 1, rhythm: .balanced, restDay: "friday", missPolicy: "ask")
+        let forecast = QuranUIForecast(title: "موعد قديم", assumptions: "", warning: nil, portions: [])
+        let state = QuranUIForecastState(input: original, forecast: forecast)
+        XCTAssertEqual(state.visible(for: original)?.title, "موعد قديم")
+
+        var changed = original
+        changed.amount = 2
+        XCTAssertNil(state.visible(for: changed), "A prior estimate must disappear while the changed plan is recalculated.")
+    }
     func testForecastCountsTodayUntilWholeWirdIsComplete() async throws {
         let root=FileManager.default.temporaryDirectory.appending(path:"QuranPlan-\(UUID())")
         let container=try MadarContainerFactory.makeLocal(at:root.appending(path:"Data")),context=ModelContext(container)

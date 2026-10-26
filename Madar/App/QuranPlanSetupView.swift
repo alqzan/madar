@@ -13,10 +13,14 @@ struct QuranPlanSetupView: View {
     @State private var step = 0
     @State private var customStart = false
     @State private var page = 1
-    @State private var forecast: QuranUIForecast?
+    @State private var forecastState: QuranUIForecastState?
     @State private var busy = false
     @State private var error: String?
     private let titles = ["من أين تبدأ؟", "كم وردك؟", "كيف تتعلّم؟", "يوم الراحة", "هذه خطّتك"]
+    private var visibleForecast: QuranUIForecast? {
+        guard let input else { return nil }
+        return forecastState?.visible(for: input)
+    }
     var body: some View {
         VStack(spacing: 0) {
             QuranScreenHeader(title: "خطة الحفظ") { if step > 0 { step -= 1 } else { close() } }.padding(.horizontal, 16)
@@ -35,9 +39,9 @@ struct QuranPlanSetupView: View {
                     QuranPaperCard {
                         VStack(alignment: .leading, spacing: 5) {
                             Text("الإتمام المتوقع بالخطة").font(quranFont(12)).foregroundStyle(theme.secondaryInk)
-                            Text(forecast?.title ?? "نحسب موعدك").font(quranSerif(27)).accessibilityIdentifier("quran-setup-forecast")
-                            if let secondary = forecast?.secondaryDate { Text(secondary).font(quranFont(12)).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("quran-setup-forecast-secondary") }
-                            if let warning = forecast?.warning { Text(warning).font(quranFont(13, bold: true)).foregroundStyle(theme.color("dueText")) }
+                            Text(visibleForecast?.title ?? "نحسب موعدك").font(quranSerif(27)).accessibilityIdentifier("quran-setup-forecast")
+                            if let secondary = visibleForecast?.secondaryDate { Text(secondary).font(quranFont(12)).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("quran-setup-forecast-secondary") }
+                            if let warning = visibleForecast?.warning { Text(warning).font(quranFont(13, bold: true)).foregroundStyle(theme.color("dueText")) }
                             Text("تقدير بافتراض إتمام أيام الحفظ بلا فوت أو تثبيت.").font(quranFont(11)).foregroundStyle(theme.secondaryInk)
                         }
                     }
@@ -54,7 +58,7 @@ struct QuranPlanSetupView: View {
                     page = try QuranResources.catalog().ayah(id: p.startAyah)?.page ?? 1
                 } catch { self.error = quranUserMessage(error) }
             }
-            .task(id: input) { guard let input else { return }; do { let result = try await service.previewPlan(input); try Task.checkCancellation(); forecast = result } catch is CancellationError { } catch { self.error = quranUserMessage(error) } }
+            .task(id: input) { guard let input else { return }; do { let result = try await service.previewPlan(input); try Task.checkCancellation(); forecastState = QuranUIForecastState(input: input, forecast: result) } catch is CancellationError { } catch { self.error = quranUserMessage(error) } }
     }
     @ViewBuilder private func content(_ p: QuranUIPlanInput) -> some View {
         switch step {
