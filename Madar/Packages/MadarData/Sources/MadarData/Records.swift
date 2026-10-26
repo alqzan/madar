@@ -2,6 +2,22 @@ import Foundation
 import CryptoKit
 
 public enum DataError: Error, Equatable { case unknownModel(String), invalidValue(String), newerStore, legacyStoreRequiresAdoption, missingAppGroup, undoExpired, invalidBackup, authenticationFailed, unsupportedBackup }
+// The app shows these in alerts, so the user reads Arabic instead of "MadarData.DataError error N".
+extension DataError: LocalizedError {
+    public var errorDescription: String? {
+        switch self {
+        case .invalidValue(let message) where message.unicodeScalars.contains { (0x0600...0x06FF).contains($0.value) }: message
+        case .invalidValue, .unknownModel: "تعذّر حفظ هذا التغيير. لم يتغيّر شيء من بياناتك."
+        case .newerStore: "بياناتك محفوظة بنسخة أحدث من مدار. حدّث التطبيق ثم افتحه."
+        case .legacyStoreRequiresAdoption: "بياناتك القديمة تحتاج إلى نقل قبل فتحها."
+        case .missingAppGroup: "تعذّر الوصول إلى مكان بيانات مدار على الجهاز."
+        case .undoExpired: "انتهت مهلة التراجع."
+        case .invalidBackup: "ملف النسخة الاحتياطية تالف أو غير مكتمل."
+        case .authenticationFailed: "كلمة المرور غير صحيحة، أو الملف ليس نسخة من مدار."
+        case .unsupportedBackup: "هذه النسخة الاحتياطية من إصدار لا يدعمه مدار الحالي."
+        }
+    }
+}
 public enum JSONValue: Codable, Hashable, Sendable {
     case null, bool(Bool), number(Double), string(String), array([JSONValue]), object([String: JSONValue])
     public init(from decoder: any Decoder) throws {
