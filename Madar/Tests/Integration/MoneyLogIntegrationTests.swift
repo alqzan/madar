@@ -6,6 +6,18 @@ import MadarMoney
 @testable import Madar
 
 @MainActor final class MoneyLogIntegrationTests: XCTestCase {
+    func testPastedBankParserKeepsAllBlocksAndReportsOversizedOnes() {
+        let valid = "شراء مدى\n*3333\n18.00 SAR\nلدى: Coffee\n2026-10-16 12:00"
+        let tooLong = String(repeating: "x", count: 2001)
+        let paste = (Array(repeating: valid, count: 501) + [tooLong]).joined(separator: "\n\n")
+
+        let parsed = AppMoneyService.pastedMessages(paste)
+
+        XCTAssertEqual(parsed.messages.count, 501)
+        XCTAssertTrue(parsed.messages.allSatisfy { $0 == valid })
+        XCTAssertEqual(parsed.oversizedCount, 1)
+    }
+
     func testLogUsesOriginalRefundDayActualDripsAndNeutralPayments() throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "MoneyLog-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }

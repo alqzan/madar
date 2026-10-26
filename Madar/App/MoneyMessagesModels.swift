@@ -169,9 +169,15 @@ extension AppMoneyService {
             statements: statementCards.sorted { $0.at > $1.at }, drafts: drafts, looks: looks.sorted { $0.at > $1.at })
     }
 
-    /// Splits pasted text into messages: one per blank-line-separated block (the paste fallback, §7.5 F09).
-    static func pastedMessages(_ text: String) -> [String] {
-        text.replacingOccurrences(of: "\r\n", with: "\n").components(separatedBy: "\n\n")
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty && $0.count <= 2000 }.prefix(500).map { $0 }
+    struct PastedBankMessages: Equatable {
+        let messages: [String]
+        let oversizedCount: Int
+    }
+
+    /// Splits the fallback paste format (§7.5 F09). Preserve every valid block; the command boundary batches at 500.
+    static func pastedMessages(_ text: String) -> PastedBankMessages {
+        let blocks = text.replacingOccurrences(of: "\r\n", with: "\n").components(separatedBy: "\n\n")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        return .init(messages: blocks.filter { $0.count <= 2000 }, oversizedCount: blocks.filter { $0.count > 2000 }.count)
     }
 }

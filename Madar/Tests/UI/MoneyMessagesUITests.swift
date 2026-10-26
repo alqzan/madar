@@ -1,4 +1,5 @@
 import XCTest
+import UIKit
 
 /// M5-V05: synthetic Shortcut messages through the real intake; «اعتمد الواضح» skips the duplicate, the statement
 /// updates its card once, and an unread message is ignored from «تحتاج نظرة».
@@ -71,6 +72,45 @@ import XCTest
         let reopenedTray = app.descendants(matching: .any)["money-pending"]; XCTAssertTrue(reopenedTray.waitForExistence(timeout: 10)); reopenedTray.tap()
         XCTAssertTrue(chip.waitForExistence(timeout: 10))
         XCTAssertTrue(chip.label.contains("بقالة"), "The successful retry persists the category")
+    }
+
+    func testPasteOverFiveHundredMessagesIsRejectedWithoutPartialImport() throws {
+        continueAfterFailure = false
+        let sample = "شراء مدى\n*3333\n18.00 SAR\nلدى: Coffee\n2026-10-16 12:00"
+        UIPasteboard.general.string = Array(repeating: sample, count: 501).joined(separator: "\n\n")
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
+                                "MADAR_UI_NOW": "2026-10-16T20:00:00+03:00"]
+        app.launch()
+        if app.buttons["first-run-skip"].waitForExistence(timeout: 2) { app.buttons["first-run-skip"].tap() }
+        let start = app.buttons["first-run-continue"]
+        if start.waitForExistence(timeout: 2) { start.tap(); if start.exists && start.isHittable { start.tap() } }
+        let tab = app.buttons["tab-customize"]; XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
+        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("المال")
+        let money = app.buttons["money-open"]; XCTAssertTrue(money.waitForExistence(timeout: 5)); money.tap()
+        let tray = app.descendants(matching: .any)["money-pending"]; XCTAssertTrue(tray.waitForExistence(timeout: 10)); tray.tap()
+        XCTAssertTrue(app.staticTexts["money-messages-title"].waitForExistence(timeout: 10))
+
+        let paste = app.descendants(matching: .any)["money-messages-paste"]
+        for _ in 0..<8 where !paste.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(paste.isHittable, app.debugDescription)
+        paste.tap()
+
+        let note = app.staticTexts["money-messages-note"]
+        let rejected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", "٥٠١"), object: note)
+        XCTAssertEqual(XCTWaiter.wait(for: [rejected], timeout: 10), .completed, "The full count must be explained instead of silently truncating")
+        XCTAssertTrue(note.label.contains("٥٠٠") && note.label.contains("لم تُستورد أي رسالة"), note.label)
+        let review = app.descendants(matching: .any)["money-messages-review"]
+        XCTAssertTrue(review.label.contains("٠"), "Rejecting the oversized paste must leave the inbox unchanged: \(review.label)")
+        shot(app, "M5-E03-paste-over-limit-L")
+
+        UIPasteboard.general.string = Array(repeating: sample, count: 500).joined(separator: "\n\n")
+        for _ in 0..<8 where !paste.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(paste.isHittable, app.debugDescription)
+        paste.tap()
+        let imported = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", "٥٠٠"), object: review)
+        XCTAssertEqual(XCTWaiter.wait(for: [imported], timeout: 60), .completed, "A complete in-limit batch must still reach review")
+        shot(app, "M5-E03-paste-500-L")
     }
 
     func testClearDraftsStatementAndLookAreDecidedHere() throws {

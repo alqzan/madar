@@ -261,10 +261,21 @@ struct MoneyMessagesView: View {
             }
             if let note { Text(note).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-messages-note") }
             PasteButton(payloadType: String.self) { strings in
-                let texts = strings.flatMap(AppMoneyService.pastedMessages)
-                guard !texts.isEmpty else { return }
-                Task { @MainActor in
-                    run("money.pasteBankMessages", ["messages": .array(texts.map { .object(["text": .string($0), "sender": .string("")]) })])
+                let parsed = strings.map(AppMoneyService.pastedMessages)
+                let messages = parsed.flatMap(\.messages), oversizedCount = parsed.reduce(0) { $0 + $1.oversizedCount }
+                if messages.count > 500 {
+                    var limitNote = "لصقك يحتوي " + service.digits.string(messages.count) + " رسالة مقبولة. الحد ٥٠٠ في الدفعة؛ لم تُستورد أي رسالة. قسّم النص وأعد لصق كل دفعة."
+                    if oversizedCount > 0 {
+                        limitNote += " وتُركت " + service.counted(oversizedCount, ("رسالة طويلة واحدة", "رسالتان طويلتان", "رسائل طويلة", "رسالة طويلة")) + " لتجاوزها ٢٠٠٠ حرف."
+                    }
+                    note = limitNote
+                } else if messages.isEmpty {
+                    if oversizedCount > 0 {
+                        note = "لم تُلصق رسائل؛ " + service.counted(oversizedCount, ("رسالة طويلة واحدة", "رسالتان طويلتان", "رسائل طويلة", "رسالة طويلة")) + " تتجاوز حد ٢٠٠٠ حرف."
+                    }
+                } else {
+                    let successNote = oversizedCount == 0 ? nil : "تُركت " + service.counted(oversizedCount, ("رسالة طويلة واحدة", "رسالتان طويلتان", "رسائل طويلة", "رسالة طويلة")) + " لتجاوزها ٢٠٠٠ حرف."
+                    run("money.pasteBankMessages", ["messages": .array(messages.map { .object(["text": .string($0), "sender": .string("")]) })], successNote: successNote)
                 }
             }.labelStyle(.titleAndIcon).tint(theme.color("reserveText")).frame(minHeight: 44).accessibilityIdentifier("money-messages-paste")
             Button { budgetOpen = true } label: { Label("تجاهله من الميزانيات", systemImage: "seal").font(MadarTypography.caption()).frame(minHeight: 44) }
@@ -274,9 +285,9 @@ struct MoneyMessagesView: View {
             Text("الصق رسائل البنك إن لم تصل عبر الاختصار؛ تُفصل الرسائل بسطر فارغ.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).multilineTextAlignment(.center)
         }.padding(.top, 8)
     }
-    private func run(_ name: String, _ payload: [String: MadarCore.JSONValue]) {
+    private func run(_ name: String, _ payload: [String: MadarCore.JSONValue], successNote: String? = nil) {
         Task {
-            do { try await app.executeMoneyCommand(name, payload: payload); note = nil }
+            do { try await app.executeMoneyCommand(name, payload: payload); note = successNote }
             catch { note = name == "money.applyStatement" ? "المبلغ يختلف عن كشف قريب لهذه البطاقة؛ راجع البطاقة أو تجاهل الرسالة" : "لم يُحفظ: الحركة تحتاج اختيارًا قبل اعتمادها" }
             load()
         }
