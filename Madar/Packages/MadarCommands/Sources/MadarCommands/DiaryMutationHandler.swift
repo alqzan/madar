@@ -10,6 +10,11 @@ struct DiaryInverse: Codable {
     let dayKey: String
     let previousOrigin: String?
     var before: DataRecord? = nil
+    var deletedEntries: [DiaryEntryDeletion]? = nil
+}
+struct DiaryEntryDeletion: Codable {
+    let before: DataRecord
+    let after: DataRecord
 }
 @MainActor enum DiaryMutationHandler {
     static func stage(text: String, day: String, targetDay: String?, id: UUID, context: ModelContext, now: Date, writer: String, mediaIDs: [UUID] = [], audioID: UUID? = nil, storedDay: GregorianDay? = nil) throws -> Data? {
@@ -92,6 +97,49 @@ struct DiaryInverse: Codable {
         next.createdAt = now; next.updatedAt = now; next.writerID = writer; context.insert(next)
         return try JSONEncoder().encode(DiaryInverse(model: "Entry", after: next.record(), dayKey: next.dayKey, previousOrigin: nil))
     }
+    static func deleteEntry(_ id: UUID, context: ModelContext, now: Date, writer: String) throws -> Data {
+        let rows = try context.fetch(FetchDescriptor<Entry>())
+        let live = rows.filter { $0.deletedAt == nil && $0.mergedInto == nil }
+        let byID = Dictionary(live.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        guard let head = byID[id] else { throw DataError.invalidValue("missing diary entry") }
+        let chains = DiaryRevisionChains(live.map {
+            .init(id: $0.id, replaces: $0.source == "revision" ? $0.sourceID.flatMap(UUID.init(uuidString:)) : nil)
+        })
+        guard chains.heads.contains(id) else { throw DataError.invalidValue("diary entry is not the current line") }
+
+        // A revision family is one logical line. Remove every live ancestor and branch so no older text
+        // becomes visible when the current line is deleted.
+        var familyIDs: Set<UUID> = [id]
+        var changed = true
+        while changed {
+            changed = false
+            for row in live {
+                let parent = row.source == "revision" ? row.sourceID.flatMap(UUID.init(uuidString:)) : nil
+                if familyIDs.contains(row.id) || parent.map(familyIDs.contains) == true {
+                    if familyIDs.insert(row.id).inserted { changed = true }
+                    if let parent, byID[parent] != nil, familyIDs.insert(parent).inserted { changed = true }
+                }
+            }
+        }
+        let family = live.filter { familyIDs.contains($0.id) }.sorted {
+            $0.eventAt == $1.eventAt ? $0.id.uuidString < $1.id.uuidString : $0.eventAt < $1.eventAt
+        }
+        guard !family.isEmpty, family.allSatisfy({ $0.dayKey == head.dayKey }) else {
+            throw DataError.invalidValue("invalid diary revision family")
+        }
+        let before = try family.map { try $0.record() }
+        for row in family {
+            row.deletedAt = now; row.deletionBarrierAt = now
+            row.updatedAt = StableIdentity.monotonic(now: now, previous: row.updatedAt); row.writerID = writer
+        }
+        let after = try family.map { try $0.record() }
+        let changes = zip(before, after).map { DiaryEntryDeletion(before: $0.0, after: $0.1) }
+        guard let deletedHead = after.first(where: { $0.id == id }) else { throw DataError.invalidValue("missing deleted diary entry") }
+        // Media rows and external bytes stay live through the undo window. Receipt records contain Entry
+        // references only; the expiry sweep clears unreferenced bytes after undo is no longer possible.
+        return try JSONEncoder().encode(DiaryInverse(model: "EntryDeletion", after: deletedHead, dayKey: head.dayKey,
+                                                     previousOrigin: nil, deletedEntries: changes))
+    }
     static func freezesAt(_ row: Entry, context: ModelContext) throws -> Date {
         let day = try GregorianDay(row.dayKey), boundary = DiaryFreeze.boundary(policy: row.dayPolicy)
         let repository = try PrayerRepository(context: context), active = repository.place(at: row.eventAt)
@@ -108,7 +156,25 @@ struct DiaryInverse: Codable {
             try record.set(stamp, for: "deletedAt"); try record.set(stamp, for: "deletionBarrierAt")
             try record.set(stamp, for: "updatedAt"); try record.set(writer, for: "writerID"); try row.apply(record)
         }
-        if inverse.model == "Niyya" {
+        if inverse.model == "EntryDeletion" {
+            guard let changes = inverse.deletedEntries, !changes.isEmpty else { throw DataError.invalidValue("invalid diary deletion receipt") }
+            let rows = try context.fetch(FetchDescriptor<Entry>())
+            for change in changes {
+                guard let row = rows.first(where: { $0.id == change.after.id && $0.mergedInto == nil }),
+                      try row.record() == change.after else { throw DataError.invalidValue("undo superseded: diary deletion") }
+            }
+            for change in changes {
+                guard let row = rows.first(where: { $0.id == change.after.id && $0.mergedInto == nil }) else { throw DataError.invalidValue("missing diary entry") }
+                var restored = change.before
+                let barrier = change.after.date("deletionBarrierAt") ?? change.after.date("deletedAt") ?? now
+                try restored.set(Optional<Date>.none, for: "deletedAt")
+                try restored.set(Optional<Date>.none, for: "deletionBarrierAt")
+                try restored.set(max(now, barrier.addingTimeInterval(0.001)), for: "restoredAt")
+                try restored.set(StableIdentity.monotonic(now: now, previous: change.after.date("updatedAt") ?? now), for: "updatedAt")
+                try restored.set(writer, for: "writerID")
+                try row.apply(restored)
+            }
+        } else if inverse.model == "Niyya" {
             guard let row=try context.fetch(FetchDescriptor<Niyya>()).first(where:{$0.id==inverse.after.id && $0.mergedInto==nil}),try row.record()==inverse.after else{throw DataError.invalidValue("undo superseded: intention")}
             if let before=inverse.before {row.text=try before.decode("text",as:String.self);row.result=try before.decode("result",as:String?.self);row.updatedAt=StableIdentity.monotonic(now:now,previous:row.updatedAt);row.writerID=writer}
             else{try tombstone(row)}

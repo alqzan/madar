@@ -28,6 +28,7 @@ struct DiaryDayView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var stampsOpen=false
     @State private var editing:DiaryLineEdit?
+    @State private var deleteConfirmation: UUID?
     @State private var original:DiaryLineEdit?
     @State private var waitingLetter:DiaryLetterCard?
     @State private var openingLetter:DiaryLetterCard?
@@ -134,6 +135,11 @@ struct DiaryDayView: View {
                 }
             }.background(theme.background).foregroundStyle(theme.ink).environment(\.roomTheme,theme)
                 .safeAreaInset(edge: .bottom, spacing: 0) {
+                    VStack(spacing: 8) {
+                    if app.undoToastVisible {
+                        UndoToast(message: app.undoMessage, undo: app.undo)
+                            .accessibilityIdentifier("diary-day-undo")
+                    }
                     HStack(spacing:10){
                         if let travel,shownDay == today {
                             Button { writing = true } label: { Text("اكتب من " + travel.city).font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 54).foregroundStyle(theme.color("onButton")).background(theme.color("button"),in:.capsule) }.buttonStyle(.plain).accessibilityIdentifier("diary-day-write")
@@ -144,6 +150,7 @@ struct DiaryDayView: View {
                         if travel != nil {Button{stampsOpen=true}label:{Text("الأختام").font(DiaryType.label).frame(minHeight:54).padding(.horizontal,18).overlay{Capsule().stroke(theme.line)}}.buttonStyle(.plain).accessibilityIdentifier("diary-stamps-open")}
                         if shownDay==today,!intentions.isEmpty {Button{intentionsOpen=true}label:{Text("حصيلة النيّات").font(DiaryType.label).frame(minHeight:54).padding(.horizontal,16).foregroundStyle(service.intentionEvening(shownDay) ? theme.background:theme.ink).background(service.intentionEvening(shownDay) ? (theme.dark ? theme.accent:theme.ink):theme.surface,in:.capsule).overlay{Capsule().stroke(theme.line)}}.buttonStyle(.plain).accessibilityIdentifier("diary-niyya-evening")}
                     }.padding(.horizontal,18).padding(.vertical,8).background(theme.background)
+                    }.background(theme.background)
                 }
                 .toolbar {
                     ToolbarItemGroup(placement:.topBarTrailing){Button{searchOpen=true}label:{Image(systemName:"magnifyingglass")}.accessibilityLabel("ابحث في مذكراتك");Button{archiveOpen=true}label:{Image(systemName:"book.closed")}.accessibilityLabel("أيامك")}
@@ -151,6 +158,19 @@ struct DiaryDayView: View {
                     ToolbarItem(placement: .topBarLeading) { Button { dismiss() } label: { Label("المذكرات", systemImage: "chevron.backward") }.accessibilityIdentifier("diary-day-close") }
                 }
                 .toolbarBackground(theme.background, for: .navigationBar).tint(theme.accent)
+                .alert("احذف السطر؟", isPresented: Binding(get: { deleteConfirmation != nil }, set: { if !$0 { deleteConfirmation = nil } })) {
+                    Button("إلغاء", role: .cancel) { deleteConfirmation = nil }
+                    Button("احذف", role: .destructive) {
+                        guard let id = deleteConfirmation else { return }
+                        deleteConfirmation = nil
+                        Task {
+                            do { try await app.executeDiaryCommand("diary.deleteEntry", payload: ["entryID": .string(id.uuidString)]) }
+                            catch { failure = error.localizedDescription }
+                        }
+                    }.accessibilityIdentifier("diary-line-delete-confirm")
+                } message: {
+                    Text("تبقى الهوامش في يوم كتابتها، ويمكنك التراجع عن الحذف خلال عشر دقائق.")
+                }
                 .fullScreenCover(isPresented:$searchOpen){DiarySearchView(app:app).environment(\.roomTheme,theme)}
                 .fullScreenCover(isPresented:$archiveOpen){DiaryHubView(app:app).environment(\.roomTheme,theme)}
                 .sheet(item:$openingLetter,onDismiss:{retry+=1}){letter in DiaryLetterMoment(app:app,letter:letter).environment(\.roomTheme,theme)}
@@ -198,11 +218,7 @@ struct DiaryDayView: View {
             Text(service.time(line.at, zone: line.tzID)).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(theme.color("ink3Text")).frame(width: 38, alignment: .center)
             VStack(alignment: .leading, spacing: 5) {
                 Text(line.markdown == true ? ((try? AttributedString(markdown: line.text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(line.text)) : AttributedString(line.text)).font(.custom("thmanyahseriftext-Regular", size: auto ? 17 : 19, relativeTo: .body)).lineSpacing(11).italic(auto || line.kind == "margin")
-                    .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
-                    .contextMenu {
-                        if page.editable.contains(line.id) {Button("عدّل السطر",systemImage:"pencil"){editing = .init(id:line.id,text:line.text)}}
-                        if shownDay==today,["normal","late","ghad"].contains(line.kind),!line.text.isEmpty {Button("اجعلها نيّة اليوم"){Task{do{try await service.saveIntention(line.text,day:shownDay);niyyaSaved=true}catch{failure=error.localizedDescription}}}}
-                    }
+                    .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading).accessibilityIdentifier("diary-day-line")
                 if let name = projectLinks[line.id] {Text("مشروع: "+name).font(DiaryType.label).foregroundStyle(theme.color("ink3Text")).accessibilityIdentifier("diary-line-project")}
                 else if let project = projectSuggestions[line.id] {
                     Button{Task{do{try await service.link(line.id,to:project.id);niyyaSaved=true}catch{failure=error.localizedDescription}}}label:{Text("يتعلّق بـ«"+project.name+"»؟").font(DiaryType.label).padding(.horizontal,10).frame(minHeight:30).overlay{Capsule().stroke(theme.line)}}.buttonStyle(.plain).accessibilityIdentifier("diary-line-project-suggest")
@@ -216,6 +232,15 @@ struct DiaryDayView: View {
                 }
                 if auto { Text(line.kind == "salah" ? "الصلاة" : line.kind == "quran" ? "القرآن" : "المحبرة").font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)) }
             }.foregroundStyle(line.kind == "margin" ? secondInk : line.kind == "late" ? theme.color("late") : auto ? theme.color("autoInkText") : theme.ink)
+        }.contextMenu {
+            if page.editable.contains(line.id) { Button("عدّل السطر", systemImage: "pencil") { editing = .init(id: line.id, text: line.text) } }
+            if page.deletable.contains(line.id), let id = UUID(uuidString: line.id) {
+                Button(role: .destructive) { deleteConfirmation = id } label: { Label("احذف السطر", systemImage: "trash") }
+                    .accessibilityIdentifier("diary-line-delete")
+            }
+            if shownDay == today, ["normal", "late", "ghad"].contains(line.kind), !line.text.isEmpty {
+                Button("اجعلها نيّة اليوم") { Task { do { try await service.saveIntention(line.text, day: shownDay); niyyaSaved = true } catch { failure = error.localizedDescription } } }
+            }
         }.padding(.leading, 6).padding(.trailing, travel == nil || typeSize.isAccessibilitySize ? 18 : 92).padding(.vertical, 10).frame(minHeight: 34)
     }
 }

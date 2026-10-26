@@ -8,6 +8,7 @@ public enum DiaryEditorCommand: Codable, Equatable, Sendable {
     case intention(id: UUID, day: String, text: String)
     case intentionResult(id: UUID, result: String?)
     case edit(entry: UUID, revision: UUID, text: String)
+    case deleteEntry(UUID)
     // §7.3 N04 letters and projects.
     case sealLetter(id: UUID, text: String, trigger: DiaryLetterTrigger, value: String?, target: UUID?)
     case refreshLetters
@@ -20,7 +21,7 @@ public enum DiaryEditorCommand: Codable, Equatable, Sendable {
     // §7.1 B03 «يوم تنتظره»: the row stores the rule; occurrences are derived.
     case saveUpcomingDay(id: UUID, title: String, calendar: String, year: Int?, month: Int, day: Int, repeats: String, countFrom: String, countUpAfter: Bool)
     case deleteUpcomingDay(UUID)
-    public static let names: Set<String> = ["diary.saveDraft", "diary.commitDraft", "diary.appendMedia", "diary.setTranscript", "diary.setIntention", "diary.setIntentionResult", "diary.editEntry", "diary.sealLetter", "diary.refreshLetters", "diary.openLetter", "diary.rescheduleLetter", "diary.saveProject", "diary.finishProject", "diary.deleteProject", "diary.linkEntry", "bahw.saveUpcomingDay", "bahw.deleteUpcomingDay"]
+    public static let names: Set<String> = ["diary.saveDraft", "diary.commitDraft", "diary.appendMedia", "diary.setTranscript", "diary.setIntention", "diary.setIntentionResult", "diary.editEntry", "diary.deleteEntry", "diary.sealLetter", "diary.refreshLetters", "diary.openLetter", "diary.rescheduleLetter", "diary.saveProject", "diary.finishProject", "diary.deleteProject", "diary.linkEntry", "bahw.saveUpcomingDay", "bahw.deleteUpcomingDay"]
     public static func parse(_ name: String, _ value: [String: JSONValue]) -> Self? {
         func uuid(_ key: String) -> UUID? { value[key]?.string.flatMap(UUID.init(uuidString:)) }
         switch name {
@@ -52,6 +53,9 @@ public enum DiaryEditorCommand: Codable, Equatable, Sendable {
             guard Set(value.keys) == ["entryID", "revisionID", "text"], let id = uuid("entryID"), let revision = uuid("revisionID"), revision != id, let text = value["text"]?.string,
                 !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
             return .edit(entry: id, revision: revision, text: text)
+        case "diary.deleteEntry":
+            guard Set(value.keys) == ["entryID"], let id = uuid("entryID") else { return nil }
+            return .deleteEntry(id)
         case "diary.sealLetter":
             guard Set(value.keys).isSubset(of: ["id", "text", "trigger", "value", "targetID"]), let id = uuid("id"), let text = value["text"]?.string, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                   let trigger = value["trigger"]?.string.flatMap(DiaryLetterTrigger.init(rawValue:)) else { return nil }

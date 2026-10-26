@@ -51,6 +51,7 @@ import MadarData
         case .deleteUpcomingDay(let id): return try BahwUpcomingHandler.delete(id, context: context, now: now, writer: writer)
         case .linkEntry(let entry, let project): return try DiaryLetterHandler.link(entry, project: project, context: context, now: now, writer: writer)
         case .edit(let entry, let revision, let text): return try DiaryMutationHandler.edit(entry: entry, revision: revision, text: text, context: context, now: now, writer: writer)
+        case .deleteEntry(let entry): return try DiaryMutationHandler.deleteEntry(entry, context: context, now: now, writer: writer)
         case .transcript(let entry, let text): return try DiaryMutationHandler.setTranscript(entry: entry, text: text, context: context, now: now, writer: writer)
         }
     }

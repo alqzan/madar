@@ -764,7 +764,21 @@ final class AppSession {
         let reschedules = name.hasPrefix("habit.") || ["diary.setIntention", "diary.sealLetter", "diary.openLetter", "diary.rescheduleLetter", "diary.refreshLetters"].contains(name)
         let result = reschedules ? try await withSerializedPrayerNotificationMutation { try await run() } : try await run()
         if let id = result.undoToken {
-            showUndo(AppUndoToken(id: id, expiresAt: now.addingTimeInterval(600)), message: name.hasPrefix("habit.") ? "حُفظت العادة" : name == "bahw.saveUpcomingDay" ? "حُفظ اليوم" : name == "bahw.deleteUpcomingDay" ? "حُذف اليوم" : name.contains("Intention") ? "حُفظت النيّة" : "حُفظ السطر")
+            let token = AppUndoToken(id: id, expiresAt: now.addingTimeInterval(600))
+            showUndo(token, message: name.hasPrefix("habit.") ? "حُفظت العادة" : name == "bahw.saveUpcomingDay" ? "حُفظ اليوم" : name == "bahw.deleteUpcomingDay" ? "حُذف اليوم" : name == "diary.deleteEntry" ? "حُذف السطر" : name.contains("Intention") ? "حُفظت النيّة" : "حُفظ السطر")
+            if name == "diary.deleteEntry" { scheduleDiaryMediaCleanup(after: token.expiresAt) }
+        }
+    }
+    /// Keep deleted diary attachments restorable during the ten-minute undo window, then apply the
+    /// dictionary's tombstone policy only to Media with no remaining live references.
+    private func scheduleDiaryMediaCleanup(after expiry: Date) {
+        Task { [weak self] in
+            guard let self else { return }
+            let delay = max(0, expiry.timeIntervalSince(self.prayerNow()))
+            try? await Task.sleep(for: .seconds(delay))
+            guard !Task.isCancelled else { return }
+            guard let pinned = try? self.pendingInbox.unacknowledgedCommandIDs() else { return }
+            try? self.commandAdapter.purgeExpiredReceipts(pinnedIDs: pinned, now: self.prayerNow())
         }
     }
     /// M3-V09: a Day One import (or its undo) is one app-process write (RA2), gated like a diary command so

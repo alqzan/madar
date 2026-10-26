@@ -21,6 +21,8 @@ struct DiaryDisplayDay: Identifiable {
     var originals: [String: String] = [:]
     /// Written lines the owner may edit (text entries; voice keeps its own transcript editor).
     var editable: Set<String> = []
+    /// Current text-only diary lines whose full revision family can be deleted and restored safely.
+    var deletable: Set<String> = []
     /// The first line with words: an imported photo-only entry has an empty text and must not hide the next line.
     var excerpt: String {
         let written = lines.filter { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
@@ -114,6 +116,22 @@ struct DiaryHomeSnapshot {
         let context = ModelContext(app.container), key = day.description
         let all = try context.fetch(FetchDescriptor<Entry>(predicate: #Predicate { $0.dayKey == key && $0.deletedAt == nil && $0.mergedInto == nil }, sortBy: [SortDescriptor(\.eventAt)]))
         let chains = Self.revisionChains(all), entries = all.filter { chains.heads.contains($0.id) }
+        let deletable = Set(entries.filter { head in
+            guard head.source != "autoPinned", ["normal", "late", "ghad"].contains(head.ink) else { return false }
+            var family: Set<UUID> = [head.id]
+            var changed = true
+            while changed {
+                changed = false
+                for row in all {
+                    let parent = row.source == "revision" ? row.sourceID.flatMap(UUID.init(uuidString:)) : nil
+                    if family.contains(row.id) || parent.map(family.contains) == true {
+                        if family.insert(row.id).inserted { changed = true }
+                        if let parent, all.contains(where: { $0.id == parent }), family.insert(parent).inserted { changed = true }
+                    }
+                }
+            }
+            return all.filter { family.contains($0.id) }.allSatisfy { $0.source != "autoPinned" }
+        }.map(\.id.uuidString))
         let page = try context.fetch(FetchDescriptor<DayPage>(predicate: #Predicate { $0.dayKey == key && $0.deletedAt == nil && $0.mergedInto == nil })).max { $0.updatedAt < $1.updatedAt }
         var lines = entries.map { row in
             let markdown = row.textFormat == "markdown"
@@ -156,7 +174,8 @@ struct DiaryHomeSnapshot {
             place: app.bool("notes.showPlace") ? entries.compactMap(\.place).first : nil, dayOne: page?.origin == "dayOne", photoID: photoID, media: attachments, marginDays: Dictionary(uniqueKeysWithValues: margins.compactMap { margin in
                 guard let day = try? GregorianDay(margin.writtenDayKey) else { return nil }; return ("margin." + margin.id.uuidString, day)
             }), originals: Dictionary(uniqueKeysWithValues: chains.originals.compactMap { head, root in all.first { $0.id == root }.map { (head.uuidString, $0.text) } }),
-            editable: Set(entries.filter { $0.mediaID == nil && $0.source != "autoPinned" && ["normal", "late", "ghad"].contains($0.ink) }.map(\.id.uuidString)))
+            editable: Set(entries.filter { $0.mediaID == nil && $0.source != "autoPinned" && ["normal", "late", "ghad"].contains($0.ink) }.map(\.id.uuidString)),
+            deletable: deletable)
     }
     func dateTitle(_ day: GregorianDay, calendar: FirstCalendar) -> String {
         let labels = dateLabels(day, first: calendar)

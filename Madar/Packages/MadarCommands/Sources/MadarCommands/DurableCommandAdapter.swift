@@ -109,7 +109,7 @@ private struct ReceiptWire: Codable {
                                        undoExpiresAt: row.undoExpiresAt ?? row.createdAt,
                                        undoJSON: row.undoJSON,
                                        outcome: .init(status: CommandStatus(rawValue: row.status) ?? .rejected,
-                                                      undoToken: row.status == "applied" && ["prayer.log", "prayer.makeUp", "prayer.resolveGap", "prayer.setHeart", "prayer.logQiyam", "prayer.addOldMissed", "prayer.editTrackingStart", "prayer.startTrip", "prayer.endTrip", "prayer.logPair", "settings.set", "settings.applyPreset"].contains(row.name) || row.status == "applied" && QuranCommandPayload.names.contains(row.name) && row.undoJSON != nil || row.status == "applied" && MoneyCommandPayload.names.subtracting(["money.accruePlans"]).contains(row.name) || row.status == "applied" && BookCommand.names.contains(row.name) && row.undoJSON != nil ? id : nil))
+                                                      undoToken: row.status == "applied" && ["prayer.log", "prayer.makeUp", "prayer.resolveGap", "prayer.setHeart", "prayer.logQiyam", "prayer.addOldMissed", "prayer.editTrackingStart", "prayer.startTrip", "prayer.endTrip", "prayer.logPair", "settings.set", "settings.applyPreset"].contains(row.name) || row.status == "applied" && QuranCommandPayload.names.contains(row.name) && row.undoJSON != nil || row.status == "applied" && MoneyCommandPayload.names.subtracting(["money.accruePlans"]).contains(row.name) || row.status == "applied" && BookCommand.names.contains(row.name) && row.undoJSON != nil || row.status == "applied" && row.name == "diary.deleteEntry" && row.undoJSON != nil ? id : nil))
                 return try JSONDecoder().decode(CoreCommandReceipt.self, from: JSONEncoder().encode(wire))
             }
             // Receipt identity is authoritative even after undo/deletion or retention expiry.
@@ -473,11 +473,45 @@ private struct ReceiptWire: Codable {
         try lease.acquire(); defer { lease.release() }
         let context = ModelContext(try containerProvider()); context.autosaveEnabled = false
         for row in try context.fetch(FetchDescriptor<MadarData.CommandReceipt>()) {
+            if row.status == "applied", row.name == "diary.deleteEntry", row.undoJSON != nil,
+               (row.undoExpiresAt ?? row.createdAt) <= now {
+                try purgeExpiredDiaryEntryMedia(from: row.undoJSON!, context: context, now: now, writer: row.writerID)
+                row.undoJSON = nil
+                row.undoExpiresAt = now
+                row.updatedAt = StableIdentity.monotonic(now: now, previous: row.updatedAt)
+            }
             guard let id = row.commandID, row.expiresAt <= now, !pinnedIDs.contains(id) else { continue }
             for scope in try context.fetch(FetchDescriptor<DeviceSetting>()) where scope.key == "sys.commandReceiptScope:\(row.id.uuidString)" { context.delete(scope) }
             context.delete(row)
         }
         try context.save()
+    }
+    private func purgeExpiredDiaryEntryMedia(from receipt: Data, context: ModelContext, now: Date, writer: String) throws {
+        let state = try JSONDecoder().decode(SettingsInverse.self, from: receipt)
+        guard let mutation = state.diaryMutation else { return }
+        let inverse = try JSONDecoder().decode(DiaryInverse.self, from: mutation)
+        guard inverse.model == "EntryDeletion", let changes = inverse.deletedEntries else { return }
+        var mediaIDs: Set<UUID> = []
+        for change in changes {
+            if let mediaID = try change.before.decode("mediaID", as: UUID?.self) { mediaIDs.insert(mediaID) }
+            mediaIDs.formUnion(try change.before.decode("attachmentMediaIDs", as: [UUID].self))
+        }
+        guard !mediaIDs.isEmpty else { return }
+        let entries = try context.fetch(FetchDescriptor<Entry>())
+        let pages = try context.fetch(FetchDescriptor<DayPage>())
+        let books = try context.fetch(FetchDescriptor<Book>())
+        let mediaRows = try context.fetch(FetchDescriptor<Media>())
+        for id in mediaIDs {
+            let entryUses = entries.contains {
+                $0.deletedAt == nil && $0.mergedInto == nil && ($0.mediaID == id || $0.attachmentMediaIDs.contains(id))
+            }
+            let pageUses = pages.contains { $0.deletedAt == nil && $0.mergedInto == nil && $0.photoMediaID == id }
+            let bookUses = books.contains { $0.deletedAt == nil && $0.mergedInto == nil && $0.mediaID == id }
+            guard !entryUses, !pageUses, !bookUses,
+                  let media = mediaRows.first(where: { $0.id == id && $0.deletedAt == nil && $0.mergedInto == nil }) else { continue }
+            media.deletedAt = now; media.deletionBarrierAt = now; media.data = nil
+            media.updatedAt = StableIdentity.monotonic(now: now, previous: media.updatedAt); media.writerID = writer
+        }
     }
     private func convert(_ values: [String: MadarCore.JSONValue]) throws -> [String: MadarData.JSONValue] {
         try values.mapValues { try JSONDecoder().decode(MadarData.JSONValue.self, from: $0.canonicalData()) }
