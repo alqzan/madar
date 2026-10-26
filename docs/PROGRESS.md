@@ -115,7 +115,7 @@ Source: `~/Downloads/madar-review-notes.md` (owner verdicts on 105 screens: 51 �
 | OR-07 | Prayer S3 Hali (M1-V04) | the design's arc and analysis are much nicer | match canonical arc + analysis | ready |
 | OR-08 | Prayer S6 Qiyam (M1-V07) | link it to my wird | owner: both ways — qiyam reading counts toward the Quran wird and is logged in Quran history (one fact, one owner: decide which room writes it; DECISIONS) | ready |
 | OR-09 | Travel S9 + diary travel + money travel (M1-F02/M3-V15/M5-V21) | a clearer travel theme; flexible for any country and multi-country trips; money travel as its own mode with a trip budget and «ارجع لمالي»; no Istanbul-specific art | owner approved multi-country trips (data-model change) and a separate money travel mode; generic, not city art | ready (data model first) |
-| OR-10 | Diary N1 window (M3-V01) | complicated: year drag, too many elements, unclear purpose | 2–3 simpler mockups, owner picks | mockups |
+| OR-10 | Diary N1 window (M3-V01) | complicated: year drag, too many elements, unclear purpose | owner picked mockup A (26 Oct): «هذا اليوم عبر السنين» — today's date (both calendars) on top, then one card per past year for the same date (newest first, short excerpt, tap opens that day), scroll for older years; no year drag; empty years skipped; keep the room's paper and ornament | ready |
 | OR-11 | Diary N3 margin (M3-V03) | my Quran/prayer/habit records are missing | owner: the design's pretty shapes under the day — show other rooms' records as the canonical ornaments/rows | ready |
 | OR-12 | Diary today, today-s1, dark (M3-V01/V05/V14) | too full; make it lighter and smoother; the design is nicer | lighten today page to the canonical | ready |
 | OR-13 | Diary editor (M3-V01) | more and better | owner: writing tools (headings, lists, emphasis, images), beauty and comfort while writing | ready |
@@ -137,7 +137,7 @@ Source: `~/Downloads/madar-review-notes.md` (owner verdicts on 105 screens: 51 �
 | OR-29 | Mihbara word + quote (M6-V08, M6-T01) | quote a word/passage and share it; quote only, fully editable, extras removable | share sheet for quotes; editable quote card with optional extras | ready |
 | OR-30 | Mihbara focus mode (M6-V11) | not built at all | build focus mode | ready |
 | OR-31 | Mihbara English word (M6-V14) | connect a real translator | owner: Apple Translation framework (on device) | ready |
-| OR-32 | Mihbara drawer (M6-V15) | the drawer is useless | 2–3 mockups, owner picks | mockups |
+| OR-32 | Mihbara drawer (M6-V15) | the drawer is useless | owner picked mockup A (26 Oct): a large «أكمل من حيث وقفت» card for the last-read book (cover, title, page N of M, percent) with one «أكمل القراءة» button opening the saved locator, then the library as a cover grid; replaces the drawer; keep Mihbara's look | ready |
 
 ## UX — owner app trial 15 Oct (do these first, in order)
 
