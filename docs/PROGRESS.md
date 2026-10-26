@@ -110,7 +110,7 @@ Source: `~/Downloads/madar-review-notes.md` (owner verdicts on 105 screens: 51 �
 | OR-02 | Habits W2 (M4-V02) | the canonical habits room (weekly/daily display and details) is lovely, we didn't build it | build the canonical habits room layout | ready |
 | OR-03 | Customize W4 (M4-V04) | more customization from the design is missing | owner 26 Oct: build all four: «ما يعرضه كل باب», «الذكاء», habit settings, «اصنع ودجة» (X3) — moves them from v2/deferred to v1, logged in DECISIONS | ready |
 | OR-04 | Widgets X1/X2 (M4-W01/W02) | my widgets are poor vs the design; lock/standby/control centre design is nicer | match canonical widget designs | ready |
-| OR-05 | Prayer S2 log (M1-V02) | heart question and the design's questions are missing | owner: `salah.askHeart` on by default (schema default change, DECISIONS); show the canonical questions | ready |
+| OR-05 | Prayer S2 log (M1-V02) | heart question and the design's questions are missing | owner: `salah.askHeart` on by default (schema default change, DECISIONS); show the canonical questions | built 26 Oct (Claude): `salah.askHeart` default true in all three schema copies; contract check updated (86/86); tests in the handover. Canonical questions still to match. |
 | OR-06 | Prayer S2b/S5 (M1-V03/V06) | reminders all the same | 15+ different reminder texts for missed/qada, rotated, still through the RP3 guard | ready |
 | OR-07 | Prayer S3 Hali (M1-V04) | the design's arc and analysis are much nicer | match canonical arc + analysis | ready |
 | OR-08 | Prayer S6 Qiyam (M1-V07) | link it to my wird | owner: both ways — qiyam reading counts toward the Quran wird and is logged in Quran history (one fact, one owner: decide which room writes it; DECISIONS) | ready |
@@ -119,7 +119,7 @@ Source: `~/Downloads/madar-review-notes.md` (owner verdicts on 105 screens: 51 �
 | OR-11 | Diary N3 margin (M3-V03) | my Quran/prayer/habit records are missing | owner: the design's pretty shapes under the day — show other rooms' records as the canonical ornaments/rows | ready |
 | OR-12 | Diary today, today-s1, dark (M3-V01/V05/V14) | too full; make it lighter and smoother; the design is nicer | lighten today page to the canonical | ready |
 | OR-13 | Diary editor (M3-V01) | more and better | owner: writing tools (headings, lists, emphasis, images), beauty and comfort while writing | ready |
-| OR-14 | Diary import Day One (M3-V09) | move to settings; used once | entry only in diary customize/settings | ready |
+| OR-14 | Diary import Day One (M3-V09) | move to settings; used once | entry only in diary customize/settings | done — already the only entry: diary customize «النقل» → «استيراد من داي ون» (`DiaryCustomizeView.swift:105`); no main diary screen links to it (Claude check 26 Oct). «انقل من مدار القديم» is the separate old-app move and stays. |
 | OR-15 | Diary morning vs evening (M3-V13) | morning = ideas, night = what happened; different looks | distinct morning and evening page designs | ready |
 | OR-16 | Diary Friday / Ramadan (M3-V14) | Friday design is poor; Ramadan theme must be far more Ramadani | redesign Friday; stronger Ramadan theme | ready |
 | OR-17 | Quran home + session log (M2-V01/V11) | bring the design's colours; log colours | owner: the approved design's colours | ready |
@@ -130,8 +130,8 @@ Source: `~/Downloads/madar-review-notes.md` (owner verdicts on 105 screens: 51 �
 | OR-22 | Money home / envelopes / sheet (M5-V01/V03/V04) | smoother bottom section; cube split not good, envelopes and goals missing; smarter sheet | match canonical envelopes + goals; smoother home | ready |
 | OR-23 | Money messages (M5-V05) | complicated; lighter and smoother | simplify the bank-messages flow | ready |
 | OR-24 | Money salary / obligations / categories / cards / cycle settings (M5-V08/V09/V10/V12/V20) | smarter analyst summary; less text, better charts; same as design but nicer; clearer timeline; design nicer | match canonical, charts over text | ready |
-| OR-25 | Money 80% lock-screen alert (M5-V10) | not built | owner: build it without the amount («تجاوزت ٨٠٪ من حد …») | ready |
-| OR-26 | Money log (M5-V13) | by Gregorian months | log arches per Gregorian month | ready |
+| OR-25 | Money 80% lock-screen alert (M5-V10) | not built | owner: build it without the amount («تجاوزت ٨٠٪ من حد …») | built 26 Oct (Claude): the alert already existed (`RoomReminders.limit80`, scheduled through the arbiter and SanctityGuard); body now names the category «بلغت ٨٠٪ من حد «…» لهذه الدورة», amount-free. Open: `stillRelevant` does not re-check 80% after an edit; no content test. |
+| OR-26 | Money log (M5-V13) | by Gregorian months | log arches per Gregorian month | built 26 Oct (Claude): log months are Gregorian (`MoneyLogModels.logMonthStart/Days`), titles Gregorian-first with Hijri beneath; cashback keeps its own calendar via an explicit end/primary. MoneyLogUITests 1/1, MoneyCashbackUITests 3/3, MoneyLogIntegrationTests 2/2 (`claude-log-gregorian-20261026-r1`). |
 | OR-27 | Money big expense / zakat (M5-V18/V22) | numbers look ugly; the crescents are ugly | redesign numbers; redraw crescents | ready |
 | OR-28 | Mihbara reader Turath / Aa / Riyad (M6-V06/V07/V08) | where are the footnotes; the design's settings panel is nicer; verses clearer | show footnotes; canonical Aa panel; clearer ayah styling | ready |
 | OR-29 | Mihbara word + quote (M6-V08, M6-T01) | quote a word/passage and share it; quote only, fully editable, extras removable | share sheet for quotes; editable quote card with optional extras | ready |

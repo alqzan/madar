@@ -222,8 +222,11 @@ import MadarPrayer
             content.userInfo = ["dayKey": candidate.dayKey, "room": "mal"]
         } else if id.hasPrefix("mal.alert80.") {
             // RU2: notifications stay amount-free even when amounts are visible inside the app.
+            // Owner, 26 Oct: name the category and the 80% line, never an amount.
+            let categoryID = String(id.split(separator: ".").last ?? "")
+            let category = protected ? nil : (try? AppMoneyService(app: session).loadCategories())?.shelves.first { $0.id.uuidString == categoryID }?.name
             content.title = protected ? "مدار" : "حدود الصرف"
-            content.body = protected ? "لديك تنبيه في مدار" : "اقترب أحد تصنيفاتك من حدّه لهذه الدورة"
+            content.body = protected ? "لديك تنبيه في مدار" : category.map { "بلغت ٨٠٪ من حد «\($0)» لهذه الدورة" } ?? "بلغ أحد تصنيفاتك ٨٠٪ من حدّه لهذه الدورة"
             content.userInfo = ["dayKey": candidate.dayKey, "room": "mal"]
         } else if id.hasPrefix("mal.reconcile.") {
             content.title = protected ? "مدار" : "مطابقة الرصيد"

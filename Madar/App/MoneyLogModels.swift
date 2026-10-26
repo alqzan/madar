@@ -95,21 +95,19 @@ struct MoneyLogReading {
 }
 extension AppMoneyService {
     var logCalendar: MadarCalendarDays { .init(zone: app.activePlace.timeZone, source: HijriSource(rawValue: app.string("core.hijriSource")) ?? .ummAlQura, offset: Int(app.number("core.hijriOffset"))) }
+    // Owner, 26 Oct 2026: the log is grouped by Gregorian month whatever the first calendar; the title still shows both.
     func logMonthStart(_ day: GregorianDay) -> GregorianDay {
-        if app.string("core.firstCalendar") != "gregorian" { return logCalendar.hijriMonthStart(containing: day) }
-        return (try? GregorianDay(year: day.year, month: day.month, day: 1)) ?? day
+        (try? GregorianDay(year: day.year, month: day.month, day: 1)) ?? day
     }
     func logMonthDays(_ anchor: GregorianDay) -> [GregorianDay] {
-        let start = logMonthStart(anchor), length: Int
-        if app.string("core.firstCalendar") == "gregorian" {
-            var calendar = Calendar(identifier: .gregorian); calendar.timeZone = app.activePlace.timeZone
-            length = calendar.range(of: .day, in: .month, for: start.date(in: calendar.timeZone))?.count ?? 30
-        } else { length = logCalendar.hijriMonthLength(containing: anchor) }
+        let start = logMonthStart(anchor)
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = app.activePlace.timeZone
+        let length = calendar.range(of: .day, in: .month, for: start.date(in: calendar.timeZone))?.count ?? 30
         return (0..<length).map { start.adding(days: $0) }
     }
-    func logMonthLabels(_ start: GregorianDay) -> MadarDateLabels {
-        let end = logMonthDays(start).last ?? start
-        let first = app.dateLabels(start), last = app.dateLabels(end)
+    func logMonthLabels(_ start: GregorianDay, end: GregorianDay? = nil, primary calendar: FirstCalendar = .gregorian) -> MadarDateLabels {
+        let end = end ?? logMonthDays(start).last ?? start
+        let first = app.dateLabels(start, first: calendar), last = app.dateLabels(end, first: calendar)
         let primary = first.primary.split(separator: " ").dropFirst().joined(separator: " ")
         let a = first.secondary.split(separator: " ").dropFirst().joined(separator: " "), b = last.secondary.split(separator: " ").dropFirst().joined(separator: " ")
         return .init(primary: primary, secondary: a == b ? a : a + " – " + b)

@@ -87,7 +87,7 @@ extension AppMoneyService {
         let months = (0...current).map { index in
             MoneyCashbackMonth(id: index, start: starts[index], short: hijriFirst ? hijriShort(days.hijri(starts[index]).month) : Self.gregorianShort[starts[index].month - 1],
                                secondaryShort: hijriFirst ? Self.gregorianShort[starts[index].month - 1] : hijriShort(days.hijri(starts[index]).month),
-                               labels: logMonthLabels(starts[index]), current: index == current)
+                               labels: logMonthLabels(starts[index], end: (index + 1 < starts.count ? starts[index + 1] : end).adding(days: -1), primary: hijriFirst ? .hijri : .gregorian), current: index == current)
         }
         let last = end.adding(days: -1)
         let yearTitle: String, yearSecondary: String
