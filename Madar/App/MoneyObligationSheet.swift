@@ -187,6 +187,7 @@ struct MoneyObligationSheet: View {
                     Text(recurring ? "أول موعد" : "أول قسط").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                     Text(RecurrencePhrase.relative(from: today, to: first, digits: digits)).font(.custom("thmanyahsans-Bold", size: 15, relativeTo: .callout))
                         .accessibilityIdentifier("money-obligation-first-relative")
+                    MadarDateLabel(app.dateLabels(first), primaryFont: MadarTypography.fine(), secondaryFont: MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                 }
                 Spacer(minLength: 8)
                 DatePicker("أول موعد", selection: $firstDue, displayedComponents: .date).labelsHidden()

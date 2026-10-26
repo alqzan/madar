@@ -2501,6 +2501,7 @@ private struct PrayerOldMissedSheet: View {
                     DatePicker("التاريخ", selection: pickerDate, in: ...maximumDate, displayedComponents: .date)
                         .environment(\.calendar, calendar).environment(\.timeZone, session.activePlace.timeZone)
                         .accessibilityIdentifier("prayer-old-date")
+                    MadarDateLabel(session.dateLabels(.containing(date, in: session.activePlace.timeZone)), primaryFont: MadarTypography.caption(), secondaryFont: MadarTypography.fine())
                     Picker("الصلاة", selection: $prayer) {
                         ForEach(Prayer.allCases, id: \.self) { Text(title($0)).tag($0) }
                     }.accessibilityIdentifier("prayer-old-prayer")

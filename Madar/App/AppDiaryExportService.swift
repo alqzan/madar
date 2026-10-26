@@ -86,7 +86,7 @@ extension AppDiaryService {
             }
             if options.margins {
                 for margin in marginsByDay[key] ?? [] {
-                    let text = margin.targetDayKey == key ? margin.text : "كتبت في هامش " + dateTitle(try GregorianDay(margin.targetDayKey), calendar: .gregorian) + ": " + margin.text
+                    let text = margin.targetDayKey == key ? margin.text : "كتبت في هامش " + bothDates(try GregorianDay(margin.targetDayKey), calendar: .gregorian) + ": " + margin.text
                     lines.append(.init(id: "margin." + margin.id.uuidString, at: margin.writtenAt, text: text, kind: "margin"))
                 }
             }
