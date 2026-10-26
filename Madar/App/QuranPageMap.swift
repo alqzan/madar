@@ -38,7 +38,7 @@ struct QuranPageMap: View {
                     if pages.indices.contains(index) { choose(pages[index].firstPage) }
                 }
                 .accessibilityElement().accessibilityLabel("خريطة المصحف، الأقدم يمينًا، اختر وجهًا من محدد الوجه")
-            }.frame(height: CGFloat((pages.count + columns - 1) / columns) * 11 - 2)
+            }.frame(height: max(0, CGFloat((pages.count + columns - 1) / columns) * 11 - 2))
         }
     }
     private func status(_ p: QuranUIIndexItem) -> String { p.memorized ? "في صدرك" : p.fraction > 0 ? "حفظ جزئي" : "لم تحفظه" }

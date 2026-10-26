@@ -1,6 +1,7 @@
 import SwiftUI
 import MadarDesign
 import MadarCommands
+import MadarData
 
 struct QuranFreeView: View {
     let service: AppQuranService
@@ -15,6 +16,10 @@ struct QuranFreeView: View {
     @State private var session: QuranUISessionState?
     @State private var busy = false
     @State private var error: String?
+    @State private var userSelectedRange = false
+    @State private var selectLastAfterIndex = false
+    @State private var injectedIndexDelay = false
+    @State private var injectedStartFailure = false
     private var range: ClosedRange<Int> { min(from,through)...max(from,through) }
     private var saved: Int { pages.filter { range.contains($0.firstPage) && $0.memorized }.count }
     var body: some View {
@@ -27,43 +32,101 @@ struct QuranFreeView: View {
                     ForEach([("last","آخر أوجه"),("surah","سورة"),("juz","الجزء"),("range","اختر نطاقًا")], id: \.0) { key, title in
                         Menu {
                             if key == "surah" {
-                                ForEach(surahs, id: \.0) { id, title in Button(title) { selectSurah(id); preset = key } }
+                                ForEach(surahs, id: \.0) { id, title in Button(title) { selectSurah(id); preset = key }.accessibilityIdentifier("quran-free-surah-\(id)") }
                             } else if key == "juz" {
-                                ForEach(1...30, id: \.self) { n in Button("الجزء " + service.numerals.string(n)) { selectJuz(n); preset = key } }
-                            } else { Button(title) { preset = key; if key == "last" { let saved = pages.filter(\.memorized).map(\.firstPage); through = saved.max() ?? 1; from = max(1,through - 4) } } }
+                                ForEach(1...30, id: \.self) { n in Button("الجزء " + service.numerals.string(n)) { selectJuz(n); preset = key }.accessibilityIdentifier("quran-free-juz-\(n)") }
+                            } else { Button(title) {
+                                preset = key
+                                if key == "last" {
+                                    userSelectedRange = true
+                                    if pages.isEmpty { selectLastAfterIndex = true }
+                                    else { selectLastAfterIndex = false; selectLastPages(pages) }
+                                } else { selectLastAfterIndex = false }
+                            }.accessibilityIdentifier("quran-free-preset-action-" + key) }
                         } label: { Text(title).font(quranFont(12, bold: preset == key)).frame(maxWidth: .infinity, minHeight: 44).background(preset == key ? theme.color("hifzTint") : theme.surface, in: Capsule()) }
+                    .accessibilityIdentifier("quran-free-preset-" + key)
                     }
                 }
                 QuranPaperCard {
                     VStack(alignment: .leading, spacing: 12) {
                         Text(pickingEnd ? "المس آخر وجه في النطاق" : "المس أول وجه، ثم آخر وجه").font(quranFont(12)).foregroundStyle(theme.secondaryInk)
                         QuranPageMap(pages: pages, selected: range) { page in
+                            userSelectedRange = true
+                            selectLastAfterIndex = false
                             if pickingEnd { through = page; pickingEnd = false } else { from = page; through = page; pickingEnd = true }
-                        }
+                        }.disabled(busy)
                         Text("في صدرك: مصمت، راجعته: نقطة، المستحق: خط مائل، الاختيار: إطار").font(quranFont(11)).foregroundStyle(theme.secondaryInk)
-                        Stepper("من الوجه " + service.numerals.string(from), value: $from, in: 1...604).accessibilityIdentifier("quran-free-from")
-                        Stepper("إلى الوجه " + service.numerals.string(through), value: $through, in: 1...604).accessibilityIdentifier("quran-free-through")
+                        Stepper("من الوجه " + service.numerals.string(from), value: Binding(get: { from }, set: { from = $0; userSelectedRange = true; selectLastAfterIndex = false }), in: 1...604)
+                            .disabled(busy).accessibilityIdentifier("quran-free-from")
+                        Stepper("إلى الوجه " + service.numerals.string(through), value: Binding(get: { through }, set: { through = $0; userSelectedRange = true; selectLastAfterIndex = false }), in: 1...604)
+                            .disabled(busy).accessibilityIdentifier("quran-free-through")
                     }.font(quranFont(14))
                 }
-                if let error { Text(error).font(quranFont(13)).foregroundStyle(theme.color("dueText")) }
+                if let error { Text(error).font(quranFont(13)).foregroundStyle(theme.color("dueText")).accessibilityIdentifier("quran-free-error") }
             }.padding(16)
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.color("review"))
             .safeAreaInset(edge: .bottom) {
                 QuranPaperCard {
                     VStack(spacing: 10) {
-                        Text("من الوجه " + service.numerals.string(range.lowerBound) + " إلى " + service.numerals.string(range.upperBound)).font(quranFont(16, bold: true))
+                        Text("من الوجه " + service.numerals.string(range.lowerBound) + " إلى " + service.numerals.string(range.upperBound))
+                            .font(quranFont(16, bold: true)).accessibilityIdentifier("quran-free-range-summary")
                         Text(saved == 0 ? "هذا النطاق للقراءة فقط؛ لا يُسجّل تقييمًا أو يزيد حفظك أو سلسلتك" : "يُسجّل من النطاق " + service.faceCount(saved) + " مكتملة في صدرك؛ الباقي قراءة فقط").font(quranFont(12)).foregroundStyle(theme.secondaryInk)
                         Text("سرد متصل").font(quranFont(13)).frame(maxWidth: .infinity, minHeight: 38).overlay { Capsule().stroke(theme.color("review"), lineWidth: 1) }
                         Button(saved == 0 ? "ابدأ القراءة" : "ابدأ التسميع") {
-                            busy = true; Task { defer { busy = false }; do { session = try await service.start(kind: .free, stepID: nil, range: QuranUIRange(fromPage: range.lowerBound,toPage: range.upperBound), rakaat: nil, spotID: nil) } catch { self.error = quranUserMessage(error) } }
-                        }.font(quranFont(16,bold:true)).foregroundStyle(theme.onAccent).frame(maxWidth:.infinity,minHeight:50).background(theme.accent,in:Capsule()).disabled(busy).accessibilityIdentifier("quran-free-start")
+                            beginReading(range)
+                        }.font(quranFont(16,bold:true)).foregroundStyle(theme.onAccent).frame(maxWidth:.infinity,minHeight:50).background(theme.accent,in:Capsule()).disabled(busy || pages.isEmpty).accessibilityIdentifier("quran-free-start")
                     }
                 }.padding(16)
             }
-            .task { do { pages = try await service.index(.page); if let initialRange { from = initialRange.fromPage; through = initialRange.toPage } else if let last = pages.last(where: \.memorized) { through = last.firstPage; from = max(1,through - 4) } } catch { self.error = quranUserMessage(error) } }
+            .task {
+                do {
+                    #if DEBUG
+                    let environment = ProcessInfo.processInfo.environment
+                    if !injectedIndexDelay, UUID(uuidString: environment["MADAR_UI_STORE_ID"] ?? "") != nil,
+                       environment["MADAR_UI_QURAN_INDEX_DELAY_ONCE"] == "1" {
+                        injectedIndexDelay = true
+                        try await Task.sleep(for: .seconds(12))
+                    }
+                    #endif
+                    let indexed = try await service.index(.page)
+                    try Task.checkCancellation()
+                    pages = indexed
+                    if selectLastAfterIndex {
+                        selectLastPages(indexed)
+                        selectLastAfterIndex = false
+                    } else if !userSelectedRange {
+                        if let initialRange { from = initialRange.fromPage; through = initialRange.toPage }
+                        else if let last = pages.last(where: \.memorized) { through = last.firstPage; from = max(1,through - 4) }
+                    }
+                } catch is CancellationError { }
+                catch { self.error = quranUserMessage(error) }
+            }
             .fullScreenCover(item: $session) { initial in QuranHomeSessionFlow(service: service, state: Binding(get: { session ?? initial }, set: { session = $0 }), close: { session = nil }) }
     }
     private var surahs: [(Int,String)] { guard let catalog = try? QuranResources.catalog() else { return [] }; return Dictionary(grouping:catalog.ayahs,by:\.surahID).sorted { $0.key < $1.key }.map { ($0.key,$0.value[0].surahNameArabic) } }
-    private func selectSurah(_ id: Int) { guard let ayahs = try? QuranResources.catalog().ayahs.filter({ $0.surahID == id }),let first=ayahs.first,let last=ayahs.last else { return };from=first.page;through=last.page }
-    private func selectJuz(_ n: Int) { guard let ayahs = try? QuranResources.catalog().ayahs.filter({ $0.juz == n }),let first=ayahs.first,let last=ayahs.last else { return };from=first.page;through=last.page }
+    private func selectLastPages(_ indexed: [QuranUIIndexItem]) {
+        let last = indexed.filter(\.memorized).map(\.firstPage).max() ?? 1
+        through = last; from = max(1, last - 4)
+    }
+    private func selectSurah(_ id: Int) { guard let ayahs = try? QuranResources.catalog().ayahs.filter({ $0.surahID == id }),let first=ayahs.first,let last=ayahs.last else { return };from=first.page;through=last.page;userSelectedRange = true;selectLastAfterIndex = false }
+    private func selectJuz(_ n: Int) { guard let ayahs = try? QuranResources.catalog().ayahs.filter({ $0.juz == n }),let first=ayahs.first,let last=ayahs.last else { return };from=first.page;through=last.page;userSelectedRange = true;selectLastAfterIndex = false }
+    private func beginReading(_ selectedRange: ClosedRange<Int>) {
+        guard !busy else { return }
+        error = nil; busy = true
+        let request = QuranUIRange(fromPage: selectedRange.lowerBound, toPage: selectedRange.upperBound)
+        Task { @MainActor in
+            defer { busy = false }
+            do {
+                #if DEBUG
+                let environment = ProcessInfo.processInfo.environment
+                if !injectedStartFailure, UUID(uuidString: environment["MADAR_UI_STORE_ID"] ?? "") != nil,
+                   environment["MADAR_UI_QURAN_FREE_START_FAILURE_ONCE"] == "1" {
+                    injectedStartFailure = true
+                    throw DataError.invalidValue("تعذّر بدء القراءة في الاختبار. حاول مرة أخرى")
+                }
+                #endif
+                session = try await service.start(kind: .free, stepID: nil, range: request, rakaat: nil, spotID: nil)
+            } catch { self.error = quranUserMessage(error) }
+        }
+    }
 }
