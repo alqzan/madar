@@ -540,6 +540,54 @@ import UIKit
         sleep(1); attach(app, "M6-UX-R-stand-dark")
     }
 
+    func testTurathUnavailableCatalogueOffersRetryWithoutFalseEmptyResults() throws {
+        let app = try openTurathForCatalogueFailure(catalogue: "invalid-catalogue")
+        let field = app.textFields["mihbara-turath-search"]
+        field.tap(); field.typeText("صيد\n")
+        XCTAssertTrue(app.staticTexts["mihbara-turath-error"].waitForExistence(timeout: 8))
+        attach(app, "M6-Turath-unavailable-L")
+        let retry = app.buttons["mihbara-turath-retry"]
+        XCTAssertTrue(retry.exists, app.debugDescription)
+        XCTAssertFalse(app.descendants(matching: .any)["mihbara-turath-empty"].exists, "Unavailable catalogue cannot establish that no book matches")
+        retry.tap()
+        XCTAssertTrue(retry.waitForExistence(timeout: 8))
+        XCTAssertEqual(field.value as? String, "صيد")
+        app.terminate()
+    }
+
+    func testTurathCatalogueRetryPreservesQueryAndFindsTheBook() throws {
+        let catalogue = #"{"cats":{},"authors":{},"books":{"12028":{"id":12028,"name":"صيد الخاطر","size":1000,"page_count":10}},"books_changed":[],"date":"2026-02-03","version":1}"#
+        let app = try openTurathForCatalogueFailure(catalogue: catalogue, failOnce: true)
+        let field = app.textFields["mihbara-turath-search"]
+        field.tap(); field.typeText("صيد\n")
+        let retry = app.buttons["mihbara-turath-retry"]
+        XCTAssertTrue(retry.waitForExistence(timeout: 8), app.debugDescription)
+        retry.tap()
+        XCTAssertTrue(app.buttons["mihbara-turath-book-12028"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertEqual(field.value as? String, "صيد")
+        XCTAssertFalse(app.staticTexts["mihbara-turath-error"].exists)
+        XCTAssertFalse(retry.exists)
+        attach(app, "M6-Turath-retry-results-L")
+        app.terminate()
+    }
+
+    private func openTurathForCatalogueFailure(catalogue: String, failOnce: Bool = false) throws -> XCUIApplication {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MIHBARA_FIXTURE": "empty",
+            "MADAR_UI_NOW": "2026-10-18T12:00:00+03:00", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
+            "MADAR_UI_TURATH_CATALOGUE_BASE64": Data(catalogue.utf8).base64EncodedString()]
+        if failOnce { app.launchEnvironment["MADAR_UI_TURATH_CATALOGUE_FAILURE_ONCE"] = "1" }
+        app.launch()
+        let customize = app.buttons["tab-customize"]; XCTAssertTrue(customize.waitForExistence(timeout: 20)); customize.tap()
+        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 8)); search.tap(); search.typeText("المحبرة")
+        let door = app.buttons["mihbara-open"]; XCTAssertTrue(door.waitForExistence(timeout: 8)); door.tap()
+        app.buttons["mihbara-add-paper"].tap()
+        let turath = app.buttons["mihbara-add-source-turath"]; XCTAssertTrue(turath.waitForExistence(timeout: 8)); turath.tap()
+        XCTAssertTrue(app.staticTexts["mihbara-turath-error"].waitForExistence(timeout: 8), app.debugDescription)
+        return app
+    }
+
     /// M6-T01: search Turath's catalogue, download a book (fixture data, no network), review it and read it.
     func testTurathSearchDownloadsABookIntoTheLibrary() throws {
         continueAfterFailure = false

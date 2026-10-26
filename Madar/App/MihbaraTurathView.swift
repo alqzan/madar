@@ -68,6 +68,7 @@ struct MihbaraTurathView: View {
     @Environment(\.roomTheme) private var theme
     @State private var books: [TurathCatalogueBook] = []
     @State private var loading = true
+    @State private var catalogueAttempt = 0
     @State private var query = ""
     @State private var results: [TurathCatalogueBook] = []
     @State private var downloading: Int?
@@ -109,33 +110,45 @@ struct MihbaraTurathView: View {
                 .overlay { RoundedRectangle(cornerRadius: 16).stroke(searching ? theme.ink.opacity(0.5) : theme.line, lineWidth: 1) }
 
                 if let error {
-                    Text(error).font(MadarTypography.caption()).foregroundStyle(theme.ink)
-                        .padding(12).frame(maxWidth: .infinity, alignment: .leading)
-                        .background(theme.surface, in: .rect(cornerRadius: 14)).accessibilityIdentifier("mihbara-turath-error")
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(error).font(MadarTypography.caption()).foregroundStyle(theme.ink)
+                            .accessibilityIdentifier("mihbara-turath-error")
+                        if books.isEmpty && !loading {
+                            Button { catalogueAttempt += 1 } label: {
+                                Label("حاول مرة أخرى", systemImage: "arrow.clockwise")
+                                    .font(MadarTypography.body()).frame(minHeight: 44)
+                            }
+                            .buttonStyle(.plain).accessibilityIdentifier("mihbara-turath-retry")
+                        }
+                    }
+                    .padding(12).frame(maxWidth: .infinity, alignment: .leading)
+                    .background(theme.surface, in: .rect(cornerRadius: 14))
                 }
 
                 if loading {
                     HStack(spacing: 10) { ProgressView().tint(theme.ink); Text("يجلب فهرس الكتب…").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
                         .frame(maxWidth: .infinity, minHeight: 80)
-                } else if query.trimmingCharacters(in: .whitespaces).isEmpty {
-                    starter
-                } else if results.isEmpty {
-                    VStack(spacing: 8) {
-                        Image(systemName: "text.magnifyingglass").font(.title2).foregroundStyle(theme.secondaryInk)
-                        Text("لا كتاب بهذا الاسم في الفهرس").font(MadarTypography.cardTitle())
-                        Text("جرّب كلمة واحدة من العنوان، أو اسم المؤلف المشهور.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                    }.frame(maxWidth: .infinity, minHeight: 160).accessibilityIdentifier("mihbara-turath-empty")
-                } else {
-                    Text(results.count >= 50 ? "أقرب \(digits.string(50)) نتيجة" : arabicCount(results.count, ["نتيجة واحدة", "نتيجتان", "نتائج", "نتيجة"], digits))
-                        .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                    VStack(spacing: 0) {
-                        ForEach(Array(results.enumerated()), id: \.element.id) { index, book in
-                            row(book)
-                            if index < results.count - 1 { Divider().padding(.leading, 16) }
+                } else if !books.isEmpty || error == nil {
+                    if query.trimmingCharacters(in: .whitespaces).isEmpty {
+                        starter
+                    } else if results.isEmpty {
+                        VStack(spacing: 8) {
+                            Image(systemName: "text.magnifyingglass").font(.title2).foregroundStyle(theme.secondaryInk)
+                            Text("لا كتاب بهذا الاسم في الفهرس").font(MadarTypography.cardTitle())
+                            Text("جرّب كلمة واحدة من العنوان، أو اسم المؤلف المشهور.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                        }.frame(maxWidth: .infinity, minHeight: 160).accessibilityIdentifier("mihbara-turath-empty")
+                    } else {
+                        Text(results.count >= 50 ? "أقرب \(digits.string(50)) نتيجة" : arabicCount(results.count, ["نتيجة واحدة", "نتيجتان", "نتائج", "نتيجة"], digits))
+                            .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                        VStack(spacing: 0) {
+                            ForEach(Array(results.enumerated()), id: \.element.id) { index, book in
+                                row(book)
+                                if index < results.count - 1 { Divider().padding(.leading, 16) }
+                            }
                         }
+                        .background(theme.surface, in: .rect(cornerRadius: 18))
+                        .overlay { RoundedRectangle(cornerRadius: 18).stroke(theme.line.opacity(0.7), lineWidth: 1) }
                     }
-                    .background(theme.surface, in: .rect(cornerRadius: 18))
-                    .overlay { RoundedRectangle(cornerRadius: 18).stroke(theme.line.opacity(0.7), lineWidth: 1) }
                 }
             }
             .padding(.horizontal, 22).padding(.top, 8).padding(.bottom, 28)
@@ -144,7 +157,7 @@ struct MihbaraTurathView: View {
         .scrollDismissesKeyboard(.interactively)
         .foregroundStyle(theme.ink).background(theme.background.ignoresSafeArea())
         .environment(\.layoutDirection, .rightToLeft).toolbarVisibility(.hidden, for: .navigationBar).statusBarHidden(true)
-        .task { await load() }
+        .task(id: catalogueAttempt) { await load() }
         .onChange(of: query) { _, value in results = TurathCatalogue.search(books, query: value) }
         .navigationDestination(isPresented: $reviewing) {
             if let downloaded {
@@ -218,10 +231,24 @@ struct MihbaraTurathView: View {
     private func load() async {
         if query.isEmpty, !initialQuery.isEmpty { query = initialQuery }
         guard books.isEmpty else { return }
-        do { books = try await MihbaraTurathSource.catalogue(); error = nil }
-        catch { self.error = "تعذّر الوصول إلى فهرس تراث. تأكد من الاتصال بالإنترنت ثم ارجع لهذه الصفحة." }
-        loading = false
-        results = TurathCatalogue.search(books, query: query)
+        loading = true; error = nil
+        defer { loading = false }
+        do {
+            #if DEBUG
+            if UUID(uuidString: ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"] ?? "") != nil,
+               ProcessInfo.processInfo.environment["MADAR_UI_TURATH_CATALOGUE_FAILURE_ONCE"] == "1", catalogueAttempt == 0 {
+                throw TurathError.unreadable
+            }
+            #endif
+            let loaded = try await MihbaraTurathSource.catalogue()
+            try Task.checkCancellation()
+            books = loaded
+            results = TurathCatalogue.search(books, query: query)
+        } catch {
+            guard !Task.isCancelled else { return }
+            self.error = "تعذّر الوصول إلى فهرس تراث. تأكد من الاتصال بالإنترنت وحاول مرة أخرى."
+            results = []
+        }
     }
 
     private func download(_ book: TurathCatalogueBook) {
