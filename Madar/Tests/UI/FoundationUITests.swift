@@ -18,7 +18,7 @@ import XCTest
             XCTAssertTrue(maghrib.exists, app.debugDescription)
             let asr = app.descendants(matching: .any).matching(identifier: "prayer-arch-asr").firstMatch
             XCTAssertTrue(asr.label.contains("وحدي"), asr.label)
-            XCTAssertFalse(app.buttons["prayer-heart-review"].exists, "RP6: the heart question is off by default")
+            // Owner 26 Oct: the heart question is on by default (RP6 reverted), so a review card may show here.
             let streaks = app.buttons["prayer-streaks"]
             XCTAssertTrue(streaks.waitForExistence(timeout: 5), app.debugDescription)
             for name in ["الجماعة", "في وقتها", "إتمام الخمس"] { XCTAssertTrue(streaks.label.contains(name), streaks.label) }
@@ -204,7 +204,7 @@ import XCTest
         XCTAssertTrue(alone.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(alone.isSelected, "Asr is already logged alone")
         XCTAssertFalse(app.buttons["prayer-status-missed"].exists, "RP2: no «فاتتني» before the window ends")
-        XCTAssertFalse(app.buttons["prayer-heart-present"].exists, "RP6: heart question off by default")
+        XCTAssertTrue(app.buttons["prayer-heart-present"].exists, "Owner 26 Oct: heart question on by default")
         attachScreenshot(app, named: "M1-V02-log-L")
         XCTAssertFalse(app.buttons["prayer-clear"].exists, "«امسح التسجيل» is not a v1 action")
         // One tap re-records; the sheet closes and the home reflects it.
@@ -213,19 +213,6 @@ import XCTest
         XCTAssertEqual(XCTWaiter.wait(for: [changed], timeout: 15), .completed, asr.label)
         XCTAssertTrue(app.buttons["undo-button"].waitForExistence(timeout: 15), app.debugDescription)
         app.buttons["undo-button"].tap()
-        // The companion canonical shows the optional heart question. Enable it
-        // through the real setting in this isolated store, preserving RP6's default.
-        app.terminate(); app.launch(); finishOnboarding(app)
-        app.buttons["tab-customize"].tap()
-        let search = app.textFields["settings-search"]
-        scrollTo(search, in: app); search.tap(); search.typeText("salah.askHeart\n")
-        let toggle = app.switches["setting-salah.askHeart"]
-        scrollTo(toggle, in: app); XCTAssertEqual(toggle.value as? String, "0"); toggle.tap()
-        app.swipeDown(); app.tabBars.buttons["الصلاة"].tap()
-        XCTAssertTrue(asr.waitForExistence(timeout: 10), app.debugDescription)
-        asr.tap()
-        XCTAssertTrue(alone.waitForExistence(timeout: 10)); XCTAssertTrue(alone.isSelected)
-        XCTAssertTrue(app.buttons["prayer-heart-present"].waitForExistence(timeout: 10), app.debugDescription)
         attachScreenshot(app, named: "M1-V02-log-heart-L")
         app.terminate()
     }
@@ -563,13 +550,13 @@ import XCTest
                 "MADAR_UI_PRAYER_FIXTURE": "ratio26of30", "MADAR_UI_THEME": "light"]
             app.launch(); finishOnboarding(app)
             app.tabBars.buttons["الصلاة"].tap()
-            XCTAssertFalse(app.buttons["prayer-heart-review"].exists, "RP6 defaults to off")
+            // Owner 26 Oct: the heart question defaults to on; the toggle below confirms it.
             app.terminate(); app.launch(); finishOnboarding(app)
             app.buttons["tab-customize"].tap()
             let search = app.textFields["settings-search"]
             scrollTo(search, in: app); search.tap(); search.typeText("salah.askHeart\n")
             let toggle = app.switches["setting-salah.askHeart"]
-            scrollTo(toggle, in: app); XCTAssertEqual(toggle.value as? String, "0"); toggle.tap()
+            scrollTo(toggle, in: app); XCTAssertEqual(toggle.value as? String, "1")
             app.swipeDown(); app.tabBars.buttons["الصلاة"].tap()
             let review = app.buttons["prayer-heart-review"]
             scrollTo(review, in: app); review.tap()

@@ -1189,7 +1189,7 @@
    "section": "التسجيل",
    "title": "اسألني عن القلب",
    "type": "bool",
-   "default": false,
+   "default": true,
    "scope": "sync",
    "storage": "Setting (synced)",
    "preset": false,

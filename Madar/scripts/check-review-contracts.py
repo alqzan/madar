@@ -34,8 +34,10 @@ require(len({(base / 'settings-schema.json').read_bytes() for base in copies}) =
 require((copies[1] / 'data-dictionary.json').read_bytes() == (copies[2] / 'data-dictionary.json').read_bytes(),
         'runtime dictionary copies drifted')
 settings = {row['key']: row for row in json.loads((handoff / 'settings-schema.json').read_text())['settings']}
-for key in ['notes.dictationFirst', 'salah.askHeart', 'salah.liveActivity', 'quran.tapForTafsir']:
+for key in ['notes.dictationFirst', 'salah.liveActivity', 'quran.tapForTafsir']:
     require(settings[key]['default'] is False, f'{key} agreed default must be false')
+# Owner, 26 Oct 2026: RP6's [DEFAULT] reverted; the heart question starts on (docs/DECISIONS.md).
+require(settings['salah.askHeart']['default'] is True, 'salah.askHeart owner default must be true')
 require(settings['quran.tapForTafsir']['availabilityGate'] == 'M2 licence check', 'RQ8 licence gate missing')
 reader = settings['mihbara.readerEn']
 require(reader['default']['arabicHints'] == 'none', 'RMI1 hints must default off')
