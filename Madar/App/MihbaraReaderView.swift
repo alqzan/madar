@@ -153,6 +153,7 @@ struct MihbaraReaderView: View {
     /// The volume's first page once the reader reached it: while it is on screen it names the page, even though
     /// the screen begins with the end of the previous volume.
     @State private var volumeLanding: String?
+    @State private var anchorNavigationTask: Task<Void, Never>?
     @State private var currentLocator: Locator?
     @State private var navigatorController: EPUBNavigatorViewController?
     @State private var focusPositionLabel: String?
@@ -417,6 +418,8 @@ struct MihbaraReaderView: View {
             stopNarration()
             cancelAutoScroll(clearActive: true)
             pendingLocatorSave?.cancel()
+            anchorNavigationTask?.cancel()
+            anchorNavigationTask = nil
             if let localURL { try? FileManager.default.removeItem(at: localURL) }
         }
         .toolbarVisibility(.hidden, for: .navigationBar)
@@ -763,14 +766,40 @@ struct MihbaraReaderView: View {
     }
 
     /// Readium's jump to a page-break anchor lands one page short in right-to-left books when the anchor falls
-    /// mid-chapter (M6-UX-V, 22 Oct 2026: `#p-2` sat on the next column, 382 pt off screen). Once the opening
-    /// jump has settled, turn pages until the anchor is on screen; the page turns report the location as usual.
+    /// mid-chapter (M6-UX-V, 22 Oct 2026: `#p-2` sat on the next column, 382 pt off screen). Once the
+    /// jump has settled, turn pages until the anchor is on screen. Contents links need the same correction.
     @MainActor private func settle(on anchor: String, in navigator: EPUBNavigatorViewController) async {
         let id = anchor.replacingOccurrences(of: "'", with: "")
-        let script = "(function(){var e=document.getElementById('\(id)');if(!e)return null;var c=Math.floor(e.getBoundingClientRect().left/window.innerWidth);var rtl=getComputedStyle(document.documentElement).direction==='rtl';return [rtl?-c:c,window.scrollX];})()"
+        let script = """
+        (() => {
+          const e = document.getElementById('\(id)');
+          if (!e) return null;
+          // Empty inline page markers can have a zero-sized box at a column boundary.
+          // Use the first following ink instead, including markers inside a continued paragraph.
+          const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+          walker.currentNode = e;
+          let r = e.getBoundingClientRect(), node;
+          while ((node = walker.nextNode())) {
+            if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
+              const start = node.textContent.search(/\\S/);
+              const range = document.createRange();
+              range.setStart(node, start); range.setEnd(node, start + 1);
+              r = range.getBoundingClientRect(); break;
+            }
+            if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'IMG') {
+              r = node.getBoundingClientRect(); break;
+            }
+          }
+          const rtl = getComputedStyle(document.documentElement).direction === 'rtl';
+          const visible = r.right > 1 && r.left < window.innerWidth - 1;
+          const side = r.right <= 1 ? -1 : 1;
+          return [visible ? 0 : (rtl ? -side : side), window.scrollX];
+        })()
+        """
         var lastScroll: Double?
         for _ in 0..<20 {
             try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled else { return }
             guard case .success(let value) = await navigator.evaluateJavaScript(script),
                   let pair = value as? [NSNumber], pair.count == 2 else { continue }
             // Wait for the opening jump to finish: two equal readings in a row.
@@ -791,13 +820,23 @@ struct MihbaraReaderView: View {
         let now = Date()
         recordInteraction(at: now)
         if let position = pageCoordinate(locator) {
-            positionProgress.observe(position: position, at: now, explicitJump: explicitJump)
+            positionProgress.observe(position: position, at: now, explicitJump: explicitJump || anchorNavigationTask != nil)
         }
         currentLocator = locator
         // The reader's undo toast belongs to the page it was made on; the undo itself stays available.
         if !explicitJump, wordCard == nil { readerUndoID = nil }
         scheduleLocatorSave(locator)
         resolvePrintPageMarker(for: locator)
+        if explicitJump {
+            anchorNavigationTask?.cancel()
+            anchorNavigationTask = nil
+            if readerMode != "scroll", let anchor = locator.locations.fragments.first, let navigatorController {
+                anchorNavigationTask = Task { @MainActor in
+                    await settle(on: anchor, in: navigatorController)
+                    if !Task.isCancelled { anchorNavigationTask = nil }
+                }
+            }
+        }
         if readerFocus { applyFocusMode() }
     }
 

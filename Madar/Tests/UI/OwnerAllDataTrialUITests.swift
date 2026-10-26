@@ -317,6 +317,10 @@ import XCTest
         XCTAssertEqual(labels.filter { $0.hasPrefix("مشروع إغاثة الفقراء") }.count, 1, labels.joined(separator: " | "))
         let intro = entries.matching(NSPredicate(format: "label BEGINSWITH %@", "المقدمة")).firstMatch
         XCTAssertTrue(intro.exists, app.debugDescription); intro.tap()
+        let introPage = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            app.staticTexts["mihbara-reader-print-page"].label.contains("٨ ")
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [introPage], timeout: 15), .completed, "The introduction starts on file page 8; page 9 continues it")
         let body = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
             app.webViews.staticTexts.allElementsBoundByIndex.contains { $0.label.precomposedStringWithCompatibilityMapping.contains("فأحببتُ أوَّلاً أن يكون") }
         }, object: nil)
@@ -330,15 +334,37 @@ import XCTest
         let lastEntry = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "mihbara-reader-toc-")).allElementsBoundByIndex.last
         XCTAssertNotNil(lastEntry, app.debugDescription); lastEntry?.tap()
         let chapterLink = app.webViews.links.matching(NSPredicate(format: "label CONTAINS %@", "لحظةُ البدايةِ")).firstMatch
-        for _ in 0..<12 where !chapterLink.exists { app.swipeRight(); Thread.sleep(forTimeInterval: 1.5) }
+        for _ in 0..<24 where !chapterLink.isHittable { app.swipeRight(); Thread.sleep(forTimeInterval: 1.5) }
         page("PDF-epub-printed-contents-L")
-        XCTAssertTrue(chapterLink.exists, "The printed contents page must list chapter ١ as a link")
+        XCTAssertTrue(chapterLink.isHittable, "The printed contents page must show chapter ١ as a tappable link")
         chapterLink.tap()
         let chapterOne = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
             String(app.staticTexts["mihbara-reader-print-page"].label.unicodeScalars.filter { !"\u{2066}\u{2067}\u{2068}\u{2069}".unicodeScalars.contains($0) }).contains("١٢")
         }, object: nil)
         XCTAssertEqual(XCTWaiter.wait(for: [chapterOne], timeout: 10), .completed, "Chapter ١ starts on file page ١٢")
         page("PDF-epub-chapter1-from-contents-L")
+        // Browse the reported area against the scan: chapter 14 starts on file page 92.
+        func footerPage() -> Int? {
+            let text = app.staticTexts["mihbara-reader-print-page"].label
+            let token = text.components(separatedBy: .whitespaces).first { $0.unicodeScalars.contains { CharacterSet.decimalDigits.contains($0) } } ?? ""
+            return Int(token.compactMap { $0.wholeNumberValue }.map(String.init).joined())
+        }
+        if !contents.exists { app.tap() }
+        contents.tap()
+        let projectChapter = entries.matching(NSPredicate(format: "label BEGINSWITH %@", "١٤ -")).firstMatch
+        XCTAssertTrue(projectChapter.exists, "The index includes chapter 14, «كيف تتعرف على مشروعك»")
+        for _ in 0..<12 where !projectChapter.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(projectChapter.isHittable); projectChapter.tap()
+        let chapter14 = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in footerPage() == 92 }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [chapter14], timeout: 15), .completed, "Chapter 14 starts on file page 92 in the source scan")
+        page("PDF-browse-chapter14-L")
+        for turn in 1...24 {
+            if footerPage() == 94 { break }
+            app.swipeRight(); Thread.sleep(forTimeInterval: 1)
+            if turn % 4 == 0 { page("PDF-browse-near94-turn\(turn)-L") }
+        }
+        XCTAssertEqual(footerPage(), 94, "Forward reading must reach the source's page 94 without a false jump")
+        page("PDF-browse-page94-L")
         // Owner: «خل دائما فيه خيار لعرضه PDF» — the original opens at the same page.
         // The page on screen, from the footer («ص ٢ بحسب الملف»), must be the page the original opens on.
         let isolates = CharacterSet(charactersIn: "\u{2066}\u{2067}\u{2068}\u{2069}")
@@ -354,5 +380,16 @@ import XCTest
         }, object: nil)
         XCTAssertEqual(XCTWaiter.wait(for: [samePage], timeout: 10), .completed, "Original must open on page \(shownPage)")
         shot(app, "PDF-original-L")
+        app.buttons["mihbara-pdf-close"].tap()
+        // «الأصل» replaces the EPUB route; closing it returns to the shelf.
+        let wantShelf = app.buttons["mihbara-shelf-want"]
+        XCTAssertTrue(wantShelf.waitForExistence(timeout: 10)); wantShelf.tap()
+        let savedBook = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", title)).firstMatch
+        XCTAssertTrue(savedBook.waitForExistence(timeout: 10)); savedBook.tap()
+        XCTAssertTrue(app.buttons["mihbara-reader-close"].waitForExistence(timeout: 20))
+        let resumed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in footerPage() == 94 }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [resumed], timeout: 15), .completed, "Reopening preserves page 94 reached by reading")
+        page("PDF-browse-resumed94-L")
+        app.swipeLeft(); page("PDF-browse-back-from94-L")
     }
 }
