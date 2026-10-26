@@ -80,7 +80,9 @@ def main():
     ASSETS.mkdir(parents=True, exist_ok=True)
     screens = json.loads((REPO / "docs/HANDOFF/screens-index.json").read_text())["screens"]
     rows = []
-    for line in (REPO / "docs/PROGRESS.md").read_text().splitlines():
+    # Finished sections leave the board for docs/archive/ (27 Oct); their rows still count.
+    board_files = [REPO / "docs/PROGRESS.md", *sorted((REPO / "docs/archive").glob("PROGRESS-*-finished-sections.md"))]
+    for line in (line for path in board_files for line in path.read_text().splitlines()):
         if not re.match(r"\| M\d-", line):
             continue
         cells = [cell.strip() for cell in line.split("|") if cell.strip()]
