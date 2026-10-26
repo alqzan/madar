@@ -1741,16 +1741,16 @@ private struct PrayerStatisticsView: View {
     }
 
     private static let monthNames = ["محرم", "صفر", "ربيع الأول", "ربيع الآخر", "جمادى الأولى", "جمادى الآخرة", "رجب", "شعبان", "رمضان", "شوال", "ذو القعدة", "ذو الحجة"]
-    /// «الثلاثاء ٢٥ ربيع الآخر».
+    /// «الثلاثاء ٢٥ ربيع الآخر ١٤٤٨ هـ».
     private func hijriDayTitle(_ day: GregorianDay) -> String {
         let f = DateFormatter(); f.locale = numeralLocale; f.timeZone = session.activePlace.timeZone; f.calendar = Calendar(identifier: .gregorian); f.dateFormat = "EEEE"
         let date = hijri(day)
-        return f.string(from: day.date(in: session.activePlace.timeZone).addingTimeInterval(12 * 3600)) + " " + formatter.string(date.day) + " " + Self.monthNames[date.month - 1]
+        return f.string(from: day.date(in: session.activePlace.timeZone).addingTimeInterval(12 * 3600)) + " " + formatter.string(date.day) + " " + Self.monthNames[date.month - 1] + " " + formatter.string(date.year) + " هـ"
     }
-    /// «٦ أكتوبر».
+    /// «٦ أكتوبر ٢٠٢٦ م».
     private func gregorianDayTitle(_ day: GregorianDay) -> String {
-        let f = DateFormatter(); f.locale = numeralLocale; f.timeZone = session.activePlace.timeZone; f.calendar = Calendar(identifier: .gregorian); f.dateFormat = "d MMMM"
-        return f.string(from: day.date(in: session.activePlace.timeZone).addingTimeInterval(12 * 3600))
+        let f = DateFormatter(); f.locale = numeralLocale; f.timeZone = session.activePlace.timeZone; f.calendar = Calendar(identifier: .gregorian); f.dateFormat = "d MMMM yyyy"
+        return f.string(from: day.date(in: session.activePlace.timeZone).addingTimeInterval(12 * 3600)) + " م"
     }
 
     // MARK: Three figures
