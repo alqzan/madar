@@ -34,6 +34,43 @@ import XCTest
         element("bahw-year-back").tap()
         XCTAssertTrue(element("bahw-greeting").waitForExistence(timeout: 5))
     }
+    func testSelectedYearStillShowsItsOtherCalendar() throws {
+        continueAfterFailure = false
+        for (mode, attachment) in [("hijri", "M4-V03-year-hijri-paired-L"), ("gregorian", "M4-V03-year-gregorian-paired-L")] {
+            let app = XCUIApplication()
+            app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
+                "MADAR_UI_NOW": "2026-10-09T16:20:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01",
+                "MADAR_UI_PRAYER_FIXTURE": "homeShowcase", "MADAR_UI_THEME": "light", "MADAR_UI_UNDO_SECONDS": "2"]
+            app.launch(); finishOnboarding(app)
+            let customize = app.buttons["tab-customize"]
+            XCTAssertTrue(customize.waitForExistence(timeout: 10), app.debugDescription)
+            customize.tap()
+            let search = app.textFields["settings-search"]
+            XCTAssertTrue(search.waitForExistence(timeout: 10), app.debugDescription)
+            search.tap(); search.typeText("أي سنة")
+            let option = app.buttons["option-bahw.yearWhich-\(mode)"]
+            XCTAssertTrue(option.waitForExistence(timeout: 8), app.debugDescription)
+            option.tap()
+            let searchButton = app.keyboards.buttons.matching(identifier: "Search").firstMatch
+            if searchButton.exists { searchButton.tap() }
+
+            let lobby = app.tabBars.buttons["البهو"]
+            XCTAssertTrue(lobby.waitForExistence(timeout: 8), app.debugDescription)
+            lobby.tap()
+            let yearBlock = app.descendants(matching: .any)["bahw-block-year"]
+            XCTAssertTrue(yearBlock.waitForExistence(timeout: 10), app.debugDescription)
+            for _ in 0..<5 where !yearBlock.isHittable { app.swipeUp(velocity: .slow) }
+            yearBlock.tap()
+            let hero = app.descendants(matching: .any)["bahw-year-hero"]
+            XCTAssertTrue(hero.waitForExistence(timeout: 10), app.debugDescription)
+            XCTAssertTrue(hero.label.contains("هـ") && hero.label.contains("م"), hero.label)
+            let strip = app.descendants(matching: .any)["bahw-year-strip"]
+            XCTAssertTrue(strip.label.contains("هـ") && strip.label.contains("م"), strip.label)
+            XCTAssertTrue(app.buttons["undo-button"].waitForNonExistence(timeout: 12), "Wait for the settings receipt before capturing the year screen.")
+            capture(app, attachment)
+            app.terminate()
+        }
+    }
     func testOneTimeDayBeyondTwoYearsHasPreviewSavesAndRelaunches() throws {
         continueAfterFailure = false
         let app = XCUIApplication()

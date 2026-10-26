@@ -157,6 +157,9 @@ struct BahwYearView: View {
         return HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 0) {
                 Text("مضى من " + yearName).font(MadarTypography.body()).foregroundStyle(lobby.secondaryInk)
+                if which != "both" {
+                    Text("ويقابله " + otherName).font(MadarTypography.fine()).foregroundStyle(lobby.secondaryInk)
+                }
                 Text(percent(period)).font(.custom("thmanyahserifdisplay-Bold", size: 84, relativeTo: .largeTitle)).foregroundStyle(lobby.color(hijri ? "sepia" : "gregorianInk"))
                     .lineLimit(1).minimumScaleFactor(0.5).accessibilityIdentifier("bahw-year-percent")
             }
@@ -172,6 +175,8 @@ struct BahwYearView: View {
     // MARK: strips
     private var strips: some View {
         let model = service.year(), period = hijri ? model.hijri : model.gregorian
+        let yearName = hijri ? digits.string(model.hijriYear) + "هـ" : digits.string(model.gregorianYear) + "م"
+        let otherYearName = hijri ? digits.string(model.gregorianYear) + "م" : digits.string(model.hijriYear) + "هـ"
         let days = service.calendarDays, today = service.today
         let month = hijri ? MadarYear.hijriMonth(today, days) : MadarYear.gregorianMonth(today)
         let monthIndex = hijri ? model.hijriMonthIndex : model.gregorianMonthIndex
@@ -181,7 +186,8 @@ struct BahwYearView: View {
         return VStack(alignment: .leading, spacing: 20) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .firstTextBaseline) {
-                    Text("السنة " + (hijri ? digits.string(model.hijriYear) + "هـ" : digits.string(model.gregorianYear) + "م")).font(MadarTypography.section())
+                    MadarDateLabel(.init(primary: "السنة " + yearName, secondary: otherYearName),
+                                   primaryFont: MadarTypography.section(), secondaryFont: MadarTypography.fine())
                     Spacer()
                     Text("مضى " + percent(period) + "، بقي " + digits.string(period.remaining) + " " + service.dayCount(period.remaining)).font(MadarTypography.caption()).foregroundStyle(lobby.secondaryInk)
                 }
