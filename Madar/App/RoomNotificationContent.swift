@@ -18,7 +18,8 @@ import MadarPrayer
         var result = RoomReminders.qada(days: prayerDays, time: RoomReminders.QadaTime(rawValue: session.string("salah.qadaReminder")) ?? .afterFajr,
                                         owed: try session.prayerSnapshot(at: now).statistics.owed, now: now)
         let service = AppBahwService(session: session, evaluationDate: now), today = service.today
-        let place = session.activePlace, civil = GregorianDay.containing(now, in: place.timeZone)
+        let place = try PrayerRepository(context: ModelContext(session.container)).place(at: now)
+        let civil = GregorianDay.containing(now, in: place.timeZone)
         for reading in try HabitRepository(context: ModelContext(session.container)).readings(at: now) {
             guard reading.reminder == "push", reading.source == nil, !reading.archived, !reading.paused,
                   let current = reading.summary.current, current.target > 0, !current.met, current.dueDays.contains(today) else { continue }

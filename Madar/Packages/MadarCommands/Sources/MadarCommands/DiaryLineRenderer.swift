@@ -19,7 +19,8 @@ public struct DiaryAutoLine: Identifiable, Codable, Equatable, Sendable {
 @MainActor public enum DiaryLineRenderer {
     public static func today(context: ModelContext, now: Date) throws -> GregorianDay {
         let repo = try PrayerRepository(context: context), place = repo.place(at: now), civil = GregorianDay.containing(now, in: place.timeZone)
-        let days = [civil.adding(days: -1), civil].compactMap { PrayerTimesEngine.calculate(day: $0, place: place, options: repo.options) }
+        let options = repo.calculationOptions(at: now)
+        let days = [civil.adding(days: -1), civil].compactMap { PrayerTimesEngine.calculate(day: $0, place: place, options: options) }
         let settings = try SettingsStore(context: context)
         return try MadarDay.resolve(instant: now, place: place, boundary: DayBoundary(rawValue: settings.value(for: "core.dayStart").string ?? "") ?? .fajr, prayerDays: days).date
     }

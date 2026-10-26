@@ -44,6 +44,8 @@ import MadarData
 
         let app = try AppSession(container: container, groupDirectory: root)
         let service = AppDiaryService(app: app, clock: { instant })
-        XCTAssertEqual(try service.diaryDay(), try GregorianDay("2026-03-20"))
+        let expected = try GregorianDay("2026-03-20")
+        XCTAssertEqual(try service.diaryDay(), expected)
+        XCTAssertEqual(AppBahwService(session: app, evaluationDate: instant).today, expected)
     }
 }

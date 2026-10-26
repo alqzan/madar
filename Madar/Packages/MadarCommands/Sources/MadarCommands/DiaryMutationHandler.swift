@@ -20,8 +20,9 @@ struct DiaryEntryDeletion: Codable {
     static func stage(text: String, day: String, targetDay: String?, id: UUID, context: ModelContext, now: Date, writer: String, mediaIDs: [UUID] = [], audioID: UUID? = nil, storedDay: GregorianDay? = nil) throws -> Data? {
         let settings = try SettingsStore(context: context), prayer = try PrayerRepository(context: context)
         let place = prayer.place(at: now), civil = GregorianDay.containing(now, in: place.timeZone)
+        let options = prayer.calculationOptions(at: now)
         let boundary = DayBoundary(rawValue: try settings.value(for: "core.dayStart").string ?? "") ?? .fajr
-        let days = [civil.adding(days: -1), civil].compactMap { PrayerTimesEngine.calculate(day: $0, place: place, options: prayer.options) }
+        let days = [civil.adding(days: -1), civil].compactMap { PrayerTimesEngine.calculate(day: $0, place: place, options: options) }
         let stored = try MadarDay.resolve(instant: now, place: place, boundary: boundary, prayerDays: days)
         let key = storedDay ?? (day == "yesterday" ? stored.date.adding(days: -1) : stored.date)
         guard key <= stored.date else { throw DataError.invalidValue("future diary day") }

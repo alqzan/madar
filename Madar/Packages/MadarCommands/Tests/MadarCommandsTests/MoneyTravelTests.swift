@@ -90,6 +90,32 @@ import MadarMoney
         #expect(try await s.run("money.confirmTransaction", ["id": .string(row.id.uuidString)]).status == .applied)
         #expect(try MoneyRepository(context: ModelContext(s.container)).confirmedTransactions().first?.homeAmountMinor == 4630)
     }
+    @Test func manualExpenseKeepsTheActiveTripMethodAtItsEventTime() async throws {
+        let s = try Store(), context = ModelContext(s.container)
+        _ = try SettingsStore(context: context).stage([
+            "core.dayStart": .string("fajr"),
+            "salah.method": .string("mwl"),
+            "salah.tripMethod": .string("egyptian"),
+            "salah.highLatitudeRule": .string("twilightAngle")
+        ])
+        let trip = try #require(context.fetch(FetchDescriptor<Trip>()).first)
+        trip.city = "لندن"; trip.lat = 51.5074; trip.lon = -0.1278; trip.tzID = "Europe/London"
+        trip.start = ISO8601DateFormatter().date(from: "2026-03-20T04:00:00Z")
+        trip.end = ISO8601DateFormatter().date(from: "2026-03-21T00:00:00Z")
+        try context.save()
+
+        let eventAt = "2026-03-20T04:08:00Z", id = UUID()
+        #expect(try await s.run("money.logExpense", [
+            "amountMinor": .string("100"), "currency": .string("SAR"), "method": .string("transfer"),
+            "fromAccountID": .string(s.bankID.uuidString), "eventAt": .string(eventAt)
+        ], id: id).status == .applied)
+        let row = try #require(MoneyRepository(context: ModelContext(s.container)).confirmedTransactions().first { $0.id == id })
+        // The approved London MWL fixture puts Fajr at 04:10 ±3 minutes; Egypt's earlier Fajr
+        // makes 04:08 part of 20 March while the home method would still stamp 19 March.
+        #expect(row.dayKey == "2026-03-20")
+        #expect(row.tzID == "Europe/London")
+        #expect(row.dayPolicy == "fajr@1")
+    }
     @Test func aTripEnvelopeTombstoneIsRevivedOnceAfterUndo() async throws {
         let s = try Store(), first = UUID()
         #expect(try await s.expense(1234, id: first).status == .applied)

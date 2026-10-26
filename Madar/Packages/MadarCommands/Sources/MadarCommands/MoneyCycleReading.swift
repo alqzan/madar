@@ -80,12 +80,13 @@ extension MoneyRepository {
             let boundary = DayBoundary(rawValue: try settings.value(for: "core.dayStart").string ?? "fajr") ?? .fajr
             for day in 1...max(length, elapsed) {
                 let key = start.adding(days: day - 1), nextKey = key.adding(days: 1)
-                let dayPlace = prayer.place(at: key.date(in: place.timeZone).addingTimeInterval(12 * 3600))
+                let dayInstant = key.date(in: place.timeZone).addingTimeInterval(12 * 3600)
+                let dayPlace = prayer.place(at: dayInstant), dayOptions = prayer.calculationOptions(at: dayInstant)
                 let beginning: Date, ending: Date
                 if boundary == .midnight { beginning = key.date(in: dayPlace.timeZone); ending = nextKey.date(in: dayPlace.timeZone) }
                 else {
-                    guard let first = PrayerTimesEngine.calculate(day: key, place: dayPlace, options: prayer.options),
-                          let next = PrayerTimesEngine.calculate(day: nextKey, place: dayPlace, options: prayer.options) else { throw CoreError.missingPrayerTimes }
+                    guard let first = PrayerTimesEngine.calculate(day: key, place: dayPlace, options: dayOptions),
+                          let next = PrayerTimesEngine.calculate(day: nextKey, place: dayPlace, options: dayOptions) else { throw CoreError.missingPrayerTimes }
                     beginning = boundary == .fajr ? first.fajr : first.maghrib
                     ending = boundary == .fajr ? next.fajr : next.maghrib
                 }

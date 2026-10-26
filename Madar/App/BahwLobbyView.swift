@@ -120,9 +120,7 @@ struct BahwLobbyView: View {
         }.frame(maxWidth: .infinity, alignment: .leading)
     }
     private var greeting: String {
-        let place = session.activePlace, day = GregorianDay.containing(service.now, in: place.timeZone)
-        guard let times = PrayerTimesEngine.calculate(day: day, place: place) else { return "أهلًا بك" }
-        return service.now >= times.fajr && service.now < times.dhuhr ? "صباح الخير" : "مساء الخير"
+        service.greeting
     }
     /// Both dates, the first calendar first; joined with «، », never "·" beside a digit (RU1).
     private var dateLine: String { session.dateLabels(service.today).combined }

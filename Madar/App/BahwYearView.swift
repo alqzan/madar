@@ -61,8 +61,8 @@ extension AppBahwService {
         return items.sorted { Self.nearestFirst(($0.elapsedDays, $0.daysLeft, $0.title), ($1.elapsedDays, $1.daysLeft, $1.title)) }
     }
     func dayModel() -> BahwDayModel? {
-        let place = session.activePlace, boundary = DayBoundary(rawValue: session.string("core.dayStart")) ?? .fajr
-        guard let todays = PrayerTimesEngine.calculate(day: today, place: place), let tomorrow = PrayerTimesEngine.calculate(day: today.adding(days: 1), place: place) else { return nil }
+        let location = prayerLocation(), place = location.place, boundary = DayBoundary(rawValue: session.string("core.dayStart")) ?? .fajr
+        guard let todays = PrayerTimesEngine.calculate(day: today, place: place, options: location.options), let tomorrow = PrayerTimesEngine.calculate(day: today.adding(days: 1), place: place, options: location.options) else { return nil }
         let start: Date, end: Date
         switch boundary {
         case .fajr: start = todays.fajr; end = tomorrow.fajr

@@ -190,6 +190,28 @@ import MadarCore
         XCTAssertFalse(try RoomNotificationContent.candidates(session: fresh, prayerDays: [day], now: now).contains { $0.id.hasPrefix("qada.") })
     }
 
+    func testHabitReminderUsesTheActiveTripCivilDay() throws {
+        let (app, _, _, _) = try fixture(["core.faceIDLock": .string("none"), "core.dayStart": .string("midnight")])
+        let now = ISO8601DateFormatter().date(from: "2026-10-15T20:00:00Z")!
+        let context = ModelContext(app.container), trip = Trip()
+        trip.city = "طوكيو"; trip.lat = 35.6762; trip.lon = 139.6503; trip.tzID = "Asia/Tokyo"
+        trip.mode = "manual"; trip.start = now.addingTimeInterval(-3600)
+        context.insert(trip)
+        let habit = Habit(); habit.name = "مشي"; habit.reminder = "push"; habit.startDate = now.addingTimeInterval(-30 * 86_400); context.insert(habit)
+        let policy = HabitPolicy(); policy.habitID = habit.id; policy.effectiveFrom = "2026-10-01"; policy.frequency = "daily"
+        policy.measure = "once"; policy.target = 1; policy.windowStartMin = 8 * 60; policy.windowEndMin = 10 * 60
+        context.insert(policy); try context.save(); try app.reload()
+        let place = try ActivePlace(latitude: trip.lat, longitude: trip.lon, timeZoneID: trip.tzID)
+        let days = (0..<3).compactMap { PrayerTimesEngine.calculate(day: try! GregorianDay("2026-10-16").adding(days: $0), place: place) }
+
+        let candidate = try XCTUnwrap(RoomNotificationContent.candidates(session: app, prayerDays: days, now: now)
+            .first { $0.id == "habits.2026-10-16.\(habit.id.uuidString)" })
+        XCTAssertEqual(candidate.dayKey, "2026-10-16")
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = place.timeZone
+        XCTAssertEqual(calendar.component(.hour, from: candidate.dueAt), 8)
+        XCTAssertEqual(calendar.component(.day, from: candidate.dueAt), 16)
+    }
+
     func testProtectedAppShowsGenericCopyAndTapsOpenTheRoom() throws {
         let (app, _, _, day) = try fixture(["core.faceIDLock": .string("app")])
         let habit = UUID()

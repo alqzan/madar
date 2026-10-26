@@ -1150,10 +1150,10 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
     }
     private static func stampDay(_ row: MoneyTransaction, at: Date, context: ModelContext, now: Date) throws {
         guard at <= now.addingTimeInterval(300) else { throw MoneyCommandError.invalidReference }
-        let prayer = try PrayerRepository(context: context), place = prayer.place(at: at)
+        let prayer = try PrayerRepository(context: context), place = prayer.place(at: at), options = prayer.calculationOptions(at: at)
         let civil = GregorianDay.containing(at, in: place.timeZone)
         let boundary = DayBoundary(rawValue: try SettingsStore(context: context).value(for: "core.dayStart").string ?? "fajr") ?? .fajr
-        let days = [civil.adding(days: -1), civil].compactMap { PrayerTimesEngine.calculate(day: $0, place: place, options: prayer.options) }
+        let days = [civil.adding(days: -1), civil].compactMap { PrayerTimesEngine.calculate(day: $0, place: place, options: options) }
         let stored = try MadarDay.resolve(instant: at, place: place, boundary: boundary, prayerDays: days)
         row.tripID = try MoneyRepository(context: context).trip(at: at)?.id
         row.eventAt = at; row.dayKey = stored.dayKey; row.tzID = place.timeZoneID; row.dayPolicy = boundary.rawValue + "@1"

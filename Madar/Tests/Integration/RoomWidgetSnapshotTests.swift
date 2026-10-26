@@ -65,6 +65,27 @@ import MadarPrayer
         XCTAssertEqual(snapshot.dayKey,civil.adding(days:-1).description)
         XCTAssertEqual(snapshot.validUntil.timeIntervalSince1970,base.fajr.addingTimeInterval(1200).timeIntervalSince1970,accuracy:1)
     }
+    func testActiveTripMethodOwnsWidgetDayAndExpiry() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("WidgetTripMethod-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let instant = ISO8601DateFormatter().date(from: "2026-03-20T04:08:00Z")!
+        let container = try MadarContainerFactory.makeLocal(at: root), app = try AppSession(container: container, groupDirectory: root)
+        try await app.applySettingsAndWait(["core.dayStart": .string("fajr"), "salah.method": .string("mwl"),
+                                            "salah.tripMethod": .string("egyptian"), "salah.highLatitudeRule": .string("twilightAngle")])
+        let context = ModelContext(container), trip = Trip()
+        trip.city = "لندن"; trip.lat = 51.5074; trip.lon = -0.1278; trip.tzID = "Europe/London"
+        trip.mode = "manual"; trip.start = ISO8601DateFormatter().date(from: "2026-03-20T04:00:00Z")
+        context.insert(trip); try context.save()
+
+        try app.publishRoomWidgetSnapshots(at: instant)
+        let snapshot = try XCTUnwrap(app.snapshotStore.read("habits", as: RoomWidgetSnapshot.self, now: instant))
+        XCTAssertEqual(snapshot.dayKey, "2026-03-20", "Egyptian trip Fajr is before 04:08; MWL home Fajr is after it")
+        XCTAssertEqual(snapshot.tzID, "Europe/London")
+        let place = try ActivePlace(latitude: 51.5074, longitude: -0.1278, timeZoneID: "Europe/London")
+        let options = try PrayerCalculationOptions(method: .egyptian, highLatitudeRule: .twilightAngle)
+        let nextFajr = try XCTUnwrap(PrayerTimesEngine.calculate(day: GregorianDay("2026-03-21"), place: place, options: options)?.fajr)
+        XCTAssertEqual(snapshot.validUntil, min(instant.addingTimeInterval(3600), nextFajr))
+    }
     func testProtectedPayloadsOmitPersonalRowsAndDiaryWritingNeverContainsDiaryText() throws {
         let root=FileManager.default.temporaryDirectory.appendingPathComponent("RoomWidgetPrivate-\(UUID())");defer{try? FileManager.default.removeItem(at:root)}
         let container=try MadarContainerFactory.makeLocal(at:root),app=try AppSession(container:container,groupDirectory:root),context=ModelContext(container)

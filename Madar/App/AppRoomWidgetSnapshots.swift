@@ -66,8 +66,8 @@ extension AppSession {
         } catch { return .init() }
     }
     func publishRoomWidgetSnapshots(at now:Date) throws {
-        let service=AppBahwService(session:self,evaluationDate:now),next=service.today.adding(days:1),place=activePlace
-        let prayers=try PrayerRepository(context:ModelContext(container)),options=prayers.activeTrip(at:now)==nil ? prayers.options : prayers.tripOptions
+        let service=AppBahwService(session:self,evaluationDate:now),prayers=try PrayerRepository(context:ModelContext(container))
+        let next=service.today.adding(days:1),place=prayers.place(at:now),options=prayers.calculationOptions(at:now)
         let end:Date?
         switch DayBoundary(rawValue:string("core.dayStart")) ?? .fajr {
         case .midnight:end=next.date(in:place.timeZone)
