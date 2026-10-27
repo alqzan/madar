@@ -258,12 +258,39 @@ struct MoneySalaryView: View {
                 Spacer()
                 Text("قرأه مدار من رسائلك").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
             }
-            ForEach(r.bullets) { bullet in
+            if visible, let previous = r.opening.previousDailyMinor {
+                dailyComparison(previous: previous, current: r.plan.rate.dailyRateMinor)
+            }
+            ForEach(r.bullets.filter { $0.id.hasPrefix("short-") } + r.bullets.filter { !$0.id.hasPrefix("short-") }) { bullet in
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Image(systemName: "diamond.fill").font(.caption2).foregroundStyle(theme.color(bullet.tint))
                     Text(visible ? bullet.text : "•••").font(MadarTypography.body()).fixedSize(horizontal: false, vertical: true)
                 }.accessibilityIdentifier("money-salary-bullet-" + bullet.id)
             }
+        }
+    }
+
+    /// Both amounts are the engine's daily rates; the bars compare them without changing the plan.
+    private func dailyComparison(previous: Int, current: Int) -> some View {
+        let peak = max(1, max(previous, current))
+        return VStack(alignment: .leading, spacing: 10) {
+            Text(current == previous ? "يوميتك كما في الدورة السابقة" : current > previous ? "يوميتك أعلى من الدورة السابقة" : "يوميتك أقل من الدورة السابقة")
+                .font(MadarTypography.section())
+            comparisonRow("السابقة", value: previous, peak: peak, color: theme.secondaryInk)
+            comparisonRow("هذه الدورة", value: current, peak: peak, color: theme.color("reserveText"))
+        }.padding(.vertical, 6).accessibilityElement(children: .contain).accessibilityIdentifier("money-salary-daily-comparison")
+    }
+    private func comparisonRow(_ title: String, value: Int, peak: Int, color: Color) -> some View {
+        VStack(spacing: 5) {
+            HStack {
+                Text(title).foregroundStyle(theme.secondaryInk)
+                Spacer()
+                Text(figure: amount(value)).foregroundStyle(theme.ink)
+            }.font(MadarTypography.caption())
+            GeometryReader { geometry in
+                Capsule().fill(theme.line)
+                Capsule().fill(color).frame(width: geometry.size.width * CGFloat(max(0, value)) / CGFloat(peak))
+            }.frame(height: 5).accessibilityHidden(true)
         }
     }
 

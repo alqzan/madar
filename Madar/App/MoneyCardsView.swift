@@ -99,8 +99,8 @@ struct MoneyCardsView: View {
                     Text("•••• " + service.digits.localized(c.last4)).font(MadarTypography.fine()).environment(\.layoutDirection, .leftToRight)
                 }
             }.padding(12).frame(width: dynamicType.isAccessibilitySize ? 280 : 171, height: dynamicType.isAccessibilitySize ? 160 : 106)
-                // The chip sits mid-card at the trailing edge, as on the canonical miniatures.
-                .overlay(alignment: .trailing) { RoundedRectangle(cornerRadius: 4).fill(LinearGradient(colors: [theme.color("reserve").opacity(0.95), theme.background.opacity(0.9), theme.color("reserve")], startPoint: .topLeading, endPoint: .bottomTrailing)).frame(width: 30, height: 22).overlay { Rectangle().stroke(theme.background.opacity(0.5), lineWidth: 0.7).padding(5) }.padding(.trailing, 22).padding(.top, 6).accessibilityHidden(true) }
+                // Keep the chip below the name on the right of an RTL card, as in the canonical miniatures.
+                .overlay(alignment: .leading) { RoundedRectangle(cornerRadius: 4).fill(LinearGradient(colors: [theme.color("reserve").opacity(0.95), theme.background.opacity(0.9), theme.color("reserve")], startPoint: .topLeading, endPoint: .bottomTrailing)).frame(width: 30, height: 22).overlay { Rectangle().stroke(theme.background.opacity(0.5), lineWidth: 0.7).padding(5) }.padding(.leading, 22).padding(.top, 6).accessibilityHidden(true) }
                 .foregroundStyle(theme.background).background(cardFill(c), in: RoundedRectangle(cornerRadius: 13))
                 .overlay { if !dynamicType.isAccessibilitySize { MoneyCardEtching().stroke(theme.background.opacity(0.16), lineWidth: 0.6).padding(6).clipShape(RoundedRectangle(cornerRadius: 9)).accessibilityHidden(true).allowsHitTesting(false) } }
                 .overlay { RoundedRectangle(cornerRadius: 13).stroke(isPrimary(c) || active ? theme.color("reserve") : theme.background.opacity(0.28), lineWidth: active ? 2.2 : 1.4) }

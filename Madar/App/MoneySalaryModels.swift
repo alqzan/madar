@@ -78,7 +78,7 @@ extension AppMoneyService {
 
         var bullets: [MoneySalaryBullet] = []
         if salary > 0 {
-            bullets.append(.init(id: "obligations", text: "الالتزامات " + percent(plan.obligationsMinor, of: salary) + " فقط من الراتب.", tint: "accent"))
+            bullets.append(.init(id: "obligations", text: "الالتزامات " + percent(plan.obligationsMinor, of: salary) + " من الراتب.", tint: "accent"))
         }
         if let close = plan.close, let carried = opening.input.closing?.availableNowMinor {
             if carried > 0 {

@@ -114,7 +114,14 @@ struct MoneySettingsView: View {
     private var cyclePage: some View {
         VStack(alignment: .leading, spacing: 14) {
             Picker("تقويم الدورة", selection: $calendar) { Text("ميلادي").tag("gregorian"); Text("هجري").tag("hijri") }.pickerStyle(.segmented).accessibilityIdentifier("money-settings-cycle-calendar")
-            if !dynamicType.isAccessibilitySize { astrolabe.frame(height: 238) }
+            if !dynamicType.isAccessibilitySize {
+                GeometryReader { geometry in
+                    let side = min(geometry.size.width, 360)
+                    astrolabe.frame(width: 238, height: 238)
+                        .scaleEffect(side / 238)
+                        .frame(width: geometry.size.width, height: side)
+                }.aspectRatio(1, contentMode: .fit).frame(maxHeight: 360)
+            }
             Toggle("موعد وفاصل أختارهما", isOn: $flexible).accessibilityIdentifier("money-settings-flexible")
             if flexible {
                 HStack { Stepper(value: $every, in: 1...unit.maxEvery) { Text(Recurrence(every: every, unit: unit, first: today).map { RecurrencePhrase.every($0, digits: service.digits) } ?? "التكرار") }; Picker("الوحدة", selection: $unit) { Text("يوم").tag(RecurrenceUnit.day); Text("أسبوع").tag(RecurrenceUnit.week); Text("شهر").tag(RecurrenceUnit.month); Text("سنة").tag(RecurrenceUnit.year) } }.accessibilityIdentifier("money-settings-interval")
@@ -135,6 +142,11 @@ struct MoneySettingsView: View {
             ForEach(1...dialDays, id: \.self) { n in Rectangle().fill(theme.color("reserveText").opacity(n.isMultiple(of: 5) ? 1 : 0.4)).frame(width: 1, height: n.isMultiple(of: 5) ? 14 : 6).offset(y: -109).rotationEffect(.degrees(Double(n) * 360 / Double(dialDays))) }
             ForEach([1,5,10,15,20,25,30].filter { $0 <= dialDays }, id: \.self) { n in Text(service.digits.string(n)).font(MadarTypography.fine()).foregroundStyle(theme.color("reserveText")).position(x: 119 + sin(Double(n) * 2 * .pi / Double(dialDays)) * 94, y: 119 - cos(Double(n) * 2 * .pi / Double(dialDays)) * 94) }
             Circle().trim(from: 0, to: min(1, CGFloat(cycle?.elapsedDays ?? 0) / CGFloat(cycle?.input.expectedLengthDays ?? 30))).stroke(theme.color("accent"), lineWidth: 7).rotationEffect(.degrees(-90)).padding(13).environment(\.layoutDirection, .leftToRight)
+            Path { path in
+                path.move(to: CGPoint(x: 119, y: 119))
+                path.addLine(to: CGPoint(x: 119 + sin(Double(dialDay) * 2 * .pi / Double(dialDays)) * 113,
+                                        y: 119 - cos(Double(dialDay) * 2 * .pi / Double(dialDays)) * 113))
+            }.stroke(theme.color("reserveText"), lineWidth: 2)
             Image(systemName: "seal.fill").foregroundStyle(theme.color("reserveText")).position(x: 119 + sin(Double(dialDay) * 2 * .pi / Double(dialDays)) * 113, y: 119 - cos(Double(dialDay) * 2 * .pi / Double(dialDays)) * 113).animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: dialDay)
             VStack(spacing: 4) { Text(flexible ? "أول موعد" : "يوم الراتب").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk); Text(service.digits.string(dialDay)).font(.custom("thmanyahserifdisplay-Bold", size: 42, relativeTo: .largeTitle)).foregroundStyle(theme.color("reserveText")); Text(calendar == "hijri" ? "بالتقويم الهجري" : "بالتقويم الميلادي").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }.padding(20).background(theme.surface, in: .circle)
         }.frame(width: 238).frame(maxWidth: .infinity).accessibilityHidden(true)
