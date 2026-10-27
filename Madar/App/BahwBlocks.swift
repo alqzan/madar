@@ -150,9 +150,11 @@ struct BahwBlockView: View {
         }
     }
     private func habitRing(_ row: HabitReading) -> some View {
+        let ringSide: CGFloat = size == .wide ? 32 : 36
         let current = row.summary.current
         let share = Double(current?.value ?? 0) / Double(max(1, current?.target ?? 1))
         let progress = habitProgress(row)
+        let compactProgress = current.map { digits.string($0.value) + " من " + digits.string($0.target) } ?? progress
         let ringTheme: RoomTheme = switch row.source {
         case "jamaah": .init(room: "salah", dark: dark)
         case "review": .init(room: "quran", dark: dark)
@@ -163,9 +165,9 @@ struct BahwBlockView: View {
         return Button { activateHabit(row) } label: {
             VStack(spacing: 2) {
                 ZStack(alignment: .topTrailing) {
-                    HabitMiniRing(share: share, theme: ringTheme).frame(width: 36, height: 36)
+                    HabitMiniRing(share: share, theme: ringTheme).frame(width: ringSide, height: ringSide)
                     if row.source != nil || current?.outcome == .complete {
-                        MadarGlyph(row.symbol, size: 16).foregroundStyle(ringTheme.accent).frame(width: 36, height: 36)
+                        MadarGlyph(row.symbol, size: 16).foregroundStyle(ringTheme.accent).frame(width: ringSide, height: ringSide)
                     }
                     if row.paused || (row.source != nil && current?.outcome == .complete) {
                         Image(systemName: row.paused ? "pause.fill" : "checkmark")
@@ -178,10 +180,10 @@ struct BahwBlockView: View {
                 }
                 Text(row.name).font(small).lineLimit(2, reservesSpace: true).multilineTextAlignment(.center)
                 // Tour 25 Oct: an empty ring already says «not yet»; the line below speaks only when it adds something.
-                if row.summary.streak > 1, current?.met != true { HabitFlame(count: row.summary.streak, frequency: current?.rule.frequency ?? .daily, digits: digits) }
-                else if progress != "لم تتمّها بعد" { Text(progress).font(MadarTypography.fine()).foregroundStyle(room.secondaryInk).lineLimit(2).multilineTextAlignment(.center) }
+                if size != .wide, row.summary.streak > 1, current?.met != true { HabitFlame(count: row.summary.streak, frequency: current?.rule.frequency ?? .daily, digits: digits) }
+                else if progress != "لم تتمّها بعد" { Text(size == .wide && !row.paused && (current?.target ?? 0) > 0 ? compactProgress : progress).font(MadarTypography.fine()).foregroundStyle(room.secondaryInk).lineLimit(size == .wide ? 1 : 2).multilineTextAlignment(.center) }
             }
-            .frame(maxWidth: .infinity, minHeight: 100)
+            .frame(maxWidth: .infinity, minHeight: size == .wide ? 78 : 100, maxHeight: size == .wide ? 78 : nil, alignment: .top)
             .contentShape(.rect(cornerRadius: 12))
         }
         .buttonStyle(.plain)
@@ -213,11 +215,19 @@ struct BahwBlockView: View {
         .accessibilityHint(row.source == nil ? "المس لتسجيل العادة" : "المس لفتح الغرفة المرتبطة")
         .accessibilityIdentifier("bahw-habit-item-" + row.id.uuidString)
     }
+    private func wideHabitStep(_ row: HabitReading) -> String {
+        guard let period = row.summary.current else { return row.name }
+        let amount = max(0, (row.summary.atRisk ? period.rule.minimum ?? period.target : period.target) - period.value)
+        let step = period.rule.measure == .once ? "أكملها اليوم" : "بقي " + habitUnitCount(amount, period.rule.unit, digits)
+        return row.name + ": " + (row.summary.atRisk ? "فاتتك فترة، " : "") + step
+    }
+
     private var habits: some View {
         let rows = (try? HabitRepository(context: ModelContext(service.session.container)).readings(at:service.now)) ?? []
-        let met = rows.filter { $0.summary.current?.met == true }.count
+        let daily = rows.filter { !$0.paused && $0.summary.current?.rule.frequency == .daily && ($0.summary.current?.target ?? 0) > 0 }
+        let met = daily.filter { $0.summary.current?.met == true }.count
         return VStack(alignment:.leading,spacing:size == .wide ? 4 : 10) {
-            Button { service.session.habitsOpen = true } label: { HStack { title(room.accent); Spacer();if met > 0 {Text(digits.string(met)+" من "+digits.string(rows.count)).font(label).foregroundStyle(room.accent)} }.frame(minHeight:44).contentShape(.rect) }.buttonStyle(.plain).accessibilityIdentifier("bahw-habits-open").disabled(!interactive)
+            Button { service.session.habitsOpen = true } label: { HStack { title(room.accent); Spacer();if !daily.isEmpty {Text(digits.string(met)+" من "+digits.string(daily.count)).font(label).foregroundStyle(room.accent)} }.frame(minHeight:44).contentShape(.rect) }.buttonStyle(.plain).accessibilityIdentifier("bahw-habits-open").disabled(!interactive)
             if rows.isEmpty {
                 // Improvement 16 Oct: no «٠ من ٠»; the four period rings at rest show what a habit becomes, and the action is a real button.
                 Spacer(minLength:0)
@@ -266,8 +276,21 @@ struct BahwBlockView: View {
                     }
                 }
             } else if size == .wide {
-                BahwHabitsWide(rows: rows, digits: digits, theme: room, interactive: interactive) {
-                    service.session.habitsOpen = true
+                if dynamicTypeSize.isAccessibilitySize {
+                    BahwHabitsWide(rows: rows, digits: digits, theme: room, interactive: interactive) {
+                        service.session.habitsOpen = true
+                    }
+                } else {
+                    let daily = rows.filter { $0.summary.current?.rule.frequency == .daily }
+                    let shown = daily.isEmpty ? rows : daily
+                    HStack(alignment: .top, spacing: 3) {
+                        ForEach(Array(shown.prefix(6))) { row in habitRing(row) }
+                    }
+                    if let next = shown.first(where: { !$0.paused && $0.summary.current?.met != true }) {
+                        Text(wideHabitStep(next))
+                            .font(MadarTypography.fine()).foregroundStyle(room.accent)
+                            .lineLimit(1).accessibilityIdentifier("bahw-habits-wide-step")
+                    }
                 }
             } else {
                 Spacer(minLength:0)

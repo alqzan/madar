@@ -93,6 +93,8 @@ import XCTest
         app.launch(); finishOnboarding(app)
         let habits = app.descendants(matching: .any).matching(identifier: "bahw-block-habits").firstMatch
         XCTAssertTrue(habits.waitForExistence(timeout: 15))
+        habits.press(forDuration: 0.7)
+        app.buttons["bahw-size-habits"].tap(); app.buttons["كبيرة"].tap(); app.buttons["bahw-arrange"].tap()
         // The large block names the next habit under its grid, with the wide block's wording.
         let largeNext = app.buttons["bahw-habits-next"]
         XCTAssertTrue(largeNext.waitForExistence(timeout: 5), app.debugDescription)
@@ -123,9 +125,9 @@ import XCTest
         wide.tap()
         app.buttons["bahw-arrange"].tap()
         XCTAssertTrue(app.buttons["bahw-arrange"].waitForNonExistence(timeout: 5))
-        let next = app.buttons["bahw-habits-next"]
+        let next = app.staticTexts["bahw-habits-wide-step"]
         XCTAssertTrue(next.waitForExistence(timeout: 5), app.debugDescription)
-        XCTAssertTrue(next.label.contains("التالي: الماء"), next.label)
+        XCTAssertTrue(next.label.contains("الماء"), next.label)
         // The same habit is named once (tour 25 Oct): its miss joins its step.
         XCTAssertTrue(next.label.contains("فاتتك فترة، "), next.label); XCTAssertFalse(next.label.contains("في الماء"), next.label)
         capture(app, "M4-V01-habit-wide-after-L")
@@ -149,6 +151,10 @@ import XCTest
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
                                  "MADAR_UI_HABIT_FIXTURE": "lobbySix", "MADAR_UI_NOW": "2026-10-15T20:00:00+03:00", "MADAR_UI_THEME": "light"]
         app.launch(); finishOnboarding(app)
+        let block = app.descendants(matching: .any).matching(identifier: "bahw-block-habits").firstMatch
+        XCTAssertTrue(block.waitForExistence(timeout: 15))
+        // The owner chose W1's wide default; customized sizes must survive relaunch.
+        XCTAssertGreaterThan(block.frame.width / block.frame.height, 1.8)
         let rings = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "bahw-habit-ring-"))
         XCTAssertTrue(rings.firstMatch.waitForExistence(timeout: 15), app.debugDescription)
         XCTAssertEqual(rings.count, 6, app.debugDescription)
@@ -166,6 +172,8 @@ import XCTest
         let recorded = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", "١"), object: water)
         XCTAssertEqual(XCTWaiter.wait(for: [recorded], timeout: 10), .completed, app.debugDescription)
         XCTAssertFalse(app.staticTexts["habits-title"].exists, "A habit tap must record in the lobby.")
+        block.press(forDuration: 0.7)
+        app.buttons["bahw-size-habits"].tap(); app.buttons["كبيرة"].tap(); app.buttons["bahw-arrange"].tap()
         app.buttons["bahw-habits-period-yearly"].tap()
         XCTAssertEqual(rings.count, 1, app.debugDescription)
         app.buttons["bahw-habits-period-daily"].tap()
@@ -174,6 +182,9 @@ import XCTest
         // Let the selected-period transition settle before the visual evidence is captured.
         Thread.sleep(forTimeInterval: 0.7)
         capture(app, "OR-01-six-habits-recorded-L")
+        app.terminate(); app.launch()
+        XCTAssertTrue(block.waitForExistence(timeout: 15))
+        XCTAssertLessThan(block.frame.width / block.frame.height, 1.2, "Keep the owner's saved large size.")
     }
     func testNextFajrAfterIsha() throws {
         continueAfterFailure = false
