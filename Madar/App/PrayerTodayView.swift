@@ -1832,9 +1832,9 @@ private struct PrayerStatisticsView: View {
     private var monthCard: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .firstTextBaseline) {
-                Text(monthTitle).font(serif(26)).accessibilityIdentifier("prayer-history-month")
+                Text(monthTitle).font(serif(26)).lineLimit(1).minimumScaleFactor(0.7).layoutPriority(1).accessibilityIdentifier("prayer-history-month")
                 Spacer(minLength: 8)
-                Text(monthSpan).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("prayer-history-month-span")
+                Text(monthSpan).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk).lineLimit(2).multilineTextAlignment(.trailing).accessibilityIdentifier("prayer-history-month-span")
             }
             if typeSize.isAccessibilitySize {
                 ForEach(snapshot.history.filter { hijri($0.day).month == month.month && hijri($0.day).year == month.year }, id: \.day) { day in
@@ -1916,7 +1916,38 @@ private struct PrayerStatisticsView: View {
                 legend("وحدي في وقتها", theme.color("goldMid"))
                 Spacer(minLength: 0)
             }.padding(.top, 2)
+            if let insight = commitmentInsight {
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    Rectangle().fill(theme.accent).frame(width: 7, height: 7).rotationEffect(.degrees(45)).accessibilityHidden(true)
+                    Text(insight).font(PrayerHomeType.lead).fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(14).frame(maxWidth: .infinity, alignment: .leading)
+                .background(theme.color("goldSoft"), in: .rect(cornerRadius: 18))
+                .accessibilityIdentifier("prayer-commitment-insight")
+            }
         }
+    }
+    /// S3's analysis read as a sentence, not more numbers: which prayer holds best this month and which needs care,
+    /// and where congregation is strongest. Only prayers with at least three due days take part.
+    private var commitmentInsight: String? {
+        let rows: [(Prayer, Double, Double)] = Prayer.allCases.compactMap { prayer in
+            guard let value = snapshot.statistics.commitment[prayer], value.denominator >= 3 else { return nil }
+            let due = Double(value.denominator)
+            return (prayer, Double(value.jamaah + value.alone) / due, Double(value.jamaah) / due)
+        }
+        guard rows.count >= 2, let best = rows.max(by: { $0.1 < $1.1 }), let weak = rows.min(by: { $0.1 < $1.1 }) else { return nil }
+        // Ties are named as a group rather than by whichever prayer comes first.
+        let top = rows.filter { best.1 - $0.1 < 0.01 }, low = rows.filter { $0.1 - weak.1 < 0.01 }
+        var sentence: String
+        if best.1 - weak.1 < 0.05 { sentence = "صلواتك الخمس متقاربة هذا الشهر، فلا واحدة تتأخر عن أخواتها." }
+        else if top.count == 1 && low.count == 1 { sentence = "أثبت صلواتك هذا الشهر " + prayerTitle(best.0) + "، وأحوجها إلى عنايتك " + prayerTitle(weak.0) + "." }
+        else if top.count == 1 { sentence = "أثبت صلواتك هذا الشهر " + prayerTitle(best.0) + "، والبقية متقاربة دونها." }
+        else if low.count == 1 { sentence = "أحوج صلواتك إلى عنايتك هذا الشهر " + prayerTitle(weak.0) + "، والبقية أثبت منها." }
+        else { sentence = "صلواتك هذا الشهر على مرتبتين متقاربتين، والفرق بينهما يسير." }
+        if let mosque = rows.max(by: { $0.2 < $1.2 }), mosque.2 > 0, rows.contains(where: { $0.2 < mosque.2 - 0.05 }) {
+            sentence += " وأكثر ما تدركه في جماعة " + prayerTitle(mosque.0) + "."
+        }
+        return sentence
     }
     private func legend(_ title: String, _ color: Color) -> some View {
         HStack(spacing: 6) {
@@ -2138,14 +2169,15 @@ private struct PrayerRecentBeads: View {
     @Environment(\.roomTheme) private var theme
     var body: some View {
         GeometryReader { geometry in arc(in: geometry.size) }
-            .frame(height: compact ? 92 : 176).environment(\.layoutDirection, .leftToRight).accessibilityHidden(true)
+            .frame(height: compact ? 92 : 196).environment(\.layoutDirection, .leftToRight).accessibilityHidden(true)
     }
     private func arc(in size: CGSize) -> some View {
-        let radius: CGFloat = min(size.width * 0.34, (size.height - 24) / 1.5)
-        let center = CGPoint(x: size.width / 2, y: radius + 12)
+        // S3: the full card opens the arc to 270°, oldest at the lower right, newest at the lower left.
+        let radius: CGFloat = compact ? min(size.width * 0.34, (size.height - 24) / 1.5) : min(size.width * 0.36, (size.height - 30) / 1.72)
+        let center = CGPoint(x: size.width / 2, y: radius + 14)
         return ZStack {
             Path { path in
-                path.addArc(center: center, radius: radius, startAngle: .degrees(-210), endAngle: .degrees(30), clockwise: false)
+                path.addArc(center: center, radius: radius, startAngle: .degrees(start - span), endAngle: .degrees(start), clockwise: false)
             }
             .stroke(theme.color("goldMid").opacity(0.5), lineWidth: 1)
             ForEach(Array(cells.enumerated()), id: \.element.reference) { index, cell in
@@ -2154,12 +2186,15 @@ private struct PrayerRecentBeads: View {
             }
         }
     }
+    private var start: Double { compact ? 30 : 45 }
+    private var span: Double { compact ? 240 : 270 }
     private func position(_ index: Int, center: CGPoint, radius: CGFloat) -> CGPoint {
-        let angle = Double(30 - index * 10) * Double.pi / 180
+        let step = compact || cells.count < 2 ? 10 : span / Double(cells.count - 1)
+        let angle = (start - Double(index) * step) * Double.pi / 180
         return CGPoint(x: center.x + CGFloat(cos(angle)) * radius, y: center.y + CGFloat(sin(angle)) * radius)
     }
     private func bead(_ cell: PrayerCell, last: Bool) -> some View {
-        let size: CGFloat = last ? 16 : 11
+        let size: CGFloat = compact ? (last ? 16 : 11) : (last ? 18 : 13)
         let dashed = cell.status == .pending || cell.status == .unconfirmed
         return Circle().fill(fill(cell.status))
             .overlay { Circle().stroke(stroke(cell.status), style: StrokeStyle(lineWidth: 1, dash: dashed ? [2, 2] : [])) }

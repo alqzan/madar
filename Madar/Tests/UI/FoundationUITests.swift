@@ -262,6 +262,11 @@ import XCTest
         XCTAssertTrue(span.label.contains(" م") && span.label.contains("٢٠٢٦"), span.label)
         app.swipeUp()
         attachScreenshot(app, named: "M1-V04-hali-scrolled-L")
+        // OR-07: the commitment bars end in one sentence that names the steadiest prayer and the one needing care.
+        let insight = app.descendants(matching: .any)["prayer-commitment-insight"]
+        scrollTo(insight, in: app)
+        XCTAssertTrue(insight.exists && insight.label.contains("الفجر") && insight.label.contains("متقاربة"), app.debugDescription)
+        attachScreenshot(app, named: "M1-V04-hali-insight-L")
         app.terminate()
     }
 
