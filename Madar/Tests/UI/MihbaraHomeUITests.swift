@@ -796,7 +796,8 @@ import UIKit
         XCTAssertTrue(card.waitForExistence(timeout: 8), app.debugDescription)
         XCTAssertFalse(closeReader.exists, "The word card should have a clear page without reader chrome.\n\(app.debugDescription)")
         XCTAssertFalse(readerFooter.exists, "The reader footer should leave room to read behind the word card.\n\(app.debugDescription)")
-        XCTAssertTrue(app.buttons["mihbara-word-lookup"].exists || app.staticTexts["mihbara-word-lookup-unavailable"].exists, app.debugDescription)
+        // The device dictionary is offered only when it has the word; otherwise the card says nothing negative.
+        XCTAssertFalse(app.staticTexts["لا يوجد تعريف لهذه الكلمة في قاموس الجهاز"].exists, app.debugDescription)
         XCTAssertTrue(app.buttons["mihbara-word-note"].exists)
         XCTAssertTrue(app.buttons["mihbara-word-copy"].exists)
         XCTAssertFalse(app.buttons["mihbara-highlight-yellow"].isSelected)
@@ -1149,7 +1150,8 @@ import UIKit
         XCTAssertTrue(word.exists)
         XCTAssertEqual(word.label.split(whereSeparator: \.isWhitespace).count, 1, app.debugDescription)
         XCTAssertTrue(app.buttons["mihbara-word-save"].waitForExistence(timeout: 5), app.debugDescription)
-        XCTAssertTrue(app.buttons["mihbara-word-lookup"].exists || app.staticTexts["mihbara-word-lookup-unavailable"].exists, app.debugDescription)
+        // The device dictionary is offered only when it has the word; otherwise the card says nothing negative.
+        XCTAssertFalse(app.staticTexts["لا يوجد تعريف لهذه الكلمة في قاموس الجهاز"].exists, app.debugDescription)
         shot(app, "M6-V14-word-L")
         app.buttons["mihbara-word-save"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["mihbara-reader-toast"].waitForExistence(timeout: 8), app.debugDescription)

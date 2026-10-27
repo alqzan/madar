@@ -2715,11 +2715,11 @@ private struct MihbaraWordCard: View {
                         }
                         .glassEffect(.regular.interactive(), in: Capsule())
                         .accessibilityIdentifier("mihbara-word-lookup")
-                    } else if state.isWord {
-                        Text("لا يوجد تعريف لهذه الكلمة في قاموس الجهاز")
-                            .font(MadarTypography.fine()).foregroundStyle(ink2)
-                            .accessibilityIdentifier("mihbara-word-lookup-unavailable")
-                    } else if let page = state.pageText {
+                    } else if state.isWord, let page = state.pageText {
+                        // Most Arabic words have no device definition; a «no definition» line at each would be a dead end.
+                        Text("من \(page)").font(MadarTypography.caption()).foregroundStyle(ink2)
+                            .accessibilityIdentifier("mihbara-word-page")
+                    } else if !state.isWord, let page = state.pageText {
                         Text("فقرة مظلّلة من \(page)").font(MadarTypography.caption()).foregroundStyle(ink2)
                     }
                 }
