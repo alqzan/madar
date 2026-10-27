@@ -26,7 +26,8 @@ struct DiaryDisplayDay: Identifiable {
     /// The first line with words: an imported photo-only entry has an empty text and must not hide the next line.
     var excerpt: String {
         let written = lines.filter { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-        return written.first(where: { $0.kind == "normal" || $0.kind == "late" })?.text ?? written.first?.text ?? "صفحة بلا كتابة"
+        guard let line = written.first(where: { $0.kind == "normal" || $0.kind == "late" }) ?? written.first else { return "صفحة بلا كتابة" }
+        return line.markdown == true ? DayOneMarkdown.plain(line.text) : line.text
     }
     /// Photos an import referenced but did not contain (N01: shown as missing, never invented).
     var missingPhotos: Int { media.filter { $0.kind == "missing" && $0.contentType == "photo" }.count }
@@ -140,7 +141,7 @@ struct DiaryHomeSnapshot {
         let page = try context.fetch(FetchDescriptor<DayPage>(predicate: #Predicate { $0.dayKey == key && $0.deletedAt == nil && $0.mergedInto == nil })).max { $0.updatedAt < $1.updatedAt }
         var lines = entries.map { row in
             let markdown = row.textFormat == "markdown"
-            return DiaryDisplayLine(id: row.id.uuidString, at: row.eventAt, text: markdown ? DayOneMarkdown.readable(row.text) : row.text, kind: row.ink,
+            return DiaryDisplayLine(id: row.id.uuidString, at: row.eventAt, text: markdown ? DayOneMarkdown.displayed(row.text) : row.text, kind: row.ink,
                                     tzID: eventTimeZoneID(row.tzID, at: row.eventAt), markdown: markdown ? true : nil)
         }
         for niyya in try context.fetch(FetchDescriptor<Niyya>(predicate:#Predicate{$0.dayKey==key && $0.deletedAt==nil && $0.mergedInto==nil})) {lines.append(.init(id:niyya.id.uuidString,at:niyya.createdAt,text:niyya.text,kind:"intention",tzID:eventTimeZoneID(nil,at:niyya.createdAt)))}

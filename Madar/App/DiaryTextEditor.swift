@@ -13,6 +13,7 @@ struct DiaryTextEditor: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @State private var text = ""
+    @State private var selection: TextSelection?
     @State private var draftID = UUID()
     @State private var hasDraftRecord = false
     @State private var loaded = false
@@ -51,7 +52,7 @@ struct DiaryTextEditor: View {
                         var marginLine = Path(); marginLine.move(to: .init(x: size.width - 22, y: 0)); marginLine.addLine(to: .init(x: size.width - 22, y: size.height))
                         context.stroke(marginLine, with: .color(theme.color("margin")), lineWidth: 1)
                     }.accessibilityHidden(true)
-                    TextEditor(text: $text).scrollContentBackground(.hidden)
+                    TextEditor(text: $text, selection: $selection).scrollContentBackground(.hidden)
                         .font(.custom("thmanyahseriftext-Regular", size: 19, relativeTo: .body)).lineSpacing(12)
                         .padding(.horizontal, 30).padding(.top, 10).focused($focused).disabled(saving).accessibilityIdentifier("diary-editor-text")
                     if text.isEmpty { Text("اكتب ما تيسّر…").font(.custom("thmanyahseriftext-Regular", size: 21, relativeTo: .body)).foregroundStyle(theme.color("ink3Text")).padding(.horizontal, 38).padding(.top, 19).allowsHitTesting(false) }
@@ -60,16 +61,19 @@ struct DiaryTextEditor: View {
                     DiaryDayPhotos(app: app, day: writingDay) { asset in await linkLibraryPhoto(asset) }.padding(.horizontal, 16)
                 }
                 if margin == nil {
-                    HStack(spacing: 8) {
+                    ScrollView(.horizontal, showsIndicators: false) { HStack(spacing: 8) {
                         PhotosPicker(selection: $photo, matching: .images, photoLibrary: .shared()) { Label("صورة", systemImage: "photo").font(MadarTypography.caption()).frame(minHeight: 44) }.labelStyle(.iconOnly).accessibilityIdentifier("diary-editor-photo")
                         Button { focused = false; choosingFile = true } label: { Label("مرفق", systemImage: "doc").font(MadarTypography.caption()).frame(minHeight: 44) }.labelStyle(.iconOnly).accessibilityIdentifier("diary-editor-file")
                         if let voice, focused { recordButton(voice, large: false) }
                         Spacer(minLength: 0)
                         Button { text += "\n" + AppDiaryService(app: app).time(app.prayerNow()) + " " } label: { Image(systemName: "clock").frame(width: 44, height: 44) }.accessibilityLabel("أدرج الوقت")
                         Button { text += "\n• " } label: { Image(systemName: "list.bullet").frame(width: 44, height: 44) }.accessibilityLabel("سطر في قائمة")
+                        // OR-13: writing tools; the line is stored as Markdown only when one of them is used.
+                        Button { heading() } label: { Image(systemName: "textformat.size").frame(width: 44, height: 44) }.accessibilityLabel("عنوان").accessibilityIdentifier("diary-editor-heading")
+                        Button { wrap("**") } label: { Image(systemName: "bold").frame(width: 44, height: 44) }.accessibilityLabel("خط عريض").accessibilityIdentifier("diary-editor-bold")
+                        Button { wrap("*") } label: { Image(systemName: "italic").frame(width: 44, height: 44) }.accessibilityLabel("خط مائل").accessibilityIdentifier("diary-editor-italic")
                         if focused { Button { focused = false } label: { Image(systemName: "keyboard.chevron.compact.down").frame(width: 44, height: 44) }.accessibilityLabel("أخفِ لوحة الكتابة").accessibilityIdentifier("diary-editor-hide-keyboard") }
-
-                    }.padding(.horizontal, 16)
+                    }.padding(.horizontal, 16) }.scrollBounceBehavior(.basedOnSize)
                 }
                 if margin == nil, let voice, focused, voice.microphoneDenied {
                     DiaryVoiceFeedback(controller: voice)
@@ -148,6 +152,38 @@ struct DiaryTextEditor: View {
         .safeAreaInset(edge: .bottom) { if editorUndo, app.undoToastVisible { UndoToast(message: app.undoMessage, undo: app.undo) } }
         .interactiveDismissDisabled(!text.isEmpty || saving || importing || voice?.recording == true || voice?.savingAudio == true)
         .onDisappear { draftTask?.cancel(); voice?.cancelConversion(); voice?.cancelDownload(); if let voice { Task { await voice.stop() } } }
+    }
+    /// The selected range, or an empty range at the cursor (the end when nothing is focused yet).
+    private var selectedOffsets: Range<Int> {
+        if case .selection(let range) = selection?.indices, range.lowerBound >= text.startIndex, range.upperBound <= text.endIndex {
+            return text.distance(from: text.startIndex, to: range.lowerBound)..<text.distance(from: text.startIndex, to: range.upperBound)
+        }
+        return text.count..<text.count
+    }
+    /// Emphasis around the selection; with no selection, around the word just written (write the word, then tap B).
+    private func wrap(_ mark: String) {
+        var r = selectedOffsets
+        if r.isEmpty {
+            let chars = Array(text); var start = r.lowerBound
+            while start > 0, !chars[start - 1].isWhitespace, chars[start - 1] != "*" { start -= 1 }
+            r = start..<r.lowerBound
+        }
+        let lower = text.index(text.startIndex, offsetBy: r.lowerBound), upper = text.index(text.startIndex, offsetBy: r.upperBound)
+        let inner = String(text[lower..<upper])
+        text.replaceSubrange(lower..<upper, with: mark + inner + mark)
+        let start = text.index(text.startIndex, offsetBy: r.lowerBound + mark.count), end = text.index(start, offsetBy: inner.count)
+        selection = TextSelection(range: start..<end); focused = true
+    }
+    /// The cursor's line becomes a heading, or stops being one.
+    private func heading() {
+        let at = text.index(text.startIndex, offsetBy: selectedOffsets.lowerBound)
+        let lineStart = text[..<at].lastIndex(of: "\n").map { text.index(after: $0) } ?? text.startIndex
+        let offset = selectedOffsets.lowerBound, removing = text[lineStart...].hasPrefix("## ")
+        if removing { text.removeSubrange(lineStart..<text.index(lineStart, offsetBy: 3)) }
+        else { text.insert(contentsOf: "## ", at: lineStart) }
+        // A fresh cursor in the new text; the old selection's indices belong to the text before the change.
+        selection = TextSelection(insertionPoint: text.index(text.startIndex, offsetBy: min(text.count, max(0, offset + (removing ? -3 : 3)))))
+        focused = true
     }
     private func recordButton(_ voice: DiaryVoiceController, large: Bool) -> some View {
         Button { focused = false; Task { if voice.recording { await voice.stop() } else if let writingDay { await voice.start(writingDay: writingDay) } } } label: {

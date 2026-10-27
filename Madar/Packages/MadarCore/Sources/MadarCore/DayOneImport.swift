@@ -274,6 +274,16 @@ public enum DayOneMarkdown {
         while text.contains("\n\n\n") { text = text.replacingOccurrences(of: "\n\n\n", with: "\n\n") }
         return text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
+    private static let headingLine = try! NSRegularExpression(pattern: #"(?m)^[ \t]{0,3}#{1,6}[ \t]+(.+?)[ \t]*$"#)
+    private static let editorMarks = try! NSRegularExpression(pattern: #"(?m)^[ \t]{0,3}#{1,6}[ \t]+\S|\*\*[^*\n]+\*\*|(?<![*\w])\*[^*\s][^*\n]*\*(?![*\w])"#)
+    /// OR-13: text written with the editor's heading or emphasis tools is stored as Markdown; anything else stays plain.
+    public static func hasEditorMarks(_ text: String) -> Bool {
+        editorMarks.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) != nil
+    }
+    /// What the page shows: `readable`, with each heading kept as a bold line instead of dropping its emphasis.
+    public static func displayed(_ markdown: String) -> String {
+        readable(headingLine.stringByReplacingMatches(in: markdown, range: NSRange(markdown.startIndex..., in: markdown), withTemplate: "**$1**"))
+    }
     /// Plain characters (no Markdown syntax) for search and exports.
     public static func plain(_ markdown: String) -> String {
         let readable = readable(markdown)

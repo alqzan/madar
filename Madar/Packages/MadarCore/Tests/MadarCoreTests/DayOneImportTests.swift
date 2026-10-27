@@ -128,6 +128,14 @@ struct DayOneImportTests {
         let text = "# مساء في لندن\n\nمشينا **طويلًا** حتى النهر\\.\n\n![](dayone-moment://P1)\n\nصوت المطر:\n\n![](dayone-moment:/audio/AU1)"
         #expect(DayOneMarkdown.inlineIdentifiers(text) == ["P1", "AU1"])
         #expect(DayOneMarkdown.readable(text) == "مساء في لندن\n\nمشينا **طويلًا** حتى النهر\\.\n\nصوت المطر:")
+        #expect(DayOneMarkdown.displayed(text) == "**مساء في لندن**\n\nمشينا **طويلًا** حتى النهر\\.\n\nصوت المطر:")
+        // OR-13: only the editor's own marks make a native line Markdown.
+        #expect(DayOneMarkdown.hasEditorMarks("## عنوان اليوم\nسطر"))
+        #expect(DayOneMarkdown.hasEditorMarks("كان يومًا **طويلًا**"))
+        #expect(DayOneMarkdown.hasEditorMarks("قلت *بهدوء* ومشيت"))
+        #expect(!DayOneMarkdown.hasEditorMarks("السعر ٥ * ٣ = ١٥"))
+        #expect(!DayOneMarkdown.hasEditorMarks("#وسم في أول السطر"))
+        #expect(!DayOneMarkdown.hasEditorMarks("• شاي\n• قهوة"))
         #expect(DayOneMarkdown.plain(text) == "مساء في لندن\n\nمشينا طويلًا حتى النهر.\n\nصوت المطر:")
     }
 }

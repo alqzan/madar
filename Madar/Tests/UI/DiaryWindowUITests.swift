@@ -47,6 +47,27 @@ import XCTest
         XCTAssertTrue(app.staticTexts["سطر محفوظ من اليوم"].waitForExistence(timeout: 10))
         capture(app, "M3-V01-today-L")
     }
+    /// OR-13: a heading and bold written with the editor's tools show formatted on the page, never as raw marks.
+    func testEditorHeadingAndBoldShowFormatted() throws {
+        continueAfterFailure = false
+        let app = launch("home")
+        app.buttons["diary-write"].tap()
+        let editor = app.textViews["diary-editor-text"]; XCTAssertTrue(editor.waitForExistence(timeout: 10))
+        func waitValue(_ contains: String) { _ = XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "value CONTAINS %@", contains), object: editor)], timeout: 8) }
+        // The text view's accessibility value lags programmatic edits, so the result is checked on the saved page.
+        editor.tap(); editor.typeText("مساء هادئ"); waitValue("مساء هادئ")
+        app.buttons["diary-editor-heading"].tap()
+        editor.typeText("\nكان يومًا طويلًا"); waitValue("طويلًا")
+        app.buttons["diary-editor-bold"].tap()
+        capture(app, "OR-13-editor-tools-L")
+        app.buttons["diary-editor-save"].tap()
+        XCTAssertTrue(app.buttons["diary-today"].waitForExistence(timeout: 10)); app.buttons["diary-today"].tap()
+        let line = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "كان يومًا طويلًا")).firstMatch
+        XCTAssertTrue(line.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(line.label.contains("*") || line.label.contains("#"), line.label)
+        XCTAssertTrue(line.label.contains("مساء هادئ"), line.label)
+        capture(app, "OR-13-formatted-page-L")
+    }
     func testFirstDayHasWorkingOneTapKeyboardAndCancelWritesNothing() throws {
         continueAfterFailure = false
         let app = launch("empty")

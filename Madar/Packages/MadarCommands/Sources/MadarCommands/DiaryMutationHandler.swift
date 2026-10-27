@@ -49,6 +49,7 @@ struct DiaryEntryDeletion: Codable {
         page.origin = "native"; page.updatedAt = StableIdentity.monotonic(now: now, previous: page.updatedAt); page.writerID = writer
         let row = Entry(); row.id = id; row.dayKey = key.description; row.eventAt = now
         row.tzID = place.timeZoneID; row.dayPolicy = boundary.rawValue + "@1"; row.text = text
+        row.textFormat = DayOneMarkdown.hasEditorMarks(text) ? "markdown" : "plain"
         row.attachmentMediaIDs = mediaIDs; row.mediaID = audioID
         row.ink = key < stored.date ? "late" : "normal"; row.source = "native"
         row.createdAt = now; row.updatedAt = now; row.writerID = writer; context.insert(row)
