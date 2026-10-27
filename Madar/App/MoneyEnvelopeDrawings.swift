@@ -108,11 +108,23 @@ struct MoneyGoalOverview: View {
                     }.frame(height: 25)
                 }.frame(height: 25).accessibilityHidden(true)
             }
-            if let target = envelope.targetMinor { Text("الهدف " + (visible ? service.amount(target) : "•••")).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
-            if envelope.balanceMinor < 0 { Text("دين، لم تُحدَّد خطة سداده بعد").font(MadarTypography.caption()).foregroundStyle(theme.color("debt")) }
-            if envelope.dailyFundingMinor > 0 { Text("من يومك " + (visible ? service.amount(envelope.dailyFundingMinor) : "•••") + " في اليوم").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
-            else if envelope.perSalaryMinor > 0 { Text("من كل راتب " + (visible ? service.amount(envelope.perSalaryMinor) : "•••")).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
-            if let due = envelope.due { MadarDateLabel(app.dateLabels(due, compact: true), primaryFont: MadarTypography.fine(), secondaryFont: MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
+            // OR-22 (design): one sentence on where the goal stands, its date beside it, instead of four stacked lines.
+            HStack(alignment: .top, spacing: 10) {
+                Text(summary).font(MadarTypography.caption()).foregroundStyle(envelope.balanceMinor < 0 ? theme.color("debt") : theme.secondaryInk)
+                    .fixedSize(horizontal: false, vertical: true).frame(maxWidth: .infinity, alignment: .leading)
+                if let due = envelope.due { MadarDateLabel(app.dateLabels(due, compact: true), primaryFont: MadarTypography.fine(), secondaryFont: MadarTypography.fine()).foregroundStyle(theme.secondaryInk).fixedSize() }
+            }
         }.padding(.vertical, 6).accessibilityElement(children: .combine).accessibilityIdentifier("money-goal-" + envelope.id.uuidString)
+    }
+    private func money(_ value: Int) -> String { visible ? service.amount(value) : "•••" }
+    private var summary: String {
+        let funding = envelope.dailyFundingMinor > 0 ? "من يومك " + money(envelope.dailyFundingMinor) + " في اليوم"
+            : envelope.perSalaryMinor > 0 ? "من كل راتب " + money(envelope.perSalaryMinor) : nil
+        let state: String
+        if envelope.balanceMinor < 0 { state = "دين لم تُحدَّد خطة سداده بعد" }
+        else if let target = envelope.targetMinor, target > 0 {
+            state = envelope.balanceMinor >= target ? "اكتمل هدفه " + money(target) : "ينقصه " + money(target - envelope.balanceMinor) + " من " + money(target)
+        } else { state = "بلا هدف محدّد" }
+        return funding.map { state + "، " + $0 } ?? state
     }
 }

@@ -17,6 +17,7 @@ struct MoneyEnvelopesView: View {
     @State private var targetOpen = false
     @State private var failure: String?
     @State private var selectedEnvelope: UUID?
+    @State private var goalOpen = false
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
     private var service: AppMoneyService { .init(app: app) }
     private var visible: Bool { revealed || !app.bool("core.hideMoneyUntilTouch") }
@@ -52,6 +53,10 @@ struct MoneyEnvelopesView: View {
                     ForEach(reading.home.envelopes) { envelope in
                         Button { selectedEnvelope = envelope.id } label: { MoneyGoalOverview(envelope: envelope, app: app, visible: visible).contentShape(.rect) }.buttonStyle(.plain).accessibilityIdentifier("money-envelope-" + envelope.name)
                     }
+                    Button { goalOpen = true } label: {
+                        Label("جهّز لشيء قادم", systemImage: "plus").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 52)
+                            .overlay { RoundedRectangle(cornerRadius: 6).stroke(theme.color("accent").opacity(0.6), style: .init(lineWidth: 1, dash: [4, 3])) }
+                    }.buttonStyle(.plain).padding(.top, 6).accessibilityIdentifier("money-envelopes-new-goal")
                 } else if let failure {
                     Text(failure).font(MadarTypography.body()); Button("أعِد المحاولة", action: load).frame(minHeight: 44)
                 } else { ProgressView().frame(maxWidth: .infinity, minHeight: 200) }
@@ -60,6 +65,8 @@ struct MoneyEnvelopesView: View {
             .environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar)
             .task { load() }.onChange(of: app.prayerRevision) { load() }
             .sheet(isPresented: $targetOpen) { MoneyReserveTargetView(app: app, current: reading?.reserveTargetMinor, visible: visible, revealed: $revealed) { load() }.environment(\.roomTheme, theme) }
+            .navigationDestination(isPresented: $goalOpen) { MoneyGoalView(app: app, revealed: $revealed).environment(\.roomTheme, theme) }
+            .onChange(of: goalOpen) { if !goalOpen { load() } }
             .navigationDestination(item: $selectedEnvelope) { id in MoneyEnvelopeDetailView(app: app, id: id, revealed: $revealed).environment(\.roomTheme, theme) }
             .accessibilityIdentifier("money-envelopes")
     }
