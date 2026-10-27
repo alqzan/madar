@@ -835,7 +835,8 @@ struct MihbaraHomeView: View {
                         .accessibilityHidden(true)
                 }
                 Button { openBook(b) } label: {
-                    Text("أكمل القراءة").font(MadarTypography.caption()).bold()
+                    // A paper book opens its card, where its page is kept; a file opens at its place.
+                    Text(b.isReadableEPUB || b.isReadablePDF ? "أكمل القراءة" : "افتح الكتاب").font(MadarTypography.caption()).bold()
                         .foregroundStyle(RoomTheme(room: "mihbara", dark: false).ink)
                         .padding(.horizontal, 18).frame(minHeight: 44)
                         .background(theme.color("goldUnderstand"), in: .capsule)
@@ -866,7 +867,7 @@ struct MihbaraHomeView: View {
         let leathers = MihbaraBookCovers.leatherIndices(for: r.books)
         return ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                HStack { Text("مكتبتي").font(MadarTypography.title()); Spacer(); Button("تمّ") { sheet = nil } }
+                HStack { Text("مكتبتي").font(MadarTypography.title()); Spacer(); Button("تمّ") { sheet = nil }.frame(minWidth: 44, minHeight: 44) }
                 ZStack {
                     UnevenRoundedRectangle(topLeadingRadius: 70, bottomLeadingRadius: 3, bottomTrailingRadius: 3, topTrailingRadius: 70).fill(theme.color("navy").gradient)
                     Circle().fill(theme.color("goldUnderstand")).frame(width: 40, height: 40).offset(x: -55, y: -5)
@@ -878,7 +879,8 @@ struct MihbaraHomeView: View {
                 libraryStatus(r)
                 // Owner, 21 Oct 2026: the «قديمًا» cabinet is a section here now, after the three shelves.
                 ForEach(Self.librarySections, id: \.shelf) { section in
-                    let books = r.books.filter { $0.shelf == section.shelf }
+                    // A search or shelf filter leaves only what matches; a grid of dimmed covers is still in the way.
+                    let books = r.books.filter { $0.shelf == section.shelf && libraryMatches($0) }
                     if !books.isEmpty {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(section.title).font(MadarTypography.section())
@@ -912,7 +914,7 @@ struct MihbaraHomeView: View {
                     .minimumScaleFactor(0.85)
             }.frame(maxWidth: .infinity).contentShape(.rect)
         }
-        .buttonStyle(.plain).opacity(libraryMatches(b) ? 1 : 0.3)
+        .buttonStyle(.plain)
         .contextMenu { bookMenu(b) }
         .accessibilityIdentifier("mihbara-library-book-" + b.id.uuidString)
     }

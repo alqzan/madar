@@ -32,10 +32,10 @@ struct MoneyAccountSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    HStack { Text(original.isNew ? "جذر جديد" : draft.name).font(.custom("thmanyahserifdisplay-Bold", size: 25, relativeTo: .title2)); Spacer(); Button("إغلاق") { dismiss() }.frame(minHeight: 44).accessibilityIdentifier("money-account-editor-close") }
+                    HStack { Text(original.isNew ? "حساب جديد" : draft.name).font(.custom("thmanyahserifdisplay-Bold", size: 25, relativeTo: .title2)); Spacer(); Button("إغلاق") { dismiss() }.frame(minHeight: 44).accessibilityIdentifier("money-account-editor-close") }
                     field("اسم الحساب") { TextField("مثل: حساب الراتب", text: $draft.name).focused($editing).accessibilityIdentifier("money-account-name") }
                     field("البنك أو المحفظة") { TextField("اسم البنك", text: $draft.bank).focused($editing).accessibilityIdentifier("money-account-bank") }
-                    field("آخر أربعة أرقام، إن وجدت") { TextField("آخر ٤", text: $draft.last4).keyboardType(.numberPad).focused($editing).accessibilityIdentifier("money-account-last4") }
+                    field("آخر أربعة أرقام، إن وجدت") { TextField("مثل ١٢٣٤", text: $draft.last4).keyboardType(.numberPad).focused($editing).accessibilityIdentifier("money-account-last4") }
                     Picker("النوع", selection: $draft.kind) { ForEach(["current", "savings", "cash", "wallet"], id: \.self) { Text(AppMoneyService.accountKind($0)).tag($0) } }.pickerStyle(.segmented).disabled(draft.fixedCheckpoint).accessibilityIdentifier("money-account-kind")
                     Toggle("هذا الحساب ملكي", isOn: Binding(get: { draft.ownership == "mine" }, set: { draft.ownership = $0 ? "mine" : "notMine" })).disabled(draft.fixedCheckpoint).accessibilityIdentifier("money-account-owned")
                     Text(draft.ownership == "mine" ? "يدخل رصيده في النقد ولك فعلًا." : "يبقى ظاهرًا بجذر مقطوع، خارج النقد ولك فعلًا والزكاة، ورسائله تُتجاهل.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
@@ -54,7 +54,8 @@ struct MoneyAccountSheet: View {
                     MadarDateLabel(app.dateLabels(.containing(draft.openingAt, in: app.activePlace.timeZone)), primaryFont: MadarTypography.caption(), secondaryFont: MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                     if !draft.openingKnown { Text("لم يُعرف رصيدها بعد. أدخل رصيد البنك ووقت المطابقة ليبدأ الحساب منه؛ الحركات الأقدم تبقى محفوظة.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
                     if draft.fixedCheckpoint && draft.openingKnown { Text("توجد حركات أو مطابقة على هذا الحساب؛ رصيد البداية ونوعه وملكيته ثابتة لحفظ دفتره. تصحيح الرصيد من «المطابقة».").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-account-checkpoint-fixed") }
-                    Toggle("أدخله في حساب الزكاة", isOn: $draft.zakatInclude).accessibilityIdentifier("money-account-zakat")
+                    // An account that is not mine is outside zakat already (the caption above says so).
+                    if draft.ownership == "mine" { Toggle("أدخله في حساب الزكاة", isOn: $draft.zakatInclude).accessibilityIdentifier("money-account-zakat") }
                     field("أسماء مرسلي رسائل البنك، اسم في كل سطر") { TextField("أسماء المرسل", text: $senders, axis: .vertical).lineLimit(2...5).focused($editing).accessibilityIdentifier("money-account-senders") }
                     if let failure { Text(failure).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")) }
                     Button(action: save) { Text(saving ? "جارٍ الحفظ…" : "احفظ الحساب").font(MadarTypography.cardTitle()).frame(maxWidth: .infinity, minHeight: 54).background(theme.ink).foregroundStyle(theme.background) }.disabled(saving || draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || (!draft.openingKnown && balance.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)).accessibilityIdentifier("money-account-save")
