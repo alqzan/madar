@@ -80,7 +80,7 @@ struct DiaryCityStamp: View {
     @Environment(\.roomTheme) private var theme
     var body: some View {
         VStack(spacing: 4) {
-            DiaryDome().stroke(theme.onAccent, style: .init(lineWidth: 1.6, lineCap: .round, lineJoin: .round)).frame(width: 50, height: 40)
+            DiaryPostmark().stroke(theme.onAccent, style: .init(lineWidth: 1.6, lineCap: .round, lineJoin: .round)).frame(width: 50, height: 40)
             Text(city).font(.custom("thmanyahsans-Bold", size: 12, relativeTo: .caption)).foregroundStyle(theme.onAccent).lineLimit(1).minimumScaleFactor(0.92)
         }.frame(width: 76, height: 92).background(theme.color("accent")).padding(6)
             .overlay { Rectangle().stroke(theme.color("accent").opacity(0.45), style: .init(lineWidth: 2, dash: [3, 3])) }
@@ -88,16 +88,17 @@ struct DiaryCityStamp: View {
     }
 }
 
-private struct DiaryDome: Shape {
+/// OR-09: a generic postmark (no city's skyline) so every stamp suits any country: a ring cancelled by three waves.
+private struct DiaryPostmark: Shape {
     func path(in r: CGRect) -> Path {
-        var p = Path(), w = r.width, h = r.height
-        p.move(to: .init(x: r.minX + w * 0.08, y: r.maxY)); p.addLine(to: .init(x: r.maxX - w * 0.08, y: r.maxY))
-        p.move(to: .init(x: r.minX + w * 0.25, y: r.maxY)); p.addLine(to: .init(x: r.minX + w * 0.25, y: r.minY + h * 0.55))
-        p.addQuadCurve(to: .init(x: r.maxX - w * 0.25, y: r.minY + h * 0.55), control: .init(x: r.midX, y: r.minY + h * 0.08))
-        p.addLine(to: .init(x: r.maxX - w * 0.25, y: r.maxY))
-        p.move(to: .init(x: r.midX, y: r.minY + h * 0.3)); p.addLine(to: .init(x: r.midX, y: r.minY))
-        for x in [0.08, 0.92] { p.move(to: .init(x: r.minX + w * x, y: r.maxY)); p.addLine(to: .init(x: r.minX + w * x, y: r.minY + h * 0.18)) }
-        for x in [0.4, 0.6] { p.move(to: .init(x: r.minX + w * x, y: r.maxY)); p.addLine(to: .init(x: r.minX + w * x, y: r.minY + h * 0.62)) }
+        var p = Path(), h = r.height, radius = h * 0.44
+        p.addEllipse(in: .init(x: r.midX - radius, y: r.midY - radius, width: radius * 2, height: radius * 2))
+        p.addEllipse(in: .init(x: r.midX - radius * 0.62, y: r.midY - radius * 0.62, width: radius * 1.24, height: radius * 1.24))
+        for row in [-1.0, 0, 1] {
+            let y = r.midY + row * h * 0.16
+            p.move(to: .init(x: r.minX, y: y))
+            for k in 0..<4 { let x0 = r.minX + r.width * Double(k) / 4, x1 = r.minX + r.width * Double(k + 1) / 4; p.addQuadCurve(to: .init(x: x1, y: y), control: .init(x: (x0 + x1) / 2, y: y + (k.isMultiple(of: 2) ? -4 : 4))) }
+        }
         return p
     }
 }
