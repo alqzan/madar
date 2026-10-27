@@ -8,6 +8,7 @@ struct CustomizeMadar: View {
     private var query: String { session.settingsQuery }
     @State private var confirmReset = false
     @State private var widgetGallery = false
+    @State private var widgetMaker = false
     @Environment(\.roomTheme) private var theme
     @Environment(\.dynamicTypeSize) private var dynamicType
     var body: some View {
@@ -40,10 +41,15 @@ struct CustomizeMadar: View {
                     }.buttonStyle(.plain).accessibilityIdentifier("money-open")
                 }
                 if query.isEmpty || normalized("الودجات وأحجامها البهو الكتل").contains(normalized(query)) { BahwBlocksSection(session: session) }
+                if query.isEmpty || normalized("صانع الودجة اصنع ودجة ودجاتي").contains(normalized(query)) {
+                    Button { widgetMaker = true } label: { Label("اصنع ودجة", systemImage: "square.stack.3d.up").font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 50).background(theme.surface, in: .rect(cornerRadius: 20)) }
+                        .buttonStyle(.plain).accessibilityIdentifier("widget-maker-open")
+                }
                 if query.isEmpty || normalized("ودجات الشاشة الرئيسية خارج التطبيق").contains(normalized(query)) {
                     Button {widgetGallery=true} label:{Label("ودجات الشاشة الرئيسية",systemImage:"square.grid.2x2").font(MadarTypography.section()).frame(maxWidth:.infinity,minHeight:50).background(theme.surface,in:.rect(cornerRadius:20))}.buttonStyle(.plain).accessibilityIdentifier("room-widgets-gallery")
                 }
-                if filtered.isEmpty && !(query.isEmpty || normalized("المال").contains(normalized(query)) || normalized("المحبرة").contains(normalized(query)) || normalized("ودجات الشاشة الرئيسية خارج التطبيق").contains(normalized(query))) {
+                if showsRoomLayouts { RoomHomeLayoutSection(session: session, searching: !query.isEmpty) }
+                if filtered.isEmpty && !showsRoomLayouts && !(query.isEmpty || normalized("صانع الودجة اصنع ودجة ودجاتي").contains(normalized(query))) && !(query.isEmpty || normalized("المال").contains(normalized(query)) || normalized("المحبرة").contains(normalized(query)) || normalized("ودجات الشاشة الرئيسية خارج التطبيق").contains(normalized(query))) {
                     ContentUnavailableView.search(text: query)
                 } else {
                     ForEach(sections, id: \.self) { section in
@@ -86,12 +92,14 @@ struct CustomizeMadar: View {
         }
         .fullScreenCover(isPresented: $session.mihbaraOpen) { MihbaraHomeView(app: session) }
         .navigationDestination(isPresented: $session.moneyOpen) { MoneyRoomView(app: session) }
+        .sheet(isPresented: $widgetMaker) { WidgetMakerView(session: session).presentationDetents([.large]) }
         .sheet(isPresented:$widgetGallery){NavigationStack{RoomWidgetsGallery(session:session)}}
         .toolbarVisibility(.hidden, for: .navigationBar)
         .confirmationDialog("أعِد الإعدادات المتفق عليها؟", isPresented: $confirmReset, titleVisibility: .visible) {
-            Button("أعِد الافتراضي", role: .destructive) { session.reset(AppSession.supportedKeys + ["bahw.layout"]) }
+            Button("أعِد الافتراضي", role: .destructive) { session.reset(AppSession.supportedKeys + ["bahw.layout"] + RoomHomeLayout.rooms.map { $0.0 + ".layout" }) }
         } message: { Text("يعود الشكل والترتيب والإعدادات. البيانات لا تُمسّ.") }
     }
+    private var showsRoomLayouts: Bool { query.isEmpty || normalized("ما يعرضه كل باب ترتيب الغرف").contains(normalized(query)) }
     private var filtered: [SettingDefinition] {
         session.schema.settings.filter { definition in
             guard AppSession.supportedKeys.contains(definition.key) else { return false }
@@ -100,10 +108,10 @@ struct CustomizeMadar: View {
             return query.isEmpty || normalized(definition.title + " " + sectionFor(definition.key) + " " + definition.key).contains(normalized(query))
         }
     }
-    private var sections: [String] { ["العادات", "السنة", "الأيام القادمة", "اليوم والتقويم", "المظهر", "مدينتك", "الخصوصية", "البحث", "الإشعارات", "الصلاة", "المواقيت"].filter { section in filtered.contains { sectionFor($0.key) == section } } }
-    private let symbols = ["العادات": "MadarHabits","السنة": "MadarYear", "الأيام القادمة": "MadarUpcoming", "اليوم والتقويم": "moon", "الصلاة": "MadarPrayer", "المواقيت": "clock.arrow.circlepath", "الخصوصية": "lock", "البحث": "magnifyingglass", "المظهر": "paintpalette", "مدينتك": "location", "الإشعارات": "bell.badge"]
+    private var sections: [String] { ["العادات", "السنة", "الأيام القادمة", "الذكاء", "اليوم والتقويم", "المظهر", "مدينتك", "الخصوصية", "البحث", "الإشعارات", "الصلاة", "المواقيت"].filter { section in filtered.contains { sectionFor($0.key) == section } } }
+    private let symbols = ["الذكاء": "sparkles", "العادات": "MadarHabits","السنة": "MadarYear", "الأيام القادمة": "MadarUpcoming", "اليوم والتقويم": "moon", "الصلاة": "MadarPrayer", "المواقيت": "clock.arrow.circlepath", "الخصوصية": "lock", "البحث": "magnifyingglass", "المظهر": "paintpalette", "مدينتك": "location", "الإشعارات": "bell.badge"]
     private var changesLabel: String {
-        let count = session.schema.settings.filter { (AppSession.supportedKeys + ["bahw.layout"]).contains($0.key) && session.values[$0.key] != $0.defaultValue }.count
+        let count = session.schema.settings.filter { (AppSession.supportedKeys + ["bahw.layout"] + RoomHomeLayout.rooms.map { $0.0 + ".layout" }).contains($0.key) && session.values[$0.key] != $0.defaultValue }.count
         return CustomizationCopy.changes(count: count, formattedCount: session.digits(count))
     }
     private func valueLabel(_ key: String) -> String {
@@ -122,7 +130,8 @@ struct CustomizeMadar: View {
 }
 
 func sectionFor(_ key: String) -> String {
-    if ["bahw.reminder", "bahw.streakBreakAfter", "bahw.travelFreezesHome"].contains(key) { return "العادات" }
+    if key == "bahw.smartPresence" { return "الذكاء" }
+    if ["bahw.reminder", "bahw.streakBreakAfter", "bahw.travelFreezesHome", "bahw.widgetScope"].contains(key) { return "العادات" }
     if key == "bahw.yearWhich" { return "السنة" }
     if key == "bahw.upcomingCount" { return "الأيام القادمة" }
     if ["core.dayStart", "core.firstCalendar", "core.hijriSource", "core.hijriOffset", "core.weekStart"].contains(key) { return "اليوم والتقويم" }
@@ -236,6 +245,15 @@ struct SettingControl: View {
             }
             if definition.key == "core.spotlightIndex" {
                 Text("يفهرس عناوين كتب المحبرة فقط؛ لا يُفهرس نص الكتب أو المؤلفون أو الملاحظات الخاصة.")
+                    .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if definition.key == "bahw.widgetScope" {
+                Text("الآن فقط يعرض العادات التي حان وقتها؛ اليوم كله يشمل نوافذها المتأخرة في اليوم نفسه. العدّاد لليوم كله، ولا تظهر عادات الغد.")
+                    .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
+            }
+            if definition.key == "bahw.smartPresence" {
+                Text("هادئ: ما يحتاج فعلًا الآن. متوسط: يضيف ما تبقّى اليوم. حاضر: يضيف خطوتك التالية في الغرف. تظهر داخل البهو، بلا إشعارات إضافية.")
                     .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                     .fixedSize(horizontal: false, vertical: true)
             }

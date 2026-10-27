@@ -23,18 +23,7 @@ struct QuranHomeView: View {
     @State private var showIndex = false
     @State private var showStrength = false
     @State private var showQiyam = false
-    private enum HomeDetail: Identifiable {
-        case step(QuranUIStep), hadith
-        var id: String { switch self { case .step(let step): "step-" + step.id; case .hadith: "hadith" } }
-    }
-    private var theme: RoomTheme { RoomTheme(room: "quran", dark: colorScheme == .dark) }
-    private var next: QuranUIStep? { state?.steps.first { !$0.completed && $0.available } }
-    var body: some View {
-        ScrollView {
-            if let state {
-                VStack(alignment: .leading, spacing: 24) {
-                    header(state)
-                    coverage(state)
+    @ViewBuilder private func planContent(_ state: QuranRoomState) -> some View {
                     if let draft = state.draft {
                         Button(draft.isPastDay ? "راجع ما تمّ في جلستك السابقة" : "تابع جلستك") {
                             run { active = try await service.resume(draftID: draft.id) }
@@ -59,8 +48,27 @@ struct QuranHomeView: View {
                     }
                     if state.plan == nil { Button("ابدأ خطة الحفظ") { showSetup = true }.font(bodyFont(16, bold: true)).frame(maxWidth: .infinity, minHeight: 50).foregroundStyle(theme.onAccent).background(theme.accent, in: Capsule()).accessibilityIdentifier("quran-start-plan") }
                     if state.plan != nil || !state.steps.isEmpty { path(state) }
-                    log(state)
-                    tools(state)
+    }
+    private enum HomeDetail: Identifiable {
+        case step(QuranUIStep), hadith
+        var id: String { switch self { case .step(let step): "step-" + step.id; case .hadith: "hadith" } }
+    }
+    private var theme: RoomTheme { RoomTheme(room: "quran", dark: colorScheme == .dark) }
+    private var next: QuranUIStep? { state?.steps.first { !$0.completed && $0.available } }
+    var body: some View {
+        ScrollView {
+            if let state {
+                VStack(alignment: .leading, spacing: 24) {
+                    header(state)
+                    ForEach(RoomHomeLayout(session: service.app, key: "quran.layout").visible, id: \.self) { id in
+                        switch id {
+                        case "sadr": coverage(state)
+                        case "path": planContent(state)
+                        case "log14": log(state)
+                        case "tools": tools(state)
+                        default: EmptyView()
+                        }
+                    }
                 }.padding(.horizontal, 16).padding(.top, 20).padding(.bottom, 36)
             } else if let error {
                 VStack(spacing: 16) { Text(error); Button("حاول مرة أخرى") { run { try await refresh() } } }

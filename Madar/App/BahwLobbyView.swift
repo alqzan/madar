@@ -81,6 +81,10 @@ struct BahwLobbyView: View {
                     BahwGridLayout(placements: placements) {
                         ForEach(visible, id: \.self) { block in tile(block, size: layout.size(block)) }
                     }
+                    if !arranging {
+                        SavedLobbyWidgets(session: session)
+                        BahwSuggestionsView(session: session)
+                    }
                     if arranging {
                         Button { drawerOpen = true } label: {
                             Label(layout.hiddenBuilt.isEmpty ? "لا كتل مخفية" : "المخفية: " + service.digits.string(layout.hiddenBuilt.count), systemImage: "plus")
@@ -276,5 +280,49 @@ struct BahwBlockSheet: View {
                 .navigationTitle(block.title).navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .topBarLeading) { Button("تم") { dismiss() }.accessibilityIdentifier("bahw-sheet-done") } }
         }.environment(\.roomTheme, theme).tint(theme.accent).presentationDetents([.medium, .large])
+    }
+}
+
+
+private struct BahwSuggestionsView: View {
+    @Bindable var session: AppSession
+    @State private var suggestions: [BahwSuggestion] = []
+    @Environment(\.roomTheme) private var theme
+    private var refreshKey: String {
+        "\(session.prayerRevision)-\(session.string("bahw.smartPresence"))-\(Int(session.prayerNow().timeIntervalSince1970 / 60))-\(session.protectedDataAuthorized)"
+    }
+    var body: some View {
+        VStack(spacing: 0) {
+            if !suggestions.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("خطوتك التالية").font(MadarTypography.section())
+                    ForEach(suggestions) { suggestion in
+                        Button { open(suggestion.destination) } label: {
+                            HStack(spacing: 12) {
+                                MadarGlyph(suggestion.symbol, size: 22).foregroundStyle(theme.accent)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(suggestion.title).font(MadarTypography.body())
+                                    Text(suggestion.detail).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                                }
+                                Spacer(minLength: 4)
+                                Image(systemName: "chevron.left").font(.caption).foregroundStyle(theme.secondaryInk)
+                            }.frame(maxWidth: .infinity, minHeight: 52, alignment: .leading).padding(12)
+                                .background(theme.surface, in: .rect(cornerRadius: 18))
+                        }.buttonStyle(.plain).accessibilityIdentifier("bahw-suggestion-" + suggestion.id)
+                    }
+                }.accessibilityElement(children: .contain).accessibilityIdentifier("bahw-suggestions")
+            }
+        }.task(id: refreshKey) { suggestions = AppBahwService(session: session).suggestions() }
+    }
+    private func open(_ destination: BahwSuggestion.Destination) {
+        switch destination {
+        case .prayer: session.selectedTab = "prayer"
+        case .habit(let id): session.habitRouteID = id; session.habitsOpen = true
+        case .quran: session.selectedTab = "quran"
+        case .diary:
+            if let url = URL(string: "madar://notes/write") { session.open(url) }
+        case .money: session.selectedTab = "money"
+        case .mihbara: session.selectedTab = "mihbara"
+        }
     }
 }

@@ -39,12 +39,15 @@ for key in ['notes.dictationFirst', 'salah.liveActivity', 'quran.tapForTafsir']:
 # Owner, 26 Oct 2026: RP6's [DEFAULT] reverted; the heart question starts on (docs/DECISIONS.md).
 require(settings['salah.askHeart']['default'] is True, 'salah.askHeart owner default must be true')
 require(settings['quran.tapForTafsir']['availabilityGate'] == 'M2 licence check', 'RQ8 licence gate missing')
+# Owner, 27 Oct: defined in-app smart suggestions; the calm default is retained.
+require(settings['bahw.smartPresence']['availability'] == 'v1' and settings['bahw.smartPresence']['default'] == 'calm', 'owner smart-presence contract changed')
+require(settings['bahw.widgetScope']['availability'] == 'v1' and settings['bahw.widgetScope']['default'] == 'todayAndAfter', 'owner habit widget scope contract changed')
 reader = settings['mihbara.readerEn']
 require(reader['default']['arabicHints'] == 'none', 'RMI1 hints must default off')
 require(reader['contract']['fieldAvailability']['arabicHints'] == 'v2', 'RMI1 hints must stay v2')
 cut_keys = ['tabbar.style', 'tabbar.labels', 'tabbar.openOn', 'tabbar.minimizeOnScroll',
-            'bahw.habitsView', 'bahw.yearView', 'bahw.upcomingView', 'bahw.smartPresence',
-            'bahw.iphoneWidgetFamily', 'bahw.widgetIdentity', 'bahw.widgetScope',
+            'bahw.habitsView', 'bahw.yearView', 'bahw.upcomingView',
+            'bahw.iphoneWidgetFamily', 'bahw.widgetIdentity',
             'core.fontScale', 'core.motion', 'core.roomIdentity', 'salah.balanceView',
             'quran.toolsOrder', 'notif.roomPriority', 'notes.echoDistances', 'mihbara.shape',
             'mihbara.sunnahPlace', 'mihbara.pageStyle', 'mihbara.motivateStyle', 'mihbara.notebookStyle']

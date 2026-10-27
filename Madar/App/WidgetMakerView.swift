@@ -1,0 +1,216 @@
+import SwiftUI
+import SwiftData
+import WidgetKit
+import MadarCore
+import MadarData
+import MadarDesign
+import MadarCommands
+import MadarSnapshots
+
+struct WidgetMakerView: View {
+    @Bindable var session: AppSession
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @FocusState private var nameFocused: Bool
+    @State private var draft = WidgetMakerDraft()
+    @State private var baseline: WidgetMakerDraft?
+    @State private var saved: [WidgetMakerDraft] = []
+    @State private var rows: [WidgetCatalogSnapshot.Row] = []
+    @State private var habits: [HabitReading] = []
+    @State private var days: [BahwUpcomingItem] = []
+    @State private var busy = false
+    @State private var status = ""
+    @State private var deleting: WidgetMakerDraft?
+    @State private var discard = false
+    @State private var pendingSelection: WidgetMakerDraft?
+    @State private var beforeReset: (WidgetMakerStyle, String)?
+    private var theme: RoomTheme { .init(room: "bahw", dark: colorScheme == .dark) }
+    private var dirty: Bool { baseline.map { draft != $0 } ?? (!draft.name.isEmpty || !draft.items.isEmpty || draft.style != WidgetMakerStyle()) }
+    private var family: WidgetFamily {
+        if draft.familyID == "extraLargePortrait" {
+            if #available(iOS 27, *) { return .systemExtraLargePortrait }
+            return .systemLarge
+        }
+        return switch draft.familyID { case "small": .systemSmall; case "large": .systemLarge; case "accessoryCircular": .accessoryCircular; case "accessoryRectangular": .accessoryRectangular; case "accessoryInline": .accessoryInline; default: .systemMedium }
+    }
+    private var config: WidgetCatalogSnapshot.Config { .init(id: draft.id, name: draft.name.isEmpty ? "مدار" : draft.name, familyID: draft.familyID, styleJSON: (try? JSONEncoder().encode(draft.style)) ?? Data(), rows: rows) }
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                HStack {
+                    Button { if dirty { pendingSelection = nil; discard = true } else { dismiss() } } label: { Label("رجوع", systemImage: "chevron.right").frame(width: 72, height: 44) }.accessibilityIdentifier("widget-maker-close")
+                    Text("صانع الودجة").font(.custom("thmanyahserifdisplay-Bold", size: 24, relativeTo: .title2)).frame(maxWidth: .infinity).accessibilityIdentifier("widget-maker-title")
+                    Color.clear.frame(width: 72, height: 44)
+                }
+                Text("اصنعها مرة، واخترها حيث تحب").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).frame(maxWidth: .infinity)
+                preview
+                choices("المكان", selection: Binding(get: { draft.style.surface }, set: { surface in
+                    draft.style.surface = surface; draft.familyID = surface == "lock" ? "accessoryRectangular" : "medium"
+                }), options: [("home", "الرئيسية"), ("lock", "القفل"), ("lobby", "البهو"), ("standby", "الاستعداد")])
+                if draft.style.surface == "lock" {
+                    choices("معاينة الحجم", selection: $draft.familyID, options: [("accessoryCircular", "دائرية"), ("accessoryRectangular", "مستطيلة"), ("accessoryInline", "سطر")])
+                } else {
+                    choices("معاينة الحجم", selection: $draft.familyID, options: previewFamilies)
+                }
+                Text("تضيف ودجة النظام من معرض iOS، وتختار حجمها هناك. ثم اختر اسمها من «القالب».").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                contentChoices
+                if !draft.items.isEmpty { selectedOrder }
+                choices("العائلة", selection: $draft.style.family, options: [("manuscript", "مخطوط"), ("glass", "زجاج"), ("ink", "حبر")])
+                choices("الخط", selection: $draft.style.font, options: [("naskh", "نسخ"), ("modern", "حديث")])
+                choices("الأرقام", selection: $draft.style.numerals, options: [("hindi", "١٢٣"), ("western", "123")])
+                choices("الكثافة", selection: $draft.style.density, options: [("compact", "مضغوطة"), ("regular", "مريحة"), ("airy", "رحبة")])
+                Toggle("بالرسم", isOn: $draft.style.showArt).font(MadarTypography.body()).frame(minHeight: 44).accessibilityIdentifier("widget-maker-art")
+                colors
+                MadarCard {
+                    VStack(spacing: 12) {
+                        behavior("تتبدّل وحدها بالوقت", detail: "يتقدّم العدّ الأقرب، وتبقى أولويتك لبقية العناصر", value: $draft.style.smartBundle, id: "smart")
+                        Divider()
+                        behavior("تختفي إذا لا شيء يهمّ", detail: "تختفي من البهو، وتقل أولويتها في الرزمة الذكية", value: $draft.style.hideWhenEmpty, id: "empty")
+                        Divider()
+                        behavior("أخفِ المال على شاشة القفل", detail: "إخفاء المال خارج التطبيق يبقى هو الحاكم", value: $draft.style.hideMoney, id: "money")
+                        Divider()
+                        behavior("في رمضان تصير عدّ الإفطار", detail: "بتوقيت مدينتك أو وجهة سفرك", value: $draft.style.iftarCountdown, id: "iftar")
+                        Divider()
+                        behavior("أزرار تُتمّ من الودجة", detail: "خطوة من عادة مخصصة؛ العادة المربوطة تُفتح دون تسجيل", value: $draft.style.interactive, id: "interactive")
+                    }
+                }
+                Button("أعِد المظهر الافتراضي") { beforeReset = (draft.style, draft.familyID); draft.style = .init(); draft.familyID = "medium" }.frame(minHeight: 44)
+                if let previous = beforeReset { Button("تراجع عن إعادة المظهر") { draft.style = previous.0; draft.familyID = previous.1; beforeReset = nil }.frame(minHeight: 44) }
+                if !saved.isEmpty { savedWidgets }
+                if session.undoToken != nil {
+                    Button("تراجع عن آخر حفظ أو حذف") { session.undo() }.frame(minHeight: 44).accessibilityIdentifier("widget-maker-undo")
+                }
+            }.padding(16)
+        }
+        .background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.accentFill)
+        .environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar)
+        .safeAreaInset(edge: .bottom) { saveBar }
+        .interactiveDismissDisabled(dirty)
+        .alert("تجاهل تعديل الودجة؟", isPresented: $discard) {
+            Button("تجاهله", role: .destructive) {
+                if let pendingSelection { applySelection(pendingSelection); self.pendingSelection = nil } else { dismiss() }
+            }
+            Button("أكمل التعديل", role: .cancel) { pendingSelection = nil }
+        } message: { Text("التعديل الذي لم تحفظه لن يبقى.") }
+        .confirmationDialog("احذف الودجة المحفوظة؟", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), titleVisibility: .visible) {
+            if let deleting { Button("احذفها", role: .destructive) { remove(deleting) } }
+            Button("إلغاء", role: .cancel) { deleting = nil }
+        } message: { Text("يبقى محتوى غرفك كما هو، ويتاح التراجع. يظل موضع ودجة النظام تحت تحكم iOS.") }
+        .task { reload(); habits = (try? HabitRepository(context: ModelContext(session.container)).readings(at: session.prayerNow())) ?? []; days = AppBahwService(session: session).upcoming(limit: Int.max).filter { UUID(uuidString: $0.id) != nil } }
+        .task(id: draft.items.joined(separator: "|") + "-\(draft.style.iftarCountdown)-\(draft.style.surface)-\(session.prayerRevision)") {
+            try? await Task.sleep(for: .milliseconds(150)); guard !Task.isCancelled else { return }
+            rows = session.widgetMakerRows(draft, at: session.prayerNow(), outside: draft.style.surface != "lobby")
+        }
+        .onChange(of: session.prayerRevision) { reload() }
+    }
+    private var preview: some View {
+        VStack(spacing: 12) {
+            WidgetMakerContent(config: config, family: family, date: session.prayerNow(), timeZoneID: AppBahwService(session: session).prayerLocation().place.timeZoneID, emptyPrompt: draft.items.isEmpty ? "اختر المحتوى الذي تحب أن تراه" : nil)
+                .padding(14).frame(height: draft.familyID == "extraLargePortrait" ? 500 : family == .systemLarge ? 340 : draft.style.surface == "lock" ? 100 : 170)
+                .background(WidgetMakerContent.background(draft.style, dark: colorScheme == .dark), in: .rect(cornerRadius: 24))
+                .allowsHitTesting(false).accessibilityIdentifier("widget-maker-preview")
+            MadarDateLabel(session.dateLabels(AppBahwService(session: session).today), primaryFont: MadarTypography.fine(), secondaryFont: MadarTypography.fine())
+                .foregroundStyle(theme.secondaryInk)
+        }.padding(14).frame(maxWidth: .infinity).background(LinearGradient(colors: [theme.color("lapis").opacity(0.3), theme.color("amber").opacity(0.3)], startPoint: .top, endPoint: .bottom), in: .rect(cornerRadius: 28))
+    }
+    private var previewFamilies: [(String, String)] {
+        var families = [("small", "صغيرة"), ("medium", "متوسطة"), ("large", "كبيرة")]
+        if #available(iOS 27, *) { families.append(("extraLargePortrait", "ضخمة")) }
+        return families
+    }
+    private var contentChoices: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack { Text("ماذا تعرض؟").font(MadarTypography.section()); Spacer(); if !draft.items.isEmpty { Button("امسح") { draft.items = [] }.font(MadarTypography.caption()).frame(minHeight: 44) } }
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: dynamicTypeSize.isAccessibilitySize ? 2 : 3), spacing: 8) {
+                ForEach(WidgetMakerStyle.itemIDs, id: \.self) { id in
+                    Button { toggle(id) } label: {
+                        HStack { Text(title(id)).font(MadarTypography.caption()); Spacer(minLength: 3); if let n = draft.items.firstIndex(of: id) { Text(session.digits(n + 1)).font(MadarTypography.fine()).padding(5).background(theme.accentFill, in: .circle).foregroundStyle(theme.onAccent) } }
+                            .padding(10).frame(maxWidth: .infinity, minHeight: 48).background(theme.surface, in: .rect(cornerRadius: 16))
+                            .overlay { RoundedRectangle(cornerRadius: 16).stroke(draft.items.contains(id) ? theme.accentFill : theme.line) }
+                    }.buttonStyle(.plain).accessibilityAddTraits(draft.items.contains(id) ? .isSelected : []).accessibilityIdentifier("widget-item-" + id)
+                }
+            }
+            if !habits.isEmpty { Menu("عادة بعينها") { ForEach(habits) { habit in Button(habit.name) { toggle("habit:" + habit.id.uuidString) } } }.frame(minHeight: 44).accessibilityIdentifier("widget-pick-habit") }
+            if !days.isEmpty { Menu("يوم تختاره") { ForEach(days) { day in Button(day.title) { toggle("day:" + day.id) } } }.frame(minHeight: 44) }
+        }
+    }
+    private var selectedOrder: some View {
+        MadarCard {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("بالترتيب الذي تختاره").font(MadarTypography.section())
+                ForEach(draft.items, id: \.self) { id in
+                    HStack { Text(title(id)).font(MadarTypography.caption()); Spacer(); Button { move(id, -1) } label: { Image(systemName: "chevron.up").frame(width: 44, height: 44) }.disabled(draft.items.first == id); Button { move(id, 1) } label: { Image(systemName: "chevron.down").frame(width: 44, height: 44) }.disabled(draft.items.last == id) }
+                }
+            }
+        }
+    }
+    private var colors: some View {
+        HStack {
+            ForEach(["gold", "green", "blue", "clay", "plum", "sepia", "ink"], id: \.self) { color in
+                Button { draft.style.color = color } label: {
+                    var style = draft.style
+                    let _ = style.color = color
+                    Circle().fill(WidgetMakerContent.accent(style, dark: colorScheme == .dark)).frame(width: 30, height: 30)
+                        .padding(5).overlay { Circle().stroke(draft.style.color == color ? theme.accent : .clear, lineWidth: 2) }.frame(maxWidth: .infinity, minHeight: 44)
+                }.buttonStyle(.plain).accessibilityLabel(["gold": "ذهبي", "green": "أخضر", "blue": "أزرق", "clay": "طيني", "plum": "برقوقي", "sepia": "بني", "ink": "حبر"][color] ?? color).accessibilityAddTraits(draft.style.color == color ? .isSelected : []).accessibilityIdentifier("widget-color-" + color)
+            }
+        }
+    }
+    private var savedWidgets: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack { Text("ودجاتي").font(MadarTypography.section()); Spacer(); Button("جديدة") { select(.init()) }.frame(minHeight: 44) }
+            ForEach(saved) { item in
+                HStack {
+                    Button { select(item) } label: { VStack(alignment: .leading, spacing: 4) { Text(item.name).font(MadarTypography.section()); Text(item.items.map(title).joined(separator: "، ")).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).lineLimit(2) }.frame(maxWidth: .infinity, minHeight: 55, alignment: .leading) }.buttonStyle(.plain).accessibilityIdentifier("widget-saved-" + item.id.uuidString)
+                    Button { deleting = item } label: { Image(systemName: "trash").frame(width: 44, height: 44) }.accessibilityLabel("احذف " + item.name).accessibilityIdentifier("widget-delete-" + item.id.uuidString)
+                }.padding(12).background(theme.surface, in: .rect(cornerRadius: 18))
+            }
+        }
+    }
+    private var saveBar: some View {
+        VStack(spacing: 6) {
+            if !status.isEmpty { Text(status).font(MadarTypography.fine()).accessibilityIdentifier("widget-maker-status") }
+            HStack(spacing: 8) {
+                TextField("سَمِّ ودجتك…", text: $draft.name).focused($nameFocused).submitLabel(.done).onSubmit { nameFocused = false }.font(MadarTypography.body()).padding(12).background(theme.surface, in: .capsule).accessibilityIdentifier("widget-maker-name")
+                Button { save() } label: { if busy { ProgressView() } else { Text("احفظها").font(MadarTypography.section()) } }
+                    .frame(minWidth: 88, minHeight: 48).background(theme.accentFill, in: .capsule).foregroundStyle(theme.onAccent)
+                    .disabled(busy || draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || draft.name.count > 80 || draft.items.isEmpty).accessibilityIdentifier("widget-maker-save")
+            }
+        }.padding(12).background(theme.background)
+    }
+    private func choices(_ title: String, selection: Binding<String>, options: [(String, String)]) -> some View {
+        VStack(alignment: .leading, spacing: 8) { Text(title).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk); Picker(title, selection: selection) { ForEach(options, id: \.0) { option in Text(option.1).tag(option.0) } }.pickerStyle(.segmented) }
+    }
+    private func behavior(_ title: String, detail: String, value: Binding<Bool>, id: String) -> some View {
+        Toggle(isOn: value) { VStack(alignment: .leading, spacing: 4) { Text(title).font(MadarTypography.body()); Text(detail).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) } }.frame(minHeight: 52).accessibilityIdentifier("widget-behavior-" + id)
+    }
+    private func toggle(_ id: String) { if draft.items.contains(id) { draft.items.removeAll { $0 == id } } else if draft.items.count < 20 { draft.items.append(id) } }
+    private func move(_ id: String, _ delta: Int) { if let i = draft.items.firstIndex(of: id), draft.items.indices.contains(i + delta) { draft.items.swapAt(i, i + delta) } }
+    private func title(_ id: String) -> String {
+        if id.hasPrefix("habit:"), let habit = habits.first(where: { "habit:" + $0.id.uuidString == id }) { return habit.name }
+        if id.hasPrefix("day:"), let day = days.first(where: { "day:" + $0.id == id }) { return day.title }
+        return ["prayerNext": "الصلاة القادمة", "habitsToday": "عادات اليوم", "moneyNow": "لك الآن", "ramadan": "رمضان", "year": "نسبة السنة", "upcoming": "أقرب يوم", "quranCoverage": "في صدرك", "quranReview": "من القرآن اليوم", "book": "الكتاب", "hadith": "حديث اليوم", "diaryLine": "سطر اليوم", "hijriClock": "الساعة والتاريخان"][id] ?? "عنصر غير متاح"
+    }
+    private func applySelection(_ item: WidgetMakerDraft) { draft = item; baseline = saved.contains { $0.id == item.id } ? item : nil; status = "" }
+    private func select(_ item: WidgetMakerDraft) {
+        if dirty { pendingSelection = item; discard = true } else { applySelection(item) }
+    }
+    private func reload() {
+        do {
+            saved = try session.widgetMakerDrafts()
+            if baseline != nil && !dirty {
+                if let current = saved.first(where: { $0.id == draft.id }) { draft = current; baseline = current }
+                else { draft = .init(); baseline = nil; status = "" }
+            }
+        } catch { session.errorMessage = error.localizedDescription }
+    }
+    private func save() {
+        busy = true; let value = draft
+        Task { defer { busy = false }; do { try await session.saveWidget(value); baseline = value; status = "حُفظت «" + value.name + "»"; reload() } catch { session.errorMessage = error.localizedDescription } }
+    }
+    private func remove(_ item: WidgetMakerDraft) {
+        deleting = nil
+        Task { do { try await session.executeDiaryCommand("widget.delete", payload: ["id": .string(item.id.uuidString)]); if draft.id == item.id { draft = .init(); baseline = nil }; reload() } catch { session.errorMessage = error.localizedDescription } }
+    }
+}

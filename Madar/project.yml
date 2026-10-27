@@ -137,6 +137,9 @@ targets:
       - Intents/StartPrayerActivityIntent.swift
       - App/QuranWidgetContent.swift
       - App/RoomWidgetContent.swift
+      - App/WidgetMakerContent.swift
+      - App/MadarGlyph.swift
+      - Intents/WidgetCompleteHabitIntent.swift
       - App/MoneyWidgetContent.swift
       - App/Resources/RoomSymbols.xcassets
     dependencies:
@@ -173,6 +176,7 @@ targets:
       - package: MadarCommands
       - package: MadarMoney
       - package: MadarInbox
+      - package: MadarPrayer
   MadarUITests:
     type: bundle.ui-testing
     platform: iOS

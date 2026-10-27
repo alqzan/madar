@@ -255,14 +255,14 @@ struct BahwBlockView: View {
                 let periods=[HabitFrequency.daily,.weekly,.monthly,.yearly]
                 let open=periods.first{f in rows.contains{$0.summary.current?.rule.frequency == f && $0.summary.current?.met != true && !$0.paused}} ?? periods.first{f in rows.contains{$0.summary.current?.rule.frequency == f}} ?? .daily
                 let period=habitPeriod.flatMap{p in rows.contains{$0.summary.current?.rule.frequency == p} ? p : nil} ?? open
-                let shown=rows.filter{$0.summary.current?.rule.frequency == period}
+                let shown=service.session.habitRowsForWidgetScope(rows.filter{$0.summary.current?.rule.frequency == period})
                 if dynamicTypeSize.isAccessibilitySize {
                     ScrollView(.vertical) {
                         VStack(alignment: .leading, spacing: 4) {
                             HStack { ForEach(periods, id: \.self) { f in periodChoice(f, rows: rows, selected: f == period) } }
                             ForEach(Array(shown.prefix(6))) { row in habitListRow(row) }
                             if shown.count > 6 { Button("افتح بقية العادات") { service.session.habitsOpen = true }.font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 44) }
-                            BahwHabitsWide(rows: rows, digits: digits, theme: room, interactive: interactive, showsPeriods: false) { service.session.habitsOpen = true }
+                            BahwHabitsWide(rows: service.session.habitRowsForWidgetScope(rows), digits: digits, theme: room, interactive: interactive, showsPeriods: false) { service.session.habitsOpen = true }
                         }
                     }
                 } else {
@@ -271,18 +271,18 @@ struct BahwBlockView: View {
                         ForEach(Array(shown.prefix(6))) { row in habitRing(row) }
                     }
                     Spacer(minLength: 0)
-                    BahwHabitsWide(rows: rows, digits: digits, theme: room, interactive: interactive, showsPeriods: false) {
+                    BahwHabitsWide(rows: service.session.habitRowsForWidgetScope(rows), digits: digits, theme: room, interactive: interactive, showsPeriods: false) {
                         service.session.habitsOpen = true
                     }
                 }
             } else if size == .wide {
                 if dynamicTypeSize.isAccessibilitySize {
-                    BahwHabitsWide(rows: rows, digits: digits, theme: room, interactive: interactive) {
+                    BahwHabitsWide(rows: service.session.habitRowsForWidgetScope(rows), digits: digits, theme: room, interactive: interactive) {
                         service.session.habitsOpen = true
                     }
                 } else {
                     let daily = rows.filter { $0.summary.current?.rule.frequency == .daily }
-                    let shown = daily.isEmpty ? rows : daily
+                    let shown = service.session.habitRowsForWidgetScope(daily.isEmpty ? rows : daily)
                     HStack(alignment: .top, spacing: 3) {
                         ForEach(Array(shown.prefix(6))) { row in habitRing(row) }
                     }
@@ -294,8 +294,8 @@ struct BahwBlockView: View {
                 }
             } else {
                 Spacer(minLength:0)
-                HabitMiniRing(share:Double(met)/Double(max(1,rows.count)),theme:room).frame(width:34,height:34)
-                if let next=rows.first(where:{$0.summary.current?.met != true && !$0.paused}) {
+                HabitMiniRing(share:Double(met)/Double(max(1,daily.count)),theme:room).frame(width:34,height:34)
+                if let next=service.session.habitRowsForWidgetScope(rows).first(where:{$0.summary.current?.met != true && !$0.paused}) {
                     Text(next.name).font(small).lineLimit(1)
                 }
                 if size == .small, let risk=rows.first(where:{$0.summary.atRisk && !$0.paused}) {

@@ -14,7 +14,7 @@ extension AppSession {
         var payloads:[BuiltRoomWidget:RoomWidgetSnapshot]=[:]
         let readings=locked ? [] : ((try? HabitRepository(context:ModelContext(container)).readings(at:now)) ?? [])
         let eligible=readings.filter{$0.summary.current?.dueDays.contains(today)==true || $0.paused}
-        let ordered=eligible.enumerated().sorted { left,right in
+        let ordered=habitRowsForWidgetScope(eligible, at: now).enumerated().sorted { left,right in
             let a=left.element,b=right.element
             func rank(_ r:HabitReading)->Int{(r.summary.current?.met == true ? 100 : 0)+(r.paused ? 50 : 0)+(r.isNow ? 0 : 10)+(r.summary.atRisk ? 0 : 1)}
             return rank(a)==rank(b) ? left.offset<right.offset : rank(a)<rank(b)
@@ -99,5 +99,19 @@ extension AppSession {
             let title=p.rule.measure == .once ? "أتممتها" : p.rule.measure == .duration ? "+"+digits.string(15)+" دقيقة" : "+"+digits.string(1)+" "+(p.rule.unit.map(habitUnitName) ?? "مرة")
             return .init(id:r.id,title:r.name,stepTitle:title,step:step,periodKey:p.key,done:p.met)
         },periodsValidUntil:periodsValidUntil)
+    }
+}
+
+
+extension AppSession {
+    /// Owner 27 Oct: scope changes visible rows only; the device's full-day count keeps one definition.
+    func habitRowsForWidgetScope(_ rows: [HabitReading], at instant: Date? = nil) -> [HabitReading] {
+        guard string("bahw.widgetScope") == "todayOnly" else { return rows }
+        let today = AppBahwService(session: self, evaluationDate: instant).today
+        return rows.filter { row in
+            guard row.summary.current?.dueDays.contains(today) == true else { return false }
+            guard let rule = row.summary.current?.rule, rule.windowStart != nil && rule.windowEnd != nil else { return true }
+            return row.isNow
+        }
     }
 }

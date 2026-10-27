@@ -21,7 +21,9 @@ public enum DiaryEditorCommand: Codable, Equatable, Sendable {
     // §7.1 B03 «يوم تنتظره»: the row stores the rule; occurrences are derived.
     case saveUpcomingDay(id: UUID, title: String, calendar: String, year: Int?, month: Int, day: Int, repeats: String, countFrom: String, countUpAfter: Bool)
     case deleteUpcomingDay(UUID)
-    public static let names: Set<String> = ["diary.saveDraft", "diary.commitDraft", "diary.appendMedia", "diary.setTranscript", "diary.setIntention", "diary.setIntentionResult", "diary.editEntry", "diary.deleteEntry", "diary.sealLetter", "diary.refreshLetters", "diary.openLetter", "diary.rescheduleLetter", "diary.saveProject", "diary.finishProject", "diary.deleteProject", "diary.linkEntry", "bahw.saveUpcomingDay", "bahw.deleteUpcomingDay"]
+    case saveWidget(id: UUID, name: String, familyID: String, items: [String], style: WidgetMakerStyle)
+    case deleteWidget(UUID)
+    public static let names: Set<String> = ["diary.saveDraft", "diary.commitDraft", "diary.appendMedia", "diary.setTranscript", "diary.setIntention", "diary.setIntentionResult", "diary.editEntry", "diary.deleteEntry", "diary.sealLetter", "diary.refreshLetters", "diary.openLetter", "diary.rescheduleLetter", "diary.saveProject", "diary.finishProject", "diary.deleteProject", "diary.linkEntry", "bahw.saveUpcomingDay", "bahw.deleteUpcomingDay", "widget.save", "widget.delete"]
     public static func parse(_ name: String, _ value: [String: JSONValue]) -> Self? {
         func uuid(_ key: String) -> UUID? { value[key]?.string.flatMap(UUID.init(uuidString:)) }
         switch name {
@@ -94,6 +96,21 @@ public enum DiaryEditorCommand: Codable, Equatable, Sendable {
             if case .bool(let flag) = value["countUpAfter"] { countUp = flag } else if value["countUpAfter"] != nil && value["countUpAfter"] != .null { return nil }
             guard !countUp || repeats == "none" else { return nil }
             return .saveUpcomingDay(id: id, title: title, calendar: calendar, year: year, month: Int(m), day: Int(d), repeats: repeats, countFrom: from, countUpAfter: countUp)
+        case "widget.save":
+            guard Set(value.keys) == ["id", "name", "familyID", "items", "style"], let id = uuid("id"),
+                  let rawName = value["name"]?.string,
+                  let family = value["familyID"]?.string, WidgetMakerStyle.familyIDs.contains(family),
+                  case .array(let values) = value["items"], !values.isEmpty, values.count <= 20,
+                  let rawStyle = value["style"],
+                  let style = try? JSONDecoder().decode(WidgetMakerStyle.self, from: JSONEncoder().encode(rawStyle)), style.isValid else { return nil }
+            let title = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+            let items = values.compactMap(\.string)
+            guard !title.isEmpty, title.count <= 80, items.count == values.count,
+                  Set(items).count == items.count, items.allSatisfy(WidgetMakerStyle.validItem) else { return nil }
+            return .saveWidget(id: id, name: title, familyID: family, items: items, style: style)
+        case "widget.delete":
+            guard Set(value.keys) == ["id"], let id = uuid("id") else { return nil }
+            return .deleteWidget(id)
         case "bahw.deleteUpcomingDay": guard Set(value.keys) == ["id"], let id = uuid("id") else { return nil }; return .deleteUpcomingDay(id)
         case "diary.deleteProject": guard Set(value.keys) == ["id"], let id = uuid("id") else { return nil }; return .deleteProject(id)
         case "diary.linkEntry":

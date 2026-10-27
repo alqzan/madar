@@ -204,6 +204,18 @@ struct DiaryEntryDeletion: Codable {
                 row.triggerTargetID = try before.decode("triggerTargetID", as: UUID?.self); row.openAt = try before.decode("openAt", as: Date?.self)
                 row.state = try before.decode("state", as: String.self); row.updatedAt = StableIdentity.monotonic(now: now, previous: row.updatedAt); row.writerID = writer
             } else { try tombstone(row) }
+        } else if inverse.model == "WidgetConfig" {
+            guard let row = try context.fetch(FetchDescriptor<WidgetConfig>()).first(where: { $0.id == inverse.after.id && $0.mergedInto == nil }), try row.record() == inverse.after else { throw DataError.invalidValue("undo superseded: widget") }
+            if let before = inverse.before {
+                row.name = try before.decode("name", as: String.self)
+                row.familyID = try before.decode("familyID", as: String?.self)
+                row.items = try before.decode("items", as: [String].self)
+                row.styleJSON = try before.decode("styleJSON", as: Data.self)
+                row.deletedAt = try before.decode("deletedAt", as: Date?.self)
+                row.deletionBarrierAt = try before.decode("deletionBarrierAt", as: Date?.self)
+                if row.deletedAt == nil { row.restoredAt = now }
+                row.updatedAt = StableIdentity.monotonic(now: now, previous: row.updatedAt); row.writerID = writer
+            } else { try tombstone(row) }
         } else if inverse.model == "UpcomingDay" {
             guard let row = try context.fetch(FetchDescriptor<UpcomingDay>()).first(where: { $0.id == inverse.after.id && $0.mergedInto == nil }), try row.record() == inverse.after else { throw DataError.invalidValue("undo superseded: upcoming day") }
             if let before = inverse.before {

@@ -24,3 +24,12 @@
 - **Next:** continue scanning item 27 for reproducible journey gaps; J05 freeze-boundary field decision still awaits the owner. No `ready` card is listed.
 - **Model/effort:** not exposed / not exposed. Helpers did bounded read-only scans of lobby return storage and dates; no owner data was delegated.
 - **Usage:** live check: 28% used in the five-hour window and 15% weekly; continue until about 5% allowance remains, preserving commit/handover reserve.
+
+
+## Handover — حماية رصيد الحساب المخفي، متابعة مدار — 2026-10-26 — Codex
+- **Works now:** محرر الحساب لا يعرض رصيد البداية المحمي قبل «أظهر الأرقام»؛ وبعد الإظهار يبقى رصيد نقطة التحقق الثابتة غير قابل للتحرير.
+- **Verified:** `MoneyAccountsUITests` 2/2 على iPhone 17 Pro / iOS 26.5 (`codex-money-account-hidden-reveal-20261026-r1.xcresult`)، وصور الحالتين المحجوبة والمكشوفة محفوظة؛ فحص `git diff --check`.
+- **Differences left:** الورقة المحجوبة لا تملك صورة معيارية؛ قبول المالك البصري لم يحدث.
+- **Not verified:** تجربة جهاز المالك. وجد الفحص أن هدف الاحتياطي المحفوظ يعبأ في حقل `MoneyReserveTargetView` مع إخفاء الأرقام.
+- **Next:** عالج تسريب `reserveTargetMinor` في M5-V03: لا تعرض الحقل ولا تسمح بالحفظ قبل الإظهار؛ أضف حالة اختبار مركبة، ثم ارجع لمواصلة مسح التطبيق.
+- **Model/effort:** Codex، غير مكشوف. **Usage:** 34% مستخدم من نافذة 5 ساعات و25% أسبوعيًا عند التسليم؛ أوقف العمل بطلب المالك.

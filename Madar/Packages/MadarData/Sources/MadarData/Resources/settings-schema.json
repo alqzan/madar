@@ -890,17 +890,18 @@
    "options": [
     {
      "value": "todayAndAfter",
-     "label": "اليوم وما بعده"
+     "label": "اليوم كله"
     },
     {
      "value": "todayOnly",
-     "label": "اليوم فقط"
+     "label": "الآن فقط"
     }
    ],
+   "note": "اختيار المالك 27 أكتوبر 2026: الآن فقط = العادات التي حان وقتها؛ اليوم كله = يضيف نوافذها المتأخرة في اليوم نفسه، بلا الغد. العدّاد لليوم كله.",
    "storage": "Setting (synced)",
    "preset": true,
-   "availability": "v2",
-   "reviewFix": "RA8"
+   "availability": "v1",
+   "reviewFix": "owner-2026-10-27"
   },
   {
    "key": "bahw.yearView",
@@ -1024,11 +1025,11 @@
      "label": "حاضر"
     }
    ],
-   "note": "توصية",
+   "note": "اختيار المالك 27 أكتوبر 2026: اقتراحات داخل البهو فقط. هادئ = ما يحتاج فعلًا الآن؛ متوسط = يضيف ما تبقّى اليوم؛ حاضر = يضيف الخطوة التالية في الغرف. بلا إشعارات إضافية.",
    "storage": "Setting (synced)",
    "preset": true,
-   "availability": "v2",
-   "reviewFix": "RA8"
+   "availability": "v1",
+   "reviewFix": "owner-2026-10-27"
   },
   {
    "key": "bahw.widgetIdentity",

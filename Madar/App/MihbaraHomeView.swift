@@ -594,6 +594,7 @@ struct MihbaraHomeView: View {
     private func desk(_ r: MihbaraHomeReading) -> some View {
         VStack(spacing: 14) {
             HStack(alignment: .top) {
+                if !RoomHomeLayout(session: app, key: "mihbara.layout").hidden.contains("notebook") {
                 Button { sheet = .notebook } label: {
                     // The notebook stays yellow in dark, so its label keeps the light room's ink.
                     Text("دفتر").font(.custom("ArefRuqaa-Regular", size: 18, relativeTo: .headline))
@@ -602,6 +603,7 @@ struct MihbaraHomeView: View {
                         .overlay(alignment: .top) { Rectangle().fill(theme.color("goldUnderstandText").opacity(0.7)).frame(height: 3).padding(.horizontal, 5) }
                         .shadow(color: theme.ink.opacity(0.18), radius: 5, y: 4).rotationEffect(.degrees(-3))
                 }.buttonStyle(.plain).accessibilityLabel("الدفتر الخاص").accessibilityHint("ملاحظاتك الخاصة تبقى داخل المحبرة").accessibilityIdentifier("mihbara-notebook")
+                }
                 Spacer(minLength: 8)
                 if let b = tableBook, hasSavedPosition(b) { deskLabel("موضعك محفوظ").padding(.top, 12) }
                 Spacer(minLength: 8)

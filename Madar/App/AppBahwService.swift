@@ -3,6 +3,7 @@ import SwiftData
 import MadarCore
 import MadarData
 import MadarPrayer
+import MadarCommands
 import MadarSnapshots
 
 /// §7.1 lobby read models. Every number is read from the room that owns it; the lobby stores only its layout.
@@ -179,5 +180,50 @@ struct BahwUpcomingItem: Identifiable, Equatable {
         let formatter = DateFormatter(); formatter.locale = Locale(identifier: "ar_SA@numbers=" + (session.string("core.numerals") == "western" ? "latn" : "arab"))
         formatter.timeZone = zone.flatMap(TimeZone.init(identifier:)) ?? session.activePlace.timeZone; formatter.dateFormat = "h:mm a"
         return formatter.string(from: at)
+    }
+}
+
+
+struct BahwSuggestion: Identifiable {
+    enum Destination { case prayer, habit(UUID), quran, diary, money, mihbara }
+    let id: String
+    let title: String
+    let detail: String
+    let symbol: String
+    let destination: Destination
+}
+
+extension AppBahwService {
+    /// Owner 27 Oct: levels add useful in-app steps; they never schedule a notification or write a room's facts.
+    func suggestions() -> [BahwSuggestion] {
+        guard session.lockController?.canPresent(.app) ?? session.protectedDataAuthorized else { return [] }
+        let level = session.string("bahw.smartPresence")
+        let includesToday = ["medium", "present"].contains(level)
+        var result: [BahwSuggestion] = []
+        if let snapshot = try? session.prayerSnapshot(at: now),
+           snapshot.today.cells.contains(where: { snapshot.pending.contains($0.reference) && $0.canLog }) {
+            result.append(.init(id: "prayer", title: "كيف صلّيت؟", detail: "صلاة تنتظر تسجيلك، متى كنت مستعدًا", symbol: "MadarPrayer", destination: .prayer))
+        }
+        let readings = (try? HabitRepository(context: ModelContext(session.container)).readings(at: now)) ?? []
+        let due = readings.filter { !$0.paused && $0.summary.current?.met != true && ($0.summary.current?.target ?? 0) > 0 && $0.summary.current?.dueDays.contains(today) == true }
+        if let habit = due.first(where: \.isNow) ?? (includesToday ? due.first : nil) {
+            result.append(.init(id: "habit", title: habit.name, detail: habit.isNow ? "وقتها الآن" : "خطوة صغيرة مما تبقّى اليوم", symbol: "MadarHabits", destination: .habit(habit.id)))
+        }
+        if includesToday, let quran = try? AppQuranService(session: session).widgetSnapshot().payload,
+           quran.done < quran.total {
+            result.append(.init(id: "quran", title: quran.nextTitle, detail: quran.nextDetail, symbol: "MadarQuran", destination: .quran))
+        }
+        if level == "present" {
+            if let diary = diary(), diary.count == 0 {
+                result.append(.init(id: "notes", title: "سطر من يومك", detail: "ما الذي تحب أن يبقى من هذا اليوم؟", symbol: "MadarDiary", destination: .diary))
+            }
+            if let money = try? AppMoneyService(app: session).load(at: now), money.pendingCount > 0 {
+                result.append(.init(id: "money", title: "راجع رسائلك البنكية", detail: "رسائل تنتظر قرارك قبل أن تصبح حركات", symbol: "MadarMoney", destination: .money))
+            }
+            if let book = session.mihbaraWidgetSnapshot(locked: false, at: now).currentBook {
+                result.append(.init(id: "mihbara", title: "أكمل «" + book.title + "»", detail: book.currentPage.map { "موضعك محفوظ عند الصفحة " + digits.string($0) } ?? "ابدأ القراءة من رحل المحبرة", symbol: "books.vertical", destination: .mihbara))
+            }
+        }
+        return result
     }
 }

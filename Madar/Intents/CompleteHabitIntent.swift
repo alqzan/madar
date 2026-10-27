@@ -19,11 +19,12 @@ struct HabitShortcutEntity: AppEntity {
     let stepTitle: String
     var displayRepresentation: DisplayRepresentation { DisplayRepresentation(title: "\(title)", subtitle: "\(stepTitle)") }
 
-    static func snapshot(now: Date = .now) -> HabitShortcutSnapshot? {
+    static func envelope(now: Date = .now) -> SnapshotEnvelope<HabitShortcutSnapshot>? {
         guard let group = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.alqzan.madar2") else { return nil }
         return SnapshotStore(directory: group.appending(path: "Snapshots", directoryHint: .isDirectory))
-            .read(HabitShortcutSnapshot.name, as: HabitShortcutSnapshot.self, now: now)?.payload
+            .read(HabitShortcutSnapshot.name, as: HabitShortcutSnapshot.self, now: now)
     }
+    static func snapshot(now: Date = .now) -> HabitShortcutSnapshot? { envelope(now: now)?.payload }
 }
 
 struct HabitShortcutQuery: EntityStringQuery {
@@ -55,7 +56,8 @@ struct CompleteHabitIntent: AppIntent {
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let now = Date()
-        guard let snapshot = HabitShortcutEntity.snapshot(now: now),
+        guard let envelope = HabitShortcutEntity.envelope(now: now), let day = try? GregorianDay(envelope.dayKey),
+              case let snapshot = envelope.payload,
               let item = snapshot.items.first(where: { $0.id == habit.id }) else { throw CompleteHabitIntentError.notAvailable }
         if snapshot.periodsValidUntil <= now {
             try await continueInForeground("افتح مدار ليسجّلها في يومها الجديد.", alwaysConfirm: false)
@@ -66,7 +68,7 @@ struct CompleteHabitIntent: AppIntent {
             throw CompleteHabitIntentError.openMadar
         }
         let inbox = PendingInbox(directory: group.appending(path: "PendingInbox", directoryHint: .isDirectory))
-        do { try HabitInboxCommandWriter.complete(inbox: inbox, habitID: item.id, delta: item.step, periodKey: item.periodKey, source: .siri, issuedAt: now) }
+        do { try HabitInboxCommandWriter.complete(inbox: inbox, habitID: item.id, delta: item.step, periodKey: item.periodKey, source: .siri, issuedAt: now, day: day) }
         catch { throw CompleteHabitIntentError.openMadar }
         await MainActor.run { NotificationCenter.default.post(name: .madarInboxChanged, object: nil) }
         WidgetCenter.shared.reloadAllTimelines()

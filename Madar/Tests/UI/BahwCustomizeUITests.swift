@@ -106,6 +106,149 @@ import XCTest
         XCTAssertTrue(reminder.isHittable, app.debugDescription)
         XCTAssertTrue(reminder.label.contains("إشعار لطيف"), app.debugDescription)
     }
+    func testRoomContentVisibilityPersistsAndResetRestoresRooms() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
+                                 "MADAR_UI_HABIT_FIXTURE": "showcase", "MADAR_UI_QURAN_FIXTURE": "home",
+                                 "MADAR_UI_MONEY_FIXTURE": "showcase", "MADAR_UI_MIHBARA_FIXTURE": "home",
+                                 "MADAR_UI_NOW": "2026-10-15T20:00:00+03:00", "MADAR_UI_THEME": "light"]
+        app.launch(); finishOnboarding(app)
+        func openLayout(_ room: String) {
+            let customize = app.buttons["tab-customize"]
+            XCTAssertTrue(customize.waitForExistence(timeout: 15)); customize.tap()
+            if app.buttons["room-layout-back"].exists { app.buttons["room-layout-back"].tap() }
+            let search = app.textFields["settings-search"]
+            XCTAssertTrue(search.waitForExistence(timeout: 10))
+            if app.buttons["settings-clear-search"].exists { app.buttons["settings-clear-search"].tap() }
+            search.tap(); search.typeText("ما يعرضه كل باب\n")
+            let link = app.buttons["room-layout-" + room]
+            XCTAssertTrue(link.waitForExistence(timeout: 10), app.debugDescription); link.tap()
+            XCTAssertTrue(app.buttons["room-layout-reset"].waitForExistence(timeout: 10))
+        }
+        func setVisible(_ room: String, _ id: String, _ visible: Bool) {
+            let toggle = app.switches["room-block-" + room + "-" + id]
+            XCTAssertTrue(toggle.waitForExistence(timeout: 5), app.debugDescription)
+            if (toggle.value as? String == "1") != visible { toggle.tap() }
+            let saved = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", visible ? "1" : "0"), object: toggle)
+            XCTAssertEqual(XCTWaiter.wait(for: [saved], timeout: 10), .completed)
+        }
+        openLayout("quran")
+        XCTAssertFalse(app.switches["room-block-quran-sadr"].exists)
+        setVisible("quran", "log14", false); setVisible("quran", "tools", false)
+        capture(app, "OR-03-quran-content-L")
+        app.tabBars.buttons["القرآن"].tap()
+        XCTAssertTrue(app.staticTexts["quran-coverage-title"].waitForExistence(timeout: 15))
+        XCTAssertFalse(app.descendants(matching: .any)["quran-log14"].exists)
+        XCTAssertFalse(app.buttons["quran-tool-qiyam"].exists)
+        capture(app, "OR-03-quran-hidden-L")
+        app.terminate(); app.launch(); finishOnboarding(app)
+        app.tabBars.buttons["القرآن"].tap()
+        XCTAssertTrue(app.staticTexts["quran-coverage-title"].waitForExistence(timeout: 15))
+        XCTAssertFalse(app.descendants(matching: .any)["quran-log14"].exists)
+        openLayout("quran"); app.buttons["room-layout-reset"].tap()
+        let restored = app.switches["room-block-quran-log14"]
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == '1'"), object: restored)], timeout: 10), .completed)
+        app.tabBars.buttons["القرآن"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["quran-log14"].waitForExistence(timeout: 10))
+
+        openLayout("mal"); setVisible("mal", "limits", false)
+        XCTAssertFalse(app.switches["room-block-mal-now"].exists)
+        capture(app, "OR-03-money-content-L")
+        app.tabBars.buttons["المال"].tap()
+        XCTAssertTrue(app.buttons["money-obligations-open"].waitForExistence(timeout: 15))
+        XCTAssertFalse(app.buttons["money-categories-open"].exists)
+        app.terminate(); app.launch(); finishOnboarding(app); app.tabBars.buttons["المال"].tap()
+        XCTAssertTrue(app.buttons["money-obligations-open"].waitForExistence(timeout: 15))
+        XCTAssertFalse(app.buttons["money-categories-open"].exists)
+        openLayout("mal"); app.buttons["room-layout-reset"].tap()
+        let limits = app.switches["room-block-mal-limits"]
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == '1'"), object: limits)], timeout: 10), .completed)
+        app.tabBars.buttons["المال"].tap()
+        XCTAssertTrue(app.buttons["money-categories-open"].waitForExistence(timeout: 10))
+        openLayout("mihbara"); setVisible("mihbara", "notebook", false)
+        capture(app, "OR-03-mihbara-content-L")
+        app.tabBars.buttons["المحبرة"].tap()
+        XCTAssertTrue(app.buttons["mihbara-add-paper"].waitForExistence(timeout: 15))
+        XCTAssertFalse(app.buttons["mihbara-notebook"].exists)
+        openLayout("mihbara"); app.buttons["room-layout-reset"].tap()
+        let notebook = app.switches["room-block-mihbara-notebook"]
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == '1'"), object: notebook)], timeout: 10), .completed)
+        app.tabBars.buttons["المحبرة"].tap()
+        let book = app.buttons["mihbara-notebook"]
+        XCTAssertTrue(book.waitForExistence(timeout: 15))
+        for _ in 0..<4 { if book.isHittable { break }; app.swipeUp() }
+        book.tap()
+        XCTAssertTrue(app.buttons["mihbara-notebook-close"].waitForExistence(timeout: 10))
+    }
+
+    func testSmartPresenceLevelsUndoPersistAndOpenSuggestedRooms() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
+                                 "MADAR_UI_HABIT_FIXTURE": "empty", "MADAR_UI_QURAN_FIXTURE": "home",
+                                 "MADAR_UI_NOW": "2026-10-15T20:00:00+03:00", "MADAR_UI_THEME": "light"]
+        app.launch(); finishOnboarding(app)
+        func openSetting() {
+            app.buttons["tab-customize"].tap()
+            let search = app.textFields["settings-search"]
+            XCTAssertTrue(search.waitForExistence(timeout: 10))
+            if app.buttons["settings-clear-search"].exists { app.buttons["settings-clear-search"].tap() }
+            search.tap(); search.typeText("bahw.smartPresence\n")
+        }
+        func selected(_ id: String) {
+            let option = app.buttons["option-bahw.smartPresence-" + id]
+            XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "selected == true"), object: option)], timeout: 10), .completed)
+        }
+        func reveal(_ item: XCUIElement) {
+            for _ in 0..<8 { if item.isHittable && item.frame.maxY < app.frame.maxY - 170 { return }; app.swipeUp(velocity: .slow) }
+            XCTAssertTrue(item.isHittable, app.debugDescription)
+        }
+        app.tabBars.buttons["البهو"].tap()
+        XCTAssertFalse(app.buttons["bahw-suggestion-quran"].exists)
+        XCTAssertFalse(app.buttons["bahw-suggestion-notes"].exists)
+        openSetting(); selected("calm")
+        app.buttons["option-bahw.smartPresence-medium"].tap(); selected("medium")
+        app.tabBars.buttons["البهو"].tap()
+        let quran = app.buttons["bahw-suggestion-quran"]
+        XCTAssertTrue(quran.waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertFalse(app.buttons["bahw-suggestion-notes"].exists)
+        reveal(quran); capture(app, "OR-03-smart-medium-L"); quran.tap()
+        XCTAssertTrue(app.staticTexts["quran-coverage-title"].waitForExistence(timeout: 15))
+        openSetting(); app.buttons["option-bahw.smartPresence-present"].tap(); selected("present")
+        app.buttons["undo-button"].tap(); selected("medium")
+        app.buttons["option-bahw.smartPresence-present"].tap(); selected("present")
+        capture(app, "OR-03-smart-settings-L")
+        app.terminate(); app.launch(); finishOnboarding(app)
+        app.tabBars.buttons["البهو"].tap()
+        let diary = app.buttons["bahw-suggestion-notes"]
+        XCTAssertTrue(diary.waitForExistence(timeout: 15), app.debugDescription)
+        reveal(diary); capture(app, "OR-03-smart-present-L"); diary.tap()
+        XCTAssertTrue(app.textViews["diary-editor-text"].waitForExistence(timeout: 15), app.debugDescription)
+    }
+
+    func testHabitWidgetScopeLabelsUndoAndRelaunch() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_HABIT_FIXTURE": "showcase", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
+        app.launch()
+        func openScope() {
+            let tab = app.buttons["tab-customize"]; XCTAssertTrue(tab.waitForExistence(timeout: 15)); tab.tap()
+            let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10))
+            if app.buttons["settings-clear-search"].exists { app.buttons["settings-clear-search"].tap() }
+            search.tap(); search.typeText("bahw.widgetScope\n")
+        }
+        func selected(_ id: String) { XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "selected == true"), object: app.buttons[id])], timeout: 10), .completed) }
+        openScope()
+        let now = app.buttons["option-bahw.widgetScope-todayOnly"], full = app.buttons["option-bahw.widgetScope-todayAndAfter"]
+        XCTAssertTrue(full.waitForExistence(timeout: 10)); XCTAssertEqual(full.label, "اليوم كله"); XCTAssertEqual(now.label, "الآن فقط")
+        selected("option-bahw.widgetScope-todayAndAfter")
+        now.tap(); selected("option-bahw.widgetScope-todayOnly")
+        app.buttons["undo-button"].tap(); selected("option-bahw.widgetScope-todayAndAfter")
+        now.tap(); selected("option-bahw.widgetScope-todayOnly"); capture(app, "OR-03-habit-widget-scope-L")
+        app.terminate(); app.launch(); openScope(); selected("option-bahw.widgetScope-todayOnly")
+    }
+
     private func finishOnboarding(_ app: XCUIApplication) {
         if app.buttons["first-run-skip"].waitForExistence(timeout: 2) { app.buttons["first-run-skip"].tap() }
         let start = app.buttons["first-run-continue"]

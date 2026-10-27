@@ -107,7 +107,7 @@ final class AppSession {
     @ObservationIgnored private var spotlightReconciliationTask: Task<Void, Never>?
     @ObservationIgnored private let spotlightIndexOperation: AppSpotlightIndexOperation
 
-    static let supportedKeys = ["core.dayStart", "core.firstCalendar", "core.hijriSource", "core.hijriOffset", "core.weekStart", "core.theme", "core.numerals", "core.homeCity", "core.faceIDLock", "core.spotlightIndex", "salah.askAfterAdhanMin", "salah.askReminder", "salah.liveActivity", "salah.showMosqueStreak", "salah.askHeart", "salah.method", "salah.asr", "salah.highLatitudeRule", "salah.offsets", "notif.thisDeviceReminders", "notif.quietAfterIsha", "notif.quietFrom", "bahw.yearWhich", "bahw.upcomingCount", "bahw.streakBreakAfter", "bahw.reminder", "bahw.travelFreezesHome"]
+    static let supportedKeys = ["core.dayStart", "core.firstCalendar", "core.hijriSource", "core.hijriOffset", "core.weekStart", "core.theme", "core.numerals", "core.homeCity", "core.faceIDLock", "core.spotlightIndex", "salah.askAfterAdhanMin", "salah.askReminder", "salah.liveActivity", "salah.showMosqueStreak", "salah.askHeart", "salah.method", "salah.asr", "salah.highLatitudeRule", "salah.offsets", "notif.thisDeviceReminders", "notif.quietAfterIsha", "notif.quietFrom", "bahw.yearWhich", "bahw.upcomingCount", "bahw.streakBreakAfter", "bahw.reminder", "bahw.travelFreezesHome", "bahw.smartPresence", "bahw.widgetScope"]
 
     init(
         container: ModelContainer,
@@ -866,7 +866,7 @@ final class AppSession {
         let result = reschedules ? try await withSerializedPrayerNotificationMutation { try await run() } : try await run()
         if let id = result.undoToken {
             let token = AppUndoToken(id: id, expiresAt: now.addingTimeInterval(600))
-            showUndo(token, message: name.hasPrefix("habit.") ? "حُفظت العادة" : name == "bahw.saveUpcomingDay" ? "حُفظ اليوم" : name == "bahw.deleteUpcomingDay" ? "حُذف اليوم" : name == "diary.deleteEntry" ? "حُذف السطر" : name.contains("Intention") ? "حُفظت النيّة" : "حُفظ السطر")
+            showUndo(token, message: name.hasPrefix("habit.") ? "حُفظت العادة" : name == "widget.save" ? "حُفظت الودجة" : name == "widget.delete" ? "حُذفت الودجة" : name == "bahw.saveUpcomingDay" ? "حُفظ اليوم" : name == "bahw.deleteUpcomingDay" ? "حُذف اليوم" : name == "diary.deleteEntry" ? "حُذف السطر" : name.contains("Intention") ? "حُفظت النيّة" : "حُفظ السطر")
             if name == "diary.deleteEntry" { scheduleDiaryMediaCleanup(after: token.expiresAt) }
         }
     }
@@ -1025,6 +1025,8 @@ final class AppSession {
             try? snapshotStore.remove("quran")
             for room in BuiltRoomWidget.allCases {try? snapshotStore.remove(room.rawValue)}
             try? snapshotStore.remove(HabitShortcutSnapshot.name)
+            try? snapshotStore.remove(WidgetCatalogSnapshot.name)
+            try? snapshotStore.remove(WidgetCatalogSnapshot.valuesName)
             return
         }
         let snapshot = SnapshotEnvelope(name: "foundation", generatedAt: instant, validUntil: instant.addingTimeInterval(3600), dayKey: key.dayKey, tzID: place.timeZoneID, privacy: SnapshotPrivacy(), payload: FoundationSnapshot(firstCalendar: string("core.firstCalendar"), numerals: string("core.numerals")))
@@ -1034,6 +1036,7 @@ final class AppSession {
         let quran = AppQuranService(session: self, clock: { instant })
         do { try snapshotStore.write(quran.widgetSnapshot()); WidgetCenter.shared.reloadTimelines(ofKind: "MadarQuran") }
         catch { try? snapshotStore.remove("quran") }
+        try publishWidgetCatalog(at: instant)
     }
     /// The next-prayer widget reads this file only; it holds times, never counts or streaks (RP9, RU2).
     private func publishPrayerNextSnapshot(at instant: Date, tzID: String, dayKey: String) {

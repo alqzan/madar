@@ -40,6 +40,7 @@ private struct FoundationWidget: Widget {
 @main struct MadarWidgetBundle: WidgetBundle {
     var body: some Widget {
         FoundationWidget()
+        MadarMakerWidget()
         NextPrayerWidget()
         QuranWidget()
         AdditionalRoomWidgets().body

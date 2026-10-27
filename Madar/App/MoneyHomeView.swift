@@ -115,18 +115,31 @@ struct MoneyHomeView: View {
             VStack(alignment: .leading, spacing: 10) {
                 header
                 if let reading {
-                    if let cycle = reading.cycle {
-                        if dynamicType.isAccessibilitySize { cycleSummary(cycle) }
-                        else { MoneyScrollChart(cycle: cycle, app: app, visible: amountsVisible, obligations: reading.obligations).frame(height: 224) }
-                        headline(reading, cycle: cycle)
-                    } else { firstPage(reading) }
-                    if reading.unknownBalanceCount > 0 {
-                        Text("بعض الحسابات لم يُعرف رصيدها بعد؛ لا تدخل في المجموع.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                        Button("المطابقة مع البنك") { reconcileOpen = true }.font(MadarTypography.body()).frame(minHeight: 44).accessibilityIdentifier("money-unknown-balance-reconcile")
+                    let blocks = RoomHomeLayout(session: app, key: "mal.layout").visible
+                    ForEach(blocks, id: \.self) { id in
+                        switch id {
+                        case "curve":
+                            if let cycle = reading.cycle {
+                                if dynamicType.isAccessibilitySize { cycleSummary(cycle) }
+                                else { MoneyScrollChart(cycle: cycle, app: app, visible: amountsVisible, obligations: reading.obligations).frame(height: 224) }
+                            }
+                        case "now":
+                            if let cycle = reading.cycle { headline(reading, cycle: cycle) }
+                            else { firstPage(reading) }
+                            if reading.unknownBalanceCount > 0 {
+                                Text("بعض الحسابات لم يُعرف رصيدها بعد؛ لا تدخل في المجموع.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                                Button("المطابقة مع البنك") { reconcileOpen = true }.font(MadarTypography.body()).frame(minHeight: 44).accessibilityIdentifier("money-unknown-balance-reconcile")
+                            }
+                            expenseButton
+                        case "envelopes": envelopeSection(reading)
+                        case "limits":
+                            if blocks.firstIndex(of: "obligations") == blocks.firstIndex(of: "limits").map({ $0 + 1 }) { lowerDesk(reading) }
+                            else { limits(reading) }
+                        case "obligations":
+                            if blocks.firstIndex(of: "obligations") != blocks.firstIndex(of: "limits").map({ $0 + 1 }) { obligations(reading) }
+                        default: EmptyView()
+                        }
                     }
-                    expenseButton
-                    envelopeSection(reading)
-                    lowerDesk(reading)
                     doors
                 } else if let failure {
                     VStack(alignment: .leading, spacing: 12) {
