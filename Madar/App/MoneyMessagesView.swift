@@ -141,15 +141,15 @@ struct MoneyMessagesView: View {
                         .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                 }
             }
-            HStack(alignment: .top, spacing: 12) {
-                figure("المستحق", amount(s.statementMinor), tint: theme.ink)
-                figure("الحد الأدنى", s.minimumMinor.map { amount($0) } ?? "—", tint: theme.ink)
-                VStack(alignment: .leading, spacing: 4) {
-                    Rectangle().fill(theme.color("accent")).frame(height: 2)
-                    Text("الاستحقاق").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
-                    if let due = s.due { MadarDateLabel(app.dateLabels(due, compact: true), primaryFont: .custom("thmanyahserifdisplay-Bold", size: 17, relativeTo: .headline), secondaryFont: MadarTypography.fine()).foregroundStyle(theme.color("accent")).lineLimit(1) }
-                    else { Text("—").font(MadarTypography.cardTitle()) }
-                }.frame(maxWidth: .infinity, alignment: .leading)
+            if dynamicType.isAccessibilitySize {
+                statementFigures(s)
+                statementMiniature(s)
+            } else {
+                HStack(alignment: .center, spacing: 8) {
+                    statementFigures(s)
+                    Image(systemName: "arrow.left").font(.system(size: 12)).foregroundStyle(theme.color("reserveText")).accessibilityHidden(true)
+                    statementMiniature(s)
+                }
             }
             if let difference = s.differenceMinor, s.cardName != nil {
                 Text((difference > 0 ? "يزيد " : "ينقص ") + amount(abs(difference)) + " عن المسجّل على البطاقة منذ الكشف السابق")
@@ -172,6 +172,39 @@ struct MoneyMessagesView: View {
             }
         }.padding(16).background(theme.surface).overlay { TicketEdge().stroke(theme.color("reserveText"), lineWidth: 1) }
             .accessibilityElement(children: .contain).accessibilityIdentifier("money-statement")
+    }
+    private func statementFigures(_ s: MoneyMessageStatement) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+                figure("المستحق", amount(s.statementMinor), tint: theme.ink)
+                figure("الحد الأدنى", s.minimumMinor.map { amount($0) } ?? "—", tint: theme.ink)
+                VStack(alignment: .leading, spacing: 4) {
+                    Rectangle().fill(theme.color("accent")).frame(height: 2)
+                    Text("الاستحقاق").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                    if let due = s.due { MadarDateLabel(app.dateLabels(due, compact: true), primaryFont: .custom("thmanyahserifdisplay-Bold", size: 17, relativeTo: .headline), secondaryFont: MadarTypography.fine()).foregroundStyle(theme.color("accent")) }
+                    else { Text("—").font(MadarTypography.cardTitle()) }
+                }.frame(maxWidth: .infinity, alignment: .leading)
+            }
+    }
+    private func statementMiniature(_ s: MoneyMessageStatement) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(s.cardName ?? "بطاقة غير معروفة")
+                .font(.custom("thmanyahserifdisplay-Bold", size: 11, relativeTo: .caption2)).lineLimit(2)
+            Spacer(minLength: 0)
+            HStack(spacing: 4) {
+                Text(service.digits.localized(s.last4)).font(.system(size: 11, weight: .medium, design: .monospaced))
+                    .environment(\.layoutDirection, .leftToRight)
+                Spacer(minLength: 0)
+                RoundedRectangle(cornerRadius: 2).stroke(theme.background.opacity(0.7), lineWidth: 0.8).frame(width: 12, height: 9)
+                    .accessibilityHidden(true)
+            }
+        }
+        .padding(7).frame(width: 82, height: 60)
+        .foregroundStyle(theme.background).background(theme.ink, in: .rect(cornerRadius: 8))
+        .overlay { RoundedRectangle(cornerRadius: 6).stroke(theme.color("reserve"), lineWidth: 1).padding(3) }
+        .rotationEffect(.degrees(-3))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("بطاقة الكشف: " + (s.cardName ?? "غير معروفة") + "، تنتهي بـ" + service.digits.localized(s.last4))
+        .accessibilityIdentifier("money-statement-card-preview")
     }
     private func figure(_ title: String, _ value: String, tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 4) {

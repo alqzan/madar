@@ -127,6 +127,9 @@ import UIKit
         let clear = app.buttons["money-confirm-clear"]
         XCTAssertTrue(review.label.contains("٦"), review.label)
         XCTAssertTrue(app.descendants(matching: .any)["money-statement"].exists)
+        let statementCard = app.descendants(matching: .any)["money-statement-card-preview"]
+        XCTAssertTrue(statementCard.exists)
+        XCTAssertTrue(statementCard.label.contains("تنتهي بـ"))
         shot(app, "M5-V05-msg-L")
         var sawDuplicate = app.descendants(matching: .any)["money-draft-duplicate"].exists
         for _ in 0..<8 where !clear.isHittable {
