@@ -52,10 +52,14 @@ struct HabitsRoomView: View {
                 VStack(alignment:.leading,spacing:8) {
                     if active.isEmpty { empty }
                     else {
-                        // Owner 24 Oct chose «خطوة اليوم»: one direct list with one tap per habit. The hero names
-                        // the next useful step, «اليوم» holds only what is due now, «كل عاداتي» the whole picture.
                         periodSummaries
-                        hero
+                        if active.count > 1 && !dynamicTypeSize.isAccessibilitySize {
+                            nextStep
+                            HabitOrbitView(readings: active, digits: digits, theme: theme) { detail = $0 }
+                                .accessibilityElement(children: .contain).accessibilityIdentifier("habits-orbit")
+                        } else {
+                            hero
+                        }
                         viewSwitch
                         if showAll { allList } else { todayList }
                         Button { editor = .init(id:UUID()) } label: { Label("عادة صغيرة جديدة",systemImage:"plus").font(MadarTypography.caption()).frame(maxWidth:.infinity,minHeight:48).overlay { RoundedRectangle(cornerRadius:16).stroke(theme.line,style:.init(lineWidth:1,dash:[4,4])) }.contentShape(.rect) }
@@ -143,6 +147,32 @@ struct HabitsRoomView: View {
         default: return r.name+": سجّل "+habitOneMore(p.rule.unit)
         }
     }
+    /// W2's short invitation leaves the full orbit as the room's focal point.
+    private var nextStep: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "sparkle").foregroundStyle(theme.accent)
+            Text(headline.title).font(MadarTypography.caption())
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+            if let next = openToday.first {
+                Button {
+                    if next.source == nil, let period = next.summary.current {
+                        perform("habit.complete", ["id": .string(next.id.uuidString),
+                                                  "delta": .number(period.rule.measure == .duration ? 15 : 1)])
+                    } else { detail = next }
+                } label: {
+                    Text(next.source == nil ? "سجّل" : "افتحها").font(MadarTypography.caption())
+                        .padding(.horizontal, 14).frame(minHeight: 44)
+                        .background(theme.accentFill, in: .capsule).foregroundStyle(theme.onAccent)
+                }
+                .buttonStyle(.plain).accessibilityLabel(heroAction(next)).accessibilityIdentifier("habits-next")
+            }
+        }
+        .padding(12).frame(maxWidth: .infinity, alignment: .leading)
+        .background(theme.surface, in: .rect(cornerRadius: 18))
+        .overlay { RoundedRectangle(cornerRadius: 18).stroke(theme.line) }
+    }
+
     private var hero: some View {
         let rows = todayRows, done = rows.count - openToday.count
         let share = rows.isEmpty ? 0 : Double(done)/Double(rows.count), line = headline

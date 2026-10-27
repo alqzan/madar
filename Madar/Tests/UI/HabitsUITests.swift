@@ -18,8 +18,8 @@ import UIKit
             shot(app, "M4-auto-\(appearance)-lobby-L"); try assertPaper(app, dark: appearance == "dark")
             open(app)
             shot(app, "M4-auto-\(appearance)-habits-L"); try assertPaper(app, dark: appearance == "dark")
-            let water = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "الماء،")).firstMatch
-            XCTAssertTrue(water.waitForExistence(timeout: 5)); water.tap()
+            let water = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label BEGINSWITH %@", "habit-row-", "الماء،")).firstMatch
+            XCTAssertTrue(water.waitForExistence(timeout: 5)); for _ in 0..<6 where !water.isHittable || water.frame.maxY > app.frame.maxY - 150 { app.swipeUp(velocity: .slow) }; water.tap()
             XCTAssertTrue(app.staticTexts["habit-progress"].waitForExistence(timeout: 5))
             shot(app, "M4-auto-\(appearance)-detail-L"); try assertPaper(app, dark: appearance == "dark")
             let past = app.buttons["habit-past-day"]
@@ -150,10 +150,24 @@ import UIKit
         let today=app.buttons["habits-view-today"],all=app.buttons["habits-view-all"]
         XCTAssertTrue(today.waitForExistence(timeout:5),app.debugDescription);XCTAssertTrue(today.isSelected)
         XCTAssertTrue(app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@","الماء،")).firstMatch.exists)
-        XCTAssertFalse(app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@","العمرة")).firstMatch.exists)
-        app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@","الماء،")).firstMatch.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["habits-orbit"].exists)
+        XCTAssertFalse(app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH %@ AND label BEGINSWITH %@","habit-row-", "العمرة")).firstMatch.exists)
+        let yearlyBead = app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH %@ AND label BEGINSWITH %@", "habit-orbit-", "العمرة")).firstMatch
+        XCTAssertTrue(yearlyBead.exists); yearlyBead.tap()
+        XCTAssertTrue(app.staticTexts["habit-progress"].waitForExistence(timeout: 5)); app.buttons["تمّ"].tap()
+        // The orbit sits above the lists, so rows are scrolled clear of the floating accessory before a tap.
+        let accessory=app.descendants(matching:.any).matching(identifier:"tab-accessory-next-prayer").firstMatch
+        func reveal(_ e:XCUIElement) {
+            for _ in 0..<8 {
+                let floor=accessory.exists ? accessory.frame.minY : app.frame.maxY-120
+                if e.isHittable && e.frame.minY >= 90 && e.frame.maxY <= floor { return }
+                if e.exists && e.frame.minY < 90 { app.swipeDown(velocity:.slow) } else { app.swipeUp(velocity:.slow) }
+            }
+        }
+        let water=app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH %@ AND label BEGINSWITH %@","habit-row-","الماء،")).firstMatch
+        reveal(water);water.tap()
         XCTAssertTrue(app.staticTexts["habit-progress"].waitForExistence(timeout:5));shot(app,"M4-V02-detail-L");app.buttons["تمّ"].tap()
-        all.tap();XCTAssertTrue(all.isSelected)
+        reveal(all);all.tap();XCTAssertTrue(all.isSelected)
         for habit in ["الماء،","الاتصال بالأخوال","صدقة الشهر","العمرة"] {
             XCTAssertTrue(app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@",habit)).firstMatch.waitForExistence(timeout:5),habit)
         }
@@ -193,20 +207,20 @@ import UIKit
     func testScheduledMonthlyAndYearlyHabitsAppearOnTheirDates() {
         continueAfterFailure = false
         let app = app("scheduledToday"); open(app)
-        let monthly = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "صدقة شهرية محددة")).firstMatch
-        let yearly = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "موعد سنوي محدد")).firstMatch
+        let monthly = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label BEGINSWITH %@", "habit-row-", "صدقة شهرية محددة")).firstMatch
+        let yearly = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label BEGINSWITH %@", "habit-row-", "موعد سنوي محدد")).firstMatch
         shot(app, "M4-V02-scheduled-due-after-L")
         XCTAssertTrue(monthly.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertTrue(yearly.waitForExistence(timeout: 5), app.debugDescription)
-        XCTAssertFalse(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "هدف شهري مرن")).firstMatch.exists, app.debugDescription)
+        XCTAssertFalse(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label BEGINSWITH %@", "habit-row-", "هدف شهري مرن")).firstMatch.exists, app.debugDescription)
     }
     func testFixedMonthlyAndYearlyHabitsStayHiddenBeforeTheirDates() {
         continueAfterFailure = false
         let app = app("scheduledEarly", now: "2026-12-25T20:00:00+03:00"); open(app)
         shot(app, "M4-V02-scheduled-early-L")
-        XCTAssertFalse(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "صدقة شهرية محددة")).firstMatch.exists, app.debugDescription)
-        XCTAssertFalse(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "موعد سنوي محدد")).firstMatch.exists, app.debugDescription)
-        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "هدف شهري مرن")).firstMatch.exists, app.debugDescription)
+        XCTAssertFalse(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label BEGINSWITH %@", "habit-row-", "صدقة شهرية محددة")).firstMatch.exists, app.debugDescription)
+        XCTAssertFalse(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label BEGINSWITH %@", "habit-row-", "موعد سنوي محدد")).firstMatch.exists, app.debugDescription)
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label BEGINSWITH %@", "habit-row-", "هدف شهري مرن")).firstMatch.exists, app.debugDescription)
     }
     func testAtRiskFixedHabitsStayHiddenBeforeTheirDates() {
         continueAfterFailure = false
