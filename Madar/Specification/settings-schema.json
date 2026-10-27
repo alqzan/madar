@@ -2072,6 +2072,56 @@
    "preset": true
   },
   {
+   "key": "mal.hawlStyle",
+   "owner": "mal",
+   "section": "الغرفة",
+   "title": "رسم الحول",
+   "type": "choice",
+   "default": "crescents",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "crescents",
+     "label": "الأهلّة"
+    },
+    {
+     "value": "orbit",
+     "label": "دورة القمر"
+    },
+    {
+     "value": "calendar",
+     "label": "تقويم الأشهر"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "mal.figureStyle",
+   "owner": "mal",
+   "section": "الغرفة",
+   "title": "شكل الأرقام",
+   "type": "choice",
+   "default": "heritage",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "heritage",
+     "label": "عريضة"
+    },
+    {
+     "value": "modern",
+     "label": "حديثة"
+    },
+    {
+     "value": "classic",
+     "label": "كلاسيكية"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
    "key": "mal.analysisDefault",
    "owner": "mal",
    "section": "السجلّ والتحليل",
@@ -2512,6 +2562,56 @@
     {
      "value": "brown",
      "label": "بنّي"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "notes.ramadanStyle",
+   "owner": "notes",
+   "section": "الجمعة ورمضان",
+   "title": "شكل رمضان",
+   "type": "choice",
+   "default": "night",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "night",
+     "label": "ليل رمضان"
+    },
+    {
+     "value": "lantern",
+     "label": "فانوس"
+    },
+    {
+     "value": "paper",
+     "label": "ورق رمضاني"
+    }
+   ],
+   "storage": "Setting (synced)",
+   "preset": true
+  },
+  {
+   "key": "notes.fridayStyle",
+   "owner": "notes",
+   "section": "الجمعة ورمضان",
+   "title": "شكل الجمعة",
+   "type": "choice",
+   "default": "mihrab",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "mihrab",
+     "label": "محراب"
+    },
+    {
+     "value": "ribbon",
+     "label": "شريط"
+    },
+    {
+     "value": "medallion",
+     "label": "زخرفة"
     }
    ],
    "storage": "Setting (synced)",

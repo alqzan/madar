@@ -134,6 +134,7 @@ final class AppSession {
         #if DEBUG
         try preparePrayerUITestTrackingStart()
         try preparePrayerPolarNoTimesFixture()
+        try prepareStyleSettingsFixture()
         try preparePrayerStatisticsFixture()
         try preparePrayerHomeShowcaseFixture()
         try preparePrayerStreakShowcaseFixture()
@@ -441,6 +442,19 @@ final class AppSession {
         }
     }
     #if DEBUG
+    /// OR-15/16/27 screenshots: picks one of the appearance looks in an isolated UI-test store, e.g.
+    /// MADAR_UI_STYLE_SETTINGS="mal.hawlStyle=orbit,notes.fridayStyle=medallion". Only these four keys are accepted.
+    private func prepareStyleSettingsFixture() throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard UUID(uuidString: environment["MADAR_UI_STORE_ID"] ?? "") != nil, let raw = environment["MADAR_UI_STYLE_SETTINGS"] else { return }
+        let allowed: Set = ["mal.figureStyle", "mal.hawlStyle", "notes.fridayStyle", "notes.ramadanStyle"]
+        for pair in raw.split(separator: ",") {
+            let parts = pair.split(separator: "=", maxSplits: 1).map(String.init)
+            guard parts.count == 2, allowed.contains(parts[0]) else { continue }
+            try store.prepare(.string(parts[1]), for: parts[0], now: prayerNow())
+        }
+        try container.mainContext.save()
+    }
     /// Isolated UI-test fixture for the contract that polar days have no invented times but remain manually loggable.
     private func preparePrayerPolarNoTimesFixture() throws {
         let environment = ProcessInfo.processInfo.environment

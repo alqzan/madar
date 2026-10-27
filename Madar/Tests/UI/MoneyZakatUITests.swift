@@ -2,11 +2,20 @@ import XCTest
 
 @MainActor final class MoneyZakatUITests:XCTestCase {
     private func shot(_ app:XCUIApplication,_ name:String){let a=XCTAttachment(screenshot:app.screenshot());a.name=name;a.lifetime = .keepAlways;add(a)}
-    private func open(_ fixture:String)->XCUIApplication{
-        let app=XCUIApplication();app.launchEnvironment=["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_MONEY_FIXTURE":fixture,"MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light","MADAR_UI_NOW":"2026-10-17T12:00:00+03:00"]
+    private func open(_ fixture:String,styles:String?=nil)->XCUIApplication{
+        let app=XCUIApplication();app.launchEnvironment=["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_MONEY_FIXTURE":fixture,"MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light","MADAR_UI_NOW":"2026-10-17T12:00:00+03:00"];if let styles{app.launchEnvironment["MADAR_UI_STYLE_SETTINGS"]=styles}
         app.launch();let tab=app.buttons["tab-customize"];XCTAssertTrue(tab.waitForExistence(timeout:20));tab.tap()
         let search=app.textFields["settings-search"];XCTAssertTrue(search.waitForExistence(timeout:10));search.tap();search.typeText("المال");app.buttons["money-open"].tap()
         let door=app.buttons["money-zakat-open"];XCTAssertTrue(door.waitForExistence(timeout:10));for _ in 0..<8 where !door.isHittable{app.swipeUp(velocity:.slow)};door.tap();XCTAssertTrue(app.staticTexts["money-zakat-result"].waitForExistence(timeout:10));return app
+    }
+    /// OR-27: each hawl drawing and figure style the owner can pick in the room settings.
+    func testHawlAndFigureStylesFromSettings(){
+        continueAfterFailure=false
+        for (hawl,figure) in [("crescents","heritage"),("orbit","modern"),("calendar","classic")] {
+            let app=open("zakat",styles:"mal.hawlStyle="+hawl+",mal.figureStyle="+figure)
+            XCTAssertTrue(app.descendants(matching:.any)["money-zakat-hawl-art-"+hawl].waitForExistence(timeout:10),hawl)
+            XCTAssertTrue(app.staticTexts["money-zakat-hawl"].exists,hawl);shot(app,"M5-V22-style-"+hawl+"-L");app.terminate()
+        }
     }
     func testScaleHawlPriceUpdateDoesNotChangeTheResultAndUndoRestoresPrice(){
         continueAfterFailure=false

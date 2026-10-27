@@ -87,7 +87,7 @@ struct MoneyBigExpenseView: View {
         VStack(alignment: .leading, spacing: 5) {
             Text(r.title).font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
             HStack(alignment: .firstTextBaseline) {
-                Text(figure: amount(r.amountMinor)).font(.custom("thmanyahserifdisplay-Black", size: 48, relativeTo: .largeTitle)).accessibilityIdentifier("money-big-amount")
+                MoneyFigure(value: amount(r.amountMinor), style: MoneyFigureStyle(app), size: 52).accessibilityIdentifier("money-big-amount")
                 if visible, case .dailies(let count) = ExpenseEntry.dailyPart(amountMinor: r.amountMinor, dailyMinor: r.home.cycle?.headline.todayAllowanceMinor) {
                     Text("نحو " + service.dailies(count)).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText"))
                 }

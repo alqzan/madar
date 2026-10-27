@@ -40,6 +40,15 @@ struct DiaryDayView: View {
     private var theme:RoomTheme {travel == nil ? roomTheme:RoomTheme(room:"notes.travel",dark:roomTheme.dark)}
     private var friday:Bool {appearance?.friday == true && travel == nil}
     private var shownDay: GregorianDay { selected ?? day }
+    private var fridayStyle:DiaryFridayStyle {DiaryFridayStyle(app)}
+    /// OR-16: the Friday title wears the look chosen in the diary settings.
+    @ViewBuilder private var fridayOrnament:some View {
+        switch fridayStyle {
+        case .ribbon: DiaryFridayFrame().stroke(theme.accent.opacity(0.65),lineWidth:0.7).padding(.horizontal,12)
+        case .mihrab: ZStack(alignment:.top){DiaryMihrabShape().stroke(theme.accent.opacity(0.55),lineWidth:1).padding(.horizontal,56);DiaryStarShape().fill(theme.accent).frame(width:22,height:22).padding(.top,16)}.accessibilityHidden(true).accessibilityIdentifier("diary-friday-mihrab")
+        case .medallion: ZStack{Circle().stroke(theme.accent.opacity(0.6),lineWidth:1);DiaryStarShape().fill(theme.accent).frame(width:18,height:18)}.frame(width:36,height:36).frame(maxHeight:.infinity,alignment:.top).accessibilityHidden(true).accessibilityIdentifier("diary-friday-medallion")
+        }
+    }
     private var service: AppDiaryService { AppDiaryService(app: app) }
     private var today: GregorianDay { (try? service.currentDay()) ?? day }
     private var first: FirstCalendar { FirstCalendar(rawValue: app.string("core.firstCalendar")) ?? .hijri }
@@ -49,7 +58,7 @@ struct DiaryDayView: View {
         NavigationStack {
             VStack(spacing: 0) {
                 if let appearance,let ramadanDay=appearance.ramadanDay {
-                    HStack{VStack(alignment:.leading,spacing:6){Text("رمضان · اليوم: "+service.digits.string(ramadanDay)).font(DiaryType.label);if let iftar=appearance.iftarAt {Text("الإفطار بعد "+countdown(iftar)).font(DiaryType.heading)}else{Text(appearance.night ? "ليلة من رمضان":"رمضان").font(DiaryType.heading)}};Spacer()}.padding(16).background((MadarToken.colors[theme.dark ? "rooms.notes.ramadan.accentDark":"rooms.notes.ramadan.accent"] ?? theme.accent).opacity(0.12),in:.rect(cornerRadius:16)).padding(.horizontal,18).padding(.vertical,6).accessibilityElement(children:.combine).accessibilityIdentifier("diary-ramadan")
+                    DiaryRamadanBanner(style:DiaryRamadanStyle(app),dayText:"اليوم "+service.digits.string(ramadanDay)+" من رمضان",headline:appearance.iftarAt.map{"الإفطار بعد "+countdown($0)} ?? (appearance.night ? "ليلة من رمضان":"رمضان")).padding(.horizontal,18).padding(.vertical,6).accessibilityIdentifier("diary-ramadan")
                 }
 
                 if let travel {
@@ -66,7 +75,7 @@ struct DiaryDayView: View {
                             VStack(alignment: .leading, spacing: 8) { title; tabs }
                         }
                     }
-                }.padding(.horizontal,18).padding(.vertical,10).frame(maxWidth:.infinity,alignment:friday ? .center:.leading).overlay{if friday {DiaryFridayFrame().stroke(theme.accent.opacity(0.65),lineWidth:0.7).padding(.horizontal,12)}}
+                }.padding(.horizontal,18).padding(.vertical,10).frame(maxWidth:.infinity,alignment:friday ? .center:.leading).padding(.top,friday && fridayStyle != .ribbon ? 34:0).background{if friday {fridayOrnament}}
                 }
                 if let returnDay,!returnDismissed {
                     VStack(alignment:.leading,spacing:8){
@@ -134,7 +143,7 @@ struct DiaryDayView: View {
                             context.stroke(margin, with: .color(theme.color("margin")), lineWidth: 1)
                         }
                     }
-                }.overlay(alignment:.topTrailing){if let travel,!typeSize.isAccessibilitySize {DiaryPassportStamp(city:travel.city,date:service.stampDate(travel.arrival)).padding(.top,40).padding(.trailing,4)}}.overlay(alignment:.topTrailing){if friday,!typeSize.isAccessibilitySize {HStack(alignment:.top,spacing:5){ribbon("يوم الجمعة",color:theme.accent,height:88);if appearance?.weekAvailable == true {Button{weekOpen=true}label:{ribbon("صندوق الأسبوع",color:theme.color("ghad"),height:130).frame(width:44).contentShape(.rect)}.buttonStyle(.plain).accessibilityIdentifier("diary-week-open")}}.padding(.trailing,12)}}
+                }.overlay(alignment:.topTrailing){if let travel,!typeSize.isAccessibilitySize {DiaryPassportStamp(city:travel.city,date:service.stampDate(travel.arrival)).padding(.top,40).padding(.trailing,4)}}.overlay(alignment:.topTrailing){if friday,!typeSize.isAccessibilitySize {HStack(alignment:.top,spacing:5){if fridayStyle == .ribbon {ribbon("يوم الجمعة",color:theme.accent,height:88)};if appearance?.weekAvailable == true {Button{weekOpen=true}label:{ribbon("صندوق الأسبوع",color:theme.color("ghad"),height:130).frame(width:44).contentShape(.rect)}.buttonStyle(.plain).accessibilityIdentifier("diary-week-open")}}.padding(.trailing,12)}}
                 }
             }.background(theme.background).foregroundStyle(theme.ink).environment(\.roomTheme,theme)
                 .safeAreaInset(edge: .bottom, spacing: 0) {

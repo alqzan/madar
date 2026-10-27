@@ -911,7 +911,8 @@ private struct PrayerTodayArch: View {
                 Capsule().fill(theme.accent).frame(width: 14, height: 2).opacity(0.35 + 0.5 * abs(1 - 2 * phase))
             }
         default:
-            Capsule().fill(theme.ink.opacity(0.22)).frame(width: 14, height: 2)
+            // DA-02 (canonical S1): a prayer still to come carries a pale star; the next one a full accent star.
+            PrayerStar().fill(isNext ? theme.accent : theme.ink.opacity(0.16)).frame(width: 15, height: 15)
         }
     }
 

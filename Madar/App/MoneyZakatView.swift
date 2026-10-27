@@ -41,12 +41,12 @@ struct MoneyZakatView: View {
                             HStack(alignment: .top) {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text("مالك في الحساب").font(MadarTypography.fine())
-                                    Text(figure: amount(max(0, result.poolMinor - result.deductedMinor))).font(MadarTypography.cardTitle()).foregroundStyle(theme.color("surplusText"))
+                                    MoneyFigure(value: amount(max(0, result.poolMinor - result.deductedMinor)), style: MoneyFigureStyle(app), size: 24).foregroundStyle(theme.color("surplusText"))
                                 }
                                 Spacer(minLength: 12)
                                 VStack(alignment: .trailing, spacing: 2) {
                                     Text(basis == .gold ? "النصاب، ذهب ٢٤ قيراطًا" : "النصاب، فضة").font(MadarTypography.fine())
-                                    Text(result.nisabMinor.map(amount) ?? "أدخل السعر").font(MadarTypography.cardTitle())
+                                    if let nisab = result.nisabMinor { MoneyFigure(value: amount(nisab), style: MoneyFigureStyle(app), size: 24) } else { Text("أدخل السعر").font(MadarTypography.cardTitle()) }
                                 }
                             }
                             .foregroundStyle(theme.secondaryInk)
@@ -193,22 +193,27 @@ struct MoneyZakatView: View {
     }
     private var hawlArc: some View {
         VStack(spacing: 8) {
-            if !dynamicType.isAccessibilitySize { GeometryReader { g in
-                ZStack {
-                    Path { p in p.move(to: CGPoint(x: 10, y: 62)); p.addQuadCurve(to: CGPoint(x: g.size.width-10, y: 62), control: CGPoint(x: g.size.width/2, y: -35)) }.stroke(theme.color("reserveText"), lineWidth: 1)
-                    ForEach(0..<12, id: \.self) { n in let t = Double(n)/11; let y = 62 - sin(t * .pi) * 45
-                        Image(systemName: n == Int((hawl?.fraction ?? 0) * 11) ? "moon.fill" : "moon").font(.system(size: n == Int((hawl?.fraction ?? 0) * 11) ? 22 : 17)).foregroundStyle(theme.color("reserveText")).position(x: 10 + t * (g.size.width-20), y: y)
-                    }
-                }
-            }.frame(height: 76).accessibilityHidden(true) }
+            let hawlStyle = MoneyHawlStyle(app)
+            if !dynamicType.isAccessibilitySize {
+                MoneyHawlArt(style: hawlStyle, fraction: hawl?.fraction ?? 0, startMonth: hawlStartMonth, centre: hawlStyle == .orbit ? AnyView(orbitCentre) : nil).accessibilityElement(children: .contain).accessibilityIdentifier("money-zakat-hawl-art-" + hawlStyle.rawValue)
+            }
             if let hawl {
-                Text(hawl.daysLeft == 0 ? "موعد حسابك اليوم" : "موعد حسابك بعد " + service.days(hawl.daysLeft)).font(MadarTypography.cardTitle()).accessibilityIdentifier("money-zakat-hawl")
+                if hawlStyle != .orbit || dynamicType.isAccessibilitySize { Text(hawl.daysLeft == 0 ? "موعد حسابك اليوم" : "موعد حسابك بعد " + service.days(hawl.daysLeft)).font(MadarTypography.cardTitle()).accessibilityIdentifier("money-zakat-hawl") }
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 3) { Text("بداية حسابك"); MadarDateLabel(app.dateLabels(hawl.chosen), primaryFont: .system(size: 11), secondaryFont: .system(size: 11)) }
                     Spacer()
                     VStack(alignment: .leading, spacing: 3) { Text("الموعد القادم"); MadarDateLabel(app.dateLabels(hawl.anniversary), primaryFont: .system(size: 11), secondaryFont: .system(size: 11)) }
                 }.font(.system(size: 11)).foregroundStyle(theme.secondaryInk)
             } else { Button("اختر تاريخًا تحاسب فيه نفسك كل سنة") { editor = true }.font(MadarTypography.body()).frame(minHeight: 44).accessibilityIdentifier("money-zakat-choose-hawl") }
+        }
+    }
+    private var hawlStartMonth: Int { input?.hawlStartHijri.flatMap { key in key.dropFirst(2).split(separator: "-").dropFirst().first.flatMap { Int($0) } } ?? 1 }
+    @ViewBuilder private var orbitCentre: some View {
+        if let hawl {
+            VStack(spacing: 2) {
+                Text(hawl.daysLeft == 0 ? "موعد حسابك" : "موعد حسابك بعد").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                Text(hawl.daysLeft == 0 ? "اليوم" : service.days(hawl.daysLeft)).font(.custom(MoneyFigureStyle(app).font, size: 30, relativeTo: .title)).accessibilityIdentifier("money-zakat-hawl")
+            }.accessibilityElement(children: .combine)
         }
     }
     @ViewBuilder private func assessment(_ r: ZakatAssessment) -> some View {
@@ -232,12 +237,7 @@ struct MoneyZakatView: View {
     /// In the display serif the decimal mark «٫» looks like the thousands mark «٬», so «٣٬٢١٢٫٥٠» read as
     /// three groups. Riyals stay large and halalas follow smaller on the same baseline, the way prices are written.
     private func dueAmount(_ minor: Int) -> some View {
-        let text = amount(minor)
-        let parts = text.split(separator: "٫", maxSplits: 1).map(String.init)
-        let whole = parts.first ?? text
-        let fraction = parts.count > 1 && parts[1].contains(where: { $0.wholeNumberValue.map { $0 > 0 } ?? false }) ? "٫" + parts[1] : "\u{2069}"
-        // One Text keeps the number a single isolated run (and a single accessible text).
-        return Text("\(Text(parts.count > 1 ? whole : text).font(.custom("thmanyahserifdisplay-Black", size: 48, relativeTo: .largeTitle)))\(Text(parts.count > 1 ? fraction : "").font(.custom("thmanyahserifdisplay-Bold", size: 26, relativeTo: .title2)).foregroundStyle(theme.secondaryInk))")
+        return MoneyFigure(value: amount(minor), style: MoneyFigureStyle(app), size: 52)
             .contentTransition(.numericText()).accessibilityIdentifier("money-zakat-result")
     }
     private func basisButton(_ choice: NisabBasis, _ title: String) -> some View { Button { basis = choice; basisChosen = true } label: { Text(title).font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 44).background(basisChosen && basis == choice ? theme.ink : theme.background).foregroundStyle(basisChosen && basis == choice ? theme.background : theme.ink).overlay { Rectangle().stroke(theme.color("reserveText"), lineWidth: 1) } }.accessibilityIdentifier("money-zakat-basis-" + choice.rawValue) }
