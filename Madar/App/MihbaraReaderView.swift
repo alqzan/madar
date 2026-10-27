@@ -2678,10 +2678,14 @@ private struct MihbaraWordCard: View {
     let makeQuoteCard: () -> Void
     let close: () -> Void
 
+    @State private var meaning: String?
+
     private var ink: SwiftUI.Color { palette.ink }
     private var ink2: SwiftUI.Color { palette.ink2 }
     private var accent: SwiftUI.Color { palette.accent }
     private var surface: SwiftUI.Color { palette.bg }
+    /// OR-31: an English word shows its Arabic at once, translated on the device, with nothing to tap.
+    private var translatesWord: Bool { state.isWord && state.canSaveAsWord && translationAvailability == .installed }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -2691,6 +2695,15 @@ private struct MihbaraWordCard: View {
                         .font(.custom("Amiri-Bold", size: state.isWord ? 30 : 22, relativeTo: .title))
                         .foregroundStyle(ink).lineLimit(2).multilineTextAlignment(.leading)
                         .accessibilityIdentifier("mihbara-word-title")
+                    if translatesWord, let meaning {
+                        Text(meaning)
+                            .font(.custom("Amiri-Bold", size: 24, relativeTo: .title2))
+                            .foregroundStyle(accent).lineLimit(2)
+                            .environment(\.layoutDirection, .rightToLeft)
+                            .transition(.opacity)
+                            .accessibilityLabel("بالعربية: " + meaning)
+                            .accessibilityIdentifier("mihbara-word-meaning")
+                    }
                     if state.isWord, state.hasSystemDefinition {
                         Button(action: lookUp) {
                             HStack(spacing: 6) {
@@ -2758,7 +2771,8 @@ private struct MihbaraWordCard: View {
                             case .installed:
                                 action("ترجم الفقرة", icon: "character.bubble", id: "mihbara-word-translate", run: translate)
                             case .needsDownload:
-                                availability("ثبّت حزمة الترجمة من الإعدادات", id: "mihbara-translation-download")
+                                // iOS asks to download the language pack the first time it translates.
+                                action("نزّل الترجمة وترجم الفقرة", icon: "arrow.down.circle", id: "mihbara-translation-download", run: translate)
                             case .checking:
                                 availability("نتحقق من توفر الترجمة", id: "mihbara-translation-checking", progress: true)
                             case .unsupported:
@@ -2774,6 +2788,9 @@ private struct MihbaraWordCard: View {
             .shadow(color: .black.opacity(palette.isDark ? 0.45 : 0.14), radius: 22, y: 6))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("mihbara-word-card")
+        .mihbaraWordMeaning(active: translatesWord, word: state.word) { result in
+            withAnimation(.easeOut(duration: 0.2)) { meaning = result }
+        }
     }
 
     private func action(_ title: String, icon: String, id: String, run: @escaping () -> Void) -> some View {
@@ -3294,6 +3311,32 @@ private struct MihbaraTranslationSheet: View {
                 await completion(nil)
             }
         }
+    }
+}
+
+/// Translates one English word to Arabic on the device; quiet on failure, the paragraph translation stays available.
+private extension View {
+    @ViewBuilder func mihbaraWordMeaning(active: Bool, word: String, completion: @escaping @MainActor @Sendable (String?) -> Void) -> some View {
+        if active {
+            translationTask(
+                source: Locale.Language(identifier: "en"),
+                target: Locale.Language(identifier: "ar"),
+                action: mihbaraWordMeaningAction(word: word, completion: completion)
+            )
+        } else {
+            self
+        }
+    }
+}
+
+private func mihbaraWordMeaningAction(
+    word: String,
+    completion: @escaping @MainActor @Sendable (String?) -> Void
+) -> @Sendable (TranslationSession) async -> Void {
+    { session in
+        let response = try? await session.translate(word)
+        let text = response?.targetText.trimmingCharacters(in: .whitespacesAndNewlines)
+        await completion(text?.isEmpty == false && text?.lowercased() != word.lowercased() ? text : nil)
     }
 }
 

@@ -1163,13 +1163,18 @@ import UIKit
         let needsDownload = app.descendants(matching: .any)["mihbara-translation-download"]
         let checking = app.descendants(matching: .any)["mihbara-translation-checking"]
         if translate.waitForExistence(timeout: 5) {
+            // OR-31: with the language pack on the device, the word's Arabic shows under it with nothing to tap.
+            XCTAssertTrue(app.staticTexts["mihbara-word-meaning"].waitForExistence(timeout: 15), app.debugDescription)
             shot(app, "M6-V14-translation-ready-L")
             translate.tap()
             let result = app.staticTexts["mihbara-translation-result"]
             let failure = app.staticTexts["mihbara-translation-error"]
             XCTAssertTrue(result.waitForExistence(timeout: 30) || failure.waitForExistence(timeout: 1), app.debugDescription)
         } else if needsDownload.waitForExistence(timeout: 2) {
+            // The pack is offered as an action (iOS asks to download it), never a dead label.
+            XCTAssertTrue(app.buttons["mihbara-translation-download"].exists, app.debugDescription)
             XCTAssertFalse(translate.exists)
+            shot(app, "M6-V14-translation-download-L")
         } else {
             XCTAssertFalse(checking.exists, app.debugDescription)
             XCTAssertFalse(translate.exists, app.debugDescription)
