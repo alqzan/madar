@@ -21,7 +21,13 @@ struct QuranYearView: View {
                         VStack(alignment: .leading, spacing: 16) {
                             HStack { Text("سنة كاملة").font(quranFont(17, bold: true)); Spacer(); Text("آخر سنة").font(quranFont(11)).foregroundStyle(theme.secondaryInk) }
                             Picker("النشاط", selection: $review) { Text("المراجعة").tag(true); Text("الحفظ").tag(false) }.pickerStyle(.segmented).frame(maxWidth: 210).accessibilityIdentifier("quran-year-kind")
-                            Text(service.dayCount(value.activeDays) + " من الصحبة").font(quranFont(14)).accessibilityIdentifier("quran-year-active")
+                            // OR-21: say what the year holds for the chosen kind, not only how many days.
+                            let faces = value.days.reduce(0) { $0 + (review ? $1.review : $1.hifz) }
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(faces == 0 ? (review ? "لا مراجعة مسجّلة هذه السنة" : "لا حفظ مسجّل هذه السنة") : service.faceCount(faces) + (review ? " راجعتها هذه السنة" : " حفظتها هذه السنة"))
+                                    .font(quranSerif(20)).accessibilityIdentifier("quran-year-active")
+                                if value.activeDays > 0 { Text("في " + service.dayCount(value.activeDays) + " من الصحبة").font(quranFont(12)).foregroundStyle(theme.secondaryInk) }
+                            }
                             if type.isAccessibilitySize {
                                 ForEach(value.months) { m in monthRow(m) }
                             } else {
@@ -43,6 +49,9 @@ struct QuranYearView: View {
                         VStack(alignment: .leading, spacing: 18) {
                             Text("الأشهر الهجرية").font(quranFont(17, bold: true))
                             Text(value.title).font(quranFont(11)).foregroundStyle(theme.secondaryInk)
+                            if let best = value.months.max(by: { $0.hifz < $1.hifz }), best.hifz > 0 {
+                                Text("أكثر شهر حفظًا: " + best.title + " (" + service.faceCount(best.hifz) + ")").font(quranFont(13)).accessibilityIdentifier("quran-year-best")
+                            }
                             monthBars(value.months, review: false)
                             Divider().overlay(theme.line)
                             monthBars(value.months, review: true)
@@ -66,7 +75,12 @@ struct QuranYearView: View {
     private func monthRow(_ m: QuranUIYearMonth) -> some View { Button { month = m } label: { Text(m.title + "، حفظ " + service.faceCount(m.hifz) + "، مراجعة " + service.faceCount(m.review)).font(quranFont(14)).frame(minHeight: 44) } }
     private func monthBars(_ months: [QuranUIYearMonth], review: Bool) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack { Text(review ? "المراجعة، أوجه" : "الحفظ، أوجه").font(quranFont(13, bold: true)); Spacer(); Text("المس شهرًا للتفاصيل").font(quranFont(11)).foregroundStyle(theme.secondaryInk) }
+            let peak = months.map { review ? $0.review : $0.hifz }.max() ?? 0
+            HStack {
+                Circle().fill(theme.color(review ? "review" : "hifz")).frame(width: 8, height: 8)
+                Text(review ? "المراجعة · أوجه" : "الحفظ · أوجه").font(quranFont(13, bold: true)); Spacer()
+                Text(peak > 0 ? "الأعلى " + service.faceCount(peak) : "المس شهرًا للتفاصيل").font(quranFont(11)).foregroundStyle(theme.secondaryInk)
+            }
             if !type.isAccessibilitySize {
                 let maxValue = max(1, months.map { review ? $0.review : $0.hifz }.max() ?? 1)
                 HStack(alignment: .bottom, spacing: 3) {
