@@ -42,6 +42,7 @@ struct MoneyMessagesView: View {
                     if !visible { Button("أظهر الأرقام") { revealed = true }.font(MadarTypography.caption()).frame(minHeight: 44).accessibilityIdentifier("money-messages-reveal") }
                     ForEach(reading.statements) { statementCard($0) }
                     ForEach(reading.drafts) { draftRow($0) }
+                    clearButton(reading)
                     if !reading.looks.isEmpty { looks(reading.looks) }
                     if reading.drafts.isEmpty && reading.statements.isEmpty && reading.looks.isEmpty {
                         VStack(alignment: .leading, spacing: 6) {
@@ -115,7 +116,7 @@ struct MoneyMessagesView: View {
         let palette = ["reserveText", "bills", "surplusText", "accent"]
         let tint = theme.color(palette[abs(sender.unicodeScalars.reduce(0) { $0 &+ Int($1.value) }) % palette.count])
         return Text(letter).font(.custom("thmanyahserifdisplay-Bold", size: 20, relativeTo: .headline)).foregroundStyle(tint)
-            .frame(width: 46, height: 46).background(tint.opacity(0.1), in: .circle).overlay { Circle().stroke(tint, lineWidth: 1.2) }
+            .frame(width: 40, height: 40).background(tint.opacity(0.1), in: .circle).overlay { Circle().stroke(tint, lineWidth: 1.2) }
             .accessibilityHidden(true)
     }
     /// RU1: «·» never touches a digit.
@@ -204,8 +205,8 @@ struct MoneyMessagesView: View {
                 }
             }
             Spacer(minLength: 6)
-            VStack(alignment: .trailing, spacing: 8) {
-                Text(visible ? sign + amount(d.amountMinor, currency: d.currency) : "•••").font(.custom("thmanyahserifdisplay-Bold", size: 22, relativeTo: .title3))
+            VStack(alignment: .trailing, spacing: 6) {
+                Text(visible ? sign + amount(d.amountMinor, currency: d.currency) : "•••").font(.custom("thmanyahserifdisplay-Bold", size: 20, relativeTo: .title3))
                     .foregroundStyle(tint).lineLimit(1).minimumScaleFactor(0.6)
                 HStack(spacing: 8) {
                     if d.isIncomingBankDraft {
@@ -219,15 +220,15 @@ struct MoneyMessagesView: View {
                             .buttonStyle(.plain).accessibilityLabel("اعتمد " + d.title).accessibilityIdentifier("money-draft-confirm")
                     }
                     Button { run("money.deleteTransaction", ["id": .string(d.id.uuidString)]) } label: {
-                        Image(systemName: "xmark").font(.body).foregroundStyle(theme.secondaryInk).frame(width: 52, height: 52).overlay { Circle().stroke(theme.line, lineWidth: 1.2) }
+                        Image(systemName: "xmark").font(.body).foregroundStyle(theme.secondaryInk).frame(width: 44, height: 44).overlay { Circle().stroke(theme.line, lineWidth: 1.2) }
                     }.buttonStyle(.plain).accessibilityLabel("احذف " + d.title).accessibilityIdentifier("money-draft-delete")
                 }.environment(\.layoutDirection, .leftToRight)
             }
-        }.padding(14).background(theme.surface).overlay { TicketEdge().stroke(theme.line, lineWidth: 1) }
+        }.padding(.horizontal, 12).padding(.vertical, 10).background(theme.surface).overlay { TicketEdge().stroke(theme.line, lineWidth: 1) }
             .accessibilityElement(children: .contain).accessibilityIdentifier("money-draft-" + d.title)
     }
     private var draftConfirmGlyph: some View {
-        Image(systemName: "checkmark").font(.body.bold()).foregroundStyle(theme.background).frame(width: 52, height: 52).background(theme.ink, in: .circle)
+        Image(systemName: "checkmark").font(.body.bold()).foregroundStyle(theme.background).frame(width: 44, height: 44).background(theme.ink, in: .circle)
     }
     private func looks(_ items: [MoneyMessageLook]) -> some View {
         LazyVStack(alignment: .leading, spacing: 10) {
@@ -248,17 +249,20 @@ struct MoneyMessagesView: View {
             }
         }.padding(.top, 6).accessibilityElement(children: .contain).accessibilityIdentifier("money-looks")
     }
+    /// OR-23 (owner: lighter, smoother): the one-tap approval sits right under the messages it approves, not below the guide.
+    @ViewBuilder private func clearButton(_ reading: MoneyMessagesReading) -> some View {
+        let clear = reading.clearIDs, left = reading.drafts.count - reading.drafts.filter(\.clear).count
+        if !clear.isEmpty {
+            Button { run("money.confirmClear", ["ids": .array(clear.map { .string($0.uuidString) })]) } label: {
+                VStack(spacing: 2) {
+                    Text("اعتمد الواضح (" + service.digits.string(clear.count) + ")").font(.custom("thmanyahsans-Bold", size: 17, relativeTo: .headline))
+                    if left > 0 { Text("ويبقى " + service.counted(left, ("قرار واحد", "قراران", "قرارات", "قرارًا")) + " لقرارك").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
+                }.frame(maxWidth: .infinity, minHeight: 60).overlay { Rectangle().stroke(theme.color("reserveText"), lineWidth: 1.2) }
+            }.buttonStyle(.plain).accessibilityIdentifier("money-confirm-clear")
+        }
+    }
     private func footer(_ reading: MoneyMessagesReading) -> some View {
         VStack(spacing: 10) {
-            let clear = reading.clearIDs, left = reading.drafts.count - reading.drafts.filter(\.clear).count
-            if !clear.isEmpty {
-                Button { run("money.confirmClear", ["ids": .array(clear.map { .string($0.uuidString) })]) } label: {
-                    VStack(spacing: 2) {
-                        Text("اعتمد الواضح (" + service.digits.string(clear.count) + ")").font(.custom("thmanyahsans-Bold", size: 17, relativeTo: .headline))
-                        if left > 0 { Text("ويبقى " + service.counted(left, ("قرار واحد", "قراران", "قرارات", "قرارًا")) + " لقرارك").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
-                    }.frame(maxWidth: .infinity, minHeight: 60).overlay { Rectangle().stroke(theme.color("reserveText"), lineWidth: 1.2) }
-                }.buttonStyle(.plain).accessibilityIdentifier("money-confirm-clear")
-            }
             if let note { Text(note).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-messages-note") }
             PasteButton(payloadType: String.self) { strings in
                 let parsed = strings.map(AppMoneyService.pastedMessages)
