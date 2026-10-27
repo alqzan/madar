@@ -29,7 +29,7 @@ import XCTest
         XCTAssertFalse(app.buttons["diary-welcome-next"].exists)
         let excerpt = app.staticTexts.matching(NSPredicate(format: "label == %@", "ذكرى مستوردة بقيت بتاريخها")).firstMatch
         XCTAssertTrue(excerpt.exists)
-        XCTAssertTrue(app.staticTexts["صورة هذا اليوم لم تُنقل"].exists)
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "صورة هذا اليوم لم تُنقل")).firstMatch.exists)
         let write = app.buttons["diary-write"]
         let accessory = app.descendants(matching: .any)["tab-accessory-next-prayer"]
         XCTAssertLessThanOrEqual(write.frame.maxY, accessory.frame.minY, "Writing stays above the native accessory")
@@ -52,7 +52,7 @@ import XCTest
         continueAfterFailure = false
         let app = launch("today")
         XCTAssertTrue(app.buttons["diary-today"].waitForExistence(timeout: 25)); app.buttons["diary-today"].tap()
-        XCTAssertTrue(app.staticTexts["صلّيت الفجر جماعة"].waitForExistence(timeout: 10)); capture(app, "M3-V05-today-L")
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH %@", "صلّيت الفجر جماعة")).firstMatch.waitForExistence(timeout: 10)); capture(app, "M3-V05-today-L")
         app.swipeUp(); capture(app, "M3-V05-today-scrolled-L")
         app.buttons["diary-day-year"].tap()
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "عشاء عند أهلي")).firstMatch.waitForExistence(timeout: 10))

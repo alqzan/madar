@@ -57,14 +57,13 @@ struct DiaryDayView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(service.weekday(shownDay) + "، " + (first == .gregorian && appearance?.night == true ? "ليلة " : "") + service.dateTitle(first == .gregorian ? appearance?.hijriDisplayDay ?? shownDay : shownDay, calendar: first == .hijri ? .gregorian : .hijri) + (friday ? "، " + service.dateTitle(shownDay,calendar:first):""))
                         .font(DiaryType.label).foregroundStyle(theme.color("ink3Text")).accessibilityIdentifier("diary-day-secondary-date")
-                    Text(friday ? "جمعة مباركة" : (first == .hijri && appearance?.night == true ? "ليلة " : "") + service.dateTitle(first == .hijri ? appearance?.hijriDisplayDay ?? shownDay : shownDay, calendar: first)).foregroundStyle(friday ? theme.accent:theme.ink).font(.custom("thmanyahserifdisplay-Bold", size: 32, relativeTo: .largeTitle)).accessibilityIdentifier("diary-day-title")
-                    if !friday { HStack(spacing: 6) {
-                        dateChoice("اليوم", id: "today", value: today)
-                        dateChoice("أمس", id: "yesterday", value: today.adding(days: -1))
-                        dateChoice("قبل سنة", id: "year", value: aYearAgo)
-                        Spacer(minLength: 0)
-                        if shownDay == today { Text("حتى الآن").font(DiaryType.label).foregroundStyle(theme.color("ink3Text")) }
-                    }
+                    // OR-12: the date and its three tabs share one row, as the canonical today page; «حتى الآن» left (lighter header).
+                    let title = Text(friday ? "جمعة مباركة" : (first == .hijri && appearance?.night == true ? "ليلة " : "") + service.dateTitle(first == .hijri ? appearance?.hijriDisplayDay ?? shownDay : shownDay, calendar: first)).foregroundStyle(friday ? theme.accent:theme.ink).font(.custom("thmanyahserifdisplay-Bold", size: 32, relativeTo: .largeTitle)).lineLimit(1).minimumScaleFactor(0.7).accessibilityIdentifier("diary-day-title")
+                    if friday { title } else {
+                        ViewThatFits(in: .horizontal) {
+                            HStack(alignment: .bottom, spacing: 8) { title; Spacer(minLength: 4); tabs }
+                            VStack(alignment: .leading, spacing: 8) { title; tabs }
+                        }
                     }
                 }.padding(.horizontal,18).padding(.vertical,10).frame(maxWidth:.infinity,alignment:friday ? .center:.leading).overlay{if friday {DiaryFridayFrame().stroke(theme.accent.opacity(0.65),lineWidth:0.7).padding(.horizontal,12)}}
                 }
@@ -203,8 +202,15 @@ struct DiaryDayView: View {
         var calendar = Calendar(identifier: .gregorian); calendar.timeZone = app.activePlace.timeZone
         return calendar.date(byAdding: .year, value: -1, to: today.date(in: app.activePlace.timeZone)).map { GregorianDay.containing($0, in: app.activePlace.timeZone) } ?? today.adding(days: -365)
     }
+    private var tabs: some View {
+        HStack(spacing: 4) {
+            dateChoice("اليوم", id: "today", value: today)
+            dateChoice("أمس", id: "yesterday", value: today.adding(days: -1))
+            dateChoice("قبل سنة", id: "year", value: aYearAgo)
+        }.fixedSize()
+    }
     private func dateChoice(_ title: String, id: String, value: GregorianDay) -> some View {
-        Button { selected = value } label: { Text(title).font(DiaryType.label).frame(minHeight: 44).padding(.horizontal, 12).background(shownDay == value ? theme.surface : .clear, in: .rect(topLeadingRadius: 10, topTrailingRadius: 10)).overlay { UnevenRoundedRectangle(topLeadingRadius: 10, topTrailingRadius: 10).stroke(shownDay == value ? theme.color("ink3Text") : theme.line) } }
+        Button { selected = value } label: { Text(title).font(DiaryType.label).frame(minHeight: 44).padding(.horizontal, 10).background(shownDay == value ? theme.surface : .clear, in: .rect(topLeadingRadius: 10, topTrailingRadius: 10)).overlay { UnevenRoundedRectangle(topLeadingRadius: 10, topTrailingRadius: 10).stroke(shownDay == value ? theme.color("ink3Text") : theme.line) } }
             .buttonStyle(.plain).accessibilityIdentifier("diary-day-" + id).accessibilityAddTraits(shownDay == value ? .isSelected : [])
     }
     /// Arabic counted noun: يوم واحد، يومان، ٣–١٠ أيام، ١١–٩٩ يومًا، ١٠٠ يوم.
@@ -212,12 +218,21 @@ struct DiaryDayView: View {
         if n == 1 {return "يوم واحد"};if n == 2 {return "يومان"}
         let r=n%100;return service.digits.string(n)+((3...10).contains(r) ? " أيام":r <= 2 ? " يوم":" يومًا")
     }
+    private static let rooms = ["salah": "الصلاة", "quran": "القرآن", "mal": "المال", "habits": "العادات", "mihbara": "المحبرة"]
+    /// RU1: the joiner picks «، » when the line ends in a digit.
+    private func roomSuffix(_ line: DiaryDisplayLine) -> String {
+        let text = line.text.trimmingCharacters(in: .whitespacesAndNewlines), joined = MadarInlineText.joined([text, Self.rooms[line.kind] ?? ""])
+        return String(joined.dropFirst(text.count))
+    }
     private func lineRow(_ line: DiaryDisplayLine, page: DiaryDisplayDay) -> some View {
         let auto = ["salah", "quran", "mihbara", "mal", "habits"].contains(line.kind)
         return HStack(alignment: .firstTextBaseline, spacing: 12) {
             Text(service.time(line.at, zone: line.tzID)).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(theme.color("ink3Text")).frame(width: 38, alignment: .center).accessibilityIdentifier("diary-day-line-time")
             VStack(alignment: .leading, spacing: 5) {
-                Text(line.markdown == true ? ((try? AttributedString(markdown: line.text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(line.text)) : AttributedString(line.text)).font(.custom("thmanyahseriftext-Regular", size: auto ? 17 : 19, relativeTo: .body)).lineSpacing(11).italic(auto || line.kind == "margin")
+                // OR-12: the room's name follows its line, small and in the same light ink («· الصلاة»), as the canonical.
+                (Text(line.markdown == true ? ((try? AttributedString(markdown: line.text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(line.text)) : AttributedString(line.text))
+                    + Text(auto ? roomSuffix(line) : "").font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)))
+                    .font(.custom("thmanyahseriftext-Regular", size: auto ? 17 : 19, relativeTo: .body)).lineSpacing(11).italic(auto || line.kind == "margin")
                     .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading).accessibilityIdentifier("diary-day-line")
                 if let name = projectLinks[line.id] {Text("مشروع: "+name).font(DiaryType.label).foregroundStyle(theme.color("ink3Text")).accessibilityIdentifier("diary-line-project")}
                 else if let project = projectSuggestions[line.id] {
@@ -230,7 +245,6 @@ struct DiaryDayView: View {
                 if line.kind == "margin" {
                     Text(MadarInlineText.joined(["هامش", page.marginDays[line.id].map { service.bothDates($0) } ?? "تاريخ الكتابة غير متاح"])).font(DiaryType.label)
                 }
-                if auto { Text(line.kind == "salah" ? "الصلاة" : line.kind == "quran" ? "القرآن" : "المحبرة").font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)) }
             }.foregroundStyle(line.kind == "margin" ? secondInk : line.kind == "late" ? theme.color("late") : auto ? theme.color("autoInkText") : theme.ink)
         }.contextMenu {
             if page.editable.contains(line.id) { Button("عدّل السطر", systemImage: "pencil") { editing = .init(id: line.id, text: line.text) } }
