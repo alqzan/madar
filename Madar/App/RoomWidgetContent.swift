@@ -132,13 +132,14 @@ struct RoomWidgetContent:View {
     }
     private func donut(_ share:Double,width:CGFloat=3,color:Color?=nil)->some View {ZStack{Circle().stroke(theme.line,lineWidth:width);Circle().trim(from:0,to:min(1,max(0,share))).stroke(color ?? accent,style:.init(lineWidth:width,lineCap:.round)).rotationEffect(.degrees(-90))}.accessibilityHidden(true)}
     /// X1: an upcoming ring takes the colour of the room its date comes from (salary in money's ink, a juz in Quran's).
+    /// Only the ring, a shape, takes the room's base accent; its text stays in lobby ink (contrast.pairs has no cross-room text pair).
     private func sourceColor(_ route:String)->Color {
         guard rendering == .fullColor,let host=URL(string:route)?.host,["salah","quran","mal","notes","mihbara"].contains(host) else{return accent}
-        return RoomTheme(room:host,dark:scheme == .dark).accent
+        return RoomTheme(room:host,dark:scheme == .dark).color("accent")
     }
     private func upcoming(_ row:RoomWidgetSnapshot.Row)->some View {
         Link(destination:URL(string:row.route) ?? URL(string:room.route)!) {
-            VStack(spacing:6){ZStack{donut(row.share,width:4,color:sourceColor(row.route));VStack(spacing:0){Text(row.value.split(separator:" ").first.map(String.init) ?? row.value).font(.custom("thmanyahserifdisplay-Bold",size:22,relativeTo:.title2)).foregroundStyle(sourceColor(row.route)).minimumScaleFactor(0.7).lineLimit(1);Text(row.value.split(separator:" ").dropFirst().joined(separator:" ")).font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2))}.multilineTextAlignment(.center).padding(7)}.frame(width:family == .systemSmall ? 84 : 66,height:family == .systemSmall ? 84 : 66);Text(row.title).font(.custom("thmanyahsans-Bold",size:11,relativeTo:.caption2)).lineLimit(2).multilineTextAlignment(.center)}.frame(maxWidth:.infinity)
+            VStack(spacing:6){ZStack{donut(row.share,width:4,color:sourceColor(row.route));VStack(spacing:0){Text(row.value.split(separator:" ").first.map(String.init) ?? row.value).font(.custom("thmanyahserifdisplay-Bold",size:22,relativeTo:.title2)).minimumScaleFactor(0.7).lineLimit(1);Text(row.value.split(separator:" ").dropFirst().joined(separator:" ")).font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2))}.multilineTextAlignment(.center).padding(7)}.frame(width:family == .systemSmall ? 84 : 66,height:family == .systemSmall ? 84 : 66);Text(row.title).font(.custom("thmanyahsans-Bold",size:11,relativeTo:.caption2)).lineLimit(2).multilineTextAlignment(.center)}.frame(maxWidth:.infinity)
         }.buttonStyle(.plain).privacySensitive()
     }
 }
