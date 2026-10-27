@@ -16,7 +16,15 @@ extension HabitReading {
         switch summary.current?.outcome { case .complete: return "تمّت"; case .minimum: return "أقلّ القليل"; case .excluded: return "إجازتها اليوم"; case .missed: return "فترة بلا تسجيل"; default: return isNow ? "وقتها الآن" : "تنتظر" }
     }
     var sourceTitle: String? { switch source { case "jamaah": "الصلاة"; case "review": "القرآن"; case "diaryLine": "المذكرات"; case "walking": "الصحة"; default: nil } }
-    var symbol: String { switch source { case "jamaah": "MadarPrayer"; case "review": "MadarQuran"; case "diaryLine": "MadarDiary"; case "walking": "figure.walk"; default: "checkmark" } }
+    var symbol: String { switch source { case "jamaah": "MadarPrayer"; case "review": "MadarQuran"; case "diaryLine": "MadarDiary"; case "walking": "figure.walk"; default: nameGlyph ?? "checkmark" } }
+    /// DA-05: a hand-made habit has no stored icon; its own words choose one for display only (nil when none fits).
+    var nameGlyph: String? {
+        let table: [([String], String)] = [(["ماء", "مياه", "شرب"], "drop"), (["أذكار المساء", "المساء", "وتر", "قيام"], "moon"), (["أذكار الصباح", "الصباح", "ضحى"], "sun.max"),
+            (["أذكار", "ذكر", "استغفار", "تسبيح"], "sparkle"), (["قراءة", "اقرأ", "كتاب", "مذاكرة", "دراسة", "حفظ"], "book"), (["مشي", "خطوات"], "figure.walk"),
+            (["رياضة", "جري", "تمرين"], "figure.run"), (["صدقة", "تبرع"], "heart"), (["صيام", "صوم"], "moon.stars"), (["الوالدين", "زيارة", "الأخوال", "اتصال", "الاتصال", "صلة", "الأرحام"], "person.2"),
+            (["نوم", "النوم"], "bed.double"), (["قهوة"], "cup.and.saucer"), (["كتابة", "تدوين"], "pencil")]
+        return table.first { $0.0.contains { name.contains($0) } }?.1
+    }
 }
 struct HabitEditorIdentity: Identifiable { let id: UUID; var reading: HabitReading? = nil }
 struct HabitsRoomView: View {

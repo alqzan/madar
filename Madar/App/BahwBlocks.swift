@@ -192,6 +192,49 @@ struct BahwBlockView: View {
         .accessibilityHint(row.source == nil ? "المس لتسجيل العادة" : "المس لفتح الغرفة المرتبطة")
         .accessibilityIdentifier("bahw-habit-ring-" + row.id.uuidString)
     }
+    /// W1 ring: 46 pt, the habit's room colour, its glyph inside, a half-moon badge when a period was missed.
+    private func wideHabitRing(_ row: HabitReading, shown6: Bool) -> some View {
+        let current = row.summary.current
+        let done = current?.met == true
+        let share = Double(current?.value ?? 0) / Double(max(1, current?.target ?? 1))
+        let progress = habitProgress(row)
+        let amount: String = {
+            guard let current, !row.paused else { return progress }
+            if current.rule.measure == .once || current.target <= 1 { return done ? "تمّت" : current.rule.frequency == .daily ? "اليوم" : current.rule.frequency.arabic }
+            return digits.string(current.value) + " من " + digits.string(current.target)
+        }()
+        let ringTheme: RoomTheme = switch row.source {
+        case "jamaah": .init(room: "salah", dark: dark)
+        case "review": .init(room: "quran", dark: dark)
+        case "diaryLine": .init(room: "notes", dark: dark)
+        case "reading", "hadith": .init(room: "mihbara", dark: dark)
+        default: room
+        }
+        return Button { activateHabit(row) } label: {
+            VStack(spacing: 3) {
+                ZStack(alignment: .topTrailing) {
+                    HabitRingGlyph(share: row.paused ? 0 : share, done: done, symbol: row.symbol == "checkmark" ? nil : row.symbol, lineWidth: 4.5)
+                        .environment(\.roomTheme, ringTheme)
+                        .opacity(row.paused ? 0.45 : 1)
+                        .frame(width: 46, height: 46)
+                    if row.paused || (row.summary.atRisk && !done) {
+                        Image(systemName: row.paused ? "pause.circle.fill" : "circle.lefthalf.filled")
+                            .font(.system(size: 13, weight: .semibold)).foregroundStyle(room.accent)
+                            .background(room.surface, in: .circle).offset(x: 3, y: -3)
+                    }
+                }
+                Text(row.name).font(.custom("thmanyahsans-Bold", size: 12, relativeTo: .caption)).lineLimit(2, reservesSpace: shown6).multilineTextAlignment(.center).minimumScaleFactor(0.85).padding(.horizontal, 1)
+                Text(amount).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(room.secondaryInk).lineLimit(1).minimumScaleFactor(0.8)
+            }
+            .frame(maxWidth: .infinity)
+            .contentShape(.rect(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+        .disabled(!interactive || row.paused)
+        .accessibilityLabel(row.name + "، " + progress + (row.statusTitle == progress ? "" : "، " + row.statusTitle))
+        .accessibilityHint(row.source == nil ? "المس لتسجيل العادة" : "المس لفتح الغرفة المرتبطة")
+        .accessibilityIdentifier("bahw-habit-ring-" + row.id.uuidString)
+    }
     private func habitListRow(_ row: HabitReading) -> some View {
         let progress = habitProgress(row)
         return Button { activateHabit(row) } label: {
@@ -227,7 +270,7 @@ struct BahwBlockView: View {
         let daily = rows.filter { !$0.paused && $0.summary.current?.rule.frequency == .daily && ($0.summary.current?.target ?? 0) > 0 }
         let met = daily.filter { $0.summary.current?.met == true }.count
         return VStack(alignment:.leading,spacing:size == .wide ? 4 : 10) {
-            Button { service.session.habitsOpen = true } label: { HStack { title(room.accent); Spacer();if !daily.isEmpty {Text(digits.string(met)+" من "+digits.string(daily.count)).font(label).foregroundStyle(room.accent)} }.frame(minHeight:44).contentShape(.rect) }.buttonStyle(.plain).accessibilityIdentifier("bahw-habits-open").disabled(!interactive)
+            Button { service.session.habitsOpen = true } label: { HStack { title(room.accent); Spacer();if !daily.isEmpty { if size == .wide { Text(digits.string(met)+" من "+digits.string(daily.count)+" اليوم").font(small).foregroundStyle(room.secondaryInk) } else { Text(digits.string(met)+" من "+digits.string(daily.count)).font(label).foregroundStyle(room.accent)} } }.frame(minHeight:44).contentShape(.rect) }.buttonStyle(.plain).accessibilityIdentifier("bahw-habits-open").disabled(!interactive)
             if rows.isEmpty {
                 // Improvement 16 Oct: no «٠ من ٠»; the four period rings at rest show what a habit becomes, and the action is a real button.
                 Spacer(minLength:0)
@@ -283,13 +326,22 @@ struct BahwBlockView: View {
                 } else {
                     let daily = rows.filter { $0.summary.current?.rule.frequency == .daily }
                     let shown = service.session.habitRowsForWidgetScope(daily.isEmpty ? rows : daily)
-                    HStack(alignment: .top, spacing: 3) {
-                        ForEach(Array(shown.prefix(6))) { row in habitRing(row) }
+                    // DA-05 (owner 27 Oct, «وش ذا القبح»): W1's rings, thick and in each habit's own room colour with
+                    // its glyph inside, the name and the amount beneath; a habit at risk speaks first, then the week.
+                    HStack(alignment: .top, spacing: 2) {
+                        ForEach(Array(shown.prefix(6))) { row in wideHabitRing(row, shown6: shown.count > 4) }
                     }
-                    if let next = shown.first(where: { !$0.paused && $0.summary.current?.met != true }) {
-                        Text(wideHabitStep(next))
+                    Spacer(minLength: 0)
+                    if let next = shown.first(where: { !$0.paused && $0.summary.atRisk }) ?? shown.first(where: { !$0.paused && $0.summary.current?.met != true }) {
+                        Label { Text(wideHabitStep(next)) } icon: { Image(systemName: next.summary.atRisk ? "circle.lefthalf.filled" : "circle.dotted").font(.system(size: 11, weight: .semibold)) }
                             .font(MadarTypography.fine()).foregroundStyle(room.accent)
                             .lineLimit(1).accessibilityIdentifier("bahw-habits-wide-step")
+                    }
+                    let week = rows.filter { !$0.paused && $0.summary.current?.rule.frequency == .weekly && ($0.summary.current?.target ?? 0) > 0 }
+                    if !week.isEmpty, !daily.isEmpty {
+                        Text("هذا الأسبوع: " + week.prefix(3).map { r in r.name + " " + digits.string(r.summary.current?.value ?? 0) + " من " + digits.string(r.summary.current?.target ?? 0) }.joined(separator: "، "))
+                            .font(MadarTypography.fine()).foregroundStyle(room.secondaryInk)
+                            .lineLimit(1).accessibilityIdentifier("bahw-habits-wide-week")
                     }
                 }
             } else {
@@ -318,11 +370,15 @@ struct BahwBlockView: View {
                     HStack(alignment: .bottom, spacing: size == .small ? 4 : 10) {
                         ForEach(model.arches) { arch in
                             VStack(spacing: 4) {
+                                // DA-05: W1's arches: a star in each (prayed in ink, the next faint, the rest paler),
+                                // Jumu'ah stands taller, and prayers still ahead are drawn lighter than the day's done ones.
+                                let jumuah = arch.name == "الجمعة", ahead = !arch.done && !arch.next
                                 ZStack {
-                                    PrayerHorseshoe().fill(arch.done ? room.color("goldMid") : room.surface)
-                                    PrayerHorseshoe().stroke(room.accent, lineWidth: arch.next ? 2.4 : 1)
-                                    if arch.done { Image(systemName: "checkmark").font(.caption2.bold()).foregroundStyle(room.ink) }
-                                }.frame(maxWidth: size == .small ? 26 : 34).frame(height: size == .small ? 36 : 40).accessibilityHidden(true)
+                                    PrayerHorseshoe().fill(arch.done ? room.color("goldMid").opacity(0.45) : room.surface)
+                                    PrayerHorseshoe().stroke(room.accent.opacity(ahead ? 0.4 : 1), lineWidth: arch.next ? 2.4 : 1.2)
+                                    PrayerStar().fill(arch.done ? room.accent : arch.next ? room.accent.opacity(0.35) : room.ink.opacity(0.14))
+                                        .frame(width: 10, height: 10).offset(y: -2)
+                                }.frame(maxWidth: size == .small ? 26 : 34).frame(height: (size == .small ? 36 : 40) + (jumuah ? 8 : 0)).accessibilityHidden(true)
                                 if size != .small { Text(arch.name + " " + arch.time).font(small).lineLimit(1) }
                             }.frame(maxWidth: .infinity)
                                 .accessibilityElement(children: .ignore).accessibilityLabel(arch.name + "، " + arch.clock24 + (arch.done ? "، صُلّيت" : ""))

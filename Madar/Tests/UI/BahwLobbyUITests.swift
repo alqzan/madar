@@ -173,7 +173,10 @@ import XCTest
         XCTAssertEqual(XCTWaiter.wait(for: [recorded], timeout: 10), .completed, app.debugDescription)
         XCTAssertFalse(app.staticTexts["habits-title"].exists, "A habit tap must record in the lobby.")
         block.press(forDuration: 0.7)
-        app.buttons["bahw-size-habits"].tap(); app.buttons["كبيرة"].tap(); app.buttons["bahw-arrange"].tap()
+        let sizeButton = app.buttons["bahw-size-habits"]; XCTAssertTrue(sizeButton.waitForExistence(timeout: 5)); sizeButton.tap()
+        let large = app.buttons["كبيرة"]
+        if !large.waitForExistence(timeout: 3) { sizeButton.tap() }
+        XCTAssertTrue(large.waitForExistence(timeout: 5), app.debugDescription); large.tap(); app.buttons["bahw-arrange"].tap()
         app.buttons["bahw-habits-period-yearly"].tap()
         XCTAssertEqual(rings.count, 1, app.debugDescription)
         app.buttons["bahw-habits-period-daily"].tap()
