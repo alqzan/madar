@@ -104,6 +104,13 @@ struct MoneyGoalOverview: View {
                         if envelope.balanceMinor < 0 {
                             Rectangle().stroke(theme.color("debt"), style: .init(lineWidth: 1.4, dash: [4, 2])).frame(width: min(48, proxy.size.width / 4), height: 16)
                         }
+                        // Design: a diamond where each coming salary brings the goal, up to its target.
+                        if let target = envelope.targetMinor, target > 0, envelope.perSalaryMinor > 0 {
+                            ForEach(Array(salaryMarks(target: target).enumerated()), id: \.offset) { _, mark in
+                                Rectangle().fill(theme.color("reserveText")).frame(width: 7, height: 7).rotationEffect(.degrees(45))
+                                    .offset(x: proxy.size.width * mark - 3.5)
+                            }
+                        }
                         Capsule().fill(LinearGradient(colors: [theme.color("rod2"), theme.color("rod"), theme.color("rod2")], startPoint: .leading, endPoint: .trailing)).frame(width: 7, height: 25).offset(x: proxy.size.width * progress)
                     }.frame(height: 25)
                 }.frame(height: 25).accessibilityHidden(true)
@@ -117,6 +124,11 @@ struct MoneyGoalOverview: View {
         }.padding(.vertical, 6).accessibilityElement(children: .combine).accessibilityIdentifier("money-goal-" + envelope.id.uuidString)
     }
     private func money(_ value: Int) -> String { visible ? service.amount(value) : "•••" }
+    /// Fractions of the target reached after each coming salary, at most eight, never past the target.
+    private func salaryMarks(target: Int) -> [Double] {
+        let start = max(0, envelope.balanceMinor)
+        return (1...8).map { Double(start + $0 * envelope.perSalaryMinor) / Double(target) }.filter { $0 < 0.999 }
+    }
     private var summary: String {
         let funding = envelope.dailyFundingMinor > 0 ? "من يومك " + money(envelope.dailyFundingMinor) + " في اليوم"
             : envelope.perSalaryMinor > 0 ? "من كل راتب " + money(envelope.perSalaryMinor) : nil
