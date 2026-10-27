@@ -66,7 +66,7 @@ struct DiaryHomeView: View {
                         if !hidden("days") { recentDays(snapshot) }
                     } else {
                     HStack {
-                        Text(snapshot.selection.match == .echo ? "أقرب صدى" : "في مثل هذا اليوم").font(DiaryType.heading)
+                        Text(snapshot.selection.match == .echo ? "أقرب صدى" : "هذا اليوم عبر السنين").font(DiaryType.heading).lineLimit(1).minimumScaleFactor(0.8)
                         Spacer()
                         HStack(spacing: 2) {
                             calendarButton(.gregorian, "بالميلادي")
@@ -75,9 +75,8 @@ struct DiaryHomeView: View {
                     }
                     ForEach(blocks, id: \.self) { block in
                         switch block {
-                        case "memory": hero(snapshot)
-                        case "thatDay": if let memory, !hidden(block) { thatDay(memory) }
-                        case "sinceThatDay": if let memory, !memory.dayOne, !hidden(block) { since(memory) }
+                        // OR-10 (owner picked mockup A, 26 Oct): one card per past year replaces the year drag, «ذاك اليوم» and «منذ ذاك اليوم».
+                        case "memory": years(snapshot)
                         case "days": if !hidden(block) { recentDays(snapshot) }
                         default: EmptyView()
                         }
@@ -209,6 +208,48 @@ struct DiaryHomeView: View {
             selected = days[(index + (value.translation.width < 0 ? 1 : days.count - 1)) % days.count]
         })
     }
+    /// OR-10: «هذا اليوم عبر السنين». Newest year first; a year with neither words nor a photo is skipped; a card opens that day.
+    private func years(_ snapshot: DiaryHomeSnapshot) -> some View {
+        let pages = snapshot.selection.days.compactMap { day in snapshot.days.first { $0.day == day } }
+            .filter { page in page.photo != nil || page.lines.contains { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } }
+        return VStack(alignment: .leading, spacing: 0) {
+            if pages.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("صفحتك الأولى").font(DiaryType.heading)
+                    Text("اكتب ما تيسّر من يومك؛ ستجده هنا في مثل هذا اليوم من العام القادم.").font(DiaryType.writing).foregroundStyle(theme.color("ink3Text")).fixedSize(horizontal: false, vertical: true)
+                }.padding(18).frame(maxWidth: .infinity, alignment: .leading).background(theme.surface, in: .rect(cornerRadius: 22)).overlay { RoundedRectangle(cornerRadius: 22).stroke(theme.line) }
+            }
+            ForEach(Array(pages.enumerated()), id: \.element.id) { index, page in
+                HStack(alignment: .top, spacing: 12) {
+                    // The thread that ties the years: a bead per year, the line running on to the next card.
+                    VStack(spacing: 0) {
+                        Circle().fill(index == 0 ? theme.accent : theme.surface).overlay { Circle().stroke(theme.accent, lineWidth: 1.5) }.frame(width: 11, height: 11).padding(.top, 22)
+                        if index < pages.count - 1 { Rectangle().fill(theme.line).frame(width: 1.5).frame(maxHeight: .infinity) }
+                    }.frame(width: 12).accessibilityHidden(true)
+                    yearCard(page, snapshot: snapshot).padding(.bottom, 12)
+                }
+            }
+        }
+    }
+    private func yearCard(_ page: DiaryDisplayDay, snapshot: DiaryHomeSnapshot) -> some View {
+        let image = page.photo.flatMap(UIImage.init(data:))
+        return Button { reader = page.day } label: {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 7) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(service.distance(page.day, snapshot.today)).font(.custom("thmanyahsans-Bold", size: 13, relativeTo: .subheadline)).foregroundStyle(theme.color("accentText"))
+                        Text(service.weekday(page.day)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
+                    }
+                    MadarDateLabel(app.dateLabels(page.day, compact: true)).foregroundStyle(theme.color("ink3Text"))
+                    Text(page.excerpt).font(.custom("thmanyahseriftext-Regular", size: 18, relativeTo: .body)).lineSpacing(6).lineLimit(3).multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)
+                    if let place = page.place { Label(place, systemImage: "mappin").font(DiaryType.label).foregroundStyle(theme.color("ink3Text")) }
+                }.frame(maxWidth: .infinity, alignment: .leading)
+                if let image, !typeSize.isAccessibilitySize { Image(uiImage: image).resizable().scaledToFill().frame(width: 76, height: 96).clipShape(.rect(cornerRadius: 14)).accessibilityHidden(true) }
+            }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
+                .background(theme.surface, in: .rect(cornerRadius: 22)).overlay { RoundedRectangle(cornerRadius: 22).stroke(theme.line) }
+                .contentShape(.rect(cornerRadius: 22))
+        }.buttonStyle(.plain).accessibilityIdentifier("diary-year-" + page.day.description)
+    }
     private func thatDay(_ day: DiaryDisplayDay) -> some View {
         VStack(alignment: .leading, spacing: 13) {
             HStack { Text("ذاك اليوم").font(.custom("thmanyahsans-Bold", size: 13, relativeTo: .subheadline)); Text("كتبه مدار وكتبته أنت").font(DiaryType.label).foregroundStyle(theme.color("ink3Text")); Spacer() }
@@ -325,7 +366,8 @@ struct DiaryHomeView: View {
     private func refresh() async {
         do {
             var value = try service.home()
-            let displayed = app.string("notes.homeShape") == "echoes" ? value.echoes.compactMap(\.day) : [selected ?? opening(value)].compactMap { $0 }
+            let shape = app.string("notes.homeShape")
+            let displayed = shape == "echoes" ? value.echoes.compactMap(\.day) : shape == "margin" ? [selected ?? opening(value)].compactMap { $0 } : value.selection.days
             for day in Set(displayed) { try await service.prepareClosedDay(day) }
             value = try service.home()
             snapshot = value; failure = nil

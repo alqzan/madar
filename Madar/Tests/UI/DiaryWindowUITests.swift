@@ -18,18 +18,22 @@ import XCTest
         XCTAssertTrue(currentMonth.label.contains("جمادى"), currentMonth.label)
         XCTAssertTrue(app.buttons["diary-year-2025-10-15"].waitForExistence(timeout: 10), app.debugDescription)
         capture(app, "M3-V01-window-L")
-        app.buttons["diary-year-2024-10-15"].tap()
-        XCTAssertTrue(app.staticTexts["مشينا بعد المغرب، والجو صار يحتمل."].waitForExistence(timeout: 8))
-        app.buttons["diary-year-2025-10-15"].tap()
-        let margin = app.buttons["diary-add-margin"]
+        // OR-10: one card per past year, newest first; a card opens that day, whose «اكتب في هامشها» writes the margin.
+        XCTAssertTrue(app.buttons["diary-year-2024-10-15"].exists, app.debugDescription)
+        XCTAssertLessThan(app.buttons["diary-year-2025-10-15"].frame.minY, app.buttons["diary-year-2024-10-15"].frame.minY)
+        XCTAssertFalse(app.buttons["diary-year-previous"].exists)
         app.swipeUp()
         capture(app, "M3-V01-window-scrolled-L")
-        for _ in 0..<6 where !margin.isHittable { app.swipeDown() }
-        XCTAssertTrue(margin.isHittable); margin.tap()
+        app.swipeDown()
+        app.buttons["diary-year-2024-10-15"].tap()
+        XCTAssertTrue(app.staticTexts["مشينا بعد المغرب، والجو صار يحتمل."].waitForExistence(timeout: 8))
+        let margin = app.buttons["diary-day-write"]
+        XCTAssertTrue(margin.waitForExistence(timeout: 8)); XCTAssertTrue(margin.label.contains("هامش"), margin.label); margin.tap()
         let editor = app.textViews["diary-editor-text"]
         XCTAssertTrue(editor.waitForExistence(timeout: 10)); editor.tap(); editor.typeText("هامش من يومي")
         capture(app, "M3-V01-margin-editor-L")
         app.buttons["diary-editor-save"].tap()
+        if app.buttons["diary-day-close"].waitForExistence(timeout: 5) { app.buttons["diary-day-close"].tap() }
         XCTAssertTrue(app.buttons["diary-today"].waitForExistence(timeout: 10)); app.buttons["diary-today"].tap()
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "هامش من يومي")).firstMatch.waitForExistence(timeout: 10))
         app.buttons["diary-day-close"].tap()
