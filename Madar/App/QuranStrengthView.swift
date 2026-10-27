@@ -31,7 +31,7 @@ struct QuranStrengthView:View {
                     if board.parts.isEmpty {QuranPaperCard {Text("يظهر المنسوب بعد إكمال حفظ وجه؛ الأوجه الجزئية تُراجع ضمن القريب.").font(quranFont(16))}}
                     else if type.isAccessibilitySize {
                         ForEach(board.parts) {p in Button {selected=p.id} label: {Text(p.title+"، "+service.numerals.percent(p.strength)).font(quranFont(16)).frame(minHeight:44)} }
-                    } else {tubes(board.parts)}
+                    } else {tubes(board.parts);legend}
                     if let part {partCard(part)}
                 }
                 if let error {Text(error).font(quranFont(13)).foregroundStyle(theme.color("dueText"))}
@@ -95,7 +95,19 @@ struct QuranStrengthView:View {
         }.padding(24)}.foregroundStyle(theme.ink).background(theme.surface).presentationDetents([.height(590),.large]).environment(\.layoutDirection,.rightToLeft)
     }
     private var faceDetails:some View {ScrollView {VStack(alignment:.leading,spacing:16) {Text(part?.title ?? "").font(quranSerif(27));ForEach(part?.faces ?? []) {face in VStack(alignment:.leading,spacing:6) {Text("الوجه "+service.numerals.string(face.id)+"، "+service.numerals.percent(face.strength)).font(quranFont(16,bold:true));Text("آخر تسميع: "+face.reviewed+"\nالموعد: "+face.due).font(quranFont(13));if face.far {Text("بعيد").font(quranFont(12)).foregroundStyle(theme.color("dueText"))}};Divider()};Button("تمّ") {details=false}.frame(minHeight:44)}.padding(24)}.foregroundStyle(theme.ink).background(theme.surface).presentationDetents([.medium,.large]).environment(\.layoutDirection,.rightToLeft)}
-    private func waterColor(_ n:Int)->Color {theme.color(n > 70 ? "review":n >= 50 ? "hifz":"due")}
+    /// OR-20/21 (owner): weak against strong must read at a glance. Above the 70% reference the green deepens with
+    /// strength (a 75% juz is visibly paler than a 96% one); 50–70 is gold; below fifty the far colour.
+    private func waterColor(_ n:Int)->Color {
+        n > 70 ? theme.color("review").opacity(0.45+0.55*Double(min(100,n)-70)/30) : theme.color(n >= 50 ? "hifz":"due")
+    }
+    private var legend:some View {
+        HStack(spacing:14) {
+            ForEach([("متين",theme.color("review")),("يحتاج تثبيتًا",theme.color("hifz")),("بعيد",theme.color("due"))],id:\.0) {item in
+                HStack(spacing:5) {RoundedRectangle(cornerRadius:2).fill(item.1).frame(width:12,height:12);Text(item.0).font(quranFont(12))}
+            }
+            Spacer(minLength:0)
+        }.foregroundStyle(theme.secondaryInk).accessibilityElement(children:.combine).accessibilityIdentifier("quran-strength-legend")
+    }
     private func waterText(_ n:Int)->Color {theme.color(n > 70 ? "reviewText":n >= 50 ? "hifzText":"dueText")}
     private func load() {do {let value=try service.strengthBoard();board=value;if selected == nil {selected=value.parts.min {$0.strength < $1.strength}?.id}} catch {self.error=quranUserMessage(error)}}
     private func run(_ work:@escaping @MainActor () async throws ->Void) {guard !busy else {return};busy=true;Task {defer {busy=false};do {try await work()} catch {self.error=quranUserMessage(error)}}}
