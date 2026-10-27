@@ -16,7 +16,14 @@ extension AppQuranService {
         else if let portion = value.hifz?.portion, !saved { title = value.hifz?.balance == .consolidation ? "التالي: التثبيت" : "التالي: الورد"; detail = portionTitle(portion, catalog: catalog); route = "madar://quran/session/hifz" }
         else if hasReview { title = "التالي: المراجعة"; detail = QuranDayCloseCopy.faces(Set(value.review.allPages + value.partialRecent.map(\.page)).count, digits: numerals); route = "madar://quran/session/review" }
         else if drill { title = "التالي: مواضع الخطأ"; detail = "تدريب مواضع تعثّرك"; route = "madar://quran/session/drill" }
-        else { title = value.plan == nil ? "ابدأ من القرآن" : "تمّ مسار اليوم"; detail = value.restDay.contains(today) ? "يوم راحة" : "افتح القرآن"; route = "madar://quran" }
+        else {
+            // OR-20: a finished day still points somewhere: one surah from what the user holds, rotating by day, to read in prayer.
+            let held = Array(Set(value.coverage.completedPages.compactMap { catalog.ayahs(on: $0).first?.surahID })).sorted()
+            let surah = held.isEmpty ? nil : catalog.ayahs.first { $0.surahID == held[(today.year * 372 + today.month * 31 + today.day) % held.count] }?.surahNameArabic
+            title = value.plan == nil ? "ابدأ من القرآن" : "تمّ مسار اليوم"
+            detail = value.restDay.contains(today) ? "يوم راحة" : value.plan != nil && surah != nil ? "اقرأ في صلاتك من " + surah! : "افتح القرآن"
+            route = "madar://quran"
+        }
         let completed = value.coverage.completedPages.count, juz = value.coverage.completedJuz.count
         let coverage = completed == 0 ? "أول الطريق" : juz > 0 ? count(juz, singular: "جزء واحد", dual: "جزآن", plural: "أجزاء") + (value.coverage.pagesOutsideCompletedJuz.isEmpty ? "" : " و" + QuranDayCloseCopy.faces(value.coverage.pagesOutsideCompletedJuz.count, digits: numerals)) : QuranDayCloseCopy.faces(completed, digits: numerals)
         var calendar = Calendar(identifier: .gregorian); calendar.timeZone = TimeZone(identifier: value.day.timeZoneID) ?? .gmt
