@@ -99,7 +99,6 @@ struct NextPrayerView: View {
         }
         .environment(\.layoutDirection, .rightToLeft)
         .widgetURL(URL(string: "madar://salah"))
-        .background(previewFamily == nil ? Color.clear : Salah.paper)
         .containerBackground(for: .widget) {if [.accessoryCircular,.accessoryRectangular,.accessoryInline].contains(family){Color.clear}else{Salah.paper}}
     }
 
@@ -113,18 +112,90 @@ struct NextPrayerView: View {
     private var inline: some View {
         Text(state.map { $0.item.name + " " + clock($0.item.at) } ?? "افتح مدار")
     }
+    /// X2: «الصلاة», the countdown with the prayer it leads to, and the day's five prayers as dots by the clock.
     private var rectangular: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text("الصلاة القادمة").font(.caption2).foregroundStyle(.secondary)
+            HStack(spacing: 4) {
+                Image("MadarPrayer").renderingMode(.template).resizable().scaledToFit().frame(width: 12, height: 12)
+                Text("الصلاة").font(.system(size: 12, weight: .semibold))
+            }
             if let state {
-                Text(state.item.name + " " + clock(state.item.at)).font(.headline)
-                Text(countdown).font(.caption).monospacedDigit()
+                HStack(alignment: .firstTextBaseline, spacing: 5) {
+                    Text(entry.snapshot?.countdown(minutes: state.minutes) ?? "").font(.system(size: 20, weight: .bold)).monospacedDigit()
+                    Text("على " + state.item.name + " " + shortClock(state.item.at)).font(.system(size: 12)).lineLimit(1).minimumScaleFactor(0.8)
+                }
+                if dayItems.count > 1 {
+                    HStack(spacing: 4) {
+                        ForEach(dayItems, id: \.at) { item in
+                            let isNext = item.at == state.item.at
+                            Circle().fill(item.at < state.item.at ? Color.primary : .clear)
+                                .overlay { Circle().stroke(Color.primary.opacity(isNext ? 1 : 0.6), lineWidth: isNext ? 2 : 1) }
+                                .frame(width: 7, height: 7)
+                        }
+                    }.accessibilityHidden(true)
+                }
             } else { Text("افتح مدار").font(.headline) }
         }.frame(maxWidth: .infinity, alignment: .leading)
     }
+    /// The five prayers of the next prayer's day; on a Friday the noon prayer is named «الجمعة».
+    private var dayItems: [PrayerNextSnapshot.Item] {
+        guard let state, let items = entry.snapshot?.items else { return [] }
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = TimeZone(identifier: entry.tzID) ?? .current
+        let friday = calendar.component(.weekday, from: state.item.at) == 6
+        return items.filter { calendar.isDate($0.at, inSameDayAs: state.item.at) }.prefix(5).map {
+            friday && $0.prayer == "dhuhr" ? .init(prayer: $0.prayer, name: "الجمعة", at: $0.at) : $0
+        }
+    }
+    private func shortClock(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: entry.snapshot?.numerals == "western" ? "ar_SA@numbers=latn" : "ar_SA@numbers=arab")
+        formatter.timeZone = TimeZone(identifier: entry.tzID) ?? .current
+        formatter.dateFormat = "h:mm"
+        return formatter.string(from: date)
+    }
+    private var header: some View {
+        HStack(spacing: 5) {
+            Image("MadarPrayer").renderingMode(.template).resizable().scaledToFit().frame(width: 14, height: 14)
+            Text("الصلاة").font(.custom("thmanyahsans-Bold", size: 14, relativeTo: .caption))
+        }.foregroundStyle(Salah.accent).widgetAccentable()
+    }
+    /// W1/X1: the next prayer on the leading side, the day's five arches on the trailing side. The arches follow the
+    /// clock only (passed, next, later); what was logged stays inside the app (RP9).
+    private var mediumHome: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                header
+                Spacer(minLength: 4)
+                Text("القادمة").font(.custom("thmanyahsans-Regular", size: 12, relativeTo: .caption2)).foregroundStyle(.secondary)
+                Text(state?.item.name ?? "").font(.custom("thmanyahserifdisplay-Bold", size: 32, relativeTo: .title)).foregroundStyle(Salah.ink).lineLimit(1).minimumScaleFactor(0.7)
+                Text(countdown).font(.custom("thmanyahsans-Bold", size: 16, relativeTo: .headline)).monospacedDigit().foregroundStyle(Salah.accent).widgetAccentable()
+                Spacer(minLength: 4)
+                Text(state.map { "عند " + clock($0.item.at) } ?? "").font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(.secondary).lineLimit(1)
+            }.frame(maxHeight: .infinity, alignment: .leading).layoutPriority(1)
+            HStack(alignment: .bottom, spacing: 6) {
+                ForEach(dayItems, id: \.at) { item in
+                    let isNext = item.at == state?.item.at, passed = item.at < (state?.item.at ?? .distantPast)
+                    VStack(spacing: 4) {
+                        ZStack {
+                            WidgetPrayerArch().fill(Salah.accent.opacity(isNext ? 0.22 : passed ? 0.14 : 0))
+                            WidgetPrayerArch().stroke(isNext || passed ? Salah.accent : Color.secondary.opacity(0.35), style: StrokeStyle(lineWidth: isNext ? 2.5 : 1.2, lineJoin: .round)).widgetAccentable()
+                            Image(systemName: "sparkle").font(.system(size: 9, weight: .semibold))
+                                .foregroundStyle(isNext || passed ? Salah.accent : Color.secondary.opacity(0.4)).offset(y: -4)
+                        }.frame(width: 30, height: 40)
+                        Text(item.name).font(.custom("thmanyahsans-Bold", size: 11, relativeTo: .caption2)).foregroundStyle(Salah.ink).lineLimit(1).minimumScaleFactor(0.8)
+                        Text(shortClock(item.at)).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).monospacedDigit().foregroundStyle(.secondary).lineLimit(1)
+                    }.frame(maxWidth: .infinity)
+                }
+            }.frame(maxWidth: .infinity).accessibilityHidden(true)
+        }.frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
     private var home: some View {
+        if family == .systemMedium && entry.template == .next && state != nil && dayItems.count > 1 { return AnyView(mediumHome) }
+        return AnyView(classicHome)
+    }
+    private var classicHome: some View {
         VStack(alignment: .leading, spacing: extraLargePortrait ? 18 : 4) {
-            Text("الصلاة القادمة").font(extraLargePortrait ? .title2 : .caption).foregroundStyle(.secondary)
+            if extraLargePortrait { Text("الصلاة القادمة").font(.title2).foregroundStyle(.secondary) } else { header }
             if let state {
                 Text(entry.template == .countdown ? countdown : state.item.name).font(.system(size: extraLargePortrait ? 72 : family == .systemSmall ? 34 : 40, weight: .bold, design: .serif))
                     .minimumScaleFactor(0.6).lineLimit(1).foregroundStyle(Salah.ink)
@@ -139,6 +210,19 @@ struct NextPrayerView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+    }
+}
+
+/// The prayer room's horseshoe arch, drawn small for widgets (the room's `PrayerHorseshoe` lives in the app target).
+private struct WidgetPrayerArch: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let radius = rect.width / 2, center = CGPoint(x: rect.midX, y: rect.minY + radius)
+        let shoulder = center.y + radius * 0.5, left = rect.minX + rect.width * 0.067, right = rect.maxX - rect.width * 0.067
+        path.move(to: CGPoint(x: left, y: rect.maxY)); path.addLine(to: CGPoint(x: left, y: shoulder))
+        path.addArc(center: center, radius: radius, startAngle: .degrees(150), endAngle: .degrees(390), clockwise: false)
+        path.addLine(to: CGPoint(x: right, y: rect.maxY)); path.closeSubpath()
+        return path
     }
 }
 

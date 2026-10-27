@@ -41,19 +41,33 @@ struct QuranWidgetContent: View {
             }
         }.accessibilityElement(children: .ignore).accessibilityLabel("في صدرك، " + value.coverage)
     }
+    /// X1 «رصّة ذكية»: the room's mark, what comes next, the amount in large serif, and today's steps as a column of beads.
     private func path(_ value: QuranWidgetSnapshot) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("مسار اليوم").font(.system(size: extraLarge ? 22 : 12)).foregroundStyle(theme.secondaryInk)
-            if !compact, !type.isAccessibilitySize, value.total > 0 {
-                HStack(spacing: 4) { ForEach(0..<value.total, id: \.self) { index in Capsule().fill(index < value.done ? theme.color("hifz") : theme.color("track")).frame(height: 5) } }.accessibilityHidden(true)
+        let label = value.nextTitle.hasPrefix("التالي: ") ? String(value.nextTitle.dropFirst(8)) : value.nextTitle
+        return HStack(alignment: .center, spacing: 10) {
+            VStack(alignment: .leading, spacing: extraLarge ? 10 : 4) {
+                HStack(spacing: 5) {
+                    Image(systemName: "book").font(.system(size: extraLarge ? 20 : 12, weight: .semibold))
+                    Text("القرآن").font(.custom("thmanyahsans-Bold", size: extraLarge ? 22 : 14, relativeTo: .caption))
+                }.foregroundStyle(theme.color("hifzText")).widgetAccentable()
+                Spacer(minLength: 0)
+                Text(label).font(.custom("thmanyahsans-Regular", size: extraLarge ? 20 : 12, relativeTo: .caption2)).foregroundStyle(theme.secondaryInk).lineLimit(1)
+                Text(value.nextDetail).font(.custom("thmanyahserifdisplay-Bold", size: extraLarge ? 44 : compact ? 24 : 28, relativeTo: .title))
+                    .lineLimit(2).minimumScaleFactor(0.6).fixedSize(horizontal: false, vertical: true)
+                if let line = value.dayLine {
+                    // The beads alone read as empty; say where the day stands.
+                    Text(line).font(.custom("thmanyahsans-Bold", size: extraLarge ? 18 : 11, relativeTo: .caption2)).foregroundStyle(theme.ink.opacity(0.8)).lineLimit(1)
+                }
+                Spacer(minLength: 0)
+            }.frame(maxWidth: .infinity, alignment: .leading)
+            if !type.isAccessibilitySize, value.total > 0 {
+                VStack(spacing: extraLarge ? 8 : 5) {
+                    ForEach(0..<min(value.total, 6), id: \.self) { index in
+                        Capsule().fill(index < value.done ? theme.color("hifz") : theme.color("track"))
+                            .frame(width: extraLarge ? 10 : 7, height: index == value.done ? (extraLarge ? 30 : 20) : (extraLarge ? 10 : 7))
+                    }
+                }.accessibilityHidden(true)
             }
-            if let line = value.dayLine {
-                // The bars alone read as empty; say where the day stands.
-                Text(line).font(.system(size: extraLarge ? 18 : 11)).foregroundStyle(theme.secondaryInk)
-            }
-            Spacer(minLength: 0)
-            Text(value.nextTitle).font(.system(size: extraLarge ? 26 : 13, weight: .semibold)).foregroundStyle(theme.color("hifzText"))
-            Text(value.nextDetail).font(.system(size: extraLarge ? 31 : compact ? 13 : 19, design: .serif)).fixedSize(horizontal: false, vertical: true)
         }
     }
     private func week(_ value: QuranWidgetSnapshot) -> some View {

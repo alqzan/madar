@@ -20,7 +20,7 @@ struct RoomWidgetContent:View {
     private var accent:Color{rendering == .fullColor ? theme.accent : .primary}
     private var extraLargePortrait:Bool {if #available(iOS 27.0, *) {family == .systemExtraLargePortrait} else {false}}
     private var largeHome:Bool {family == .systemLarge || extraLargePortrait}
-    private var capacity:Int {let n=extraLargePortrait ? 7 : largeHome ? 5 : family == .systemMedium ? 3 : 2;return type.isAccessibilitySize ? (n+1)/2 : n}
+    private var capacity:Int {let n=extraLargePortrait ? 7 : largeHome ? 5 : family == .systemMedium ? (room == .upcoming ? 4 : 3) : room == .habits ? 3 : 2;return type.isAccessibilitySize ? (n+1)/2 : n}
     private var rows:[RoomWidgetSnapshot.Row] {
         guard let snapshot else{return[]}
         if room == .habits && template == "periods"{return Array(snapshot.periods.prefix(capacity))}
@@ -32,7 +32,7 @@ struct RoomWidgetContent:View {
     var body:some View {Group{if room == .mihbara{MihbaraRoomWidgetContent(snapshot:mihbaraSnapshot,locked:mihbaraLocked,family:family,numerals:numerals)}else if room == .money { MoneyWidgetContent(snapshot: snapshot, family: family, template: template) } else if accessory{accessoryContent}else{home}}}
     private var home:some View {
         VStack(alignment:.leading,spacing:8) {
-            HStack(spacing:6) { Image(room.glyph).renderingMode(.template).resizable().scaledToFit().frame(width:16,height:16).widgetAccentable();Text(diaryRow?.title ?? room.title).font(.custom("thmanyahsans-Bold",size:13,relativeTo:.caption));Spacer(minLength:0);if room == .habits && family == .systemMedium {Text(snapshot?.heading ?? "").font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).privacySensitive()} }.foregroundStyle(accent)
+            HStack(spacing:6) { Image(room.glyph).renderingMode(.template).resizable().scaledToFit().frame(width:16,height:16).widgetAccentable();Text(diaryRow?.title ?? room.title).font(.custom("thmanyahsans-Bold",size:13,relativeTo:.caption));Spacer(minLength:0);if room == .habits && template != "periods" && !largeHome {Text(snapshot?.heading ?? "").font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).foregroundStyle(theme.secondaryInk).lineLimit(1).privacySensitive()} else if room == .upcoming && !largeHome && snapshot?.locked != true {Text("كم بقي").font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).foregroundStyle(theme.secondaryInk)} }.foregroundStyle(accent)
             if snapshot?.locked == true {
                 Spacer(minLength:0);Label("افتح مدار",systemImage:"lock").font(MadarTypography.section());Text("المحتوى محمي").font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).foregroundStyle(theme.secondaryInk);Spacer(minLength:0)
             } else if let row = diaryRow {
@@ -46,21 +46,24 @@ struct RoomWidgetContent:View {
             } else if rows.isEmpty {
                 Spacer(minLength:0);Text(snapshot?.emptyTitle ?? "افتح مدار للتحديث").font(MadarTypography.section());dates;Spacer(minLength:0)
             } else if room == .upcoming && !largeHome {
-                HStack(alignment:.top,spacing:8) {ForEach(rows){row in upcoming(row)}}.frame(maxHeight:.infinity)
+                HStack(alignment:.top,spacing:8) {ForEach(rows){row in upcoming(row)}}.frame(maxHeight:.infinity,alignment:.center)
             } else {
-                if room == .habits && template != "periods" && family != .systemMedium && !type.isAccessibilitySize {Text(snapshot?.heading ?? "").font(.custom("thmanyahserifdisplay-Bold",size:22,relativeTo:.title2)).foregroundStyle(accent).lineLimit(2).minimumScaleFactor(0.7).privacySensitive()}
+                if room == .habits && template != "periods" && largeHome && !type.isAccessibilitySize {Text(snapshot?.heading ?? "").font(.custom("thmanyahserifdisplay-Bold",size:22,relativeTo:.title2)).foregroundStyle(accent).lineLimit(2).minimumScaleFactor(0.7).privacySensitive()}
                 ForEach(rows) { row in
                     let isHero = extraLargePortrait && row.id == rows.first?.id
                     Link(destination:URL(string:row.route) ?? URL(string:room.route)!) {
                         HStack(spacing:8) {
-                            if room == .year || room == .habits {donut(row.share).frame(width:24,height:24)}
+                            if room == .year {donut(row.share).frame(width:24,height:24)}
                             VStack(alignment:.leading,spacing:2) {
                                 Text(row.title).font(.custom("thmanyahsans-Bold",size:isHero ? 19 : 13,relativeTo:isHero ? .headline : .caption)).lineLimit(1)
                                 Text(figure: row.value).font(.custom("thmanyahsans-Regular",size:isHero ? 24 : 11,relativeTo:isHero ? .title3 : .caption2)).foregroundStyle(theme.secondaryInk).lineLimit(1)
                                 if largeHome && !type.isAccessibilitySize && !row.detail.isEmpty && (room != .habits || (template != "periods" && row.id == rows.first?.id)) {HStack(spacing:6){Text(row.detail).font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).foregroundStyle(theme.secondaryInk).lineLimit(1);if !row.secondDate.isEmpty {Text(row.secondDate).font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).foregroundStyle(theme.secondaryInk).lineLimit(1)}}}
                             }
                             Spacer(minLength:0)
-                            if row.done && room == .habits {Image(systemName:"checkmark").font(.caption).foregroundStyle(accent)}
+                            if room == .habits {
+                                // X1: each habit's own ring sits at the row's far end, a check inside once it is met.
+                                ZStack{donut(row.share,width:3);if row.done{Image(systemName:"checkmark").font(.system(size:10,weight:.bold)).foregroundStyle(accent)}}.frame(width:28,height:28)
+                            }
                         }.contentShape(.rect)
                     }.buttonStyle(.plain).privacySensitive(room == .habits || room == .upcoming)
                 }
@@ -127,10 +130,15 @@ struct RoomWidgetContent:View {
     private var dates:some View {
         VStack(alignment:.leading,spacing:2){Text(snapshot?.datePrimary ?? "");Text(snapshot?.dateSecondary ?? "")}.font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).foregroundStyle(theme.secondaryInk)
     }
-    private func donut(_ share:Double)->some View {ZStack{Circle().stroke(theme.line,lineWidth:3);Circle().trim(from:0,to:min(1,max(0,share))).stroke(accent,style:.init(lineWidth:3,lineCap:.round)).rotationEffect(.degrees(-90))}.accessibilityHidden(true)}
+    private func donut(_ share:Double,width:CGFloat=3,color:Color?=nil)->some View {ZStack{Circle().stroke(theme.line,lineWidth:width);Circle().trim(from:0,to:min(1,max(0,share))).stroke(color ?? accent,style:.init(lineWidth:width,lineCap:.round)).rotationEffect(.degrees(-90))}.accessibilityHidden(true)}
+    /// X1: an upcoming ring takes the colour of the room its date comes from (salary in money's ink, a juz in Quran's).
+    private func sourceColor(_ route:String)->Color {
+        guard rendering == .fullColor,let host=URL(string:route)?.host,["salah","quran","mal","notes","mihbara"].contains(host) else{return accent}
+        return RoomTheme(room:host,dark:scheme == .dark).accent
+    }
     private func upcoming(_ row:RoomWidgetSnapshot.Row)->some View {
         Link(destination:URL(string:row.route) ?? URL(string:room.route)!) {
-            VStack(spacing:5){ZStack{donut(row.share);VStack(spacing:0){Text(row.value.split(separator:" ").first.map(String.init) ?? row.value).font(.custom("thmanyahserifdisplay-Bold",size:26,relativeTo:.title2)).minimumScaleFactor(0.7).lineLimit(1);Text(row.value.split(separator:" ").dropFirst().joined(separator:" ")).font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2))}.multilineTextAlignment(.center).padding(7)}.aspectRatio(1,contentMode:.fit);Text(row.title).font(.custom("thmanyahsans-Bold",size:11,relativeTo:.caption2)).lineLimit(2).multilineTextAlignment(.center)}.frame(maxWidth:.infinity)
+            VStack(spacing:6){ZStack{donut(row.share,width:4,color:sourceColor(row.route));VStack(spacing:0){Text(row.value.split(separator:" ").first.map(String.init) ?? row.value).font(.custom("thmanyahserifdisplay-Bold",size:22,relativeTo:.title2)).foregroundStyle(sourceColor(row.route)).minimumScaleFactor(0.7).lineLimit(1);Text(row.value.split(separator:" ").dropFirst().joined(separator:" ")).font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2))}.multilineTextAlignment(.center).padding(7)}.frame(width:family == .systemSmall ? 84 : 66,height:family == .systemSmall ? 84 : 66);Text(row.title).font(.custom("thmanyahsans-Bold",size:11,relativeTo:.caption2)).lineLimit(2).multilineTextAlignment(.center)}.frame(maxWidth:.infinity)
         }.buttonStyle(.plain).privacySensitive()
     }
 }
