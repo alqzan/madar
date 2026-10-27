@@ -140,6 +140,6 @@ extension AppMoneyService {
             defaultMethodID: recentMethod ?? methods.first(where: { $0.kind != .cash })?.id ?? methods.first?.id,
             merchants: merchants, categories: categories, envelopes: home.envelopes,
             cashCountedAtWithdrawal: try settings.value(for: "mal.cashWithdrawalAsSpend") == .bool(true),
-            diaryOn: app.values["notes.autoLines"]?.object?["mal"] != .bool(false), nearby: nearby, tripCurrency: trip?.currency, tripRate: trip?.fxRateToHome, tripEnvelopeID: trip?.id)
+            diaryOn: app.values["notes.autoLines"]?.object?["mal"] != .bool(false), nearby: nearby, tripCurrency: trip?.currency, tripRate: trip?.fxRateToHome, tripEnvelopeID: trip?.journeyKey)
     }
 }

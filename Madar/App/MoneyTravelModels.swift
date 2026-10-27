@@ -35,6 +35,8 @@ struct MoneyTravelReading {
     var reserveMinor: Int
     var surplusMinor: Int
     var hasEnvelope: Bool
+    /// OR-09: the journey's cities in order; one city for a single-country trip.
+    var legCities: [String] = []
     var days: [GregorianDay] {
         let first = max(start, today.adding(days: -30)), last = min(due ?? today.adding(days: 3), today.adding(days: 30))
         return (0...max(0, MadarCalendarDays.distance(from: first, to: last))).map { first.adding(days: $0) }
@@ -47,27 +49,29 @@ extension AppMoneyService {
         guard let trip = try repo.trip(at: now), let began = trip.start else { return nil }
         let zone = TimeZone(identifier: trip.tzID) ?? app.activePlace.timeZone
         let today = try DiaryLineRenderer.today(context: context, now: now)
-        let start = GregorianDay.containing(began, in: zone), envelope = try repo.tripEnvelope(trip)
+        // OR-09: one journey = every leg; spending, today and the budget sum all of them, each leg keeps its own currency.
+        let legs = try repo.journeyLegs(of: trip), legIDs = Set(legs.map(\.id)), key = trip.journeyKey
+        let start = GregorianDay.containing(legs.first?.start ?? began, in: zone), envelope = try repo.tripEnvelope(trip)
         let allocations = try context.fetch(FetchDescriptor<Allocation>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
         let all = try repo.confirmedTransactions()
-        let rows = all.filter { $0.tripID == trip.id && $0.eventAt <= now && ["expense", "fee", "refund", "transfer", "withdrawal"].contains($0.kind) }.compactMap { tx -> MoneyTripMovement? in
+        let rows = all.filter { $0.tripID.map(legIDs.contains) == true && $0.eventAt <= now && ["expense", "fee", "refund", "transfer", "withdrawal"].contains($0.kind) }.compactMap { tx -> MoneyTripMovement? in
             guard let day = try? GregorianDay(tx.dayKey) else { return nil }
             return .init(id: tx.id, day: day, eventAt: tx.eventAt, name: tx.merchant ?? tx.counterparty ?? (tx.kind == "refund" ? "مبلغ مسترد" : "مصروف"), homeMinor: tx.homeAmountMinor, originalMinor: tx.amountMinor, currency: tx.currency, isRefund: tx.kind == "refund")
         }.sorted { $0.eventAt == $1.eventAt ? $0.id.uuidString < $1.id.uuidString : $0.eventAt < $1.eventAt }
         let todayIDs = Set(all.filter { tx in
-            guard tx.tripID == trip.id else { return false }
+            guard tx.tripID.map(legIDs.contains) == true else { return false }
             let key = tx.kind == "refund" ? all.first(where: { $0.id == tx.relatedTransactionID })?.dayKey ?? tx.dayKey : tx.dayKey
             return key == today.description
         }.map(\.id))
-        let spent = -allocations.filter { $0.targetID == trip.id && $0.transactionID.map(todayIDs.contains) == true && ["spend", "refund"].contains($0.kind) }.reduce(0) { $0 + $1.amountMinor }
+        let spent = -allocations.filter { $0.targetID == key && $0.transactionID.map(todayIDs.contains) == true && ["spend", "refund"].contains($0.kind) }.reduce(0) { $0 + $1.amountMinor }
         let due = envelope?.due.map { GregorianDay.containing($0, in: zone) }
         let target = envelope?.targetMinor
         let planned = due.flatMap { end in target.flatMap { TravelBudget.dailyMinor(targetMinor: $0, durationDays: MadarCalendarDays.distance(from: start, to: end) + 1, day: MadarCalendarDays.distance(from: start, to: today) + 1) } }
         let envelopes = try context.fetch(FetchDescriptor<Envelope>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
         func role(_ name: String) -> Int { let ids = Set(envelopes.filter { $0.role == name }.map(\.id)); return allocations.filter { ($0.target == name && $0.targetID == nil) || $0.targetID.map(ids.contains) == true }.reduce(0) { $0 + $1.amountMinor } }
         return .init(id: trip.id, city: trip.city, homeCity: app.values["core.homeCity"]?.object?["name"]?.string ?? "مدينتك", mode: trip.mode, distanceKm: trip.homeKm.map { Int($0.rounded()) }, currency: trip.currency, rate: trip.fxRateToHome, rateAt: trip.fxSetAt,
-            start: start, today: today, due: due, targetMinor: target, balanceMinor: allocations.filter { $0.targetID == trip.id }.reduce(0) { $0 + $1.amountMinor }, dailyMinor: planned, todaySpentMinor: spent, movements: rows,
-            reserveMinor: role("reserve"), surplusMinor: role("surplus"), hasEnvelope: envelope != nil)
+            start: start, today: today, due: due, targetMinor: target, balanceMinor: allocations.filter { $0.targetID == key }.reduce(0) { $0 + $1.amountMinor }, dailyMinor: planned, todaySpentMinor: spent, movements: rows,
+            reserveMinor: role("reserve"), surplusMinor: role("surplus"), hasEnvelope: envelope != nil, legCities: legs.map(\.city))
     }
     func currencyName(_ code: String) -> String { Locale(identifier: "ar").localizedString(forCurrencyCode: code) ?? code }
     func localizedRate(_ raw: String) -> String {

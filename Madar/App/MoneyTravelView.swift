@@ -104,6 +104,8 @@ struct MoneyTravelView: View {
         HStack(alignment: .center, spacing: 15) {
             VStack(alignment: .leading, spacing: 7) {
                 HStack { Text(r.homeCity.isEmpty ? "مدينتك" : r.homeCity); Spacer(minLength: 4); Image(systemName: "airplane").foregroundStyle(theme.color("accentText")); Spacer(minLength: 4); Text(r.city) }.font(.custom("thmanyahserifdisplay-Bold", size: 18, relativeTo: .headline))
+                // OR-09: a multi-country journey names its stops; one budget covers them all.
+                if r.legCities.count > 1 { Text(r.legCities.joined(separator: " ← ")).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).lineLimit(2).accessibilityIdentifier("money-travel-legs") }
                 HStack(spacing: 3) { ForEach(0..<7, id: \.self) { i in Capsule().fill(i < min(7, MadarCalendarDays.distance(from: r.start, to: r.today)+1) ? theme.color("accent") : theme.line).frame(height: 5) } }.accessibilityHidden(true)
                 HStack { Text("اليوم " + service.digits.string(MadarCalendarDays.distance(from: r.start, to: r.today)+1)); Spacer(minLength: 4); MadarDateLabel(app.dateLabels(r.today, compact: true), primaryFont: .system(size: 11), secondaryFont: .system(size: 11)) }.font(.system(size: 11)).foregroundStyle(theme.secondaryInk)
                 Text(r.dailyMinor == nil ? "في مظروف الرحلة" : "باقٍ من خطة اليوم").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).padding(.top, 8)
@@ -147,7 +149,7 @@ struct MoneyTravelView: View {
     }
     private func tripReport(_ r: MoneyTravelReading) -> some View {
         ScrollView { VStack(alignment: .leading, spacing: 14) {
-            HStack { Text("تقرير رحلة " + r.city).font(MadarTypography.title()); Spacer(); Button("تم") { report = false }.frame(minHeight: 44).accessibilityIdentifier("money-trip-report-close") }
+            HStack { Text("تقرير رحلة " + (r.legCities.count > 1 ? r.legCities.joined(separator: " و") : r.city)).font(MadarTypography.title()); Spacer(); Button("تم") { report = false }.frame(minHeight: 44).accessibilityIdentifier("money-trip-report-close") }
             MadarDateLabel(app.dateLabels(r.start), primaryFont: MadarTypography.body(), secondaryFont: MadarTypography.caption())
             Text(figure: "في المظروف " + amount(r.balanceMinor)).font(MadarTypography.cardTitle())
             ForEach(r.movements) { row in HStack { VStack(alignment: .leading) { Text(row.name); MadarDateLabel(app.dateLabels(row.day, compact: true), primaryFont: MadarTypography.fine(), secondaryFont: MadarTypography.fine()) }; Spacer(); Text(figure: (row.isRefund ? "+" : "") + amount(row.homeMinor)) } }
@@ -163,17 +165,22 @@ struct MoneyTravelView: View {
     private func load() { do { reading = try service.loadTravel(); failure = nil } catch { failure = "لم تكتمل قراءة الرحلة. حاول مرة أخرى." } }
 }
 private struct MoneyAirmailBorder: Shape { func path(in r: CGRect) -> Path { Path(r) } }
+/// OR-09: a generic journey ornament (no city's skyline): a horizon, two soft hills and a dotted flight arc
+/// from home (trailing, the start in RTL) to the destination, so it suits any country and any number of stops.
 private struct MoneyTravelSkyline: Shape {
     func path(in r: CGRect) -> Path {
-        var p = Path(); p.addRect(CGRect(x: 0, y: r.height-4, width: r.width, height: 4))
-        for (x, w, h) in [(0.025,0.08,0.14),(0.29,0.14,0.23),(0.50,0.23,0.33),(0.81,0.14,0.25)] {
-            let rect = CGRect(x:r.width*x,y:r.height*(1-h),width:r.width*w,height:r.height*h)
-            p.addRect(rect); p.move(to: CGPoint(x:rect.minX,y:rect.minY)); p.addQuadCurve(to:CGPoint(x:rect.maxX,y:rect.minY),control:CGPoint(x:rect.midX,y:rect.minY-rect.width*0.62)); p.closeSubpath()
-            p.addRect(CGRect(x:rect.midX-0.5,y:rect.minY-rect.width*0.34-6,width:1,height:10))
+        var p = Path(); p.addRect(CGRect(x: 0, y: r.height-3, width: r.width, height: 3))
+        for (from, to, h) in [(0.0, 0.46, 0.34), (0.38, 1.0, 0.24)] {
+            p.move(to: CGPoint(x: r.width*from, y: r.height-3))
+            p.addQuadCurve(to: CGPoint(x: r.width*to, y: r.height-3), control: CGPoint(x: r.width*(from+to)/2, y: r.height*(1-h*2)))
+            p.closeSubpath()
         }
-        for (x,h) in [(0.14,0.85),(0.22,0.62),(0.435,0.77),(0.463,0.87),(0.488,0.86),(0.735,0.94),(0.758,0.90),(0.783,0.75),(0.965,0.72)] {
-            let x = r.width*x, w = r.width*0.011, y = r.height*(1-h)
-            p.addRect(CGRect(x:x,y:y,width:w,height:r.height-y)); p.move(to:CGPoint(x:x,y:y));p.addLine(to:CGPoint(x:x+w/2,y:y-8));p.addLine(to:CGPoint(x:x+w,y:y));p.closeSubpath()
+        let start = CGPoint(x: r.width*0.92, y: r.height*0.62), end = CGPoint(x: r.width*0.10, y: r.height*0.48), control = CGPoint(x: r.width*0.5, y: -r.height*0.35)
+        for step in 0...18 {
+            let t = Double(step)/18, u = 1-t
+            let x = u*u*start.x + 2*u*t*control.x + t*t*end.x, y = u*u*start.y + 2*u*t*control.y + t*t*end.y
+            let d = step == 0 || step == 18 ? 5.0 : 2.2
+            p.addEllipse(in: CGRect(x: x-d/2, y: y-d/2, width: d, height: d))
         }
         return p
     }

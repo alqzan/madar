@@ -201,6 +201,14 @@ private struct PrayerInverse: Codable {
         for expected in inverse.after {
             guard current.first(where: { $0.model == expected.model && $0.id == expected.id }) == expected else { throw PrayerDomainError.staleUndo }
         }
+        // OR-09: a leg this command created cannot be undone once money, a prayer log or a habit pause points to it.
+        let newLegs = Set(inverse.after.filter { a in a.model == "Trip" && !inverse.before.contains(where: { $0.model == "Trip" && $0.id == a.id }) }.map(\.id))
+        if !newLegs.isEmpty {
+            let used = try context.fetch(FetchDescriptor<MoneyTransaction>()).contains { $0.deletedAt == nil && $0.tripID.map(newLegs.contains) == true }
+                || context.fetch(FetchDescriptor<PrayerLog>()).contains { $0.deletedAt == nil && $0.tripID.map(newLegs.contains) == true }
+                || context.fetch(FetchDescriptor<HabitPause>()).contains { $0.deletedAt == nil && $0.tripID.map(newLegs.contains) == true }
+            if used { throw PrayerDomainError.staleUndo }
+        }
         for after in inverse.after {
             var restored = inverse.before.first { $0.model == after.model && $0.id == after.id } ?? after
             let stamp = StableIdentity.monotonic(now: now, previous: after.date("updatedAt") ?? now)

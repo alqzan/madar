@@ -50,6 +50,26 @@ import MadarMoney
         #expect(try await undoStore.run("system.undo", ["undoToken": .string(isolated.uuidString)]).status == .applied)
         #expect(try MoneyRepository(context: ModelContext(undoStore.container)).confirmedTransactions().isEmpty)
     }
+    /// OR-09: the second country of one journey charges the same trip envelope, in its own currency and price.
+    @Test func aSecondLegChargesTheJourneyEnvelopeAtItsOwnPrice() async throws {
+        let s = try Store(), first = UUID(), second = UUID(), legID = UUID()
+        #expect(try await s.expense(1234, id: first).status == .applied)
+        let c = ModelContext(s.container), leg1 = try #require(try c.fetch(FetchDescriptor<Trip>()).first { $0.id == s.tripID })
+        leg1.end = s.now.addingTimeInterval(-3600)
+        let leg2 = Trip(); leg2.id = legID; leg2.journeyID = s.tripID; leg2.city = "المدينة الثانية"; leg2.currency = "EUR"; leg2.fxRateToHome = "4.1"; leg2.fxSetAt = leg1.end; leg2.start = leg1.end; leg2.lat = 48.8; leg2.lon = 2.3; leg2.tzID = "Europe/Paris"; c.insert(leg2); try c.save()
+        #expect(try await s.run("money.logExpense", ["currency": .string("EUR"), "amountMinor": .string("1000"), "fromAccountID": .string(s.bankID.uuidString), "method": .string("transfer")], id: second).status == .applied)
+        let repo = MoneyRepository(context: ModelContext(s.container))
+        let tx = try #require(try repo.confirmedTransactions().first { $0.id == second })
+        #expect(tx.tripID == legID); #expect(tx.homeAmountMinor == 4100); #expect(tx.rateAtTime == "4.1")
+        #expect(try repo.allocationRows(transactionID: second).map(\.target) == [.envelope(s.tripID.uuidString)], "Both legs spend from the one journey envelope")
+        let now2 = try #require(try repo.trip(at: s.now))
+        #expect(now2.id == legID); #expect(now2.journeyKey == s.tripID)
+        #expect(try repo.tripEnvelope(now2)?.id == s.tripID)
+        #expect(try repo.journeyLegs(of: now2).map(\.id) == [s.tripID, legID])
+        #expect(try repo.allocationRows().filter { $0.target == .envelope(s.tripID.uuidString) }.reduce(0) { $0 + $1.amountMinor } == -(4628 + 4100))
+        #expect(try await s.run("system.undo", ["undoToken": .string(second.uuidString)]).status == .applied)
+        #expect(try MoneyRepository(context: ModelContext(s.container)).allocationRows().filter { $0.target == .envelope(s.tripID.uuidString) }.reduce(0) { $0 + $1.amountMinor } == -4628)
+    }
     @Test func repricingPreviewsAllHalalasAndRefundsAndOneUndoRestoresTheOriginalGraph() async throws {
         let s = try Store(), original = UUID(), refundID = UUID()
         #expect(try await s.expense(1234, id: original).status == .applied)

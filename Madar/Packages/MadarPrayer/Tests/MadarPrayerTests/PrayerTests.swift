@@ -305,6 +305,17 @@ import MadarData
         #expect(live.count == 1 && live.first?.country == "TR" && live.first?.end == nil)
         #expect(try PrayerRepository(context: context).activeTrip(at: time("2026-10-09T12:00:00+03:00"))?.city == "إسطنبول")
     }
+    @Test func continueTripUndoIsRefusedOnceMoneyPointsToTheNewLeg() throws {
+        let container = try container(); let context = container.mainContext
+        let istanbul = try ActivePlace(latitude: 41.0082, longitude: 28.9784, timeZoneID: "Europe/Istanbul")
+        let cairo = try ActivePlace(latitude: 30.0444, longitude: 31.2357, timeZoneID: "Africa/Cairo")
+        try apply(.startTrip(city: "إسطنبول", country: "TR", place: istanbul, homeKm: 2_100), context, at: "2026-10-07T10:00:00+03:00")
+        let inverse = try #require(try apply(.continueTrip(city: "القاهرة", country: "EG", place: cairo, homeKm: nil), context, at: "2026-10-09T10:00:00+03:00"))
+        let leg = try #require(context.fetch(FetchDescriptor<Trip>()).first { $0.country == "EG" })
+        let tx = MoneyTransaction(); tx.tripID = leg.id; context.insert(tx); try context.save()
+        #expect(throws: PrayerDomainError.staleUndo) { try PrayerMutationHandler.undo(inverse, in: context, now: time("2026-10-09T10:05:00+03:00"), writer: "test-device") }
+        #expect(try context.fetch(FetchDescriptor<Trip>()).filter { $0.deletedAt == nil }.count == 2)
+    }
     @Test func editingOnePairedPrayerUnlinksBothAndEndTripPreservesOldClock() throws {
         let container = try container(); let context = container.mainContext
         let jeddah = try ActivePlace(latitude: 21.4858, longitude: 39.1925, timeZoneID: "Asia/Riyadh")

@@ -4,7 +4,18 @@ import MadarCore
 import MadarData
 import MadarMoney
 
+extension Trip {
+    /// OR-09: legs of one multi-country trip share the first leg's id; the trip budget envelope uses this key.
+    public var journeyKey: UUID { journeyID ?? id }
+}
+
 extension MoneyRepository {
+    /// Every live leg of the journey `trip` belongs to, oldest first.
+    public func journeyLegs(of trip: Trip) throws -> [Trip] {
+        let key = trip.journeyKey
+        return try context.fetch(FetchDescriptor<Trip>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && !$0.dismissed && $0.journeyKey == key }
+            .sorted { ($0.start ?? .distantPast, $0.id.uuidString) < ($1.start ?? .distantPast, $1.id.uuidString) }
+    }
     public func trip(at instant: Date) throws -> Trip? {
         try context.fetch(FetchDescriptor<Trip>()).filter {
             $0.deletedAt == nil && $0.mergedInto == nil && !$0.dismissed && $0.start.map { $0 <= instant } == true && ($0.end == nil || instant < $0.end!)
@@ -21,6 +32,6 @@ extension MoneyRepository {
         return rates
     }
     public func tripEnvelope(_ trip: Trip) throws -> Envelope? {
-        try context.fetch(FetchDescriptor<Envelope>()).first { $0.id == trip.id && $0.role == "trip" && $0.deletedAt == nil && $0.mergedInto == nil }
+        try context.fetch(FetchDescriptor<Envelope>()).first { $0.id == trip.journeyKey && $0.role == "trip" && $0.deletedAt == nil && $0.mergedInto == nil }
     }
 }

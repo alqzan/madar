@@ -1077,7 +1077,7 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
     }
 
     private static func restoreTripEnvelope(_ trip: Trip, _ context: ModelContext, _ now: Date, _ writer: String) throws -> Envelope {
-        let existing = try context.fetch(FetchDescriptor<Envelope>()).filter { $0.id == trip.id }
+        let existing = try context.fetch(FetchDescriptor<Envelope>()).filter { $0.id == trip.journeyKey }
         guard existing.count <= 1 else { throw MoneyCommandError.invalidReference }
         if let old = existing.first {
             guard old.role == "trip", old.mergedInto == nil else { throw MoneyCommandError.invalidReference }
@@ -1086,7 +1086,7 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
             try record.set(Optional<Date>.none, for: "deletedAt"); try record.set(stamp, for: "restoredAt"); try record.set(stamp, for: "updatedAt"); try record.set(writer, for: "writerID")
             try old.apply(record); return old
         }
-        let row = Envelope(); row.id = trip.id; row.role = "trip"; row.name = "رحلة " + trip.city; row.createdAt = now; context.insert(row); try touch(row, now, writer); return row
+        let row = Envelope(); row.id = trip.journeyKey; row.role = "trip"; row.name = "رحلة " + trip.city; row.createdAt = now; context.insert(row); try touch(row, now, writer); return row
     }
     private static func configureTrip(_ p: [String: MadarCore.JSONValue], context: ModelContext, now: Date, writer: String) throws {
         guard let id = uuid(p, "id"), let trip = try context.fetch(FetchDescriptor<Trip>()).first(where: { $0.id == id && live($0) && !$0.dismissed }),
@@ -1103,7 +1103,7 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
               let due = MoneyCommandPayload.date(p["due"]), trip.start != nil, due >= now else { throw MoneyCommandError.invalidReference }
         let all = try context.fetch(FetchDescriptor<Allocation>()).filter { live($0) }, role = text(p, "source")
         let envelopes = try context.fetch(FetchDescriptor<Envelope>()).filter { live($0) }
-        let balance = try sum(all.filter { $0.targetID == trip.id }.map(\.amountMinor))
+        let balance = try sum(all.filter { $0.targetID == trip.journeyKey }.map(\.amountMinor))
         guard balance == MoneyCommandPayload.integer(p["expectedBalanceMinor"]) else { throw MoneyCommandError.invalidReference }
         let sourceIDs = Set(envelopes.filter { $0.role == role }.map(\.id))
         let available = try sum(all.filter { ($0.target == role && $0.targetID == nil) || $0.targetID.map(sourceIDs.contains) == true }.map(\.amountMinor))
