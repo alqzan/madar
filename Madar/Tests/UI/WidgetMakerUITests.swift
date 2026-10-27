@@ -37,12 +37,13 @@ import XCTest
         let save = app.buttons["widget-maker-save"]; XCTAssertTrue(save.isEnabled); save.tap()
         XCTAssertTrue(app.staticTexts["widget-maker-status"].waitForExistence(timeout: 15))
         let saved = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "widget-saved-")).firstMatch
-        XCTAssertTrue(saved.waitForExistence(timeout: 10)); reach(app, saved); capture(app, "OR-03-X3-saved-L")
+        reach(app, saved); XCTAssertTrue(saved.waitForExistence(timeout: 10)); capture(app, "OR-03-X3-saved-L")
         app.terminate(); app.launch(); open(app)
-        XCTAssertTrue(saved.waitForExistence(timeout: 15)); reach(app, saved); saved.tap()
+        reach(app, saved); XCTAssertTrue(saved.waitForExistence(timeout: 15)); saved.tap()
         XCTAssertEqual(app.textFields["widget-maker-name"].value as? String, "ميزان يومي")
         reach(app, green); XCTAssertTrue(green.isSelected)
         XCTAssertTrue(ink.isSelected)
+        XCTAssertTrue(app.staticTexts["widget-maker-title"].isHittable)
         capture(app, "OR-03-X3-style-reopened-L")
         for _ in 0..<8 { if app.staticTexts["widget-maker-title"].isHittable { break }; app.swipeDown(velocity: .slow) }
         XCTAssertTrue(app.staticTexts["widget-maker-title"].isHittable)
@@ -52,8 +53,8 @@ import XCTest
         let confirm = app.buttons["احذفها"]; XCTAssertTrue(confirm.waitForExistence(timeout: 5)); confirm.tap()
         XCTAssertTrue(saved.waitForNonExistence(timeout: 10))
         let undo = app.buttons["widget-maker-undo"]; reach(app, undo); undo.tap()
-        XCTAssertTrue(saved.waitForExistence(timeout: 10))
-        reach(app, saved); capture(app, "OR-03-X3-restored-L")
+        reach(app, saved); XCTAssertTrue(saved.waitForExistence(timeout: 10))
+        capture(app, "OR-03-X3-restored-L")
     }
     func testSavedLobbyPresetKeepsItsSizeAndOpensHabits() throws {
         continueAfterFailure = false
@@ -63,6 +64,10 @@ import XCTest
         app.launch(); open(app)
         let surface = app.segmentedControls.buttons["البهو"]; reach(app, surface); surface.tap()
         let small = app.segmentedControls.buttons["صغيرة"]; reach(app, small); small.tap()
+        let preview = app.descendants(matching: .any).matching(identifier: "widget-maker-preview").firstMatch
+        XCTAssertTrue(preview.waitForExistence(timeout: 5))
+        XCTAssertEqual(preview.frame.width, preview.frame.height, accuracy: 1)
+        capture(app, "OR-03-X3-square-preview-L")
         let habits = app.buttons["widget-item-habitsToday"]; reach(app, habits); habits.tap()
         let name = app.textFields["widget-maker-name"]; name.tap(); name.typeText("عادات البهو\n")
         app.buttons["widget-maker-save"].tap()
