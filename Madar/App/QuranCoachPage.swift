@@ -319,11 +319,20 @@ private final class QuranCoachTextView: UIView {
         if let id = hits.first(where: { $0.0.contains(point) })?.1, coach.plannedAyahs.contains(id) { reveal?(id) }
     }
     private var dragRevealed: Set<Int> = []
-    /// Each covered planned ayah the finger passes over is revealed once, in the order it was touched.
+    /// Sliding down the page reveals each covered planned ayah the finger passes over, once, in the order it was touched.
+    /// A sideways swipe anywhere (owner OR-19) reveals the next covered ayah in reading order, like turning a card.
     @objc private func drag(_ gesture: UIPanGestureRecognizer) {
         guard let coach, stage != .grading, !coach.bridge, readingTap == nil else { return }
         if gesture.state == .began { dragRevealed = [] }
-        guard gesture.state == .began || gesture.state == .changed else { return }
+        let move = gesture.translation(in: self)
+        if gesture.state == .ended {
+            guard dragRevealed.isEmpty, abs(move.x) > 50, abs(move.x) > abs(move.y) * 1.5,
+                  let next = coach.plannedAyahs.subtracting(coach.revealedAyahs).min() else { return }
+            UISelectionFeedbackGenerator().selectionChanged()
+            reveal?(next)
+            return
+        }
+        guard gesture.state == .changed, abs(move.y) >= abs(move.x) else { return }
         let point = gesture.location(in: self)
         guard let id = hits.first(where: { $0.0.insetBy(dx: 0, dy: -6).contains(point) })?.1, coach.plannedAyahs.contains(id),
               !coach.revealedAyahs.contains(id), !dragRevealed.contains(id) else { return }

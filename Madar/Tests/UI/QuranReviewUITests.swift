@@ -97,6 +97,13 @@ import XCTest
         XCTAssertEqual(XCTWaiter.wait(for: [fewer], timeout: 10), .completed, "before \(before), after \(covered.count)")
         XCTAssertTrue(app.staticTexts["quran-session-stage"].label.contains("كشفت"), app.staticTexts["quran-session-stage"].label)
         attach(app, "M2-V03-drag-after-L")
+        // OR-19: a sideways swipe anywhere on the page reveals the next covered ayah.
+        let afterDrag = covered.count
+        let left = window.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.45)), right = window.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.46))
+        left.press(forDuration: 0.05, thenDragTo: right, withVelocity: 900, thenHoldForDuration: 0.1)
+        let one = XCTNSPredicateExpectation(predicate: NSPredicate(block: { _, _ in covered.count == afterDrag - 1 }), object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [one], timeout: 10), .completed, "after drag \(afterDrag), after swipe \(covered.count)")
+        attach(app, "M2-V03-swipe-after-L")
     }
 
     func testQuietFullPageInDarkAtDefaultSize() {

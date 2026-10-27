@@ -329,7 +329,7 @@ extension AppQuranService {
             let far = record?.isFar == true, quick = canGrade && record.map { $0.grade == .mastered && !$0.isFar } == true
             let progressLine = "كشفت " + numerals.string(revealedCount) + " من " + numerals.string(currentAyahs.count)
             let caption = draft.kind == .free && !canGrade ? "قراءة فقط؛ هذا الوجه غير مكتمل في صدرك" : stage == .grading ? "تقييم مقترح من تعثّرك؛ يمكنك تغييره"
-                : revealedCount > 0 ? progressLine : quick ? "وجه متقن؛ سمّعه كله ثم اكشفه مرة واحدة" : far ? "وجه بعُد عهدك به؛ خذه آية آية" : progressLine
+                : revealedCount > 0 ? progressLine : quick ? "وجه متقن؛ سمّعه كله ثم اكشفه مرة واحدة" : far ? "وجه بعُد عهدك به؛ خذه آية آية" : "اسحب جانبًا لتكشف الآية التالية"
             state.coach = QuranUICoach(activeAyahID: next?.id ?? currentAyahs.last?.id ?? draft.ayahID, activeAyahNumber: numerals.string(next?.ayahNumber ?? 0),
                 plannedAyahs: ids, revealedAyahs: revealed, repetition: 0, target: 0, bridge: false, method: "continuous", stageTitle: stage == .grading ? "تقييمك" : "المراجعة المستورة",
                 pageProgress: "المقطع " + numerals.string(sectionIndex + 1) + " من " + numerals.string(sections.count), caption: caption, pages: orderedPages, referenceText: nil,
