@@ -44,6 +44,22 @@ import MadarData
         #expect(lines.count == 3)
         #expect(lines.allSatisfy { $0.tzID == "Europe/London" })
     }
+    /// OR-11: N3 shows what was read and the day's habits. Al-Fatiha is ayahs 1–7 on page 1; Al-Baqara 1 is ayah 8.
+    @Test func quranLinesNameTheAmountAndHabitsWriteTheirDay() throws {
+        let (container, _, root) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
+        let context = ModelContext(container), day = try GregorianDay("2026-03-20"), at = instant("2026-03-20T09:00:00Z")
+        let review = HifzSession(); review.dayKey = day.description; review.kind = "review"; review.fromAyah = 1; review.toAyah = 7; review.endedAt = at; context.insert(review)
+        let hifz = HifzSession(); hifz.dayKey = day.description; hifz.kind = "hifz"; hifz.fromAyah = 8; hifz.toAyah = 12; hifz.endedAt = at.addingTimeInterval(60); context.insert(hifz)
+        let walk = Habit(); walk.name = "المشي"; context.insert(walk)
+        let read = Habit(); read.name = "القراءة"; context.insert(read)
+        let linked = Habit(); linked.name = "الفجر جماعة"; linked.linkedSource = "salah.fajr"; context.insert(linked)
+        func event(_ habit: Habit, _ delta: Int, _ unit: String?, _ minutes: Double) { let e = HabitEvent(); e.habitID = habit.id; e.dayKey = day.description; e.periodKey = day.description; e.delta = delta; e.unit = unit; e.eventAt = at.addingTimeInterval(minutes * 60); context.insert(e) }
+        event(walk, 1, nil, 5); event(read, 20, "minutes", 6); event(read, 10, "minutes", 7); event(linked, 1, nil, 8)
+        try context.save()
+        let lines = try DiaryLineRenderer.live(day: day, context: context)
+        #expect(lines.filter { $0.kind == "quran" }.map(\.text) == ["راجعت وجهًا واحدًا من الفاتحة", "حفظت ٥ آيات من البقرة"])
+        #expect(Set(lines.filter { $0.kind == "habits" }.map(\.text)) == ["المشي", "القراءة، ٣٠ دقيقة"])
+    }
     @Test func yesterdayIsLateAndMarginIsOneFactWithTwoDayReferences() async throws {
         let (container, bus, root) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
         let now = instant("2026-10-15T12:00:00+03:00")

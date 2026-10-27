@@ -14,6 +14,8 @@ struct DiaryMarginView: View {
     @Environment(\.roomTheme) private var theme
     @Environment(\.dynamicTypeSize) private var typeSize
     private var originals: [DiaryDisplayLine] { page.lines.filter { $0.kind != "margin" && (showAuto || !["salah", "quran"].contains($0.kind)) } }
+    /// OR-11 (N3): other rooms' lines read lighter and name their room, as the canonical margin shows.
+    private static let rooms = ["salah": "الصلاة", "quran": "القرآن", "mal": "المال", "habits": "العادات", "mihbara": "المحبرة"]
     private var replies: [DiaryDisplayLine] { page.lines.filter { $0.kind == "margin" } }
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
@@ -36,7 +38,9 @@ struct DiaryMarginView: View {
                     ForEach(originals) { line in
                         HStack(alignment: .firstTextBaseline, spacing: 10) {
                             Text(service.time(line.at, zone: line.tzID)).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(theme.color("ink3Text")).frame(width: 42, alignment: .leading)
-                            Text(line.text).font(DiaryType.writing).lineSpacing(11).italic(line.kind != "normal")
+                            let room = Self.rooms[line.kind]
+                            Text(room.map { MadarInlineText.joined([line.text, $0]) } ?? line.text)
+                                .font(room == nil ? DiaryType.writing : .custom("thmanyahseriftext-Regular", size: 16, relativeTo: .callout)).lineSpacing(room == nil ? 11 : 6).italic(room == nil && line.kind != "normal")
                                 .foregroundStyle(line.kind == "normal" ? theme.ink : theme.color("autoInkText"))
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }.padding(.vertical, 10).frame(minHeight: 34)

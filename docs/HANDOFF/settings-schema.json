@@ -2550,7 +2550,8 @@
     "salah": true,
     "quran": true,
     "mal": true,
-    "mihbara": true
+    "mihbara": true,
+    "habits": true
    },
    "scope": "sync",
    "note": "المالك الوحيد لظهور سطور كل غرفة في المذكرات؛ «المصروف يدخل صفحة اليوم» في خصّص المال يعرض المفتاح نفسه notes.autoLines.mal (حُذف mal.expenseInDiary)",
@@ -2561,7 +2562,8 @@
      "salah",
      "quran",
      "mal",
-     "mihbara"
+     "mihbara",
+     "habits"
     ],
     "exactKeys": true,
     "value": "Bool"

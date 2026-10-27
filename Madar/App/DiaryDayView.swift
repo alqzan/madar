@@ -213,7 +213,7 @@ struct DiaryDayView: View {
         let r=n%100;return service.digits.string(n)+((3...10).contains(r) ? " أيام":r <= 2 ? " يوم":" يومًا")
     }
     private func lineRow(_ line: DiaryDisplayLine, page: DiaryDisplayDay) -> some View {
-        let auto = ["salah", "quran", "mihbara"].contains(line.kind)
+        let auto = ["salah", "quran", "mihbara", "mal", "habits"].contains(line.kind)
         return HStack(alignment: .firstTextBaseline, spacing: 12) {
             Text(service.time(line.at, zone: line.tzID)).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(theme.color("ink3Text")).frame(width: 38, alignment: .center).accessibilityIdentifier("diary-day-line-time")
             VStack(alignment: .leading, spacing: 5) {

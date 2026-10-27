@@ -156,7 +156,8 @@ struct DiaryHomeSnapshot {
             if let frozen { auto = try JSONDecoder().decode([DiaryDisplayLine].self, from: frozen.valueJSON) }
             else { auto = try DiaryLineRenderer.live(day: day, context: context) }
             let enabled = app.values["notes.autoLines"]?.object ?? [:]
-            lines += auto.filter { enabled[$0.kind] == .bool(true) }.map { line in
+            // OR-11: «habits» joined the map later; a stored map without it keeps the schema default (on).
+            lines += auto.filter { enabled[$0.kind] == .bool(true) || ($0.kind == "habits" && enabled["habits"] == nil) }.map { line in
                 var dated = line
                 dated.tzID = eventTimeZoneID(line.tzID, at: line.at)
                 return dated

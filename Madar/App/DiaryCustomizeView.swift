@@ -188,8 +188,8 @@ struct DiaryCustomizeView: View {
     private var autoControls: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("اليوم يكتب نفسه").font(MadarTypography.section())
-            ForEach([("salah", "الصلاة"), ("quran", "القرآن"), ("mihbara", "المحبرة")], id: \.0) { id, title in
-                Toggle(title, isOn: Binding(get: { app.values["notes.autoLines"]?.object?[id] == .bool(true) }, set: { on in
+            ForEach([("salah", "الصلاة"), ("quran", "القرآن"), ("habits", "العادات"), ("mihbara", "المحبرة")], id: \.0) { id, title in
+                Toggle(title, isOn: Binding(get: { app.values["notes.autoLines"]?.object?[id] == .bool(true) || (id == "habits" && app.values["notes.autoLines"]?.object?["habits"] == nil) }, set: { on in
                     var values = app.values["notes.autoLines"]?.object ?? [:]; values[id] = .bool(on); app.set(.object(values), key: "notes.autoLines")
                 })).font(MadarTypography.body()).tint(theme.color("ghad")).accessibilityIdentifier("diary-auto-" + id)
             }

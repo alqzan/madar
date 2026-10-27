@@ -42,15 +42,31 @@ public struct DiaryAutoLine: Identifiable, Codable, Equatable, Sendable {
                 text: "صلّيت " + (names[row.prayer] ?? "الصلاة") + (row.status == "jamaah" ? " جماعة" : row.status == "qada" ? " قضاءً" : " وحدي"), kind: "salah",
                 tzID: row.tzID.isEmpty ? nil : row.tzID))
         }
+        let settings = try SettingsStore(context: context)
+        let digits = MadarNumberFormatter(style: try settings.value(for: "core.numerals") == .string("western") ? .western : .hindi)
+        /// Accusative after the verb: «وجهًا واحدًا»، «وجهين»، «٣ أوجه»، «١١ وجهًا».
+        func counted(_ n: Int, _ forms: [String]) -> String {
+            let r = n % 100
+            return n == 1 ? forms[0] : n == 2 ? forms[1] : (3...10).contains(r) ? digits.string(n) + " " + forms[2] : digits.string(n) + " " + forms[3]
+        }
+        let catalog = try? QuranResources.catalog()
         for row in try context.fetch(FetchDescriptor<HifzSession>()) where days.contains(row.dayKey) && row.deletedAt == nil && row.mergedInto == nil && visible("quran", row.id) {
             guard row.kind != "drill" else { continue }
-            let text = row.kind == "hifz" ? "حفظت من القرآن" : row.kind == "qiyam" ? "راجعت من محفوظي في القيام" : "راجعت من محفوظي"
+            // OR-11: the line names what was read, as in N3 («راجعت ٣ أوجه من الأنعام»); without the catalog it keeps the plain wording.
+            var text = row.kind == "hifz" ? "حفظت من القرآن" : row.kind == "qiyam" ? "راجعت من محفوظي في القيام" : "راجعت من محفوظي"
+            if let catalog, let first = catalog.ayah(id: min(row.fromAyah, row.toAyah)), let last = catalog.ayah(id: max(row.fromAyah, row.toAyah)) {
+                func plain(_ name: String) -> String { String(String.UnicodeScalarView(name.unicodeScalars.filter { $0.properties.generalCategory != .nonspacingMark })) }
+                let surah = first.surahID == last.surahID ? plain(first.surahNameArabic) : plain(first.surahNameArabic) + " إلى " + plain(last.surahNameArabic)
+                if row.kind == "hifz" {
+                    text = "حفظت " + counted(abs(row.toAyah - row.fromAyah) + 1, ["آية واحدة", "آيتين", "آيات", "آية"]) + " من " + surah
+                } else {
+                    text = "راجعت " + counted(last.page - first.page + 1, ["وجهًا واحدًا", "وجهين", "أوجه", "وجهًا"]) + " من " + surah + (row.kind == "qiyam" ? " في القيام" : "")
+                }
+            }
             lines[row.dayKey, default: []].append(.init(id: "quran." + row.id.uuidString, at: row.endedAt, text: text, kind: "quran",
                                                         tzID: row.tzID.isEmpty ? nil : row.tzID))
         }
         let books=try context.fetch(FetchDescriptor<Book>()).sorted{$0.updatedAt>$1.updatedAt}
-        let settings = try SettingsStore(context: context)
-        let digits = MadarNumberFormatter(style: try settings.value(for: "core.numerals") == .string("western") ? .western : .hindi)
         var bookTitles:[UUID:String]=[:]
         for book in books where bookTitles[book.id] == nil {
             let title=book.title.trimmingCharacters(in:.whitespacesAndNewlines)
@@ -71,6 +87,23 @@ public struct DiaryAutoLine: Identifiable, Codable, Equatable, Sendable {
             }
             lines[row.dayKey, default: []].append(.init(id:"mihbara."+row.id.uuidString,at:row.end ?? row.updatedAt,text:text,kind:"mihbara",
                                                         tzID: row.tzID.isEmpty ? nil : row.tzID))
+        }
+        // OR-11: habits write their day too. A habit linked to another room (prayer, Quran) is already told by that room's line.
+        let habitRows = Dictionary(try context.fetch(FetchDescriptor<Habit>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.linkedSource == nil }.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        let events = try context.fetch(FetchDescriptor<HabitEvent>()).filter { days.contains($0.dayKey) && $0.deletedAt == nil && $0.mergedInto == nil }
+        for (group, rows) in Dictionary(grouping: events.filter { $0.habitID.map { habitRows[$0] != nil } == true }, by: { $0.dayKey + "|" + $0.habitID!.uuidString }) {
+            guard let habit = habitRows[rows[0].habitID!], let latest = rows.max(by: { $0.eventAt == $1.eventAt ? $0.id.uuidString < $1.id.uuidString : $0.eventAt < $1.eventAt }), visible("habits", latest.id) else { continue }
+            let total = rows.reduce(0) { $0 + $1.delta }
+            guard total > 0 else { continue }
+            let name = habit.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "عادتك" : habit.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            let unit = (latest.unit ?? "").trimmingCharacters(in: .whitespaces)
+            let forms: [String: [String]] = ["minutes": ["دقيقة واحدة", "دقيقتين", "دقائق", "دقيقة"], "دقيقة": ["دقيقة واحدة", "دقيقتين", "دقائق", "دقيقة"],
+                "steps": ["خطوة واحدة", "خطوتين", "خطوات", "خطوة"], "pages": ["صفحة واحدة", "صفحتين", "صفحات", "صفحة"], "صفحة": ["صفحة واحدة", "صفحتين", "صفحات", "صفحة"],
+                "كوب": ["كوبًا واحدًا", "كوبين", "أكواب", "كوبًا"], "مرة": ["مرة واحدة", "مرتين", "مرات", "مرة"]]
+            let amount = rows.contains { ($0.unit ?? "").isEmpty } && total == 1 ? nil : unit.isEmpty ? (total > 1 ? counted(total, forms["مرة"]!) : nil) : forms[unit].map { counted(total, $0) } ?? digits.string(total) + " " + unit
+            let text = MadarInlineText.joined([name, amount].compactMap { $0 })
+            lines[String(group.split(separator: "|")[0]), default: []].append(.init(id: "habits." + latest.id.uuidString, at: latest.eventAt, text: text, kind: "habits",
+                                                        tzID: latest.tzID.isEmpty ? nil : latest.tzID))
         }
         let money = MoneyRepository(context: context)
         for row in try money.confirmedTransactions() where days.contains(row.dayKey) && row.showInDiary && visible("mal", row.id) {
