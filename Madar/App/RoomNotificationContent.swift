@@ -343,7 +343,11 @@ import MadarPrayer
             let reminderDay = anniversary.adding(days: -leadDays)
             return GregorianDay.containing(now, in: session.activePlace.timeZone) == reminderDay
         }
-        if id.hasPrefix("mal.alert80.") { return session.bool("mal.alert80") }
+        if id.hasPrefix("mal.alert80.") {
+            // Reuse the same cycle/category threshold as planning. A raised limit, refund,
+            // removal or closed cycle can make an already queued alert obsolete.
+            return limitCandidates(session: session, prayerDays: [], now: now).contains { $0.id == id }
+        }
         return false // «افتح مدار» while Madar is open says nothing.
     }
 

@@ -81,6 +81,26 @@ import MadarCore
             XCTAssertNil(body.replacingOccurrences(of: "٨٠٪", with: "").rangeOfCharacter(from: .decimalDigits))
             XCTAssertFalse(body.contains("باقي"))
         }
+        XCTAssertTrue(try RoomNotificationContent.stillRelevant(candidate.id, session: app, now: now))
+        XCTAssertFalse(try RoomNotificationContent.stillRelevant("mal.alert80.\(UUID().uuidString).\(category.id.uuidString)", session: app, now: now), "An earlier cycle must not alert in this cycle")
+
+        limit.limitMinor = 200_000; try context.save(); try app.reload()
+        XCTAssertTrue(RoomNotificationContent.limitCandidates(session: app, prayerDays: [], now: now).isEmpty)
+        XCTAssertFalse(try RoomNotificationContent.stillRelevant(candidate.id, session: app, now: now), "Raising the limit makes the queued 90/100 alert obsolete")
+
+        limit.limitMinor = 100_000; allocation.amountMinor = -79_999; try context.save(); try app.reload()
+        XCTAssertFalse(try RoomNotificationContent.stillRelevant(candidate.id, session: app, now: now), "Below 80% is not relevant")
+        allocation.amountMinor = -80_000; try context.save(); try app.reload()
+        XCTAssertTrue(try RoomNotificationContent.stillRelevant(candidate.id, session: app, now: now), "Exactly 80% remains relevant")
+
+        transaction.deletedAt = now; try context.save(); try app.reload()
+        XCTAssertFalse(try RoomNotificationContent.stillRelevant(candidate.id, session: app, now: now), "A removed expense cannot keep a stale alert alive")
+        transaction.deletedAt = nil; limit.mode = "none"; try context.save(); try app.reload()
+        XCTAssertFalse(try RoomNotificationContent.stillRelevant(candidate.id, session: app, now: now), "Turning off the limit removes the alert")
+        limit.mode = "fixed"
+        _ = try SettingsStore(context: context).stage(["mal.alert80": .bool(false)])
+        try context.save(); try app.reload()
+        XCTAssertFalse(try RoomNotificationContent.stillRelevant(candidate.id, session: app, now: now))
     }
 
     func testReconciliationReminderUsesSharedBudgetAndGenericCopy() throws {

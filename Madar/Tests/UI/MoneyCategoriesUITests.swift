@@ -83,10 +83,10 @@ import XCTest
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard"); springboard.activate()
         springboard.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.02))
             .press(forDuration: 0.1, thenDragTo: springboard.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.72)))
-        let body = springboard.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "اقترب أحد تصنيفاتك من حدّه لهذه الدورة")).firstMatch
-        XCTAssertTrue(body.waitForExistence(timeout: 2_400), springboard.debugDescription)
-        XCTAssertNil(body.label.rangeOfCharacter(from: .decimalDigits), body.label)
-        XCTAssertFalse(body.label.contains("مطاعم"), body.label)
+        let body = springboard.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "بلغت ٨٠٪ من حد «مطاعم» لهذه الدورة")).firstMatch
+        XCTAssertTrue(body.waitForExistence(timeout: 180), springboard.debugDescription)
+        XCTAssertNil(body.label.replacingOccurrences(of: "٨٠٪", with: "").rangeOfCharacter(from: .decimalDigits), body.label)
+        XCTAssertTrue(body.label.contains("مطاعم"), body.label)
         shot(springboard, "M5-V10-a80-real-privacy-safe-L")
     }
 }
