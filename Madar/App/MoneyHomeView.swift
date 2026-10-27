@@ -39,12 +39,13 @@ struct MoneyHomeView: View {
     private var service: AppMoneyService { .init(app: app) }
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
     private var amountsVisible: Bool { !app.bool("core.hideMoneyUntilTouch") || revealed }
-    /// Owner, «تعمّق وحسّن» 22 Oct 2026: the daily action sits under «لك الآن», not at the foot of ten equal buttons.
+    /// The daily action. 22 Oct put it as a full-width bar under «لك الآن»; DA-03 (27 Oct) returns it to the canonical
+    /// «+» in the header, always in reach, so the envelopes are back on the first screen.
     private var expenseButton: some View {
         Button { expenseOpen = true } label: {
-            Label("سجّل مصروفًا", systemImage: "plus").font(MadarTypography.body().weight(.semibold))
-                .frame(maxWidth: .infinity, minHeight: 50).foregroundStyle(theme.onAccent).background(theme.accent, in: .capsule)
-        }.buttonStyle(.plain).padding(.vertical, 4).accessibilityIdentifier("money-expense-open")
+            Image(systemName: "plus").font(.system(size: 20, weight: .medium)).foregroundStyle(theme.ink)
+                .frame(width: 46, height: 46).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1.2) }.contentShape(Circle())
+        }.buttonStyle(.plain).accessibilityLabel("سجّل مصروفًا").accessibilityIdentifier("money-expense-open")
     }
     /// The room's other doors as drawers of one desk, two to a row, most used first; settings close the desk.
     private var doors: some View {
@@ -132,7 +133,6 @@ struct MoneyHomeView: View {
                                 Text("بعض الحسابات لم يُعرف رصيدها بعد؛ لا تدخل في المجموع.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                                 Button("المطابقة مع البنك") { reconcileOpen = true }.font(MadarTypography.body()).frame(minHeight: 44).accessibilityIdentifier("money-unknown-balance-reconcile")
                             }
-                            expenseButton
                         case "envelopes": envelopeSection(reading)
                         case "limits":
                             if blocks.firstIndex(of: "obligations") == blocks.firstIndex(of: "limits").map({ $0 + 1 }) { lowerDesk(reading) }
@@ -203,6 +203,7 @@ struct MoneyHomeView: View {
                 Text(left == 0 ? "موعد الراتب اليوم" : "بقي للراتب " + service.days(left)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
             }
             Spacer(minLength: 0)
+            expenseButton.alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 6 }
             if let reading {
                 // Always reachable: «الصق رسائل» lives inside, for when the Shortcut has stopped.
                 let count = reading.pendingCount
@@ -221,12 +222,6 @@ struct MoneyHomeView: View {
     }
     private func headline(_ reading: MoneyHomeReading, cycle: MoneyCycleReading) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("اليوم").font(MadarTypography.section())
-                Spacer()
-                Text(figure: "صرفت " + amount(cycle.headline.todaySpentMinor) + " من " + amount(cycle.headline.todayAllowanceMinor))
-                    .font(MadarTypography.body()).accessibilityIdentifier("money-today")
-            }
             HStack(alignment: .center) {
                 Button { basisOpen = true } label: {
                 VStack(alignment: .leading, spacing: 1) {
@@ -239,7 +234,9 @@ struct MoneyHomeView: View {
                 VStack(alignment: .trailing, spacing: 7) {
                     Text("لك فعلًا").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                     Text(figure: !reading.hasKnownBalance ? "—" : amount(reading.basis.netMinor)).font(MadarTypography.cardTitle()).accessibilityIdentifier("money-net")
-                    Text(reading.currency == "SAR" ? "ريال سعودي" : reading.currency).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                    // DA-03: today's spending takes the currency line's place, so the hero is one row as in the canonical.
+                    Text(figure: "صرفت " + amount(cycle.headline.todaySpentMinor) + " من " + amount(cycle.headline.todayAllowanceMinor))
+                        .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-today")
                 }
             }
             if let over = cycle.headline.overTodayMinor {
