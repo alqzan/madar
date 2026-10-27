@@ -165,11 +165,12 @@ struct MoneyRepaymentView: View {
                         Text("، وكان في المظروف " + service.amount(cause.balanceMinor - cause.amountMinor) + ".")
                     }.font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                 }
-                Text("على كم راتب؟").font(MadarTypography.body())
+                // Design: the question and its six answers on one row, so the choices below stay in view.
                 HStack(spacing: 0) {
+                    Text("على كم راتب؟").font(MadarTypography.body()).fixedSize().padding(.trailing, 6)
                     ForEach(1...6, id: \.self) { count in
                         Button { salaries = count } label: {
-                            Text(service.digits.string(count)).font(MadarTypography.cardTitle()).frame(width: 44, height: 44)
+                            Text(service.digits.string(count)).font(MadarTypography.cardTitle()).frame(width: 40, height: 40)
                                 .foregroundStyle(salaries == count ? theme.background : theme.ink).background(salaries == count ? theme.ink : .clear, in: .circle)
                                 .overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1) }.frame(maxWidth: .infinity)
                         }.buttonStyle(.plain).accessibilityIdentifier("money-repay-count-\(count)").accessibilityAddTraits(salaries == count ? .isSelected : [])
@@ -204,7 +205,7 @@ struct MoneyRepaymentView: View {
                     .disabled(working || reading.home.reserveMinor < debt)
                 if let errorMessage { Text(errorMessage).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")) }
             }.padding(18)
-        }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).presentationDetents([.medium, .large]).presentationDragIndicator(.visible).accessibilityIdentifier("money-repayment-preview")
+        }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).presentationDetents([.fraction(0.78), .large]).presentationDragIndicator(.visible).accessibilityIdentifier("money-repayment-preview")
     }
     private func outlined(_ title: String, note: String?, id: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
