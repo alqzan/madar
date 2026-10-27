@@ -37,6 +37,8 @@ public enum PrayerMutation: Codable, Equatable, Sendable {
     case editTrackingStart(GregorianDay)
     case initializeTracking
     case startTrip(city: String, country: String, place: ActivePlace, homeKm: Double?)
+    /// OR-09: the traveller moved on to another country; the open leg closes and the next leg joins the same journey.
+    case continueTrip(city: String, country: String, place: ActivePlace, homeKm: Double?)
     case endTrip(UUID)
     case clear(PrayerReference)
 }
@@ -49,13 +51,14 @@ extension PrayerMutation {
             return try .init(day: GregorianDay(day), prayer: prayer)
         }
         switch name {
-        case "prayer.startTrip":
+        case "prayer.startTrip", "prayer.continueTrip":
             guard Set(payload.keys).isSubset(of: ["city", "country", "lat", "lon", "tzID", "homeKm"]), case .number(let lat) = payload["lat"], case .number(let lon) = payload["lon"] else { throw CoreError.invalidCommand }
             let city = try string("city"), country = try string("country")
             guard !city.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, city.count <= 100, country.count == 2, country.unicodeScalars.allSatisfy({ (65...90).contains($0.value) }) else { throw CoreError.invalidCommand }
             var distance: Double?
             if let value = payload["homeKm"] { guard case .number(let km) = value, km.isFinite, km >= 0 else { throw CoreError.invalidCommand }; distance = km }
-            return (.startTrip(city: city, country: country, place: try ActivePlace(latitude: lat, longitude: lon, timeZoneID: string("tzID")), homeKm: distance), nil)
+            let place = try ActivePlace(latitude: lat, longitude: lon, timeZoneID: string("tzID"))
+            return (name == "prayer.continueTrip" ? .continueTrip(city: city, country: country, place: place, homeKm: distance) : .startTrip(city: city, country: country, place: place, homeKm: distance), nil)
         case "prayer.endTrip":
             guard Set(payload.keys) == ["tripID"], let id = UUID(uuidString: try string("tripID")) else { throw CoreError.invalidCommand }
             return (.endTrip(id), "trip." + id.uuidString)

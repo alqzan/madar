@@ -2,6 +2,7 @@ import CoreLocation
 import MadarCore
 import MadarDesign
 import MadarPrayer
+import SwiftData
 import SwiftUI
 
 /// RP7 · M1-F02. The device location is read once, only to compare it with the home city. Nothing is stored or sent.
@@ -185,12 +186,46 @@ struct PrayerTravelQuestionSheet: View {
 struct PrayerTripSheet: View {
     let session: AppSession
     let trip: PrayerTrip
+    var fix: TravelFix? = nil
+    var thresholdKm: Double = 80
     let finished: () -> Void
     @Environment(\.roomTheme) private var theme
+    /// OR-09: the journey's legs; a trip through several countries reads «إسطنبول ← القاهرة».
+    private var legs: [(city: String, country: String, start: Date, end: Date?)] {
+        (try? PrayerRepository(context: ModelContext(session.container)))?.journeyLegs(of: trip.id) ?? []
+    }
+    /// The phone is in another city than this leg and far from it: offer to add it to the same journey.
+    private var nextStop: TravelFix? {
+        guard let fix, fix.city != trip.city, TravelRule.distanceKm(from: trip.place, to: fix.place) > thresholdKm,
+              TravelRule.isAway(home: session.activePlace, current: fix.place, thresholdKm: thresholdKm) else { return nil }
+        return fix
+    }
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                Text("رحلتك إلى \(trip.city)").font(MadarTypography.title()).accessibilityAddTraits(.isHeader)
+                Text(legs.count > 1 ? "رحلتك" : "رحلتك إلى \(trip.city)").font(MadarTypography.title()).accessibilityAddTraits(.isHeader)
+                if legs.count > 1 {
+                    // One line of stops, the current one last and in the accent.
+                    HStack(spacing: 6) {
+                        ForEach(Array(legs.enumerated()), id: \.offset) { index, leg in
+                            if index > 0 { Image(systemName: "arrow.left").font(.system(size: 12, weight: .semibold)).foregroundStyle(theme.secondaryInk) }
+                            Text(leg.city).font(PrayerHomeType.strong).foregroundStyle(leg.end == nil ? theme.color("accentText") : theme.ink)
+                        }
+                    }
+                    .accessibilityElement(children: .combine).accessibilityIdentifier("prayer-trip-legs")
+                }
+                if let stop = nextStop {
+                    PrayerPaperCard {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("أنت الآن في \(stop.city)").font(PrayerHomeType.strong)
+                            Text("أضفها محطةً في رحلتك نفسها: تُحسب المواقيت هنا، ويبقى القصر والجمع، وتجمع ميزانية الرحلة مصروف البلدين.")
+                                .font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
+                            TravelPrimaryButton(title: "أضف \(stop.city) إلى رحلتك", id: "prayer-trip-continue", busy: session.prayerWriteInProgress) {
+                                session.continuePrayerTrip(city: stop.city, country: stop.country, place: stop.place, homeKm: max(0, TravelRule.distanceKm(from: session.activePlace, to: stop.place) - TravelRule.homeRadiusKm)) { if $0 { finished() } }
+                            }
+                        }
+                    }
+                }
                 Text("المواقيت محسوبة بطريقة \(PrayerTravelCopy.methodName(PrayerCalculationMethod(rawValue: session.string("salah.tripMethod")) ?? .ummAlQura)). تبقى الصلوات التي سجّلتها كما هي، ويعود الحساب لمدينتك من الفرض التالي.")
                     .font(PrayerHomeType.lead).foregroundStyle(theme.secondaryInk)
                 TravelPrimaryButton(title: "أنهِ الرحلة", id: "prayer-end-trip-confirm", busy: session.prayerWriteInProgress) {

@@ -178,6 +178,13 @@ private struct PrayerInverse: Codable {
         case .startTrip(let city, let country, let place, let homeKm):
             guard repository.activeTrip(at: now) == nil else { throw PrayerDomainError.invalidRecord }
             let row = Trip(); row.city = city; row.country = country; row.lat = place.latitude; row.lon = place.longitude; row.tzID = place.timeZoneID; row.mode = "manual"; row.start = now; row.homeKm = homeKm; row.createdAt = now; row.updatedAt = now; context.insert(row); try registerNew(row); try touch(row)
+        case .continueTrip(let city, let country, let place, let homeKm):
+            // One journey, one open leg: the current leg ends now and the next starts at the same instant (OR-09).
+            guard let open = repository.activeTrip(at: now), let leg = repository.trips.first(where: { $0.id == open.id }) else { throw PrayerDomainError.noActiveTrip }
+            guard leg.country != country || leg.city != city else { throw PrayerDomainError.invalidRecord }
+            try capture(leg); leg.end = now; try touch(leg)
+            let row = Trip(); row.city = city; row.country = country; row.lat = place.latitude; row.lon = place.longitude; row.tzID = place.timeZoneID; row.mode = "manual"; row.start = now
+            row.homeKm = homeKm ?? leg.homeKm; row.journeyID = leg.journeyID ?? leg.id; row.createdAt = now; row.updatedAt = now; context.insert(row); try registerNew(row); try touch(row)
         case .endTrip(let id):
             guard let row = repository.trips.first(where: { $0.id == id }) else { throw PrayerDomainError.noActiveTrip }
             if row.end == nil { try capture(row); row.end = now; try touch(row) }

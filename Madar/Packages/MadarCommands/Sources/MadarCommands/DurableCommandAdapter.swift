@@ -109,7 +109,7 @@ private struct ReceiptWire: Codable {
                                        undoExpiresAt: row.undoExpiresAt ?? row.createdAt,
                                        undoJSON: row.undoJSON,
                                        outcome: .init(status: CommandStatus(rawValue: row.status) ?? .rejected,
-                                                      undoToken: row.status == "applied" && ["prayer.log", "prayer.makeUp", "prayer.resolveGap", "prayer.setHeart", "prayer.logQiyam", "prayer.addOldMissed", "prayer.editTrackingStart", "prayer.startTrip", "prayer.endTrip", "prayer.logPair", "settings.set", "settings.applyPreset"].contains(row.name) || row.status == "applied" && QuranCommandPayload.names.contains(row.name) && row.undoJSON != nil || row.status == "applied" && MoneyCommandPayload.names.subtracting(["money.accruePlans"]).contains(row.name) || row.status == "applied" && BookCommand.names.contains(row.name) && row.undoJSON != nil || row.status == "applied" && row.name == "diary.deleteEntry" && row.undoJSON != nil ? id : nil))
+                                                      undoToken: row.status == "applied" && ["prayer.log", "prayer.makeUp", "prayer.resolveGap", "prayer.setHeart", "prayer.logQiyam", "prayer.addOldMissed", "prayer.editTrackingStart", "prayer.startTrip", "prayer.continueTrip", "prayer.endTrip", "prayer.logPair", "settings.set", "settings.applyPreset"].contains(row.name) || row.status == "applied" && QuranCommandPayload.names.contains(row.name) && row.undoJSON != nil || row.status == "applied" && MoneyCommandPayload.names.subtracting(["money.accruePlans"]).contains(row.name) || row.status == "applied" && BookCommand.names.contains(row.name) && row.undoJSON != nil || row.status == "applied" && row.name == "diary.deleteEntry" && row.undoJSON != nil ? id : nil))
                 return try JSONDecoder().decode(CoreCommandReceipt.self, from: JSONEncoder().encode(wire))
             }
             // Receipt identity is authoritative even after undo/deletion or retention expiry.
@@ -276,10 +276,11 @@ private struct ReceiptWire: Codable {
                         inverse = SettingsInverse(settings: [:], afterSettings: [:], layouts: [:], afterLayouts: [:], prayerMutation: undo)
                     }
                 } catch let error as PrayerDomainError { return .init(status: .rejected, reason: String(describing: error)) }
-            case .startPrayerTrip, .endPrayerTrip, .logPrayerPair:
+            case .startPrayerTrip, .continuePrayerTrip, .endPrayerTrip, .logPrayerPair:
                 let mutation: PrayerMutation
                 switch request.operation {
                 case .startPrayerTrip(let city, let country, let place, let homeKm): mutation = .startTrip(city: city, country: country, place: place, homeKm: homeKm)
+                case .continuePrayerTrip(let city, let country, let place, let homeKm): mutation = .continueTrip(city: city, country: country, place: place, homeKm: homeKm)
                 case .endPrayerTrip(let id): mutation = .endTrip(id)
                 case .logPrayerPair(let day, let pair, let status, let shortened, let mode): mutation = .logPair(day: day, pair: pair, status: status, shortened: shortened, mode: mode)
                 default: return .init(status: .rejected, reason: "invalidPayload")

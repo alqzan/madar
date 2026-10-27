@@ -36,6 +36,12 @@ import MadarData
         guard let row = trips.filter({ $0.start! <= date && ($0.end == nil || date < $0.end!) }).max(by: { $0.start! < $1.start! }), let place = try? ActivePlace(latitude: row.lat, longitude: row.lon, timeZoneID: row.tzID) else { return nil }
         return .init(id: row.id, city: row.city, place: place, start: row.start!, end: row.end)
     }
+    /// OR-09: every leg of the journey this trip belongs to, oldest first (journey key = journeyID ?? id).
+    public func journeyLegs(of tripID: UUID) -> [(city: String, country: String, start: Date, end: Date?)] {
+        guard let leg = trips.first(where: { $0.id == tripID }) else { return [] }
+        let key = leg.journeyID ?? leg.id
+        return trips.filter { ($0.journeyID ?? $0.id) == key }.sorted { $0.start! < $1.start! }.map { ($0.city, $0.country, $0.start!, $0.end) }
+    }
     public func place(at date: Date) -> ActivePlace { activeTrip(at: date)?.place ?? home }
     public func calculationOptions(at date: Date) -> PrayerCalculationOptions {
         activeTrip(at: date) == nil ? options : tripOptions

@@ -274,6 +274,37 @@ import MadarData
         try PrayerMutationHandler.undo(inverse, in: context, now: time("2026-10-07T12:01:00+03:00"), writer: "test-device"); try context.save()
         #expect(try context.fetch(FetchDescriptor<PrayerLog>()).filter { $0.deletedAt == nil }.isEmpty)
     }
+    /// OR-09: Istanbul → Cairo is one journey: the open leg closes at the move, the next leg points to the first. The next test undoes one move.
+    @Test func continueTripJoinsLegsOfOneJourney() throws {
+        let container = try container(); let context = container.mainContext
+        let istanbul = try ActivePlace(latitude: 41.0082, longitude: 28.9784, timeZoneID: "Europe/Istanbul")
+        let cairo = try ActivePlace(latitude: 30.0444, longitude: 31.2357, timeZoneID: "Africa/Cairo")
+        let amman = try ActivePlace(latitude: 31.9539, longitude: 35.9106, timeZoneID: "Asia/Amman")
+        #expect(throws: PrayerDomainError.noActiveTrip) { try apply(.continueTrip(city: "القاهرة", country: "EG", place: cairo, homeKm: nil), context, at: "2026-10-07T09:00:00+03:00") }
+        try apply(.startTrip(city: "إسطنبول", country: "TR", place: istanbul, homeKm: 2_100), context, at: "2026-10-07T10:00:00+03:00")
+        let first = try #require(context.fetch(FetchDescriptor<Trip>()).first)
+        #expect(throws: PrayerDomainError.invalidRecord) { try apply(.continueTrip(city: "إسطنبول", country: "TR", place: istanbul, homeKm: nil), context, at: "2026-10-08T10:00:00+03:00") }
+        try apply(.continueTrip(city: "القاهرة", country: "EG", place: cairo, homeKm: nil), context, at: "2026-10-09T10:00:00+03:00")
+        try apply(.continueTrip(city: "عمّان", country: "JO", place: amman, homeKm: 1_300), context, at: "2026-10-11T10:00:00+03:00")
+        let legs = try context.fetch(FetchDescriptor<Trip>()).sorted { $0.start! < $1.start! }
+        #expect(legs.map(\.country) == ["TR", "EG", "JO"])
+        #expect(legs[0].journeyID == nil && legs[1].journeyID == first.id && legs[2].journeyID == first.id)
+        #expect(legs[0].end == time("2026-10-09T10:00:00+03:00") && legs[1].end == time("2026-10-11T10:00:00+03:00") && legs[2].end == nil)
+        #expect(legs[1].homeKm == 2_100 && legs[2].homeKm == 1_300)
+        #expect(try PrayerRepository(context: context).activeTrip(at: time("2026-10-11T12:00:00+03:00"))?.city == "عمّان")
+        #expect(try PrayerRepository(context: context).activeTrip(at: time("2026-10-10T12:00:00+03:00"))?.city == "القاهرة")
+    }
+    @Test func undoOfContinueTripReopensTheFirstLeg() throws {
+        let container = try container(); let context = container.mainContext
+        let istanbul = try ActivePlace(latitude: 41.0082, longitude: 28.9784, timeZoneID: "Europe/Istanbul")
+        let cairo = try ActivePlace(latitude: 30.0444, longitude: 31.2357, timeZoneID: "Africa/Cairo")
+        try apply(.startTrip(city: "إسطنبول", country: "TR", place: istanbul, homeKm: 2_100), context, at: "2026-10-07T10:00:00+03:00")
+        let inverse = try #require(try apply(.continueTrip(city: "القاهرة", country: "EG", place: cairo, homeKm: nil), context, at: "2026-10-09T10:00:00+03:00"))
+        try PrayerMutationHandler.undo(inverse, in: context, now: time("2026-10-09T10:05:00+03:00"), writer: "test-device"); try context.save()
+        let live = try context.fetch(FetchDescriptor<Trip>()).filter { $0.deletedAt == nil }
+        #expect(live.count == 1 && live.first?.country == "TR" && live.first?.end == nil)
+        #expect(try PrayerRepository(context: context).activeTrip(at: time("2026-10-09T12:00:00+03:00"))?.city == "إسطنبول")
+    }
     @Test func editingOnePairedPrayerUnlinksBothAndEndTripPreservesOldClock() throws {
         let container = try container(); let context = container.mainContext
         let jeddah = try ActivePlace(latitude: 21.4858, longitude: 39.1925, timeZoneID: "Asia/Riyadh")

@@ -115,7 +115,7 @@ struct PrayerTodayView: View {
             case .travelQuestion(let fix, let km):
                 PrayerTravelQuestionSheet(session: session, fix: fix, homeKm: km, finished: { selectedSheet = nil })
             case .trip(let trip):
-                PrayerTripSheet(session: session, trip: trip, finished: { selectedSheet = nil })
+                PrayerTripSheet(session: session, trip: trip, fix: locator.fix, thresholdKm: travelThresholdKm, finished: { selectedSheet = nil })
             case .pair(let day, let pair, let cell, let timeZone):
                 PrayerTravelPairSheet(session: session, day: day, pair: pair, alone: { selectedSheet = .log(cell, timeZone) }, finished: { selectedSheet = nil })
             case .oldMissed:
@@ -562,6 +562,8 @@ struct PrayerTodayView: View {
     private func travelPillText(_ snapshot: PrayerSnapshot) -> String? {
         if let trip = snapshot.activeTrip {
             if let fix = locator.fix, !TravelRule.isAway(home: session.activePlace, current: fix.place, thresholdKm: travelThresholdKm) { return "عدتَ إلى مدينتك؟" }
+            // OR-09: in a new city of the same journey, the pill asks before anything changes.
+            if let fix = locator.fix, fix.city != trip.city, TravelRule.distanceKm(from: trip.place, to: fix.place) > travelThresholdKm { return "وصلت إلى " + fix.city + "؟" }
         return MadarInlineText.joined(["مسافر", trip.city] + (session.bool("salah.travelShortenCombine") ? ["قصرٌ وجمع"] : []))
         }
         return travelDetects && awayFix() != nil ? "خارج مدينتك" : nil

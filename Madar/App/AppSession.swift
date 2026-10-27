@@ -342,6 +342,12 @@ final class AppSession {
             sendPrayerCommand(name: "prayer.startTrip", payload: .object(payload), undoMessage: "بدأت الرحلة", completion: completion)
         }
     }
+    /// OR-09: the trip moves on to another country; the open leg closes and the next joins the same journey (one undo).
+    func continuePrayerTrip(city: String, country: String, place: ActivePlace, homeKm: Double?, completion: ((Bool) -> Void)? = nil) {
+        var payload: [String: MadarCore.JSONValue] = ["city": .string(city), "country": .string(country), "lat": .number(place.latitude), "lon": .number(place.longitude), "tzID": .string(place.timeZoneID)]
+        if let homeKm { payload["homeKm"] = .number(homeKm) }
+        sendPrayerCommand(name: "prayer.continueTrip", payload: .object(payload), undoMessage: "أُضيفت " + city + " إلى رحلتك", completion: completion)
+    }
     func endPrayerTrip(_ id: UUID, completion: ((Bool) -> Void)? = nil) {
         sendPrayerCommand(name: "prayer.endTrip", payload: .object(["tripID": .string(id.uuidString)]), undoMessage: "انتهت الرحلة", completion: completion)
     }
