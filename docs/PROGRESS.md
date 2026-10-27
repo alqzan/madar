@@ -348,6 +348,14 @@ M0-M6 software is integrated; M5 has its bounded software gate. M7 remains open 
 
 # Handovers
 
+## Handover — OR-02…OR-13 after Codex — 2026-10-27 — Claude
+- **Works now:** on branch `codex/bahw-owner-review` only (not merged to `main`; Codex's OR-01/OR-03 are unfinished on the same branch): OR-02 habit orbit, OR-04 widgets, OR-07 hali arc + insight, OR-08 qiyam wird line, OR-09 multi-country trips (schema V13 `Trip.journeyID`; prayer «وصلت إلى X؟» → «أضف X إلى رحلتك»; money reads the whole journey with one envelope; undo of «add country» refused once money/prayer/habit rows point to the leg; generic travel ornaments, no Istanbul art), OR-10 diary «هذا اليوم عبر السنين», OR-11 habits + Quran amounts in the diary margin (`notes.autoLines.habits`), OR-12 lighter today page, OR-13 editor heading/bold/italic stored as Markdown.
+- **Verified:** MadarData 108/108; Commands 246/246; Prayer 35/35; Core DayOneImportTests 10/10; UI: FoundationUITests OR09, MoneyTravelUITests 3/3, DiaryTravel 3/3, DiaryWindow 3/3, DiaryMargin 2/2, DiaryCustomize 1/1, DiaryToday 3/3, HabitsUITests (OR-02 run). Money review (OR-09): one High fixed, two Medium handled.
+- **Pre-existing failures (also on baseline HEAD):** `test_M1F02_TravelQuestionPillAndPair` line 147 (pair sheet does not open from Dhuhr); `QuranQiyamUITests.testNightPreviewRakahProgressResumeAndSave` line 10.
+- **Differences left:** diary «منذ ذاك اليوم» lacks before/after bars; today dark variant not re-shot; editor shows Markdown marks while typing; customize order list still lists «ذاك اليوم»/«منذ ذاك اليوم» rows (margin shape only now).
+- **Next:** OR-15 (morning vs evening pages), OR-16 Friday/Ramadan, then OR-17… in order. Merging this branch to `main` waits for Codex's OR-01/OR-03 or the owner.
+- **Model/effort:** claude-opus-5-5, effort not exposed. **Usage:** 53% of the five-hour window at this note.
+
 ## Handover — التخصيص وصانع الودجة — 2026-10-27 — Codex
 - **Works now:** OR-01 افتراضي العادات عريض مع حفظ الأحجام المخصصة (`8628d96`). OR-03: ترتيب/إخفاء أجزاء الغرف، مستويات الذكاء المعتمدة، نطاق العادات المعتمد، وصانع X3 يحفظ ودجات مسماة ويعرض المختارة للبهو ويصدر قوالب JSON للنظام. ضغطة العادة من الودجة/Siri تحفظ يومها عند تأخر التصريف. العمل على `codex/bahw-owner-review`؛ لم يُدمج في main.
 - **Verified:** `xcodebuild ... test` على iPhone 17 Pro/iOS 26.5: final X3 4/4 (`codex-x3-verified-final-r1.xcresult`)، النطاق 4/4، X3 والبهو/التخصيص 5/5، الذكاء والبهو 3/3، محررو الغرف والبهو 2/2؛ أسماء الحزم والحدود في OR-03. `swift test --package-path Madar/Packages/MadarCommands --filter WidgetConfigPersistenceTests` 3/3؛ اختبار inbox القديم 1/1؛ `swift test --package-path Madar/Packages/MadarSnapshots --filter WidgetCatalogTests` 1/1. `git diff --check` ونسخ المخطط والبروتوكول متطابقة.
