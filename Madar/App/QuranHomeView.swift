@@ -291,7 +291,15 @@ struct QuranHomeView: View {
             Button { detail = .step(step) } label: {
                 HStack(spacing: 10) {
                     Text(step.title).font(bodyFont(12, bold: true)).foregroundStyle(color)
-                    Text(step.detail).font(serif(19)).foregroundStyle(theme.ink).fixedSize(horizontal: false, vertical: true)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(step.detail).font(serif(19)).foregroundStyle(theme.ink).fixedSize(horizontal: false, vertical: true)
+                        // DA-07: the step in hand says where it starts and what it is for, as R18 Home does.
+                        if step.id == next?.id, let range = step.range, step.kind == .bridge || step.kind == .hifz {
+                            Text("من الوجه " + service.numerals.string(range.fromPage) + (step.kind == .bridge ? "، تمهيد للورد" : ""))
+                                .font(bodyFont(12)).foregroundStyle(theme.secondaryInk).lineLimit(1)
+                                .accessibilityIdentifier("quran-step-start")
+                        }
+                    }
                     Spacer(minLength: 0)
                     if step.completed { Image(systemName: "checkmark").foregroundStyle(color) }
                 }.frame(minHeight: 50).strikethrough(step.completed).opacity(step.completed ? 0.55 : 1).contentShape(Rectangle())
