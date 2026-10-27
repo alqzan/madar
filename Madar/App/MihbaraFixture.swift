@@ -42,6 +42,10 @@ extension AppSession {
             let old = Book(); old.title = "قراءة قديمة"; old.author = "من مكتبتك"; old.shelf = "old"; old.finishedAt = ISO8601DateFormatter().date(from: "2016-10-01T12:00:00Z"); c.insert(old)
             let note = NotebookNote(); note.id = StableIdentity.uuid(for: "mihbara-fixture-private-note"); note.text = "سر لا يظهر قبل المصادقة"; note.isPrivate = true; note.link = "general"; note.updatedAt = now; c.insert(note)
             let pageNote = NotebookNote(); pageNote.id = StableIdentity.uuid(for: "mihbara-fixture-page-note"); pageNote.text = "أكمل من هذا الموضع على مهل."; pageNote.isPrivate = true; pageNote.link = "page"; pageNote.targetID = r.id; pageNote.page = 147; pageNote.updatedAt = now; c.insert(pageNote)
+            if ProcessInfo.processInfo.environment["MADAR_UI_MIHBARA_SECOND_READING"] == "1" {
+                // OR-32: a second book in hand, read an hour before the one on the stand.
+                let other = Book(); other.id = StableIdentity.uuid(for: "mihbara-fixture-second-reading"); other.title = "الأدب الصغير"; other.author = "ابن المقفع"; other.pages = 200; other.currentPage = 60; other.locatorJSON = try JSONEncoder().encode(PaperBookPosition(page: 60)); other.shelf = "reading"; other.updatedAt = now.addingTimeInterval(-3600); c.insert(other)
+            }
             for n in 1...12 { let h = HadithProgress(); h.id = StableIdentity.uuid(for: "hadith:nawawi40:\(n)"); h.collectionID = "nawawi40"; h.editionID = "wikisource-ar-500107"; h.number = n; h.readAt = now.addingTimeInterval(-86400); h.understood = true; c.insert(h) }
         }
         if variant == "bindings" {

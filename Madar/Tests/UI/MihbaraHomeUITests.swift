@@ -580,31 +580,43 @@ import UIKit
         XCTAssertEqual(app.buttons["mihbara-rahlOpens-manual"].value as? String, "محدد")
     }
 
-    func testSunnahDrawerUsesRealProgressAndOpensWirdAndImport() {
+    /// OR-32 (owner mockup A): the drawer gave way to «أكمل من حيث وقفت» for the other book in hand, and the
+    /// library became a wall of covers.
+    func testContinueCardOpensTheOtherBookAndLibraryShowsCovers() {
+        continueAfterFailure = false
+        let app = app("home"); app.launchEnvironment["MADAR_UI_MIHBARA_SECOND_READING"] = "1"; app.launch(); open(app)
+        XCTAssertFalse(app.buttons["mihbara-sunnah-drawer"].exists)
+        let card = app.descendants(matching: .any)["mihbara-continue-card"]
+        reach(app, card)
+        XCTAssertTrue(card.exists, app.debugDescription)
+        XCTAssertTrue(app.staticTexts["الأدب الصغير"].exists, app.debugDescription)
+        XCTAssertTrue(app.staticTexts["صفحة ٦٠ من ٢٠٠"].exists, app.debugDescription)
+        XCTAssertTrue(app.staticTexts["٣٠٪"].exists, app.debugDescription)
+        shot(app, "M6-V15-continue-L")
+        let go = app.buttons["mihbara-continue-reading"]; reach(app, go); go.tap()
+        // A paper book opens its card, where its page is kept.
+        let position = app.staticTexts["mihbara-paper-position-summary"]
+        XCTAssertTrue(position.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertEqual(position.label, "وصلت إلى الصفحة ٦٠ من ٢٠٠")
+        shot(app, "M6-V15-continue-opened-L")
+        let sheetTop = position.frame.minY - 30
+        app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: app.frame.midX, dy: sheetTop))
+            .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.99)))
+        XCTAssertTrue(position.waitForNonExistence(timeout: 5), app.debugDescription)
+        let library = app.buttons["mihbara-library"]
+        for _ in 0..<8 where !library.isHittable { app.swipeDown(velocity: .slow) }
+        library.tap()
+        let covers = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "mihbara-library-book-"))
+        XCTAssertTrue(covers.firstMatch.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertGreaterThanOrEqual(covers.count, 3, app.debugDescription) // the grid is lazy; «قديمًا» sits below the fold
+        shot(app, "M6-V15-library-covers-L")
+    }
+
+    func testOnlyBookInHandShowsNoContinueCard() {
         continueAfterFailure = false
         let app = app("home"); app.launch(); open(app)
-        let drawer = app.buttons["mihbara-sunnah-drawer"]
-        reach(app, drawer)
-        shot(app, "M6-V15-drawer-L")
-        XCTAssertEqual(drawer.value as? String, "مغلق")
-        drawer.tap()
-        let read = app.buttons["mihbara-sunnah-drawer-read"]
-        reach(app, read)
-        XCTAssertTrue(app.staticTexts["فهمت ١٢ حديثًا من ٤٢"].exists)
-        XCTAssertFalse(app.staticTexts["رياض الصالحين"].exists)
-        reach(app, app.buttons["mihbara-sunnah-drawer-add"])
-        app.swipeUp(velocity: .slow)
-        shot(app, "M6-V15-drawer-s1-L")
-        read.tap()
-        XCTAssertTrue(app.textViews["mihbara-hadith-text"].waitForExistence(timeout: 8))
-        app.buttons["تمّ"].tap()
-        let add = app.buttons["mihbara-sunnah-drawer-add"]; reach(app, add); add.tap()
-        XCTAssertTrue(app.buttons["mihbara-add-source-file"].waitForExistence(timeout: 8))
-        app.buttons["mihbara-add-back"].tap()
-        XCTAssertTrue(drawer.waitForExistence(timeout: 8))
-        reach(app, drawer); drawer.tap()
-        XCTAssertEqual(drawer.value as? String, "مغلق")
-        XCTAssertFalse(app.buttons["mihbara-sunnah-drawer-add"].exists)
+        for _ in 0..<4 { app.swipeUp(velocity: .slow) }
+        XCTAssertFalse(app.descendants(matching: .any)["mihbara-continue-card"].exists, "The stand already continues the only book in hand.")
     }
 
     func testLocalEPUBOpensInArabicReaderAndClosesBackToItsShelf() throws {
