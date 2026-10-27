@@ -806,12 +806,34 @@ import UIKit
         quoteCard.tap()
         let quotePreview = app.descendants(matching: .any)["mihbara-quote-card-preview"]
         XCTAssertTrue(quotePreview.waitForExistence(timeout: 8), app.debugDescription)
-        XCTAssertTrue(quotePreview.label.contains("كتاب اختبار القارئ"), quotePreview.label)
-        XCTAssertTrue(quotePreview.label.contains("من مكتبتك"), quotePreview.label)
         let quotedSentence = "القراءة باب يدخل منه الإنسان إلى خبرات من سبقه"
         XCTAssertEqual(quotePreview.label.components(separatedBy: quotedSentence).count - 1, 1, quotePreview.label)
-        XCTAssertFalse(quotePreview.label.contains("shamela.ws"), quotePreview.label)
+        // OR-29: the quote alone by default; every extra is the reader's to add and remove.
+        XCTAssertFalse(quotePreview.label.contains("كتاب اختبار القارئ"), quotePreview.label)
+        XCTAssertFalse(quotePreview.label.contains("من مكتبتك"), quotePreview.label)
         shot(app, "M6-V08-quote-card-L")
+        let quoteText = app.textViews["mihbara-quote-card-text"]
+        XCTAssertTrue(quoteText.waitForExistence(timeout: 5), app.debugDescription)
+        quoteText.tap()
+        quoteText.typeText(" تجربة")
+        XCTAssertTrue(app.buttons["mihbara-quote-card-restore"].waitForExistence(timeout: 5), app.debugDescription)
+        let edited = NSPredicate(format: "label CONTAINS %@", "تجربة")
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: edited, object: quotePreview)], timeout: 5), .completed, quotePreview.label)
+        if app.buttons["mihbara-quote-card-done"].exists { app.buttons["mihbara-quote-card-done"].tap() }
+        app.buttons["mihbara-quote-card-restore"].tap()
+        XCTAssertFalse(quotePreview.label.contains("تجربة"), quotePreview.label)
+        for extra in ["book", "source", "signature"] {
+            let chip = app.buttons["mihbara-quote-extra-\(extra)"]
+            if !chip.isHittable { app.swipeUp(velocity: .slow) }
+            XCTAssertTrue(chip.waitForExistence(timeout: 5), app.debugDescription); chip.tap()
+        }
+        XCTAssertTrue(quotePreview.label.contains("كتاب اختبار القارئ"), quotePreview.label)
+        XCTAssertTrue(quotePreview.label.contains("من مكتبتك"), quotePreview.label)
+        XCTAssertTrue(quotePreview.label.contains("مِحبرة مدار"), quotePreview.label)
+        XCTAssertFalse(quotePreview.label.contains("shamela.ws"), quotePreview.label)
+        shot(app, "M6-V08-quote-card-extras-L")
+        app.buttons["mihbara-quote-extra-book"].tap()
+        XCTAssertFalse(quotePreview.label.contains("كتاب اختبار القارئ"), quotePreview.label)
         app.buttons["mihbara-quote-card-close"].tap()
         XCTAssertTrue(quoteCard.waitForExistence(timeout: 5), app.debugDescription)
         sleep(1); shot(app, "M6-V08-highlight-L")

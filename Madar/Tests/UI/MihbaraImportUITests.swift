@@ -792,6 +792,12 @@ import UIKit
         quoteButton.tap()
         let preview = app.descendants(matching: .any)["mihbara-quote-card-preview"]
         XCTAssertTrue(preview.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertFalse(preview.label.contains("shamela.ws"), preview.label)
+        for extra in ["book", "author", "location", "source"] {
+            let chip = app.buttons["mihbara-quote-extra-\(extra)"]
+            if !chip.isHittable { app.swipeUp(velocity: .slow) }
+            XCTAssertTrue(chip.waitForExistence(timeout: 5), app.debugDescription); chip.tap()
+        }
         XCTAssertTrue(preview.label.contains("صيد الخاطر"), preview.label)
         XCTAssertTrue(preview.label.contains("ابن الجوزي"), preview.label)
         XCTAssertTrue(preview.label.contains("ج ٢، ص ٢٨"), preview.label)
@@ -851,6 +857,11 @@ import UIKit
         let quoteButton = app.buttons["mihbara-quote-card-open"]; XCTAssertTrue(quoteButton.waitForExistence(timeout: 8)); quoteButton.tap()
         let preview = app.descendants(matching: .any)["mihbara-quote-card-preview"]
         XCTAssertTrue(preview.waitForExistence(timeout: 10))
+        for extra in ["book", "author", "location", "source"] {
+            let chip = app.buttons["mihbara-quote-extra-\(extra)"]
+            if !chip.isHittable { app.swipeUp(velocity: .slow) }
+            XCTAssertTrue(chip.waitForExistence(timeout: 5)); chip.tap()
+        }
         XCTAssertTrue(preview.label.contains("صيد الخاطر")); XCTAssertTrue(preview.label.contains("ابن الجوزي"))
         // The live source has 893 pages in one volume; this chapter's printed label is 23.
         // Unlike the two-volume synthetic fixture, this citation correctly omits a volume prefix.

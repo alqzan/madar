@@ -1423,7 +1423,6 @@ struct MihbaraReaderView: View {
     }
 
     @MainActor private func makeQuoteCard(from state: MihbaraWordCardState) {
-        guard state.highlightID != nil else { return }
         let quote = state.paragraphText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !quote.isEmpty else { return }
         quoteCard = MihbaraQuoteCardContent(
@@ -2728,9 +2727,7 @@ private struct MihbaraWordCard: View {
                         action("دوّن ملاحظة", icon: "square.and.pencil", id: "mihbara-word-note", run: note)
                         action(copied ? "نُسخت" : "انسخ مع التوثيق", icon: copied ? "checkmark" : "doc.on.doc", id: "mihbara-word-copy", run: copy)
                     }
-                    if state.highlightID != nil {
-                        action("بطاقة اقتباس", icon: "quote.bubble", id: "mihbara-quote-card-open", run: makeQuoteCard)
-                    }
+                    action("بطاقة اقتباس", icon: "quote.bubble", id: "mihbara-quote-card-open", run: makeQuoteCard)
                     if state.isWord && (state.canSaveAsWord || translationAvailability != .unsupported) {
                         HStack(spacing: 10) {
                             if state.canSaveAsWord {
@@ -2791,20 +2788,61 @@ private struct MihbaraWordCard: View {
     }
 }
 
+/// What a quote card may carry beside the quote itself. Owner 27 Oct (OR-29): the quote alone by default;
+/// every extra is the reader's choice and can be removed again.
+enum MihbaraQuoteExtra: String, CaseIterable, Identifiable {
+    case book, author, location, source, signature
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .book: "الكتاب"
+        case .author: "المؤلف"
+        case .location: "الموضع"
+        case .source: "المصدر"
+        case .signature: "توقيع مِحبرة"
+        }
+    }
+}
+
 private struct MihbaraQuoteCardSheet: View {
     let app: AppSession
     let card: MihbaraQuoteCardContent
     @Environment(\.dismiss) private var dismiss
     @Environment(\.roomTheme) private var theme
-    @State private var image: UIImage?
+    @State private var quote: String
+    @State private var extras: Set<MihbaraQuoteExtra> = []
     @State private var shareError: String?
+    @State private var sharing = false
+    @FocusState private var editing: Bool
+
+    init(app: AppSession, card: MihbaraQuoteCardContent) {
+        self.app = app
+        self.card = card
+        _quote = State(initialValue: card.quote)
+    }
 
     private var background: SwiftUI.Color { theme.background }
     private var ink: SwiftUI.Color { theme.ink }
     private var secondaryInk: SwiftUI.Color { theme.secondaryInk }
+    private var trimmedQuote: String { quote.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    /// Extras with nothing to show (a book without an author, a page without a printed label) are not offered.
+    private var offeredExtras: [MihbaraQuoteExtra] {
+        MihbaraQuoteExtra.allCases.filter { extra in
+            switch extra {
+            case .author: !card.author.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            case .location: card.location != nil
+            default: true
+            }
+        }
+    }
+
+    private var artwork: MihbaraQuoteCardArtwork {
+        MihbaraQuoteCardArtwork(card: card, quote: trimmedQuote, extras: extras)
+    }
 
     var body: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 12) {
             GlassEffectContainer(spacing: 12) {
                 ZStack {
                     Text("بطاقة اقتباس").font(MadarTypography.section())
@@ -2814,50 +2852,125 @@ private struct MihbaraQuoteCardSheet: View {
                         closeButton
                     }
                 }
-                if image != nil {
-                    shareButton
+                shareButton
+                    .disabled(trimmedQuote.isEmpty || sharing)
                     .accessibilityIdentifier("mihbara-quote-card-share")
-                    .accessibilityHint(card.sourceURL == nil ? "يشارك صورة البطاقة" : "يشارك صورة البطاقة ورابط الكتاب في الشاملة")
-                }
+                    .accessibilityHint(extras.contains(.source) && card.sourceURL != nil ? "يشارك صورة البطاقة ورابط الكتاب في الشاملة" : "يشارك صورة البطاقة")
             }
 
-            if let image {
-                ScrollView {
-                    Image(uiImage: image)
-                        .resizable().scaledToFit().frame(maxWidth: 360)
-                        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-                        .shadow(color: ink.opacity(0.18), radius: 18, y: 7)
-                        .accessibilityLabel(accessibilityDescription)
-                        .accessibilityIdentifier("mihbara-quote-card-preview")
-                        .padding(.horizontal, 20).padding(.vertical, 8)
+            ScrollView {
+                VStack(spacing: 18) {
+                    preview
+                    editor
+                    extrasPicker
                 }
-                .scrollIndicators(.hidden)
-            } else {
-                ProgressView("يجهّز البطاقة…").font(MadarTypography.caption())
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .accessibilityIdentifier("mihbara-quote-card-rendering")
+                .padding(.horizontal, 8).padding(.bottom, 12)
             }
+            .scrollIndicators(.hidden)
+            .scrollDismissesKeyboard(.interactively)
 
-            Text("الفقرة التي ظلّلتها، مع موضعها ورابط مصدرها عند توفره.")
-                .font(MadarTypography.fine()).foregroundStyle(secondaryInk)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 24)
             if let shareError {
                 Text(shareError).font(MadarTypography.caption()).foregroundStyle(ink)
                     .accessibilityIdentifier("mihbara-quote-card-error")
             }
         }
-        .padding(.horizontal, 12).padding(.top, 14).padding(.bottom, 18)
+        .padding(.horizontal, 12).padding(.top, 14).padding(.bottom, 12)
         .foregroundStyle(ink).background(background.ignoresSafeArea())
-        .task { renderCard() }
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("تم") { editing = false }.accessibilityIdentifier("mihbara-quote-card-done")
+            }
+        }
         .alert("مشاركة البطاقة", isPresented: Binding(get: { shareError != nil }, set: { if !$0 { shareError = nil } })) {
             Button("حسنًا", role: .cancel) { shareError = nil }
         } message: { Text(shareError ?? "") }
     }
 
+    /// The card itself, drawn live at its real size and scaled to the sheet, so every edit shows at once.
+    private var preview: some View {
+        GeometryReader { proxy in
+            let width = proxy.size.width
+            artwork
+                .scaleEffect(width / MihbaraQuoteCardArtwork.size.width)
+                .frame(width: width, height: width * MihbaraQuoteCardArtwork.size.height / MihbaraQuoteCardArtwork.size.width)
+                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .shadow(color: ink.opacity(0.18), radius: 16, y: 6)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(accessibilityDescription)
+                .accessibilityIdentifier("mihbara-quote-card-preview")
+                .animation(.easeInOut(duration: 0.2), value: extras)
+        }
+        .aspectRatio(MihbaraQuoteCardArtwork.size.width / MihbaraQuoteCardArtwork.size.height, contentMode: .fit)
+        .frame(maxWidth: 300)
+        .allowsHitTesting(false)
+    }
+
+    private var editor: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("النص").font(MadarTypography.caption()).foregroundStyle(secondaryInk)
+                Spacer()
+                if quote != card.quote {
+                    Button("أعد النص كما في الكتاب") { quote = card.quote }
+                        .font(MadarTypography.caption()).foregroundStyle(ink)
+                        .frame(minHeight: 44)
+                        .accessibilityIdentifier("mihbara-quote-card-restore")
+                }
+            }
+            TextEditor(text: $quote)
+                .font(.custom("Amiri", size: 19, relativeTo: .body))
+                .lineSpacing(6)
+                .scrollContentBackground(.hidden)
+                .focused($editing)
+                .frame(minHeight: 120, maxHeight: 220)
+                .padding(10)
+                .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(theme.surface))
+                .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(secondaryInk.opacity(0.22), lineWidth: 1))
+                .accessibilityLabel("نص الاقتباس")
+                .accessibilityIdentifier("mihbara-quote-card-text")
+            Text(trimmedQuote.isEmpty ? "اكتب ما تريد أن يبقى من الفقرة." : "احذف منه ما شئت أو أضف؛ البطاقة تتبعك.")
+                .font(MadarTypography.fine()).foregroundStyle(secondaryInk)
+        }
+    }
+
+    private var extrasPicker: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("أضف إلى البطاقة").font(MadarTypography.caption()).foregroundStyle(secondaryInk)
+            FlowRows(spacing: 8) {
+                ForEach(offeredExtras) { extra in
+                    let on = extras.contains(extra)
+                    Button {
+                        if on { extras.remove(extra) } else { extras.insert(extra) }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: on ? "checkmark" : "plus").font(.system(size: 12, weight: .bold))
+                            Text(extra.title).font(.custom("thmanyahsans-Bold", size: 15, relativeTo: .subheadline))
+                        }
+                        .padding(.horizontal, 14).frame(minHeight: 44)
+                        .foregroundStyle(on ? theme.background : ink)
+                        .background(Capsule().fill(on ? ink : theme.surface))
+                        .overlay(Capsule().strokeBorder(secondaryInk.opacity(on ? 0 : 0.3), lineWidth: 1))
+                        .contentShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(on ? "أزل " + extra.title : "أضف " + extra.title)
+                    .accessibilityAddTraits(on ? .isSelected : [])
+                    .accessibilityIdentifier("mihbara-quote-extra-\(extra.rawValue)")
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     private var accessibilityDescription: String {
-        [card.quote, card.bookTitle, card.author, card.location, card.sourceName, card.sourceAddress]
-            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+        var parts: [String?] = [trimmedQuote]
+        if extras.contains(.book) { parts.append(card.bookTitle) }
+        if extras.contains(.author) { parts.append(card.author) }
+        if extras.contains(.location) { parts.append(card.location) }
+        if extras.contains(.source) { parts += [card.sourceName, card.sourceAddress] }
+        if extras.contains(.signature) { parts.append("مِحبرة مدار") }
+        return parts.compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }.joined(separator: "، ")
     }
 
@@ -2896,17 +3009,18 @@ private struct MihbaraQuoteCardSheet: View {
         }
     }
 
-    @MainActor private func renderCard() {
-        guard image == nil else { return }
-        let renderer = ImageRenderer(content: MihbaraQuoteCardArtwork(card: card))
-        renderer.scale = 2
-        image = renderer.uiImage
-        if image == nil { shareError = "تعذّر إنشاء صورة البطاقة." }
-    }
-
+    /// The image is drawn from the card exactly as it stands when the reader taps share.
     private func shareCard() {
-        guard let image else { return }
+        editing = false
+        let renderer = ImageRenderer(content: artwork)
+        renderer.scale = 2
+        guard let image = renderer.uiImage else {
+            shareError = "تعذّر إنشاء صورة البطاقة."
+            return
+        }
+        sharing = true
         Task { @MainActor in
+            defer { sharing = false }
             do {
                 guard let controller = app.lockController, let presenter = app.privacyPresenter else {
                     throw PrivacyAuthorizationError.stale
@@ -2914,7 +3028,7 @@ private struct MihbaraQuoteCardSheet: View {
                 let authorization = try await controller.authorize([.app])
                 try controller.validate(authorization)
                 var items: [Any] = [image]
-                if let sourceURL = card.sourceURL { items.append(sourceURL) }
+                if extras.contains(.source), let sourceURL = card.sourceURL { items.append(sourceURL) }
                 try presenter.present(items: items, authorization: authorization)
             } catch {
                 shareError = "تعذّرت المشاركة. أعد المحاولة من البطاقة."
@@ -2923,8 +3037,40 @@ private struct MihbaraQuoteCardSheet: View {
     }
 }
 
+/// Wraps chips onto as many rows as they need, right to left.
+private struct FlowRows: SwiftUI.Layout {
+    var spacing: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? .infinity
+        var x: CGFloat = 0, y: CGFloat = 0, row: CGFloat = 0, widest: CGFloat = 0
+        for view in subviews {
+            let size = view.sizeThatFits(.unspecified)
+            if x > 0, x + size.width > width { x = 0; y += row + spacing; row = 0 }
+            x += size.width + spacing
+            row = max(row, size.height)
+            widest = max(widest, x - spacing)
+        }
+        return CGSize(width: proposal.width ?? widest, height: y + row)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var x: CGFloat = 0, y: CGFloat = 0, row: CGFloat = 0
+        for view in subviews {
+            let size = view.sizeThatFits(.unspecified)
+            if x > 0, x + size.width > bounds.width { x = 0; y += row + spacing; row = 0 }
+            view.place(at: CGPoint(x: bounds.minX + x, y: bounds.minY + y), proposal: ProposedViewSize(size))
+            x += size.width + spacing
+            row = max(row, size.height)
+        }
+    }
+}
+
 private struct MihbaraQuoteCardArtwork: View {
+    static let size = CGSize(width: 1080, height: 1350)
     let card: MihbaraQuoteCardContent
+    let quote: String
+    let extras: Set<MihbaraQuoteExtra>
     private let theme = RoomTheme(room: "mihbara")
     private var forest: SwiftUI.Color { theme.accentFill }
     private var paper: SwiftUI.Color { theme.surface }
@@ -2934,14 +3080,18 @@ private struct MihbaraQuoteCardArtwork: View {
     private var goldText: SwiftUI.Color { theme.color("goldUnderstandText") }
 
     private var displayedQuote: String {
-        guard card.quote.count > 520 else { return card.quote }
-        return String(card.quote.prefix(519)).trimmingCharacters(in: .whitespacesAndNewlines) + "…"
+        guard quote.count > 520 else { return quote }
+        return String(quote.prefix(519)).trimmingCharacters(in: .whitespacesAndNewlines) + "…"
     }
     private var quoteSize: CGFloat {
-        if displayedQuote.count > 360 { 35 }
-        else if displayedQuote.count > 240 { 41 }
-        else if displayedQuote.count > 150 { 47 }
-        else { 55 }
+        if displayedQuote.count > 360 { hasCitation ? 35 : 39 }
+        else if displayedQuote.count > 240 { hasCitation ? 41 : 46 }
+        else if displayedQuote.count > 150 { hasCitation ? 47 : 52 }
+        else if displayedQuote.count > 60 { 55 }
+        else { 66 }
+    }
+    private var hasCitation: Bool {
+        !extras.isDisjoint(with: [.book, .author, .location, .source])
     }
 
     var body: some View {
@@ -2952,56 +3102,56 @@ private struct MihbaraQuoteCardArtwork: View {
                 .stroke(gold.opacity(0.78), lineWidth: 2).padding(48)
 
             VStack(spacing: 0) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text("مِحبرة").font(.custom("thmanyahserifdisplay-Bold", size: 45, relativeTo: .title))
-                    Spacer()
-                    Text("مَدَار").font(.custom("thmanyahsans-Bold", size: 22, relativeTo: .headline)).tracking(4)
-                }
-                .foregroundStyle(ink)
-                Text("مما ظلّلته في كتابك")
-                    .font(.custom("thmanyahsans-Medium", size: 23, relativeTo: .subheadline))
-                    .foregroundStyle(muted).padding(.top, 8)
-
-                Spacer(minLength: 42)
+                Spacer(minLength: 24)
                 Text("❝").font(.custom("Amiri-Bold", size: 104, relativeTo: .largeTitle))
                     .foregroundStyle(gold).frame(height: 86)
                 Text(displayedQuote)
                     .font(.custom("Amiri", size: quoteSize, relativeTo: .title2))
                     .foregroundStyle(ink).multilineTextAlignment(.center)
-                    .lineSpacing(15).lineLimit(13).minimumScaleFactor(0.68)
+                    .lineSpacing(15).lineLimit(hasCitation ? 13 : 16).minimumScaleFactor(0.68)
                     .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 10)
                     .accessibilityIdentifier("mihbara-quote-card-artwork-quote")
-                Spacer(minLength: 48)
+                Spacer(minLength: 40)
 
-                Rectangle().fill(gold.opacity(0.72)).frame(height: 2).padding(.horizontal, 120)
-                    .padding(.bottom, 25)
-                Text(card.bookTitle).font(.custom("thmanyahserifdisplay-Bold", size: 31, relativeTo: .title3))
-                    .foregroundStyle(ink).multilineTextAlignment(.center).lineLimit(2)
-                    .minimumScaleFactor(0.8)
-                if !card.author.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                if hasCitation {
+                    Rectangle().fill(gold.opacity(0.72)).frame(height: 2).padding(.horizontal, 120)
+                        .padding(.bottom, 25)
+                }
+                if extras.contains(.book) {
+                    Text(card.bookTitle).font(.custom("thmanyahserifdisplay-Bold", size: 31, relativeTo: .title3))
+                        .foregroundStyle(ink).multilineTextAlignment(.center).lineLimit(2)
+                        .minimumScaleFactor(0.8)
+                }
+                if extras.contains(.author), !card.author.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     Text(card.author).font(.custom("thmanyahsans-Medium", size: 23, relativeTo: .body))
                         .foregroundStyle(muted).padding(.top, 8).lineLimit(1).minimumScaleFactor(0.8)
                 }
-                if let location = card.location {
+                if extras.contains(.location), let location = card.location {
                     Text(location).font(.custom("thmanyahsans-Bold", size: 22, relativeTo: .body))
                         .foregroundStyle(ink).padding(.top, 8)
                 }
-                Text("المصدر: \(card.sourceName)")
-                    .font(.custom("thmanyahsans-Medium", size: 20, relativeTo: .caption))
-                    .foregroundStyle(muted).padding(.top, 16)
-                if let sourceAddress = card.sourceAddress {
-                    Text(sourceAddress).font(.system(size: 18, weight: .medium, design: .rounded))
-                        .foregroundStyle(ink).padding(.top, 5)
+                if extras.contains(.source) {
+                    Text("المصدر: \(card.sourceName)")
+                        .font(.custom("thmanyahsans-Medium", size: 20, relativeTo: .caption))
+                        .foregroundStyle(muted).padding(.top, 16)
+                    if let sourceAddress = card.sourceAddress {
+                        Text(sourceAddress).font(.system(size: 18, weight: .medium, design: .rounded))
+                            .foregroundStyle(ink).padding(.top, 5)
+                    }
+                }
+                if extras.contains(.signature) {
+                    Text("مِحبرة مدار").font(.custom("thmanyahsans-Bold", size: 19, relativeTo: .footnote))
+                        .tracking(2).foregroundStyle(goldText).padding(.top, hasCitation ? 22 : 0)
                 }
                 Spacer(minLength: 12)
-                Text("مِحبرة مدار").font(.custom("thmanyahsans-Bold", size: 17, relativeTo: .footnote))
-                    .foregroundStyle(goldText)
             }
+            .frame(maxHeight: .infinity)
             .padding(.horizontal, 118).padding(.vertical, 105)
             .environment(\.layoutDirection, .rightToLeft)
             .multilineTextAlignment(.center)
         }
-        .frame(width: 1080, height: 1350)
+        .frame(width: Self.size.width, height: Self.size.height)
         .environment(\.colorScheme, .light)
     }
 }
