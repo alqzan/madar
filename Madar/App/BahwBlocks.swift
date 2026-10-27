@@ -150,7 +150,7 @@ struct BahwBlockView: View {
         }
     }
     private func habitRing(_ row: HabitReading) -> some View {
-        let ringSide: CGFloat = size == .wide ? 32 : 36
+        let ringSide: CGFloat = size == .wide ? 32 : 42
         let current = row.summary.current
         let share = Double(current?.value ?? 0) / Double(max(1, current?.target ?? 1))
         let progress = habitProgress(row)
@@ -165,10 +165,10 @@ struct BahwBlockView: View {
         return Button { activateHabit(row) } label: {
             VStack(spacing: 2) {
                 ZStack(alignment: .topTrailing) {
-                    HabitMiniRing(share: share, theme: ringTheme).frame(width: ringSide, height: ringSide)
-                    if row.source != nil || current?.outcome == .complete {
-                        MadarGlyph(row.symbol, size: 16).foregroundStyle(ringTheme.accent).frame(width: ringSide, height: ringSide)
-                    }
+                    // DA-05: the same coloured ring and glyph as the wide card.
+                    HabitRingGlyph(share: row.paused ? 0 : share, done: current?.met == true, symbol: row.symbol == "checkmark" ? nil : row.symbol, lineWidth: 4)
+                        .environment(\.roomTheme, ringTheme).opacity(row.paused ? 0.45 : 1)
+                        .frame(width: ringSide, height: ringSide)
                     if row.paused || (row.source != nil && current?.outcome == .complete) {
                         Image(systemName: row.paused ? "pause.fill" : "checkmark")
                             .font(.system(size: 8, weight: .bold))
