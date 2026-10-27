@@ -343,7 +343,7 @@ struct HabitsRoomView: View {
             .accessibilityLabel(quickLogLabel(row.name,.once))
             .accessibilityIdentifier("habit-quick-"+row.id.uuidString)
         } else if !dynamicTypeSize.isAccessibilitySize {
-            HabitRingGlyph(share:share,done:met,symbol:row.source == nil ? nil : row.symbol).frame(width:36,height:36).frame(width:44,height:44)
+            HabitRingGlyph(share:share,done:met,symbol:row.source == nil ? row.nameGlyph : row.symbol).frame(width:36,height:36).frame(width:44,height:44)
         }
     }
     /// Count and duration habits log from a «+»; a once-habit logs from its ring.
