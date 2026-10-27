@@ -14,6 +14,7 @@ struct DiaryDayView: View {
     @State private var writing = false
     @State private var retry = 0
     @State private var intentions:[DiaryIntention]=[]
+    @State private var arc:DiaryDayArc?
     @State private var intentionsOpen=false
     @State private var niyyaSaved=false
     @State private var appearance:DiaryDayAppearance?
@@ -86,9 +87,12 @@ struct DiaryDayView: View {
                 if shownDay == today,let waitingLetter {
                     DiaryLetterWaitingCard(letter:waitingLetter,digitsTitle:service.bothDates(waitingLetter.writtenDay)){openingLetter=waitingLetter}.padding(.horizontal,18).padding(.vertical,6)
                 }
-                if shownDay == today || !intentions.isEmpty {
+                if shownDay == today,travel == nil,let arc {DiaryDayArcView(arc:arc).padding(.horizontal,18).padding(.top,2)}
+                if eveningPrimary,let first=intentions.first {
+                    eveningIntention(first)
+                } else if shownDay == today || !intentions.isEmpty {
                     Button {intentionsOpen=true} label:{
-                        HStack(alignment:.firstTextBaseline,spacing:10){Text("النيّة").font(DiaryType.label).foregroundStyle(theme.accent);Text(intentions.first?.text ?? "أضف نيّتك لليوم").font(DiaryType.writing).frame(maxWidth:.infinity,alignment:.leading).lineLimit(2);Image(systemName:"chevron.backward").font(.caption)}.padding(.horizontal,18).frame(minHeight:54).contentShape(.rect)
+                        HStack(alignment:.firstTextBaseline,spacing:10){Text("النيّة").font(DiaryType.label).foregroundStyle(theme.accent);VStack(alignment:.leading,spacing:2){Text(intentions.first?.text ?? "أضف نيّتك لليوم").font(DiaryType.writing).lineLimit(2);if shownDay == today,!intentions.isEmpty {Text("أسألك عنها بعد العشاء").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))}}.frame(maxWidth:.infinity,alignment:.leading);Image(systemName:"chevron.backward").font(.caption)}.padding(.horizontal,18).frame(minHeight:54).contentShape(.rect)
                     }.buttonStyle(.plain).accessibilityIdentifier("diary-niyya-open")
                 }
                 GeometryReader { geometry in ScrollView {
@@ -143,11 +147,10 @@ struct DiaryDayView: View {
                         if let travel,shownDay == today {
                             Button { writing = true } label: { Text("اكتب من " + travel.city).font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 54).foregroundStyle(theme.color("onButton")).background(theme.color("button"),in:.capsule) }.buttonStyle(.plain).accessibilityIdentifier("diary-day-write")
                         } else {
-                        Button { writing = true } label: { Label(shownDay == today ? "اكتب" : "اكتب في هامشها", systemImage: "pencil").font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 54).foregroundStyle(eveningPrimary ? theme.ink:theme.background).background(eveningPrimary ? theme.surface:(theme.dark ? theme.accent:theme.ink),in:.capsule) }.buttonStyle(.plain).accessibilityIdentifier("diary-day-write")
+                        Button { writing = true } label: { Label(shownDay == today ? "اكتب" : "اكتب في هامشها", systemImage: "pencil").font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 54).foregroundStyle(theme.background).background(theme.dark ? theme.accent:theme.ink,in:.capsule) }.buttonStyle(.plain).accessibilityIdentifier("diary-day-write")
 
                         }
                         if travel != nil {Button{stampsOpen=true}label:{Text("الأختام").font(DiaryType.label).frame(minHeight:54).padding(.horizontal,18).overlay{Capsule().stroke(theme.line)}}.buttonStyle(.plain).accessibilityIdentifier("diary-stamps-open")}
-                        if shownDay==today,!intentions.isEmpty {Button{intentionsOpen=true}label:{Text("حصيلة النيّات").font(DiaryType.label).frame(minHeight:54).padding(.horizontal,16).foregroundStyle(service.intentionEvening(shownDay) ? theme.background:theme.ink).background(service.intentionEvening(shownDay) ? (theme.dark ? theme.accent:theme.ink):theme.surface,in:.capsule).overlay{Capsule().stroke(theme.line)}}.buttonStyle(.plain).accessibilityIdentifier("diary-niyya-evening")}
                     }.padding(.horizontal,18).padding(.vertical,8).background(theme.background)
                     }.background(theme.background)
                 }
@@ -181,15 +184,25 @@ struct DiaryDayView: View {
                 .sheet(isPresented: $writing) { DiaryTextEditor(app: app, margin: shownDay == today ? nil : shownDay).environment(\.roomTheme, theme) }
                 // N04: letters are checked when the diary is open and the app comes to the foreground.
                 .onChange(of:scenePhase){_,phase in if phase == .active {retry+=1}}
-                .task {while !Task.isCancelled {do{try await Task.sleep(for:.seconds(30));displayNow=service.clock();appearance=try service.appearance(shownDay)}catch{break}}}
+                .task {while !Task.isCancelled {do{try await Task.sleep(for:.seconds(30));displayNow=service.clock();appearance=try service.appearance(shownDay);arc=service.dayArc(shownDay)}catch{break}}}
                 .task(id: shownDay.description + ":" + String(app.prayerRevision) + ":" + String(retry)) {
-                    do { try await service.prepareClosedDay(shownDay); page = try service.day(shownDay); intentions=try service.intentions(shownDay); appearance=try service.appearance(shownDay);displayNow=service.clock();returnDay=try service.returnAfterAbsence(shownDay);travel=try service.travel(shownDay);travelReturn=travel == nil ? try service.travelReturn(shownDay):nil
+                    do { try await service.prepareClosedDay(shownDay); page = try service.day(shownDay); intentions=try service.intentions(shownDay);arc=service.dayArc(shownDay); appearance=try service.appearance(shownDay);displayNow=service.clock();returnDay=try service.returnAfterAbsence(shownDay);travel=try service.travel(shownDay);travelReturn=travel == nil ? try service.travelReturn(shownDay):nil
                         if shownDay == today {try? await service.refreshLetters()}
                         let letters=try service.letters();waitingLetter=letters.first{$0.state == .eligible};sealedHere=letters.filter{$0.writtenDay==shownDay && $0.state != .opened}.count
                         (projectLinks,projectSuggestions)=try service.projectNotes(shownDay); failure = nil }
                     catch { page = nil; failure = error.localizedDescription }
                 }
         }
+    }
+    /// OR-15: after Isha the morning's intention comes back on the page itself and asks how it went.
+    private func eveningIntention(_ row:DiaryIntention)->some View {
+        VStack(alignment:.leading,spacing:10){
+            HStack{Text("نويت صباحًا").font(DiaryType.label).foregroundStyle(theme.accent);Spacer();if intentions.count>1 {Button("و"+service.digits.string(intentions.count-1)+" غيرها"){intentionsOpen=true}.font(DiaryType.label).frame(minHeight:44).accessibilityIdentifier("diary-niyya-more")}}
+            Button{intentionsOpen=true}label:{Text(row.text).font(DiaryType.writing).frame(maxWidth:.infinity,alignment:.leading).lineLimit(3)}.buttonStyle(.plain).accessibilityIdentifier("diary-niyya-open")
+            HStack(spacing:6){ForEach([("done","تمّت"),("partial","جزئيًا"),("notEasy","ما تيسّرت")],id:\.0){value,title in
+                Button{Task{@MainActor in do{try await service.setIntentionResult(row.id,result:row.result==value ? nil:value);intentions=try service.intentions(shownDay);niyyaSaved=true}catch{failure=error.localizedDescription}}}label:{Text(title).font(DiaryType.label).frame(maxWidth:.infinity,minHeight:44).foregroundStyle(row.result==value ? theme.background:theme.ink).background(row.result==value ? (theme.dark ? theme.accent:theme.ink):.clear,in:.capsule).overlay{Capsule().stroke(theme.line)}}.buttonStyle(.plain).accessibilityIdentifier("diary-niyya-inline-"+value).accessibilityAddTraits(row.result==value ? .isSelected:[])
+            }}
+        }.padding(14).background(theme.surface,in:.rect(cornerRadius:18)).overlay{RoundedRectangle(cornerRadius:18).stroke(theme.line)}.padding(.horizontal,18).padding(.vertical,6).accessibilityElement(children:.contain).accessibilityIdentifier("diary-niyya-evening")
     }
     private func ribbon(_ title:String,color:Color,height:CGFloat)->some View {Text(title).font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).foregroundStyle(theme.background).fixedSize().rotationEffect(.degrees(90)).frame(width:24,height:height-8).frame(height:height,alignment:.top).background(DiaryRibbonShape().fill(color)).accessibilityLabel(title)}
     private func countdown(_ date:Date)->String {

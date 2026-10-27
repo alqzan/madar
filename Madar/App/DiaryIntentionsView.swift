@@ -49,3 +49,34 @@ struct DiaryIntentionsView:View {
     private func load(){do{rows=try service.intentions(day);failure=nil}catch{failure=error.localizedDescription}}
     private func run(_ action:@escaping @MainActor () async throws -> Void){busy=true;Task{@MainActor in defer{busy=false};do{try await action();saved=true;load()}catch{failure=error.localizedDescription}}}
 }
+
+/// OR-15 (owner, 27 Oct 2026): the current page stays; one slim arc from Fajr to Isha ties morning and evening.
+/// The sun walks it by day and a crescent rests on it after Maghrib.
+struct DiaryDayArcView:View {
+    let arc:DiaryDayArc
+    @Environment(\.roomTheme) private var theme
+    var body:some View {
+        Canvas{context,size in
+            let inset=20.0,base=size.height-8,lift=size.height-18
+            func point(_ t:Double)->CGPoint{
+                // RTL: Fajr sits on the trailing (right) edge, Isha on the leading edge.
+                let x=size.width-inset-t*(size.width-2*inset)
+                return .init(x:x,y:base-lift*4*t*(1-t))
+            }
+            var path=Path();path.move(to:point(0));for i in 1...40 {path.addLine(to:point(Double(i)/40))}
+            context.stroke(path,with:.color(theme.line),style:.init(lineWidth:1,dash:[2,4]))
+            var walked=Path();walked.move(to:point(0));for i in 1...40 where Double(i)/40<=arc.progress {walked.addLine(to:point(Double(i)/40))};walked.addLine(to:point(arc.progress))
+            context.stroke(walked,with:.color(theme.accent.opacity(0.7)),style:.init(lineWidth:1.6,lineCap:.round))
+            for m in arc.marks {let c=point(m);context.fill(Path(ellipseIn:.init(x:c.x-2.5,y:c.y-2.5,width:5,height:5)),with:.color(m<=arc.progress ? theme.accent:theme.line))}
+            let c=point(arc.progress)
+            if arc.night {
+                let r=8.5;var moon=Path(ellipseIn:.init(x:c.x-r,y:c.y-r,width:2*r,height:2*r))
+                moon=moon.subtracting(Path(ellipseIn:.init(x:c.x-r*0.35,y:c.y-r*1.15,width:2*r,height:2*r)))
+                context.fill(moon,with:.color(theme.color("pencil")))
+            } else {
+                context.fill(Path(ellipseIn:.init(x:c.x-11,y:c.y-11,width:22,height:22)),with:.color(theme.color("highlight").opacity(0.7)))
+                context.fill(Path(ellipseIn:.init(x:c.x-5.5,y:c.y-5.5,width:11,height:11)),with:.color(theme.accent))
+            }
+        }.frame(height:34).accessibilityElement().accessibilityLabel(arc.night ? "مساء اليوم":"اليوم بين الفجر والعشاء").accessibilityIdentifier("diary-day-arc")
+    }
+}

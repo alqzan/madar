@@ -6,11 +6,13 @@ import XCTest
         app.launchEnvironment=["MADAR_UI_STORE_ID":store,"MADAR_UI_DIARY_FIXTURE":"empty","MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light","MADAR_UI_NOW":"2026-10-15T07:00:00+03:00"]
         app.launch();XCTAssertTrue(app.buttons["diary-today"].waitForExistence(timeout:25));app.buttons["diary-today"].tap();app.buttons["diary-niyya-open"].tap()
         let text=app.textFields["diary-niyya-text"];XCTAssertTrue(text.waitForExistence(timeout:10));text.tap();text.typeText("أُنهي ما بدأت");app.buttons["diary-niyya-save"].tap()
-        XCTAssertTrue(app.buttons["diary-niyya-undo"].waitForExistence(timeout:10));app.buttons["diary-niyya-close"].tap();capture(app,"M3-V13-morning-L")
+        XCTAssertTrue(app.buttons["diary-niyya-undo"].waitForExistence(timeout:10));app.buttons["diary-niyya-close"].tap();XCTAssertTrue(app.staticTexts["أسألك عنها بعد العشاء"].waitForExistence(timeout:10));capture(app,"M3-V13-morning-L")
         app.terminate();app.launchEnvironment["MADAR_UI_NOW"]="2026-10-15T22:00:00+03:00";app.launch();XCTAssertTrue(app.buttons["diary-today"].waitForExistence(timeout:25));app.buttons["diary-today"].tap()
-        XCTAssertTrue(app.buttons["diary-niyya-evening"].waitForExistence(timeout:10));capture(app,"M3-V13-evening-L");app.buttons["diary-niyya-evening"].tap()
-        let partial=app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH 'diary-niyya-result-partial-'")).firstMatch;XCTAssertTrue(partial.waitForExistence(timeout:10));XCTAssertFalse(partial.isSelected);partial.tap();XCTAssertTrue(partial.isSelected);capture(app,"M3-V13-outcome-L")
-        let undo=app.buttons["diary-niyya-undo"];for _ in 0..<4 where !undo.isHittable{app.swipeUp()};undo.tap();XCTAssertFalse(partial.isSelected)
+        XCTAssertTrue(app.descendants(matching:.any)["diary-day-arc"].waitForExistence(timeout:10))
+        let partial=app.buttons["diary-niyya-inline-partial"];XCTAssertTrue(partial.waitForExistence(timeout:10));capture(app,"M3-V13-evening-L");XCTAssertFalse(partial.isSelected)
+        partial.tap();XCTAssertTrue(app.buttons["diary-niyya-inline-partial"].waitForExistence(timeout:5));let selected=NSPredicate(format:"isSelected == true");expectation(for:selected,evaluatedWith:app.buttons["diary-niyya-inline-partial"]);waitForExpectations(timeout:10);capture(app,"M3-V13-outcome-L")
+        let undo=app.buttons["diary-day-niyya-undo"];XCTAssertTrue(undo.waitForExistence(timeout:10));undo.tap()
+        expectation(for:NSPredicate(format:"isSelected == false"),evaluatedWith:app.buttons["diary-niyya-inline-partial"]);waitForExpectations(timeout:10)
     }
     func testSentenceBecomesIntentionFromItsContextMenu() throws {
         continueAfterFailure=false
