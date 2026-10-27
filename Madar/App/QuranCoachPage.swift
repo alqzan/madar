@@ -18,25 +18,36 @@ struct QuranCoachPage: View {
     @Environment(\.roomTheme) private var theme
     var body: some View {
         VStack(spacing: 4) {
-            HStack {
-                Text(page.juzTitle)
-                Spacer()
-                Text("سورة " + page.surahTitle)
-            }.font(.custom(medinaStyle ? "Amiri-Regular" : "Amiri-Bold", size: medinaStyle ? 15 : 13)).foregroundStyle(theme.color("hifzText"))
-                .padding(.horizontal, medinaStyle ? 24 : 12).frame(height: medinaStyle ? 30 : 26)
+            if medinaStyle {
+                // Like a printed mushaf: the juz in words on the right, the page number in the middle, the surah on the left.
+                HStack(spacing: 8) {
+                    Text(page.juzTitle).font(.custom("Amiri-Bold", size: 19)).frame(maxWidth: .infinity, alignment: .leading)
+                    Text(page.numberLabel).font(.custom("Amiri-Regular", size: 17)).fixedSize()
+                    Text("سورة " + page.surahTitle).font(.custom("Amiri-Bold", size: 19)).frame(maxWidth: .infinity, alignment: .trailing)
+                }.lineLimit(1).minimumScaleFactor(0.7).foregroundStyle(theme.color("mushafInk"))
+                    .padding(.horizontal, 22).frame(height: 34)
+            } else {
+                HStack {
+                    Text(page.juzTitle)
+                    Spacer()
+                    Text("سورة " + page.surahTitle)
+                }.font(.custom("Amiri-Bold", size: 13)).foregroundStyle(theme.color("hifzText"))
+                    .padding(.horizontal, 12).frame(height: 26)
+            }
             if let reference = coach.referenceText, stage == .repetition, !coach.bridge {
                 Text(reference).font(.custom(page.postScriptName, size: 16)).foregroundStyle(theme.color("mushafInk"))
                     .padding(8).frame(maxWidth: .infinity).background(theme.color("hifzTint"))
             }
             ZStack {
                 if coach.review, stage == .review {
-                    QuranCoachTextCanvas(page: page, coach: coach, stage: stage, ink: UIColor(theme.color("mushafInk")), tint: .clear, reveal: { _ in }, blurredWordsOnly: true)
-                        .blur(radius: 3.5).opacity(0.28).padding(.horizontal, 8).padding(.vertical, 4)
+                    QuranCoachTextCanvas(page: page, coach: coach, stage: stage, ink: UIColor(theme.color("mushafInk")), tint: .clear, reveal: { _ in }, blurredWordsOnly: true, medinaStyle: medinaStyle)
+                        .blur(radius: 3.5).opacity(0.28).padding(.horizontal, medinaStyle ? 24 : 8).padding(.vertical, medinaStyle ? 14 : 4)
                         .allowsHitTesting(false).accessibilityHidden(true)
                 }
                 QuranCoachTextCanvas(page: page, coach: coach, stage: stage, ink: UIColor(theme.color("mushafInk")), tint: UIColor(theme.color("hifzTint")), reveal: reveal, markWord: markWord, readingTap: readingTap, mark: UIColor(theme.color("due")), sealInk: UIColor(theme.color("hifzText")), sealTint: UIColor(theme.color("reviewTint")), medinaStyle: medinaStyle, gold: UIColor(theme.color("gold")), paper: UIColor(theme.color("mushafPaper")))
-                    .padding(.horizontal, medinaStyle ? 24 : 8).padding(.vertical, 4).accessibilityHidden(true)
+                    .padding(.horizontal, medinaStyle ? 24 : 8).padding(.vertical, medinaStyle ? 14 : 4).accessibilityHidden(true)
             }
+            .background { if medinaStyle { QuranMushafFrame(gold: theme.color("gold"), green: theme.color("review")).padding(.horizontal, 6).allowsHitTesting(false) } }
             .accessibilityRepresentation {
                 ForEach(page.semanticAyat.filter { coach.plannedAyahs.contains($0.id) }) { ayah in
                     if stage == .grading { Text(ayah.title + "، " + ayah.text) }
@@ -47,10 +58,41 @@ struct QuranCoachPage: View {
                     }
                 }
             }
-            HStack { Spacer(); Text(page.numberLabel).font(.custom("Amiri-Bold", size: 13)); if medinaStyle { Spacer() } }
-                .foregroundStyle(theme.color("hifzText")).padding(.horizontal, 12).frame(height: 22)
+            if !medinaStyle {
+                HStack { Spacer(); Text(page.numberLabel).font(.custom("Amiri-Bold", size: 13)) }
+                    .foregroundStyle(theme.color("hifzText")).padding(.horizontal, 12).frame(height: 22)
+            }
         }
         .background(theme.color("mushafPaper"))
+    }
+}
+
+/// The printed mushaf's page border: two gold rules with a band of small green and gold lozenges between them.
+private struct QuranMushafFrame: View {
+    let gold: Color, green: Color
+    var body: some View {
+        Canvas { context, size in
+            let outer = CGRect(origin: .zero, size: size).insetBy(dx: 1, dy: 1), band: CGFloat = 9
+            let inner = outer.insetBy(dx: band, dy: band)
+            context.stroke(Path(outer), with: .color(gold), lineWidth: 1.4)
+            context.stroke(Path(inner), with: .color(gold), lineWidth: 1)
+            context.stroke(Path(inner.insetBy(dx: -2.5, dy: -2.5)), with: .color(green.opacity(0.55)), lineWidth: 0.6)
+            func lozenge(_ c: CGPoint, _ r: CGFloat) -> Path {
+                Path { p in p.move(to: CGPoint(x: c.x, y: c.y - r)); p.addLine(to: CGPoint(x: c.x + r, y: c.y)); p.addLine(to: CGPoint(x: c.x, y: c.y + r)); p.addLine(to: CGPoint(x: c.x - r, y: c.y)); p.closeSubpath() }
+            }
+            let mid = band / 2 + 1, step: CGFloat = 11
+            var index = 0
+            func bead(_ c: CGPoint) { context.fill(lozenge(c, 2.6), with: .color(index % 2 == 0 ? green.opacity(0.8) : gold)); index += 1 }
+            var x = outer.minX + mid + step
+            while x < outer.maxX - mid - step / 2 { bead(CGPoint(x: x, y: outer.minY + mid)); bead(CGPoint(x: x, y: outer.maxY - mid)); x += step }
+            var y = outer.minY + mid + step
+            while y < outer.maxY - mid - step / 2 { bead(CGPoint(x: outer.minX + mid, y: y)); bead(CGPoint(x: outer.maxX - mid, y: y)); y += step }
+            for corner in [CGPoint(x: outer.minX + mid, y: outer.minY + mid), CGPoint(x: outer.maxX - mid, y: outer.minY + mid),
+                           CGPoint(x: outer.minX + mid, y: outer.maxY - mid), CGPoint(x: outer.maxX - mid, y: outer.maxY - mid)] {
+                context.fill(lozenge(corner, 4.2), with: .color(gold))
+            }
+        }
+        .accessibilityHidden(true)
     }
 }
 

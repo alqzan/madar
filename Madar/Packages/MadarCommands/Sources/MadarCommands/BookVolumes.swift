@@ -37,9 +37,11 @@ public enum BookVolumes {
 
     private static let ordinals = ["الأول", "الثاني", "الثالث", "الرابع", "الخامس", "السادس", "السابع", "الثامن", "التاسع", "العاشر",
                                    "الحادي عشر", "الثاني عشر", "الثالث عشر", "الرابع عشر", "الخامس عشر", "السادس عشر",
-                                   "السابع عشر", "الثامن عشر", "التاسع عشر", "العشرون"]
+                                   "السابع عشر", "الثامن عشر", "التاسع عشر", "العشرون", "الحادي والعشرون", "الثاني والعشرون",
+                                   "الثالث والعشرون", "الرابع والعشرون", "الخامس والعشرون", "السادس والعشرون", "السابع والعشرون",
+                                   "الثامن والعشرون", "التاسع والعشرون", "الثلاثون"]
 
-    /// «الجزء الثاني» for volume index 1; nil past the twentieth, where the caller writes the number.
+    /// «الجزء الثاني» for volume index 1; nil past the thirtieth (the Quran's last juz), where the caller writes the number.
     public static func name(_ volume: Int) -> String? {
         ordinals.indices.contains(volume) ? "الجزء " + ordinals[volume] : nil
     }

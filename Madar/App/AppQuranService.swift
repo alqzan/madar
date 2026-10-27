@@ -284,7 +284,7 @@ import MadarPrayer
         }
         return QuranUIPage(page: number, title: "الوجه " + numerals.string(number), postScriptName: name, lines: lines,
             semanticAyat: catalog.ayahs(on: number).map { QuranUIVerse(id: $0.id, title: $0.surahNameArabic + " " + numerals.string($0.ayahNumber), text: $0.uthmaniText, hidden: false, canReveal: false) },
-            surahTitle: catalog.ayahs(on: number).first?.surahNameArabic ?? "", juzTitle: "الجزء " + numerals.string(catalog.ayahs(on: number).first?.juz ?? 1), numberLabel: numerals.string(number), printedPostScriptName: printName)
+            surahTitle: catalog.ayahs(on: number).first?.surahNameArabic ?? "", juzTitle: BookVolumes.name((catalog.ayahs(on: number).first?.juz ?? 1) - 1) ?? "الجزء " + numerals.string(catalog.ayahs(on: number).first?.juz ?? 1), numberLabel: numerals.string(number), printedPostScriptName: printName)
     }
     func qiyamPreview(rakaat: Int) async throws -> QuranUIQiyamPreview {
         let snapshot = try snapshot(), result = try QuranQiyamEngine.assignment(rakats: rakaat, pages: snapshot.pages)

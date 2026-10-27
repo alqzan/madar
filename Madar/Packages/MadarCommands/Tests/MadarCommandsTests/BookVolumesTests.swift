@@ -30,6 +30,9 @@ struct BookVolumesTests {
     @Test func volumesAreNamedInWords() {
         #expect(BookVolumes.name(1) == "الجزء الثاني")
         #expect(BookVolumes.name(10) == "الجزء الحادي عشر")
-        #expect(BookVolumes.name(20) == nil)
+        #expect(BookVolumes.name(14) == "الجزء الخامس عشر")
+        #expect(BookVolumes.name(20) == "الجزء الحادي والعشرون")
+        #expect(BookVolumes.name(29) == "الجزء الثلاثون")
+        #expect(BookVolumes.name(30) == nil)
     }
 }
