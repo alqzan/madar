@@ -1909,14 +1909,14 @@ private struct MihbaraReaderSettingsSheet: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 9) {
-                themeRow
                 sizeRow
                 fontRow
                 modeRow
-                autoScrollRow
+                themeRow
+                if options.mode == "scroll" { autoScrollRow }
                 Button { withAnimation(.smooth(duration: 0.25)) { more.toggle() } } label: {
                     Text(more ? "خيارات أقل" : "خيارات أكثر").font(MadarTypography.caption().weight(.semibold))
-                        .frame(maxWidth: .infinity, minHeight: 32)
+                        .frame(maxWidth: .infinity, minHeight: 44)
                         .glassEffect(.regular.interactive(), in: Capsule())
                 }
                 .buttonStyle(.plain).accessibilityIdentifier("mihbara-reader-more")
@@ -1937,10 +1937,12 @@ private struct MihbaraReaderSettingsSheet: View {
                 // Changing a font can preserve a scrolled content offset. The close
                 // action stays outside that scrolling content and below the undo toast.
                 header.padding(.horizontal, 18).padding(.vertical, 8)
-            }.background(paper)
+            }.foregroundStyle(ink).background(paper)
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
+        .environment(\.colorScheme, palette.isDark ? .dark : .light)
+        .environment(\.roomTheme, RoomTheme(room: "mihbara", dark: palette.isDark))
     }
 
     private var header: some View {
@@ -2299,6 +2301,11 @@ private struct MihbaraEPUBNavigator: UIViewControllerRepresentable {
         func navigator(_ navigator: Navigator, didJumpTo locator: Locator) { onLocation(locator, true) }
         func navigator(_ navigator: Navigator, presentError error: NavigatorError) { onError(error) }
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+            if message.name == "madarReaderFootnote", let value = message.body as? [String: String],
+               let note = MihbaraFootnote(html: value["html"] ?? "", referrer: value["referrer"]) {
+                onFootnote(note)
+                return
+            }
             guard message.name == "madarReaderDocumentReady" else { return }
             onDocumentReady()
         }
@@ -2317,6 +2324,7 @@ private struct MihbaraEPUBNavigator: UIViewControllerRepresentable {
         }
         func navigator(_ navigator: EPUBNavigatorViewController, setupUserScripts userContentController: WKUserContentController) {
             userContentController.add(self, name: "madarReaderDocumentReady")
+            userContentController.add(self, name: "madarReaderFootnote")
             let quotations = QuranQuotationScript.source(index: try? QuranQuotationIndex.bundled())
             userContentController.addUserScript(WKUserScript(source: quotations, injectionTime: .atDocumentStart, forMainFrameOnly: true))
             let source = """
@@ -2341,6 +2349,7 @@ private struct MihbaraEPUBNavigator: UIViewControllerRepresentable {
                     \(MihbaraReaderTheme.pageCSS)
                     a[role~='doc-noteref'] { display: inline-flex !important; align-items: center; justify-content: center; box-sizing: border-box; width: 1.45em; height: 1.45em; padding: 0 0 .12em 0 !important; margin-inline: .12em; border-radius: 50%; background: #9E2F25 !important; color: #FAF6EA !important; font-size: .7em; font-weight: 700; line-height: 1 !important; text-indent: 0 !important; vertical-align: .35em; text-decoration: none !important; }
                   `;
+                  style.textContent += "a.madar-page-notes-link[role~='doc-noteref'] { width:auto !important; height:auto !important; padding:.35em .65em !important; border-radius:.7em !important; vertical-align:baseline !important; }";
                   head.appendChild(style);
                 }
                 return true;
@@ -2506,7 +2515,44 @@ private struct MihbaraEPUBNavigator: UIViewControllerRepresentable {
                   setFocusBlock(nearestFocusBlock(blocks), blocks);
                 });
               }, true);
-              const notifyDocumentReady = () => window.webkit.messageHandlers.madarReaderDocumentReady.postMessage(true);
+              const connectPageNotes = () => {
+                // Compatibility for already imported Turath EPUBs. Only the live document is
+                // enriched: the stored file, hash and saved locator remain untouched.
+                document.querySelectorAll('.madar-page-notes').forEach((note, index) => {
+                  if (!note.id) {
+                    let id = 'madar-turath-notes-' + (index + 1);
+                    while (document.getElementById(id)) id += '-note';
+                    note.id = id;
+                  }
+                  if (Array.from(document.querySelectorAll('a[role~="doc-noteref"]')).some(link => link.getAttribute('href') === '#' + note.id)) {
+                    note.hidden = true;
+                    return;
+                  }
+                  note.setAttributeNS('http://www.idpf.org/2007/ops', 'epub:type', 'footnote');
+                  note.setAttribute('role', 'doc-footnote');
+                  const paragraph = document.createElement('p');
+                  const link = document.createElement('a');
+                  link.href = '#' + note.id;
+                  link.className = 'madar-page-notes-link';
+                  link.setAttributeNS('http://www.idpf.org/2007/ops', 'epub:type', 'noteref');
+                  link.setAttribute('role', 'doc-noteref');
+                  link.textContent = 'حواشي الصفحة';
+                  // Readium fetches noteref targets from the original EPUB resource. For
+                  // legacy files this target exists only in the live DOM, so present locally.
+                  link.addEventListener('click', event => {
+                    event.preventDefault();
+                    event.stopImmediatePropagation();
+                    window.webkit.messageHandlers.madarReaderFootnote.postMessage({ html: note.innerHTML, referrer: 'حواشي الصفحة' });
+                  }, true);
+                  paragraph.appendChild(link);
+                  note.before(paragraph);
+                  note.hidden = true;
+                });
+              };
+              const notifyDocumentReady = () => {
+                connectPageNotes();
+                window.webkit.messageHandlers.madarReaderDocumentReady.postMessage(true);
+              };
               if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', notifyDocumentReady, { once: true });
               else queueMicrotask(notifyDocumentReady);
             })();
@@ -3109,7 +3155,7 @@ struct MihbaraFootnote: Equatable {
         let body = html.replacingOccurrences(of: "<a[^>]*(doc-backlink|href=\"[^\"]*#ref[^\"]*\")[^>]*>.*?</a>", with: "", options: [.regularExpression, .caseInsensitive])
         let text = plain(body)
         guard !text.isEmpty else { return nil }
-        self.text = String(text.prefix(4000))
+        self.text = text
         self.number = plain(referrer ?? "")
     }
 }
@@ -3128,13 +3174,13 @@ private struct MihbaraFootnoteCard: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            if !number.isEmpty {
+            if !number.isEmpty && number != "حواشي الصفحة" {
                 Text(number).font(.custom("thmanyahsans-Bold", size: 15, relativeTo: .subheadline)).foregroundStyle(onAccent)
                     .frame(minWidth: 32, minHeight: 32).background(Circle().fill(accent))
                     .accessibilityHidden(true)
             }
             VStack(alignment: .leading, spacing: 4) {
-                Text("حاشية الكتاب").font(MadarTypography.fine()).foregroundStyle(ink2)
+                Text(number == "حواشي الصفحة" ? "حواشي الصفحة" : "حاشية الكتاب").font(MadarTypography.fine()).foregroundStyle(ink2)
                 ScrollView {
                     Text(note.text).font(.custom("Amiri-Regular", size: 19, relativeTo: .body)).foregroundStyle(ink)
                         .lineSpacing(5).frame(maxWidth: .infinity, alignment: .leading)

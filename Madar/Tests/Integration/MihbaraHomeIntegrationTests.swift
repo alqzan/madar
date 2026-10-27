@@ -70,6 +70,14 @@ import CoreSpotlight
 }
 
 @MainActor final class MihbaraHomeIntegrationTests: XCTestCase {
+    func testPageFootnotesKeepContinuationLinesAndLongSourceText() throws {
+        let note = try XCTUnwrap(MihbaraFootnote(html: "<aside><p>١ الحاشية الأولى.</p><p>سطر مكمل للحاشية.</p><a role=\"doc-backlink\" href=\"#page-ref\">عودة</a></aside>", referrer: "حواشي الصفحة"))
+        XCTAssertEqual(note.number, "حواشي الصفحة")
+        XCTAssertEqual(note.text, "١ الحاشية الأولى.\nسطر مكمل للحاشية.")
+        let long = try XCTUnwrap(MihbaraFootnote(html: "<p>" + String(repeating: "نص حاشية طويل. ", count: 400) + "خاتمة الحاشية المحفوظة.</p>", referrer: "حواشي الصفحة"))
+        XCTAssertTrue(long.text.hasSuffix("خاتمة الحاشية المحفوظة."), "The note card must not silently cut off the end of a source note")
+    }
+
     func testPinnedMatnAndRealFajrGateThenExplicitWirdAndUndo() async throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "MihbaraHome-\(UUID())"); defer { try? FileManager.default.removeItem(at: root) }
         let container = try MadarContainerFactory.makeLocal(at: root), app = try AppSession(container: container, groupDirectory: root); app.authorizeProtectedData()

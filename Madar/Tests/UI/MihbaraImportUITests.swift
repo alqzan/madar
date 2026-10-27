@@ -772,6 +772,14 @@ import UIKit
         chapter.tap()
         let passage = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "من علامة كمال العقل")).firstMatch
         XCTAssertTrue(passage.waitForExistence(timeout: 10), app.debugDescription)
+        let notes = app.links["حواشي الصفحة"]
+        for _ in 0..<5 where !notes.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(notes.waitForExistence(timeout: 8), app.debugDescription); notes.tap()
+        let footnote = app.staticTexts["mihbara-footnote-text"]
+        XCTAssertTrue(footnote.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(footnote.label.contains("الدون: الأمر الخسيس الحقير"))
+        attach(app, "OR-28-turath-page-footnotes-L")
+        app.buttons["mihbara-footnote-close"].tap()
         passage.coordinate(withNormalizedOffset: CGVector(dx: 0.7, dy: 0.15)).press(forDuration: 1.2)
         let wordCard = app.descendants(matching: .any)["mihbara-word-card"]
         XCTAssertTrue(wordCard.waitForExistence(timeout: 8), app.debugDescription)

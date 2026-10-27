@@ -61,9 +61,22 @@ struct TurathBookTests {
 
     @Test func pageTextKeepsTitlesNotesAndEscapesMarkup() {
         var ids: [Int: String] = [:]
-        let html = TurathEPUB.render("٧- فصل:<span data-type=\"title\" id=toc-9> علو الهمة</span>\nنص <b>غامق</b> & آخر\n_________\n١ الدون: الخسيس.", file: "c2.xhtml", titleIDs: &ids)
-        #expect(html == "<h2>٧- فصل:<span id=\"toc-9\" class=\"madar-title\"> علو الهمة</span></h2><p>نص غامق &amp; آخر</p><div class=\"madar-page-notes\" role=\"doc-endnotes\"><p>١ الدون: الخسيس.</p></div>")
+        let html = TurathEPUB.render("٧- فصل:<span data-type=\"title\" id=toc-9> علو الهمة</span>\nنص <b>غامق</b> & آخر\n_________\n١ الدون: الخسيس.", file: "c2.xhtml", pageAnchor: "p-2", titleIDs: &ids)
+        #expect(html == "<h2>٧- فصل:<span id=\"toc-9\" class=\"madar-title\"> علو الهمة</span></h2><p>نص غامق &amp; آخر</p><p><a id=\"p-2-notes-ref\" class=\"madar-page-notes-link\" epub:type=\"noteref\" role=\"doc-noteref\" href=\"#p-2-notes\">حواشي الصفحة</a></p><aside id=\"p-2-notes\" class=\"madar-page-notes\" epub:type=\"footnote\" role=\"doc-footnote\"><p>١ الدون: الخسيس.</p><a role=\"doc-backlink\" href=\"#p-2-notes-ref\">العودة إلى المتن</a></aside>")
         #expect(ids == [9: "c2.xhtml"])
         #expect(TurathEPUB.arabicDigits("2/453") == "٢/٤٥٣")
     }
+    @Test func eachPrintedPageHasItsOwnCompleteNoteTarget() {
+        var ids: [Int: String] = [:]
+        let first = TurathEPUB.render("متن الصفحة الأولى\n_____\n١ الحاشية الأولى.\nسطر مكمل لا يضيع.\n٢ الحاشية الثانية.", file: "c1.xhtml", pageAnchor: "p-1", titleIDs: &ids)
+        let second = TurathEPUB.render("متن الصفحة الثانية\n_____\n١ حاشية مختلفة.", file: "c1.xhtml", pageAnchor: "p-2", titleIDs: &ids)
+        #expect(first.contains("href=\"#p-1-notes\""))
+        #expect(second.contains("href=\"#p-2-notes\""))
+        #expect(first.contains("<p>١ الحاشية الأولى.</p><p>سطر مكمل لا يضيع.</p><p>٢ الحاشية الثانية.</p>"))
+        #expect(second.contains("<p>١ حاشية مختلفة.</p>"))
+        #expect(!first.contains("p-2-notes"))
+        let plain = TurathEPUB.render("صفحة بلا حاشية", file: "c1.xhtml", pageAnchor: "p-3", titleIDs: &ids)
+        #expect(plain == "<p>صفحة بلا حاشية</p>")
+    }
+
 }

@@ -132,7 +132,7 @@ public enum TurathEPUB {
                     body += "<span id=\"p-\(ordinal)\" epub:type=\"pagebreak\" role=\"doc-pagebreak\" title=\"\(label)\" aria-label=\"\(label)\"></span>"
                     pageList += "<li><a href=\"c\(n + 1).xhtml#p-\(ordinal)\">\(label)</a></li>"
                 } else { body += "<span id=\"p-\(ordinal)\"></span>" }
-                body += render(page.text, file: "c\(n + 1).xhtml", titleIDs: &titleIDs)
+                body += render(page.text, file: "c\(n + 1).xhtml", pageAnchor: "p-\(ordinal)", titleIDs: &titleIDs)
             }
             files.append(("OEBPS/c\(n + 1).xhtml", xhtml(title: book.title, body: "<section>\(body)</section>")))
         }
@@ -162,7 +162,7 @@ public enum TurathEPUB {
 
     /// One Turath page: lines become paragraphs, inline title spans become anchored headings,
     /// and the part after the `_____` rule becomes the page's notes block.
-    static func render(_ text: String, file: String, titleIDs: inout [Int: String]) -> String {
+    static func render(_ text: String, file: String, pageAnchor: String, titleIDs: inout [Int: String]) -> String {
         let parts = text.components(separatedBy: "\n")
         var body: [String] = [], notes: [String] = [], inNotes = false
         for line in parts {
@@ -174,7 +174,13 @@ public enum TurathEPUB {
             else if html.isTitle { body.append("<h2>\(html.text)</h2>") }
             else { body.append("<p>\(html.text)</p>") }
         }
-        return body.joined() + (notes.isEmpty ? "" : "<div class=\"madar-page-notes\" role=\"doc-endnotes\">\(notes.joined())</div>")
+        guard !notes.isEmpty else { return body.joined() }
+        let noteID = escape(pageAnchor + "-notes"), referenceID = escape(pageAnchor + "-notes-ref")
+        // A page can contain several numbered notes and continuation lines. Open the complete
+        // source block rather than guessing which plain-text numeral belongs to which note.
+        return body.joined()
+            + "<p><a id=\"\(referenceID)\" class=\"madar-page-notes-link\" epub:type=\"noteref\" role=\"doc-noteref\" href=\"#\(noteID)\">حواشي الصفحة</a></p>"
+            + "<aside id=\"\(noteID)\" class=\"madar-page-notes\" epub:type=\"footnote\" role=\"doc-footnote\">\(notes.joined())<a role=\"doc-backlink\" href=\"#\(referenceID)\">العودة إلى المتن</a></aside>"
     }
 
     private static let titleSpan = try! NSRegularExpression(pattern: #"<span data-type=["']?title["']? id=["']?toc-(\d+)["']?>(.*?)</span>"#, options: [.dotMatchesLineSeparators])
@@ -224,7 +230,7 @@ public enum TurathEPUB {
 
     static func xhtml(title: String, body: String) -> Data {
         Data(("<?xml version=\"1.0\" encoding=\"UTF-8\"?><html xmlns=\"http://www.w3.org/1999/xhtml\" xmlns:epub=\"http://www.idpf.org/2007/ops\" xml:lang=\"ar\" lang=\"ar\" dir=\"rtl\"><head><title>\(escape(title))</title>"
-              + "<style>.madar-title{font-weight:bold}h2{font-size:1.15em;margin:1.2em 0 .5em}.madar-page-notes{font-size:.82em;opacity:.85;border-top:1px solid currentColor;margin-top:.8em;padding-top:.4em}.madar-page-notes p{margin:.2em 0}.madar-source{font-size:.85em;margin-top:2em}.madar-page-picture{margin:1em 0;text-align:center;page-break-inside:avoid;break-inside:avoid}.madar-page-picture img{max-width:100%;max-height:85vh;height:auto}</style>"
+              + "<style>.madar-title{font-weight:bold}h2{font-size:1.15em;margin:1.2em 0 .5em}.madar-page-notes{font-size:.82em;opacity:.85;border-top:1px solid currentColor;margin-top:.8em;padding-top:.4em}.madar-page-notes p{margin:.2em 0}.madar-page-notes-link{font-size:.85em;text-decoration:underline}.madar-source{font-size:.85em;margin-top:2em}.madar-page-picture{margin:1em 0;text-align:center;page-break-inside:avoid;break-inside:avoid}.madar-page-picture img{max-width:100%;max-height:85vh;height:auto}</style>"
               + "</head><body>\(body)</body></html>").utf8)
     }
 }

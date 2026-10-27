@@ -2,6 +2,48 @@ import XCTest
 import UIKit
 
 @MainActor final class MihbaraHomeUITests: XCTestCase {
+    /// Handwritten legacy Turath EPUB: one chapter, no noteref link, two complete note paragraphs.
+    /// Its immutable content is enriched only in the reader DOM; no converter or owner file is used.
+    func testLegacyTurathPageNotesOpenWithoutReimportingTheBook() throws {
+        continueAfterFailure = false
+        let bytes = try XCTUnwrap(Data(base64Encoded: """
+            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
+            """, options: .ignoreUnknownCharacters))
+        let app = app("reader", epub: bytes)
+        app.launch(); open(app)
+        let read = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "ابدأ القراءة")).firstMatch
+        XCTAssertTrue(read.waitForExistence(timeout: 8)); reach(app, read); read.tap()
+        let link = app.links["حواشي الصفحة"]
+        XCTAssertTrue(link.waitForExistence(timeout: 12), app.debugDescription); link.tap()
+        let note = app.staticTexts["mihbara-footnote-text"]
+        XCTAssertTrue(note.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(note.label.contains("حاشية قديمة محفوظة"))
+        XCTAssertTrue(note.label.contains("سطر مكمل للحاشية بلا فقد"))
+        shot(app, "OR-28-legacy-turath-notes-L")
+        app.buttons["mihbara-footnote-close"].tap()
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "متن كتاب قديم بقي كما استوردته")).firstMatch.exists)
+    }
+
     func testUnavailableFileExplainsItsStateWithoutOfferingAPaperPositionSave() throws {
         continueAfterFailure = false
         let app = app("missingFile"); app.launch(); open(app)
@@ -936,6 +978,11 @@ import UIKit
 
         app.buttons["mihbara-reader-settings"].tap()
         let slow = app.buttons["mihbara-reader-autoScroll-slow"]
+        XCTAssertFalse(slow.exists, "Speed choices belong to scrolling mode")
+        let scroll = app.buttons["mihbara-reader-mode-scroll"]
+        XCTAssertTrue(scroll.waitForExistence(timeout: 5)); scroll.tap()
+        XCTAssertTrue(scroll.waitForSelection(timeout: 5))
+        reach(app, slow)
         XCTAssertTrue(slow.waitForExistence(timeout: 8), app.debugDescription)
         XCTAssertTrue(app.buttons["mihbara-reader-autoScroll-off"].isSelected)
         slow.tap()
