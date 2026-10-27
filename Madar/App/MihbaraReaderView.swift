@@ -1,4 +1,5 @@
 import SwiftUI
+import LocalAuthentication
 import Observation
 import UIKit
 import WebKit
@@ -2898,11 +2899,6 @@ private struct MihbaraQuoteCardSheet: View {
             }
             .scrollIndicators(.hidden)
             .scrollDismissesKeyboard(.interactively)
-
-            if let shareError {
-                Text(shareError).font(MadarTypography.caption()).foregroundStyle(ink)
-                    .accessibilityIdentifier("mihbara-quote-card-error")
-            }
         }
         .padding(.horizontal, 12).padding(.top, 14).padding(.bottom, 12)
         .foregroundStyle(ink).background(background.ignoresSafeArea())
@@ -3061,6 +3057,8 @@ private struct MihbaraQuoteCardSheet: View {
                 if extras.contains(.source), let sourceURL = card.sourceURL { items.append(sourceURL) }
                 try presenter.present(items: items, authorization: authorization)
             } catch {
+                // Cancelling Face ID is the reader's choice, not a failure.
+                if let la = error as? LAError, [.userCancel, .systemCancel, .appCancel].contains(la.code) { return }
                 shareError = "تعذّرت المشاركة. أعد المحاولة من البطاقة."
             }
         }

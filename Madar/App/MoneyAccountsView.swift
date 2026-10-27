@@ -47,7 +47,7 @@ struct MoneyAccountsView: View {
                     HStack(spacing: 8) {
                         Label(r.shortcutAt == nil ? "لم تصل رسالة عبر الاختصار بعد" : "رسائل عبر الاختصار", systemImage: r.shortcutAt == nil ? "tray" : "checkmark.circle").font(MadarTypography.caption())
                         Spacer(minLength: 0)
-                        Text(service.counted(r.shortcutCount, ("وصلت رسالة واحدة", "وصلت رسالتان", "رسائل وصلت", "رسالةً وصلت"))).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                        if r.shortcutCount > 0 { Text(service.counted(r.shortcutCount, ("وصلت رسالة واحدة", "وصلت رسالتان", "رسائل وصلت", "رسالةً وصلت"))).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
                     }.padding(14).frame(maxWidth: .infinity).overlay { Capsule().stroke(theme.line, lineWidth: 1) }
                 } else if let errorMessage { Text(errorMessage); Button("أعِد المحاولة", action: load) }
                 else { ProgressView().frame(height: 250) }
@@ -84,7 +84,7 @@ struct MoneyAccountsView: View {
             } }
         } else {
         VStack(spacing: 0) {
-            HStack { Text("الحساب").frame(maxWidth: .infinity, alignment: .leading); Text("المبلغ").frame(width: 90); Text("ملكي؟").frame(width: 38); Text("رسائله").frame(width: 55) }.font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).padding(.vertical, 8)
+            HStack { Text("الحساب").frame(maxWidth: .infinity, alignment: .leading); Text("المبلغ").frame(width: 90); Text("ملكي؟").frame(width: 38); Text("في المجموع").frame(width: 55).lineLimit(1).minimumScaleFactor(0.85) }.font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).padding(.vertical, 8)
             ForEach(r.rows) { row in
                 HStack(spacing: 5) {
                     Circle().fill(tint(row)).frame(width: 7, height: 7)
@@ -92,7 +92,7 @@ struct MoneyAccountsView: View {
                         VStack(alignment: .leading, spacing: 2) { Text(row.name).font(.custom("thmanyahserifdisplay-Bold", size: 18, relativeTo: .headline)); Text(row.amountMinor == nil ? "لم يُعرف رصيدها بعد" : row.subtitle + (row.currency == app.string("core.currency") ? "" : "، " + row.currency)).font(MadarTypography.fine()).foregroundStyle(tint(row)) }.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                     }.accessibilityIdentifier("money-account-" + row.name)
                     Text(figure: row.amountMinor.map { (row.side == .cash ? "" : "(") + amount($0, currency: row.currency) + (row.side == .cash ? "" : ")") } ?? "—").font(.custom("thmanyahserifdisplay-Bold", size: 18, relativeTo: .headline)).foregroundStyle(row.counted ? theme.ink : theme.secondaryInk).frame(width: 90).strikethrough(!row.counted)
-                    Image(systemName: row.counted ? "checkmark.square" : "square").font(.system(size: 20)).foregroundStyle(row.counted ? theme.color("surplusText") : theme.secondaryInk).frame(width: 38).accessibilityLabel(row.counted ? "يُحتسب" : "خارج الحساب")
+                    Image(systemName: row.counted ? "checkmark" : "minus").font(.system(size: 15, weight: .semibold)).foregroundStyle(row.counted ? theme.color("surplusText") : theme.secondaryInk).frame(width: 38).accessibilityLabel(row.counted ? "يُحتسب" : "خارج الحساب")
                     Button { selectedSource = row } label: { VStack(spacing: 2) { Circle().fill(row.counted ? theme.color("surplusText") : theme.color("reserveText")).frame(width: 5, height: 5); Text(row.amountMinor == nil ? "مجهول" : row.counted ? "تُحتسب" : "تُتجاهل").font(MadarTypography.fine()) }.frame(width: 55, height: 44) }.accessibilityLabel("مصدر " + row.name).accessibilityIdentifier("money-account-source-" + row.name)
                 }.padding(.vertical, 8).padding(.horizontal, 8).frame(minHeight: 60)
                 .anchorPreference(key: MoneyAccountRowBounds.self, value: .bounds) { [row.id: $0] }
