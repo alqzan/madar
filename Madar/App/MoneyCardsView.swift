@@ -126,7 +126,7 @@ struct MoneyCardsView: View {
             } else {
                 Button { source = c.sources["statement"] } label: {
                     VStack(alignment: .leading, spacing: 5) {
-                        HStack { Text("الكشف المستحق").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk); Spacer(); if let due = c.due { Text(due == reading!.today ? "اليوم" : due < reading!.today ? "حلّ موعده" : "بعد " + service.days(MadarCalendarDays.distance(from: reading!.today, to: due))).font(MadarTypography.fine()).foregroundStyle(theme.color("reserveText")).padding(.horizontal, 10).padding(.vertical, 5).background(theme.color("reserve").opacity(0.14), in: Capsule()) } }
+                        HStack { Text("الكشف المستحق").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk); Spacer(); if let due = c.due { Text(due == reading!.today ? "اليوم" : due < reading!.today ? "حلّ موعده" : "بعد " + service.days(MadarCalendarDays.distance(from: reading!.today, to: due))).font(MadarTypography.fine()).foregroundStyle(theme.color("dueText")).padding(.horizontal, 10).padding(.vertical, 5).background(theme.color("dueText").opacity(0.1), in: Capsule()) } }
                         HStack(alignment: .lastTextBaseline) {
                             Text(c.close == nil ? "لم يصل كشف" : amount(c.billedMinor)).font(.custom("thmanyahserifdisplay-Black", size: 40, relativeTo: .largeTitle)).foregroundStyle(c.close == nil ? theme.ink : theme.color("debt")).accessibilityIdentifier("money-card-billed")
                             Spacer()
@@ -169,14 +169,14 @@ struct MoneyCardsView: View {
         VStack(alignment: .leading, spacing: 8) {
             GeometryReader { proxy in
                 let scale = max(1, c.limitMinor ?? c.owedMinor), billed = min(1, Double(c.billedMinor) / Double(scale)), unbilled = min(1 - billed, Double(c.unbilledMinor) / Double(scale))
-                HStack(spacing: 2) { Rectangle().fill(theme.color("reserveText")).frame(width: visible ? proxy.size.width * billed : 0); Rectangle().fill(theme.color("bills")).frame(width: visible ? proxy.size.width * unbilled : 0); Rectangle().fill(theme.line) }.clipShape(.capsule)
+                HStack(spacing: 2) { Rectangle().fill(c.close == nil ? theme.color("reserveText") : theme.color("debt")).frame(width: visible ? proxy.size.width * billed : 0); Rectangle().fill(theme.color("bills")).frame(width: visible ? proxy.size.width * unbilled : 0); Rectangle().fill(theme.line) }.clipShape(.capsule)
             }.frame(height: 12).accessibilityHidden(true)
             HStack(spacing: 10) {
-                swatch(theme.color("reserveText"), "كشف", nil)
+                swatch(c.close == nil ? theme.color("reserveText") : theme.color("debt"), "كشف", nil)
                 swatch(theme.color("bills"), "غير مفوتر", c.unbilledMinor > 0 ? amount(c.unbilledMinor) : nil)
                 if let limit = c.limitMinor { swatch(theme.line, "متاح", amount(max(0, limit - c.owedMinor))) }
                 Spacer(minLength: 4)
-                Button { source = c.sources["limitMinor"] } label: { Text(visible ? CardPlanning.utilisationBp(owedMinor: c.owedMinor, limitMinor: c.limitMinor).map { percent($0) + " من الحد" } ?? "الحد غير معروف" : "•••").bold().foregroundStyle(theme.color("reserveText")) }.buttonStyle(.plain)
+                Button { source = c.sources["limitMinor"] } label: { Text(visible ? CardPlanning.utilisationBp(owedMinor: c.owedMinor, limitMinor: c.limitMinor).map { percent($0) + " من الحد" } ?? "الحد غير معروف" : "•••").bold().foregroundStyle(c.close == nil ? theme.color("reserveText") : theme.color("dueText")) }.buttonStyle(.plain)
             }.font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
         }
     }
