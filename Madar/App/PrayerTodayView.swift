@@ -2451,6 +2451,15 @@ private struct PrayerNightLoggingSheet: View {
         }
     }
 
+    /// «وجه مستحق»، «وجهان مستحقان»، «٣ أوجه مستحقة»، «١١ وجهًا مستحقًا».
+    private func duePhrase(_ n: Int) -> String {
+        switch n {
+        case 1: "وجه مستحق"
+        case 2: "وجهان مستحقان"
+        case 3...10: formatter.string(n) + " أوجه مستحقة"
+        default: formatter.string(n) + " وجهًا مستحقًا"
+        }
+    }
     /// OR-08: the Quran room owns the wird; this sheet only reads tonight's board. Due pages read in qiyam count as review there.
     private func loadWird() {
         let service = AppQuranService(session: session)
@@ -2462,7 +2471,7 @@ private struct PrayerNightLoggingSheet: View {
         }
         let due = board.assignments.filter { $0.status == "مستحق" }.count
         wird = (due > 0
-            ? "في ركعاتك " + QuranDayCloseCopy.faces(due, digits: formatter) + " مستحقة من مراجعتك؛ ما تقرؤه منها يُحتسب من وردك."
+            ? "في ركعاتك " + duePhrase(due) + " من مراجعتك؛ ما تقرؤه منها يُحتسب من وردك."
             : "تقرأ في ركعاتك من محفوظك، ويُسجَّل في سجل القرآن.", false)
     }
 
