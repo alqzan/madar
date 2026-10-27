@@ -2355,6 +2355,7 @@ private struct PrayerNightLoggingSheet: View {
     @State private var witr: Bool
     @State private var confirmRestore = false
     @State private var contentHeight: CGFloat = 520
+    @State private var wird: (line: String, logged: Bool)?
     @Environment(\.roomTheme) private var theme
     @Environment(\.dynamicTypeSize) private var typeSize
     init(session: AppSession, snapshot: PrayerSnapshot, finished: @escaping () -> Void) {
@@ -2399,13 +2400,29 @@ private struct PrayerNightLoggingSheet: View {
             }
             .frame(minHeight: 76)
             divider
-            Toggle("أوترتُ", isOn: $witr).toggleStyle(PrayerPillToggleStyle()).padding(.top, 14).accessibilityIdentifier("prayer-qiyam-witr")
+            // S6: «أوترتُ» and the wird link side by side; the line beneath says what tonight's reading gives the Quran room.
+            let showWird = selectedNight == snapshot.nightDefault && !restoreNeeded && wird != nil
+            HStack(spacing: 10) {
+                Toggle("أوترتُ", isOn: $witr).toggleStyle(PrayerPillToggleStyle()).accessibilityIdentifier("prayer-qiyam-witr")
+                if showWird, wird?.logged == false {
+                    Button { finished(); session.open(URL(string: "madar://quran/session/qiyam")!) } label: {
+                        HStack(spacing: 8) {
+                            Text("ورد القيام من محفوظك").font(PrayerHomeType.strong).lineLimit(1).minimumScaleFactor(0.8)
+                            Spacer(minLength: 4)
+                            Image(systemName: "chevron.forward").font(.system(size: 13, weight: .semibold)).foregroundStyle(theme.secondaryInk)
+                        }
+                        .padding(.horizontal, 16).frame(maxWidth: .infinity, minHeight: 50)
+                        .overlay { Capsule().stroke(theme.ink.opacity(0.14), lineWidth: 1) }.contentShape(.capsule)
+                    }
+                    .buttonStyle(.plain).accessibilityIdentifier("prayer-quran-qiyam")
+                }
+            }.padding(.top, 14)
+            if showWird, let line = wird?.line {
+                Text(line).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 8).accessibilityIdentifier("prayer-qiyam-wird-line")
+            }
             footprintStrip.padding(.top, 18)
             Text("آخر ثلاثين ليلة · ليست سلسلة تنكسر، أثرٌ يُرى").font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk).padding(.top, 10)
-            if selectedNight == snapshot.nightDefault && !restoreNeeded && hasQuranCoverage {
-                Button("ورد القيام من محفوظك") { finished(); session.open(URL(string: "madar://quran/session/qiyam")!) }
-                    .font(PrayerHomeType.strong).frame(maxWidth: .infinity, minHeight: 44).accessibilityIdentifier("prayer-quran-qiyam").padding(.top, 8)
-            }
             if restoreNeeded {
                 Text("سبق التراجع عن تسجيل هذه الليلة. يمكنك إعادة تسجيلها صراحة.").font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk).padding(.top, 14)
                 primary("أعد تسجيل الليلة", id: "prayer-qiyam-restore") { confirmRestore = true }.padding(.top, 8)
@@ -2426,13 +2443,28 @@ private struct PrayerNightLoggingSheet: View {
         .confirmationDialog("أعد تسجيل هذه الليلة؟", isPresented: $confirmRestore, titleVisibility: .visible) {
             Button("أعد التسجيل") { save(restoring: true) }
         } message: { Text("يعود تسجيل الركعات والوتر لهذه الليلة؛ يبقى أثر التراجع محفوظًا.") }
+        .onAppear { loadWird() }
+        .onChange(of: rakaat) { _, _ in loadWird() }
         .onChange(of: selectedNight) { _, night in
             let previous = snapshot.nights.first { $0.night == night }
             rakaat = previous?.rakaat ?? 0; witr = previous?.witr ?? false
         }
     }
 
-    private var hasQuranCoverage: Bool { (try? AppQuranService(session: session).snapshot().coverage.completedPages.isEmpty) == false }
+    /// OR-08: the Quran room owns the wird; this sheet only reads tonight's board. Due pages read in qiyam count as review there.
+    private func loadWird() {
+        let service = AppQuranService(session: session)
+        guard (try? service.snapshot().coverage.completedPages.isEmpty) == false,
+              let board = try? service.qiyamBoard(rakaat: max(2, rakaat)) else { wird = nil; return }
+        if let unavailable = board.unavailable {
+            wird = unavailable.hasPrefix("سُجّل") ? ("قرأت ورد هذه الليلة في قيامك، واحتُسبت أوجهه من مراجعتك في القرآن.", true) : nil
+            return
+        }
+        let due = board.assignments.filter { $0.status == "مستحق" }.count
+        wird = (due > 0
+            ? "في ركعاتك " + QuranDayCloseCopy.faces(due, digits: formatter) + " مستحقة من مراجعتك؛ ما تقرؤه منها يُحتسب من وردك."
+            : "تقرأ في ركعاتك من محفوظك، ويُسجَّل في سجل القرآن.", false)
+    }
 
     private var divider: some View { Rectangle().fill(theme.ink.opacity(0.1)).frame(height: 1) }
 

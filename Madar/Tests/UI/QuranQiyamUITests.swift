@@ -17,7 +17,10 @@ import XCTest
         continueAfterFailure=false
         let app=launch();XCTAssertTrue(app.staticTexts["quran-coverage-title"].waitForExistence(timeout:25));app.tabBars.buttons["الصلاة"].tap()
         for _ in 0..<8 {if app.buttons["prayer-qiyam"].isHittable {break};app.swipeUp()};app.buttons["prayer-qiyam"].tap()
-        XCTAssertTrue(app.buttons["prayer-quran-qiyam"].waitForExistence(timeout:10));app.buttons["prayer-quran-qiyam"].tap()
+        XCTAssertTrue(app.buttons["prayer-quran-qiyam"].waitForExistence(timeout:10))
+        // OR-08: the sheet says what tonight's reading gives the wird before it hands over to the Quran room.
+        let line=app.staticTexts["prayer-qiyam-wird-line"];XCTAssertTrue(line.exists && (line.label.contains("وردك") || line.label.contains("سجل القرآن")),app.debugDescription);capture(app,"OR-08-qiyam-sheet-L")
+        app.buttons["prayer-quran-qiyam"].tap()
         XCTAssertTrue(app.buttons["quran-qiyam-start"].waitForExistence(timeout:15));capture(app,"M2-V17-prayer-link-L")
     }
     private func capture(_ app:XCUIApplication,_ name:String) {let a=XCTAttachment(screenshot:app.screenshot());a.name=name;a.lifetime = .keepAlways;add(a)}
