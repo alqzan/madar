@@ -33,7 +33,11 @@ extension AppQuranService {
         let groups = Dictionary(grouping: value.completedOn.values.filter { $0 <= today }, by: { $0 }).sorted { $0.key < $1.key }
         var total = 0
         var points: [QuranUIJourneyPoint] = []
-        if let first { points.append(QuranUIJourneyPoint(id: "start", day: first, remaining: 604)) }
+        // Pages held without a completion day (imported or marked as already memorised) are held from the start,
+        // and the line starts on the earliest day anything happened, so it never jumps vertically.
+        total = completed - groups.reduce(0) { $0 + $1.value.count }
+        // A day-one bulk (memorisation marked when the plan began) is where the line starts, not a cliff.
+        if let start = [first, groups.first?.key].compactMap({ $0 }).min(), groups.first?.key != start { points.append(QuranUIJourneyPoint(id: "start", day: start, remaining: 604 - max(0, total))) }
         for group in groups { total += group.value.count; points.append(QuranUIJourneyPoint(id: group.key.description, day: group.key, remaining: 604 - total)) }
         if points.last?.day != today { points.append(QuranUIJourneyPoint(id: "today", day: today, remaining: 604 - completed)) }
         let activeDays = Set(value.activities.filter { $0.countsForStreak && $0.dayKey <= today }.map(\.dayKey)).sorted()

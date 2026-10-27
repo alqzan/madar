@@ -19,7 +19,7 @@ struct QuranJourneyView: View {
                     QuranPaperCard {
                         VStack(alignment: .leading, spacing: 12) {
                             Text("رحلة الحفظ").font(quranFont(17, bold: true))
-                            Text("أوجه القرآن الباقية").font(quranFont(12)).foregroundStyle(theme.secondaryInk)
+                            Text("ما في صدرك من القرآن، والختمة في الأعلى").font(quranFont(12)).foregroundStyle(theme.secondaryInk)
                             journeyChart(value)
                             MadarDateLabel("بالخطة: " + value.planned).font(quranFont(13, bold: true))
                             MadarDateLabel("بوتيرتك: " + value.actual).font(quranFont(13, bold: true)).accessibilityIdentifier("quran-journey-forecast")
@@ -63,26 +63,62 @@ struct QuranJourneyView: View {
             }
             .fullScreenCover(isPresented: Binding(get: { reader != nil }, set: { if !$0 { reader = nil } })) { QuranMushafView(service: service, initialPage: reader ?? page, close: { reader = nil }) }
     }
+    /// Canonical «رحلة الحفظ»: the line climbs from the first day (right) towards the khatma (top left); quarter rules
+    /// are named, the area held is shaded, and each juz still ahead is a gold bead on the dashed estimate.
     private func journeyChart(_ v: QuranUIJourney) -> some View {
         VStack(spacing: 8) {
             Canvas { context, size in
-                let firstDay = v.points.first?.day, end = v.forecastDay ?? v.points.last?.day
-                let length = max(1, firstDay.flatMap { f in end.map { f.quranDistance(to: $0) } } ?? 1)
-                func point(_ p: QuranUIJourneyPoint) -> CGPoint { CGPoint(x: size.width * (1 - CGFloat(firstDay?.quranDistance(to: p.day) ?? 0) / CGFloat(length)), y: (1 - CGFloat(p.remaining) / 604) * size.height) }
-                for n in [0, 151, 302, 453, 604] {
-                    let y = (1 - CGFloat(n) / 604) * size.height
-                    var line = Path(); line.move(to: CGPoint(x: 0, y: y)); line.addLine(to: CGPoint(x: size.width, y: y)); context.stroke(line, with: .color(theme.line), lineWidth: 0.6)
+                // As in the design, the days so far fill the right half and the estimate the left, so a short past is never squeezed.
+                let firstDay = v.points.first?.day, today = v.points.last?.day
+                let past = max(1, firstDay.flatMap { f in today.map { f.quranDistance(to: $0) } } ?? 1)
+                let pastWidth = v.forecastDay == nil ? size.width : size.width / 2
+                let top: CGFloat = 14, height = size.height - top
+                func y(_ remaining: Int) -> CGFloat { top + CGFloat(remaining) / 604 * height }
+                func point(_ p: QuranUIJourneyPoint) -> CGPoint { CGPoint(x: size.width - pastWidth * CGFloat(firstDay?.quranDistance(to: p.day) ?? 0) / CGFloat(past), y: y(p.remaining)) }
+                for (n, name) in [(0, "الختمة"), (151, "ثلاثة أرباع"), (302, "النصف"), (453, "الربع")] {
+                    var line = Path(); line.move(to: CGPoint(x: 0, y: y(n))); line.addLine(to: CGPoint(x: size.width, y: y(n)))
+                    context.stroke(line, with: .color(theme.line), style: StrokeStyle(lineWidth: 0.7, dash: [3, 3]))
+                    context.draw(Text(name).font(quranFont(10)).foregroundStyle(theme.secondaryInk), at: CGPoint(x: 2, y: y(n) - 7), anchor: .leading)
                 }
+                guard let firstPoint = v.points.first, let last = v.points.last else { return }
                 var path = Path()
                 for (i, p) in v.points.enumerated() { if i == 0 { path.move(to: point(p)) } else { path.addLine(to: point(p)) } }
-                context.stroke(path, with: .color(theme.color("review")), lineWidth: 2)
-                if let last = v.points.last {
-                    let p = point(last); context.fill(Path(ellipseIn: CGRect(x: p.x - 4, y: p.y - 4, width: 8, height: 8)), with: .color(theme.color("review")))
-                    context.draw(Text("اليوم").font(quranFont(11)).foregroundStyle(theme.secondaryInk), at: CGPoint(x: min(max(p.x, 18), size.width - 18), y: min(size.height - 16, p.y + 14)))
-                    if v.forecastDay != nil { var tail = Path(); tail.move(to: p); tail.addLine(to: CGPoint(x: 0, y: size.height)); context.stroke(tail, with: .color(theme.color("hifz")), style: StrokeStyle(lineWidth: 2, dash: [4, 4])) }
+                var area = path; area.addLine(to: CGPoint(x: point(last).x, y: size.height)); area.addLine(to: CGPoint(x: point(firstPoint).x, y: size.height)); area.closeSubpath()
+                context.fill(area, with: .color(theme.color("reviewTint")))
+                context.stroke(path, with: .color(theme.color("review")), style: StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round))
+                let now = point(last)
+                if v.forecastDay != nil {
+                    let goal = CGPoint(x: 0, y: top)
+                    var tail = Path(); tail.move(to: now); tail.addLine(to: goal)
+                    context.stroke(tail, with: .color(theme.color("review").opacity(0.7)), style: StrokeStyle(lineWidth: 1.6, dash: [4, 4]))
+                    // One bead per juz still ahead, placed where the estimate crosses its page count.
+                    let held = 604 - last.remaining
+                    for juz in 1...30 where Double(juz) * 604 / 30 > Double(held) + 4 {
+                        let t = (Double(juz) * 604 / 30 - Double(held)) / Double(max(1, last.remaining))
+                        let c = CGPoint(x: now.x + (goal.x - now.x) * t, y: now.y + (goal.y - now.y) * t)
+                        context.fill(Path(ellipseIn: CGRect(x: c.x - 3.5, y: c.y - 3.5, width: 7, height: 7)), with: .color(theme.color("hifz")))
+                    }
                 }
-            }.frame(height: 150).accessibilityLabel("تبقّى " + service.faceCount(v.remaining) + " من القرآن")
-            HStack { Text("البداية"); Spacer(); Text("تقدير").foregroundStyle(theme.color("hifzText")) }.font(quranFont(11)).foregroundStyle(theme.secondaryInk)
+                context.fill(Path(ellipseIn: CGRect(x: now.x - 8, y: now.y - 8, width: 16, height: 16)), with: .color(theme.surface))
+                context.stroke(Path(ellipseIn: CGRect(x: now.x - 8, y: now.y - 8, width: 16, height: 16)), with: .color(theme.color("review")), lineWidth: 2)
+                context.fill(Path(ellipseIn: CGRect(x: now.x - 5, y: now.y - 5, width: 10, height: 10)), with: .color(theme.color("review")))
+            }.frame(height: 200).accessibilityLabel("تبقّى " + service.faceCount(v.remaining) + " من القرآن")
+            HStack {
+                Text(v.first); Spacer()
+                Text("اليوم، " + service.faceCount(604 - v.remaining)).font(quranFont(11, bold: true)).foregroundStyle(theme.ink); Spacer()
+                Text(v.forecastDay == nil ? "الختمة" : "الختمة تقديرًا")
+            }.font(quranFont(11)).foregroundStyle(theme.secondaryInk)
+            HStack(spacing: 14) {
+                legend("في صدرك") { Capsule().fill(theme.color("review")).frame(width: 16, height: 3) }
+                if v.forecastDay != nil {
+                    legend("تقدير بوتيرتك") { Capsule().fill(theme.color("review").opacity(0.7)).frame(width: 5, height: 3); Capsule().fill(theme.color("review").opacity(0.7)).frame(width: 5, height: 3) }
+                    legend("تمام جزء") { Circle().fill(theme.color("hifz")).frame(width: 7, height: 7) }
+                }
+                Spacer(minLength: 0)
+            }.font(quranFont(11)).foregroundStyle(theme.secondaryInk).accessibilityHidden(true)
         }
+    }
+    private func legend<Mark: View>(_ text: String, @ViewBuilder mark: () -> Mark) -> some View {
+        HStack(spacing: 5) { HStack(spacing: 2) { mark() }; Text(text) }
     }
 }
