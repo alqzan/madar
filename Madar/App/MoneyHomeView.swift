@@ -95,19 +95,21 @@ struct MoneyHomeView: View {
         return hawl.daysLeft == 0 ? "حولك اليوم" : "حولك بعد " + service.days(hawl.daysLeft)
     }
     private func drawer(_ title: String, _ symbol: String, _ id: String, fact: String? = nil, action: @escaping () -> Void) -> some View {
+        // OR-22 (owner: a smoother bottom section): a light chip, icon beside the name, half the old drawer's height.
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 8) {
-                Image(systemName: symbol).font(.system(size: 18, weight: .regular)).foregroundStyle(theme.color("reserveText"))
-                Text(title).font(MadarTypography.body()).lineLimit(2).minimumScaleFactor(0.85).multilineTextAlignment(.leading)
-                if let fact { Text(fact).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).lineLimit(1).minimumScaleFactor(0.85) }
-                // The drawer's brass pull.
-                Capsule().fill(theme.color("reserveText").opacity(0.55)).frame(width: 22, height: 3).frame(maxWidth: .infinity).accessibilityHidden(true)
+            HStack(spacing: 10) {
+                Image(systemName: symbol).font(.system(size: 16, weight: .regular)).foregroundStyle(theme.color("reserveText")).frame(width: 22)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title).font(MadarTypography.body()).lineLimit(1).minimumScaleFactor(0.8)
+                    if let fact { Text(fact).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).lineLimit(1).minimumScaleFactor(0.85) }
+                }
+                Spacer(minLength: 0)
             }
-            .padding(.horizontal, 14).padding(.top, 14).padding(.bottom, 10)
-            .frame(maxWidth: .infinity, minHeight: 92, alignment: .topLeading)
-            .background(theme.surface, in: .rect(cornerRadius: 14))
-            .overlay { RoundedRectangle(cornerRadius: 14).stroke(theme.color("reserveText").opacity(0.45), lineWidth: 1) }
-            .contentShape(.rect(cornerRadius: 14))
+            .padding(.horizontal, 12).padding(.vertical, 8)
+            .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading)
+            .background(theme.surface.opacity(0.7), in: .rect(cornerRadius: 12))
+            .overlay { RoundedRectangle(cornerRadius: 12).stroke(theme.color("reserveText").opacity(0.25), lineWidth: 0.8) }
+            .contentShape(.rect(cornerRadius: 12))
         }.buttonStyle(.plain).accessibilityLabel(title).accessibilityValue(fact ?? "").accessibilityIdentifier(id)
     }
     var body: some View {
