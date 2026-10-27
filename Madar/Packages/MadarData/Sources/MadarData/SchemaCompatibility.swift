@@ -22,6 +22,7 @@ enum SchemaCompatibility {
         case 9: MadarSchemaV9.syncedNames
         case 10: MadarSchemaV10.syncedNames
         case 11: MadarSchemaV11.syncedNames
+        case 12: MadarSchemaV12.syncedNames
         case MadarSchema.version: MadarSchema.syncedNames
         default: throw version > MadarSchema.version ? DataError.newerStore : DataError.unsupportedBackup
         }
@@ -73,6 +74,8 @@ enum SchemaCompatibility {
             if version < 11, row.model == "UpcomingDay" { row.fields["countUpAfter"] = .bool(false) }
             // V12: a habit time recorded before the diary link has none.
             if version < 12, row.model == "HabitEvent", row.fields["entryID"] == nil { row.fields["entryID"] = .null }
+            // V13: every trip recorded before multi-country legs is its own journey.
+            if version < 13, row.model == "Trip", row.fields["journeyID"] == nil { row.fields["journeyID"] = .null }
             return row
         }
     }

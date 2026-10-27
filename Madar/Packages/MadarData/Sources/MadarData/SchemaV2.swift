@@ -6,7 +6,7 @@ public enum MadarSchemaV2: VersionedSchema {
     public static let versionIdentifier = Schema.Version(2, 0, 0)
     // Pin the complete v2 inventory here; later models belong only to later schemas.
     public static let syncedTypes: [any PersistentModel.Type] = [
-        Setting.self, LayoutState.self, Preset.self, Trip.self, MadarFrozenUpcomingDayV10.UpcomingDay.self, ImportBatch.self, ImportLink.self,
+        Setting.self, LayoutState.self, Preset.self, MadarFrozenTripV12.Trip.self, MadarFrozenUpcomingDayV10.UpcomingDay.self, ImportBatch.self, ImportLink.self,
         PrayerLog.self, QadaItem.self, QiyamNight.self, HifzPlan.self, HifzSession.self, PageGrade.self,
         MistakeSpot.self, MistakeEvent.self, QuranDayState.self, QuranAllotment.self, RecoveryPlan.self,
         DayPage.self, Niyya.self, MadarFrozenDiaryV7.Entry.self, HiddenAutoLine.self, MarginNote.self, Letter.self, Project.self,

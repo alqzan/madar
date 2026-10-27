@@ -262,7 +262,7 @@ import Testing
     @Test func test_M0S1_RA4_originalV1ArchiveMapsOnlyAfterAuthentication() throws {
         let bytes = try Data(contentsOf:resources.appendingPathComponent("source-v1.madarbackup"))
         let backup = try BackupCodec.validate(bytes,passphrase:"legacy fixture password")
-        #expect(MadarSchema.version == 12)
+        #expect(MadarSchema.version == 13)
         #expect(backup.records.contains { $0.model == "MoneyTransaction" })
         #expect(!backup.records.contains { $0.model == "Transaction" })
         let expected = try expectedRows().filter { MadarSchema.syncedNames.contains($0.model) }
@@ -285,7 +285,7 @@ import Testing
     @Test func test_M0S1_RA4_originalSQLiteIsAdoptedWithoutLosingAnyRow() throws {
         let base = try fixtureDirectory(); defer { try? FileManager.default.removeItem(at:base) }
         let managed = try ManagedDataStore.adoptLegacy(from:base.appendingPathComponent("Flat"),at:base.appendingPathComponent("Managed"))
-        #expect(MadarSchema.version == 12)
+        #expect(MadarSchema.version == 13)
         #expect(try RecordFingerprint.hash(RecordBridge.all(managed.container.mainContext,syncedOnly:false)) == RecordFingerprint.hash(expectedRows()))
         #expect(try managed.container.mainContext.fetchCount(FetchDescriptor<DeviceSetting>()) == 2)
         #expect(try managed.container.mainContext.fetchCount(FetchDescriptor<CommandReceipt>()) == 1)
@@ -552,6 +552,58 @@ import Testing
     }
 
     /// Owner-approved 25 Oct: V12 adds an optional diary link to HabitEvent; V11 habit times keep every field and get none.
+    /// Owner-approved 26 Oct (OR-09): V13 adds optional Trip.journeyID; every V12 trip keeps its fields and stays its own journey.
+    @Test func schemaV12UpgradeKeepsTripsAsSingleJourneysAndReopen() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("MadarV13-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let oldID = UUID(), generation = root.appendingPathComponent("Generations/\(oldID.uuidString)")
+        try FileManager.default.createDirectory(at: generation, withIntermediateDirectories: true)
+        let openID = UUID(), closedID = UUID(), stamp = Date(timeIntervalSince1970: 1_797_000_000)
+        var before: [DataRecord] = []
+        do {
+            let old = try ModelContainer(for: MadarSchemaV12.schema, configurations: [
+                ModelConfiguration("synced", schema: Schema(MadarSchemaV12.syncedTypes), url: generation.appendingPathComponent("Madar.store"), cloudKitDatabase: .none),
+                ModelConfiguration("deviceOnly", schema: Schema(MadarSchemaV12.deviceTypes), url: root.appendingPathComponent("Device.store"), cloudKitDatabase: .none)])
+            old.mainContext.autosaveEnabled = false
+            for id in [openID, closedID] {
+                let row = MadarFrozenTripV12.Trip()
+                row.id = id; row.city = id == openID ? "Istanbul" : "Cairo"; row.country = id == openID ? "TR" : "EG"
+                row.currency = id == openID ? "TRY" : "EGP"; row.fxRateToHome = "0.1"; row.lat = 41.0; row.lon = 29.0; row.tzID = "Europe/Istanbul"
+                row.mode = "manual"; row.start = stamp; row.end = id == closedID ? stamp.addingTimeInterval(86_400) : nil; row.homeKm = 2_100
+                row.createdAt = stamp; row.updatedAt = stamp; row.writerID = "synthetic-v12"
+                old.mainContext.insert(row)
+                let shape = Trip(); shape.id = id; shape.city = row.city; shape.country = row.country; shape.currency = row.currency
+                shape.fxRateToHome = row.fxRateToHome; shape.lat = row.lat; shape.lon = row.lon; shape.tzID = row.tzID; shape.mode = row.mode
+                shape.start = row.start; shape.end = row.end; shape.homeKm = row.homeKm
+                shape.createdAt = stamp; shape.updatedAt = stamp; shape.writerID = row.writerID
+                var record = try shape.record(); record.fields.removeValue(forKey: "journeyID"); before.append(record)
+            }
+            try old.mainContext.save()
+        }
+        try DurableFiles.encode(12, to: generation.appendingPathComponent("SchemaVersion.json"))
+        try DurableFiles.encode(1, to: root.appendingPathComponent("DeviceSchemaVersion.json"))
+        try DurableFiles.encode(GenerationReady(version: 1, generationID: oldID, recordsHash: RecordFingerprint.hash(before), createdAt: stamp), to: generation.appendingPathComponent("GenerationReady.json"))
+        try DurableFiles.encode(ManagedPointer(version: 1, generationID: oldID, previousGenerationID: nil, accountHash: nil, cloudKitContainerIdentifier: nil), to: root.appendingPathComponent("ActiveGeneration.json"))
+        let sourceHash = try stableGenerationHashes(generation)
+        let upgraded = try ManagedDataStore(root: root)
+        #expect(upgraded.binding.generationID != oldID)
+        #expect(try stableGenerationHashes(generation) == sourceHash)
+        #expect(try MadarContainerFactory.storeVersionForAdoption(at: upgraded.binding.syncedDirectory) == MadarSchema.version)
+        let rows = try upgraded.container.mainContext.fetch(FetchDescriptor<Trip>())
+        #expect(rows.count == 2 && rows.allSatisfy { $0.journeyID == nil && $0.fxRateToHome == "0.1" && $0.homeKm == 2_100 })
+        #expect(rows.first { $0.id == openID }?.end == nil && rows.first { $0.id == closedID }?.currency == "EGP")
+        let expected = try SchemaCompatibility.currentRecords(before, from: 12)
+        #expect(try RecordFingerprint.hash(RecordBridge.all(upgraded.container.mainContext)) == RecordFingerprint.hash(expected))
+        let reopened = try ManagedDataStore(root: root)
+        #expect(reopened.binding.generationID == upgraded.binding.generationID)
+        let leg = try #require(reopened.container.mainContext.fetch(FetchDescriptor<Trip>()).first { $0.id == openID })
+        leg.journeyID = closedID; try reopened.container.mainContext.save()
+        let sealed = try BackupCodec.export(records: RecordBridge.all(reopened.container.mainContext), passphrase: "synthetic journey password")
+        let checked = try BackupCodec.validate(sealed, passphrase: "synthetic journey password")
+        #expect(checked.records.first { $0.id == openID }?.fields["journeyID"] == .string(closedID.uuidString))
+        #expect(checked.records.first { $0.id == closedID }?.fields["journeyID"] == .null)
+        #expect(try stableGenerationHashes(generation) == sourceHash)
+    }
     @Test func schemaV11UpgradeKeepsHabitTimesWithoutADiaryLinkAndReopen() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("MadarV12-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -587,7 +639,7 @@ import Testing
         let upgraded = try ManagedDataStore(root: root)
         #expect(upgraded.binding.generationID != oldID)
         #expect(try stableGenerationHashes(generation) == sourceHash)
-        #expect(try MadarContainerFactory.storeVersionForAdoption(at: upgraded.binding.syncedDirectory) == 12)
+        #expect(try MadarContainerFactory.storeVersionForAdoption(at: upgraded.binding.syncedDirectory) == MadarSchema.version)
         let rows = try upgraded.container.mainContext.fetch(FetchDescriptor<HabitEvent>())
         #expect(rows.count == 2 && rows.allSatisfy { $0.entryID == nil && $0.habitID == habitID && $0.delta == 1 })
         #expect(rows.first { $0.id == liveID }?.dayKey == "2026-02-23")

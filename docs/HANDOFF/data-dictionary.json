@@ -347,6 +347,13 @@
      "type": "Double?",
      "optional": true,
      "unit": "km"
+    },
+    {
+      "name": "journeyID",
+      "type": "UUID?",
+      "optional": true,
+      "default": null,
+      "note": "Owner-approved 26 Oct 2026 (OR-09, multi-country trips): a later leg of one trip points to the first leg's id; nil on the first or only leg. Journey key = journeyID ?? id. Never backfilled."
     }
    ]
   },
@@ -5954,5 +5961,5 @@
    "execution": "Immediately on press, within undo window"
   }
  },
- "storeSchemaVersion": 12
+ "storeSchemaVersion": 13
 }
