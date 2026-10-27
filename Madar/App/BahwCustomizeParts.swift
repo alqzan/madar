@@ -70,6 +70,19 @@ struct BahwCustomizePreview: View {
             Text(value).font(MadarTypography.caption().bold()).lineLimit(2).fixedSize(horizontal: false, vertical: true)
         }
     }
+    /// DA-09: each tile in its own card's colours, as W4 draws them (Quran's green cover, money's blue, the diary's clay).
+    private func tileColours(_ block: BahwBlock) -> (fill: Color, ink: Color) {
+        let dark = colorScheme == .dark
+        switch block {
+        case .habits: return (lobby.surface, lobby.accent)
+        case .salah: let t = RoomTheme(room: "salah", dark: dark); return (t.surface, t.accent)
+        case .quran: let t = RoomTheme(room: "quran", dark: dark); return (t.color("cover"), t.color("gold"))
+        case .mal: let t = RoomTheme(room: "mal", dark: dark); return (MadarToken.colors["widgetIdentity.room.mal.\(dark ? "dark" : "light").bg"] ?? t.surface, t.accent)
+        case .notes: let t = RoomTheme(room: "notes", dark: dark); return (t.accentFill, t.onAccent)
+        case .mihbara: let t = RoomTheme(room: "mihbara", dark: dark); return (t.accentFill.opacity(0.14), t.accent)
+        default: return (lobby.color(block.tone).opacity(0.16), lobby.ink)
+        }
+    }
     /// A small phone drawn with the same packing as the lobby (`BahwGrid.pack`).
     private var miniLobby: some View {
         let visible = layout.visible, placements = BahwGrid.pack(visible.map { ($0.rawValue, layout.size($0)) })
@@ -79,9 +92,10 @@ struct BahwCustomizePreview: View {
                 let gap: CGFloat = 4, unit = (geometry.size.width - 3 * gap) / 4
                 ForEach(Array(zip(visible, placements)), id: \.0) { block, place in
                     let w = CGFloat(place.size.columns) * unit + CGFloat(place.size.columns - 1) * gap, h = CGFloat(place.size.rows) * unit + CGFloat(place.size.rows - 1) * gap
-                    RoundedRectangle(cornerRadius: 7).fill(lobby.color(block.tone).opacity(0.16))
+                    let tile = tileColours(block)
+                    RoundedRectangle(cornerRadius: 7).fill(tile.fill)
                         .overlay { RoundedRectangle(cornerRadius: 7).stroke(lobby.line) }
-                        .overlay { if place.size != .icon { Text(block.title).font(.custom("thmanyahsans-Bold", size: 11, relativeTo: .caption2)).foregroundStyle(lobby.ink).lineLimit(1).padding(2) } }
+                        .overlay { if place.size != .icon { Text(block.title).font(.custom("thmanyahsans-Bold", size: 11, relativeTo: .caption2)).foregroundStyle(tile.ink).lineLimit(1).padding(2) } }
                         .frame(width: w, height: h)
                         .position(x: CGFloat(place.column) * (unit + gap) + w / 2, y: CGFloat(place.row) * (unit + gap) + h / 2)
                 }
