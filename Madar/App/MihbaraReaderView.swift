@@ -571,13 +571,15 @@ struct MihbaraReaderView: View {
             .accessibilityIdentifier("mihbara-reader-footer-value")
     }
 
+    /// The design's focus pill (`11-R9-Qari-Tarkiz`): a wide soft capsule, the previous paragraph on the right, the next
+    /// on the left, the mode named between them.
     private var focusControls: some View {
         GlassEffectContainer(spacing: 8) {
-            HStack(spacing: 12) {
+            HStack(spacing: 18) {
                 Button { stepFocus(-1) } label: {
                     Image(systemName: "chevron.up")
-                        .font(.system(size: 13, weight: .semibold))
-                        .frame(width: 36, height: 34)
+                        .font(.system(size: 17, weight: .regular))
+                        .frame(width: 48, height: 48)
                         .contentShape(.capsule)
                 }
                 .buttonStyle(.plain)
@@ -585,14 +587,20 @@ struct MihbaraReaderView: View {
                 .accessibilityValue(focusPositionLabel ?? "")
                 .accessibilityIdentifier("mihbara-focus-previous")
 
-                Text("وضع التركيز")
-                    .font(MadarTypography.caption().weight(.semibold))
-                    .fixedSize()
+                VStack(spacing: 2) {
+                    Text("وضع التركيز")
+                        .font(.custom("thmanyahsans-Bold", size: 15, relativeTo: .subheadline))
+                    if let focusPositionLabel {
+                        Text(focusPositionLabel).font(MadarTypography.fine()).foregroundStyle(palette.ink2)
+                            .contentTransition(.numericText())
+                    }
+                }
+                .fixedSize()
 
                 Button { stepFocus(1) } label: {
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 13, weight: .semibold))
-                        .frame(width: 36, height: 34)
+                        .font(.system(size: 17, weight: .regular))
+                        .frame(width: 48, height: 48)
                         .contentShape(.capsule)
                 }
                 .buttonStyle(.plain)
@@ -601,13 +609,14 @@ struct MihbaraReaderView: View {
                 .accessibilityIdentifier("mihbara-focus-next")
             }
             .foregroundStyle(palette.ink)
-            .padding(.horizontal, 7)
-            .padding(.vertical, 5)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 6)
+            .background(Capsule().fill(paper.opacity(palette.isDark ? 0.82 : 0.9)))
             .glassEffect(.regular.interactive(), in: Capsule())
-            .overlay { Capsule().stroke(palette.line.opacity(0.8), lineWidth: 0.7) }
-            .shadow(color: .black.opacity(palette.isDark ? 0.22 : 0.12), radius: 15, y: 5)
+            .shadow(color: .black.opacity(palette.isDark ? 0.26 : 0.1), radius: 22, y: 8)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("mihbara-focus-controls")
+            .sensoryFeedback(.selection, trigger: focusPositionLabel)
         }
     }
 
@@ -2395,6 +2404,7 @@ private struct MihbaraEPUBNavigator: UIViewControllerRepresentable {
                 }, null);
               };
               let focusTargetSequence = 0;
+              let focusStepLockUntil = 0;
               const scrollFocusBlock = (block, behavior) => {
                 if (!block.id) block.id = 'madar-focus-target-' + (++focusTargetSequence);
                 // Readium owns the EPUB scroll surface. Its locator helper reaches the right
@@ -2428,6 +2438,9 @@ private struct MihbaraEPUBNavigator: UIViewControllerRepresentable {
                 // At the chapter edge Swift turns to the next or previous chapter and focus continues there.
                 if (!next) return direction > 0 ? 'edge:next' : 'edge:previous';
                 const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+                // The step is the reader's choice: the scroll it starts must not hand focus to whichever paragraph
+                // passes the middle on the way.
+                focusStepLockUntil = Date.now() + 900;
                 scrollFocusBlock(next, behavior);
                 return setFocusBlock(next, blocks);
               };
@@ -2507,7 +2520,7 @@ private struct MihbaraEPUBNavigator: UIViewControllerRepresentable {
               };
               let focusFrame = 0;
               document.addEventListener('scroll', () => {
-                if (!document.body?.dataset.madarFocus || focusFrame) return;
+                if (!document.body?.dataset.madarFocus || focusFrame || Date.now() < focusStepLockUntil) return;
                 focusFrame = requestAnimationFrame(() => {
                   focusFrame = 0;
                   const blocks = focusBlocks();
@@ -3388,12 +3401,12 @@ enum MihbaraReaderTheme: String, CaseIterable, Identifiable {
             let h = theme.hex, root = ":root[style*=\"\(h.bg)\"]"
             return "\(root) body span.madar-ayah.madar-ayah.madar-ayah { color: \(h.verse) !important; font-family: 'MadarHafs', serif !important; font-size: 1.12em !important; line-height: inherit; } "
                 + "\(root) body a[role~='doc-noteref'][role~='doc-noteref'] { background: \(h.accent) !important; color: \(h.onAccent) !important; }"
-                + "\(root) body[data-madar-focus='true'] .madar-focus-block { color: \(h.ink2) !important; } "
-                + "\(root) body[data-madar-focus='true'] .madar-focus-block.madar-focus-active { color: \(h.ink) !important; }"
+                + "\(root) body[data-madar-focus='true'] .madar-focus-block { color: \(h.ink2) !important; opacity: .34; } "
+                + "\(root) body[data-madar-focus='true'] .madar-focus-block.madar-focus-active { color: \(h.ink) !important; opacity: 1; }"
                 + "\(root) body[data-madar-focus='true'] { padding-bottom: 8rem !important; } "
                 + "\(root) body .madar-focus-block.madar-speech-active { background-color: \(h.highlight[1]) !important; border-radius: .32em; box-decoration-break: clone; -webkit-box-decoration-break: clone; } "
                 + "\(root) body .madar-focus-block.madar-auto-scroll-active { background-color: \(h.highlight[1]) !important; border-radius: .32em; box-decoration-break: clone; -webkit-box-decoration-break: clone; } "
-                + "@media (prefers-reduced-motion: no-preference) { \(root) body[data-madar-focus='true'] .madar-focus-block { transition: color .18s ease; } }"
+                + "@media (prefers-reduced-motion: no-preference) { \(root) body[data-madar-focus='true'] .madar-focus-block { transition: color .22s ease, opacity .22s ease; } }"
         }.joined(separator: "\n")
     }
 }
