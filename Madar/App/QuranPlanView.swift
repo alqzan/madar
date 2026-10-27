@@ -22,16 +22,16 @@ struct QuranPlanView: View {
                     let forecasts = overview.day == currentDay ? overview.forecasts : [:]
                     QuranPaperCard {
                         VStack(spacing: 0) {
-                            levelRow("درجة الحفظ المعتادة", key: "quran.hifzLevel")
+                            levelRow("درجة الحفظ المعتادة", key: "quran.hifzLevel", dot: "hifz")
                             line; levelRow("درجة المراجعة المعتادة", key: "quran.reviewLevel")
                             line
                             if let p = overview.input {
-                                row("وحدة خطة الحفظ", detail: QuranPlanCopy.amount(p, digits: service.numerals))
+                                row("وحدة خطة الحفظ", detail: QuranPlanCopy.amount(p, digits: service.numerals), dot: "hifz")
                                 line; row("وتيرة المراجعة المعتادة", detail: p.rhythm.title)
                                 line
                             }
-                            choiceRow("يوم الراحة", key: "quran.restDay", options: QuranUIRestDays.days + [("none","بلا")])
-                            line; choiceRow("التذكير", key: "quran.wirdReminder", options: [("afterFajr","بعد الفجر"),("afterAsr","بعد العصر"),("afterIsha","بعد العشاء"),("off","بلا")])
+                            choiceRow("يوم الراحة", key: "quran.restDay", options: QuranUIRestDays.days + [("none","بلا")], dot: nil)
+                            line; choiceRow("التذكير", key: "quran.wirdReminder", options: [("afterFajr","بعد الفجر"),("afterAsr","بعد العصر"),("afterIsha","بعد العشاء"),("off","بلا")], dot: nil)
                             line; choiceRow("جدول المراجعة", key: "quran.reviewSchedule", options: [("spaced","متباعدة"),("fixedJuzDaily","جزء يوميًا"),("fixedManzilWeekly","المنازل الأسبوعية")])
                         }
                     }
@@ -44,10 +44,20 @@ struct QuranPlanView: View {
                                 Text(forecasts[level]?.title ?? (overview.day == currentDay ? "—" : "نحسب موعدك")).font(quranSerif(29)).accessibilityIdentifier("quran-plan-forecast")
                                 if let secondary = forecasts[level]?.secondaryDate { Text(secondary).font(quranFont(12)).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("quran-plan-forecast-secondary") }
                                 Text(forecasts[level]?.assumptions ?? "").font(quranFont(11)).foregroundStyle(theme.secondaryInk)
+                                if let days = forecasts[level]?.estimatedDays { Text("بعد " + span(days)).font(quranFont(13, bold: true)).accessibilityIdentifier("quran-plan-span") }
+                                // Each level as the time it would take, a length the user can picture; the chosen level's date is above in both calendars.
+                                let longest = CGFloat(max(1, forecasts.values.compactMap(\.estimatedDays).max() ?? 1))
                                 ForEach(QuranUILevel.allCases) { item in
-                                    HStack { Text(item.title).font(quranFont(12, bold: item.id == level)).frame(width: 48, alignment: .leading)
-                                        Capsule().fill(theme.color("hifz").opacity(item.id == level ? 1 : 0.4)).frame(width: 150 * CGFloat(forecasts[item.id]?.estimatedDays ?? 0) / CGFloat(max(1, forecasts.values.compactMap(\.estimatedDays).max() ?? 1)), height: 4)
-                                        Spacer(minLength: 4); VStack(alignment: .trailing, spacing: 2) { Text(forecasts[item.id]?.title ?? "—").font(quranFont(12)); if let secondary = forecasts[item.id]?.secondaryDate { Text(secondary).font(quranFont(11)).foregroundStyle(theme.secondaryInk) } } }
+                                    HStack(spacing: 10) {
+                                        Text(item.title).font(quranFont(12, bold: item.id == level)).frame(width: 48, alignment: .leading)
+                                        GeometryReader { proxy in
+                                            ZStack(alignment: .leading) {
+                                                Capsule().fill(theme.color("hifzTint"))
+                                                Capsule().fill(theme.color("hifz").opacity(item.id == level ? 1 : 0.45)).frame(width: proxy.size.width * CGFloat(forecasts[item.id]?.estimatedDays ?? 0) / longest)
+                                            }
+                                        }.frame(height: 6)
+                                        Text(forecasts[item.id]?.estimatedDays.map(span) ?? "—").font(quranFont(12, bold: item.id == level)).frame(width: 82, alignment: .trailing)
+                                    }.accessibilityElement(children: .combine)
                                 }
                                 if let warning = forecasts[level]?.warning { Text(warning).font(quranFont(13)).foregroundStyle(theme.color("dueText")) }
                                 Text(input.startAyah == 1 ? "ختم القرآن يتطلّب اكتمال الأوجه كلها، والفجوات معها." : "هذا موعد نطاق خطّتك؛ ختم القرآن لا يكون إلا بحفظ الأوجه كلها.").font(quranFont(12)).foregroundStyle(theme.secondaryInk)
@@ -90,10 +100,23 @@ struct QuranPlanView: View {
         }
     }
     private var line: some View { Divider().overlay(theme.line) }
-    private func row(_ title: String, detail: String) -> some View { HStack { Circle().fill(theme.color("review")).frame(width: 5, height: 5); Text(title).font(quranFont(13, bold: true)); Spacer(); Text(detail).font(quranFont(12)).foregroundStyle(theme.secondaryInk) }.frame(minHeight: 46) }
-    private func levelRow(_ title: String, key: String) -> some View { choiceRow(title, key: key, options: QuranUILevel.allCases.map { ($0.id,$0.title) }) }
-    private func choiceRow(_ title: String, key: String, options: [(String,String)]) -> some View {
-        Menu { ForEach(options, id: \.0) { value, label in Button(label) { app.set(.string(value), key: key) }.accessibilityIdentifier("quran-plan-option-" + key + "-" + value) } } label: { row(title, detail: options.first { $0.0 == app.string(key) }?.1 ?? "—") }.accessibilityIdentifier("quran-plan-" + key)
+    /// «نحو ١٣ شهرًا»; under two months the days themselves.
+    private func span(_ days: Int) -> String {
+        if days < 60 { return service.dayCount(days) }
+        let months = Int((Double(days) / 30.44).rounded()), n = service.numerals.string(months)
+        return "نحو " + (months == 2 ? "شهرين" : (3...10).contains(months) ? n + " أشهر" : n + " شهرًا")
+    }
+    /// As in the design, each row's dot says what it governs: gold memorisation, green review, ink for the day itself.
+    private func row(_ title: String, detail: String, dot: String? = "review", chevron: Bool = false) -> some View {
+        HStack {
+            Circle().fill(dot.map { theme.color($0) } ?? theme.secondaryInk).frame(width: 7, height: 7)
+            Text(title).font(quranFont(13, bold: true)); Spacer(); Text(detail).font(quranFont(12)).foregroundStyle(theme.secondaryInk)
+            if chevron { Image(systemName: "chevron.left").font(.system(size: 11, weight: .semibold)).foregroundStyle(theme.secondaryInk).accessibilityHidden(true) }
+        }.frame(minHeight: 46)
+    }
+    private func levelRow(_ title: String, key: String, dot: String = "review") -> some View { choiceRow(title, key: key, options: QuranUILevel.allCases.map { ($0.id,$0.title) }, dot: dot) }
+    private func choiceRow(_ title: String, key: String, options: [(String,String)], dot: String? = "review") -> some View {
+        Menu { ForEach(options, id: \.0) { value, label in Button(label) { app.set(.string(value), key: key) }.accessibilityIdentifier("quran-plan-option-" + key + "-" + value) } } label: { row(title, detail: options.first { $0.0 == app.string(key) }?.1 ?? "—", dot: dot, chevron: true) }.accessibilityIdentifier("quran-plan-" + key)
     }
     private func load(at instant: Date? = nil) { do { overview = try service.planOverview(at: instant); error = nil } catch { self.error = quranUserMessage(error) } }
     private func run(_ work: @escaping @MainActor () async throws -> Void) { guard !busy else { return }; busy = true; Task { defer { busy = false }; do { try await work() } catch { self.error = quranUserMessage(error) } } }
