@@ -131,11 +131,16 @@ struct MoneyObligationsView: View {
                             Text("الراتب القادم").font(.custom("thmanyahsans-Bold", size: 11, relativeTo: .caption2)).fixedSize().foregroundStyle(theme.color("surplusText"))
                             Circle().fill(theme.color("surplus")).frame(width: 12, height: 12).padding(.leading, 6)
                         }.frame(width: 90, alignment: .leading).offset(x: x(length) - 12, y: 9)
-                        let levels = lanternLevels(r.cycle.map { x(MadarCalendarDays.distance(from: r.cycleStart, to: $0.due)) })
+                        // OR-24 (owner: a clearer timeline): close dues fan out sideways first, each on a short slanted string
+                        // from its real day, and neighbours alternate between two heights as in the design.
+                        let trueX = r.cycle.map { x(MadarCalendarDays.distance(from: r.cycleStart, to: $0.due)) }
+                        let shownX = spread(trueX, gap: 44, low: 37, high: proxy.size.width - 37)
+                        let levels = lanternLevels(shownX)
                         ForEach(Array(r.cycle.enumerated()), id: \.element.id) { index, due in
-                            let day = MadarCalendarDays.distance(from: r.cycleStart, to: due.due)
+                            Path { p in p.move(to: CGPoint(x: trueX[index], y: 31)); p.addLine(to: CGPoint(x: shownX[index], y: 41)) }
+                                .stroke(theme.color("reserveText"), lineWidth: 1)
                             Button { withAnimation(.easeOut(duration: 0.2)) { selected = due.id } } label: { lantern(due, drop: 14 + CGFloat(levels[index]) * 76, active: current(r)?.id == due.id) }
-                                .buttonStyle(.plain).frame(width: 74).offset(x: x(day) - 37, y: 31)
+                                .buttonStyle(.plain).frame(width: 74).offset(x: shownX[index] - 37, y: 31)
                                 // Higher lanterns sit above the strings of the ones hanging below them.
                                 .zIndex(-Double(levels[index]))
                                 .accessibilityIdentifier("money-obligation-lantern-" + due.name)
@@ -145,17 +150,33 @@ struct MoneyObligationsView: View {
             }
         }
     }
-    /// Lanterns closer than one label's width hang one row lower, so no two labels overlap.
+    /// Lanterns still closer than one label's width hang one row lower, so no two labels overlap.
     private func lanternLevels(_ xs: [CGFloat]) -> [Int] {
-        var lastX: [CGFloat] = []
-        return xs.map { x in
-            if let free = lastX.firstIndex(where: { abs($0 - x) >= 76 }) { lastX[free] = x; return free }
-            lastX.append(x); return lastX.count - 1
+        // In order along the thread, so close neighbours alternate rows instead of piling up.
+        var lastX: [CGFloat] = [], levels = Array(repeating: 0, count: xs.count)
+        for index in xs.indices.sorted(by: { xs[$0] < xs[$1] }) {
+            let x = xs[index]
+            if let free = lastX.firstIndex(where: { abs($0 - x) >= 76 }) { lastX[free] = x; levels[index] = free }
+            else { lastX.append(x); levels[index] = lastX.count - 1 }
         }
+        return levels
+    }
+    /// Pushes neighbouring positions apart to at least `gap`, keeping their order and staying inside the thread.
+    private func spread(_ xs: [CGFloat], gap: CGFloat, low: CGFloat, high: CGFloat) -> [CGFloat] {
+        let order = xs.indices.sorted { xs[$0] < xs[$1] }
+        var v = order.map { min(high, max(low, xs[$0])) }
+        for _ in 0..<40 {
+            for i in v.indices.dropFirst() where v[i] - v[i - 1] < gap { let push = (gap - (v[i] - v[i - 1])) / 2; v[i - 1] -= push; v[i] += push }
+            for i in v.indices { v[i] = min(high, max(low, v[i])) }
+        }
+        var result = xs
+        for (k, index) in order.enumerated() { result[index] = v[k] }
+        return result
     }
     private func threadDepth(_ r: MoneyObligationsReading) -> Int {
         let length = max(1, MadarCalendarDays.distance(from: r.cycleStart, to: r.cycleEnd)), w: CGFloat = 340
-        return lanternLevels(r.cycle.map { CGFloat(MadarCalendarDays.distance(from: r.cycleStart, to: $0.due)) / CGFloat(length) * w }).max() ?? 0
+        let xs = r.cycle.map { w - CGFloat(MadarCalendarDays.distance(from: r.cycleStart, to: $0.due)) / CGFloat(length) * w + 12 }
+        return lanternLevels(spread(xs, gap: 44, low: 37, high: w + 24 - 37)).max() ?? 0
     }
     private func lantern(_ due: MoneyObligationDue, drop: CGFloat, active: Bool) -> some View {
         let tint = color(due.group), outline = due.group == .statement
