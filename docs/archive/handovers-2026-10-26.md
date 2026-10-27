@@ -53,3 +53,12 @@
 - **Owner to decide (repo):** 16 merged local branches and 20 extra worktrees (three with uncommitted changes) can be removed; ~58 GB in `Madar/Artifacts` and three DerivedData roots; whether `Madar/docs/CORE.md`, `DATA.md`, `SYNC.md` go to the archive. Nothing deleted.
 - **Not verified:** owner iPhone; review page in a real browser click-through.
 - **Model/effort:** claude-opus-5-5, not exposed; four Haiku + two Sonnet read-only helpers. **Usage:** weekly ~94% at handover.
+
+## Handover — التخصيص وصانع الودجة — 2026-10-27 — Codex
+- **Works now:** OR-01 افتراضي العادات عريض مع حفظ الأحجام المخصصة (`8628d96`). OR-03: ترتيب/إخفاء أجزاء الغرف، مستويات الذكاء المعتمدة، نطاق العادات المعتمد، وصانع X3 يحفظ ودجات مسماة ويعرض المختارة للبهو ويصدر قوالب JSON للنظام. ضغطة العادة من الودجة/Siri تحفظ يومها عند تأخر التصريف. العمل على `codex/bahw-owner-review`؛ لم يُدمج في main.
+- **Verified:** `xcodebuild ... test` على iPhone 17 Pro/iOS 26.5: final X3 4/4 (`codex-x3-verified-final-r1.xcresult`)، النطاق 4/4، X3 والبهو/التخصيص 5/5، الذكاء والبهو 3/3، محررو الغرف والبهو 2/2؛ أسماء الحزم والحدود في OR-03. `swift test --package-path Madar/Packages/MadarCommands --filter WidgetConfigPersistenceTests` 3/3؛ اختبار inbox القديم 1/1؛ `swift test --package-path Madar/Packages/MadarSnapshots --filter WidgetCatalogTests` 1/1. `git diff --check` ونسخ المخطط والبروتوكول متطابقة.
+- **Differences left:** W1 يحافظ على ترتيب بقية كتل الغرف المعتمد؛ W4/X3 يحتاجان مطابقة بصرية أدق (بطاقات «ودجاتي» المصغرة، الزجاج، مواضع التمرير والكروم). المقارنات W1 2/2 وW4 3/3 وX3 4/4؛ صور X3 النهائية في `Artifacts/codex-x3-verified-final-shots/` والبهو الصغير في `codex-x3-final-shots/`.
+- **Not verified:** اختيار القالب وتسجيل العادة من ودجة موضوعة فعليًا عبر النظام، جهاز المالك، iOS 27، CloudKit أو التوقيع/الإصدار. امتداد الودجة بُني، واختبارات inbox محلية؛ ليست إثباتًا لتشغيل زر النظام. لا بيانات مالك خاصة استُخدمت.
+- **Next:** OR-02 مرشح المدار محفوظ وغير مطبق في `Artifacts/codex-or02-full-orbit-candidate.patch` بعد محاولتي الإصلاح: الاختبار يضغط صفًا خارج الشاشة (`HabitsUITests.swift:159`)، فيحتاج تمرير الصف فوق الملحق قبل اللمس. أكمل المطابقة البصرية لـ OR-03 ثم OR-04؛ تفاصيل المصدر والاختبارات في الصفوف. قرارات الحجم والذكاء والنطاق أُجيبت وسُجلت؛ لا تُسأل ثانية.
+- **Model/effort:** Codex، غير مكشوف / غير مكشوف؛ مساعد Luna للقراءة فقط ومراجعة حذف محدودة واحدة، بلا لمس للمحاكي أو بيانات المالك.
+- **Usage:** آخر قياس قبل الالتزام والتسليم: 93٪ مستخدم من نافذة خمس ساعات و55٪ أسبوعيًا؛ لا بدء عمل جديد، والاحتياطي للالتزام والتسليم فقط.

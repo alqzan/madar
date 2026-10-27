@@ -4,7 +4,7 @@ import MadarCore
 import MadarData
 import MadarMoney
 
-/// M5-V19 / RM5: the account rules the intake, `money.saveAccount`, «الحسابات» share.
+/// M5-V19 / RM5: the account rules the intake, `money.saveAccount`, `money.removeAccount` and «الحسابات» share.
 @MainActor public enum MoneyAccountRules {
     /// RM5: a message belongs to an account when its sender is the account's bank (or one of its sender names) and the
     /// message names the account's last 4 digits.
@@ -22,6 +22,14 @@ import MadarMoney
         return try context.fetch(FetchDescriptor<MoneyTransaction>()).contains { row in
             row.fromAccountID == id || row.toAccountID == id || row.cardID.map(cards.contains) == true
         }
+    }
+
+    /// An account can be removed only when nothing ever referred to it: no movement (live or undoable), no
+    /// reconciliation, no card (a linked card's debt would drop out of «عليك») and no sub-account.
+    public static func removable(_ id: UUID, in context: ModelContext) throws -> Bool {
+        if try hasMovements(id, in: context) { return false }
+        if try context.fetch(FetchDescriptor<Card>()).contains(where: { $0.accountID == id }) { return false }
+        return try !context.fetch(FetchDescriptor<Account>()).contains { $0.parentID == id && live($0) }
     }
 
     /// Two live accounts at one bank with the same last 4 would both stop matching their messages (intake needs one match).

@@ -19,6 +19,7 @@ import XCTest
         let name = app.textFields["money-account-name"]; XCTAssertTrue(name.waitForExistence(timeout: 5))
         XCTAssertFalse(app.switches["money-account-owned"].isEnabled)
         XCTAssertFalse(app.textFields["money-account-opening"].isEnabled)
+        XCTAssertFalse(app.buttons["money-account-remove"].exists, "Movements refer to it: it cannot be removed")
         shot(app, "M5-V19-checkpoint-L")
         app.buttons["money-account-editor-close"].tap()
         app.buttons["money-account-source-الحساب الجاري"].tap()
@@ -35,6 +36,29 @@ import XCTest
         XCTAssertTrue(app.buttons["money-account-حساب الأسرة"].waitForExistence(timeout: 10)); XCTAssertEqual(net.label, before)
         let undo = app.buttons["تراجع"]; XCTAssertTrue(undo.waitForExistence(timeout: 5)); undo.tap()
         XCTAssertFalse(app.buttons["money-account-حساب الأسرة"].exists); XCTAssertEqual(net.label, before)
+    }
+    /// Item 34: an account added by mistake is removed from its sheet after a confirmation, and the toast brings it back.
+    func testUnusedAccountRemovesWithConfirmationAndUndo() {
+        continueAfterFailure = false
+        let app = open("accounts")
+        app.buttons["money-accounts-add"].tap()
+        let field = app.textFields["money-account-name"]; XCTAssertTrue(field.waitForExistence(timeout: 5)); field.tap(); field.typeText("حساب زائد")
+        let bank = app.textFields["money-account-bank"]; bank.tap(); bank.typeText("مصرف الاختبار")
+        app.buttons["money-account-keyboard-done"].tap()
+        let save = app.buttons["money-account-save"]; for _ in 0..<5 where !save.isHittable { app.swipeUp(velocity: .slow) }; save.tap()
+        let row = app.buttons["money-account-حساب زائد"]; XCTAssertTrue(row.waitForExistence(timeout: 10), app.debugDescription)
+        for _ in 0..<6 where !row.isHittable { app.swipeUp(velocity: .slow) }
+        row.tap()
+        let remove = app.buttons["money-account-remove"]
+        XCTAssertTrue(remove.waitForExistence(timeout: 5), app.debugDescription)
+        for _ in 0..<5 where !remove.isHittable { app.swipeUp(velocity: .slow) }
+        shot(app, "M5-V19-remove-L"); remove.tap()
+        let confirm = app.buttons.matching(identifier: "money-account-remove-confirm"); XCTAssertTrue(confirm.firstMatch.waitForExistence(timeout: 5), app.debugDescription)
+        shot(app, "M5-V19-remove-confirm-L"); confirm.firstMatch.tap()
+        XCTAssertTrue(row.waitForNonExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["حُذف الحساب"].waitForExistence(timeout: 5), app.debugDescription)
+        let undo = app.buttons["تراجع"]; XCTAssertTrue(undo.waitForExistence(timeout: 5)); undo.tap()
+        XCTAssertTrue(row.waitForExistence(timeout: 10), app.debugDescription)
     }
     func testWrappedAccountNamesAndScrolledRoots() {
         continueAfterFailure = false

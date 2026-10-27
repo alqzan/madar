@@ -836,7 +836,7 @@ final class AppSession {
             // A confirmed spend can cross a category's 80% line (M5-V10); re-plan room reminders through the one arbiter.
             Task { await refreshPrayerNotifications() }
         }
-        if let token = result.undoToken { showUndo(.init(id: token, expiresAt: now.addingTimeInterval(600)), message: name == "money.confirmSalary" ? "فُتحت الدورة" : name == "money.logExpense" ? "سُجّل المصروف" : name == "money.deleteTransaction" ? "حُذفت الحركة" : "حُفظ التغيير") }
+        if let token = result.undoToken { showUndo(.init(id: token, expiresAt: now.addingTimeInterval(600)), message: name == "money.confirmSalary" ? "فُتحت الدورة" : name == "money.logExpense" ? "سُجّل المصروف" : name == "money.deleteTransaction" ? "حُذفت الحركة" : name == "money.removeAccount" ? "حُذف الحساب" : "حُفظ التغيير") }
     }
 
     func executeBookCommand(_ name: String, payload: [String: MadarCore.JSONValue], id: UUID = UUID(), undoMessage: String = "حُفظ في المحبرة") async throws {

@@ -15,6 +15,7 @@ struct MoneyAccountSheet: View {
     @State private var senders: String
     @State private var saving = false
     @State private var failure: String?
+    @State private var confirmingRemoval = false
     @FocusState private var editing: Bool
     private var service: AppMoneyService { .init(app: app) }
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
@@ -57,6 +58,19 @@ struct MoneyAccountSheet: View {
                     field("أسماء مرسلي رسائل البنك، اسم في كل سطر") { TextField("أسماء المرسل", text: $senders, axis: .vertical).lineLimit(2...5).focused($editing).accessibilityIdentifier("money-account-senders") }
                     if let failure { Text(failure).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")) }
                     Button(action: save) { Text(saving ? "جارٍ الحفظ…" : "احفظ الحساب").font(MadarTypography.cardTitle()).frame(maxWidth: .infinity, minHeight: 54).background(theme.ink).foregroundStyle(theme.background) }.disabled(saving || draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || (!draft.openingKnown && balance.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)).accessibilityIdentifier("money-account-save")
+                    // Item 34: an account entered by mistake goes, while nothing refers to it; the toast offers undo.
+                    if !original.isNew && original.removable {
+                        Button(role: .destructive) { confirmingRemoval = true } label: {
+                            Label("احذف هذا الحساب", systemImage: "trash").font(MadarTypography.caption())
+                                .foregroundStyle(theme.color("dueText")).frame(maxWidth: .infinity, minHeight: 48)
+                        }
+                        .disabled(saving)
+                        .accessibilityIdentifier("money-account-remove")
+                        .confirmationDialog("حذف «\(original.name)»؟", isPresented: $confirmingRemoval, titleVisibility: .visible) {
+                            Button("احذف الحساب", role: .destructive, action: remove).accessibilityIdentifier("money-account-remove-confirm")
+                            Button("إلغاء", role: .cancel) {}
+                        } message: { Text("لا حركات ولا بطاقات عليه، فلا يتغيّر شيء من أرقامك سوى رصيد بدايته. يمكنك التراجع بعد الحذف.") }
+                    }
                 }.padding(20)
             }.scrollDismissesKeyboard(.interactively).background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.plain)
                 .toolbar(.hidden, for: .navigationBar).toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تم") { editing = false }.accessibilityIdentifier("money-account-keyboard-done") } }
@@ -64,6 +78,13 @@ struct MoneyAccountSheet: View {
     }
     private func field<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 5) { Text(title).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk); content().font(MadarTypography.body()).padding(10).frame(minHeight: 44).overlay { Rectangle().stroke(theme.line, lineWidth: 1) } }
+    }
+    private func remove() {
+        saving = true; failure = nil
+        Task {
+            do { try await app.executeMoneyCommand("money.removeAccount", payload: ["id": .string(original.id.uuidString)]); dismiss() }
+            catch { saving = false; failure = "لم يُحذف الحساب؛ ربما صار عليه حركة أو بطاقة. أعد فتح الحساب لترى حاله." }
+        }
     }
     private func save() {
         guard !saving else { return }; editing = false

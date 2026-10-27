@@ -34,6 +34,8 @@ struct MoneyAccountEdit: Identifiable {
     var zakatInclude: Bool
     var fixedCheckpoint: Bool
     var openingKnown = true
+    /// Item 34: nothing ever referred to it (no movement, card, reconciliation or sub-account), so it may be removed.
+    var removable = false
 }
 struct MoneyAccountsReading {
     var rows: [MoneyAccountRow]
@@ -64,7 +66,8 @@ extension AppMoneyService {
             let source = AccountsTree.source(openingAt: a.balanceAt, reconciledAt: reconciliations.filter { $0.accountID == a.id }.map(\.at).max(), message: evidence)
             let edit = MoneyAccountEdit(id: a.id, isNew: false, name: a.name, bank: a.bank, last4: a.last4 ?? "", kind: a.kind, ownership: a.ownership,
                 currency: a.currency, openingMinor: a.balanceMinor, openingAt: a.balanceAt ?? now, senderIDs: a.senderIDs, tracked: a.tracked, zakatInclude: a.zakatInclude,
-                fixedCheckpoint: try MoneyAccountRules.hasMovements(a.id, in: context), openingKnown: a.balanceAt != nil)
+                fixedCheckpoint: try MoneyAccountRules.hasMovements(a.id, in: context), openingKnown: a.balanceAt != nil,
+                removable: try MoneyAccountRules.removable(a.id, in: context))
             rows.append(.init(id: "account:" + a.id.uuidString, accountID: a.id, name: a.name, subtitle: Self.accountKind(a.kind), amountMinor: a.balanceAt == nil ? nil : try? repo.accountBalance(a, at: now), currency: a.currency, side: .cash,
                 counted: a.ownership == "mine" && a.tracked && a.balanceAt != nil, messageCount: matching.count, source: source, edit: edit))
         }

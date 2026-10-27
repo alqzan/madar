@@ -1042,6 +1042,44 @@ import MadarInbox
         #expect(try await f.run("money.saveAccount", renamed).status == .applied)
         #expect(try ModelContext(f.container).fetch(FetchDescriptor<Account>()).first { $0.id == f.bank }?.balanceAt == nil, "Renaming a legacy account never invents a checkpoint")
     }
+    /// Item 34 / M5-V19: an account entered by mistake can be removed, only while nothing ever referred to it; one undo
+    /// brings it back. Its card, a movement (even an undoable tombstone), a reconciliation or a sub-account keep it.
+    @Test func removingAnUnusedAccountOnly() async throws {
+        let f = try MoneyFixture(); defer { f.clean() }; try await f.setup()
+        func account(_ id: UUID, last4: String) -> [String: MadarCore.JSONValue] {
+            ["id": .string(id.uuidString), "name": .string("حساب زائد"), "bank": .string("Bank"), "kind": .string("savings"),
+                "ownership": .string("mine"), "currency": .string("SAR"), "balanceMinor": .string("50000"), "balanceAt": .string("2026-10-14T00:00:00Z"), "last4": .string(last4)]
+        }
+        let spare = UUID(), before = try f.basis()
+        #expect(try await f.run("money.saveAccount", account(spare, last4: "7777")).status == .applied)
+        #expect(try f.basis().inAccountMinor == before.inAccountMinor + 50_000)
+        #expect(try await f.run("money.removeAccount", ["id": .string(spare.uuidString)], source: .shortcut).status != .applied, "App only")
+        let removal = UUID()
+        #expect(try await f.run("money.removeAccount", ["id": .string(spare.uuidString)], id: removal).status == .applied)
+        #expect(try ModelContext(f.container).fetch(FetchDescriptor<Account>()).first { $0.id == spare }?.deletedAt != nil, "A tombstone, not a hard delete")
+        #expect(try f.basis() == before, "Its opening balance leaves «لك فعلًا»")
+        #expect(try await f.run("money.removeAccount", ["id": .string(spare.uuidString)]).status == .rejected, "Already removed")
+        #expect(try await f.run("system.undo", ["undoToken": .string(removal.uuidString)]).status == .applied)
+        #expect(try ModelContext(f.container).fetch(FetchDescriptor<Account>()).first { $0.id == spare }?.deletedAt == nil)
+        #expect(try f.basis().inAccountMinor == before.inAccountMinor + 50_000)
+
+        // Removed, then a new account takes the same bank and last 4: the undo is refused rather than leave two matches.
+        let second = UUID()
+        #expect(try await f.run("money.removeAccount", ["id": .string(spare.uuidString)], id: second).status == .applied)
+        #expect(try await f.run("money.saveAccount", account(UUID(), last4: "7777")).status == .applied)
+        let refused = try? await f.run("system.undo", ["undoToken": .string(second.uuidString)])
+        #expect(refused?.status != .applied)
+        #expect(try ModelContext(f.container).fetch(FetchDescriptor<Account>()).first { $0.id == spare }?.deletedAt != nil)
+
+        // The fixture's current account carries cards; the cash wallet gains a movement: both stay.
+        #expect(try await f.run("money.removeAccount", ["id": .string(f.bank.uuidString)]).status == .rejected, "Cards refer to it")
+        #expect(try MoneyAccountRules.removable(f.cash, in: ModelContext(f.container)))
+        #expect(try await f.run("money.logExpense", ["amountMinor": .string("1500"), "currency": .string("SAR"), "fromAccountID": .string(f.cash.uuidString), "merchant": .string("مخبز")]).status == .applied)
+        #expect(try MoneyAccountRules.hasMovements(f.cash, in: ModelContext(f.container)))
+        #expect(try await f.run("money.removeAccount", ["id": .string(f.cash.uuidString)]).status == .rejected, "A movement refers to it")
+        #expect(!MoneyCommandPayload.validate(name: "money.removeAccount", payload: ["id": .string(spare.uuidString), "force": .bool(true)]))
+        #expect(!MoneyCommandPayload.validate(name: "money.removeAccount", payload: ["id": .string("not-a-uuid")]))
+    }
 
     @Test func trackedWalletTopUpLinksBothSidesWhileUntrackedTopUpStaysSpending() async throws {
         let tracked = try MoneyFixture(); defer { tracked.clean() }; try await tracked.setup()

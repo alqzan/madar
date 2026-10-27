@@ -205,6 +205,11 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
                 let row = Envelope(); row.name = "الاحتياطي"; row.role = "reserve"; row.targetMinor = amount; row.createdAt = now; context.insert(row); try touch(row, now, writer)
             }
         case "money.saveAccount": try saveAccount(p, context, now, writer)
+        case "money.removeAccount":
+            // Item 34 / M5-V19: only an account nothing ever referred to; a tombstone the app's undo restores.
+            guard let accountID = uuid(p, "id"), let row = try context.fetch(FetchDescriptor<Account>()).first(where: { $0.id == accountID && live($0) }) else { throw MoneyCommandError.missingRow }
+            guard try MoneyAccountRules.removable(accountID, in: context) else { throw MoneyCommandError.invalidReference }
+            try touch(row, now, writer, deleting: true)
         case "money.saveCard": try saveCard(p, context, now, writer)
         case "money.setCardCashback":
             // M5-V16: the cashback rate entered by hand; its source becomes «entered» (Card.fieldSourcesJSON).
@@ -1032,6 +1037,11 @@ private struct MoneyInverse: Codable { var v = 1; var before: [DataRecord]; var 
                 // A cycle opened by a salary stays once later movements or allocations were filed into it.
                 let referenceKeys = ["accountID", "fromAccountID", "toAccountID", "cardID", "relatedTransactionID", "cycleID", "obligationID"]
                 guard !dependencies.contains(where: { record in referenceKeys.contains { record.fields[$0]?.string == after.id.uuidString } }) else { throw MoneyCommandError.undoSuperseded }
+            }
+            // Bringing a removed account back must not leave two live accounts of one bank with the same last 4 (RM5).
+            if after.model == "Account", after.deletedAt != nil, let before = inverse.before.first(where: { recordKey($0) == recordKey(after) }), before.isLive,
+               try MoneyAccountRules.duplicateLast4(before.fields["last4"]?.string, bank: before.fields["bank"]?.string ?? "", excluding: before.id, in: context) {
+                throw MoneyCommandError.undoSuperseded
             }
         }
         for after in inverse.after {
