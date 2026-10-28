@@ -33,7 +33,15 @@ struct QuranSessionLogView: View {
                             Button { filter = key } label: { Text(title).font(quranFont(12, bold: filter == key)).frame(maxWidth: .infinity, minHeight: 44).foregroundStyle(filter == key ? theme.onAccent : theme.ink).background(filter == key ? theme.accent : theme.surface, in: Capsule()) }.buttonStyle(.plain).accessibilityIdentifier("quran-history-filter-" + key)
                         }
                     }
-                    if records.isEmpty { Text("لا جلسات مسجّلة").font(quranFont(15)).padding(20) }
+                    if records.isEmpty {
+                        // Audit 28 Oct: an empty filter is not an empty log.
+                        if filter != "all" {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("لا جلسات من هذا النوع بعد").font(quranFont(15))
+                                Button("اعرض الكل") { filter = "all" }.font(quranFont(14, bold: true)).frame(minHeight: 44).accessibilityIdentifier("quran-log-show-all")
+                            }.padding(20)
+                        } else { Text("لا جلسات مسجّلة بعد؛ تظهر هنا بعد أول حفظ أو مراجعة").font(quranFont(15)).padding(20) }
+                    }
                     let list = records
                     ForEach(Array(list.enumerated()), id: \.element.id) { index, record in
                         VStack(alignment: .leading, spacing: 8) {

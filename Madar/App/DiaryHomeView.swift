@@ -317,7 +317,15 @@ struct DiaryHomeView: View {
                     }.buttonStyle(.plain).accessibilityIdentifier("diary-recent-" + day.day.description)
                     if day.id != days.last?.id { Divider().overlay(theme.line) }
                 }
-                if days.isEmpty { Text("أيامك تبدأ من هنا.").font(DiaryType.writing).padding(24) }
+                // Audit 28 Oct: the empty card is the way in, not a line that points at nothing.
+                if days.isEmpty {
+                    Button { editor = .init(margin: nil) } label: {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("أيامك تبدأ من هنا.").font(DiaryType.writing)
+                            Label("اكتب سطر اليوم", systemImage: "pencil").font(DiaryType.label).foregroundStyle(theme.color("accentText"))
+                        }.frame(maxWidth: .infinity, alignment: .leading).padding(24).contentShape(.rect)
+                    }.buttonStyle(.plain).accessibilityIdentifier("diary-recent-empty-write")
+                }
             }.background(theme.surface, in: .rect(cornerRadius: 22)).overlay { RoundedRectangle(cornerRadius: 22).stroke(theme.line, lineWidth: 1) }
         }.accessibilityElement(children: .contain).accessibilityIdentifier("diary-recent-days")
     }

@@ -633,7 +633,8 @@ struct MihbaraHomeView: View {
                     .overlay { RoundedRectangle(cornerRadius: 5).stroke(theme.line, style: .init(lineWidth: 1, dash: [4,4])) }
                     .foregroundStyle(theme.ink)
                 if r.books.isEmpty {
-                    placeholder.accessibilityIdentifier("mihbara-empty-stand")
+                    // Audit 28 Oct: the dashed stand looks tappable, so it is: it adds the first book.
+                    Button { showingAddBook = true } label: { placeholder }.buttonStyle(.plain).accessibilityIdentifier("mihbara-empty-stand")
                 } else {
                     Button { if waiting > 0 { scrollTarget = "want" } else { showingAddBook = true } } label: { placeholder }
                         .buttonStyle(.plain)
