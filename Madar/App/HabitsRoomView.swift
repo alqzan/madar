@@ -240,7 +240,7 @@ struct HabitsRoomView: View {
         let group = active.filter { $0.summary.current?.rule.frequency == frequency }
         let rows = group.filter { !$0.paused && ($0.summary.current?.target ?? 0) > 0 }
         let done = rows.filter { $0.summary.current?.met == true }.count
-        let count = rows.isEmpty ? (group.isEmpty ? "لا عادات" : "لا استحقاق") : digits.string(done) + " من " + digits.string(rows.count)
+        let count = rows.isEmpty ? (group.isEmpty ? "لا عادات" : "لا شيء مستحق") : digits.string(done) + " من " + digits.string(rows.count)
         let title: String = switch frequency {
         case .daily: "اليوم"
         case .weekly: "الأسبوع"

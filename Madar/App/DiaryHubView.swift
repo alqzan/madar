@@ -165,7 +165,7 @@ struct DiaryHubView: View {
     private func photos(_ archive: DiaryArchiveSnapshot) -> some View {
         let days = archive.days.filter { !$0.photoIDs.isEmpty }
         return VStack(alignment: .leading, spacing: 14) {
-            if days.isEmpty { Text("صورك المحفوظة في اليوميات تظهر هنا.").font(DiaryType.writing).padding(.vertical, 24) }
+            if days.isEmpty { Text("لا صور بعد. أضف صورة إلى صفحة يومك لتظهر هنا.").font(DiaryType.writing).padding(.vertical, 24) }
             LazyVGrid(columns: [GridItem(.flexible()),GridItem(.flexible())], spacing: 14) {
                 ForEach(days) { day in
                     ForEach(day.photoIDs, id: \.self) { id in

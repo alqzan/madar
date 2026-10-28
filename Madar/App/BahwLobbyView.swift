@@ -198,7 +198,7 @@ struct BahwLobbyView: View {
             }
             .scrollContentBackground(.hidden).background(theme.background)
             .navigationTitle("الودجات المخفية").navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .topBarLeading) { Button("تم") { drawerOpen = false } } }
+            .toolbar { ToolbarItem(placement: .topBarLeading) { Button("تمّ") { drawerOpen = false } } }
         }.environment(\.roomTheme, theme).tint(theme.accent)
     }
 }
@@ -278,7 +278,7 @@ struct BahwBlockSheet: View {
                 }.padding(18)
             }.background(theme.background).foregroundStyle(theme.ink)
                 .navigationTitle(block.title).navigationBarTitleDisplayMode(.inline)
-                .toolbar { ToolbarItem(placement: .topBarLeading) { Button("تم") { dismiss() }.accessibilityIdentifier("bahw-sheet-done") } }
+                .toolbar { ToolbarItem(placement: .topBarLeading) { Button("تمّ") { dismiss() }.accessibilityIdentifier("bahw-sheet-done") } }
         }.environment(\.roomTheme, theme).tint(theme.accent).presentationDetents([.medium, .large])
     }
 }

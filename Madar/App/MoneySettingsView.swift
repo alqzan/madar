@@ -188,7 +188,7 @@ struct MoneySettingsView: View {
                 TextField("المبلغ بعملة البيت", text: $rawBigAmount).keyboardType(.decimalPad).focused($editing).accessibilityIdentifier("money-settings-big-amount")
                 saveButton("احفظ الحد", id: "big-save", enabled: MoneyAmountInput.minor(rawBigAmount, exponent: homeExponent).map { $0 > 0 && $0 <= 10000000000000 } == true) { app.set(.number(Double(MoneyAmountInput.minor(rawBigAmount, exponent: homeExponent) ?? 100000)), key: "mal.bigExpenseMinor") }
             }
-            else { Stepper(value: Binding(get: { Int(app.number("mal.bigExpenseDays")) }, set: { app.set(.number(Double($0)), key: "mal.bigExpenseDays") }), in: 2...8) { Text(service.digits.string(Int(app.number("mal.bigExpenseDays"))) + " يوميات") } }
+            else { Stepper(value: Binding(get: { Int(app.number("mal.bigExpenseDays")) }, set: { app.set(.number(Double($0)), key: "mal.bigExpenseDays") }), in: 2...8) { Text(arabicCount(Int(app.number("mal.bigExpenseDays")), ["يومية واحدة", "يوميتان", "يوميات", "يوميةً"], service.digits)) } }
             }
             if let threshold = service.bigExpenseThreshold(cycle: cycle) { Text("يفتح موجّه التوزيع من " + amount(threshold)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-settings-big-threshold") }
             else { note("حدّد اليومية أو الراتب، أو اختر مبلغًا ثابتًا.") }

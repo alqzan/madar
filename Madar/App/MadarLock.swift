@@ -192,7 +192,7 @@ struct PrivacyAuthorization {
             return .init(owner: identity, generation: generation, epoch: epoch, features: features)
         } catch {
             if currentAuth?.0 == id {
-                statusMessage = "لم يفتح Face ID. حاول مرة ثانية."
+                statusMessage = "لم يفتح Face ID. حاول مرة أخرى."
                 if !(error is PrivacyAuthorizationError) && !(error is CancellationError) { redactionFailed = true; covered = true; notify() }
             }
             throw error

@@ -103,7 +103,7 @@ struct QuranHomeView: View {
             VStack(alignment: .leading, spacing: 18) {
                 Text(step.title).font(serif(22))
                 Text(step.detail).font(bodyFont(14))
-                if let range = step.range { Text("الأوجه " + service.numerals.string(range.fromPage) + " إلى " + service.numerals.string(range.toPage)).font(bodyFont(13)).foregroundStyle(theme.secondaryInk) }
+                if let range = step.range { Text(pagesRange(range.fromPage, range.toPage)).font(bodyFont(13)).foregroundStyle(theme.secondaryInk) }
                 // §7.4: mistake locations are their own session entry, not only after the review step.
                 if step.kind == .drill, step.available, state?.draft == nil {
                     Button("ابدأ التدريب") { detail = nil; run { active = try await service.start(kind: .drill, stepID: step.id, range: nil, rakaat: nil, spotID: nil) } }
@@ -145,6 +145,13 @@ struct QuranHomeView: View {
         .fullScreenCover(isPresented: $showPlan, onDismiss: { run { try await refresh() } }) { QuranPlanView(service: service, close: { showPlan = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
         .fullScreenCover(isPresented: $showWeek) { QuranLogView(service: service, close: { showWeek = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
         .alert("تعذّر إتمام العملية", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) { Button("تمّ") { error = nil } } message: { Text(error ?? "") }
+    }
+    /// «الوجه ٥»، «الوجهان ٥ و٦»، «الأوجه ٥ إلى ٩»: a one- or two-page step is not «الأوجه».
+    private func pagesRange(_ from: Int, _ to: Int) -> String {
+        let n = service.numerals
+        if from == to { return "الوجه " + n.string(from) }
+        if to == from + 1 { return "الوجهان " + n.string(from) + " و" + n.string(to) }
+        return "الأوجه " + n.string(from) + " إلى " + n.string(to)
     }
     private func serif(_ size: CGFloat) -> Font { .custom("Amiri-Bold", size: size, relativeTo: size > 26 ? .largeTitle : .title2) }
     private func bodyFont(_ size: CGFloat, bold: Bool = false) -> Font { .custom(bold ? "thmanyahsans-Bold" : "thmanyahsans-Regular", size: size, relativeTo: .body) }
@@ -319,7 +326,7 @@ struct QuranHomeView: View {
                 HStack { Text("سجلّك").font(serif(22)); Spacer(); Button("الأسبوع") { showWeek = true }.font(bodyFont(13, bold: true)).frame(minHeight: 44).accessibilityIdentifier("quran-week-open") }
                 Text(state.history.weekSummary.first ?? "آخر أربعة عشر يومًا").font(bodyFont(13)).foregroundStyle(theme.secondaryInk)
                 if state.recentDays.isEmpty {
-                    Text("تظهر هنا أيام الحفظ والمراجعة بعد التسجيل").font(bodyFont(13)).foregroundStyle(theme.secondaryInk)
+                    Text("سجّل جلسة اليوم، فتظهر هنا أيام حفظك ومراجعتك.").font(bodyFont(13)).foregroundStyle(theme.secondaryInk)
                 } else if dynamicType.isAccessibilitySize {
                     ForEach(state.recentDays) { day in Text(day.accessibilityLabel).font(bodyFont(14)) }
                 } else {

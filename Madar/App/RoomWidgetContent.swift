@@ -237,7 +237,7 @@ private struct MihbaraRoomWidgetContent:View {
     }
     @ViewBuilder private var accessory:some View {
         if family == .accessoryInline {
-            Text("المحبرة، "+(locked ? "افتح مدار" : fallbackTitle ?? "رفّك")).font(.caption).lineLimit(1)
+            Text("المحبرة، "+(locked ? "افتح مدار" : fallbackTitle ?? "رفّك ينتظرك")).font(.caption).lineLimit(1)
         } else if family == .accessoryCircular {
             ZStack {
                 Circle().stroke(.primary.opacity(0.25),lineWidth:3)
@@ -246,7 +246,7 @@ private struct MihbaraRoomWidgetContent:View {
                     Text(digits.string(page)).font(.custom("thmanyahsans-Bold",size:14,relativeTo:.caption)).lineLimit(1).minimumScaleFactor(0.79)
                 }
                 else {Image(systemName:locked ? "lock.fill" : "books.vertical").font(.system(size:17,weight:.medium))}
-            }.accessibilityElement(children:.ignore).accessibilityLabel(locked ? "المحبرة مقفلة" : "المحبرة، "+(bookTitle ?? "رفّك")).accessibilityValue(locked ? "" : pageLine ?? "")
+            }.accessibilityElement(children:.ignore).accessibilityLabel(locked ? "المحبرة مقفلة" : "المحبرة، "+(bookTitle ?? "رفّك ينتظرك")).accessibilityValue(locked ? "" : pageLine ?? "")
         } else {
             HStack(spacing:8) {
                 Image(systemName:locked ? "lock.fill" : "books.vertical.fill").font(.system(size:18,weight:.semibold))
@@ -297,7 +297,7 @@ enum WidgetCopy {
         return digits.string(value)+" من "+unitCount(target,unit == nil ? "" : unit,digits,genitive:true)
     }
     static func periodProgress(met:Int,total:Int,digits:MadarNumberFormatter)->String {
-        if total==0{return "لا استحقاق"}
+        if total==0{return "لا شيء مستحق"}
         if met==total{return total==1 ? "تمّت" : "تمّت كلها"}
         if met==0{
             switch total {case 1:return "عادة واحدة تنتظرك";case 2:return "عادتان تنتظرانك"

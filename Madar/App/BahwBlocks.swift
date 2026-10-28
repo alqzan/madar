@@ -658,7 +658,7 @@ private struct BahwHabitPeriod: View {
             HabitMiniRing(share: Double(done) / Double(max(1, active.count)), theme: theme)
                 .frame(width: 20, height: 20)
             Text(frequency.arabic).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).lineLimit(1)
-            Text(active.isEmpty ? "لا استحقاق" : digits.string(done) + " من " + digits.string(active.count))
+            Text(active.isEmpty ? "لا شيء مستحق" : digits.string(done) + " من " + digits.string(active.count))
                 .font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2))
                 .foregroundStyle(theme.secondaryInk).lineLimit(1)
         }

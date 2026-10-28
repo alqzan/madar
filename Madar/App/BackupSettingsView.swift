@@ -332,7 +332,7 @@ struct BackupSettingsView: View {
                     }
                     if let next = nextLine(status) { note(next).accessibilityIdentifier("backup-next") }
                     if status.schedule != .manual {
-                        note("يحاول مدار النسخ في الخلفية عندما يسمح الجهاز، ويُستدرك عند فتحه. موعد التنفيذ غير مضمون.")
+                        note("يحاول مدار النسخ في الخلفية عندما يسمح الجهاز، وإن فاته الموعد نسخ حين تفتحه. قد يتأخر قليلًا.")
                             .accessibilityIdentifier("backup-background-policy")
                     }
                     if let result = status.lastResult, status.lastResult != "آخر عملية نسخ نجحت." { Text(result).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
@@ -428,7 +428,7 @@ struct BackupSettingsView: View {
                 SecureField("أعِد كلمة المرور", text: $model.exportConfirmation).textContentType(.newPassword).focused($focusedPassword, equals: 2).submitLabel(.done).onSubmit { focusedPassword = nil }
                     .padding(12).background(theme.background, in: .rect(cornerRadius: 12)).accessibilityIdentifier("backup-password-confirmation")
                 note("احفظ كلمة المرور في مكان آمن. فقدانها يجعل النسخة غير قابلة للقراءة.")
-                if model.status?.keyConfigured == false { note("تُستخدم كلمة مرور أول نسخة للنسخ التلقائي أيضًا. يُحفظ مفتاح مشتق منها على هذا الجهاز، وتبقى كلمة المرور عندك.").accessibilityIdentifier("backup-key-setup") }
+                if model.status?.keyConfigured == false { note("كلمة مرور أول نسخة تشفّر النسخ التلقائية أيضًا. لا تُحفظ كلمة المرور نفسها على الجهاز، فاحفظها عندك.").accessibilityIdentifier("backup-key-setup") }
                 exportButton.buttonStyle(MadarPrimaryButton())
                 if model.exportedURL != nil {
                     Button(action: model.shareEncrypted) { Label("احفظ النسخة أو شاركها", systemImage: "square.and.arrow.up").frame(maxWidth: .infinity, minHeight: 44) }.disabled(model.busy).accessibilityIdentifier("backup-export")
@@ -457,7 +457,7 @@ struct BackupSettingsView: View {
         MadarCard {
             VStack(alignment: .leading, spacing: 12) {
                 heading("تصدير بياناتك", "square.and.arrow.up.on.square")
-                note("ملف ZIP غير مشفّر يحتوي سجلاتك بصيغة JSONL وصورها وصوتها، ويمكن فتحه خارج مدار. شاركه مع من تثق به. إعدادات هذا الجهاز وقفل التطبيق لا تدخل فيه.")
+                note("ملف ZIP غير مشفّر يحتوي بياناتك كلها مع الصور والتسجيلات الصوتية، ويمكن فتحه خارج مدار. شاركه مع من تثق به. إعدادات هذا الجهاز وقفل التطبيق لا تدخل فيه.")
                 Button("جهّز ملف التصدير", action: model.exportPlain).frame(minHeight: 44).disabled(model.busy).accessibilityIdentifier("plain-export-now")
                 if model.plainExportedURL != nil {
                     Button(action: model.sharePlain) { Label("احفظ التصدير أو شاركه", systemImage: "square.and.arrow.up") }.frame(minHeight: 44).disabled(model.busy).accessibilityIdentifier("plain-export-share")

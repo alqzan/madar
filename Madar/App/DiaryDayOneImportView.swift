@@ -31,7 +31,7 @@ struct DiaryDayOneImportView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     Text("من داي ون").font(.custom("thmanyahserifdisplay-Bold", size: 32, relativeTo: .largeTitle)).accessibilityAddTraits(.isHeader)
-                    Text("صدّر دفترك من داي ون بصيغة JSON، واختر الملف. كل صفحة تنزل في يومها، وفي مكانها بين الصلوات حسب وقتها.")
+                    Text("صدّر دفترك من داي ون بصيغة JSON، واختر الملف. تُوضع كل صفحة في يومها، وفي مكانها بين الصلوات بحسب وقتها.")
                         .font(MadarTypography.body()).foregroundStyle(theme.secondaryInk).lineSpacing(6).fixedSize(horizontal: false, vertical: true).padding(.bottom, 6)
                     if let receipt { result(receipt) }
                     else if undone { undoneCard }
