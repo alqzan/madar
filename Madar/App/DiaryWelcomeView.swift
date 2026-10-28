@@ -62,6 +62,9 @@ struct DiaryWelcomeView: View {
             }
             HStack(spacing: 10) {
                 if step > 0 { Button("السابق") { step -= 1 }.font(MadarTypography.section()).frame(minHeight: 52).padding(.horizontal, 16) }
+                // Audit 28 Oct: four steps with no way past them; every choice already has its agreed default.
+                else { Button("ابدأ مباشرة") { Task { await finish() } }.font(MadarTypography.section()).frame(minHeight: 52).padding(.horizontal, 16)
+                    .disabled(saving || app.settingsWriteInProgress).accessibilityIdentifier("diary-welcome-skip") }
                 Button(step == 3 ? "افتح دفتري" : "التالي") {
                     if step < 3 { step += 1 } else { Task { await finish() } }
                 }.font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 54).foregroundStyle(theme.background).background(theme.ink, in: .capsule)
