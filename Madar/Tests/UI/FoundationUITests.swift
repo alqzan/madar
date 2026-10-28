@@ -299,6 +299,8 @@ import XCTest
         app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
         openHali(app)
         XCTAssertTrue(app.staticTexts["prayer-stat-percentage"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["prayer-stat-percentage"].label.contains("٪"), "The room uses the Arabic percent sign.")
+        XCTAssertFalse(app.staticTexts["prayer-stat-percentage"].label.contains("%"))
         XCTAssertTrue(app.buttons["prayer-hali-back"].exists)
         XCTAssertTrue(app.staticTexts["حالي"].exists)
         attachScreenshot(app, named: "M1-V04-hali-L")
