@@ -136,8 +136,10 @@ struct QuranDrillView: View {
 
     private var emptyCard: some View {
         VStack(spacing: 10) {
-            Text(tab == .today ? "لا مواضع من أخطاء اليوم" : "أتممت مواضع اليوم").font(font(17, bold: true))
-            Text(tab == .today ? "ما تعثّرت فيه اليوم يظهر هنا للتدريب" : "تعود المواضع المفتوحة غدًا").font(font(13)).foregroundStyle(theme.secondaryInk)
+            // AU-26: «أتممت» only when something was practised; an empty «أخطائي» is not a finished day.
+            let finished = (empty?.board.done ?? 0) > 0
+            Text(tab == .today ? "لا مواضع من أخطاء اليوم" : finished ? "أتممت مواضع اليوم" : "لا مواضع مفتوحة في أخطائك").font(font(17, bold: true))
+            Text(tab == .today ? "ما تعثّرت فيه اليوم يظهر هنا للتدريب" : finished ? "تعود المواضع المفتوحة غدًا" : "ما تعثّرت فيه أثناء المراجعة يظهر هنا").font(font(13)).foregroundStyle(theme.secondaryInk)
         }
         .multilineTextAlignment(.center).frame(maxWidth: .infinity).padding(.vertical, 40).padding(.horizontal, 24)
         .background(theme.surface, in: RoundedRectangle(cornerRadius: 30, style: .continuous))

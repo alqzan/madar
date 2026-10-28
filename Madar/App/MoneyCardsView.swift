@@ -281,7 +281,7 @@ struct MoneyCardsView: View {
                     HStack { Text(selected.name).font(MadarTypography.cardTitle()); Spacer(); Text(figure: amount(-selected.amountMinor)).font(MadarTypography.cardTitle()) }
                     dates(selected.day)
                     Text("النقد بعد الالتزامات المعروفة حتى هذا الموعد: " + amount(selected.cashAfterMinor)).font(MadarTypography.body())
-                    Label(visible ? selected.cashAfterMinor >= 0 ? "يكفي من النقد الحالي" : "النقد الحالي لا يغطي المواعيد المعروفة" : "•••", systemImage: "checkmark.circle").font(MadarTypography.caption()).foregroundStyle(theme.color("surplusText"))
+                    Label(visible ? selected.cashAfterMinor >= 0 ? "يكفي من النقد الحالي" : "النقد الحالي لا يغطي المواعيد المعروفة" : "•••", systemImage: !visible ? "eye.slash" : selected.cashAfterMinor >= 0 ? "checkmark.circle" : "exclamationmark.triangle").font(MadarTypography.caption()).foregroundStyle(theme.color(visible && selected.cashAfterMinor < 0 ? "dueText" : "surplusText"))
                 }.padding(16).background(theme.surface, in: RoundedRectangle(cornerRadius: 16)).overlay { RoundedRectangle(cornerRadius: 16).stroke(theme.color("reserveText"), lineWidth: 1) }.accessibilityIdentifier("money-card-due-detail")
             } else { Text("لا مبالغ مستحقة معروفة بعد.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk) }
             Text("المواعيد المعروفة").font(MadarTypography.cardTitle())

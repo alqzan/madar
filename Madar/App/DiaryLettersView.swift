@@ -24,7 +24,7 @@ struct DiaryLettersPanel: View {
             if let failure { Text(failure).font(MadarTypography.body()) }
             let waiting = letters.filter { $0.state == .eligible }, orphaned = letters.filter { $0.state == .orphaned }
             let sealed = letters.filter { $0.state == .sealed }, opened = letters.filter { $0.state == .opened }
-            if letters.isEmpty { Text("لا رسائل بعد. اكتب لنفسك في موعد أو بعد حدث.").font(DiaryType.writing).foregroundStyle(theme.color("ink3Text")).padding(.vertical, 20) }
+            if letters.isEmpty && failure == nil { Text("لا رسائل بعد. اكتب لنفسك في موعد أو بعد حدث.").font(DiaryType.writing).foregroundStyle(theme.color("ink3Text")).padding(.vertical, 20) }
             ForEach(waiting) { letter in DiaryLetterWaitingCard(letter: letter, digitsTitle: service.bothDates(letter.writtenDay)) { opening = letter } }
             ForEach(orphaned) { letter in
                 VStack(alignment: .leading, spacing: 10) {

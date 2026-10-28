@@ -110,6 +110,11 @@ struct PrayerCustomizeView: View {
                     let items = definitions(group)
                     if !items.isEmpty { groupCard(group, items) }
                 }
+                // AU-26: a search with no match explains itself instead of leaving a blank page.
+                if !query.isEmpty, !normalized("ترتيب الرئيسية").contains(normalized(query)), groups.allSatisfy({ definitions($0).isEmpty }) {
+                    Text("لا إعداد يطابق «\(query)». جرّب «المواقيت» أو «التذكير».").font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk)
+                    Button("امسح البحث") { query = "" }.font(PrayerHomeType.body.bold()).frame(minHeight: 44).accessibilityIdentifier("prayer-customize-clear-search")
+                }
                 Text("حرمة الصلاة ليست هنا لأنها لا تُطفأ: من الأذان حتى انقضاء الصلاة لا يرسل مدار شيئًا.")
                     .font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk).padding(.top, 4)
             }
