@@ -2905,7 +2905,7 @@ private struct MihbaraQuoteCardSheet: View {
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()
-                Button("تم") { editing = false }.accessibilityIdentifier("mihbara-quote-card-done")
+                Button("تمّ") { editing = false }.accessibilityIdentifier("mihbara-quote-card-done")
             }
         }
         .alert("مشاركة البطاقة", isPresented: Binding(get: { shareError != nil }, set: { if !$0 { shareError = nil } })) {
@@ -3257,7 +3257,7 @@ private struct MihbaraTranslationSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Button("تم") { dismiss() }
+                Button("تمّ") { dismiss() }
                     .font(MadarTypography.body()).frame(minWidth: 44, minHeight: 44)
                     .accessibilityIdentifier("mihbara-translation-close")
                 Spacer()

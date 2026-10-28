@@ -69,7 +69,7 @@ struct MoneyCardSheet: View {
                         .disabled(!canSave).accessibilityIdentifier("money-card-save")
                 }.padding(20)
             }.scrollDismissesKeyboard(.interactively).background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.plain)
-                .toolbar(.hidden, for: .navigationBar).toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تم") { editing = false }.accessibilityIdentifier("money-card-keyboard-done") } }
+                .toolbar(.hidden, for: .navigationBar).toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تمّ") { editing = false }.accessibilityIdentifier("money-card-keyboard-done") } }
                 .task { loadAccounts() }
                 .onChange(of: kind) { _, value in if value != "credit", accountID == nil, accounts.count == 1 { accountID = accounts[0].id } }
         }

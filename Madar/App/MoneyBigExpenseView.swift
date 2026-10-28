@@ -79,7 +79,7 @@ struct MoneyBigExpenseView: View {
                     else { ProgressView().frame(height: 200) }
                 }.padding(20).frame(maxWidth: 620).frame(maxWidth: .infinity)
             }.scrollDismissesKeyboard(.interactively).background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.plain)
-                .toolbar(.hidden, for: .navigationBar).toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تم") { editing = false } } }
+                .toolbar(.hidden, for: .navigationBar).toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تمّ") { editing = false } } }
                 .task { load() }.accessibilityIdentifier("money-big")
         }
     }

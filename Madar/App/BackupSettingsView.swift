@@ -480,7 +480,7 @@ struct BackupSettingsView: View {
         #endif
     }
     @ViewBuilder private var keyboardDoneButton: some View {
-        let button = Button("تم") { focusedPassword = nil }.accessibilityIdentifier("backup-keyboard-done")
+        let button = Button("تمّ") { focusedPassword = nil }.accessibilityIdentifier("backup-keyboard-done")
         #if DEBUG
         if let diagnostic = fixtureInputDiagnostic {
             // AX3 virtualizes the export row while a secure field is focused.

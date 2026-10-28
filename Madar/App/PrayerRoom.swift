@@ -166,7 +166,7 @@ struct PrayerRoom: View {
         .task { while !Task.isCancelled { do { try await Task.sleep(for: .seconds(60)) } catch { return }; await model.refresh() } }
         .refreshable { await model.refresh() }
         .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await model.refresh() } } }
-        .sheet(item: $sheet) { route in NavigationStack { sheetBody(route).alert("تعذّر إتمام العملية", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) { Button("حسنًا") { model.error = nil } } message: { Text(model.error ?? "") }.toolbar { ToolbarItem(placement: .confirmationAction) { Button("تم") { sheet = nil } } } }.environment(\.roomTheme, theme) }
+        .sheet(item: $sheet) { route in NavigationStack { sheetBody(route).alert("تعذّر إتمام العملية", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) { Button("حسنًا") { model.error = nil } } message: { Text(model.error ?? "") }.toolbar { ToolbarItem(placement: .confirmationAction) { Button("تمّ") { sheet = nil } } } }.environment(\.roomTheme, theme) }
         .alert("تعذّر إتمام العملية", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) { Button("حسنًا") { model.error = nil } } message: { Text(model.error ?? "") }
         .disabled(model.busy)
         .overlay { if model.busy { ProgressView().padding(20).background(.regularMaterial, in: .capsule).accessibilityLabel("جارٍ حفظ الصلاة") } }

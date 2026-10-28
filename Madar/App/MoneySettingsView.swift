@@ -78,7 +78,7 @@ struct MoneySettingsView: View {
                     Text(page == .daily || page == .cycle ? "معاينة أولًا، ثم حفظ واحد وتراجع" : "كل تغيير له تراجع").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                 }.padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 28).frame(maxWidth: 620).frame(maxWidth: .infinity)
             }.scrollDismissesKeyboard(.interactively).background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.plain).toolbar(.hidden, for: .navigationBar, .tabBar)
-                .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تم") { editing = false }.accessibilityIdentifier("money-settings-keyboard-done") } }
+                .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تمّ") { editing = false }.accessibilityIdentifier("money-settings-keyboard-done") } }
                 .task { load() }.onChange(of: app.prayerRevision) { load() }.onChange(of: unit) { every = min(every, unit.maxEvery) }
                 .accessibilityIdentifier("money-settings")
         }

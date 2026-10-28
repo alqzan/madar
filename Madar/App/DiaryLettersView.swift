@@ -150,7 +150,7 @@ struct DiaryLetterMoment: View {
                     if let failure { Text(failure).font(MadarTypography.body()) }
                 }.padding(22)
             }.background(theme.background).foregroundStyle(theme.ink)
-                .toolbar { ToolbarItem(placement: .topBarLeading) { Button("تم") { dismiss() }.accessibilityIdentifier("diary-letter-done") } }
+                .toolbar { ToolbarItem(placement: .topBarLeading) { Button("تمّ") { dismiss() }.accessibilityIdentifier("diary-letter-done") } }
                 .toolbarBackground(theme.background, for: .navigationBar).tint(theme.accent)
         }
     }

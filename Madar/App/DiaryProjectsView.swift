@@ -123,7 +123,7 @@ struct DiaryProjectDetail: View {
                 }.padding(18)
             }.background(theme.background).foregroundStyle(theme.ink)
                 .navigationTitle(project.name).navigationBarTitleDisplayMode(.inline)
-                .toolbar { ToolbarItem(placement: .topBarLeading) { Button("تم") { dismiss() } } }
+                .toolbar { ToolbarItem(placement: .topBarLeading) { Button("تمّ") { dismiss() } } }
                 .toolbarBackground(theme.background, for: .navigationBar).tint(theme.accent)
                 .confirmationDialog("تبقى السطور بنصّها، ويختفي ربطها. يمكنك التراجع.", isPresented: $confirmDelete, titleVisibility: .visible) {
                     Button("احذف المشروع", role: .destructive) { Task { do { try await service.deleteProject(project.id); dismiss() } catch { failure = madarUserMessage(error) } } }

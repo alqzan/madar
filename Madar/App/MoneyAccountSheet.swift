@@ -74,7 +74,7 @@ struct MoneyAccountSheet: View {
                     }
                 }.padding(20)
             }.scrollDismissesKeyboard(.interactively).background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.plain)
-                .toolbar(.hidden, for: .navigationBar).toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تم") { editing = false }.accessibilityIdentifier("money-account-keyboard-done") } }
+                .toolbar(.hidden, for: .navigationBar).toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تمّ") { editing = false }.accessibilityIdentifier("money-account-keyboard-done") } }
         }
     }
     private func field<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {

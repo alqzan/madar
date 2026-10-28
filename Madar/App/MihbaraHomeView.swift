@@ -1234,9 +1234,9 @@ private struct MihbaraNotebookEditor: View {
                     ToolbarItemGroup(placement: .topBarLeading) {
                         Button("إلغاء") { if text != note.text { prompt = .discard } else { dismiss() } }
                             .accessibilityIdentifier("mihbara-note-cancel")
-                        if !note.text.isEmpty { Button("حذف", role: .destructive) { prompt = .delete }.accessibilityIdentifier("mihbara-note-delete") }
+                        if !note.text.isEmpty { Button("احذف", role: .destructive) { prompt = .delete }.accessibilityIdentifier("mihbara-note-delete") }
                     }
-                    ToolbarItem(placement: .topBarTrailing) { Button("حفظ") { write(deleting: false) }.disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || text.count > 2000).accessibilityIdentifier("mihbara-note-save") }
+                    ToolbarItem(placement: .topBarTrailing) { Button("احفظ") { write(deleting: false) }.disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || text.count > 2000).accessibilityIdentifier("mihbara-note-save") }
                 }
         }.environment(\.roomTheme, theme).disabled(isSaving)
         .safeAreaInset(edge: .bottom) {

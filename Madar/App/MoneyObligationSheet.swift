@@ -157,7 +157,7 @@ struct MoneyObligationSheet: View {
             .toolbar {
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
-                    Button("تم") { field = nil }.accessibilityIdentifier("money-obligation-keyboard-done")
+                    Button("تمّ") { field = nil }.accessibilityIdentifier("money-obligation-keyboard-done")
                 }
             }
             .onChange(of: unit) { every = min(every, unit.maxEvery) }

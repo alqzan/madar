@@ -41,7 +41,7 @@ struct MoneyTripRateSheet: View {
                 }.disabled(!visible || saving).font(MadarTypography.caption()).frame(minHeight: 44).accessibilityIdentifier("money-trip-reprice-preview")
             }
         }.padding(22) }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.plain).scrollDismissesKeyboard(.interactively)
-            .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تم") { focused = false }.accessibilityIdentifier("money-trip-keyboard-done") } }
+            .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تمّ") { focused = false }.accessibilityIdentifier("money-trip-keyboard-done") } }
             .sheet(isPresented: $previewOpen) { if let preview { repricePreview(preview) } }
             .task { currency = reading.currency ?? app.string("core.currency"); raw = reading.rate.map(service.localizedRate) ?? "" }
         }
@@ -115,7 +115,7 @@ struct MoneyTripFundingSheet: View {
             if let failure { Text(failure).font(MadarTypography.caption()) }
             Button { save() } label: { Text("انقل للمظروف").frame(maxWidth: .infinity, minHeight: 50).background(theme.ink).foregroundStyle(theme.background) }.disabled(saving || !visible || minor.map { $0 > 0 && $0 <= available } != true).accessibilityIdentifier("money-trip-fund-save")
         }.padding(22) }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.plain).scrollDismissesKeyboard(.interactively)
-            .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تم") { focused = false }.accessibilityIdentifier("money-trip-keyboard-done") } }
+            .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تمّ") { focused = false }.accessibilityIdentifier("money-trip-keyboard-done") } }
             .task { due = max(app.prayerNow(), reading.due?.date(in: app.activePlace.timeZone) ?? reading.today.adding(days: 3).date(in: app.activePlace.timeZone)); if reading.surplusMinor <= 0 { source = "reserve" } }
         }
     }

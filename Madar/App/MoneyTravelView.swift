@@ -149,7 +149,7 @@ struct MoneyTravelView: View {
     }
     private func tripReport(_ r: MoneyTravelReading) -> some View {
         ScrollView { VStack(alignment: .leading, spacing: 14) {
-            HStack { Text("تقرير رحلة " + (r.legCities.count > 1 ? r.legCities.joined(separator: " و") : r.city)).font(MadarTypography.title()); Spacer(); Button("تم") { report = false }.frame(minHeight: 44).accessibilityIdentifier("money-trip-report-close") }
+            HStack { Text("تقرير رحلة " + (r.legCities.count > 1 ? r.legCities.joined(separator: " و") : r.city)).font(MadarTypography.title()); Spacer(); Button("تمّ") { report = false }.frame(minHeight: 44).accessibilityIdentifier("money-trip-report-close") }
             MadarDateLabel(app.dateLabels(r.start), primaryFont: MadarTypography.body(), secondaryFont: MadarTypography.caption())
                 .accessibilityElement(children: .combine)
                 .accessibilityIdentifier("money-trip-report-start")

@@ -202,9 +202,9 @@ struct QuranRoom: View {
         .toolbar { ToolbarItem(placement: .topBarTrailing) { NavigationLink { QuranSettingsView(service: settingsService) } label: { Image(systemName: "slider.horizontal.3") }.accessibilityLabel("خصّص القرآن").accessibilityIdentifier("quran-settings") } }
         .task { await model.refresh() }.refreshable { await model.refresh() }
         .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await model.refresh() } } }
-        .sheet(item: $sheet) { route in NavigationStack { sheetBody(route).toolbar { ToolbarItem(placement: .confirmationAction) { Button("تم") { sheet = nil } } }.quranErrorAlert(model) }.environment(\.roomTheme, theme) }
+        .sheet(item: $sheet) { route in NavigationStack { sheetBody(route).toolbar { ToolbarItem(placement: .confirmationAction) { Button("تمّ") { sheet = nil } } }.quranErrorAlert(model) }.environment(\.roomTheme, theme) }
         .fullScreenCover(item: Binding(get: { model.session }, set: { if $0 == nil { model.session = nil } })) { _ in QuranSessionView(model: model).environment(\.roomTheme, theme) }
-        .sheet(isPresented: Binding(get: { model.completion != nil }, set: { if !$0 { model.completion = nil } })) { NavigationStack { QuranSummaryView(lines: model.completion ?? []).toolbar { ToolbarItem(placement: .confirmationAction) { Button("تم") { model.completion = nil } } } }.environment(\.roomTheme, theme) }
+        .sheet(isPresented: Binding(get: { model.completion != nil }, set: { if !$0 { model.completion = nil } })) { NavigationStack { QuranSummaryView(lines: model.completion ?? []).toolbar { ToolbarItem(placement: .confirmationAction) { Button("تمّ") { model.completion = nil } } } }.environment(\.roomTheme, theme) }
         .quranErrorAlert(model).disabled(model.busy)
     }
     private func blocks(_ state: QuranRoomState) -> [String] { ["sadr", "path", "log14", "tools"].sorted { (state.blockOrder.firstIndex(of: $0) ?? 99) < (state.blockOrder.firstIndex(of: $1) ?? 99) }.filter { !state.hiddenBlocks.contains($0) || ["sadr", "path"].contains($0) } }
