@@ -79,6 +79,11 @@ struct MoneyExpenseView: View {
                     Button(action: save) {
                         Text(saving ? "جارٍ التسجيل…" : duplicate ? "سجّل عملية أخرى" : "سجّل").font(.custom("thmanyahserifdisplay-Bold", size: 19, relativeTo: .headline)).frame(maxWidth: .infinity, minHeight: 50).background(theme.ink).foregroundStyle(theme.background)
                     }.disabled(saving || homeMinor <= 0 || (foreign && inputCurrency != reading.currency && reading.tripRate == nil) || method == nil || (method?.kind != .credit && method?.currency != reading.currency && method?.currency != inputCurrency) || (share != .daily && envelopeID == nil)).accessibilityIdentifier("money-expense-save")
+                    // AU-30: a disabled «سجّل» says what it is waiting for.
+                    if !saving, homeMinor > 0 {
+                        let waiting: String? = method == nil ? "اختر مصدر الدفع" : (method?.kind != .credit && method?.currency != reading.currency && method?.currency != inputCurrency) ? "هذا المصدر بعملة أخرى؛ اختر غيره" : (share != .daily && envelopeID == nil) ? "اختر المظروف الذي يُخصم منه" : nil
+                        if let waiting { Text(waiting).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-expense-waiting") }
+                    }
                 } else if let failure { Text(failure); Button("أعِد المحاولة", action: load) }
                 else { ProgressView().frame(height: 250) }
             }.padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 20).frame(maxWidth: 620).frame(maxWidth: .infinity)
