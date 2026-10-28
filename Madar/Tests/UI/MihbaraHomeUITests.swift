@@ -222,6 +222,26 @@ import UIKit
         XCTAssertTrue(notes.firstMatch.label.contains(draft))
     }
 
+    func testPrivateNoteExplainsLengthLimitAndCanDiscardWithoutSaving() {
+        continueAfterFailure = false
+        let app = app("empty"); app.launch(); open(app)
+        let notebook = app.buttons["mihbara-notebook"]
+        reach(app, notebook); notebook.tap()
+        let add = app.buttons["mihbara-note-add"]
+        XCTAssertTrue(add.waitForExistence(timeout: 10)); add.tap()
+        let editor = app.textViews["mihbara-note-text"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 8)); editor.tap()
+        editor.typeText(String(repeating: "x", count: 2001))
+        XCTAssertFalse(app.buttons["mihbara-note-save"].isEnabled)
+        XCTAssertTrue(app.staticTexts["mihbara-note-length-hint"].exists)
+        shot(app, "M6-private-note-length-hint-L")
+        app.buttons["mihbara-note-cancel"].tap()
+        let discard = app.alerts["اترك التعديلات؟"]
+        XCTAssertTrue(discard.waitForExistence(timeout: 5)); discard.buttons["اتركها"].tap()
+        XCTAssertTrue(editor.waitForNonExistence(timeout: 8))
+        XCTAssertEqual(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND identifier != %@", "mihbara-note-", "mihbara-note-add")).count, 0)
+    }
+
     func testCancellingGoodreadsPickerReturnsWithoutAnError() {
         continueAfterFailure = false
         let app = app("empty"); app.launch(); open(app)

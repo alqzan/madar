@@ -1238,6 +1238,14 @@ private struct MihbaraNotebookEditor: View {
                     ToolbarItem(placement: .topBarTrailing) { Button("حفظ") { write(deleting: false) }.disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || text.count > 2000).accessibilityIdentifier("mihbara-note-save") }
                 }
         }.environment(\.roomTheme, theme).disabled(isSaving)
+        .safeAreaInset(edge: .bottom) {
+            if text.count > 2000 {
+                Text("اختصر الملاحظة إلى ألفي حرف حتى تُحفظ.")
+                    .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    .frame(maxWidth: .infinity, alignment: .leading).padding(12).background(theme.surface)
+                    .accessibilityIdentifier("mihbara-note-length-hint")
+            }
+        }
         .interactiveDismissDisabled(isSaving || text != note.text)
         .alert(prompt?.title ?? "", isPresented: Binding(get: { prompt != nil }, set: { if !$0 { prompt = nil } }), presenting: prompt) { current in
             switch current {
