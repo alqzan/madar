@@ -19,7 +19,12 @@ extension AppQuranService {
         }
         let frontier = try v.coverage.frontier(from: v.plan?.plan.startAyah ?? 1)
         let gap = frontier.flatMap { first in v.coverage.coveredAyahs.contains(where: { $0 > first }) ? "في حفظك فجوة تبدأ من " + (catalog.ayah(id: first)?.surahNameArabic ?? "") + "؛ تُقدَّم في الورد القادم" : nil }
-        return QuranUISessionLog(records: records, coverage: faceCount(v.coverage.completedPages.count), fraction: Double(v.coverage.completedPages.count) / 604,
+        return QuranUISessionLog(records: records, coverage: coverageTitle(v.coverage), fraction: Double(v.coverage.completedPages.count) / 604,
             nextDue: v.pages.reduce(into: [:]) { $0[$1.page] = displayDate($1.nextDue) }, gap: gap)
+    }
+    /// The same «في صدرك» phrase as the room's home: whole parts first, then the faces outside them.
+    func coverageTitle(_ coverage: QuranCoverage) -> String {
+        let completed = coverage.completedPages.count, juz = coverage.completedJuz.count, outside = coverage.pagesOutsideCompletedJuz.count
+        return completed == 0 ? "أول الطريق" : (juz == 0 ? faceCount(outside) : count(juz, singular: "جزء واحد", dual: "جزآن", plural: "أجزاء") + (outside > 0 ? " و" + faceCount(outside) : ""))
     }
 }
