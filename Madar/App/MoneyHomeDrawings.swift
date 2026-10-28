@@ -160,9 +160,15 @@ struct MoneyEnvelopeLine: View {
                 GeometryReader { proxy in
                     let target = max(1, envelope.targetMinor ?? max(1, abs(envelope.balanceMinor)))
                     let progress = min(1, Double(abs(envelope.balanceMinor)) / Double(target))
-                    ZStack(alignment: .trailing) {
-                        Rectangle().stroke(color, style: .init(lineWidth: 0.8, dash: [3, 2])).frame(height: 9)
-                        Rectangle().fill(color).frame(width: proxy.size.width * progress, height: 5)
+                    // Arabic leading is the rail's right-hand zero. Fill and its
+                    // sliding bead advance left together, as in Z-R12-Home2.
+                    ZStack(alignment: .leading) {
+                        Rectangle().stroke(theme.color("envelopes"), style: .init(lineWidth: 0.8, dash: [3, 2])).frame(height: 9)
+                        if envelope.balanceMinor < 0 {
+                            MoneyHatch().frame(width: proxy.size.width * progress, height: 9)
+                        } else {
+                            Rectangle().fill(color).frame(width: proxy.size.width * progress, height: 5)
+                        }
                         Capsule().fill(LinearGradient(colors: [theme.color("rod2"), theme.color("rod"), theme.color("rod2")], startPoint: .leading, endPoint: .trailing)).frame(width: 6, height: 18).offset(x: -proxy.size.width * progress)
                         Rectangle().fill(theme.color("reserveText")).frame(width: 1, height: 17)
                     }.frame(height: proxy.size.height)

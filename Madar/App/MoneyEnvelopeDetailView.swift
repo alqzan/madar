@@ -112,7 +112,8 @@ struct MoneyEnvelopeDetailView: View {
     private func load() { do { reading = try service.loadEnvelope(id); errorMessage = reading == nil ? "لم يعد هذا المظروف موجودًا." : nil } catch { errorMessage = "لم تكتمل قراءة المظروف." } }
 }
 
-private struct MoneyHatch: View {
+/// Shared debt texture: the home rail and the detail legend show the same meaning.
+struct MoneyHatch: View {
     @Environment(\.roomTheme) private var theme
     var body: some View {
         Canvas { context, size in
