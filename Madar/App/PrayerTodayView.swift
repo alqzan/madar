@@ -1047,6 +1047,11 @@ private struct PrayerQadaListSheet: View {
                 }
             }
             .scrollBounceBehavior(.basedOnSize).frame(height: min(CGFloat(items.count) * 61 + 1, 280)).padding(.top, 16)
+            // Audit 28 Oct: making up the last one here leaves a calm line, not an empty frame.
+            if items.isEmpty {
+                Text("لا فوائت مسجّلة عليك").font(PrayerHomeType.lead).foregroundStyle(theme.secondaryInk)
+                    .padding(.top, 8).accessibilityIdentifier("prayer-qada-sheet-empty")
+            }
             actions(selected)
         }
         .padding(.horizontal, 20).padding(.top, 26).padding(.bottom, 14)

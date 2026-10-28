@@ -43,7 +43,13 @@ struct MoneyAccountsView: View {
                         HStack { Text(figure: "كاش " + amount(basis.inAccountMinor) + "، عليك " + amount(basis.owedMinor)).font(MadarTypography.caption()); Spacer(); Text(figure: amount(basis.netMinor)).font(MadarTypography.cardTitle()).foregroundStyle(theme.color("surplusText")) }.padding(12).background(theme.surface)
                         }
                     } else { Text("لا نجمع عملات مختلفة بلا سعر صرف. أرصدة الحسابات أدناه بعملاتها.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
-                    if r.rows.isEmpty { Text("من هنا تبدأ الجذور. أضف حسابك ورصيده، ثم تصله رسائل البنك.").font(MadarTypography.body()).padding(.vertical, 20).accessibilityIdentifier("money-accounts-empty") }
+                    if r.rows.isEmpty {
+                        // Audit 28 Oct: the empty tree offers its first account right where it asks for one.
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("من هنا تبدأ الجذور. أضف حسابك ورصيده، ثم تصله رسائل البنك.").font(MadarTypography.body()).accessibilityIdentifier("money-accounts-empty")
+                            Button(action: addAccount) { Label("أضف أول حساب", systemImage: "plus").font(MadarTypography.body().bold()).padding(.horizontal, 18).frame(minHeight: 44).foregroundStyle(theme.onAccent).background(theme.color("accent"), in: Capsule()) }.buttonStyle(.plain).accessibilityIdentifier("money-accounts-empty-add")
+                        }.padding(.vertical, 20)
+                    }
                     HStack(spacing: 8) {
                         Label(r.shortcutAt == nil ? "لم تصل رسالة عبر الاختصار بعد" : "رسائل عبر الاختصار", systemImage: r.shortcutAt == nil ? "tray" : "checkmark.circle").font(MadarTypography.caption())
                         Spacer(minLength: 0)

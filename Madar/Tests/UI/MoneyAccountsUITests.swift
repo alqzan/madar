@@ -76,7 +76,7 @@ import XCTest
         continueAfterFailure = false
         let hidden = open("hidden"); XCTAssertTrue(hidden.staticTexts["money-accounts-net"].label.contains("•••")); shot(hidden, "M5-V19-hidden-L")
         hidden.buttons["money-accounts-reveal"].tap(); XCTAssertFalse(hidden.staticTexts["money-accounts-net"].label.contains("•••")); hidden.terminate()
-        let empty = open("empty"); XCTAssertTrue(empty.staticTexts["money-accounts-empty"].exists); shot(empty, "M5-V19-empty-L")
+        let empty = open("empty"); XCTAssertTrue(empty.staticTexts["money-accounts-empty"].exists); XCTAssertTrue(empty.buttons["money-accounts-empty-add"].exists); shot(empty, "M5-V19-empty-L")
     }
     func testHiddenOpeningBalanceRequiresExplicitRevealInAccountSheet() {
         continueAfterFailure = false

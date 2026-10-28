@@ -173,7 +173,13 @@ struct MoneyLogView: View {
                 metric("نقد خرج فعلًا", value: d.cashOutMinor.map(amount) ?? "غير مكتمل", note: "البطاقة عند السداد", tint: theme.secondaryInk)
             }
             if d.pending > 0 { Button { messagesOpen = true } label: { Label("حركات تحتاج قرارك؛ اليوم معلّق", systemImage: "tray").font(MadarTypography.caption()).frame(minHeight: 44) }.buttonStyle(.plain).accessibilityIdentifier("money-log-pending") }
-            if rows.isEmpty { Text("لا حركات تطابق هذا اليوم والفلتر.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk).padding(.vertical, 16).accessibilityIdentifier("money-log-empty") }
+            if rows.isEmpty {
+                // Audit 28 Oct: a narrowed empty day offers the way back to the whole day.
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(filter == "all" && query.isEmpty ? "لا حركات في هذا اليوم." : "لا حركات تطابق هذا اليوم والفلتر.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-log-empty")
+                    if filter != "all" || !query.isEmpty { Button("اعرض كل حركات اليوم") { filter = "all"; query = "" }.font(MadarTypography.caption()).foregroundStyle(theme.color("accentText")).frame(minHeight: 44).accessibilityIdentifier("money-log-clear-filter") }
+                }.padding(.vertical, 12)
+            }
             LazyVGrid(columns: [GridItem(.adaptive(minimum: dynamicType.isAccessibilitySize ? 300 : 150), spacing: 8)], spacing: 8) {
                 ForEach(rows) { row in
                     Button { source = row.detail } label: {
