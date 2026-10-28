@@ -13,6 +13,8 @@ import XCTest
         let money = app.buttons["money-open"]; XCTAssertTrue(money.waitForExistence(timeout: 5)); money.tap()
         let open = app.buttons["money-categories-open"]; XCTAssertTrue(open.waitForExistence(timeout: 10))
         for _ in 0..<6 where !open.isHittable { app.swipeUp(velocity: .slow) }
+        // The limits block sits low on the home; a half-visible button lies under the bottom dimming.
+        for _ in 0..<4 where open.frame.maxY > app.frame.maxY - 140 { app.swipeUp(velocity: .slow) }
         open.tap()
         let shelf = app.buttons["money-shelf-مطاعم"]; XCTAssertTrue(shelf.waitForExistence(timeout: 10), app.debugDescription)
         shot(app, "M5-V10-cat-L")
@@ -67,6 +69,7 @@ import XCTest
         let money = app.buttons["money-open"]; XCTAssertTrue(money.waitForExistence(timeout: 5)); money.tap()
         let categories = app.buttons["money-categories-open"]; XCTAssertTrue(categories.waitForExistence(timeout: 10))
         for _ in 0..<6 where !categories.isHittable { app.swipeUp(velocity: .slow) }
+        for _ in 0..<4 where categories.frame.maxY > app.frame.maxY - 140 { app.swipeUp(velocity: .slow) }
         categories.tap()
         let shelf = app.buttons["money-shelf-مطاعم"]; XCTAssertTrue(shelf.waitForExistence(timeout: 10)); shelf.tap()
         let minus = app.buttons["money-limit-minus"], value = app.staticTexts["money-limit-value"]

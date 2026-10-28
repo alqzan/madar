@@ -38,7 +38,7 @@ struct MoneyEnvelopeDetailView: View {
                     if !visible { Button("أظهر الأرقام") { revealed = true }.frame(minHeight: 44) }
                     if reading.savingMinor > 0 || (visible && reading.savingPlanID != nil) {
                         HStack(spacing: 10) {
-                            Label { Text("الادخار: ") + Text(figure: amount(reading.savingMinor)).font(MadarTypography.cardTitle()) + Text(" من كل راتب") } icon: { Image(systemName: "diamond.fill").foregroundStyle(theme.color("reserveText")) }.font(MadarTypography.body()).accessibilityLabel("الادخار: " + amount(reading.savingMinor) + " من كل راتب")
+                            Label { Text("تدّخر ") + Text(figure: amount(reading.savingMinor)).font(MadarTypography.cardTitle()) + Text(" من كل راتب") } icon: { Image(systemName: "diamond.fill").foregroundStyle(theme.color("reserveText")) }.font(MadarTypography.body()).accessibilityLabel("تدّخر " + amount(reading.savingMinor) + " من كل راتب")
                             Spacer(minLength: 0)
                             if visible && reading.savingPlanID != nil {
                                 Button { savingAdd = false; savingOpen = true } label: { Image(systemName: "minus").frame(width: 48, height: 48).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1) } }.accessibilityLabel("قلّل ادخار المظروف").buttonStyle(.plain)
@@ -193,7 +193,7 @@ struct MoneyRepaymentView: View {
                     }
                     Text("المواعيد متوقعة بطول الدورة الحالية؛ آخر راتب يدفع الباقي بالهللة، ويومك الحالي لا يتغيّر.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                     Button { adopt() } label: {
-                        Text("اعتمد: " + service.amount(preview.installmentsMinor[0]) + " من كل راتب").font(MadarTypography.cardTitle()).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 18).frame(minHeight: 60)
+                        Text("اعتمد " + service.amount(preview.installmentsMinor[0]) + " من كل راتب").font(MadarTypography.cardTitle()).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 18).frame(minHeight: 60)
                             .foregroundStyle(theme.background).background(theme.ink)
                     }.buttonStyle(.plain).disabled(working).accessibilityIdentifier("money-repay-adopt")
                 } else { Text("تظهر اليومية ومواعيد الرواتب بعد بدء الدورة.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk) }

@@ -661,7 +661,7 @@ struct MihbaraHomeView: View {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("ورد اليوم: " + h.title).font(MadarTypography.cardTitle()).lineLimit(2)
                         Text(excerpt(hadithMatn(h.text))).font(MadarTypography.caption()).lineLimit(1)
-                        Text(service.digits.string(r.readCount) + " من " + service.digits.string(r.collection.hadiths.count) + "، " + (left <= 0 ? "أتممت الأربعين" : "بقي " + MihbaraCopy.hadiths(left, service.digits)))
+                        Text(r.readCount == 0 ? MihbaraCopy.hadiths(r.collection.hadiths.count, service.digits) + " تنتظرك" : service.digits.string(r.readCount) + " من " + service.digits.string(r.collection.hadiths.count) + "، " + (left <= 0 ? "أتممت الأربعين" : "بقي " + MihbaraCopy.hadiths(left, service.digits)))
                             .font(MadarTypography.fine())
                     }
                     Spacer(minLength: 4)

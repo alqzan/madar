@@ -32,7 +32,7 @@ struct DiaryProjectsPanel: View {
     private func row(_ project: DiaryProjectCard) -> some View {
         Button { detail = project } label: {
             VStack(alignment: .leading, spacing: 6) {
-                HStack { Text(project.name).font(DiaryType.heading); Spacer(); Text("سطور: " + service.digits.string(project.lines.count)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text")) }
+                HStack { Text(project.name).font(DiaryType.heading); Spacer(); Text(project.lines.isEmpty ? "بلا سطور بعد" : arabicCount(project.lines.count, ["سطر واحد", "سطران", "أسطر", "سطرًا"], service.digits)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text")) }
                 if !project.intention.isEmpty { Text(project.intention).font(DiaryType.writing).foregroundStyle(theme.color("ink3Text")).lineLimit(2) }
                 if let last = project.lines.last { Text(last.text).font(DiaryType.label).lineLimit(1) }
             }.padding(14).background(theme.surface, in: .rect(cornerRadius: 14)).overlay { RoundedRectangle(cornerRadius: 14).stroke(theme.line) }.contentShape(.rect)

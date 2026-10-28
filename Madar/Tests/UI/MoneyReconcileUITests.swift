@@ -41,7 +41,7 @@ import XCTest
         XCTAssertTrue(app.buttons["money-reconcile-close"].waitForExistence(timeout: 5)); sleep(1)
         shot(app, "M5-V15-rec-L")
         app.swipeUp(velocity: .slow)
-        XCTAssertTrue(element(app, "money-reconcile-open-count").label.contains("٠"))
+        XCTAssertTrue(element(app, "money-reconcile-open-count").label.contains("لا فروق مفتوحة"))
         shot(app, "M5-V15-rec-s1-L")
         app.buttons["money-reconcile-save"].tap()
         // Written: the book now matches, the line starts afresh and the record is dated today.

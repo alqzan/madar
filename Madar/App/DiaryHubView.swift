@@ -153,9 +153,9 @@ struct DiaryHubView: View {
             timeline(archive.days.filter { let parts = grid.parts($0.day); return parts.year == selectedYear && parts.month == month })
         }
     }
-    private func timeline(_ days: [DiaryDaySummary]) -> some View {
+    private func timeline(_ days: [DiaryDaySummary], empty: String = "لا كتابة في هذه الفترة. يمكنك فتح أي يوم من التقويم.") -> some View {
         LazyVStack(alignment: .leading, spacing: 0) {
-            if days.isEmpty { Text("لا كتابة في هذه الفترة. يمكنك فتح أي يوم من التقويم.").font(DiaryType.writing).padding(.vertical, 24) }
+            if days.isEmpty { Text(empty).font(DiaryType.writing).padding(.vertical, 24) }
             ForEach(days) { day in
                 Button { reader = day.day } label: { VStack(alignment: .leading, spacing: 7) { Text(service.weekday(day.day) + "، " + service.bothDates(day.day, calendar: grid.first)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text")); Text(day.excerpt).font(DiaryType.writing).lineLimit(3).multilineTextAlignment(.leading) }.padding(16).frame(maxWidth: .infinity, alignment: .leading) }.buttonStyle(.plain).accessibilityIdentifier("diary-hub-day-" + day.id)
                 Divider().overlay(theme.line)
@@ -182,7 +182,7 @@ struct DiaryHubView: View {
         return VStack(alignment: .leading, spacing: 14) {
             Text("رف الذكريات").font(DiaryType.heading)
             Text(home?.selection.match == .echo ? "أقرب صدى من كتابتك" : "من مثل هذا اليوم").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
-            timeline(archive.days.filter { home?.selection.days.contains($0.day) == true })
+            timeline(archive.days.filter { home?.selection.days.contains($0.day) == true }, empty: "لا ذكريات لهذا اليوم بعد.")
         }
     }
     private func index(_ archive: DiaryArchiveSnapshot) -> some View {

@@ -338,7 +338,7 @@ struct MoneyReconcileView: View {
                 Rectangle().fill(theme.ink).frame(height: 1)
             }
             HStack {
-                Text("فروق مفتوحة: " + service.digits.string(s.open)).font(MadarTypography.caption()).bold().accessibilityIdentifier("money-reconcile-open-count")
+                Text(s.open == 0 ? "لا فروق مفتوحة" : service.counted(s.open, ("فرق مفتوح", "فرقان مفتوحان", "فروق مفتوحة", "فرقًا مفتوحًا"))).font(MadarTypography.caption()).bold().accessibilityIdentifier("money-reconcile-open-count")
                 Spacer()
                 if s.negativeMinor != 0 { Text(figure: signed(s.negativeMinor)).font(MadarTypography.caption()).bold().foregroundStyle(theme.color("dueText")) }
                 if s.positiveMinor != 0 { Text(figure: signed(s.positiveMinor)).font(MadarTypography.caption()).bold().foregroundStyle(theme.color("accentText")) }

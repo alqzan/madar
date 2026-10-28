@@ -1024,7 +1024,7 @@ private struct PrayerQadaListSheet: View {
             Text("الفوائت والقضاء").font(.custom("thmanyahserifdisplay-Bold", size: 30, relativeTo: .title)).accessibilityAddTraits(.isHeader)
                 .accessibilityIdentifier("prayer-qada-title")
             HStack(alignment: .center, spacing: 12) {
-                Text(digits.string(items.count)).font(.custom("thmanyahserifdisplay-Bold", size: 64, relativeTo: .largeTitle))
+                if !items.isEmpty { Text(digits.string(items.count)).font(.custom("thmanyahserifdisplay-Bold", size: 64, relativeTo: .largeTitle)) }
                 Text(PrayerCopy.owed(items.count)).font(PrayerHomeType.lead).foregroundStyle(theme.secondaryInk)
                 Spacer(minLength: 0)
             }
@@ -1047,11 +1047,6 @@ private struct PrayerQadaListSheet: View {
                 }
             }
             .scrollBounceBehavior(.basedOnSize).frame(height: min(CGFloat(items.count) * 61 + 1, 280)).padding(.top, 16)
-            // Audit 28 Oct: making up the last one here leaves a calm line, not an empty frame.
-            if items.isEmpty {
-                Text("لا فوائت مسجّلة عليك").font(PrayerHomeType.lead).foregroundStyle(theme.secondaryInk)
-                    .padding(.top, 8).accessibilityIdentifier("prayer-qada-sheet-empty")
-            }
             actions(selected)
         }
         .padding(.horizontal, 20).padding(.top, 26).padding(.bottom, 14)
@@ -1770,8 +1765,11 @@ private struct PrayerStatisticsView: View {
             } else {
                 HStack(alignment: .top, spacing: 10) { metricCards }
             }
-            Text("قُضيت \(formatter.string(snapshot.statistics.madeUp))، عليك \(formatter.string(snapshot.statistics.owed))")
-                .font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("prayer-stat-qada")
+            // AU-24: «قُضيت ٠، عليك ٠» says nothing; the line appears once there is qada.
+            if snapshot.statistics.madeUp + snapshot.statistics.owed > 0 {
+                Text("قُضيت \(formatter.string(snapshot.statistics.madeUp))، عليك \(formatter.string(snapshot.statistics.owed))")
+                    .font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("prayer-stat-qada")
+            }
         }
     }
     @ViewBuilder private var metricCards: some View {
@@ -1818,7 +1816,7 @@ private struct PrayerStatisticsView: View {
                         VStack(spacing: 4) {
                             Text(mizan.due == 0 ? "—" : formatter.percent(Int((Double(mizan.onTime) / Double(mizan.due) * 100).rounded())))
                                 .font(serif(46))
-                            Text("أوفيت \(formatter.string(mizan.onTime))، معلّقة \(formatter.string(mizan.pending))")
+                            Text([mizan.onTime > 0 ? "أوفيت \(formatter.string(mizan.onTime))" : nil, mizan.pending > 0 ? "معلّقة \(formatter.string(mizan.pending))" : nil].compactMap { $0 }.joined(separator: "، "))
                                 .font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
                         }.offset(y: 12)
                     }
@@ -2057,7 +2055,10 @@ private struct PrayerDayEditSheet: View {
                 Text(firstGregorian ? gregorianTitle : hijriTitle).font(.custom("thmanyahserifdisplay-Bold", size: 26, relativeTo: .title))
                     .accessibilityAddTraits(.isHeader)
                 Spacer(minLength: 8)
-                Text("\(digits.string(together)) من \(digits.string(summary.cells.count)) جماعة").font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
+                // AU-24: a day with nothing recorded is not «٠ من ٥ جماعة».
+                if summary.cells.contains(where: { [.jamaah, .alone, .qada, .missed, .excused].contains($0.status) }) {
+                    Text("\(digits.string(together)) من \(digits.string(summary.cells.count)) جماعة").font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
+                }
             }
             Text(firstGregorian ? hijriTitle : gregorianTitle).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
         }

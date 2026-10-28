@@ -85,7 +85,7 @@ struct MoneyCategoriesView: View {
                     Text(s.name).font(.custom("thmanyahserifdisplay-Bold", size: 20, relativeTo: .headline))
                     Spacer(minLength: 6)
                     Text(figure: reading?.cycleID == nil ? "تُحسب مع أول دورة" : s.limitMinor.map { amount(s.spentMinor) + " من " + amount($0) } ?? amount(s.spentMinor) + " صُرفت، بلا حد").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
-                    Text(visible ? used.map { service.digits.string($0) + "٪" } ?? "—" : "•••").font(.custom("thmanyahsans-Bold", size: 15, relativeTo: .callout))
+                    Text(visible ? used.map { service.digits.string($0) + "٪" } ?? "" : "•••").font(.custom("thmanyahsans-Bold", size: 15, relativeTo: .callout))
                         .foregroundStyle((used ?? 0) >= 80 ? theme.color("dueText") : theme.color("reserveText")).frame(minWidth: 40, alignment: .trailing)
                 }
                 GeometryReader { proxy in

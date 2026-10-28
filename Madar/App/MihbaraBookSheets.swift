@@ -681,7 +681,7 @@ struct MihbaraHadithView: View {
             }.padding(24)
         }.background(theme.background).foregroundStyle(theme.ink)
     }
-    private func mark(_ understood: Bool) { saving = true; Task { do { try await app.executeBookCommand("hadith.mark", payload: ["number":.number(Double(hadith.number)),"edition":.string(collection.editionID),"understood":.bool(understood),"day":.string(day.description)]); dismiss() } catch { app.errorMessage = madarUserMessage(error) }; saving = false } }
+    private func mark(_ understood: Bool) { saving = true; Task { do { try await app.executeBookCommand("hadith.mark", payload: ["number":.number(Double(hadith.number)),"edition":.string(collection.editionID),"understood":.bool(understood),"day":.string(day.description)], undoMessage: understood ? "سُجّل أنك فهمته" : "سيعود إليك هذا الحديث"); dismiss() } catch { app.errorMessage = madarUserMessage(error) }; saving = false } }
 }
 private func mihbaraInteger(_ value: String) -> Int? { let clean = value.trimmingCharacters(in: .whitespacesAndNewlines); guard !clean.isEmpty, clean.allSatisfy({ $0.wholeNumberValue != nil }) else { return nil }; return Int(clean.compactMap { $0.wholeNumberValue.map(String.init) }.joined()) }
 
