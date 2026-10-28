@@ -109,6 +109,8 @@ struct WidgetMakerView: View {
             if let deleting { Button("احذفها", role: .destructive) { remove(deleting) } }
             Button("إلغاء", role: .cancel) { deleting = nil }
         } message: { Text("يبقى محتوى غرفك كما هو، ويتاح التراجع. يظل موضع ودجة النظام تحت تحكم iOS.") }
+        // AU-28: «حُفظت …» stops claiming the widget is saved once it is edited again.
+        .onChange(of: draft) { if dirty, !status.isEmpty { status = "" } }
         .task { reload(); habits = (try? HabitRepository(context: ModelContext(session.container)).readings(at: session.prayerNow())) ?? []; days = AppBahwService(session: session).upcoming(limit: Int.max).filter { UUID(uuidString: $0.id) != nil } }
         .task(id: draft.items.joined(separator: "|") + "-\(draft.style.iftarCountdown)-\(draft.style.surface)-\(session.prayerRevision)") {
             try? await Task.sleep(for: .milliseconds(150)); guard !Task.isCancelled else { return }
