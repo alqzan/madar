@@ -95,10 +95,10 @@ struct RoomWidgetContent:View {
             Text(room.title+"، "+accessoryValue).font(.caption).lineLimit(1).privacySensitive(room == .habits || room == .upcoming)
         } else if family == .accessoryCircular {
             ZStack {
-                Circle().trim(from: 0.08, to: 0.92).stroke(.primary.opacity(0.25), style: .init(lineWidth: 3, lineCap: .round)).rotationEffect(.degrees(90))
+                Circle().trim(from: 0.08, to: 0.92).stroke(.primary.opacity(0.25), style: .init(lineWidth: 3, lineCap: .round)).rotationEffect(.degrees(-90))
                 if snapshot?.locked != true {
                     Circle().trim(from: 0.08, to: 0.08 + 0.84 * min(1, max(0, accessoryRow?.share ?? 0)))
-                        .stroke(.primary, style: .init(lineWidth: 3, lineCap: .round)).rotationEffect(.degrees(90))
+                        .stroke(.primary, style: .init(lineWidth: 3, lineCap: .round)).rotationEffect(.degrees(-90))
                 }
                 VStack(spacing:1) {
                     if snapshot?.locked==true{Image(systemName:"lock");Text("افتح").font(.caption2)}
