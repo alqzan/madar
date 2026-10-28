@@ -107,7 +107,7 @@ struct QuranDayCloseView: View {
     private func review(_ value: QuranUIDayClose) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
-                Text("المراجعة: " + faces(value.reviewedFaces)).font(font(14, bold: true))
+                Text(value.reviewedFaces == 0 ? "المراجعة" : "راجعت " + service.faceCount(value.reviewedFaces, accusative: true)).font(font(14, bold: true))
                     .accessibilityIdentifier("quran-day-close-reviewed")
                 Spacer(minLength: 4)
                 Button("قبل ← بعد") { explainStrength = true }.font(font(11)).foregroundStyle(theme.secondaryInk).frame(minHeight: 44)

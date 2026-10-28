@@ -131,7 +131,7 @@ struct QuranSessionLogView: View {
                                 .accessibilityIdentifier("quran-history-grade-" + grade.id)
                         }
                     }
-                    Text("الموعد التالي: " + (value?.nextDue[page] ?? "—")).font(quranFont(12)).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("quran-history-due")
+                    if let due = value?.nextDue[page] { Text("الموعد التالي: " + due).font(quranFont(12)).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("quran-history-due") }
                 }
                 if let warning = record.warning { Text(warning).font(quranFont(13)).foregroundStyle(theme.color("dueText")).accessibilityIdentifier("quran-history-warning") }
                 Button("احذف الجلسة", role: .destructive) { deleting = record.id }.font(quranFont(13, bold: true)).foregroundStyle(theme.color("dueText")).frame(minHeight: 44).accessibilityIdentifier("quran-history-delete")

@@ -52,7 +52,7 @@ struct QuranQiyamSessionView:View {
             if qiyam.finished || qiyam.pastDay {
                 ScrollView {VStack(alignment:.leading,spacing:16) {
                     Text(qiyam.pastDay ? "جلسة من يوم سابق":"تقبّل الله قيامك").font(quranSerif(32)).foregroundStyle(QuranNightColors.gold)
-                    Text("الركعات المكتملة: "+number(qiyam.completed)+" / "+number(qiyam.total)).font(quranFont(17,bold:true)).accessibilityIdentifier("quran-qiyam-completed")
+                    Text("أتممت "+number(qiyam.completed)+" من "+(qiyam.total == 1 ? "ركعة" : qiyam.total == 2 ? "ركعتين" : number(qiyam.total)+(qiyam.total <= 10 ? " ركعات" : " ركعةً"))).font(quranFont(17,bold:true)).accessibilityIdentifier("quran-qiyam-completed")
                     if !qiyam.pastDay {ForEach(state.grades) {grade in Menu {ForEach(QuranUIGrade.allCases) {value in Button(value.title) {action(.grade(page:grade.page,grade:value))}}} label: {HStack {Text(grade.title);Spacer();Text(grade.grade.title)}.font(quranFont(15)).frame(minHeight:44)}.accessibilityIdentifier("quran-qiyam-grade-"+String(grade.page))}}
                     if qiyam.completed > 0 {Button(qiyam.finished ? "سجّل القيام والمراجعة":"سجّل ما أتممت") {action(qiyam.finished && !qiyam.pastDay ? .commit:.commitPartial)}.font(quranFont(16,bold:true)).foregroundStyle(QuranNightColors.ink).frame(maxWidth:.infinity,minHeight:54).background(QuranNightColors.gold,in:Capsule()).accessibilityIdentifier("quran-qiyam-save")}
                 }}

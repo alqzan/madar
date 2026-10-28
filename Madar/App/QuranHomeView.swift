@@ -219,7 +219,6 @@ struct QuranHomeView: View {
                 }
                 }
                 let hifzSteps = state.steps.filter { $0.kind == .bridge || $0.kind == .hifz }
-                if hifzSteps.isEmpty, state.plan != nil { Text(state.balanceTitle).font(bodyFont(14)).foregroundStyle(theme.secondaryInk) }
                 VStack(spacing: 18) { ForEach(hifzSteps) { step in stepRow(step, color: theme.color("hifzText")) } }
                     .background(alignment: .leading) { if !hifzSteps.isEmpty { Rectangle().fill(theme.color("track")).frame(width: 1.5).padding(.vertical, 16).padding(.leading, 10) } }
                 if state.plan != nil { level("المراجعة", kind: .review, value: state.reviewLevel, color: theme.color("review"), text: theme.color("reviewText"), badge: "بعد الحفظ", progress: progress(state, kinds: [.review, .drill])) }
@@ -238,7 +237,7 @@ struct QuranHomeView: View {
     private func level(_ title: String, kind: QuranUIKind, value: QuranUILevel, color: Color, text: Color, badge: String, progress: String) -> some View {
         VStack(spacing: 15) {
             HStack(spacing: 7) {
-                Text(progress).font(bodyFont(11, bold: true)).padding(7).background(theme.color("track"), in: Circle())
+                if !progress.isEmpty { Text(progress).font(bodyFont(11, bold: true)).padding(7).background(theme.color("track"), in: Circle()) }
                 Circle().fill(color).frame(width: 8, height: 8)
                 Text(title).font(bodyFont(16, bold: true)); Spacer(); Text(badge).font(bodyFont(11, bold: true)).foregroundStyle(text)
             }
@@ -285,6 +284,8 @@ struct QuranHomeView: View {
     }
     private func progress(_ state: QuranRoomState, kinds: [QuranUIKind]) -> String {
         let steps = state.steps.filter { kinds.contains($0.kind) }
+        // AU-23: a section with no steps today shows no «٠/٠» chip.
+        guard !steps.isEmpty else { return "" }
         return service.numerals.string(steps.filter(\.completed).count) + "/" + service.numerals.string(steps.count)
     }
     private func stepRow(_ step: QuranUIStep, color: Color) -> some View {

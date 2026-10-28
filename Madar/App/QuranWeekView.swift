@@ -31,8 +31,11 @@ struct QuranWeekView: View {
                     VStack(alignment: .leading, spacing: 18) {
                         Text(day.date).font(serif(22))
                         Text(day.rest ? "يوم راحة، مراجعة فقط" : day.active ? "يوم عمل" : "لا جلسات مسجّلة").font(font(15, bold: true))
-                        Text("الحفظ: " + faces(day.hifz)).font(font(16))
-                        Text("المراجعة: " + faces(day.review)).font(font(16)).accessibilityIdentifier("quran-week-day-review")
+                        // AU-23: a quiet day says so once, not as two zeros.
+                        if day.hifz > 0 || day.review > 0 {
+                            Text(day.hifz > 0 ? "حفظت " + service.faceCount(day.hifz, accusative: true) : "لم تحفظ جديدًا").font(font(16))
+                            Text(day.review > 0 ? "راجعت " + service.faceCount(day.review, accusative: true) : "لم تراجع").font(font(16)).accessibilityIdentifier("quran-week-day-review")
+                        }
                         if day.partialAyahs > 0 { Text(QuranDayCloseCopy.ayahs(day.partialAyahs, digits: service.numerals) + " من وجه لم يكتمل بعد").font(font(14)) }
                         Text("الحفظ في الحلقة الخارجية من وجه واحد، والمراجعة في الداخلية من ثمانية أوجه. يوم الراحة خارج مقام أيام الحفظ.").font(font(13)).foregroundStyle(theme.secondaryInk)
                         Button("تمّ") { selected = nil }.frame(maxWidth: .infinity, minHeight: 44)
