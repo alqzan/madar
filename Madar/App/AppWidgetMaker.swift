@@ -117,7 +117,7 @@ extension AppSession {
                 if item.hasPrefix("habit:"), let id = UUID(uuidString: String(item.dropFirst(6))), let habit = readings.first(where: { $0.id == id }), let period = habit.summary.current {
                     result.append(.init(id: item, title: habit.name, value: habit.statusTitle,
                                         detail: WidgetCopy.habitProgress(value: period.value, target: period.target, measure: period.rule.measure, unit: period.rule.unit, digits: digits),
-                                        glyph: "MadarHabits", route: "madar://bahw/habits/" + id.uuidString, share: Double(period.value) / Double(max(1, period.target)),
+                                        glyph: habit.symbol, route: "madar://bahw/habits/" + id.uuidString, share: Double(period.value) / Double(max(1, period.target)),
                                         habitID: habit.source == nil && !habit.paused && !period.met && period.target > 0 ? id : nil))
                 } else if item.hasPrefix("day:"), let id = UUID(uuidString: String(item.dropFirst(4))), let row = service.upcoming(limit: Int.max).first(where: { $0.id == id.uuidString }) {
                     let date = dateLabels(row.day)

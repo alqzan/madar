@@ -61,8 +61,15 @@ struct RoomWidgetContent:View {
                             }
                             Spacer(minLength:0)
                             if room == .habits {
-                                // X1: each habit's own ring sits at the row's far end, a check inside once it is met.
-                                ZStack{donut(row.share,width:3);if row.done{Image(systemName:"checkmark").font(.system(size:10,weight:.bold)).foregroundStyle(accent)}}.frame(width:28,height:28)
+                                // X1: the habit keeps its identity inside its progress ring.
+                                ZStack {
+                                    donut(row.share, width: 3)
+                                    if template != "periods", let glyph = HabitNameGlyph.symbol(for: row.title) {
+                                        MadarGlyph(glyph, size: 12).foregroundStyle(accent)
+                                    } else if row.done {
+                                        Image(systemName: "checkmark").font(.system(size: 10, weight: .bold)).foregroundStyle(accent)
+                                    }
+                                }.frame(width: 28, height: 28)
                             }
                         }.contentShape(.rect)
                     }.buttonStyle(.plain).privacySensitive(room == .habits || room == .upcoming)

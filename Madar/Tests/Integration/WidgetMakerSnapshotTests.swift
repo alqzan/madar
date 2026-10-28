@@ -6,6 +6,22 @@ import MadarSnapshots
 @testable import Madar
 
 @MainActor final class WidgetMakerSnapshotTests: XCTestCase {
+    func testIndividualHabitIdentitySurvivesTheWidgetJSON() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "WidgetHabitIdentity-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root), app = try AppSession(container: container, groupDirectory: root)
+        try await app.applySettingsAndWait(["core.faceIDLock": .string("none"), "core.dayStart": .string("midnight")])
+        let context = ModelContext(container), today = AppBahwService(session: app).today
+        let habit = Habit(); habit.name = "الماء"; habit.startDate = today.date(in: app.activePlace.timeZone); context.insert(habit)
+        let policy = HabitPolicy(); policy.habitID = habit.id; policy.effectiveFrom = today.description; policy.measure = "count"; policy.target = 8; policy.unit = "كوب"; context.insert(policy)
+        try context.save()
+        var draft = WidgetMakerDraft(); draft.name = "مائي"; draft.items = ["habit:" + habit.id.uuidString]
+        try await app.saveWidget(draft)
+        let value = try XCTUnwrap(app.snapshotStore.read(WidgetCatalogSnapshot.valuesName, as: WidgetCatalogSnapshot.self, now: app.prayerNow()))
+        let row = try XCTUnwrap(value.payload.configs.first?.rows.first)
+        XCTAssertEqual(row.title, "الماء"); XCTAssertEqual(row.glyph, "drop")
+        XCTAssertEqual(row.habitID, habit.id)
+    }
     func testCatalogHasMetadataOnlyAndValuesRespectPrivacyAndExpiry() async throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "WidgetMakerSnapshot-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }
