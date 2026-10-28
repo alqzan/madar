@@ -85,7 +85,9 @@ struct WidgetMakerContent: View {
                         Text(row.title).font(textFont(11, bold: true)).lineLimit(2)
                     }
                     Text(value(row)).font(textFont(family == .systemMedium ? 18 : 17, bold: true)).lineLimit(2).minimumScaleFactor(0.75)
-                    if !row.detail.isEmpty { Text(numerals(row.detail)).font(textFont(11)).lineLimit(2) }
+                    if !row.detail.isEmpty && numerals(row.detail) != value(row) {
+                        Text(numerals(row.detail)).font(textFont(11)).lineLimit(2)
+                    }
                     if !row.secondDate.isEmpty { Text(numerals(row.secondDate)).font(textFont(11)).lineLimit(1) }
                     if style.showArt, let share = row.share { ProgressView(value: max(0, min(1, share))).tint(accent).widgetAccentable().accessibilityHidden(true) }
                 }.frame(maxWidth: .infinity, alignment: .leading).contentShape(.rect)
