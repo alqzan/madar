@@ -39,7 +39,7 @@ import XCTest
         shot(app, "M5-V03-target-L")
         let undo = app.buttons["تراجع"]; XCTAssertTrue(undo.waitForExistence(timeout: 5)); undo.tap()
         XCTAssertTrue(app.descendants(matching: .any)["money-reserve-target"].firstMatch.waitForNonExistence(timeout: 10))
-        app.swipeUp(velocity: .slow); app.swipeUp(velocity: .slow); shot(app, "M5-V03-envelopes-s1-L")
+        app.swipeUp(velocity: .slow); shot(app, "M5-V03-envelopes-surplus-L"); app.swipeUp(velocity: .slow); shot(app, "M5-V03-envelopes-s1-L")
         app.terminate(); app.launch(); open(app)
         XCTAssertFalse(app.descendants(matching: .any)["money-reserve-after"].firstMatch.exists)
         XCTAssertFalse(app.descendants(matching: .any)["money-reserve-target"].firstMatch.exists)

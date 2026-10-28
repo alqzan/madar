@@ -66,10 +66,21 @@ struct MoneySurplusChart: View {
                         context.stroke(Path(future), with: .color(theme.color("surplusText")), style: .init(lineWidth: 1, dash: [3, 2]))
                     }
                 }.accessibilityHidden(true)
+                // AU-04 (Z-R12-Env): each cycle's change sits signed above its own bar, the total above «الآن».
+                ZStack(alignment: .topLeading) {
+                    let x = { (index: Int) in proxy.size.width - CGFloat(index + 1) * step + step / 2 }
+                    let y = { (value: Int) in base - CGFloat(max(0, value)) / CGFloat(maximum) * (base - 20) }
+                    ForEach(Array(points.enumerated()), id: \.element.id) { index, point in
+                        Text(figure: (point.deltaMinor > 0 ? "+" : "") + AppMoneyService(app: app).amount(point.deltaMinor)).font(MadarTypography.fine())
+                            .foregroundStyle(theme.color(point.deltaMinor < 0 ? "dueText" : "surplusText")).fixedSize()
+                            .position(x: x(index), y: min(y(point.balanceMinor), y(point.balanceMinor - point.deltaMinor)) - 9)
+                    }
+                    Text(figure: AppMoneyService(app: app).amount(current)).font(MadarTypography.fine().bold()).foregroundStyle(theme.ink).fixedSize()
+                        .position(x: x(points.count), y: y(current) - 9)
+                }.environment(\.layoutDirection, .leftToRight).accessibilityHidden(true)
                 HStack(alignment: .top, spacing: 0) {
                     ForEach(points) { point in
                         VStack(spacing: 1) {
-                            Text(AppMoneyService(app: app).amount(point.deltaMinor)).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                             if let date = point.date { MadarDateLabel(app.dateLabels(date, compact: true), primaryFont: .custom("thmanyahsans-Regular", size: 11), secondaryFont: .custom("thmanyahsans-Regular", size: 11)) }
                             else { Text("البداية").font(MadarTypography.fine()) }
                         }.frame(width: step)
