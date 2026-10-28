@@ -42,50 +42,22 @@ struct QuranSessionLogView: View {
                             }.padding(20)
                         } else { Text("لا جلسات مسجّلة بعد؛ تظهر هنا بعد أول حفظ أو مراجعة").font(quranFont(15)).padding(20) }
                     }
-                    let list = records
-                    ForEach(Array(list.enumerated()), id: \.element.id) { index, record in
+                    // AU-04 (R18-Sijil-Log): one card per day, sessions divided inside it, the day's kinds beside its date.
+                    ForEach(dayGroups, id: \.day) { group in
                         VStack(alignment: .leading, spacing: 8) {
-                            // One date per day (owner trial: eight reviews on one day repeated the same date eight times).
-                            if index == 0 || list[index - 1].day != record.day {
-                                MadarDateLabel(record.day).font(quranFont(12, bold: true)).foregroundStyle(theme.secondaryInk)
+                            HStack(alignment: .firstTextBaseline) {
+                                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                                    if let relative = group.records.first?.relative { Text(relative + "،").font(quranFont(12, bold: true)).foregroundStyle(theme.ink) }
+                                    MadarDateLabel(group.day).font(quranFont(12, bold: true)).foregroundStyle(theme.secondaryInk)
+                                }
+                                Spacer(minLength: 8)
+                                Text(kinds(group.records)).font(quranFont(11)).foregroundStyle(theme.secondaryInk)
                             }
                             QuranPaperCard {
-                                VStack(alignment: .leading, spacing: 12) {
-                                    Button {
-                                        expanded = expanded == record.id ? nil : record.id
-                                        page = record.grades.first?.page ?? 1
-                                    } label: {
-                                        HStack {
-                                            Rectangle().fill(theme.color(record.kind == .hifz ? "hifz" : "review")).frame(width: 3)
-                                            VStack(alignment: .leading, spacing: 5) { Text(record.title).font(quranFont(16, bold: true)); Text(record.detail).font(quranFont(12)).foregroundStyle(theme.secondaryInk) }
-                                            Spacer(); Image(systemName: expanded == record.id ? "chevron.up" : "chevron.down").font(.system(size: 12))
-                                        }.frame(minHeight: 50).contentShape(Rectangle())
-                                    }.buttonStyle(.plain).accessibilityIdentifier("quran-history-record-" + record.id.uuidString)
-                                    if expanded == record.id {
-                                        if !record.grades.isEmpty {
-                                            Picker("الوجه", selection: $page) { ForEach(record.grades) { grade in Text(grade.title).tag(grade.page) } }.font(quranFont(14)).tint(theme.ink)
-                                            HStack(spacing: 4) {
-                                                ForEach(QuranUIGrade.allCases) { grade in
-                                                    let current = record.grades.first { $0.page == page }?.grade == grade
-                                                    let palette: (ink: String, tint: String) = switch grade {
-                                                    case .mastered: ("reviewText", "reviewTint")
-                                                    case .good: ("hifzText", "hifzTint")
-                                                    case .needs: ("dueText", "dueTint")
-                                                    }
-                                                    Button { run { try await service.perform(.editSessionGrade(sessionID: record.id, page: page, grade: grade)); load() } } label: {
-                                                        Text(grade.title).font(quranFont(12, bold: current))
-                                                            .foregroundStyle(theme.color(palette.ink))
-                                                            .frame(maxWidth: .infinity, minHeight: 44)
-                                                            .background(current ? theme.color(palette.tint) : theme.surface, in: Capsule())
-                                                            .overlay { Capsule().stroke(theme.color(palette.ink).opacity(current ? 1 : 0.28), lineWidth: current ? 1.5 : 0.8) }
-                                                    }.buttonStyle(.plain).accessibilityAddTraits(current ? .isSelected : [])
-                                                        .accessibilityIdentifier("quran-history-grade-" + grade.id)
-                                                }
-                                            }
-                                            Text("الموعد التالي: " + (value.nextDue[page] ?? "—")).font(quranFont(12)).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("quran-history-due")
-                                        }
-                                        if let warning = record.warning { Text(warning).font(quranFont(13)).foregroundStyle(theme.color("dueText")).accessibilityIdentifier("quran-history-warning") }
-                                        Button("احذف الجلسة", role: .destructive) { deleting = record.id }.font(quranFont(13, bold: true)).foregroundStyle(theme.color("dueText")).frame(minHeight: 44).accessibilityIdentifier("quran-history-delete")
+                                VStack(alignment: .leading, spacing: 0) {
+                                    ForEach(Array(group.records.enumerated()), id: \.element.id) { index, record in
+                                        if index > 0 { Divider().padding(.vertical, 8) }
+                                        row(record)
                                     }
                                 }
                             }
@@ -103,6 +75,68 @@ struct QuranSessionLogView: View {
                 Button("أبقِ الجلسة", role: .cancel) { deleting = nil }
             } message: { _ in Text("ستُزال آثارها من الحفظ والمواعيد والأخطاء. يمكنك التراجع عشر دقائق.") }
             .alert("لم تكتمل العملية", isPresented: Binding(get: { app.errorMessage != nil }, set: { if !$0 { app.errorMessage = nil } })) { Button("تمّ") { app.errorMessage = nil } } message: { Text(app.errorMessage ?? "") }
+    }
+    private var dayGroups: [(day: String, records: [QuranUILogRecord])] {
+        records.reduce(into: []) { groups, record in
+            if groups.last?.day == record.day { groups[groups.count - 1].records.append(record) } else { groups.append((record.day, [record])) }
+        }
+    }
+    private func kinds(_ list: [QuranUILogRecord]) -> String {
+        var names: [String] = []
+        for record in list {
+            let name = switch record.kind { case .hifz: "حفظ"; case .drill: "مذاكرة"; default: "مراجعة" }
+            if !names.contains(name) { names.append(name) }
+        }
+        return names.joined(separator: "، ")
+    }
+    /// The session's weakest page grade; a session is only as settled as its weakest face.
+    private func weakest(_ record: QuranUILogRecord) -> QuranUIGrade? {
+        record.grades.map(\.grade).max { QuranUIGrade.allCases.firstIndex(of: $0)! < QuranUIGrade.allCases.firstIndex(of: $1)! }
+    }
+    private func palette(_ grade: QuranUIGrade) -> (ink: String, tint: String) {
+        switch grade { case .mastered: ("reviewText", "reviewTint"); case .good: ("hifzText", "hifzTint"); case .needs: ("dueText", "dueTint") }
+    }
+    @ViewBuilder private func row(_ record: QuranUILogRecord) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Button {
+                expanded = expanded == record.id ? nil : record.id
+                page = record.grades.first?.page ?? 1
+            } label: {
+                HStack(spacing: 10) {
+                    Rectangle().fill(theme.color(record.kind == .hifz ? "hifz" : "review")).frame(width: 3)
+                    VStack(alignment: .leading, spacing: 5) { Text(record.title).font(quranFont(16, bold: true)); Text(record.detail).font(quranFont(12)).foregroundStyle(theme.secondaryInk) }
+                    Spacer(minLength: 6)
+                    if let grade = weakest(record) {
+                        let colours = palette(grade)
+                        Text(grade.title).font(quranFont(11, bold: true)).foregroundStyle(theme.color(colours.ink))
+                            .padding(.horizontal, 10).padding(.vertical, 4).background(theme.color(colours.tint), in: Capsule())
+                    }
+                    Image(systemName: expanded == record.id ? "chevron.up" : "chevron.down").font(.system(size: 12)).foregroundStyle(theme.secondaryInk)
+                }.frame(minHeight: 50).contentShape(Rectangle())
+            }.buttonStyle(.plain).accessibilityIdentifier("quran-history-record-" + record.id.uuidString)
+            if expanded == record.id {
+                if !record.grades.isEmpty {
+                    Picker("الوجه", selection: $page) { ForEach(record.grades) { grade in Text(grade.title).tag(grade.page) } }.font(quranFont(14)).tint(theme.ink)
+                    HStack(spacing: 4) {
+                        ForEach(QuranUIGrade.allCases) { grade in
+                            let current = record.grades.first { $0.page == page }?.grade == grade
+                            let colours = palette(grade)
+                            Button { run { try await service.perform(.editSessionGrade(sessionID: record.id, page: page, grade: grade)); load() } } label: {
+                                Text(grade.title).font(quranFont(12, bold: current))
+                                    .foregroundStyle(theme.color(colours.ink))
+                                    .frame(maxWidth: .infinity, minHeight: 44)
+                                    .background(current ? theme.color(colours.tint) : theme.surface, in: Capsule())
+                                    .overlay { Capsule().stroke(theme.color(colours.ink).opacity(current ? 1 : 0.28), lineWidth: current ? 1.5 : 0.8) }
+                            }.buttonStyle(.plain).accessibilityAddTraits(current ? .isSelected : [])
+                                .accessibilityIdentifier("quran-history-grade-" + grade.id)
+                        }
+                    }
+                    Text("الموعد التالي: " + (value?.nextDue[page] ?? "—")).font(quranFont(12)).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("quran-history-due")
+                }
+                if let warning = record.warning { Text(warning).font(quranFont(13)).foregroundStyle(theme.color("dueText")).accessibilityIdentifier("quran-history-warning") }
+                Button("احذف الجلسة", role: .destructive) { deleting = record.id }.font(quranFont(13, bold: true)).foregroundStyle(theme.color("dueText")).frame(minHeight: 44).accessibilityIdentifier("quran-history-delete")
+            }
+        }
     }
     private func load() { do { value = try service.sessionLog() } catch { self.error = quranUserMessage(error) } }
     private func run(_ work: @escaping @MainActor () async throws -> Void) { guard !busy else { return }; busy = true; Task { defer { busy = false }; do { try await work() } catch { self.error = quranUserMessage(error) } } }
