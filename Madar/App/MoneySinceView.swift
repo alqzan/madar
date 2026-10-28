@@ -75,7 +75,7 @@ struct MoneySinceView: View {
             }
             HStack {
                 Text("عدد الأيام " + service.digits.string(r.days.count)).foregroundStyle(theme.secondaryInk)
-                Text("✓ " + service.digits.string(r.shortcutCount) + (r.shortcutCount == 1 ? " رسالة عبر الاختصار" : " رسائل عبر الاختصار")).bold().foregroundStyle(theme.color("surplusText"))
+                Text("✓ " + service.counted(r.shortcutCount, ("رسالة واحدة", "رسالتان", "رسائل", "رسالةً")) + " عبر الاختصار").bold().foregroundStyle(theme.color("surplusText"))
                 Spacer()
                 MadarDateLabel(app.dateLabels(r.today, compact: true, weekday: true), primaryFont: MadarTypography.fine(), secondaryFont: MadarTypography.fine())
             }.font(MadarTypography.fine())

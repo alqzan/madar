@@ -43,7 +43,7 @@ struct MoneyGoalView: View {
                 if !visible { Button("المس لإظهار الأرقام") { revealed = true }.frame(minHeight: 44).accessibilityIdentifier("money-goal-reveal") }
                 ScrollView(.horizontal) { HStack { ForEach(["هدية", "دراسة", "سفرة", "أثاث", "سيارة"], id: \.self) { title in Button(title) { name = title }.font(MadarTypography.caption()).padding(.horizontal, 18).frame(minHeight: 42).background(name == title ? theme.ink : .clear, in: Capsule()).foregroundStyle(name == title ? theme.background : theme.ink).overlay { Capsule().stroke(theme.color("reserveText").opacity(0.25)) } } } }.scrollIndicators(.hidden)
                 Button { edit = true } label: { HStack { VStack(alignment: .leading) { Text(name.isEmpty ? "ما الذي تستعد له؟" : name).font(MadarTypography.cardTitle()).foregroundStyle(theme.color("reserveText")); Text(shown(minor(amount))).font(.custom("thmanyahserifdisplay-Bold", size: 40, relativeTo: .largeTitle)) }; Spacer(); Image(systemName: "pencil").frame(width: 44, height: 44).overlay { Circle().stroke(theme.color("reserveText")) } }.frame(maxWidth: .infinity).contentShape(.rect) }.accessibilityIdentifier("money-goal-edit")
-                Text(reading.dailyMinor > 0 ? "حجمه من يومياتك: " + app.digits(target / max(1, reading.dailyMinor)) + " يومًا؛ اختر ما يناسبك" : "يمكنك تمويله من الفائض أو الاحتياطي؛ اليومية غير متاحة الآن")
+                Text(reading.dailyMinor > 0 ? "حجمه من يومياتك: " + service.days(target / max(1, reading.dailyMinor)) + "؛ اختر ما يناسبك" : "يمكنك تمويله من الفائض أو الاحتياطي؛ اليومية غير متاحة الآن")
                     .font(MadarTypography.caption()).padding(12).frame(maxWidth: .infinity).background(theme.surface, in: RoundedRectangle(cornerRadius: 12)).accessibilityHidden(!visible).redacted(reason: visible ? [] : .placeholder)
                 HStack(spacing: 8) { ForEach(0..<3, id: \.self) { index in
                     Button { choose(index) } label: { VStack(spacing: 7) { Text(["خفيف", "متوازن", "سريع"][index]).font(MadarTypography.cardTitle()); Text(shown(suggestions[index].dailyMinor) + "/ يوم").font(MadarTypography.body()); Text(!visible ? "•••" : suggestions[index].days.map { $0 == 0 ? "جاهز من الفائض" : service.days($0) } ?? "عدّل اليومية").font(MadarTypography.fine()) }.frame(maxWidth: .infinity, minHeight: 96).padding(4).background(selected == index ? theme.ink : .clear, in: RoundedRectangle(cornerRadius: 16)).foregroundStyle(selected == index ? theme.background : theme.ink).overlay { RoundedRectangle(cornerRadius: 16).stroke(theme.color("reserveText").opacity(0.25)) } }.accessibilityIdentifier("money-goal-plan-\(index)")
@@ -51,7 +51,7 @@ struct MoneyGoalView: View {
                 VStack(spacing: 4) { Text("يكتمل تقريبًا").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                     if let finish, visible { MadarDateLabel(app.dateLabels(finish), primaryFont: MadarTypography.cardTitle(), secondaryFont: MadarTypography.caption()).foregroundStyle(theme.color("reserveText")) }
                     else { Text(visible ? "اختر مبلغًا وخطة" : "•••").font(MadarTypography.cardTitle()) }
-                    Text(app.digits(days ?? 0) + " يومًا؛ يبقى ليومك " + shown(max(0, reading.dailyMinor - minor(daily)))).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).redacted(reason: visible ? [] : .placeholder)
+                    Text(service.days(days ?? 0) + "؛ يبقى ليومك " + shown(max(0, reading.dailyMinor - minor(daily)))).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).redacted(reason: visible ? [] : .placeholder)
                 }.accessibilityIdentifier("money-goal-completion")
                 if !size.isAccessibilitySize && visible { chart.frame(height: 120).accessibilityHidden(true) }
                 VStack(spacing: 8) {
@@ -94,7 +94,7 @@ struct MoneyGoalView: View {
             Path { path in path.move(to: .init(x: proxy.size.width, y: y)); path.addLine(to: .init(x: x, y: height)) }.stroke(theme.secondaryInk.opacity(0.4), style: .init(lineWidth: 1, dash: [3, 4]))
         }
         Path { path in path.move(to: .init(x: proxy.size.width, y: top)); path.addLine(to: .init(x: end, y: height)) }.stroke(theme.color("surplusText"), lineWidth: 2)
-        HStack { Text("الآن"); Spacer(); Text("بعد " + app.digits(horizon) + " يومًا") }.font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).frame(maxHeight: .infinity, alignment: .bottom)
+        HStack { Text("الآن"); Spacer(); Text("بعد " + service.days(horizon)) }.font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).frame(maxHeight: .infinity, alignment: .bottom)
     } }
     private var editor: some View { NavigationStack { ScrollView { VStack(alignment: .leading, spacing: 16) {
         Text("على قدر يومك").font(MadarTypography.title())

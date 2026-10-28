@@ -84,7 +84,7 @@ struct MoneyEnvelopeDetailView: View {
             VStack(alignment: .leading, spacing: 2) {
                 if let plan = reading.repayment, let next = plan.nextMinor {
                     Text("الدين " + service.amount(debt) + "، يُسدّد " + service.amount(next) + " من الراتب القادم")
-                    Text(plan.remainingMinor.count == 1 ? "آخر دفعة في الخطة" : "باقي " + service.digits.string(plan.remainingMinor.count) + " رواتب في الخطة").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                    Text(plan.remainingMinor.count == 1 ? "آخر دفعة في الخطة" : "باقي " + salariesText(plan.remainingMinor.count) + " في الخطة").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                 } else { Text("الدين " + service.amount(debt) + " بلا خطة سداد") }
             }.font(MadarTypography.body()).foregroundStyle(theme.color("debt")).accessibilityIdentifier("money-detail-debt")
             Spacer(minLength: 8)

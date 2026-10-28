@@ -147,7 +147,7 @@ struct MihbaraMotivationCue: Identifiable {
                 let remaining = total - current
                 cues.append(.init(
                     id: "progress-\(book.id.uuidString)", title: "أنت أقرب مما تظن",
-                    message: "بقي " + arabicCount(remaining, ["صفحة واحدة", "صفحتان", "صفحات", "صفحة"], digits) + " لتكمل «" + book.title + "»",
+                    message: MihbaraCopy.pagesLeft(remaining, digits) + " لتكمل «" + book.title + "»",
                     source: "موضعك: صفحة " + digits.string(current) + " من " + digits.string(total),
                     actionTitle: "واصل القراءة", bookID: book.id
                 ))

@@ -32,7 +32,7 @@ struct MoneyMessagesView: View {
                 header
                 if let reading {
                     HStack(alignment: .firstTextBaseline) {
-                        Label(service.digits.string(reading.shortcutToday) + (reading.shortcutToday == 1 ? " رسالة وصلت اليوم عبر الاختصار" : " رسائل وصلت اليوم عبر الاختصار"), systemImage: "checkmark.square")
+                        Label(service.counted(reading.shortcutToday, ("رسالة واحدة", "رسالتان", "رسائل", "رسالةً")) + " وصلت اليوم عبر الاختصار", systemImage: "checkmark.square")
                             .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-messages-shortcut")
                         Spacer(minLength: 8)
                         MadarDateLabel(app.dateLabels(reading.today, compact: true, weekday: true), primaryFont: MadarTypography.fine(), secondaryFont: MadarTypography.fine())
@@ -266,7 +266,7 @@ struct MoneyMessagesView: View {
     private func looks(_ items: [MoneyMessageLook]) -> some View {
         LazyVStack(alignment: .leading, spacing: 10) {
             HStack { Text("تحتاج نظرة").font(MadarTypography.cardTitle()).foregroundStyle(theme.color("reserveText")); DoubleRule().stroke(theme.color("reserveText"), lineWidth: 0.7).frame(height: 3) }
-            Text("رسائل لم يفهمها المحلّل؛ لا تُحسب حتى تحسمها.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+            Text("رسائل لم يفهمها مدار؛ لا تُحسب حتى تحسمها.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
             ForEach(items) { item in
                 HStack(alignment: .top, spacing: 12) {
                     avatar(item.sender)

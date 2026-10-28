@@ -301,7 +301,7 @@ struct MoneySalaryView: View {
         return VStack(alignment: .leading, spacing: 10) {
             Rectangle().fill(theme.line).frame(height: 1)
             Text("الشكل ١، الفائض المرحّل").font(.custom("thmanyahserifdisplay-Bold", size: 21, relativeTo: .title3))
-            Text("آخر " + service.digits.string(r.history.count) + " دورات، والأخيرة هي التي تُغلق الآن").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+            Text("آخر " + service.counted(r.history.count, ("دورة", "دورتين", "دورات", "دورةً")) + "، والأخيرة هي التي تُغلق الآن").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
             if dynamicType.isAccessibilitySize {
                 ForEach(r.history) { bar in HStack { Text(bar.label); Spacer(); Text(figure: signed(bar.carriedMinor)) } }
             } else {
@@ -374,7 +374,7 @@ struct MoneySalaryView: View {
         let left = target - e.balanceMinor
         guard left > 0 else { return "اكتمل" }
         let salaries = (left + e.amountMinor - 1) / e.amountMinor
-        return salaries == 1 ? "يكتمل بهذا الراتب" : salaries == 2 ? "يكتمل بعد راتبين" : "يكتمل بعد " + service.digits.string(salaries) + " رواتب"
+        return salaries == 1 ? "يكتمل بهذا الراتب" : salaries == 2 ? "يكتمل بعد راتبين" : "يكتمل بعد " + service.counted(salaries, ("راتب", "راتبين", "رواتب", "راتبًا"))
     }
     private func stepper(_ symbol: String, _ e: SalaryOpeningReading.EnvelopeLine, _ delta: Int) -> some View {
         Button {

@@ -898,7 +898,7 @@ struct MihbaraHomeView: View {
     }
     private static let librarySections: [(shelf: String, title: String, note: String?)] = [
         ("reading", "أقرؤها الآن", nil), ("want", "أبي أقرأها", nil), ("finished", "أنهيتها", nil),
-        ("old", "قديمًا", "كتب قرأتها من زمان، تستقر أيضًا أسفل «أنهيتها» في الغرفة."),
+        ("old", "قديمًا", "كتب قرأتها منذ زمن، وتستقر أيضًا أسفل «أنهيتها» في الغرفة."),
     ]
     private func libraryCover(_ b: MihbaraBook, leather: Int) -> some View {
         Button { openBook(b) } label: {
@@ -1298,7 +1298,7 @@ private struct MihbaraOldBooksCabinet: View {
                 }.accessibilityHidden(true)
             }
             if books.isEmpty {
-                Text("كتب أنهيتها من زمان تستقر هنا حين تستورد قراءاتك القديمة.")
+                Text("كتب أنهيتها منذ زمن تستقر هنا حين تستورد قراءاتك القديمة.")
                     .font(MadarTypography.caption())
                     .foregroundStyle(theme.color("onDesk"))
                     .frame(maxWidth: .infinity, minHeight: 70, alignment: .leading)

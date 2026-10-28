@@ -53,7 +53,7 @@ struct MoneyBigExpenseView: View {
                                 VStack(alignment: .leading, spacing: 12) {
                                     if p.repaymentMinor > 0 {
                                     HStack { Text("سداده على").font(MadarTypography.caption()); Spacer();
-                                        Menu { ForEach(1...12, id: \.self) { n in Button(service.digits.string(n) + " دورات") { cycles = n } } } label: { Text(service.digits.string(p.cycles) + " دورات").font(MadarTypography.body()); Image(systemName: "chevron.down") }.accessibilityIdentifier("money-big-cycles")
+                                        Menu { ForEach(1...12, id: \.self) { n in Button(service.counted(n, ("دورة واحدة", "دورتان", "دورات", "دورةً"))) { cycles = n } } } label: { Text(service.counted(p.cycles, ("دورة واحدة", "دورتان", "دورات", "دورةً"))).font(MadarTypography.body()); Image(systemName: "chevron.down") }.accessibilityIdentifier("money-big-cycles")
                                     }
                                     Text("سداد مستقل، لا يزيد على ثلث يومك.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                                     } else { Text("يغطيه رصيد المظروف؛ لا اقتطاع قادم.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }

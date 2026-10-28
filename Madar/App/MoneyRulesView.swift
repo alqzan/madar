@@ -33,7 +33,7 @@ struct MoneyRulesView: View {
                         Text(reading.rules.count == 1 ? "تاجر يعرفه مدار" : "تجار يعرفهم مدار").font(MadarTypography.cardTitle())
                         Spacer()
                         if reading.applied > 0 {
-                            (Text("طُبّقت ") + Text(service.digits.string(reading.applied)).bold().foregroundStyle(theme.color("surplusText")) + Text(" مرة بدلًا منك"))
+                            (Text("طُبّقت ") + Text(service.counted(reading.applied, ("مرة واحدة", "مرتان", "مرات", "مرةً"))).bold().foregroundStyle(theme.color("surplusText")) + Text(" بدلًا منك"))
                                 .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                         }
                     }.accessibilityElement(children: .combine).accessibilityIdentifier("money-rules-count")
@@ -75,7 +75,7 @@ struct MoneyRulesView: View {
                                         VStack(spacing: 4) {
                                             Image(systemName: MoneyCategoryIcon.symbol(r.allCategories.first { $0.id == option.categoryID }?.icon ?? "", name: option.name))
                                             Text(option.name).font(MadarTypography.caption()).bold().lineLimit(1)
-                                            Text(service.digits.string(option.count) + " مرة").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                                            Text(service.counted(option.count, ("مرة واحدة", "مرتان", "مرات", "مرةً"))).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                                         }.frame(width: 104, height: 84).overlay { RoundedRectangle(cornerRadius: 8).stroke(theme.color("bills"), lineWidth: 1) }
                                     }.buttonStyle(.plain).accessibilityIdentifier("money-conflict-option")
                                 }
@@ -110,7 +110,7 @@ struct MoneyRulesView: View {
                                     }.foregroundStyle(active ? theme.background : tint)
                                 }.shadow(color: active ? tint.opacity(0.45) : .clear, radius: 14)
                                 Text(item.1).font(MadarTypography.caption()).bold().foregroundStyle(active ? tint : theme.ink).lineLimit(1)
-                                Text(service.digits.string(item.4) + " مرة").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                                Text(service.counted(item.4, ("مرة واحدة", "مرتان", "مرات", "مرةً"))).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                             }.frame(minWidth: 72)
                         }.buttonStyle(.plain).accessibilityIdentifier("money-lantern-" + item.1)
                     }
@@ -126,7 +126,7 @@ struct MoneyRulesView: View {
         return VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .firstTextBaseline) {
                 Text(name).font(.custom("thmanyahserifdisplay-Bold", size: 26, relativeTo: .title2)).foregroundStyle(theme.color("dueText"))
-                Text(service.digits.string(list.count) + (list.count == 1 ? " تاجر" : " تجار")).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                Text(service.counted(list.count, ("تاجر واحد", "تاجران", "تجار", "تاجرًا"))).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                 Spacer()
                 Text("اضغط تاجرًا لتنقله").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
             }.padding(.bottom, 8)
