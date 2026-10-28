@@ -15,7 +15,7 @@ extension AppQuranService {
         let night=try PrayerRepository(context:repository.context).defaultNight(at:clock())
         let row=try repository.context.fetch(FetchDescriptor<QiyamNight>()).filter {$0.nightKey == night.description && $0.mergedInto == nil}.max {$0.updatedAt < $1.updatedAt}
         let assignments=try QuranQiyamEngine.assignment(rakats:rakaat,pages:v.pages)
-        let unavailable = v.pages.isEmpty ? "يظهر ورد القيام بعد حفظ وجه كامل" : row?.deletedAt != nil ? "أعد تسجيل الليلة صراحة من قسم الصلاة أولًا" : row?.quranSessionID != nil ? "سُجّل ورد هذه الليلة؛ تجده في سجل الجلسات" : nil
+        let unavailable = v.pages.isEmpty ? "يظهر ورد القيام بعد حفظ وجه كامل" : row?.deletedAt != nil ? "حُذف قيام هذه الليلة من الصلاة؛ سجّله هناك من جديد ليظهر ورده" : row?.quranSessionID != nil ? "سُجّل ورد هذه الليلة؛ تجده في سجل الجلسات" : nil
         return QuranUIQiyamBoard(assignments:qiyamRows(assignments.pageByRakah,catalog:catalog,pages:v.pages),unavailable:unavailable,night:displayDate(night))
     }
     func qiyamPages(_ draft:QuranSessionDraft,catalog:QuranResourceCatalog)->[Int] {
@@ -24,9 +24,9 @@ extension AppQuranService {
     }
     private func qiyamRows(_ assigned:[Int?],catalog:QuranResourceCatalog,pages:[QuranPlanningPage])->[QuranUIQiyamRakah] {
         assigned.enumerated().map { i,page in
-            let title=page.map {n in (catalog.ayahs(on:n).first?.surahNameArabic ?? "") + "، " + numerals.string(n)} ?? "أعد ما شئت"
+            let title=page.map {n in (catalog.ayahs(on:n).first?.surahNameArabic ?? "") + "، " + numerals.string(n)} ?? "اقرأ ما شئت مما حفظت"
             let record=pages.first {$0.page == page}
-            return QuranUIQiyamRakah(id:i,page:page,title:title,status:page == nil ? "لا يُكرّر تسجيل الوجه" : record?.isDue == true ? "مستحق" : "في صدرك")
+            return QuranUIQiyamRakah(id:i,page:page,title:title,status:page == nil ? "لا يُحتسب الوجه مرتين" : record?.isDue == true ? "مستحق" : "في صدرك")
         }
     }
     func qiyamSession(_ value:QuranDraftPayload,catalog:QuranResourceCatalog) throws ->QuranUIQiyamSession {
