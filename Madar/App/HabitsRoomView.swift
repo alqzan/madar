@@ -63,7 +63,7 @@ struct HabitsRoomView: View {
                         periodSummaries
                         if active.count > 1 && !dynamicTypeSize.isAccessibilitySize {
                             nextStep
-                            HabitOrbitView(readings: active, digits: digits, theme: theme) { detail = $0 }
+                            HabitOrbitView(readings: active, digits: digits, theme: theme, nowPositions: AppBahwService(session: session).habitOrbitPositions()) { detail = $0 }
                                 .accessibilityElement(children: .contain).accessibilityIdentifier("habits-orbit")
                         } else {
                             hero

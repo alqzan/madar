@@ -5,7 +5,9 @@ import MadarDesign
 
 /// RL1: each visible bead has a visible name and a 44 pt target. Extra habits stay in the labelled list.
 struct HabitOrbitView:View {
-    let readings:[HabitReading]; let digits:MadarNumberFormatter; let theme:RoomTheme; let select:(HabitReading)->Void
+    let readings:[HabitReading]; let digits:MadarNumberFormatter; let theme:RoomTheme
+    let nowPositions:[HabitFrequency:Double]
+    let select:(HabitReading)->Void
     private let frequencies:[HabitFrequency] = [.daily,.weekly,.monthly,.yearly]
     /// A linked habit's bead takes its room's colour (prayer, Quran, diary, Mihbara), as W2 draws them.
     private func beadColour(_ row:HabitReading)->Color {
@@ -39,11 +41,18 @@ struct HabitOrbitView:View {
                             }.frame(width:86,height:44)
                         }.buttonStyle(.plain).accessibilityLabel(row.name+"، "+row.statusTitle).accessibilityIdentifier("habit-orbit-"+row.id.uuidString).position(x:centre.x+cos(angle)*radius,y:centre.y+sin(angle)*radius)
                     }
+                    if let phase = nowPositions[f] {
+                        let angle = (phase * 360 - 90) * Double.pi / 180
+                        Circle().fill(theme.ink).frame(width: 6, height: 6)
+                            .overlay { Circle().stroke(theme.surface, lineWidth: 1) }
+                            .position(x: centre.x + cos(angle) * radius, y: centre.y + sin(angle) * radius)
+                            .accessibilityHidden(true)
+                    }
                 }
                 VStack(spacing:4) { Text(centreCount).font(MadarTypography.cardTitle()); Text("عادات اليوم").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }.frame(width:88,height:88).background(theme.surface,in:.circle).overlay{Circle().stroke(theme.line)}.position(centre)
             }.environment(\.layoutDirection,.leftToRight)
         }.frame(height:380)
-        .overlay(alignment:.bottom) { HStack(spacing:12) { ForEach([HabitBead.State.done,.waiting,.atRisk,.paused],id:\.self) { st in Label { Text(st.title) } icon: { HabitBead(state:st,colour:theme.accentFill,theme:theme).frame(width:11,height:11) } } }.font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).padding(.bottom,8) }
+        .overlay(alignment:.bottom) { HStack(spacing:10) { ForEach([HabitBead.State.done,.waiting,.atRisk,.paused],id:\.self) { st in Label { Text(st.title) } icon: { HabitBead(state:st,colour:theme.accentFill,theme:theme).frame(width:11,height:11) } }; Label { Text("الآن") } icon: { Circle().fill(theme.ink).frame(width:6,height:6) } }.font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).padding(.bottom,8) }
         .background(theme.surface.opacity(0.35),in:.rect(cornerRadius:26)).overlay{RoundedRectangle(cornerRadius:26).stroke(theme.line)}
     }
 }
