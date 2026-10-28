@@ -114,10 +114,12 @@ struct RoomWidgetContent:View {
                         }
                     } else {
                         let value=accessoryRow?.value ?? ""
-                        let big=room == .upcoming ? value.split(separator:" ").first.map(String.init) : (value.contains(where:{$0.isNumber}) ? value : nil)
+                        // AU-19: an elapsed day reads «مضى ٣ أيام»; the big slot takes the number, not «مضى».
+                        let words=value.split(separator:" ").map(String.init)
+                        let big=room == .upcoming ? (words.first{$0.contains(where:{$0.isNumber})} ?? value) : (value.contains(where:{$0.isNumber}) ? value : nil)
                         if room == .upcoming, accessoryRow?.id == "season-9-1" { Image(systemName: "moon").font(.system(size: 10)) }
                         Text(big ?? "افتح").font(.custom("thmanyahsans-Bold",size:15,relativeTo:.caption)).lineLimit(1).minimumScaleFactor(0.74)
-                        Text(room == .upcoming ? accessoryRow?.title ?? room.title : "السنة").font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).lineLimit(1)
+                        Text(room == .upcoming ? accessoryRow?.title ?? room.title : accessoryRow?.title ?? "السنة").font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).lineLimit(1)
                     }
                 }.padding(7)
             }.privacySensitive(room == .habits || room == .upcoming).foregroundStyle(.primary).accessibilityElement(children:.combine)
