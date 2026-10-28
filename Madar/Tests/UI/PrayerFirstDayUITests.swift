@@ -27,6 +27,12 @@ import XCTest
         XCTAssertTrue(alone.waitForExistence(timeout: 10), app.debugDescription)
         alone.tap()
         XCTAssertTrue(app.buttons["undo-button"].waitForExistence(timeout: 15), app.debugDescription)
+        // The default heart question keeps the log sheet open after the prayer is saved.
+        // Finish that real flow before checking or scrolling the home behind it.
+        let skipHeart = app.buttons["prayer-heart-skip"]
+        XCTAssertTrue(skipHeart.waitForExistence(timeout: 10), app.debugDescription)
+        skipHeart.tap()
+        XCTAssertTrue(alone.waitForNonExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(fajr.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(fajr.label.contains("وحدي"), fajr.label)
         XCTAssertTrue(fajr.label.contains("—"), fajr.label)
@@ -88,7 +94,13 @@ import XCTest
 
     private func reveal(_ element: XCUIElement, in app: XCUIApplication) {
         XCTAssertTrue(element.waitForExistence(timeout: 10), app.debugDescription)
-        for _ in 0..<12 where !element.isHittable { app.swipeUp() }
+        // A partly visible tall card can report hittable while its tap point is
+        // beneath the floating accessory. Bring its centre into the clear area.
+        for _ in 0..<12 {
+            if element.isHittable && element.frame.midY < app.frame.maxY * 0.8 { break }
+            app.swipeUp()
+        }
         XCTAssertTrue(element.isHittable, app.debugDescription)
+        XCTAssertLessThan(element.frame.midY, app.frame.maxY * 0.8, app.debugDescription)
     }
 }
