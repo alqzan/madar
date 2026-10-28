@@ -24,7 +24,12 @@ struct HabitOrbitView:View {
                     let radius=base-Double(3-index)*28, rows=readings.filter{$0.summary.current?.rule.frequency == f}, due=rows.filter{!$0.paused && ($0.summary.current?.target ?? 0)>0}, met=due.filter{$0.summary.current?.met == true}.count
                     Circle().stroke(theme.line,lineWidth:1).frame(width:radius*2,height:radius*2).position(centre)
                     Circle().trim(from:0,to:due.isEmpty ? 0 : Double(met)/Double(due.count)).stroke(theme.accentFill.opacity(0.55),style:.init(lineWidth:5,lineCap:.round)).rotationEffect(.degrees(-90)).frame(width:radius*2,height:radius*2).position(centre)
-                    Text(f == .daily ? "اليوم" : f == .weekly ? "الأسبوع" : f == .monthly ? "الشهر" : "السنة").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).padding(.horizontal,5).background(theme.surface).position(x:centre.x,y:centre.y-radius)
+                    let period = f == .daily ? "اليوم" : f == .weekly ? "الأسبوع" : f == .monthly ? "الشهر" : "السنة"
+                    let progress = due.isEmpty ? "" : " " + digits.percent(Int((Double(met) * 100 / Double(due.count)).rounded()))
+                    Text(period + progress).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                        .padding(.horizontal,5).background(theme.surface).position(x:centre.x,y:centre.y-radius)
+                        .accessibilityIdentifier("habit-orbit-progress-" + f.rawValue)
+                        .accessibilityLabel(period + (due.isEmpty ? "، لا أهداف في هذه الفترة" : progress))
                     ForEach(Array(rows.prefix(3).enumerated()),id:\.element.id) { offset,row in
                         let angle=(Double(offset)*100+30+Double(index)*35)*Double.pi/180
                         Button { select(row) } label: {

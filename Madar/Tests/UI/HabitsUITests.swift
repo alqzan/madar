@@ -80,6 +80,10 @@ import UIKit
         continueAfterFailure = false
         for fixture in ["pausedLater", "pausedLaterMixed"] {
             let app = app(fixture); open(app)
+            let weekly = app.staticTexts["habit-orbit-progress-weekly"]
+            XCTAssertTrue(weekly.waitForExistence(timeout: 5))
+            XCTAssertEqual(weekly.label, "الأسبوع، لا أهداف في هذه الفترة")
+            XCTAssertFalse(weekly.label.contains("٪"), "A paused-only period has no completion denominator.")
             let later = app.buttons["habits-later"]
             XCTAssertTrue(later.waitForExistence(timeout: 5), app.debugDescription)
             shot(app, "M4-later-\(fixture)-L")
@@ -151,6 +155,10 @@ import UIKit
         XCTAssertTrue(today.waitForExistence(timeout:5),app.debugDescription);XCTAssertTrue(today.isSelected)
         XCTAssertTrue(app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@","الماء،")).firstMatch.exists)
         XCTAssertTrue(app.descendants(matching: .any)["habits-orbit"].exists)
+        // The fixture has no events today, two completed weekly goals, and completed monthly/yearly goals.
+        for (frequency, expected) in [("daily", "اليوم ٠٪"), ("weekly", "الأسبوع ١٠٠٪"), ("monthly", "الشهر ١٠٠٪"), ("yearly", "السنة ١٠٠٪")] {
+            XCTAssertEqual(app.staticTexts["habit-orbit-progress-" + frequency].label, expected)
+        }
         XCTAssertFalse(app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH %@ AND label BEGINSWITH %@","habit-row-", "العمرة")).firstMatch.exists)
         let yearlyBead = app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH %@ AND label BEGINSWITH %@", "habit-orbit-", "العمرة")).firstMatch
         XCTAssertTrue(yearlyBead.exists); yearlyBead.tap()
@@ -203,6 +211,19 @@ import UIKit
         XCTAssertTrue(today.waitForExistence(timeout: 5)); today.tap()
         XCTAssertTrue(today.isSelected)
         XCTAssertTrue(app.staticTexts["habits-today-group-daily"].waitForExistence(timeout: 5))
+    }
+    func testOrbitPercentageUpdatesAfterCompletionAndRelaunch() throws {
+        continueAfterFailure = false
+        let app = app("showcase"); open(app)
+        let daily = app.staticTexts["habit-orbit-progress-daily"]
+        XCTAssertEqual(daily.label, "اليوم ٠٪")
+        let morning = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label BEGINSWITH %@", "habit-orbit-", "أذكار الصباح")).firstMatch
+        XCTAssertTrue(morning.isHittable); morning.tap()
+        XCTAssertTrue(app.buttons["habit-complete"].waitForExistence(timeout: 5)); app.buttons["habit-complete"].tap()
+        XCTAssertTrue(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", "اليوم ٣٣٪"), object: daily)], timeout: 10) == .completed)
+        shot(app, "OR-02-orbit-one-of-three-L")
+        app.terminate(); app.launch(); open(app)
+        XCTAssertEqual(daily.label, "اليوم ٣٣٪")
     }
     func testScheduledMonthlyAndYearlyHabitsAppearOnTheirDates() {
         continueAfterFailure = false
