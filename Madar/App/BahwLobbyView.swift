@@ -87,7 +87,7 @@ struct BahwLobbyView: View {
                     }
                     if arranging {
                         Button { drawerOpen = true } label: {
-                            Label(layout.hiddenBuilt.isEmpty ? "لا كتل مخفية" : "المخفية: " + service.digits.string(layout.hiddenBuilt.count), systemImage: "plus")
+                            Label(layout.hiddenBuilt.isEmpty ? "لا ودجات مخفية" : "المخفية: " + WidgetCopy.agree(layout.hiddenBuilt.count, service.digits, one: "ودجة واحدة", two: "ودجتان", few: "ودجات", many: "ودجة"), systemImage: "plus")
                                 .font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 46).overlay { Capsule().stroke(theme.line) }
                         }.buttonStyle(.plain).disabled(layout.hiddenBuilt.isEmpty).accessibilityIdentifier("bahw-drawer")
                     }
@@ -197,7 +197,7 @@ struct BahwLobbyView: View {
                     .accessibilityIdentifier("bahw-show-" + block.rawValue)
             }
             .scrollContentBackground(.hidden).background(theme.background)
-            .navigationTitle("الكتل المخفية").navigationBarTitleDisplayMode(.inline)
+            .navigationTitle("الودجات المخفية").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarLeading) { Button("تم") { drawerOpen = false } } }
         }.environment(\.roomTheme, theme).tint(theme.accent)
     }
