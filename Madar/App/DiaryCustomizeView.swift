@@ -155,11 +155,13 @@ struct DiaryCustomizeView: View {
                 Capsule().fill(theme.ink.opacity(0.3)).frame(width: 30, height: 4).padding(.vertical, 5)
                 ForEach(visibleOrder, id: \.self) { id in
                     RoundedRectangle(cornerRadius: id == "memory" && app.string("notes.homeShape") == "margin" ? 2 : 7)
-                        .fill(id == "memory" ? theme.accent : theme.line)
-                        .frame(height: id == "memory" ? 62 : 20)
+                        .fill(id == "memory" ? theme.accentFill : theme.line)
+                        // AU-04 (K-Mudhakkirat): the mini page names its parts, so the order reads at a glance.
+                        .overlay { Text(blockTitle(id)).font(.custom("thmanyahsans-Bold", size: 11, relativeTo: .caption2)).foregroundStyle(id == "memory" ? theme.onAccent : theme.ink).lineLimit(id == "memory" ? 2 : 1).multilineTextAlignment(.center).truncationMode(.tail).padding(.horizontal, 4) }
+                        .frame(height: id == "memory" ? 62 : 22)
                 }
                 Spacer(minLength: 0)
-            }.padding(8).frame(width: 90, height: 210).overlay { RoundedRectangle(cornerRadius: 20).stroke(theme.color("ink3Text")) }.accessibilityHidden(true)
+            }.padding(8).frame(width: 108, height: 220).overlay { RoundedRectangle(cornerRadius: 20).stroke(theme.color("ink3Text")) }.accessibilityHidden(true)
         }.padding(16).background(theme.surface, in: .rect(cornerRadius: 26)).overlay { RoundedRectangle(cornerRadius: 26).stroke(theme.line) }
     }
     @ViewBuilder private var previewButtons: some View {
