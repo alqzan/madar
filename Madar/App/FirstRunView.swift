@@ -15,12 +15,12 @@ struct FirstRunView: View {
                     }.accessibilityLabel(step == 0 ? "الخطوة الأولى من خطوتين" : "الخطوة الثانية من خطوتين")
                     Image(systemName: step == 0 ? "circle.hexagongrid" : "location.circle").font(.system(size: 54)).foregroundStyle(theme.accent).accessibilityHidden(true)
                     Text(step == 0 ? "مدار" : "ابدأ من مدينتك").font(MadarTypography.title())
-                    Text(step == 0 ? "يومك بين الصلوات" : "تُحسب بداية اليوم والمواقيت بمدينتك، حتى دون اتصال.").font(MadarTypography.cardTitle())
+                    Text(step == 0 ? "يومك بين الصلوات" : "نحتاج مدينتك لمواقيت الصلاة وبداية يومك، وتعمل دون اتصال.").font(MadarTypography.cardTitle())
                     if step == 1 {
                         MadarCard {
                             VStack(alignment: .leading, spacing: 16) {
                                 Text(session.cityName).font(MadarTypography.section())
-                                Text("حساب أم القرى").foregroundStyle(theme.secondaryInk)
+                                Text("المواقيت بطريقة أم القرى").foregroundStyle(theme.secondaryInk)
                                 NavigationLink("اختر مدينة") { CityEditor(session: session) }
                                     .frame(minHeight: 44).accessibilityIdentifier("first-run-city")
                             }

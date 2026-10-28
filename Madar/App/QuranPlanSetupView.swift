@@ -47,7 +47,7 @@ struct QuranPlanSetupView: View {
                             Text("تقدير بافتراض إتمام أيام الحفظ بلا فوت أو تثبيت.").font(quranFont(11)).foregroundStyle(theme.secondaryInk)
                         }
                     }
-                    Button(step == 4 ? "احفظ" : "التالي") {
+                    Button(step == 4 ? "احفظ الخطة" : "التالي") {
                         if step < 4 { step += 1 }
                         else { busy = true; Task { defer { busy = false }; do { try await service.perform(.savePlan(input)); close() } catch { self.error = quranUserMessage(error) } } }
                     }.font(quranFont(16, bold: true)).frame(maxWidth: .infinity, minHeight: 52).foregroundStyle(theme.onAccent).background(theme.accent, in: Capsule()).accessibilityIdentifier("quran-setup-next")
