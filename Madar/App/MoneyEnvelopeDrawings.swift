@@ -1,6 +1,7 @@
 import SwiftUI
 import MadarCore
 import MadarDesign
+import MadarMoney
 
 struct MoneyReserveGrid: View {
     let beforeMinor: Int
@@ -104,12 +105,16 @@ struct MoneyGoalOverview: View {
                         if envelope.balanceMinor < 0 {
                             Rectangle().stroke(theme.color("debt"), style: .init(lineWidth: 1.4, dash: [4, 2])).frame(width: min(48, proxy.size.width / 4), height: 16)
                         }
-                        // Design: a diamond where each coming salary brings the goal, up to its target.
-                        if let target = envelope.targetMinor, target > 0, envelope.perSalaryMinor > 0 {
-                            ForEach(Array(salaryMarks(target: target).enumerated()), id: \.offset) { _, mark in
+                        // Dated, conditional funding, never a multiple of today's aggregate rate.
+                        if let target = envelope.targetMinor, target > 0 {
+                            ForEach(salaryMarks(target: target), id: \.day) { mark in
                                 Rectangle().fill(theme.color("reserveText")).frame(width: 7, height: 7).rotationEffect(.degrees(45))
-                                    .offset(x: proxy.size.width * mark - 3.5)
+                                    .offset(x: proxy.size.width * share(mark.balanceMinor, target: target) - 3.5)
                             }
+                        }
+                        if let marker = dueMarker {
+                            Rectangle().fill(theme.color(marker.shortMinor > 0 ? "due" : "reserveText")).frame(width: 2, height: 33)
+                                .offset(x: min(proxy.size.width - 2, proxy.size.width * marker.share))
                         }
                         Capsule().fill(LinearGradient(colors: [theme.color("rod2"), theme.color("rod"), theme.color("rod2")], startPoint: .leading, endPoint: .trailing)).frame(width: 7, height: 25).offset(x: proxy.size.width * progress)
                     }.frame(height: 25)
@@ -117,17 +122,26 @@ struct MoneyGoalOverview: View {
             }
             // OR-22 (design): one sentence on where the goal stands, its date beside it, instead of four stacked lines.
             HStack(alignment: .top, spacing: 10) {
-                Text(summary).font(MadarTypography.caption()).foregroundStyle(envelope.balanceMinor < 0 ? theme.color("debt") : theme.secondaryInk)
-                    .fixedSize(horizontal: false, vertical: true).frame(maxWidth: .infinity, alignment: .leading)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(summary).font(MadarTypography.caption()).foregroundStyle(envelope.balanceMinor < 0 ? theme.color("debt") : theme.secondaryInk)
+                    if visible, let marker = dueMarker, envelope.balanceMinor < (envelope.targetMinor ?? 0) {
+                        Text(marker.shortMinor > 0 ? "بحسب خطتك، ينقصه " + money(marker.shortMinor) + " عند الموعد" : "بحسب خطتك، يكتمل بحلول الموعد")
+                            .font(MadarTypography.fine()).foregroundStyle(marker.shortMinor > 0 ? theme.color("dueText") : theme.secondaryInk)
+                    }
+                }.fixedSize(horizontal: false, vertical: true).frame(maxWidth: .infinity, alignment: .leading)
                 if let due = envelope.due { MadarDateLabel(app.dateLabels(due, compact: true), primaryFont: MadarTypography.fine(), secondaryFont: MadarTypography.fine()).foregroundStyle(theme.secondaryInk).fixedSize() }
             }
         }.padding(.vertical, 6).accessibilityElement(children: .combine).accessibilityIdentifier("money-goal-" + envelope.id.uuidString)
     }
     private func money(_ value: Int) -> String { visible ? service.amount(value) : "•••" }
-    /// Fractions of the target reached after each coming salary, at most eight, never past the target.
-    private func salaryMarks(target: Int) -> [Double] {
-        let start = max(0, envelope.balanceMinor)
-        return (1...8).map { Double(start + $0 * envelope.perSalaryMinor) / Double(target) }.filter { $0 < 0.999 }
+    private func share(_ balance: Int, target: Int) -> Double { min(1, max(0, Double(balance) / Double(target))) }
+    private func salaryMarks(target: Int) -> [FundingProjectionPoint] {
+        Array((envelope.fundingProjection?.points ?? []).filter { $0.salary && $0.balanceMinor > 0 && $0.balanceMinor < target }.prefix(8))
+    }
+    private var dueMarker: (share: Double, shortMinor: Int)? {
+        guard let target = envelope.targetMinor, target > 0, let due = envelope.due,
+              let balance = envelope.fundingProjection?.balance(on: due) else { return nil }
+        return (share(balance, target: target), max(0, target - balance))
     }
     private var summary: String {
         let funding = envelope.dailyFundingMinor > 0 ? "من يومك " + money(envelope.dailyFundingMinor) + " في اليوم"

@@ -73,12 +73,33 @@ extension MoneyRepository {
                     return max(0, target - alreadyFunded)
                 })
         }
+        let paused = try moneyPausedDays(from: start, count: max(length, elapsed), knownAt: now)
+        let input = CycleInput(expectedLengthDays: length, policies: specs, plans: planSpecs, carryMinor: cycle.carryAdjustMinor, pausedDays: paused)
+        let tx = try confirmedTransactions(), rows = try context.fetch(FetchDescriptor<Allocation>())
+        var spent: [Int: Int] = [:]
+        for allocation in rows where allocation.deletedAt == nil && allocation.mergedInto == nil && allocation.target == "daily" && allocation.cycleID == cycle.id && ["spend", "refund", "adjust", "offset"].contains(allocation.kind) {
+            guard let transaction = tx.first(where: { $0.id == allocation.transactionID }) else { continue }
+            let budgetDay: String
+            if transaction.kind == "refund", let original = tx.first(where: { $0.id == transaction.relatedTransactionID }) { budgetDay = original.dayKey }
+            else { budgetDay = transaction.dayKey }
+            let index = MadarCalendarDays.distance(from: start, to: try GregorianDay(budgetDay)) + 1
+            spent[index, default: 0] -= allocation.amountMinor
+        }
+        let headline = CycleEngine.headline(elapsedDays: elapsed, input, dailySpentMinor: spent, pendingDecisions: try pendingDecisionCount())
+        return .init(id: cycle.id, startDay: start, today: today, expectedEndDay: end, incomeMinor: cycle.incomeMinor, elapsedDays: elapsed, input: input, spent: spent,
+            headline: headline, curve: CycleEngine.curve(through: max(length, elapsed), input, dailySpentMinor: spent), planEnvelopes: planEnvelopes)
+    }
+    /// The same known travel intervals govern actual cycle readings and conditional funding forecasts.
+    public func moneyPausedDays(from start: GregorianDay, count: Int, knownAt now: Date) throws -> Set<Int> {
+        guard count > 0 else { return [] }
         var paused: Set<Int> = []
+        let prayer = try PrayerRepository(context: context)
+        let place = prayer.place(at: now)
         let settings = try SettingsStore(context: context)
         if try settings.value(for: "mal.travelPausesDaily") == .bool(true) {
             let trips = try context.fetch(FetchDescriptor<Trip>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
             let boundary = DayBoundary(rawValue: try settings.value(for: "core.dayStart").string ?? "fajr") ?? .fajr
-            for day in 1...max(length, elapsed) {
+            for day in 1...count {
                 let key = start.adding(days: day - 1), nextKey = key.adding(days: 1)
                 let dayInstant = key.date(in: place.timeZone).addingTimeInterval(12 * 3600)
                 let dayPlace = prayer.place(at: dayInstant), dayOptions = prayer.calculationOptions(at: dayInstant)
@@ -97,19 +118,7 @@ extension MoneyRepository {
                 }) { paused.insert(day) }
             }
         }
-        let input = CycleInput(expectedLengthDays: length, policies: specs, plans: planSpecs, carryMinor: cycle.carryAdjustMinor, pausedDays: paused)
-        let tx = try confirmedTransactions(), rows = try context.fetch(FetchDescriptor<Allocation>())
-        var spent: [Int: Int] = [:]
-        for allocation in rows where allocation.deletedAt == nil && allocation.mergedInto == nil && allocation.target == "daily" && allocation.cycleID == cycle.id && ["spend", "refund", "adjust", "offset"].contains(allocation.kind) {
-            guard let transaction = tx.first(where: { $0.id == allocation.transactionID }) else { continue }
-            let budgetDay: String
-            if transaction.kind == "refund", let original = tx.first(where: { $0.id == transaction.relatedTransactionID }) { budgetDay = original.dayKey }
-            else { budgetDay = transaction.dayKey }
-            let index = MadarCalendarDays.distance(from: start, to: try GregorianDay(budgetDay)) + 1
-            spent[index, default: 0] -= allocation.amountMinor
-        }
-        let headline = CycleEngine.headline(elapsedDays: elapsed, input, dailySpentMinor: spent, pendingDecisions: try pendingDecisionCount())
-        return .init(id: cycle.id, startDay: start, today: today, expectedEndDay: end, incomeMinor: cycle.incomeMinor, elapsedDays: elapsed, input: input, spent: spent,
-            headline: headline, curve: CycleEngine.curve(through: max(length, elapsed), input, dailySpentMinor: spent), planEnvelopes: planEnvelopes)
+        return paused
     }
+
 }

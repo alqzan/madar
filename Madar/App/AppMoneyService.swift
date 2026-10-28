@@ -13,6 +13,7 @@ struct MoneyHomeEnvelope: Identifiable {
     var due: GregorianDay?
     var perSalaryMinor: Int
     var dailyFundingMinor: Int
+    var fundingProjection: MoneyGoalFundingProjection? = nil
 }
 struct MoneyHomeLimit: Identifiable {
     var id: UUID
@@ -27,6 +28,7 @@ struct MoneyHomeObligation: Identifiable, Equatable {
     var due: GregorianDay
 }
 struct MoneyHomeReading {
+    var salaryDates: [GregorianDay] = []
     var cycle: MoneyCycleReading?
     var basis: Basis
     var currency: String
@@ -103,13 +105,16 @@ struct MoneyHomeReading {
         }
         let reserve = roleBalance("reserve"), surplus = roleBalance("surplus")
         let zone = app.activePlace.timeZone, today = try DiaryLineRenderer.today(context: context, now: now)
+        let balances = Dictionary(uniqueKeysWithValues: envelopes.map { ($0.id, envelopeBalance($0.id)) })
+        let projections = try fundingProjections(cycle: cycle, today: today, now: now, zone: zone, envelopes: envelopes,
+                                                plans: plans, allocations: allocations, balances: balances, surplus: surplus, reserve: reserve)
         let goals = envelopes.filter { !["reserve", "surplus"].contains($0.role) }.sorted { $0.createdAt == $1.createdAt ? $0.id.uuidString < $1.id.uuidString : $0.createdAt < $1.createdAt }.map { envelope in
             MoneyHomeEnvelope(id: envelope.id, name: envelope.name, balanceMinor: envelopeBalance(envelope.id), targetMinor: envelope.targetMinor,
                 due: envelope.due.map { GregorianDay.containing($0, in: zone) },
                 perSalaryMinor: plans.filter { $0.envelopeID == envelope.id && $0.source != "daily" && ($0.untilDate == nil || $0.untilDate! >= now) }.reduce(0) { $0 + $1.perPaycheckMinor },
                 dailyFundingMinor: cycle.map { reading in
                     CycleEngine.day(reading.elapsedDays, reading.input).dripsMinor.filter { reading.planEnvelopes[$0.key] == envelope.id }.values.reduce(0, +)
-                } ?? 0)
+                } ?? 0, fundingProjection: projections[envelope.id])
         }
         var limits: [MoneyHomeLimit] = []
         let categories = try context.fetch(FetchDescriptor<MadarData.Category>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
@@ -161,7 +166,7 @@ struct MoneyHomeReading {
         let history = Dictionary(grouping: allocations.filter { $0.target == "surplus" || $0.targetID.map { id in envelopes.contains { $0.id == id && $0.role == "surplus" } } == true }, by: { $0.cycleID })
             .sorted { ($0.value.map(\.createdAt).min() ?? .distantPast) < ($1.value.map(\.createdAt).min() ?? .distantPast) }.suffix(6).map { $0.value.reduce(0) { $0 + $1.amountMinor } }
         let reserveReading = ReserveEngine.read(balanceMinor: reserve, dailyMinor: cycle?.headline.todayAllowanceMinor, cycleLengthDays: length, obligationsPerCycleMinor: cycleObligations)
-        return .init(cycle: cycle, basis: basis, currency: currency, hasAccounts: !accounts.isEmpty,
+        return .init(salaryDates: try salaryForecastDays(cycle: cycle, today: today, zone: zone), cycle: cycle, basis: basis, currency: currency, hasAccounts: !accounts.isEmpty,
             unknownBalanceCount: accounts.filter { $0.ownership == "mine" && $0.tracked && $0.balanceAt == nil }.count,
             knownBalanceCount: accounts.filter { $0.ownership == "mine" && $0.tracked && $0.balanceAt != nil }.count,
             pendingCount: try repo.pendingDecisionCount(), reserveMinor: reserve, surplusMinor: surplus, reserveRunway: reserveReading.runway, reserveDailies: reserveReading.wholeDailies, obligationsPerCycleMinor: cycleObligations,

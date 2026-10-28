@@ -14,7 +14,7 @@ private struct UITestBankCorpusLine: Decodable {
 extension AppSession {
     /// Named synthetic stores only. Never reads or writes the owner's store.
     func prepareMoneyFixture(group: URL) throws {
-        guard let variant = ProcessInfo.processInfo.environment["MADAR_UI_MONEY_FIXTURE"], ["goal", "zakat", "zakatHidden", "travel", "travelMissing", "travelHidden", "travelMultiLeg", "travelMultiLegHidden", "accounts", "expense", "showcase", "empty", "hidden", "zero", "shortfall", "messages", "salarySourceFlow", "bankCorpus", "since", "rules", "salary", "budget", "cards", "cardsHidden", "analysis", "analysisHidden", "reconcile", "reconcileHidden", "cashback", "cashbackHidden", "subscriptions", "subscriptionsHidden"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
+        guard let variant = ProcessInfo.processInfo.environment["MADAR_UI_MONEY_FIXTURE"], ["funding", "goal", "zakat", "zakatHidden", "travel", "travelMissing", "travelHidden", "travelMultiLeg", "travelMultiLegHidden", "accounts", "expense", "showcase", "empty", "hidden", "zero", "shortfall", "messages", "salarySourceFlow", "bankCorpus", "since", "rules", "salary", "budget", "cards", "cardsHidden", "analysis", "analysisHidden", "reconcile", "reconcileHidden", "cashback", "cashbackHidden", "subscriptions", "subscriptionsHidden"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         let c = ModelContext(container)
         guard !(try c.fetch(FetchDescriptor<DeviceSetting>())).contains(where: { $0.key == "sys.moneyFixture" }) else { return }
         for key in ["sys.moneyFixture", "sys.onboardingCompleted"] { let marker = DeviceSetting(); marker.key = key; marker.valueJSON = Data("true".utf8); c.insert(marker) }
@@ -49,6 +49,16 @@ extension AppSession {
         }
         let planEnvelope = try c.fetch(FetchDescriptor<Envelope>()).first { $0.name == "رحلة الشتاء" }!
         let plan = EnvelopePlan(); plan.envelopeID = planEnvelope.id; plan.source = "daily"; plan.period = "perDay"; plan.perPaycheckMinor = variant == "zero" ? 0 : 1300; plan.startDayKey = start.description; c.insert(plan)
+        if variant == "funding" {
+            let goals = try c.fetch(FetchDescriptor<Envelope>())
+            if let gift = goals.first(where: { $0.name == "هدية" }) {
+                let p = EnvelopePlan(); p.envelopeID = gift.id; p.source = "salary"; p.perPaycheckMinor = 14_000
+                p.untilDate = end.date(in: zone); c.insert(p)
+            }
+            if let emergency = goals.first(where: { $0.name == "الطوارئ" }) {
+                let p = EnvelopePlan(); p.envelopeID = emergency.id; p.source = "surplus"; p.perPaycheckMinor = 50_000; c.insert(p)
+            }
+        }
         var categories: [MadarData.Category] = []
         for (index, title) in ["مطاعم", "بقالة", "بنزين", "أخرى"].enumerated() { let category = MadarData.Category(); category.name = title; category.order = index; c.insert(category); categories.append(category); let limit = CategoryLimit(); limit.categoryID = category.id; limit.limitMinor = [300_000, 400_000, 200_000, 500_000][index]; c.insert(limit) }
         for (index, spent) in [30_000, 12_000, 15_000, variant == "cards" ? 52_000 : 22_000, 11_000, 14_000].enumerated() { // «cards»: day 4 passes the 413 limit so the log shows a red arch

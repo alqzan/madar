@@ -49,7 +49,7 @@ struct MoneyEnvelopeDetailView: View {
                     if reading.envelope.balanceMinor < 0 && visible { debtRow(reading) }
                     if visible, let short = shortfall(reading), let due = reading.envelope.due {
                         HStack(alignment: .firstTextBaseline, spacing: 4) {
-                            Text("يوم"); MadarDateLabel(app.dateLabels(due, compact: true), primaryFont: MadarTypography.body(), secondaryFont: MadarTypography.fine()); Text("ينقصه " + service.amount(short))
+                            Text("بحسب خطتك، يوم"); MadarDateLabel(app.dateLabels(due, compact: true), primaryFont: MadarTypography.body(), secondaryFont: MadarTypography.fine()); Text("ينقصه " + service.amount(short))
                         }.font(MadarTypography.body()).fontWeight(.semibold).foregroundStyle(theme.color("dueText")).accessibilityElement(children: .combine).accessibilityIdentifier("money-detail-shortfall")
                     }
                     HStack { Text("السجل").font(MadarTypography.cardTitle()); Rectangle().fill(theme.line).frame(height: 1); Text("الرصيد بعدها").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }.padding(.top, 8)
@@ -101,12 +101,9 @@ struct MoneyEnvelopeDetailView: View {
     private func salariesText(_ count: Int) -> String {
         switch count { case 1: "راتب واحد"; case 2: "راتبين"; default: service.digits.string(count) + (count <= 10 ? " رواتب" : " راتبًا") }
     }
-    /// What the envelope still lacks on its due day: balance plus the saving and repayments of the salaries before it.
+    /// One read projection for the overview and detail, including expiry, daily caps and conditional sources.
     private func shortfall(_ reading: MoneyEnvelopeDetailReading) -> Int? {
-        guard let due = reading.envelope.due, due >= .containing(app.prayerNow(), in: app.activePlace.timeZone) else { return nil }
-        let salaries = (0..<MoneyCommandPayload.maxRepaySalaries).filter { service.salaryForecast($0, home: reading.home).map { $0 <= due } ?? false }.count
-        let repaid = reading.repayment.map { Array($0.remainingMinor.prefix(salaries)).reduce(0, +) } ?? 0
-        let projected = reading.envelope.balanceMinor + reading.savingMinor * salaries + repaid
+        guard let due = reading.envelope.due, let projected = reading.envelope.fundingProjection?.balance(on: due) else { return nil }
         let lack = (reading.envelope.targetMinor ?? 0) - projected
         return lack > 0 ? lack : nil
     }
@@ -245,7 +242,7 @@ private struct MoneyEnvelopeRoad: View {
     private var service: AppMoneyService { .init(app: app) }
     var body: some View {
         let dates = (0..<6).map { service.salaryForecast($0, home: reading.home) }
-        let dueIndex: Int? = reading.envelope.due.flatMap { due in dates.lastIndex { $0.map { $0 <= due } ?? false } }
+        let dueSlot = dueSlot(dates: dates)
         let pieces = reading.repayment?.remainingMinor.count ?? 0
         VStack(alignment: .leading, spacing: 8) {
             if !dynamicType.isAccessibilitySize {
@@ -268,10 +265,10 @@ private struct MoneyEnvelopeRoad: View {
                                     context.stroke(Path(piece), with: .color(theme.color("debt")), style: .init(lineWidth: 1, dash: [2, 2]))
                                 }
                             }
-                            if let dueIndex {
-                                let x = right - slot * CGFloat(dueIndex) - slot / 2
+                            if let dueSlot {
+                                let x = right - slot * dueSlot
                                 var line = Path(); line.move(to: .init(x: x, y: 27)); line.addLine(to: .init(x: x, y: 70))
-                                context.stroke(line, with: .color(theme.color("debt")), lineWidth: 2)
+                                context.stroke(line, with: .color(theme.color(reading.envelope.balanceMinor < 0 ? "debt" : "due")), lineWidth: 2)
                             }
                         }.accessibilityHidden(true)
                         ForEach(0..<6, id: \.self) { index in
@@ -280,7 +277,7 @@ private struct MoneyEnvelopeRoad: View {
                                 if let date = dates[index] { MadarDateLabel(app.dateLabels(date, compact: true), primaryFont: .custom("thmanyahsans-Regular", size: 11), secondaryFont: .custom("thmanyahsans-Regular", size: 11)) }
                             }.frame(width: slot, height: 80, alignment: .top).position(x: right - slot * CGFloat(index) - slot / 2, y: 72)
                         }
-                        if let dueIndex, let due = reading.envelope.due {
+                        if let dueSlot, let due = reading.envelope.due {
                             let labels = app.dateLabels(due, compact: true)
                             VStack(spacing: 0) {
                                 Text(labels.primary).font(.custom("thmanyahsans-Bold", size: 11, relativeTo: .caption2))
@@ -289,7 +286,7 @@ private struct MoneyEnvelopeRoad: View {
                             .foregroundStyle(theme.color("dueText"))
                             .multilineTextAlignment(.center)
                             .fixedSize()
-                            .position(x: right - slot * CGFloat(dueIndex) - slot / 2, y: 13)
+                            .position(x: right - slot * dueSlot, y: 13)
                         }
                         Capsule().fill(LinearGradient(colors: [theme.color("rod2"), theme.color("rod"), theme.color("rod2")], startPoint: .leading, endPoint: .trailing)).frame(width: 12, height: 48).position(x: right + 8, y: 41)
                     }
@@ -301,6 +298,23 @@ private struct MoneyEnvelopeRoad: View {
                 if let target = reading.envelope.targetMinor { Text("الهدف " + service.amount(target)) }
             }.font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
         }
+    }
+    /// The deadline lies between salary occurrences; it is not snapped to the preceding salary's diamond.
+    private func dueSlot(dates: [GregorianDay?]) -> CGFloat? {
+        guard let due = reading.envelope.due else { return nil }
+        var previous = reading.envelope.fundingProjection?.today ?? GregorianDay.containing(app.prayerNow(), in: app.activePlace.timeZone)
+        guard due >= previous else { return nil }
+        var previousSlot: CGFloat = 0
+        for (index, date) in dates.enumerated() {
+            guard let date, date > previous else { continue }
+            let nextSlot = CGFloat(index) + 0.5
+            if due <= date {
+                let fraction = CGFloat(MadarCalendarDays.distance(from: previous, to: due)) / CGFloat(MadarCalendarDays.distance(from: previous, to: date))
+                return previousSlot + (nextSlot - previousSlot) * fraction
+            }
+            previous = date; previousSlot = nextSlot
+        }
+        return nil
     }
 }
 

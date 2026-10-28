@@ -47,6 +47,14 @@ struct MoneyEnvelopesView: View {
                         }
                     }.padding(.top, 8)
                     HStack { Text("مظاريف الأهداف").font(MadarTypography.cardTitle()).foregroundStyle(theme.color("accent")); DoubleRule().stroke(theme.color("reserveText"), lineWidth: 0.7).frame(height: 3) }
+                    if visible && reading.home.envelopes.contains(where: { $0.fundingProjection != nil && $0.due != nil }) {
+                        HStack(spacing: 10) {
+                            Label("راتب", systemImage: "diamond.fill")
+                            HStack(spacing: 4) { Rectangle().frame(width: 1, height: 10); Text("موعد") }
+                            Spacer(minLength: 0)
+                            Text("تقدير دون صرف جديد")
+                        }.font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                    }
                     if reading.home.envelopes.isEmpty {
                         Text("لم تُضف مظاريف أهداف بعد").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk).padding(.vertical, 18)
                     }

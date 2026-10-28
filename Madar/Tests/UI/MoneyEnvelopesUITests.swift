@@ -12,6 +12,16 @@ import XCTest
         XCTAssertTrue(app.descendants(matching: .any)["money-envelopes"].waitForExistence(timeout: 10))
     }
     func shot(_ app: XCUIApplication, _ name: String) { let a = XCTAttachment(screenshot: app.screenshot()); a.name = name; a.lifetime = .keepAlways; add(a) }
+    private func plainLabel(_ element: XCUIElement) -> String {
+        element.label.unicodeScalars.filter { ![0x200E, 0x200F, 0x2066, 0x2067, 0x2068, 0x2069].contains($0.value) }.map(String.init).joined()
+    }
+    private func reachGoal(_ goal: XCUIElement, in app: XCUIApplication) {
+        for _ in 0..<6 {
+            if goal.isHittable && goal.frame.maxY < app.frame.maxY - 140 { return }
+            app.swipeUp(velocity: .slow)
+        }
+        XCTAssertTrue(goal.isHittable && goal.frame.maxY < app.frame.maxY - 140, app.debugDescription)
+    }
     func testReservePreviewTargetUndoAndRelaunch() throws {
         continueAfterFailure = false; let app = make(); open(app)
         XCTAssertTrue(app.staticTexts["money-reserve-dailies"].label.contains("٢٥٠"), app.staticTexts["money-reserve-dailies"].label)
@@ -43,6 +53,39 @@ import XCTest
         shot(app, "M5-V03-hidden-L")
         app.buttons["money-envelopes-reveal"].tap()
         XCTAssertTrue(app.staticTexts["money-reserve-dailies"].label.contains("٢٥٠"))
+    }
+    func testGoalForecastShowsFundedAndShortDatesAndPersistsThroughRelaunch() throws {
+        continueAfterFailure = false; let app = make("funding"); open(app)
+        let gift = app.buttons["money-envelope-هدية"], emergency = app.buttons["money-envelope-الطوارئ"]
+        reachGoal(gift, in: app)
+        XCTAssertTrue(gift.waitForExistence(timeout: 10))
+        XCTAssertTrue(gift.label.contains("بحسب خطتك، يكتمل بحلول الموعد"), gift.label)
+        XCTAssertTrue(plainLabel(emergency).contains("بحسب خطتك، ينقصه ١٠٠ عند الموعد"), emergency.label)
+        shot(app, "OR-22-goal-due-rails-L")
+        app.terminate(); app.launch(); open(app)
+        reachGoal(gift, in: app)
+        XCTAssertTrue(gift.label.contains("بحسب خطتك، يكتمل بحلول الموعد"), gift.label)
+        XCTAssertTrue(plainLabel(emergency).contains("ينقصه ١٠٠ عند الموعد"), emergency.label)
+        shot(app, "OR-22-goal-due-reopened-L")
+        for _ in 0..<3 where !emergency.isHittable { app.swipeDown(velocity: .slow) }
+        emergency.tap()
+        let detail = app.descendants(matching: .any)["money-detail-shortfall"]
+        XCTAssertTrue(detail.waitForExistence(timeout: 10))
+        XCTAssertTrue(plainLabel(detail).contains("ينقصه ١٠٠"), detail.label)
+        shot(app, "OR-22-shared-detail-forecast-L")
+    }
+    func testHiddenGoalsDoNotExposeConditionalAmountsUntilReveal() throws {
+        continueAfterFailure = false; let app = make("hidden"); open(app)
+        let gift = app.buttons["money-envelope-هدية"]
+        XCTAssertFalse(gift.label.contains("بحسب خطتك"), gift.label)
+        XCTAssertFalse(app.staticTexts["تقدير دون صرف جديد"].exists)
+        app.buttons["money-envelopes-reveal"].tap()
+        reachGoal(gift, in: app)
+        XCTAssertTrue(plainLabel(gift).contains("بحسب خطتك، ينقصه ١٤٠ عند الموعد"), gift.label)
+        shot(app, "OR-22-goals-revealed-L")
+        app.terminate(); app.launch(); open(app)
+        XCTAssertFalse(gift.label.contains("بحسب خطتك"), gift.label)
+        XCTAssertFalse(app.staticTexts["تقدير دون صرف جديد"].exists)
     }
     func testHiddenSavedReserveGoalNeedsRevealInSheet() throws {
         continueAfterFailure = false; let app = make("hidden"); open(app)

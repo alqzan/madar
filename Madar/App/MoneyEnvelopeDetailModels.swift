@@ -58,9 +58,6 @@ extension AppMoneyService {
         return .init(home: home, envelope: envelope, entries: entries.reversed(), savingMinor: plans.reduce(0) { $0 + $1.perPaycheckMinor }, savingPlanID: plans.count == 1 ? plans.first?.id : nil, repayment: repayment)
     }
     func salaryForecast(_ index: Int, home: MoneyHomeReading) -> GregorianDay? {
-        guard let first = home.cycle?.expectedEndDay else { return nil }
-        var calendar = Calendar(identifier: app.string("mal.cycleCalendar") == "hijri" ? .islamicUmmAlQura : .gregorian)
-        calendar.timeZone = app.activePlace.timeZone
-        return calendar.date(byAdding: .month, value: index, to: first.date(in: calendar.timeZone)).map { .containing($0, in: calendar.timeZone) }
+        home.salaryDates.indices.contains(index) ? home.salaryDates[index] : nil
     }
 }
