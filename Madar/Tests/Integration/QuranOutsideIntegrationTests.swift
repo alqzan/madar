@@ -58,4 +58,22 @@ import MadarSnapshots
         XCTAssertNil(app.quranRoute); XCTAssertNotNil(app.errorMessage)
         XCTAssertEqual(try ModelContext(app.container).fetchCount(FetchDescriptor<HifzSession>()), 1)
     }
+    func testWidgetReviewProgressCountsDistinctFacesAndDecodesOlderJSON() throws {
+        let (app, service, root, now) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
+        let initial = try service.widgetSnapshot().payload
+        XCTAssertEqual(initial.reviewProgress, "٠ من ١")
+        let context = ModelContext(app.container)
+        for kind in ["free", "qiyam"] {
+            let session = HifzSession(); session.kind = kind; session.fromAyah = 1; session.toAyah = 7; session.pages = [1]
+            session.dayKey = "2026-10-15"; session.endedAt = now.addingTimeInterval(-60); context.insert(session)
+            let grade = PageGrade(); grade.sessionID = session.id; grade.page = 1; grade.grade = "mastered"; context.insert(grade)
+        }
+        try context.save()
+        let completed = try service.widgetSnapshot().payload
+        XCTAssertEqual(completed.reviewProgress, "١ من ١", "Free review and qiyam on the same face count once.")
+        var oldJSON = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(completed)) as? [String: Any])
+        oldJSON.removeValue(forKey: "reviewProgress")
+        let legacy = try JSONDecoder().decode(QuranWidgetSnapshot.self, from: JSONSerialization.data(withJSONObject: oldJSON))
+        XCTAssertNil(legacy.reviewProgress); XCTAssertEqual(legacy.nextTitle, completed.nextTitle)
+    }
 }

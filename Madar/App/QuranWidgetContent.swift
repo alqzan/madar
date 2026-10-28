@@ -10,6 +10,7 @@ struct QuranWidgetContent: View {
     let template: QuranWidgetTemplate
     var compact = false
     var extraLarge = false
+    var smallHome = false
     @Environment(\.colorScheme) private var scheme
     @Environment(\.dynamicTypeSize) private var type
     private var theme: RoomTheme { RoomTheme(room: "quran", dark: scheme == .dark) }
@@ -18,7 +19,7 @@ struct QuranWidgetContent: View {
             if let snapshot {
                 switch template {
                 case .coverage: coverage(snapshot)
-                case .path: path(snapshot)
+                case .path: if smallHome { smallPath(snapshot) } else { path(snapshot) }
                 case .week: week(snapshot)
                 }
             } else {
@@ -46,6 +47,36 @@ struct QuranWidgetContent: View {
                 }.aspectRatio(1, contentMode: .fit).frame(maxHeight: extraLarge ? 250 : 110)
             }
         }.accessibilityElement(children: .ignore).accessibilityLabel("في صدرك، " + value.coverage)
+    }
+    /// X1: room mark, current work and its real amount, with the day's step beads down the side.
+    private func smallPath(_ value: QuranWidgetSnapshot) -> some View {
+        let reviewing = value.nextTitle.contains("المراجعة")
+        let title = value.nextTitle.hasPrefix("التالي: ") ? String(value.nextTitle.dropFirst(8)) : value.nextTitle
+        let progress = reviewing ? value.reviewProgress : nil
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 5) {
+                MadarGlyph("MadarQuran", size: 14)
+                Text("القرآن").font(.custom("thmanyahsans-Bold", size: 13, relativeTo: .caption))
+                Spacer(minLength: 0)
+            }.foregroundStyle(theme.color("reviewText")).widgetAccentable()
+            HStack(alignment: .center, spacing: 8) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Spacer(minLength: 0)
+                    Text(title).font(.custom("thmanyahsans-Regular", size: 12, relativeTo: .caption)).foregroundStyle(theme.secondaryInk).lineLimit(2)
+                    Text(progress ?? value.nextDetail).font(.custom("thmanyahserifdisplay-Bold", size: 27, relativeTo: .title2)).lineLimit(2).minimumScaleFactor(0.6)
+                    if progress != nil { Text("بقي " + value.nextDetail).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(theme.secondaryInk).lineLimit(1) }
+                    Spacer(minLength: 0)
+                    if let line = value.dayLine { Text(line).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(theme.secondaryInk).lineLimit(1) }
+                }.frame(maxWidth: .infinity, alignment: .leading)
+                if !type.isAccessibilitySize, value.total > 0 {
+                    VStack(spacing: 4) {
+                        ForEach(0..<min(value.total, 6), id: \.self) { index in
+                            Capsule().fill(index < value.done ? theme.ink : theme.color("track")).frame(width: 4, height: index == value.done ? 12 : 6)
+                        }
+                    }.accessibilityHidden(true)
+                }
+            }
+        }
     }
     /// The canonical «مسار اليوم»: the day's steps as a row of bars, then what comes next in gold and its amount in large serif.
     private func path(_ value: QuranWidgetSnapshot) -> some View {

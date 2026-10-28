@@ -32,6 +32,9 @@ extension AppQuranService {
         func reviewed(_ day: GregorianDay) -> Int { Set(value.sessions.filter { $0.dayKey == day && [.review, .free, .qiyam].contains($0.kind) }.flatMap { $0.grades.map(\.page) }).count }
         func memorized(_ day: GregorianDay) -> Int { value.completedOn.values.filter { $0 == day }.count }
         let days = (0..<7).map { start.adding(days: $0) }
+        let reviewedFaces = Set(value.sessions.filter { $0.dayKey == today && [.review, .free, .qiyam].contains($0.kind) }.flatMap { $0.grades.map(\.page) })
+        let reviewFaces = reviewedFaces.union(value.review.allPages).union(value.partialRecent.map(\.page))
+        let reviewProgress = reviewFaces.isEmpty ? nil : numerals.string(reviewedFaces.count) + " من " + numerals.string(reviewFaces.count)
         let hifzSteps = hasHifz ? (value.hifz?.bridge == nil ? 1 : 2) : 0
         let reviewDone = reviewed(today) > 0 && !hasReview
         let drillDone = value.drillBoard.drilledToday > 0 && !drill
@@ -42,7 +45,7 @@ extension AppQuranService {
             done: done, total: total,
             hifzToday: QuranDayCloseCopy.faces(memorized(today), digits: numerals), reviewToday: QuranDayCloseCopy.faces(reviewed(today), digits: numerals),
             hifzWeek: QuranDayCloseCopy.faces(days.reduce(0) { $0 + memorized($1) }, digits: numerals), reviewWeek: QuranDayCloseCopy.faces(days.reduce(0) { $0 + reviewed($1) }, digits: numerals),
-            days: days.map { .init(label: numerals.string($0.day), hifz: Double(memorized($0)), review: Double(reviewed($0)) / 8) }, dayLine: dayLine)
+            days: days.map { .init(label: numerals.string($0.day), hifz: Double(memorized($0)), review: Double(reviewed($0)) / 8) }, dayLine: dayLine, reviewProgress: reviewProgress)
         let now = clock(), prayerRepository = try PrayerRepository(context: repository().context)
         let place = prayerRepository.place(at: now)
         let civil = GregorianDay.containing(now, in: place.timeZone)

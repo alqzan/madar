@@ -1,13 +1,27 @@
 import XCTest
 @MainActor final class RoomWidgetsUITests:XCTestCase {
-    private func openGallery()->XCUIApplication {
-        let app=XCUIApplication();app.launchEnvironment=["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_HABIT_FIXTURE":"showcase","MADAR_UI_MIHBARA_FIXTURE":"home","MADAR_UI_NOW":"2026-10-15T20:00:00+03:00","MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light"];app.launch()
+    private func openGallery(quranFixture: String? = nil)->XCUIApplication {
+        let app=XCUIApplication();app.launchEnvironment=["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_HABIT_FIXTURE":"showcase","MADAR_UI_MIHBARA_FIXTURE":"home","MADAR_UI_NOW":"2026-10-15T20:00:00+03:00","MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light"]
+        if let quranFixture { app.launchEnvironment["MADAR_UI_QURAN_FIXTURE"] = quranFixture }
+        app.launch()
         XCTAssertTrue(app.buttons["tab-customize"].waitForExistence(timeout:20));app.buttons["tab-customize"].tap()
         let search=app.textFields["settings-search"];XCTAssertTrue(search.waitForExistence(timeout:10));search.tap();search.typeText("خارج التطبيق")
         let gallery=app.buttons["room-widgets-gallery"];XCTAssertTrue(gallery.waitForExistence(timeout:10));gallery.tap()
         XCTAssertTrue(app.staticTexts["room-widgets-title"].waitForExistence(timeout:10));return app
     }
     private func shot(_ app:XCUIApplication,_ name:String){let a=XCTAttachment(screenshot:app.screenshot());a.name=name;a.lifetime = .keepAlways;add(a)}
+    func testQuranSmallReviewPreviewOpensItsPath() throws {
+        continueAfterFailure = false
+        let app = openGallery(quranFixture: "widgetReview")
+        let preview = app.buttons["room-widget-quran"]
+        XCTAssertTrue(preview.waitForExistence(timeout: 10))
+        // The four-level minimum is not a cap: this fixture also has overdue faces.
+        XCTAssertTrue(preview.label.contains("القرآن") && preview.label.contains("٠ من "), preview.label)
+        shot(app, "OR-04-quran-review-small-L")
+        preview.tap()
+        XCTAssertTrue(app.staticTexts["room-widgets-title"].waitForNonExistence(timeout: 10))
+        XCTAssertTrue(app.tabBars.buttons["القرآن"].isSelected)
+    }
     func testDefaultRoomPreviewsAndDirectDiaryWriting() throws {
         continueAfterFailure=false;let app=openGallery();shot(app,"M4-W01-X1-Raisiya-L")
         app.swipeUp(velocity:.slow);shot(app,"M4-W01-X1-Raisiya-s1-L")

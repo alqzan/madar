@@ -36,7 +36,7 @@ private struct QuranWidgetView: View {
     var body: some View {
         Group {
             if family == .accessoryInline { Text("القرآن، " + (entry.value?.nextDetail ?? "افتح مدار")) }
-            else { QuranWidgetContent(snapshot: entry.value, template: entry.template, compact: family == .accessoryCircular || family == .accessoryRectangular, extraLarge: extraLargePortrait) }
+            else { QuranWidgetContent(snapshot: entry.value, template: entry.template, compact: family == .accessoryCircular || family == .accessoryRectangular, extraLarge: extraLargePortrait, smallHome: family == .systemSmall) }
         }
         .environment(\.layoutDirection, .rightToLeft)
         .widgetURL(URL(string: entry.value?.route ?? "madar://quran"))

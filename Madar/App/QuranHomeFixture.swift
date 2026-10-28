@@ -9,7 +9,7 @@ import MadarQuran
 extension AppSession {
     func prepareQuranHomeFixture(group: URL) throws {
         let env = ProcessInfo.processInfo.environment
-        guard let variant = env["MADAR_UI_QURAN_FIXTURE"], ["home", "drill", "dayClose", "dayCloseStart", "khatmaStart"].contains(variant), let id = env["MADAR_UI_STORE_ID"],
+        guard let variant = env["MADAR_UI_QURAN_FIXTURE"], ["home", "drill", "dayClose", "dayCloseStart", "khatmaStart", "widgetReview"].contains(variant), let id = env["MADAR_UI_STORE_ID"],
               group.lastPathComponent == id, group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         let context = ModelContext(container)
         selectedTab = "quran"
@@ -42,7 +42,7 @@ extension AppSession {
                 append(kind: "hifz", first: catalog.ayahs(on: page).first!.id, last: catalog.ayahs(on: page).last!.id, pages: [page], offset: index - 14)
             }
         }
-        if variant == "dayClose" {
+        if variant == "dayClose" || variant == "widgetReview" {
             let page = 285
             let hifz = append(kind: "hifz", first: catalog.ayahs(on: page).first!.id, last: catalog.ayahs(on: page).last!.id, pages: [page], offset: 0)
             hifz.endedAt = now.addingTimeInterval(-3600)
@@ -50,7 +50,7 @@ extension AppSession {
             let snapshot = try QuranRepository(context: context, catalog: catalog).snapshot(at: now)
             let pages = snapshot.review.allPages
             let dayState = QuranDayState(); dayState.dayKey = today.description; dayState.testPages = snapshot.review.testPages; context.insert(dayState)
-            if let first = pages.min(), let last = pages.max() {
+            if variant == "dayClose", let first = pages.min(), let last = pages.max() {
                 let review = append(kind: "review", first: catalog.ayahs(on: first).first!.id, last: catalog.ayahs(on: last).last!.id, pages: pages, offset: 0)
                 review.endedAt = now.addingTimeInterval(-1800)
             }
