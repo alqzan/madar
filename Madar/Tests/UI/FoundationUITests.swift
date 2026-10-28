@@ -246,12 +246,21 @@ import XCTest
         }
         attachScreenshot(app, named: "M1-V02-log-L")
         XCTAssertFalse(app.buttons["prayer-clear"].exists, "«امسح التسجيل» is not a v1 action")
-        // One tap re-records; the sheet closes and the home reflects it.
+        // One tap records; with heart on by default the optional question remains open.
         app.buttons["prayer-status-jamaah"].tap()
         let changed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", "جماعة"), object: asr)
         XCTAssertEqual(XCTWaiter.wait(for: [changed], timeout: 15), .completed, asr.label)
+        let skip = app.buttons["prayer-heart-skip"]
+        XCTAssertTrue(skip.exists); skip.tap()
+        XCTAssertTrue(skip.waitForNonExistence(timeout: 10))
         XCTAssertTrue(app.buttons["undo-button"].waitForExistence(timeout: 15), app.debugDescription)
         app.buttons["undo-button"].tap()
+        let restored = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", "وحدي"), object: asr)
+        XCTAssertEqual(XCTWaiter.wait(for: [restored], timeout: 10), .completed, asr.label)
+        asr.tap()
+        XCTAssertTrue(alone.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(alone.isSelected, "Undo restores the prayer before the companion sheet capture")
+        XCTAssertTrue(app.buttons["prayer-heart-present"].exists)
         attachScreenshot(app, named: "M1-V02-log-heart-L")
         app.terminate()
     }
