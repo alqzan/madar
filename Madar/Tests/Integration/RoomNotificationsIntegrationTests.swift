@@ -232,6 +232,36 @@ import MadarCore
         XCTAssertEqual(calendar.component(.day, from: candidate.dueAt), 16)
     }
 
+    func testQuranReminderCopyIsGenericOnlyUnderWholeAppLock() throws {
+        for lock in ["none", "app"] {
+            let (app, _, now, day) = try fixture(["core.faceIDLock": .string(lock)])
+            let plan = NotificationArbiter.plan(candidates: [], prayerDays: [day], now: now,
+                                                timeZone: day.place.timeZone, policy: .init(staleNudgeEnabled: false))
+            for (suffix, title, body) in [("wird", QuranReminderCopy.title, QuranReminderCopy.body),
+                                          ("late", QuranReminderCopy.lateTitle, QuranReminderCopy.lateBody)] {
+                let candidate = NotificationCandidate(id: "quran.2026-10-15.\(suffix)", room: .quran,
+                                                      dueAt: day.fajr.addingTimeInterval(1800), dayKey: "2026-10-15")
+                let content = RoomNotificationContent.content(for: candidate, plan: plan, session: app, habitNames: [:])
+                if lock == "app" {
+                    XCTAssertEqual(content.title, "مدار")
+                    XCTAssertEqual(content.body, "لديك تذكير في مدار")
+                } else {
+                    XCTAssertEqual(content.title, title)
+                    XCTAssertEqual(content.body, body)
+                }
+            }
+        }
+    }
+
+    func testWholeAppLockPurgesEveryRoomNotificationButKeepsPrayerPrompts() {
+        let identifiers = ["quran.2026-10-15.late", "digest.2026-10-15", "qada.2026-10-15",
+                           "habits.2026-10-15.id", "notes.2026-10-15.niyya", "nudge.2026-10-15",
+                           "mal.alert80.id.category", "mal.cardDue.id", "mal.cardCash.id",
+                           "mal.reconcile.id", "mal.zakat.id", "salah.2026-10-15.fajr"]
+        XCTAssertEqual(Set(AppPrivacyService.protectedRoomNotificationIdentifiers(in: identifiers)),
+                       Set(identifiers.dropLast()), "Whole-app lock removes sensitive room notices while prayer prompts stay available.")
+    }
+
     func testProtectedAppShowsGenericCopyAndTapsOpenTheRoom() throws {
         let (app, _, _, day) = try fixture(["core.faceIDLock": .string("app")])
         let habit = UUID()

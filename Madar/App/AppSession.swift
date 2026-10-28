@@ -49,6 +49,7 @@ final class AppSession {
     var bankCorpusImportedInputCount = 0
 #endif
     @ObservationIgnored weak var prayerNotifications: PrayerNotificationCoordinator?
+    @ObservationIgnored private var privacyScopeTransitionPending = false
     let schema: SettingsSchema
     var store: SettingsStore
     private(set) var values: [String: JSONValue] = [:]
@@ -1022,6 +1023,21 @@ final class AppSession {
         try snapshotStore.remove("quran")
         WidgetCenter.shared.reloadTimelines(ofKind: "MadarQuran")
     }
+    /// Remove every room snapshot that can reveal protected progress before whole-app
+    /// scope is persisted. A later publication replaces these with locked-safe copies.
+    func beginPrivacyScopeTransition() { privacyScopeTransitionPending = true }
+    func finishPrivacyScopeTransition() throws {
+        privacyScopeTransitionPending = false
+        try publishSnapshot()
+    }
+    func redactSensitiveWidgetSnapshots() throws {
+        let names = Set(BuiltRoomWidget.allCases.map(\.rawValue) + [
+            "quran", HabitShortcutSnapshot.name, WidgetCatalogSnapshot.name,
+            WidgetCatalogSnapshot.valuesName, "notes", "notesToday", "privateNote", "notesMemory"
+        ])
+        for name in names { try snapshotStore.remove(name) }
+        WidgetCenter.shared.reloadAllTimelines()
+    }
     func authorizeProtectedData() { protectedDataAuthorized = true }
     func bindContainer(_ replacement: ModelContainer) {
         container = replacement; store = SettingsStore(context: ModelContext(replacement), schema: schema)
@@ -1054,6 +1070,10 @@ final class AppSession {
         return place
     }
     func publishSnapshot() throws {
+        if privacyScopeTransitionPending {
+            try redactSensitiveWidgetSnapshots()
+            return
+        }
         let instant = prayerNow()
         try pendingInbox.publishGeneration(inboxGeneration())
         try publishNotificationBudget(at: instant)

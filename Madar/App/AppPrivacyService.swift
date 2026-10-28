@@ -47,7 +47,11 @@ enum AppSpotlightIndexing {
     func redactProtectedData() async throws {
         guard let session else { throw DataError.invalidValue("session unavailable") }
         session.redactProtectedData()
-        try redactQuranWidgetSnapshotIfLocked()
+        if session.string("core.faceIDLock") == "app" {
+            try session.redactSensitiveWidgetSnapshots()
+            await redactProtectedRoomNotifications()
+            await session.refreshPrayerNotifications()
+        }
         let snapshots = session.snapshotStore
         for name in ["notes", "notesToday", "privateNote", "notesMemory"] { try snapshots.remove(name) }
         let center = UNUserNotificationCenter.current()
@@ -71,8 +75,32 @@ enum AppSpotlightIndexing {
     }
     func privacyScopeDidChange(to scope: MadarLockScope) async throws {
         guard let session else { throw DataError.invalidValue("session unavailable") }
-        if scope.effective == .app { try session.redactQuranWidgetSnapshot() }
-        try await session.applySettingsAndWait(["core.faceIDLock": .string(scope.rawValue)])
+        session.beginPrivacyScopeTransition()
+        do {
+            try session.redactSensitiveWidgetSnapshots()
+            if scope.effective == .app { await redactProtectedRoomNotifications() }
+            try await session.applySettingsAndWait(["core.faceIDLock": .string(scope.rawValue)])
+            try session.finishPrivacyScopeTransition()
+        } catch {
+            try? session.reload()
+            if session.string("core.faceIDLock") == "app" {
+                session.beginPrivacyScopeTransition()
+                try? session.redactSensitiveWidgetSnapshots()
+            } else {
+                try? session.finishPrivacyScopeTransition()
+            }
+            throw error
+        }
+    }
+    static func protectedRoomNotificationIdentifiers(in identifiers: [String]) -> [String] {
+        identifiers.filter(RoomNotificationContent.isRoomRequest)
+    }
+    private func redactProtectedRoomNotifications() async {
+        let center = UNUserNotificationCenter.current()
+        let pending = await center.pendingNotificationRequests()
+        center.removePendingNotificationRequests(withIdentifiers: Self.protectedRoomNotificationIdentifiers(in: pending.map(\.identifier)))
+        let delivered = await center.deliveredNotifications()
+        center.removeDeliveredNotifications(withIdentifiers: Self.protectedRoomNotificationIdentifiers(in: delivered.map { $0.request.identifier }))
     }
     func persistedPrivacyScope() throws -> MadarLockScope {
         guard let session else { throw DataError.invalidValue("session unavailable") }

@@ -212,8 +212,8 @@ import MadarPrayer
         content.threadIdentifier = id.split(separator: ".").first.map(String.init).map { $0 + "." + candidate.dayKey } ?? candidate.dayKey
         if id.hasPrefix("quran.") {
             let late = id.hasSuffix(".late")
-            content.title = late ? QuranReminderCopy.lateTitle : QuranReminderCopy.title
-            content.body = late ? QuranReminderCopy.lateBody : QuranReminderCopy.body
+            content.title = protected ? "مدار" : late ? QuranReminderCopy.lateTitle : QuranReminderCopy.title
+            content.body = protected ? "لديك تذكير في مدار" : late ? QuranReminderCopy.lateBody : QuranReminderCopy.body
             content.userInfo = ["dayKey": candidate.dayKey, "room": "quran"]
         } else if id.hasPrefix("digest.") {
             // Audit 28 Oct: under whole-app protection the digest named its kinds («القضاء، الزكاة…») on the lock screen.
