@@ -17,7 +17,10 @@ public struct RoomWidgetSnapshot:Codable,Sendable,Equatable {
         public var share:Double
         public var route:String
         public var done:Bool
-        public init(id:String,title:String,value:String,detail:String="",secondDate:String="",share:Double=0,route:String,done:Bool=false){self.id=id;self.title=title;self.value=value;self.detail=detail;self.secondDate=secondDate;self.share=share;self.route=route;self.done=done}
+        /// Optional read projections for period circles; older payloads retain their prose fallback.
+        public var completedCount:Int?
+        public var targetCount:Int?
+        public init(id:String,title:String,value:String,detail:String="",secondDate:String="",share:Double=0,route:String,done:Bool=false,completedCount:Int?=nil,targetCount:Int?=nil){self.id=id;self.title=title;self.value=value;self.detail=detail;self.secondDate=secondDate;self.share=share;self.route=route;self.done=done;self.completedCount=completedCount;self.targetCount=targetCount}
     }
     public var datePrimary:String
     public var dateSecondary:String

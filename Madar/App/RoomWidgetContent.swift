@@ -95,16 +95,29 @@ struct RoomWidgetContent:View {
             Text(room.title+"، "+accessoryValue).font(.caption).lineLimit(1).privacySensitive(room == .habits || room == .upcoming)
         } else if family == .accessoryCircular {
             ZStack {
-                Circle().stroke(.primary.opacity(0.25),lineWidth:3)
-                if snapshot?.locked != true {Circle().trim(from:0,to:min(1,max(0,accessoryRow?.share ?? 0))).stroke(.primary,style:.init(lineWidth:3,lineCap:.round)).rotationEffect(.degrees(-90))}
+                Circle().trim(from: 0.08, to: 0.92).stroke(.primary.opacity(0.25), style: .init(lineWidth: 3, lineCap: .round)).rotationEffect(.degrees(90))
+                if snapshot?.locked != true {
+                    Circle().trim(from: 0.08, to: 0.08 + 0.84 * min(1, max(0, accessoryRow?.share ?? 0)))
+                        .stroke(.primary, style: .init(lineWidth: 3, lineCap: .round)).rotationEffect(.degrees(90))
+                }
                 VStack(spacing:1) {
                     if snapshot?.locked==true{Image(systemName:"lock");Text("افتح").font(.caption2)}
                     else if room == .diaryWrite{Image(room.glyph).renderingMode(.template).resizable().scaledToFit().frame(width:24,height:24);Text("اكتب").font(.caption2)}
-                    else {
-                        let value=accessoryRow?.value ?? "",remaining=accessoryRow?.detail ?? ""
-                        let big=room == .upcoming ? value.split(separator:" ").first.map(String.init) : room == .habits ? (remaining.isEmpty ? nil : remaining) : (value.contains(where:{$0.isNumber}) ? value : nil)
+                    else if room == .habits {
+                        let digits = MadarNumberFormatter(style: numerals == "western" ? .western : .hindi)
+                        Image(systemName: "checkmark").font(.system(size: 9, weight: .semibold))
+                        if let completed = accessoryRow?.completedCount, let total = accessoryRow?.targetCount, total > 0 {
+                            Text(digits.string(completed)).font(.custom("thmanyahserifdisplay-Bold", size: 20, relativeTo: .title3)).lineLimit(1)
+                            Text("من " + digits.string(total)).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).lineLimit(1)
+                        } else {
+                            Text(accessoryRow?.value ?? "افتح مدار").font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).multilineTextAlignment(.center).lineLimit(2)
+                        }
+                    } else {
+                        let value=accessoryRow?.value ?? ""
+                        let big=room == .upcoming ? value.split(separator:" ").first.map(String.init) : (value.contains(where:{$0.isNumber}) ? value : nil)
+                        if room == .upcoming, accessoryRow?.id == "season-9-1" { Image(systemName: "moon").font(.system(size: 10)) }
                         Text(big ?? "افتح").font(.custom("thmanyahsans-Bold",size:15,relativeTo:.caption)).lineLimit(1).minimumScaleFactor(0.74)
-                        Text(room == .upcoming ? accessoryRow?.title ?? room.title : room == .habits ? (remaining == "تمّ" ? "اليوم" : "متبقية") : "السنة").font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).lineLimit(1)
+                        Text(room == .upcoming ? accessoryRow?.title ?? room.title : "السنة").font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).lineLimit(1)
                     }
                 }.padding(7)
             }.privacySensitive(room == .habits || room == .upcoming).foregroundStyle(.primary).accessibilityElement(children:.combine)

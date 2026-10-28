@@ -30,6 +30,13 @@ import MadarPrayer
         XCTAssertEqual(habits.heading,"أتممت عادتك","one due habit, finished: say so instead of a bare count")
         XCTAssertEqual(habits.periods.first{$0.id=="daily"}?.value,"تمّت");XCTAssertEqual(habits.periods.first{$0.id=="daily"}?.detail,"تمّ")
         XCTAssertEqual(habits.periods.first{$0.id=="weekly"}?.value,"لا استحقاق");XCTAssertEqual(habits.periods.first{$0.id=="weekly"}?.detail,"")
+        let daily = try XCTUnwrap(habits.periods.first { $0.id == "daily" })
+        XCTAssertEqual(daily.completedCount, 1); XCTAssertEqual(daily.targetCount, 1)
+        XCTAssertEqual(habits.periods.first { $0.id == "weekly" }?.targetCount, 0)
+        var legacyJSON = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(daily)) as? [String: Any])
+        legacyJSON.removeValue(forKey: "completedCount"); legacyJSON.removeValue(forKey: "targetCount")
+        let legacy = try JSONDecoder().decode(RoomWidgetSnapshot.Row.self, from: JSONSerialization.data(withJSONObject: legacyJSON))
+        XCTAssertNil(legacy.completedCount); XCTAssertNil(legacy.targetCount); XCTAssertEqual(legacy.value, "تمّت")
 
     }
     /// Expected strings come from Arabic number agreement (singular, dual, 3 to 10, 11 and up), not from the code's own output.

@@ -60,6 +60,17 @@ import XCTest
         XCTAssertTrue(habits.exists);habits.tap()
         XCTAssertTrue(app.staticTexts["habits-title"].waitForExistence(timeout:10))
     }
+    func testLockHabitCircleShowsCompletionAndOpensItsRoom() throws {
+        continueAfterFailure = false
+        let app = openGallery(); app.buttons["room-widgets-lock"].tap()
+        let circle = app.buttons["lock-circle-habits"]
+        XCTAssertTrue(circle.waitForExistence(timeout: 10))
+        XCTAssertTrue(circle.label.contains("٠") && circle.label.contains("من ٣"), circle.label)
+        XCTAssertFalse(circle.label.contains("متبقية"))
+        XCTAssertGreaterThanOrEqual(circle.frame.width, 74); XCTAssertGreaterThanOrEqual(circle.frame.height, 74)
+        shot(app, "OR-04-lock-circles-L")
+        circle.tap(); XCTAssertTrue(app.staticTexts["habits-title"].waitForExistence(timeout: 10))
+    }
     func testPrayerWidgetPreviewOpensPrayerDirectly() throws {
         continueAfterFailure=false;let app=openGallery();app.buttons["room-widget-prayer"].tap()
         XCTAssertTrue(app.staticTexts["room-widgets-title"].waitForNonExistence(timeout:5))

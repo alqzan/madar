@@ -20,7 +20,16 @@ struct LockWidgetGallery:View {
             ScrollView {
                 VStack(alignment:.leading,spacing:18) {
                     Text("أضفها من تخصيص شاشة القفل. تتبع ألوان النظام؛ وفي الاستعداد تُستخدم ودجات الشاشة الرئيسية.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                    HStack(spacing:14){ForEach(BuiltRoomWidget.allCases,id:\.self){room in Link(destination:URL(string:room.route)!){preview(room,family:.accessoryCircular).frame(maxWidth:.infinity).frame(height:74)}.buttonStyle(.plain)}}.padding(14).background(theme.surface,in:.rect(cornerRadius:22))
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 3), spacing: 18) {
+                        ForEach(BuiltRoomWidget.allCases, id: \.self) { room in
+                            Link(destination: URL(string: room.route)!) {
+                                VStack(spacing: 6) {
+                                    preview(room, family: .accessoryCircular).frame(width: 74, height: 74)
+                                    Text(room.title).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                                }.frame(maxWidth: .infinity)
+                            }.buttonStyle(.plain).accessibilityIdentifier("lock-circle-" + room.rawValue)
+                        }
+                    }.padding(14).background(theme.surface, in: .rect(cornerRadius: 22))
                     RoomWidgetContent(room:.upcoming,snapshot:value(.upcoming),family:.accessoryInline).padding(14).frame(maxWidth:.infinity,alignment:.leading).background(theme.surface,in:.rect(cornerRadius:18))
                     HStack(spacing:16) {
                         let next=session.snapshotStore.read("prayerNext",as:PrayerNextSnapshot.self,now:session.prayerNow())

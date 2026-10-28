@@ -27,7 +27,7 @@ extension AppSession {
         let periods=[HabitFrequency.daily,.weekly,.monthly,.yearly].map { f->RoomWidgetSnapshot.Row in
             let group=readings.filter{$0.summary.current?.rule.frequency==f && !$0.paused && ($0.summary.current?.target ?? 0)>0},met=group.filter{$0.summary.current?.met==true}.count
             // `detail` carries the compact remainder for the lock-screen circle; empty means nothing is due in this period.
-            return .init(id:f.rawValue,title:f.arabic,value:WidgetCopy.periodProgress(met:met,total:group.count,digits:digits),detail:group.isEmpty ? "" : met==group.count ? "تمّ" : digits.string(group.count-met),share:Double(met)/Double(max(1,group.count)),route:BuiltRoomWidget.habits.route)
+            return .init(id:f.rawValue,title:f.arabic,value:WidgetCopy.periodProgress(met:met,total:group.count,digits:digits),detail:group.isEmpty ? "" : met==group.count ? "تمّ" : digits.string(group.count-met),share:Double(met)/Double(max(1,group.count)),route:BuiltRoomWidget.habits.route,completedCount:met,targetCount:group.count)
         }
         let dueToday=eligible.filter{!$0.paused && ($0.summary.current?.target ?? 0)>0}
         payloads[.habits] = .init(datePrimary:date.primary,dateSecondary:date.secondary,heading:WidgetCopy.habitsHeading(met:dueToday.filter{$0.summary.current?.met==true}.count,total:dueToday.count,digits:digits),emptyTitle:"أضف أول عادة",rows:rows,periods:periods,locked:locked)
