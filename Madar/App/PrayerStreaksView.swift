@@ -95,7 +95,7 @@ struct PrayerStreakArches: View {
                             Text(level.short).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk).lineLimit(2).minimumScaleFactor(0.85).fixedSize(horizontal: false, vertical: true)
                         }
                         Spacer(minLength: 4)
-                        Text(PrayerCopy.days(level.count(stats), digits: digits))
+                        Text(level.count(stats) == 0 ? "لم تبدأ بعد" : PrayerCopy.days(level.count(stats), digits: digits))
                             .font(.custom("thmanyahserifdisplay-Bold", size: 18, relativeTo: .headline))
                             .lineLimit(1).fixedSize()
                     }
@@ -216,7 +216,7 @@ struct PrayerStreaksSheet: View {
                         Text(level.meaning).font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
                     }
                     Spacer(minLength: 6)
-                    Text(PrayerCopy.days(level.count(snapshot.statistics), digits: digits))
+                    Text(level.count(snapshot.statistics) == 0 ? "لم تبدأ بعد" : PrayerCopy.days(level.count(snapshot.statistics), digits: digits))
                         .font(.custom("thmanyahserifdisplay-Bold", size: 22, relativeTo: .title3))
                 }
                 HStack(spacing: 6) {
