@@ -43,6 +43,7 @@ import XCTest
         // XCUITest can call it hittable before it is enabled; that tap never reaches the action.
         expectation(for: NSPredicate(format: "isEnabled == true"), evaluatedWith: edit)
         waitForExpectations(timeout: 15)
+        XCTAssertTrue(app.buttons["quran-plan-summary"].exists, "The plan heads its card with where it starts")
         capture(app,"M2-V12-before-edit-L")
         edit.tap()
         XCTAssertTrue(app.buttons["quran-setup-continue"].waitForExistence(timeout:10),app.debugDescription);capture(app,"M2-V13-start-L")

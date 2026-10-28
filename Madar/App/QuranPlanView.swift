@@ -1,5 +1,6 @@
 import SwiftUI
 import MadarDesign
+import MadarCommands
 
 struct QuranPlanView: View {
     let service: AppQuranService
@@ -23,6 +24,12 @@ struct QuranPlanView: View {
                     let forecasts = overview.day == currentDay ? overview.forecasts : [:]
                     QuranPaperCard {
                         VStack(spacing: 0) {
+                            // AU-04 (R18-Khitta): the plan itself heads the card, what it memorises, one tap from its editor.
+                            if let p = overview.input, let surah = (try? QuranResources.catalog())?.ayah(id: p.startAyah)?.surahNameArabic {
+                                Button { showSetup = true } label: { row("خطة الحفظ", detail: "من سورة " + surah, dot: "hifz", chevron: true).contentShape(Rectangle()) }
+                                    .buttonStyle(.plain).accessibilityIdentifier("quran-plan-summary")
+                                line
+                            }
                             levelRow("درجة الحفظ المعتادة", key: "quran.hifzLevel", dot: "hifz")
                             line; levelRow("درجة المراجعة المعتادة", key: "quran.reviewLevel")
                             line
