@@ -177,7 +177,7 @@ import MadarPrayer
             missedDayKey: missedDay?.description, missedDayTitle: missedDay.map { "فاتك وِرد " + app.dateLabels($0, first: .hijri, compact: true, weekday: true).combined },
             summary: ["في صدرك " + coverageTitle], history: QuranUIHistory(weekSummary: [weeklySummary], yearSummary: [], allSummary: [], days: heat, coverage: [], sessions: historySessions),
             strengthTitle: "مؤشر وصفي من تقييمك ومواعيد المراجعة", strength: strength,
-            recovery: QuranUIRecovery(distantLabel: faceCount(snapshot.pages.filter(\.isFar).count) + " بعيدة", activeTitle: snapshot.recovery == nil ? nil : "خطة استرداد", canCreate: snapshot.pages.contains(where: \.isFar), previews: [:]),
+            recovery: QuranUIRecovery(distantLabel: { n in faceCount(n) + (n == 1 ? " بعيد" : n == 2 ? " بعيدان" : " بعيدة") }(snapshot.pages.filter(\.isFar).count), activeTitle: snapshot.recovery == nil ? nil : "خطة استرداد", canCreate: snapshot.pages.contains(where: \.isFar), previews: [:]),
             errors: errors, toolsOrder: [], availableTools: [], blockOrder: ["sadr", "path", "log14", "tools"], hiddenBlocks: [],
             sessionUnavailableReason: nil, readerUnavailableReason: nil, numeralLocale: app.values["core.numerals"]?.string == "western" ? "en" : "ar",
             dayCloseAvailable: snapshot.sessions.contains { $0.dayKey == today })

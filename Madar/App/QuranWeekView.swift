@@ -44,7 +44,7 @@ struct QuranWeekView: View {
         card {
             VStack(alignment: .leading, spacing: 14) {
                 HStack { Text("حلقات الأسبوع").font(font(17, bold: true)); Spacer(); Text("آخر سبعة أيام").font(font(11)).foregroundStyle(theme.secondaryInk) }
-                Text("أغلقت الحلقتين في " + service.numerals.string(value.closedDays) + " من " + service.numerals.string(value.eligibleDays) + " أيام الحفظ")
+                Text("أغلقت الحلقتين في " + service.numerals.string(value.closedDays) + " من " + service.numerals.string(value.eligibleDays) + (value.eligibleDays == 1 ? " يوم الحفظ" : value.eligibleDays == 2 ? " يومَي الحفظ" : " أيام الحفظ"))
                     .font(font(14)).accessibilityIdentifier("quran-week-closed")
                 if type.isAccessibilitySize {
                     ForEach(value.days) { day in Button { selected = day } label: { Text(day.label + "، حفظ " + faces(day.hifz) + "، مراجعة " + faces(day.review)).font(font(15)).frame(minHeight: 44) }.buttonStyle(.plain) }

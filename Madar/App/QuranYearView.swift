@@ -24,7 +24,7 @@ struct QuranYearView: View {
                             // OR-21: say what the year holds for the chosen kind, not only how many days.
                             let faces = value.days.reduce(0) { $0 + (review ? $1.review : $1.hifz) }
                             VStack(alignment: .leading, spacing: 3) {
-                                Text(faces == 0 ? (review ? "لا مراجعة مسجّلة هذه السنة" : "لا حفظ مسجّل هذه السنة") : service.faceCount(faces) + (review ? " راجعتها هذه السنة" : " حفظتها هذه السنة"))
+                                Text(faces == 0 ? (review ? "لا مراجعة مسجّلة هذه السنة" : "لا حفظ مسجّل هذه السنة") : service.faceCount(faces) + (review ? " راجعت" : " حفظت") + (faces == 1 ? "ه" : faces == 2 ? "هما" : "ها") + " هذه السنة")
                                     .font(quranSerif(20)).accessibilityIdentifier("quran-year-active")
                                 if value.activeDays > 0 { Text("في " + service.dayCount(value.activeDays) + " من الصحبة").font(quranFont(12)).foregroundStyle(theme.secondaryInk) }
                             }
