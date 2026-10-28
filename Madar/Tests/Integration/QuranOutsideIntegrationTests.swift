@@ -58,6 +58,31 @@ import MadarSnapshots
         XCTAssertNil(app.quranRoute); XCTAssertNotNil(app.errorMessage)
         XCTAssertEqual(try ModelContext(app.container).fetchCount(FetchDescriptor<HifzSession>()), 1)
     }
+    func testQuranWidgetSnapshotIsRemovedUnderWholeAppLockAndReturnsAfterUnlock() async throws {
+        let (app, _, root, _) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
+        let store = app.snapshotStore
+        let privacy = AppPrivacyService(session: app)
+
+        try await privacy.privacyScopeDidChange(to: .none)
+        let visible = try XCTUnwrap(store.read("quran", as: QuranWidgetSnapshot.self))
+        XCTAssertEqual(visible.payload.route, "madar://quran/session/hifz")
+        XCTAssertFalse(visible.payload.nextDetail.isEmpty)
+        try privacy.redactQuranWidgetSnapshotIfLocked()
+        XCTAssertNotNil(store.read("quran", as: QuranWidgetSnapshot.self), "Notes-only and no-lock redaction must not clear Quran progress.")
+
+        try await privacy.privacyScopeDidChange(to: .app)
+        XCTAssertNil(store.read("quran", as: QuranWidgetSnapshot.self), "A locked app must not leave Quran progress in the App Group snapshot.")
+
+        try store.write(visible) // Simulate an older published file surviving until the lock redaction runs.
+        XCTAssertNotNil(store.read("quran", as: QuranWidgetSnapshot.self))
+        try privacy.redactQuranWidgetSnapshotIfLocked()
+        XCTAssertNil(store.read("quran", as: QuranWidgetSnapshot.self), "Lock redaction must also remove an already-published Quran snapshot.")
+
+        try await privacy.privacyScopeDidChange(to: .none)
+        let restored = try XCTUnwrap(store.read("quran", as: QuranWidgetSnapshot.self))
+        XCTAssertEqual(restored.payload.route, "madar://quran/session/hifz")
+        XCTAssertFalse(restored.payload.nextDetail.isEmpty)
+    }
     func testWidgetReviewProgressCountsDistinctFacesAndDecodesOlderJSON() throws {
         let (app, service, root, now) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
         let initial = try service.widgetSnapshot().payload

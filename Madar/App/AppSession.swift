@@ -1018,6 +1018,10 @@ final class AppSession {
         protectedDataAuthorized = false
         undoToken = nil; undoToastVisible = false; expiryTask?.cancel()
     }
+    func redactQuranWidgetSnapshot() throws {
+        try snapshotStore.remove("quran")
+        WidgetCenter.shared.reloadTimelines(ofKind: "MadarQuran")
+    }
     func authorizeProtectedData() { protectedDataAuthorized = true }
     func bindContainer(_ replacement: ModelContainer) {
         container = replacement; store = SettingsStore(context: ModelContext(replacement), schema: schema)
@@ -1069,9 +1073,13 @@ final class AppSession {
         try snapshotStore.write(snapshot)
         try publishRoomWidgetSnapshots(at:instant)
         publishPrayerNextSnapshot(at: instant, tzID: place.timeZoneID, dayKey: key.dayKey)
-        let quran = AppQuranService(session: self, clock: { instant })
-        do { try snapshotStore.write(quran.widgetSnapshot()); WidgetCenter.shared.reloadTimelines(ofKind: "MadarQuran") }
-        catch { try? snapshotStore.remove("quran") }
+        if string("core.faceIDLock") == "app" {
+            try redactQuranWidgetSnapshot()
+        } else {
+            let quran = AppQuranService(session: self, clock: { instant })
+            do { try snapshotStore.write(quran.widgetSnapshot()); WidgetCenter.shared.reloadTimelines(ofKind: "MadarQuran") }
+            catch { try? redactQuranWidgetSnapshot() }
+        }
         try publishWidgetCatalog(at: instant)
     }
     /// The next-prayer widget reads this file only; it holds times, never counts or streaks (RP9, RU2).

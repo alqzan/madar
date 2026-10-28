@@ -47,6 +47,7 @@ enum AppSpotlightIndexing {
     func redactProtectedData() async throws {
         guard let session else { throw DataError.invalidValue("session unavailable") }
         session.redactProtectedData()
+        try redactQuranWidgetSnapshotIfLocked()
         let snapshots = session.snapshotStore
         for name in ["notes", "notesToday", "privateNote", "notesMemory"] { try snapshots.remove(name) }
         let center = UNUserNotificationCenter.current()
@@ -58,6 +59,11 @@ enum AppSpotlightIndexing {
         try await CSSearchableIndex.default().deleteSearchableItems(withDomainIdentifiers: ["madar.notes", "madar.privateNotes"])
         WidgetCenter.shared.reloadAllTimelines()
     }
+    func redactQuranWidgetSnapshotIfLocked() throws {
+        guard let session else { throw DataError.invalidValue("session unavailable") }
+        guard session.string("core.faceIDLock") == "app" else { return }
+        try session.redactQuranWidgetSnapshot()
+    }
     func authorizeAccess(to feature: MadarProtectedFeature) async throws {
         guard let session else { throw DataError.invalidValue("session unavailable") }
         // Room view models fetch only after this authorization and their own lock gate.
@@ -65,6 +71,7 @@ enum AppSpotlightIndexing {
     }
     func privacyScopeDidChange(to scope: MadarLockScope) async throws {
         guard let session else { throw DataError.invalidValue("session unavailable") }
+        if scope.effective == .app { try session.redactQuranWidgetSnapshot() }
         try await session.applySettingsAndWait(["core.faceIDLock": .string(scope.rawValue)])
     }
     func persistedPrivacyScope() throws -> MadarLockScope {
