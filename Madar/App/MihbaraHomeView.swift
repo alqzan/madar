@@ -1182,29 +1182,46 @@ private struct MihbaraNotebookContent: View {
         } catch { notes.removeAll(); failure = "تعذّر فتح الملاحظات المحفوظة." }
     }
 
-    private func save(_ note: Editor, text: String) {
-        Task {
-            do { try await app.executeBookCommand("notebook.savePrivate", payload: ["id": .string(note.id.uuidString), "text": .string(text)]); load() }
-            catch { failure = "لم تُحفظ الملاحظة. أعد المحاولة." }
-        }
+    private func save(_ note: Editor, text: String) async throws {
+        try await app.executeBookCommand("notebook.savePrivate", payload: ["id": .string(note.id.uuidString), "text": .string(text)], undoMessage: "حُفظت الملاحظة")
+        load()
     }
 
-    private func delete(_ note: Editor) {
-        Task {
-            do { try await app.executeBookCommand("notebook.deletePrivate", payload: ["id": .string(note.id.uuidString)]); load() }
-            catch { failure = "لم تُحذف الملاحظة. أعد المحاولة." }
-        }
+    private func delete(_ note: Editor) async throws {
+        try await app.executeBookCommand("notebook.deletePrivate", payload: ["id": .string(note.id.uuidString)], undoMessage: "حُذفت الملاحظة")
+        load()
     }
 }
 
 private struct MihbaraNotebookEditor: View {
     let note: MihbaraNotebookContent.Editor
-    let save: (MihbaraNotebookContent.Editor, String) -> Void
-    let delete: (MihbaraNotebookContent.Editor) -> Void
+    let save: (MihbaraNotebookContent.Editor, String) async throws -> Void
+    let delete: (MihbaraNotebookContent.Editor) async throws -> Void
     @Environment(\.dismiss) private var dismiss
     @Environment(\.roomTheme) private var theme
     @State private var text: String
-    init(note: MihbaraNotebookContent.Editor, save: @escaping (MihbaraNotebookContent.Editor, String) -> Void, delete: @escaping (MihbaraNotebookContent.Editor) -> Void) {
+    @State private var isSaving = false
+    @State private var prompt: Prompt?
+    private enum Prompt {
+        case delete, discard, saveFailed, deleteFailed
+        var title: String {
+            switch self {
+            case .delete: "احذف هذه الملاحظة؟"
+            case .discard: "اترك التعديلات؟"
+            case .saveFailed: "لم تُحفظ الملاحظة"
+            case .deleteFailed: "لم تُحذف الملاحظة"
+            }
+        }
+        var message: String {
+            switch self {
+            case .delete: "يمكنك التراجع عن الحذف من دفتر المحبرة."
+            case .discard: "لن يُحفظ ما كتبته منذ فتح الملاحظة."
+            case .saveFailed: "بقي نصك هنا. حاول الحفظ مرة أخرى أو أكمل الكتابة."
+            case .deleteFailed: "ما زالت الملاحظة محفوظة. حاول مرة أخرى أو أبقها."
+            }
+        }
+    }
+    init(note: MihbaraNotebookContent.Editor, save: @escaping (MihbaraNotebookContent.Editor, String) async throws -> Void, delete: @escaping (MihbaraNotebookContent.Editor) async throws -> Void) {
         self.note = note; self.save = save; self.delete = delete; _text = State(initialValue: note.text)
     }
     var body: some View {
@@ -1213,10 +1230,42 @@ private struct MihbaraNotebookEditor: View {
                 .accessibilityIdentifier("mihbara-note-text")
                 .toolbar {
                     ToolbarItem(placement: .principal) { Text("ملاحظة خاصة").font(MadarTypography.section()) }
-                    ToolbarItem(placement: .topBarLeading) { if !note.text.isEmpty { Button("حذف", role: .destructive) { delete(note); dismiss() }.accessibilityIdentifier("mihbara-note-delete") } }
-                    ToolbarItem(placement: .topBarTrailing) { Button("حفظ") { save(note, text); dismiss() }.disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || text.count > 2000).accessibilityIdentifier("mihbara-note-save") }
+                    ToolbarItemGroup(placement: .topBarLeading) {
+                        Button("إلغاء") { if text != note.text { prompt = .discard } else { dismiss() } }
+                            .accessibilityIdentifier("mihbara-note-cancel")
+                        if !note.text.isEmpty { Button("حذف", role: .destructive) { prompt = .delete }.accessibilityIdentifier("mihbara-note-delete") }
+                    }
+                    ToolbarItem(placement: .topBarTrailing) { Button("حفظ") { write(deleting: false) }.disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || text.count > 2000).accessibilityIdentifier("mihbara-note-save") }
                 }
-        }.environment(\.roomTheme, theme)
+        }.environment(\.roomTheme, theme).disabled(isSaving)
+        .interactiveDismissDisabled(isSaving || text != note.text)
+        .alert(prompt?.title ?? "", isPresented: Binding(get: { prompt != nil }, set: { if !$0 { prompt = nil } }), presenting: prompt) { current in
+            switch current {
+            case .delete:
+                Button("احذف", role: .destructive) { write(deleting: true) }
+                Button("أبقها", role: .cancel) {}
+            case .discard:
+                Button("اتركها", role: .destructive) { dismiss() }
+                Button("أكمل الكتابة", role: .cancel) {}
+            case .saveFailed:
+                Button("حاول مرة أخرى") { write(deleting: false) }
+                Button("أكمل الكتابة", role: .cancel) {}
+            case .deleteFailed:
+                Button("حاول مرة أخرى") { write(deleting: true) }
+                Button("أبقها", role: .cancel) {}
+            }
+        } message: { Text($0.message) }
+    }
+    private func write(deleting: Bool) {
+        guard !isSaving else { return }
+        isSaving = true
+        Task {
+            defer { isSaving = false }
+            do {
+                if deleting { try await delete(note) } else { try await save(note, text) }
+                dismiss()
+            } catch { prompt = deleting ? .deleteFailed : .saveFailed }
+        }
     }
 }
 

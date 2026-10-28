@@ -74,6 +74,9 @@ final class AppSession {
     var accessoryHiders: Set<String> = []
     private(set) var prayerRevision = 0
     private(set) var prayerWriteInProgress = false
+    #if DEBUG
+    @ObservationIgnored private var failFirstNotebookSave = false
+    #endif
     var settingsQuery = ""
     private let bus: CommandBus
     private let commandAdapter: DurableCommandAdapter
@@ -122,6 +125,12 @@ final class AppSession {
         self.managedStore = managedStore
         self.spotlightIndexOperation = spotlightIndexOperation
         guard let group = groupDirectory ?? FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.alqzan.madar2") else { throw DataError.missingAppGroup }
+        #if DEBUG
+        let notebookTest = ProcessInfo.processInfo.environment
+        failFirstNotebookSave = notebookTest["MADAR_UI_NOTE_FAIL_FIRST_SAVE"] == "1"
+            && notebookTest["MADAR_UI_STORE_ID"] == group.lastPathComponent
+            && group.deletingLastPathComponent().lastPathComponent == "UITestStores"
+        #endif
         snapshotStore = SnapshotStore(directory: group.appending(path: "Snapshots", directoryHint: .isDirectory))
         pendingInbox = PendingInbox(directory: group.appending(path: "PendingInbox", directoryHint: .isDirectory))
         commandAdapter = DurableCommandAdapter(containerProvider: { try managedStore?.containerForTransaction() ?? container }, lockDirectory: managedStore?.commandLockURL.deletingLastPathComponent() ?? group, transactionClock: { _ in prayerUITestClock(.now) }, generationProvider: {
@@ -857,6 +866,13 @@ final class AppSession {
         guard lockController?.canPresent(.app) ?? protectedDataAuthorized else { throw DataError.authenticationFailed }
         guard beginWrite() else { throw BackupOperationError.busy }
         defer { pendingWrites -= 1 }
+        #if DEBUG
+        // One failed command in an explicitly named synthetic UI store; never applies to an owner store.
+        if failFirstNotebookSave && name == "notebook.savePrivate" {
+            failFirstNotebookSave = false
+            throw DataError.invalidValue("notebook UI fixture write failure")
+        }
+        #endif
         let now = prayerNow()
         let result = try await bus.execute(.init(commandID: id, name: name, payload: .object(payload), issuedAt: now), now: now)
         guard result.status == .applied || result.status == .duplicate else { throw DataError.invalidValue(result.reason ?? "تعذّر حفظ الكتاب") }

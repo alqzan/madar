@@ -168,12 +168,58 @@ import UIKit
         let delete = app.buttons["mihbara-note-delete"]
         XCTAssertTrue(delete.waitForExistence(timeout: 5), app.debugDescription)
         delete.tap()
+        let confirmation = app.alerts["احذف هذه الملاحظة؟"]
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 5))
+        shot(app, "M6-private-note-delete-confirm-L")
+        confirmation.buttons["أبقها"].tap()
+        XCTAssertTrue(editor.exists)
+        XCTAssertTrue((editor.value as? String)?.contains("تم التعديل") == true)
+        delete.tap(); confirmation.buttons["احذف"].tap()
         XCTAssertTrue(note.waitForNonExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["حُذفت الملاحظة"].exists)
         undo(app)
         let restoredNote = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND identifier != %@", "mihbara-note-", "mihbara-note-add")).firstMatch
         XCTAssertTrue(restoredNote.waitForExistence(timeout: 8), app.debugDescription)
         XCTAssertTrue(restoredNote.label.contains("تم التعديل"), restoredNote.label)
         XCTAssertTrue(restoredNote.label.contains("رحلة Goodreads"), restoredNote.label)
+    }
+
+    func testPrivateNoteFailedSaveKeepsDraftAndRetryPersistsIt() {
+        continueAfterFailure = false
+        let app = app("empty")
+        app.launchEnvironment["MADAR_UI_NOTE_FAIL_FIRST_SAVE"] = "1"
+        app.launch(); open(app)
+        let notebook = app.buttons["mihbara-notebook"]
+        reach(app, notebook); notebook.tap()
+        let add = app.buttons["mihbara-note-add"]
+        XCTAssertTrue(add.waitForExistence(timeout: 10)); add.tap()
+        let editor = app.textViews["mihbara-note-text"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 8))
+        let draft = "نص محفوظ بعد إعادة المحاولة"
+        editor.tap(); editor.typeText(draft)
+        app.buttons["mihbara-note-save"].tap()
+        let failure = app.alerts["لم تُحفظ الملاحظة"]
+        XCTAssertTrue(failure.waitForExistence(timeout: 8), app.debugDescription)
+        shot(app, "M6-private-note-save-failed-L")
+        failure.buttons["أكمل الكتابة"].tap()
+        XCTAssertTrue(editor.exists)
+        XCTAssertEqual(editor.value as? String, draft)
+        app.buttons["mihbara-note-cancel"].tap()
+        let discard = app.alerts["اترك التعديلات؟"]
+        XCTAssertTrue(discard.waitForExistence(timeout: 5))
+        discard.buttons["أكمل الكتابة"].tap()
+        XCTAssertEqual(editor.value as? String, draft)
+        app.buttons["mihbara-note-save"].tap()
+        XCTAssertTrue(editor.waitForNonExistence(timeout: 8))
+        let notes = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND identifier != %@", "mihbara-note-", "mihbara-note-add"))
+        XCTAssertEqual(notes.count, 1)
+        XCTAssertTrue(notes.firstMatch.label.contains(draft))
+        shot(app, "M6-private-note-saved-after-retry-L")
+        app.terminate(); app.launch(); open(app)
+        reach(app, notebook); notebook.tap()
+        XCTAssertTrue(notes.firstMatch.waitForExistence(timeout: 10))
+        XCTAssertEqual(notes.count, 1)
+        XCTAssertTrue(notes.firstMatch.label.contains(draft))
     }
 
     func testCancellingGoodreadsPickerReturnsWithoutAnError() {
