@@ -39,7 +39,8 @@ struct QuranMushafView: View {
                 } else if let error {
                     VStack(spacing: 16) { Text(error); Button("حاول مرة أخرى") { Task { await load() } }; Button("رجوع", action: close) }.padding(24)
                 } else { ProgressView() }
-                if tools { controls }
+                // AU-18: while the page loads there is no page to tap, so the close stays visible.
+                if tools || (page == nil && error == nil) { controls }
             }
         }
         .foregroundStyle(theme.ink).background(theme.color("mushafPaper").ignoresSafeArea())

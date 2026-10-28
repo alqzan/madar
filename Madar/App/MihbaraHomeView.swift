@@ -183,6 +183,9 @@ struct MihbaraHomeView: View {
                     )
                 }
                 .environment(\.roomTheme, theme)
+            } else {
+                // AU-18: never a blank full-screen cover with no way out.
+                Color.clear.onAppear { showingAddBook = false }
             }
         }
     }
