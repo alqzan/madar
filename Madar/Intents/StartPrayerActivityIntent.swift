@@ -31,7 +31,7 @@ import MadarInbox
 
 struct StartPrayerActivityIntent: LiveActivityIntent {
     static let title: LocalizedStringResource = "ابدأ عدّاد الصلاة"
-    static let description = IntentDescription("يبدأ متابعة الصلاة القادمة الآن خارج وقت الحرمة والهدوء، ضمن ميزانية هذا الجهاز.")
+    static let description = IntentDescription("يضع عدّاد الصلاة القادمة على شاشة القفل، إلا وقت الصلاة نفسها وساعات الهدوء.")
     static let openAppWhenRun = false
 
     @MainActor func perform() async throws -> some IntentResult {
@@ -59,8 +59,8 @@ private enum PrayerActivityIntentError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .unavailable: "اسمح بالأنشطة الحيّة لمدار في إعدادات الجهاز."
-        case .disabled: "فعّل النشاط الحيّ وتذكيرات هذا الجهاز. لا يبدأ العدّاد في وقت الحرمة أو الهدوء أو الليل. جرّب بعد انقضائها."
-        case .budget: "لا توجد سعة للتنبيه الآن ضمن ميزانية هذا الجهاز أو وقت الهدوء."
+        case .disabled: "فعّل عدّاد الصلاة والتذكيرات من إعدادات مدار. لا يبدأ العدّاد وقت الصلاة ولا في ساعات الهدوء أو الليل، فجرّب بعد انتهائها."
+        case .budget: "بلغت تنبيهات اليوم حدّها أو هذه ساعات الهدوء؛ جرّب بعد قليل."
         case .refresh: "افتح مدار لتحديث المواقيت والإعدادات ثم أعد المحاولة."
         }
     }

@@ -170,7 +170,7 @@ import MadarPrayer
 
     func testStaleIftarCopyNeverClaimsTheMealTimeHasArrived() {
         XCTAssertEqual(MadarContextActivityAttributes.Kind.iftar.staleTitle, "افتح مدار لتحديث وقت الإفطار")
-        XCTAssertEqual(MadarContextActivityAttributes.Kind.iftar.compactStaleTitle, "تحديث")
+        XCTAssertEqual(MadarContextActivityAttributes.Kind.iftar.compactStaleTitle, "حدّث")
         XCTAssertFalse(MadarContextActivityAttributes.Kind.iftar.staleTitle.contains("حان وقت الإفطار"))
     }
 

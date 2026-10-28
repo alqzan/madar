@@ -139,7 +139,8 @@ private struct MadarContextActivityWidget: Widget {
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     if context.attributes.kind == .letter && !context.isStale {
-                        Text("رسالة تنتظر وقتها").font(.caption)
+                        // Audit 28 Oct: the title above already says «رسالة تنتظر وقتها»; the bottom says when it opens.
+                        Text("تُفتح في وقتها").font(.caption)
                     }
                 }
             } compactLeading: {

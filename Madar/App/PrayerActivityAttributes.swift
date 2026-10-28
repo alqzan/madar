@@ -55,13 +55,13 @@ extension MadarContextActivityAttributes.Kind {
     /// must never claim that the event itself has happened.
     var staleTitle: String {
         switch self {
-        case .letter: "افتح مدار لتحديث حالتها"
+        case .letter: "افتح مدار لتحديث حالة الرسالة"
         case .iftar: "افتح مدار لتحديث وقت الإفطار"
         case .travel: "افتح مدار لتحديث التوقيت"
         }
     }
 
-    var compactStaleTitle: String { "تحديث" }
+    var compactStaleTitle: String { "حدّث" }
 
     var destination: URL? {
         switch self {
