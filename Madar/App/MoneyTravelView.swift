@@ -77,11 +77,11 @@ struct MoneyTravelView: View {
                         Button { funding = true } label: { Text(r.hasEnvelope ? "أضف للمظروف" : "موّل الرحلة").font(MadarTypography.fine()).frame(minHeight: 44) }.accessibilityIdentifier("money-travel-fund")
                     }
                     Button { report = true } label: { Text("تقرير الرحلة").font(MadarTypography.cardTitle()).frame(maxWidth: .infinity, minHeight: 56).foregroundStyle(theme.color("onButton")).background(theme.color("button"), in: .capsule) }.accessibilityIdentifier("money-travel-report")
-                    HStack { Button("سجّل مصروفًا") { expense = true }.accessibilityIdentifier("money-travel-expense"); Spacer(); Button("دفتر المال") { regular = true }.accessibilityIdentifier("money-travel-ledger") }.font(MadarTypography.caption()).frame(minHeight: 44)
+                    HStack { Button("سجّل مصروفًا") { expense = true }.accessibilityIdentifier("money-travel-expense"); Spacer(); Button("ارجع لمالي") { regular = true }.accessibilityIdentifier("money-travel-ledger") }.font(MadarTypography.caption()).frame(minHeight: 44)
                     if let failure { Text(failure).font(MadarTypography.caption()) }
                 } else { Text(failure ?? "لا توجد رحلة جارية. تبدأ الرحلة من حالة السفر المشتركة في الصلاة.").font(MadarTypography.body()).padding(24) }
             }.padding(.horizontal, 18).padding(.top, 6).padding(.bottom, 24).frame(maxWidth: 620).frame(maxWidth: .infinity)
-        }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.plain).environment(\.roomTheme, theme)
+        }.clipped().background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.plain).environment(\.roomTheme, theme)
             .toolbar(.hidden, for: .navigationBar, .tabBar).task { load(); entered = true }.onChange(of: app.prayerRevision) { load() }
             .onChange(of: scenePhase) { if scenePhase != .active { revealed = false } }
             .accessibilityIdentifier("money-travel")
@@ -144,17 +144,33 @@ struct MoneyTravelView: View {
         return VStack(alignment: .leading, spacing: 9) {
             MadarDateLabel(app.dateLabels(day), primaryFont: .custom("thmanyahserifdisplay-Bold", size: 18, relativeTo: .headline), secondaryFont: MadarTypography.fine()).accessibilityIdentifier("money-travel-selected-date")
             if rows.isEmpty { Text(day > r.today ? "صفحة تنتظر أيامك القادمة" : "لم يُسجّل مصروف لهذا اليوم").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk) }
-            ForEach(rows) { row in HStack { Image(systemName: row.isRefund ? "arrow.uturn.backward" : "diamond.fill").font(.system(size: 7)).foregroundStyle(theme.color("accentText")); Text(row.name).lineLimit(1); Spacer(); Text(figure: (row.isRefund ? "+" : "") + amount(row.homeMinor)).monospacedDigit() }.font(MadarTypography.caption()) }
+            ForEach(rows) { row in HStack { Image(systemName: row.isRefund ? "arrow.uturn.backward" : "diamond.fill").font(.system(size: 7)).foregroundStyle(theme.color("accentText")); Text(row.name).lineLimit(1); Spacer(); movementAmount(row) }.font(MadarTypography.caption()) }
         }.padding(15).frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading).background(theme.surface).overlay { MoneyAirmailBorder().stroke(theme.color("accentText"), style: .init(lineWidth: 4, dash: [8,16])).padding(4); MoneyAirmailBorder().stroke(theme.color("alert"), style: .init(lineWidth: 4, dash: [8,16], dashPhase: 12)).padding(4); Rectangle().stroke(theme.color("stampText"), lineWidth: 0.5).padding(10) }
     }
     private func tripReport(_ r: MoneyTravelReading) -> some View {
         ScrollView { VStack(alignment: .leading, spacing: 14) {
             HStack { Text("تقرير رحلة " + (r.legCities.count > 1 ? r.legCities.joined(separator: " و") : r.city)).font(MadarTypography.title()); Spacer(); Button("تم") { report = false }.frame(minHeight: 44).accessibilityIdentifier("money-trip-report-close") }
             MadarDateLabel(app.dateLabels(r.start), primaryFont: MadarTypography.body(), secondaryFont: MadarTypography.caption())
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("money-trip-report-start")
             Text(figure: "في المظروف " + amount(r.balanceMinor)).font(MadarTypography.cardTitle())
-            ForEach(r.movements) { row in HStack { VStack(alignment: .leading) { Text(row.name); MadarDateLabel(app.dateLabels(row.day, compact: true), primaryFont: MadarTypography.fine(), secondaryFont: MadarTypography.fine()) }; Spacer(); Text(figure: (row.isRefund ? "+" : "") + amount(row.homeMinor)) } }
+            ForEach(r.movements) { row in HStack { VStack(alignment: .leading) { Text(row.name); MadarDateLabel(app.dateLabels(row.day, compact: true), primaryFont: MadarTypography.fine(), secondaryFont: MadarTypography.fine()) }; Spacer(); movementAmount(row) } }
             if r.movements.isEmpty { Text("تظهر هنا المصروفات بعد تسجيلها أو تأكيد رسائل البنك.").foregroundStyle(theme.secondaryInk) }
         }.font(MadarTypography.body()).padding(22) }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).accessibilityIdentifier("money-trip-report").buttonStyle(.plain).accessibilityIdentifier("money-travel-report-sheet")
+    }
+    /// The display currency can change with a new country; a movement keeps its original amount and currency.
+    private func movementAmount(_ row: MoneyTripMovement) -> some View {
+        let sign = row.isRefund ? "+" : ""
+        return VStack(alignment: .trailing, spacing: 3) {
+            Text(figure: sign + amount(row.homeMinor) + " " + service.currencyName(shownCurrency))
+                .monospacedDigit().lineLimit(2).multilineTextAlignment(.trailing)
+            if visible && row.currency != shownCurrency {
+                Text(figure: "الأصل " + sign + service.amount(row.originalMinor, currency: row.currency) + " " + service.currencyName(row.currency))
+                    .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                    .multilineTextAlignment(.trailing).fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("money-travel-original-" + row.id.uuidString)
+            }
+        }
     }
     private func stampDate(_ day: GregorianDay) -> MadarDateLabels {
         let date = DualDate(instant: day.date(in: app.activePlace.timeZone).addingTimeInterval(12*3600), timeZone: app.activePlace.timeZone, source: HijriSource(rawValue: app.string("core.hijriSource")) ?? .ummAlQura, sightingOffset: Int(app.number("core.hijriOffset")))

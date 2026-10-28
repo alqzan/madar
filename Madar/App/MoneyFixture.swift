@@ -14,11 +14,11 @@ private struct UITestBankCorpusLine: Decodable {
 extension AppSession {
     /// Named synthetic stores only. Never reads or writes the owner's store.
     func prepareMoneyFixture(group: URL) throws {
-        guard let variant = ProcessInfo.processInfo.environment["MADAR_UI_MONEY_FIXTURE"], ["goal", "zakat", "zakatHidden", "travel", "travelMissing", "travelHidden", "accounts", "expense", "showcase", "empty", "hidden", "zero", "shortfall", "messages", "salarySourceFlow", "bankCorpus", "since", "rules", "salary", "budget", "cards", "cardsHidden", "analysis", "analysisHidden", "reconcile", "reconcileHidden", "cashback", "cashbackHidden", "subscriptions", "subscriptionsHidden"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
+        guard let variant = ProcessInfo.processInfo.environment["MADAR_UI_MONEY_FIXTURE"], ["goal", "zakat", "zakatHidden", "travel", "travelMissing", "travelHidden", "travelMultiLeg", "travelMultiLegHidden", "accounts", "expense", "showcase", "empty", "hidden", "zero", "shortfall", "messages", "salarySourceFlow", "bankCorpus", "since", "rules", "salary", "budget", "cards", "cardsHidden", "analysis", "analysisHidden", "reconcile", "reconcileHidden", "cashback", "cashbackHidden", "subscriptions", "subscriptionsHidden"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         let c = ModelContext(container)
         guard !(try c.fetch(FetchDescriptor<DeviceSetting>())).contains(where: { $0.key == "sys.moneyFixture" }) else { return }
         for key in ["sys.moneyFixture", "sys.onboardingCompleted"] { let marker = DeviceSetting(); marker.key = key; marker.valueJSON = Data("true".utf8); c.insert(marker) }
-        _ = try SettingsStore(context: c).stage(["core.dayStart": .string("midnight"), "core.faceIDLock": .string("none"), "core.hideMoneyUntilTouch": .bool(["zakatHidden", "travelHidden", "hidden", "cardsHidden", "analysisHidden", "reconcileHidden", "cashbackHidden", "subscriptionsHidden"].contains(variant))])
+        _ = try SettingsStore(context: c).stage(["core.dayStart": .string("midnight"), "core.faceIDLock": .string("none"), "core.hideMoneyUntilTouch": .bool(["zakatHidden", "travelHidden", "travelMultiLegHidden", "hidden", "cardsHidden", "analysisHidden", "reconcileHidden", "cashbackHidden", "subscriptionsHidden"].contains(variant))])
         if ProcessInfo.processInfo.environment["MADAR_UI_MONEY_BLOCK_SIZE"] == "4x4" {
             let store = try SettingsStore(context: c)
             var layout = try store.value(for: "bahw.layout").object ?? [:], sizes = layout["sizes"]?.object ?? [:]
@@ -240,10 +240,28 @@ extension AppSession {
             let profile = ZakatProfile(); profile.goldPricePerGramMinor = 40000; profile.goldPriceSetAt = now.addingTimeInterval(-40*86400); profile.debtsPolicy = "none"; profile.hawlStartHijri = "h:1447-09-01"; c.insert(profile); try c.save()
         }
         if variant.hasPrefix("travel") {
+            let multiLeg = variant.hasPrefix("travelMultiLeg")
             let trip = Trip(); trip.city = "إسطنبول"; trip.country = "تركيا"; trip.currency = variant == "travelMissing" ? nil : "TRY"; trip.fxRateToHome = variant == "travelMissing" ? nil : "0.1"; trip.fxSetAt = now.addingTimeInterval(-86400); trip.lat = 41.0082; trip.lon = 28.9784; trip.tzID = "Europe/Istanbul"; trip.start = today.adding(days: -3).date(in: zone); trip.mode = "auto"; trip.homeKm = 2450; c.insert(trip)
             let e = Envelope(); e.id = trip.id; e.role = "trip"; e.name = "رحلة إسطنبول"; e.targetMinor = 500_000; e.due = today.adding(days: 3).date(in: zone); c.insert(e); allocation(500_000, "envelope", id: e.id)
             for (index, foreignAmount, name) in [(0, 77000, "فطور"), (1, 27500, "قهوة"), (2, 126500, "زيارة البرج")] {
                 let tx = MoneyTransaction(); tx.tripID = trip.id; tx.currency = "TRY"; tx.amountMinor = foreignAmount; tx.homeAmountMinor = foreignAmount / 10; tx.rateAtTime = "0.1"; tx.rateSource = "trip"; tx.dayKey = today.description; tx.eventAt = now.addingTimeInterval(Double(-3600 * (index+1))); tx.tzID = trip.tzID; tx.dayPolicy = "midnight@1"; tx.merchant = name; tx.cardID = card.id; tx.method = "card"; tx.reviewState = "ok"; tx.cycleID = cycle.id; c.insert(tx); allocation(-tx.homeAmountMinor, "envelope", id: e.id, tx: tx.id, kind: "spend")
+                if multiLeg {
+                    tx.dayKey = today.adding(days: -1).description
+                    tx.eventAt = today.adding(days: -1).date(in: zone).addingTimeInterval(Double(3600 * (index + 12)))
+                }
+            }
+            if multiLeg {
+                let next = Trip(); next.journeyID = trip.id; next.city = "باريس"; next.country = "فرنسا"
+                next.lat = 48.8566; next.lon = 2.3522; next.tzID = "Europe/Paris"; next.start = now.addingTimeInterval(-3600)
+                next.currency = "EUR"; next.fxRateToHome = "4"; next.fxSetAt = next.start; next.mode = "auto"
+                trip.end = next.start; c.insert(next)
+                // Explicit synthetic rates: TRY 2,310 → SAR 231; EUR 25 → SAR 100.
+                // One SAR 5,000 envelope therefore has SAR 4,669 left across both legs.
+                let tx = MoneyTransaction(); tx.tripID = next.id; tx.currency = "EUR"; tx.amountMinor = 2500
+                tx.homeAmountMinor = 10000; tx.rateAtTime = "4"; tx.rateSource = "trip"; tx.dayKey = today.description
+                tx.eventAt = now.addingTimeInterval(-1800); tx.tzID = next.tzID; tx.dayPolicy = "midnight@1"
+                tx.merchant = "متحف باريس"; tx.cardID = card.id; tx.method = "card"; tx.reviewState = "ok"; tx.cycleID = cycle.id
+                c.insert(tx); allocation(-10000, "envelope", id: e.id, tx: tx.id, kind: "spend")
             }
             try c.save()
         }

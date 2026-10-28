@@ -47,11 +47,13 @@ extension AppMoneyService {
         guard app.lockController?.canPresent(.app) ?? app.protectedDataAuthorized else { throw DataError.authenticationFailed }
         let context = ModelContext(app.container), repo = MoneyRepository(context: context), now = app.prayerNow()
         guard let trip = try repo.trip(at: now), let began = trip.start else { return nil }
-        let zone = TimeZone(identifier: trip.tzID) ?? app.activePlace.timeZone
         let today = try DiaryLineRenderer.today(context: context, now: now)
         // OR-09: one journey = every leg; spending, today and the budget sum all of them, each leg keeps its own currency.
         let legs = try repo.journeyLegs(of: trip), legIDs = Set(legs.map(\.id)), key = trip.journeyKey
-        let start = GregorianDay.containing(legs.first?.start ?? began, in: zone), envelope = try repo.tripEnvelope(trip)
+        // The one journey budget belongs to its first leg. Moving west must not turn its
+        // saved start/due midnight into the previous civil date in the current country's zone.
+        let budgetZone = TimeZone(identifier: legs.first?.tzID ?? trip.tzID) ?? app.activePlace.timeZone
+        let start = GregorianDay.containing(legs.first?.start ?? began, in: budgetZone), envelope = try repo.tripEnvelope(trip)
         let allocations = try context.fetch(FetchDescriptor<Allocation>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
         let all = try repo.confirmedTransactions()
         let rows = all.filter { $0.tripID.map(legIDs.contains) == true && $0.eventAt <= now && ["expense", "fee", "refund", "transfer", "withdrawal"].contains($0.kind) }.compactMap { tx -> MoneyTripMovement? in
@@ -64,7 +66,7 @@ extension AppMoneyService {
             return key == today.description
         }.map(\.id))
         let spent = -allocations.filter { $0.targetID == key && $0.transactionID.map(todayIDs.contains) == true && ["spend", "refund"].contains($0.kind) }.reduce(0) { $0 + $1.amountMinor }
-        let due = envelope?.due.map { GregorianDay.containing($0, in: zone) }
+        let due = envelope?.due.map { GregorianDay.containing($0, in: budgetZone) }
         let target = envelope?.targetMinor
         let planned = due.flatMap { end in target.flatMap { TravelBudget.dailyMinor(targetMinor: $0, durationDays: MadarCalendarDays.distance(from: start, to: end) + 1, day: MadarCalendarDays.distance(from: start, to: today) + 1) } }
         let envelopes = try context.fetch(FetchDescriptor<Envelope>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }

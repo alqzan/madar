@@ -7,6 +7,29 @@ import MadarSnapshots
 @testable import Madar
 
 @MainActor final class MoneyOutsideRoomTests: XCTestCase {
+    func testJourneyBudgetKeepsItsFirstCountryDatesWhenMovingWest() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "MoneyJourneyDates-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root), context = ModelContext(container)
+        func at(_ raw: String) -> Date { ISO8601DateFormatter().date(from: raw)! }
+        _ = try SettingsStore(context: context).stage(["core.dayStart": .string("midnight"), "core.faceIDLock": .string("none")])
+        let first = Trip(); first.city = "إسطنبول"; first.tzID = "Europe/Istanbul"
+        first.start = at("2026-10-14T00:00:00+03:00"); first.end = at("2026-10-17T10:00:00+03:00")
+        let next = Trip(); next.journeyID = first.id; next.city = "باريس"; next.tzID = "Europe/Paris"
+        next.start = first.end; next.currency = "EUR"; next.fxRateToHome = "4"
+        context.insert(first); context.insert(next)
+        let envelope = Envelope(); envelope.id = first.id; envelope.role = "trip"; envelope.targetMinor = 500_000
+        envelope.due = at("2026-10-20T00:00:00+03:00"); context.insert(envelope)
+        try context.save()
+        let app = try AppSession(container: container, groupDirectory: root); app.authorizeProtectedData()
+        let journey = try XCTUnwrap(AppMoneyService(app: app).loadTravel())
+        XCTAssertEqual(journey.legCities, ["إسطنبول", "باريس"])
+        XCTAssertEqual(journey.start, try GregorianDay("2026-10-14"))
+        XCTAssertEqual(journey.due, try GregorianDay("2026-10-20"))
+        XCTAssertTrue(journey.hasEnvelope)
+        XCTAssertEqual(try context.fetch(FetchDescriptor<Envelope>()).filter { $0.role == "trip" }.count, 1)
+    }
+
     func testSnapshotRedactionAndDiaryFactUseTheOwningMovement() async throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "MoneyOutside-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }

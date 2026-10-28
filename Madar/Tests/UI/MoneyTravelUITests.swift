@@ -71,4 +71,67 @@ import XCTest
         hidden.buttons["money-travel-reveal"].tap(); XCTAssertNotEqual(hidden.staticTexts["money-travel-remaining"].label, "•••"); hidden.terminate()
         let missing = open("travelMissing"); XCTAssertTrue(missing.buttons["money-travel-missing-rate"].exists); shot(missing, "M5-V21-missing-L")
     }
+
+    func testTwoCountriesKeepOneBudgetAndTheirOriginalCurrencies() {
+        continueAfterFailure = false
+        let store = UUID().uuidString, app = open("travelMultiLeg", store: store)
+        let legs = app.staticTexts["money-travel-legs"]
+        XCTAssertEqual(legs.label, "إسطنبول ← باريس")
+        let units = app.segmentedControls["money-travel-units"]
+        units.buttons["ريال"].tap()
+        let balance = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "وفي الرحلة ")).firstMatch
+        // SAR 5,000 − TRY 2,310 at 0.1 − EUR 25 at 4 = SAR 4,669.
+        XCTAssertTrue(balance.label.contains("٤٬٦٦٩"), balance.label)
+        units.buttons["يورو"].tap()
+        XCTAssertTrue(balance.label.contains("١٬١٦٧٫٢٥"), balance.label)
+        units.buttons["ريال"].tap()
+        shot(app, "OR-09-two-country-ticket-L")
+        let report = app.buttons["money-travel-report"]; reach(app, report); report.tap()
+        let close = app.buttons["money-trip-report-close"]
+        XCTAssertTrue(close.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["تقرير رحلة إسطنبول وباريس"].exists)
+        XCTAssertTrue(app.staticTexts["زيارة البرج"].exists)
+        XCTAssertTrue(app.staticTexts["متحف باريس"].exists)
+        let start = app.descendants(matching: .any).matching(identifier: "money-trip-report-start").firstMatch
+        XCTAssertTrue(start.label.contains("١٤ أكتوبر"), start.label)
+        shot(app, "OR-09-two-currency-report-L")
+        let sheet = app.descendants(matching: .any).matching(identifier: "money-travel-report-sheet").firstMatch
+        let originals = sheet.staticTexts.matching(NSPredicate(format: "identifier BEGINSWITH %@", "money-travel-original-"))
+        XCTAssertEqual(originals.count, 4)
+        let labels = originals.allElementsBoundByIndex.map(\.label)
+        XCTAssertTrue(labels.contains { $0.contains("١٬٢٦٥") && $0.contains("ليرة") }, labels.description)
+        XCTAssertTrue(labels.contains { $0.contains("٢٥") && $0.contains("يورو") }, labels.description)
+        close.tap()
+        let ledger = app.buttons["money-travel-ledger"]; reach(app, ledger)
+        XCTAssertEqual(ledger.label, "ارجع لمالي"); ledger.tap()
+        XCTAssertTrue(app.staticTexts["money-title"].waitForExistence(timeout: 10))
+        app.terminate()
+        let reopened = open("travelMultiLeg", store: store)
+        XCTAssertEqual(reopened.staticTexts["money-travel-legs"].label, "إسطنبول ← باريس")
+        reopened.segmentedControls["money-travel-units"].buttons["ريال"].tap()
+        XCTAssertTrue(reopened.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "وفي الرحلة ")).firstMatch.label.contains("٤٬٦٦٩"))
+    }
+
+    func testTwoCountryReportKeepsOriginalAmountsHiddenUntilReveal() {
+        continueAfterFailure = false
+        let app = open("travelMultiLegHidden")
+        XCTAssertEqual(app.staticTexts["money-travel-remaining"].label, "•••")
+        let report = app.buttons["money-travel-report"]; reach(app, report); report.tap()
+        let close = app.buttons["money-trip-report-close"]
+        XCTAssertTrue(close.waitForExistence(timeout: 5))
+        let sheet = app.descendants(matching: .any).matching(identifier: "money-travel-report-sheet").firstMatch
+        let originals = sheet.staticTexts.matching(NSPredicate(format: "identifier BEGINSWITH %@", "money-travel-original-"))
+        XCTAssertEqual(originals.count, 0)
+        XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "٤٬٦٦٩")).firstMatch.exists)
+        shot(app, "OR-09-two-country-hidden-report-L")
+        close.tap()
+        let reveal = app.buttons["money-travel-reveal"]
+        for _ in 0..<6 where !reveal.isHittable { app.swipeDown(velocity: .slow) }
+        reveal.tap()
+        app.segmentedControls["money-travel-units"].buttons["ريال"].tap()
+        reach(app, report); report.tap()
+        XCTAssertTrue(close.waitForExistence(timeout: 5))
+        XCTAssertEqual(originals.count, 4)
+        shot(app, "OR-09-two-country-revealed-report-L")
+    }
 }
