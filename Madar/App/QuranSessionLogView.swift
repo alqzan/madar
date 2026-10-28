@@ -73,7 +73,7 @@ struct QuranSessionLogView: View {
             .alert("احذف هذه الجلسة؟", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), presenting: deleting) { id in
                 Button("احذف", role: .destructive) { deleting = nil; run { try await service.perform(.deleteSession(id)); expanded = nil; load() } }
                 Button("أبقِ الجلسة", role: .cancel) { deleting = nil }
-            } message: { _ in Text("ستُزال آثارها من الحفظ والمواعيد والأخطاء. يمكنك التراجع عشر دقائق.") }
+            } message: { _ in Text("ستُزال آثارها من الحفظ والمواعيد والأخطاء. يمكنك التراجع فور الحذف من الشريط أسفل الشاشة.") }
             .alert("لم تكتمل العملية", isPresented: Binding(get: { app.errorMessage != nil }, set: { if !$0 { app.errorMessage = nil } })) { Button("تمّ") { app.errorMessage = nil } } message: { Text(app.errorMessage ?? "") }
     }
     private var dayGroups: [(day: String, records: [QuranUILogRecord])] {

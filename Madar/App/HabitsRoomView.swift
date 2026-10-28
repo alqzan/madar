@@ -59,7 +59,7 @@ struct HabitsRoomView: View {
                         periodSummaries
                         if active.count > 1 && !dynamicTypeSize.isAccessibilitySize {
                             nextStep
-                            HabitOrbitView(readings: active, digits: digits, theme: theme, nowPositions: AppBahwService(session: session).habitOrbitPositions()) { detail = $0 }
+                            HabitOrbitView(readings: active.filter { !waitsForItsDate($0) }, digits: digits, theme: theme, nowPositions: AppBahwService(session: session).habitOrbitPositions()) { detail = $0 }
                                 .accessibilityElement(children: .contain).accessibilityIdentifier("habits-orbit")
                         } else {
                             hero
@@ -103,6 +103,13 @@ struct HabitsRoomView: View {
 
     /// Due now: every daily habit and longer habits on their scheduled days, with the existing weekly and
     /// flexible-monthly closing windows.
+    /// A fixed-date habit before its date stays out of the orbit as it stays out of today's list
+    /// (it used to show «فاتتك فترة» on a monthly charity days before its day).
+    private func waitsForItsDate(_ r:HabitReading)->Bool {
+        guard !r.paused, let p=r.summary.current, !p.met else { return false }
+        let fixed = p.rule.frequency == .yearly || (p.rule.frequency == .monthly && !p.rule.monthDays.isEmpty)
+        return fixed && !p.dueDays.contains(today)
+    }
     private func dueToday(_ r:HabitReading)->Bool {
         guard !r.paused, let p=r.summary.current, p.target > 0 else { return false }
         if p.rule.frequency == .daily { return true }
@@ -458,7 +465,7 @@ func habitProgressText(_ value:Int,_ target:Int,_ unit:String?,_ digits:MadarNum
 /// One more of a unit, as the object of «سجّل/أضف»: «كوبًا»، «صفحة»، «مرة».
 func habitOneMore(_ unit:String?)->String {
     guard let unit, !unit.isEmpty else { return "مرة" }
-    return ["كوب":"كوبًا","كأس":"كأسًا","pages":"صفحة","صفحة":"صفحة","ركعة":"ركعتين","مرة":"مرة","فنجان":"فنجانًا"][unit] ?? "واحدًا"
+    return ["كوب":"كوبًا","كأس":"كأسًا","pages":"صفحة","صفحة":"صفحة","ركعة":"ركعة","مرة":"مرة","فنجان":"فنجانًا"][unit] ?? "واحدًا"
 }
 func habitUnitName(_ unit:String)->String { ["minutes":"دقيقة","exerciseMinutes":"دقيقة حركة","steps":"خطوة","pages":"صفحة"][unit] ?? unit }
 /// A count with its unit in Arabic number agreement; the table lives in `WidgetCopy` so the widget says the same.

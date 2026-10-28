@@ -16,7 +16,7 @@ import XCTest
         XCTAssertTrue(reveal.waitForExistence(timeout: 15), app.debugDescription)
         let title = app.staticTexts["quran-drill-title"]
         XCTAssertTrue(title.label.hasSuffix("١١٤، الوجه ١٤٢"), title.label)
-        XCTAssertTrue(app.staticTexts["تكرر مرتين"].exists)
+        XCTAssertTrue(app.staticTexts["تعثّرت هنا مرتين"].exists)
         XCTAssertEqual(app.descendants(matching: .any)["quran-drill-ayah"].label, "الكلمة مستورة")
         attach(app, "M2-V04-drill-L")
         reveal.tap()

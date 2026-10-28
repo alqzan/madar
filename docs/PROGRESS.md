@@ -90,6 +90,7 @@ Six read-only Sonnet audits compared canonical screens with the newest screensho
 | AU-04 | Visual sweep (Sonnet helpers 28 Oct) | Twelve canonical/app pairs from `Artifacts/compare/` were read by three helpers. Applied: the habits orbit rings back to 3.5 pt (W2 draws them thinner than the 5 pt of 27 Oct), and the empty Quran strength board leads back to today's path. Checked, no defect: the «٪» on S3 is the Arabic sign (the display face draws it like «%»). Left for the owner's eye, larger work: money home reserve/surplus two-column row and hatched debt bars (Z-R12-Home2), the Khitta row set (R18-Khitta), the reader theme row inside «خيارات أكثر» (R9-Qari-Aa). `HabitsUITests` 1/1 (aud28f), `QuranStrengthUITests` 1/1 (aud28e). Then the diary customize mini preview names its blocks like K-Mudhakkirat (the memory block in white on the room colour); `DiaryCustomizeUITests` passed (aud28i). The session log groups each day in one card like R18-Sijil-Log: «اليوم/أمس» before the date, the day's kinds beside it, the weakest page grade as a chip on each row; `QuranHistoryUITests` 1/1 (aud28j). «في صدرك» then reads in parts like the canonical and the room's home («١٤ جزءًا و٣ أوجه», one shared `coverageTitle`), not «٢٨٤ وجهًا»; `QuranHistoryUITests` 1/1 (aud28p). Checked, kept: R9-Qari-Aa shows the colour themes on the main sheet instead of under «خيارات أكثر» (one tap less); R18-Khitta rows follow later plan decisions, but the card now opens with the plan itself like the canonical («خطة الحفظ، من سورة …», one tap to its editor); `QuranPlanSetupUITests` 2/2 (aud28q). The surplus waterfall writes each cycle's change signed above its bar (green +, clay −) and the total above «الآن» like Z-R12-Env; `MoneyEnvelopesUITests` 5/5 (aud28m), new mid-scroll shot M5-V03-envelopes-surplus-L (aud28n) | matched — awaiting owner |
 | AU-05 | Helper audit: Prayer and Money (Sonnet, 28 Oct) | Two read-only helpers. Applied: the empty accounts tree carries «أضف أول حساب» right under its sentence; an empty filtered day in the money log offers «اعرض كل حركات اليوم»; the qada sheet says «لا فوائت مسجّلة عليك» when its last item is made up. Rejected after checking: the «small text in base accent/debt/bills» findings (`theme.accent` is `accentText`, Theme.swift:24; mal debt/bills/accent are 5.3–7.3:1 on bg, surface and surface2 in both themes), the messages empty state (its guide button sits right under it), the travel screen (its header has a close). `MoneyAccountsUITests` 6/6 + `MoneyLogUITests` 1/1 (aud28k), empty add asserted (aud28l). Not run: the qada sheet's empty state (compiled only; no test reaches it) | matched — awaiting owner |
 | AU-06 | Helper audit: Mihbara and Diary copy (Sonnet, 28 Oct) | Applied: the PDF conversion names its result one way («الكتاب المنساب») and one place («رفّك», not the ambiguous «رفّه»); the barcode fallback explains «رقم الكتاب الدولي (ISBN) المطبوع تحت الباركود خلف الغلاف»; the file-removal note no longer mentions a future iCloud sync (v1 is local, RA1); the empty projects line points at «مشروع جديد»; clearing an intention's result says «مُسحت النتيجة» in its undo toast (it said «حُفظت النيّة»). Checked, kept: every other sheet closes, every delete confirms or undoes, all dates are paired, no «·» by a digit; the chapter row delete in the paper index editor only edits an unsaved draft. `DiaryIntentionUITests` 2/2 (aud28o, the build carries all copy changes). Not run: the PDF, barcode and projects strings (no test reaches them) | matched — awaiting owner |
+| AU-07 | Helper audit: Habits, lobby and Quran copy (Sonnet, 28 Oct) | Applied: «أضف ركعة» (it said «ركعتين» and added one); habit toasts say what happened («حُذفت العادة»، «جُمّدت العادة»، «عادت العادة»، «سُجّلت») instead of «حُفظت العادة» for all; «صلاة/وجه/سطر» joined the agreement table («٥ صلوات»، not «٥ صلاة»); the editor's target and minimum carry their agreed unit; one `daysPhrase` drops the digit for one and two («بقي يومان»، «رمضان بعد يومين»، not «بقي ٢ يومان»); Quran: «وجه واحد بعيد / وجهان بعيدان / ٣ أوجه بعيدة», «ما اكتمل في صدرك (…)», «أتممت خطوات اليوم كلها», «تعثّرت هنا مرتين», the delete alert no longer promises ten minutes of undo (the bar shows a few seconds). Found and fixed: a fixed-date monthly/yearly habit sat in the orbit as «فاتتك فترة» before its date; the orbit now keeps it out like today's list (`testAtRiskFixedHabitsStayHiddenBeforeTheirDates` failed on the base code too, aud28s). Verified: `HabitsUITests` 15/15 (aud28t); `BahwYearUITests` 4/4, `QuranDrillUITests`, `QuranFreeUITests` 4/4, `QuranStrengthUITests` 1/1 (aud28r). Left for later: qiyam «أعد ما شئت» wording, discard-session confirmation in the coach/qiyam sheets, «فاتتك فترة» per-frequency wording | matched — awaiting owner |
 
 OR-03 current source and proof are in the live row above. The earlier widgetScope, smartPresence and X3 behavior gaps were implemented and verified on 27 Oct; do not treat the old placeholder-control note as current. The actual OS gallery/action and iOS 27 runtime checks remain open.
 
@@ -373,6 +374,15 @@ M0-M6 software is integrated; M5 has its bounded software gate. M7 remains open 
 
 # Handovers
 
+## Handover — تدقيق AU-04…AU-07 — 2026-10-28 — Claude
+- **Works now:** معاينة تخصيص المذكرات بأسماء أجزائها؛ سجل جلسات القرآن بطاقة لكل يوم مع «اليوم/أمس» وشارة التقييم و«في صدرك» بالأجزاء؛ صف «خطة الحفظ، من سورة …» أول بطاقة خطّتك؛ شلال الفائض بإشارات فوق الأعمدة؛ حالات فارغة تقود إلى فعل (الحسابات، السجل، القضاء)؛ نصوص المحبرة والمذكرات والعادات والقرآن مصحّحة (AU-05…AU-07)؛ العادة ذات التاريخ الثابت لا تظهر في المدار قبل يومها.
+- **Verified:** DiaryCustomize (aud28i)، QuranHistory 1/1 (aud28j/p)، MoneyAccounts 6/6 + MoneyLog 1/1 (aud28k/l)، MoneyEnvelopes 5/5 (aud28m/n)، DiaryIntention 2/2 (aud28o)، QuranPlanSetup 2/2 (aud28q)، BahwYear 4/4 + Quran Drill/Free/Strength (aud28r)، Habits 15/15 (aud28t).
+- **Differences left:** أعمدة الدين المخطّطة في رئيسية المال (Z-R12-Home2)، شريط أجزاء «في صدرك» في السجل، ثيمات القارئ في الورقة الرئيسية (أُبقيت عمدًا).
+- **Not verified:** ورقة القضاء الفارغة ونصوص PDF/الباركود/المشاريع (لا اختبار يصلها)؛ الجهاز.
+- **Disk:** حُذفت ستّ نسخ DerivedData قديمة في `Madar/Artifacts` (~15GB) لأن القرص امتلأ (198MB)؛ `owner-data` والمحاكيات لم تُمسّ.
+- **Next:** بقايا AU-07 في نفس الصف؛ ثم مراجعة المالك لصفوف AU.
+- **Model/effort:** claude-opus-5-5، not exposed. Sonnet helpers للقراءة فقط.
+
 ## Handover — main والمظاريف وودجة النظام — 2026-10-28 — Codex
 - **Works now:** main includes all 84 prior review commits, plus 53cb2ed OR-22 conditional dated goal funding/shared detail forecast. OR-03 actual Home Screen gallery/preset/action and Clear/Tinted now proven; completed widget text no longer repeats.
 - **Verified:** money engine 6/6; serial `codex-or22-final-r1` data/UI 7/7, prior envelopes 3/3, final date/full-row UI 1/1. Actual OS widget tap produced one JSONL pending request with zero positive store events; app open drained it to one event/delta1, empty inbox; reinstall/relaunch unchanged. Final serial glass save/relaunch/lobby UI 1/1 (`codex-or03-final-glass-r4`, complete xcresult); X3 comparison 4/4 regenerated. App/widget builds and git diff --check.
@@ -390,36 +400,3 @@ M0-M6 software is integrated; M5 has its bounded software gate. M7 remains open 
 - **Next:** OR-03 actual OS gallery/preset/button proof on a fresh isolated simulator (never the owner store); OR-22 dated conditional funding projection before the due rail, as specified in its row. Continue remaining live board gaps. Branch codex/bahw-owner-review remains unmerged.
 - **Model/effort:** not exposed / not exposed. Luna read-only helpers; one money-data and one note-preservation pass, no Critical/High.
 - **Usage:** the prior window reached 71%; live limits then switched to a new window and last showed 94% used (weekly 15%). No reset was redeemed by this agent; final card, evidence and handover closed at the requested reserve; all session changes committed, no merge.
-
-## Handover — OR-15/16/27 والتدقيق DA-01…DA-09 — 2026-10-27 — Claude
-
-- **Works now:**
-  - OR-15: قوس الفجر–العشاء، ونيّة الصباح تعود بعد العشاء.
-  - OR-16: أشكال الجمعة ورمضان.
-  - OR-27: أشكال الأرقام والحول.
-  - DA-02: نجوم الصلاة.
-  - DA-03: «+» المصروف في رأس المال.
-  - DA-05 (شكوى المالك «حق العادات… القبح»):
-    - بطاقة العادات العريضة في البهو صارت بحلقات ملوّنة برمز كل عادة، وتحتها الاسم والمقدار، ثم سطر الخطوة وسطر «هذا الأسبوع».
-    - البطاقة الكبيرة صارت بالحلقات نفسها.
-    - أقواس الصلاة في البهو بنجوم، والجمعة أطول.
-    - مدار غرفة العادات بخرزات مرسومة.
-  - DA-04: شريط الكشف أحمر بعد صدوره.
-  - DA-07: «من الوجه N، تمهيد للورد».
-  - DA-09: النموذج الحيّ بألوان الغرف.
-  - DA-01 وDA-06 وDA-08 أُغلقت بلا تغيير، والسبب في كل صف.
-- **Verified:**
-  - `BahwLobbyUITests` 3/3 (da05b/e/f)
-  - `HabitsUITests` 2/2 (da05hab2)
-  - `MoneyCardsUITests` 3/3 (da04a)
-  - `QuranHomeUITests` 3/3 (da07b)
-  - `BahwCustomizeUITests` 5/5 (da09a)
-  - `DiaryWindowUITests` 3/3 (da08a)
-  - `MoneyHomeUITests` (da03a)
-  - والسابقة: or15a، or27a/b/c، MadarData 108/108
-- **Flaky:** `testSixHabitRingsStay…` فشل مرة لأن قائمة الحجم لم تظهر، فصار الاختبار ينتظرها ويعيد اللمس.
-- **Differences left:** الشكل المداري F1 للبطاقة الكبيرة؛ دوائر التكرار تحت الجسر (لا بيانات لها)؛ إعادة تصوير المصحف؛ خط رابع «system» للقارئ يحتاج CSS لـReadium.
-- **Not verified:** الجهاز؛ `check-shipping-sources.py` يفشل «unclosed Swift string» من قبل تغييراتي.
-- **Next:** موافقة المالك على صفوف DA؛ ثم بقية القائمة.
-- **Model/effort:** claude-opus-5-5، not exposed.
-- **Usage:** 5-hour ~62%.

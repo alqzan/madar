@@ -25,7 +25,7 @@ struct QuranStrengthView:View {
                     HStack {
                         VStack(alignment:.leading,spacing:5) {Text("منسوب صدرك").font(quranFont(12));Text(board.mean.map {service.numerals.percent($0)} ?? "—").font(quranSerif(43)).foregroundStyle(theme.color("hifzText")).accessibilityIdentifier("quran-strength-mean")}
                         Spacer()
-                        if board.far > 0 || board.active != nil {Button {recovery=true} label: {VStack(spacing:4) {Text(service.faceCount(board.far)+" بعيدة");Text(board.active == nil ? "خطة استرداد" : "خطّتك")}.font(quranFont(12,bold:true)).padding(12).background(theme.color("dueTint"),in:.rect(cornerRadius:16))}.buttonStyle(.plain).foregroundStyle(theme.color("dueText")).accessibilityIdentifier("quran-strength-recovery")}
+                        if board.far > 0 || board.active != nil {Button {recovery=true} label: {VStack(spacing:4) {Text(farFaces(board.far));Text(board.active == nil ? "خطة استرداد" : "خطّتك")}.font(quranFont(12,bold:true)).padding(12).background(theme.color("dueTint"),in:.rect(cornerRadius:16))}.buttonStyle(.plain).foregroundStyle(theme.color("dueText")).accessibilityIdentifier("quran-strength-recovery")}
                     }
                     Text("مؤشر وصفي من تقييمك ومواعيد المراجعة؛ ليس احتمالًا للحفظ. البعيد: متأخر مدة كاملة أو متانته تحت خمسين.").font(quranFont(12)).foregroundStyle(theme.secondaryInk)
                     if board.parts.isEmpty {QuranPaperCard {VStack(alignment:.leading,spacing:10) {
@@ -90,7 +90,7 @@ struct QuranStrengthView:View {
         ScrollView {VStack(alignment:.leading,spacing:16) {
             Text("استرداد البعيد").font(quranSerif(29))
             if let board {
-                Text(service.faceCount(board.far)+" بعيدة").font(quranFont(17,bold:true))
+                Text(farFaces(board.far)).font(quranFont(17,bold:true))
                 if let active=board.active {Text(active).font(quranFont(15,bold:true));Text("المتبقي: "+service.faceCount(board.remaining)+"، حصة اليوم: "+service.faceCount(board.activeShare)).font(quranFont(13));Button("ألغِ خطة الاسترداد") {run {try await service.perform(.cancelRecovery);load();recovery=false}}.frame(minHeight:44).accessibilityIdentifier("quran-recovery-cancel")}
                 ForEach(board.options) {option in Button {days=option.id} label: {HStack {Image(systemName:days == option.id ? "largecircle.fill.circle":"circle");VStack(alignment:.leading,spacing:5) {Text(option.title).font(quranFont(16,bold:true));Text("زيادة اليوم: "+service.faceCount(option.daily)+"، الإتمام "+option.end).font(quranFont(12))};Spacer()}.padding(12).background(theme.color("reviewTint"),in:.rect(cornerRadius:16)).contentShape(Rectangle())}.buttonStyle(.plain).accessibilityIdentifier("quran-recovery-days-"+String(option.id))}
                 if board.far > 0 {Button(board.active == nil ? "ابدأ الاسترداد":"ابدأ خطة جديدة") {run {try await service.perform(.createRecovery(days:days));load();recovery=false}}.font(quranFont(16,bold:true)).foregroundStyle(theme.onAccent).frame(maxWidth:.infinity,minHeight:50).background(theme.accent,in:Capsule()).accessibilityIdentifier("quran-recovery-create")}
@@ -115,4 +115,11 @@ struct QuranStrengthView:View {
     private func waterText(_ n:Int)->Color {theme.color(n > 70 ? "reviewText":n >= 50 ? "hifzText":"dueText")}
     private func load() {do {let value=try service.strengthBoard();board=value;if selected == nil {selected=value.parts.min {$0.strength < $1.strength}?.id}} catch {self.error=quranUserMessage(error)}}
     private func run(_ work:@escaping @MainActor () async throws ->Void) {guard !busy else {return};busy=true;Task {defer {busy=false};do {try await work()} catch {self.error=quranUserMessage(error)}}}
+}
+
+extension QuranStrengthView {
+    /// Audit 28 Oct: the adjective agrees with its count («وجه واحد بعيد»، «وجهان بعيدان»، «٣ أوجه بعيدة»، «١٢ وجهًا بعيدًا»).
+    func farFaces(_ n: Int) -> String {
+        service.faceCount(n) + (n == 1 ? " بعيد" : n == 2 ? " بعيدان" : n % 100 >= 11 || n % 100 == 0 ? " بعيدًا" : " بعيدة")
+    }
 }

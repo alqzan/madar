@@ -15,7 +15,7 @@ extension AppQuranService {
     }
 
     func timesLabel(_ hits: Int) -> String {
-        "تكرر " + count(max(1, hits), singular: "مرة", dual: "مرتين", plural: "مرات")
+        "تعثّرت هنا " + count(max(1, hits), singular: "مرة", dual: "مرتين", plural: "مرات")
     }
 
     func drillCard(_ value: QuranDraftPayload, catalog: QuranResourceCatalog) async throws -> QuranUIDrillCard? {

@@ -52,10 +52,10 @@ struct HabitEditorView:View {
                             Text("دقائق الحركة تشمل كل تمرين، وليست المشي وحده. السماح بالصحة باختيارك، ولا يكتب مدار فيها.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                         }
                         if rule.measure != .once {
-                            Stepper("الهدف: "+digits.string(rule.target)+(rule.unit.map{" "+habitUnitName($0)} ?? ""),value:$rule.target,in:1...(source == "jamaah" ? 5 : 100000)).frame(minHeight:44).accessibilityIdentifier("habit-target")
+                            Stepper("الهدف: "+habitUnitCount(rule.target,rule.unit,digits),value:$rule.target,in:1...(source == "jamaah" ? 5 : 100000)).frame(minHeight:44).accessibilityIdentifier("habit-target")
                             if !rule.weekdays.isEmpty && rule.frequency == .weekly || !monthDays.isEmpty && rule.frequency == .monthly { Text("الأيام المحددة تحدد هدف الفترة؛ ما زاد مكافأة.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
                             Toggle("أقلّ القليل يحفظ السلسلة",isOn:$minimumOn).frame(minHeight:44).accessibilityIdentifier("habit-minimum-toggle")
-                            if minimumOn { Stepper("أقلّ القليل: "+digits.string(rule.minimum ?? 1),value:Binding(get:{min(rule.target,rule.minimum ?? 1)},set:{rule.minimum=$0}),in:1...max(1,rule.target)).frame(minHeight:44) }
+                            if minimumOn { Stepper("أقلّ القليل: "+habitUnitCount(min(rule.target,rule.minimum ?? 1),rule.unit,digits),value:Binding(get:{min(rule.target,rule.minimum ?? 1)},set:{rule.minimum=$0}),in:1...max(1,rule.target)).frame(minHeight:44) }
                         }
                     }
                     section("وقت اختياري") {

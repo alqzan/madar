@@ -187,6 +187,11 @@ struct BahwUpcomingItem: Identifiable, Equatable {
     func upcomingCloseness(daysLeft: Int) -> Double {
         1 - min(1, max(0, Double(daysLeft) / Double(MadarYear.gregorianYear(today).length)))
     }
+    /// «يوم واحد»، «يومان» (after a preposition «يومين»)، «٣ أيام»: one and two take no digit (audit 28 Oct: «بقي ١ يوم»، «٢ يومان»).
+    func daysPhrase(_ n: Int, afterPreposition: Bool = false) -> String {
+        if n == 1 { return "يوم واحد" }; if n == 2 { return afterPreposition ? "يومين" : "يومان" }
+        return digits.string(n) + " " + dayCount(n)
+    }
     func dayCount(_ n: Int) -> String {
         if n == 1 { return "يوم" }; if n == 2 { return "يومان" }
         let r = n % 100; return (3...10).contains(r) ? "أيام" : (r <= 2 && n >= 100) ? "يوم" : "يومًا"

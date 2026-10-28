@@ -165,8 +165,8 @@ struct BahwYearView: View {
             }
             Spacer(minLength: 8)
             VStack(alignment: .leading, spacing: 6) {
-                Text("بقي " + digits.string(period.remaining) + " " + service.dayCount(period.remaining)).font(MadarTypography.title())
-                if let ramadan = model.ramadanIn { Text("رمضان بعد " + digits.string(ramadan) + " " + service.dayCount(ramadan)).font(MadarTypography.body()).foregroundStyle(lobby.secondaryInk) }
+                Text("بقي " + service.daysPhrase(period.remaining)).font(MadarTypography.title())
+                if let ramadan = model.ramadanIn { Text("رمضان بعد " + service.daysPhrase(ramadan, afterPreposition: true)).font(MadarTypography.body()).foregroundStyle(lobby.secondaryInk) }
                 if which == "both" { Text("وفي " + otherName + " مضى " + percent(other)).font(MadarTypography.body()).foregroundStyle(lobby.secondaryInk) }
             }.padding(.top, 26)
         }.accessibilityElement(children: .combine).accessibilityIdentifier("bahw-year-hero")
@@ -189,15 +189,15 @@ struct BahwYearView: View {
                     MadarDateLabel(.init(primary: "السنة " + yearName, secondary: otherYearName),
                                    primaryFont: MadarTypography.section(), secondaryFont: MadarTypography.fine())
                     Spacer()
-                    Text("مضى " + percent(period) + "، بقي " + digits.string(period.remaining) + " " + service.dayCount(period.remaining)).font(MadarTypography.caption()).foregroundStyle(lobby.secondaryInk)
+                    Text("مضى " + percent(period) + "، بقي " + service.daysPhrase(period.remaining)).font(MadarTypography.caption()).foregroundStyle(lobby.secondaryInk)
                 }
                 yearStrip(period: period, month: monthIndex, landmarks: model.landmarks)
             }.accessibilityElement(children: .combine).accessibilityIdentifier("bahw-year-strip")
             let nextMonth = names[(monthIndex + 1) % 12]
             row("الشهر", detail: names[monthIndex], share: Double(month.elapsed) / Double(max(1, month.length)), segments: 1, tone: "sepia",
-                caption: "بقي " + digits.string(month.remaining) + " " + service.dayCount(month.remaining) + "، و" + nextMonth + " بعد " + digits.string(month.remaining) + " " + service.dayCount(month.remaining), id: "month")
+                caption: "بقي " + service.daysPhrase(month.remaining) + "، و" + nextMonth + " بعد " + service.daysPhrase(month.remaining, afterPreposition: true), id: "month")
             row("الأسبوع", detail: (service.weekStart == .saturday ? "الجمعة" : "السبت") + " آخره", share: Double(week.elapsed) / 7, segments: 7, tone: "green",
-                caption: week.remaining == 1 ? "آخر يوم في الأسبوع، وأسبوع جديد غدًا" : "بقي " + digits.string(week.remaining) + " " + service.dayCount(week.remaining) + " من الأسبوع", id: "week")
+                caption: week.remaining == 1 ? "آخر يوم في الأسبوع، وأسبوع جديد غدًا" : "بقي " + service.daysPhrase(week.remaining) + " من الأسبوع", id: "week")
             if let day = service.dayModel() {
                 row("اليوم", detail: boundary == "midnight" ? "من منتصف الليل" : boundary == "maghrib" ? "من المغرب" : "من الفجر", share: day.share, marks: day.marks, tone: "clay", caption: day.next, id: "day")
             }
@@ -265,7 +265,7 @@ struct BahwYearView: View {
         return VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text("ما يهمّك").font(MadarTypography.title()).accessibilityAddTraits(.isHeader)
-                Text(digits.string(all.count) + " " + service.dayCount(all.count) + "، الأقرب أولًا").font(MadarTypography.caption()).foregroundStyle(lobby.secondaryInk)
+                Text(service.daysPhrase(all.count) + "، الأقرب أولًا").font(MadarTypography.caption()).foregroundStyle(lobby.secondaryInk)
                 Spacer()
                 Button { editing = .init(service: service) } label: {
                     Label("يوم يهمّك", systemImage: "plus").font(MadarTypography.section()).lineLimit(1).fixedSize().padding(.horizontal, 16).frame(minHeight: 46).overlay { Capsule().stroke(lobby.line) }

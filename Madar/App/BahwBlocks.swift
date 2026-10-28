@@ -493,7 +493,7 @@ struct BahwBlockView: View {
             HStack(alignment: .firstTextBaseline) {
                 Text(name).font(label)
                 Spacer()
-                Text("بقي " + digits.string(period.remaining) + " " + service.dayCount(period.remaining)).font(small).foregroundStyle(lobby.secondaryInk)
+                Text("بقي " + service.daysPhrase(period.remaining)).font(small).foregroundStyle(lobby.secondaryInk)
                 Text(percent(period)).font(.custom("thmanyahserifdisplay-Bold", size: 20, relativeTo: .title3)).foregroundStyle(hijri ? lobby.color("amberText") : lobby.color("gregorianInk"))
             }
             strip(period, month: month, hijri: hijri)
@@ -548,7 +548,7 @@ struct BahwBlockView: View {
                 }
                 // Large: the rest of `bahw.upcomingCount` as lines.
                 ForEach(items.dropFirst(4)) { item in
-                    HStack { Text(item.title).font(label); Spacer(); Text(item.elapsedDays.map(service.sincePhrase) ?? (item.daysLeft == 0 ? "اليوم" : digits.string(item.daysLeft) + " " + service.dayCount(item.daysLeft))).font(small).foregroundStyle(lobby.secondaryInk) }
+                    HStack { Text(item.title).font(label); Spacer(); Text(item.elapsedDays.map(service.sincePhrase) ?? (item.daysLeft == 0 ? "اليوم" : service.daysPhrase(item.daysLeft))).font(small).foregroundStyle(lobby.secondaryInk) }
                         .accessibilityElement(children: .combine).accessibilityIdentifier("bahw-upcoming-item")
                 }
             }

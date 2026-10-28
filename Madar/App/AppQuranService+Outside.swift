@@ -39,7 +39,7 @@ extension AppQuranService {
         let reviewDone = reviewed(today) > 0 && !hasReview
         let drillDone = value.drillBoard.drilledToday > 0 && !drill
         let done = (saved ? hifzSteps : 0) + (reviewDone ? 1 : 0) + (drillDone ? 1 : 0), total = hifzSteps + (hasReview || reviewDone ? 1 : 0) + (drill || drillDone ? 1 : 0)
-        let dayLine = total == 0 ? nil : done >= total ? "أتممت خطواته كلها" : done > 0 ? "أتممت " + numerals.string(done) + " من " + numerals.string(total)
+        let dayLine = total == 0 ? nil : done >= total ? "أتممت خطوات اليوم كلها" : done > 0 ? "أتممت " + numerals.string(done) + " من " + numerals.string(total)
             : total == 1 ? "خطوة واحدة اليوم" : total == 2 ? "خطوتان اليوم" : numerals.string(total) + " خطوات اليوم"
         let payload = QuranWidgetSnapshot(coverage: coverage, fraction: Double(completed) / 604, nextTitle: title, nextDetail: detail, route: route,
             done: done, total: total,
