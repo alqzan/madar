@@ -46,7 +46,9 @@ import MadarPrayer
         guard !onPage.isEmpty else { return 0 }
         return min(0.9, Double(onPage.filter(ayahs.contains).count) / Double(onPage.count))
     }
-    func faceCount(_ value: Int) -> String { count(value, singular: "وجه واحد", dual: "وجهان", plural: "أوجه") }
+    func faceCount(_ value: Int, accusative: Bool = false) -> String {
+        count(value, singular: accusative ? "وجهًا واحدًا" : "وجه واحد", dual: accusative ? "وجهين" : "وجهان", plural: "أوجه")
+    }
     func dayCount(_ value: Int) -> String { count(value, singular: "يوم واحد", dual: "يومان", plural: "أيام") }
     func range(_ portion: QuranAyahRange, catalog: QuranResourceCatalog) throws -> QuranUIRange {
         let pages = try QuranPortionEngine.pages(for: portion, catalog: catalog)
@@ -116,8 +118,8 @@ import MadarPrayer
         let activeDays = Set(snapshot.activities.filter(\.countsForStreak).map(\.dayKey))
         let completedDays = eligibleWeekDays.filter { activeDays.contains($0) }.count
         let weekHifzAyahs = Set(snapshot.sessions.filter { $0.kind == .hifz && $0.dayKey >= weekStart && $0.dayKey <= today }.flatMap { Array($0.ayahs.first...$0.ayahs.last) }).count
-        let memorizedText = memorizedThisWeek > 0 || weekHifzAyahs == 0 ? faceCount(memorizedThisWeek) : count(weekHifzAyahs, singular: "آية واحدة", dual: "آيتين", plural: "آيات")
-        let weeklySummary = firstHifzDay == nil || firstHifzDay == today ? "أول يوم" : "آخر " + numerals.string(7) + " أيام: حفظت " + memorizedText + "، راجعت " + faceCount(reviewedThisWeek)
+        let memorizedText = memorizedThisWeek > 0 || weekHifzAyahs == 0 ? faceCount(memorizedThisWeek, accusative: true) : count(weekHifzAyahs, singular: "آية واحدة", dual: "آيتين", plural: "آيات")
+        let weeklySummary = firstHifzDay == nil || firstHifzDay == today ? "أول يوم" : "آخر " + numerals.string(7) + " أيام: حفظت " + memorizedText + "، راجعت " + faceCount(reviewedThisWeek, accusative: true)
             + "، " + serviceWeekRatio(completedDays, eligibleWeekDays.count)
         let historySessions = snapshot.sessions.reversed().map { fact in
             QuranUIHistorySession(id: fact.id, title: fact.kind == .hifz ? "حفظ" : "مراجعة", dateLabel: displayDate(fact.dayKey),

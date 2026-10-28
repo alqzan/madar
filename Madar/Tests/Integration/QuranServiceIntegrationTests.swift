@@ -14,7 +14,8 @@ import MadarCommands
         let app = try AppSession(container: container, groupDirectory: root)
         return (app, AppQuranService(session: app), root)
     }
-    func testDayCloseArabicPluralsFollowNumeralPreference() {
+    func testDayCloseArabicPluralsFollowNumeralPreference() throws {
+        let (_, service, root) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
         let digits = MadarNumberFormatter(style: .hindi)
         func plain(_ value: String) -> String { String(value.unicodeScalars.filter { !(0x2066...0x2069).contains($0.value) }) }
         XCTAssertEqual(plain(QuranDayCloseCopy.faces(0, digits: digits)), "٠ أوجه")
@@ -24,6 +25,10 @@ import MadarCommands
         XCTAssertEqual(plain(QuranDayCloseCopy.faces(11, digits: digits)), "١١ وجهًا")
         XCTAssertEqual(plain(QuranDayCloseCopy.faces(12, digits: MadarNumberFormatter(style: .western))), "12 وجهًا")
         XCTAssertEqual(QuranDayCloseCopy.ayahs(2, digits: digits), "آيتان محفوظتان")
+        XCTAssertEqual(service.faceCount(1), "وجه واحد")
+        XCTAssertEqual(service.faceCount(2), "وجهان")
+        XCTAssertEqual(service.faceCount(1, accusative: true), "وجهًا واحدًا")
+        XCTAssertEqual(service.faceCount(2, accusative: true), "وجهين")
     }
     /// Q07 golden: mastered at its due date = 71; reviewed today = 100 (balanced initial interval: 3 days).
     func testDayCloseReplaysBeforeAtSameDayDedupesReviewsAndPreviewsRestDay() throws {
