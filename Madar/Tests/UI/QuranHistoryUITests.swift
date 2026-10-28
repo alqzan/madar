@@ -10,8 +10,23 @@ import XCTest
         app.buttons["quran-history-filter-hifz"].tap()
         let row=app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH %@","quran-history-record-")).firstMatch
         let id=row.identifier;row.tap();capture(app,"M2-V11-history-L")
-        app.buttons["quran-history-grade-needs"].tap()
+        func selectGrade(_ id: String) {
+            let choice = app.buttons["quran-history-grade-" + id]
+            choice.tap()
+            let selected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "selected == true"), object: choice)
+            XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 8), .completed)
+            for other in ["mastered", "good", "needs"] where other != id {
+                XCTAssertFalse(app.buttons["quran-history-grade-" + other].isSelected)
+            }
+        }
+        selectGrade("good")
+        XCTAssertFalse(app.staticTexts["quran-history-warning"].exists)
+        capture(app, "OR-17-history-good-L")
+        selectGrade("needs")
         XCTAssertTrue(app.staticTexts["quran-history-warning"].waitForExistence(timeout:5));capture(app,"M2-V11-grade-L")
+        selectGrade("mastered")
+        XCTAssertTrue(app.staticTexts["quran-history-warning"].waitForNonExistence(timeout: 5))
+        capture(app, "OR-17-history-mastered-L")
         app.buttons["quran-history-delete"].tap();app.alerts.buttons["احذف"].tap()
         XCTAssertTrue(app.buttons[id].waitForNonExistence(timeout:8))
         app.otherElements["quran-history-undo"].buttons["undo-button"].tap()

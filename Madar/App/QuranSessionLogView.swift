@@ -59,9 +59,19 @@ struct QuranSessionLogView: View {
                                             HStack(spacing: 4) {
                                                 ForEach(QuranUIGrade.allCases) { grade in
                                                     let current = record.grades.first { $0.page == page }?.grade == grade
+                                                    let palette: (ink: String, tint: String) = switch grade {
+                                                    case .mastered: ("reviewText", "reviewTint")
+                                                    case .good: ("hifzText", "hifzTint")
+                                                    case .needs: ("dueText", "dueTint")
+                                                    }
                                                     Button { run { try await service.perform(.editSessionGrade(sessionID: record.id, page: page, grade: grade)); load() } } label: {
-                                                        Text(grade.title).font(quranFont(12, bold: current)).frame(maxWidth: .infinity, minHeight: 44).background(current ? theme.color("reviewTint") : theme.color("track"), in: Capsule())
-                                                    }.buttonStyle(.plain).accessibilityIdentifier("quran-history-grade-" + grade.id)
+                                                        Text(grade.title).font(quranFont(12, bold: current))
+                                                            .foregroundStyle(theme.color(palette.ink))
+                                                            .frame(maxWidth: .infinity, minHeight: 44)
+                                                            .background(current ? theme.color(palette.tint) : theme.surface, in: Capsule())
+                                                            .overlay { Capsule().stroke(theme.color(palette.ink).opacity(current ? 1 : 0.28), lineWidth: current ? 1.5 : 0.8) }
+                                                    }.buttonStyle(.plain).accessibilityAddTraits(current ? .isSelected : [])
+                                                        .accessibilityIdentifier("quran-history-grade-" + grade.id)
                                                 }
                                             }
                                             Text("الموعد التالي: " + (value.nextDue[page] ?? "—")).font(quranFont(12)).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("quran-history-due")
