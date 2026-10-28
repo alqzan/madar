@@ -72,6 +72,6 @@
     "Owner and Claude's full-screen comparison captures and later real-device checks.",
     "Confirm the third-party network retention disclosure against the provider's published policy before submitting the privacy label.",
     "Review App Privacy categories and purposes against the exact CloudKit-enabled release build; do not reuse a local-only answer.",
-    "Confirm a user-approved CloudKit copy deletion and retention path; turning sync off currently leaves existing iCloud data and no in-app delete control is implemented."
+    "Implement and verify the owner-approved settings action: request confirmation, delete only the user's private CloudKit copy, and preserve the device copy. Until verified, disclose that turning sync off does not delete previously synced data."
   ]
 }
