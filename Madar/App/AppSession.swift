@@ -902,7 +902,7 @@ final class AppSession {
         let result = reschedules ? try await withSerializedPrayerNotificationMutation { try await run() } : try await run()
         if let id = result.undoToken {
             let token = AppUndoToken(id: id, expiresAt: now.addingTimeInterval(600))
-            showUndo(token, message: name.hasPrefix("habit.") ? "حُفظت العادة" : name == "widget.save" ? "حُفظت الودجة" : name == "widget.delete" ? "حُذفت الودجة" : name == "bahw.saveUpcomingDay" ? "حُفظ اليوم" : name == "bahw.deleteUpcomingDay" ? "حُذف اليوم" : name == "diary.deleteEntry" ? "حُذف السطر" : name.contains("Intention") ? "حُفظت النيّة" : "حُفظ السطر")
+            showUndo(token, message: name.hasPrefix("habit.") ? "حُفظت العادة" : name == "widget.save" ? "حُفظت الودجة" : name == "widget.delete" ? "حُذفت الودجة" : name == "bahw.saveUpcomingDay" ? "حُفظ اليوم" : name == "bahw.deleteUpcomingDay" ? "حُذف اليوم" : name == "diary.deleteEntry" ? "حُذف السطر" : name == "diary.setIntentionResult" ? (payload["result"] == .null ? "مُسحت النتيجة" : "حُفظت النتيجة") : name.contains("Intention") ? "حُفظت النيّة" : "حُفظ السطر")
             if name == "diary.deleteEntry" { scheduleDiaryMediaCleanup(after: token.expiresAt) }
         }
     }

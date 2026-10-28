@@ -18,7 +18,7 @@ struct DiaryProjectsPanel: View {
                 .buttonStyle(.plain).accessibilityIdentifier("diary-project-new")
             if let failure { Text(failure).font(MadarTypography.body()) }
             let open = projects.filter { $0.finishedAt == nil }, chapters = projects.filter { $0.finishedAt != nil }
-            if projects.isEmpty { Text("لا مشاريع بعد. اكتب كلمة تدلّ عليه، ويقترح مدار ربط سطورك به.").font(DiaryType.writing).foregroundStyle(theme.color("ink3Text")).padding(.vertical, 16) }
+            if projects.isEmpty { Text("لا مشاريع بعد. اضغط «مشروع جديد» واكتب كلمة تدلّ عليه، ويقترح مدار ربط سطورك به.").font(DiaryType.writing).foregroundStyle(theme.color("ink3Text")).padding(.vertical, 16) }
             ForEach(open) { project in row(project) }
             if !chapters.isEmpty {
                 Text("الفصول").font(DiaryType.heading).padding(.top, 8)

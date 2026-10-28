@@ -111,7 +111,7 @@ struct MihbaraConversionCard: View {
                         Text(timeLeft(left)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                             .accessibilityIdentifier("mihbara-pdf-flow-time-left")
                     }
-                    Text("تنقّل في التطبيق كما تشاء؛ يكمل وحده ويضعه على رفّه.")
+                    Text("تنقّل في التطبيق كما تشاء؛ يكمل وحده ويضعه على رفّك.")
                         .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
                     Button("إيقاف") { MihbaraConversions.shared.cancel(job.id, app: app) }.font(MadarTypography.caption()).frame(minHeight: 44)
                         .accessibilityIdentifier("mihbara-pdf-flow-cancel")
@@ -122,13 +122,13 @@ struct MihbaraConversionCard: View {
                     ProgressView()
                     cancelButton
                 case .staging:
-                    Text("يفحص نسخة «\(job.title)» الأخيرة").font(MadarTypography.section())
+                    Text("يفحص الكتاب المنساب «\(job.title)» فحصًا أخيرًا").font(MadarTypography.section())
                         .accessibilityIdentifier("mihbara-pdf-flow-staging")
                     Text("يبقى ملف PDF الأصلي كما هو.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                     ProgressView()
                     cancelButton
                 case .staged:
-                    Text("اكتملت نسخة «\(job.title)»").font(MadarTypography.section())
+                    Text("اكتمل الكتاب المنساب «\(job.title)»").font(MadarTypography.section())
                         .accessibilityIdentifier("mihbara-pdf-flow-staged")
                     Text("تُضاف إلى رفّك بعد التحقق الأخير.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                     ProgressView()
@@ -139,13 +139,13 @@ struct MihbaraConversionCard: View {
                     Text("يبقى ملف PDF الأصلي وموضعه كما هما.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                     ProgressView()
                 case .committing:
-                    Text("الكتاب جاهز لوضعه على رفّه").font(MadarTypography.section())
+                    Text("الكتاب جاهز لوضعه على رفّك").font(MadarTypography.section())
                         .accessibilityIdentifier("mihbara-pdf-flow-committing")
                     Text("ما زال بإمكانك إيقافه قبل الحفظ.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                     ProgressView()
                     cancelButton
                 case .saving:
-                    Text("يحفظ «\(job.title)» على رفّه").font(MadarTypography.section())
+                    Text("يحفظ «\(job.title)» على رفّك").font(MadarTypography.section())
                         .accessibilityIdentifier("mihbara-pdf-flow-saving")
                     Text("يبقى ملف PDF الأصلي محفوظًا في المحبرة.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                     ProgressView()

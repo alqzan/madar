@@ -17,7 +17,7 @@ struct PaperBarcodeScannerSheet: View {
                 PaperBarcodeScanner(onISBN: onISBN, onError: { message in onError(message); dismiss() })
                     .ignoresSafeArea()
             } else {
-                ContentUnavailableView("مسح الباركود غير متاح", systemImage: "barcode.viewfinder", description: Text("اكتب رقم ISBN-13 يدويًا لإكمال الإضافة."))
+                ContentUnavailableView("مسح الباركود غير متاح", systemImage: "barcode.viewfinder", description: Text("اكتب رقم الكتاب الدولي (ISBN) المطبوع تحت الباركود خلف الغلاف."))
             }
             Button("إغلاق") { dismiss() }
                 .font(.body.weight(.semibold))
