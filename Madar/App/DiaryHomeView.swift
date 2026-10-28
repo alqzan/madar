@@ -373,6 +373,6 @@ struct DiaryHomeView: View {
             for day in Set(displayed) { try await service.prepareClosedDay(day) }
             value = try service.home()
             snapshot = value; failure = nil
-        } catch { failure = error.localizedDescription }
+        } catch { failure = madarUserMessage(error) }
     }
 }

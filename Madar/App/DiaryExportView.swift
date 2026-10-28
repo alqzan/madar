@@ -43,7 +43,7 @@ struct DiaryExportView:View {
                 }.padding(18)
             }.background(theme.background).foregroundStyle(theme.ink).navigationBarTitleDisplayMode(.inline)
                 .toolbar{ToolbarItem(placement:.topBarLeading){Button{dismiss()}label:{HStack{Image(systemName:"chevron.backward");Text("رجوع").font(DiaryType.label)}}.disabled(busy).accessibilityIdentifier("diary-export-close")}}.tint(theme.accent).toolbarBackground(theme.background,for:.navigationBar)
-                .task{do{years=Set(try service.exportPages(.init()).map(\.day.year)+[service.currentDay().year]).sorted(by:>)}catch{failure=error.localizedDescription}}
+                .task{do{years=Set(try service.exportPages(.init()).map(\.day.year)+[service.currentDay().year]).sorted(by:>)}catch{failure=madarUserMessage(error)}}
                 .onChange(of:options.year){_,_ in options.month=nil;clear()}.onChange(of:options.month){_,_ in clear()}.onChange(of:options.format){_,_ in clear()}.onChange(of:options.margins){_,_ in clear()}.onChange(of:options.sources){_,_ in clear()}
                 .onChange(of:phase){_,value in if value == .background {preview=false;clear()}}
                 .sheet(isPresented:$preview){if let artifact {DiaryQuickLook(url:artifact.url)}}
@@ -63,11 +63,11 @@ struct DiaryExportView:View {
             HStack {
                 Button("معاينة الملف"){preview=true}.accessibilityIdentifier("diary-export-preview")
                 Spacer()
-                Button("حفظ أو مشاركة"){Task{do{try await service.shareDiary(file)}catch{failure=error.localizedDescription}}}.accessibilityIdentifier("diary-export-share")
+                Button("حفظ أو مشاركة"){Task{do{try await service.shareDiary(file)}catch{failure=madarUserMessage(error)}}}.accessibilityIdentifier("diary-export-share")
             }.font(MadarTypography.body()).frame(minHeight:44)
         }
     }
     private func card<Content:View>(@ViewBuilder _ content:()->Content)->some View{VStack(alignment:.leading,spacing:12,content:content).padding(16).background(theme.surface,in:.rect(cornerRadius:18)).overlay{RoundedRectangle(cornerRadius:18).stroke(theme.line)}}
-    private func prepare(){busy=true;failure=nil;clear();Task{@MainActor in await Task.yield();defer{busy=false};do{artifact=try service.exportDiary(options)}catch{failure=error.localizedDescription}}}
+    private func prepare(){busy=true;failure=nil;clear();Task{@MainActor in await Task.yield();defer{busy=false};do{artifact=try service.exportDiary(options)}catch{failure=madarUserMessage(error)}}}
     private func clear(){if let artifact {try? FileManager.default.removeItem(at:artifact.url.deletingLastPathComponent())};artifact=nil}
 }

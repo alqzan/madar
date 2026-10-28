@@ -206,7 +206,7 @@ struct DiaryStampsView: View {
                 .navigationTitle("الأختام").navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .topBarLeading) { Button("تم") { dismiss() }.accessibilityIdentifier("diary-stamps-done") } }
                 .toolbarBackground(theme.background, for: .navigationBar).tint(theme.accent)
-                .task { do { stamps = try service.travelStamps() } catch { failure = error.localizedDescription } }
+                .task { do { stamps = try service.travelStamps() } catch { failure = madarUserMessage(error) } }
         }.accessibilityIdentifier("diary-stamps")
     }
 }

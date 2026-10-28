@@ -250,7 +250,7 @@ struct MadarRootView: View {
                 try (session.syncService as? AppSyncService)?.processLocalHistory()
                 try await (session.backupService as? AppBackupService)?.runScheduledBackup()
             } catch BackupOperationError.busy { }
-            catch { session.errorMessage = "لم يكتمل تحديث البيانات. \(error.localizedDescription)" }
+            catch { session.errorMessage = "لم يكتمل تحديث البيانات. \(madarUserMessage(error))" }
             await session.refreshPrayerNotifications()
         }
         .overlay(alignment: .bottom) {
@@ -270,14 +270,14 @@ struct MadarRootView: View {
                     try session.publishSnapshot()
                     session.recordBahwReturnVisit()
                 }
-                catch { session.errorMessage = "تعذّر تحديث الواجهة. \(error.localizedDescription)" }
+                catch { session.errorMessage = "تعذّر تحديث الواجهة. \(madarUserMessage(error))" }
                 Task {
                     do {
                         try await session.drainInbox()
                         try (session.syncService as? AppSyncService)?.processLocalHistory()
                         try await (session.backupService as? AppBackupService)?.runScheduledBackup()
                     } catch BackupOperationError.busy { }
-                    catch { session.errorMessage = "لم يكتمل تحديث البيانات. \(error.localizedDescription)" }
+                    catch { session.errorMessage = "لم يكتمل تحديث البيانات. \(madarUserMessage(error))" }
                     await session.refreshPrayerNotifications()
                 }
             }

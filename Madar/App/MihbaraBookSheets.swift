@@ -310,7 +310,7 @@ struct MihbaraAddBookView: View {
         case .failure(let error):
             let nsError = error as NSError
             if nsError.domain != NSCocoaErrorDomain || nsError.code != NSUserCancelledError {
-                app.errorMessage = "لم يُفتح الملف. \(error.localizedDescription)"
+                app.errorMessage = "لم يُفتح الملف. \(madarUserMessage(error))"
             }
         }
     }
@@ -320,7 +320,7 @@ struct MihbaraAddBookView: View {
         case .failure(let error):
             let nsError = error as NSError
             if nsError.domain != NSCocoaErrorDomain || nsError.code != NSUserCancelledError {
-                app.errorMessage = error.localizedDescription
+                app.errorMessage = madarUserMessage(error)
             }
         case .success(let urls):
             guard let source = urls.first else { return }
@@ -336,7 +336,7 @@ struct MihbaraAddBookView: View {
                     pendingGoodreadsFile = source
                     pendingGoodreadsStage = stage
                     previewingGoodreads = true
-                } catch { app.errorMessage = error.localizedDescription }
+                } catch { app.errorMessage = madarUserMessage(error) }
             }
         }
     }
@@ -430,7 +430,7 @@ struct MihbaraPaperEditor: View {
         }
         if let replacing { p["replacing"] = .string(replacing.uuidString) }
         saving = true
-        Task { do { try await app.executeBookCommand("book.savePaper", payload: p); onSaved() } catch { app.errorMessage = error.localizedDescription }; saving = false }
+        Task { do { try await app.executeBookCommand("book.savePaper", payload: p); onSaved() } catch { app.errorMessage = madarUserMessage(error) }; saving = false }
     }
 }
 struct MihbaraBookCard: View {
@@ -654,11 +654,11 @@ struct MihbaraBookCard: View {
     private func moveToReading() { if books.filter({ $0.shelf == "reading" }).count >= 3 { choosingSlot = true } else { move("reading") } }
     private func move(_ shelf: String, replacing: UUID? = nil) {
         var p: [String:MadarCore.JSONValue] = ["id":.string(book.id.uuidString),"shelf":.string(shelf)]; if let replacing { p["replacing"] = .string(replacing.uuidString) }
-        saving = true; Task { do { try await app.executeBookCommand("book.moveShelf", payload: p); if shelf == "reading" { onTable() } else { dismiss() } } catch { app.errorMessage = error.localizedDescription }; saving = false }
+        saving = true; Task { do { try await app.executeBookCommand("book.moveShelf", payload: p); if shelf == "reading" { onTable() } else { dismiss() } } catch { app.errorMessage = madarUserMessage(error) }; saving = false }
     }
     private func savePosition() {
         guard let n = mihbaraInteger(page) else { app.errorMessage = "اكتب رقم صفحة صحيحًا"; return }
-        saving = true; Task { do { try await app.executeBookCommand("book.setPosition", payload: ["id":.string(book.id.uuidString),"page":.number(Double(n)),"finished":.bool(finish)]); dismiss() } catch { app.errorMessage = error.localizedDescription }; saving = false }
+        saving = true; Task { do { try await app.executeBookCommand("book.setPosition", payload: ["id":.string(book.id.uuidString),"page":.number(Double(n)),"finished":.bool(finish)]); dismiss() } catch { app.errorMessage = madarUserMessage(error) }; saving = false }
     }
 }
 struct MihbaraHadithView: View {
@@ -681,7 +681,7 @@ struct MihbaraHadithView: View {
             }.padding(24)
         }.background(theme.background).foregroundStyle(theme.ink)
     }
-    private func mark(_ understood: Bool) { saving = true; Task { do { try await app.executeBookCommand("hadith.mark", payload: ["number":.number(Double(hadith.number)),"edition":.string(collection.editionID),"understood":.bool(understood),"day":.string(day.description)]); dismiss() } catch { app.errorMessage = error.localizedDescription }; saving = false } }
+    private func mark(_ understood: Bool) { saving = true; Task { do { try await app.executeBookCommand("hadith.mark", payload: ["number":.number(Double(hadith.number)),"edition":.string(collection.editionID),"understood":.bool(understood),"day":.string(day.description)]); dismiss() } catch { app.errorMessage = madarUserMessage(error) }; saving = false } }
 }
 private func mihbaraInteger(_ value: String) -> Int? { let clean = value.trimmingCharacters(in: .whitespacesAndNewlines); guard !clean.isEmpty, clean.allSatisfy({ $0.wholeNumberValue != nil }) else { return nil }; return Int(clean.compactMap { $0.wholeNumberValue.map(String.init) }.joined()) }
 
@@ -904,7 +904,7 @@ private struct MihbaraGoodreadsImportView: View {
                                        sourceGoodreadsID: $0.sourceGoodreadsID, shelf: $0.shelf)
             }
             rebuildPreview()
-        } catch { failure = error.localizedDescription }
+        } catch { failure = madarUserMessage(error) }
         loading = false
     }
 
@@ -929,7 +929,7 @@ private struct MihbaraGoodreadsImportView: View {
                 try await app.executeBookCommand("book.importGoodreads", payload: payload, undoMessage: "أُضيفت كتب Goodreads إلى المحبرة")
                 GoodreadsCSVFiles.discard(id: stage.id, root: app.bookStagingDirectory)
                 onImported()
-            } catch { failure = error.localizedDescription }
+            } catch { failure = madarUserMessage(error) }
             saving = false
         }
     }

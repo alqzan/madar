@@ -156,24 +156,24 @@ enum QuranUISessionResult: Sendable { case active(QuranUISessionState), complete
     var error: String?
     var completion: [String]?
     init(service: any QuranUIService) { self.service = service }
-    func refresh() async { guard !busy else { return }; do { state = try await service.load() } catch { self.error = error.localizedDescription } }
+    func refresh() async { guard !busy else { return }; do { state = try await service.load() } catch { self.error = madarUserMessage(error) } }
     func perform(_ command: QuranUICommand) async -> Bool {
         guard !busy else { return false }; busy = true; error = nil; defer { busy = false }
-        do { try await service.perform(command) } catch { self.error = error.localizedDescription; return false }
-        do { state = try await service.load() } catch { state = nil; self.error = "حُفظ التغيير، وتعذّرت إعادة القراءة: " + error.localizedDescription }
+        do { try await service.perform(command) } catch { self.error = madarUserMessage(error); return false }
+        do { state = try await service.load() } catch { state = nil; self.error = "حُفظ التغيير، وتعذّرت إعادة القراءة: " + madarUserDetail(error) }
         return true
     }
     func begin(kind: QuranUIKind, stepID: String? = nil, range: QuranUIRange? = nil, rakaat: Int? = nil, spotID: String? = nil) async -> Bool {
         guard !busy else { return false }; busy = true; error = nil; defer { busy = false }
-        do { session = try await service.start(kind: kind, stepID: stepID, range: range, rakaat: rakaat, spotID: spotID); return true } catch { self.error = error.localizedDescription; return false }
+        do { session = try await service.start(kind: kind, stepID: stepID, range: range, rakaat: rakaat, spotID: spotID); return true } catch { self.error = madarUserMessage(error); return false }
     }
     func resume(_ draft: QuranUIDraft) async {
         guard !busy else { return }; busy = true; defer { busy = false }
-        do { session = try await service.resume(draftID: draft.id) } catch { self.error = error.localizedDescription }
+        do { session = try await service.resume(draftID: draft.id) } catch { self.error = madarUserMessage(error) }
     }
     func advance(_ action: QuranUISessionAction) async {
         guard !busy, let id = session?.id else { return }; busy = true; error = nil; defer { busy = false }
-        do { switch try await service.session(draftID: id, action: action) { case .active(let next): session = next; case .completed(let summary, _): session = nil; completion = summary; state = try await service.load(); case .discarded: session = nil; state = try await service.load() } } catch { self.error = error.localizedDescription }
+        do { switch try await service.session(draftID: id, action: action) { case .active(let next): session = next; case .completed(let summary, _): session = nil; completion = summary; state = try await service.load(); case .discarded: session = nil; state = try await service.load() } } catch { self.error = madarUserMessage(error) }
     }
 }
 

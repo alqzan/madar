@@ -125,13 +125,13 @@ enum PrayerUICommand: Sendable {
     var busy = false
     var error: String?
     init(service: any PrayerUIService) { self.service = service }
-    func refresh() async { guard !busy else { return }; do { state = try await service.load() } catch { self.error = error.localizedDescription } }
+    func refresh() async { guard !busy else { return }; do { state = try await service.load() } catch { self.error = madarUserMessage(error) } }
     func perform(_ command: PrayerUICommand) async -> Bool {
         guard !busy else { return false }; error = nil; busy = true; defer { busy = false }
         do { try await service.perform(command) }
-        catch { self.error = error.localizedDescription; return false }
+        catch { self.error = madarUserMessage(error); return false }
         do { state = try await service.load() }
-        catch { state = nil; self.error = "حُفظ التغيير، وتعذّرت إعادة قراءة السجلّ: " + error.localizedDescription }
+        catch { state = nil; self.error = "حُفظ التغيير، وتعذّرت إعادة قراءة السجلّ: " + madarUserDetail(error) }
         return true
     }
 }

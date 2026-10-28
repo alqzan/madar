@@ -42,11 +42,11 @@ struct PrayerSettingsUIState: Sendable {
     var busy = false
     var error: String?
     init(service: any PrayerSettingsUIService) { self.service = service }
-    func refresh() async { guard !busy else { return }; do { state = try await service.loadSettings() } catch { self.error = error.localizedDescription } }
+    func refresh() async { guard !busy else { return }; do { state = try await service.loadSettings() } catch { self.error = madarUserMessage(error) } }
     func run(_ operation: @MainActor () async throws -> Void) async {
         guard !busy else { return }; error = nil; busy = true; defer { busy = false }
-        do { try await operation() } catch { self.error = error.localizedDescription; return }
-        do { state = try await service.loadSettings() } catch { state = nil; self.error = "حُفظ التغيير، وتعذّرت إعادة قراءة الإعدادات: " + error.localizedDescription }
+        do { try await operation() } catch { self.error = madarUserMessage(error); return }
+        do { state = try await service.loadSettings() } catch { state = nil; self.error = "حُفظ التغيير، وتعذّرت إعادة قراءة الإعدادات: " + madarUserDetail(error) }
     }
     func set(_ value: MadarData.JSONValue, key: String) { Task { await run { try await service.set(value, for: key) } } }
     func value(_ definition: SettingDefinition) -> MadarData.JSONValue { state?.values[definition.key] ?? definition.defaultValue }

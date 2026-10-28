@@ -41,11 +41,11 @@ struct DiaryYearbookView:View {
                     if let failure {Text(failure).font(DiaryType.label)}
                     if busy {ProgressView("يجهّز الكتاب…")}
                     Button{prepare()}label:{Text("جهّز الكتاب").font(DiaryType.heading).frame(maxWidth:.infinity,minHeight:56).foregroundStyle(theme.background).background(theme.ink,in:.capsule)}.buttonStyle(.plain).disabled(busy || pages.isEmpty).accessibilityIdentifier("diary-book-prepare")
-                    if let artifact {HStack{Button("اقرأ الكتاب"){preview=true}.accessibilityIdentifier("diary-book-preview");Spacer();Button("حفظ أو مشاركة"){Task{do{try await service.shareDiary(artifact)}catch{failure=error.localizedDescription}}}}}
+                    if let artifact {HStack{Button("اقرأ الكتاب"){preview=true}.accessibilityIdentifier("diary-book-preview");Spacer();Button("حفظ أو مشاركة"){Task{do{try await service.shareDiary(artifact)}catch{failure=madarUserMessage(error)}}}}}
                 }.padding(18)
             }.background(theme.background).foregroundStyle(theme.ink).navigationBarTitleDisplayMode(.inline)
                 .toolbar{ToolbarItem(placement:.topBarLeading){Button{dismiss()}label:{HStack{Image(systemName:"chevron.backward");Text("رجوع").font(DiaryType.label)}}.disabled(busy).accessibilityIdentifier("diary-book-close")}}.tint(theme.accent).toolbarBackground(theme.background,for:.navigationBar)
-                .task{do{years=Set(try service.exportPages(.init()).map(\.day.year)+[service.currentDay().year]).sorted(by:>);load()}catch{failure=error.localizedDescription}}
+                .task{do{years=Set(try service.exportPages(.init()).map(\.day.year)+[service.currentDay().year]).sorted(by:>);load()}catch{failure=madarUserMessage(error)}}
                 .onChange(of:year){_,_ in load()}.onChange(of:margins){_,_ in load()}.onChange(of:sources){_,_ in load()}.onChange(of:photos){_,_ in load()}.onChange(of:includeIndex){_,_ in clear()}
                 .onChange(of:phase){_,v in if v == .background {preview=false;clear()}}
                 .sheet(isPresented:$preview){if let artifact {DiaryQuickLook(url:artifact.url)}}
@@ -74,7 +74,7 @@ struct DiaryYearbookView:View {
     private func previewPage(_ page:DiaryExportPage)->some View {
         VStack(alignment:.leading,spacing:8){MadarDateLabel(page.title);ForEach(Array(page.lines.prefix(4))){line in Text(AppDiaryService.exportLabel(line.kind)+line.text).font(.custom("thmanyahseriftext-Regular",size:12,relativeTo:.caption)).foregroundStyle(line.kind=="margin" ? theme.color("pencil"):theme.ink).lineLimit(3)};if photos,let item=page.media.first(where:{$0.kind=="photo"}),let image=UIImage(data:item.data){Image(uiImage:image).resizable().scaledToFill().frame(height:50).clipped()};Spacer(minLength:0)}.frame(maxWidth:.infinity,alignment:.leading).frame(minHeight:155,alignment:.top).padding(10).background(theme.surface)
     }
-    private func load(){clear();do{pages=try service.yearbookPages(year:selectedYear,margins:margins,sources:sources,photos:photos);failure=nil}catch{failure=error.localizedDescription}}
-    private func prepare(){busy=true;failure=nil;clear();Task{@MainActor in await Task.yield();defer{busy=false};do{artifact=try service.exportYearbook(pages:pages,year:selectedYear,index:includeIndex)}catch{failure=error.localizedDescription}}}
+    private func load(){clear();do{pages=try service.yearbookPages(year:selectedYear,margins:margins,sources:sources,photos:photos);failure=nil}catch{failure=madarUserMessage(error)}}
+    private func prepare(){busy=true;failure=nil;clear();Task{@MainActor in await Task.yield();defer{busy=false};do{artifact=try service.exportYearbook(pages:pages,year:selectedYear,index:includeIndex)}catch{failure=madarUserMessage(error)}}}
     private func clear(){if let artifact {try? FileManager.default.removeItem(at:artifact.url.deletingLastPathComponent())};artifact=nil}
 }

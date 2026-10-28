@@ -63,7 +63,7 @@ extension AppSession {
                 try await executeDiaryCommand("habit.complete", payload: ["id": .string(habitID.uuidString), "delta": .number(current.rule.measure == .duration ? 15 : 1)], id: id)
                 clearRecoveredMaintenanceError()
             } catch BackupOperationError.busy { return false }
-            catch { errorMessage = error.localizedDescription }
+            catch { errorMessage = madarUserMessage(error) }
             return true
         case .capture(let text, let id):
             switch CaptureRouter.route(text) {
@@ -92,7 +92,7 @@ extension AppSession {
             try await executeDiaryCommand("diary.appendLine", payload: ["text": .string(text), "day": .string(day)], id: id)
             clearRecoveredMaintenanceError()
         } catch BackupOperationError.busy { return false }
-        catch { errorMessage = "لم يُضف السطر. \(error.localizedDescription)" }
+        catch { errorMessage = "لم يُضف السطر. \(madarUserMessage(error))" }
         return true
     }
 

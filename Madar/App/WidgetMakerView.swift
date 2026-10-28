@@ -268,14 +268,14 @@ struct WidgetMakerView: View {
                 if let current = saved.first(where: { $0.id == draft.id }) { draft = current; baseline = current }
                 else { draft = .init(); baseline = nil; status = "" }
             }
-        } catch { session.errorMessage = error.localizedDescription }
+        } catch { session.errorMessage = madarUserMessage(error) }
     }
     private func save() {
         busy = true; let value = draft
-        Task { defer { busy = false }; do { try await session.saveWidget(value); baseline = value; status = "حُفظت «" + value.name + "»"; reload() } catch { session.errorMessage = error.localizedDescription } }
+        Task { defer { busy = false }; do { try await session.saveWidget(value); baseline = value; status = "حُفظت «" + value.name + "»"; reload() } catch { session.errorMessage = madarUserMessage(error) } }
     }
     private func remove(_ item: WidgetMakerDraft) {
         deleting = nil
-        Task { do { try await session.executeDiaryCommand("widget.delete", payload: ["id": .string(item.id.uuidString)]); if draft.id == item.id { draft = .init(); baseline = nil }; reload() } catch { session.errorMessage = error.localizedDescription } }
+        Task { do { try await session.executeDiaryCommand("widget.delete", payload: ["id": .string(item.id.uuidString)]); if draft.id == item.id { draft = .init(); baseline = nil }; reload() } catch { session.errorMessage = madarUserMessage(error) } }
     }
 }

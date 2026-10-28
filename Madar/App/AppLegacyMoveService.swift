@@ -191,7 +191,7 @@ struct LegacyMoveUndo {
                     }
                     outcomes.append(summarize(room, counts))
                 } catch {
-                    var o = LegacyMoveOutcome(id: room.id, title: room.title); o.failed = error.localizedDescription; outcomes.append(o)
+                    var o = LegacyMoveOutcome(id: room.id, title: room.title); o.failed = madarUserMessage(error); outcomes.append(o)
                 }
                 // A crash can lose at most the in-flight room's checkpoint. A known completed room is always undoable.
                 journal = journal.recording(from: roomBefore, to: try RecordBridge.all(ModelContext(app.container), syncedOnly: false))

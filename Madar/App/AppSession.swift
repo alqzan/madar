@@ -429,7 +429,7 @@ final class AppSession {
                     return true
                 }
             } catch {
-                errorMessage = "لم يُسجّل التغيير. \(error.localizedDescription)"
+                errorMessage = "لم يُسجّل التغيير. \(madarUserMessage(error))"
             }
         }
         return true
@@ -625,7 +625,7 @@ final class AppSession {
         if key == "core.faceIDLock", case .string(let raw) = value, let scope = MadarLockScope(rawValue: raw), let lockController {
             Task {
                 do { try await lockController.changeScope(scope); completion?() }
-                catch { errorMessage = "لم يتغيّر القفل. \(error.localizedDescription)" }
+                catch { errorMessage = "لم يتغيّر القفل. \(madarUserMessage(error))" }
             }
             return
         }
@@ -659,7 +659,7 @@ final class AppSession {
                 let result = try await bus.execute(command)
                 guard result.status == .applied || result.status == .duplicate else { throw DataError.invalidValue("preset") }
                 try reload(); completion?()
-            } catch { errorMessage = "لم يُحفظ النمط. \(error.localizedDescription)" }
+            } catch { errorMessage = "لم يُحفظ النمط. \(madarUserMessage(error))" }
         }
     }
     func completeOnboarding() {
@@ -670,7 +670,7 @@ final class AppSession {
                 let result = try await bus.execute(CommandEnvelope(name: "core.completeOnboarding", payload: .object([:])))
                 guard result.status == .applied || result.status == .duplicate else { throw DataError.invalidValue("onboarding") }
                 onboardingComplete = true
-            } catch { errorMessage = "لم تُحفظ البداية. \(error.localizedDescription)" }
+            } catch { errorMessage = "لم تُحفظ البداية. \(madarUserMessage(error))" }
         }
     }
     func undo() {
@@ -686,7 +686,7 @@ final class AppSession {
                     await reconcileSpotlightIndex()
                     WidgetCenter.shared.reloadAllTimelines()
                 }
-            } catch { errorMessage = "لم يكتمل التراجع. \(error.localizedDescription)" }
+            } catch { errorMessage = "لم يكتمل التراجع. \(madarUserMessage(error))" }
         }
     }
     private func execute(name: String, values: [String: JSONValue], message: String, completion: (() -> Void)? = nil) {
@@ -712,7 +712,7 @@ final class AppSession {
                 }
                 if values["core.spotlightIndex"] != nil { await reconcileSpotlightIndex(reportFailure: true) }
                 completion?()
-            } catch { errorMessage = "لم يُحفظ التعديل. \(error.localizedDescription)" }
+            } catch { errorMessage = "لم يُحفظ التعديل. \(madarUserMessage(error))" }
         }
     }
     private func beginWrite() -> Bool {
@@ -737,7 +737,7 @@ final class AppSession {
         Task {
             do {
                 guard try await drainInbox() else { return }
-            } catch { errorMessage = "لم يكتمل تحديث البيانات. \(error.localizedDescription)"; return }
+            } catch { errorMessage = "لم يكتمل تحديث البيانات. \(madarUserMessage(error))"; return }
             await MadarIntentHandoff.shared.flush()
         }
     }
@@ -953,11 +953,11 @@ final class AppSession {
               notificationStoreAccessAvailable else { return }
         do { try await AppDiaryService(app: self).refreshLetters() }
         catch BackupOperationError.busy { }
-        catch { errorMessage = "تعذّر تحديث موعد الرسالة. \(error.localizedDescription)" }
+        catch { errorMessage = "تعذّر تحديث موعد الرسالة. \(madarUserMessage(error))" }
     }
     func refreshPrayerNotifications() async {
         do { try await prayerNotifications?.refresh() }
-        catch { errorMessage = "تعذّر تحديث تذكيرات الصلاة. \(error.localizedDescription)" }
+        catch { errorMessage = "تعذّر تحديث تذكيرات الصلاة. \(madarUserMessage(error))" }
     }
     private func withSerializedPrayerNotificationMutation<T>(
         shouldRefresh: (T) -> Bool = { _ in true },
@@ -981,7 +981,7 @@ final class AppSession {
     func requestPrayerNotificationPermission() {
         Task {
             do { try await prayerNotifications?.requestAuthorization() }
-            catch { errorMessage = "تعذّر طلب إذن الإشعارات. \(error.localizedDescription)" }
+            catch { errorMessage = "تعذّر طلب إذن الإشعارات. \(madarUserMessage(error))" }
         }
     }
 #if DEBUG
@@ -994,7 +994,7 @@ final class AppSession {
         Task { [weak self, coordinator] in
             guard let self else { return }
             do { notificationTestResult = try await coordinator.runSimulatorAcceptanceScenarioForTesting() }
-            catch { notificationTestResult = "FAIL — \(error.localizedDescription)" }
+            catch { notificationTestResult = "FAIL — \(madarUserMessage(error))" }
         }
     }
 #endif

@@ -31,7 +31,7 @@ struct DiaryLineEditSheet: View {
                     ToolbarItem(placement: .cancellationAction) { Button("إلغاء") { if text == edit.text { dismiss() } else { confirmDiscard = true } }.accessibilityIdentifier("diary-line-edit-cancel") }
                     ToolbarItem(placement: .confirmationAction) {
                         Button("احفظ") { Task { saving = true; defer { saving = false }
-                            do { try await AppDiaryService(app: app).edit(edit.id, text: text); saved(); dismiss() } catch { failure = error.localizedDescription } } }
+                            do { try await AppDiaryService(app: app).edit(edit.id, text: text); saved(); dismiss() } catch { failure = madarUserMessage(error) } } }
                             .disabled(saving || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || text == edit.text).accessibilityIdentifier("diary-line-edit-save")
                     }
                 }.toolbarBackground(theme.background, for: .navigationBar).tint(theme.accent)

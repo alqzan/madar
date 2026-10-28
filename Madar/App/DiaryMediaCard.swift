@@ -132,7 +132,7 @@ private struct DiaryTranscriptEditor: View {
             }.background(theme.background).foregroundStyle(theme.ink).navigationTitle("نص التسجيل").navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) { Button("إلغاء") { dismiss() } }
-                    ToolbarItem(placement: .topBarTrailing) { Button("احفظ") { Task { saving = true; do { try await app.executeDiaryCommand("diary.setTranscript", payload: ["entryID": .string(media.entryID), "text": .string(text)]); dismiss() } catch { self.error = error.localizedDescription; saving = false } } }.disabled(saving).accessibilityIdentifier("diary-transcript-save") }
+                    ToolbarItem(placement: .topBarTrailing) { Button("احفظ") { Task { saving = true; do { try await app.executeDiaryCommand("diary.setTranscript", payload: ["entryID": .string(media.entryID), "text": .string(text)]); dismiss() } catch { self.error = madarUserMessage(error); saving = false } } }.disabled(saving).accessibilityIdentifier("diary-transcript-save") }
                 }
         }.task { text = original }.interactiveDismissDisabled(text != original)
     }

@@ -217,7 +217,7 @@ struct MihbaraHomeView: View {
             let books = reading?.books ?? []
             MihbaraConversions.shared.resume(books, app: app)
             Task { shapes = await service.bookShapes(books) }
-        } catch { app.errorMessage = error.localizedDescription }
+        } catch { app.errorMessage = madarUserMessage(error) }
     }
     private func openSpotlightBookIfNeeded() {
         guard let id = app.mihbaraBookToOpen else { return }
@@ -234,7 +234,7 @@ struct MihbaraHomeView: View {
         do {
             motivationCues = try service.motivationCues(for: reading, book: tableBook)
             sheet = .motivation
-        } catch { app.errorMessage = error.localizedDescription }
+        } catch { app.errorMessage = madarUserMessage(error) }
     }
     private func performMotivation(_ cue: MihbaraMotivationCue) {
         if let number = cue.hadithNumber { sheet = .hadith(number); return }
@@ -284,7 +284,7 @@ struct MihbaraHomeView: View {
             do {
                 try await app.executeBookCommand("book.delete", payload: ["id": .string(book.id.uuidString)], undoMessage: "حُذف الكتاب من رفوف المحبرة")
                 load()
-            } catch { app.errorMessage = error.localizedDescription }
+            } catch { app.errorMessage = madarUserMessage(error) }
         }
     }
     private var removalTitle: String {
@@ -300,7 +300,7 @@ struct MihbaraHomeView: View {
             do {
                 try await app.executeBookCommand("book.removeFile", payload: ["id": .string(book.id.uuidString)])
                 load(); sheet = .book(book.id)
-            } catch { app.errorMessage = error.localizedDescription }
+            } catch { app.errorMessage = madarUserMessage(error) }
         }
     }
     private func requestBookFileRestore() {
@@ -316,7 +316,7 @@ struct MihbaraHomeView: View {
                                                       "author": .string(String(renameAuthor.trimmingCharacters(in: .whitespacesAndNewlines).prefix(300)))]
         Task {
             do { try await app.executeBookCommand("book.rename", payload: payload); load() }
-            catch { app.errorMessage = error.localizedDescription }
+            catch { app.errorMessage = madarUserMessage(error) }
         }
     }
     private func moveBook(_ b: MihbaraBook, to shelf: String, replacing: UUID? = nil) {
@@ -331,7 +331,7 @@ struct MihbaraHomeView: View {
                 try await app.executeBookCommand("book.moveShelf", payload: payload)
                 if shelf == "reading" { tableID = b.id }
                 load()
-            } catch { app.errorMessage = error.localizedDescription }
+            } catch { app.errorMessage = madarUserMessage(error) }
         }
     }
     private func openPendingMotivationBook() {
@@ -978,7 +978,7 @@ struct MihbaraHomeView: View {
             reading = try service.load()
             readerRoute = MihbaraReaderRoute(bookID: book.id, volume: volume)
         } catch {
-            app.errorMessage = error.localizedDescription
+            app.errorMessage = madarUserMessage(error)
         }
     }
 

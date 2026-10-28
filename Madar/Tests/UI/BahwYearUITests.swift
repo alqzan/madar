@@ -30,6 +30,7 @@ import XCTest
         capture(app, "M4-V03-mine-L")
         element("bahw-matter-هدية أمي").tap()
         let delete = app.buttons["bahw-day-delete"]; XCTAssertTrue(delete.waitForExistence(timeout: 5)); delete.tap()
+        let confirm = app.buttons["bahw-day-delete-confirm"].firstMatch; XCTAssertTrue(confirm.waitForExistence(timeout: 5), app.debugDescription); confirm.tap()
         XCTAssertTrue(element("bahw-matter-هدية أمي").waitForNonExistence(timeout: 8))
         element("bahw-year-back").tap()
         XCTAssertTrue(element("bahw-greeting").waitForExistence(timeout: 5))

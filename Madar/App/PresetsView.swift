@@ -42,7 +42,7 @@ struct PresetsView: View {
                                     guard case .object(let root) = payload, case .object(let values) = root["settings"] else { throw PresetViewError.invalidPayload }
                                     let layouts = root["layouts"]?.object ?? [:]
                                     candidate = .init(id: preset.id, name: preset.name, settings: values, layouts: layouts)
-                                } catch { session.errorMessage = "تعذّرت قراءة النمط المحفوظ. \(error.localizedDescription)" }
+                                } catch { session.errorMessage = "تعذّرت قراءة النمط المحفوظ. \(madarUserMessage(error))" }
                             }.frame(minHeight: 44)
                         }
                     }

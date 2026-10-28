@@ -113,7 +113,7 @@ struct BackupRestoreResult: Sendable { let restoredCount: Int; let skippedCount:
     func refresh() async {
         observePrivacy()
         do { status = try await service.status() }
-        catch { errorMessage = "تعذّر قراءة حالة النسخ. \(error.localizedDescription)" }
+        catch { errorMessage = "تعذّر قراءة حالة النسخ. \(madarUserMessage(error))" }
     }
     func setSchedule(_ schedule: BackupUISchedule) {
         run(initial: "يحفظ موعد النسخ…") { [self] _, _ in try await service.setSchedule(schedule); status = try await service.status() }
@@ -225,7 +225,7 @@ struct BackupRestoreResult: Sendable { let restoredCount: Int; let skippedCount:
                     progress = update
                 }, id)
             } catch is CancellationError { if operationID == id { resultMessage = "أُلغي الإجراء. النسخ السابقة محفوظة." } }
-            catch { if operationID == id { errorMessage = "لم يكتمل الإجراء. \(error.localizedDescription)" } }
+            catch { if operationID == id { errorMessage = "لم يكتمل الإجراء. \(madarUserMessage(error))" } }
         }
     }
 }
@@ -293,7 +293,7 @@ struct BackupSettingsView: View {
                     if filePurpose == .folder {
                         if let folder = urls.first { model.chooseFolder(folder) }
                     } else { model.selectedFile = urls.first; model.dismissPreview() }
-                case .failure(let error): model.errorMessage = error.localizedDescription
+                case .failure(let error): model.errorMessage = madarUserMessage(error)
                 }
             }
             .confirmationDialog(model.restoreMode == .replace ? "استبدل بيانات مدار بهذه النسخة؟" : "ادمج النسخة مع بيانات مدار؟", isPresented: $confirmingRestore, titleVisibility: .visible) {

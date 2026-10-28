@@ -292,9 +292,16 @@ import MadarPrayer
     }
 }
 
-func quranUserMessage(_ error: any Error) -> String {
-    if let data = error as? DataError, case .invalidValue(let message) = data,
-       message.unicodeScalars.contains(where: { (0x0600...0x06FF).contains($0.value) }) { return message }
+func quranUserMessage(_ error: any Error) -> String { madarUserMessage(error) }
+/// Audit 28 Oct: a system error reaches the user only when it already speaks Arabic (DataError, the import
+/// and backup errors); anything else, often English («The operation couldn't be completed»), becomes one fixed sentence.
+func madarUserMessage(_ error: any Error) -> String { madarArabicDetail(error) ?? "تعذّر إتمام العملية. حاول مرة أخرى" }
+/// After a sentence that already names what failed: the Arabic reason, or «حاول مرة أخرى».
+func madarUserDetail(_ error: any Error) -> String { madarArabicDetail(error) ?? "حاول مرة أخرى." }
+private func madarArabicDetail(_ error: any Error) -> String? {
     if case BackupOperationError.busy = error { return "انتظر انتهاء العملية الحالية، ثم حاول مرة أخرى" }
-    return "تعذّر إتمام العملية. حاول مرة أخرى"
+    if let data = error as? DataError, case .invalidValue(let message) = data, isArabicText(message) { return message }
+    let text = error.localizedDescription
+    return isArabicText(text) ? text : nil
 }
+private func isArabicText(_ text: String) -> Bool { text.unicodeScalars.contains { (0x0600...0x06FF).contains($0.value) } }

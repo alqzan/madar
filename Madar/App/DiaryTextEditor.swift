@@ -118,7 +118,7 @@ struct DiaryTextEditor: View {
             day = initialDay
             writingDay = (try? AppDiaryService(app: app).currentDay()).map { initialDay == "yesterday" ? $0.adding(days: -1) : $0 }
             do { if let draft = try AppDiaryService(app: app).draft(margin: margin) { draftID = draft.id; hasDraftRecord = true; text = draft.text; day = draft.day; writingDay = draft.writingDay; draftStatus = draft.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : "مسودة مستعادة" } }
-            catch { failure = error.localizedDescription }
+            catch { failure = madarUserMessage(error) }
             loaded = true
             if voice == nil { voice = DiaryVoiceController(app: app); await voice?.recoverRecordings() }
             // A room-tab write link presents during the native sheet transition; an earlier
@@ -139,13 +139,13 @@ struct DiaryTextEditor: View {
                 if let id = item.itemIdentifier, let copy = DiaryPhotoLibrary.smallCopy(of: data) { try await add(copy, kind: "photo", type: "image/jpeg", assetID: id) }
                 else { try await add(data, kind: "photo", type: item.supportedContentTypes.first?.preferredMIMEType ?? "image/jpeg") }
             }
-            catch { failure = error.localizedDescription }
+            catch { failure = madarUserMessage(error) }
         } }
         .fileImporter(isPresented: $choosingFile, allowedContentTypes: [.data]) { result in Task {
             do { let url = try result.get(); let access = url.startAccessingSecurityScopedResource(); defer { if access { url.stopAccessingSecurityScopedResource() } }
                 let type = try url.resourceValues(forKeys: [.contentTypeKey]).contentType ?? .data
                 try await add(Data(contentsOf: url), kind: type.conforms(to: .image) ? "photo" : type.conforms(to: .audio) ? "audio" : type.conforms(to: .movie) ? "video" : "document", type: type.preferredMIMEType ?? "application/octet-stream", caption: url.lastPathComponent)
-            } catch { failure = error.localizedDescription }
+            } catch { failure = madarUserMessage(error) }
         } }
         .onChange(of: voice?.lastMedia?.id) { _, id in if id != nil { attachmentSaved = true; editorUndo = true } }
         .onChange(of: scenePhase) { _, phase in if phase == .active { voice?.refreshMicrophoneAuthorization() } else { Task { draftTask?.cancel(); if loaded { try? await persistDraft() }; await voice?.stop() } } }
@@ -201,7 +201,7 @@ struct DiaryTextEditor: View {
         draftTask?.cancel(); draftStatus = "تُحفظ المسودة…"
         draftTask = Task {
             do { try await Task.sleep(for: .milliseconds(500)); try Task.checkCancellation(); try await persistDraft(); draftStatus = text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : "المسودة محفوظة" }
-            catch is CancellationError {} catch { draftStatus = "لم تُحفظ المسودة"; failure = error.localizedDescription }
+            catch is CancellationError {} catch { draftStatus = "لم تُحفظ المسودة"; failure = madarUserMessage(error) }
         }
     }
     private func persistDraft() async throws {
@@ -213,7 +213,7 @@ struct DiaryTextEditor: View {
     private func close() async {
         draftTask?.cancel(); saving = true
         do { await voice?.stop(); if loaded { try await persistDraft() }; dismiss() }
-        catch { failure = error.localizedDescription; saving = false }
+        catch { failure = madarUserMessage(error); saving = false }
     }
     private func add(_ data: Data, kind: String, type: String, caption: String = "", assetID: String? = nil) async throws {
         guard let writingDay else { throw CocoaError(.coderInvalidValue) }; importing = true
@@ -230,12 +230,12 @@ struct DiaryTextEditor: View {
                 try await app.executeDiaryCommand("diary.commitDraft", payload: ["id": .string(draftID.uuidString)], id: draftID)
             }
             dismiss()
-        } catch { failure = error.localizedDescription; saving = false }
+        } catch { failure = madarUserMessage(error); saving = false }
     }
     private func linkLibraryPhoto(_ asset: PHAsset) async -> Bool {
         guard let data = await DiaryPhotoLibrary.data(asset), let copy = DiaryPhotoLibrary.smallCopy(of: data) else { failure = "تعذّر فتح الصورة من تطبيق الصور."; return false }
         do { try await add(copy, kind: "photo", type: "image/jpeg", assetID: asset.localIdentifier); return true }
-        catch { failure = error.localizedDescription; return false }
+        catch { failure = madarUserMessage(error); return false }
     }
     /// «كلمة واحدة»، «كلمتان»، «٥ كلمات»، «١١ كلمةً»; nothing before the first word.
     private func wordCount(_ n: Int) -> String {

@@ -322,7 +322,7 @@ extension AppQuranService {
             let revealed = value.revealedAyahs ?? []
             let next = currentAyahs.first { !revealed.contains($0.id) }
             let revealedCount = currentAyahs.filter { revealed.contains($0.id) }.count
-            state.title = draft.kind == .free ? "مراجعة حرة" : "المراجعة · " + faceCount(orderedPages.count) + " في خطوة واحدة"
+            state.title = draft.kind == .free ? "مراجعة حرة" : "المراجعة: " + faceCount(orderedPages.count) + " في خطوة واحدة"
             let range = section.pages.first == section.pages.last ? numerals.string(section.pages.first ?? draft.page) : numerals.string(section.pages.first ?? draft.page) + "–" + numerals.string(section.pages.last ?? draft.page)
             state.segmentTitle = section.title + " " + range + "، الوجه " + numerals.string(draft.page)
             let record = try snapshot().pages.first { $0.page == draft.page }

@@ -131,7 +131,7 @@ final class PrayerNotificationCoordinator {
         pendingResponses.removeAll()
         for response in queued { await handle(response) }
         do { try await refresh() }
-        catch { session.errorMessage = "تعذّر إعداد تذكيرات الصلاة. \(error.localizedDescription)" }
+        catch { session.errorMessage = "تعذّر إعداد تذكيرات الصلاة. \(madarUserMessage(error))" }
     }
 
     func requestAuthorization() async throws {
@@ -166,7 +166,7 @@ final class PrayerNotificationCoordinator {
         do { try await refreshLocked(session: session, suppliedNow: nil) }
         catch {
             guard !isExpectedNoPrayerBoundary(error, session: session) else { return }
-            session.errorMessage = "تعذّر تحديث تذكيرات الصلاة. \(error.localizedDescription)"
+            session.errorMessage = "تعذّر تحديث تذكيرات الصلاة. \(madarUserMessage(error))"
         }
     }
 
@@ -182,7 +182,7 @@ final class PrayerNotificationCoordinator {
         pendingResponses.removeAll()
         for response in queued { await handle(response) }
         do { try await refresh() }
-        catch { session?.errorMessage = "تعذّر تحديث تذكيرات الصلاة بعد تحديث البيانات. \(error.localizedDescription)" }
+        catch { session?.errorMessage = "تعذّر تحديث تذكيرات الصلاة بعد تحديث البيانات. \(madarUserMessage(error))" }
     }
 
     private func refreshLocked(session: AppSession, suppliedNow: Date?) async throws {
@@ -284,7 +284,7 @@ final class PrayerNotificationCoordinator {
                 if RoomNotificationContent.isRoomRequest(request.identifier) { RoomNotificationContent.open(request.identifier, userInfo: request.content.userInfo, session: session) }
                 else { session.selectedTab = "prayer" }
             }
-        } catch { session.errorMessage = "تعذّر تنفيذ تذكير الصلاة. \(error.localizedDescription)" }
+        } catch { session.errorMessage = "تعذّر تنفيذ تذكير الصلاة. \(madarUserMessage(error))" }
     }
 
     func foregroundOptions(for notification: UNNotification) async -> UNNotificationPresentationOptions {
@@ -328,7 +328,7 @@ final class PrayerNotificationCoordinator {
             try updateLedger(requestID: notification.request.identifier, state: "observed")
             return [.banner, .list, .sound]
         } catch {
-            session.errorMessage = "تعذّر التحقق من وقت التذكير. \(error.localizedDescription)"
+            session.errorMessage = "تعذّر التحقق من وقت التذكير. \(madarUserMessage(error))"
             return []
         }
     }

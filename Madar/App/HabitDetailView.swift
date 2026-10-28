@@ -61,7 +61,7 @@ struct HabitDetailView:View {
     private func filled(_ title:String)->some View { Text(title).font(MadarTypography.section()).frame(maxWidth:.infinity,minHeight:48).background(theme.accentFill,in:.capsule).foregroundStyle(theme.onAccent) }
     @ViewBuilder private func primary(_ current:HabitPeriodResult)->some View {
         if reading.source == "walking" {
-            if HabitHealthStore.available { Button {Task{do{try await HabitHealthStore.authorize(unit:reading.summary.current?.rule.unit ?? "steps");_ = try await HabitHealthStore.refresh(session:session);dismiss()}catch{session.errorMessage=error.localizedDescription}}} label: { filled("حدّث من الصحة") }.buttonStyle(.plain) } else {Text("بيانات الصحة غير متاحة على هذا الجهاز").font(MadarTypography.caption())}
+            if HabitHealthStore.available { Button {Task{do{try await HabitHealthStore.authorize(unit:reading.summary.current?.rule.unit ?? "steps");_ = try await HabitHealthStore.refresh(session:session);dismiss()}catch{session.errorMessage=madarUserMessage(error)}}} label: { filled("حدّث من الصحة") }.buttonStyle(.plain) } else {Text("بيانات الصحة غير متاحة على هذا الجهاز").font(MadarTypography.caption())}
         } else if let source=reading.source {
             Button {
                 if source == "jamaah"{session.selectedTab="prayer"}else if source == "review"{session.selectedTab="quran"}else{session.selectedTab="notes"};dismiss()
@@ -119,5 +119,5 @@ struct HabitDetailView:View {
         var p:[String:MadarCore.JSONValue]=["id":.string(reading.id.uuidString),"from":.string((yesterday ? today.adding(days:-1) : today).description)]
         if week {p["until"] = .string(today.adding(days:7).description)};if trip{p["trip"] = .bool(true)};perform("habit.pause",p)
     }
-    private func perform(_ name:String,_ payload:[String:MadarCore.JSONValue]) { busy=true;Task{do{try await session.executeDiaryCommand(name,payload:payload);dismiss()}catch{session.errorMessage=error.localizedDescription};busy=false} }
+    private func perform(_ name:String,_ payload:[String:MadarCore.JSONValue]) { busy=true;Task{do{try await session.executeDiaryCommand(name,payload:payload);dismiss()}catch{session.errorMessage=madarUserMessage(error)};busy=false} }
 }

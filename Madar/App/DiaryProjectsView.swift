@@ -25,7 +25,7 @@ struct DiaryProjectsPanel: View {
                 ForEach(chapters) { project in row(project) }
             }
         }
-        .task(id: app.prayerRevision) { do { projects = try service.projects(); failure = nil } catch { failure = error.localizedDescription } }
+        .task(id: app.prayerRevision) { do { projects = try service.projects(); failure = nil } catch { failure = madarUserMessage(error) } }
         .sheet(isPresented: $creating) { DiaryProjectEditor(app: app).environment(\.roomTheme, theme).presentationDetents([.medium, .large]) }
         .sheet(item: $detail) { project in DiaryProjectDetail(app: app, project: project).environment(\.roomTheme, theme) }
     }
@@ -68,7 +68,7 @@ struct DiaryProjectEditor: View {
                             guard !saving else { return }; saving = true
                             Task { defer { saving = false }
                                 do { try await AppDiaryService(app: app).saveProject(identity, name: name, intention: intention, keyword: keyword.isEmpty ? name : keyword); dismiss() }
-                                catch { failure = error.localizedDescription }
+                                catch { failure = madarUserMessage(error) }
                             }
                         }
                             .disabled(saving || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty).accessibilityIdentifier("diary-project-save")
@@ -111,7 +111,7 @@ struct DiaryProjectDetail: View {
                     if project.finishedAt == nil {
                         if finishing {
                             TextField("كلمة تختم بها المشروع", text: $reflection, axis: .vertical).font(DiaryType.writing).padding(12).background(theme.surface, in: .rect(cornerRadius: 12)).accessibilityIdentifier("diary-project-reflection")
-                            Button { Task { do { try await service.finishProject(project.id, reflection: reflection); dismiss() } catch { failure = error.localizedDescription } } } label: {
+                            Button { Task { do { try await service.finishProject(project.id, reflection: reflection); dismiss() } catch { failure = madarUserMessage(error) } } } label: {
                                 Text("أنهِ المشروع").font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 50).foregroundStyle(theme.background).background(theme.ink, in: .capsule)
                             }.buttonStyle(.plain).accessibilityIdentifier("diary-project-finish-confirm")
                         } else {
@@ -126,7 +126,7 @@ struct DiaryProjectDetail: View {
                 .toolbar { ToolbarItem(placement: .topBarLeading) { Button("تم") { dismiss() } } }
                 .toolbarBackground(theme.background, for: .navigationBar).tint(theme.accent)
                 .confirmationDialog("تبقى السطور بنصّها، ويختفي ربطها. يمكنك التراجع.", isPresented: $confirmDelete, titleVisibility: .visible) {
-                    Button("احذف المشروع", role: .destructive) { Task { do { try await service.deleteProject(project.id); dismiss() } catch { failure = error.localizedDescription } } }
+                    Button("احذف المشروع", role: .destructive) { Task { do { try await service.deleteProject(project.id); dismiss() } catch { failure = madarUserMessage(error) } } }
                 }
         }
     }

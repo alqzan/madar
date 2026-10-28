@@ -46,8 +46,8 @@ struct DiaryIntentionsView:View {
                 .task(id:app.prayerRevision){load()}.disabled(busy)
         }
     }
-    private func load(){do{rows=try service.intentions(day);failure=nil}catch{failure=error.localizedDescription}}
-    private func run(_ action:@escaping @MainActor () async throws -> Void){busy=true;Task{@MainActor in defer{busy=false};do{try await action();saved=true;load()}catch{failure=error.localizedDescription}}}
+    private func load(){do{rows=try service.intentions(day);failure=nil}catch{failure=madarUserMessage(error)}}
+    private func run(_ action:@escaping @MainActor () async throws -> Void){busy=true;Task{@MainActor in defer{busy=false};do{try await action();saved=true;load()}catch{failure=madarUserMessage(error)}}}
 }
 
 /// OR-15 (owner, 27 Oct 2026): the current page stays; one slim arc from Fajr to Isha ties morning and evening.

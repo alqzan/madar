@@ -67,7 +67,7 @@ struct MoneySalaryView: View {
         HStack(spacing: 8) {
             Text("مدار، تقرير الدورة").font(.custom("thmanyahsans-Bold", size: 13, relativeTo: .caption))
             Spacer(minLength: 6)
-            Text("مسودة").font(.custom("thmanyahsans-Bold", size: 13, relativeTo: .caption)).foregroundStyle(theme.color("reserve"))
+            Text("مسودة").font(.custom("thmanyahsans-Bold", size: 13, relativeTo: .caption)).foregroundStyle(theme.color("reserveText"))
             MadarDateLabel(app.dateLabels(r.today, compact: true, weekday: true), primaryFont: MadarTypography.fine(), secondaryFont: MadarTypography.fine())
         }.foregroundStyle(theme.background).padding(.horizontal, 12).padding(.vertical, 8).background(theme.ink)
             .overlay(alignment: .bottom) { Rectangle().fill(theme.color("reserve")).frame(height: 2).offset(y: 4) }

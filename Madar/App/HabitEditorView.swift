@@ -131,7 +131,7 @@ struct HabitEditorView:View {
             let json=try JSONDecoder().decode(MadarCore.JSONValue.self,from:JSONEncoder().encode(saved))
             var p:[String:MadarCore.JSONValue]=["id":.string(id.uuidString),"name":.string(name),"rule":json,"homeOnly":.bool(homeOnly),"reminder":.string(reminder)]
             if source != "custom"{p["source"] = .string(source)}
-            Task {do{if source == "walking" {try await HabitHealthStore.authorize(unit:saved.unit ?? "steps")};try await session.executeDiaryCommand("habit.save",payload:p);dismiss()}catch{issue="لم تُحفظ العادة: "+error.localizedDescription};busy=false}
+            Task {do{if source == "walking" {try await HabitHealthStore.authorize(unit:saved.unit ?? "steps")};try await session.executeDiaryCommand("habit.save",payload:p);dismiss()}catch{issue="لم تُحفظ العادة: "+madarUserDetail(error)};busy=false}
         }catch{issue="راجع الهدف وأيام الشهر؛ وقت البداية والنهاية يجب أن يختلفا.";busy=false}
     }
 }

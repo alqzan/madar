@@ -74,7 +74,7 @@ struct DiaryLettersPanel: View {
         .sheet(item: $rescheduling) { letter in DiaryLetterReschedule(app: app, letter: letter).environment(\.roomTheme, theme).presentationDetents([.medium]) }
     }
     private func load() async {
-        do { try await service.refreshLetters(); letters = try service.letters(); failure = nil } catch { failure = error.localizedDescription }
+        do { try await service.refreshLetters(); letters = try service.letters(); failure = nil } catch { failure = madarUserMessage(error) }
     }
 }
 
@@ -143,7 +143,7 @@ struct DiaryLetterMoment: View {
                             .textSelection(.enabled).transition(.opacity.combined(with: .move(edge: .bottom))).accessibilityIdentifier("diary-letter-text")
                     } else {
                         DiaryEnvelope(sealed: true).frame(width: 220, height: 150).padding(.top, 30)
-                        Button { Task { do { let value = try await service.openLetter(letter.id); withAnimation(.easeOut(duration: 0.5)) { text = value } } catch { failure = error.localizedDescription } } } label: {
+                        Button { Task { do { let value = try await service.openLetter(letter.id); withAnimation(.easeOut(duration: 0.5)) { text = value } } catch { failure = madarUserMessage(error) } } } label: {
                             Text("افتح الرسالة").font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 52).foregroundStyle(theme.background).background(theme.dark ? theme.accent : theme.ink, in: .capsule)
                         }.buttonStyle(.plain).accessibilityIdentifier("diary-letter-open")
                     }
@@ -222,12 +222,12 @@ struct DiaryLetterComposer: View {
                         Button("اختمها") {
                             guard !saving, let choice else { return }; saving = true
                             Task { defer { saving = false }
-                                do { try await service.sealLetter(text, choice: choice, date: date); dismiss() } catch { failure = error.localizedDescription } }
+                                do { try await service.sealLetter(text, choice: choice, date: date); dismiss() } catch { failure = madarUserMessage(error) } }
                         }
                             .disabled(saving || choice == nil || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty).accessibilityIdentifier("diary-letter-seal")
                     }
                 }.toolbarBackground(theme.background, for: .navigationBar).tint(theme.accent)
-                .task { do { choices = try service.letterChoices(); choice = choice ?? choices.first } catch { failure = error.localizedDescription } }
+                .task { do { choices = try service.letterChoices(); choice = choice ?? choices.first } catch { failure = madarUserMessage(error) } }
         }
     }
 }
@@ -245,7 +245,7 @@ struct DiaryLetterReschedule: View {
             DatePicker("اليوم", selection: $date, in: Date().addingTimeInterval(86_400)..., displayedComponents: .date).font(DiaryType.writing)
             MadarDateLabel(app.dateLabels(GregorianDay.containing(date, in: app.activePlace.timeZone)))
             if let failure { Text(failure).font(MadarTypography.body()) }
-            Button { Task { do { try await AppDiaryService(app: app).rescheduleLetter(letter.id, to: date); dismiss() } catch { failure = error.localizedDescription } } } label: {
+            Button { Task { do { try await AppDiaryService(app: app).rescheduleLetter(letter.id, to: date); dismiss() } catch { failure = madarUserMessage(error) } } } label: {
                 Text("احفظ الموعد").font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 50).foregroundStyle(theme.background).background(theme.ink, in: .capsule)
             }.buttonStyle(.plain).accessibilityIdentifier("diary-letter-reschedule-save")
         }.padding(22).frame(maxHeight: .infinity, alignment: .top).background(theme.background).foregroundStyle(theme.ink)

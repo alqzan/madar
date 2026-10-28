@@ -35,7 +35,7 @@ private struct MadarSceneContent: View {
                 Task {
                     do { try await session.drainInbox() }
                     catch BackupOperationError.busy { }
-                    catch { session.errorMessage = "لم يكتمل تحديث البيانات. \(error.localizedDescription)" }
+                    catch { session.errorMessage = "لم يكتمل تحديث البيانات. \(madarUserMessage(error))" }
                     await session.reconcileSpotlightIndex()
                     await session.refreshEligibleDiaryLettersForNotificationLifecycle()
                     await MadarIntentHandoff.shared.flush()
@@ -189,11 +189,11 @@ private struct MadarSceneContent: View {
             await opened.reconcileSpotlightIndex()
             do { try await opened.drainInbox() }
             catch BackupOperationError.busy { }
-            catch { opened.errorMessage = "لم يكتمل تحديث البيانات. \(error.localizedDescription)" }
+            catch { opened.errorMessage = "لم يكتمل تحديث البيانات. \(madarUserMessage(error))" }
             if let pendingURL { opened.open(pendingURL); self.pendingURL = nil }
             if let pendingSpotlightBookID { opened.openSpotlightBook(pendingSpotlightBookID); self.pendingSpotlightBookID = nil }
             await MadarIntentHandoff.shared.attach { [weak opened] request in await opened?.handleIntentRequest(request) ?? false }
-        } catch { startupError = error.localizedDescription }
+        } catch { startupError = madarUserMessage(error) }
     }
 
 }

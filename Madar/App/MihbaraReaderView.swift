@@ -79,7 +79,7 @@ import MadarQuran
         do {
             let json = try locator.jsonString()
             enqueueLocatorJSON(json, bookID: bookID)
-        } catch { app?.errorMessage = error.localizedDescription }
+        } catch { app?.errorMessage = madarUserMessage(error) }
     }
 
     func enqueueLocatorJSON(_ json: String, bookID: UUID) {
@@ -117,7 +117,7 @@ import MadarQuran
                         clearRecoveredWriteError(in: app)
                     } catch {
                         sessions.finish(commandID: write.commandID, acknowledged: false)
-                        lastWriteError = error.localizedDescription
+                        lastWriteError = madarUserMessage(error)
                         app.errorMessage = lastWriteError
                         break
                     }
@@ -134,7 +134,7 @@ import MadarQuran
                         clearRecoveredWriteError(in: app)
                     } catch {
                         failedLocatorEpoch = epoch
-                        lastWriteError = error.localizedDescription
+                        lastWriteError = madarUserMessage(error)
                         app.errorMessage = lastWriteError
                         break
                     }
@@ -772,7 +772,7 @@ struct MihbaraReaderView: View {
             positionCount = readyPositionCount
             positionProgress = ReadingPositionProgress(startingAt: pageCoordinate(startLocator), at: now)
         } catch {
-            message = error.localizedDescription
+            message = madarUserMessage(error)
         }
     }
 
@@ -1327,7 +1327,7 @@ struct MihbaraReaderView: View {
             wordAlreadySaved = true
             readerUndoID = app.undoToken?.id
             closeWordCard()
-        } catch { readerAlert = error.localizedDescription }
+        } catch { readerAlert = madarUserMessage(error) }
     }
 
     /// The printed page in effect at a block: its own marker, else the last page that began before its resource.
@@ -1393,7 +1393,7 @@ struct MihbaraReaderView: View {
             }
             readerUndoID = app.undoToken?.id
             reloadHighlights()
-        } catch { readerAlert = error.localizedDescription }
+        } catch { readerAlert = madarUserMessage(error) }
     }
 
     @MainActor private func savePageNote(_ text: String, for card: MihbaraWordCardState) async -> Bool {
@@ -1410,7 +1410,7 @@ struct MihbaraReaderView: View {
             closeWordCard()
             return true
         } catch {
-            readerAlert = error.localizedDescription
+            readerAlert = madarUserMessage(error)
             return false
         }
     }

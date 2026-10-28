@@ -357,6 +357,7 @@ struct BahwDaySheet: View {
     @State var draft: BahwDayDraft
     @Environment(\.dismiss) private var dismiss
     @State private var failure: String?
+    @State private var confirmingDelete = false
     private var lobby: RoomTheme { RoomTheme(room: "bahw", dark: colorScheme == .dark) }
     private var digits: MadarNumberFormatter { .init(style: session.string("core.numerals") == "western" ? .western : .hindi) }
     var body: some View {
@@ -409,8 +410,10 @@ struct BahwDaySheet: View {
                         Text("احفظ").font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 50).foregroundStyle(lobby.onAccent).background(lobby.accentFill, in: .capsule)
                     }.buttonStyle(.plain).disabled(draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty).accessibilityIdentifier("bahw-day-save")
                     if draft.existing {
-                        Button(role: .destructive) { remove() } label: { Text("احذف اليوم").font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 46) }
+                        Button(role: .destructive) { confirmingDelete = true } label: { Text("احذف اليوم").font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 46) }
                             .buttonStyle(.plain).accessibilityIdentifier("bahw-day-delete")
+                            // Audit 28 Oct: a one-tap delete now asks first, like the other deletes in Madar.
+                            .confirmationDialog("تحذف «" + draft.title + "»؟", isPresented: $confirmingDelete, titleVisibility: .visible) { Button("احذف اليوم", role: .destructive) { remove() }.accessibilityIdentifier("bahw-day-delete-confirm") }
                     }
                 }.padding(18)
             }
@@ -435,13 +438,13 @@ struct BahwDaySheet: View {
         if draft.repeats == "none" { payload["year"] = .number(Double(draft.year)); payload["countUpAfter"] = .bool(draft.countUpAfter) }
         Task {
             do { try await session.executeDiaryCommand("bahw.saveUpcomingDay", payload: payload); dismiss() }
-            catch { failure = "لم يُحفظ اليوم. " + error.localizedDescription }
+            catch { failure = "لم يُحفظ اليوم. " + madarUserDetail(error) }
         }
     }
     private func remove() {
         Task {
             do { try await session.executeDiaryCommand("bahw.deleteUpcomingDay", payload: ["id": .string(draft.id.uuidString)]); dismiss() }
-            catch { failure = "لم يُحذف اليوم. " + error.localizedDescription }
+            catch { failure = "لم يُحذف اليوم. " + madarUserDetail(error) }
         }
     }
 }

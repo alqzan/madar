@@ -182,7 +182,7 @@ struct MihbaraPDFReaderView: View {
             let now = Date()
             beginSegment(at: now)
             readingClock = ActiveReadingClock(startedAt: now, foreground: scenePhase == .active && canRead)
-        } catch { self.error = error.localizedDescription }
+        } catch { self.error = madarUserMessage(error) }
     }
 
     private func restoredIndex(count: Int) -> Int {

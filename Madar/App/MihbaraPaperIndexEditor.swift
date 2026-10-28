@@ -374,7 +374,7 @@ struct MihbaraPaperIndexEditor: View {
                 if existingBook != nil { dismiss() }
                 onSaved()
             }
-            catch { app.errorMessage = error.localizedDescription }
+            catch { app.errorMessage = madarUserMessage(error) }
             saving = false
         }
     }

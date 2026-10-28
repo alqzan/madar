@@ -35,14 +35,14 @@ struct SyncUIStatus: Sendable {
     init(service: any SyncUIService) { self.service = service }
     func refresh() async {
         do { status = try await service.status() }
-        catch { errorMessage = "تعذّرت قراءة حالة iCloud. \(error.localizedDescription)" }
+        catch { errorMessage = "تعذّرت قراءة حالة iCloud. \(madarUserMessage(error))" }
     }
     func setEnabled(_ enabled: Bool) {
         guard !busy else { return }; busy = true
         Task { [self] in
             defer { busy = false }
             do { try await service.setEnabled(enabled); status = try await service.status() }
-            catch { errorMessage = "لم يتغيّر إعداد المزامنة. \(error.localizedDescription)" }
+            catch { errorMessage = "لم يتغيّر إعداد المزامنة. \(madarUserMessage(error))" }
         }
     }
     func resolve(_ choice: SyncUIAccountChoice) {
@@ -50,7 +50,7 @@ struct SyncUIStatus: Sendable {
         Task { [self] in
             defer { busy = false }
             do { try await service.resolveAccountChange(id: change.id, choice: choice); status = try await service.status() }
-            catch { errorMessage = "لم يكتمل اختيار الحساب. \(error.localizedDescription)" }
+            catch { errorMessage = "لم يكتمل اختيار الحساب. \(madarUserMessage(error))" }
         }
     }
 }

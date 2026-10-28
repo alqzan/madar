@@ -240,7 +240,7 @@ struct LegacyMoveView: View {
                 receipt = try await service.commit(p, progress: { moving = $0 }, movementProgress: { movementProgress = ($0, $1) })
                 preview = nil; last = service.lastMove()
             }
-            catch { failure = "لم يكتمل النقل. " + error.localizedDescription }
+            catch { failure = "لم يكتمل النقل. " + madarUserDetail(error) }
         }
     }
     private func undo() {
@@ -248,7 +248,7 @@ struct LegacyMoveView: View {
         Task { @MainActor in
             defer { moving = nil }
             do { undone = try await service.undo(); receipt = nil; last = nil }
-            catch { failure = "لم يكتمل التراجع. " + error.localizedDescription }
+            catch { failure = "لم يكتمل التراجع. " + madarUserDetail(error) }
         }
     }
 }

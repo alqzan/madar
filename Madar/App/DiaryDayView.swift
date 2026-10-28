@@ -176,7 +176,7 @@ struct DiaryDayView: View {
                         deleteConfirmation = nil
                         Task {
                             do { try await app.executeDiaryCommand("diary.deleteEntry", payload: ["entryID": .string(id.uuidString)]) }
-                            catch { failure = error.localizedDescription }
+                            catch { failure = madarUserMessage(error) }
                         }
                     }.accessibilityIdentifier("diary-line-delete-confirm")
                 } message: {
@@ -199,7 +199,7 @@ struct DiaryDayView: View {
                         if shownDay == today {try? await service.refreshLetters()}
                         let letters=try service.letters();waitingLetter=letters.first{$0.state == .eligible};sealedHere=letters.filter{$0.writtenDay==shownDay && $0.state != .opened}.count
                         (projectLinks,projectSuggestions)=try service.projectNotes(shownDay); failure = nil }
-                    catch { page = nil; failure = error.localizedDescription }
+                    catch { page = nil; failure = madarUserMessage(error) }
                 }
         }
     }
@@ -209,7 +209,7 @@ struct DiaryDayView: View {
             HStack{Text("نويت صباحًا").font(DiaryType.label).foregroundStyle(theme.accent);Spacer();if intentions.count>1 {Button("و"+service.digits.string(intentions.count-1)+" غيرها"){intentionsOpen=true}.font(DiaryType.label).frame(minHeight:44).accessibilityIdentifier("diary-niyya-more")}}
             Button{intentionsOpen=true}label:{Text(row.text).font(DiaryType.writing).frame(maxWidth:.infinity,alignment:.leading).lineLimit(3)}.buttonStyle(.plain).accessibilityIdentifier("diary-niyya-open")
             HStack(spacing:6){ForEach([("done","تمّت"),("partial","جزئيًا"),("notEasy","ما تيسّرت")],id:\.0){value,title in
-                Button{Task{@MainActor in do{try await service.setIntentionResult(row.id,result:row.result==value ? nil:value);intentions=try service.intentions(shownDay);niyyaSaved=true}catch{failure=error.localizedDescription}}}label:{Text(title).font(DiaryType.label).frame(maxWidth:.infinity,minHeight:44).foregroundStyle(row.result==value ? theme.background:theme.ink).background(row.result==value ? (theme.dark ? theme.accent:theme.ink):.clear,in:.capsule).overlay{Capsule().stroke(theme.line)}}.buttonStyle(.plain).accessibilityIdentifier("diary-niyya-inline-"+value).accessibilityAddTraits(row.result==value ? .isSelected:[])
+                Button{Task{@MainActor in do{try await service.setIntentionResult(row.id,result:row.result==value ? nil:value);intentions=try service.intentions(shownDay);niyyaSaved=true}catch{failure=madarUserMessage(error)}}}label:{Text(title).font(DiaryType.label).frame(maxWidth:.infinity,minHeight:44).foregroundStyle(row.result==value ? theme.background:theme.ink).background(row.result==value ? (theme.dark ? theme.accent:theme.ink):.clear,in:.capsule).overlay{Capsule().stroke(theme.line)}}.buttonStyle(.plain).accessibilityIdentifier("diary-niyya-inline-"+value).accessibilityAddTraits(row.result==value ? .isSelected:[])
             }}
         }.padding(14).background(theme.surface,in:.rect(cornerRadius:18)).overlay{RoundedRectangle(cornerRadius:18).stroke(theme.line)}.padding(.horizontal,18).padding(.vertical,6).accessibilityElement(children:.contain).accessibilityIdentifier("diary-niyya-evening")
     }
@@ -258,7 +258,7 @@ struct DiaryDayView: View {
                     .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading).accessibilityIdentifier("diary-day-line")
                 if let name = projectLinks[line.id] {Text("مشروع: "+name).font(DiaryType.label).foregroundStyle(theme.color("ink3Text")).accessibilityIdentifier("diary-line-project")}
                 else if let project = projectSuggestions[line.id] {
-                    Button{Task{do{try await service.link(line.id,to:project.id);niyyaSaved=true}catch{failure=error.localizedDescription}}}label:{Text("يتعلّق بـ«"+project.name+"»؟").font(DiaryType.label).padding(.horizontal,10).frame(minHeight:30).overlay{Capsule().stroke(theme.line)}}.buttonStyle(.plain).accessibilityIdentifier("diary-line-project-suggest")
+                    Button{Task{do{try await service.link(line.id,to:project.id);niyyaSaved=true}catch{failure=madarUserMessage(error)}}}label:{Text("يتعلّق بـ«"+project.name+"»؟").font(DiaryType.label).padding(.horizontal,10).frame(minHeight:30).overlay{Capsule().stroke(theme.line)}}.buttonStyle(.plain).accessibilityIdentifier("diary-line-project-suggest")
                 }
                 if let first = page.originals[line.id] {
                     Button{original = .init(id:line.id,text:first)}label:{Text("عُدّل · الأصل").font(DiaryType.label).frame(minHeight:30)}.buttonStyle(.plain).foregroundStyle(theme.color("ink3Text")).accessibilityIdentifier("diary-line-edited")
@@ -275,7 +275,7 @@ struct DiaryDayView: View {
                     .accessibilityIdentifier("diary-line-delete")
             }
             if shownDay == today, ["normal", "late", "ghad"].contains(line.kind), !line.text.isEmpty {
-                Button("اجعلها نيّة اليوم") { Task { do { try await service.saveIntention(line.text, day: shownDay); niyyaSaved = true } catch { failure = error.localizedDescription } } }
+                Button("اجعلها نيّة اليوم") { Task { do { try await service.saveIntention(line.text, day: shownDay); niyyaSaved = true } catch { failure = madarUserMessage(error) } } }
             }
         }.padding(.leading, 6).padding(.trailing, travel == nil || typeSize.isAccessibilitySize ? 18 : 92).padding(.vertical, 10).frame(minHeight: 34)
     }

@@ -16,7 +16,7 @@ struct DiaryLaunchView: View {
         }.onChange(of: app.diaryRoute, initial: true) { _, route in
             if route?.path.first == "write" { writingDirectly = true }
         }.task {
-            do { welcomed = try AppDiaryService(app: app).hasWelcomed() } catch { failure = error.localizedDescription }
+            do { welcomed = try AppDiaryService(app: app).hasWelcomed() } catch { failure = madarUserMessage(error) }
         }
         // The diary opens from the glass accessory, not a tab: hiding the bar during the welcome left no way to another room.
     }
@@ -72,6 +72,6 @@ struct DiaryWelcomeView: View {
     private func finish() async {
         saving = true
         do { try await app.executeDiaryCommand("diary.completeWelcome", payload: [:]); finished() }
-        catch { failure = error.localizedDescription; saving = false }
+        catch { failure = madarUserMessage(error); saving = false }
     }
 }

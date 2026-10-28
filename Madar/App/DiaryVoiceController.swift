@@ -74,7 +74,7 @@ import MadarCore
             try AVAudioSession.sharedInstance().setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker])
             try AVAudioSession.sharedInstance().setActive(true)
             recordingDay = writingDay; recording = true; microphoneDenied = false; message = "الحبر يسمعك · اضغط للإيقاف"; try startChunk()
-        } catch { recording = false; message = error.localizedDescription }
+        } catch { recording = false; message = madarUserMessage(error) }
     }
     private func startChunk() throws {
         let root = app.diaryStagingDirectory
@@ -113,7 +113,7 @@ import MadarCore
     fileprivate func storeChunk(url: URL, successful: Bool) async {
         guard processed.insert(url).inserted, let day = recordingDay else { return }
         let continueRecording = recording
-        if continueRecording { do { try startChunk() } catch { recording = false; message = error.localizedDescription } }
+        if continueRecording { do { try startChunk() } catch { recording = false; message = madarUserMessage(error) } }
         savingAudio = true
         defer { savingAudio = false; refreshPendingAudio() }
         do {
@@ -126,11 +126,11 @@ import MadarCore
             try? FileManager.default.removeItem(at: url.deletingPathExtension().appendingPathExtension("json"))
             message = recording ? "الحبر يسمعك · المقاطع السابقة محفوظة" : successful ? "الصوت محفوظ في الصفحة" : "توقف التسجيل؛ حُفظ ما أمكن من الصوت"
             // The staged file is removed only by a successful durable media write.
-        } catch { processed.remove(url); message = "تعذّر إدخال الصوت في الصفحة؛ الملف محفوظ لإعادة المحاولة. " + error.localizedDescription }
+        } catch { processed.remove(url); message = "تعذّر إدخال الصوت في الصفحة؛ الملف محفوظ لإعادة المحاولة. " + madarUserDetail(error) }
     }
     func transcribe(_ media: DiaryDisplayMedia) async {
         guard !converting, media.kind == "audio" else { return }
-        do { try AppDiaryService(app: app).authorizeRead() } catch { message = error.localizedDescription; return }
+        do { try AppDiaryService(app: app).authorizeRead() } catch { message = madarUserMessage(error); return }
         let token = UUID(); job = token; converting = true; partialText = ""; message = "يُجهّز التحويل…"
         await refreshLanguage(); guard job == token else { return }
         var authorization = SFSpeechRecognizer.authorizationStatus()
@@ -169,7 +169,7 @@ import MadarCore
                     text = parts.joined(separator: " ")
                 }
                 try Task.checkCancellation(); await self.accept(text, media: media, token: token)
-            } catch { self.fail(error.localizedDescription, token: token) }
+            } catch { self.fail(madarUserMessage(error), token: token) }
         }
     }
     private func accept(_ text: String, media: DiaryDisplayMedia, token: UUID) async {
@@ -178,7 +178,7 @@ import MadarCore
             guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw CocoaError(.coderInvalidValue) }
             try await app.executeDiaryCommand("diary.setTranscript", payload: ["entryID": .string(media.entryID), "text": .string(text)])
             guard job == token else { return }; cancelConversion(); message = "حُفظ النص بجانب صوته؛ يمكنك تعديله"
-        } catch { fail(error.localizedDescription, token: token) }
+        } catch { fail(madarUserMessage(error), token: token) }
     }
     private func fail(_ error: String, token: UUID) {
         guard job == token else { return }; cancelConversion(); message = "لم يتحوّل؛ الصوت محفوظ · أعد المحاولة. " + error
@@ -191,7 +191,7 @@ import MadarCore
         let media = consentMedia; consentMedia = nil; needsConsent = false
         guard allow, let media else { message = "الصوت محفوظ دون إرسال"; return }
         do { try await app.applySettingsAndWait(["notes.serverDictationConsent": .bool(true)]); await transcribe(media) }
-        catch { message = error.localizedDescription }
+        catch { message = madarUserMessage(error) }
     }
     func downloadLanguage() {
         guard let supportedLocale, download == nil else { return }

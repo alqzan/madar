@@ -136,7 +136,7 @@ struct MoneyEnvelopesView: View {
                 Spacer(minLength: 2)
                 ForEach(previews(reading.home.reserveMinor), id: \.self) { value in
                     Button { previewMinor = value } label: {
-                        Text(figure: value == 0 ? "لا شيء" : visible ? service.amount(value) : "•••")
+                        Text(figure: value == 0 ? "بلا صرف" : visible ? service.amount(value) : "•••")
                             .font(MadarTypography.fine()).padding(.horizontal, 10).padding(.vertical, 7)
                             .foregroundStyle(value == previewMinor ? theme.background : theme.ink)
                             .background(value == previewMinor ? theme.ink : .clear, in: .capsule)

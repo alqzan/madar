@@ -180,6 +180,6 @@ struct HabitPastDaySheet:View {
         busy = true
         var payload:[String:MadarCore.JSONValue] = ["id":.string(reading.id.uuidString),"day":.string(day.description),"delta":.number(Double(delta))]
         if let entry { payload["entryID"] = .string(entry.uuidString) }
-        Task { do { try await session.executeDiaryCommand("habit.complete",payload:payload); dismiss(); done() } catch { session.errorMessage = error.localizedDescription }; busy = false }
+        Task { do { try await session.executeDiaryCommand("habit.complete",payload:payload); dismiss(); done() } catch { session.errorMessage = madarUserMessage(error) }; busy = false }
     }
 }
