@@ -126,7 +126,7 @@ struct BahwBlocksSection: View {
                 }.contentShape(.rect)
             }.buttonStyle(.plain).accessibilityIdentifier("bahw-custom-blocks")
             if expanded {
-                Text("كل ودجة بأربعة أحجام، وكلما كبرت عرضت أكثر. اسحب المقبض لترتيبها، والمفتاح يُظهرها أو يُخفيها. وتقدر تفعل هذا كله من البهو بالضغط المطوّل.")
+                Text("كل ودجة بأربعة أحجام، وكلما كبرت عرضت أكثر. اسحب المقبض لترتيبها، والمفتاح يُظهرها أو يُخفيها. ويمكنك فعل هذا كله من البهو بالضغط المطوّل.")
                     .font(MadarTypography.caption()).foregroundStyle(lobby.secondaryInk).fixedSize(horizontal: false, vertical: true)
                 ForEach(rows, id: \.self) { block in row(block) }
             }
