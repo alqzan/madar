@@ -216,9 +216,10 @@ import MadarPrayer
             content.body = late ? QuranReminderCopy.lateBody : QuranReminderCopy.body
             content.userInfo = ["dayKey": candidate.dayKey, "room": "quran"]
         } else if id.hasPrefix("digest.") {
-            content.title = "ملخّص تذكيراتك"
-            let members = plan.digestMembers[id] ?? [], kinds = RoomReminders.digestKinds(memberIDs: members)
-            content.body = "لديك " + reminderCount(members.count, digits) + (kinds.isEmpty ? "" : ": " + kinds.joined(separator: "، "))
+            // Audit 28 Oct: under whole-app protection the digest named its kinds («القضاء، الزكاة…») on the lock screen.
+            content.title = protected ? "مدار" : "ملخّص تذكيراتك"
+            let members = plan.digestMembers[id] ?? [], kinds = protected ? [] : RoomReminders.digestKinds(memberIDs: members)
+            content.body = "لديك " + reminderCount(members.count, digits) + (protected ? " في مدار" : kinds.isEmpty ? "" : ": " + kinds.joined(separator: "، "))
             content.userInfo = ["dayKey": candidate.dayKey, "room": "bahw"]
         } else if id.hasPrefix("qada.") {
             content.title = "القضاء"
@@ -249,7 +250,7 @@ import MadarPrayer
             let categoryID = String(id.split(separator: ".").last ?? "")
             let category = protected ? nil : (try? AppMoneyService(app: session).loadCategories())?.shelves.first { $0.id.uuidString == categoryID }?.name
             content.title = protected ? "مدار" : "حدود الصرف"
-            content.body = protected ? "لديك تنبيه في مدار" : category.map { "بلغت ٨٠٪ من حد «\($0)» لهذه الدورة" } ?? "بلغ أحد تصنيفاتك ٨٠٪ من حدّه لهذه الدورة"
+            content.body = protected ? "لديك تنبيه في مدار" : category.map { "بلغت " + digits.string(80) + "٪ من حد «\($0)» لهذه الدورة" } ?? "بلغ أحد تصنيفاتك " + digits.string(80) + "٪ من حدّه لهذه الدورة"
             content.userInfo = ["dayKey": candidate.dayKey, "room": "mal"]
         } else if id.hasPrefix("mal.reconcile.") {
             content.title = protected ? "مدار" : "مطابقة الرصيد"
@@ -375,5 +376,5 @@ import MadarPrayer
 /// The Quran reminders' fixed copy, shared by the notification and its preview in «التذكير والودجات» so the preview never promises other words.
 enum QuranReminderCopy {
     static let title = "القرآن، وردك", body = "تابع من الموضع الذي توقفت عنده"
-    static let lateTitle = "القرآن، المراجعة", lateBody = "راجع المستحق قبل أن يبعد"
+    static let lateTitle = "القرآن، المراجعة", lateBody = "راجع أوجهك المستحقة قبل أن تبعد عنك"
 }
