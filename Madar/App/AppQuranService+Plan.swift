@@ -7,6 +7,14 @@ import MadarQuran
 struct QuranUIPlanOverview: Sendable {
     var day: GregorianDay; var input: QuranUIPlanInput?; var forecasts: [String: QuranUIForecast]; var streak: String
     var days: [QuranUIYearDay]; var version: String
+    var missPreviews: [String: [QuranUIMissPreviewDay]] = [:]
+    var habitualAmount: String = ""
+}
+struct QuranUIMissPreviewDay: Identifiable, Sendable {
+    var day: GregorianDay
+    var base: Double
+    var extra: Double
+    var id: String { day.description }
 }
 extension AppQuranService {
     func planInput() throws -> QuranUIPlanInput {
@@ -24,7 +32,33 @@ extension AppQuranService {
         var forecasts: [String: QuranUIForecast] = [:]
         if v.plan != nil { for level in QuranDayLevel.allCases { forecasts[level.rawValue] = try forecast(input, snapshot: v, using: level, at: evaluatedAt) } }
         let streak = QuranProgressEngine.streak(activities: v.activities, through: v.day.date, restDay: v.restDay)
-        return QuranUIPlanOverview(day: v.day.date, input: v.plan == nil ? nil : input, forecasts: forecasts, streak: dayCount(streak.days), days: Array(try yearLog(at: evaluatedAt).days.suffix(28)), version: v.plan.map { "نسخة الخطة " + numerals.string($0.version) } ?? "لا خطة حفظ بعد")
+        var result = QuranUIPlanOverview(day: v.day.date, input: v.plan == nil ? nil : input, forecasts: forecasts, streak: dayCount(streak.days), days: Array(try yearLog(at: evaluatedAt).days.suffix(28)), version: v.plan.map { "نسخة الخطة " + numerals.string($0.version) } ?? "لا خطة حفظ بعد")
+        if v.plan != nil {
+            result.missPreviews = try missedDayPreviews(input: input, startingOn: v.day.date, level: v.habitualHifzLevel)
+            var habitual = input; habitual.amount *= v.habitualHifzLevel.hifzFactor
+            result.habitualAmount = QuranPlanCopy.amount(habitual, digits: numerals)
+        }
+        return result
+    }
+    /// Canonical R18-Khitta labels this as an example. No allotment is written or added to a forecast.
+    func missedDayPreviews(input: QuranUIPlanInput, startingOn day: GregorianDay, level: QuranDayLevel) throws -> [String: [QuranUIMissPreviewDay]] {
+        let rest = QuranRestDay(rawValue: input.restDay) ?? .friday
+        let base = input.amount * level.hifzFactor
+        var origin = day.adding(days: -1)
+        while rest.contains(origin) { origin = origin.adding(days: -1) }
+        var dates: [GregorianDay] = [], cursor = day
+        while dates.count < 4 {
+            if !rest.contains(cursor) { dates.append(cursor) }
+            cursor = cursor.adding(days: 1)
+        }
+        var previews: [String: [QuranUIMissPreviewDay]] = [:]
+        for choice in [QuranMissedDayChoice.spread, .double, .skip] {
+            let allotments = try QuranDailyPlanEngine.missedDayAllotments(originDay: origin, resolvingOn: day, choice: choice, missedAmount: base, restDay: rest)
+            previews[choice.rawValue] = dates.map { target in
+                .init(day: target, base: base, extra: allotments.filter { $0.dayKey == target }.reduce(0) { $0 + $1.amount })
+            }
+        }
+        return previews
     }
 }
 

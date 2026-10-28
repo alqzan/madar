@@ -9,6 +9,7 @@ struct QuranPlanView: View {
     @State private var error: String?
     @State private var busy = false
     @State private var showSetup = false
+    @State private var previewLevel: QuranUILevel?
     private var app: AppSession { service.app }
     private let resetKeys = ["quran.hifzLevel", "quran.reviewLevel", "quran.restDay", "quran.wirdReminder", "quran.reviewSchedule"]
     var body: some View {
@@ -40,7 +41,8 @@ struct QuranPlanView: View {
                         VStack(alignment: .leading, spacing: 16) {
                             HStack { Text("موعد الختمة").font(quranFont(17, bold: true)); Spacer(); Text("تقدير لكل درجة").font(quranFont(11)).foregroundStyle(theme.secondaryInk) }
                             if let input = overview.input {
-                                let level = app.string("quran.hifzLevel")
+                                let level = previewLevel?.rawValue ?? app.string("quran.hifzLevel")
+                                forecastTrack
                                 Text(forecasts[level]?.title ?? (overview.day == currentDay ? "—" : "نحسب موعدك")).font(quranSerif(29)).accessibilityIdentifier("quran-plan-forecast")
                                 if let secondary = forecasts[level]?.secondaryDate { Text(secondary).font(quranFont(12)).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("quran-plan-forecast-secondary") }
                                 Text(forecasts[level]?.assumptions ?? "").font(quranFont(11)).foregroundStyle(theme.secondaryInk)
@@ -80,10 +82,21 @@ struct QuranPlanView: View {
                                 Text("اختر ما يحدث في يوم الحفظ التالي").font(quranFont(12)).foregroundStyle(theme.secondaryInk)
                                 ForEach([("ask","اسألني كل مرة"),("spread","وزّعه على ثلاثة أيام"),("double","ضاعف اليوم"),("skip","تجاوزه")], id: \.0) { key, title in
                                     Button { var p = input; p.missPolicy = key; run { try await service.perform(.savePlan(p)); load() } } label: {
-                                        HStack { Image(systemName: input.missPolicy == key ? "largecircle.fill.circle" : "circle"); Text(title).font(quranFont(14, bold: input.missPolicy == key)); Spacer() }.frame(minHeight: 44).contentShape(Rectangle())
+                                        HStack(spacing: 10) {
+                                            Image(systemName: input.missPolicy == key ? "largecircle.fill.circle" : "circle").foregroundStyle(input.missPolicy == key ? theme.color("hifzText") : theme.secondaryInk)
+                                            VStack(alignment: .leading, spacing: 3) {
+                                                Text(title).font(quranFont(14, bold: input.missPolicy == key))
+                                                Text(key == "ask" ? "تختار عند كل ورد فائت" : key == "spread" ? "ثلث الورد في ثلاثة أيام حفظ" : key == "double" ? "ورد إضافي في يوم حفظ واحد" : "تُكمل بالمعتاد")
+                                                    .font(quranFont(11)).foregroundStyle(theme.secondaryInk)
+                                            }
+                                            Spacer()
+                                        }.padding(.horizontal, 14).frame(minHeight: 64).contentShape(.rect)
+                                            .background(input.missPolicy == key ? theme.color("hifzTint") : theme.surface, in: .rect(cornerRadius: 17))
+                                            .overlay { RoundedRectangle(cornerRadius: 17).stroke(input.missPolicy == key ? theme.color("hifz") : theme.color("track"), lineWidth: 1) }
                                     }.buttonStyle(.plain).accessibilityIdentifier("quran-plan-miss-" + key)
+                                        .accessibilityAddTraits(input.missPolicy == key ? .isSelected : [])
                                 }
-                                Text("وزّعه: وجه واحد فائت يضيف ثلث وجه في كل يوم من ثلاثة أيام الحفظ، حسب مقدار وردك. تُطبّق السياسة المحفوظة في يوم الحفظ التالي.").font(quranFont(12)).foregroundStyle(theme.secondaryInk)
+                                missedDayChart(overview, policy: input.missPolicy)
                             }
                         }
                     }
@@ -92,14 +105,79 @@ struct QuranPlanView: View {
                 }
                 if let error { Text(error).font(quranFont(13)) }
             }.padding(16)
-        }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.color("review")).disabled(busy || app.settingsWriteInProgress)
+        }.clipped().background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.color("review")).disabled(busy || app.settingsWriteInProgress)
             .safeAreaInset(edge: .bottom) { if app.undoToastVisible { UndoToast(message: app.undoMessage, undo: app.undo).accessibilityIdentifier("quran-plan-undo") } }
             .fullScreenCover(isPresented: $showSetup, onDismiss: { load(at: service.currentTime()) }) { QuranPlanSetupView(service: service, close: { showSetup = false }) }
             .task(id: currentDay) { load(at: evaluatedAt) }.onChange(of: app.settingsWriteInProgress) { if !app.settingsWriteInProgress { load(at: service.currentTime()) } }.onChange(of: app.undoToken?.id) { load(at: service.currentTime()) }
+            .onChange(of: app.string("quran.hifzLevel")) { previewLevel = nil }
             .alert("لم تكتمل العملية", isPresented: Binding(get: { app.errorMessage != nil }, set: { if !$0 { app.errorMessage = nil } })) { Button("تمّ") { app.errorMessage = nil } } message: { Text(app.errorMessage ?? "") }
         }
     }
     private var line: some View { Divider().overlay(theme.line) }
+    private func missedDayChart(_ overview: QuranUIPlanOverview, policy: String) -> some View {
+        let choice = policy == "ask" ? "spread" : policy
+        let days = overview.missPreviews[choice] ?? []
+        let highest = max(0.000001, days.map { $0.base + $0.extra }.max() ?? 1)
+        return VStack(alignment: .leading, spacing: 12) {
+            Divider().overlay(theme.line)
+            Text("معاينة: لو فاتك ورد واحد").font(quranFont(14, bold: true))
+            Text("وردك المعتاد في المثال: " + overview.habitualAmount).font(quranFont(12)).foregroundStyle(theme.secondaryInk)
+            if policy == "ask" {
+                Text("هذا مثال للتوزيع؛ ستختار عند الفوات.").font(quranFont(11)).foregroundStyle(theme.secondaryInk)
+            }
+            HStack(alignment: .top, spacing: 8) {
+                ForEach(days) { day in
+                    VStack(spacing: 7) {
+                        Text(day.extra == 0 ? "وردك" : choice == "spread" ? "وردك وثلثه" : "وردان")
+                            .font(quranFont(11, bold: day.extra > 0)).foregroundStyle(theme.color("hifzText"))
+                            .frame(minHeight: 30).multilineTextAlignment(.center)
+                        VStack(spacing: 0) {
+                            Spacer(minLength: 0)
+                            Rectangle().fill(theme.color("hifz")).frame(height: 70 * day.extra / highest)
+                            Rectangle().fill(theme.color("hifzTint")).frame(height: 70 * day.base / highest)
+                        }.frame(height: 70).clipShape(.rect(topLeadingRadius: 5, topTrailingRadius: 5)).accessibilityHidden(true)
+                        MadarDateLabel(app.dateLabels(day.day, compact: true), primaryFont: quranFont(11), secondaryFont: quranFont(11))
+                            .foregroundStyle(theme.secondaryInk).multilineTextAlignment(.center)
+                    }.frame(maxWidth: .infinity).accessibilityElement(children: .combine)
+                        .accessibilityIdentifier("quran-plan-miss-preview-" + day.id)
+                }
+            }
+            Text("الأيام المعروضة أيام حفظ، بلا يوم الراحة. المعاينة لا تسجّل تعويضًا ولا تغيّر موعد الختمة.")
+                .font(quranFont(11)).foregroundStyle(theme.secondaryInk)
+        }
+    }
+    /// The home room's four-stop track, reused as a read-only forecast comparison here.
+    private var forecastTrack: some View {
+        let selected = previewLevel ?? QuranUILevel(rawValue: app.string("quran.hifzLevel")) ?? .medium
+        let current = QuranUILevel.allCases.firstIndex(of: selected) ?? 1
+        return VStack(alignment: .leading, spacing: 8) {
+            Text("لو ثبتّ على درجة واحدة").font(quranFont(12)).foregroundStyle(theme.secondaryInk)
+            GeometryReader { proxy in
+                HStack(spacing: 0) {
+                    ForEach(Array(QuranUILevel.allCases.enumerated()), id: \.element) { index, item in
+                        Button { previewLevel = item } label: {
+                            VStack(spacing: 7) {
+                                ZStack {
+                                    Rectangle().fill(theme.color("track")).frame(height: 4).padding(.leading, index == 0 ? 22 : 0).padding(.trailing, index == 3 ? 22 : 0)
+                                    if index <= current {
+                                        Rectangle().fill(theme.color("hifz")).frame(height: 4).padding(.leading, index == 0 ? 22 : 0).padding(.trailing, index == 3 ? 22 : 0)
+                                    }
+                                    Circle().fill(index <= current ? theme.color("hifz") : theme.surface).frame(width: index == current ? 20 : 12, height: index == current ? 20 : 12)
+                                        .overlay { Circle().stroke(index <= current ? theme.color("hifz") : theme.color("track"), lineWidth: 2) }
+                                }.frame(height: 24)
+                                Text(item.title).font(quranFont(12, bold: index == current))
+                            }.frame(maxWidth: .infinity, minHeight: 48).contentShape(.rect)
+                        }.buttonStyle(.plain).accessibilityIdentifier("quran-plan-preview-" + item.rawValue)
+                            .accessibilityAddTraits(index == current ? .isSelected : [])
+                    }
+                }.simultaneousGesture(DragGesture(minimumDistance: 12).onChanged { gesture in
+                    let position = min(1, max(0, 1 - gesture.location.x / max(1, proxy.size.width)))
+                    previewLevel = QuranUILevel.allCases[Int((position * 3).rounded())]
+                })
+            }.frame(height: 54)
+            Text("معاينة للموعد؛ درجتك المعتادة لا تتغيّر.").font(quranFont(11)).foregroundStyle(theme.secondaryInk)
+        }
+    }
     /// «نحو ١٣ شهرًا»; under two months the days themselves.
     private func span(_ days: Int) -> String {
         if days < 60 { return service.dayCount(days) }

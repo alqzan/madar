@@ -6,6 +6,26 @@ import MadarCommands
 @testable import Madar
 
 @MainActor final class QuranPlanIntegrationTests: XCTestCase {
+    func testMissedDayExampleUsesPlanAmountAndSkipsRestWithoutWritingAllotments() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "QuranMissPreview-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root), context = ModelContext(container)
+        let app = try AppSession(container: container, groupDirectory: root), service = AppQuranService(session: app)
+        let input = QuranUIPlanInput(startAyah: 1, unit: .page, amount: 1, rhythm: .balanced, restDay: "friday", missPolicy: "ask")
+        let preview = try service.missedDayPreviews(input: input, startingOn: GregorianDay("2026-10-15"), level: .medium)
+        let spread = try XCTUnwrap(preview["spread"])
+        XCTAssertEqual(spread.map(\.id), ["2026-10-15", "2026-10-17", "2026-10-18", "2026-10-19"])
+        XCTAssertEqual(spread.map(\.base), [1, 1, 1, 1])
+        for day in spread.prefix(3) { XCTAssertEqual(day.extra, 1.0 / 3, accuracy: 0.000001) }
+        XCTAssertEqual(spread[3].extra, 0)
+        XCTAssertEqual(preview["double"]?.map(\.extra), [1, 0, 0, 0])
+        XCTAssertEqual(preview["skip"]?.map(\.extra), [0, 0, 0, 0])
+        let deep = try service.missedDayPreviews(input: input, startingOn: GregorianDay("2026-10-16"), level: .deep)
+        XCTAssertEqual(deep["spread"]?.first?.id, "2026-10-17")
+        XCTAssertEqual(deep["spread"]?.first?.base, 1.5)
+        XCTAssertEqual(deep["spread"]?.first?.extra, 0.5)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<QuranAllotment>()), 0)
+    }
     func testUnitQuantityUsesArabicPluralCatalog() {
         var p=QuranUIPlanInput(startAyah:1,unit:.quarter,amount:1,rhythm:.balanced,restDay:"friday",missPolicy:"ask")
         XCTAssertEqual(QuranPlanCopy.amount(p,digits:.init()),"ربع وجه")
