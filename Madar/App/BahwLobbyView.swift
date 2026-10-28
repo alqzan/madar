@@ -118,10 +118,32 @@ struct BahwLobbyView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            MadarDateLabel(session.dateLabels(service.today, weekday: true)).foregroundStyle(theme.secondaryInk).accessibilityElement(children: .combine).accessibilityIdentifier("bahw-date")
-            Text(greeting).font(MadarTypography.title()).accessibilityAddTraits(.isHeader).accessibilityIdentifier("bahw-greeting")
-        }.frame(maxWidth: .infinity, alignment: .leading)
+        HStack(alignment: .top, spacing: 8) {
+            VStack(alignment: .leading, spacing: 4) {
+                MadarDateLabel(session.dateLabels(service.today, weekday: true)).foregroundStyle(theme.secondaryInk).accessibilityElement(children: .combine).accessibilityIdentifier("bahw-date")
+                Text(greeting).font(MadarTypography.title()).accessibilityAddTraits(.isHeader).accessibilityIdentifier("bahw-greeting")
+            }.frame(maxWidth: .infinity, alignment: .leading)
+
+            Button { withAnimation(.snappy) { arranging = true } } label: {
+                Text("رتّب")
+                    .font(.custom("thmanyahsans-Bold", size: 14, relativeTo: .caption))
+                    .frame(width: 44, height: 44)
+                    .contentShape(Circle())
+                    .overlay { Circle().stroke(theme.line) }
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("bahw-arrange-start")
+
+            Button { session.selectedTab = "customize" } label: {
+                Image(systemName: "slider.horizontal.3")
+                    .font(.system(size: 17, weight: .regular))
+                    .frame(width: 44, height: 44)
+                    .overlay { Circle().stroke(theme.line) }
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("خصّص مدار")
+            .accessibilityIdentifier("bahw-customize")
+        }
     }
     private var greeting: String {
         service.greeting

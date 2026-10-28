@@ -19,6 +19,13 @@ import XCTest
         // Every shipped room, including Mihbara from M6, has a lobby destination.
         XCTAssertTrue(element("bahw-salah-next").label.contains("المغرب"), element("bahw-salah-next").label)
         capture(app, "M4-V01-lobby-L")
+        app.buttons["bahw-arrange-start"].tap()
+        XCTAssertTrue(app.buttons["bahw-arrange"].waitForExistence(timeout: 5), app.debugDescription)
+        app.buttons["bahw-arrange"].tap()
+        app.buttons["bahw-customize"].tap()
+        XCTAssertTrue(app.textFields["settings-search"].waitForExistence(timeout: 10), app.debugDescription)
+        app.tabBars.buttons["البهو"].tap()
+        XCTAssertTrue(element("bahw-greeting").waitForExistence(timeout: 10), app.debugDescription)
         app.swipeUp(); XCTAssertTrue(element("bahw-block-notes").waitForExistence(timeout: 5)); XCTAssertTrue(element("bahw-block-mihbara").exists); capture(app, "M4-V01-lobby-s1-L")
         app.swipeDown()
 
@@ -250,8 +257,8 @@ import XCTest
         app.launch(); finishOnboarding(app)
         let greeting = app.staticTexts["bahw-greeting"]
         XCTAssertTrue(greeting.waitForExistence(timeout: 15))
-        XCTAssertFalse(app.buttons["bahw-arrange"].exists)
-        XCTAssertFalse(app.buttons["settings-button"].exists)
+        XCTAssertTrue(app.buttons["bahw-arrange-start"].isHittable)
+        XCTAssertTrue(app.buttons["bahw-customize"].isHittable)
         capture(app, "UX-14-lobby-L")
         app.swipeUp(velocity: .slow); app.swipeUp(velocity: .slow)
         XCTAssertFalse(greeting.isHittable)
