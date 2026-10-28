@@ -265,11 +265,33 @@ struct BahwBlockView: View {
         return row.name + ": " + (row.summary.atRisk ? "فاتتك فترة، " : "") + step
     }
 
-    private var habits: some View {
+    @ViewBuilder private var habits: some View {
         let rows = (try? HabitRepository(context: ModelContext(service.session.container)).readings(at:service.now)) ?? []
         let daily = rows.filter { !$0.paused && $0.summary.current?.rule.frequency == .daily && ($0.summary.current?.target ?? 0) > 0 }
         let met = daily.filter { $0.summary.current?.met == true }.count
-        return VStack(alignment:.leading,spacing:size == .wide ? 4 : 10) {
+        if size == .icon {
+            // A 1×1 cell has no room for the full card header or the next-habit details.
+            // The whole tile already opens the room; keep its count and ring inside the grid cell.
+            VStack(spacing: 4) {
+                ZStack {
+                    HabitMiniRing(share: Double(met) / Double(max(1, daily.count)), theme: room)
+                        .frame(width: 38, height: 38)
+                    if !daily.isEmpty {
+                        Text(digits.string(met) + "/" + digits.string(daily.count))
+                            .font(MadarTypography.fine()).lineLimit(1)
+                            .frame(maxWidth: 30)
+                            .accessibilityLabel(digits.string(met) + " من " + digits.string(daily.count) + " اليوم")
+                            .accessibilityIdentifier("bahw-habits-icon-count")
+                    } else {
+                        Image(systemName: rows.isEmpty ? "plus" : "moon")
+                            .font(.system(size: 13)).foregroundStyle(room.accent)
+                    }
+                }
+                Text(rows.isEmpty ? "ابدأ عادة" : "عاداتك").font(MadarTypography.fine())
+                    .lineLimit(1).foregroundStyle(room.accent)
+            }.frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+        VStack(alignment:.leading,spacing:size == .wide ? 4 : 10) {
             Button { service.session.habitsOpen = true } label: { HStack { title(room.accent); Spacer();if !daily.isEmpty { if size == .wide { Text(digits.string(met)+" من "+digits.string(daily.count)+" اليوم").font(small).foregroundStyle(room.secondaryInk) } else { Text(digits.string(met)+" من "+digits.string(daily.count)).font(label).foregroundStyle(room.accent)} } }.frame(minHeight:44).contentShape(.rect) }.buttonStyle(.plain).accessibilityIdentifier("bahw-habits-open").disabled(!interactive)
             if rows.isEmpty {
                 // Improvement 16 Oct: no «٠ من ٠»; the four period rings at rest show what a habit becomes, and the action is a real button.
@@ -356,6 +378,7 @@ struct BahwBlockView: View {
                 }
                 Spacer(minLength:0)
             }
+        }
         }
     }
 

@@ -145,6 +145,36 @@ import XCTest
         capture(app, "M4-V01-habit-small-after-L")
     }
 
+    func testHabitIconFitsAndOpensItsRoom() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
+                                 "MADAR_UI_HABIT_FIXTURE": "atRisk", "MADAR_UI_NOW": "2026-10-15T20:00:00+03:00", "MADAR_UI_THEME": "light"]
+        app.launch(); finishOnboarding(app)
+        let block = app.descendants(matching: .any).matching(identifier: "bahw-block-habits").firstMatch
+        XCTAssertTrue(block.waitForExistence(timeout: 15))
+        block.press(forDuration: 0.7)
+        let size = app.buttons["bahw-size-habits"]
+        XCTAssertTrue(size.waitForExistence(timeout: 5)); size.tap()
+        let icon = app.buttons["أيقونة"]
+        XCTAssertTrue(icon.waitForExistence(timeout: 5)); icon.tap()
+        app.buttons["bahw-arrange"].tap()
+        XCTAssertTrue(app.buttons["bahw-arrange"].waitForNonExistence(timeout: 5))
+        capture(app, "DA-05-habits-icon-L")
+        XCTAssertEqual(block.frame.height, block.frame.width, accuracy: 1, "The icon must stay inside its square grid cell")
+        let title = block.staticTexts["عاداتك"]
+        XCTAssertTrue(title.exists)
+        XCTAssertGreaterThanOrEqual(title.frame.minY, block.frame.minY)
+        XCTAssertLessThanOrEqual(title.frame.maxY, block.frame.maxY)
+        let count = block.staticTexts["bahw-habits-icon-count"]
+        XCTAssertTrue(count.exists)
+        XCTAssertEqual(count.label, "٠ من ٣ اليوم")
+        XCTAssertGreaterThanOrEqual(count.frame.minY, block.frame.minY)
+        XCTAssertLessThanOrEqual(count.frame.maxY, block.frame.maxY)
+        block.tap()
+        XCTAssertTrue(app.staticTexts["habits-title"].waitForExistence(timeout: 10))
+    }
+
     func testSixHabitRingsStayTappableAndPeriodChoiceKeepsProgress() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
