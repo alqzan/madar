@@ -291,7 +291,7 @@ struct MoneyCashbackView: View {
 
     private func destinationSection(_ r: MoneyCashbackReading) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("وين يروح الاسترداد؟").font(MadarTypography.section()).accessibilityAddTraits(.isHeader)
+            Text("أين يذهب الاسترداد؟").font(MadarTypography.section()).accessibilityAddTraits(.isHeader)
             Text("عند تأكيد استرداد نقدي مودع، ينتقل إلى الظرف الذي تختاره. إذا خفّض الاسترداد دين بطاقة ائتمان، يبقى تخفيضًا للدين.")
                 .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
             GlassEffectContainer(spacing: 8) {

@@ -358,10 +358,10 @@ struct MoneyAnalysisView: View {
                     }.frame(width: 104, height: 104)
                     Spacer()
                 }
-                Text(r.pendingDays > 0 ? "معلّق حتى تقرّر: " + service.dayCount(r.pendingDays) : r.running ? "من الأيام المنقضية" : "من أيام الفترة")
+                Text(r.pendingDays > 0 ? "معلّق حتى تقرّر: " + service.dayCount(r.pendingDays) : r.running ? "من الأيام المنقضية" : "من أيام الدورة")
                     .font(MadarTypography.fine()).foregroundStyle(r.pendingDays > 0 ? theme.secondaryInk : theme.color("surplusText")).frame(maxWidth: .infinity)
             } else {
-                Text("لا يوم مكتمل الحكم في هذه الفترة بعد.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
+                Text("لم يكتمل الحكم على أي يوم في هذه الدورة بعد.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
             }
         }
     }

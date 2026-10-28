@@ -842,8 +842,8 @@ private struct MihbaraGoodreadsImportView: View {
             }
             HStack(spacing: 8) {
                 if let rating = row.entry.rating { Text("التقييم \(digits.string(rating))/٥") }
-                Text("قُرئت \(digits.string(row.entry.readCount)) مرات")
-                if let pages = row.entry.pages { Text("\(digits.string(pages)) صفحة") }
+                Text(row.entry.readCount == 0 ? "لم تُقرأ بعد" : "قُرئت " + arabicCount(row.entry.readCount, ["مرة واحدة","مرتين","مرات","مرة"], digits))
+                if let pages = row.entry.pages { Text(MihbaraCopy.pages(pages, digits)) }
             }.font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
             if let date = row.entry.dateRead {
                 MadarDateLabel(app.dateLabels(GregorianDay.containing(date, in: app.activePlace.timeZone)),

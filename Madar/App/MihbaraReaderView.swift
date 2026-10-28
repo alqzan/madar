@@ -1549,7 +1549,7 @@ struct MihbaraReaderView: View {
         guard let page = ReadingSourcePage.zeroBasedPDFIndex(
             forPrintedOrdinal: pageCoordinate(printLocator), pageCount: sourcePageCount
         ) else {
-            readerAlert = "ما قدرت أحدد الصفحة المطبوعة لهذا الموضع. بقيت في الكتاب المنساب."
+            readerAlert = "تعذّر تحديد الصفحة المطبوعة لهذا الموضع، فبقيتَ في الكتاب المنساب."
             return
         }
         isClosing = true

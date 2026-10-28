@@ -219,16 +219,16 @@ struct MoneyObligationsView: View {
                         RoundedRectangle(cornerRadius: 1.5).fill(n < paid ? color(due.group) : Color.clear)
                             .overlay { RoundedRectangle(cornerRadius: 1.5).stroke(n < paid ? Color.clear : theme.color("reserve"), lineWidth: 1) }.frame(height: 12)
                     }
-                }.environment(\.layoutDirection, .rightToLeft).accessibilityLabel("دفعت " + service.digits.string(paid) + " من " + service.digits.string(total))
+                }.environment(\.layoutDirection, .rightToLeft).accessibilityLabel("دفعت " + service.digits.string(paid) + " من " + service.counted(total, ("دفعة واحدة", "دفعتين", "دفعات", "دفعة")))
                 HStack(spacing: 4) {
-                    Text("دفعت " + service.digits.string(paid) + " من " + service.digits.string(total) + (due.remainingMinor.map { "، يبقى " + amount($0) } ?? "، والمتبقي غير معروف") + (due.lastDue == nil ? "" : "، آخره"))
+                    Text("دفعت " + service.digits.string(paid) + " من " + service.counted(total, ("دفعة واحدة", "دفعتين", "دفعات", "دفعة")) + (due.remainingMinor.map { "، يبقى " + amount($0) } ?? "، والمتبقي غير معروف") + (due.lastDue == nil ? "" : "، وآخر دفعة"))
                     if let last = due.lastDue { MadarDateLabel(app.dateLabels(last, compact: true), primaryFont: MadarTypography.fine(), secondaryFont: MadarTypography.fine()) }
                 }.font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-obligation-progress")
             } else if let schedule = due.schedule {
                 Text((due.group == .subscription ? "اشتراك يتكرر " : "فاتورة تتكرر ") + schedule).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                     .accessibilityIdentifier("money-obligation-schedule")
             } else if let day = due.dueDay {
-                Text("فاتورة شهرية يوم " + service.digits.string(day) + " من كل شهر").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                Text("فاتورة تتكرر يوم " + service.digits.string(day) + " من كل شهر").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
             } else if let minimum = due.minimumMinor, minimum > 0 {
                 Text("الحد الأدنى " + amount(minimum) + (due.estimated ? "، الموعد تقريبي" : "")).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
             }
@@ -345,7 +345,7 @@ struct MoneyObligationsView: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .center, spacing: 12) {
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("تكرر عندك في \(service.digits.string(suggestion.count)) أشهر متتالية")
+                        Text("تكرّر عندك في " + service.counted(suggestion.count, ("شهر واحد", "شهرين متتاليين", "أشهر متتالية", "شهرًا متتاليًا")))
                             .font(MadarTypography.fine().weight(.semibold)).foregroundStyle(theme.color("reserveText")).lineLimit(1)
                         HStack(spacing: 5) {
                             Text(suggestion.name).font(.custom("thmanyahserifdisplay-Bold", size: 19, relativeTo: .title3)).lineLimit(1)
