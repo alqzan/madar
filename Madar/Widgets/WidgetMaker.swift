@@ -79,7 +79,7 @@ private struct MakerWidgetView: View {
     @Environment(\.colorScheme) private var colorScheme
     private var style: WidgetMakerStyle { entry.config.flatMap { try? JSONDecoder().decode(WidgetMakerStyle.self, from: $0.styleJSON) } ?? .init() }
     var body: some View {
-        WidgetMakerContent(config: entry.config, family: family, date: entry.date, locked: entry.locked, stale: entry.stale, permitsActions: true, timeZoneID: entry.timeZoneID)
+        WidgetMakerContent(config: entry.config, family: family, date: entry.date, locked: entry.locked, stale: entry.stale, permitsActions: true, usesSystemRendering: true, timeZoneID: entry.timeZoneID)
             .containerBackground(for: .widget) {
                 if [.accessoryCircular, .accessoryRectangular, .accessoryInline].contains(family) { Color.clear }
                 else { WidgetMakerContent.background(style, dark: colorScheme == .dark) }

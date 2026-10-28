@@ -87,4 +87,34 @@ import XCTest
         XCTAssertTrue(app.staticTexts["habits-title"].waitForExistence(timeout: 15), app.debugDescription)
     }
 
+    func testGlassPresetPersistsAndOpensItsLobbyContent() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
+                                 "MADAR_UI_HABIT_FIXTURE": "showcase", "MADAR_UI_NOW": "2026-10-15T20:00:00+03:00", "MADAR_UI_THEME": "light"]
+        app.launch(); open(app)
+        let lobby = app.segmentedControls.buttons["البهو"]; reach(app, lobby); lobby.tap()
+        for id in ["prayerNext", "habitsToday"] { let item = app.buttons["widget-item-" + id]; reach(app, item); item.tap() }
+        let glass = app.segmentedControls.buttons["زجاج"]; reach(app, glass); glass.tap()
+        XCTAssertTrue(glass.isSelected)
+        let name = app.textFields["widget-maker-name"]; name.tap(); name.typeText("زجاج يومي\n")
+        capture(app, "OR-03-X3-glass-preview-L")
+        app.buttons["widget-maker-save"].tap()
+        XCTAssertTrue(app.staticTexts["widget-maker-status"].waitForExistence(timeout: 15))
+        let saved = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "widget-saved-")).firstMatch
+        reach(app, saved); capture(app, "OR-03-X3-glass-saved-L")
+        app.terminate(); app.launch(); open(app)
+        reach(app, saved); saved.tap()
+        XCTAssertTrue(glass.isSelected)
+        XCTAssertEqual(name.value as? String, "زجاج يومي")
+        capture(app, "OR-03-X3-glass-reopened-L")
+        app.buttons["widget-maker-close"].tap(); app.tabBars.buttons["البهو"].tap()
+        let card = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "maker-lobby-")).firstMatch
+        XCTAssertTrue(card.waitForExistence(timeout: 15)); reach(app, card)
+        capture(app, "OR-03-X3-glass-lobby-L")
+        let habits = card.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "عادات اليوم")).firstMatch
+        XCTAssertTrue(habits.exists); habits.tap()
+        XCTAssertTrue(app.staticTexts["habits-title"].waitForExistence(timeout: 15))
+    }
+
 }

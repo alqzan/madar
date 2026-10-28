@@ -12,9 +12,11 @@ struct WidgetMakerContent: View {
     var locked = false
     var stale = false
     var permitsActions = false
+    var usesSystemRendering = false
     var timeZoneID = "Asia/Riyadh"
     var emptyPrompt: String? = nil
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.widgetRenderingMode) private var renderingMode
     private var style: WidgetMakerStyle { config.flatMap { try? JSONDecoder().decode(WidgetMakerStyle.self, from: $0.styleJSON) } ?? .init() }
     private var accessory: Bool { [.accessoryCircular, .accessoryRectangular, .accessoryInline].contains(family) }
     private var capacity: Int {
@@ -24,6 +26,7 @@ struct WidgetMakerContent: View {
     private var theme: RoomTheme { Self.theme(style, dark: colorScheme == .dark) }
     private var ink: Color { accessory ? .primary : theme.ink }
     private var accent: Color { Self.accent(style, dark: colorScheme == .dark) }
+    private var systemMonochrome: Bool { usesSystemRendering && renderingMode != .fullColor }
     private var rows: [WidgetCatalogSnapshot.Row] {
         config?.visibleRows(at: date, capacity: capacity, smart: style.smartBundle) ?? []
     }
@@ -78,13 +81,13 @@ struct WidgetMakerContent: View {
             Link(destination: URL(string: row.route) ?? URL(string: "madar://bahw")!) {
                 VStack(alignment: .leading, spacing: 5) {
                     HStack(spacing: 5) {
-                        if style.showArt { MadarGlyph(row.glyph, size: 16).foregroundStyle(accent) }
+                        if style.showArt { MadarGlyph(row.glyph, size: 16).foregroundStyle(accent).widgetAccentable() }
                         Text(row.title).font(textFont(11, bold: true)).lineLimit(2)
                     }
                     Text(value(row)).font(textFont(family == .systemMedium ? 18 : 17, bold: true)).lineLimit(2).minimumScaleFactor(0.75)
                     if !row.detail.isEmpty { Text(numerals(row.detail)).font(textFont(11)).lineLimit(2) }
                     if !row.secondDate.isEmpty { Text(numerals(row.secondDate)).font(textFont(11)).lineLimit(1) }
-                    if style.showArt, let share = row.share { ProgressView(value: max(0, min(1, share))).tint(accent).accessibilityHidden(true) }
+                    if style.showArt, let share = row.share { ProgressView(value: max(0, min(1, share))).tint(accent).widgetAccentable().accessibilityHidden(true) }
                 }.frame(maxWidth: .infinity, alignment: .leading).contentShape(.rect)
             }.buttonStyle(.plain)
             if permitsActions && style.interactive, let id = row.habitID {
@@ -92,8 +95,15 @@ struct WidgetMakerContent: View {
             }
         }
         .padding(style.density == "compact" ? 5 : 8).frame(maxWidth: .infinity, maxHeight: family == .systemMedium ? .infinity : nil, alignment: .topLeading)
-        .background(theme.background, in: .rect(cornerRadius: style.family == "glass" ? 20 : 12))
-        .overlay { if style.family == "glass" { RoundedRectangle(cornerRadius: 20).stroke(theme.line, lineWidth: 1) } }
+        .background {
+            // WidgetKit supplies the glass/tint background in accented modes. Opaque inner
+            // rectangles otherwise turn white and hide that material.
+            if !systemMonochrome {
+                RoundedRectangle(cornerRadius: style.family == "glass" ? 20 : 12)
+                    .fill(style.family == "glass" ? theme.background.opacity(0.24) : theme.background)
+            }
+        }
+        .overlay { if style.family == "glass" && !systemMonochrome { RoundedRectangle(cornerRadius: 20).stroke(theme.line, lineWidth: 1) } }
         .privacySensitive(row.money)
     }
     static func theme(_ style: WidgetMakerStyle, dark: Bool) -> RoomTheme {
@@ -105,4 +115,32 @@ struct WidgetMakerContent: View {
         return theme.color(role)
     }
     static func background(_ style: WidgetMakerStyle, dark: Bool) -> Color { theme(style, dark: dark).surface }
+}
+
+/// Native material for the app's preview, saved cards and lobby. WidgetKit owns its system background.
+struct WidgetMakerAppSurface: ViewModifier {
+    let style: WidgetMakerStyle
+    let dark: Bool
+    var cornerRadius: CGFloat = 22
+    var interactive = false
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    func body(content: Content) -> some View {
+        if style.family == "glass" && style.surface != "lock" && !reduceTransparency {
+            if #available(iOS 26, *) {
+                content.glassEffect(.regular.interactive(interactive), in: .rect(cornerRadius: cornerRadius))
+            } else {
+                content.background(.regularMaterial, in: .rect(cornerRadius: cornerRadius))
+            }
+        } else {
+            content.background(WidgetMakerContent.background(style, dark: dark), in: .rect(cornerRadius: cornerRadius))
+        }
+    }
+}
+
+struct WidgetMakerGlassGroup<Content: View>: View {
+    @ViewBuilder var content: Content
+    var body: some View {
+        if #available(iOS 26, *) { GlassEffectContainer(spacing: 6) { content } }
+        else { content }
+    }
 }

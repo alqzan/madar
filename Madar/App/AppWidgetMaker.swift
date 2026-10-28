@@ -160,14 +160,16 @@ struct SavedLobbyWidgets: View {
     @Environment(\.colorScheme) private var colorScheme
     private var key: String { "\(session.prayerRevision)-\(session.protectedDataAuthorized)-\(Int(session.prayerNow().timeIntervalSince1970 / 60))" }
     var body: some View {
+        WidgetMakerGlassGroup {
         BahwGridLayout(placements: BahwGrid.pack(configs.map { ($0.id.uuidString, size($0)) })) {
             ForEach(configs) { config in
                 let style = (try? JSONDecoder().decode(WidgetMakerStyle.self, from: config.styleJSON)) ?? .init()
                 WidgetMakerContent(config: config, family: size(config) == .small ? .systemSmall : size(config) == .large ? .systemLarge : .systemMedium,
                                    date: session.prayerNow(), timeZoneID: AppBahwService(session: session).prayerLocation().place.timeZoneID)
-                    .padding(12).background(WidgetMakerContent.background(style, dark: colorScheme == .dark), in: .rect(cornerRadius: 22))
+                    .padding(12).modifier(WidgetMakerAppSurface(style: style, dark: colorScheme == .dark))
                     .accessibilityElement(children: .contain).accessibilityIdentifier("maker-lobby-" + config.id.uuidString)
             }
+        }
         }
         .task(id: key) {
             guard session.lockController?.canPresent(.app) ?? session.protectedDataAuthorized else { configs = []; return }

@@ -54,6 +54,10 @@ struct WidgetMakerView: View {
                 contentChoices
                 if !draft.items.isEmpty { selectedOrder }
                 choices("العائلة", selection: $draft.style.family, options: [("manuscript", "مخطوط"), ("glass", "زجاج"), ("ink", "حبر")])
+                if draft.style.family == "glass", ["home", "standby"].contains(draft.style.surface) {
+                    Text("مظهر الزجاج على شاشة iPhone يتبع مظهر الشاشة الرئيسية.")
+                        .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                }
                 choices("الخط", selection: $draft.style.font, options: [("naskh", "نسخ"), ("modern", "حديث")])
                 choices("الأرقام", selection: $draft.style.numerals, options: [("hindi", "١٢٣"), ("western", "123")])
                 choices("الكثافة", selection: $draft.style.density, options: [("compact", "مضغوطة"), ("regular", "مريحة"), ("airy", "رحبة")])
@@ -130,7 +134,7 @@ struct WidgetMakerView: View {
             WidgetMakerContent(config: config, family: family, date: session.prayerNow(), timeZoneID: AppBahwService(session: session).prayerLocation().place.timeZoneID, emptyPrompt: draft.items.isEmpty ? "اختر المحتوى الذي تحب أن تراه" : nil)
                 .padding(14)
                 .frame(width: family == .systemSmall ? 170 : family == .accessoryCircular ? 100 : nil, height: draft.familyID == "extraLargePortrait" ? 500 : family == .systemLarge ? 340 : draft.style.surface == "lock" ? 100 : 170)
-                .background(WidgetMakerContent.background(draft.style, dark: colorScheme == .dark), in: .rect(cornerRadius: 24))
+                .modifier(WidgetMakerAppSurface(style: draft.style, dark: colorScheme == .dark, cornerRadius: 24))
                 .allowsHitTesting(false).accessibilityElement(children: .contain).accessibilityIdentifier("widget-maker-preview")
             MadarDateLabel(session.dateLabels(AppBahwService(session: session).today), primaryFont: MadarTypography.fine(), secondaryFont: MadarTypography.fine())
                 .foregroundStyle(theme.secondaryInk)
@@ -183,11 +187,13 @@ struct WidgetMakerView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack { Text("ودجاتي").font(MadarTypography.section()); Spacer(); Button("جديدة") { select(.init()) }.frame(minHeight: 44) }
             ScrollView(.horizontal) {
+                WidgetMakerGlassGroup {
                 HStack(alignment: .top, spacing: 10) {
                     ForEach(saved) { item in
                         savedCard(item)
                     }
                 }.padding(.vertical, 2)
+                }
             }.scrollIndicators(.hidden)
         }
     }
@@ -206,7 +212,8 @@ struct WidgetMakerView: View {
                 }
                 .padding(14).frame(width: 164, height: 142, alignment: .leading)
                 .foregroundStyle(cardTheme.ink)
-                .background(WidgetMakerContent.background(item.style, dark: colorScheme == .dark))
+                .clipShape(.rect(cornerRadius: 22))
+                .modifier(WidgetMakerAppSurface(style: item.style, dark: colorScheme == .dark, interactive: true))
                 .overlay(alignment: .topTrailing) {
                     if item.id == baseline?.id {
                         Image(systemName: "checkmark.circle.fill")
@@ -214,7 +221,6 @@ struct WidgetMakerView: View {
                             .padding(8).accessibilityHidden(true)
                     }
                 }
-                .clipShape(.rect(cornerRadius: 22))
                 .overlay { RoundedRectangle(cornerRadius: 22).stroke(item.id == baseline?.id ? theme.accentFill : theme.line, lineWidth: 1) }
             }.buttonStyle(.plain).accessibilityIdentifier("widget-saved-" + item.id.uuidString)
             Button { deleting = item } label: { Label("احذف", systemImage: "trash").font(MadarTypography.fine()).frame(minHeight: 44) }
