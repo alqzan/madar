@@ -96,8 +96,9 @@ extension AppSession {
                 if let row = roomValues[.upcoming]?.rows.first { result.append(from(row, id: item, glyph: "MadarUpcoming")) }
             case "book":
                 if let current = book.currentBook {
-                    let page = current.currentPage.map { "ص " + digits.string($0) } ?? "ابدأ القراءة"
-                    let total = current.pages.map { " من " + digits.string($0) } ?? ""
+                    let page = current.currentPage.map { digits.string($0) } ?? "لم تبدأ بعد"
+                    // Audit 28 Oct: «ابدأ القراءة من ٣٠٠» read as an instruction; same wording as the Mihbara widget.
+                    let total = current.pages.map { (current.currentPage == nil ? "، " : " من ") + MihbaraCopy.pages($0, digits) } ?? ""
                     result.append(.init(id: item, title: current.title, value: page + total, glyph: "books.vertical", route: "madar://mihbara", share: current.pages.flatMap { $0 > 0 ? Double(current.currentPage ?? 0) / Double($0) : nil }))
                 }
             case "hadith":

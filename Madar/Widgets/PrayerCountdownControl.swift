@@ -10,6 +10,6 @@ struct PrayerCountdownControl: ControlWidget {
             }
         }
         .displayName("عدّاد الصلاة")
-        .description("ابدأ متابعة الصلاة القادمة مع احترام الحرمة والهدوء وميزانية الجهاز.")
+        .description("يضع عدّاد الصلاة القادمة على شاشتك، إلا وقت الصلاة نفسها وساعات الهدوء.")
     }
 }

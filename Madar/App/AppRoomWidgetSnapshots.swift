@@ -30,11 +30,11 @@ extension AppSession {
             return .init(id:f.rawValue,title:f.arabic,value:WidgetCopy.periodProgress(met:met,total:group.count,digits:digits),detail:group.isEmpty ? "" : met==group.count ? "تمّ" : digits.string(group.count-met),share:Double(met)/Double(max(1,group.count)),route:BuiltRoomWidget.habits.route,completedCount:met,targetCount:group.count)
         }
         let dueToday=eligible.filter{!$0.paused && ($0.summary.current?.target ?? 0)>0}
-        payloads[.habits] = .init(datePrimary:date.primary,dateSecondary:date.secondary,heading:WidgetCopy.habitsHeading(met:dueToday.filter{$0.summary.current?.met==true}.count,total:dueToday.count,digits:digits),emptyTitle:"أضف أول عادة",rows:rows,periods:periods,locked:locked)
+        payloads[.habits] = .init(datePrimary:date.primary,dateSecondary:date.secondary,heading:WidgetCopy.habitsHeading(met:dueToday.filter{$0.summary.current?.met==true}.count,total:dueToday.count,digits:digits),emptyTitle:readings.isEmpty ? "أضف أول عادة" : "لا عادات مستحقة اليوم",rows:rows,periods:periods,locked:locked)
         let year=service.year()
         var yearRows:[RoomWidgetSnapshot.Row]=[
-            .init(id:"hijri",title:digits.string(year.hijriYear)+" هـ",value:digits.string(year.hijri.basisPoints/100)+"٪\u{061C}",detail:"بقي "+digits.string(year.hijri.remaining)+" "+service.dayCount(year.hijri.remaining),share:Double(year.hijri.basisPoints)/10000,route:BuiltRoomWidget.year.route),
-            .init(id:"gregorian",title:digits.string(year.gregorianYear)+" م",value:digits.string(year.gregorian.basisPoints/100)+"٪\u{061C}",detail:"بقي "+digits.string(year.gregorian.remaining)+" "+service.dayCount(year.gregorian.remaining),share:Double(year.gregorian.basisPoints)/10000,route:BuiltRoomWidget.year.route)]
+            .init(id:"hijri",title:digits.string(year.hijriYear)+" هـ",value:digits.string(year.hijri.basisPoints/100)+"٪\u{061C}",detail:"بقي "+service.daysPhrase(year.hijri.remaining),share:Double(year.hijri.basisPoints)/10000,route:BuiltRoomWidget.year.route),
+            .init(id:"gregorian",title:digits.string(year.gregorianYear)+" م",value:digits.string(year.gregorian.basisPoints/100)+"٪\u{061C}",detail:"بقي "+service.daysPhrase(year.gregorian.remaining),share:Double(year.gregorian.basisPoints)/10000,route:BuiltRoomWidget.year.route)]
         if string("core.firstCalendar")=="gregorian"{yearRows.reverse()}
         payloads[.year] = .init(datePrimary:date.primary,dateSecondary:date.secondary,heading:"عامك، يومًا بيوم",emptyTitle:"افتح السنة",rows:yearRows)
         let upcoming=locked ? [] : service.upcoming(limit:7).map { item->RoomWidgetSnapshot.Row in

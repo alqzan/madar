@@ -54,6 +54,6 @@ struct QuranReviewTimerControl: ControlWidget {
     var body: some ControlWidgetConfiguration {
         StaticControlConfiguration(kind: "com.alqzan.madar2.quran-review") {
             ControlWidgetButton(action: StartQuranSessionIntent(step: .review)) { Label("مؤقّت المراجعة", systemImage: "stopwatch") }
-        }.displayName("مؤقّت المراجعة").description("ابدأ المراجعة أو استأنف جلستك، والمؤقّت في طريقة الجلسة.")
+        }.displayName("مؤقّت المراجعة").description("ابدأ المراجعة أو أكمل جلستك، ويظهر المؤقّت داخل الجلسة.")
     }
 }
