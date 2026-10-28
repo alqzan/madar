@@ -239,6 +239,11 @@ import XCTest
         XCTAssertTrue(alone.isSelected, "Asr is already logged alone")
         XCTAssertFalse(app.buttons["prayer-status-missed"].exists, "RP2: no «فاتتني» before the window ends")
         XCTAssertTrue(app.buttons["prayer-heart-present"].exists, "Owner 26 Oct: heart question on by default")
+        for (id, words) in [("distracted", "كنت في وادٍ آخر"), ("present", "عرفت ما أقول"), ("khashi", "وجدت لها أثرًا")] {
+            let choice = app.buttons["prayer-heart-" + id]
+            XCTAssertTrue(choice.exists)
+            XCTAssertTrue(choice.label.contains(words), choice.label)
+        }
         attachScreenshot(app, named: "M1-V02-log-L")
         XCTAssertFalse(app.buttons["prayer-clear"].exists, "«امسح التسجيل» is not a v1 action")
         // One tap re-records; the sheet closes and the home reflects it.
@@ -598,7 +603,21 @@ import XCTest
             scrollTo(toggle, in: app); XCTAssertEqual(toggle.value as? String, "1")
             app.swipeDown(); app.tabBars.buttons["الصلاة"].tap()
             let review = app.buttons["prayer-heart-review"]
-            scrollTo(review, in: app); review.tap()
+            // Returning from the sheet can leave this row above the viewport. Scroll toward it,
+            // rather than the shared one-way helper moving it farther offscreen after «أمرّ».
+            func openHeartReview() {
+                XCTAssertTrue(review.waitForExistence(timeout: 10), app.debugDescription)
+                for _ in 0..<8 {
+                    let frame = review.frame
+                    if review.isHittable && frame.minY >= 80 && frame.maxY <= app.frame.height - 220 { break }
+                    if frame.minY < 80 { app.swipeDown(velocity: .slow) }
+                    else { app.swipeUp(velocity: .slow) }
+                }
+                XCTAssertTrue(review.isHittable, app.debugDescription)
+                review.tap()
+                XCTAssertTrue(app.buttons["prayer-heart-present"].waitForExistence(timeout: 10))
+            }
+            openHeartReview()
             let present = app.buttons["prayer-heart-present"]
             scrollTo(present, in: app); present.tap()
             let selected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "selected == true"), object: present)
@@ -610,11 +629,12 @@ import XCTest
             XCTAssertEqual(XCTWaiter.wait(for: [closed], timeout: 15), .completed, app.debugDescription)
             let undo = app.buttons["undo-button"]
             XCTAssertTrue(undo.waitForExistence(timeout: 15)); undo.tap()
-            scrollTo(review, in: app); review.tap()
+            openHeartReview()
             XCTAssertFalse(present.isSelected)
             let skip = app.buttons["prayer-heart-skip"]
             scrollTo(skip, in: app); skip.tap()
-            scrollTo(review, in: app); review.tap()
+            XCTAssertTrue(skip.waitForNonExistence(timeout: 10))
+            openHeartReview()
             scrollTo(present, in: app); present.tap(); scrollTo(save, in: app); save.tap()
             app.terminate(); app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
             openHali(app)

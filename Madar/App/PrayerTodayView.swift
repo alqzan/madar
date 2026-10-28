@@ -389,7 +389,7 @@ struct PrayerTodayView: View {
     }
 
     @ViewBuilder private func heartNotice(_ snapshot: PrayerSnapshot) -> some View {
-        // RP6: shown only when the owner turned the heart question on (default off).
+        // RP6: optional; the owner chose an on-by-default heart question on 26 October.
         if session.bool("salah.askHeart"), let cell = snapshot.history.flatMap(\.cells).first(where: { snapshot.pendingHeart.contains($0.reference) }) {
             Button { selectedSheet = .heart(cell) } label: {
                 HStack(spacing: 12) {
