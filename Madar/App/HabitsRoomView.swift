@@ -10,9 +10,22 @@ extension HabitFrequency {
     var periodArabic: String { switch self { case .daily: "أيام"; case .weekly: "أسابيع"; case .monthly: "أشهر"; case .yearly: "سنوات" } }
 }
 extension HabitReading {
+    /// What was missed in the habit's own unit (audit 28 Oct: «فاتتك فترة» meant nothing for a daily habit):
+    /// «فاتك يوم»، «فاتك أسبوعان»، «فاتتك ٣ أشهر».
+    func missedPhrase(_ digits: MadarNumberFormatter) -> String {
+        let n = max(1, summary.consecutiveMisses)
+        let forms: (verb: String, one: String, two: String, few: String, many: String) = switch summary.current?.rule.frequency {
+        case .daily?: (n > 2 ? "فاتتك" : "فاتك", "يوم", "يومان", "أيام", "يومًا")
+        case .weekly?: (n > 2 ? "فاتتك" : "فاتك", "أسبوع", "أسبوعان", "أسابيع", "أسبوعًا")
+        case .monthly?: (n > 2 ? "فاتتك" : "فاتك", "شهر", "شهران", "أشهر", "شهرًا")
+        case .yearly?: ("فاتتك", "سنة", "سنتان", "سنوات", "سنة")
+        case nil: ("فاتتك", "فترة", "فترتان", "فترات", "فترة")
+        }
+        return forms.verb + " " + WidgetCopy.agree(n, digits, one: forms.one, two: forms.two, few: forms.few, many: forms.many)
+    }
     var statusTitle: String {
         if paused { return "مجمّدة" }
-        if summary.atRisk { return summary.consecutiveMisses == 1 ? "فاتتك فترة؛ الحالية تحفظها" : "فاتتك فترتان؛ الحالية تحفظها" }
+        if summary.atRisk { return missedPhrase(MadarNumberFormatter(style: .hindi)) + "؛ الحالية تحفظها" }
         switch summary.current?.outcome { case .complete: return "تمّت"; case .minimum: return "أقلّ القليل"; case .excluded: return "إجازتها اليوم"; case .missed: return "فترة بلا تسجيل"; default: return isNow ? "وقتها الآن" : "تنتظر" }
     }
     var sourceTitle: String? { switch source { case "jamaah": "الصلاة"; case "review": "القرآن"; case "diaryLine": "المذكرات"; case "walking": "الصحة"; default: nil } }

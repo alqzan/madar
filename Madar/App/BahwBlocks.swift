@@ -262,7 +262,7 @@ struct BahwBlockView: View {
         guard let period = row.summary.current else { return row.name }
         let amount = max(0, (row.summary.atRisk ? period.rule.minimum ?? period.target : period.target) - period.value)
         let step = period.rule.measure == .once ? "أكملها اليوم" : "بقي " + habitUnitCount(amount, period.rule.unit, digits)
-        return row.name + ": " + (row.summary.atRisk ? "فاتتك فترة، " : "") + step
+        return row.name + ": " + (row.summary.atRisk ? row.missedPhrase(digits) + "، " : "") + step
     }
 
     @ViewBuilder private var habits: some View {
@@ -373,7 +373,7 @@ struct BahwBlockView: View {
                     Text(next.name).font(small).lineLimit(1)
                 }
                 if size == .small, let risk=rows.first(where:{$0.summary.atRisk && !$0.paused}) {
-                    Text(risk.summary.consecutiveMisses == 1 ? "فاتتك فترة" : risk.summary.consecutiveMisses == 2 ? "فاتتك فترتان" : "فاتتك " + digits.string(risk.summary.consecutiveMisses) + " فترات")
+                    Text(risk.missedPhrase(digits))
                         .font(small).foregroundStyle(room.accent).lineLimit(1).accessibilityIdentifier("bahw-habits-at-risk")
                 }
                 Spacer(minLength:0)
@@ -634,15 +634,11 @@ private struct BahwHabitsWide: View {
     }
 
     private func missedCount(_ row: HabitReading) -> String {
-        let count = row.summary.consecutiveMisses
-        return count == 1 ? "فاتتك فترة" : count == 2 ? "فاتتك فترتان" : "فاتتك " + digits.string(count) + " فترات"
+        row.missedPhrase(digits)
     }
 
     private func missedText(for row: HabitReading) -> String {
-        let count = row.summary.consecutiveMisses
-        if count == 1 { return "فاتتك فترة في " + row.name }
-        if count == 2 { return "فاتتك فترتان في " + row.name }
-        return "فاتتك " + digits.string(count) + " فترات في " + row.name
+        row.missedPhrase(digits) + " في " + row.name
     }
 }
 

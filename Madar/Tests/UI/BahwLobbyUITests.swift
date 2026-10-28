@@ -129,7 +129,7 @@ import XCTest
         XCTAssertTrue(next.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertTrue(next.label.contains("الماء"), next.label)
         // The same habit is named once (tour 25 Oct): its miss joins its step.
-        XCTAssertTrue(next.label.contains("فاتتك فترة، "), next.label); XCTAssertFalse(next.label.contains("في الماء"), next.label)
+        XCTAssertTrue(next.label.contains("فاتك يوم، "), next.label); XCTAssertFalse(next.label.contains("في الماء"), next.label)
         capture(app, "M4-V01-habit-wide-after-L")
 
         habits.press(forDuration: 0.7)
@@ -141,7 +141,7 @@ import XCTest
         XCTAssertTrue(app.buttons["bahw-arrange"].waitForNonExistence(timeout: 5))
         let risk = app.staticTexts["bahw-habits-at-risk"]
         XCTAssertTrue(risk.waitForExistence(timeout: 5), app.debugDescription)
-        XCTAssertEqual(risk.label, "فاتتك فترة")
+        XCTAssertEqual(risk.label, "فاتك يوم")
         capture(app, "M4-V01-habit-small-after-L")
     }
 

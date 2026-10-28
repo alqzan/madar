@@ -62,7 +62,7 @@ struct HabitOrbitView:View {
 struct HabitBead:View {
     enum State:Hashable { case done, minimum, waiting, atRisk, paused
         init(_ row:HabitReading) { self = row.paused ? .paused : row.summary.current?.outcome == .minimum ? .minimum : row.summary.current?.met == true ? .done : row.summary.atRisk ? .atRisk : .waiting }
-        var title:String { switch self { case .done: "تمّت"; case .minimum: "أقلّ القليل"; case .waiting: "تنتظر"; case .atRisk: "فاتتك مرة"; case .paused: "مجمّدة" } }
+        var title:String { switch self { case .done: "تمّت"; case .minimum: "أقلّ القليل"; case .waiting: "تنتظر"; case .atRisk: "فاتتك"; case .paused: "مجمّدة" } }
     }
     let state:State; let colour:Color; let theme:RoomTheme
     var body:some View {
