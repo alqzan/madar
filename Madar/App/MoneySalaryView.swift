@@ -121,7 +121,7 @@ struct MoneySalaryView: View {
                 Text(plan.leftoverMinor >= 0 ? "الباقي ← " + destination : "الباقي").bold()
                 Spacer(minLength: 4)
                 Text(figure: amount(plan.leftoverMinor)).bold().foregroundStyle(plan.leftoverMinor >= 0 ? tint("reserve") : tint("due"))
-                Text(service.percent(max(0, plan.leftoverMinor), of: salary)).foregroundStyle(theme.secondaryInk).frame(width: 34, alignment: .trailing)
+                Text(plan.leftoverMinor < 0 ? "" : service.percent(plan.leftoverMinor, of: salary)).foregroundStyle(theme.secondaryInk).frame(width: 34, alignment: .trailing)
             }.font(MadarTypography.fine()).padding(.vertical, 5).overlay(alignment: .top) { Rectangle().fill(theme.ink).frame(height: 1.2) }
                 .accessibilityIdentifier("money-salary-leftover")
             if let carried = r.opening.input.closing?.availableNowMinor {
