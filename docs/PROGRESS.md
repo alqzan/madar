@@ -376,9 +376,9 @@ M0-M6 software is integrated; M5 has its bounded software gate. M7 remains open 
 
 # Handovers
 
-## Handover — تدقيق AU-04…AU-07 — 2026-10-28 — Claude
-- **Works now:** معاينة تخصيص المذكرات بأسماء أجزائها؛ سجل جلسات القرآن بطاقة لكل يوم مع «اليوم/أمس» وشارة التقييم و«في صدرك» بالأجزاء؛ صف «خطة الحفظ، من سورة …» أول بطاقة خطّتك؛ شلال الفائض بإشارات فوق الأعمدة؛ حالات فارغة تقود إلى فعل (الحسابات، السجل، القضاء)؛ نصوص المحبرة والمذكرات والعادات والقرآن مصحّحة (AU-05…AU-07)؛ العادة ذات التاريخ الثابت لا تظهر في المدار قبل يومها.
-- **Verified:** DiaryCustomize (aud28i)، QuranHistory 1/1 (aud28j/p)، MoneyAccounts 6/6 + MoneyLog 1/1 (aud28k/l)، MoneyEnvelopes 5/5 (aud28m/n)، DiaryIntention 2/2 (aud28o)، QuranPlanSetup 2/2 (aud28q)، BahwYear 4/4 + Quran Drill/Free/Strength (aud28r)، Habits 15/15 (aud28t).
+## Handover — تدقيق AU-04…AU-08 — 2026-10-28 — Claude
+- **Works now:** معاينة تخصيص المذكرات بأسماء أجزائها؛ سجل جلسات القرآن بطاقة لكل يوم مع «اليوم/أمس» وشارة التقييم و«في صدرك» بالأجزاء؛ صف «خطة الحفظ، من سورة …» أول بطاقة خطّتك؛ شلال الفائض بإشارات فوق الأعمدة؛ حالات فارغة تقود إلى فعل (الحسابات، السجل، القضاء)؛ نصوص المحبرة والمذكرات والعادات والقرآن والإعدادات مصحّحة (AU-05…AU-08)، والعادة الفائتة بوحدتها («فاتك يوم»)؛ العادة ذات التاريخ الثابت لا تظهر في المدار قبل يومها.
+- **Verified:** DiaryCustomize (aud28i)، QuranHistory 1/1 (aud28j/p)، MoneyAccounts 6/6 + MoneyLog 1/1 (aud28k/l)، MoneyEnvelopes 5/5 (aud28m/n)، DiaryIntention 2/2 (aud28o)، QuranPlanSetup 2/2 (aud28q)، BahwYear 4/4 + Quran Drill/Free/Strength (aud28r)، Habits 15/15 (aud28t)، Lobby+Habits 27/27 (aud28v)، Qiyam 2/2 (aud28u)، إعدادات 6/6 (aud28w).
 - **Differences left:** أعمدة الدين المخطّطة في رئيسية المال (Z-R12-Home2)، شريط أجزاء «في صدرك» في السجل، ثيمات القارئ في الورقة الرئيسية (أُبقيت عمدًا).
 - **Not verified:** ورقة القضاء الفارغة ونصوص PDF/الباركود/المشاريع (لا اختبار يصلها)؛ الجهاز.
 - **Disk:** حُذفت ستّ نسخ DerivedData قديمة في `Madar/Artifacts` (~15GB) لأن القرص امتلأ (198MB)؛ `owner-data` والمحاكيات لم تُمسّ.
