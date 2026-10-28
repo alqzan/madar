@@ -51,9 +51,9 @@ struct LogPrayerIntent: AppIntent {
     @Parameter(title: "الصلاة") var prayer: PrayerIntentPrayer
     @Parameter(title: "الحالة") var status: PrayerIntentStatus
     @Parameter(title: "حال القلب") var heart: PrayerIntentHeart?
-    @Parameter(title: "قصراً") var shortened: Bool?
+    @Parameter(title: "قصرًا") var shortened: Bool?
     @Parameter(title: "تصنيف ظهر الجمعة") var fridayKind: PrayerIntentFridayKind?
-    @Parameter(title: "يوم الصلاة بصيغة YYYY-MM-DD") var dayKey: String?
+    @Parameter(title: "يوم الصلاة (السنة-الشهر-اليوم)") var dayKey: String?
 
     static var parameterSummary: some ParameterSummary {
         Summary("سجّل \(\.$prayer) \(\.$status)") {
@@ -126,7 +126,7 @@ private enum LogPrayerIntentError: LocalizedError {
         case .refreshMadar: "حدّث مدار ثم أعد المحاولة."
         case .prayerNotOccurred: "لم يدخل وقت هذه الصلاة بعد."
         case .jumuahRequiresCongregation: "الجمعة تُسجّل جماعة؛ اختر الظهر إذا صليت منفردًا."
-        case .invalidDayKey: "أدخل يوم الصلاة بصيغة YYYY-MM-DD."
+        case .invalidDayKey: "أدخل يوم الصلاة بصيغة السنة-الشهر-اليوم، مثل 2026-10-28."
         case .invalidSelection: "راجع الصلاة والحالة والقصر وتصنيف الجمعة."
         }
     }

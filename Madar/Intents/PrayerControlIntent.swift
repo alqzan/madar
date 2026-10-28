@@ -24,7 +24,7 @@ struct PrayerLogControlConfiguration: ControlConfigurationIntent {
 /// SwiftData from the widget extension.
 struct LogConfiguredPrayerControlIntent: AppIntent {
     static let title: LocalizedStringResource = "سجّل الصلاة من التحكم"
-    static let description = IntentDescription("يسجل الصلاة والحالة اللتين اختيرتا لهذا التحكم.")
+    static let description = IntentDescription("يسجّل الصلاة والحالة اللتين اختيرتا لهذا التحكم.")
     static let openAppWhenRun = false
 
     @Parameter(title: "الصلاة") var prayer: PrayerIntentPrayer?
@@ -100,7 +100,7 @@ struct LogConfiguredPrayerControlIntent: AppIntent {
 
         WidgetCenter.shared.reloadAllTimelines()
         ControlCenter.shared.reloadAllControls()
-        return .result(dialog: "أُضيف طلب تسجيل \(prayer.arabicName) إلى الوارد؛ يطبّقه مدار عند فتح التطبيق.")
+        return .result(dialog: "حُفظ طلب تسجيل \(prayer.arabicName)، ويُسجَّل في مدار حين تفتحه.")
     }
 }
 
