@@ -275,7 +275,7 @@ struct BahwYearView: View {
                 .pickerStyle(.segmented).accessibilityIdentifier("bahw-matters-filter")
             VStack(spacing: 0) {
                 if shown.isEmpty {
-                    Text(filter == 2 ? "لم تضف يومًا بعد. أضف يومًا يهمّك ليظهر هنا." : "لا شيء هنا الآن.").font(MadarTypography.body()).foregroundStyle(lobby.secondaryInk).padding(22).frame(maxWidth: .infinity)
+                    Text(filter == 2 ? "لم تضف يومًا بعد. أضف يومًا يهمّك ليظهر هنا." : filter == 1 ? "لا مواسم في الأيام القادمة؛ تظهر هنا حين يقترب موسم." : "لا شيء قادم بعد. أضف يومًا يهمّك ليظهر هنا.").font(MadarTypography.body()).foregroundStyle(lobby.secondaryInk).padding(22).frame(maxWidth: .infinity)
                 }
                 ForEach(Array(shown.enumerated()), id: \.element.id) { index, item in
                     if index > 0 { Rectangle().fill(lobby.line).frame(height: 1) }

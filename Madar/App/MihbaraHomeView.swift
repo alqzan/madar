@@ -718,7 +718,8 @@ struct MihbaraHomeView: View {
     /// An EPUB or PDF on the table: what it is, how far the reader is, and what is left, with no figure shown twice.
     private func fileTableBook(_ b: MihbaraBook) -> some View {
         let digits = service.digits
-        let percent = b.progress.map { Int(($0 * 100).rounded()) }
+        // AU-25: a book opened but not read yet is «لم تبدأه بعد», not «قرأت منه ٠٪».
+        let percent = b.progress.map { Int(($0 * 100).rounded()) }.flatMap { $0 > 0 ? $0 : nil }
         let kind = b.format == "epub" ? "كتاب إلكتروني" : b.format == "pdfScanned" ? "ملف PDF مصوّر" : "ملف PDF"
         let total = b.pages.flatMap { $0 > 0 ? $0 : nil }
         let read = MihbaraCopy.pagesRead(b)
@@ -810,7 +811,8 @@ struct MihbaraHomeView: View {
     }
     private func continueCard(_ b: MihbaraBook, leather: Int) -> some View {
         let digits = service.digits
-        let percent = b.progress.map { Int(($0 * 100).rounded()) }
+        // AU-25: a book opened but not read yet is «لم تبدأه بعد», not «قرأت منه ٠٪».
+        let percent = b.progress.map { Int(($0 * 100).rounded()) }.flatMap { $0 > 0 ? $0 : nil }
         let read = (b.isReadableEPUB || b.isReadablePDF) ? MihbaraCopy.pagesRead(b) : b.page
         let total = b.pages.flatMap { $0 > 0 ? $0 : nil }
         let where_: String = {
