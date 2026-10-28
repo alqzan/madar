@@ -257,7 +257,7 @@ struct PrayerTodayView: View {
                 Text("اكتمل يوم الصلاة").font(MadarTypography.cardTitle())
             } else {
                 Text("لا تُحسب المواقيت هنا اليوم").font(MadarTypography.cardTitle())
-                Text("لا تظهر أوقات غير متاحة أو تسجيلات مستقبلية.")
+                Text("لا أوقات ولا عدّ تنازلي في هذا اليوم، وصلاتك تُسجَّل كالمعتاد.")
                     .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
             }
         }
@@ -1726,7 +1726,7 @@ private struct PrayerStatisticsView: View {
                 }
                 if snapshot.statistics.denominator >= 5 {
                     metrics
-                    PrayerSummarySection(title: "الميزان", trailing: "آخر \(formatter.string(snapshot.statistics.last25.count)) فرضًا") { mizanCard }
+                    PrayerSummarySection(title: "الميزان", trailing: "آخر " + arabicCount(snapshot.statistics.last25.count, ["فرض", "فرضين", "فروض", "فرضًا"], formatter)) { mizanCard }
                 } else {
                     Text("يظهر حالي بعد خمسة فروض مسجّلة؛ المعلّقة لا تدخل في النسبة.")
                         .font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk)
@@ -1806,7 +1806,7 @@ private struct PrayerStatisticsView: View {
         summaryCard {
             VStack(spacing: 10) {
                 if typeSize.isAccessibilitySize {
-                    DisclosureGroup("آخر \(formatter.string(snapshot.statistics.last25.count)) فرضًا") {
+                    DisclosureGroup("آخر " + arabicCount(snapshot.statistics.last25.count, ["فرض", "فرضين", "فروض", "فرضًا"], formatter)) {
                         ForEach(snapshot.statistics.last25) { cell in
                             Text(cellLabel(cell)).font(MadarTypography.caption())
                                 .accessibilityIdentifier("prayer-bead-list-\(cell.reference.naturalKey)")
@@ -2390,7 +2390,7 @@ private struct PrayerNightLoggingSheet: View {
                 Spacer(minLength: 8)
                 Text(logged ? "سُجّلت ليلتك" : "لم تُسجَّل ليلتك").font(PrayerHomeType.smallBold).foregroundStyle(theme.color("accentText"))
             }
-            Text("ثنتان تُثبتان الليلة خيرٌ من إحدى عشرة تنقطع. سجِّل ما قمتَه.").font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk).padding(.top, 10)
+            Text("ركعتان تداوم عليهما خيرٌ من إحدى عشرة تنقطع. سجِّل ما صلّيتَ.").font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk).padding(.top, 10)
             if eligibleNights.count > 1 {
                 Picker("الليلة", selection: $selectedNight) {
                     ForEach(eligibleNights, id: \.self) { Text(dateTitle($0)).tag($0) }
@@ -2432,7 +2432,7 @@ private struct PrayerNightLoggingSheet: View {
             footprintStrip.padding(.top, 18)
             Text("آخر ثلاثين ليلة · ليست سلسلة تنكسر، أثرٌ يُرى").font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk).padding(.top, 10)
             if restoreNeeded {
-                Text("سبق التراجع عن تسجيل هذه الليلة. يمكنك إعادة تسجيلها صراحة.").font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk).padding(.top, 14)
+                Text("تراجعتَ عن تسجيل هذه الليلة؛ يمكنك تسجيلها من جديد.").font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk).padding(.top, 14)
                 primary("أعد تسجيل الليلة", id: "prayer-qiyam-restore") { confirmRestore = true }.padding(.top, 8)
             } else {
                 primary("احفظ قيام الليلة", id: "prayer-qiyam-save") { save(restoring: false) }.padding(.top, 16)
@@ -2518,7 +2518,7 @@ private struct PrayerNightLoggingSheet: View {
                 }
             }
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("آخر ثلاثين ليلة، \(formatter.string(footprint.filter(hasRecord).count)) منها فيها قيام")
+            .accessibilityLabel("آخر ثلاثين ليلة، سُجّل القيام في " + arabicCount(footprint.filter(hasRecord).count, ["ليلة واحدة", "ليلتين", "ليالٍ", "ليلة"], formatter) + " منها")
             .accessibilityIdentifier("prayer-qiyam-footprint-list")
         }
     }
@@ -2599,7 +2599,7 @@ private struct PrayerOldMissedSheet: View {
                 }
                 Section {
                     if restoring {
-                        Text("سبق حذف هذا التسجيل أو التراجع عنه؛ إعادته تحتاج اختيارًا صريحًا.")
+                        Text("حذفتَ هذا التسجيل أو تراجعتَ عنه؛ يمكنك إعادته من الزر أدناه.")
                         Button("أعد تسجيل الفائتة") { confirmRestore = true }.accessibilityIdentifier("prayer-old-restore")
                     } else {
                         Button("أضف الفائتة") { save(false) }.accessibilityIdentifier("prayer-old-save")
