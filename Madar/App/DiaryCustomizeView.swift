@@ -145,7 +145,7 @@ struct DiaryCustomizeView: View {
                 previewLine("شكل الرئيسية", label("notes.homeShape"))
                 previewLine("المطابقة", label("notes.match"))
                 previewLine("إذا لا ذكرى", label("notes.noMemory"))
-                Text(changed == 0 ? "كما اتفقنا" : "عُدّل " + app.digits(changed) + " من الإعدادات").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
+                Text(CustomizationCopy.changes(count: changed, formattedCount: app.digits(changed))).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: 6) { previewButtons }
                     VStack(alignment: .leading, spacing: 8) { previewButtons }

@@ -42,7 +42,7 @@ struct QuranOutsideView: View {
                         Button("أعِد المتفق عليه") { app.reset(["quran.wirdReminder", "quran.lateReminder"]) }.frame(minHeight: 44).accessibilityIdentifier("quran-reminder-reset")
                     }.font(MadarTypography.body()).disabled(app.settingsWriteInProgress)
                 }
-                Text("أضف «القرآن» من معرض ودجات iOS، واختر قالب «في صدرك» أو «مسار اليوم» أو «الحفظ والمراجعة». الحجم يختاره النظام. تحكّم «مؤقّت المراجعة» يفتح جلستك، والمؤقّت في طريقة الجلسة.")
+                Text("أضف «القرآن» من معرض ودجات iOS، واختر قالب «في صدرك» أو «مسار اليوم» أو «الحفظ والمراجعة». يختار النظام حجمها. وزرّ «مؤقّت المراجعة» في مركز التحكم يفتح جلسة المراجعة مباشرة.")
                     .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                 if let error { Text(error).font(MadarTypography.caption()) }
             }.padding(16)

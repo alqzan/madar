@@ -151,7 +151,7 @@ struct PrayerCustomizeView: View {
                     previewLine("الأجزاء", "\(session.digits(layout.visibleCount)) ظاهرة")
                     previewLine("طريقة الحساب", label("salah.method"))
                     previewLine("وقت العصر", label("salah.asr"))
-                    Text(changedCount == 0 ? "كما اتفقنا" : "عُدّل \(session.digits(changedCount)) من الإعدادات")
+                    Text(CustomizationCopy.changes(count: changedCount, formattedCount: session.digits(changedCount)))
                         .font(PrayerHomeType.smallBold).foregroundStyle(theme.secondaryInk)
                         .accessibilityIdentifier("prayer-customize-changes")
                     HStack(spacing: 8) {

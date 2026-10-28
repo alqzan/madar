@@ -202,14 +202,15 @@ struct MoneySettingsView: View {
                     TextField("٩٠", text: $rawReconcileDays).keyboardType(.numberPad).focused($editing)
                         .multilineTextAlignment(.center).font(MadarTypography.cardTitle()).frame(width: 88)
                         .accessibilityIdentifier("money-settings-reconcile-days")
-                    Text("يومًا").font(MadarTypography.body())
+                    // Audit 28 Oct: «كل ٥ أيام»، not «كل ٥ يومًا».
+                    Text({ let n = reconcileDaysInput ?? 90; return n <= 2 ? "يوم" : (3...10).contains(n % 100) ? "أيام" : "يومًا" }()).font(MadarTypography.body())
                 }.frame(maxWidth: .infinity)
                 saveButton("احفظ مدة التذكير", id: "reconcile-cadence-save", enabled: reconcileDaysInput.map { (1...365).contains($0) } == true) {
                     guard let days = reconcileDaysInput else { return }
                     app.set(.number(Double(days)), key: "mal.reconcileEveryDays") { load() }
                 }
             } else {
-                Text("••• يومًا").font(MadarTypography.cardTitle()).frame(maxWidth: .infinity)
+                Text("••• أيام").font(MadarTypography.cardTitle()).frame(maxWidth: .infinity)
                 Button("أظهر الأرقام") { revealed = true }.font(MadarTypography.caption()).frame(minHeight: 44)
                     .accessibilityIdentifier("money-settings-reconcile-reveal")
             }
