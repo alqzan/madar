@@ -70,11 +70,13 @@ import XCTest
         XCTAssertFalse(bar("2026-10-16").exists)
         XCTAssertTrue(bar("2026-10-19").label.contains("وردك")); XCTAssertFalse(bar("2026-10-19").label.contains("ثلثه"))
         XCTAssertEqual(app.staticTexts["quran-plan-forecast"].label, forecast)
+        app.swipeUp(velocity: .slow)
         capture(app, "OR-21-missed-spread-preview-L")
         let double = app.buttons["quran-plan-miss-double"]
         for _ in 0..<5 where !double.isHittable { app.swipeDown() }
         double.tap()
         reveal(bar("2026-10-19")); XCTAssertTrue(bar("2026-10-15").label.contains("وردان"))
+        app.swipeUp(velocity: .slow)
         capture(app, "OR-21-missed-double-preview-L")
         app.terminate(); app.launch(); openPlan()
         reveal(app.buttons["quran-plan-miss-double"]); XCTAssertTrue(app.buttons["quran-plan-miss-double"].isSelected)
