@@ -250,7 +250,7 @@ struct MoneyAnalysisView: View {
                 Text("أين راح صرفك؟").font(.custom("Amiri-Bold", size: 27, relativeTo: .title2)).accessibilityAddTraits(.isHeader)
                 Spacer()
                 if rows.contains(where: { $0.capMinor != nil }) {
-                    HStack(spacing: 4) { Rectangle().fill(theme.ink).frame(width: 2, height: 12); Text(r.period == .week ? "الخط = حصة الأسبوع من الحد" : "الخط = الحد") }
+                    HStack(spacing: 4) { Rectangle().fill(theme.ink).frame(width: 2, height: 12); Text(r.period == .week ? "الخط حصة الأسبوع من حدّك" : "الخط حدّك") }
                         .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                 }
             }

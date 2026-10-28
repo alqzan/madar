@@ -49,7 +49,7 @@ struct MoneyCategoriesView: View {
                     ForEach(Array(reading.shelves.enumerated()), id: \.element.id) { shelf($0.element, tint: binding($0.offset)) }
                     if !reading.shelves.isEmpty {
                         HStack(spacing: 14) {
-                            HStack(spacing: 4) { Rectangle().fill(wood).frame(width: 18, height: 4); Text("الرف = حدّك") }
+                            HStack(spacing: 4) { Rectangle().fill(wood).frame(width: 18, height: 4); Text("الرف حدّك") }
                             HStack(spacing: 4) { DashLine().stroke(theme.color("accent"), style: .init(lineWidth: 2, dash: [3, 2])).frame(width: 2, height: 14); Text("المفروض حتى اليوم") }
                         }.font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).frame(maxWidth: .infinity)
                     }
