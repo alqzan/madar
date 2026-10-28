@@ -15,10 +15,19 @@ struct DiaryHomeLayout {
         hidden = Set(value?.object?["hidden"]?.array?.compactMap(\.string) ?? []).intersection(["thatDay", "sinceThatDay", "days"])
     }
     var payload: JSONValue { .object(["blocks": .array(order.map(JSONValue.string)), "pinned": .array([.string("memory"), .string("todayBar")]), "hidden": .array(hidden.sorted().map(JSONValue.string)), "sizes": .object([:])]) }
-    func move(_ id: String, by offset: Int) -> Self {
+    func activeOrder(for shape: String) -> [String] {
+        switch shape {
+        case "margin": Self.all
+        case "echoes": ["memory", "days", "todayBar"]
+        default: order.filter { ["memory", "days", "todayBar"].contains($0) }
+        }
+    }
+    func move(_ id: String, by offset: Int, among active: [String]) -> Self {
         var result = self
-        guard let i = order.firstIndex(of: id), id != "todayBar", (0..<(order.count-1)).contains(i+offset) else { return self }
-        result.order.swapAt(i, i+offset); return result
+        let movable = active.filter { $0 != "todayBar" }
+        guard let index = movable.firstIndex(of: id), movable.indices.contains(index + offset),
+              let source = order.firstIndex(of: id), let target = order.firstIndex(of: movable[index + offset]) else { return self }
+        result.order.swapAt(source, target); return result
     }
     func toggle(_ id: String) -> Self { var result = self; if result.hidden.contains(id) { result.hidden.remove(id) } else if !["memory", "todayBar"].contains(id) { result.hidden.insert(id) }; return result }
 }
@@ -32,6 +41,15 @@ struct DiaryCustomizeView: View {
     @State private var confirmReset = false
     @State private var transfer: String?
     private var layout: DiaryHomeLayout { .init(app.values["notes.layout"]) }
+    private var shape: String { app.string("notes.homeShape") }
+    private var activeOrder: [String] { layout.activeOrder(for: shape) }
+    private var visibleOrder: [String] { activeOrder.filter { !layout.hidden.contains($0) } }
+    private func blockTitle(_ id: String) -> String {
+        if id == "memory" {
+            return shape == "echoes" ? "أصداء السنين" : shape == "margin" ? "صفحة الذكرى" : "هذا اليوم عبر السنين"
+        }
+        return id == "thatDay" ? "سطور ذاك اليوم" : DiaryHomeLayout.titles[id] ?? id
+    }
     private let groups: [(String, String, String, [String])] = [
         ("calendar", "التقويم", "calendar", ["notes.calendarFirst"]),
         ("memory", "أي ذكرى تظهر", "clock", ["notes.match", "notes.noMemory", "notes.yearsBack", "notes.includeDayOne"]),
@@ -123,7 +141,7 @@ struct DiaryCustomizeView: View {
             VStack(alignment: .leading, spacing: 10) {
                 Label("معاينة حيّة", systemImage: "circle.fill").font(DiaryType.label).foregroundStyle(theme.accent)
                 Text("المذكرات كما ستظهر").font(DiaryType.heading)
-                previewLine("الأجزاء", app.digits(layout.order.count-layout.hidden.count) + " ظاهرة")
+                previewLine("الأجزاء", app.digits(visibleOrder.count) + " ظاهرة").accessibilityElement(children: .combine).accessibilityIdentifier("diary-preview-parts")
                 previewLine("شكل الرئيسية", label("notes.homeShape"))
                 previewLine("المطابقة", label("notes.match"))
                 previewLine("إذا لا ذكرى", label("notes.noMemory"))
@@ -135,7 +153,7 @@ struct DiaryCustomizeView: View {
             }.frame(maxWidth: .infinity, alignment: .leading)
             VStack(spacing: 5) {
                 Capsule().fill(theme.ink.opacity(0.3)).frame(width: 30, height: 4).padding(.vertical, 5)
-                ForEach(layout.order.filter { !layout.hidden.contains($0) }, id: \.self) { id in
+                ForEach(visibleOrder, id: \.self) { id in
                     RoundedRectangle(cornerRadius: id == "memory" && app.string("notes.homeShape") == "margin" ? 2 : 7)
                         .fill(id == "memory" ? theme.accent : theme.line)
                         .frame(height: id == "memory" ? 62 : 20)
@@ -150,18 +168,18 @@ struct DiaryCustomizeView: View {
     }
     private func previewLine(_ title: String, _ value: String) -> some View { HStack { Text(title).foregroundStyle(theme.color("ink3Text")); Spacer(minLength: 5); Text(value) }.font(DiaryType.label) }
     private var homeCard: some View {
-        section("home", title: "الرئيسية", subtitle: app.digits(layout.order.count-layout.hidden.count) + " ظاهرة · " + label("notes.homeShape"), symbol: "square.grid.2x2") {
-            Text("الذكرى وشريط اليوم ظاهران دائمًا. ترتيب الكتل للنافذة، وإخفاء «ذاك اليوم» و«أيامك» يسري على الأشكال الثلاثة.").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
-            ForEach(layout.order, id: \.self) { id in
+        section("home", title: "الرئيسية", subtitle: label("notes.homeShape") + "، " + app.digits(visibleOrder.count) + " أجزاء ظاهرة", symbol: "square.grid.2x2") {
+            Text(shape == "window" ? "قدّم بطاقات السنين أو أيامك بما يناسبك. شريط صفحة اليوم ثابت في الأسفل." : shape == "margin" ? "الصفحة وشريط اليوم ثابتان. اختر ما يظهر حول الذكرى؛ ترتيب الهامش ثابت." : "الأصداء أولًا وشريط صفحة اليوم في الأسفل. يمكنك إظهار أيامك أو إخفاؤها.").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
+            ForEach(activeOrder, id: \.self) { id in
                 Divider().overlay(theme.line)
                 HStack {
-                    Text(DiaryHomeLayout.titles[id] ?? id).font(MadarTypography.section()).frame(maxWidth: .infinity, alignment: .leading)
-                    if app.string("notes.homeShape") == "window", id != "todayBar" {
+                    Text(blockTitle(id)).font(MadarTypography.section()).frame(maxWidth: .infinity, alignment: .leading)
+                    if shape == "window", id != "todayBar" {
                         arrow(id, offset: -1); arrow(id, offset: 1)
                     }
                     if ["memory", "todayBar"].contains(id) { Text("ثابت").font(DiaryType.label).foregroundStyle(theme.color("ink3Text")) }
                     else {
-                        Toggle(DiaryHomeLayout.titles[id] ?? id, isOn: Binding(get: { !layout.hidden.contains(id) }, set: { _ in app.set(layout.toggle(id).payload, key: "notes.layout") }))
+                        Toggle(blockTitle(id), isOn: Binding(get: { !layout.hidden.contains(id) }, set: { _ in app.set(layout.toggle(id).payload, key: "notes.layout") }))
                             .labelsHidden().tint(theme.color("ghad")).accessibilityIdentifier("diary-block-" + id)
                     }
                 }.frame(minHeight: 48)
@@ -171,10 +189,11 @@ struct DiaryCustomizeView: View {
         }
     }
     private func arrow(_ id: String, offset: Int) -> some View {
-        let index = layout.order.firstIndex(of: id) ?? 0
-        return Button { app.set(layout.move(id, by: offset).payload, key: "notes.layout") } label: { Image(systemName: offset < 0 ? "chevron.up" : "chevron.down").frame(width: 44, height: 44) }
-            .buttonStyle(.plain).disabled(!(0..<(layout.order.count-1)).contains(index+offset) || app.settingsWriteInProgress)
-            .accessibilityLabel((offset < 0 ? "قدّم " : "أخّر ") + (DiaryHomeLayout.titles[id] ?? id)).accessibilityIdentifier("diary-block-" + (offset < 0 ? "up-" : "down-") + id)
+        let movable = activeOrder.filter { $0 != "todayBar" }
+        let index = movable.firstIndex(of: id) ?? 0
+        return Button { app.set(layout.move(id, by: offset, among: activeOrder).payload, key: "notes.layout") } label: { Image(systemName: offset < 0 ? "chevron.up" : "chevron.down").frame(width: 44, height: 44) }
+            .buttonStyle(.plain).disabled(!movable.indices.contains(index+offset) || app.settingsWriteInProgress)
+            .accessibilityLabel((offset < 0 ? "قدّم " : "أخّر ") + blockTitle(id)).accessibilityIdentifier("diary-block-" + (offset < 0 ? "up-" : "down-") + id)
     }
     private var metricControls: some View {
         VStack(alignment: .leading, spacing: 12) {
