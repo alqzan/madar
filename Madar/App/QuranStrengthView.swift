@@ -28,7 +28,11 @@ struct QuranStrengthView:View {
                         if board.far > 0 || board.active != nil {Button {recovery=true} label: {VStack(spacing:4) {Text(service.faceCount(board.far)+" بعيدة");Text(board.active == nil ? "خطة استرداد" : "خطّتك")}.font(quranFont(12,bold:true)).padding(12).background(theme.color("dueTint"),in:.rect(cornerRadius:16))}.buttonStyle(.plain).foregroundStyle(theme.color("dueText")).accessibilityIdentifier("quran-strength-recovery")}
                     }
                     Text("مؤشر وصفي من تقييمك ومواعيد المراجعة؛ ليس احتمالًا للحفظ. البعيد: متأخر مدة كاملة أو متانته تحت خمسين.").font(quranFont(12)).foregroundStyle(theme.secondaryInk)
-                    if board.parts.isEmpty {QuranPaperCard {Text("يظهر المنسوب بعد إكمال حفظ وجه؛ الأوجه الجزئية تُراجع ضمن القريب.").font(quranFont(16))}}
+                    if board.parts.isEmpty {QuranPaperCard {VStack(alignment:.leading,spacing:10) {
+                        Text("يظهر المنسوب بعد إكمال حفظ وجه؛ الأوجه الجزئية تُراجع ضمن القريب.").font(quranFont(16))
+                        // Audit 28 Oct: the empty board leads back to today's path, where the first face starts.
+                        Button {close()} label: {Text("ارجع إلى مسار اليوم").font(quranFont(14,bold:true)).frame(minHeight:44)}.accessibilityIdentifier("quran-strength-empty-back")
+                    }}}
                     else if type.isAccessibilitySize {
                         ForEach(board.parts) {p in Button {selected=p.id} label: {Text(p.title+"، "+service.numerals.percent(p.strength)).font(quranFont(16)).frame(minHeight:44)} }
                     } else {tubes(board.parts);legend}
