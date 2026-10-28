@@ -1,5 +1,20 @@
 import XCTest
 @MainActor final class QuranPlanUITests:XCTestCase {
+    func testDeepHabitualExampleShowsItsActualFractionalWird() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00", "MADAR_UI_QURAN_FIXTURE": "home"]
+        app.launch(); XCTAssertTrue(app.buttons["quran-streak"].waitForExistence(timeout: 25)); app.buttons["quran-streak"].tap()
+        let level = app.buttons["quran-plan-quran.hifzLevel"]
+        XCTAssertTrue(level.waitForExistence(timeout: 10)); level.tap()
+        app.buttons["quran-plan-option-quran.hifzLevel-deep"].tap()
+        let amount = app.staticTexts["quran-plan-example-amount"]
+        for _ in 0..<8 where !amount.isHittable { app.swipeUp() }
+        XCTAssertTrue(amount.isHittable)
+        XCTAssertTrue(amount.label.contains("وجه ونصف"), amount.label)
+        XCTAssertFalse(amount.label.contains("المقدار") || amount.label.contains("وحدة"))
+        capture(app, "OR-21-fractional-wird-L")
+    }
     func testForecastTrackComparesLevelsWithoutChangingTheHabitualSetting() throws {
         continueAfterFailure = false
         let app = XCUIApplication()

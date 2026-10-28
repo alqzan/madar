@@ -32,6 +32,11 @@ import MadarCommands
         p.amount=2;XCTAssertEqual(QuranPlanCopy.amount(p,digits:.init()),"ربعان من وجه")
         p.unit = .ayah;XCTAssertEqual(QuranPlanCopy.amount(p,digits:.init()),"آيتان")
         p.unit = .page;p.amount=11;XCTAssertEqual(String(QuranPlanCopy.amount(p,digits:.init()).unicodeScalars.filter { !(0x2066...0x2069).contains($0.value) }),"١١ وجهًا")
+        p.amount = 0.25; XCTAssertEqual(QuranPlanCopy.amount(p, digits: .init()), "ربع وجه")
+        p.amount = 0.5; XCTAssertEqual(QuranPlanCopy.amount(p, digits: .init()), "نصف وجه")
+        p.amount = 0.75; XCTAssertEqual(QuranPlanCopy.amount(p, digits: .init()), "ثلاثة أرباع وجه")
+        p.amount = 1.5; XCTAssertEqual(QuranPlanCopy.amount(p, digits: .init()), "وجه ونصف")
+        p.amount = 2.25; XCTAssertEqual(QuranPlanCopy.amount(p, digits: .init()), "وجهان وربع")
     }
     func testForecastIsOnlyVisibleForItsInputAndMadarDay() throws {
         let original = QuranUIPlanInput(startAyah: 1, unit: .page, amount: 1, rhythm: .balanced, restDay: "friday", missPolicy: "ask")

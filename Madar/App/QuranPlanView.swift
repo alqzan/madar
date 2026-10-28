@@ -121,7 +121,7 @@ struct QuranPlanView: View {
         return VStack(alignment: .leading, spacing: 12) {
             Divider().overlay(theme.line)
             Text("معاينة: لو فاتك ورد واحد").font(quranFont(14, bold: true))
-            Text("وردك المعتاد في المثال: " + overview.habitualAmount).font(quranFont(12)).foregroundStyle(theme.secondaryInk)
+            Text("وردك المعتاد في المثال: " + overview.habitualAmount).font(quranFont(12)).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("quran-plan-example-amount")
             if policy == "ask" {
                 Text("هذا مثال للتوزيع؛ ستختار عند الفوات.").font(quranFont(11)).foregroundStyle(theme.secondaryInk)
             }

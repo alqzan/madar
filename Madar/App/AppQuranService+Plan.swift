@@ -65,6 +65,14 @@ extension AppQuranService {
 /// Count grammar stays in the room's String Catalog, independent of the stored numeral preference.
 enum QuranPlanCopy {
     static func amount(_ p: QuranUIPlanInput, digits: MadarNumberFormatter) -> String {
+        if p.unit == .page, p.amount.isFinite, p.amount > 0, p.amount <= 6236,
+           (p.amount * 4).rounded() == p.amount * 4, p.amount.rounded() != p.amount {
+            let whole = Int(p.amount), quarter = Int((p.amount - Double(whole)) * 4)
+            let fraction = ["", "ربع", "نصف", "ثلاثة أرباع"][quarter]
+            if whole == 0 { return fraction + " وجه" }
+            let pages = whole == 1 ? "وجه" : QuranDayCloseCopy.faces(whole, digits: digits)
+            return pages + " و" + fraction
+        }
         guard p.amount.rounded() == p.amount, p.amount >= 0, p.amount <= 6236 else {
             return "المقدار " + digits.localized(String(format: "%g", p.amount).replacingOccurrences(of: ".", with: "٫")) + " من وحدة " + p.unit.title
         }
