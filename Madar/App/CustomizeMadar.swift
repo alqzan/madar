@@ -231,7 +231,7 @@ struct SettingControl: View {
                             HStack { Text(prayerTitle(prayer)); Spacer(); offsetControls(prayer) }
                         }
                     }
-                    Text("التعديل بالدقائق من −٦٠ إلى ٦٠، ويُطبّق على المواقيت دون تغيير تسجيلاتك.")
+                    Text("التعديل بالدقائق من −" + session.digits(60) + " إلى " + session.digits(60) + "، ويُطبّق على المواقيت دون تغيير تسجيلاتك.")
                         .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                 }
             case "place": NavigationLink(session.cityName) { CityEditor(session: session) }.frame(minHeight: 44).accessibilityIdentifier("setting-\(definition.key)")
