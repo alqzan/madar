@@ -56,11 +56,16 @@ import XCTest
         continueAfterFailure = false; let app = app("showcase"); open(app)
         XCTAssertTrue(app.staticTexts["money-today"].label.contains("١٤٠"), app.staticTexts["money-today"].label)
         XCTAssertTrue(app.staticTexts["money-today"].label.contains("٤٠٠"), app.staticTexts["money-today"].label)
+        XCTAssertTrue(app.staticTexts["money-today"].label.hasPrefix("اليوم:"))
         XCTAssertTrue(app.staticTexts["money-available"].label.contains("١٬٣٦٠"), app.staticTexts["money-available"].label)
         let chart = app.descendants(matching: .any)["money-scroll-chart"]
         XCTAssertTrue(chart.exists)
         assertChartDates(chart)
         XCTAssertTrue(app.descendants(matching: .any)["money-pending"].exists)
+        // The compact header and one-row headline leave the envelopes on the first screen.
+        let envelopes = app.buttons["money-envelopes-open"]
+        XCTAssertTrue(envelopes.isHittable)
+        XCTAssertLessThan(envelopes.frame.maxY, app.frame.maxY - 160)
         // V14 analysis and V17 manual expense are both built; each must have a live door.
         XCTAssertTrue(app.buttons["سجّل مصروفًا"].exists); XCTAssertTrue(app.buttons["money-analysis-open"].exists)
         shot(app, "M5-V01-home-L"); app.swipeUp(velocity: .slow); shot(app, "M5-V01-home-s1-L")

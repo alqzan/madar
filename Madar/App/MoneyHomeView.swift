@@ -235,7 +235,7 @@ struct MoneyHomeView: View {
                     Text("لك فعلًا").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                     Text(figure: !reading.hasKnownBalance ? "—" : amount(reading.basis.netMinor)).font(MadarTypography.cardTitle()).accessibilityIdentifier("money-net")
                     // DA-03: today's spending takes the currency line's place, so the hero is one row as in the canonical.
-                    Text(figure: "صرفت " + amount(cycle.headline.todaySpentMinor) + " من " + amount(cycle.headline.todayAllowanceMinor))
+                    Text(figure: "اليوم: صرفت " + amount(cycle.headline.todaySpentMinor) + " من " + amount(cycle.headline.todayAllowanceMinor))
                         .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-today")
                 }
             }

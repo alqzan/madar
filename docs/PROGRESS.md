@@ -75,7 +75,7 @@ Six read-only Sonnet audits compared canonical screens with the newest screensho
 |---|---|---|---|
 | DA-01 | Common | the floating tab bar covers the last rows (money cards, prayer home, customize, diary home); content needs a bottom inset equal to the bar | no change: the native iOS 26 tab bar already insets scroll content and floats over it by design (`TabShell.swift`); the shots catch content mid-scroll |
 | DA-02 | Prayer home | future arches show a dash instead of a pale star; reflection weak; qiyam footprint shows 6 of 30 nights | matched — awaiting owner: pale star on future arches, accent star on the next (`test_M1V01_HomeMatchesCanonical` pass, `or27b`). Footprint already draws 30 cells (empty ones faint); reflection unchanged. |
-| DA-03 | Money home | owner 27 Oct: «سجل مصروف أبيها فوق شي بسيط لأنه نادر، ما أبيه ظاهر كبير» — done as a small «+» in the header. Also: hero extras (اليوم، صرفت، currency line, blue «سجّل مصروفًا» bar) push envelopes below the fold; scroll chart lacks day bars | ready |
+| DA-03 | Money home | owner 27 Oct: «سجل مصروف أبيها فوق شي بسيط لأنه نادر، ما أبيه ظاهر كبير» — done as a small «+» in the header. Also: hero extras (اليوم، صرفت، currency line, blue «سجّل مصروفًا» bar) push envelopes below the fold; scroll chart lacks day bars | matched — awaiting owner (Codex 28 Oct): daily-spend bars use their own proportional scale, rise from one baseline, and sit above due diamonds and paired dates as in Z-R12; zero-spend days have no invented bar. «اليوم: صرفت X من Y» remains one compact line beside «لك الآن». Header + and envelope placement already built by Claude. `MoneyHomeUITests` home/relaunch/envelopes-above-fold + empty/hidden 2/2 (`codex-da03-final-r2.xcresult`), serial iPhone 17 Pro / iOS 26.5 on isolated simulator 0638DFC9. L/light before `codex-da03-before-shots/`, final `codex-da03-final-shots/`; Z-R12 comparison regenerated (1 canonical, 2 actual). Differences: native chrome, both-calendar rows, real content and the previously approved drawer arrangement. No owner-device/visual acceptance. |
 | DA-04 | Money cards | Done: once a statement exists, the statement bar, its swatch, the «بعد N أيام» chip and the share of the limit take the due red, as in `mal/16-Z-R19-cards-1.jpg`, instead of gold. `MoneyCardsUITests` 3/3 (da04a); shot `Artifacts/da04-shots/`. Kept: the close tile's second line is the Hijri date (both calendars, owner rule), so the tiles stay taller than the canonical | matched — awaiting owner |
 | DA-05 | Lobby | owner 27 Oct: «حق العادات مضروب صح، وش ذا القبح». Done for the wide habits card (W1, the owner's default size): 46 pt rings in each habit's room colour with a glyph inside, chosen from the habit's name for hand-made ones; name and amount beneath; the at-risk habit first in the step line; then «هذا الأسبوع». Lobby prayer arches carry stars instead of checkmarks, Jumu'ah stands taller, and coming prayers are paler. `BahwLobbyUITests` 3/3 (da05b, da05e); shots in `Artifacts/da05-shots/`. The large (4×4) grid uses the same rings (da05f). Left: the F1 orbit for the large card, and clipped small tiles. Habits room orbit (W2): drawn beads instead of icons (filled when done, half when a period was missed, hollow while waiting, dashed when frozen; linked habits in their room's colour) and thicker progress rings; `HabitsUITests` 2/2 (da05hab2) | matched — awaiting owner |
 | DA-06 | Mihbara reader | Closed with no change after reading the code: the sheet's undo banner is the timed undo toast (`AppSession.showUndo` hides it after `undoToastSeconds`), not a permanent one; the footer keeps «بحسب الملف» (decision 24 Oct, no unverified printed total); the footnote card sizes to its text up to 220 pt. The three bundled faces stay; a fourth «system» face is allowed by the schema but needs Readium font CSS, listed under ideas | closed |
@@ -365,6 +365,16 @@ M0-M6 software is integrated; M5 has its bounded software gate. M7 remains open 
 
 # Handovers
 
+## Handover — أعمدة المال وأحجام العادات — 2026-10-28 — Codex
+- **Works now:** DA-03 أعمدة الصرف اليومي واضحة وعلى قاعدة واحدة، علامات الاستحقاق أسفلها، واليوم بلا صرف بلا عمود وهمي؛ سطر «اليوم» مختصر والمظاريف ظاهرة في أول الشاشة.
+- **Verified:** `xcodebuild test ... -parallel-testing-enabled NO -only-testing:MadarUITests/MoneyHomeUITests/testHomeReadsActualCycleAndHasNoUnbuiltDoors -only-testing:MadarUITests/MoneyHomeUITests/testEmptyAndHiddenAmountsAreHonest` نجح 2/2 (`codex-da03-final-r2.xcresult`)، محاكي iPhone 17 Pro/iOS 26.5 مستقل 0638DFC9؛ `git diff --check` نظيف.
+- **Differences left:** كروم النظام، التاريخان، المحتوى الحقيقي وترتيب الأدراج المعتمد؛ مقارنة Z-R12 مجددة 1/2، الصور `Artifacts/codex-da03-final-shots/`.
+- **Not verified:** جهاز المالك أو قبوله البصري؛ لم تُستخدم بياناته أو محاكيه النشط.
+- **Next:** DA-05 قصّ حجم أيقونة العادات، ثم بقية الصفوف غير المكتملة؛ العمل على `codex/bahw-owner-review` وغير مدمج.
+- **Model/effort:** غير مكشوف / غير مكشوف؛ Luna للقراءة فقط أثناء الاختبار.
+- **Usage:** آخر قياس 13٪ مستخدم من خمس ساعات و73٪ أسبوعيًا؛ العمل مستمر حتى قرابة 5٪ متبقية.
+
+
 ## Handover — OR-15/16/27 والتدقيق DA-01…DA-09 — 2026-10-27 — Claude
 
 - **Works now:**
@@ -407,12 +417,3 @@ M0-M6 software is integrated; M5 has its bounded software gate. M7 remains open 
 - **Next:** OR-15/16/27 تنتظر اختيار المالك A/B/C (`Madar/Artifacts/diary-directions/index.html`). OR-01/03 بقيت فيها الزجاجيات وكروم النظام والجهاز فقط. ثم قائمة «Next work» (19، 21، 27 مستمرة).
 - **Model/effort:** Claude Opus 5.5، الجهد غير مكشوف؛ مساعدون Sonnet/Haiku للقراءة والمراجعة فقط.
 - **Usage:** 27٪ من نافذة الخمس ساعات و16٪ أسبوعيًا عند كتابة هذا.
-
-## Handover — التخصيص والمال وحواشي تراث — 2026-10-27 — Codex
-- **Works now:** `38ba33b` معاينة X3 ثابتة وبطاقات القوالب؛ `f1c854e` بطاقة الكشف؛ `e8899a6` تنبيه ٨٠٪ حيّ وتسليم OS فعلي؛ `7506eaa` مقارنة اليومية وقرص الدورة ورقاقة البطاقة. OR-28: حواشي تراث الجديدة والقديمة وورقة Aa أوضح، مع الحفاظ على الملفات. على `codex/bahw-owner-review` ولم يُدمج في main.
-- **Verified:** `xcodebuild ... -parallel-testing-enabled NO test` للحالات المحددة في صفوف OR-03/23/24/25/28، والمحاكي iPhone 17 Pro/iOS 26.5 فقط؛ `swift test --package-path Madar/Packages/MadarCommands --filter TurathBookTests` 4/4. حزم UI الكبيرة علقت بعد نجاح الأجسام؛ لا تُحسب كحزم مكتملة، والحزم الأصغر النهائية موثقة بالصفوف. `git diff --check` ونسخ البروتوكول متطابقة.
-- **Differences left:** زجاج X3/كروم النظام؛ حواشي تراث تفتح كمجموعة بدلاً من تخمين الأرقام العارية. صفحة المراجعة مجددة: 105 شاشات، 127/130 حالة؛ W2-Adat وS2-Log وS4-Day فيها حالة بلا مقابل. 255 مرجع صورة محلي صالح؛ لم تُختبر أزرار الصفحة بالمتصفح في هذه الجلسة.
-- **Not verified:** جهاز المالك، القبول البصري منه، iOS 27، التوقيع/الإصدار أو CloudKit؛ لم تُستخدم بيانات المالك أو تُغيّر مخازنه. تصحيح رأس ورقة الليل اجتاز 1/1 في `codex-or28-night-r2`؛ اللقطة النهائية مفحوصة.
-- **Next:** OR-15/16/27 تنتظر اختيار A/B/C؛ المعاينات في `Madar/Artifacts/diary-directions/index.html`، ولا تفترض جوابًا. ثم OR-29: بطاقة الاقتباس الحالية ثابتة وغير قابلة للتعديل (`MihbaraReaderView.swift`, `MihbaraQuoteCardSheet/Artwork`)؛ المطلوب نص الاقتباس فقط افتراضيًا، تحرير كامل وإضافات اختيارية قابلة للإزالة. OR-30 له تنفيذ قائم، ثم OR-31 ترجمة Apple وOR-32 درج A. لا تبدأ بدمج main وOR-01/03 غير مكتملتين.
-- **Model/effort:** Codex، غير مكشوف / غير مكشوف؛ Luna للقراءة فقط أثناء البنايات، بلا محاكي أو تعديل أو بيانات خاصة.
-- **Usage:** آخر قياس قبل الالتزام النهائي 98٪ مستخدم من نافذة خمس ساعات و71٪ أسبوعيًا؛ تجاوز حد 95٪ أثناء الإغلاق، توقّف العمل وحُفظ التسليم فور ظهور القياس.

@@ -72,3 +72,12 @@
 - **Not verified:** the finished-day surah reminder (no fixture); real Home-Screen widgets (gallery preview only); owner iPhone.
 - **Next:** finish OR-23 (row chips, statement card picture) and OR-24 (salary summary, categories charts, cards, cycle settings), then OR-25 onward. Mockups for OR-15/OR-16 and OR-27 (numbers and crescents) go to the owner before building. Merging to `main` waits for Codex's OR-01/OR-03 or the owner.
 - **Model/effort:** claude-opus-5-5, effort not exposed. **Usage:** 90% of the five-hour window at this note.
+
+## Handover — التخصيص والمال وحواشي تراث — 2026-10-27 — Codex
+- **Works now:** `38ba33b` معاينة X3 ثابتة وبطاقات القوالب؛ `f1c854e` بطاقة الكشف؛ `e8899a6` تنبيه ٨٠٪ حيّ وتسليم OS فعلي؛ `7506eaa` مقارنة اليومية وقرص الدورة ورقاقة البطاقة. OR-28: حواشي تراث الجديدة والقديمة وورقة Aa أوضح، مع الحفاظ على الملفات. على `codex/bahw-owner-review` ولم يُدمج في main.
+- **Verified:** `xcodebuild ... -parallel-testing-enabled NO test` للحالات المحددة في صفوف OR-03/23/24/25/28، والمحاكي iPhone 17 Pro/iOS 26.5 فقط؛ `swift test --package-path Madar/Packages/MadarCommands --filter TurathBookTests` 4/4. حزم UI الكبيرة علقت بعد نجاح الأجسام؛ لا تُحسب كحزم مكتملة، والحزم الأصغر النهائية موثقة بالصفوف. `git diff --check` ونسخ البروتوكول متطابقة.
+- **Differences left:** زجاج X3/كروم النظام؛ حواشي تراث تفتح كمجموعة بدلاً من تخمين الأرقام العارية. صفحة المراجعة مجددة: 105 شاشات، 127/130 حالة؛ W2-Adat وS2-Log وS4-Day فيها حالة بلا مقابل. 255 مرجع صورة محلي صالح؛ لم تُختبر أزرار الصفحة بالمتصفح في هذه الجلسة.
+- **Not verified:** جهاز المالك، القبول البصري منه، iOS 27، التوقيع/الإصدار أو CloudKit؛ لم تُستخدم بيانات المالك أو تُغيّر مخازنه. تصحيح رأس ورقة الليل اجتاز 1/1 في `codex-or28-night-r2`؛ اللقطة النهائية مفحوصة.
+- **Next:** OR-15/16/27 تنتظر اختيار A/B/C؛ المعاينات في `Madar/Artifacts/diary-directions/index.html`، ولا تفترض جوابًا. ثم OR-29: بطاقة الاقتباس الحالية ثابتة وغير قابلة للتعديل (`MihbaraReaderView.swift`, `MihbaraQuoteCardSheet/Artwork`)؛ المطلوب نص الاقتباس فقط افتراضيًا، تحرير كامل وإضافات اختيارية قابلة للإزالة. OR-30 له تنفيذ قائم، ثم OR-31 ترجمة Apple وOR-32 درج A. لا تبدأ بدمج main وOR-01/03 غير مكتملتين.
+- **Model/effort:** Codex، غير مكشوف / غير مكشوف؛ Luna للقراءة فقط أثناء البنايات، بلا محاكي أو تعديل أو بيانات خاصة.
+- **Usage:** آخر قياس قبل الالتزام النهائي 98٪ مستخدم من نافذة خمس ساعات و71٪ أسبوعيًا؛ تجاوز حد 95٪ أثناء الإغلاق، توقّف العمل وحُفظ التسليم فور ظهور القياس.
