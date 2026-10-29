@@ -37,6 +37,11 @@ struct DiarySearchTests {
         #expect(p.matches(document,chips:p.parse("#عائلة")))
         #expect(!p.matches(document,chips:p.parse("#بيت")))
     }
+    @Test func monthOnlyRangeRunsFromTheFirstToTheLastDay() throws {
+        #expect(try parser().parse("من مايو إلى يونيو").map(\.rule)==[.range(try GregorianDay("2026-05-01"),try GregorianDay("2026-06-30"))])
+        #expect(try parser().parse("من فبراير ٢٠٢٤ إلى فبراير ٢٠٢٤").map(\.rule)==[.range(try GregorianDay("2024-02-01"),try GregorianDay("2024-02-29"))])
+    }
+
     @Test func ArabicNormalizationAndNoInventedAnswer() throws {
         #expect(DiarySearchParser.contains("بالصبر والصلاة",words:"الصَّبر الصلاة"))
         #expect(DiarySearchParser.contains("أمي في مكـة ١٤٤٥",words:"امي مكه 1445"))

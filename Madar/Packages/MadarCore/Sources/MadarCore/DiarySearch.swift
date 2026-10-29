@@ -49,11 +49,19 @@ public struct DiarySearchParser: Sendable {
         let h=["محرم","صفر","ربيع الاول","ربيع الثاني","جمادي الاولي","جمادي الاخره","رجب","شعبان","رمضان","شوال","ذو القعده","ذو الحجه"]
         return g.enumerated().map{($0.element,$0.offset+1,.gregorian)} + h.enumerated().map{($0.element,$0.offset+1,.hijri)}
     }
-    private func endpoint(_ raw: String) -> GregorianDay? {
+    /// A month alone («مايو»، «رمضان ١٤٤٥») stands for its first day as a start and its last day as an end.
+    private func endpoint(_ raw: String, end: Bool = false) -> GregorianDay? {
         let s=raw.trimmingCharacters(in:.whitespaces)
         if let d=try? GregorianDay(s) { return d }
         for (name,m,first) in months where s.contains(name) {
             let values=s.replacingOccurrences(of:name,with:"").split(separator:" ").compactMap{Int($0)}
+            if values.isEmpty || values.count==1 && values[0]>31 {
+                let year=values.first ?? parts(today,first).year!
+                guard let start=date(year,m,1,first) else { continue }
+                if !end { return start }
+                guard let next=m==12 ? date(year+1,1,1,first) : date(year,m+1,1,first) else { continue }
+                return next.adding(days:-1)
+            }
             guard let d=values.first, (1...31).contains(d) else { continue }
             return date(values.count>1 ? values[1] : parts(today,first).year!,m,d,first)
         }
@@ -71,7 +79,7 @@ public struct DiarySearchParser: Sendable {
                 chips.append(.init(label:values[0].trimmingCharacters(in:.whitespaces),rule:rule)); source.replaceSubrange(range,with:" ")
             }
         }
-        take("من (.+?) الي (.+)$") { v in guard let a=endpoint(v[1]),let b=endpoint(v[2]),a<=b else{return nil};return .range(a,b) }
+        take("من (.+?) الي (.+)$") { v in guard let a=endpoint(v[1]),let b=endpoint(v[2],end:true),a<=b else{return nil};return .range(a,b) }
         take("اول امس|امس|اليوم") { v in let d=today.adding(days:v[0]=="اليوم" ? 0 : v[0]=="امس" ? -1 : -2);return .range(d,d) }
         take("(?:العام|السنه) الماضي(?:ه)?") { _ in .year(today.year-1,.gregorian) }
         take("الشهر الماضي") { _ in let start=date(today.year,today.month,1,.gregorian)!;let end=start.adding(days:-1);return .range(date(end.year,end.month,1,.gregorian)!,end) }
