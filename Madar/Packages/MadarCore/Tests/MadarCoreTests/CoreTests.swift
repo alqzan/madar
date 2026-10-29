@@ -73,26 +73,25 @@ func sanctity() throws {
     #expect(NotificationArbiter.prayerAsk(day: day, prayer: .fajr, askAfterAdhanMinutes: 1)?.dueAt == day.fajr.addingTimeInterval(1800))
     #expect(NotificationArbiter.prayerAsk(day: day, prayer: .fajr, recorded: true) == nil)
 }
-@Test("RP3 prayer-specific sanctity extensions use Friday and Ramadan dates")
-func sanctityExtensions() throws {
+@Test("Sanctity windows last 30 minutes after adhan and 20 after Maghrib")
+func sanctityWindowDurations() throws {
     let friday = try #require(PrayerTimesEngine.calculate(day: GregorianDay("2026-10-09"), place: .riyadh))
-    let fridayWindows = friday.sanctityWindows
-    #expect(fridayWindows.first { $0.prayer == .dhuhr }?.end == friday.dhuhr.addingTimeInterval(60 * 60))
-    #expect(fridayWindows.first { $0.prayer == .maghrib }?.end == friday.maghrib.addingTimeInterval(20 * 60))
-    #expect(fridayWindows.first { $0.prayer == .isha }?.end == friday.isha.addingTimeInterval(30 * 60))
-
     let ramadan = try #require(PrayerTimesEngine.calculate(day: GregorianDay("2027-02-10"), place: .riyadh))
     #expect(ramadan.hijriDate?.month == 9)
-    #expect(ramadan.sanctityWindows.first { $0.prayer == .isha }?.end == ramadan.isha.addingTimeInterval(90 * 60))
-    #expect(ramadan.sanctityWindows.first { $0.prayer == .dhuhr }?.end == ramadan.dhuhr.addingTimeInterval(30 * 60))
+    for day in [friday, ramadan] {
+        for prayer in Prayer.allCases {
+            let minutes = prayer == .maghrib ? 20 : 30
+            #expect(day.sanctityWindows.first { $0.prayer == prayer }?.end == day.time(for: prayer).addingTimeInterval(Double(minutes * 60)))
+        }
+    }
 }
 @Test("RP3 guard repeats across a following window and clamps exact starts")
 func sanctityGuardCascades() throws {
-    let first = SanctityWindow(prayer: .dhuhr, adhan: try instant(hour: 10), durationMinutes: 60)
-    let following = SanctityWindow(prayer: .asr, adhan: try instant(hour: 10, minute: 55), durationMinutes: 30)
+    let first = SanctityWindow(prayer: .dhuhr, adhan: try instant(hour: 10), durationMinutes: 30)
+    let following = SanctityWindow(prayer: .asr, adhan: try instant(hour: 10, minute: 25), durationMinutes: 30)
     let guarder = SanctityGuard(windows: [following, first])
-    let requested = try instant(hour: 10, minute: 30)
-    let clear = try instant(hour: 11, minute: 25)
+    let requested = try instant(hour: 10, minute: 10)
+    let clear = try instant(hour: 10, minute: 55)
     #expect(guarder.clamp(requested) == clear)
     #expect(guarder.clamp(following.start) == following.end)
     #expect(guarder.clamp(following.end) == following.end)
@@ -101,10 +100,10 @@ func sanctityGuardCascades() throws {
 func sanctityRequestPaths() throws {
     let friday = try #require(PrayerTimesEngine.calculate(day: GregorianDay("2026-10-09"), place: .riyadh))
     let dhuhrWindow = try #require(friday.sanctityWindows.first { $0.prayer == .dhuhr })
-    let ask = try #require(NotificationArbiter.prayerAsk(day: friday, prayer: .dhuhr, askAfterAdhanMinutes: 45))
+    let ask = try #require(NotificationArbiter.prayerAsk(day: friday, prayer: .dhuhr, askAfterAdhanMinutes: 25))
     #expect(ask.dueAt == dhuhrWindow.end)
-    let snooze = NotificationCandidate(id: "salah.\(friday.day).dhuhr.snooze", room: .salah, kind: .prayerAsk, dueAt: friday.dhuhr.addingTimeInterval(45 * 60), dayKey: friday.day.description)
-    let roomRequest = NotificationCandidate(id: "quran.friday", room: .quran, dueAt: friday.dhuhr.addingTimeInterval(45 * 60), dayKey: friday.day.description)
+    let snooze = NotificationCandidate(id: "salah.\(friday.day).dhuhr.snooze", room: .salah, kind: .prayerAsk, dueAt: friday.dhuhr.addingTimeInterval(25 * 60), dayKey: friday.day.description)
+    let roomRequest = NotificationCandidate(id: "quran.friday", room: .quran, dueAt: friday.dhuhr.addingTimeInterval(25 * 60), dayKey: friday.day.description)
     let fridayPlan = NotificationArbiter.plan(candidates: [snooze, roomRequest], prayerDays: [friday], now: friday.dhuhr.addingTimeInterval(-60 * 60), timeZone: friday.place.timeZone, policy: .init(dailyBudget: 10, staleNudgeEnabled: false))
     #expect(fridayPlan.scheduled.count == 2)
     #expect(fridayPlan.scheduled.allSatisfy { $0.dueAt == dhuhrWindow.end })
@@ -115,7 +114,7 @@ func sanctityRequestPaths() throws {
     }
     let digestPlan = NotificationArbiter.plan(candidates: reminders, prayerDays: [ramadan], now: ramadan.isha.addingTimeInterval(-60 * 60), timeZone: ramadan.place.timeZone, policy: .init(dailyBudget: 1, staleNudgeEnabled: false))
     let digest = try #require(digestPlan.scheduled.first { $0.kind == .digest })
-    #expect(digest.dueAt == ramadan.isha.addingTimeInterval(90 * 60))
+    #expect(digest.dueAt == ramadan.isha.addingTimeInterval(60 * 60))
 
     let nudgeNow = friday.dhuhr.addingTimeInterval(-48 * 60 * 60)
     let nudgePlan = NotificationArbiter.plan(candidates: [], prayerDays: [friday], now: nudgeNow, timeZone: friday.place.timeZone, policy: .init(staleNudgeEnabled: true))

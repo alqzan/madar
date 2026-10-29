@@ -47,7 +47,7 @@ import MadarPrayer
         XCTAssertGreaterThan(abs(tripEstimate.dhuhr.timeIntervalSince(dhuhr.occurrence.time)), 60 * 60)
         let windows = PrayerNotificationSchedule.sanctityWindows(for: slots)
         let dhuhrWindow = try XCTUnwrap(windows.first { $0.prayer == .dhuhr && $0.start == dhuhr.occurrence.time })
-        XCTAssertEqual(dhuhrWindow.end, dhuhrWindow.start.addingTimeInterval(60 * 60), "Friday Dhuhr keeps its 60-minute sanctity window")
+        XCTAssertEqual(dhuhrWindow.end, dhuhrWindow.start.addingTimeInterval(30 * 60), "Friday Dhuhr follows the 30-minute sanctity window")
         let candidate = try XCTUnwrap(PrayerNotificationSchedule.candidates(for: slots, sanctityWindows: windows,
                                                                             askAfterAdhanMinutes: 30)
             .first { $0.id == "salah.2026-03-20.dhuhr" })

@@ -45,14 +45,8 @@ public struct PrayerDay: Codable, Equatable, Sendable {
     }
     public func time(for prayer: Prayer) -> Date { switch prayer { case .fajr: fajr; case .dhuhr: dhuhr; case .asr: asr; case .maghrib: maghrib; case .isha: isha } }
     public var sanctityWindows: [SanctityWindow] {
-        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = place.timeZone
-        let isFriday = calendar.component(.weekday, from: day.date(in: place.timeZone)) == 6
-        let month = hijriDate?.month ?? HijriCalendar.date(for: day.date(in: place.timeZone).addingTimeInterval(12 * 3600), timeZone: place.timeZone).month
         return Prayer.allCases.map { prayer in
-            let minutes: Int
-            if prayer == .dhuhr && isFriday { minutes = 60 }
-            else if prayer == .isha && month == 9 { minutes = 90 }
-            else { minutes = prayer == .maghrib ? 20 : 30 }
+            let minutes = prayer == .maghrib ? 20 : 30
             return .init(prayer: prayer, adhan: time(for: prayer), durationMinutes: minutes)
         }
     }
