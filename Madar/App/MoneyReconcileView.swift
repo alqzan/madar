@@ -69,7 +69,6 @@ struct MoneyReconcileView: View {
                         naming(row, reading: reading)
                         hint(row)
                         ledger(reading)
-                        if let note { Text(note).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")).accessibilityIdentifier("money-reconcile-note") }
                     }
                 } else if let failure { Text(failure).font(MadarTypography.body()); Button("أعِد المحاولة", action: load).frame(minHeight: 44) }
                 else { ProgressView().frame(maxWidth: .infinity, minHeight: 260) }
@@ -413,13 +412,17 @@ struct MoneyReconcileView: View {
         case 3...10: count = " · تُكتب " + service.digits.string(s.settlements) + " تسويات"
         default: count = " · تُكتب " + service.digits.string(s.settlements) + " تسوية"
         }
-        return Button(action: save) {
+        // AU-43: a refused save is said right above the pinned button, not deep in the page.
+        return VStack(alignment: .leading, spacing: 6) {
+        if let note { Text(note).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")).accessibilityIdentifier("money-reconcile-note") }
+        Button(action: save) {
             HStack(spacing: 12) {
                 PrayerStar().stroke(theme.background, lineWidth: 1.2).frame(width: 26, height: 26).accessibilityHidden(true)
                 Text("ثبّت المطابقة" + count).font(MadarTypography.cardTitle()).bold().lineLimit(1).minimumScaleFactor(0.8)
             }.frame(maxWidth: .infinity, minHeight: 60).foregroundStyle(theme.background)
                 .background(theme.ink.opacity(any && !saving ? 1 : 0.35), in: RoundedRectangle(cornerRadius: 8))
         }.buttonStyle(.plain).disabled(!any || saving || !visible).accessibilityIdentifier("money-reconcile-save")
+        }
             .padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 4).background(theme.background.opacity(0.94))
     }
 

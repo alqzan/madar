@@ -243,6 +243,12 @@ struct SettingControl: View {
                     .accessibilityIdentifier("setting-\(definition.key)")
             default: EmptyView()
             }
+            // AU-43: the switches that change what reaches the user say what they do.
+            if let caption = ["core.faceIDLock": "مدار كله: يطلب Face ID عند فتح مدار، ويخفي تفاصيل الودجات والإشعارات. بلا: يُفتح مباشرة.",
+                              "notif.thisDeviceReminders": "إيقافه يوقف كل تذكيرات مدار على هذا الجهاز، وتبقى مواعيدك وسجلّك كما هي.",
+                              "notif.quietAfterIsha": "لا تصلك التذكيرات من وقت الصمت حتى منتصف الليل."][definition.key] {
+                Text(caption).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
+            }
             if definition.key == "core.spotlightIndex" {
                 Text("يفهرس عناوين كتب المحبرة فقط؛ لا يُفهرس نص الكتب أو المؤلفون أو الملاحظات الخاصة.")
                     .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
