@@ -120,7 +120,7 @@ struct BahwLobbyView: View {
         .toolbarVisibility(.hidden, for: .navigationBar)
         .navigationDestination(isPresented: $session.habitsOpen) { HabitsRoomView(session: session) }
         .navigationDestination(isPresented: $session.yearOpen) { BahwYearView(session: session) }
-        .sheet(isPresented: $drawerOpen) { drawer.presentationDetents([.medium]) }
+        .sheet(isPresented: $drawerOpen) { drawer.presentationDetents([.medium]).madarSheetErrorAlert(session) }
         .onChange(of: arranging) { _, on in wiggle = on && !reduceMotion }
     }
 

@@ -256,7 +256,7 @@ struct MadarRootView: View {
         .overlay(alignment: .bottom) {
             if session.undoToastVisible { UndoToast(message: session.undoMessage, undo: session.undo).padding(.bottom, 86) }
         }
-        .fullScreenCover(isPresented: Binding(get: { !session.onboardingComplete }, set: { _ in })) { FirstRunView(session: session).environment(\.roomTheme, theme) }
+        .fullScreenCover(isPresented: Binding(get: { !session.onboardingComplete }, set: { _ in })) { FirstRunView(session: session).environment(\.roomTheme, theme).madarSheetErrorAlert(session) }
         .alert("لم تكتمل العملية", isPresented: Binding(get: { session.errorMessage != nil }, set: { if !$0 { session.errorMessage = nil } })) {
             Button("حسنًا") { session.errorMessage = nil }
         } message: { Text(session.errorMessage ?? "") }

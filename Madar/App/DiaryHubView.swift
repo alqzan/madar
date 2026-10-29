@@ -56,7 +56,7 @@ struct DiaryHubView: View {
                 .fullScreenCover(isPresented: $searchOpen) { DiarySearchView(app: app).environment(\.roomTheme, theme) }
                 .toolbar { ToolbarItem(placement: .topBarTrailing) { Button { searchOpen = true } label: { Image(systemName: "magnifyingglass") }.accessibilityLabel("ابحث في مذكراتك") }; ToolbarItem(placement: .topBarLeading) { Button { dismiss() } label: { Label("المذكرات", systemImage: "chevron.backward") }.accessibilityIdentifier("diary-hub-close") } }
                 .toolbarBackground(theme.background, for: .navigationBar).tint(theme.accent)
-                .sheet(isPresented: Binding(get: { reader != nil }, set: { if !$0 { reader = nil } })) { if let reader { DiaryDayView(app: app, day: reader).environment(\.roomTheme, theme) } }
+                .sheet(isPresented: Binding(get: { reader != nil }, set: { if !$0 { reader = nil } })) { if let reader { DiaryDayView(app: app, day: reader).environment(\.roomTheme, theme).madarSheetErrorAlert(app) } }
                 .task(id: app.prayerRevision) { do { archive = try service.archive(); travelDays = (try? service.travelDays()) ?? []; failure = nil } catch { failure = madarUserMessage(error) } }
         }
     }

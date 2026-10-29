@@ -32,7 +32,7 @@ struct HabitDetailView:View {
                 Text("الحذف يحفظ سجلك؛ تستعيد العادة من «عادات محذوفة».").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
             }.padding(22)
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.accent).environment(\.roomTheme,theme)
-        .sheet(isPresented:$pastDay) { HabitPastDaySheet(session:session,reading:reading) { dismiss() } }
+        .sheet(isPresented:$pastDay) { HabitPastDaySheet(session:session,reading:reading) { dismiss() }.madarSheetErrorAlert(session) }
     }
     /// The period at a glance: its arch filling with progress, what is left, and the one action that moves it.
     private func hero(_ current:HabitPeriodResult)->some View {

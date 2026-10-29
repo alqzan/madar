@@ -104,9 +104,9 @@ struct HabitsRoomView: View {
             Button("احذف نهائيًا",role:.destructive) {if let row=deletingArchived{perform("habit.deleteArchived",["id":.string(row.id.uuidString)])};deletingArchived=nil}
             Button("إلغاء",role:.cancel){deletingArchived=nil}
         } message:{Text("تختفي العادة وسياساتها وتسجيلاتها. يتاح التراجع لعشر دقائق.")}
-        .sheet(item:$editor) { value in HabitEditorView(session:session,reading:value.reading,id:value.id) }
-        .sheet(item:$pastDay) { row in HabitPastDaySheet(session:session,reading:row) { reload() } }
-        .sheet(item:$detail,onDismiss:{if let pendingEditor {editor=pendingEditor;self.pendingEditor=nil}}) { row in HabitDetailView(session:session,reading:row) { pendingEditor = .init(id:row.id,reading:row); detail=nil } }
+        .sheet(item:$editor) { value in HabitEditorView(session:session,reading:value.reading,id:value.id).madarSheetErrorAlert(session) }
+        .sheet(item:$pastDay) { row in HabitPastDaySheet(session:session,reading:row) { reload() }.madarSheetErrorAlert(session) }
+        .sheet(item:$detail,onDismiss:{if let pendingEditor {editor=pendingEditor;self.pendingEditor=nil}}) { row in HabitDetailView(session:session,reading:row) { pendingEditor = .init(id:row.id,reading:row); detail=nil }.madarSheetErrorAlert(session) }
     }
     private var empty: some View {
         VStack(spacing:16) { HabitRingGlyph(share:0.25,done:false,symbol:nil,lineWidth:5).frame(width:60,height:60); Text("القليل الذي تدوم عليه").font(MadarTypography.title()); Text("اختر عادة صغيرة تبدأ بها، أو اربطها بما تسجّله في غرف مدار.").font(MadarTypography.body()).multilineTextAlignment(.center).foregroundStyle(theme.secondaryInk); Button { editor = .init(id:UUID()) } label: { Text("أضف أول عادة").font(MadarTypography.section()).padding(.horizontal,22).frame(minHeight:48).background(theme.accentFill,in:.capsule).foregroundStyle(theme.onAccent) }.buttonStyle(.plain).accessibilityIdentifier("habit-first") }.padding(28).frame(maxWidth:.infinity).background(theme.surface,in:.rect(cornerRadius:24)).padding(.top,25)

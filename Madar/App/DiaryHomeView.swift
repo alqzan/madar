@@ -107,11 +107,11 @@ struct DiaryHomeView: View {
         }
         .onChange(of: selected) { _, day in if let day { Task { try? await service.prepareClosedDay(day); await refresh() } } }
         .fullScreenCover(isPresented: $searchOpen) { DiarySearchView(app: app).environment(\.roomTheme, theme) }
-        .fullScreenCover(isPresented: $archiveOpen) { DiaryHubView(app: app).environment(\.roomTheme, theme) }
-        .sheet(isPresented: $customizing, onDismiss: { selected = nil; Task { await refresh() } }) { DiaryCustomizeView(app: app).environment(\.roomTheme, theme) }
-        .sheet(item: $editor) { target in DiaryTextEditor(app: app, margin: target.margin, initialDay: target.day).environment(\.roomTheme, theme) }
+        .fullScreenCover(isPresented: $archiveOpen) { DiaryHubView(app: app).environment(\.roomTheme, theme).madarSheetErrorAlert(app) }
+        .sheet(isPresented: $customizing, onDismiss: { selected = nil; Task { await refresh() } }) { DiaryCustomizeView(app: app).environment(\.roomTheme, theme).madarSheetErrorAlert(app) }
+        .sheet(item: $editor) { target in DiaryTextEditor(app: app, margin: target.margin, initialDay: target.day).environment(\.roomTheme, theme).madarSheetErrorAlert(app) }
         .sheet(isPresented: Binding(get: { reader != nil }, set: { if !$0 { reader = nil } })) {
-            if let reader { DiaryDayView(app: app, day: reader).environment(\.roomTheme, theme) }
+            if let reader { DiaryDayView(app: app, day: reader).environment(\.roomTheme, theme).madarSheetErrorAlert(app) }
         }
         .onChange(of: app.diaryRoute, initial: true) { _, route in
             guard let route else { return }; app.diaryRoute = nil

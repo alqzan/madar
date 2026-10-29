@@ -49,7 +49,7 @@ struct DiaryDayOneImportView: View {
             .onChange(of: choice) { _, value in if let draft { preview = try? service.preview(draft, choice: value) } }
             .onChange(of: phase) { _, value in if value == .background, importing == nil, receipt == nil { reset() } }
             .onDisappear { service.discard(draft) }
-            .sheet(isPresented: Binding(get: { openDay != nil }, set: { if !$0 { openDay = nil } })) { if let openDay { DiaryDayView(app: app, day: openDay).environment(\.roomTheme, theme) } }
+            .sheet(isPresented: Binding(get: { openDay != nil }, set: { if !$0 { openDay = nil } })) { if let openDay { DiaryDayView(app: app, day: openDay).environment(\.roomTheme, theme).madarSheetErrorAlert(app) } }
         }
     }
 

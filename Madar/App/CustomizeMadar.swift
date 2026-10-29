@@ -92,8 +92,8 @@ struct CustomizeMadar: View {
         }
         .fullScreenCover(isPresented: $session.mihbaraOpen) { MihbaraHomeView(app: session) }
         .navigationDestination(isPresented: $session.moneyOpen) { MoneyRoomView(app: session) }
-        .sheet(isPresented: $widgetMaker) { WidgetMakerView(session: session).presentationDetents([.large]) }
-        .sheet(isPresented:$widgetGallery){NavigationStack{RoomWidgetsGallery(session:session)}}
+        .sheet(isPresented: $widgetMaker) { WidgetMakerView(session: session).presentationDetents([.large]).madarSheetErrorAlert(session) }
+        .sheet(isPresented:$widgetGallery){NavigationStack{RoomWidgetsGallery(session:session)}.madarSheetErrorAlert(session)}
         .toolbarVisibility(.hidden, for: .navigationBar)
         .confirmationDialog("أعِد الإعدادات المتفق عليها؟", isPresented: $confirmReset, titleVisibility: .visible) {
             Button("أعِد الافتراضي", role: .destructive) { session.reset(AppSession.supportedKeys + ["bahw.layout"] + RoomHomeLayout.rooms.map { $0.0 + ".layout" }) }

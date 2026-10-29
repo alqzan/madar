@@ -55,7 +55,7 @@ struct DiarySearchView: View {
                 .task(id:app.prayerRevision){do{index=try service.searchIndex();chips=index?.parser.parse(query) ?? [];failure=nil}catch{failure=madarUserMessage(error)}}
                 .onChange(of:query){_,value in chips=index?.parser.parse(value) ?? []}
                 .alert("تعديل الفلتر",isPresented:Binding(get:{editing != nil},set:{if !$0{editing=nil}})){TextField("الكلمة أو التاريخ",text:$replacement);Button("تطبيق"){if let old=editing,let i=chips.firstIndex(where:{$0.id==old.id}),let parser=index?.parser {chips.replaceSubrange(i...i,with:parser.parse(replacement))};editing=nil};Button("إلغاء",role:.cancel){editing=nil}}
-                .sheet(isPresented:Binding(get:{reader != nil},set:{if !$0{reader=nil}})){if let reader {DiaryDayView(app:app,day:reader).environment(\.roomTheme,theme)}}
+                .sheet(isPresented:Binding(get:{reader != nil},set:{if !$0{reader=nil}})){if let reader {DiaryDayView(app:app,day:reader).environment(\.roomTheme,theme).madarSheetErrorAlert(app)}}
         }
     }
     private func source(_ kind:String)->String {switch kind{case "photo":"صورة";case "audio":"تسجيل";case "margin":"هامش";case "intention":"نيّة";case "tomorrow":"لِغد";case "letter":"رسالة مفتوحة";default:"كتابتك"}}
