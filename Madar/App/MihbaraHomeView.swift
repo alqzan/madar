@@ -35,6 +35,7 @@ struct MihbaraHomeView: View {
     @State private var pendingMotivationBook: UUID?
     @State private var slotBook: MihbaraBook?
     @State private var pendingSlotBook: MihbaraBook?
+    @State private var pendingLibraryAction: MihbaraLibraryAction?
     @State private var restoreFileAfterSheet = false
     @State private var offerConversion: MihbaraBook?
     private var theme: RoomTheme { .init(room: "mihbara", dark: colorScheme == .dark) }
@@ -248,12 +249,37 @@ struct MihbaraHomeView: View {
         if let id = cue.bookID { pendingMotivationBook = id; sheet = nil }
     }
     private func sheetDismissed() {
+        if let action = pendingLibraryAction {
+            pendingLibraryAction = nil
+            present(action)
+            return
+        }
         if restoreFileAfterSheet {
             restoreFileAfterSheet = false
             showingAddBook = true
         }
         openPendingMotivationBook()
         if let book = pendingSlotBook { pendingSlotBook = nil; slotBook = book }
+    }
+    private func scheduleLibraryAction(_ action: MihbaraLibraryAction) {
+        if case .library? = sheet {
+            pendingLibraryAction = action
+            sheet = nil
+        } else {
+            present(action)
+        }
+    }
+    private func present(_ action: MihbaraLibraryAction) {
+        switch action {
+        case .rename(let book):
+            renameTitle = book.title
+            renameAuthor = book.author
+            renaming = book
+        case .remove(let target):
+            pendingRemoval = target
+        case .open(let book, let volume):
+            openBook(book, volume: volume)
+        }
     }
     /// A book can change shelf from where it sits: long-press its spine or its library row. The table holds three at most.
     @ViewBuilder private func bookMenu(_ b: MihbaraBook) -> some View {
@@ -268,11 +294,11 @@ struct MihbaraHomeView: View {
         if b.shelf == "want" { Button { moveBook(b, to: "old") } label: { Label("قرأته قديمًا", systemImage: "archivebox") } }
         if b.shelf == "old" { Button { moveBook(b, to: "finished") } label: { Label("أعده إلى أنهيتها", systemImage: "checkmark.circle") } }
         if b.kind == "file" {
-            Button { renameTitle = b.title; renameAuthor = b.author; renaming = b } label: { Label("غيّر الاسم", systemImage: "pencil") }
+            Button { scheduleLibraryAction(.rename(b)) } label: { Label("غيّر الاسم", systemImage: "pencil") }
                 .accessibilityIdentifier("mihbara-book-rename")
             if !conversionRunning {
                 if service.hasLocalFile(for: b) {
-                    Button(role: .destructive) { pendingRemoval = .file(b) } label: { Label("احذف ملف الكتاب", systemImage: "doc.badge.minus") }
+                    Button(role: .destructive) { scheduleLibraryAction(.remove(.file(b))) } label: { Label("احذف ملف الكتاب", systemImage: "doc.badge.minus") }
                         .accessibilityIdentifier("mihbara-book-file-remove")
                 } else {
                     Button { requestBookFileRestore() } label: { Label("أعد استيراد ملفه", systemImage: "arrow.down.doc") }
@@ -281,7 +307,7 @@ struct MihbaraHomeView: View {
             }
         }
         if !conversionRunning {
-            Button(role: .destructive) { pendingRemoval = .book(b) } label: { Label("احذف من مكتبتي", systemImage: "trash") }
+            Button(role: .destructive) { scheduleLibraryAction(.remove(.book(b))) } label: { Label("احذف من مكتبتي", systemImage: "trash") }
                 .accessibilityIdentifier("mihbara-book-delete")
         }
     }
@@ -979,6 +1005,10 @@ struct MihbaraHomeView: View {
     }
 
     private func openBook(_ book: MihbaraBook, volume: Int? = nil) {
+        if case .library? = sheet {
+            scheduleLibraryAction(.open(book, volume: volume))
+            return
+        }
         guard book.isReadableEPUB || book.isReadablePDF else { sheet = .book(book.id); return }
         guard service.hasLocalFile(for: book) else { sheet = .book(book.id); return }
         do {
@@ -995,6 +1025,7 @@ struct MihbaraHomeView: View {
 }
 private enum MihbaraRemovalConfirmation { case book(MihbaraBook), file(MihbaraBook) }
 private enum MihbaraSheet: Identifiable { case library, book(UUID), hadith(Int), opening, notebook, motivation; var id: String { String(describing: self) } }
+private enum MihbaraLibraryAction { case rename(MihbaraBook), remove(MihbaraRemovalConfirmation), open(MihbaraBook, volume: Int?) }
 /// Owner, 25 Oct 2026: «اول ما احمل بي دي اف يقولي ترا بحوله لك ولي انا الخيار».
 private struct MihbaraConversionOffer: ViewModifier {
     let app: AppSession

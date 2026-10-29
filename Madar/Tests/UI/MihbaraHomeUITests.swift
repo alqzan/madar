@@ -304,11 +304,12 @@ import UIKit
         let keep = app.alerts.buttons["أبقه PDF"].firstMatch
         if keep.waitForExistence(timeout: 15) { keep.tap() }
     }
-    private func app(_ fixture: String, epub: Data? = nil, paperIndex: Bool = false, storeID: String? = nil, pdf: Data? = nil) -> XCUIApplication {
+    private func app(_ fixture: String, epub: Data? = nil, paperIndex: Bool = false, storeID: String? = nil, pdf: Data? = nil, fileRow: Bool = false) -> XCUIApplication {
         let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID":storeID ?? UUID().uuidString,"MADAR_UI_MIHBARA_FIXTURE":fixture,"MADAR_UI_NOW":"2026-10-17T12:00:00+03:00","MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light"]
         if let epub { app.launchEnvironment["MADAR_UI_MIHBARA_EPUB_BASE64"] = epub.base64EncodedString() }
         if let pdf { app.launchEnvironment["MADAR_UI_MIHBARA_IMPORT_PDF"] = pdf.base64EncodedString() }
         if paperIndex { app.launchEnvironment["MADAR_UI_MIHBARA_PAPER_INDEX_FIXTURE"] = "1" }
+        if fileRow { app.launchEnvironment["MADAR_UI_MIHBARA_FILE_ROW"] = "1" }
         return app
     }
     private func open(_ app: XCUIApplication) {
@@ -439,6 +440,7 @@ import UIKit
         row.press(forDuration: 1.2)
         let remove = app.buttons["mihbara-book-delete"]
         XCTAssertTrue(remove.waitForExistence(timeout: 5), app.debugDescription); remove.tap()
+        XCTAssertTrue(app.textFields["mihbara-library-search"].waitForNonExistence(timeout: 8), "Dismiss the library before presenting the removal confirmation.")
         let confirm = app.buttons["احذف من مكتبتي"]
         XCTAssertTrue(confirm.waitForExistence(timeout: 5), app.debugDescription)
         shot(app, "M6-J13-delete-confirm-L")
@@ -447,7 +449,30 @@ import UIKit
         XCTAssertTrue(book.waitForNonExistence(timeout: 8), app.debugDescription)
         shot(app, "M6-J13-delete-after-L")
         undo(app)
+        reach(app, library); library.tap()
         XCTAssertTrue(app.staticTexts["رحلة القراءة"].waitForExistence(timeout: 8), app.debugDescription)
+    }
+    func testLibraryRenameAndOpenWaitForTheLibrarySheetToDismiss() {
+        continueAfterFailure = false; let app = app("home", fileRow: true); app.launch(); open(app)
+        let library = app.buttons["mihbara-library"]; reach(app, library); library.tap()
+        let readingBook = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "mihbara-library-book-"))
+            .containing(NSPredicate(format: "label CONTAINS %@", "ملف قابل للتعديل")).firstMatch
+        XCTAssertTrue(readingBook.waitForExistence(timeout: 8), app.debugDescription)
+        readingBook.press(forDuration: 1.2)
+        let rename = app.buttons["mihbara-book-rename"]
+        XCTAssertTrue(rename.waitForExistence(timeout: 5), app.debugDescription); rename.tap()
+        XCTAssertTrue(app.textFields["mihbara-library-search"].waitForNonExistence(timeout: 8), "Dismiss the library before presenting rename.")
+        XCTAssertTrue(app.textFields["عنوان الكتاب"].waitForExistence(timeout: 5), app.debugDescription)
+        app.alerts.buttons["إلغاء"].tap()
+
+        reach(app, library); library.tap()
+        let wantBook = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "mihbara-library-book-"))
+            .containing(NSPredicate(format: "label CONTAINS %@", "كتاب ينتظر")).firstMatch
+        XCTAssertTrue(wantBook.waitForExistence(timeout: 8), app.debugDescription); wantBook.tap()
+        XCTAssertTrue(app.textFields["mihbara-library-search"].waitForNonExistence(timeout: 8), "Dismiss the library before opening book details.")
+        XCTAssertTrue(app.buttons["mihbara-paper-start"].waitForExistence(timeout: 8), app.debugDescription)
     }
     func testEmptyShelfPaperAddAndUndo() {
         continueAfterFailure = false; let app = app("empty"); app.launch(); open(app); shot(app,"M6-V01-empty-L")
