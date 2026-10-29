@@ -9,6 +9,8 @@ public struct MoneyCardDebtReading {
     public var statementID: UUID?
     public var statementLeftMinor: Int
     public var unbilledLeftMinor: Int
+    /// Paid beyond the whole debt; the card holds it (F01).
+    public var creditMinor: Int = 0
     public var dueDate: Date?
     public var estimatedClose: Bool
     public var messageID: UUID?
@@ -36,7 +38,7 @@ extension MoneyRepository {
             }
             let state = CreditCardState(statementMinor: max(0, billed), paidSinceCloseMinor: payments, unbilledMinor: max(0, unbilled))
             return .init(cardID: card.id, cardName: card.name, statementID: statement?.id, statementLeftMinor: state.statementLeftMinor,
-                unbilledLeftMinor: state.unbilledLeftMinor, dueDate: statement?.dueDate, estimatedClose: statement?.closeDateSource == "estimated", messageID: statement?.messageID)
+                unbilledLeftMinor: state.unbilledLeftMinor, creditMinor: state.creditMinor, dueDate: statement?.dueDate, estimatedClose: statement?.closeDateSource == "estimated", messageID: statement?.messageID)
         }
     }
 }

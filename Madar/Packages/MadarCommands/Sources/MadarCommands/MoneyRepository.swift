@@ -117,7 +117,7 @@ import MadarPrayer
         let rates = try manualRates(at: now).merging(rates) { _, explicit in explicit }
         let accounts = try homeAccountBalances(at: now, rates: rates).map { AccountState(balanceMinor: $0.homeMinor) }
         let transactions = try confirmedTransactions().filter { $0.eventAt <= now }
-        let cardStates = try cardDebts(at: now).map { CreditCardState(statementMinor: $0.statementLeftMinor, unbilledMinor: $0.unbilledLeftMinor) }
+        let cardStates = try cardDebts(at: now).map { CreditCardState(statementMinor: $0.statementLeftMinor, paidSinceCloseMinor: $0.creditMinor, unbilledMinor: $0.unbilledLeftMinor) }
         let obligations = try context.fetch(FetchDescriptor<Obligation>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
         let items = try context.fetch(FetchDescriptor<InstallmentItem>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
         let home = try SettingsStore(context: context).value(for: "core.currency").string ?? "SAR"

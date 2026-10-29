@@ -19,6 +19,8 @@ public struct CreditCardState: Equatable, Sendable {
     /// F07: the statement left = statement − payments since close (never below 0); an overpayment lowers the unbilled.
     public var statementLeftMinor: Int { max(0, statementMinor - paidSinceCloseMinor) }
     public var unbilledLeftMinor: Int { max(0, unbilledMinor - max(0, paidSinceCloseMinor - statementMinor)) }
+    /// F01: a payment beyond the whole debt stays on the card as credit you hold, so «لك فعلًا» does not move.
+    public var creditMinor: Int { max(0, paidSinceCloseMinor - statementMinor - unbilledMinor) }
 }
 
 /// One InstallmentItem of a BNPL purchase (Tamara, Tabby); the rest is derived from paidMinor (F03).
@@ -61,7 +63,9 @@ public struct Basis: Equatable, Sendable {
 
 public enum BasisEngine {
     public static func basis(_ input: BasisInput) -> Basis {
+        // A card's credit balance is your money held at the bank: it sits with the cash, and «عليك» never goes below 0.
         let cash = input.accounts.filter { $0.ownership == .mine }.reduce(0) { $0 + $1.balanceMinor }
+            + input.creditCards.reduce(0) { $0 + $1.creditMinor }
         let owed = input.creditCards.reduce(0) { $0 + $1.statementLeftMinor + $1.unbilledLeftMinor }
             + input.installments.reduce(0) { $0 + $1.leftMinor }
         let reserved = input.loanDueMinor + input.billsDueMinor + input.envelopeAllocationsMinor.reduce(0, +)

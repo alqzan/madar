@@ -48,6 +48,10 @@ extension AppMoneyService {
                 explanation: "لم يُسجّل لهذا الحساب رصيد أكّده البنك بعد. الحركات وحدها لا تكشف رصيد البداية؛ أجرِ مطابقة مع البنك من الحسابات.",
                 valueText: "لم يُعرف رصيدها بعد")
         }
+        for card in try repo.cardDebts(at: now) where card.creditMinor > 0 {
+            accountRows.append(.init(id: "credit:" + card.cardID.uuidString, title: "رصيد دائن، " + card.cardName, amountMinor: card.creditMinor,
+                explanation: "سدّدت للبطاقة أكثر من كل ما عليها، فبقي الزائد لك عند البنك ويُخصم من مشترياتك القادمة."))
+        }
         let messages = try context.fetch(FetchDescriptor<BankMessage>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }
         var debts: [MoneySourceDetail] = []
         for card in try repo.cardDebts(at: now) {

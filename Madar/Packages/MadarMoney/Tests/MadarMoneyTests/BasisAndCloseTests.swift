@@ -42,6 +42,18 @@ import Testing
         #expect(after.netMinor == 11_870_000)
     }
 
+    @Test func paymentBeyondTheWholeCardDebtLeavesNetUnchanged() {
+        // F01: a payment is a transfer even beyond the whole debt; the extra stays on the card as credit.
+        var paid = Self.c0
+        let whole = paid.creditCards[0].statementMinor + paid.creditCards[0].unbilledMinor
+        paid.accounts[0].balanceMinor -= whole + 50_000; paid.creditCards[0].paidSinceCloseMinor = whole + 50_000
+        #expect(paid.creditCards[0].creditMinor == 50_000)
+        let before = BasisEngine.basis(Self.c0), after = BasisEngine.basis(paid)
+        #expect(after.netMinor == before.netMinor)
+        #expect(after.owedMinor == before.owedMinor - whole)
+        #expect(after.inAccountMinor == before.inAccountMinor - whole)
+    }
+
     @Test func notMineAccountStaysOutOfCashAndNet() {
         var more = Self.c0
         more.accounts[2].balanceMinor += 1_000_000
