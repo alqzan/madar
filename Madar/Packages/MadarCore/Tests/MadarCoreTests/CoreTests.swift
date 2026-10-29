@@ -481,3 +481,19 @@ func quietEndChoice() throws {
     #expect(!NotificationArbiter.plan(candidates: [night], prayerDays: [day], now: early, timeZone: zone,
         policy: .init(quietFromMinutes: from, quietUntil: .midnight)).droppedIDs.contains("night"))
 }
+
+@Test("A daylight-saving day still digests before quiet begins")
+func quietCutoffFollowsTheWallClock() throws {
+    // London springs forward at 01:00 on 29 March 2026 (after Ramadan): 22:00 on that day is 21 elapsed hours after midnight, not 22.
+    let place = try ActivePlace(latitude: 51.51, longitude: -0.13, timeZoneID: "Europe/London")
+    var cal = Calendar(identifier: .gregorian); cal.timeZone = place.timeZone
+    func at(_ h: Int, _ m: Int = 0) throws -> Date { try #require(cal.date(from: .init(year: 2026, month: 3, day: 29, hour: h, minute: m))) }
+    let day = PrayerDay(day: try GregorianDay("2026-03-29"), place: place, fajr: try at(5, 50), sunrise: try at(7, 15), dhuhr: try at(13, 10),
+                        asr: try at(16, 25), maghrib: try at(19, 10), isha: try at(21))
+    let candidates = (0..<3).map { NotificationCandidate(id: "habits.2026-03-29.\($0)", room: .habits, dueAt: day.dhuhr.addingTimeInterval(3600 + Double($0) * 600), dayKey: "2026-03-29") }
+    let plan = NotificationArbiter.plan(candidates: candidates, prayerDays: [day], now: try at(9), timeZone: place.timeZone,
+                                        policy: .init(dailyBudget: 2, quietFromMinutes: 22 * 60, staleNudgeEnabled: false))
+    // Isha + 60 min is 22:00, the start of quiet; the digest moves to 21:45 wall time instead of being lost.
+    let digest = try #require(plan.scheduled.first { $0.kind == .digest })
+    #expect(cal.dateComponents([.hour, .minute], from: digest.dueAt) == DateComponents(hour: 21, minute: 45))
+}

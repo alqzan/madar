@@ -160,8 +160,11 @@ public enum NotificationArbiter {
             if policy.digestEnabled, let prayers = prayerDays.first(where: { $0.day.description == key }) {
                 var proposed = prayers.isha.addingTimeInterval(60 * 60) // sanctity end + 30 minutes
                 if let quiet = policy.quietFromMinutes {
-                    let cutoff = prayers.day.date(in: timeZone).addingTimeInterval(Double(quiet - 15) * 60)
-                    proposed = min(proposed, cutoff)
+                    // Wall-clock time, so a daylight-saving day still digests 15 minutes before quiet begins.
+                    var calendar = Calendar(identifier: .gregorian); calendar.timeZone = timeZone
+                    if let cutoff = calendar.date(bySettingHour: max(0, quiet - 15) / 60, minute: max(0, quiet - 15) % 60, second: 0, of: prayers.day.date(in: timeZone)) {
+                        proposed = min(proposed, cutoff)
+                    }
                 }
                 proposed = sanctityGuard.clamp(proposed)
                 if proposed >= now && proposed <= ordinaryEnd && !isQuiet(proposed, timeZone: timeZone, policy: policy, prayerDays: prayerDays) { digestTime = proposed }
@@ -226,6 +229,7 @@ public enum NotificationArbiter {
         guard until != .midnight, let day = prayerDays.first(where: { $0.day == civil }) else { return false }
         let end = until == .fajr ? day.fajr : day.sunrise
         // The morning part only: before this day's end, and only in the small hours before the evening start.
-        return date < end && end.timeIntervalSince(calendar.startOfDay(for: date)) < Double(fromMinutes) * 60
+        let endParts = calendar.dateComponents([.hour, .minute], from: end)
+        return date < end && (endParts.hour ?? 0) * 60 + (endParts.minute ?? 0) < fromMinutes
     }
 }
