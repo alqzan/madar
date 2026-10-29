@@ -18,6 +18,9 @@ public struct HabitReading: Identifiable, Sendable {
     /// Days the habit was done, newest first, each with the diary line linked to it (item 26 «منذ آخر مرة»).
     public var times: [HabitTime] = []
     public var lastTime: HabitTime? { times.first }
+    public func refreshed(in readings: [HabitReading]) -> HabitReading? {
+        readings.first { $0.id == id }
+    }
 }
 public struct HabitTime: Equatable, Sendable {
     public let day: GregorianDay

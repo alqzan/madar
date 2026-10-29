@@ -38,6 +38,28 @@ import MadarData
         #expect(stale.status == .rejected); #expect(stale.reason == "انتهت هذه الفترة؛ افتح العادات للتسجيل")
 
     }
+    @Test func openDetailCanReplaceItsHabitSnapshotAfterReload() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("HabitDetailRefresh-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root)
+        let bus = CommandBus(adapter: DurableCommandAdapter(container: container, lockDirectory: root, transactionClock: { $0 }))
+        let id = UUID()
+        var rule = HabitRule(effectiveFrom: try GregorianDay("2026-10-15"))
+        rule.measure = .count; rule.target = 2
+        let save = try await bus.execute(.init(name: "habit.save", payload: .object(payload(id, rule)), issuedAt: now), now: now)
+        #expect(save.status == .applied)
+        let selected = try #require(HabitRepository(context: ModelContext(container)).readings(at: now).first)
+        #expect(selected.summary.current?.value == 0)
+
+        let completion = try await bus.execute(.init(name: "habit.complete", payload: .object(["id": .string(id.uuidString), "delta": .number(1)]), issuedAt: now), now: now)
+        #expect(completion.status == .applied)
+        let fresh = try #require(HabitRepository(context: ModelContext(container)).readings(at: now).first)
+        let refreshed = try #require(selected.refreshed(in: [fresh]))
+        #expect(refreshed.id == selected.id)
+        #expect(selected.summary.current?.value == 0)
+        #expect(refreshed.summary.current?.value == 1)
+        #expect(selected.refreshed(in: []).map(\.id) == nil)
+    }
     /// Item 26 «فعلتها في يوم سابق»: a past day lands in the period that held it with its diary line; a day to come or
     /// before the habit began is refused, and a day plus a period key is not a valid payload.
     @Test func pastDayIsLoggedInItsOwnPeriodWithItsDiaryLine() async throws {
