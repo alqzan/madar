@@ -53,7 +53,7 @@ struct MoneyGoalView: View {
             if let reading {
                 if !visible { Button("المس لإظهار الأرقام") { revealed = true }.frame(minHeight: 44).accessibilityIdentifier("money-goal-reveal") }
                 ScrollView(.horizontal) { HStack { ForEach(["هدية", "دراسة", "سفرة", "أثاث", "سيارة"], id: \.self) { title in Button(title) { name = title }.font(MadarTypography.caption()).padding(.horizontal, 18).frame(minHeight: 42).background(name == title ? theme.ink : .clear, in: Capsule()).foregroundStyle(name == title ? theme.background : theme.ink).overlay { Capsule().stroke(theme.color("reserveText").opacity(0.25)) } } } }.scrollIndicators(.hidden)
-                Button { edit = true } label: { HStack { VStack(alignment: .leading) { Text(name.isEmpty ? "ما الذي تستعد له؟" : name).font(MadarTypography.cardTitle()).foregroundStyle(theme.color("reserveText")); Text(shown(minor(amount))).font(.custom("thmanyahserifdisplay-Bold", size: 40, relativeTo: .largeTitle)) }; Spacer(); Image(systemName: "pencil").frame(width: 44, height: 44).overlay { Circle().stroke(theme.color("reserveText")) } }.frame(maxWidth: .infinity).contentShape(.rect) }.accessibilityIdentifier("money-goal-edit")
+                Button { edit = true } label: { HStack { VStack(alignment: .leading) { Text(name.isEmpty ? "ما الذي تستعد له؟" : name).font(MadarTypography.cardTitle()).foregroundStyle(theme.color("reserveText")); Text(shown(minor(amount))).font(.custom("thmanyahserifdisplay-Bold", size: 40, relativeTo: .largeTitle)) }; Spacer(); Image(systemName: "pencil").frame(width: 44, height: 44).overlay { Circle().stroke(theme.color("reserveText")) } }.frame(maxWidth: .infinity).contentShape(.rect) }.disabled(!visible).accessibilityIdentifier("money-goal-edit")
                 Text(target == 0 ? "اكتب مبلغ ما تستعد له، ثم اختر خطة" : reading.dailyMinor > 0 ? "يعادل يومك كله مدة " + service.days(target / max(1, reading.dailyMinor)) + "؛ اختر ما يناسبك" : "يمكنك تمويله من الفائض أو الاحتياطي؛ يومك لا يتّسع لاقتطاع الآن")
                     .font(MadarTypography.caption()).padding(12).frame(maxWidth: .infinity).background(theme.surface, in: RoundedRectangle(cornerRadius: 12)).accessibilityHidden(!visible).redacted(reason: visible ? [] : .placeholder)
                 HStack(spacing: 8) { ForEach(0..<3, id: \.self) { index in
@@ -70,19 +70,25 @@ struct MoneyGoalView: View {
                     HStack { Text("من " + (source == "surplus" ? "الفائض " : "الاحتياطي ") + shown(minor(upfront))); Spacer(); Text("من يومك " + shown(rest)) }.font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                     HStack { Text("يومك"); Text(shown(max(0, reading.dailyMinor - minor(daily)))).frame(maxWidth: .infinity); Text("+ " + shown(minor(daily))).foregroundStyle(theme.color("surplusText")) }.font(MadarTypography.body()).padding(8).overlay { Capsule().stroke(theme.color("reserveText").opacity(0.25)) }
                 }
-                Button("عدّل المبلغ والاقتطاع والمصدر") { edit = true }.font(MadarTypography.caption()).frame(minHeight: 44).accessibilityIdentifier("money-goal-adjust")
+                Button("عدّل المبلغ والاقتطاع والمصدر") { edit = true }.font(MadarTypography.caption()).frame(minHeight: 44).disabled(!visible).accessibilityIdentifier("money-goal-adjust")
                 Button("خطة سنة من الاحتياطي ويومك") { yearPlan() }.font(MadarTypography.caption()).frame(minHeight: 44).disabled(!visible).accessibilityIdentifier("money-goal-year")
                 Button("دفعت منه شيء قبل؟ " + (paid.isEmpty ? "اختر من مصروفاتك" : shown(already))) { paidOpen = true }.font(MadarTypography.caption()).frame(minHeight: 44).disabled(!visible).accessibilityIdentifier("money-goal-paid")
                 if let failure { Text(failure).font(MadarTypography.caption()) }
                 if failure == nil, let blocked { Text(blocked).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-goal-blocked") }
                 Button { preview = true } label: { Text("أنشئ المظروف").font(MadarTypography.cardTitle()).frame(maxWidth: .infinity, minHeight: 54).background(theme.ink, in: Capsule()).foregroundStyle(theme.background) }.disabled(!valid).accessibilityIdentifier("money-goal-create")
-            } else { ProgressView() }
+            } else if failure != nil { loadFailure } else { ProgressView() }
         }.padding(20).frame(maxWidth: 620).frame(maxWidth: .infinity) }
-        .background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).environment(\.roomTheme, theme).buttonStyle(.plain).toolbarVisibility(.hidden, for: .navigationBar)
+        .background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).environment(\.roomTheme, theme).buttonStyle(.madarPlain).toolbarVisibility(.hidden, for: .navigationBar)
         .sheet(isPresented: $edit) { editor }
         .sheet(isPresented: $paidOpen) { payments }
         .sheet(isPresented: $preview) { confirmation }
         .task { load(); if ProcessInfo.processInfo.environment["MADAR_UI_MONEY_FIXTURE"] == "goal" { name = "سفرة الصيف"; amount = "15000"; choose(0) } }
+    }
+    /// AU-95: a failed first read showed a spinner forever; say so and read again on a tap.
+    @ViewBuilder private var loadFailure: some View {
+        Text(failure ?? "").font(MadarTypography.body()).accessibilityIdentifier("money-goal-load-failure")
+        Button { failure = nil; load() } label: { Text("أعِد المحاولة").font(MadarTypography.cardTitle()).frame(minHeight: 44).contentShape(.rect) }
+            .accessibilityIdentifier("money-goal-retry")
     }
     private var suggestions: [GoalPreparation.Suggestion] { GoalPreparation.suggestions(targetMinor: target, availableDailyMinor: reading?.dailyMinor ?? 0, surplusMinor: reading?.surplusMinor ?? 0) }
     private func choose(_ index: Int) { selected = index; source = "surplus"; upfront = service.moneyInput(suggestions[index].upfrontMinor); daily = service.moneyInput(suggestions[index].dailyMinor) }
@@ -124,15 +130,15 @@ struct MoneyGoalView: View {
         Text("دفعات مسجلة لهذا الشيء").font(MadarTypography.cardTitle()); Text("اختر ما دفعته نقدًا أو بالبطاقة أو التقسيط. يبقى المصروف كما سجلته؛ المظروف الجديد للمتبقي فقط.").font(MadarTypography.caption())
         ForEach(reading?.paid ?? []) { item in Button { if paid.contains(item.id) { paid.remove(item.id) } else { paid.insert(item.id) } } label: { HStack { Image(systemName: paid.contains(item.id) ? "checkmark.circle.fill" : "circle"); VStack(alignment: .leading) { Text(item.title); if let day = try? GregorianDay(item.dayKey) { MadarDateLabel(app.dateLabels(day), primaryFont: MadarTypography.fine(), secondaryFont: MadarTypography.fine()) } }; Spacer(); Text(shown(item.amountMinor)) }.frame(minHeight: 50).contentShape(.rect) }.accessibilityIdentifier("money-goal-paid-" + item.id.uuidString) }
         Button("تمّ") { upfront = service.moneyInput(min(target, minor(upfront))); daily = service.moneyInput(min(rest, minor(daily))); selected = -1; paidOpen = false }.frame(minHeight: 44).accessibilityIdentifier("money-goal-paid-done")
-    }.padding(22) }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.plain) }
+    }.padding(22) }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.madarPlain) }
     private var confirmation: some View { VStack(alignment: .leading, spacing: 18) {
         Text("قبل إنشاء المظروف").font(MadarTypography.cardTitle()); Text(name).font(MadarTypography.body()); Text("المتبقي " + shown(target) + "؛ تنقل الآن " + shown(minor(upfront)) + " من " + (source == "surplus" ? "الفائض" : "الاحتياطي") + "، ومن الغد " + shown(minor(daily)) + " يوميًا.").font(MadarTypography.body())
         if let finish { MadarDateLabel(app.dateLabels(finish), primaryFont: MadarTypography.body(), secondaryFont: MadarTypography.caption()) }
         Text("الموعد تقديري إذا بقي الاقتطاع اليومي كما هو. لا تعاد كتابة مصروفاتك السابقة.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
         Button(saving ? "جارٍ الإنشاء…" : "اعتمد الخطة") { save() }.frame(maxWidth: .infinity, minHeight: 50).background(theme.ink).foregroundStyle(theme.background).disabled(saving || !valid).accessibilityIdentifier("money-goal-confirm")
         Button("ارجع للتعديل") { preview = false }.frame(minHeight: 44)
-    }.padding(24).background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.plain).presentationDetents([.medium, .large]) }
-    private func load() { do { _ = try service.load(); reading = try MoneyRepository(context: ModelContext(app.container)).goalPreparation(at: app.prayerNow()) } catch { failure = "تعذّرت قراءة المال. أعد فتح الصفحة." } }
+    }.padding(24).background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.madarPlain).presentationDetents([.medium, .large]) }
+    private func load() { do { _ = try service.load(); reading = try MoneyRepository(context: ModelContext(app.container)).goalPreparation(at: app.prayerNow()) } catch { failure = "تعذّرت قراءة المال." } }
     private func save() {
         guard let reading, valid, let finish else { return }; saving = true; failure = nil
         let due = max(app.prayerNow(), finish.date(in: app.activePlace.timeZone).addingTimeInterval(12 * 3600))

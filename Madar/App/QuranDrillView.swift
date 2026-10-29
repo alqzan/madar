@@ -52,7 +52,7 @@ struct QuranDrillView: View {
                 Button { leave() } label: {
                     Image(systemName: "chevron.forward").font(.system(size: 17, weight: .semibold))
                         .frame(width: 44, height: 44).background(theme.color("track"), in: Circle())
-                }.buttonStyle(.plain).accessibilityLabel("رجوع").accessibilityIdentifier("quran-drill-close")
+                }.buttonStyle(.madarPlain).accessibilityLabel("رجوع").accessibilityIdentifier("quran-drill-close")
                 Spacer()
             }
         }
@@ -72,7 +72,7 @@ struct QuranDrillView: View {
                 .foregroundStyle(value == tab ? theme.ink : theme.secondaryInk)
                 .background { if value == tab { Capsule().fill(theme.surface).shadow(color: .black.opacity(0.06), radius: 3, y: 1) } }
                 .contentShape(Capsule())
-        }.buttonStyle(.plain).disabled(busy)
+        }.buttonStyle(.madarPlain).disabled(busy)
             .accessibilityAddTraits(value == tab ? .isSelected : []).accessibilityIdentifier("quran-drill-tab-" + value.rawValue)
     }
 
@@ -158,11 +158,11 @@ struct QuranDrillView: View {
                         Button { answer("fail") } label: {
                             Text("أخطأت").font(font(17, bold: true)).frame(maxWidth: .infinity, minHeight: 56)
                                 .foregroundStyle(theme.ink).background(theme.color("track"), in: Capsule())
-                        }.buttonStyle(.plain).accessibilityIdentifier("quran-drill-fail")
+                        }.buttonStyle(.madarPlain).accessibilityIdentifier("quran-drill-fail")
                         Button { answer("pass") } label: {
                             Text("أصبت").font(font(17, bold: true)).frame(maxWidth: .infinity, minHeight: 56)
                                 .foregroundStyle(theme.onAccent).background(theme.accent, in: Capsule())
-                        }.buttonStyle(.plain).accessibilityIdentifier("quran-drill-pass")
+                        }.buttonStyle(.madarPlain).accessibilityIdentifier("quran-drill-pass")
                     }
                 }
             } else {
@@ -178,7 +178,7 @@ struct QuranDrillView: View {
         Button(action: action) {
             Text(title).font(font(17, bold: true)).frame(maxWidth: .infinity, minHeight: 56)
                 .foregroundStyle(theme.onAccent).background(theme.accent, in: Capsule())
-        }.buttonStyle(.plain).accessibilityIdentifier(id)
+        }.buttonStyle(.madarPlain).accessibilityIdentifier(id)
     }
 
     // MARK: actions

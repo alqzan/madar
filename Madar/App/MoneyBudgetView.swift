@@ -21,7 +21,7 @@ struct MoneyBudgetView: View {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(spacing: 12) {
                     Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1) } }
-                        .buttonStyle(.plain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-budget-close")
+                        .buttonStyle(.madarPlain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-budget-close")
                     Text("تجاهله من الميزانيات").font(.custom("thmanyahserifdisplay-Bold", size: 25, relativeTo: .title)).accessibilityAddTraits(.isHeader)
                     Spacer(minLength: 0)
                 }.padding(.top, 8)
@@ -105,12 +105,13 @@ struct MoneyBudgetView: View {
             }.padding(.vertical, 9).frame(minHeight: 52)
                 .overlay { if row.excluded { MoneyStrike().stroke(theme.color("reserveText"), lineWidth: 1).frame(height: 6).allowsHitTesting(false) } }
                 .overlay(alignment: .top) { Rectangle().fill(theme.line).frame(height: 0.7) }.contentShape(Rectangle())
-        }.buttonStyle(.plain).accessibilityLabel(row.merchant + "، " + amount(row.netMinor) + (row.excluded ? "، خارج الميزانية" + (row.reason.map { "، لأن " + $0 } ?? "") : "، داخل الميزانية"))
+        }.buttonStyle(.madarPlain).accessibilityLabel(row.merchant + "، " + amount(row.netMinor) + (row.excluded ? "، خارج الميزانية" + (row.reason.map { "، لأن " + $0 } ?? "") : "، داخل الميزانية"))
             .accessibilityIdentifier("money-budget-row-" + row.merchant)
     }
     private func load() {
         do { reading = try service.loadBudgetExclusions(); failure = nil }
-        catch { failure = "لم تكتمل قراءة الحركات. حاول مرة أخرى." }
+        // AU-95: a failed reload must not leave old rows on screen with the reason hidden.
+        catch { reading = nil; failure = "لم تكتمل قراءة الحركات. حاول مرة أخرى." }
     }
 }
 
@@ -174,7 +175,7 @@ private struct MoneyBudgetReceipt: View {
                 Button(action: save) {
                     HStack { if saving { ProgressView() }; Text(row.excluded ? "ارفع الختم وأعدها للميزانية" : "اعتمد الختم · خارج الميزانية") }
                         .font(MadarTypography.body()).bold().frame(maxWidth: .infinity, minHeight: 54).background(theme.ink, in: Capsule()).foregroundStyle(theme.background)
-                }.buttonStyle(.plain).disabled(saving).accessibilityIdentifier("money-budget-confirm")
+                }.buttonStyle(.madarPlain).disabled(saving).accessibilityIdentifier("money-budget-confirm")
                 Button("إلغاء") { dismiss() }.font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 44).disabled(saving)
             }.padding(20).padding(.top, 12).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }.background(theme.surface.ignoresSafeArea()).foregroundStyle(theme.ink).environment(\.roomTheme, theme)

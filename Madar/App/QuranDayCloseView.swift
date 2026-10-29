@@ -17,7 +17,7 @@ struct QuranDayCloseView: View {
                 HStack(spacing: 14) {
                     Button(action: close) {
                         Image(systemName: "chevron.backward").font(.system(size: 17, weight: .semibold)).frame(width: 44, height: 44)
-                    }.buttonStyle(.plain).accessibilityLabel("رجوع إلى الرئيسية").accessibilityIdentifier("quran-day-close-back")
+                    }.buttonStyle(.madarPlain).accessibilityLabel("رجوع إلى الرئيسية").accessibilityIdentifier("quran-day-close-back")
                     Text("ختام اليوم").font(serif(28)).accessibilityAddTraits(.isHeader)
                     Spacer(minLength: 0)
                 }.padding(.horizontal, 4).padding(.bottom, 8)

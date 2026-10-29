@@ -87,7 +87,7 @@ struct LegacyMoveView: View {
             .background(theme.surface.opacity(0.55), in: .rect(cornerRadius: 3))
             .overlay { RoundedRectangle(cornerRadius: 3).stroke(theme.color("ink3Text").opacity(0.55), style: StrokeStyle(lineWidth: 1, dash: [4, 3])) }
             .contentShape(.rect)
-        }.buttonStyle(.plain).accessibilityIdentifier("legacy-move-choose")
+        }.buttonStyle(.madarPlain).accessibilityIdentifier("legacy-move-choose")
     }
 
     private func previewCards(_ p: LegacyMovePreview) -> some View {
@@ -185,7 +185,7 @@ struct LegacyMoveView: View {
                 Image(systemName: "chevron.backward").font(.caption).foregroundStyle(theme.secondaryInk)
             }
             .padding(16).frame(maxWidth: .infinity, alignment: .leading).background(theme.surface, in: .rect(cornerRadius: 14)).contentShape(.rect)
-        }.buttonStyle(.plain).disabled(moving != nil).accessibilityIdentifier("legacy-move-diary")
+        }.buttonStyle(.madarPlain).disabled(moving != nil).accessibilityIdentifier("legacy-move-diary")
     }
 
     // MARK: pieces

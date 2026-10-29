@@ -20,7 +20,7 @@ struct MoneyEnvelopeDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                Button { dismiss() } label: { Label("المظاريف", systemImage: "chevron.backward").font(MadarTypography.body()).foregroundStyle(theme.color("reserveText")).frame(minHeight: 44) }.buttonStyle(.plain)
+                Button { dismiss() } label: { Label("المظاريف", systemImage: "chevron.backward").font(MadarTypography.body()).foregroundStyle(theme.color("reserveText")).frame(minHeight: 44) }.buttonStyle(.madarPlain)
                 if let reading {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(alignment: .firstTextBaseline) {
@@ -41,8 +41,8 @@ struct MoneyEnvelopeDetailView: View {
                             Label { Text("تدّخر ") + Text(figure: amount(reading.savingMinor)).font(MadarTypography.cardTitle()) + Text(" من كل راتب") } icon: { Image(systemName: "diamond.fill").foregroundStyle(theme.color("reserveText")) }.font(MadarTypography.body()).accessibilityLabel("تدّخر " + amount(reading.savingMinor) + " من كل راتب")
                             Spacer(minLength: 0)
                             if visible && reading.savingPlanID != nil {
-                                Button { savingAdd = false; savingOpen = true } label: { Image(systemName: "minus").frame(width: 48, height: 48).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1) } }.accessibilityLabel("قلّل ادخار المظروف").buttonStyle(.plain)
-                                Button { savingAdd = true; savingOpen = true } label: { Image(systemName: "plus").frame(width: 48, height: 48).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1) } }.accessibilityLabel("زد ادخار المظروف").accessibilityIdentifier("money-envelope-saving-add").buttonStyle(.plain)
+                                Button { savingAdd = false; savingOpen = true } label: { Image(systemName: "minus").frame(width: 48, height: 48).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1) } }.accessibilityLabel("قلّل ادخار المظروف").buttonStyle(.madarPlain)
+                                Button { savingAdd = true; savingOpen = true } label: { Image(systemName: "plus").frame(width: 48, height: 48).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1) } }.accessibilityLabel("زد ادخار المظروف").accessibilityIdentifier("money-envelope-saving-add").buttonStyle(.madarPlain)
                             }
                         }
                     }
@@ -154,7 +154,7 @@ struct MoneyRepaymentView: View {
                 HStack {
                     Text(reading.envelope.name + " عليه " + service.amount(debt)).font(MadarTypography.title()).foregroundStyle(theme.color("debt"))
                     Spacer()
-                    Button { dismiss() } label: { Image(systemName: "xmark").font(.body).frame(width: 44, height: 44) }.buttonStyle(.plain).accessibilityLabel("إغلاق").foregroundStyle(theme.secondaryInk)
+                    Button { dismiss() } label: { Image(systemName: "xmark").font(.body).frame(width: 44, height: 44) }.buttonStyle(.madarPlain).accessibilityLabel("إغلاق").foregroundStyle(theme.secondaryInk)
                 }
                 if let cause {
                     HStack(alignment: .firstTextBaseline, spacing: 0) {
@@ -171,7 +171,7 @@ struct MoneyRepaymentView: View {
                             Text(service.digits.string(count)).font(MadarTypography.cardTitle()).frame(width: 40, height: 40)
                                 .foregroundStyle(salaries == count ? theme.background : theme.ink).background(salaries == count ? theme.ink : .clear, in: .circle)
                                 .overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1) }.frame(maxWidth: .infinity)
-                        }.buttonStyle(.plain).accessibilityIdentifier("money-repay-count-\(count)").accessibilityAddTraits(salaries == count ? .isSelected : [])
+                        }.buttonStyle(.madarPlain).accessibilityIdentifier("money-repay-count-\(count)").accessibilityAddTraits(salaries == count ? .isSelected : [])
                     }
                 }
                 Rectangle().fill(theme.line).frame(height: 1)
@@ -195,7 +195,7 @@ struct MoneyRepaymentView: View {
                     Button { adopt() } label: {
                         Text("اعتمد " + service.amount(preview.installmentsMinor[0]) + " من كل راتب").font(MadarTypography.cardTitle()).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 18).frame(minHeight: 60)
                             .foregroundStyle(theme.background).background(theme.ink)
-                    }.buttonStyle(.plain).disabled(working).accessibilityIdentifier("money-repay-adopt")
+                    }.buttonStyle(.madarPlain).disabled(working).accessibilityIdentifier("money-repay-adopt")
                 } else { Text("تظهر اليومية ومواعيد الرواتب بعد بدء الدورة.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk) }
                 outlined("خذ " + service.amount(debt) + " من الفائض الآن", note: reading.home.surplusMinor < debt ? "الفائض " + service.amount(reading.home.surplusMinor) + " لا يكفي" : nil, id: "money-repay-from-surplus") { repay("surplus") }
                     .disabled(working || reading.home.surplusMinor < debt)
@@ -211,7 +211,7 @@ struct MoneyRepaymentView: View {
                 Text(title).font(MadarTypography.cardTitle())
                 if let note { Text(note).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
             }.frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 18).frame(minHeight: 60).overlay { Rectangle().stroke(theme.line, lineWidth: 1.2) }.contentShape(.rect)
-        }.buttonStyle(.plain).accessibilityIdentifier(id)
+        }.buttonStyle(.madarPlain).accessibilityIdentifier(id)
     }
     private func adopt() {
         working = true

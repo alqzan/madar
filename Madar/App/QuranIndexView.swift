@@ -21,7 +21,7 @@ struct QuranIndexView: View {
                 HStack(spacing:4) { ForEach(QuranUIIndexUnit.allCases) { option in
                     Button { withAnimation(reduceMotion ? nil : .easeInOut(duration:0.2)) { unit=option; query="" } } label: {
                         VStack(spacing:4) { Image(systemName:option.icon).font(.system(size:18));Text(option.title).font(quranFont(11)) }.frame(maxWidth:.infinity,minHeight:52).foregroundStyle(unit == option ? theme.onAccent : theme.ink).background(unit == option ? theme.accent : .clear,in:Capsule())
-                    }.buttonStyle(.plain).accessibilityIdentifier("quran-index-unit-"+option.id).accessibilityAddTraits(unit == option ? .isSelected : [])
+                    }.buttonStyle(.madarPlain).accessibilityIdentifier("quran-index-unit-"+option.id).accessibilityAddTraits(unit == option ? .isSelected : [])
                 } }.padding(4).background(theme.color("track"),in:Capsule())
                 HStack { let held=items.filter(\.memorized).count,form=unit.counted(held);Text("في صدرك").font(quranFont(12));if form.number {Text(service.numerals.string(held)).font(quranSerif(25))};Text(form.noun).font(form.number ? quranFont(12) : quranSerif(20));Spacer();Text("المس لتفاصيله").font(quranFont(11)).foregroundStyle(theme.secondaryInk) }
                 if unit == .ayah { TextField("ابحث في الآيات",text:$query).font(quranFont(15)).padding(12).background(theme.surface,in:.rect(cornerRadius:14)).accessibilityIdentifier("quran-index-search") }
@@ -30,7 +30,7 @@ struct QuranIndexView: View {
                 } else {
                     LazyVGrid(columns:[GridItem(.adaptive(minimum:type.isAccessibilitySize ? 280 : unit == .ayah ? 300 : 90))],spacing:8) {
                         ForEach(filtered) { item in
-                            Button { selected=item } label: { VStack(alignment:.leading,spacing:5) { Text(item.title).font(quranFont(13,bold:true));if unit == .ayah { Text(item.subtitle).font(.custom("Amiri-Regular",size:20)) };ProgressView(value:item.fraction).tint(theme.color("memorized"));Text(status(item)).font(quranFont(11)).foregroundStyle(theme.secondaryInk) }.padding(10).frame(maxWidth:.infinity,minHeight:62,alignment:.leading).background(theme.surface,in:.rect(cornerRadius:13)).contentShape(Rectangle()) }.buttonStyle(.plain).accessibilityIdentifier("quran-index-item-"+item.id)
+                            Button { selected=item } label: { VStack(alignment:.leading,spacing:5) { Text(item.title).font(quranFont(13,bold:true));if unit == .ayah { Text(item.subtitle).font(.custom("Amiri-Regular",size:20)) };ProgressView(value:item.fraction).tint(theme.color("memorized"));Text(status(item)).font(quranFont(11)).foregroundStyle(theme.secondaryInk) }.padding(10).frame(maxWidth:.infinity,minHeight:62,alignment:.leading).background(theme.surface,in:.rect(cornerRadius:13)).contentShape(Rectangle()) }.buttonStyle(.madarPlain).accessibilityIdentifier("quran-index-item-"+item.id)
                         }
                     }
                 }

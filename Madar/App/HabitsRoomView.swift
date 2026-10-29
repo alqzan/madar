@@ -80,7 +80,7 @@ struct HabitsRoomView: View {
                         viewSwitch
                         if showAll { allList } else { todayList }
                         Button { editor = .init(id:UUID()) } label: { Label("عادة صغيرة جديدة",systemImage:"plus").font(MadarTypography.caption()).frame(maxWidth:.infinity,minHeight:48).overlay { RoundedRectangle(cornerRadius:16).stroke(theme.line,style:.init(lineWidth:1,dash:[4,4])) }.contentShape(.rect) }
-                            .buttonStyle(.plain).padding(.top,10).accessibilityIdentifier("habits-new")
+                            .buttonStyle(.madarPlain).padding(.top,10).accessibilityIdentifier("habits-new")
                     }
                     if readings.contains(where: \.archived) {
                         Button(showArchived ? "أخفِ العادات المحذوفة" : "عادات محذوفة") { showArchived.toggle() }.font(MadarTypography.caption()).frame(minHeight:44).accessibilityIdentifier("habit-archived")
@@ -113,7 +113,7 @@ struct HabitsRoomView: View {
         .sheet(item:$detail,onDismiss:{if let pendingEditor {editor=pendingEditor;self.pendingEditor=nil}}) { row in HabitDetailView(session:session,reading:row) { pendingEditor = .init(id:row.id,reading:row); detail=nil }.madarSheetErrorAlert(session) }
     }
     private var empty: some View {
-        VStack(spacing:16) { HabitRingGlyph(share:0.25,done:false,symbol:nil,lineWidth:5).frame(width:60,height:60); Text("القليل الذي تدوم عليه").font(MadarTypography.title()); Text("اختر عادة صغيرة تبدأ بها، أو اربطها بما تسجّله في غرف مدار.").font(MadarTypography.body()).multilineTextAlignment(.center).foregroundStyle(theme.secondaryInk); Button { editor = .init(id:UUID()) } label: { Text("أضف أول عادة").font(MadarTypography.section()).padding(.horizontal,22).frame(minHeight:48).background(theme.accentFill,in:.capsule).foregroundStyle(theme.onAccent) }.buttonStyle(.plain).accessibilityIdentifier("habit-first") }.padding(28).frame(maxWidth:.infinity).background(theme.surface,in:.rect(cornerRadius:24)).padding(.top,25)
+        VStack(spacing:16) { HabitRingGlyph(share:0.25,done:false,symbol:nil,lineWidth:5).frame(width:60,height:60); Text("القليل الذي تدوم عليه").font(MadarTypography.title()); Text("اختر عادة صغيرة تبدأ بها، أو اربطها بما تسجّله في غرف مدار.").font(MadarTypography.body()).multilineTextAlignment(.center).foregroundStyle(theme.secondaryInk); Button { editor = .init(id:UUID()) } label: { Text("أضف أول عادة").font(MadarTypography.section()).padding(.horizontal,22).frame(minHeight:48).background(theme.accentFill,in:.capsule).foregroundStyle(theme.onAccent) }.buttonStyle(.madarPlain).accessibilityIdentifier("habit-first") }.padding(28).frame(maxWidth:.infinity).background(theme.surface,in:.rect(cornerRadius:24)).padding(.top,25)
     }
 
     // MARK: What «اليوم» holds
@@ -193,7 +193,7 @@ struct HabitsRoomView: View {
                         .padding(.horizontal, 14).frame(minHeight: 44)
                         .background(theme.accentFill, in: .capsule).foregroundStyle(theme.onAccent)
                 }
-                .buttonStyle(.plain).accessibilityLabel(heroAction(next)).accessibilityIdentifier("habits-next")
+                .buttonStyle(.madarPlain).accessibilityLabel(heroAction(next)).accessibilityIdentifier("habits-next")
             }
         }
         .padding(12).frame(maxWidth: .infinity, alignment: .leading)
@@ -213,7 +213,7 @@ struct HabitsRoomView: View {
                     Button {
                         if next.source == nil, let p = next.summary.current { perform("habit.complete",["id":.string(next.id.uuidString),"delta":.number(p.rule.measure == .duration ? 15 : 1)]) } else { detail = next }
                     } label: { Text(heroAction(next)).font(MadarTypography.caption()).lineLimit(1).minimumScaleFactor(0.8).padding(.horizontal,14).frame(minHeight:44).background(theme.accentFill,in:.capsule).foregroundStyle(theme.onAccent) }
-                        .buttonStyle(.plain).padding(.top,4).accessibilityIdentifier("habits-next")
+                        .buttonStyle(.madarPlain).padding(.top,4).accessibilityIdentifier("habits-next")
                 }
             }
             Spacer(minLength:0)
@@ -269,7 +269,7 @@ struct HabitsRoomView: View {
                         .overlay { Capsule().stroke(on ? theme.accentFill : theme.line,lineWidth:on ? 1.5 : 1) }
                         .foregroundStyle(on ? theme.ink : theme.secondaryInk).contentShape(.capsule)
                 }
-                .buttonStyle(.plain).accessibilityAddTraits(on ? .isSelected : []).accessibilityIdentifier(all ? "habits-view-all" : "habits-view-today")
+                .buttonStyle(.madarPlain).accessibilityAddTraits(on ? .isSelected : []).accessibilityIdentifier(all ? "habits-view-all" : "habits-view-today")
             }
         }.padding(.top,6)
     }
@@ -282,7 +282,7 @@ struct HabitsRoomView: View {
         let settledLater = laterPaused == later ? "عاداتك الأخرى مجمّدة" : laterPaused > 0 ? "عادات مكتملة وأخرى مجمّدة" : "عاداتك الأخرى تمّت في فتراتها"
         if rows.isEmpty && frozen.isEmpty {
             Button { withAnimation(reduceMotion ? nil : .snappy) { showAll = true } } label: { Label("لا شيء مستحقّ اليوم؛ اعرض كل عاداتك",systemImage:"list.bullet").font(MadarTypography.caption()).frame(maxWidth:.infinity,minHeight:56) }
-                .buttonStyle(.plain).background(theme.surface,in:.rect(cornerRadius:20)).accessibilityIdentifier("habits-today-empty")
+                .buttonStyle(.madarPlain).background(theme.surface,in:.rect(cornerRadius:20)).accessibilityIdentifier("habits-today-empty")
         } else {
             ForEach([HabitFrequency.daily, .weekly, .monthly, .yearly], id: \.self) { frequency in
                 let group = open.filter { $0.summary.current?.rule.frequency == frequency }
@@ -305,7 +305,7 @@ struct HabitsRoomView: View {
             Button { withAnimation(reduceMotion ? nil : .snappy) { showAll = true } } label: {
                 HStack { Text(laterOpen == 0 ? settledLater : laterOpen == 1 ? "عادة أخرى تنتظر في فترتها" : laterOpen == 2 ? "عادتان أخريان في فترتيهما" : arabicCount(laterOpen,["","","عادات","عادة"],digits)+" أخرى في فتراتها").font(MadarTypography.fine()); Image(systemName:"chevron.left").font(.caption) }
                     .foregroundStyle(theme.accent).frame(minHeight:44)
-            }.buttonStyle(.plain).accessibilityIdentifier("habits-later")
+            }.buttonStyle(.madarPlain).accessibilityIdentifier("habits-later")
         }
     }
     @ViewBuilder private var allList: some View {
@@ -347,7 +347,7 @@ struct HabitsRoomView: View {
                     }
                     Spacer(minLength:0)
                 }.padding(.leading,10).padding(.vertical,13).frame(minHeight:70).contentShape(.rect)
-            }.buttonStyle(.plain).accessibilityIdentifier("habit-row-"+row.id.uuidString).accessibilityLabel(row.name+"، "+progress(row)+"، "+row.statusTitle)
+            }.buttonStyle(.madarPlain).accessibilityIdentifier("habit-row-"+row.id.uuidString).accessibilityLabel(row.name+"، "+progress(row)+"، "+row.statusTitle)
             // A day forgotten is one long-press away (item 26), without opening the habit.
             .contextMenu { if row.source == nil, !row.archived, let p = row.summary.current, p.rule.measure != .health, (row.summary.periods.first?.start).map({ $0 < today }) == true { Button("فعلتها في يوم سابق",systemImage:"calendar.badge.clock") { pastDay = row } } }
             trailing(row).padding(.trailing,10)
@@ -359,7 +359,7 @@ struct HabitsRoomView: View {
         if let p=row.summary.current, row.source == nil, !row.paused, p.target > 0, p.rule.measure == .once, !met {
             Button { perform("habit.complete",["id":.string(row.id.uuidString),"delta":.number(1)]) } label: {
                 Circle().stroke(theme.accent,lineWidth:2).frame(width:32,height:32).frame(width:44,height:44).contentShape(.circle)
-            }.buttonStyle(.plain)
+            }.buttonStyle(.madarPlain)
             .accessibilityLabel(quickLogLabel(row.name,.once))
             .accessibilityIdentifier("habit-quick-"+row.id.uuidString)
         } else if !dynamicTypeSize.isAccessibilitySize {
@@ -372,7 +372,7 @@ struct HabitsRoomView: View {
             Button { perform("habit.complete",["id":.string(row.id.uuidString),"delta":.number(p.rule.measure == .duration ? 15 : 1)]) } label: {
                 Image(systemName:"plus").font(.system(size:16,weight:.semibold)).foregroundStyle(p.met ? theme.accent : theme.onAccent).frame(width:38,height:38).background(p.met ? theme.accentFill.opacity(0.14) : theme.accentFill,in:.circle)
                     .frame(width:44,height:44).contentShape(.circle)
-            }.buttonStyle(.plain)
+            }.buttonStyle(.madarPlain)
             .accessibilityLabel(quickLogLabel(row.name,p.rule.measure))
             .accessibilityIdentifier("habit-quick-"+row.id.uuidString)
         }
@@ -428,7 +428,7 @@ private struct HabitPeriodSummaryCard: View {
             .overlay { RoundedRectangle(cornerRadius: 14).stroke(selected ? theme.accentFill : theme.line, lineWidth: selected ? 1.5 : 1) }
             .contentShape(.rect(cornerRadius: 14))
         }
-        .buttonStyle(.plain).disabled(!enabled)
+        .buttonStyle(.madarPlain).disabled(!enabled)
         .accessibilityLabel(frequency.arabic + "، " + count)
         .accessibilityAddTraits(selected ? .isSelected : [])
         .accessibilityIdentifier("habits-period-" + frequency.rawValue)

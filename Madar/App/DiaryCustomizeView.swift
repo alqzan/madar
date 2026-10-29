@@ -64,7 +64,7 @@ struct DiaryCustomizeView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 HStack {
-                    Button { dismiss() } label: { Label("المذكرات", systemImage: "chevron.backward").font(MadarTypography.caption()).frame(minHeight: 44) }.buttonStyle(.plain).accessibilityIdentifier("diary-customize-back")
+                    Button { dismiss() } label: { Label("المذكرات", systemImage: "chevron.backward").font(MadarTypography.caption()).frame(minHeight: 44) }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-customize-back")
                     Spacer()
                     Text("خصّص المذكرات").font(DiaryType.title)
                 }
@@ -103,7 +103,7 @@ struct DiaryCustomizeView: View {
                     .font(DiaryType.label).foregroundStyle(theme.color("ink3Text")).padding(.vertical, 12)
             }.padding(16).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }.background(theme.background).foregroundStyle(theme.ink).toolbarVisibility(.hidden, for: .navigationBar)
-            .safeAreaInset(edge: .bottom) { if app.undoToastVisible { UndoToast(message: app.undoMessage, undo: app.undo) } }
+            .safeAreaInset(edge: .bottom) { if app.undoToastVisible { UndoToast(message: app.undoMessage, undo: app.undo, dismiss: app.hideUndoToast) } }
             .confirmationDialog("أعِد إعدادات المذكرات؟", isPresented: $confirmReset, titleVisibility: .visible) {
                 Button("أعِد الافتراضي", role: .destructive) { app.reset(keys) }.accessibilityIdentifier("diary-customize-reset-confirm")
             } message: { Text("يعود الشكل والترتيب والإعدادات. البيانات لا تُمسّ.") }
@@ -132,7 +132,7 @@ struct DiaryCustomizeView: View {
                         Spacer()
                         Image(systemName: "chevron.backward").font(.footnote).foregroundStyle(theme.secondaryInk)
                     }.frame(minHeight: 56).contentShape(.rect)
-                }.buttonStyle(.plain).accessibilityIdentifier("diary-transfer-" + id)
+                }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-transfer-" + id)
             }
         }.padding(16).background(theme.surface, in: .rect(cornerRadius: 24)).overlay { RoundedRectangle(cornerRadius: 24).stroke(theme.line) }
     }
@@ -165,8 +165,8 @@ struct DiaryCustomizeView: View {
         }.padding(16).background(theme.surface, in: .rect(cornerRadius: 26)).overlay { RoundedRectangle(cornerRadius: 26).stroke(theme.line) }
     }
     @ViewBuilder private var previewButtons: some View {
-        Button { dismiss() } label: { Text("افتح المذكرات").font(MadarTypography.caption()).padding(.horizontal, 13).frame(minHeight: 44).foregroundStyle(theme.background).background(theme.ink, in: .capsule) }.buttonStyle(.plain).accessibilityIdentifier("diary-customize-open")
-        Button { confirmReset = true } label: { Text("أعِد الافتراضي").font(MadarTypography.caption()).padding(.horizontal, 10).frame(minHeight: 44).overlay { Capsule().stroke(theme.line) } }.buttonStyle(.plain).accessibilityIdentifier("diary-customize-reset")
+        Button { dismiss() } label: { Text("افتح المذكرات").font(MadarTypography.caption()).padding(.horizontal, 13).frame(minHeight: 44).foregroundStyle(theme.background).background(theme.ink, in: .capsule) }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-customize-open")
+        Button { confirmReset = true } label: { Text("أعِد الافتراضي").font(MadarTypography.caption()).padding(.horizontal, 10).frame(minHeight: 44).overlay { Capsule().stroke(theme.line) } }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-customize-reset")
     }
     private var visiblePartsText: String { let n = visibleOrder.count; return n == 1 ? "جزء واحد ظاهر" : n == 2 ? "جزءان ظاهران" : app.digits(n) + ((3...10).contains(n % 100) ? " أجزاء ظاهرة" : " جزءًا ظاهرًا") }
     private func previewLine(_ title: String, _ value: String) -> some View { HStack { Text(title).foregroundStyle(theme.color("ink3Text")); Spacer(minLength: 5); Text(value) }.font(DiaryType.label) }
@@ -183,7 +183,7 @@ struct DiaryCustomizeView: View {
                     if ["memory", "todayBar"].contains(id) { Text("ثابت").font(DiaryType.label).foregroundStyle(theme.color("ink3Text")) }
                     else {
                         Toggle(blockTitle(id), isOn: Binding(get: { !layout.hidden.contains(id) }, set: { _ in app.set(layout.toggle(id).payload, key: "notes.layout") }))
-                            .labelsHidden().tint(theme.color("ghad")).accessibilityIdentifier("diary-block-" + id)
+                            .labelsHidden().tint(theme.color("ghad")).disabled(app.settingsWriteInProgress).accessibilityIdentifier("diary-block-" + id)
                     }
                 }.frame(minHeight: 48)
             }
@@ -195,7 +195,7 @@ struct DiaryCustomizeView: View {
         let movable = activeOrder.filter { $0 != "todayBar" }
         let index = movable.firstIndex(of: id) ?? 0
         return Button { app.set(layout.move(id, by: offset, among: activeOrder).payload, key: "notes.layout") } label: { Image(systemName: offset < 0 ? "chevron.up" : "chevron.down").frame(width: 44, height: 44) }
-            .buttonStyle(.plain).disabled(!movable.indices.contains(index+offset) || app.settingsWriteInProgress)
+            .buttonStyle(.madarPlain).disabled(!movable.indices.contains(index+offset) || app.settingsWriteInProgress)
             .accessibilityLabel((offset < 0 ? "قدّم " : "أخّر ") + blockTitle(id)).accessibilityIdentifier("diary-block-" + (offset < 0 ? "up-" : "down-") + id)
     }
     private var metricControls: some View {
@@ -204,7 +204,7 @@ struct DiaryCustomizeView: View {
             ForEach([("sadr", "في صدرك"), ("fajrJamaah", "الفجر جماعة")], id: \.0) { id, title in
                 Toggle(title, isOn: Binding(get: { app.values["notes.sinceMetrics"]?.array?.contains(.string(id)) == true }, set: { on in
                     var values = app.values["notes.sinceMetrics"]?.array ?? []; values.removeAll { $0 == .string(id) }; if on { values.append(.string(id)) }; app.set(.array(values), key: "notes.sinceMetrics")
-                })).font(MadarTypography.body()).tint(theme.color("ghad")).accessibilityIdentifier("diary-metric-" + id)
+                })).font(MadarTypography.body()).tint(theme.color("ghad")).disabled(app.settingsWriteInProgress).accessibilityIdentifier("diary-metric-" + id)
             }
         }
     }
@@ -214,7 +214,7 @@ struct DiaryCustomizeView: View {
             ForEach([("salah", "الصلاة"), ("quran", "القرآن"), ("habits", "العادات"), ("mihbara", "المحبرة")], id: \.0) { id, title in
                 Toggle(title, isOn: Binding(get: { app.values["notes.autoLines"]?.object?[id] == .bool(true) || (id == "habits" && app.values["notes.autoLines"]?.object?["habits"] == nil) }, set: { on in
                     var values = app.values["notes.autoLines"]?.object ?? [:]; values[id] = .bool(on); app.set(.object(values), key: "notes.autoLines")
-                })).font(MadarTypography.body()).tint(theme.color("ghad")).accessibilityIdentifier("diary-auto-" + id)
+                })).font(MadarTypography.body()).tint(theme.color("ghad")).disabled(app.settingsWriteInProgress).accessibilityIdentifier("diary-auto-" + id)
             }
         }
     }
@@ -227,7 +227,7 @@ struct DiaryCustomizeView: View {
                     VStack(alignment: .leading, spacing: 4) { Text(title).font(DiaryType.heading); Text(subtitle).font(DiaryType.label).foregroundStyle(theme.color("ink3Text")) }
                     Spacer(); Image(systemName: open ? "chevron.up" : "chevron.down")
                 }.contentShape(.rect)
-            }.buttonStyle(.plain).accessibilityIdentifier("diary-customize-section-" + id).accessibilityValue(open ? "مفتوح" : "مطوي")
+            }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-customize-section-" + id).accessibilityValue(open ? "مفتوح" : "مطوي")
             if open { content() }
         }.padding(16).background(theme.surface, in: .rect(cornerRadius: 24)).overlay { RoundedRectangle(cornerRadius: 24).stroke(id == "home" && open ? theme.accent : theme.line) }
     }

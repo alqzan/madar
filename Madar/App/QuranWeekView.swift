@@ -53,7 +53,7 @@ struct QuranWeekView: View {
                 Text("أغلقت الحلقتين في " + service.numerals.string(value.closedDays) + " من " + service.numerals.string(value.eligibleDays) + (value.eligibleDays == 1 ? " يوم الحفظ" : value.eligibleDays == 2 ? " يومَي الحفظ" : " أيام الحفظ"))
                     .font(font(14)).accessibilityIdentifier("quran-week-closed")
                 if type.isAccessibilitySize {
-                    ForEach(value.days) { day in Button { selected = day } label: { Text(day.label + "، حفظ " + faces(day.hifz) + "، مراجعة " + faces(day.review)).font(font(15)).frame(minHeight: 44) }.buttonStyle(.plain) }
+                    ForEach(value.days) { day in Button { selected = day } label: { Text(day.label + "، حفظ " + faces(day.hifz) + "، مراجعة " + faces(day.review)).font(font(15)).frame(minHeight: 44) }.buttonStyle(.madarPlain) }
                 } else {
                     HStack(spacing: 3) {
                         ForEach(value.days) { day in
@@ -68,7 +68,7 @@ struct QuranWeekView: View {
                                     }.frame(width: 38, height: 38)
                                     Text(day.label).font(font(11, bold: day.today)).foregroundStyle(theme.secondaryInk)
                                 }.frame(maxWidth: .infinity, minHeight: 62)
-                            }.buttonStyle(.plain).accessibilityLabel(day.label + "، حفظ " + faces(day.hifz) + "، مراجعة " + faces(day.review))
+                            }.buttonStyle(.madarPlain).accessibilityLabel(day.label + "، حفظ " + faces(day.hifz) + "، مراجعة " + faces(day.review))
                                 .accessibilityIdentifier("quran-week-day-" + day.id)
                         }
                     }

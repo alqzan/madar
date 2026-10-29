@@ -25,7 +25,7 @@ struct QuranHifzCoachView: View {
                     .overlay {
                         if fullPage {
                             Button { fullPage = false } label: { Color.clear.contentShape(Rectangle()) }
-                                .buttonStyle(.plain).accessibilityLabel("إظهار أدوات الجلسة")
+                                .buttonStyle(.madarPlain).accessibilityLabel("إظهار أدوات الجلسة")
                                 .accessibilityIdentifier("quran-session-show-tools")
                         }
                     }
@@ -54,7 +54,7 @@ struct QuranHifzCoachView: View {
                                                 .foregroundStyle(value == grade.grade ? theme.onAccent : theme.ink)
                                                 .background(value == grade.grade ? theme.accent : theme.surface, in: Capsule())
                                                 .frame(minHeight: 44).contentShape(Rectangle())
-                                        }.buttonStyle(.plain).accessibilityAddTraits(value == grade.grade ? .isSelected : [])
+                                        }.buttonStyle(.madarPlain).accessibilityAddTraits(value == grade.grade ? .isSelected : [])
                                             .accessibilityIdentifier("quran-coach-grade-" + value.rawValue)
                                     }
                                 }
@@ -64,7 +64,7 @@ struct QuranHifzCoachView: View {
                             Image(systemName: "arrow.left").font(.system(size: 16, weight: .semibold))
                                 .frame(width: 44, height: 36).foregroundStyle(theme.onAccent)
                                 .background(theme.accent, in: Capsule()).frame(minHeight: 44).contentShape(Rectangle())
-                        }.buttonStyle(.plain).accessibilityLabel(state.primaryTitle)
+                        }.buttonStyle(.madarPlain).accessibilityLabel(state.primaryTitle)
                             .accessibilityIdentifier("quran-session-advance")
                     }.padding(.horizontal, 14).padding(.bottom, 12).disabled(busy)
                 } else {
@@ -100,7 +100,7 @@ struct QuranHifzCoachView: View {
                             } label: {
                                 HStack { Text(method.title); Spacer(); if state.method == method.rawValue { Image(systemName: "checkmark") } }
                                     .font(font(14)).frame(minHeight: 44).contentShape(Rectangle())
-                            }.buttonStyle(.plain).accessibilityIdentifier("quran-method-" + method.rawValue)
+                            }.buttonStyle(.madarPlain).accessibilityIdentifier("quran-method-" + method.rawValue)
                         }
                         Button("تمّ") { sheet = nil }.font(font(14, bold: true)).frame(maxWidth: .infinity, minHeight: 44).accessibilityIdentifier("quran-method-done")
                     } else {
@@ -125,14 +125,14 @@ struct QuranHifzCoachView: View {
         Button { sheet = nil; perform() } label: {
             Text(title).font(font(14, bold: true)).frame(maxWidth: .infinity, minHeight: 48)
                 .background(theme.surface, in: Capsule()).contentShape(Capsule())
-        }.buttonStyle(.plain).accessibilityIdentifier(id)
+        }.buttonStyle(.madarPlain).accessibilityIdentifier(id)
     }
     private var header: some View {
         HStack(spacing: 10) {
             Button { sheet = .exit } label: {
                 Image(systemName: "xmark").font(.system(size: 19, weight: .regular))
                     .frame(width: 44, height: 44).background(theme.color("track").opacity(0.35), in: Circle())
-            }.buttonStyle(.plain).accessibilityLabel("إغلاق الجلسة").accessibilityIdentifier("quran-session-close")
+            }.buttonStyle(.madarPlain).accessibilityLabel("إغلاق الجلسة").accessibilityIdentifier("quran-session-close")
             VStack(spacing: 4) {
                 Text(state.title).font(font(14, bold: true)).lineLimit(1).minimumScaleFactor(0.8)
                 Text(coach.pageProgress + "، " + state.segmentTitle).font(font(11)).foregroundStyle(theme.secondaryInk)
@@ -146,7 +146,7 @@ struct QuranHifzCoachView: View {
             Button { fullPage = true } label: {
                 Image(systemName: "arrow.up.left.and.arrow.down.right").font(.system(size: 15))
                     .frame(width: 44, height: 44)
-            }.buttonStyle(.plain).accessibilityLabel("عرض الصفحة كاملة")
+            }.buttonStyle(.madarPlain).accessibilityLabel("عرض الصفحة كاملة")
                 .accessibilityIdentifier("quran-session-full-page")
         }.padding(.horizontal, 12).padding(.bottom, 10)
             .accessibilityElement(children: .contain)
@@ -163,7 +163,7 @@ struct QuranHifzCoachView: View {
                     Image(systemName: coach.review ? "text.justify" : "star")
                     Text(state.availableMethods[state.method] ?? "المدرّب الموجّه").font(font(12, bold: true)).multilineTextAlignment(.center)
                 }.frame(maxWidth: .infinity, minHeight: 48).contentShape(Capsule())
-            }.buttonStyle(.plain).accessibilityIdentifier("quran-session-method")
+            }.buttonStyle(.madarPlain).accessibilityIdentifier("quran-session-method")
             Button {
                 // A mastered page is checked whole: recite it, then one tap uncovers it and opens grading.
                 action(wholePageCheck ? .advance : state.primaryAction)
@@ -171,11 +171,11 @@ struct QuranHifzCoachView: View {
                 Text(wholePageCheck ? "سمّعته كاملًا" : state.primaryTitle).font(font(14, bold: true)).multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity, minHeight: 52).foregroundStyle(theme.onAccent)
                     .background(theme.accent, in: Capsule())
-            }.buttonStyle(.plain).accessibilityIdentifier("quran-session-advance")
+            }.buttonStyle(.madarPlain).accessibilityIdentifier("quran-session-advance")
             Button { action(coach.review ? .mistake(ayahID: coach.activeAyahID, wordIndex: nil) : .reveal(ayahID: coach.activeAyahID, wordIndex: nil)) } label: {
                 Image(systemName: coach.review ? "flag" : "chevron.forward.2").font(.system(size: 18)).frame(width: 48, height: 48)
                     .background(theme.color("track").opacity(0.4), in: Circle())
-            }.buttonStyle(.plain).accessibilityLabel(coach.review ? "تعثّرت" : "تلقين الآية").accessibilityIdentifier("quran-session-hint")
+            }.buttonStyle(.madarPlain).accessibilityLabel(coach.review ? "تعثّرت" : "تلقين الآية").accessibilityIdentifier("quran-session-hint")
                 .disabled(coach.bridge || state.stage == .grading || (coach.review && coach.flaggedAyahs.contains(coach.activeAyahID)))
         }.padding(8).background(theme.surface, in: Capsule()).disabled(busy)
     }

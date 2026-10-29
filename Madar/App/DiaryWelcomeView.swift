@@ -95,6 +95,7 @@ struct DiaryWelcomeView: View {
         }.foregroundStyle(theme.ink).background(theme.background)
     }
     private func finish() async {
+        guard !saving else { return }
         saving = true
         do { try await app.executeDiaryCommand("diary.completeWelcome", payload: [:]); finished() }
         catch { failure = madarUserMessage(error); saving = false }

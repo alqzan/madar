@@ -24,7 +24,7 @@ struct MoneyEnvelopesView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                Button { dismiss() } label: { HStack(spacing: 5) { Image(systemName: "chevron.backward"); Text("المال") }.font(MadarTypography.body()).foregroundStyle(theme.color("reserveText")).frame(minHeight: 44) }.buttonStyle(.plain).accessibilityIdentifier("money-envelopes-back")
+                Button { dismiss() } label: { HStack(spacing: 5) { Image(systemName: "chevron.backward"); Text("المال") }.font(MadarTypography.body()).foregroundStyle(theme.color("reserveText")).frame(minHeight: 44) }.buttonStyle(.madarPlain).accessibilityIdentifier("money-envelopes-back")
                 HStack(alignment: .firstTextBaseline) {
                     Text("المظاريف").font(MadarTypography.title())
                     Spacer()
@@ -58,13 +58,15 @@ struct MoneyEnvelopesView: View {
                     if reading.home.envelopes.isEmpty {
                         Text("لم تُضف مظاريف أهداف بعد").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk).padding(.vertical, 18)
                     }
+                    // AU-95: a failed reserve change used to vanish, since `failure` showed only when nothing was read.
+                    if let failure { Text(failure).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")).accessibilityIdentifier("money-envelopes-failure") }
                     ForEach(reading.home.envelopes) { envelope in
-                        Button { selectedEnvelope = envelope.id } label: { MoneyGoalOverview(envelope: envelope, app: app, visible: visible).contentShape(.rect) }.buttonStyle(.plain).accessibilityIdentifier("money-envelope-" + envelope.name)
+                        Button { selectedEnvelope = envelope.id } label: { MoneyGoalOverview(envelope: envelope, app: app, visible: visible).contentShape(.rect) }.buttonStyle(.madarPlain).accessibilityIdentifier("money-envelope-" + envelope.name)
                     }
                     Button { goalOpen = true } label: {
                         Label("جهّز لشيء قادم", systemImage: "plus").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 52)
                             .overlay { RoundedRectangle(cornerRadius: 6).stroke(theme.color("accent").opacity(0.6), style: .init(lineWidth: 1, dash: [4, 3])) }
-                    }.buttonStyle(.plain).padding(.top, 6).accessibilityIdentifier("money-envelopes-new-goal")
+                    }.buttonStyle(.madarPlain).padding(.top, 6).accessibilityIdentifier("money-envelopes-new-goal")
                 } else if let failure {
                     Text(failure).font(MadarTypography.body()); Button("أعِد المحاولة", action: load).frame(minHeight: 44)
                 } else { ProgressView().frame(maxWidth: .infinity, minHeight: 200) }
@@ -142,7 +144,7 @@ struct MoneyEnvelopesView: View {
                             .background(value == previewMinor ? theme.ink : .clear, in: .capsule)
                             .overlay { Capsule().stroke(theme.color("reserveText"), lineWidth: 1) }
                             .frame(minHeight: 44)
-                    }.buttonStyle(.plain).accessibilityIdentifier("money-reserve-preview-" + String(value))
+                    }.buttonStyle(.madarPlain).accessibilityIdentifier("money-reserve-preview-" + String(value))
                 }
             }
             }
@@ -170,7 +172,7 @@ struct MoneyEnvelopesView: View {
     }
     private func mode(_ text: String, selected: Bool, id: String, action: @escaping () -> Void) -> some View {
         Button(action: action) { Text(text).font(MadarTypography.fine()).padding(.horizontal, 13).padding(.vertical, 8).foregroundStyle(selected ? theme.background : theme.ink).background(selected ? theme.ink : .clear, in: .capsule).frame(minHeight: 44) }
-            .buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected : []).accessibilityIdentifier("money-reserve-mode-" + id)
+            .buttonStyle(.madarPlain).accessibilityAddTraits(selected ? .isSelected : []).accessibilityIdentifier("money-reserve-mode-" + id)
     }
     private func previews(_ balance: Int) -> [Int] { [0] + Array(Set([max(0, balance) / 4, max(0, balance) / 2, max(0, balance) / 4 * 3].filter { $0 > 0 })).sorted() }
     private func amount(_ value: Int) -> String { visible ? service.amount(value) : "•••" }

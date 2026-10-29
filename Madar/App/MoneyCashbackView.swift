@@ -70,7 +70,7 @@ struct MoneyCashbackView: View {
     private var header: some View {
         HStack(spacing: 12) {
             Button { dismiss() } label: { Image(systemName: "xmark").font(.title3).frame(width: 52, height: 52).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1.2) } }
-                .buttonStyle(.plain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-cashback-close")
+                .buttonStyle(.madarPlain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-cashback-close")
             Text("الاسترداد النقدي").font(.custom("thmanyahserifdisplay-Bold", size: 28, relativeTo: .title)).accessibilityAddTraits(.isHeader)
             Spacer()
         }.padding(.top, 8)
@@ -149,7 +149,7 @@ struct MoneyCashbackView: View {
                         .overlay { Capsule().stroke(theme.color("accent"), lineWidth: 1) }
                 }
             }.frame(minHeight: 44).contentShape(Rectangle())
-        }.buttonStyle(.plain)
+        }.buttonStyle(.madarPlain)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(c.name + "، " + (c.rateBp.map { "استرداد " + service.percent($0) } ?? "النسبة غير معروفة") + (c.total.earnedMinor.map { c.rateBp != nil || c.recorded ? "، " + whole($0) : "" } ?? ""))
             .accessibilityHint("يفتح نسبة الاسترداد").accessibilityAddTraits(.isButton)
@@ -174,7 +174,7 @@ struct MoneyCashbackView: View {
             }
             if dynamicType.isAccessibilitySize {
                 ForEach(r.months) { m in
-                    Button { selectedMonth = m.id } label: { HStack { MadarDateLabel(m.labels, primaryFont: MadarTypography.body()); Spacer(); Text(whole(r.jar.monthTotals[m.id])) }.font(MadarTypography.body()).frame(minHeight: 44).contentShape(.rect) }.buttonStyle(.plain)
+                    Button { selectedMonth = m.id } label: { HStack { MadarDateLabel(m.labels, primaryFont: MadarTypography.body()); Spacer(); Text(whole(r.jar.monthTotals[m.id])) }.font(MadarTypography.body()).frame(minHeight: 44).contentShape(.rect) }.buttonStyle(.madarPlain)
                 }
             } else {
                 HStack(alignment: .bottom, spacing: r.months.count > 8 ? 4 : 10) {
@@ -222,7 +222,7 @@ struct MoneyCashbackView: View {
                     Text(m.secondaryShort).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).lineLimit(1)
                 }
             }.frame(maxWidth: .infinity).contentShape(Rectangle())
-        }.buttonStyle(.plain)
+        }.buttonStyle(.madarPlain)
             .accessibilityLabel(m.labels.primary + "، " + m.labels.secondary + "، " + whole(r.jar.monthTotals[m.id]) + (m.current ? "، يتجمّع" : ""))
             .accessibilityAddTraits(selected ? .isSelected : [])
             .accessibilityIdentifier("money-cashback-month-" + String(m.id))
@@ -255,7 +255,7 @@ struct MoneyCashbackView: View {
                             Text("+" + whole(chip.gainMinor)).font(MadarTypography.fine().bold()).foregroundStyle(theme.color("surplusText"))
                         }.frame(maxWidth: .infinity, minHeight: 62).padding(.horizontal, 2)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.madarPlain)
                         .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 14))
                         .overlay { RoundedRectangle(cornerRadius: 14).stroke(chip.id == selectedChip ? theme.color("reserveText") : theme.line, lineWidth: 1) }
                         .accessibilityAddTraits(chip.id == selectedChip ? .isSelected : [])
@@ -273,7 +273,7 @@ struct MoneyCashbackView: View {
                         Text(isPreferred ? "أزل البطاقة المفضلة لـ" + chosen.title : "اجعل " + s.to.name + " المفضلة لـ" + chosen.title)
                             .font(MadarTypography.caption().weight(.semibold)).frame(maxWidth: .infinity, minHeight: 46)
                     }
-                    .buttonStyle(.plain).disabled(savingPreferredCard)
+                    .buttonStyle(.madarPlain).disabled(savingPreferredCard)
                     .glassEffect(.regular.interactive(), in: Capsule())
                     .accessibilityLabel(isPreferred ? "أزل البطاقة المفضلة لتصنيف " + chosen.title : "اجعل " + s.to.name + " البطاقة المفضلة لتصنيف " + chosen.title)
                     .accessibilityIdentifier("money-cashback-preferred-card-" + chosen.id)
@@ -320,7 +320,7 @@ struct MoneyCashbackView: View {
             Text(name).font(MadarTypography.caption().weight(.semibold))
                 .lineLimit(1).minimumScaleFactor(0.85).padding(.horizontal, 4).frame(maxWidth: .infinity, minHeight: 44)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.madarPlain)
         .glassEffect(.regular.interactive(), in: Capsule())
         .overlay { Capsule().stroke(selected ? theme.color("reserveText") : .clear, lineWidth: 1) }
         .accessibilityLabel(name + (selected ? "، الوجهة المختارة" : ""))
@@ -522,7 +522,7 @@ struct MoneyCashbackRateSheet: View {
                             Text(service.percent(value)).font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 44)
                                 .background(bp == value ? theme.ink : Color.clear, in: Capsule()).foregroundStyle(bp == value ? theme.background : theme.ink)
                                 .overlay { Capsule().stroke(theme.line, lineWidth: 1) }
-                        }.buttonStyle(.plain).accessibilityAddTraits(bp == value ? .isSelected : []).accessibilityIdentifier("money-cashback-rate-chip-" + String(value))
+                        }.buttonStyle(.madarPlain).accessibilityAddTraits(bp == value ? .isSelected : []).accessibilityIdentifier("money-cashback-rate-chip-" + String(value))
                     }
                 }
                 let sample = 1_000 * unit
@@ -534,10 +534,10 @@ struct MoneyCashbackRateSheet: View {
                 if let failure { Text(failure).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")) }
                 Button { if let bp { save(bp) } } label: {
                     Text("احفظ النسبة").font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 52).background(theme.ink, in: Capsule()).foregroundStyle(theme.background)
-                }.buttonStyle(.plain).disabled(saving || bp == nil || bp == card.rateBp).opacity(bp == nil || bp == card.rateBp ? 0.45 : 1).accessibilityIdentifier("money-cashback-rate-save")
+                }.buttonStyle(.madarPlain).disabled(saving || bp == nil || bp == card.rateBp).opacity(bp == nil || bp == card.rateBp ? 0.45 : 1).accessibilityIdentifier("money-cashback-rate-save")
                 if card.rateBp != nil {
                     Button { save(nil) } label: { Text("لا أعرفها").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 44) }
-                        .buttonStyle(.plain).disabled(saving).accessibilityIdentifier("money-cashback-rate-unknown")
+                        .buttonStyle(.madarPlain).disabled(saving).accessibilityIdentifier("money-cashback-rate-unknown")
                 }
             }.padding(20)
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
@@ -546,7 +546,7 @@ struct MoneyCashbackRateSheet: View {
     }
     private func stepButton(_ symbol: String, label: String, id: String, action: @escaping () -> Void) -> some View {
         Button(action: action) { Image(systemName: symbol).font(.title3).frame(width: 48, height: 48).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1) } }
-            .buttonStyle(.plain).accessibilityLabel(label).accessibilityIdentifier(id)
+            .buttonStyle(.madarPlain).accessibilityLabel(label).accessibilityIdentifier(id)
     }
     private func save(_ value: Int?) {
         guard !saving else { return }

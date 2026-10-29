@@ -262,7 +262,7 @@ struct MihbaraPaperIndexEditor: View {
             .background(theme.surface, in: .rect(cornerRadius: 18))
             .overlay { RoundedRectangle(cornerRadius: 18).stroke(theme.line, lineWidth: 1) }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.madarPlain)
         .accessibilityIdentifier(id)
     }
 

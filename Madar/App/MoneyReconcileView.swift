@@ -56,7 +56,7 @@ struct MoneyReconcileView: View {
                                 Text("لم يُعرف رصيدها بعد").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                                 Label("أدخل رصيد البنك", systemImage: "plus.circle").font(MadarTypography.body())
                             }.frame(maxWidth: .infinity, alignment: .leading).padding(16).background(theme.surface, in: .rect(cornerRadius: 12))
-                        }.buttonStyle(.plain).accessibilityIdentifier("money-reconcile-unknown-" + account.id.uuidString)
+                        }.buttonStyle(.madarPlain).accessibilityIdentifier("money-reconcile-unknown-" + account.id.uuidString)
                     }
                     if reading.rows.isEmpty && reading.unknownAccounts.isEmpty { emptyPage }
                     else if let row {
@@ -88,7 +88,7 @@ struct MoneyReconcileView: View {
     private var header: some View {
         HStack(spacing: 14) {
             Button { dismiss() } label: { Image(systemName: "xmark").font(.title3).frame(width: 52, height: 52).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1.2) } }
-                .buttonStyle(.plain).glassEffect(.regular.interactive(), in: Circle())
+                .buttonStyle(.madarPlain).glassEffect(.regular.interactive(), in: Circle())
                 .accessibilityLabel("إغلاق").accessibilityIdentifier("money-reconcile-close")
             Text("المطابقة مع البنك").font(.custom("thmanyahserifdisplay-Bold", size: 27, relativeTo: .title)).accessibilityAddTraits(.isHeader)
             Spacer(minLength: 0)
@@ -145,7 +145,7 @@ struct MoneyReconcileView: View {
                 Text(r.side == .account ? "حساب، يقارن النقد" : r.side == .creditCard ? "بطاقة، تقارن الدين" : "تقسيط، يقارن رصيد المزود")
                     .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
             }.contentShape(Rectangle())
-        }.buttonStyle(.plain).accessibilityIdentifier("money-reconcile-account")
+        }.buttonStyle(.madarPlain).accessibilityIdentifier("money-reconcile-account")
     }
 
     private func arches(_ r: MoneyReconcileRow) -> some View {
@@ -158,7 +158,7 @@ struct MoneyReconcileView: View {
                         Text(figure: amount(r.expectedMinor)).font(.custom("thmanyahserifdisplay-Black", size: 33, relativeTo: .largeTitle)).minimumScaleFactor(0.5).lineLimit(1)
                             .accessibilityIdentifier("money-reconcile-expected")
                     }
-                }.buttonStyle(.plain).disabled(!visible).accessibilityHint("يعرض كيف تكوّن هذا الرقم")
+                }.buttonStyle(.madarPlain).disabled(!visible).accessibilityHint("يعرض كيف تكوّن هذا الرقم")
                     .accessibilityIdentifier("money-reconcile-madar")
                 arch(caption: providerCaption(r), title: providerTitle(r), tint: theme.color("dueText"), titleTint: theme.color("dueText"), matched: matched) {
                     VStack(spacing: 4) {
@@ -237,7 +237,7 @@ struct MoneyReconcileView: View {
                 Button { source = .init(id: "message-" + r.id.uuidString, title: "رصيد من رسالة البنك", amountMinor: suggestion.observedMinor, explanation: "آخر رسالة على هذا الحساب ذكرت رصيده، ولم يتحرك دفتر مدار بعدها. عدّله إن كان تطبيق البنك يقول غير ذلك.", message: suggestion.text, date: suggestion.day) } label: {
                     HStack(spacing: 5) { Image(systemName: "envelope"); Text("من رسالة البنك"); inlineDate(suggestion.day); Text(service.time(at)) }
                         .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
-                }.buttonStyle(.plain).accessibilityIdentifier("money-reconcile-from-message")
+                }.buttonStyle(.madarPlain).accessibilityIdentifier("money-reconcile-from-message")
             }
         }.frame(maxWidth: .infinity)
     }
@@ -251,7 +251,7 @@ struct MoneyReconcileView: View {
                     Text("\u{2066}" + (units < 0 ? "−" : "+") + service.digits.string(abs(units)) + "\u{2069}").font(MadarTypography.body())
                         .frame(maxWidth: 66, minHeight: 58).frame(maxWidth: .infinity)
                         .background(theme.color("surface2"), in: Rectangle()).overlay { Rectangle().stroke(theme.line, lineWidth: 1) }
-                }.buttonStyle(.plain).disabled(!visible).accessibilityLabel((units < 0 ? "أنقص " : "زِد ") + service.digits.string(abs(units)))
+                }.buttonStyle(.madarPlain).disabled(!visible).accessibilityLabel((units < 0 ? "أنقص " : "زِد ") + service.digits.string(abs(units)))
                     .accessibilityIdentifier("money-reconcile-nudge-" + String(units))
             }
         }
@@ -271,7 +271,7 @@ struct MoneyReconcileView: View {
                                 .frame(minHeight: 58).frame(maxWidth: .infinity)
                                 .background(chosen == name ? theme.ink : theme.color("surface2"), in: Rectangle())
                                 .foregroundStyle(chosen == name ? theme.background : theme.ink).overlay { Rectangle().stroke(theme.line, lineWidth: 1) }
-                        }.buttonStyle(.plain).disabled(!visible).accessibilityAddTraits(chosen == name ? .isSelected : []).accessibilityIdentifier("money-reconcile-name-" + name.rawValue)
+                        }.buttonStyle(.madarPlain).disabled(!visible).accessibilityAddTraits(chosen == name ? .isSelected : []).accessibilityIdentifier("money-reconcile-name-" + name.rawValue)
                     }
                 }
                 Text(caption(chosen, reading: reading)).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-reconcile-name-caption")
@@ -305,7 +305,7 @@ struct MoneyReconcileView: View {
                     Spacer(minLength: 0)
                     Image(systemName: "chevron.left").font(.caption).foregroundStyle(theme.secondaryInk)
                 }.padding(12).background(theme.surface, in: RoundedRectangle(cornerRadius: 12)).overlay { RoundedRectangle(cornerRadius: 12).stroke(theme.color("reserveText"), style: .init(lineWidth: 1, dash: [4, 3])) }
-            }.buttonStyle(.plain).accessibilityIdentifier("money-reconcile-hint")
+            }.buttonStyle(.madarPlain).accessibilityIdentifier("money-reconcile-hint")
         }
     }
 
@@ -321,7 +321,7 @@ struct MoneyReconcileView: View {
                 inlineDate(reading.today)
             }
             if dynamicType.isAccessibilitySize {
-                ForEach(reading.rows) { item in Button { select(item.id) } label: { accessibleRow(item) }.buttonStyle(.plain) }
+                ForEach(reading.rows) { item in Button { select(item.id) } label: { accessibleRow(item) }.buttonStyle(.madarPlain) }
             } else {
                 HStack(spacing: 4) {
                     Text("الحساب / المزود").frame(maxWidth: .infinity, alignment: .leading)
@@ -357,7 +357,7 @@ struct MoneyReconcileView: View {
         VStack(alignment: .leading, spacing: 0) {
             Text(title).font(MadarTypography.caption()).bold().foregroundStyle(theme.color("reserveText")).padding(.top, 6).padding(.bottom, 2)
             ForEach(rows) { item in
-                Button { select(item.id) } label: { ledgerRow(item) }.buttonStyle(.plain).accessibilityIdentifier("money-reconcile-row-" + item.name)
+                Button { select(item.id) } label: { ledgerRow(item) }.buttonStyle(.madarPlain).accessibilityIdentifier("money-reconcile-row-" + item.name)
                 if item.id != rows.last?.id { Rectangle().fill(theme.line).frame(height: 0.7) }
             }
         }
@@ -421,7 +421,7 @@ struct MoneyReconcileView: View {
                 Text("ثبّت المطابقة" + count).font(MadarTypography.cardTitle()).bold().lineLimit(1).minimumScaleFactor(0.8)
             }.frame(maxWidth: .infinity, minHeight: 60).foregroundStyle(theme.background)
                 .background(theme.ink.opacity(any && !saving ? 1 : 0.35), in: RoundedRectangle(cornerRadius: 8))
-        }.buttonStyle(.plain).disabled(!any || saving || !visible).accessibilityIdentifier("money-reconcile-save")
+        }.buttonStyle(.madarPlain).disabled(!any || saving || !visible).accessibilityIdentifier("money-reconcile-save")
         }
             .padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 4).background(theme.background.opacity(0.94))
     }
@@ -513,7 +513,8 @@ struct MoneyReconcileView: View {
         } catch { reading = nil; failure = "لم تكتمل قراءة الحسابات. حاول مرة أخرى." }
     }
     private func save() {
-        guard let reading else { return }
+        // AU-95: `.disabled` lands a render later; a fast second tap must not send the same reconcile twice.
+        guard !saving, let reading else { return }
         note = nil
         let formatter = ISO8601DateFormatter()
         let rows: [MadarCore.JSONValue] = reading.rows.compactMap { r in

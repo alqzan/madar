@@ -36,17 +36,17 @@ struct DiarySearchView: View {
                                 Button { query = ""; chips = []; focused = true } label: {
                                     Label("ابدأ بحثًا جديدًا", systemImage: "arrow.counterclockwise").font(DiaryType.label).padding(.horizontal, 16).frame(minHeight: 44)
                                         .background(theme.surface, in: Capsule()).overlay { Capsule().stroke(theme.line) }
-                                }.buttonStyle(.plain).accessibilityIdentifier("diary-search-restart")
+                                }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-search-restart")
                             }.padding(.vertical, 24)
                         }
                         ForEach(results) { row in Button { focused=false;reader=row.day } label: {
                             VStack(alignment:.leading,spacing:8) {Text(row.text).font(DiaryType.writing).lineLimit(4).multilineTextAlignment(.leading);Text(source(row.kind)+"، "+service.bothDates(row.day,calendar:FirstCalendar(rawValue:app.string("core.firstCalendar")) ?? .hijri)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))}.padding(16).frame(maxWidth:.infinity,alignment:.leading).background(theme.surface,in:.rect(cornerRadius:14)).overlay{RoundedRectangle(cornerRadius:14).stroke(theme.line)}
-                        }.buttonStyle(.plain).accessibilityIdentifier("diary-search-result-"+row.id) }
+                        }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-search-result-"+row.id) }
                     } else if let index {
-                        ForEach(["العام الماضي","صور","هوامش"],id:\.self) { example in Button {query=example;focused=false} label:{Text(example).font(DiaryType.writing).frame(maxWidth:.infinity,alignment:.leading).padding(16).overlay{RoundedRectangle(cornerRadius:14).stroke(theme.line)}}.buttonStyle(.plain) }
+                        ForEach(["العام الماضي","صور","هوامش"],id:\.self) { example in Button {query=example;focused=false} label:{Text(example).font(DiaryType.writing).frame(maxWidth:.infinity,alignment:.leading).padding(16).overlay{RoundedRectangle(cornerRadius:14).stroke(theme.line)}}.buttonStyle(.madarPlain) }
                         Text("فهرس الكتاب").font(DiaryType.heading).foregroundStyle(theme.accent).padding(.top,12)
                         if index.terms.isEmpty {Text("تظهر هنا الأماكن والمشاريع والوسوم التي استخدمتها.").font(DiaryType.writing)}
-                        ForEach(index.terms,id:\.1) { name,filter,count in Button {query=filter;focused=false} label:{HStack{Text(name).font(DiaryType.writing);Rectangle().fill(theme.line).frame(height:1);Text(PrayerCopy.days(count, digits: service.digits)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))}.frame(minHeight:44)}.buttonStyle(.plain) }
+                        ForEach(index.terms,id:\.1) { name,filter,count in Button {query=filter;focused=false} label:{HStack{Text(name).font(DiaryType.writing);Rectangle().fill(theme.line).frame(height:1);Text(PrayerCopy.days(count, digits: service.digits)).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))}.frame(minHeight:44)}.buttonStyle(.madarPlain) }
                     }
                 }.padding(18)
             }.navigationBarTitleDisplayMode(.inline).scrollDismissesKeyboard(.interactively).background(theme.background).foregroundStyle(theme.ink)

@@ -27,7 +27,7 @@ struct QuranPlanView: View {
                             // AU-04 (R18-Khitta): the plan itself heads the card, what it memorises, one tap from its editor.
                             if let p = overview.input, let surah = (try? QuranResources.catalog())?.ayah(id: p.startAyah)?.surahNameArabic {
                                 Button { showSetup = true } label: { row("خطة الحفظ", detail: "من سورة " + surah, dot: "hifz", chevron: true).contentShape(Rectangle()) }
-                                    .buttonStyle(.plain).accessibilityIdentifier("quran-plan-summary")
+                                    .buttonStyle(.madarPlain).accessibilityIdentifier("quran-plan-summary")
                                 line
                             }
                             levelRow("درجة الحفظ المعتادة", key: "quran.hifzLevel", dot: "hifz")
@@ -100,7 +100,7 @@ struct QuranPlanView: View {
                                         }.padding(.horizontal, 14).frame(minHeight: 64).contentShape(.rect)
                                             .background(input.missPolicy == key ? theme.color("hifzTint") : theme.surface, in: .rect(cornerRadius: 17))
                                             .overlay { RoundedRectangle(cornerRadius: 17).stroke(input.missPolicy == key ? theme.color("hifz") : theme.color("track"), lineWidth: 1) }
-                                    }.buttonStyle(.plain).accessibilityIdentifier("quran-plan-miss-" + key)
+                                    }.buttonStyle(.madarPlain).accessibilityIdentifier("quran-plan-miss-" + key)
                                         .accessibilityAddTraits(input.missPolicy == key ? .isSelected : [])
                                 }
                                 missedDayChart(overview, policy: input.missPolicy)
@@ -111,9 +111,13 @@ struct QuranPlanView: View {
                     Text(overview.version).font(quranFont(11)).accessibilityIdentifier("quran-plan-version").foregroundStyle(theme.secondaryInk)
                 }
                 if let error { Text(error).font(quranFont(13)) }
+                // AU-95: a failed first read left only the header; one tap reads the plan again.
+                if overview == nil, error != nil {
+                    Button("أعِد المحاولة") { load(at: service.currentTime()) }.font(quranFont(14, bold: true)).frame(minHeight: 44).contentShape(Rectangle()).accessibilityIdentifier("quran-plan-retry")
+                }
             }.padding(16)
         }.clipped().background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.color("review")).disabled(busy || app.settingsWriteInProgress)
-            .safeAreaInset(edge: .bottom) { if app.undoToastVisible { UndoToast(message: app.undoMessage, undo: app.undo).accessibilityIdentifier("quran-plan-undo") } }
+            .safeAreaInset(edge: .bottom) { if app.undoToastVisible { UndoToast(message: app.undoMessage, undo: app.undo, dismiss: app.hideUndoToast).accessibilityIdentifier("quran-plan-undo") } }
             .fullScreenCover(isPresented: $showSetup, onDismiss: { load(at: service.currentTime()) }) { QuranPlanSetupView(service: service, close: { showSetup = false }) }
             .task(id: currentDay) { load(at: evaluatedAt) }.onChange(of: app.settingsWriteInProgress) { if !app.settingsWriteInProgress { load(at: service.currentTime()) } }.onChange(of: app.undoToken?.id) { load(at: service.currentTime()) }
             .onChange(of: app.string("quran.hifzLevel")) { previewLevel = nil }
@@ -174,7 +178,7 @@ struct QuranPlanView: View {
                                 }.frame(height: 24)
                                 Text(item.title).font(quranFont(12, bold: index == current))
                             }.frame(maxWidth: .infinity, minHeight: 48).contentShape(.rect)
-                        }.buttonStyle(.plain).accessibilityIdentifier("quran-plan-preview-" + item.rawValue)
+                        }.buttonStyle(.madarPlain).accessibilityIdentifier("quran-plan-preview-" + item.rawValue)
                             .accessibilityAddTraits(index == current ? .isSelected : [])
                     }
                 }.simultaneousGesture(DragGesture(minimumDistance: 12).onChanged { gesture in

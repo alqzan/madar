@@ -38,7 +38,7 @@ struct MoneyCategoriesView: View {
                 HStack(spacing: 12) {
                     Button { dismiss() } label: {
                         Image(systemName: "xmark").font(.title3).frame(width: 52, height: 52).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1.2) }
-                    }.buttonStyle(.plain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-categories-close")
+                    }.buttonStyle(.madarPlain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-categories-close")
                     Text("التصنيفات والحدود").font(.custom("thmanyahserifdisplay-Bold", size: 26, relativeTo: .title)).accessibilityAddTraits(.isHeader)
                     Spacer()
                 }.padding(.top, 8)
@@ -113,7 +113,7 @@ struct MoneyCategoriesView: View {
             }.padding(.horizontal, 10).padding(.vertical, 8).background(active ? theme.surface : Color.clear)
                 .overlay { if active { RoundedRectangle(cornerRadius: 8).stroke(theme.color("reserve"), lineWidth: 1.2) } }
                 .contentShape(Rectangle())
-        }.buttonStyle(.plain).accessibilityIdentifier("money-shelf-" + s.name)
+        }.buttonStyle(.madarPlain).accessibilityIdentifier("money-shelf-" + s.name)
     }
     private func bookView(_ book: MoneyShelfBook, width: CGFloat, height: CGFloat, index: Int, showName: Bool, tint: Color) -> some View {
         let tints = [tint, tint.opacity(0.78), tint.opacity(0.58)]
@@ -161,12 +161,12 @@ struct MoneyCategoriesView: View {
                 if s.limitMinor != nil {
                     Button { save(s, none: true) } label: {
                         Text("بلا حد").font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 54).overlay { Capsule().stroke(theme.line, lineWidth: 1) }
-                    }.buttonStyle(.plain).disabled(saving).accessibilityIdentifier("money-limit-none")
+                    }.buttonStyle(.madarPlain).disabled(saving).accessibilityIdentifier("money-limit-none")
                 }
                 Button { save(s, none: false) } label: {
                     Text("احفظ الحد").font(.custom("thmanyahsans-Bold", size: 18, relativeTo: .headline)).foregroundStyle(theme.background)
                         .frame(maxWidth: .infinity, minHeight: 54).background(theme.ink, in: Capsule())
-                }.buttonStyle(.plain).disabled(saving).accessibilityIdentifier("money-limit-save").layoutPriority(1)
+                }.buttonStyle(.madarPlain).disabled(saving).accessibilityIdentifier("money-limit-save").layoutPriority(1)
             }
             if let saveFailure { Text(saveFailure).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")).accessibilityIdentifier("money-limit-failure") }
         }.padding(.top, 6)
@@ -174,7 +174,7 @@ struct MoneyCategoriesView: View {
     private func modeButton(_ title: String, _ on: Bool, id: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title).font(MadarTypography.caption()).foregroundStyle(on ? theme.background : theme.ink).padding(.horizontal, 16).frame(minHeight: 44).background(on ? theme.ink : Color.clear)
-        }.buttonStyle(.plain).accessibilityAddTraits(on ? .isSelected : []).accessibilityIdentifier("money-limit-mode-" + id)
+        }.buttonStyle(.madarPlain).accessibilityAddTraits(on ? .isSelected : []).accessibilityIdentifier("money-limit-mode-" + id)
     }
     private func percentLabel(_ basisPoints: Int) -> String {
         if basisPoints % 100 == 0 { return service.digits.percent(basisPoints / 100) }
@@ -184,7 +184,7 @@ struct MoneyCategoriesView: View {
     private func step(_ symbol: String, _ action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: symbol).font(.title3).frame(width: 64, height: 64).background(theme.surface, in: Circle()).overlay { Circle().stroke(theme.color("reserve"), lineWidth: 1) }
-        }.buttonStyle(.plain).accessibilityLabel(symbol == "plus" ? "زد الحد" : "أنقص الحد").accessibilityIdentifier("money-limit-" + symbol)
+        }.buttonStyle(.madarPlain).accessibilityLabel(symbol == "plus" ? "زد الحد" : "أنقص الحد").accessibilityIdentifier("money-limit-" + symbol)
     }
 
     // MARK: Actions
@@ -201,7 +201,7 @@ struct MoneyCategoriesView: View {
             let first = reading == nil
             reading = try service.loadCategories(); failure = nil
             if first, let shelf = reading?.shelves.first { pick(shelf) }
-        } catch { failure = "تعذّرت قراءة التصنيفات الآن." }
+        } catch { reading = nil; failure = "تعذّرت قراءة التصنيفات الآن." }  // AU-95: never stale limits with a hidden reason
     }
     private func save(_ s: MoneyCategoryShelf, none: Bool) {
         guard !saving else { return }

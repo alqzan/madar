@@ -87,7 +87,7 @@ struct MoneyExpenseView: View {
                 } else if let failure { Text(failure); Button("أعِد المحاولة", action: load) }
                 else { ProgressView().frame(height: 250) }
             }.padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 20).frame(maxWidth: 620).frame(maxWidth: .infinity)
-        }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.plain)
+        }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.madarPlain)
             .environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar, .tabBar).hidesRoomAccessory(app, id: "money-expense")
             .scrollDismissesKeyboard(.interactively)
             .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تمّ") { editing = false } } }
@@ -152,7 +152,7 @@ struct MoneyExpenseView: View {
                         Text(selected ? "مختارة للدفع" : "استخدمها للدفع").font(MadarTypography.fine().weight(.semibold))
                             .frame(minWidth: 96, minHeight: 44)
                     }
-                    .buttonStyle(.plain).disabled(selected)
+                    .buttonStyle(.madarPlain).disabled(selected)
                     .glassEffect(.regular.interactive(), in: Capsule())
                     .accessibilityIdentifier("money-expense-preferred-card-use")
                 }

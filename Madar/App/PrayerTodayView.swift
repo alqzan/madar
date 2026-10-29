@@ -216,7 +216,7 @@ struct PrayerTodayView: View {
                     .overlay { Circle().stroke(theme.ink.opacity(0.14), lineWidth: 1) }
                     .contentShape(Circle())
             }
-            .buttonStyle(.plain).accessibilityLabel("خصّص الصلاة").accessibilityIdentifier("prayer-customize")
+            .buttonStyle(.madarPlain).accessibilityLabel("خصّص الصلاة").accessibilityIdentifier("prayer-customize")
         }
     }
 
@@ -238,7 +238,7 @@ struct PrayerTodayView: View {
             .background(theme.color("goldSoft"), in: .capsule)
             .overlay { Capsule().stroke(theme.line, lineWidth: 1) }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.madarPlain)
         .accessibilityLabel("جمعة مباركة، افتح سورة الكهف")
         .accessibilityIdentifier("prayer-friday-pill")
     }
@@ -325,7 +325,7 @@ struct PrayerTodayView: View {
             countdown: isNext && cell.status == .future ? cell.prayerTime.flatMap { PrayerCopy.countdown(until: $0, now: now, digits: digits) } : nil)
         if canEdit {
             Button { choose(cell) } label: { arch }
-                .buttonStyle(.plain)
+                .buttonStyle(.madarPlain)
                 .accessibilityElement(children: dynamicType.isAccessibilitySize ? .combine : .ignore)
                 .accessibilityLabel(arch.accessibilityText)
                 .accessibilityHint("سجّل الصلاة أو غيّر تسجيلها")
@@ -404,7 +404,7 @@ struct PrayerTodayView: View {
                 .background(theme.color("surface"), in: .rect(cornerRadius: 18))
                 .overlay { RoundedRectangle(cornerRadius: 18).stroke(theme.line, lineWidth: 1) }
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.madarPlain)
             .accessibilityIdentifier("prayer-heart-review")
         }
     }
@@ -429,7 +429,7 @@ struct PrayerTodayView: View {
                 }
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.madarPlain)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("سلاسلك: " + summary)
         .accessibilityHint("افتح تفاصيل السلاسل")
@@ -470,7 +470,7 @@ struct PrayerTodayView: View {
                 .overlay { RoundedRectangle(cornerRadius: 18).stroke(theme.line, lineWidth: 1) }
                 .contentShape(.rect(cornerRadius: 18))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.madarPlain)
             .accessibilityIdentifier("prayer-old-missed")
         }
     }
@@ -480,14 +480,14 @@ struct PrayerTodayView: View {
             Text("قضيتُ واحدة").font(PrayerHomeType.strong).frame(maxWidth: .infinity, minHeight: 54)
                 .foregroundStyle(theme.background).background(theme.ink, in: .rect(cornerRadius: 16))
         }
-        .buttonStyle(.plain).disabled(session.prayerWriteInProgress)
+        .buttonStyle(.madarPlain).disabled(session.prayerWriteInProgress)
         .accessibilityIdentifier("prayer-qada-makeup")
         let places = Button { selectedSheet = .qadaList } label: {
             Text("مواضعها").font(PrayerHomeType.strong).frame(minHeight: 54).padding(.horizontal, 26)
                 .overlay { RoundedRectangle(cornerRadius: 16).stroke(theme.ink.opacity(0.18), lineWidth: 1) }
                 .contentShape(.rect(cornerRadius: 16))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.madarPlain)
         .accessibilityIdentifier("prayer-qada-places")
         if dynamicType.isAccessibilitySize {
             VStack(spacing: 10) { makeUp; places.frame(maxWidth: .infinity) }
@@ -516,7 +516,7 @@ struct PrayerTodayView: View {
                 }
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.madarPlain)
         .accessibilityIdentifier("prayer-qiyam")
     }
 
@@ -749,7 +749,7 @@ private struct PrayerNoticeRow: View {
                 }
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.madarPlain)
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier(identifier)
     }
@@ -1076,7 +1076,7 @@ private struct PrayerQadaListSheet: View {
             .background(on ? theme.color("missed").opacity(0.08) : .clear, in: .rect(cornerRadius: 14))
             .contentShape(.rect)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.madarPlain)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(on ? .isSelected : [])
         .accessibilityIdentifier("prayer-qada-row-\(item.reference.day)-\(item.reference.prayer.rawValue)")
@@ -1088,14 +1088,14 @@ private struct PrayerQadaListSheet: View {
                 Text("اقضِ واحدة").font(PrayerHomeType.strong).foregroundStyle(theme.background)
                     .frame(maxWidth: .infinity, minHeight: 56).background(theme.ink, in: .rect(cornerRadius: 18))
             }
-            .buttonStyle(.plain).disabled(selected == nil || session.prayerWriteInProgress)
+            .buttonStyle(.madarPlain).disabled(selected == nil || session.prayerWriteInProgress)
             .opacity(selected == nil ? 0.4 : 1).accessibilityIdentifier("prayer-qada-makeup-chosen")
             Button(action: addOld) {
                 Text("أضِف فائتة قديمة").font(PrayerHomeType.strong).padding(.horizontal, 22).frame(minHeight: 56)
                     .overlay { RoundedRectangle(cornerRadius: 18).stroke(theme.ink.opacity(0.14), lineWidth: 1) }
                     .contentShape(.rect(cornerRadius: 18))
             }
-            .buttonStyle(.plain).accessibilityIdentifier("prayer-old-missed")
+            .buttonStyle(.madarPlain).accessibilityIdentifier("prayer-old-missed")
         }
         .padding(.top, 16)
     }
@@ -1223,7 +1223,7 @@ private struct PrayerTodayLogSheet: View {
                         .overlay { Capsule().stroke(on ? theme.accent : theme.ink.opacity(0.14), lineWidth: on ? 1.5 : 1) }
                         .frame(minHeight: 44).contentShape(.rect)
                 }
-                .buttonStyle(.plain).accessibilityAddTraits(on ? .isSelected : [])
+                .buttonStyle(.madarPlain).accessibilityAddTraits(on ? .isSelected : [])
                 .accessibilityIdentifier("prayer-friday-kind-\(kind.rawValue)")
             }
             Spacer(minLength: 0)
@@ -1263,7 +1263,7 @@ private struct PrayerTodayLogSheet: View {
             .overlay { RoundedRectangle(cornerRadius: 20).stroke(on ? tint : theme.ink.opacity(0.13), lineWidth: on ? 1.5 : 1) }
             .contentShape(.rect(cornerRadius: 20))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.madarPlain)
         .opacity(needsKind(option) ? 0.45 : 1)
         .disabled(needsKind(option))
         .accessibilityElement(children: .combine)
@@ -1298,7 +1298,7 @@ private struct PrayerTodayLogSheet: View {
                     Text("قضيتُها الآن").font(PrayerHomeType.strong).foregroundStyle(theme.background)
                         .frame(maxWidth: .infinity, minHeight: 54).background(theme.ink, in: .rect(cornerRadius: 18))
                 }
-                .buttonStyle(.plain).accessibilityIdentifier("prayer-makeup-now")
+                .buttonStyle(.madarPlain).accessibilityIdentifier("prayer-makeup-now")
                 Button {
                     save(.missed, kind, false) { ok in if ok { dismiss() } }
                 } label: {
@@ -1306,7 +1306,7 @@ private struct PrayerTodayLogSheet: View {
                         .padding(.horizontal, 22).frame(minHeight: 54)
                         .overlay { RoundedRectangle(cornerRadius: 18).stroke(theme.ink.opacity(0.14), lineWidth: 1) }
                 }
-                .buttonStyle(.plain).accessibilityIdentifier("prayer-missed-later")
+                .buttonStyle(.madarPlain).accessibilityIdentifier("prayer-missed-later")
             }
             .disabled(isSaving || (cell.isFriday && fridayKind == nil))
         }
@@ -1325,7 +1325,7 @@ private struct PrayerTodayLogSheet: View {
                 Button { if heart != nil { answerHeart(nil) { ok in if ok { dismiss() } } } else { dismiss() } } label: {
                     Text("أمرُّ").font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk).frame(minHeight: 44).contentShape(.rect)
                 }
-                .buttonStyle(.plain).accessibilityIdentifier("prayer-heart-skip")
+                .buttonStyle(.madarPlain).accessibilityIdentifier("prayer-heart-skip")
             }
             HStack(spacing: 8) {
                 ForEach(PrayerHeart.allCases, id: \.self) { value in
@@ -1345,7 +1345,7 @@ private struct PrayerTodayLogSheet: View {
                         .overlay { RoundedRectangle(cornerRadius: 20).stroke(on ? theme.accent : theme.ink.opacity(0.13), lineWidth: on ? 1.5 : 1) }
                         .contentShape(.rect(cornerRadius: 20))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.madarPlain)
                     .accessibilityElement(children: .combine)
                     .accessibilityAddTraits(on ? .isSelected : [])
                     .accessibilityIdentifier("prayer-heart-\(value.rawValue)")
@@ -1415,7 +1415,7 @@ private struct PrayerMakeUpSheet: View {
                                 .overlay { Capsule().stroke(on ? theme.accent : theme.ink.opacity(0.14), lineWidth: on ? 1.5 : 1) }
                                 .frame(minHeight: 44).contentShape(.rect)
                         }
-                        .buttonStyle(.plain).accessibilityAddTraits(on ? .isSelected : [])
+                        .buttonStyle(.madarPlain).accessibilityAddTraits(on ? .isSelected : [])
                         .accessibilityIdentifier("prayer-makeup-friday-kind-\(kind.rawValue)")
                     }
                     Spacer(minLength: 0)
@@ -1425,7 +1425,7 @@ private struct PrayerMakeUpSheet: View {
                 Text("قضيتُها الآن").font(PrayerHomeType.strong).foregroundStyle(theme.background)
                     .frame(maxWidth: .infinity, minHeight: 56).background(theme.ink, in: .rect(cornerRadius: 18))
             }
-            .buttonStyle(.plain).disabled(isSaving || (isFridayNoon && fridayKind == nil))
+            .buttonStyle(.madarPlain).disabled(isSaving || (isFridayNoon && fridayKind == nil))
             .opacity(isSaving || (isFridayNoon && fridayKind == nil) ? 0.4 : 1)
             .accessibilityIdentifier("prayer-makeup-confirm")
         }
@@ -1509,11 +1509,11 @@ private struct PrayerGapResolutionSheet: View {
             Button { apply(Choice(status: .alone, fridayKind: nil), to: references, saveNow: true) } label: {
                 quickLabel("صلّيتها كلها", detail: "تُسجَّل في وقتها، وحدي")
             }
-            .buttonStyle(.plain).accessibilityIdentifier("prayer-gap-alone-all")
+            .buttonStyle(.madarPlain).accessibilityIdentifier("prayer-gap-alone-all")
             Button { apply(Choice(status: .unrecordedHistory), to: references, saveNow: true) } label: {
                 quickLabel("لم أسجّل هذه الفترة", detail: "لا قضاء ولا نسبة ولا سلسلة")
             }
-            .buttonStyle(.plain).accessibilityIdentifier("prayer-gap-unrecorded-all")
+            .buttonStyle(.madarPlain).accessibilityIdentifier("prayer-gap-unrecorded-all")
         }
     }
 
@@ -1591,7 +1591,7 @@ private struct PrayerGapResolutionSheet: View {
                 .foregroundStyle(count == 0 ? theme.secondaryInk : theme.background)
                 .background(count == 0 ? theme.color("surface") : theme.ink, in: .rect(cornerRadius: 16))
         }
-        .buttonStyle(.plain).disabled(count == 0)
+        .buttonStyle(.madarPlain).disabled(count == 0)
         .padding(.horizontal, 20).padding(.vertical, 10)
         .background(theme.background)
         .accessibilityIdentifier("prayer-gap-save")
@@ -1721,7 +1721,7 @@ private struct PrayerStatisticsView: View {
                             Text("الصلاة").font(PrayerHomeType.strong)
                         }.frame(minHeight: 44).contentShape(.rect)
                     }
-                    .buttonStyle(.plain).accessibilityIdentifier("prayer-hali-back")
+                    .buttonStyle(.madarPlain).accessibilityIdentifier("prayer-hali-back")
                     Text("حالي").font(serif(44)).accessibilityAddTraits(.isHeader)
                 }
                 if snapshot.statistics.denominator >= 5 {
@@ -1872,7 +1872,7 @@ private struct PrayerStatisticsView: View {
                 let isToday = day == snapshot.today.day
                 if let summary = snapshot.history.first(where: { $0.day == day }) {
                     Button { editing = PrayerDayRoute(day: day) } label: { dayCell(day, cells: summary.cells, today: isToday) }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.madarPlain)
                         .accessibilityLabel(dateTitle(day)).accessibilityIdentifier("prayer-history-day-\(day)")
                 } else {
                     dayCell(day, cells: [], today: isToday).opacity(0.3).accessibilityHidden(true)
@@ -2083,7 +2083,7 @@ private struct PrayerDayEditSheet: View {
             Button { openLog(cell) } label: {
                 Text(prayerTitle(cell.reference.prayer)).font(PrayerHomeType.lead).frame(width: 58, alignment: .leading).frame(minHeight: 44)
             }
-            .buttonStyle(.plain).accessibilityLabel("تفاصيل \(prayerTitle(cell.reference.prayer))")
+            .buttonStyle(.madarPlain).accessibilityLabel("تفاصيل \(prayerTitle(cell.reference.prayer))")
             .accessibilityIdentifier("prayer-history-log-\(cell.reference.prayer.rawValue)")
             if editable {
                 ForEach(options(cell), id: \.self) { pill($0, cell) }
@@ -2126,7 +2126,7 @@ private struct PrayerDayEditSheet: View {
                 .overlay { RoundedRectangle(cornerRadius: 18).stroke(on ? tint : theme.ink.opacity(0.13), lineWidth: on ? 1.5 : 1) }
                 .contentShape(.rect(cornerRadius: 18))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.madarPlain)
         .accessibilityAddTraits(on ? .isSelected : [])
         .accessibilityIdentifier("prayer-day-\(cell.reference.prayer.rawValue)-\(option.rawValue)")
     }
@@ -2314,7 +2314,7 @@ private struct PrayerHeartAnswerSheet: View {
                 Text("احفظ الإجابة").font(PrayerHomeType.strong).foregroundStyle(theme.background)
                     .frame(maxWidth: .infinity, minHeight: 56).background(theme.ink, in: .rect(cornerRadius: 18))
             }
-            .buttonStyle(.plain).disabled(answer == nil).opacity(answer == nil ? 0.4 : 1).padding(.top, 18)
+            .buttonStyle(.madarPlain).disabled(answer == nil).opacity(answer == nil ? 0.4 : 1).padding(.top, 18)
             .accessibilityIdentifier("prayer-heart-save")
             Button("أمرّ") { save(nil) }.font(PrayerHomeType.strong).foregroundStyle(theme.secondaryInk)
                 .frame(maxWidth: .infinity, minHeight: 44).padding(.top, 4).accessibilityIdentifier("prayer-heart-skip")
@@ -2350,7 +2350,7 @@ private struct PrayerHeartAnswerSheet: View {
             .overlay { RoundedRectangle(cornerRadius: 18).stroke(chosen ? theme.accent : theme.line, lineWidth: chosen ? 1.5 : 1) }
             .contentShape(.rect(cornerRadius: 18))
         }
-        .buttonStyle(.plain).animation(reduceMotion ? nil : .snappy(duration: 0.22), value: chosen)
+        .buttonStyle(.madarPlain).animation(reduceMotion ? nil : .snappy(duration: 0.22), value: chosen)
         .accessibilityIdentifier("prayer-heart-\(heart.rawValue)").accessibilityAddTraits(chosen ? [.isSelected] : [])
     }
     private func save(_ value: PrayerHeart?) {
@@ -2433,7 +2433,7 @@ private struct PrayerNightLoggingSheet: View {
                         .padding(.horizontal, 16).frame(maxWidth: .infinity, minHeight: 50)
                         .overlay { Capsule().stroke(theme.ink.opacity(0.14), lineWidth: 1) }.contentShape(.capsule)
                     }
-                    .buttonStyle(.plain).accessibilityIdentifier("prayer-quran-qiyam")
+                    .buttonStyle(.madarPlain).accessibilityIdentifier("prayer-quran-qiyam")
                 }
             }.padding(.top, 14)
             if showWird, let line = wird?.line {
@@ -2501,7 +2501,7 @@ private struct PrayerNightLoggingSheet: View {
             Image(systemName: symbol).font(.system(size: 17, weight: .medium)).frame(width: 52, height: 52)
                 .overlay { Circle().stroke(theme.ink.opacity(0.14), lineWidth: 1) }.contentShape(Circle())
         }
-        .buttonStyle(.plain).opacity(disabled ? 0.35 : 1).disabled(disabled)
+        .buttonStyle(.madarPlain).opacity(disabled ? 0.35 : 1).disabled(disabled)
         .accessibilityLabel(label).accessibilityIdentifier(id)
     }
 
@@ -2510,7 +2510,7 @@ private struct PrayerNightLoggingSheet: View {
             Text(title).font(PrayerHomeType.strong).foregroundStyle(theme.background)
                 .frame(maxWidth: .infinity, minHeight: 56).background(theme.ink, in: .rect(cornerRadius: 18))
         }
-        .buttonStyle(.plain).accessibilityIdentifier(id)
+        .buttonStyle(.madarPlain).accessibilityIdentifier(id)
     }
 
     /// The last 30 nights, oldest on the right: a footprint, not a streak.
@@ -2560,7 +2560,7 @@ private struct PrayerPillToggleStyle: ToggleStyle {
             .overlay { RoundedRectangle(cornerRadius: 18).stroke(configuration.isOn ? theme.accent : theme.ink.opacity(0.14), lineWidth: configuration.isOn ? 1.5 : 1) }
             .contentShape(.rect(cornerRadius: 18))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.madarPlain)
         .accessibilityValue(configuration.isOn ? "1" : "0")
         .accessibilityAddTraits(.isToggle)
     }

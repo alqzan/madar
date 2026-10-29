@@ -25,7 +25,7 @@ struct MoneyRulesView: View {
                     Text("قواعد التاجر").font(MadarTypography.cardTitle()).accessibilityIdentifier("money-rules-title")
                     Button { dismiss() } label: {
                         Image(systemName: "xmark").font(.title3).frame(width: 52, height: 52).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1.2) }
-                    }.buttonStyle(.plain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-rules-close")
+                    }.buttonStyle(.madarPlain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-rules-close")
                     Spacer()
                 }.padding(.top, 8)
                 if let reading {
@@ -79,7 +79,7 @@ struct MoneyRulesView: View {
                                             Text(option.name).font(MadarTypography.caption()).bold().lineLimit(1)
                                             Text(service.counted(option.count, ("مرة واحدة", "مرتان", "مرات", "مرةً"))).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                                         }.frame(width: 104, height: 84).overlay { RoundedRectangle(cornerRadius: 8).stroke(theme.color("bills"), lineWidth: 1) }
-                                    }.buttonStyle(.plain).accessibilityIdentifier("money-conflict-option")
+                                    }.buttonStyle(.madarPlain).accessibilityIdentifier("money-conflict-option")
                                 }
                             }
                         }.padding(12).overlay { RoundedRectangle(cornerRadius: 10).stroke(theme.color("dueText").opacity(0.7), lineWidth: 1.2) }
@@ -114,7 +114,7 @@ struct MoneyRulesView: View {
                                 Text(item.1).font(MadarTypography.caption()).bold().foregroundStyle(active ? tint : theme.ink).lineLimit(1)
                                 Text(service.counted(item.4, ("مرة واحدة", "مرتان", "مرات", "مرةً"))).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                             }.frame(minWidth: 72)
-                        }.buttonStyle(.plain).accessibilityIdentifier("money-lantern-" + item.1)
+                        }.buttonStyle(.madarPlain).accessibilityIdentifier("money-lantern-" + item.1)
                     }
                 }.padding(.horizontal, 4)
             }
@@ -152,7 +152,7 @@ struct MoneyRulesView: View {
                             Text(service.digits.string(rule.count)).font(.custom("thmanyahserifdisplay-Bold", size: 20, relativeTo: .headline)).frame(minWidth: 30)
                             Image(systemName: expanded == rule.id ? "chevron.up" : "chevron.down").font(.caption).foregroundStyle(theme.secondaryInk)
                         }.frame(minHeight: 56).contentShape(.rect)
-                    }.buttonStyle(.plain).accessibilityIdentifier("money-rule-" + rule.merchant)
+                    }.buttonStyle(.madarPlain).accessibilityIdentifier("money-rule-" + rule.merchant)
                     if expanded == rule.id { ruleEditor(rule, r) }
                 }.padding(.vertical, 8).padding(.horizontal, expanded == rule.id ? 10 : 0)
                     .background(expanded == rule.id ? theme.surface : .clear)
@@ -173,12 +173,12 @@ struct MoneyRulesView: View {
                         Button { if !current { run("money.saveMerchantRule", ["merchant": .string(rule.merchant), "categoryID": .string(category.id.uuidString), "ignore": .bool(false)]) } } label: {
                             VStack(spacing: 4) { Image(systemName: MoneyCategoryIcon.symbol(category.icon, name: category.name)); Text(category.name).font(MadarTypography.caption()).bold().lineLimit(1) }
                                 .frame(width: 92, height: 64).overlay { RoundedRectangle(cornerRadius: 8).stroke(current ? theme.color("dueText") : theme.line, lineWidth: current ? 1.6 : 1) }
-                        }.buttonStyle(.plain).accessibilityIdentifier("money-rule-move-" + category.name)
+                        }.buttonStyle(.madarPlain).accessibilityIdentifier("money-rule-move-" + category.name)
                     }
                     Button { run("money.forgetMerchantRule", ["id": .string(rule.id.uuidString)]) } label: {
                         Text("انسه").font(MadarTypography.caption()).bold().foregroundStyle(theme.color("dueText")).frame(width: 72, height: 64)
                             .overlay { RoundedRectangle(cornerRadius: 8).stroke(theme.color("dueText"), lineWidth: 1.4) }
-                    }.buttonStyle(.plain).accessibilityIdentifier("money-rule-forget")
+                    }.buttonStyle(.madarPlain).accessibilityIdentifier("money-rule-forget")
                 }
             }
         }
@@ -265,7 +265,7 @@ struct MoneyCategorizeSheet: View {
                                 .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading)
                                 .contentShape(.rect)
                             }
-                            .buttonStyle(.plain).disabled(saving).accessibilityIdentifier("money-categorize-" + category.name)
+                            .buttonStyle(.madarPlain).disabled(saving).accessibilityIdentifier("money-categorize-" + category.name)
                             if index < categories.count - 1 { Rectangle().fill(theme.line.opacity(0.55)).frame(height: 1) }
                         }
                     }

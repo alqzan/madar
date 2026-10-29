@@ -76,7 +76,7 @@ struct MoneyAccountSheet: View {
                         } message: { Text("لا حركات ولا بطاقات عليه، فلا يتغيّر شيء من أرقامك سوى رصيد بدايته. يمكنك التراجع بعد الحذف.") }
                     }
                 }.padding(20)
-            }.scrollDismissesKeyboard(.interactively).background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.plain)
+            }.scrollDismissesKeyboard(.interactively).background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.madarPlain)
                 .toolbar(.hidden, for: .navigationBar).toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تمّ") { editing = false }.accessibilityIdentifier("money-account-keyboard-done") } }
         }
     }

@@ -17,21 +17,21 @@ struct RoomWidgetsGallery:View {
             ScrollView {
                 VStack(alignment:.leading,spacing:16) {
                     Text("أضفها من معرض الودجات في الآيفون، واختر الحجم هناك. اضغط مطوّلًا على الودجة لتختار قالبها.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                    NavigationLink {LockWidgetGallery(session:session)} label:{Label("القفل والاستعداد ومركز التحكم",systemImage:"lock.rectangle").font(MadarTypography.section()).frame(maxWidth:.infinity,minHeight:44)}.buttonStyle(.plain).accessibilityIdentifier("room-widgets-lock")
+                    NavigationLink {LockWidgetGallery(session:session)} label:{Label("القفل والاستعداد ومركز التحكم",systemImage:"lock.rectangle").font(MadarTypography.section()).frame(maxWidth:.infinity,minHeight:44)}.buttonStyle(.madarPlain).accessibilityIdentifier("room-widgets-lock")
                     Link(destination:URL(string:"madar://salah")!) {
                         let prayers=session.snapshotStore.read("prayerNext",as:PrayerNextSnapshot.self,now:now)
                         NextPrayerView(entry:.init(date:now,snapshot:prayers?.payload,tzID:prayers?.tzID ?? session.activePlace.timeZoneID),previewFamily:.systemMedium).padding(16).frame(height:160).background(theme.surface,in:.rect(cornerRadius:26))
-                    }.buttonStyle(.plain).accessibilityIdentifier("room-widget-prayer")
+                    }.buttonStyle(.madarPlain).accessibilityIdentifier("room-widget-prayer")
                     HStack(alignment:.top,spacing:12) {
-                        Link(destination:URL(string:"madar://quran")!) {QuranWidgetContent(snapshot:session.snapshotStore.read("quran",as:QuranWidgetSnapshot.self,now:now)?.payload,template:.path,compact:true,smallHome:true).padding(14).frame(height:170).frame(maxWidth:.infinity).background(RoomTheme(room:"quran",dark:colorScheme == .dark).surface,in:.rect(cornerRadius:24))}.buttonStyle(.plain).accessibilityIdentifier("room-widget-quran")
+                        Link(destination:URL(string:"madar://quran")!) {QuranWidgetContent(snapshot:session.snapshotStore.read("quran",as:QuranWidgetSnapshot.self,now:now)?.payload,template:.path,compact:true,smallHome:true).padding(14).frame(height:170).frame(maxWidth:.infinity).background(RoomTheme(room:"quran",dark:colorScheme == .dark).surface,in:.rect(cornerRadius:24))}.buttonStyle(.madarPlain).accessibilityIdentifier("room-widget-quran")
                         preview(.habits,family:.systemSmall,template:"today").frame(height:170)
                     }
                     preview(.upcoming,family:.systemMedium,template:"upcoming").frame(height:180)
-                    Link(destination:URL(string:"madar://mal")!){previewContent(.money,family:.systemMedium,template:"now")}.buttonStyle(.plain).frame(height:180).accessibilityIdentifier("room-widget-money")
-                    Link(destination:URL(string:BuiltRoomWidget.mihbara.route)!){preview(.mihbara,family:.systemMedium,template:"summary").frame(height:190)}.buttonStyle(.plain).accessibilityIdentifier("room-widget-mihbara")
+                    Link(destination:URL(string:"madar://mal")!){previewContent(.money,family:.systemMedium,template:"now")}.buttonStyle(.madarPlain).frame(height:180).accessibilityIdentifier("room-widget-money")
+                    Link(destination:URL(string:BuiltRoomWidget.mihbara.route)!){preview(.mihbara,family:.systemMedium,template:"summary").frame(height:190)}.buttonStyle(.madarPlain).accessibilityIdentifier("room-widget-mihbara")
                     Text("السنة وسطر اليوم").font(MadarTypography.section())
                     preview(.year,family:.systemMedium,template:"both").frame(height:185)
-                    Link(destination:URL(string:BuiltRoomWidget.diaryWrite.route)!) {previewContent(.diaryWrite,family:.systemSmall,template:"write")}.buttonStyle(.plain).frame(height:170).accessibilityIdentifier("room-widget-diaryWrite")
+                    Link(destination:URL(string:BuiltRoomWidget.diaryWrite.route)!) {previewContent(.diaryWrite,family:.systemSmall,template:"write")}.buttonStyle(.madarPlain).frame(height:170).accessibilityIdentifier("room-widget-diaryWrite")
                     let diaryRows=Set((snapshot(.diaryWrite)?.rows ?? []).map(\.id))
                     if diaryRows.isEmpty {
                         Text("ودجة «سطر سريع» تفتح الكتابة ولا تعرض نصًا أو صورة من مذكراتك.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
@@ -39,11 +39,11 @@ struct RoomWidgetsGallery:View {
                         // RD7: shown only after the owner turned on «محتوى المذكرات في الودجات».
                         HStack(spacing:12) {
                             ForEach(["intention","lastLine"].filter(diaryRows.contains),id:\.self) { template in
-                                Link(destination:URL(string:BuiltRoomWidget.diaryWrite.route)!) {previewContent(.diaryWrite,family:.systemSmall,template:template)}.buttonStyle(.plain).frame(height:170).accessibilityIdentifier("room-widget-diary-"+template)
+                                Link(destination:URL(string:BuiltRoomWidget.diaryWrite.route)!) {previewContent(.diaryWrite,family:.systemSmall,template:template)}.buttonStyle(.madarPlain).frame(height:170).accessibilityIdentifier("room-widget-diary-"+template)
                             }
                         }
                         if diaryRows.contains("thatDay") {
-                            Link(destination:URL(string:"madar://notes")!) {previewContent(.diaryWrite,family:.systemMedium,template:"thatDay")}.buttonStyle(.plain).frame(height:170).accessibilityIdentifier("room-widget-diary-thatDay")
+                            Link(destination:URL(string:"madar://notes")!) {previewContent(.diaryWrite,family:.systemMedium,template:"thatDay")}.buttonStyle(.madarPlain).frame(height:170).accessibilityIdentifier("room-widget-diary-thatDay")
                         }
                         Text("هذه الودجات تعرض نصًا من مذكراتك لأنك فعّلت «محتوى المذكرات في الودجات»، ويحجبه iOS حين يكون الجهاز مقفلًا.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                     }

@@ -32,7 +32,7 @@ struct QuranLogTabs: View {
         HStack(spacing: 3) {
             ForEach(QuranLogTab.allCases) { tab in
                 Button { selection = tab } label: { Text(tab.title).font(quranFont(12, bold: selection == tab)).frame(maxWidth: .infinity, minHeight: 44).background(selection == tab ? theme.surface : .clear, in: Capsule()) }
-                    .buttonStyle(.plain).accessibilityIdentifier("quran-log-" + tab.id).accessibilityAddTraits(selection == tab ? .isSelected : [])
+                    .buttonStyle(.madarPlain).accessibilityIdentifier("quran-log-" + tab.id).accessibilityAddTraits(selection == tab ? .isSelected : [])
             }
         }.padding(4).background(theme.color("track"), in: Capsule())
     }

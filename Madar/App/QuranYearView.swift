@@ -93,7 +93,7 @@ struct QuranYearView: View {
                                 RoundedRectangle(cornerRadius: 4).fill(theme.color(review ? "review" : "hifz")).frame(height: max(3, CGFloat(review ? m.review : m.hifz) / CGFloat(maxValue) * 70))
                                 Text(shortMonth(m.title)).font(quranFont(11)).foregroundStyle(theme.secondaryInk)
                             }.frame(maxWidth: .infinity, minHeight: 100, alignment: .bottom)
-                        }.buttonStyle(.plain).accessibilityLabel(m.title + "، " + service.faceCount(review ? m.review : m.hifz)).accessibilityIdentifier("quran-year-month-" + m.id + (review ? "-review" : "-hifz"))
+                        }.buttonStyle(.madarPlain).accessibilityLabel(m.title + "، " + service.faceCount(review ? m.review : m.hifz)).accessibilityIdentifier("quran-year-month-" + m.id + (review ? "-review" : "-hifz"))
                     }
                 }
             }

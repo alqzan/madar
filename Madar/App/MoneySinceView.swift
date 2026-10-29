@@ -17,6 +17,7 @@ struct MoneySinceView: View {
     @State private var reading: MoneySinceReading?
     @State private var selected: GregorianDay?
     @State private var failure: String?
+    @State private var finishing = false
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
     private var service: AppMoneyService { .init(app: app) }
     private var visible: Bool { revealed || !app.bool("core.hideMoneyUntilTouch") }
@@ -28,7 +29,7 @@ struct MoneySinceView: View {
                     Text("منذ آخر زيارة").font(MadarTypography.cardTitle()).accessibilityIdentifier("money-since-title")
                     Button(action: finish) {
                         Image(systemName: "xmark").font(.title3).frame(width: 52, height: 52).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1.2) }
-                    }.buttonStyle(.plain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-since-close")
+                    }.buttonStyle(.madarPlain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-since-close")
                     Spacer()
                 }.padding(.top, 8)
                 if let reading {
@@ -48,7 +49,7 @@ struct MoneySinceView: View {
                     Button(action: finish) {
                         Text("تمّ، افتح المال").font(.custom("thmanyahsans-Bold", size: 18, relativeTo: .headline)).foregroundStyle(theme.background)
                             .frame(maxWidth: .infinity, minHeight: 58).background(theme.ink)
-                    }.buttonStyle(.plain).accessibilityIdentifier("money-since-done").padding(.top, 6)
+                    }.buttonStyle(.madarPlain).accessibilityIdentifier("money-since-done").padding(.top, 6)
                 } else if let failure { Text(failure).font(MadarTypography.body()); Button("أعِد المحاولة", action: load).frame(minHeight: 44) }
                 else { ProgressView().frame(maxWidth: .infinity, minHeight: 240) }
             }.padding(.horizontal, 16).padding(.bottom, 30).frame(maxWidth: 620).frame(maxWidth: .infinity)
@@ -115,7 +116,7 @@ struct MoneySinceView: View {
                 HStack(alignment: .bottom, spacing: 6) {
                     ForEach(r.days.reversed()) { day in
                         Button { selected = day.day } label: { column(day, maxSpent: maxSpent, active: day.day == current) }
-                            .buttonStyle(.plain).accessibilityIdentifier("money-since-day-" + day.id)
+                            .buttonStyle(.madarPlain).accessibilityIdentifier("money-since-day-" + day.id)
                     }
                 }.environment(\.layoutDirection, .rightToLeft)
             }
@@ -205,7 +206,7 @@ struct MoneySinceView: View {
                     Image(systemName: "chevron.backward").foregroundStyle(theme.color("reserveText"))
                 }.padding(16).frame(minHeight: 64).background(theme.surface).overlay { RoundedRectangle(cornerRadius: 14).stroke(theme.color("dueText").opacity(0.7), lineWidth: 1.2) }
                     .clipShape(.rect(cornerRadius: 14))
-            }.buttonStyle(.plain).accessibilityIdentifier("money-since-decisions")
+            }.buttonStyle(.madarPlain).accessibilityIdentifier("money-since-decisions")
         }.padding(.top, 8).overlay(alignment: .top) { DoubleRule().stroke(theme.ink, lineWidth: 0.8).frame(height: 3).offset(y: -4) }
     }
     private func doors(_ r: MoneySinceReading) -> some View {
@@ -251,6 +252,9 @@ struct MoneySinceView: View {
             .overlay { RoundedRectangle(cornerRadius: 18).stroke(theme.color("reserveText"), lineWidth: 1) }
     }
     private func finish() {
+        // AU-95: one visit mark per close, however fast the two buttons are tapped.
+        guard !finishing else { return }
+        finishing = true
         Task { try? await app.executeMoneyCommand("money.markVisit"); dismiss() }
     }
     private func load() {

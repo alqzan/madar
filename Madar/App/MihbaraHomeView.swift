@@ -79,7 +79,7 @@ struct MihbaraHomeView: View {
         .environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar)
         .safeAreaInset(edge: .bottom) {
             if app.undoToastVisible && sheet == nil {
-                UndoToast(message: app.undoMessage, undo: app.undo)
+                UndoToast(message: app.undoMessage, undo: app.undo, dismiss: app.hideUndoToast)
                     .accessibilityIdentifier("mihbara-undo")
             }
         }
@@ -422,7 +422,7 @@ struct MihbaraHomeView: View {
                     .background(theme.color("goldUnderstand"), in: .rect(cornerRadius: 4))
                     .shadow(color: .black.opacity(0.25), radius: 1.5, y: 1)
                     .frame(minHeight: 44, alignment: .bottom)
-            }.buttonStyle(.plain).accessibilityAddTraits(.isHeader).accessibilityIdentifier("mihbara-shelf-" + id)
+            }.buttonStyle(.madarPlain).accessibilityAddTraits(.isHeader).accessibilityIdentifier("mihbara-shelf-" + id)
             content()
         }
         .background(theme.background.opacity(0.92), in: .rect(cornerRadius: 6))
@@ -526,7 +526,7 @@ struct MihbaraHomeView: View {
             HStack(alignment: .bottom, spacing: MihbaraBookSpine.volumeGap) {
                 ForEach(0..<min(volumes, 8), id: \.self) { v in
                     Button { openBook(b, volume: v) } label: { MihbaraBookSpine(book: b, shape: shape, leather: leather, digits: service.digits, volume: v, volumeCount: min(volumes, 8)) }
-                        .buttonStyle(.plain).contextMenu { bookMenu(b) }
+                        .buttonStyle(.madarPlain).contextMenu { bookMenu(b) }
                         .accessibilityLabel(shelfLabel(b) + "، " + (BookVolumes.name(v) ?? "الجزء " + service.digits.string(v + 1)))
                         .accessibilityIdentifier("mihbara-book-" + b.id.uuidString + (v == 0 ? "" : "-v\(v + 1)"))
                 }
@@ -534,7 +534,7 @@ struct MihbaraHomeView: View {
             }
         } else {
             Button { openBook(b) } label: { MihbaraBookSpine(book: b, shape: shape, leather: leather, digits: service.digits) }
-                .buttonStyle(.plain).contextMenu { bookMenu(b) }.accessibilityLabel(shelfLabel(b)).accessibilityIdentifier("mihbara-book-" + b.id.uuidString)
+                .buttonStyle(.madarPlain).contextMenu { bookMenu(b) }.accessibilityLabel(shelfLabel(b)).accessibilityIdentifier("mihbara-book-" + b.id.uuidString)
         }
     }
     private struct PileItem { let book: MihbaraBook; let volume: Int?; var key: String { book.id.uuidString + "-\(volume ?? -1)" } }
@@ -584,7 +584,7 @@ struct MihbaraHomeView: View {
             }
             ForEach(pile, id: \.key) { item in
                 Button { openBook(item.book, volume: item.volume) } label: { lying(item, leather: leathers[item.book.id] ?? 0) }
-                    .buttonStyle(.plain).contextMenu { bookMenu(item.book) }.accessibilityLabel(shelfLabel(item.book)).accessibilityIdentifier("mihbara-book-" + item.book.id.uuidString)
+                    .buttonStyle(.madarPlain).contextMenu { bookMenu(item.book) }.accessibilityLabel(shelfLabel(item.book)).accessibilityIdentifier("mihbara-book-" + item.book.id.uuidString)
             }
         }
     }
@@ -620,7 +620,7 @@ struct MihbaraHomeView: View {
                 Text("أضف كتابك الأول").font(MadarTypography.cardTitle())
                 Text("ضع كتابًا من مكتبتك على الرف، واحفظ أين وصلت.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
             }.frame(maxWidth: .infinity, minHeight: 95, alignment: .leading).contentShape(.rect)
-        }.buttonStyle(.plain).accessibilityIdentifier("mihbara-empty-shelf-add")
+        }.buttonStyle(.madarPlain).accessibilityIdentifier("mihbara-empty-shelf-add")
     }
     private func shelfTotal(_ count: Int) -> String {
         count == 0 ? "" : count == 1 ? "كتاب واحد على رفّك" : MihbaraCopy.books(count, service.digits) + " على رفوفك"
@@ -638,7 +638,7 @@ struct MihbaraHomeView: View {
                         .background(theme.color("notebookYellow"), in: .rect(topLeadingRadius: 2, bottomLeadingRadius: 10, bottomTrailingRadius: 2, topTrailingRadius: 2))
                         .overlay(alignment: .top) { Rectangle().fill(theme.color("goldUnderstandText").opacity(0.7)).frame(height: 3).padding(.horizontal, 5) }
                         .shadow(color: theme.ink.opacity(0.18), radius: 5, y: 4).rotationEffect(.degrees(-3))
-                }.buttonStyle(.plain).accessibilityLabel("الدفتر الخاص").accessibilityHint("ملاحظاتك الخاصة تبقى داخل المحبرة").accessibilityIdentifier("mihbara-notebook")
+                }.buttonStyle(.madarPlain).accessibilityLabel("الدفتر الخاص").accessibilityHint("ملاحظاتك الخاصة تبقى داخل المحبرة").accessibilityIdentifier("mihbara-notebook")
                 }
                 Spacer(minLength: 8)
                 if let b = tableBook, hasSavedPosition(b) { deskLabel("موضعك محفوظ").padding(.top, 12) }
@@ -647,7 +647,7 @@ struct MihbaraHomeView: View {
                     Image(systemName: "slider.horizontal.3").font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(theme.ink).frame(width: 46, height: 46)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.madarPlain)
                 .glassEffect(.regular.interactive(), in: Circle())
                 .accessibilityLabel("وقت فتح ورد السنّة").accessibilityIdentifier("mihbara-opening-preference")
             }
@@ -667,10 +667,10 @@ struct MihbaraHomeView: View {
                     .foregroundStyle(theme.ink)
                 if r.books.isEmpty {
                     // Audit 28 Oct: the dashed stand looks tappable, so it is: it adds the first book.
-                    Button { showingAddBook = true } label: { placeholder }.buttonStyle(.plain).accessibilityIdentifier("mihbara-empty-stand")
+                    Button { showingAddBook = true } label: { placeholder }.buttonStyle(.madarPlain).accessibilityIdentifier("mihbara-empty-stand")
                 } else {
                     Button { if waiting > 0 { scrollTarget = "want" } else { showingAddBook = true } } label: { placeholder }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.madarPlain)
                 }
             }
             // The stand's crossed legs.
@@ -700,11 +700,11 @@ struct MihbaraHomeView: View {
                 }
                 .padding(12).frame(maxWidth: .infinity, alignment: .leading)
                 .background(theme.color("desk"), in: .rect(cornerRadius: 14)).foregroundStyle(theme.color("onDesk"))
-            }.buttonStyle(.plain).accessibilityIdentifier("mihbara-wird-open")
+            }.buttonStyle(.madarPlain).accessibilityIdentifier("mihbara-wird-open")
         } else {
             Button { manuallyOpen = true; if let h = hadith { sheet = .hadith(h.number) } } label: {
                 HStack { Image(systemName: r.completedToday > 0 ? "checkmark.seal" : "book.closed"); VStack(alignment: .leading, spacing: 4) { Text(r.completedToday > 0 ? "أتممت ورد اليوم" : r.readCount == 42 ? "أتممت الأربعين النووية" : "وردك بعد الفجر").font(MadarTypography.cardTitle()); if r.completedToday > 0 { Text("الحديث القادم في يومك الجديد").font(MadarTypography.caption()) } }; Spacer() }.padding(16).background(theme.color("sunnahLeather"), in: .rect(cornerRadius: 12)).foregroundStyle(theme.onAccent)
-            }.buttonStyle(.plain).disabled(hadith == nil).accessibilityIdentifier("mihbara-wird-closed")
+            }.buttonStyle(.madarPlain).disabled(hadith == nil).accessibilityIdentifier("mihbara-wird-closed")
         }
     }
     /// The stand's one action, under the open book: where you continue, in pages.
@@ -713,14 +713,14 @@ struct MihbaraHomeView: View {
             Text(title).font(MadarTypography.body().weight(.semibold)).padding(.horizontal, 22).frame(minHeight: 48)
                 .foregroundStyle(theme.onAccent).background(theme.accent, in: .capsule)
                 .shadow(color: .black.opacity(0.25), radius: 5, y: 3)
-        }.buttonStyle(.plain).accessibilityIdentifier("mihbara-book-continue")
+        }.buttonStyle(.madarPlain).accessibilityIdentifier("mihbara-book-continue")
     }
     private func finishedHint(_ b: MihbaraBook) -> some View {
         Button { moveBook(b, to: "finished") } label: {
             Label("وصلت إلى آخره؟ انقله إلى «أنهيتها»", systemImage: "checkmark.circle").font(MadarTypography.caption())
                 .padding(.horizontal, 14).frame(minHeight: 44).foregroundStyle(theme.color("onDesk"))
                 .background(theme.color("desk"), in: .capsule)
-        }.buttonStyle(.plain).accessibilityIdentifier("mihbara-book-mark-finished")
+        }.buttonStyle(.madarPlain).accessibilityIdentifier("mihbara-book-mark-finished")
     }
     /// A paper book on the stand: the right page names it, the left says where you are and what is left.
     private func paperTableBook(_ b: MihbaraBook) -> some View {
@@ -797,7 +797,7 @@ struct MihbaraHomeView: View {
                 .background(LinearGradient(colors: [theme.color("wood"), theme.color("desk")], startPoint: .top, endPoint: .bottom), in: .rect(cornerRadius: 9))
                 .overlay { RoundedRectangle(cornerRadius: 9).stroke(theme.color("onDesk").opacity(0.12), lineWidth: 1) }
                 .shadow(color: theme.ink.opacity(0.22), radius: 4, y: 4)
-            }.buttonStyle(.plain)
+            }.buttonStyle(.madarPlain)
                 .accessibilityIdentifier("mihbara-sunnah-drawer")
                 .accessibilityValue(sunnahDrawerOpen ? "مفتوح" : "مغلق")
                 .accessibilityHint("كتب السنّة وتقدمك فيها")
@@ -828,7 +828,7 @@ struct MihbaraHomeView: View {
                             .font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 48)
                             .foregroundStyle(theme.color("onDesk"))
                             .overlay { RoundedRectangle(cornerRadius: 10).stroke(theme.color("onDesk").opacity(0.6), style: .init(lineWidth: 1, dash: [4, 3])) }
-                    }.buttonStyle(.plain).accessibilityIdentifier("mihbara-sunnah-drawer-add")
+                    }.buttonStyle(.madarPlain).accessibilityIdentifier("mihbara-sunnah-drawer-add")
                 }.padding(12).background(theme.color("desk"), in: .rect(bottomLeadingRadius: 12, bottomTrailingRadius: 12))
                     .padding(.horizontal, 8).transition(.opacity.combined(with: .move(edge: .top)))
             }
@@ -876,7 +876,7 @@ struct MihbaraHomeView: View {
                         .foregroundStyle(RoomTheme(room: "mihbara", dark: false).ink)
                         .padding(.horizontal, 18).frame(minHeight: 44)
                         .background(theme.color("goldUnderstand"), in: .capsule)
-                }.buttonStyle(.plain).accessibilityIdentifier("mihbara-continue-reading")
+                }.buttonStyle(.madarPlain).accessibilityIdentifier("mihbara-continue-reading")
             }
             Spacer(minLength: 0)
         }
@@ -950,7 +950,7 @@ struct MihbaraHomeView: View {
                     .minimumScaleFactor(0.85)
             }.frame(maxWidth: .infinity).contentShape(.rect)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.madarPlain)
         .contextMenu { bookMenu(b) }
         .accessibilityIdentifier("mihbara-library-book-" + b.id.uuidString)
     }
@@ -969,7 +969,7 @@ struct MihbaraHomeView: View {
                                 if let p = MihbaraCopy.progressPercent(b.progress), b.shelf != "finished" { Text(service.digits.string(p) + "٪").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
                             }
                         }.padding(16).background(theme.surface, in: .rect(cornerRadius: 14))
-                    }.buttonStyle(.plain).opacity(libraryMatches(b) ? 1 : 0.3)
+                    }.buttonStyle(.madarPlain).opacity(libraryMatches(b) ? 1 : 0.3)
                         .contextMenu { bookMenu(b) }
                         .accessibilityIdentifier("mihbara-library-book-" + b.id.uuidString)
     }
@@ -1080,7 +1080,7 @@ private struct MihbaraMotivationCard: View {
                         } label: {
                             Text("اقتراح آخر").font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 46)
                         }
-                        .buttonStyle(.plain).glassEffect(.regular.interactive(), in: Capsule())
+                        .buttonStyle(.madarPlain).glassEffect(.regular.interactive(), in: Capsule())
                         .accessibilityIdentifier("mihbara-motivate-next")
                     }
                 } else {
@@ -1115,7 +1115,7 @@ private struct MihbaraRahlOpeningView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 if app.undoToastVisible {
-                    UndoToast(message: app.undoMessage, undo: app.undo)
+                    UndoToast(message: app.undoMessage, undo: app.undo, dismiss: app.hideUndoToast)
                         .accessibilityIdentifier("mihbara-undo")
                 }
                 Text("اختر متى ينفتح الرَّحل لوردك اليوم.")
@@ -1134,7 +1134,7 @@ private struct MihbaraRahlOpeningView: View {
                             .foregroundStyle(isSelected ? theme.onAccent : theme.ink)
                             .background(isSelected ? theme.color("sunnahLeather") : theme.surface, in: .rect(cornerRadius: 14))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.madarPlain)
                         .accessibilityValue(isSelected ? "محدد" : "غير محدد")
                         .accessibilityIdentifier("mihbara-rahlOpens-" + value)
                     }
@@ -1189,7 +1189,7 @@ private struct MihbaraNotebookContent: View {
                                 MadarDateLabel(app.dateLabels(GregorianDay.containing(note.updatedAt, in: app.activePlace.timeZone))).foregroundStyle(theme.secondaryInk)
                             }
                                 .frame(maxWidth: .infinity, alignment: .leading).padding(16).background(theme.surface, in: .rect(cornerRadius: 14))
-                        }.buttonStyle(.plain).accessibilityIdentifier("mihbara-note-" + note.id.uuidString)
+                        }.buttonStyle(.madarPlain).accessibilityIdentifier("mihbara-note-" + note.id.uuidString)
                     }
                 }
             }.padding(18)
@@ -1203,7 +1203,7 @@ private struct MihbaraNotebookContent: View {
             ToolbarItem(placement: .principal) { Text("دفتر المحبرة").font(MadarTypography.section()) }
             ToolbarItem(placement: .topBarTrailing) { Button("تمّ") { dismiss() }.accessibilityIdentifier("mihbara-notebook-close") }
         }
-        .safeAreaInset(edge: .bottom) { if app.undoToastVisible { UndoToast(message: app.undoMessage, undo: { app.undo(); load() }).accessibilityIdentifier("mihbara-undo") } }
+        .safeAreaInset(edge: .bottom) { if app.undoToastVisible { UndoToast(message: app.undoMessage, undo: { app.undo(); load() }, dismiss: app.hideUndoToast).accessibilityIdentifier("mihbara-undo") } }
         .task { load() }
         .onChange(of: app.undoToken?.id) { load() }
         .onDisappear { notes.removeAll(); editor = nil }
@@ -1366,7 +1366,7 @@ private struct MihbaraOldBooksCabinet: View {
                                 let index = leathers[book.id] ?? 0
                                 MihbaraBookSpine(book: book, shape: shapes[book.id], leather: index == 3 ? 4 : index, digits: digits)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.madarPlain)
                             .accessibilityLabel("افتح كتابًا قديمًا: " + book.title)
                             .accessibilityHint("خيارات العودة إلى القراءة أو إلى رف أبي أقرأها")
                             .accessibilityIdentifier("mihbara-old-book-" + book.id.uuidString)

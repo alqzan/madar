@@ -104,7 +104,7 @@ struct PrayerTravelPill: View {
             .overlay { Capsule().stroke(theme.line, lineWidth: 1) }
             .contentShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.madarPlain)
         .accessibilityIdentifier("prayer-travel-pill")
     }
 }
@@ -120,7 +120,7 @@ private struct TravelPrimaryButton: View {
             Text(title).font(PrayerHomeType.strong).foregroundStyle(theme.background)
                 .frame(maxWidth: .infinity, minHeight: 52).background(theme.ink, in: .capsule)
         }
-        .buttonStyle(.plain).disabled(busy).accessibilityIdentifier(id)
+        .buttonStyle(.madarPlain).disabled(busy).accessibilityIdentifier(id)
     }
 }
 private struct TravelSecondaryButton: View {
@@ -133,7 +133,7 @@ private struct TravelSecondaryButton: View {
             Text(title).font(PrayerHomeType.strong)
                 .frame(maxWidth: .infinity, minHeight: 52).overlay { Capsule().stroke(theme.ink.opacity(0.18), lineWidth: 1) }
         }
-        .buttonStyle(.plain).accessibilityIdentifier(id)
+        .buttonStyle(.madarPlain).accessibilityIdentifier(id)
     }
 }
 
@@ -273,7 +273,7 @@ struct PrayerTravelPairSheet: View {
                 .background(on ? theme.color("goldSoft") : .clear, in: .capsule)
                 .overlay { Capsule().stroke(on ? theme.line : theme.ink.opacity(0.14), lineWidth: 1) }
         }
-        .buttonStyle(.plain).accessibilityIdentifier(id)
+        .buttonStyle(.madarPlain).accessibilityIdentifier(id)
     }
     var body: some View {
         ScrollView {

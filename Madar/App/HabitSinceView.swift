@@ -159,12 +159,12 @@ struct HabitPastDaySheet:View {
                                         Image(systemName:on ? "checkmark.circle.fill" : "circle").foregroundStyle(on ? theme.accent : theme.secondaryInk)
                                         Text(line.text).font(MadarTypography.body()).lineLimit(3).frame(maxWidth:.infinity,alignment:.leading)
                                     }.padding(12).background(theme.surface,in:.rect(cornerRadius:16)).contentShape(.rect)
-                                }.buttonStyle(.plain).accessibilityAddTraits(on ? .isSelected : []).accessibilityIdentifier("habit-past-line")
+                                }.buttonStyle(.madarPlain).accessibilityAddTraits(on ? .isSelected : []).accessibilityIdentifier("habit-past-line")
                             }
                         }
                     }
                     Button { log() } label: { Text(saveTitle).font(MadarTypography.section()).frame(maxWidth:.infinity,minHeight:48).background(theme.accentFill,in:.capsule).foregroundStyle(theme.onAccent) }
-                        .buttonStyle(.plain).disabled(busy).accessibilityIdentifier("habit-past-save")
+                        .buttonStyle(.madarPlain).disabled(busy).accessibilityIdentifier("habit-past-save")
                 } else {
                     Text("بدأت العادة اليوم؛ لا يوم قبله في سجلها.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                 }

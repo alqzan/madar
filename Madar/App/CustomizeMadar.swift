@@ -25,28 +25,28 @@ struct CustomizeMadar: View {
                         .overlay(alignment: .trailing) {
                             if !query.isEmpty {
                                 Button { session.settingsQuery = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(theme.secondaryInk).frame(width: 44, height: 44) }
-                                    .buttonStyle(.plain).accessibilityLabel("امسح البحث").accessibilityIdentifier("settings-clear-search")
+                                    .buttonStyle(.madarPlain).accessibilityLabel("امسح البحث").accessibilityIdentifier("settings-clear-search")
                             }
                         }
                 }.padding(16).background(theme.surface, in: .capsule)
                 if query.isEmpty || normalized("المحبرة").contains(normalized(query)) {
                     Button { session.mihbaraOpen = true } label: {
                         HStack { Text("افتح المحبرة").font(MadarTypography.section()); Spacer(); Image(systemName: "chevron.left") }.padding(16).background(theme.surface, in: .rect(cornerRadius: 20))
-                    }.buttonStyle(.plain).accessibilityIdentifier("mihbara-open")
+                    }.buttonStyle(.madarPlain).accessibilityIdentifier("mihbara-open")
                 }
                 if query.isEmpty || normalized("المال").contains(normalized(query)) {
                     Button { session.moneyOpen = true } label: {
                         HStack { Text("افتح المال").font(MadarTypography.section()); Spacer(); Image(systemName: "chevron.left") }
                             .padding(16).background(theme.surface, in: .rect(cornerRadius: 20))
-                    }.buttonStyle(.plain).accessibilityIdentifier("money-open")
+                    }.buttonStyle(.madarPlain).accessibilityIdentifier("money-open")
                 }
                 if query.isEmpty || normalized("الودجات وأحجامها البهو الكتل").contains(normalized(query)) { BahwBlocksSection(session: session) }
                 if query.isEmpty || normalized("صانع الودجة اصنع ودجة ودجاتي").contains(normalized(query)) {
                     Button { widgetMaker = true } label: { Label("اصنع ودجة", systemImage: "square.stack.3d.up").font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 50).background(theme.surface, in: .rect(cornerRadius: 20)) }
-                        .buttonStyle(.plain).accessibilityIdentifier("widget-maker-open")
+                        .buttonStyle(.madarPlain).accessibilityIdentifier("widget-maker-open")
                 }
                 if query.isEmpty || normalized("ودجات الشاشة الرئيسية خارج التطبيق").contains(normalized(query)) {
-                    Button {widgetGallery=true} label:{Label("ودجات الشاشة الرئيسية",systemImage:"square.grid.2x2").font(MadarTypography.section()).frame(maxWidth:.infinity,minHeight:50).background(theme.surface,in:.rect(cornerRadius:20))}.buttonStyle(.plain).accessibilityIdentifier("room-widgets-gallery")
+                    Button {widgetGallery=true} label:{Label("ودجات الشاشة الرئيسية",systemImage:"square.grid.2x2").font(MadarTypography.section()).frame(maxWidth:.infinity,minHeight:50).background(theme.surface,in:.rect(cornerRadius:20))}.buttonStyle(.madarPlain).accessibilityIdentifier("room-widgets-gallery")
                 }
                 if showsRoomLayouts { RoomHomeLayoutSection(session: session, searching: !query.isEmpty) }
                 if filtered.isEmpty && !showsRoomLayouts && !(query.isEmpty || normalized("صانع الودجة اصنع ودجة ودجاتي").contains(normalized(query))) && !(query.isEmpty || normalized("المال").contains(normalized(query)) || normalized("المحبرة").contains(normalized(query)) || normalized("ودجات الشاشة الرئيسية خارج التطبيق").contains(normalized(query))) {
@@ -193,6 +193,10 @@ struct SettingControl: View {
     @Bindable var session: AppSession
     @Environment(\.roomTheme) private var theme
     @Environment(\.dynamicTypeSize) private var dynamicType
+    /// AU-95: quick taps on +/− each stepped from the stored value, which only refreshes after the write lands, so
+    /// three taps moved one step. The control steps from the value it last sent until that write comes back.
+    @State private var sentInt: Int?
+    private var shownInt: Int { sentInt ?? Int(session.number(definition.key)) }
     /// «اسألني بعد الأذان بـ (دقيقة)» over a bare «٣٠» reads as a form; the number carries its unit instead («٣٠ دقيقة»).
     private var unitSuffix: String { definition.title.hasSuffix(" (دقيقة)") ? " (دقيقة)" : " (أيام)" }
     private var unitForms: [String]? {
@@ -218,8 +222,11 @@ struct SettingControl: View {
                 Toggle(definition.title, isOn: Binding(get: { session.bool(definition.key) }, set: { session.set(.bool($0), key: definition.key) }))
                     .labelsHidden().accessibilityIdentifier("setting-\(definition.key)")
             case "int":
-                Stepper(value: Binding(get: { Int(session.number(definition.key)) }, set: { session.set(.number(Double($0)), key: definition.key) }), in: integerRange) {
-                    let n = Int(session.number(definition.key))
+                Stepper(value: Binding(get: { shownInt }, set: { value in
+                    sentInt = value
+                    session.set(.number(Double(value)), key: definition.key) { if sentInt == value { sentInt = nil } }
+                }), in: integerRange) {
+                    let n = shownInt
                     // AU-44: the Hijri correction reads as a sentence, not a signed number.
                     if definition.key == "core.hijriOffset" {
                         Text(n == 0 ? "بلا تصحيح" : (abs(n) == 1 ? "يوم" : abs(n) == 2 ? "يومان" : session.digits(abs(n)) + " أيام") + (n > 0 ? " زيادة" : " نقصان"))
@@ -227,6 +234,7 @@ struct SettingControl: View {
                     Text(unitForms.map { arabicCount(n, $0, MadarNumberFormatter(style: session.string("core.numerals") == "western" ? .western : .hindi)) } ?? session.digits(n))
                     }
                 }.accessibilityIdentifier("setting-\(definition.key)")
+                .onChange(of: session.errorMessage) { _, message in if message != nil { sentInt = nil } }
             case "map":
                 if definition.key == "salah.offsets" {
                     ForEach(Prayer.allCases, id: \.self) { prayer in
@@ -329,7 +337,7 @@ struct SettingControl: View {
                     .foregroundStyle(session.values[definition.key] == option.value ? theme.ink : theme.secondaryInk)
                     .background(session.values[definition.key] == option.value ? theme.surface : theme.background, in: .rect(cornerRadius: 12))
                     .overlay { RoundedRectangle(cornerRadius: 12).stroke(session.values[definition.key] == option.value ? theme.accent : theme.line, lineWidth: 1) }
-            }.buttonStyle(.plain).accessibilityLabel(option.label)
+            }.buttonStyle(.madarPlain).accessibilityLabel(option.label)
                 .accessibilityValue(session.values[definition.key] == option.value ? "مختار" : "")
                 .accessibilityAddTraits(session.values[definition.key] == option.value ? .isSelected : [])
                 .accessibilityIdentifier("option-\(definition.key)-\(option.identifier)")

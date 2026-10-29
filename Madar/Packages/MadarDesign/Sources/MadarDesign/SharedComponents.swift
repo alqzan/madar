@@ -3,9 +3,14 @@ import SwiftUI
 public struct UndoToast: View {
     @Environment(\.roomTheme) private var theme
     @Environment(\.dynamicTypeSize) private var dynamicType
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private let message: String
     private let undo: () -> Void
-    public init(message: String, undo: @escaping () -> Void) { self.message = message; self.undo = undo }
+    private let dismiss: (() -> Void)?
+    /// Owner, 30 Oct 2026: the toast glides in from the bottom edge and a swipe down puts it away early.
+    public init(message: String, undo: @escaping () -> Void, dismiss: (() -> Void)? = nil) {
+        self.message = message; self.undo = undo; self.dismiss = dismiss
+    }
     public var body: some View {
         Group {
             if dynamicType.isAccessibilitySize {
@@ -23,6 +28,11 @@ public struct UndoToast: View {
         .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 16))
         .overlay { RoundedRectangle(cornerRadius: 16).stroke(theme.accent.opacity(0.62), lineWidth: 0.8) }
         .padding(.horizontal, 16).accessibilityElement(children: .contain)
+        .gesture(DragGesture(minimumDistance: 12).onEnded { value in
+            if value.translation.height > 24 { dismiss?() }
+        })
+        .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+        .accessibilityAction(named: "أخفِ") { dismiss?() }
     }
 }
 

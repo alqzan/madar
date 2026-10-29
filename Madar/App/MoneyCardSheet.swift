@@ -78,7 +78,7 @@ struct MoneyCardSheet: View {
                     Button(action: save) { Text(saving ? "جارٍ الحفظ…" : "احفظ البطاقة").font(MadarTypography.cardTitle()).frame(maxWidth: .infinity, minHeight: 54).background(theme.ink.opacity(canSave ? 1 : 0.35)).foregroundStyle(theme.background) }
                         .disabled(!canSave).accessibilityIdentifier("money-card-save")
                 }.padding(20)
-            }.scrollDismissesKeyboard(.interactively).background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.plain)
+            }.scrollDismissesKeyboard(.interactively).background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.madarPlain)
                 .toolbar(.hidden, for: .navigationBar).toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تمّ") { editing = false }.accessibilityIdentifier("money-card-keyboard-done") } }
                 .task { loadAccounts() }
                 .onChange(of: kind) { _, value in if value != "credit", accountID == nil, accounts.count == 1 { accountID = accounts[0].id } }

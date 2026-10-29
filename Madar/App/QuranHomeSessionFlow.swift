@@ -10,6 +10,9 @@ struct QuranHomeSessionFlow: View {
     @State private var showExit = false
     @State private var busy = false
     @State private var queuedReveals: [Int] = []
+    /// AU-95: «أنهِ وسجّل» or «تجاهل» tapped while a reveal or grade is still saving runs once it lands, instead of
+    /// closing the sheet and silently doing nothing.
+    @State private var queuedFinish: QuranUISessionAction?
     @State private var autoAdvance: UUID?
     @State private var error: String?
     @State private var showDayClose = false
@@ -83,18 +86,28 @@ struct QuranHomeSessionFlow: View {
     }
     /// Only ayahs still covered on the page in front of the reader; anything else is stale.
     private func drainReveals() {
+        if let finish = queuedFinish { queuedFinish = nil; queuedReveals = []; perform(finish); return }
         let open = (state.coach?.plannedAyahs ?? []).subtracting(state.coach?.revealedAyahs ?? [])
         queuedReveals.removeAll { !open.contains($0) }
         guard state.stage != .grading, !queuedReveals.isEmpty else { queuedReveals = []; return }
         perform(.reveal(ayahID: queuedReveals.removeFirst(), wordIndex: nil))
     }
     private func schedule(_ token: UUID, after seconds: Double) {
-        Task { try? await Task.sleep(for: .seconds(seconds)); if autoAdvance == token, !busy { autoAdvance = nil; perform(.advance) } }
+        Task { try? await Task.sleep(for: .seconds(seconds)); guard autoAdvance == token else { return }
+            // A save still running would drop the advance and leave the page waiting; try again shortly.
+            if busy { schedule(token, after: 0.3) } else { autoAdvance = nil; perform(.advance) } }
     }
     private func perform(_ action: QuranUISessionAction) {
         // A finger dragged across the covered page reveals several ayahs in a row: queue them
         // instead of dropping the ones that arrive while the previous reveal is still saving.
-        if busy { if case .reveal(let ayah, nil) = action, !queuedReveals.contains(ayah) { queuedReveals.append(ayah) }; return }
+        if busy {
+            switch action {
+            case .reveal(let ayah, nil) where !queuedReveals.contains(ayah): queuedReveals.append(ayah)
+            case .commit, .commitPartial, .discard: queuedFinish = action
+            default: break
+            }
+            return
+        }
         busy = true
         if case .reveal = action {} else { queuedReveals = [] }
         Task { defer { busy = false; drainReveals() }; do { switch try await service.session(draftID: state.id, action: action) {

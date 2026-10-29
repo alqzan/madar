@@ -20,6 +20,7 @@ struct QuranFreeView: View {
     @State private var selectLastAfterIndex = false
     @State private var injectedIndexDelay = false
     @State private var injectedStartFailure = false
+    @State private var indexAttempt = 0
     private var range: ClosedRange<Int> { min(from,through)...max(from,through) }
     private var saved: Int { pages.filter { range.contains($0.firstPage) && $0.memorized }.count }
     var body: some View {
@@ -63,6 +64,12 @@ struct QuranFreeView: View {
                     }.font(quranFont(14))
                 }
                 if let error { Text(error).font(quranFont(13)).foregroundStyle(theme.color("dueText")).accessibilityIdentifier("quran-free-error") }
+                // AU-95: a failed index read left «ابدأ» disabled for good; one tap reads it again.
+                if error != nil, pages.isEmpty {
+                    Button("أعِد المحاولة") { error = nil; indexAttempt += 1 }
+                        .font(quranFont(14, bold: true)).frame(minHeight: 44).contentShape(Rectangle())
+                        .accessibilityIdentifier("quran-free-retry")
+                }
             }.padding(16)
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.color("review"))
             .safeAreaInset(edge: .bottom) {
@@ -78,7 +85,7 @@ struct QuranFreeView: View {
                     }
                 }.padding(16)
             }
-            .task {
+            .task(id: indexAttempt) {
                 do {
                     #if DEBUG
                     let environment = ProcessInfo.processInfo.environment

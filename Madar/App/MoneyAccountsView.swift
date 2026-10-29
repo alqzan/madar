@@ -47,7 +47,7 @@ struct MoneyAccountsView: View {
                         // Audit 28 Oct: the empty tree offers its first account right where it asks for one.
                         VStack(alignment: .leading, spacing: 10) {
                             Text("من هنا تبدأ الجذور. أضف حسابك ورصيده، ثم تصله رسائل البنك.").font(MadarTypography.body()).accessibilityIdentifier("money-accounts-empty")
-                            Button(action: addAccount) { Label("أضف أول حساب", systemImage: "plus").font(MadarTypography.body().bold()).padding(.horizontal, 18).frame(minHeight: 44).foregroundStyle(theme.onAccent).background(theme.color("accent"), in: Capsule()) }.buttonStyle(.plain).accessibilityIdentifier("money-accounts-empty-add")
+                            Button(action: addAccount) { Label("أضف أول حساب", systemImage: "plus").font(MadarTypography.body().bold()).padding(.horizontal, 18).frame(minHeight: 44).foregroundStyle(theme.onAccent).background(theme.color("accent"), in: Capsule()) }.buttonStyle(.madarPlain).accessibilityIdentifier("money-accounts-empty-add")
                         }.padding(.vertical, 20)
                     }
                     HStack(spacing: 8) {
@@ -58,7 +58,7 @@ struct MoneyAccountsView: View {
                 } else if let errorMessage { Text(errorMessage); Button("أعِد المحاولة", action: load) }
                 else { ProgressView().frame(height: 250) }
             }.padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 24).frame(maxWidth: 620).frame(maxWidth: .infinity)
-        }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.plain).toolbar(.hidden, for: .navigationBar, .tabBar)
+        }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.madarPlain).toolbar(.hidden, for: .navigationBar, .tabBar)
             .task { load(); withAnimation(reduceMotion ? nil : .easeOut(duration: 0.5)) { appeared = true } }.onChange(of: app.prayerRevision) { load() }
             .sheet(item: $selected) { MoneyAccountSheet(app: app, original: $0, visible: visible, revealed: $revealed) }.sheet(item: $selectedSource) { source($0) }
             .navigationDestination(isPresented: $reconcileOpen) { MoneyReconcileView(app: app, revealed: $revealed) }

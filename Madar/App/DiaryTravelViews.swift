@@ -176,7 +176,7 @@ struct DiaryTravelReturnCard: View {
                 }.padding(.horizontal, 16).padding(.vertical, 12)
                 DiaryAirmailStripe()
             }.background(theme.surface).clipShape(.rect(cornerRadius: 6)).overlay { RoundedRectangle(cornerRadius: 6).stroke(theme.line) }.contentShape(.rect)
-        }.buttonStyle(.plain).accessibilityElement(children: .combine).accessibilityIdentifier("diary-travel-return")
+        }.buttonStyle(.madarPlain).accessibilityElement(children: .combine).accessibilityIdentifier("diary-travel-return")
     }
 }
 

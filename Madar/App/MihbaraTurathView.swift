@@ -103,7 +103,7 @@ struct MihbaraTurathView: View {
                         .autocorrectionDisabled().accessibilityIdentifier("mihbara-turath-search")
                     if !query.isEmpty {
                         Button { query = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(theme.secondaryInk) }
-                            .buttonStyle(.plain).frame(minWidth: 44, minHeight: 44).accessibilityLabel("امسح البحث")
+                            .buttonStyle(.madarPlain).frame(minWidth: 44, minHeight: 44).accessibilityLabel("امسح البحث")
                     }
                 }
                 .padding(.horizontal, 14).frame(minHeight: 52)
@@ -119,7 +119,7 @@ struct MihbaraTurathView: View {
                                 Label("حاول مرة أخرى", systemImage: "arrow.clockwise")
                                     .font(MadarTypography.body()).frame(minHeight: 44)
                             }
-                            .buttonStyle(.plain).accessibilityIdentifier("mihbara-turath-retry")
+                            .buttonStyle(.madarPlain).accessibilityIdentifier("mihbara-turath-retry")
                         }
                     }
                     .padding(12).frame(maxWidth: .infinity, alignment: .leading)
@@ -213,7 +213,7 @@ struct MihbaraTurathView: View {
             }
             .padding(.horizontal, 16).padding(.vertical, 12).contentShape(.rect)
         }
-        .buttonStyle(.plain).disabled(downloading != nil)
+        .buttonStyle(.madarPlain).disabled(downloading != nil)
         .accessibilityLabel("\(book.title)، \(book.author)").accessibilityHint("ينزّل الكتاب ويعرض معاينته قبل إضافته")
         .accessibilityIdentifier("mihbara-turath-book-\(book.id)")
     }
@@ -290,7 +290,7 @@ private struct FlowChips: View {
                 Button { action(item) } label: {
                     Text(item).font(MadarTypography.caption()).padding(.horizontal, 14).frame(minHeight: 40)
                         .background(theme.surface, in: .capsule).overlay { Capsule().stroke(theme.line, lineWidth: 1) }
-                }.buttonStyle(.plain).accessibilityIdentifier("mihbara-turath-suggestion-\(item)")
+                }.buttonStyle(.madarPlain).accessibilityIdentifier("mihbara-turath-suggestion-\(item)")
             }
         }
     }

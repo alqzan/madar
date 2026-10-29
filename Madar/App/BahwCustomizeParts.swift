@@ -44,10 +44,10 @@ struct BahwCustomizePreview: View {
             HStack(spacing: 10) {
                 Button { session.selectedTab = "foundation" } label: {
                     Text("افتح البهو").font(MadarTypography.section()).padding(.horizontal, 20).frame(minHeight: 48).foregroundStyle(lobby.onAccent).background(lobby.ink, in: .capsule)
-                }.buttonStyle(.plain).accessibilityIdentifier("bahw-custom-open-lobby")
+                }.buttonStyle(.madarPlain).accessibilityIdentifier("bahw-custom-open-lobby")
                 Button { reset() } label: {
                     Text("أعِد الافتراضي").font(MadarTypography.section()).padding(.horizontal, 18).frame(minHeight: 48).overlay { Capsule().stroke(lobby.line) }
-                }.buttonStyle(.plain).accessibilityIdentifier("reset-settings")
+                }.buttonStyle(.madarPlain).accessibilityIdentifier("reset-settings")
                 Spacer(minLength: 0)
             }
         }
@@ -124,7 +124,7 @@ struct BahwBlocksSection: View {
                     Spacer()
                     Image(systemName: expanded ? "chevron.up" : "chevron.down").foregroundStyle(lobby.secondaryInk)
                 }.contentShape(.rect)
-            }.buttonStyle(.plain).accessibilityIdentifier("bahw-custom-blocks")
+            }.buttonStyle(.madarPlain).accessibilityIdentifier("bahw-custom-blocks")
             if expanded {
                 Text("كل ودجة بأربعة أحجام، وكلما كبرت عرضت أكثر. اسحب المقبض لترتيبها، والمفتاح يُظهرها أو يُخفيها. ويمكنك فعل هذا كله من البهو بالضغط المطوّل.")
                     .font(MadarTypography.caption()).foregroundStyle(lobby.secondaryInk).fixedSize(horizontal: false, vertical: true)
@@ -153,7 +153,7 @@ struct BahwBlocksSection: View {
             HStack(spacing: 3) {
                 ForEach([BahwBlockSize.icon, .small, .wide, .large], id: \.self) { option in
                     Button { update { $0.sizes[block.rawValue] = option.rawValue } } label: { glyph(option, on: option == size) }
-                        .buttonStyle(.plain).accessibilityLabel(option.title).accessibilityAddTraits(option == size ? .isSelected : [])
+                        .buttonStyle(.madarPlain).accessibilityLabel(option.title).accessibilityAddTraits(option == size ? .isSelected : [])
                         .accessibilityIdentifier("bahw-custom-size-\(block.rawValue)-\(String(describing: option))")
                 }
             }

@@ -96,7 +96,7 @@ struct BahwLobbyView: View {
                         Button { drawerOpen = true } label: {
                             Label(layout.hiddenBuilt.isEmpty ? "لا ودجات مخفية" : "المخفية: " + WidgetCopy.agree(layout.hiddenBuilt.count, service.digits, one: "ودجة واحدة", two: "ودجتان", few: "ودجات", many: "ودجة"), systemImage: "plus")
                                 .font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 46).overlay { Capsule().stroke(theme.line) }
-                        }.buttonStyle(.plain).disabled(layout.hiddenBuilt.isEmpty).accessibilityIdentifier("bahw-drawer")
+                        }.buttonStyle(.madarPlain).disabled(layout.hiddenBuilt.isEmpty).accessibilityIdentifier("bahw-drawer")
                     }
                 }.padding(.horizontal, 14).padding(.top, 4).padding(.bottom, 24).frame(maxWidth: 620).frame(maxWidth: .infinity)
             }
@@ -138,7 +138,7 @@ struct BahwLobbyView: View {
                     .contentShape(Circle())
                     .overlay { Circle().stroke(theme.line) }
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.madarPlain)
             .accessibilityIdentifier("bahw-arrange-start")
 
             Button { session.selectedTab = "customize" } label: {
@@ -147,7 +147,7 @@ struct BahwLobbyView: View {
                     .frame(width: 44, height: 44)
                     .overlay { Circle().stroke(theme.line) }
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.madarPlain)
             .accessibilityLabel("خصّص مدار")
             .accessibilityIdentifier("bahw-customize")
         }
@@ -168,12 +168,12 @@ struct BahwLobbyView: View {
         Group {
             if block == .habits { BahwBlockView(service: service, block: block, size: size, interactive: !arranging).contentShape(.rect(cornerRadius:22)).onTapGesture { open(block) } }
             else { Button { open(block) } label: { BahwBlockView(service: service, block: block, size: size, interactive: !arranging).contentShape(.rect(cornerRadius:22)) } }
-        }.buttonStyle(.plain)
+        }.buttonStyle(.madarPlain)
             .rotationEffect(.degrees(wiggle ? 0.7 : 0)).animation(wiggle ? .easeInOut(duration: 0.14).repeatForever(autoreverses: true) : .default, value: wiggle)
             .overlay(alignment: .topLeading) {
                 if arranging {
                     Button { update { $0.hidden.append(block.rawValue) } } label: { Image(systemName: "minus").font(.body.bold()).frame(width: 30, height: 30).background(theme.surface, in: .circle).overlay { Circle().stroke(theme.line) } }
-                        .buttonStyle(.plain).frame(width: 44, height: 44).offset(x: -10, y: -10).accessibilityLabel("أخفِ " + block.title).accessibilityIdentifier("bahw-hide-" + block.rawValue)
+                        .buttonStyle(.madarPlain).frame(width: 44, height: 44).offset(x: -10, y: -10).accessibilityLabel("أخفِ " + block.title).accessibilityIdentifier("bahw-hide-" + block.rawValue)
                 }
             }
             .overlay(alignment: .bottomTrailing) {
@@ -280,7 +280,7 @@ private struct BahwReturnPlanCard: View {
             .background(primary ? theme.accentFill : .clear, in: .capsule)
             .overlay { Capsule().stroke(primary ? Color.clear : theme.line, lineWidth: 1) }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.madarPlain)
         .accessibilityIdentifier(identifier)
     }
 }
@@ -302,7 +302,7 @@ struct BahwBlockSheet: View {
                     BahwBlockView(service: .init(session: session), block: block, size: .large).frame(height: 365)
                     if block.tab != nil || block == .year || block == .upcoming {
                         Button { open() } label: { Text(block.tab == nil ? "افتح السنة وما يهمّك" : "افتح " + block.title).font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 50).foregroundStyle(theme.onAccent).background(theme.accentFill, in: .capsule) }
-                            .buttonStyle(.plain).accessibilityIdentifier("bahw-open-" + (block.tab ?? "year"))
+                            .buttonStyle(.madarPlain).accessibilityIdentifier("bahw-open-" + (block.tab ?? "year"))
                     }
                 }.padding(18)
             }.background(theme.background).foregroundStyle(theme.ink)
@@ -337,7 +337,7 @@ private struct BahwSuggestionsView: View {
                                 Image(systemName: "chevron.left").font(.caption).foregroundStyle(theme.secondaryInk)
                             }.frame(maxWidth: .infinity, minHeight: 52, alignment: .leading).padding(12)
                                 .background(theme.surface, in: .rect(cornerRadius: 18))
-                        }.buttonStyle(.plain).accessibilityIdentifier("bahw-suggestion-" + suggestion.id)
+                        }.buttonStyle(.madarPlain).accessibilityIdentifier("bahw-suggestion-" + suggestion.id)
                     }
                 }.accessibilityElement(children: .contain).accessibilityIdentifier("bahw-suggestions")
             }

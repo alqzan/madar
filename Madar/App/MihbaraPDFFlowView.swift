@@ -39,13 +39,13 @@ struct MihbaraPDFFlowView: View {
                     } label: {
                         option("ابحث عنه في تراث", "إن كان في المكتبة الشاملة فنسخته أدق: نص محقق وفهرس وحواشٍ.", "books.vertical.fill", "desk", "onDesk")
                     }
-                    .buttonStyle(.plain).disabled(running).accessibilityIdentifier("mihbara-pdf-flow-turath")
+                    .buttonStyle(.madarPlain).disabled(running).accessibilityIdentifier("mihbara-pdf-flow-turath")
 
                     // Owner, 25 Oct 2026: the conversion runs while the person moves around the app.
                     Button { conversions.start(book, app: app); dismiss() } label: {
                         option("حوّله على جهازك", "نقرأ كل صفحة على جهازك، والمصوّرة ضوئيًا، وتتنقل في التطبيق وهو يعمل. يصير الكتاب منسابًا على رفّه، والـPDF أصله.", "text.page.fill", "navy", "onNavy")
                     }
-                    .buttonStyle(.plain).disabled(running).accessibilityIdentifier("mihbara-pdf-flow-device")
+                    .buttonStyle(.madarPlain).disabled(running).accessibilityIdentifier("mihbara-pdf-flow-device")
 
                     status
                 }

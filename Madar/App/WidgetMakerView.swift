@@ -156,7 +156,7 @@ struct WidgetMakerView: View {
                         HStack { Text(title(id)).font(MadarTypography.caption()); Spacer(minLength: 3); if let n = draft.items.firstIndex(of: id) { Text(session.digits(n + 1)).font(MadarTypography.fine()).padding(5).background(theme.accentFill, in: .circle).foregroundStyle(theme.onAccent) } }
                             .padding(10).frame(maxWidth: .infinity, minHeight: 48).background(theme.surface, in: .rect(cornerRadius: 16))
                             .overlay { RoundedRectangle(cornerRadius: 16).stroke(draft.items.contains(id) ? theme.accentFill : theme.line) }
-                    }.buttonStyle(.plain).accessibilityAddTraits(draft.items.contains(id) ? .isSelected : []).accessibilityIdentifier("widget-item-" + id)
+                    }.buttonStyle(.madarPlain).accessibilityAddTraits(draft.items.contains(id) ? .isSelected : []).accessibilityIdentifier("widget-item-" + id)
                 }
             }
             if !habits.isEmpty { Menu("عادة بعينها") { ForEach(habits) { habit in Button(habit.name) { toggle("habit:" + habit.id.uuidString) } } }.frame(minHeight: 44).accessibilityIdentifier("widget-pick-habit") }
@@ -181,7 +181,7 @@ struct WidgetMakerView: View {
                     let _ = style.color = color
                     Circle().fill(WidgetMakerContent.accent(style, dark: colorScheme == .dark)).frame(width: 30, height: 30)
                         .padding(5).overlay { Circle().stroke(draft.style.color == color ? theme.accent : .clear, lineWidth: 2) }.frame(maxWidth: .infinity, minHeight: 44)
-                }.buttonStyle(.plain).accessibilityLabel(["gold": "ذهبي", "green": "أخضر", "blue": "أزرق", "clay": "طيني", "plum": "برقوقي", "sepia": "بني", "ink": "حبر"][color] ?? color).accessibilityAddTraits(draft.style.color == color ? .isSelected : []).accessibilityIdentifier("widget-color-" + color)
+                }.buttonStyle(.madarPlain).accessibilityLabel(["gold": "ذهبي", "green": "أخضر", "blue": "أزرق", "clay": "طيني", "plum": "برقوقي", "sepia": "بني", "ink": "حبر"][color] ?? color).accessibilityAddTraits(draft.style.color == color ? .isSelected : []).accessibilityIdentifier("widget-color-" + color)
             }
         }
     }
@@ -224,7 +224,7 @@ struct WidgetMakerView: View {
                     }
                 }
                 .overlay { RoundedRectangle(cornerRadius: 22).stroke(item.id == baseline?.id ? theme.accentFill : theme.line, lineWidth: 1) }
-            }.buttonStyle(.plain).accessibilityIdentifier("widget-saved-" + item.id.uuidString)
+            }.buttonStyle(.madarPlain).accessibilityIdentifier("widget-saved-" + item.id.uuidString)
             Button { deleting = item } label: { Label("احذف", systemImage: "trash").font(MadarTypography.fine()).frame(minHeight: 44) }
                 .accessibilityLabel("احذف " + item.name).accessibilityIdentifier("widget-delete-" + item.id.uuidString)
         }

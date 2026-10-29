@@ -150,7 +150,7 @@ struct MoneyObligationSheet: View {
                 Button(action: save) {
                     Text("احفظ الالتزام").font(.custom("thmanyahsans-Bold", size: 18, relativeTo: .headline)).foregroundStyle(theme.background)
                         .frame(maxWidth: .infinity, minHeight: 54).background(theme.ink)
-                }.buttonStyle(.plain)
+                }.buttonStyle(.madarPlain)
                     .disabled(saving || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || amountMinor == nil)
                     .accessibilityIdentifier("money-obligation-save")
             }.padding(16)

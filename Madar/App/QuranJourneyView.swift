@@ -11,6 +11,7 @@ struct QuranJourneyView: View {
     @State private var showPage = false
     @State private var reader: Int?
     @State private var error: String?
+    @State private var attempt = 0
     var body: some View {
         ScrollView {
             VStack(spacing: 12) {
@@ -49,10 +50,14 @@ struct QuranJourneyView: View {
                             Button("تفاصيل الوجه") { showPage = true }.frame(minHeight: 44).accessibilityIdentifier("quran-journey-page")
                         }
                     }
-                } else if let error { Text(error) }
+                } else if let error {
+                    Text(error)
+                    // AU-95: one failed read used to leave this page dead.
+                    Button("أعِد المحاولة") { self.error = nil; attempt += 1 }.frame(minHeight: 44).contentShape(Rectangle()).accessibilityIdentifier("quran-journey-retry")
+                }
             }.padding(16)
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.color("review"))
-            .task { do { value = try await service.journeyLog() } catch { self.error = quranUserMessage(error) } }
+            .task(id: attempt) { do { value = try await service.journeyLog() } catch { self.error = quranUserMessage(error) } }
             .sheet(isPresented: $showPage) {
                 VStack(alignment: .leading, spacing: 16) {
                     Text("الوجه " + service.numerals.string(page)).font(quranSerif(26))

@@ -78,7 +78,7 @@ struct MoneyMessagesView: View {
             Button { dismiss() } label: {
                 Image(systemName: "xmark").font(.title3).frame(width: 52, height: 52)
                     .overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1.2) }
-            }.buttonStyle(.plain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-messages-close")
+            }.buttonStyle(.madarPlain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-messages-close")
             Spacer()
         }.padding(.top, 8)
     }
@@ -165,12 +165,12 @@ struct MoneyMessagesView: View {
                     Button { run("money.applyStatement", ["id": .string(s.id.uuidString)]) } label: {
                         Text("حدّث البطاقة بالأرقام").font(.custom("thmanyahsans-Bold", size: 17, relativeTo: .headline)).foregroundStyle(theme.background)
                             .frame(maxWidth: .infinity, minHeight: 56).background(theme.ink)
-                    }.buttonStyle(.plain).accessibilityIdentifier("money-statement-apply")
+                    }.buttonStyle(.madarPlain).accessibilityIdentifier("money-statement-apply")
                 }
                 Button { run("money.ignoreMessage", ["id": .string(s.id.uuidString)]) } label: {
                     Text("تجاهل").font(MadarTypography.body()).frame(maxWidth: s.cardName == nil ? .infinity : 150, minHeight: 56)
                         .overlay { Rectangle().stroke(theme.line, lineWidth: 1.2) }
-                }.buttonStyle(.plain).accessibilityIdentifier("money-statement-ignore")
+                }.buttonStyle(.madarPlain).accessibilityIdentifier("money-statement-ignore")
             }
         }.padding(16).background(theme.surface).overlay { TicketEdge().stroke(theme.color("reserveText"), lineWidth: 1) }
             .accessibilityElement(children: .contain).accessibilityIdentifier("money-statement")
@@ -232,7 +232,7 @@ struct MoneyMessagesView: View {
                     Button { categorizing = d } label: {
                         Label(d.categoryName ?? "صنّفها", systemImage: d.categoryName == nil ? "tag" : "arrow.triangle.2.circlepath").font(MadarTypography.fine()).padding(.horizontal, 8).padding(.vertical, 4)
                             .overlay { Rectangle().stroke(theme.color("reserveText"), style: .init(lineWidth: 1, dash: [3, 2])) }
-                    }.buttonStyle(.plain).frame(minHeight: 32).accessibilityIdentifier("money-draft-category")
+                    }.buttonStyle(.madarPlain).frame(minHeight: 32).accessibilityIdentifier("money-draft-category")
                 }
                 if let note = d.note {
                     Text(note).font(MadarTypography.fine()).padding(.horizontal, 8).padding(.vertical, 4)
@@ -252,11 +252,11 @@ struct MoneyMessagesView: View {
                             .accessibilityLabel("خيارات اعتماد " + d.title).accessibilityIdentifier("money-draft-confirm")
                     } else {
                         Button { if d.isSalary { salary = .init(id: d.id) } else if d.isBigExpense { bigExpense = .init(transactionID: d.id) } else { run("money.confirmTransaction", ["id": .string(d.id.uuidString)]) } } label: { draftConfirmGlyph }
-                            .buttonStyle(.plain).accessibilityLabel("اعتمد " + d.title).accessibilityIdentifier("money-draft-confirm")
+                            .buttonStyle(.madarPlain).accessibilityLabel("اعتمد " + d.title).accessibilityIdentifier("money-draft-confirm")
                     }
                     Button { run("money.deleteTransaction", ["id": .string(d.id.uuidString)]) } label: {
                         Image(systemName: "xmark").font(.body).foregroundStyle(theme.secondaryInk).frame(width: 44, height: 44).overlay { Circle().stroke(theme.line, lineWidth: 1.2) }
-                    }.buttonStyle(.plain).accessibilityLabel("احذف " + d.title).accessibilityIdentifier("money-draft-delete")
+                    }.buttonStyle(.madarPlain).accessibilityLabel("احذف " + d.title).accessibilityIdentifier("money-draft-delete")
                 }.environment(\.layoutDirection, .leftToRight)
                 if deleteFailureID == d.id {
                     Text("تعذّر حذف الحركة.").font(MadarTypography.fine()).foregroundStyle(theme.color("dueText"))
@@ -283,7 +283,7 @@ struct MoneyMessagesView: View {
                     Spacer(minLength: 6)
                     Button { run("money.ignoreMessage", ["id": .string(item.id.uuidString)]) } label: {
                         Text("تجاهل").font(MadarTypography.caption()).padding(.horizontal, 14).frame(minHeight: 44).overlay { Capsule().stroke(theme.line, lineWidth: 1) }
-                    }.buttonStyle(.plain).accessibilityIdentifier("money-look-ignore")
+                    }.buttonStyle(.madarPlain).accessibilityIdentifier("money-look-ignore")
                 }.padding(12).background(theme.surface.opacity(0.6))
             }
         }.padding(.top, 6).accessibilityElement(children: .contain).accessibilityIdentifier("money-looks")
@@ -297,7 +297,7 @@ struct MoneyMessagesView: View {
                     Text("اعتمد الواضح (" + service.digits.string(clear.count) + ")").font(.custom("thmanyahsans-Bold", size: 17, relativeTo: .headline))
                     if left > 0 { Text("ويبقى " + service.counted(left, ("قرار واحد", "قراران", "قرارات", "قرارًا")) + " لقرارك").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
                 }.frame(maxWidth: .infinity, minHeight: 60).overlay { Rectangle().stroke(theme.color("reserveText"), lineWidth: 1.2) }
-            }.buttonStyle(.plain).accessibilityIdentifier("money-confirm-clear")
+            }.buttonStyle(.madarPlain).accessibilityIdentifier("money-confirm-clear")
         }
     }
     private func footer(_ reading: MoneyMessagesReading) -> some View {
@@ -322,9 +322,9 @@ struct MoneyMessagesView: View {
                 }
             }.labelStyle(.titleAndIcon).tint(theme.color("reserveText")).frame(minHeight: 44).accessibilityIdentifier("money-messages-paste")
             Button { budgetOpen = true } label: { Label("تجاهله من الميزانيات", systemImage: "seal").font(MadarTypography.caption()).frame(minHeight: 44) }
-                .buttonStyle(.plain).foregroundStyle(theme.color("reserveText")).accessibilityIdentifier("money-budget-open")
+                .buttonStyle(.madarPlain).foregroundStyle(theme.color("reserveText")).accessibilityIdentifier("money-budget-open")
             Button { rulesOpen = true } label: { Label("قواعد التاجر", systemImage: "lamp.table").font(MadarTypography.caption()).frame(minHeight: 44) }
-                .buttonStyle(.plain).foregroundStyle(theme.color("reserveText")).accessibilityIdentifier("money-rules-open")
+                .buttonStyle(.madarPlain).foregroundStyle(theme.color("reserveText")).accessibilityIdentifier("money-rules-open")
             Text("الصق رسائل البنك إن لم تصل عبر الاختصار؛ تُفصل الرسائل بسطر فارغ.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).multilineTextAlignment(.center)
         }.padding(.top, 8)
     }

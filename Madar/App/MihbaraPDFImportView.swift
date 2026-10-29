@@ -184,7 +184,11 @@ struct MihbaraPDFImportView: View {
                 try await service.confirmPDF(inspection, bookID: bookID, commandID: commandID, title: metadata[0], author: metadata[1], language: metadata[2])
                 finished = true; saving = false; onImported()
             } catch {
-                if case DataError.invalidValue(let message) = error { self.error = message }
+                if case DataError.invalidValue(let message) = error {
+                    // AU-95: a rejected title or author was never written; free the fields so it can be corrected,
+                    // under a fresh command so the corrected values are not refused as a changed duplicate.
+                    self.error = message; confirmedMetadata = nil; commandID = UUID()
+                }
                 else { self.error = "لم يكتمل الحفظ. أعد المحاولة عندما تكون بيانات مدار مفتوحة." }
                 saving = false
             }

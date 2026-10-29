@@ -18,6 +18,15 @@ struct MoneySettingsView: View {
         var title: String { switch self { case .messages: "الرسائل"; case .daily: "اليومية"; case .cycle: "الدورة"; case .deficit: "العجز"; case .travel: "السفر"; case .room: "الغرفة"; case .reconciliation: "المطابقة" } }
     }
     @State private var page = Page.daily
+    /// AU-95: quick +/− taps each stepped from the stored value until the write landed, so three taps moved one step.
+    @State private var sentInts: [String: Int] = [:]
+    private func shownInt(_ key: String) -> Int { sentInts[key] ?? Int(app.number(key)) }
+    private func stepping(_ key: String) -> Binding<Int> {
+        Binding(get: { shownInt(key) }, set: { value in
+            sentInts[key] = value
+            app.set(.number(Double(value)), key: key) { if sentInts[key] == value { sentInts[key] = nil } }
+        })
+    }
     @State private var cycle: MoneyCycleReading?
     @State private var mode = "fixed"
     @State private var rawAmount = ""
@@ -78,7 +87,7 @@ struct MoneySettingsView: View {
                     }
                     Text(page == .daily || page == .cycle ? "معاينة أولًا، ثم حفظ واحد وتراجع" : "كل تغيير له تراجع").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                 }.padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 28).frame(maxWidth: 620).frame(maxWidth: .infinity)
-            }.scrollDismissesKeyboard(.interactively).background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.plain).toolbar(.hidden, for: .navigationBar, .tabBar)
+            }.scrollDismissesKeyboard(.interactively).background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.madarPlain).toolbar(.hidden, for: .navigationBar, .tabBar)
                 .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تمّ") { editing = false }.accessibilityIdentifier("money-settings-keyboard-done") } }
                 .task { load() }.onChange(of: app.prayerRevision) { refreshAfterSettingsChange() }.onChange(of: unit) { every = min(every, unit.maxEvery) }
                 .accessibilityIdentifier("money-settings")
@@ -155,7 +164,7 @@ struct MoneySettingsView: View {
     private var deficitPage: some View {
         VStack(alignment: .leading, spacing: 14) {
             toggle("المقاصة من الفائض", "mal.autoOffset")
-            Stepper(value: Binding(get: { Int(app.number("mal.offsetCapDailies")) }, set: { app.set(.number(Double($0)), key: "mal.offsetCapDailies") }), in: 0...365) { Text(app.number("mal.offsetCapDailies") == 0 ? "بلا مقاصة" : "سقف الدورة: " + service.dailies(Int(app.number("mal.offsetCapDailies")))) }.accessibilityIdentifier("money-settings-offset-cap")
+            Stepper(value: stepping("mal.offsetCapDailies"), in: 0...365) { Text(shownInt("mal.offsetCapDailies") == 0 ? "بلا مقاصة" : "سقف الدورة: " + service.dailies(shownInt("mal.offsetCapDailies"))) }.accessibilityIdentifier("money-settings-offset-cap").onChange(of: app.errorMessage) { _, message in if message != nil { sentInts = [:] } }
             note("السقف لكل الدورة، وليس لكل مرة. وما لا يُسدّ يبقى ترحيلًا ظاهرًا؛ لا تختفي هللة.")
             Picker("باقي الراتب", selection: stringBinding("mal.salaryRemainder")) { Text("للفوائض ثم الاحتياطي").tag("surplusThenReserve"); Text("للاحتياطي").tag("reserve"); Text("اسألني").tag("ask") }
             toggle("السحب النقدي يُحسب مصروفًا", "mal.cashWithdrawalAsSpend")
@@ -189,7 +198,7 @@ struct MoneySettingsView: View {
                 TextField("المبلغ بعملة البيت", text: $rawBigAmount).keyboardType(.decimalPad).focused($editing).accessibilityIdentifier("money-settings-big-amount")
                 saveButton("احفظ الحد", id: "big-save", enabled: MoneyAmountInput.minor(rawBigAmount, exponent: homeExponent).map { $0 > 0 && $0 <= 10000000000000 } == true) { app.set(.number(Double(MoneyAmountInput.minor(rawBigAmount, exponent: homeExponent) ?? 100000)), key: "mal.bigExpenseMinor") }
             }
-            else { Stepper(value: Binding(get: { Int(app.number("mal.bigExpenseDays")) }, set: { app.set(.number(Double($0)), key: "mal.bigExpenseDays") }), in: 2...8) { Text(arabicCount(Int(app.number("mal.bigExpenseDays")), ["يومية واحدة", "يوميتان", "يوميات", "يوميةً"], service.digits)) } }
+            else { Stepper(value: stepping("mal.bigExpenseDays"), in: 2...8) { Text(arabicCount(shownInt("mal.bigExpenseDays"), ["يومية واحدة", "يوميتان", "يوميات", "يوميةً"], service.digits)) } }
             }
             if let threshold = service.bigExpenseThreshold(cycle: cycle) { Text("يفتح موجّه التوزيع من " + amount(threshold)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-settings-big-threshold") }
             else { note("حدّد اليومية أو الراتب، أو اختر مبلغًا ثابتًا.") }

@@ -142,7 +142,7 @@ private struct GlassRoomShortcuts: View {
                 .frame(minWidth: 44, minHeight: 44)
                 .contentShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.madarPlain)
         .foregroundStyle(ink)
         .accessibilityLabel(tab.title)
         .accessibilityIdentifier("tab-\(tab.id)")
@@ -254,7 +254,7 @@ struct MadarRootView: View {
             await session.refreshPrayerNotifications()
         }
         .overlay(alignment: .bottom) {
-            if session.undoToastVisible { UndoToast(message: session.undoMessage, undo: session.undo).padding(.bottom, 86) }
+            if session.undoToastVisible { UndoToast(message: session.undoMessage, undo: session.undo, dismiss: session.hideUndoToast).padding(.bottom, 86) }
         }
         .fullScreenCover(isPresented: Binding(get: { !session.onboardingComplete }, set: { _ in })) { FirstRunView(session: session).environment(\.roomTheme, theme).madarSheetErrorAlert(session) }
         .alert("لم تكتمل العملية", isPresented: Binding(get: { session.errorMessage != nil }, set: { if !$0 { session.errorMessage = nil } })) {

@@ -42,7 +42,7 @@ struct MoneyTripRateSheet: View {
                     catch { failure = "تعذّرت المعاينة. افتح الورقة من جديد وحاول مرة أخرى." }
                 }.disabled(!visible || saving).font(MadarTypography.caption()).frame(minHeight: 44).accessibilityIdentifier("money-trip-reprice-preview")
             }
-        }.padding(22) }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.plain).scrollDismissesKeyboard(.interactively)
+        }.padding(22) }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.madarPlain).scrollDismissesKeyboard(.interactively)
             .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تمّ") { focused = false }.accessibilityIdentifier("money-trip-keyboard-done") } }
             .sheet(isPresented: $previewOpen) { if let preview { repricePreview(preview) } }
             .task { currency = reading.currency ?? app.string("core.currency"); raw = reading.rate.map(service.localizedRate) ?? "" }
@@ -59,7 +59,7 @@ struct MoneyTripRateSheet: View {
                 saving = true
                 Task { do { try await app.executeMoneyCommand("money.repriceTrip", payload: ["id": .string(reading.id.uuidString), "rate": .string(reading.rate!), "signature": .string(p.signature)]); previewOpen = false; dismiss() } catch { failure = "تغيّرت الحركات منذ المعاينة؛ أعد فتحها قبل التطبيق."; previewOpen = false; saving = false } }
             } label: { Text("طبّق على الحركات المعروضة").frame(maxWidth: .infinity, minHeight: 50).background(theme.ink).foregroundStyle(theme.background) }.disabled(saving || p.lines.isEmpty).accessibilityIdentifier("money-trip-reprice-apply")
-        }.padding(22) }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.plain)
+        }.padding(22) }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.madarPlain)
     }
     private func scale(_ code: String) -> Int { (0..<(CurrencyExponents.specified.exponent(code) ?? 2)).reduce(1) { n, _ in n * 10 } }
     private func save() {
@@ -118,7 +118,7 @@ struct MoneyTripFundingSheet: View {
             // AU-34: hidden numbers say why save waits.
             if !visible { Text("أرقامك مخفية؛ أظهرها من صفحة الرحلة لتحفظ").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-trip-hidden-hint") }
             Button { save() } label: { Text("انقل للمظروف").frame(maxWidth: .infinity, minHeight: 50).background(theme.ink).foregroundStyle(theme.background) }.disabled(saving || !visible || minor.map { $0 > 0 && $0 <= available } != true).accessibilityIdentifier("money-trip-fund-save")
-        }.padding(22) }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.plain).scrollDismissesKeyboard(.interactively)
+        }.padding(22) }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.madarPlain).scrollDismissesKeyboard(.interactively)
             .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تمّ") { focused = false }.accessibilityIdentifier("money-trip-keyboard-done") } }
             .task { due = max(app.prayerNow(), reading.due?.date(in: app.activePlace.timeZone) ?? reading.today.adding(days: 3).date(in: app.activePlace.timeZone)); if reading.surplusMinor <= 0 { source = "reserve" } }
         }

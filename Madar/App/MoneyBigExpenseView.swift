@@ -78,7 +78,7 @@ struct MoneyBigExpenseView: View {
                     } else if let failure { Text(failure); Button("أعِد المحاولة", action: load) }
                     else { ProgressView().frame(height: 200) }
                 }.padding(20).frame(maxWidth: 620).frame(maxWidth: .infinity)
-            }.scrollDismissesKeyboard(.interactively).background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.plain)
+            }.scrollDismissesKeyboard(.interactively).background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.madarPlain)
                 .toolbar(.hidden, for: .navigationBar).toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تمّ") { editing = false } } }
                 .task { load() }.accessibilityIdentifier("money-big")
         }

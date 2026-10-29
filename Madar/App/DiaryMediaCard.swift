@@ -23,11 +23,11 @@ struct DiaryMediaCard: View {
         VStack(alignment: .leading, spacing: 8) {
             if media.kind == "photo", let image = UIImage(data: media.data) {
                 Button { open() } label: { Image(uiImage: image).resizable().scaledToFit().frame(maxWidth: 150).padding(8).background(theme.surface).rotationEffect(.degrees(-2)).shadow(color: theme.ink.opacity(0.1), radius: 5, y: 4) }
-                    .buttonStyle(.plain).accessibilityLabel("افتح الصورة").accessibilityIdentifier("diary-media-" + media.id.uuidString)
+                    .buttonStyle(.madarPlain).accessibilityLabel("افتح الصورة").accessibilityIdentifier("diary-media-" + media.id.uuidString)
             } else if media.kind == "audio" {
                 HStack(spacing: 12) {
                     Button { togglePlayback() } label: { Image(systemName: playing ? "pause.fill" : "play.fill").frame(width: 44, height: 44).foregroundStyle(theme.onAccent).background(theme.accent, in: .circle) }
-                        .buttonStyle(.plain).accessibilityLabel(playing ? "أوقف الصوت مؤقتًا" : "شغّل التسجيل").accessibilityIdentifier("diary-play-" + media.id.uuidString)
+                        .buttonStyle(.madarPlain).accessibilityLabel(playing ? "أوقف الصوت مؤقتًا" : "شغّل التسجيل").accessibilityIdentifier("diary-play-" + media.id.uuidString)
                     ProgressView(value: playback.activeID == media.id ? playback.position : 0).tint(theme.accent)
                     Text(media.duration.map(seconds) ?? "تسجيل صوتي").font(MadarTypography.fine())
                 }.padding(10).background(theme.surface, in: .capsule)
@@ -46,7 +46,7 @@ struct DiaryMediaCard: View {
                     .accessibilityIdentifier("diary-media-missing")
             } else {
                 Button { open() } label: { Label(media.kind == "video" ? "افتح المقطع" : "افتح المرفق", systemImage: media.kind == "video" ? "play.rectangle" : "doc").font(MadarTypography.caption()).padding(.horizontal, 14).frame(minHeight: 44).background(theme.surface, in: .rect(cornerRadius: 10)).overlay { RoundedRectangle(cornerRadius: 10).stroke(theme.line) } }
-                    .buttonStyle(.plain).accessibilityIdentifier("diary-media-" + media.id.uuidString)
+                    .buttonStyle(.madarPlain).accessibilityIdentifier("diary-media-" + media.id.uuidString)
             }
             if let error { Text(error).font(MadarTypography.fine()) }
         }.padding(.vertical, 10).padding(.leading, 58).padding(.trailing, 18)

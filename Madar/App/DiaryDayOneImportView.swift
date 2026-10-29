@@ -71,7 +71,7 @@ struct DiaryDayOneImportView: View {
             .background(theme.surface.opacity(0.55), in: .rect(cornerRadius: 3))
             .overlay { RoundedRectangle(cornerRadius: 3).stroke(theme.color("ink3Text").opacity(0.55), style: StrokeStyle(lineWidth: 1, dash: [4, 3])) }
             .contentShape(.rect)
-        }.buttonStyle(.plain).disabled(reading).accessibilityIdentifier("dayone-choose")
+        }.buttonStyle(.madarPlain).disabled(reading).accessibilityIdentifier("dayone-choose")
     }
 
     // MARK: preview (N01: counts, days, media, missing, duplicates — nothing written before «استورد»)
@@ -145,7 +145,7 @@ struct DiaryDayOneImportView: View {
                     row("مدخلات", digits.string(p.changed))
                     ForEach([(DayOneMerge.Choice.automatic, "حدّثها إن لم أعدّلها هنا، وإلا أبقِ الاثنتين"), (.update, "حدّثها"), (.keepMine, "أبقِ نسختي"), (.keepBoth, "احتفظ بالاثنتين")], id: \.0) { value, title in
                         Button { choice = value } label: { HStack { Text(title).font(MadarTypography.body()); Spacer(); Image(systemName: choice == value ? "checkmark.circle.fill" : "circle").foregroundStyle(choice == value ? theme.accent : theme.line) }.frame(minHeight: 44).contentShape(.rect) }
-                            .buttonStyle(.plain).accessibilityIdentifier("dayone-choice-" + value.rawValue)
+                            .buttonStyle(.madarPlain).accessibilityIdentifier("dayone-choice-" + value.rawValue)
                     }
                 }
             }
@@ -156,7 +156,7 @@ struct DiaryDayOneImportView: View {
                 }.padding(.vertical, 8).accessibilityIdentifier("dayone-importing")
             } else if p.writes > 0 {
                 Button { commit(draft) } label: { Text("استورد").font(DiaryType.heading).frame(maxWidth: .infinity, minHeight: 56).foregroundStyle(theme.background).background(theme.ink, in: .capsule) }
-                    .buttonStyle(.plain).accessibilityIdentifier("dayone-confirm")
+                    .buttonStyle(.madarPlain).accessibilityIdentifier("dayone-confirm")
                 Text("لا يُكتب شيء في دفترك قبل أن تضغط «استورد»، ويمكنك التراجع بعده.").font(DiaryType.label).foregroundStyle(theme.color("ink3Text")).frame(maxWidth: .infinity)
             } else {
                 Text("كل ما في هذا الملف موجود في دفترك من قبل. لا شيء جديد.").font(MadarTypography.body()).accessibilityIdentifier("dayone-nothing-new")
@@ -198,10 +198,10 @@ struct DiaryDayOneImportView: View {
                     Divider().overlay(theme.line)
                     Button { openDay = last } label: {
                         HStack { VStack(alignment: .leading, spacing: 4) { Text("افتح آخر يوم وصل").font(MadarTypography.body()); MadarDateLabel(diary.dateLabels(last, first: first)) }; Spacer(); Image(systemName: "chevron.backward").font(.caption) }.contentShape(.rect)
-                    }.buttonStyle(.plain).accessibilityIdentifier("dayone-open-day")
+                    }.buttonStyle(.madarPlain).accessibilityIdentifier("dayone-open-day")
                 }
             }
-            Button { dismiss() } label: { Text("تمّ").font(DiaryType.heading).frame(maxWidth: .infinity, minHeight: 56).foregroundStyle(theme.background).background(theme.ink, in: .capsule) }.buttonStyle(.plain).accessibilityIdentifier("dayone-finish")
+            Button { dismiss() } label: { Text("تمّ").font(DiaryType.heading).frame(maxWidth: .infinity, minHeight: 56).foregroundStyle(theme.background).background(theme.ink, in: .capsule) }.buttonStyle(.madarPlain).accessibilityIdentifier("dayone-finish")
             Button { undo(r.batchID) } label: { Label("تراجع عن هذا الاستيراد", systemImage: "arrow.uturn.backward").font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 44) }.accessibilityIdentifier("dayone-undo")
         }
     }

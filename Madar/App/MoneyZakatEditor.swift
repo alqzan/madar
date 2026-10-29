@@ -69,7 +69,7 @@ struct MoneyZakatEditor: View {
             // AU-34: a dimmed save names what it still waits for.
             if !saving, let waiting {Text(waiting).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-zakat-waiting")}
             Button(action:save) {Text(saving ? "جارٍ الحفظ…" : "احفظ بيانات الحساب").font(MadarTypography.body()).frame(maxWidth:.infinity,minHeight:50).background(theme.ink).foregroundStyle(theme.background)}.disabled(saving || !valid || !numbersVisible).accessibilityIdentifier("money-zakat-save")
-        }.padding(22) }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.plain).scrollDismissesKeyboard(.interactively)
+        }.padding(22) }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.madarPlain).scrollDismissesKeyboard(.interactively)
             .toolbar {ToolbarItemGroup(placement:.keyboard){Spacer();Button("تمّ"){focused=false}.accessibilityIdentifier("money-zakat-keyboard-done")}}
             .task {let i=reading.input;selectedBasis=basis;basisChosen=chosen;selectedDebt=debt;gold=i.goldPricePerGramMinor.map{service.moneyInput($0)} ?? "";silver=i.silverPricePerGramMinor.map{service.moneyInput($0)} ?? "";goldWeight=service.moneyInput(i.nisabMg,exponent:3);silverWeight=service.moneyInput(i.nisabSilverMg,exponent:3);other=service.moneyInput(i.otherAssetsMinor);hasHawl = !(i.hawlStartHijri ?? "").isEmpty;date=MoneyHawl.read(i.hawlStartHijri ?? "",app:app)?.chosen.date(in:app.activePlace.timeZone) ?? app.prayerNow()}
         }

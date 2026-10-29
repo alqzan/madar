@@ -133,10 +133,10 @@ struct DiaryHomeView: View {
                     MadarDateLabel(app.dateLabels(snapshot.today, weekday: true)).foregroundStyle(theme.color("ink3Text"))
                 }
             }.frame(maxWidth: .infinity, alignment: .leading)
-            Button { searchOpen = true } label: { Image(systemName: "magnifyingglass").frame(width: 44, height: 44) }.buttonStyle(.plain).accessibilityLabel("ابحث في مذكراتك").accessibilityIdentifier("diary-search")
-            Button { archiveOpen = true } label: { Image(systemName: "calendar").frame(width: 44, height: 44) }.buttonStyle(.plain).accessibilityLabel("أيامك").accessibilityIdentifier("diary-days")
+            Button { searchOpen = true } label: { Image(systemName: "magnifyingglass").frame(width: 44, height: 44) }.buttonStyle(.madarPlain).accessibilityLabel("ابحث في مذكراتك").accessibilityIdentifier("diary-search")
+            Button { archiveOpen = true } label: { Image(systemName: "calendar").frame(width: 44, height: 44) }.buttonStyle(.madarPlain).accessibilityLabel("أيامك").accessibilityIdentifier("diary-days")
             Button { customizing = true } label: { Image(systemName: "slider.horizontal.3").frame(width: 44, height: 44).overlay { Circle().stroke(theme.line) } }
-                .buttonStyle(.plain).accessibilityLabel("خصّص المذكرات").accessibilityIdentifier("diary-customize")
+                .buttonStyle(.madarPlain).accessibilityLabel("خصّص المذكرات").accessibilityIdentifier("diary-customize")
         }.padding(.vertical, 4)
     }
     private func calendarButton(_ calendar: FirstCalendar, _ title: String) -> some View {
@@ -144,7 +144,7 @@ struct DiaryHomeView: View {
             Text(title).font(.custom("thmanyahsans-Bold", size: 12, relativeTo: .caption))
                 .padding(.horizontal, 10).frame(minHeight: 36)
                 .background(service.preferredMatch == calendar ? theme.surface : .clear, in: .capsule)
-        }.buttonStyle(.plain).accessibilityIdentifier("diary-match-" + calendar.rawValue)
+        }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-match-" + calendar.rawValue)
     }
     private func hero(_ snapshot: DiaryHomeSnapshot) -> some View {
         let page = memory ?? snapshot.todayPage
@@ -183,7 +183,7 @@ struct DiaryHomeView: View {
                                     .frame(minWidth: 42, minHeight: 36).padding(.horizontal, 4)
                                     .foregroundStyle(day == page.day ? theme.ink : hasPhoto ? .white : theme.ink)
                                     .background(day == page.day ? theme.surface : hasPhoto ? Color.black.opacity(0.62) : theme.background, in: .capsule)
-                            }.buttonStyle(.plain).accessibilityIdentifier("diary-year-" + day.description)
+                            }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-year-" + day.description)
                         }
                         Spacer(minLength: 0)
                     }
@@ -255,7 +255,7 @@ struct DiaryHomeView: View {
             }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
                 .background(theme.surface, in: .rect(cornerRadius: 22)).overlay { RoundedRectangle(cornerRadius: 22).stroke(theme.line) }
                 .contentShape(.rect(cornerRadius: 22))
-        }.buttonStyle(.plain).accessibilityIdentifier("diary-year-" + page.day.description)
+        }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-year-" + page.day.description)
     }
     private func thatDay(_ day: DiaryDisplayDay) -> some View {
         VStack(alignment: .leading, spacing: 13) {
@@ -297,7 +297,7 @@ struct DiaryHomeView: View {
         let month = service.monthLabels(snapshot.today)
         return VStack(alignment: .leading, spacing: 10) {
             HStack {
-            Button { archiveOpen = true } label: { HStack { Text("أيامك").font(DiaryType.heading); Image(systemName: "arrow.left").font(.caption) } }.buttonStyle(.plain)
+            Button { archiveOpen = true } label: { HStack { Text("أيامك").font(DiaryType.heading); Image(systemName: "arrow.left").font(.caption) } }.buttonStyle(.madarPlain)
                 Spacer()
                 VStack(alignment: .leading, spacing: 2) {
                     Text(month.primary).font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
@@ -319,7 +319,7 @@ struct DiaryHomeView: View {
                             Text(day.excerpt).font(.custom("thmanyahseriftext-Regular", size: 17, relativeTo: .body)).frame(maxWidth: .infinity, alignment: .leading).multilineTextAlignment(.leading)
                             if let data = day.photo, let image = UIImage(data: data) { Image(uiImage: image).resizable().scaledToFill().frame(width: 38, height: 38).clipShape(.rect(cornerRadius: 8)) }
                         }.padding(16)
-                    }.buttonStyle(.plain).accessibilityIdentifier("diary-recent-" + day.day.description)
+                    }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-recent-" + day.day.description)
                     if day.id != days.last?.id { Divider().overlay(theme.line) }
                 }
                 // Audit 28 Oct: the empty card is the way in, not a line that points at nothing.
@@ -329,7 +329,7 @@ struct DiaryHomeView: View {
                             Text("أيامك تبدأ من هنا.").font(DiaryType.writing)
                             Label("اكتب سطر اليوم", systemImage: "pencil").font(DiaryType.label).foregroundStyle(theme.color("accentText"))
                         }.frame(maxWidth: .infinity, alignment: .leading).padding(24).contentShape(.rect)
-                    }.buttonStyle(.plain).accessibilityIdentifier("diary-recent-empty-write")
+                    }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-recent-empty-write")
                 }
             }.background(theme.surface, in: .rect(cornerRadius: 22)).overlay { RoundedRectangle(cornerRadius: 22).stroke(theme.line, lineWidth: 1) }
         }.accessibilityElement(children: .contain).accessibilityIdentifier("diary-recent-days")
@@ -347,13 +347,13 @@ struct DiaryHomeView: View {
                 Button { reader = day.day } label: {
                     VStack(alignment: .leading, spacing: 3) { Text("صفحة اليوم").font(MadarTypography.section()); Text(day.excerpt).font(DiaryType.label).lineLimit(1) }
                         .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading)
-                }.buttonStyle(.plain).accessibilityIdentifier("diary-today")
+                }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-today")
                 Button { editor = .init(margin: nil) } label: { Image(systemName: "plus").frame(width: 44, height: 44).overlay { Circle().stroke(theme.line) } }
-                    .buttonStyle(.plain).accessibilityLabel("اكتب في صفحة اليوم").accessibilityIdentifier("diary-write")
+                    .buttonStyle(.madarPlain).accessibilityLabel("اكتب في صفحة اليوم").accessibilityIdentifier("diary-write")
             }.padding(.horizontal, 12).background(theme.surface, in: .capsule).overlay { Capsule().stroke(theme.line) }
             Button { editor = .init(margin: target) } label: {
                 Label("اكتب في هامشها", systemImage: "pencil").font(MadarTypography.caption()).padding(.horizontal, 15).frame(minHeight: 54).foregroundStyle(theme.background).background(theme.ink, in: .capsule)
-            }.buttonStyle(.plain).accessibilityIdentifier("diary-add-margin")
+            }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-add-margin")
         }.padding(.horizontal, 14).padding(.vertical, 8).background(theme.background)
     }
     private func todayBar(_ day: DiaryDisplayDay) -> some View {
@@ -362,14 +362,14 @@ struct DiaryHomeView: View {
                 VStack(alignment: .leading, spacing: 2) { Text("صفحة اليوم").font(.custom("thmanyahsans-Bold", size: 13, relativeTo: .subheadline)); Text(day.lines.isEmpty ? "اكتب سطرك الأول" : "آخرها " + service.time(day.lines.last!.at)).font(DiaryType.label) }
                     .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading).padding(.horizontal, 18)
                     .background(theme.surface, in: .capsule).overlay { Capsule().stroke(theme.line, lineWidth: 1) }
-            }.buttonStyle(.plain).accessibilityIdentifier("diary-today")
+            }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-today")
             Button { editor = .init(margin: nil) } label: { Label("اكتب", systemImage: "pencil").font(MadarTypography.section()).padding(.horizontal, 22).frame(minHeight: 54).foregroundStyle(theme.background).background(theme.ink, in: .capsule) }
-                .buttonStyle(.plain).accessibilityIdentifier("diary-write")
+                .buttonStyle(.madarPlain).accessibilityIdentifier("diary-write")
         }.padding(.horizontal, 14).padding(.vertical, 8).background(theme.background)
     }
     private func pill(_ title: String, id: String, ink: Color? = nil, action: @escaping () -> Void) -> some View {
         Button(action: action) { Text(title).font(.custom("thmanyahsans-Bold", size: 13, relativeTo: .subheadline)).frame(maxWidth: .infinity, minHeight: 44).foregroundStyle(ink ?? theme.ink).overlay { Capsule().stroke(ink ?? theme.line, lineWidth: 1) } }
-            .buttonStyle(.plain).accessibilityIdentifier(id)
+            .buttonStyle(.madarPlain).accessibilityIdentifier(id)
     }
     private var blocks: [String] { DiaryHomeLayout(app.values["notes.layout"]).order }
     private func hidden(_ block: String) -> Bool { app.values["notes.layout"]?.object?["hidden"]?.array?.contains(.string(block)) == true }

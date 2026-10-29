@@ -304,7 +304,7 @@ struct MihbaraEPUBImportView: View {
                 .background(selected ? theme.color("sunnahLeather") : theme.background, in: .capsule)
                 .overlay { Capsule().stroke(selected ? .clear : theme.line, lineWidth: 1) }
         }
-        .buttonStyle(.plain).accessibilityIdentifier("mihbara-epub-shelf-\(value)")
+        .buttonStyle(.madarPlain).accessibilityIdentifier("mihbara-epub-shelf-\(value)")
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 

@@ -144,7 +144,7 @@ struct RoomHomeLayoutEditor: View {
         let fixedDiaryBar = room == "notes" && layout.blocks.indices.contains(target) && layout.blocks[target] == "todayBar"
         return Button { session.set(layout.moved(id, by: delta), key: layout.key) } label: {
             Image(systemName: symbol).frame(width: 44, height: 44)
-        }.buttonStyle(.plain).disabled(!layout.blocks.indices.contains(target) || fixedPrayerBlock || fixedDiaryBar)
+        }.buttonStyle(.madarPlain).disabled(!layout.blocks.indices.contains(target) || fixedPrayerBlock || fixedDiaryBar)
             .accessibilityLabel((delta < 0 ? "قدّم " : "أخّر ") + RoomHomeLayout.title(id, room: room))
             .accessibilityIdentifier("room-block-" + room + "-" + id + (delta < 0 ? "-up" : "-down"))
     }

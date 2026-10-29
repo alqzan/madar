@@ -101,7 +101,7 @@ struct BahwBlockView: View {
             .foregroundStyle(selected ? room.accent : room.secondaryInk)
             .frame(maxWidth: .infinity, minHeight: 44)
             .contentShape(.rect).opacity(group.isEmpty ? 0.45 : 1)
-        }.buttonStyle(.plain).disabled(!interactive || group.isEmpty)
+        }.buttonStyle(.madarPlain).disabled(!interactive || group.isEmpty)
         .accessibilityLabel(f.arabic + "، " + spoken)
         .accessibilityAddTraits(selected ? .isSelected : []).accessibilityIdentifier("bahw-habits-period-" + f.rawValue)
     }
@@ -118,7 +118,7 @@ struct BahwBlockView: View {
                 .background(selected ? room.accentFill : room.background, in: .rect(cornerRadius: 12))
                 .foregroundStyle(selected ? room.onAccent : room.secondaryInk)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.madarPlain)
         .disabled(!interactive || group.isEmpty)
         .accessibilityLabel(f.arabic + "، " + spoken)
         .accessibilityAddTraits(selected ? .isSelected : [])
@@ -186,7 +186,7 @@ struct BahwBlockView: View {
             .frame(maxWidth: .infinity, minHeight: size == .wide ? 78 : 100, maxHeight: size == .wide ? 78 : nil, alignment: .top)
             .contentShape(.rect(cornerRadius: 12))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.madarPlain)
         .disabled(!interactive || row.paused)
         .accessibilityLabel(row.name + "، " + progress + (row.statusTitle == progress ? "" : "، " + row.statusTitle))
         .accessibilityHint(row.source == nil ? "المس لتسجيل العادة" : "المس لفتح الغرفة المرتبطة")
@@ -229,7 +229,7 @@ struct BahwBlockView: View {
             .frame(maxWidth: .infinity)
             .contentShape(.rect(cornerRadius: 12))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.madarPlain)
         .disabled(!interactive || row.paused)
         .accessibilityLabel(row.name + "، " + progress + (row.statusTitle == progress ? "" : "، " + row.statusTitle))
         .accessibilityHint(row.source == nil ? "المس لتسجيل العادة" : "المس لفتح الغرفة المرتبطة")
@@ -252,7 +252,7 @@ struct BahwBlockView: View {
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             .contentShape(.rect)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.madarPlain)
         .disabled(!interactive || row.paused)
         .accessibilityLabel(row.name + "، " + progress + (row.statusTitle == progress ? "" : "، " + row.statusTitle))
         .accessibilityHint(row.source == nil ? "المس لتسجيل العادة" : "المس لفتح الغرفة المرتبطة")
@@ -292,7 +292,7 @@ struct BahwBlockView: View {
             }.frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
         VStack(alignment:.leading,spacing:size == .wide ? 4 : 10) {
-            Button { service.session.habitsOpen = true } label: { HStack { title(room.accent); Spacer();if !daily.isEmpty { if size == .wide { Text(digits.string(met)+" من "+digits.string(daily.count)+" اليوم").font(small).foregroundStyle(room.secondaryInk) } else { Text(digits.string(met)+" من "+digits.string(daily.count)).font(label).foregroundStyle(room.accent)} } }.frame(minHeight:44).contentShape(.rect) }.buttonStyle(.plain).accessibilityIdentifier("bahw-habits-open").disabled(!interactive)
+            Button { service.session.habitsOpen = true } label: { HStack { title(room.accent); Spacer();if !daily.isEmpty { if size == .wide { Text(digits.string(met)+" من "+digits.string(daily.count)+" اليوم").font(small).foregroundStyle(room.secondaryInk) } else { Text(digits.string(met)+" من "+digits.string(daily.count)).font(label).foregroundStyle(room.accent)} } }.frame(minHeight:44).contentShape(.rect) }.buttonStyle(.madarPlain).accessibilityIdentifier("bahw-habits-open").disabled(!interactive)
             if rows.isEmpty {
                 // Improvement 16 Oct: no «٠ من ٠»; the four period rings at rest show what a habit becomes, and the action is a real button.
                 Spacer(minLength:0)
@@ -310,7 +310,7 @@ struct BahwBlockView: View {
                 else {
                     Text("أقلّ القليل كل يوم يصير سلسلة تراها هنا").font(small).foregroundStyle(room.secondaryInk)
                     Button { service.session.habitsOpen = true } label: { Label("أضف أول عادة", systemImage: "plus").font(label).padding(.horizontal,18).frame(minHeight:44).foregroundStyle(room.onAccent).background(room.accentFill, in: .capsule) }
-                        .buttonStyle(.plain).disabled(!interactive).padding(.top,6).accessibilityIdentifier("bahw-habits-add-first")
+                        .buttonStyle(.madarPlain).disabled(!interactive).padding(.top,6).accessibilityIdentifier("bahw-habits-add-first")
                 }
                 Spacer(minLength:0)
             }
@@ -629,7 +629,7 @@ private struct BahwHabitsWide: View {
                 .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                 .contentShape(.rect)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.madarPlain)
             .disabled(!interactive)
             .accessibilityIdentifier("bahw-habits-next")
         }

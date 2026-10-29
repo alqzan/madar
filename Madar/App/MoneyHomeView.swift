@@ -46,7 +46,7 @@ struct MoneyHomeView: View {
         Button { expenseOpen = true } label: {
             Image(systemName: "plus").font(.system(size: 20, weight: .medium)).foregroundStyle(theme.ink)
                 .frame(width: 46, height: 46).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1.2) }.contentShape(Circle())
-        }.buttonStyle(.plain).accessibilityLabel("سجّل مصروفًا").accessibilityIdentifier("money-expense-open")
+        }.buttonStyle(.madarPlain).accessibilityLabel("سجّل مصروفًا").accessibilityIdentifier("money-expense-open")
     }
     /// The room's other doors as drawers of one desk, two to a row, most used first; settings close the desk.
     private var doors: some View {
@@ -72,7 +72,7 @@ struct MoneyHomeView: View {
             }
             Button { settingsOpen = true } label: {
                 Label("إعدادات المال", systemImage: "slider.horizontal.3").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).frame(minHeight: 44)
-            }.buttonStyle(.plain).accessibilityIdentifier("money-settings-open")
+            }.buttonStyle(.madarPlain).accessibilityIdentifier("money-settings-open")
         }.padding(.top, 8)
     }
     // «تعمّق وحسّن», all-data walk 24 Oct 2026: a drawer with something in it says one fact; counts only, never amounts.
@@ -112,7 +112,7 @@ struct MoneyHomeView: View {
             .background(theme.surface.opacity(0.7), in: .rect(cornerRadius: 12))
             .overlay { RoundedRectangle(cornerRadius: 12).stroke(theme.color("reserveText").opacity(0.25), lineWidth: 0.8) }
             .contentShape(.rect(cornerRadius: 12))
-        }.buttonStyle(.plain).accessibilityLabel(title).accessibilityValue(fact ?? "").accessibilityIdentifier(id)
+        }.buttonStyle(.madarPlain).accessibilityLabel(title).accessibilityValue(fact ?? "").accessibilityIdentifier(id)
     }
     var body: some View {
         ScrollView {
@@ -214,12 +214,12 @@ struct MoneyHomeView: View {
                     HStack(spacing: 5) { Image(systemName: "tray"); if count > 0 { Text(service.digits.string(count)) } }
                         .font(MadarTypography.fine()).padding(.horizontal, 9).padding(.vertical, 7).frame(minHeight: 44)
                         .overlay { Capsule().stroke(theme.color("reserveText"), lineWidth: 1).padding(.vertical, 6) }
-                }.buttonStyle(.plain).accessibilityElement(children: .ignore)
+                }.buttonStyle(.madarPlain).accessibilityElement(children: .ignore)
                     .accessibilityLabel(count > 0 ? "رسائل البنك، " + service.pending(count) : "رسائل البنك").accessibilityAddTraits(.isButton).accessibilityIdentifier("money-pending")
             }
             if !isTabRoot {
                 Button { dismiss() } label: { Image(systemName: "chevron.backward").font(.body).frame(width: 44, height: 44) }
-                    .buttonStyle(.plain).accessibilityLabel("العودة").accessibilityIdentifier("money-back")
+                    .buttonStyle(.madarPlain).accessibilityLabel("العودة").accessibilityIdentifier("money-back")
             }
         }.frame(minHeight: 48)
     }
@@ -232,7 +232,7 @@ struct MoneyHomeView: View {
                     displayFigure(amount(cycle.headline.availableNowMinor), "thmanyahserifdisplay-Black", size: 54, relativeTo: .largeTitle)
                         .contentTransition(.numericText()).minimumScaleFactor(0.55).lineLimit(1).accessibilityIdentifier("money-available")
                 }
-                }.buttonStyle(.plain).accessibilityIdentifier("money-basis-open")
+                }.buttonStyle(.madarPlain).accessibilityIdentifier("money-basis-open")
                 Spacer(minLength: 12)
                 VStack(alignment: .trailing, spacing: 7) {
                     Text("لك فعلًا").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
@@ -278,14 +278,14 @@ struct MoneyHomeView: View {
             if reading.hasAccounts {
                 Button { basisOpen = true } label: {
                     HStack { Text(reading.unknownBalanceCount > 0 ? "الأرصدة المعروفة" : "في حسابك"); Spacer(); Text(figure: !reading.hasKnownBalance ? "—" : amount(reading.basis.inAccountMinor)).font(MadarTypography.cardTitle()); Image(systemName: "chevron.left").font(.caption) }.frame(minHeight: 44).contentShape(.rect) // the whole row, Spacer included (owner-data walk 25 Oct)
-                }.buttonStyle(.plain).accessibilityLabel(!reading.hasKnownBalance ? "على أي أساس، لم يُعرف رصيد الحسابات بعد" : "على أي أساس، الأرصدة المعروفة " + amount(reading.basis.inAccountMinor)).accessibilityIdentifier("money-basis-open")
+                }.buttonStyle(.madarPlain).accessibilityLabel(!reading.hasKnownBalance ? "على أي أساس، لم يُعرف رصيد الحسابات بعد" : "على أي أساس، الأرصدة المعروفة " + amount(reading.basis.inAccountMinor)).accessibilityIdentifier("money-basis-open")
                 if !amountsVisible { Button("أظهر الأرقام") { revealed = true }.frame(minHeight: 44).accessibilityIdentifier("money-reveal") }
             }
         }
     }
     private func envelopeSection(_ reading: MoneyHomeReading) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Button { envelopesOpen = true } label: { HStack { sectionTitle("المظاريف", color: theme.color("accent")); Image(systemName: "chevron.left").font(.caption) }.frame(minHeight: 44) }.buttonStyle(.plain).accessibilityIdentifier("money-envelopes-open")
+            Button { envelopesOpen = true } label: { HStack { sectionTitle("المظاريف", color: theme.color("accent")); Image(systemName: "chevron.left").font(.caption) }.frame(minHeight: 44) }.buttonStyle(.madarPlain).accessibilityIdentifier("money-envelopes-open")
             HStack(alignment: .center, spacing: 14) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("الاحتياطي").font(.custom("thmanyahserifdisplay-Bold", size: 18, relativeTo: .headline)).foregroundStyle(theme.color("reserveText"))
@@ -320,7 +320,7 @@ struct MoneyHomeView: View {
                         Spacer(minLength: 0)
                         Image(systemName: "chevron.left").font(.caption)
                     }.padding(14).frame(maxWidth: .infinity, minHeight: 64).background(theme.surface, in: .rect(cornerRadius: 12))
-                }.buttonStyle(.plain).accessibilityIdentifier("money-envelope-empty-create")
+                }.buttonStyle(.madarPlain).accessibilityIdentifier("money-envelope-empty-create")
             } else {
                 ForEach(reading.envelopes) { envelope in MoneyEnvelopeLine(envelope: envelope, app: app, visible: amountsVisible) }
             }
@@ -338,7 +338,7 @@ struct MoneyHomeView: View {
     }
     private func limits(_ reading: MoneyHomeReading) -> some View {
         Button { categoriesOpen = true } label: { limitsList(reading).contentShape(Rectangle()) }
-            .buttonStyle(.plain).accessibilityIdentifier("money-categories-open")
+            .buttonStyle(.madarPlain).accessibilityIdentifier("money-categories-open")
     }
     private func limitsList(_ reading: MoneyHomeReading) -> some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -365,7 +365,7 @@ struct MoneyHomeView: View {
     }
     private func obligations(_ reading: MoneyHomeReading) -> some View {
         Button { obligationsOpen = true } label: { obligationsList(reading).contentShape(Rectangle()) }
-            .buttonStyle(.plain).accessibilityIdentifier("money-obligations-open")
+            .buttonStyle(.madarPlain).accessibilityIdentifier("money-obligations-open")
     }
     private func obligationsList(_ reading: MoneyHomeReading) -> some View {
         VStack(alignment: .leading, spacing: 10) {

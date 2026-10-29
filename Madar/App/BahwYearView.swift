@@ -130,7 +130,7 @@ struct BahwYearView: View {
             Button { dismiss() } label: {
                 Label("البهو", systemImage: "chevron.backward").labelStyle(.titleAndIcon).font(MadarTypography.section()).lineLimit(1).fixedSize().padding(.horizontal, 16).frame(minHeight: 48)
                     .overlay { Capsule().stroke(lobby.line) }
-            }.buttonStyle(.plain).accessibilityIdentifier("bahw-year-back")
+            }.buttonStyle(.madarPlain).accessibilityIdentifier("bahw-year-back")
             Spacer()
             if which == "both" {
                 HStack(spacing: 2) {
@@ -146,7 +146,7 @@ struct BahwYearView: View {
         Button(action: { withAnimation(.snappy) { action() } }) {
             Text(title).font(MadarTypography.section()).lineLimit(1).fixedSize().padding(.horizontal, 18).frame(minHeight: 40)
                 .background(on ? lobby.surface : .clear, in: .capsule).foregroundStyle(on ? lobby.ink : lobby.secondaryInk)
-        }.buttonStyle(.plain).accessibilityAddTraits(on ? .isSelected : [])
+        }.buttonStyle(.madarPlain).accessibilityAddTraits(on ? .isSelected : [])
     }
 
     // MARK: hero
@@ -269,7 +269,7 @@ struct BahwYearView: View {
                 Spacer()
                 Button { editing = .init(service: service) } label: {
                     Label("يوم يهمّك", systemImage: "plus").font(MadarTypography.section()).lineLimit(1).fixedSize().padding(.horizontal, 16).frame(minHeight: 46).overlay { Capsule().stroke(lobby.line) }
-                }.buttonStyle(.plain).accessibilityIdentifier("bahw-add-day")
+                }.buttonStyle(.madarPlain).accessibilityIdentifier("bahw-add-day")
             }.padding(.top, 10)
             Picker("التصفية", selection: $filter) { Text("الكل").tag(0); Text("المواسم").tag(1); Text("أيامي").tag(2) }
                 .pickerStyle(.segmented).accessibilityIdentifier("bahw-matters-filter")
@@ -309,7 +309,7 @@ struct BahwYearView: View {
             Text(service.weekday(item.day)).font(MadarTypography.caption()).foregroundStyle(lobby.secondaryInk).frame(width: 56, alignment: .trailing)
         }.padding(.horizontal, 16).padding(.vertical, 14).contentShape(.rect)
         if let id = item.rowID {
-            Button { editing = .init(service: service, matter: item, id: id) } label: { content }.buttonStyle(.plain)
+            Button { editing = .init(service: service, matter: item, id: id) } label: { content }.buttonStyle(.madarPlain)
                 .accessibilityElement(children: .combine).accessibilityHint("لتعديل اليوم أو حذفه").accessibilityIdentifier("bahw-matter-" + item.title)
         } else {
             content.accessibilityElement(children: .combine).accessibilityIdentifier("bahw-matter-" + item.title)
@@ -357,6 +357,7 @@ struct BahwDaySheet: View {
     @State var draft: BahwDayDraft
     @Environment(\.dismiss) private var dismiss
     @State private var failure: String?
+    @State private var saving = false
     @State private var confirmingDelete = false
     private var lobby: RoomTheme { RoomTheme(room: "bahw", dark: colorScheme == .dark) }
     private var digits: MadarNumberFormatter { .init(style: session.string("core.numerals") == "western" ? .western : .hindi) }
@@ -408,10 +409,10 @@ struct BahwDaySheet: View {
                     if let failure { Text(failure).font(MadarTypography.caption()).foregroundStyle(lobby.ink) }
                     Button { save() } label: {
                         Text("احفظ").font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 50).foregroundStyle(lobby.onAccent).background(lobby.accentFill, in: .capsule)
-                    }.buttonStyle(.plain).disabled(draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty).accessibilityIdentifier("bahw-day-save")
+                    }.buttonStyle(.madarPlain).disabled(saving || draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty).accessibilityIdentifier("bahw-day-save")
                     if draft.existing {
                         Button(role: .destructive) { confirmingDelete = true } label: { Text("احذف اليوم").font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 46) }
-                            .buttonStyle(.plain).accessibilityIdentifier("bahw-day-delete")
+                            .buttonStyle(.madarPlain).accessibilityIdentifier("bahw-day-delete")
                             // Audit 28 Oct: a one-tap delete now asks first, like the other deletes in Madar.
                             .confirmationDialog("تحذف «" + draft.title + "»؟", isPresented: $confirmingDelete, titleVisibility: .visible) { Button("احذف اليوم", role: .destructive) { remove() }.accessibilityIdentifier("bahw-day-delete-confirm") }
                     }
@@ -436,13 +437,19 @@ struct BahwDaySheet: View {
         var payload: [String: MadarCore.JSONValue] = ["id": .string(draft.id.uuidString), "title": .string(draft.title), "calendar": .string(draft.hijri ? "hijri" : "greg"),
                                             "month": .number(Double(draft.month)), "day": .number(Double(draft.day)), "repeats": .string(draft.repeats), "countFromDayKey": .string(draft.countFrom.flatMap { $0.isEmpty ? nil : $0 } ?? today.description)]
         if draft.repeats == "none" { payload["year"] = .number(Double(draft.year)); payload["countUpAfter"] = .bool(draft.countUpAfter) }
+        guard !saving else { return }
+        saving = true
         Task {
+            defer { saving = false }
             do { try await session.executeDiaryCommand("bahw.saveUpcomingDay", payload: payload); dismiss() }
             catch { failure = "لم يُحفظ اليوم. " + madarUserDetail(error) }
         }
     }
     private func remove() {
+        guard !saving else { return }
+        saving = true
         Task {
+            defer { saving = false }
             do { try await session.executeDiaryCommand("bahw.deleteUpcomingDay", payload: ["id": .string(draft.id.uuidString)]); dismiss() }
             catch { failure = "لم يُحذف اليوم. " + madarUserDetail(error) }
         }

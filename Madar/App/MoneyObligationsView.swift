@@ -42,7 +42,7 @@ struct MoneyObligationsView: View {
                 HStack(spacing: 12) {
                     Button { dismiss() } label: {
                         Image(systemName: "xmark").font(.title3).frame(width: 52, height: 52).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1.2) }
-                    }.buttonStyle(.plain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-obligations-close")
+                    }.buttonStyle(.madarPlain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-obligations-close")
                     Text("الالتزامات").font(.custom("thmanyahserifdisplay-Bold", size: 28, relativeTo: .title)).accessibilityAddTraits(.isHeader)
                     Spacer()
                 }.padding(.top, 8)
@@ -56,7 +56,7 @@ struct MoneyObligationsView: View {
                     Button { obligationSheet = .new } label: {
                         Text("+ أضف التزامًا، وشاهد أثره على السلّم").font(.custom("thmanyahserifdisplay-Bold", size: 19, relativeTo: .headline)).foregroundStyle(theme.background)
                             .frame(maxWidth: .infinity, minHeight: 60).background(theme.ink).shadow(color: theme.ink.opacity(0.18), radius: 8, y: 4)
-                    }.buttonStyle(.plain).accessibilityIdentifier("money-obligations-add")
+                    }.buttonStyle(.madarPlain).accessibilityIdentifier("money-obligations-add")
                     shelves(reading)
                 } else if let failure { Text(failure).font(MadarTypography.body()) }
                 else { ProgressView().frame(maxWidth: .infinity, minHeight: 240) }
@@ -113,7 +113,7 @@ struct MoneyObligationsView: View {
         return Group {
             if dynamicType.isAccessibilitySize {
                 VStack(alignment: .leading, spacing: 8) {
-                    ForEach(r.cycle) { due in Button { selected = due.id } label: { HStack { Text(due.name); Spacer(); Text(figure: amount(due.amountMinor)) }.contentShape(.rect) }.buttonStyle(.plain) }
+                    ForEach(r.cycle) { due in Button { selected = due.id } label: { HStack { Text(due.name); Spacer(); Text(figure: amount(due.amountMinor)) }.contentShape(.rect) }.buttonStyle(.madarPlain) }
                 }
             } else {
                 GeometryReader { proxy in
@@ -140,7 +140,7 @@ struct MoneyObligationsView: View {
                             Path { p in p.move(to: CGPoint(x: trueX[index], y: 31)); p.addLine(to: CGPoint(x: shownX[index], y: 41)) }
                                 .stroke(theme.color("reserveText"), lineWidth: 1)
                             Button { withAnimation(.easeOut(duration: 0.2)) { selected = due.id } } label: { lantern(due, drop: 14 + CGFloat(levels[index]) * 76, active: current(r)?.id == due.id) }
-                                .buttonStyle(.plain).frame(width: 74).offset(x: shownX[index] - 37, y: 31)
+                                .buttonStyle(.madarPlain).frame(width: 74).offset(x: shownX[index] - 37, y: 31)
                                 // Higher lanterns sit above the strings of the ones hanging below them.
                                 .zIndex(-Double(levels[index]))
                                 .accessibilityIdentifier("money-obligation-lantern-" + due.name)
@@ -333,7 +333,7 @@ struct MoneyObligationsView: View {
                         }
                     }.padding(.vertical, 10).padding(.horizontal, 8).background(current(r)?.id == due.id ? theme.surface : Color.clear)
                         .overlay(alignment: .bottom) { Rectangle().fill(theme.line).frame(height: 0.6) }.contentShape(Rectangle())
-                }.buttonStyle(.plain).accessibilityIdentifier("money-obligation-row-" + due.name)
+                }.buttonStyle(.madarPlain).accessibilityIdentifier("money-obligation-row-" + due.name)
             }
         }
     }
@@ -377,7 +377,7 @@ struct MoneyObligationsView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.madarPlain)
         .accessibilityLabel("اشتراك محتمل من مدفوعاتك، \(suggestion.name)، \(amount(suggestion.amountMinor))، راجع التفاصيل")
         .accessibilityIdentifier("money-subscription-suggestion")
 

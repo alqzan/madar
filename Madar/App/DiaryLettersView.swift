@@ -20,7 +20,7 @@ struct DiaryLettersPanel: View {
                 Spacer()
             }
             Button { composing = true } label: { Label("اكتب رسالة لنفسك", systemImage: "envelope").font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 50).foregroundStyle(theme.background).background(theme.dark ? theme.accent : theme.ink, in: .capsule) }
-                .buttonStyle(.plain).accessibilityIdentifier("diary-letter-compose")
+                .buttonStyle(.madarPlain).accessibilityIdentifier("diary-letter-compose")
             if let failure { Text(failure).font(MadarTypography.body()) }
             let waiting = letters.filter { $0.state == .eligible }, orphaned = letters.filter { $0.state == .orphaned }
             let sealed = letters.filter { $0.state == .sealed }, opened = letters.filter { $0.state == .opened }
@@ -33,7 +33,7 @@ struct DiaryLettersPanel: View {
                     HStack(spacing: 8) {
                         Button { opening = letter } label: { Text("افتحها الآن").frame(maxWidth: .infinity, minHeight: 44).foregroundStyle(theme.background).background(theme.ink, in: .capsule) }.accessibilityIdentifier("diary-letter-orphan-open")
                         Button { rescheduling = letter } label: { Text("اختر موعدًا").frame(maxWidth: .infinity, minHeight: 44).overlay { Capsule().stroke(theme.line) } }.accessibilityIdentifier("diary-letter-orphan-date")
-                    }.font(DiaryType.label).buttonStyle(.plain)
+                    }.font(DiaryType.label).buttonStyle(.madarPlain)
                 }.padding(16).background(theme.surface, in: .rect(cornerRadius: 16)).overlay { RoundedRectangle(cornerRadius: 16).stroke(theme.line) }
             }
             if !sealed.isEmpty {
@@ -63,7 +63,7 @@ struct DiaryLettersPanel: View {
                             }
                             Spacer(minLength: 0)
                         }.padding(.vertical, 8).contentShape(.rect)
-                    }.buttonStyle(.plain).overlay(alignment: .bottom) { Rectangle().fill(theme.line).frame(height: 1) }.accessibilityIdentifier("diary-letter-opened")
+                    }.buttonStyle(.madarPlain).overlay(alignment: .bottom) { Rectangle().fill(theme.line).frame(height: 1) }.accessibilityIdentifier("diary-letter-opened")
                 }
             }
         }
@@ -94,7 +94,7 @@ struct DiaryLetterWaitingCard: View {
                 Spacer(minLength: 0)
                 Image(systemName: "chevron.backward").font(.caption)
             }.padding(16).background(theme.surface, in: .rect(cornerRadius: 16)).overlay { RoundedRectangle(cornerRadius: 16).stroke(theme.accent.opacity(0.5)) }.contentShape(.rect)
-        }.buttonStyle(.plain).accessibilityIdentifier("diary-letter-waiting")
+        }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-letter-waiting")
     }
 }
 
@@ -131,6 +131,7 @@ struct DiaryLetterMoment: View {
     @Environment(\.dismiss) private var dismiss
     @State private var text: String?
     @State private var failure: String?
+    @State private var opening = false
     private var service: AppDiaryService { .init(app: app) }
     var body: some View {
         NavigationStack {
@@ -143,9 +144,9 @@ struct DiaryLetterMoment: View {
                             .textSelection(.enabled).transition(.opacity.combined(with: .move(edge: .bottom))).accessibilityIdentifier("diary-letter-text")
                     } else {
                         DiaryEnvelope(sealed: true).frame(width: 220, height: 150).padding(.top, 30)
-                        Button { Task { do { let value = try await service.openLetter(letter.id); withAnimation(.easeOut(duration: 0.5)) { text = value } } catch { failure = madarUserMessage(error) } } } label: {
+                        Button { guard !opening else { return }; opening = true; Task { defer { opening = false }; do { let value = try await service.openLetter(letter.id); withAnimation(.easeOut(duration: 0.5)) { text = value } } catch { failure = madarUserMessage(error) } } } label: {
                             Text("افتح الرسالة").font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 52).foregroundStyle(theme.background).background(theme.dark ? theme.accent : theme.ink, in: .capsule)
-                        }.buttonStyle(.plain).accessibilityIdentifier("diary-letter-open")
+                        }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-letter-open")
                     }
                     if let failure { Text(failure).font(MadarTypography.body()) }
                 }.padding(22)
@@ -203,7 +204,7 @@ struct DiaryLetterComposer: View {
                     ForEach(choices) { item in
                         Button { choice = item } label: {
                             HStack { Text(item.title).font(DiaryType.writing); Spacer(); Image(systemName: choice == item ? "largecircle.fill.circle" : "circle").foregroundStyle(choice == item ? theme.accent : theme.color("ink3Text")) }.frame(minHeight: 44).contentShape(.rect)
-                        }.buttonStyle(.plain).accessibilityIdentifier("diary-letter-trigger-" + item.id).accessibilityAddTraits(choice == item ? .isSelected : [])
+                        }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-letter-trigger-" + item.id).accessibilityAddTraits(choice == item ? .isSelected : [])
                     }
                     if choice?.trigger == .date || choice?.trigger == .hijriDate {
                         DatePicker("اليوم", selection: pickerDate, in: firstDate..., displayedComponents: .date)
@@ -214,6 +215,10 @@ struct DiaryLetterComposer: View {
                     }
                     Text("لا يدخل نصّها البحث ولا الودجات ولا الإشعارات قبل أن تُفتح.").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
                     if let failure { Text(failure).font(MadarTypography.body()) }
+                    // AU-95: without its choices «اختمها» stayed dim and the written letter had nowhere to go.
+                    if choices.isEmpty, failure != nil {
+                        Button("أعِد المحاولة") { loadChoices() }.font(MadarTypography.section()).frame(minHeight: 44).contentShape(Rectangle()).accessibilityIdentifier("diary-letter-choices-retry")
+                    }
                 }.padding(18)
             }.background(theme.background).foregroundStyle(theme.ink)
                 .navigationTitle("رسالة لنفسك").navigationBarTitleDisplayMode(.inline)
@@ -228,7 +233,7 @@ struct DiaryLetterComposer: View {
                             .disabled(saving || choice == nil || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty).accessibilityIdentifier("diary-letter-seal")
                     }
                 }.toolbarBackground(theme.background, for: .navigationBar).tint(theme.accent)
-                .task { do { choices = try service.letterChoices(); choice = choice ?? choices.first } catch { failure = madarUserMessage(error) } }
+                .task { loadChoices() }
                 // A letter in progress is not lost to a stray swipe or cancel.
                 .interactiveDismissDisabled(!text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || saving)
                 .alert("تتجاهل رسالتك؟", isPresented: $confirmDiscard) {
@@ -236,6 +241,9 @@ struct DiaryLetterComposer: View {
                     Button("أكمل الكتابة", role: .cancel) {}
                 }
         }
+    }
+    private func loadChoices() {
+        do { choices = try service.letterChoices(); choice = choice ?? choices.first; failure = nil } catch { failure = madarUserMessage(error) }
     }
 }
 
@@ -246,15 +254,16 @@ struct DiaryLetterReschedule: View {
     @Environment(\.dismiss) private var dismiss
     @State private var date = Date().addingTimeInterval(7 * 86_400)
     @State private var failure: String?
+    @State private var rescheduling = false
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("اختر موعدًا لرسالتك").font(DiaryType.heading)
             DatePicker("اليوم", selection: $date, in: Date().addingTimeInterval(86_400)..., displayedComponents: .date).font(DiaryType.writing)
             MadarDateLabel(app.dateLabels(GregorianDay.containing(date, in: app.activePlace.timeZone)))
             if let failure { Text(failure).font(MadarTypography.body()) }
-            Button { Task { do { try await AppDiaryService(app: app).rescheduleLetter(letter.id, to: date); dismiss() } catch { failure = madarUserMessage(error) } } } label: {
+            Button { guard !rescheduling else { return }; rescheduling = true; Task { defer { rescheduling = false }; do { try await AppDiaryService(app: app).rescheduleLetter(letter.id, to: date); dismiss() } catch { failure = madarUserMessage(error) } } } label: {
                 Text("احفظ الموعد").font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 50).foregroundStyle(theme.background).background(theme.ink, in: .capsule)
-            }.buttonStyle(.plain).accessibilityIdentifier("diary-letter-reschedule-save")
+            }.buttonStyle(.madarPlain).disabled(rescheduling).accessibilityIdentifier("diary-letter-reschedule-save")
         }.padding(22).frame(maxHeight: .infinity, alignment: .top).background(theme.background).foregroundStyle(theme.ink)
     }
 }

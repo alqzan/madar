@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import Observation
 import SwiftData
 import MadarData
@@ -59,15 +60,23 @@ final class AppSession {
     /// itself stays valid until its token expires.
     private(set) var undoToastVisible = false
     /// UI tests reach the toast after several steps, so a UI-test store keeps it two minutes unless
-    /// MADAR_UI_UNDO_SECONDS says otherwise (DEBUG only). The app itself shows it for six seconds.
+    /// MADAR_UI_UNDO_SECONDS says otherwise (DEBUG only). The app itself shows it for four seconds.
     static var undoToastSeconds: Double {
         #if DEBUG
         let environment = ProcessInfo.processInfo.environment
         if let text = environment["MADAR_UI_UNDO_SECONDS"], let seconds = Double(text) { return seconds }
         if environment["MADAR_UI_STORE_ID"] != nil { return 120 }
         #endif
-        return 6
+        return 4
     }
+    /// Owner, 30 Oct 2026: «الزر حق التراجع… طريقه خروجه وبقائه مزعجه». It popped in and out and every screen jumped
+    /// under it; now it glides in and out with the screen, and stays four seconds instead of six.
+    private func setUndoToast(_ visible: Bool) {
+        guard undoToastVisible != visible else { return }
+        withAnimation(.smooth(duration: 0.35)) { undoToastVisible = visible }
+    }
+    /// A swipe down puts the toast away; the undo itself stays valid until its token expires, as before.
+    func hideUndoToast() { toastTask?.cancel(); setUndoToast(false) }
     var errorMessage: String?
     var onboardingComplete = false
     var selectedTab = "foundation"
@@ -692,7 +701,7 @@ final class AppSession {
                 try await withSerializedPrayerNotificationMutation {
                     let result = try await bus.execute(CommandEnvelope(name: "system.undo", payload: .object(["undoToken": .string(token.id.uuidString)])))
                     guard result.status == .applied else { throw DataError.undoExpired }
-                    try reload(); undoToken = nil; undoToastVisible = false; expiryTask?.cancel(); try publishSnapshot()
+                    try reload(); undoToken = nil; setUndoToast(false); expiryTask?.cancel(); try publishSnapshot()
                     await reconcileSpotlightIndex()
                     WidgetCenter.shared.reloadAllTimelines()
                 }
@@ -1031,7 +1040,7 @@ final class AppSession {
     }
     func redactProtectedData() {
         protectedDataAuthorized = false
-        undoToken = nil; undoToastVisible = false; expiryTask?.cancel()
+        undoToken = nil; setUndoToast(false); expiryTask?.cancel()
     }
     func redactQuranWidgetSnapshot() throws {
         try snapshotStore.remove("quran")
@@ -1055,24 +1064,24 @@ final class AppSession {
     func authorizeProtectedData() { protectedDataAuthorized = true }
     func bindContainer(_ replacement: ModelContainer) {
         container = replacement; store = SettingsStore(context: ModelContext(replacement), schema: schema)
-        undoToken = nil; undoToastVisible = false; expiryTask?.cancel()
+        undoToken = nil; setUndoToast(false); expiryTask?.cancel()
     }
     private func showUndo(_ token: AppUndoToken, message: String) {
-        undoToken = token; undoMessage = message; undoToastVisible = true; expiryTask?.cancel(); toastTask?.cancel()
+        undoToken = token; undoMessage = message; setUndoToast(true); expiryTask?.cancel(); toastTask?.cancel()
         toastTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(Self.undoToastSeconds))
             guard !Task.isCancelled else { return }
-            if self?.undoToken?.id == token.id { self?.undoToastVisible = false }
+            if self?.undoToken?.id == token.id { self?.setUndoToast(false) }
         }
         expiryTask = Task { [weak self] in
             let delay = max(0, token.expiresAt.timeIntervalSince(self?.prayerNow() ?? .now))
             try? await Task.sleep(for: .seconds(delay))
             guard !Task.isCancelled else { return }
-            if self?.undoToken?.id == token.id { self?.undoToken = nil; self?.undoToastVisible = false }
+            if self?.undoToken?.id == token.id { self?.undoToken = nil; self?.setUndoToast(false) }
         }
     }
     private func clearUndo() {
-        undoToken = nil; undoToastVisible = false
+        undoToken = nil; setUndoToast(false)
         expiryTask?.cancel(); expiryTask = nil
         toastTask?.cancel(); toastTask = nil
     }

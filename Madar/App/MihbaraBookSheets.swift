@@ -45,8 +45,10 @@ enum MihbaraCopy {
     static func progressPercent(_ progress: Double?) -> Int? {
         guard let progress, progress.isFinite else { return nil }
         let bounded = min(1, max(0, progress))
-        guard bounded > 0 else { return nil }
-        return bounded >= 1 ? 100 : min(99, Int((bounded * 100).rounded()))
+        if bounded >= 1 { return 100 }
+        // A sliver that rounds to ٠٪ is still «لم تبدأه بعد», not «قرأت منه ٠٪».
+        let percent = min(99, Int((bounded * 100).rounded()))
+        return percent > 0 ? percent : nil
     }
     /// Whole pages reached, rounded down so an unfinished final page never vanishes.
     static func pagesRead(_ book: MihbaraBook) -> Int? {
@@ -104,7 +106,7 @@ struct MihbaraAddBookView: View {
                             foreground: theme.color("onNavy")
                         )
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.madarPlain)
                     .accessibilityIdentifier("mihbara-add-source-file")
                     // Each importer sits on its own button: stacked on one view, SwiftUI honours only the last.
                     .fileImporter(isPresented: $importingBook, allowedContentTypes: bookTypes, allowsMultipleSelection: false) { result in
@@ -126,7 +128,7 @@ struct MihbaraAddBookView: View {
                             foreground: theme.color("onDesk")
                         )
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.madarPlain)
                     .accessibilityIdentifier("mihbara-add-source-turath")
 
                     NavigationLink {
@@ -141,7 +143,7 @@ struct MihbaraAddBookView: View {
                             foreground: theme.background
                         )
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.madarPlain)
                     .accessibilityIdentifier("mihbara-add-source-paper")
 
                     Button { importingGoodreads = true } label: {
@@ -153,7 +155,7 @@ struct MihbaraAddBookView: View {
                             foreground: theme.color("onAccent")
                         )
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.madarPlain)
                     .disabled(stagingGoodreads)
                     .accessibilityIdentifier("mihbara-add-source-goodreads")
                     .fileImporter(isPresented: $importingGoodreads, allowedContentTypes: [.commaSeparatedText], allowsMultipleSelection: false) { result in
@@ -166,7 +168,7 @@ struct MihbaraAddBookView: View {
                     if let pendingGoodreadsFile {
                         Button { previewingGoodreads = pendingGoodreadsStage != nil } label: {
                             MihbaraRecentImportRow(name: pendingGoodreadsFile.lastPathComponent, kind: "CSV", theme: theme)
-                        }.buttonStyle(.plain).disabled(pendingGoodreadsStage == nil).accessibilityIdentifier("mihbara-goodreads-reopen")
+                        }.buttonStyle(.madarPlain).disabled(pendingGoodreadsStage == nil).accessibilityIdentifier("mihbara-goodreads-reopen")
                     }
                     if let pendingBookFile {
                         Button {
@@ -174,7 +176,7 @@ struct MihbaraAddBookView: View {
                             else { previewingPDF = true }
                         } label: {
                             MihbaraRecentImportRow(name: pendingBookFile.lastPathComponent, kind: pendingBookFile.pathExtension.lowercased() == "epub" ? "EPUB" : "PDF", theme: theme)
-                        }.buttonStyle(.plain).accessibilityIdentifier("mihbara-import-reopen")
+                        }.buttonStyle(.madarPlain).accessibilityIdentifier("mihbara-import-reopen")
                     }
                     if pendingBookFile == nil && pendingGoodreadsFile == nil {
                         HStack(spacing: 12) {
@@ -509,7 +511,7 @@ struct MihbaraBookCard: View {
                             MadarDateLabel(app.dateLabels(GregorianDay.containing(finished, in: app.activePlace.timeZone)))
                         }
                     }
-                    if book.shelf != "reading" { Button("ضعه على الطاولة") { moveToReading() }.buttonStyle(MadarPrimaryButton()).accessibilityIdentifier("mihbara-put-on-table") }
+                    if book.shelf != "reading" { Button("ضعه على الطاولة") { moveToReading() }.buttonStyle(MadarPrimaryButton()).disabled(saving).accessibilityIdentifier("mihbara-put-on-table") }
                     if fileUnavailable {
                         Label("ملف الكتاب غير موجود على هذا الجهاز.", systemImage: "doc.badge.ellipsis")
                             .font(MadarTypography.body()).accessibilityIdentifier("mihbara-book-file-unavailable")
@@ -605,7 +607,7 @@ struct MihbaraBookCard: View {
                     .background(theme.surface, in: .rect(cornerRadius: 18))
                     .overlay { RoundedRectangle(cornerRadius: 18).stroke(theme.line, lineWidth: 1) }
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.madarPlain)
                 .accessibilityIdentifier("mihbara-paper-index-prompt")
             } else {
                 VStack(alignment: .trailing, spacing: 7) {
@@ -636,7 +638,7 @@ struct MihbaraBookCard: View {
                     .frame(maxWidth: .infinity).frame(height: 52)
                     .background(theme.ink, in: .rect(cornerRadius: 14))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.madarPlain)
             .disabled(saving)
             .accessibilityIdentifier("mihbara-paper-start")
 
@@ -647,7 +649,7 @@ struct MihbaraBookCard: View {
                     .background(theme.background, in: .rect(cornerRadius: 14))
                     .overlay { RoundedRectangle(cornerRadius: 14).stroke(theme.line, lineWidth: 1) }
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.madarPlain)
             .accessibilityIdentifier("mihbara-paper-index-details")
         }
         .padding(.horizontal, 22)
@@ -792,7 +794,7 @@ private struct MihbaraGoodreadsImportView: View {
                     }.font(MadarTypography.body()).foregroundStyle(theme.background)
                         .frame(maxWidth: .infinity).frame(height: 52).background(theme.ink, in: .rect(cornerRadius: 14))
                 }
-                .buttonStyle(.plain).disabled(saving || !targetsAreUnique || preview == nil)
+                .buttonStyle(.madarPlain).disabled(saving || !targetsAreUnique || preview == nil)
                 .padding(.horizontal, 18).padding(.top, 10).padding(.bottom, 12).background(theme.background)
                 .accessibilityIdentifier("mihbara-goodreads-import")
             }
@@ -841,7 +843,7 @@ private struct MihbaraGoodreadsImportView: View {
                 .foregroundStyle(selected ? theme.background : theme.ink)
                 .background(selected ? theme.ink : theme.background, in: .rect(cornerRadius: 11))
                 .overlay { RoundedRectangle(cornerRadius: 11).stroke(theme.line, lineWidth: selected ? 0 : 1) }
-        }.buttonStyle(.plain).accessibilityIdentifier("mihbara-goodreads-missing-\(value)")
+        }.buttonStyle(.madarPlain).accessibilityIdentifier("mihbara-goodreads-missing-\(value)")
     }
 
     @ViewBuilder private func goodreadsRow(_ row: GoodreadsPreviewRow) -> some View {

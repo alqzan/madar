@@ -90,6 +90,8 @@ struct BackupRestoreResult: Sendable { let restoredCount: Int; let skippedCount:
     private(set) var resultMessage: String?
     private(set) var restoreResult: BackupRestoreResult?
     var errorMessage: String?
+    /// AU-95: a failed first read showed «يقرأ حالة النسخ…» forever; the card offers to read again instead.
+    private(set) var statusReadFailed = false
     var exportPassphrase = ""
     var exportConfirmation = ""
     var restorePassphrase = ""
@@ -114,8 +116,8 @@ struct BackupRestoreResult: Sendable { let restoredCount: Int; let skippedCount:
     var canInspect: Bool { !busy && selectedFile != nil && !restorePassphrase.isEmpty }
     func refresh() async {
         observePrivacy()
-        do { status = try await service.status() }
-        catch { errorMessage = "تعذّر قراءة حالة النسخ. \(madarUserMessage(error))" }
+        do { status = try await service.status(); statusReadFailed = false }
+        catch { statusReadFailed = true; errorMessage = "تعذّر قراءة حالة النسخ. \(madarUserMessage(error))" }
     }
     func setSchedule(_ schedule: BackupUISchedule) {
         run(initial: "يحفظ موعد النسخ…") { [self] _, _ in try await service.setSchedule(schedule); status = try await service.status() }
@@ -374,6 +376,8 @@ struct BackupSettingsView: View {
                             .accessibilityIdentifier("backup-storage-location")
                     }.accessibilityElement(children: .combine)
                 }
+            } else if model.statusReadFailed {
+                Button("أعِد قراءة حالة النسخ") { Task { await model.refresh() } }.frame(maxWidth: .infinity, minHeight: 80).accessibilityIdentifier("backup-status-retry")
             } else { ProgressView("يقرأ حالة النسخ…").frame(maxWidth: .infinity, minHeight: 80) }
         }
     }

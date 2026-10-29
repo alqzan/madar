@@ -202,6 +202,7 @@ struct MihbaraReaderView: View {
     @State private var isClosing = false
     @State private var message: String?
     @State private var readerAlert: String?
+    @State private var narrationStarting = false
     @State private var highlights: [MihbaraHighlight] = []
     @State private var wordCard: MihbaraWordCardState?
     @State private var quoteCard: MihbaraQuoteCardContent?
@@ -472,7 +473,7 @@ struct MihbaraReaderView: View {
             MihbaraPageNoteSheet(draft: draft, palette: palette, pageText: draft.pageText) { text in
                 await savePageNote(text, for: draft)
             }
-            .environment(\.layoutDirection, .rightToLeft)
+            .environment(\.layoutDirection, .rightToLeft).madarSheetErrorAlert(app)
         }
         .sheet(item: $lookupTerm) { term in
             MihbaraDictionaryView(term: term.word).ignoresSafeArea()
@@ -938,7 +939,7 @@ struct MihbaraReaderView: View {
         } else if shouldShowAutoScrollPlayer {
             autoScrollPlayer
         } else if app.undoToastVisible, let token = app.undoToken, token.id == readerUndoID, !showingReaderSettings {
-            UndoToast(message: app.undoMessage, undo: app.undo)
+            UndoToast(message: app.undoMessage, undo: app.undo, dismiss: app.hideUndoToast)
                 .accessibilityIdentifier("mihbara-reader-toast")
                 .padding(.bottom, 64)
         }
@@ -1410,7 +1411,8 @@ struct MihbaraReaderView: View {
             closeWordCard()
             return true
         } catch {
-            readerAlert = madarUserMessage(error)
+            // AU-95: the root alert cannot show over the open note sheet; the sheet's own alert can.
+            app.errorMessage = madarUserMessage(error)
             return false
         }
     }
@@ -1639,8 +1641,12 @@ struct MihbaraReaderView: View {
             readerAlert = "لم يجهز القارئ للصوت بعد."
             return
         }
+        // AU-95: a second tap while the chapter is being prepared must not queue it twice.
+        guard !narrationStarting else { return }
+        narrationStarting = true
         recordInteraction()
         Task { @MainActor in
+            defer { narrationStarting = false }
             let result = await navigatorController.evaluateJavaScript("window.madarReaderSpeechQueue ? window.madarReaderSpeechQueue() : ''")
             guard case .success(let value) = result, let raw = value as? String,
                   let data = raw.data(using: .utf8), let document = try? JSONDecoder().decode(MihbaraSpeechDocument.self, from: data) else {
@@ -1721,7 +1727,7 @@ private struct MihbaraContentsSheet: View {
             HStack {
                 Text("فهرس الكتاب").font(.custom("thmanyahserifdisplay-Bold", size: 22, relativeTo: .title2))
                 Spacer()
-                Button("تمّ") { dismiss() }.font(MadarTypography.caption()).accessibilityIdentifier("mihbara-reader-contents-close")
+                Button("تمّ") { dismiss() }.font(MadarTypography.caption()).frame(minWidth: 44, minHeight: 44).contentShape(Rectangle()).accessibilityIdentifier("mihbara-reader-contents-close")
             }
             if items.isEmpty {
                 Text("لا يتضمن هذا الكتاب فهرسًا").font(MadarTypography.body()).foregroundStyle(palette.ink2)
@@ -1939,7 +1945,7 @@ private struct MihbaraReaderSettingsSheet: View {
         .safeAreaInset(edge: .top) {
             VStack(spacing: 0) {
                 if hasSettingsUndo {
-                    UndoToast(message: app.undoMessage, undo: app.undo)
+                    UndoToast(message: app.undoMessage, undo: app.undo, dismiss: app.hideUndoToast)
                         .accessibilityIdentifier("mihbara-reader-undo")
                         .padding(.horizontal, 12).padding(.top, 4)
                 }
@@ -2132,7 +2138,7 @@ private struct MihbaraReaderSettingsSheet: View {
                         .foregroundStyle(isOn ? paper : ink.opacity(0.6))
                         .background(isOn ? ink : .clear, in: .rect(cornerRadius: 12))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.madarPlain)
                 .accessibilityAddTraits(isOn ? .isSelected : [])
                 .accessibilityIdentifier("mihbara-reader-\(id)-\(value)")
             }
@@ -2152,7 +2158,7 @@ private struct MihbaraReaderSettingsSheet: View {
                             .frame(maxWidth: .infinity, minHeight: 44)
                             .background(isOn ? ink : .clear, in: .rect(cornerRadius: 10))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.madarPlain)
                     .accessibilityLabel("\(title) \(digits.string(level))")
                     .accessibilityAddTraits(isOn ? .isSelected : [])
                     .accessibilityIdentifier("mihbara-reader-\(id)-\(level)")
@@ -3228,7 +3234,13 @@ private struct MihbaraPageNoteSheet: View {
             }
             .padding(10)
             .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(palette.ink.opacity(palette.isDark ? 0.10 : 0.05)))
-            Text("تُحفظ في دفتر هذا الكتاب مربوطة بهذه الفقرة.").font(MadarTypography.fine()).foregroundStyle(palette.ink2)
+            // AU-95: past the limit «احفظ» dims; say why, as the notebook editor does.
+            if text.count > 2000 {
+                Text("اختصر الملاحظة إلى ألفي حرف حتى تُحفظ.").font(MadarTypography.fine()).foregroundStyle(palette.ink)
+                    .accessibilityIdentifier("mihbara-note-too-long")
+            } else {
+                Text("تُحفظ في دفتر هذا الكتاب مربوطة بهذه الفقرة.").font(MadarTypography.fine()).foregroundStyle(palette.ink2)
+            }
         }
         .padding(20)
         .foregroundStyle(palette.ink)

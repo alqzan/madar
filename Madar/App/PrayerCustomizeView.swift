@@ -138,7 +138,7 @@ struct PrayerCustomizeView: View {
                     Image(systemName: "chevron.backward").font(.system(size: 14, weight: .semibold))
                     Text("الصلاة").font(PrayerHomeType.strong)
                 }.frame(minHeight: 44).contentShape(.rect)
-            }.buttonStyle(.plain).accessibilityIdentifier("prayer-customize-back")
+            }.buttonStyle(.madarPlain).accessibilityIdentifier("prayer-customize-back")
             Text("خصّص الصلاة").font(serif(40)).accessibilityAddTraits(.isHeader)
             Text("كل تعديل يُحفظ وحده").font(PrayerHomeType.body).foregroundStyle(theme.secondaryInk)
         }
@@ -164,12 +164,12 @@ struct PrayerCustomizeView: View {
                             Text("افتح الصلاة").font(PrayerHomeType.strong).foregroundStyle(theme.color("onAccent")).lineLimit(1).minimumScaleFactor(0.8)
                                 .padding(.horizontal, 16).frame(minHeight: 48)
                                 .background(theme.ink, in: .rect(cornerRadius: 24))
-                        }.buttonStyle(.plain).accessibilityIdentifier("prayer-customize-open")
+                        }.buttonStyle(.madarPlain).accessibilityIdentifier("prayer-customize-open")
                         Button { confirmReset = true } label: {
                             Text("أعِد الافتراضي").font(PrayerHomeType.strong).lineLimit(1).minimumScaleFactor(0.8)
                                 .padding(.horizontal, 12).frame(minHeight: 48)
                                 .overlay { RoundedRectangle(cornerRadius: 24).stroke(theme.ink.opacity(0.14), lineWidth: 1) }
-                        }.buttonStyle(.plain).disabled(changedCount == 0).accessibilityIdentifier("prayer-customize-reset")
+                        }.buttonStyle(.madarPlain).disabled(changedCount == 0).accessibilityIdentifier("prayer-customize-reset")
                     }
                 }
                 miniPhone
@@ -223,7 +223,7 @@ struct PrayerCustomizeView: View {
                     Spacer(minLength: 8)
                     Image(systemName: open ? "chevron.up" : "chevron.down").foregroundStyle(theme.secondaryInk)
                 }.frame(minHeight: 56).contentShape(.rect)
-            }.buttonStyle(.plain).accessibilityAddTraits(.isButton).accessibilityValue(open ? "مفتوح" : "مطوي")
+            }.buttonStyle(.madarPlain).accessibilityAddTraits(.isButton).accessibilityValue(open ? "مفتوح" : "مطوي")
                 .accessibilityIdentifier("prayer-customize-card-" + id)
             if open { VStack(alignment: .leading, spacing: 0) { body() }.padding(.top, 12) }
         }
@@ -261,7 +261,7 @@ struct PrayerCustomizeView: View {
                 arrow("chevron.up", id: "prayer-block-up-" + key, label: "قدّم " + PrayerHomeLayout.title(key), disabled: index == 0) { session.set(layout.moved(key, by: -1).payload, key: "salah.layout") }
                 arrow("chevron.down", id: "prayer-block-down-" + key, label: "أخّر " + PrayerHomeLayout.title(key), disabled: index == nil || index == layout.order.count - 1) { session.set(layout.moved(key, by: 1).payload, key: "salah.layout") }
                 Toggle(PrayerHomeLayout.title(key), isOn: Binding(get: { !layout.hidden.contains(key) }, set: { _ in session.set(layout.toggled(key).payload, key: "salah.layout") }))
-                    .labelsHidden().tint(theme.accent).accessibilityIdentifier("prayer-block-" + key)
+                    .labelsHidden().tint(theme.accent).disabled(session.settingsWriteInProgress).accessibilityIdentifier("prayer-block-" + key)
             }
         }
         .padding(.vertical, 10).frame(minHeight: 60)
@@ -271,7 +271,7 @@ struct PrayerCustomizeView: View {
         Button(action: action) {
             Image(systemName: symbol).font(.system(size: 17, weight: .semibold)).frame(width: 44, height: 44).contentShape(.rect)
         }
-        .buttonStyle(.plain).disabled(disabled || session.settingsWriteInProgress).opacity(disabled ? 0.3 : 1)
+        .buttonStyle(.madarPlain).disabled(disabled || session.settingsWriteInProgress).opacity(disabled ? 0.3 : 1)
         .accessibilityLabel(label).accessibilityIdentifier(id)
     }
 
@@ -301,11 +301,11 @@ struct PrayerCustomizeView: View {
                         Button { confirmStart = true } label: {
                             Text("احفظ التعديل الوحيد").font(PrayerHomeType.strong).foregroundStyle(theme.color("onAccent"))
                                 .padding(.horizontal, 20).frame(minHeight: 48).background(theme.ink, in: .rect(cornerRadius: 24))
-                        }.buttonStyle(.plain).disabled(session.prayerWriteInProgress).accessibilityIdentifier("prayer-tracking-save")
+                        }.buttonStyle(.madarPlain).disabled(session.prayerWriteInProgress).accessibilityIdentifier("prayer-tracking-save")
                     } else {
                         Button { startDate = tracking.day.date(in: zone).addingTimeInterval(12 * 3600); editingStart = true } label: {
                             Text("عدّل بداية التتبّع").font(PrayerHomeType.strong).foregroundStyle(theme.color("accentText")).frame(minHeight: 44)
-                        }.buttonStyle(.plain).accessibilityIdentifier("prayer-tracking-edit")
+                        }.buttonStyle(.madarPlain).accessibilityIdentifier("prayer-tracking-edit")
                     }
                 } else {
                     Text("اكتمل التعديل الوحيد لبداية التتبّع.").font(PrayerHomeType.small).accessibilityIdentifier("prayer-tracking-done")

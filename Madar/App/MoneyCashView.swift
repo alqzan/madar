@@ -56,7 +56,7 @@ struct MoneyCashView: View {
                 Text(figure: visible ? item.valueText ?? service.amount(item.amountMinor) : "•••").font(MadarTypography.cardTitle())
                 Image(systemName: "chevron.left").font(.caption).padding(.top, 5)
             }.padding(.vertical, 10).frame(minHeight: 44).overlay(alignment: .bottom) { Rectangle().fill(theme.line).frame(height: 1) }
-        }.buttonStyle(.plain).accessibilityIdentifier("money-source-" + item.id)
+        }.buttonStyle(.madarPlain).accessibilityIdentifier("money-source-" + item.id)
     }
     private func balanceAmount(_ value: Int) -> String { visible && !reading.home.hasKnownBalance ? "—" : amount(value) }
     private func amount(_ value: Int) -> String { visible ? service.amount(value) : "•••" }
@@ -106,7 +106,7 @@ private struct MoneyCashColumns: View {
                             if item.estimated { Text("تقريبًا").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
                             if let date = item.date { MadarDateLabel(app.dateLabels(date, compact: true), primaryFont: MadarTypography.fine(), secondaryFont: MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
                         }.frame(maxWidth: .infinity, alignment: .leading).frame(minHeight: 44)
-                    }.buttonStyle(.plain).frame(width: max(76, proxy.size.width - cashX - width - 8))
+                    }.buttonStyle(.madarPlain).frame(width: max(76, proxy.size.width - cashX - width - 8))
                         .position(x: (proxy.size.width - cashX - width - 8) / 2, y: 104 + CGFloat(index) * 86)
                         .accessibilityIdentifier("money-cash-debt-" + item.id)
                 }

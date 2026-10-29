@@ -73,7 +73,7 @@ struct DiaryDayPhotos: View {
             if status == .notDetermined {
                 Button { Task { status = await PHPhotoLibrary.requestAuthorization(for: .readWrite); load() } } label: {
                     Label("اعرض صور هذا اليوم من تطبيق الصور", systemImage: "photo.on.rectangle.angled").font(MadarTypography.caption()).frame(minHeight: 44)
-                }.buttonStyle(.plain).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("diary-day-photos-allow")
+                }.buttonStyle(.madarPlain).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("diary-day-photos-allow")
             } else if !visible.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("صور هذا اليوم").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
@@ -111,7 +111,7 @@ private struct DiaryDayPhotoThumb: View {
                 if let image { Image(uiImage: image).resizable().scaledToFill() } else { theme.surface }
                 if busy { ProgressView() }
             }.frame(width: 64, height: 64).clipShape(.rect(cornerRadius: 8)).overlay { RoundedRectangle(cornerRadius: 8).stroke(theme.line) }
-        }.buttonStyle(.plain).accessibilityLabel("أضف هذه الصورة إلى صفحة اليوم").accessibilityIdentifier("diary-day-photo")
+        }.buttonStyle(.madarPlain).accessibilityLabel("أضف هذه الصورة إلى صفحة اليوم").accessibilityIdentifier("diary-day-photo")
             .task { image = await DiaryPhotoLibrary.image(asset, side: 128) }
     }
 }

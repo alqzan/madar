@@ -64,7 +64,7 @@ struct MoneyAnalysisView: View {
     private var header: some View {
         HStack(spacing: 12) {
             Button { dismiss() } label: { Image(systemName: "xmark").font(.title3).frame(width: 52, height: 52).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1.2) } }
-                .buttonStyle(.plain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-analysis-close")
+                .buttonStyle(.madarPlain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-analysis-close")
             Text("التحليل").font(.custom("thmanyahserifdisplay-Bold", size: 28, relativeTo: .title)).accessibilityAddTraits(.isHeader)
             Spacer()
         }.padding(.top, 8)
@@ -75,7 +75,7 @@ struct MoneyAnalysisView: View {
                 Button { guard p != current else { return }; period = p; offset = 0; selected = nil; load() } label: {
                     Text(p == .week ? "الأسبوع" : "الدورة").font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 44)
                         .background(p == current ? theme.ink : Color.clear, in: Capsule()).foregroundStyle(p == current ? theme.background : theme.ink)
-                }.buttonStyle(.plain).accessibilityAddTraits(p == current ? .isSelected : []).accessibilityIdentifier("money-analysis-period-" + p.rawValue)
+                }.buttonStyle(.madarPlain).accessibilityAddTraits(p == current ? .isSelected : []).accessibilityIdentifier("money-analysis-period-" + p.rawValue)
             }
         }.padding(4).background(theme.color("glass"), in: Capsule())
     }
@@ -96,9 +96,9 @@ struct MoneyAnalysisView: View {
                 }.accessibilityElement(children: .combine).accessibilityIdentifier("money-analysis-range")
                 Spacer(minLength: 4)
                 Button { offset -= 1; selected = nil; load() } label: { Image(systemName: "chevron.backward").frame(width: 44, height: 44).contentShape(Rectangle()) }
-                    .buttonStyle(.plain).disabled(!r.canGoBack).opacity(r.canGoBack ? 1 : 0.3).accessibilityLabel(r.period == .week ? "الأسبوع السابق" : "الدورة السابقة").accessibilityIdentifier("money-analysis-previous")
+                    .buttonStyle(.madarPlain).disabled(!r.canGoBack).opacity(r.canGoBack ? 1 : 0.3).accessibilityLabel(r.period == .week ? "الأسبوع السابق" : "الدورة السابقة").accessibilityIdentifier("money-analysis-previous")
                 Button { offset = min(0, offset + 1); selected = nil; load() } label: { Image(systemName: "chevron.forward").frame(width: 44, height: 44).contentShape(Rectangle()) }
-                    .buttonStyle(.plain).disabled(r.offset >= 0).opacity(r.offset < 0 ? 1 : 0.3).accessibilityLabel(r.period == .week ? "الأسبوع التالي" : "الدورة التالية").accessibilityIdentifier("money-analysis-next")
+                    .buttonStyle(.madarPlain).disabled(r.offset >= 0).opacity(r.offset < 0 ? 1 : 0.3).accessibilityLabel(r.period == .week ? "الأسبوع التالي" : "الدورة التالية").accessibilityIdentifier("money-analysis-next")
             }
             HStack(alignment: .center, spacing: 10) {
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
@@ -206,7 +206,7 @@ struct MoneyAnalysisView: View {
                     }
                 }.frame(height: axis, alignment: .top).padding(.top, 4)
             }.frame(maxWidth: .infinity, maxHeight: .infinity).contentShape(Rectangle())
-        }.buttonStyle(.plain)
+        }.buttonStyle(.madarPlain)
             .accessibilityLabel(app.dateLabels(d.day, weekday: true).combined + "، " + (future ? "يوم قادم" : "صرفت " + amount(d.spentMinor) + " من " + (d.dailyMinor.map(amount) ?? "يومية غير معروفة")) + (d.pending > 0 ? "، يحتاج قرارًا" : ""))
             .accessibilityAddTraits(isSelected ? .isSelected : []).accessibilityIdentifier("money-analysis-day-" + d.id)
     }

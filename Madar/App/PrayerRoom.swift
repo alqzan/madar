@@ -191,9 +191,9 @@ struct PrayerRoom: View {
         case "next": nextCard(state)
         case "riwaq": riwaq(state)
         case "pending": pendingCard(state)
-        case "hali": if let summary = state.summary { Button { sheet = .hali } label: { MadarCard { VStack(alignment: .leading, spacing: 12) { Text("حالي").font(MadarTypography.cardTitle()); PrayerBalance(summary: summary, style: state.balanceView, locale: state.numeralLocale); Text(summary.percentageLabel.map { $0 + "، " + summary.monthTitle } ?? "لم تُحسب النسبة بعد"); Text(summary.prayerStreakLabel).foregroundStyle(theme.secondaryInk); if let mosque = summary.mosqueStreakLabel { Text(mosque).foregroundStyle(theme.secondaryInk) } } } }.buttonStyle(.plain).accessibilityIdentifier("prayer-hali") }
+        case "hali": if let summary = state.summary { Button { sheet = .hali } label: { MadarCard { VStack(alignment: .leading, spacing: 12) { Text("حالي").font(MadarTypography.cardTitle()); PrayerBalance(summary: summary, style: state.balanceView, locale: state.numeralLocale); Text(summary.percentageLabel.map { $0 + "، " + summary.monthTitle } ?? "لم تُحسب النسبة بعد"); Text(summary.prayerStreakLabel).foregroundStyle(theme.secondaryInk); if let mosque = summary.mosqueStreakLabel { Text(mosque).foregroundStyle(theme.secondaryInk) } } } }.buttonStyle(.madarPlain).accessibilityIdentifier("prayer-hali") }
         case "qada": qadaCard(state)
-        case "qiyam": if !state.nights.isEmpty { Button { sheet = .qiyam } label: { MadarCard { VStack(alignment: .leading, spacing: 10) { Label("قيام الليل", systemImage: "moon.stars").font(MadarTypography.cardTitle()); Text(state.nights[0].rakaat == 0 ? "سجّل ما قمتَه" : "\(number(state.nights[0].rakaat, state)) ركعات"); Text("ليس سلسلة تنكسر، أثرٌ يُرى").foregroundStyle(theme.secondaryInk) } } }.buttonStyle(.plain).accessibilityIdentifier("prayer-qiyam") }
+        case "qiyam": if !state.nights.isEmpty { Button { sheet = .qiyam } label: { MadarCard { VStack(alignment: .leading, spacing: 10) { Label("قيام الليل", systemImage: "moon.stars").font(MadarTypography.cardTitle()); Text(state.nights[0].rakaat == 0 ? "سجّل ما قمتَه" : "\(number(state.nights[0].rakaat, state)) ركعات"); Text("ليس سلسلة تنكسر، أثرٌ يُرى").foregroundStyle(theme.secondaryInk) } } }.buttonStyle(.madarPlain).accessibilityIdentifier("prayer-qiyam") }
         default: EmptyView()
         }
     }
@@ -213,12 +213,12 @@ struct PrayerRoom: View {
         MadarCard {
             VStack(spacing: 12) {
                 if typeSize.isAccessibilitySize {
-                    ForEach(state.entries) { entry in Button { sheet = .log(entry) } label: { HStack { PrayerStar().fill(statusColor(entry.status)).frame(width: 20, height: 20); VStack(alignment: .leading) { Text(entry.title); Text([entry.timeLabel, entry.status.title].compactMap { $0 }.joined(separator: "، ")).font(MadarTypography.caption()) }; Spacer(); Image(systemName: "chevron.forward") }.frame(minHeight: 60) }.buttonStyle(.plain).accessibilityIdentifier("prayer-arch-" + entry.selection.prayer.rawValue) }
+                    ForEach(state.entries) { entry in Button { sheet = .log(entry) } label: { HStack { PrayerStar().fill(statusColor(entry.status)).frame(width: 20, height: 20); VStack(alignment: .leading) { Text(entry.title); Text([entry.timeLabel, entry.status.title].compactMap { $0 }.joined(separator: "، ")).font(MadarTypography.caption()) }; Spacer(); Image(systemName: "chevron.forward") }.frame(minHeight: 60) }.buttonStyle(.madarPlain).accessibilityIdentifier("prayer-arch-" + entry.selection.prayer.rawValue) }
                 } else {
                     HStack(alignment: .bottom, spacing: 8) {
                         ForEach(state.entries) { entry in
                             Button { sheet = .log(entry) } label: { PrayerArchView(entry: entry, pool: state.pool, tall: state.fridayTallArch && entry.isFriday) }
-                                .buttonStyle(.plain).frame(maxWidth: .infinity).accessibilityLabel([entry.title, entry.timeLabel, entry.status.title, entry.heart?.title].compactMap { $0 }.joined(separator: "، ")).accessibilityIdentifier("prayer-arch-" + entry.selection.prayer.rawValue)
+                                .buttonStyle(.madarPlain).frame(maxWidth: .infinity).accessibilityLabel([entry.title, entry.timeLabel, entry.status.title, entry.heart?.title].compactMap { $0 }.joined(separator: "، ")).accessibilityIdentifier("prayer-arch-" + entry.selection.prayer.rawValue)
                         }
                     }
                 }
@@ -228,9 +228,9 @@ struct PrayerRoom: View {
     }
     @ViewBuilder private func pendingCard(_ state: PrayerRoomState) -> some View {
         if !state.pending.isEmpty {
-            Button { sheet = .pending } label: { MadarCard { VStack(alignment: .leading, spacing: 8) { Text("\(number(state.pending.count, state)) صلوات تنتظر التسجيل").font(MadarTypography.section()); Text("تظل معلّقة \(number(state.pendingDays, state)) أيام صلاة، ثم تُحسب فائتة.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk); Text("سجّلها").foregroundStyle(theme.accent) } } }.buttonStyle(.plain).accessibilityIdentifier("prayer-pending")
+            Button { sheet = .pending } label: { MadarCard { VStack(alignment: .leading, spacing: 8) { Text("\(number(state.pending.count, state)) صلوات تنتظر التسجيل").font(MadarTypography.section()); Text("تظل معلّقة \(number(state.pendingDays, state)) أيام صلاة، ثم تُحسب فائتة.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk); Text("سجّلها").foregroundStyle(theme.accent) } } }.buttonStyle(.madarPlain).accessibilityIdentifier("prayer-pending")
         }
-        if let entry = state.pendingHeart.first { Button { sheet = .log(entry) } label: { MadarCard { Label("بقي سؤال القلب عن " + entry.title, systemImage: "sparkle").font(MadarTypography.section()) } }.buttonStyle(.plain).accessibilityIdentifier("prayer-pending-heart") }
+        if let entry = state.pendingHeart.first { Button { sheet = .log(entry) } label: { MadarCard { Label("بقي سؤال القلب عن " + entry.title, systemImage: "sparkle").font(MadarTypography.section()) } }.buttonStyle(.madarPlain).accessibilityIdentifier("prayer-pending-heart") }
     }
     private func qadaCard(_ state: PrayerRoomState) -> some View {
         MadarCard {
@@ -423,7 +423,7 @@ struct PrayerQadaCitation: View {
         ("مَنْ نَسِيَ صَلَاةً أَوْ نَامَ عَنْهَا فَكَفَّارَتُهَا أَنْ يُصَلِّيَهَا إِذَا ذَكَرَهَا", "مسلم ٦٨٤"),
         ("﴿حَافِظُوا عَلَى الصَّلَوَاتِ وَالصَّلَاةِ الْوُسْطَىٰ وَقُومُوا لِلَّهِ قَانِتِينَ﴾", "البقرة ٢٣٨")
     ]
-    var body: some View { Button { index = (index + 1) % citations.count } label: { VStack(alignment: .leading, spacing: 8) { Text(citations[index].0).font(.custom("Amiri-Regular", size: 21, relativeTo: .title3)).fixedSize(horizontal: false, vertical: true); Text(citations[index].1).font(MadarTypography.caption()) } }.buttonStyle(.plain).accessibilityHint("لمسة تعرض نصًا آخر موثّقًا") }
+    var body: some View { Button { index = (index + 1) % citations.count } label: { VStack(alignment: .leading, spacing: 8) { Text(citations[index].0).font(.custom("Amiri-Regular", size: 21, relativeTo: .title3)).fixedSize(horizontal: false, vertical: true); Text(citations[index].1).font(MadarTypography.caption()) } }.buttonStyle(.madarPlain).accessibilityHint("لمسة تعرض نصًا آخر موثّقًا") }
 }
 struct PrayerStar: Shape {
     func path(in rect: CGRect) -> Path {

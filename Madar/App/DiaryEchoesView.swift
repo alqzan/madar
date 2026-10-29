@@ -33,7 +33,7 @@ struct DiaryEchoesView: View {
                             }.frame(maxWidth: .infinity, alignment: .leading)
                             Image(systemName: "chevron.forward").foregroundStyle(theme.color("ink3Text"))
                         }.padding(16).background(theme.surface, in: .rect(cornerRadius: 24)).overlay { RoundedRectangle(cornerRadius: 24).stroke(theme.line) }
-                    }.buttonStyle(.plain).accessibilityIdentifier("diary-echo-today")
+                    }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-echo-today")
                 }.id("today")
                 ForEach(snapshot.echoes, id: \.distance.rawValue) { echo in
                     let page = snapshot.days.first { $0.day == echo.day }
@@ -54,7 +54,7 @@ struct DiaryEchoesView: View {
             Text(title).font(MadarTypography.caption()).padding(.horizontal, 14).frame(minHeight: 44)
                 .foregroundStyle(selected == id ? theme.background : theme.ink)
                 .background(selected == id ? theme.ink : theme.ink.opacity(0.06), in: .capsule)
-        }.buttonStyle(.plain).accessibilityIdentifier("diary-echo-jump-" + id).accessibilityAddTraits(selected == id ? .isSelected : [])
+        }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-echo-jump-" + id).accessibilityAddTraits(selected == id ? .isSelected : [])
     }
     private func timelineRow<Content: View>(title: String, day: GregorianDay, current: Bool, @ViewBuilder content: () -> Content) -> some View {
         HStack(alignment: .top, spacing: 12) {
@@ -85,6 +85,6 @@ struct DiaryEchoesView: View {
                 }.padding(16)
             }.background(theme.surface).clipShape(.rect(cornerRadius: 24))
                 .overlay { RoundedRectangle(cornerRadius: 24).stroke(theme.line) }
-        }.buttonStyle(.plain).accessibilityIdentifier("diary-echo-" + distance.rawValue)
+        }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-echo-" + distance.rawValue)
     }
 }

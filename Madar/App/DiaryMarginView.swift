@@ -28,7 +28,7 @@ struct DiaryMarginView: View {
                 Spacer(minLength: 0)
                 if let another {
                     Button(action: another) { Label("ذكرى أخرى", systemImage: "shuffle").font(MadarTypography.caption()).padding(.horizontal, 12).frame(minHeight: 44).overlay { Capsule().stroke(theme.line) } }
-                        .buttonStyle(.plain).accessibilityIdentifier("diary-another-memory")
+                        .buttonStyle(.madarPlain).accessibilityIdentifier("diary-another-memory")
                 }
             }
             VStack(alignment: .leading, spacing: 20) {
@@ -58,7 +58,7 @@ struct DiaryMarginView: View {
                 }
                 Spacer(minLength: 30)
                 Button(action: open) { Label("افتح اليوم كاملًا", systemImage: "arrow.up.left").font(MadarTypography.caption()).frame(minHeight: 44) }
-                    .buttonStyle(.plain).foregroundStyle(theme.color("ink3Text")).accessibilityIdentifier("diary-open-memory")
+                    .buttonStyle(.madarPlain).foregroundStyle(theme.color("ink3Text")).accessibilityIdentifier("diary-open-memory")
             }
             .padding(18).frame(maxWidth: .infinity, minHeight: 420, alignment: .topLeading)
             .background {

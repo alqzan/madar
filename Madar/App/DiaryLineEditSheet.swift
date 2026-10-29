@@ -30,7 +30,7 @@ struct DiaryLineEditSheet: View {
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) { Button("إلغاء") { if text == edit.text { dismiss() } else { confirmDiscard = true } }.accessibilityIdentifier("diary-line-edit-cancel") }
                     ToolbarItem(placement: .confirmationAction) {
-                        Button("احفظ") { Task { saving = true; defer { saving = false }
+                        Button("احفظ") { guard !saving else { return }; saving = true; Task { defer { saving = false }
                             do { try await AppDiaryService(app: app).edit(edit.id, text: text); saved(); dismiss() } catch { failure = madarUserMessage(error) } } }
                             .disabled(saving || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || text == edit.text).accessibilityIdentifier("diary-line-edit-save")
                     }

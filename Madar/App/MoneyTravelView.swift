@@ -81,7 +81,7 @@ struct MoneyTravelView: View {
                     if let failure { Text(failure).font(MadarTypography.caption()) }
                 } else { Text(failure ?? "لا توجد رحلة جارية. تبدأ الرحلة من حالة السفر المشتركة في الصلاة.").font(MadarTypography.body()).padding(24) }
             }.padding(.horizontal, 18).padding(.top, 6).padding(.bottom, 24).frame(maxWidth: 620).frame(maxWidth: .infinity)
-        }.clipped().background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.plain).environment(\.roomTheme, theme)
+        }.clipped().background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.madarPlain).environment(\.roomTheme, theme)
             .toolbar(.hidden, for: .navigationBar, .tabBar).task { load(); entered = true }.onChange(of: app.prayerRevision) { load() }
             .onChange(of: scenePhase) { if scenePhase != .active { revealed = false } }
             .accessibilityIdentifier("money-travel")
@@ -156,7 +156,7 @@ struct MoneyTravelView: View {
             Text(figure: "في المظروف " + amount(r.balanceMinor)).font(MadarTypography.cardTitle())
             ForEach(r.movements) { row in HStack { VStack(alignment: .leading) { Text(row.name); MadarDateLabel(app.dateLabels(row.day, compact: true), primaryFont: MadarTypography.fine(), secondaryFont: MadarTypography.fine()) }; Spacer(); movementAmount(row) } }
             if r.movements.isEmpty { Text("تظهر هنا المصروفات بعد تسجيلها أو تأكيد رسائل البنك.").foregroundStyle(theme.secondaryInk) }
-        }.font(MadarTypography.body()).padding(22) }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).accessibilityIdentifier("money-trip-report").buttonStyle(.plain).accessibilityIdentifier("money-travel-report-sheet")
+        }.font(MadarTypography.body()).padding(22) }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).accessibilityIdentifier("money-trip-report").buttonStyle(.madarPlain).accessibilityIdentifier("money-travel-report-sheet")
     }
     /// The display currency can change with a new country; a movement keeps its original amount and currency.
     private func movementAmount(_ row: MoneyTripMovement) -> some View {

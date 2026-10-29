@@ -114,7 +114,7 @@ struct QuranPlanSetupView: View {
                 VStack(alignment: .leading, spacing: 18) {
                     Text("الوحدة").font(quranFont(15, bold: true))
                     ForEach(QuranUIUnit.allCases) { unit in
-                        Button { input?.unit = unit; input?.amount = 1 } label: { HStack { Text(unit.title); Spacer(); if unit == p.unit { Image(systemName: "checkmark.circle.fill") } }.frame(minHeight: 44).contentShape(Rectangle()) }.buttonStyle(.plain).accessibilityIdentifier("quran-setup-unit-" + unit.id)
+                        Button { input?.unit = unit; input?.amount = 1 } label: { HStack { Text(unit.title); Spacer(); if unit == p.unit { Image(systemName: "checkmark.circle.fill") } }.frame(minHeight: 44).contentShape(Rectangle()) }.buttonStyle(.madarPlain).accessibilityIdentifier("quran-setup-unit-" + unit.id)
                     }
                     Stepper(QuranPlanCopy.amount(p, digits: service.numerals), value: binding(\.amount), in: 1...(p.unit == .ayah ? 6236 : 604), step: 1).accessibilityIdentifier("quran-setup-amount")
                 }.font(quranFont(15))
@@ -134,7 +134,7 @@ struct QuranPlanSetupView: View {
                             .foregroundStyle(selected ? theme.onAccent : theme.ink)
                             .background(selected ? theme.accent : theme.surface, in: .rect(cornerRadius: 16))
                             .overlay { RoundedRectangle(cornerRadius: 16).stroke(selected ? .clear : theme.line, lineWidth: 1) }
-                    }.buttonStyle(.plain).accessibilityIdentifier("quran-setup-rest-" + key).accessibilityAddTraits(selected ? .isSelected : [])
+                    }.buttonStyle(.madarPlain).accessibilityIdentifier("quran-setup-rest-" + key).accessibilityAddTraits(selected ? .isSelected : [])
                 }
             }
             option("بلا يوم راحة", detail: "الحفظ كل يوم", selected: p.restDay == "none", id: "quran-setup-rest-none") { input?.restDay = "none" }
@@ -151,7 +151,7 @@ struct QuranPlanSetupView: View {
         }
     }
     private func option(_ title: String, detail: String, selected: Bool, id: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) { HStack(spacing: 12) { Image(systemName: selected ? "largecircle.fill.circle" : "circle"); VStack(alignment: .leading, spacing: 5) { Text(title).font(quranFont(17, bold: true)); Text(detail).font(quranFont(12)).foregroundStyle(theme.secondaryInk) }; Spacer(minLength: 0) }.padding(18).frame(maxWidth: .infinity, minHeight: 80, alignment: .leading).background(theme.surface, in: .rect(cornerRadius: 22)).overlay { RoundedRectangle(cornerRadius: 22).stroke(selected ? theme.color("hifz") : theme.line, lineWidth: selected ? 2 : 1) }.contentShape(Rectangle()) }.buttonStyle(.plain).accessibilityIdentifier(id).accessibilityAddTraits(selected ? .isSelected : [])
+        Button(action: action) { HStack(spacing: 12) { Image(systemName: selected ? "largecircle.fill.circle" : "circle"); VStack(alignment: .leading, spacing: 5) { Text(title).font(quranFont(17, bold: true)); Text(detail).font(quranFont(12)).foregroundStyle(theme.secondaryInk) }; Spacer(minLength: 0) }.padding(18).frame(maxWidth: .infinity, minHeight: 80, alignment: .leading).background(theme.surface, in: .rect(cornerRadius: 22)).overlay { RoundedRectangle(cornerRadius: 22).stroke(selected ? theme.color("hifz") : theme.line, lineWidth: selected ? 2 : 1) }.contentShape(Rectangle()) }.buttonStyle(.madarPlain).accessibilityIdentifier(id).accessibilityAddTraits(selected ? .isSelected : [])
     }
     private func binding<T>(_ key: WritableKeyPath<QuranUIPlanInput,T>) -> Binding<T> { Binding(get: { input![keyPath:key] }, set: { input?[keyPath:key] = $0 }) }
     private func ayahs(_ page: Int) -> [QuranAyahResourceRecord] { (try? QuranResources.catalog().ayahs(on: page)) ?? [] }

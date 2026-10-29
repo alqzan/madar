@@ -59,7 +59,7 @@ struct MoneySalaryView: View {
         HStack(spacing: 12) {
             Button { dismiss() } label: {
                 Image(systemName: "xmark").font(.title3).frame(width: 52, height: 52).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1.2) }
-            }.buttonStyle(.plain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-salary-close")
+            }.buttonStyle(.madarPlain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-salary-close")
             Text("نزل الراتب").font(.custom("thmanyahserifdisplay-Bold", size: 28, relativeTo: .title)).accessibilityAddTraits(.isHeader)
             Spacer()
         }.padding(.top, 8).environment(\.layoutDirection, .rightToLeft)
@@ -164,7 +164,7 @@ struct MoneySalaryView: View {
             }
             ForEach(r.entries) { entry in
                 Button { withAnimation(.easeOut(duration: 0.2)) { selected = selected == entry.id ? nil : entry.id } } label: { ledgerRow(entry, salary: salary) }
-                    .buttonStyle(.plain).accessibilityIdentifier("money-salary-entry-" + entry.id)
+                    .buttonStyle(.madarPlain).accessibilityIdentifier("money-salary-entry-" + entry.id)
                 if selected == entry.id {
                     Text(entry.explanation).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).padding(10).frame(maxWidth: .infinity, alignment: .leading)
                         .overlay { Rectangle().stroke(theme.color("reserveText"), style: .init(lineWidth: 1, dash: [3, 2])) }
@@ -236,7 +236,7 @@ struct MoneySalaryView: View {
             Text(title).font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 48)
                 .foregroundStyle(remainderTo == value ? theme.background : theme.ink)
                 .background(remainderTo == value ? theme.ink : .clear).overlay { Rectangle().stroke(theme.ink, lineWidth: 1) }
-        }.buttonStyle(.plain).accessibilityAddTraits(remainderTo == value ? .isSelected : [])
+        }.buttonStyle(.madarPlain).accessibilityAddTraits(remainderTo == value ? .isSelected : [])
     }
 
     private func confirmButton(_ r: MoneySalaryReading) -> some View {
@@ -245,7 +245,7 @@ struct MoneySalaryView: View {
             Text("اعتمد الراتب وافتح الدورة").font(.custom("thmanyahserifdisplay-Bold", size: 20, relativeTo: .headline)).foregroundStyle(theme.background)
                 .frame(maxWidth: .infinity, minHeight: 60).background(theme.ink.opacity(blocked || busy ? 0.4 : 1))
                 .shadow(color: theme.ink.opacity(0.18), radius: 8, y: 4)
-        }.buttonStyle(.plain).disabled(blocked || busy).accessibilityIdentifier("money-salary-confirm").padding(.vertical, 6)
+        }.buttonStyle(.madarPlain).disabled(blocked || busy).accessibilityIdentifier("money-salary-confirm").padding(.vertical, 6)
             // A failed confirm used to reload silently; say so under the button.
             if confirmFailed { Text("لم يُعتمد الراتب. حاول مرة أخرى.").font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")).accessibilityIdentifier("money-salary-confirm-failed") }
         }
@@ -384,7 +384,7 @@ struct MoneySalaryView: View {
             run("money.setEnvelopeSaving", ["id": .string(e.planID.uuidString), "amountMinor": .string(String(max(0, e.amountMinor + delta))), "expectedMinor": .string(String(e.amountMinor))])
         } label: {
             Image(systemName: symbol).font(.body).frame(maxWidth: .infinity, minHeight: 44).overlay { Rectangle().stroke(theme.ink, lineWidth: 1) }
-        }.buttonStyle(.plain).disabled(busy || (delta < 0 && e.amountMinor == 0))
+        }.buttonStyle(.madarPlain).disabled(busy || (delta < 0 && e.amountMinor == 0))
             .accessibilityLabel((delta > 0 ? "زد " : "أنقص ") + e.name + " " + (visible ? service.amount(abs(delta)) : "•••"))
     }
 

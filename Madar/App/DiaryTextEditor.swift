@@ -29,6 +29,8 @@ struct DiaryTextEditor: View {
     @State private var writingDay: GregorianDay?
     @State private var saving = false
     @State private var failure: String?
+    /// AU-95: a failed «تمّ» stays on screen; the next quiet draft save must not wipe it while the page is uncommitted.
+    @State private var commitFailed = false
     @FocusState private var focused: Bool
     var body: some View {
         NavigationStack {
@@ -153,7 +155,7 @@ struct DiaryTextEditor: View {
         } }
         .onChange(of: voice?.lastMedia?.id) { _, id in if id != nil { attachmentSaved = true; editorUndo = true } }
         .onChange(of: scenePhase) { _, phase in if phase == .active { voice?.refreshMicrophoneAuthorization() } else { Task { draftTask?.cancel(); if loaded { do { try await persistDraft() } catch { draftStatus = "لم تُحفظ المسودة"; failure = madarUserMessage(error) } }; await voice?.stop() } } }
-        .safeAreaInset(edge: .bottom) { if editorUndo, app.undoToastVisible { UndoToast(message: app.undoMessage, undo: app.undo) } }
+        .safeAreaInset(edge: .bottom) { if editorUndo, app.undoToastVisible { UndoToast(message: app.undoMessage, undo: app.undo, dismiss: app.hideUndoToast) } }
         .interactiveDismissDisabled(!text.isEmpty || saving || importing || voice?.recording == true || voice?.savingAudio == true)
         .onDisappear { draftTask?.cancel(); voice?.cancelConversion(); voice?.cancelDownload(); if let voice { Task { await voice.stop() } } }
     }
@@ -193,18 +195,18 @@ struct DiaryTextEditor: View {
         Button { focused = false; Task { if voice.recording { await voice.stop() } else if let writingDay { await voice.start(writingDay: writingDay) } } } label: {
             Image(systemName: voice.recording ? "stop.fill" : "mic").font(.system(size: large ? 28 : 20)).frame(width: large ? 72 : 44, height: large ? 72 : 44)
                 .foregroundStyle(large ? theme.onAccent : theme.ink).background(large ? theme.accent : .clear, in: .circle)
-        }.buttonStyle(.plain).disabled(saving || importing || voice.savingAudio || voice.converting)
+        }.buttonStyle(.madarPlain).disabled(saving || importing || voice.savingAudio || voice.converting)
             .accessibilityLabel(voice.recording ? "أوقف التسجيل واحفظه" : "سجّل صوتًا").accessibilityIdentifier("diary-editor-record")
     }
     private func choice(_ value: String, _ label: String) -> some View {
         Button { day = value; writingDay = (try? AppDiaryService(app: app).currentDay()).map { value == "yesterday" ? $0.adding(days: -1) : $0 } } label: { Text(label).font(MadarTypography.caption()).padding(.horizontal, 16).frame(minHeight: 42).foregroundStyle(day == value ? theme.background : theme.ink).background(day == value ? theme.ink : theme.surface, in: .capsule).overlay { Capsule().stroke(theme.line, lineWidth: 1) } }
-            .buttonStyle(.plain).disabled(saving || importing || voice?.recording == true).accessibilityIdentifier("diary-editor-" + value).accessibilityAddTraits(day == value ? .isSelected : [])
+            .buttonStyle(.madarPlain).disabled(saving || importing || voice?.recording == true).accessibilityIdentifier("diary-editor-" + value).accessibilityAddTraits(day == value ? .isSelected : [])
     }
     private func scheduleDraft() {
         guard loaded, !saving else { return }
         draftTask?.cancel(); draftStatus = "تُحفظ المسودة…"
         draftTask = Task {
-            do { try await Task.sleep(for: .milliseconds(500)); try Task.checkCancellation(); try await persistDraft(); failure = nil; draftStatus = text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : "المسودة محفوظة" }
+            do { try await Task.sleep(for: .milliseconds(500)); try Task.checkCancellation(); try await persistDraft(); if !commitFailed { failure = nil }; draftStatus = text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : "المسودة محفوظة" }
             catch is CancellationError {} catch { draftStatus = "لم تُحفظ المسودة"; failure = madarUserMessage(error) }
         }
     }
@@ -227,7 +229,7 @@ struct DiaryTextEditor: View {
         attachmentSaved = true; editorUndo = true; draftStatus = "حُفظ المرفق في الصفحة"
     }
     private func save() async {
-        guard !saving else { return }; saving = true; failure = nil; draftTask?.cancel()
+        guard !saving else { return }; saving = true; failure = nil; commitFailed = false; draftTask?.cancel()
         do {
             await voice?.stop()
             if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -235,7 +237,7 @@ struct DiaryTextEditor: View {
                 try await app.executeDiaryCommand("diary.commitDraft", payload: ["id": .string(draftID.uuidString)], id: draftID)
             }
             dismiss()
-        } catch { failure = madarUserMessage(error); saving = false }
+        } catch { failure = madarUserMessage(error); commitFailed = true; saving = false }
     }
     private func linkLibraryPhoto(_ asset: PHAsset) async -> Bool {
         guard let data = await DiaryPhotoLibrary.data(asset), let copy = DiaryPhotoLibrary.smallCopy(of: data) else { failure = "تعذّر فتح الصورة من تطبيق الصور."; return false }

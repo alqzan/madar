@@ -30,18 +30,18 @@ struct MoneyCardsView: View {
             VStack(alignment: .leading, spacing: 18) {
                 HStack(spacing: 12) {
                     Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1) } }
-                        .buttonStyle(.plain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-cards-close")
+                        .buttonStyle(.madarPlain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-cards-close")
                     Text("البطاقات").font(.custom("thmanyahserifdisplay-Bold", size: 26, relativeTo: .title)).accessibilityAddTraits(.isHeader)
                     Spacer()
                     Button { adding = true } label: { Image(systemName: "plus").frame(width: 44, height: 44).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1) } }
-                        .buttonStyle(.plain).accessibilityLabel("أضف بطاقة").accessibilityIdentifier("money-cards-add")
+                        .buttonStyle(.madarPlain).accessibilityLabel("أضف بطاقة").accessibilityIdentifier("money-cards-add")
                 }.padding(.top, 8)
                 if let reading {
                     if reading.cards.isEmpty {
                         Text("لا بطاقات بعد").font(MadarTypography.cardTitle())
                         Text("أضف بطاقتك باسمها وآخر أربعة أرقامها، فتُربط بها رسائل البنك. لا تُنشأ بطاقة من رقم غير معروف تلقائيًا.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
                         Button { adding = true } label: { Text("أضف بطاقة").font(MadarTypography.cardTitle()).frame(maxWidth: .infinity, minHeight: 54).background(theme.ink).foregroundStyle(theme.background) }
-                            .buttonStyle(.plain).accessibilityIdentifier("money-cards-add-first")
+                            .buttonStyle(.madarPlain).accessibilityIdentifier("money-cards-add-first")
                     } else {
                         ScrollView(.horizontal) {
                             HStack(spacing: 10) { ForEach(reading.cards) { miniature($0) } }
@@ -76,7 +76,7 @@ struct MoneyCardsView: View {
                 Button { tab = name } label: {
                     Text(name).font(MadarTypography.fine()).bold().fixedSize().padding(.horizontal, 12).frame(minHeight: 42)
                         .background(tab == name ? theme.ink : Color.clear, in: Capsule()).foregroundStyle(tab == name ? theme.background : theme.ink)
-                }.buttonStyle(.plain).accessibilityAddTraits(tab == name ? .isSelected : []).accessibilityIdentifier("money-cards-tab-" + name)
+                }.buttonStyle(.madarPlain).accessibilityAddTraits(tab == name ? .isSelected : []).accessibilityIdentifier("money-cards-tab-" + name)
             }
         }.padding(3).background(theme.surface, in: Capsule()).overlay { Capsule().stroke(theme.line, lineWidth: 1) }
     }
@@ -106,7 +106,7 @@ struct MoneyCardsView: View {
                 .overlay { RoundedRectangle(cornerRadius: 13).stroke(isPrimary(c) || active ? theme.color("reserve") : theme.background.opacity(0.28), lineWidth: active ? 2.2 : 1.4) }
                 .overlay { RoundedRectangle(cornerRadius: 9).stroke(theme.background.opacity(0.35), lineWidth: 0.6).padding(5) }
                 .shadow(color: theme.ink.opacity(0.14), radius: 5, y: 4)
-        }.buttonStyle(.plain).accessibilityLabel(c.name + (c.kind == "credit" ? "، عليك " + amount(c.owedMinor) : "، ليست دينًا ائتمانيًا"))
+        }.buttonStyle(.madarPlain).accessibilityLabel(c.name + (c.kind == "credit" ? "، عليك " + amount(c.owedMinor) : "، ليست دينًا ائتمانيًا"))
             .accessibilityIdentifier("money-card-" + c.name)
     }
     private func isPrimary(_ c: MoneyCardReading) -> Bool { c.kind == "credit" && c.id == reading?.cards.first(where: { $0.kind == "credit" })?.id }
@@ -133,7 +133,7 @@ struct MoneyCardsView: View {
                             if let due = c.due { dates(due) }
                         }
                     }.contentShape(Rectangle())
-                }.buttonStyle(.plain).accessibilityIdentifier("money-card-statement-source")
+                }.buttonStyle(.madarPlain).accessibilityIdentifier("money-card-statement-source")
                 usage(c)
                 HStack(alignment: .top, spacing: 8) {
                     tile("يقفل الكشف", value: c.nextClose.map { app.dateLabels($0, compact: true).primary } ?? "غير معروف", secondary: c.nextClose.map { app.dateLabels($0, compact: true).secondary + "، تقريبًا" }, key: nil, card: c)
@@ -141,27 +141,27 @@ struct MoneyCardsView: View {
                     tile("الاسترداد", value: c.cashbackBp.map(percent) ?? "غير معروف", secondary: "تقدير الشراء", key: "cashbackBp", card: c)
                 }
                 Button { jarOpen = true } label: { HStack { Image(systemName: "drop"); Text("جرّة الاسترداد"); Spacer(); Image(systemName: "chevron.left").font(.caption) }.font(MadarTypography.caption()).frame(minHeight: 44).contentShape(Rectangle()) }
-                    .buttonStyle(.plain).foregroundStyle(theme.color("reserveText")).accessibilityIdentifier("money-cards-cashback-open")
+                    .buttonStyle(.madarPlain).foregroundStyle(theme.color("reserveText")).accessibilityIdentifier("money-cards-cashback-open")
                 HStack { Text("كيف تسدّد").font(MadarTypography.cardTitle()); Spacer(); HStack(spacing: 0) {
                     ForEach([false, true], id: \.self) { option in
                         Button { minimum = option } label: { Text(option ? "الحد الأدنى" : "كامل").font(MadarTypography.caption()).bold().padding(.horizontal, 16).frame(minHeight: 44).background(minimum == option ? theme.ink : Color.clear).foregroundStyle(minimum == option ? theme.background : theme.ink).contentShape(Rectangle()) }
-                            .buttonStyle(.plain).accessibilityAddTraits(minimum == option ? .isSelected : [])
+                            .buttonStyle(.madarPlain).accessibilityAddTraits(minimum == option ? .isSelected : [])
                     }
                 }.clipShape(Capsule()).overlay { Capsule().stroke(theme.ink, lineWidth: 1) }.accessibilityElement(children: .contain).accessibilityLabel("كيف تسدّد").accessibilityIdentifier("money-card-payment-choice") }
                 if minimum {
                     let unpaid = max(0, c.billedMinor - (c.minimumMinor ?? 0))
                     Text("يبقى عليك " + amount(unpaid)).font(MadarTypography.body())
                     if let interest = CardPlanning.interestEstimate(unpaidMinor: unpaid, annualRateBp: c.aprBp, days: 30) {
-                        Button { source = c.sources["aprBp"] } label: { Text("تقدير فائدة ٣٠ يومًا: " + amount(interest)).font(MadarTypography.body()).foregroundStyle(theme.color("reserveText")) }.buttonStyle(.plain)
+                        Button { source = c.sources["aprBp"] } label: { Text("تقدير فائدة ٣٠ يومًا: " + amount(interest)).font(MadarTypography.body()).foregroundStyle(theme.color("reserveText")) }.buttonStyle(.madarPlain)
                     } else { Text("نسبة الفائدة غير معروفة؛ لا يمكن تقديرها.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
                     Text("تقدير تقريبي بفائدة بسيطة: النسبة السنوية × ٣٠ ÷ ٣٦٥، دون الرسوم أو التركيب. كشف البنك هو المرجع.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                 } else { Label("سداد كامل المتبقي: " + amount(c.billedMinor), systemImage: "checkmark.circle.fill").font(MadarTypography.body()).foregroundStyle(theme.color("surplusText")) }
             }
-            HStack { Text(c.kind == "credit" ? "في الكشف القادم" : "المشتريات المسجلة").font(MadarTypography.cardTitle()); Spacer(); if c.kind == "credit" { Button("غير المفوتر " + amount(c.unbilledMinor)) { source = c.sources["unbilled"] }.font(MadarTypography.fine()).buttonStyle(.plain) } }
+            HStack { Text(c.kind == "credit" ? "في الكشف القادم" : "المشتريات المسجلة").font(MadarTypography.cardTitle()); Spacer(); if c.kind == "credit" { Button("غير المفوتر " + amount(c.unbilledMinor)) { source = c.sources["unbilled"] }.font(MadarTypography.fine()).buttonStyle(.madarPlain) } }
             if c.purchases.isEmpty { Text("لا حركات مؤكّدة في هذه الفترة.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk) }
             ForEach(c.purchases) { movement($0) }
             if let best = reading?.cards.filter({ $0.kind == "credit" && $0.graceDays != nil }).max(by: { ($0.graceDays ?? 0) < ($1.graceDays ?? 0) }), let grace = best.graceDays {
-                Button { tab = "متى يخرج النقد" } label: { HStack { Text("للشراء اليوم: " + best.name); Spacer(); Text("مهلة " + service.days(grace) + " تقريبًا") }.font(MadarTypography.caption()).padding(16).overlay { Capsule().stroke(theme.color("reserveText"), lineWidth: 1) }.contentShape(.rect) }.buttonStyle(.plain)
+                Button { tab = "متى يخرج النقد" } label: { HStack { Text("للشراء اليوم: " + best.name); Spacer(); Text("مهلة " + service.days(grace) + " تقريبًا") }.font(MadarTypography.caption()).padding(16).overlay { Capsule().stroke(theme.color("reserveText"), lineWidth: 1) }.contentShape(.rect) }.buttonStyle(.madarPlain)
             }
         }
     }
@@ -176,7 +176,7 @@ struct MoneyCardsView: View {
                 swatch(theme.color("bills"), "غير مفوتر", c.unbilledMinor > 0 ? amount(c.unbilledMinor) : nil)
                 if let limit = c.limitMinor { swatch(theme.line, "متاح", amount(max(0, limit - c.owedMinor))) }
                 Spacer(minLength: 4)
-                Button { source = c.sources["limitMinor"] } label: { Text(visible ? CardPlanning.utilisationBp(owedMinor: c.owedMinor, limitMinor: c.limitMinor).map { percent($0) + " من الحد" } ?? "الحد غير معروف" : "•••").bold().foregroundStyle(c.close == nil ? theme.color("reserveText") : theme.color("dueText")) }.buttonStyle(.plain)
+                Button { source = c.sources["limitMinor"] } label: { Text(visible ? CardPlanning.utilisationBp(owedMinor: c.owedMinor, limitMinor: c.limitMinor).map { percent($0) + " من الحد" } ?? "الحد غير معروف" : "•••").bold().foregroundStyle(c.close == nil ? theme.color("reserveText") : theme.color("dueText")) }.buttonStyle(.madarPlain)
             }.font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
         }
     }
@@ -202,7 +202,7 @@ struct MoneyCardsView: View {
         Button { if let key { source = card.sources[key] } else { source = .init(id: "close-" + card.id.uuidString, title: "موعد القفل القادم", amountMinor: 0, explanation: "توقّع من كشفين على يوم الشهر نفسه؛ ليس تاريخًا مؤكّدًا من البنك.", message: nil, date: card.nextClose, estimated: true, valueText: card.nextClose == nil ? "غير معروف" : "تقريبًا") } } label: {
             VStack(alignment: .leading, spacing: 6) { Text(title).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk); Text(visible || key == nil ? value : "•••").font(.custom("thmanyahserifdisplay-Bold", size: 19, relativeTo: .headline)).lineLimit(1).minimumScaleFactor(0.6); if let secondary { Text(secondary).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) } }
                 .frame(maxWidth: .infinity, minHeight: 86, alignment: .topLeading).padding(8).background(theme.surface, in: RoundedRectangle(cornerRadius: 12)).overlay { RoundedRectangle(cornerRadius: 12).stroke(theme.line, lineWidth: 1) }
-        }.buttonStyle(.plain)
+        }.buttonStyle(.madarPlain)
     }
     private func movement(_ row: MoneyCardMovement) -> some View {
         Button { source = row.detail } label: {
@@ -211,7 +211,7 @@ struct MoneyCardsView: View {
                 VStack(alignment: .leading, spacing: 5) { Text(row.merchant).font(MadarTypography.body()); Text(row.budgeted ? "احتُسب في الميزانية يوم الشراء" : "خارج الميزانية").font(MadarTypography.fine()).foregroundStyle(theme.color("surplusText")) }
                 Spacer(minLength: 2); dates(row.day); Text(figure: amount(row.amountMinor)).font(MadarTypography.body())
             }.padding(.vertical, 11).overlay(alignment: .bottom) { Rectangle().fill(theme.line).frame(height: 0.7) }.contentShape(.rect)
-        }.buttonStyle(.plain).accessibilityIdentifier("money-card-movement-" + row.merchant)
+        }.buttonStyle(.madarPlain).accessibilityIdentifier("money-card-movement-" + row.merchant)
     }
     private func dates(_ day: GregorianDay) -> some View {
         MadarDateLabel(app.dateLabels(day, compact: true), primaryFont: MadarTypography.fine(), secondaryFont: MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
@@ -236,7 +236,7 @@ struct MoneyCardsView: View {
             HStack {
                 Text("مبلغ الشراء").font(MadarTypography.caption()); Spacer()
                 ForEach([50_000, 200_000, 800_000], id: \.self) { value in
-                    Button { purchaseMinor = value } label: { Text(figure: amount(value)).font(MadarTypography.caption()).padding(.horizontal, 12).frame(minHeight: 44).background(purchaseMinor == value ? theme.ink : Color.clear, in: Capsule()).foregroundStyle(purchaseMinor == value ? theme.background : theme.ink).overlay { Capsule().stroke(theme.line, lineWidth: 1) } }.buttonStyle(.plain)
+                    Button { purchaseMinor = value } label: { Text(figure: amount(value)).font(MadarTypography.caption()).padding(.horizontal, 12).frame(minHeight: 44).background(purchaseMinor == value ? theme.ink : Color.clear, in: Capsule()).foregroundStyle(purchaseMinor == value ? theme.background : theme.ink).overlay { Capsule().stroke(theme.line, lineWidth: 1) } }.buttonStyle(.madarPlain)
                 }
             }
             let best = r.cards.filter { $0.kind == "credit" && $0.graceDays != nil }.max { ($0.graceDays ?? 0) < ($1.graceDays ?? 0) }?.id
@@ -287,7 +287,7 @@ struct MoneyCardsView: View {
             } else { Text("لا مبالغ مستحقة معروفة بعد.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk) }
             if !r.dues.isEmpty { Text("المواعيد المعروفة").font(MadarTypography.cardTitle()) }
             ForEach(r.dues) { due in
-                Button { selectedDue = due.id } label: { HStack { Text(due.name); Spacer(); dates(due.day); Text(figure: amount(due.amountMinor)) }.font(MadarTypography.caption()).padding(.vertical, 8).contentShape(.rect) }.buttonStyle(.plain)
+                Button { selectedDue = due.id } label: { HStack { Text(due.name); Spacer(); dates(due.day); Text(figure: amount(due.amountMinor)) }.font(MadarTypography.caption()).padding(.vertical, 8).contentShape(.rect) }.buttonStyle(.madarPlain)
             }
             Text("التغطية من النقد الموجود الآن بعد المواعيد السابقة فقط، دون افتراض راتب قادم. لا يُحجز المال ولا يُسجّل سداد من هذه الصفحة.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
         }.accessibilityElement(children: .contain).accessibilityIdentifier("money-card-calendar")
@@ -309,7 +309,7 @@ struct MoneyCardsView: View {
         let label = app.dateLabels(day).primary + "، " + app.dateLabels(day).secondary + "، " + items.map(\.name).joined(separator: "، ")
         return Group {
             if items.isEmpty { content.accessibilityElement(children: .ignore).accessibilityLabel(label) }
-            else { Button { if let due = items.first { selectedDue = due.id } } label: { content }.buttonStyle(.plain).accessibilityLabel(label) }
+            else { Button { if let due = items.first { selectedDue = due.id } } label: { content }.buttonStyle(.madarPlain).accessibilityLabel(label) }
         }
     }
     private func match(_ c: MoneyCardReading) -> some View {
@@ -317,7 +317,7 @@ struct MoneyCardsView: View {
             if let payment = c.payment {
                 Button { source = payment.detail } label: {
                     HStack { Image(systemName: "arrow.left.arrow.right").foregroundStyle(theme.color("reserveText")); VStack(alignment: .leading, spacing: 5) { Text("سداد " + c.name).font(MadarTypography.cardTitle()); Text("تحويل، ليس مصروفًا جديدًا").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk); dates(payment.day) }; Spacer(); Text(figure: amount(payment.amountMinor)).font(.custom("thmanyahserifdisplay-Bold", size: 28, relativeTo: .title)) }.padding(16).overlay { RoundedRectangle(cornerRadius: 13).stroke(theme.color("reserveText"), lineWidth: 1) }.contentShape(.rect(cornerRadius: 13))
-                }.buttonStyle(.plain).accessibilityIdentifier("money-card-payment-source")
+                }.buttonStyle(.madarPlain).accessibilityIdentifier("money-card-payment-source")
                 if !c.matchedPurchases.isEmpty {
                     let total = c.matchedPurchases.reduce(0) { $0 + $1.amountMinor }
                     GeometryReader { proxy in

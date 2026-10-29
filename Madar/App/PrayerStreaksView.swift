@@ -192,7 +192,7 @@ struct PrayerStreaksSheet: View {
                     .overlay { RoundedRectangle(cornerRadius: 18).stroke(theme.line, lineWidth: 1) }
                     .contentShape(.rect(cornerRadius: 18))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.madarPlain)
                 .accessibilityIdentifier("prayer-history")
             }
             .padding(.horizontal, 20).padding(.top, 26).padding(.bottom, 20)

@@ -84,7 +84,7 @@ struct DiaryDayView: View {
                         HStack(spacing:8){
                             Button{archiveOpen=true}label:{Text("افتح يومًا سابقًا").frame(maxWidth:.infinity,minHeight:44).overlay{Capsule().stroke(theme.line)}}.accessibilityIdentifier("diary-return-days")
                             Button{returnDismissed=true;writing=true}label:{Text("ابدأ من اليوم").frame(maxWidth:.infinity,minHeight:44).foregroundStyle(theme.background).background(theme.ink,in:.capsule)}.accessibilityIdentifier("diary-return-write")
-                        }.font(DiaryType.label).buttonStyle(.plain)
+                        }.font(DiaryType.label).buttonStyle(.madarPlain)
                     }.padding(16).overlay(alignment:.bottom){Rectangle().fill(theme.line).frame(height:1)}.accessibilityElement(children:.contain).accessibilityIdentifier("diary-return")
                 }
                 if appearance?.weekAvailable == true,typeSize.isAccessibilitySize {
@@ -102,7 +102,7 @@ struct DiaryDayView: View {
                 } else if shownDay == today || !intentions.isEmpty {
                     Button {intentionsOpen=true} label:{
                         HStack(alignment:.firstTextBaseline,spacing:10){Text("النيّة").font(DiaryType.label).foregroundStyle(theme.accent);VStack(alignment:.leading,spacing:2){Text(intentions.first?.text ?? "أضف نيّتك لليوم").font(DiaryType.writing).lineLimit(2);if shownDay == today,!intentions.isEmpty {Text("أسألك عنها بعد العشاء").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))}}.frame(maxWidth:.infinity,alignment:.leading);Image(systemName:"chevron.backward").font(.caption)}.padding(.horizontal,18).frame(minHeight:54).contentShape(.rect)
-                    }.buttonStyle(.plain).accessibilityIdentifier("diary-niyya-open")
+                    }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-niyya-open")
                 }
                 GeometryReader { geometry in ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
@@ -143,23 +143,23 @@ struct DiaryDayView: View {
                             context.stroke(margin, with: .color(theme.color("margin")), lineWidth: 1)
                         }
                     }
-                }.overlay(alignment:.topTrailing){if let travel,!typeSize.isAccessibilitySize {DiaryPassportStamp(city:travel.city,date:service.stampDate(travel.arrival)).padding(.top,40).padding(.trailing,4)}}.overlay(alignment:.topTrailing){if friday,!typeSize.isAccessibilitySize {HStack(alignment:.top,spacing:5){if fridayStyle == .ribbon {ribbon("يوم الجمعة",color:theme.accent,height:88)};if appearance?.weekAvailable == true {Button{weekOpen=true}label:{ribbon("صندوق الأسبوع",color:theme.color("ghad"),height:130).frame(width:44).contentShape(.rect)}.buttonStyle(.plain).accessibilityIdentifier("diary-week-open")}}.padding(.trailing,12)}}
+                }.overlay(alignment:.topTrailing){if let travel,!typeSize.isAccessibilitySize {DiaryPassportStamp(city:travel.city,date:service.stampDate(travel.arrival)).padding(.top,40).padding(.trailing,4)}}.overlay(alignment:.topTrailing){if friday,!typeSize.isAccessibilitySize {HStack(alignment:.top,spacing:5){if fridayStyle == .ribbon {ribbon("يوم الجمعة",color:theme.accent,height:88)};if appearance?.weekAvailable == true {Button{weekOpen=true}label:{ribbon("صندوق الأسبوع",color:theme.color("ghad"),height:130).frame(width:44).contentShape(.rect)}.buttonStyle(.madarPlain).accessibilityIdentifier("diary-week-open")}}.padding(.trailing,12)}}
                 }
             }.background(theme.background).foregroundStyle(theme.ink).environment(\.roomTheme,theme)
                 .safeAreaInset(edge: .bottom, spacing: 0) {
                     VStack(spacing: 8) {
                     if app.undoToastVisible {
-                        UndoToast(message: app.undoMessage, undo: app.undo)
+                        UndoToast(message: app.undoMessage, undo: app.undo, dismiss: app.hideUndoToast)
                             .accessibilityIdentifier("diary-day-undo")
                     }
                     HStack(spacing:10){
                         if let travel,shownDay == today {
-                            Button { writing = true } label: { Text("اكتب من " + travel.city).font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 54).foregroundStyle(theme.color("onButton")).background(theme.color("button"),in:.capsule) }.buttonStyle(.plain).accessibilityIdentifier("diary-day-write")
+                            Button { writing = true } label: { Text("اكتب من " + travel.city).font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 54).foregroundStyle(theme.color("onButton")).background(theme.color("button"),in:.capsule) }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-day-write")
                         } else {
-                        Button { writing = true } label: { Label(shownDay == today ? "اكتب" : "اكتب في هامشها", systemImage: "pencil").font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 54).foregroundStyle(theme.background).background(theme.dark ? theme.accent:theme.ink,in:.capsule) }.buttonStyle(.plain).accessibilityIdentifier("diary-day-write")
+                        Button { writing = true } label: { Label(shownDay == today ? "اكتب" : "اكتب في هامشها", systemImage: "pencil").font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 54).foregroundStyle(theme.background).background(theme.dark ? theme.accent:theme.ink,in:.capsule) }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-day-write")
 
                         }
-                        if travel != nil {Button{stampsOpen=true}label:{Text("الأختام").font(DiaryType.label).frame(minHeight:54).padding(.horizontal,18).overlay{Capsule().stroke(theme.line)}}.buttonStyle(.plain).accessibilityIdentifier("diary-stamps-open")}
+                        if travel != nil {Button{stampsOpen=true}label:{Text("الأختام").font(DiaryType.label).frame(minHeight:54).padding(.horizontal,18).overlay{Capsule().stroke(theme.line)}}.buttonStyle(.madarPlain).accessibilityIdentifier("diary-stamps-open")}
                     }.padding(.horizontal,18).padding(.vertical,8).background(theme.background)
                     }.background(theme.background)
                 }
@@ -207,9 +207,9 @@ struct DiaryDayView: View {
     private func eveningIntention(_ row:DiaryIntention)->some View {
         VStack(alignment:.leading,spacing:10){
             HStack{Text("نويت صباحًا").font(DiaryType.label).foregroundStyle(theme.accent);Spacer();if intentions.count>1 {Button("و"+arabicCount(intentions.count-1,["نيّة أخرى","نيّتان أخريان","نيّات أخرى","نيّةً أخرى"],service.digits)){intentionsOpen=true}.font(DiaryType.label).frame(minHeight:44).accessibilityIdentifier("diary-niyya-more")}}
-            Button{intentionsOpen=true}label:{Text(row.text).font(DiaryType.writing).frame(maxWidth:.infinity,alignment:.leading).lineLimit(3)}.buttonStyle(.plain).accessibilityIdentifier("diary-niyya-open")
+            Button{intentionsOpen=true}label:{Text(row.text).font(DiaryType.writing).frame(maxWidth:.infinity,alignment:.leading).lineLimit(3)}.buttonStyle(.madarPlain).accessibilityIdentifier("diary-niyya-open")
             HStack(spacing:6){ForEach([("done","تمّت"),("partial","جزئيًا"),("notEasy","ما تيسّرت")],id:\.0){value,title in
-                Button{Task{@MainActor in do{try await service.setIntentionResult(row.id,result:row.result==value ? nil:value);intentions=try service.intentions(shownDay);niyyaSaved=true}catch{failure=madarUserMessage(error)}}}label:{Text(title).font(DiaryType.label).frame(maxWidth:.infinity,minHeight:44).foregroundStyle(row.result==value ? theme.background:theme.ink).background(row.result==value ? (theme.dark ? theme.accent:theme.ink):.clear,in:.capsule).overlay{Capsule().stroke(theme.line)}}.buttonStyle(.plain).accessibilityIdentifier("diary-niyya-inline-"+value).accessibilityAddTraits(row.result==value ? .isSelected:[])
+                Button{Task{@MainActor in do{try await service.setIntentionResult(row.id,result:row.result==value ? nil:value);intentions=try service.intentions(shownDay);niyyaSaved=true}catch{failure=madarUserMessage(error)}}}label:{Text(title).font(DiaryType.label).frame(maxWidth:.infinity,minHeight:44).foregroundStyle(row.result==value ? theme.background:theme.ink).background(row.result==value ? (theme.dark ? theme.accent:theme.ink):.clear,in:.capsule).overlay{Capsule().stroke(theme.line)}}.buttonStyle(.madarPlain).accessibilityIdentifier("diary-niyya-inline-"+value).accessibilityAddTraits(row.result==value ? .isSelected:[])
             }}
         }.padding(14).background(theme.surface,in:.rect(cornerRadius:18)).overlay{RoundedRectangle(cornerRadius:18).stroke(theme.line)}.padding(.horizontal,18).padding(.vertical,6).accessibilityElement(children:.contain).accessibilityIdentifier("diary-niyya-evening")
     }
@@ -233,7 +233,7 @@ struct DiaryDayView: View {
     }
     private func dateChoice(_ title: String, id: String, value: GregorianDay) -> some View {
         Button { selected = value } label: { Text(title).font(DiaryType.label).frame(minHeight: 44).padding(.horizontal, 10).background(shownDay == value ? theme.surface : .clear, in: .rect(topLeadingRadius: 10, topTrailingRadius: 10)).overlay { UnevenRoundedRectangle(topLeadingRadius: 10, topTrailingRadius: 10).stroke(shownDay == value ? theme.color("ink3Text") : theme.line) } }
-            .buttonStyle(.plain).accessibilityIdentifier("diary-day-" + id).accessibilityAddTraits(shownDay == value ? .isSelected : [])
+            .buttonStyle(.madarPlain).accessibilityIdentifier("diary-day-" + id).accessibilityAddTraits(shownDay == value ? .isSelected : [])
     }
     /// Arabic counted noun: يوم واحد، يومان، ٣–١٠ أيام، ١١–٩٩ يومًا، ١٠٠ يوم.
     private func dayCount(_ n:Int)->String {
@@ -258,10 +258,10 @@ struct DiaryDayView: View {
                     .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading).accessibilityIdentifier("diary-day-line")
                 if let name = projectLinks[line.id] {Text("مشروع: "+name).font(DiaryType.label).foregroundStyle(theme.color("ink3Text")).accessibilityIdentifier("diary-line-project")}
                 else if let project = projectSuggestions[line.id] {
-                    Button{Task{do{try await service.link(line.id,to:project.id);niyyaSaved=true}catch{failure=madarUserMessage(error)}}}label:{Text("يتعلّق بـ«"+project.name+"»؟").font(DiaryType.label).padding(.horizontal,10).frame(minHeight:30).overlay{Capsule().stroke(theme.line)}}.buttonStyle(.plain).accessibilityIdentifier("diary-line-project-suggest")
+                    Button{Task{do{try await service.link(line.id,to:project.id);niyyaSaved=true}catch{failure=madarUserMessage(error)}}}label:{Text("يتعلّق بـ«"+project.name+"»؟").font(DiaryType.label).padding(.horizontal,10).frame(minHeight:30).overlay{Capsule().stroke(theme.line)}}.buttonStyle(.madarPlain).accessibilityIdentifier("diary-line-project-suggest")
                 }
                 if let first = page.originals[line.id] {
-                    Button{original = .init(id:line.id,text:first)}label:{Text("عُدّل · الأصل").font(DiaryType.label).frame(minHeight:30)}.buttonStyle(.plain).foregroundStyle(theme.color("ink3Text")).accessibilityIdentifier("diary-line-edited")
+                    Button{original = .init(id:line.id,text:first)}label:{Text("عُدّل · الأصل").font(DiaryType.label).frame(minHeight:30)}.buttonStyle(.madarPlain).foregroundStyle(theme.color("ink3Text")).accessibilityIdentifier("diary-line-edited")
                 }
                 if line.kind == "late" { Text("كُتبت لاحقًا").font(DiaryType.label) }
                 if line.kind == "margin" {

@@ -172,10 +172,10 @@ struct QuranHomeView: View {
             if state.streakDays > 0 {
             Button { showPlan = true } label: { HStack(spacing: 6) { Circle().fill(theme.color("hifz")).frame(width: 7, height: 7); Text(state.streakLabel).font(bodyFont(12, bold: true)) }
                 .padding(.horizontal, 13).padding(.vertical, 9).background(theme.color("hifzTint"), in: Capsule())
-                }.buttonStyle(.plain).accessibilityIdentifier("quran-streak")
+                }.buttonStyle(.madarPlain).accessibilityIdentifier("quran-streak")
             } else if state.plan != nil {
                 Button { showPlan = true } label: { Label("خطّتك", systemImage: "slider.horizontal.3").font(bodyFont(12, bold: true)).frame(minHeight: 44) }
-                    .buttonStyle(.plain).accessibilityIdentifier("quran-open-plan")
+                    .buttonStyle(.madarPlain).accessibilityIdentifier("quran-open-plan")
             }
         }.padding(.horizontal, 8)
     }
@@ -189,7 +189,7 @@ struct QuranHomeView: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                     .padding(.vertical, 2).contentShape(Rectangle())
-            }.buttonStyle(.plain)
+            }.buttonStyle(.madarPlain)
                 .accessibilityHint("عرض مصدر الحديث")
                 .accessibilityIdentifier("quran-coverage-hadith")
             VStack(alignment: .leading, spacing: 6) {
@@ -282,7 +282,7 @@ struct QuranHomeView: View {
                 Text(selected.title).font(bodyFont(12, bold: isSelected)).foregroundStyle(isSelected ? theme.ink : theme.secondaryInk)
                 Text(subtitle).font(bodyFont(11)).foregroundStyle(text).lineLimit(2).multilineTextAlignment(.center).frame(minHeight: 28, alignment: .top)
             }.frame(maxWidth: .infinity).contentShape(Rectangle())
-        }.buttonStyle(.plain).accessibilityIdentifier("quran-level-\(kind.rawValue)-\(selected.rawValue)")
+        }.buttonStyle(.madarPlain).accessibilityIdentifier("quran-level-\(kind.rawValue)-\(selected.rawValue)")
             .accessibilityLabel((kind == .hifz ? "الحفظ" : "المراجعة") + "، " + selected.title + "، " + subtitle)
             .accessibilityValue(isSelected ? "محدد" : "غير محدد")
             .accessibilityAddTraits(isSelected ? .isSelected : [])
@@ -316,7 +316,7 @@ struct QuranHomeView: View {
                     Spacer(minLength: 0)
                     if step.completed { Image(systemName: "checkmark").foregroundStyle(color) }
                 }.frame(minHeight: 50).strikethrough(step.completed).opacity(step.completed ? 0.55 : 1).contentShape(Rectangle())
-            }.buttonStyle(.plain).accessibilityIdentifier("quran-step-" + step.id)
+            }.buttonStyle(.madarPlain).accessibilityIdentifier("quran-step-" + step.id)
             if step.id == next?.id, state?.draft == nil {
                 Button("ابدأ") { run { active = try await service.start(kind: step.kind, stepID: step.id, range: step.range, rakaat: nil, spotID: nil) } }
                     .font(bodyFont(14, bold: true)).foregroundStyle(theme.onAccent).padding(.horizontal, 20).frame(minHeight: 44)
@@ -366,12 +366,12 @@ struct QuranHomeView: View {
                     if state.coverageFraction > 0 { tool("ورد القيام", icon: "moon", id: "qiyam") { showQiyam = true } }
                 }
                 Divider().overlay(theme.line)
-                Button { showOutside = true } label: { Label("التذكير والودجات", systemImage: "bell").font(bodyFont(14)).frame(maxWidth: .infinity, minHeight: 44) }.buttonStyle(.plain).accessibilityIdentifier("quran-outside")
+                Button { showOutside = true } label: { Label("التذكير والودجات", systemImage: "bell").font(bodyFont(14)).frame(maxWidth: .infinity, minHeight: 44) }.buttonStyle(.madarPlain).accessibilityIdentifier("quran-outside")
             }
         }
     }
     private func tool(_ title: String, icon: String, id: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) { VStack(spacing: 8) { Image(systemName: icon).font(.system(size: 18)); Text(title).font(bodyFont(11, bold: true)).multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true) }.frame(maxWidth: .infinity, minHeight: 74, alignment: .top).contentShape(Rectangle()) }.buttonStyle(.plain).accessibilityIdentifier("quran-tool-" + id)
+        Button(action: action) { VStack(spacing: 8) { Image(systemName: icon).font(.system(size: 18)); Text(title).font(bodyFont(11, bold: true)).multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true) }.frame(maxWidth: .infinity, minHeight: 74, alignment: .top).contentShape(Rectangle()) }.buttonStyle(.madarPlain).accessibilityIdentifier("quran-tool-" + id)
     }
     private func refresh() async throws { state = try await service.load() }
     private func run(_ operation: @escaping @MainActor () async throws -> Void) {

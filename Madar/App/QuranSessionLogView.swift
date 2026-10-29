@@ -30,7 +30,7 @@ struct QuranSessionLogView: View {
                     }
                     HStack(spacing: 4) {
                         ForEach([("all","الكل"),("hifz","حفظ"),("review","مراجعة"),("drill","مذاكرة")], id: \.0) { key, title in
-                            Button { filter = key } label: { Text(title).font(quranFont(12, bold: filter == key)).frame(maxWidth: .infinity, minHeight: 44).foregroundStyle(filter == key ? theme.onAccent : theme.ink).background(filter == key ? theme.accent : theme.surface, in: Capsule()) }.buttonStyle(.plain).accessibilityIdentifier("quran-history-filter-" + key)
+                            Button { filter = key } label: { Text(title).font(quranFont(12, bold: filter == key)).frame(maxWidth: .infinity, minHeight: 44).foregroundStyle(filter == key ? theme.onAccent : theme.ink).background(filter == key ? theme.accent : theme.surface, in: Capsule()) }.buttonStyle(.madarPlain).accessibilityIdentifier("quran-history-filter-" + key)
                         }
                     }
                     if records.isEmpty {
@@ -68,7 +68,7 @@ struct QuranSessionLogView: View {
                 if let error { Text(error).font(quranFont(13)) }
             }.padding(16)
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.color("review")).disabled(busy)
-            .safeAreaInset(edge: .bottom) { if app.undoToastVisible { UndoToast(message: app.undoMessage, undo: app.undo).accessibilityIdentifier("quran-history-undo") } }
+            .safeAreaInset(edge: .bottom) { if app.undoToastVisible { UndoToast(message: app.undoMessage, undo: app.undo, dismiss: app.hideUndoToast).accessibilityIdentifier("quran-history-undo") } }
             .task { load() }.onChange(of: app.undoToken?.id) { load() }
             .alert("احذف هذه الجلسة؟", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), presenting: deleting) { id in
                 Button("احذف", role: .destructive) { deleting = nil; run { try await service.perform(.deleteSession(id)); expanded = nil; load() } }
@@ -113,7 +113,7 @@ struct QuranSessionLogView: View {
                     }
                     Image(systemName: expanded == record.id ? "chevron.up" : "chevron.down").font(.system(size: 12)).foregroundStyle(theme.secondaryInk)
                 }.frame(minHeight: 50).contentShape(Rectangle())
-            }.buttonStyle(.plain).accessibilityIdentifier("quran-history-record-" + record.id.uuidString)
+            }.buttonStyle(.madarPlain).accessibilityIdentifier("quran-history-record-" + record.id.uuidString)
             if expanded == record.id {
                 if !record.grades.isEmpty {
                     Picker("الوجه", selection: $page) { ForEach(record.grades) { grade in Text(grade.title).tag(grade.page) } }.font(quranFont(14)).tint(theme.ink)
@@ -127,7 +127,7 @@ struct QuranSessionLogView: View {
                                     .frame(maxWidth: .infinity, minHeight: 44)
                                     .background(current ? theme.color(colours.tint) : theme.surface, in: Capsule())
                                     .overlay { Capsule().stroke(theme.color(colours.ink).opacity(current ? 1 : 0.28), lineWidth: current ? 1.5 : 0.8) }
-                            }.buttonStyle(.plain).accessibilityAddTraits(current ? .isSelected : [])
+                            }.buttonStyle(.madarPlain).accessibilityAddTraits(current ? .isSelected : [])
                                 .accessibilityIdentifier("quran-history-grade-" + grade.id)
                         }
                     }

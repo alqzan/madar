@@ -39,7 +39,7 @@ struct HabitOrbitView:View {
                                 HabitBead(state:HabitBead.State(row),colour:beadColour(row),theme:theme).frame(width:17,height:17)
                                 Text(row.name).font(.custom("thmanyahsans-Regular",size:11,relativeTo:.caption2)).lineLimit(1).padding(.horizontal,3).background(theme.background.opacity(0.92),in:.capsule)
                             }.frame(width:86,height:44)
-                        }.buttonStyle(.plain).accessibilityLabel(row.name+"، "+row.statusTitle).accessibilityIdentifier("habit-orbit-"+row.id.uuidString).position(x:centre.x+cos(angle)*radius,y:centre.y+sin(angle)*radius)
+                        }.buttonStyle(.madarPlain).accessibilityLabel(row.name+"، "+row.statusTitle).accessibilityIdentifier("habit-orbit-"+row.id.uuidString).position(x:centre.x+cos(angle)*radius,y:centre.y+sin(angle)*radius)
                     }
                     if let phase = nowPositions[f] {
                         let angle = (phase * 360 - 90) * Double.pi / 180

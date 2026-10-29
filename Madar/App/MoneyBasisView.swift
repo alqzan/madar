@@ -32,7 +32,7 @@ struct MoneyBasisView: View {
                                         Image(systemName: "arrow.up.left").font(.caption)
                                     }
                                 }.frame(maxWidth: .infinity, alignment: .trailing).contentShape(.rect)
-                            }.buttonStyle(.plain).accessibilityIdentifier("money-cash-open")
+                            }.buttonStyle(.madarPlain).accessibilityIdentifier("money-cash-open")
                             if reading.home.unknownBalanceCount > 0 {
                                 Text(reading.home.hasKnownBalance ? "الأرقام تخص الأرصدة المعروفة فقط؛ الحسابات التي تنتظر مطابقة لا تدخل في المجموع." : "المحجوز واليومية من السجلات؛ النقد والصافي وغير المخصّص ينتظرون مطابقة مع البنك.")
                                     .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
@@ -73,7 +73,7 @@ struct MoneyBasisView: View {
             if let value = reading.explanation.futureDailyMinor { basisRow("يومياتك القادمة", value, "money-basis-future") }
             if let value = reading.explanation.cycleRemainderMinor { basisRow(reading.home.hasKnownBalance && value < 0 ? "فرق التمويل" : "فائض الدورة", value, "money-basis-remainder", known: reading.home.hasKnownBalance) }
             ForEach(reading.reserved) { piece in
-                Button { source = piece.detail } label: { HStack { Text(piece.title); Spacer(); Text(figure: amount(piece.amountMinor)) }.frame(minHeight: 44).contentShape(.rect) }.buttonStyle(.plain)
+                Button { source = piece.detail } label: { HStack { Text(piece.title); Spacer(); Text(figure: amount(piece.amountMinor)) }.frame(minHeight: 44).contentShape(.rect) }.buttonStyle(.madarPlain)
             }
         }
     }
@@ -92,7 +92,7 @@ struct MoneyPageHeader: View {
             Text(title).font(MadarTypography.title())
             Spacer()
             Button(action: close) { Image(systemName: "xmark").font(.body).frame(width: 44, height: 44).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1) } }
-                .buttonStyle(.plain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-page-close")
+                .buttonStyle(.madarPlain).accessibilityLabel("إغلاق").accessibilityIdentifier("money-page-close")
         }.frame(minHeight: 48)
     }
 }
@@ -161,7 +161,7 @@ struct MoneyBasisColumn: View {
                             Text(piece.title).font(MadarTypography.fine()).foregroundStyle(theme.color(piece.role))
                             Text(figure: service.amount(piece.amountMinor)).font(MadarTypography.cardTitle())
                         }.frame(minHeight: 44)
-                    }.buttonStyle(.plain).frame(width: 170, alignment: .leading).position(x: proxy.size.width - barX + 90, y: y)
+                    }.buttonStyle(.madarPlain).frame(width: 170, alignment: .leading).position(x: proxy.size.width - barX + 90, y: y)
                         .accessibilityIdentifier("money-basis-source-" + piece.id)
                 }
             }
