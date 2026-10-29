@@ -87,7 +87,8 @@ struct DiaryTextEditor: View {
                             Spacer()
                             recordButton(voice, large: true)
                             Spacer()
-                            PhotosPicker(selection: $photo, matching: .images, photoLibrary: .shared()) { Label("صورة", systemImage: "photo").font(MadarTypography.caption()).padding(.horizontal, 12).frame(minHeight: 44).overlay { Capsule().stroke(theme.line) } }
+                            // AU-45: the row above already offers «صورة»; one button is enough.
+                            Color.clear.frame(width: 44, height: 44).accessibilityHidden(true)
                         }
                         Text(voice.recording ? "اضغط لإيقاف التسجيل وحفظ الصوت" : "اضغط وتكلّم").font(MadarTypography.fine()).frame(maxWidth: .infinity)
                         HStack {
