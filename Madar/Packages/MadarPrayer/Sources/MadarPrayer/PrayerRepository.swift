@@ -55,11 +55,8 @@ import MadarData
         guard let homeTimes = PrayerTimesEngine.calculate(day: ref.day, place: home, options: options) else {
             return tripOccurrence(ref)
         }
+        if let trip = tripOccurrence(ref) { return trip }
         let base = homeTimes.time(for: ref.prayer)
-        if let trip = activeTrip(at: base), let times = PrayerTimesEngine.calculate(day: ref.day, place: trip.place, options: tripOptions) {
-            let actual = times.time(for: ref.prayer)
-            if trip.start <= actual && (trip.end == nil || actual < trip.end!) { return .init(reference: ref, time: actual, place: trip.place, tripID: trip.id) }
-        }
         return .init(reference: ref, time: base, place: home, tripID: nil)
     }
     private func tripOccurrence(_ ref: PrayerReference) -> PrayerOccurrence? {

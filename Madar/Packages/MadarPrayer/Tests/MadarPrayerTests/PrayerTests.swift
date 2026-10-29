@@ -352,6 +352,20 @@ import MadarData
         // Independent MWL fixture in CoreTests pins London Fajr to 04:10 ±3 min; Egypt's 19.5° Fajr is earlier.
         #expect(repository.prayerDay(at: nearFajr) == expectedPrayerDay)
     }
+    @Test func aTripStartingAfterHomeDhuhrUsesTheLaterDestinationDhuhr() throws {
+        let container = try container(start: "2026-03-28T08:00:00+00:00")
+        let context = container.mainContext
+        let trip = Trip()
+        trip.city = "لندن"; trip.lat = 51.5074; trip.lon = -0.1278; trip.tzID = "Europe/London"
+        trip.mode = "manual"; trip.start = time("2026-03-28T09:30:00+00:00"); trip.end = time("2026-03-28T13:00:00+00:00")
+        context.insert(trip); try context.save()
+
+        let repository = try PrayerRepository(context: context)
+        let occurrence = try #require(repository.occurrence(ref("2026-03-28", .dhuhr)))
+        // §9 reference table: London, 28 March 2026, Dhuhr 12:06 (GMT).
+        #expect(occurrence.time == time("2026-03-28T12:06:00+00:00"))
+        #expect(occurrence.place.timeZoneID == "Europe/London" && occurrence.tripID == trip.id)
+    }
     @Test func monthRatioGolden26Of30AndStrictStreakNotRepairedByQada() throws {
         // Hand-authored §7.2 example: 26 on time, 2 qada, 2 missed. No code-generated expectations.
         let container = try container(start: "2026-10-01T12:00:00+03:00"); let context = container.mainContext
