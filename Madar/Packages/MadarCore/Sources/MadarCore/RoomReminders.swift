@@ -39,8 +39,13 @@ public enum RoomReminders {
     /// (category, cycle). The request id is stable for the pair, so once it has fallen the ledger keeps it from returning;
     /// `categoryCycleKey` holds the arbiter's in-plan cap. It leaves sanctity like every other reminder (RP3).
     /// `scheduledAt` is the time an earlier pass already planned; keeping it stops each refresh from pushing the alert later.
-    public static func limit80(categoryID: UUID, cycleID: UUID, spentMinor: Int, limitMinor: Int, dayKey: String, prayerDays: [PrayerDay], now: Date, scheduledAt: Date? = nil) -> NotificationCandidate? {
-        guard limitMinor > 0, spentMinor * 5 >= limitMinor * 4 else { return nil }
+    public static func limit80(categoryID: UUID, cycleID: UUID, spentMinor: Int, limitMinor: Int?, dayKey: String, prayerDays: [PrayerDay], now: Date, scheduledAt: Date? = nil) -> NotificationCandidate? {
+        guard let limitMinor, limitMinor >= 0, spentMinor > 0 else { return nil }
+        if limitMinor > 0 {
+            // ceil(limit * 0.8), without multiplying either potentially large minor-unit value.
+            let threshold = (limitMinor / 5) * 4 + ((limitMinor % 5) * 4 + 4) / 5
+            guard spentMinor >= threshold else { return nil }
+        }
         let due = SanctityGuard(prayerDays: prayerDays).clamp(scheduledAt.flatMap { $0 > now ? $0 : nil } ?? now.addingTimeInterval(60))
         return .init(id: "mal.alert80.\(cycleID.uuidString).\(categoryID.uuidString)", room: .mal, dueAt: due, dayKey: dayKey,
                      categoryCycleKey: "\(categoryID.uuidString):\(cycleID.uuidString)")

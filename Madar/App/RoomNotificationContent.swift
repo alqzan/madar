@@ -126,8 +126,8 @@ import MadarPrayer
         let planned = (try? ModelContext(session.container).fetch(FetchDescriptor<NotificationLedger>()))?.filter { $0.deletedAt == nil && $0.state == "submitted" && $0.requestID.hasPrefix("mal.alert80.") } ?? []
         return reading.shelves.compactMap { shelf in
             let id = "mal.alert80.\(cycle.uuidString).\(shelf.id.uuidString)"
-            return shelf.limitMinor.flatMap { RoomReminders.limit80(categoryID: shelf.id, cycleID: cycle, spentMinor: shelf.spentMinor, limitMinor: $0, dayKey: dayKey, prayerDays: prayerDays, now: now,
-                                                                     scheduledAt: planned.filter { $0.requestID == id }.map(\.scheduledFor).max()) }
+            return RoomReminders.limit80(categoryID: shelf.id, cycleID: cycle, spentMinor: shelf.spentMinor, limitMinor: shelf.limitMinor, dayKey: dayKey, prayerDays: prayerDays, now: now,
+                                         scheduledAt: planned.filter { $0.requestID == id }.map(\.scheduledFor).max())
         }
     }
 

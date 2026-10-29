@@ -113,7 +113,12 @@ import Testing
         let at80 = RoomReminders.limit80(categoryID: category, cycleID: cycle, spentMinor: 1_920, limitMinor: 2_400, dayKey: "2026-10-09", prayerDays: [day], now: dawn)
         #expect(at80?.id == "mal.alert80.\(cycle.uuidString).\(category.uuidString)")
         #expect(at80?.room == .mal); #expect(at80?.dueAt == dawn.addingTimeInterval(60))
-        #expect(RoomReminders.limit80(categoryID: category, cycleID: cycle, spentMinor: 100, limitMinor: 0, dayKey: "2026-10-09", prayerDays: [day], now: dawn) == nil, "No limit, no alert")
+        let fixedZero = RoomReminders.limit80(categoryID: category, cycleID: cycle, spentMinor: 100, limitMinor: 0, dayKey: "2026-10-09", prayerDays: [day], now: dawn)
+        #expect(fixedZero?.id == at80?.id)
+        #expect(fixedZero?.dueAt == dawn.addingTimeInterval(60))
+        #expect(RoomReminders.limit80(categoryID: category, cycleID: cycle, spentMinor: 0, limitMinor: 0, dayKey: "2026-10-09", prayerDays: [day], now: dawn) == nil)
+        #expect(RoomReminders.limit80(categoryID: category, cycleID: cycle, spentMinor: 100, limitMinor: nil, dayKey: "2026-10-09", prayerDays: [day], now: dawn) == nil, "No configured limit")
+        #expect(RoomReminders.limit80(categoryID: category, cycleID: cycle, spentMinor: Int.max, limitMinor: Int.max, dayKey: "2026-10-09", prayerDays: [day], now: dawn) != nil)
         // A later movement in the same cycle makes the same request; a new cycle makes a new one.
         let again = RoomReminders.limit80(categoryID: category, cycleID: cycle, spentMinor: 2_300, limitMinor: 2_400, dayKey: "2026-10-10", prayerDays: [day], now: dawn)
         #expect(again?.id == at80?.id)
