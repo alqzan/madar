@@ -13,7 +13,7 @@ import XCTest
         let app = open(); shot(app,"M5-V23-medium-L")
         app.buttons["money-goal-plan-1"].tap(); XCTAssertTrue(app.staticTexts["money-goal-completion"].exists || app.otherElements["money-goal-completion"].exists)
         let adjust = app.buttons["money-goal-adjust"]; for _ in 0..<4 where !adjust.isHittable { app.swipeUp(velocity: .slow) }; shot(app,"M5-V23-medium-s1-L"); adjust.tap()
-        let daily = app.textFields["money-goal-daily"]; XCTAssertTrue(daily.waitForExistence(timeout: 5)); daily.tap(); daily.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 14) + "75")
+        let daily = app.textFields["money-goal-daily"]; XCTAssertTrue(daily.waitForExistence(timeout: 5)); shot(app, "M5-V23-editor-L"); daily.tap(); daily.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 14) + "75")
         let done = app.buttons["money-goal-editor-done"]; if !done.isHittable { app.swipeUp() }; done.tap()
         let create = app.buttons["money-goal-create"]; for _ in 0..<4 where !create.isHittable { app.swipeUp(velocity: .slow) }; create.tap()
         let confirm = app.buttons["money-goal-confirm"]; XCTAssertTrue(confirm.waitForExistence(timeout: 5)); shot(app,"M5-V23-preview-L"); confirm.tap()
