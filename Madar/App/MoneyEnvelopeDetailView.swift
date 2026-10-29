@@ -42,7 +42,7 @@ struct MoneyEnvelopeDetailView: View {
                             Spacer(minLength: 0)
                             if visible && reading.savingPlanID != nil {
                                 Button { savingAdd = false; savingOpen = true } label: { Image(systemName: "minus").frame(width: 48, height: 48).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1) } }.accessibilityLabel("قلّل ادخار المظروف").buttonStyle(.plain)
-                                Button { savingAdd = true; savingOpen = true } label: { Image(systemName: "plus").frame(width: 48, height: 48).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1) } }.accessibilityLabel("زد ادخار المظروف").buttonStyle(.plain)
+                                Button { savingAdd = true; savingOpen = true } label: { Image(systemName: "plus").frame(width: 48, height: 48).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1) } }.accessibilityLabel("زد ادخار المظروف").accessibilityIdentifier("money-envelope-saving-add").buttonStyle(.plain)
                             }
                         }
                     }
@@ -334,16 +334,15 @@ private struct MoneySavingChangeView: View {
         VStack(alignment: .leading, spacing: 18) {
             MoneyPageHeader(title: add ? "زد الادخار" : "قلّل الادخار", close: { dismiss() })
             Text("الآن " + service.amount(currentMinor) + " من كل راتب. التعديل للرواتب القادمة.").font(MadarTypography.body())
-            TextField("مقدار التغيير", text: $input).keyboardType(.decimalPad).font(MadarTypography.cardTitle()).padding(14).overlay { Rectangle().stroke(theme.color("reserveText"), lineWidth: 1) }
+            TextField("مقدار التغيير", text: $input).keyboardType(.decimalPad).font(MadarTypography.cardTitle()).padding(14).overlay { Rectangle().stroke(theme.color("reserveText"), lineWidth: 1) }.accessibilityIdentifier("money-saving-change-amount")
             Text("خطة السداد والحركات السابقة تبقى كما هي.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
             if let errorMessage { Text(errorMessage).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")) }
-            Button("احفظ التعديل", action: save).buttonStyle(MadarPrimaryButton()).disabled(working)
+            Button("احفظ التعديل", action: save).buttonStyle(MadarPrimaryButton()).disabled(working || changeMinor == nil).accessibilityIdentifier("money-saving-change-save")
             Spacer(minLength: 0)
         }.padding(20).background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).presentationDetents([.medium]).presentationDragIndicator(.visible)
     }
     private func save() {
-        let raw = BankMessageParser.clean(input).replacingOccurrences(of: ",", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let exponent = CurrencyExponents.specified.exponent(app.string("core.currency")), let delta = MoneyAmountInput.minor(raw, exponent: exponent), delta > 0 else { errorMessage = "أدخل مبلغًا موجبًا."; return }
+        guard let delta = changeMinor else { errorMessage = "أدخل مبلغًا موجبًا."; return }
         let (next, overflow) = currentMinor.addingReportingOverflow(add ? delta : -delta)
         guard !overflow, next >= 0, MoneyCommandPayload.integer(.string(String(next))) != nil else { errorMessage = "التخفيض أكبر من ادخارك، أو المبلغ خارج الحد المتاح."; return }
         working = true
@@ -352,5 +351,11 @@ private struct MoneySavingChangeView: View {
             do { try await app.executeMoneyCommand("money.setEnvelopeSaving", payload: ["id": .string(plan.uuidString), "amountMinor": .string(String(next)), "expectedMinor": .string(String(currentMinor))]); dismiss() }
             catch { errorMessage = "لم يُحفظ التعديل. أعد فتح المظروف لتحديثه." }
         }
+    }
+    private var changeMinor: Int? {
+        let raw = BankMessageParser.clean(input).replacingOccurrences(of: ",", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let exponent = CurrencyExponents.specified.exponent(app.string("core.currency")),
+              let delta = MoneyAmountInput.minor(raw, exponent: exponent), delta > 0 else { return nil }
+        return delta
     }
 }

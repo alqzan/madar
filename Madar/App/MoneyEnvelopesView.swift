@@ -202,7 +202,7 @@ struct MoneyReserveTargetView: View {
             } else {
                 TextField("المبلغ المستهدف", text: $input).keyboardType(.decimalPad).font(MadarTypography.cardTitle()).padding(16).overlay { RoundedRectangle(cornerRadius: 12).stroke(theme.color("reserveText"), lineWidth: 1) }.accessibilityIdentifier("money-reserve-target-input")
                 if let errorMessage { Text(errorMessage).font(MadarTypography.caption()) }
-                Button("احفظ الهدف") { save() }.buttonStyle(MadarPrimaryButton()).disabled(working).accessibilityIdentifier("money-reserve-target-save")
+                Button("احفظ الهدف") { save() }.buttonStyle(MadarPrimaryButton()).disabled(working || targetMinor == nil).accessibilityIdentifier("money-reserve-target-save")
             }
             Spacer(minLength: 0)
         }.padding(20).background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
@@ -210,12 +210,17 @@ struct MoneyReserveTargetView: View {
             .task { fill() }.onChange(of: numbersVisible) { fill() }
     }
     private var numbersVisible: Bool { visible || revealed }
+    private var targetMinor: Int? {
+        let raw = BankMessageParser.clean(input).replacingOccurrences(of: ",", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let exp = CurrencyExponents.specified.exponent(app.string("core.currency")),
+              let value = MoneyAmountInput.minor(raw, exponent: exp), value > 0 else { return nil }
+        return value
+    }
     private func fill() { if let current, numbersVisible, input.isEmpty { input = AppMoneyService(app: app).amount(current, full: true) } }
     private func save() {
         guard current == nil || numbersVisible else { return }
         errorMessage = nil
-        let raw = BankMessageParser.clean(input).replacingOccurrences(of: ",", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let exp = CurrencyExponents.specified.exponent(app.string("core.currency")), let value = MoneyAmountInput.minor(raw, exponent: exp), value > 0 else { errorMessage = "أدخل مبلغًا موجبًا للهدف."; return }
+        guard let value = targetMinor else { errorMessage = "أدخل مبلغًا موجبًا للهدف."; return }
         working = true
         Task {
             defer { working = false }

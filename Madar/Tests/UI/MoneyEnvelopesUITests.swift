@@ -45,6 +45,31 @@ import XCTest
         XCTAssertFalse(app.descendants(matching: .any)["money-reserve-target"].firstMatch.exists)
         XCTAssertTrue(app.staticTexts["money-envelope-reserve"].label.contains("١٠٠٬٠٠٠"))
     }
+    func testReserveGoalSaveRequiresPositiveAmount() throws {
+        continueAfterFailure = false; let app = make(); open(app)
+        app.buttons["money-reserve-preview-5000000"].tap()
+        app.buttons["money-reserve-mode-goal"].tap()
+        let input = app.textFields["money-reserve-target-input"], save = app.buttons["money-reserve-target-save"]
+        XCTAssertTrue(input.waitForExistence(timeout: 5)); XCTAssertTrue(save.waitForExistence(timeout: 5))
+        XCTAssertFalse(save.isEnabled, "An empty reserve goal cannot be saved")
+        input.tap(); input.typeText("200000")
+        XCTAssertTrue(save.isEnabled, "A positive target enables saving")
+        app.terminate()
+    }
+    func testEnvelopeSavingChangeRequiresPositiveAmount() throws {
+        continueAfterFailure = false; let app = make("salary"); open(app)
+        let trip = app.buttons["money-envelope-رحلة الشتاء"]
+        reachGoal(trip, in: app); XCTAssertTrue(trip.waitForExistence(timeout: 10)); trip.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["money-envelope-detail"].waitForExistence(timeout: 10))
+        let increase = app.buttons["money-envelope-saving-add"]
+        XCTAssertTrue(increase.waitForExistence(timeout: 5)); increase.tap()
+        let input = app.textFields["money-saving-change-amount"], save = app.buttons["money-saving-change-save"]
+        XCTAssertTrue(input.waitForExistence(timeout: 5)); XCTAssertTrue(save.waitForExistence(timeout: 5))
+        XCTAssertFalse(save.isEnabled, "An empty saving change cannot be saved")
+        input.tap(); input.typeText("50")
+        XCTAssertTrue(save.isEnabled, "A positive change enables saving")
+        app.terminate()
+    }
     func testHiddenReserveDoesNotLeakDailiesOrCoverage() throws {
         continueAfterFailure = false; let app = make("hidden"); open(app)
         XCTAssertEqual(app.staticTexts["money-envelope-reserve"].label, "•••")
