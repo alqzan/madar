@@ -184,6 +184,11 @@ private struct PDFConversionLoadedCheckpoint {
             jobs.removeAll { $0.id == book.id }
             Self.setPending(book.id, false, app: app)
             Self.removeCheckpoint(book.id, app: app)
+        } catch DataError.authenticationFailed {
+            // Locked mid-way: keep it pending with its checkpoint; the shelf resumes it after the next unlock.
+            jobs.removeAll { $0.id == book.id }
+            tasks[book.id] = nil; endBackground(book.id)
+            return
         } catch {
             update(book.id) { $0.state = .failed("تعذّر تحويل «\(book.title)». يبقى PDF كما هو وتقرؤه بصفحاته.") }
         }
