@@ -14,6 +14,7 @@ struct MoneyRulesView: View {
     @State private var selected: UUID?
     @State private var expanded: UUID?
     @State private var failure: String?
+    @State private var runFailure: String?
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
     private var service: AppMoneyService { .init(app: app) }
     private static let ignoreLantern = UUID(uuidString: "00000000-0000-0000-0000-00000000F00D")!
@@ -47,6 +48,7 @@ struct MoneyRulesView: View {
                         lanterns(reading)
                         merchants(reading)
                     }
+                    if let runFailure { Text(runFailure).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")).accessibilityIdentifier("money-rule-failure") }
                     Label("يتعلّم مدار التاجر من اختيارك، ولا يغيّر نقل القاعدة أو نسيانها حركاتك السابقة.", systemImage: "lightbulb")
                         .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).padding(.top, 6)
                 } else if let failure { Text(failure).font(MadarTypography.body()); Button("أعِد المحاولة", action: load).frame(minHeight: 44) }
@@ -182,7 +184,12 @@ struct MoneyRulesView: View {
         }
     }
     private func run(_ name: String, _ payload: [String: MadarCore.JSONValue]) {
-        Task { try? await app.executeMoneyCommand(name, payload: payload); expanded = nil; load() }
+        runFailure = nil
+        // AU-42: a refused move or forget says so instead of quietly showing the old rule again.
+        Task {
+            do { try await app.executeMoneyCommand(name, payload: payload) } catch { runFailure = "لم يُحفظ التغيير على القاعدة. حاول مرة أخرى." }
+            expanded = nil; load()
+        }
     }
     private func load() {
         do { reading = try service.loadRules(); failure = nil } catch { failure = "تعذّرت قراءة القواعد" }
