@@ -26,7 +26,10 @@ import XCTest
         XCTAssertTrue(resume.waitForExistence(timeout: 20)); resume.tap()
         waitLabel(advance, contains: "١ من ٥")
         app.buttons["quran-session-hint"].tap()
-        app.buttons["quran-session-method"].tap()
+        let method = app.buttons["quran-session-method"]
+        // The hint is saved before the controls take taps again.
+        expectation(for: NSPredicate(format: "isEnabled == true"), evaluatedWith: method); waitForExpectations(timeout: 10)
+        method.tap()
         XCTAssertTrue(app.buttons["quran-method-completeAyah"].waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertFalse(app.buttons["quran-method-voice"].exists)
         attach(app, "M2-V02-methods-L")
