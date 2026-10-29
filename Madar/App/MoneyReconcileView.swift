@@ -466,13 +466,16 @@ struct MoneyReconcileView: View {
         return service.digits.string(minor / scale) == whole ? (fraction == 0 ? whole : whole + "." + String(format: "%0\(exponent)d", fraction))
             : service.amount(minor).filter { !"\u{2068}\u{2069}٬".contains($0) }
     }
+    // A typed amount that cannot be read says so; the row keeps its last good figure.
+    private static let unreadable = "لم أفهم هذا المبلغ؛ اكتب أرقامًا وفاصلة واحدة على الأكثر."
     private func commitTyped(_ r: MoneyReconcileRow) {
         let ascii = String(typed.map { ch -> Character in
             if let v = "٠١٢٣٤٥٦٧٨٩".firstIndex(of: ch) { return Character(String("٠١٢٣٤٥٦٧٨٩".distance(from: "٠١٢٣٤٥٦٧٨٩".startIndex, to: v))) }
             return ch == "٫" || ch == "," ? "." : ch
         }).filter { $0 != "٬" && $0 != " " }
-        if ascii.isEmpty { if entries[r.id] != nil, typing { entries[r.id] = nil }; return }
-        guard let value = MoneyAmountInput.minor(ascii, exponent: exponent) else { return }
+        if ascii.isEmpty { if note == Self.unreadable { note = nil }; if entries[r.id] != nil, typing { entries[r.id] = nil }; return }
+        guard let value = MoneyAmountInput.minor(ascii, exponent: exponent) else { note = Self.unreadable; return }
+        if note == Self.unreadable { note = nil }
         if entries[r.id]?.observedMinor != value { set(r, value, at: nil) }
     }
     private func nudge(_ r: MoneyReconcileRow, _ units: Int) {
