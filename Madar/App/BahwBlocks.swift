@@ -471,11 +471,11 @@ struct BahwBlockView: View {
     @ViewBuilder private var year: some View {
         let model = service.year()
         if size == .icon {
-            VStack(spacing: 2) { Text("مضى").font(small).foregroundStyle(lobby.secondaryInk); Text(percent(model.hijri)).font(big) }.frame(maxWidth: .infinity, maxHeight: .infinity)
+            VStack(spacing: 2) { Text("مضى").font(small).foregroundStyle(lobby.secondaryInk); Text(percent(model.hijri)).font(big).lineLimit(1).minimumScaleFactor(0.6) }.frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if size == .small {
             VStack(alignment: .leading, spacing: 6) {
                 title(lobby.accent)
-                Text(percent(model.hijri)).font(big)
+                Text(percent(model.hijri)).font(big).lineLimit(1).minimumScaleFactor(0.6)
                 strip(model.hijri, month: model.hijriMonthIndex, hijri: true)
             }
         } else {
@@ -517,7 +517,11 @@ struct BahwBlockView: View {
             }
         }.environment(\.layoutDirection, .rightToLeft).accessibilityHidden(true)
     }
-    private func percent(_ period: MadarPeriod) -> String { digits.string(period.basisPoints / 100) + "٪\u{061C}" }
+    // AU-33: the first days of a year read «دون ١٪», not a «٠٪» that says nothing has passed.
+    private func percent(_ period: MadarPeriod) -> String {
+        if period.elapsed > 0 && period.basisPoints < 100 { return "دون " + digits.string(1) + "٪\u{061C}" }
+        return digits.string(period.basisPoints / 100) + "٪\u{061C}"
+    }
     private func markTitle(_ name: MadarLandmark.Name) -> String {
         switch name { case .ramadan: "رمضان"; case .eidAlFitr: "العيد"; case .arafah: "عرفة"; case .hijriNewYear: "رأس السنة"; case .gregorianYearEnd: "نهاية السنة" }
     }
