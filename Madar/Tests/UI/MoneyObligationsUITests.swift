@@ -21,8 +21,12 @@ import XCTest
         XCTAssertTrue(app.descendants(matching: .any)["money-ladder"].exists)
         let add = app.buttons["money-obligations-add"]; for _ in 0..<3 where !add.isHittable { app.swipeUp(velocity: .slow) }
         add.tap()
+        let save = app.buttons["money-obligation-save"]
+        XCTAssertTrue(save.waitForExistence(timeout: 5)); XCTAssertFalse(save.isEnabled, "An empty new obligation cannot be saved")
         let name = app.textFields["money-obligation-name"]; XCTAssertTrue(name.waitForExistence(timeout: 5)); name.tap(); name.typeText("الماء")
+        XCTAssertFalse(save.isEnabled, "A name without an amount cannot be saved")
         let amount = app.textFields["money-obligation-amount"]; amount.tap(); amount.typeText("85")
+        XCTAssertTrue(save.isEnabled, "A positive amount and name enable saving")
         XCTAssertTrue(app.descendants(matching: .any)["money-obligation-preview"].waitForExistence(timeout: 5))
         let done = app.buttons["money-obligation-keyboard-done"]
         XCTAssertTrue(done.waitForExistence(timeout: 5)); done.tap()
@@ -34,7 +38,7 @@ import XCTest
         XCTAssertTrue(app.staticTexts["الإضافة"].exists)
         shot(app, "M5-V09-add-preview-L")
         shot(app, "M5-V09-add-L")
-        app.buttons["money-obligation-save"].tap()
+        save.tap()
         let row = app.buttons["money-obligation-row-الماء"]; XCTAssertTrue(row.waitForExistence(timeout: 10), app.debugDescription)
         for _ in 0..<5 where !row.isHittable { app.swipeUp(velocity: .slow) }
         shot(app, "M5-V09-obl-s2-L")
