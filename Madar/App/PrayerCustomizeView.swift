@@ -153,7 +153,7 @@ struct PrayerCustomizeView: View {
                         Text("معاينة حيّة").font(PrayerHomeType.smallBold).foregroundStyle(theme.color("accentText"))
                     }
                     Text("الصلاة كما ستظهر").font(serif(26))
-                    previewLine("الأجزاء", "\(session.digits(layout.visibleCount)) ظاهرة")
+                    previewLine("الأجزاء", arabicCount(layout.visibleCount, ["جزء واحد ظاهر", "جزآن ظاهران", "أجزاء ظاهرة", "جزءًا ظاهرًا"], MadarNumberFormatter(style: session.string("core.numerals") == "western" ? .western : .hindi))) // AU-37: «٥ أجزاء ظاهرة», not «٥ ظاهرة».
                     previewLine("طريقة الحساب", label("salah.method"))
                     previewLine("وقت العصر", label("salah.asr"))
                     Text(CustomizationCopy.changes(count: changedCount, formattedCount: session.digits(changedCount)))

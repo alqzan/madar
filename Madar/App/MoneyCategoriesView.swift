@@ -20,6 +20,7 @@ struct MoneyCategoriesView: View {
     @State private var draftBp = 0
     @State private var draftBase = "income"
     @State private var saving = false
+    @State private var saveFailure: String?
     @State private var revealed = false
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
     private var service: AppMoneyService { .init(app: app) }
@@ -54,7 +55,7 @@ struct MoneyCategoriesView: View {
                         }.font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).frame(maxWidth: .infinity)
                     }
                     if let shelf = reading.shelves.first(where: { $0.id == selected }) ?? reading.shelves.first { editor(shelf, reading) }
-                } else if let failure { Text(failure).font(MadarTypography.body()) }
+                } else if let failure { Text(failure).font(MadarTypography.body()); Button("أعِد المحاولة", action: load).frame(minHeight: 44) }
                 else { ProgressView().frame(maxWidth: .infinity, minHeight: 240) }
             }.padding(.horizontal, 16).padding(.bottom, 30).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }.clipped().background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
@@ -166,6 +167,7 @@ struct MoneyCategoriesView: View {
                         .frame(maxWidth: .infinity, minHeight: 54).background(theme.ink, in: Capsule())
                 }.buttonStyle(.plain).disabled(saving).accessibilityIdentifier("money-limit-save").layoutPriority(1)
             }
+            if let saveFailure { Text(saveFailure).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")).accessibilityIdentifier("money-limit-failure") }
         }.padding(.top, 6)
     }
     private func modeButton(_ title: String, _ on: Bool, _ action: @escaping () -> Void) -> some View {
@@ -201,8 +203,12 @@ struct MoneyCategoriesView: View {
         if none { payload["mode"] = .string("none") }
         else if percentMode { payload["mode"] = .string("percent"); payload["percentBp"] = .number(Double(max(1, draftBp))); payload["base"] = .string(draftBase) }
         else { payload["mode"] = .string("fixed"); payload["limitMinor"] = .string(String(draftMinor)) }
-        saving = true
-        Task { try? await app.executeMoneyCommand("money.setCategoryLimit", payload: payload); saving = false; load() }
+        saving = true; saveFailure = nil
+        // AU-37: a failed limit says so instead of quietly showing the old one again.
+        Task {
+            do { try await app.executeMoneyCommand("money.setCategoryLimit", payload: payload) } catch { saveFailure = "لم يُحفظ الحد. حاول مرة أخرى." }
+            saving = false; load()
+        }
     }
 }
 

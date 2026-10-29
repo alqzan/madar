@@ -45,6 +45,7 @@ struct MoneySalaryView: View {
                     if !reading.opening.envelopes.isEmpty { envelopes(reading) }
                 } else if let failure {
                     Text(failure).font(MadarTypography.body()).accessibilityIdentifier("money-salary-failure")
+                    Button("أعِد المحاولة", action: load).frame(minHeight: 44).accessibilityIdentifier("money-salary-retry")
                 } else { ProgressView().frame(maxWidth: .infinity, minHeight: 240) }
             }.padding(.horizontal, 16).padding(.bottom, 30).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }.clipped().background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)

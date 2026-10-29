@@ -49,7 +49,7 @@ struct MoneySinceView: View {
                         Text("تمّ، افتح المال").font(.custom("thmanyahsans-Bold", size: 18, relativeTo: .headline)).foregroundStyle(theme.background)
                             .frame(maxWidth: .infinity, minHeight: 58).background(theme.ink)
                     }.buttonStyle(.plain).accessibilityIdentifier("money-since-done").padding(.top, 6)
-                } else if let failure { Text(failure).font(MadarTypography.body()) }
+                } else if let failure { Text(failure).font(MadarTypography.body()); Button("أعِد المحاولة", action: load).frame(minHeight: 44) }
                 else { ProgressView().frame(maxWidth: .infinity, minHeight: 240) }
             }.padding(.horizontal, 16).padding(.bottom, 30).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }.clipped().background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)

@@ -49,7 +49,7 @@ struct MoneyRulesView: View {
                     }
                     Label("يتعلّم مدار التاجر من اختيارك، ولا يغيّر نقل القاعدة أو نسيانها حركاتك السابقة.", systemImage: "lightbulb")
                         .font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).padding(.top, 6)
-                } else if let failure { Text(failure).font(MadarTypography.body()) }
+                } else if let failure { Text(failure).font(MadarTypography.body()); Button("أعِد المحاولة", action: load).frame(minHeight: 44) }
                 else { ProgressView().frame(maxWidth: .infinity, minHeight: 240) }
             }.padding(.horizontal, 16).padding(.bottom, 30).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }.clipped().background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)

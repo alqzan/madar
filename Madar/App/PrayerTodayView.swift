@@ -171,6 +171,7 @@ struct PrayerTodayView: View {
             }
             .dynamicTypeSize(dynamicType)
             .environment(\.roomTheme, theme)
+            .madarSheetErrorAlert(session) // AU-37: a failed write inside a prayer sheet is said there.
         }
     }
 
@@ -1739,7 +1740,7 @@ private struct PrayerStatisticsView: View {
         .sheet(item: $editing) { route in
             PrayerDayEditSheet(session: session, day: route.day, hijriTitle: hijriDayTitle(route.day), gregorianTitle: gregorianDayTitle(route.day),
                 firstGregorian: session.string("core.firstCalendar") == "gregorian", digits: formatter, openLog: { cell in editing = nil; select(cell) })
-                .environment(\.roomTheme, theme)
+                .environment(\.roomTheme, theme).madarSheetErrorAlert(session)
         }
     }
 

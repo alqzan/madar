@@ -122,7 +122,7 @@ struct MoneyGoalView: View {
     }.padding(24).background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.plain).presentationDetents([.medium, .large]) }
     private func load() { do { _ = try service.load(); reading = try MoneyRepository(context: ModelContext(app.container)).goalPreparation(at: app.prayerNow()) } catch { failure = "تعذّرت قراءة المال. أعد فتح الصفحة." } }
     private func save() {
-        guard let reading, valid, let finish else { return }; saving = true
+        guard let reading, valid, let finish else { return }; saving = true; failure = nil
         let due = max(app.prayerNow(), finish.date(in: app.activePlace.timeZone).addingTimeInterval(12 * 3600))
         Task { do { try await app.executeMoneyCommand("money.prepareGoal", payload: ["name": .string(name), "totalMinor": .string(String(minor(amount))), "paidIDs": .array(paid.map { .string($0.uuidString) }), "upfrontMinor": .string(String(minor(upfront))), "dailyMinor": .string(String(minor(daily))), "source": .string(source), "due": .string(ISO8601DateFormatter().string(from: due)), "signature": .string(reading.signature)]); preview = false; dismiss() } catch { preview = false; saving = false; failure = "تغيّر المال منذ المعاينة. راجع الأرقام ثم اعتمدها من جديد."; load() } }
     }
