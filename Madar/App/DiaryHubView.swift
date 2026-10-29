@@ -18,6 +18,8 @@ struct DiaryHubView: View {
     @State private var exportOpen = false
     @State private var bookOpen = false
     @State private var failure: String?
+    @State private var loadAttempt = 0
+    @State private var injectedArchiveReadFailure = false
     private var service: AppDiaryService { .init(app: app) }
     private var grid: DiaryCalendarGrid { service.diaryCalendar }
     private var selectedYear: Int { year ?? archive.map { grid.parts($0.today).year ?? $0.today.year } ?? grid.parts(GregorianDay.containing(.now, in: app.activePlace.timeZone)).year ?? Calendar.current.component(.year, from: .now) }
@@ -40,7 +42,14 @@ struct DiaryHubView: View {
                             case "projects": DiaryProjectsPanel(app: app)
                             default: timeline(archive.days)
                             }
-                        } else if let failure { Text(failure).font(MadarTypography.body()) }
+                        } else if let failure {
+                            VStack(spacing: 12) {
+                                Text(failure).font(DiaryType.heading).multilineTextAlignment(.center)
+                                    .accessibilityIdentifier("diary-hub-error")
+                                Button("أعد المحاولة") { loadAttempt += 1 }
+                                    .frame(minHeight: 44).accessibilityIdentifier("diary-hub-retry")
+                            }.frame(maxWidth: .infinity).padding(.vertical, 28)
+                        }
                         else { ProgressView("تُفتح أيامك…") }
                         Button { bookOpen = true } label: { Label("كتاب السنة", systemImage: "book.closed").font(DiaryType.label).frame(minHeight: 44) }.accessibilityIdentifier("diary-yearbook")
                         Button { exportOpen = true } label: { Label("تصدير المذكرات", systemImage: "square.and.arrow.up").font(DiaryType.label).frame(minHeight: 44) }.accessibilityIdentifier("diary-export")
@@ -57,7 +66,26 @@ struct DiaryHubView: View {
                 .toolbar { ToolbarItem(placement: .topBarTrailing) { Button { searchOpen = true } label: { Image(systemName: "magnifyingglass") }.accessibilityLabel("ابحث في مذكراتك") }; ToolbarItem(placement: .topBarLeading) { Button { dismiss() } label: { Label("المذكرات", systemImage: "chevron.backward") }.accessibilityIdentifier("diary-hub-close") } }
                 .toolbarBackground(theme.background, for: .navigationBar).tint(theme.accent)
                 .sheet(isPresented: Binding(get: { reader != nil }, set: { if !$0 { reader = nil } })) { if let reader { DiaryDayView(app: app, day: reader).environment(\.roomTheme, theme).madarSheetErrorAlert(app) } }
-                .task(id: app.prayerRevision) { do { archive = try service.archive(); travelDays = (try? service.travelDays()) ?? []; failure = nil } catch { failure = madarUserMessage(error) } }
+                .task(id: "\(app.prayerRevision)-\(loadAttempt)") {
+                    failure = nil
+                    do {
+                        #if DEBUG
+                        let environment = ProcessInfo.processInfo.environment
+                        if !injectedArchiveReadFailure,
+                           environment["MADAR_UI_DIARY_HUB_READ_FAILURE_ONCE"] == "1",
+                           environment["MADAR_UI_DIARY_FIXTURE"] == "letters",
+                           environment["MADAR_UI_STORE_ID"] != nil {
+                            injectedArchiveReadFailure = true
+                            throw CocoaError(.fileReadUnknown)
+                        }
+                        #endif
+                        archive = try service.archive()
+                        travelDays = (try? service.travelDays()) ?? []
+                        failure = nil
+                    } catch {
+                        failure = "تعذّر فتح سجل اليوميات."
+                    }
+                }
         }
     }
     private func calendar(_ archive: DiaryArchiveSnapshot) -> some View {

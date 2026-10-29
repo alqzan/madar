@@ -12,11 +12,26 @@ import XCTest
         let retry = app.buttons["diary-welcome-retry"]
         XCTAssertTrue(retry.waitForExistence(timeout: 12), app.debugDescription)
         let error = app.staticTexts["diary-welcome-error"]
-        XCTAssertEqual(error.label, "تعذّر فتح صفحة اليوميات. أعد المحاولة.")
+        XCTAssertEqual(error.label, "تعذّر فتح صفحة اليوميات.")
         shot(app, "AU-70-welcome-read-error-L")
         retry.tap()
         XCTAssertTrue(app.buttons["diary-welcome-next"].waitForExistence(timeout: 10), app.debugDescription)
         shot(app, "AU-70-welcome-retried-L")
+    }
+    func testDiaryArchiveRetriesAfterItsFirstReadFails() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": "letters", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00", "MADAR_UI_DIARY_HUB_READ_FAILURE_ONCE": "1"]
+        app.launch()
+        let days = app.buttons["diary-days"]
+        XCTAssertTrue(days.waitForExistence(timeout: 25), app.debugDescription); days.tap()
+        let error = app.staticTexts["diary-hub-error"]
+        XCTAssertTrue(error.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertEqual(error.label, "تعذّر فتح سجل اليوميات.")
+        shot(app, "AU-74-hub-read-error-L")
+        app.buttons["diary-hub-retry"].tap()
+        XCTAssertTrue(app.staticTexts["diary-hub-year"].waitForExistence(timeout: 10), app.debugDescription)
+        shot(app, "AU-74-hub-retried-L")
     }
     func testSwipeCannotDiscardAnUnsavedProjectDraft() {
         continueAfterFailure = false

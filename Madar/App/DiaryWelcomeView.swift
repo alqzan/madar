@@ -38,7 +38,7 @@ struct DiaryLaunchView: View {
                 }
                 #endif
                 welcomed = try AppDiaryService(app: app).hasWelcomed()
-            } catch { failure = "تعذّر فتح صفحة اليوميات. أعد المحاولة." }
+            } catch { failure = "تعذّر فتح صفحة اليوميات." }
         }
         // The diary opens from the glass accessory, not a tab: hiding the bar during the welcome left no way to another room.
     }
