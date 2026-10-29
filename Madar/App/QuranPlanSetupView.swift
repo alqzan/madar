@@ -116,7 +116,7 @@ struct QuranPlanSetupView: View {
                     ForEach(QuranUIUnit.allCases) { unit in
                         Button { input?.unit = unit; input?.amount = 1 } label: { HStack { Text(unit.title); Spacer(); if unit == p.unit { Image(systemName: "checkmark.circle.fill") } }.frame(minHeight: 44).contentShape(Rectangle()) }.buttonStyle(.plain).accessibilityIdentifier("quran-setup-unit-" + unit.id)
                     }
-                    Stepper("المقدار " + service.numerals.localized(String(format: "%g", p.amount)), value: binding(\.amount), in: 1...(p.unit == .ayah ? 6236 : 604), step: 1).accessibilityIdentifier("quran-setup-amount")
+                    Stepper(QuranPlanCopy.amount(p, digits: service.numerals), value: binding(\.amount), in: 1...(p.unit == .ayah ? 6236 : 604), step: 1).accessibilityIdentifier("quran-setup-amount")
                 }.font(quranFont(15))
             }
         case 2:

@@ -113,7 +113,8 @@ struct LogPrayerIntent: AppIntent {
         await MainActor.run { NotificationCenter.default.post(name: Notification.Name("madar.inboxChanged"), object: nil) }
         WidgetCenter.shared.reloadAllTimelines()
         ControlCenter.shared.reloadAllControls()
-        return .result(dialog: "سُجّلت.")
+        // Written to the inbox, not yet to the record: the dialog says so, as the Control does.
+        return .result(dialog: "حُفظ طلب تسجيل \(prayer.arabicName)، ويُسجَّل في مدار حين تفتحه.")
     }
 }
 

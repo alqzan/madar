@@ -221,6 +221,7 @@ import WidgetKit
         folderTask?.cancel()
         exportCancellation?.cancel(); cancellation.cancel(); restoreID = nil; restoreTicket = nil; clearPreviews()
     }
+    func discardPreviews() { clearPreviews() }
     private func clearPreviews() {
         previewPasswords.removeAll()
         for preview in previews.values { try? FileManager.default.removeItem(at: preview.fileURL) }

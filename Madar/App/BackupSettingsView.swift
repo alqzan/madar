@@ -60,6 +60,8 @@ struct BackupRestoreResult: Sendable { let restoredCount: Int; let skippedCount:
 
 @MainActor protocol BackupUIService: AnyObject {
     func status() async throws -> BackupUIStatus
+    /// Forgets a previewed restore: its staged copy and the passphrase held for it.
+    func discardPreviews()
     func setSchedule(_ schedule: BackupUISchedule) async throws
     func chooseFolder(_ folder: URL) async throws
     func clearFolder() async throws
@@ -102,7 +104,7 @@ struct BackupRestoreResult: Sendable { let restoredCount: Int; let skippedCount:
         guard revocationObserver == nil else { return }
         revocationObserver = service.observeExportRevocation { [weak self] cancel in
             guard let self else { return }
-            exportedURL = nil; plainExportedURL = nil; exportPassphrase = ""; exportConfirmation = ""; resultMessage = nil
+            exportedURL = nil; discardPlain(); exportPassphrase = ""; exportConfirmation = ""; resultMessage = nil
             if cancel && protectedOperation {
                 operation?.cancel(); operationID = nil; busy = false; progress = nil; operation = nil; protectedOperation = false
             }
@@ -160,6 +162,11 @@ struct BackupRestoreResult: Sendable { let restoredCount: Int; let skippedCount:
             resultMessage = "التصدير جاهز للحفظ أو المشاركة. الملف غير مشفّر."
         }
     }
+    /// The plain export is never kept on the device after this screen lets it go.
+    private func discardPlain() {
+        if let file = plainExportedURL { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
+        plainExportedURL = nil
+    }
     func sharePlain() { if let file = plainExportedURL { share(file) } }
     func shareEncrypted() { if let file = exportedURL { share(file) } }
     private func share(_ file: URL) {
@@ -192,11 +199,11 @@ struct BackupRestoreResult: Sendable { let restoredCount: Int; let skippedCount:
             restoreResult = result
         }
     }
-    func dismissPreview() { preview = nil }
+    func dismissPreview() { preview = nil; service.discardPreviews() }
     func close() {
         let wasProtected = protectedOperation
         operation?.cancel(); exportPassphrase = ""; exportConfirmation = ""; restorePassphrase = ""; preview = nil
-        exportedURL = nil; plainExportedURL = nil; operationID = nil; busy = false; progress = nil; protectedOperation = false
+        exportedURL = nil; discardPlain(); operationID = nil; busy = false; progress = nil; protectedOperation = false
         if let revocationObserver { service.removeExportObserver(revocationObserver) }; revocationObserver = nil
         if !wasProtected { Task { [service] in await service.cancel() } }
     }

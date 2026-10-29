@@ -22,6 +22,14 @@ enum MadarIntentRequest: Equatable, Sendable {
     private var pending: [MadarIntentRequest] = []
     private var handler: ((MadarIntentRequest) async -> Bool)?
     private var flushing = false
+    /// Requests that ran and failed, with the app's own message, so the Siri dialog never says «سُجّلت» for them.
+    private var failures: [(MadarIntentRequest, String)] = []
+    func fail(_ request: MadarIntentRequest, _ message: String) { failures.append((request, message)); failures = Array(failures.suffix(20)) }
+    /// The failure message for a request that ran, removed once read.
+    func takeFailure(_ request: MadarIntentRequest) -> String? {
+        guard let index = failures.firstIndex(where: { $0.0 == request }) else { return nil }
+        return failures.remove(at: index).1
+    }
 
     /// Returns false while the request is held (diary locked or Madar still loading), so the
     /// Siri dialog never claims a line was added before it was.
@@ -52,6 +60,13 @@ extension AppSession {
     /// Returns false only when the request must wait (diary locked); every other outcome is final
     /// and reported in the room it belongs to.
     func handleIntentRequest(_ request: MadarIntentRequest) async -> Bool {
+        let earlier = errorMessage; errorMessage = nil
+        let done = await performIntentRequest(request)
+        if done, let message = errorMessage { MadarIntentHandoff.shared.fail(request, message) }
+        if errorMessage == nil { errorMessage = earlier }
+        return done
+    }
+    private func performIntentRequest(_ request: MadarIntentRequest) async -> Bool {
         switch request {
         case .diaryLine(let text, let day, let id):
             return await addDiaryLineFromIntent(text: text, day: day, id: id)

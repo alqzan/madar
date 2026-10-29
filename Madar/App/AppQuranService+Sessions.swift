@@ -284,7 +284,7 @@ extension AppQuranService {
             if isBridge { caption = switch coach.bridgeAyahs.count {
             case 1: "اقرأ الآية المحفوظة السابقة، ثم ابدأ الورد"
             case 2: "اقرأ الآيتين المحفوظتين السابقتين، ثم ابدأ الورد"
-            default: "اقرأ آخر " + numerals.string(coach.bridgeAyahs.count) + ((3...10).contains(coach.bridgeAyahs.count % 100) ? " آيات محفوظة" : " آية محفوظة") + "، ثم ابدأ الورد"
+            default: "اقرأ آخر " + numerals.string(coach.bridgeAyahs.count) + ((3...10).contains(coach.bridgeAyahs.count % 100) ? " آيات محفوظة" : " آيةً محفوظةً") + "، ثم ابدأ الورد"
             } }
             else if draft.coachStage == .repetition {
                 switch value.method {

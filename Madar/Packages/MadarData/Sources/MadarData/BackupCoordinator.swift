@@ -49,7 +49,8 @@ import Darwin
         try cancellation.check()
         let rows = try currentRecords()
         try RecordValidator.validate(rows); try BackupCodec.validateTypedRows(rows)
-        let directory = backupDirectory.appendingPathComponent("PlainExports").appendingPathComponent(UUID().uuidString)
+        let exports = backupDirectory.appendingPathComponent("PlainExports")
+        let directory = exports.appendingPathComponent(UUID().uuidString)
         return try await background(cancellation) {
             let bytes = try PortableExportCodec.export(records: rows, now: now, cancellation: cancellation)
             _ = try PortableExportCodec.validateContents(bytes, cancellation: cancellation)
@@ -77,6 +78,10 @@ import Darwin
                 guard rename(partial.path, destination.path) == 0 else { throw DataError.invalidBackup }
             } catch { try? handle.close(); throw error }
             completed = true
+            // An unencrypted export lives only until the next one succeeds: earlier copies (shared, closed or left by a quit) go.
+            for old in (try? FileManager.default.contentsOfDirectory(at: exports, includingPropertiesForKeys: nil)) ?? [] where old.lastPathComponent != directory.lastPathComponent {
+                try? FileManager.default.removeItem(at: old)
+            }
             progress(.init(phase: .completed, completedUnits: 1, totalUnits: 1))
             return destination
         }

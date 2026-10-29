@@ -223,7 +223,10 @@ struct DiaryHomeSnapshot {
                     let facts = try rows.filter { $0.dayKey <= key }.map { row in QuranCoverageSession(id: row.id.uuidString, kind: .hifz, ayahs: try QuranAyahRange(first: row.fromAyah, last: row.toAyah), endedAt: row.endedAt) }
                     return try QuranCoverageEngine.summarize(sessions: facts, catalog: catalog).completedPages.count
                 }
-                result.append(("في صدرك", digits.string(try count(through: day.description)) + " ← " + digits.string(try count(through: today.description)) + " وجهًا"))
+                let now = try count(through: today.description)
+                // The noun agrees with the number beside it: «٥ أوجه»، «١٢ وجهًا».
+                let noun = now == 1 ? "وجه" : now == 2 ? "وجهان" : (3...10).contains(now % 100) || now == 0 ? "أوجه" : "وجهًا"
+                result.append(("في صدرك", digits.string(try count(through: day.description)) + " ← " + digits.string(now) + " " + noun))
             } else { result.append(("في صدرك", "لم يكن مدار يسجّل هذا بعد")) }
         }
         if metrics.contains("fajrJamaah") {
@@ -235,7 +238,9 @@ struct DiaryHomeSnapshot {
                 let window = logs.filter { $0.dayKey >= start.description && $0.dayKey <= end.description }
                 let recorded = Set(window.map(\.dayKey)), jamaah = Set(window.filter { $0.status == "jamaah" }.map(\.dayKey))
                 guard !recorded.isEmpty else { return "لا تسجيل للفجر في هذه الفترة" }
-                return digits.string(jamaah.count) + " من " + digits.string(recorded.count) + " يومًا مسجّلًا"
+                let n = recorded.count
+                let days = n == 1 ? "يوم مسجّل" : n == 2 ? "يومين مسجّلين" : (3...10).contains(n % 100) ? "أيام مسجّلة" : "يومًا مسجّلًا"
+                return digits.string(jamaah.count) + " من " + digits.string(n) + " " + days
             }
             result.append(("الفجر جماعة", ratio(through: day) + " ← " + ratio(through: today)))
         }

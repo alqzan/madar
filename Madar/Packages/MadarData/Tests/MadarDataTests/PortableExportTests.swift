@@ -130,6 +130,9 @@ import Testing
         #expect(files["data/NotificationLedger.jsonl"] == nil)
         #expect(!String(decoding: bytes, as: UTF8.self).contains("private-device-value"))
         _ = try PortableExportCodec.validate(bytes)
+        // A second export removes the first unencrypted copy instead of piling them up.
+        let second = try await coordinator.exportPlain()
+        #expect(!FileManager.default.fileExists(atPath: file.path)); #expect(FileManager.default.fileExists(atPath: second.path))
     }
     @Test func cancelledExportCleansPartialDirectoryAndPreservesPreviousShareFile() async throws {
         let base = try scratch(); defer { try? FileManager.default.removeItem(at: base) }

@@ -21,7 +21,9 @@ struct CaptureIntent: AppIntent {
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let route = CaptureRouter.route(text)
-        let handled = await MadarIntentHandoff.shared.submit(.capture(text: text, id: UUID()))
+        let request = MadarIntentRequest.capture(text: text, id: UUID())
+        let handled = await MadarIntentHandoff.shared.submit(request)
+        if let failure = await MadarIntentHandoff.shared.takeFailure(request) { return .result(dialog: "\(failure)") }
         return .result(dialog: CaptureIntentResponse.make(route: route, handled: handled).dialog)
     }
 }
@@ -93,7 +95,9 @@ struct AddDiaryLineIntent: AppIntent {
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let line = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !line.isEmpty, line.count <= 2000 else { throw AddDiaryLineIntentError.invalidLength }
-        let applied = await MadarIntentHandoff.shared.submit(.diaryLine(text: line, day: day.rawValue, id: UUID()))
+        let request = MadarIntentRequest.diaryLine(text: line, day: day.rawValue, id: UUID())
+        let applied = await MadarIntentHandoff.shared.submit(request)
+        if let failure = await MadarIntentHandoff.shared.takeFailure(request) { return .result(dialog: "\(failure)") }
         return .result(dialog: applied ? "أُضيف." : CaptureIntent.heldDialog)
     }
 }

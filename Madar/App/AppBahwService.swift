@@ -171,7 +171,7 @@ struct BahwUpcomingItem: Identifiable, Equatable {
     }
     /// «مضى» wording under a count-up number, agreeing with the count.
     func sinceCount(_ n: Int) -> String {
-        n == 1 ? "يوم مضى" : n == 2 ? "يومان مضيا" : dayCount(n) + " مضت"
+        n == 1 ? "يوم مضى" : n == 2 ? "يومان مضيا" : dayCount(n) + ((3...10).contains(n % 100) ? " مضت" : " مضى")
     }
     /// «مضى يوم»، «مضى يومان»، «مضت ٥ أيام»، «مضى ٤٠ يومًا»: no digit beside the singular or dual word.
     func sincePhrase(_ n: Int) -> String {

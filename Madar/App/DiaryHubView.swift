@@ -178,11 +178,13 @@ struct DiaryHubView: View {
         }
     }
     private func memories(_ archive: DiaryArchiveSnapshot) -> some View {
-        let home = try? service.home()
+        let loaded = Result { try service.home() }, home = try? loaded.get()
         return VStack(alignment: .leading, spacing: 14) {
             Text("رف الذكريات").font(DiaryType.heading)
             Text(home?.selection.match == .echo ? "أقرب صدى من كتابتك" : "من مثل هذا اليوم").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
-            timeline(archive.days.filter { home?.selection.days.contains($0.day) == true }, empty: "لا ذكريات لهذا اليوم بعد.")
+            // A read that failed says so; «لا ذكريات» is only for a day that truly has none.
+            if case .failure(let error) = loaded { Text(madarUserMessage(error)).font(DiaryType.writing) }
+            else { timeline(archive.days.filter { home?.selection.days.contains($0.day) == true }, empty: "لا ذكريات لهذا اليوم بعد.") }
         }
     }
     private func index(_ archive: DiaryArchiveSnapshot) -> some View {

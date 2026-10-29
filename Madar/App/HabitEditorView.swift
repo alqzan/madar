@@ -103,7 +103,13 @@ struct HabitEditorView:View {
             if let previous=defaults[old],name==previous {name=defaults[value] ?? ""}
             if value != "custom" && reading == nil { rule.measure = value == "walking" ? .health : .count;rule.unit=["jamaah":"صلاة","review":"وجه","diaryLine":"سطر","walking":"steps"][value];rule.target=value == "walking" ? 6000 : value == "jamaah" ? 5 : 1; if name.isEmpty {name=["jamaah":"الجماعة","review":"المراجعة","diaryLine":"سطر اليوم","walking":"المشي"][value] ?? ""} }
         }
-        .onChange(of:rule.measure){_,value in if value == .duration {rule.unit="minutes";rule.target=15}else if value == .once {rule.target=1;rule.minimum=nil;minimumOn=false} }
+        .onChange(of:rule.measure){old,value in measureChanged(from:old,to:value)}
+    }
+    /// Switching back from minutes to a count drops the «minutes» unit, so a count habit never reads as time.
+    private func measureChanged(from old:HabitMeasure,to value:HabitMeasure) {
+        if value == .duration {rule.unit="minutes";rule.target=15}
+        else if value == .once {rule.target=1;rule.minimum=nil;minimumOn=false}
+        else if value == .count, old == .duration {rule.unit=nil}
     }
     private func dayButtons(_ selection:Binding<[Int]>)->some View { HStack(spacing:3) { ForEach(Array(["ح","ن","ث","ر","خ","ج","س"].enumerated()),id:\.offset){i,label in Button {let day=i+1;if selection.wrappedValue.contains(day){selection.wrappedValue.removeAll{$0==day}}else{selection.wrappedValue.append(day)}}label:{Text(label).font(MadarTypography.caption()).frame(maxWidth:.infinity,minHeight:44).background(selection.wrappedValue.contains(i+1) ? theme.accentFill : theme.background,in:.capsule).foregroundStyle(selection.wrappedValue.contains(i+1) ? theme.onAccent : theme.ink)}.buttonStyle(.plain).accessibilityLabel(["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"][i]).accessibilityAddTraits(selection.wrappedValue.contains(i+1) ? .isSelected : []) } } }
     private func section<Content:View>(_ title:String,@ViewBuilder content:()->Content)->some View { VStack(alignment:.leading,spacing:12){Text(title).font(MadarTypography.section());content()}.padding(16).frame(maxWidth:.infinity,alignment:.leading).background(theme.surface,in:.rect(cornerRadius:22)) }
@@ -126,8 +132,11 @@ struct HabitEditorView:View {
             var saved=rule;saved.effectiveFrom=AppBahwService(session:session).today
             let english=monthDays.map { $0.wholeNumberValue.map(String.init) ?? String($0) }.joined()
             let parts=english.split(whereSeparator:{!$0.isNumber});let parsed=parts.compactMap{Int($0)}
-            guard parsed.count==parts.count,parsed.allSatisfy({(1...(saved.hijri ? 30 : 31)).contains($0)}) else{issue=saved.hijri ? "أيام الشهر الهجري من ١ إلى ٣٠، تفصلها فاصلة." : "أيام الشهر من ١ إلى ٣١، تفصلها فاصلة.";busy=false;return}
-            saved.monthDays=Array(Set(parsed)).sorted();saved.minimum=minimumOn ? min(saved.target,saved.minimum ?? 1) : nil
+            // Days of the month count only for a monthly habit; a hidden field never blocks another rhythm.
+            if saved.frequency != .monthly { saved.monthDays=[] }
+            else { guard parsed.count==parts.count,parsed.allSatisfy({(1...(saved.hijri ? 30 : 31)).contains($0)}) else{issue=saved.hijri ? "أيام الشهر الهجري من ١ إلى ٣٠، تفصلها فاصلة." : "أيام الشهر من ١ إلى ٣١، تفصلها فاصلة.";busy=false;return}
+            saved.monthDays=Array(Set(parsed)).sorted() }
+            saved.minimum=minimumOn ? min(saved.target,saved.minimum ?? 1) : nil
             if !windowOn{saved.windowStart=nil;saved.windowEnd=nil;saved.windowAnchor=nil}else{saved.windowStart=saved.windowStart ?? 1020;saved.windowEnd=saved.windowEnd ?? 1200}
             // Name the one thing to fix instead of one sentence for every refusal.
             if saved.target <= 0 {issue="اجعل الهدف أكبر من صفر.";busy=false;return}
@@ -138,6 +147,6 @@ struct HabitEditorView:View {
             var p:[String:MadarCore.JSONValue]=["id":.string(id.uuidString),"name":.string(name),"rule":json,"homeOnly":.bool(homeOnly),"reminder":.string(reminder)]
             if source != "custom"{p["source"] = .string(source)}
             Task {do{if source == "walking" {try await HabitHealthStore.authorize(unit:saved.unit ?? "steps")};try await session.executeDiaryCommand("habit.save",payload:p);dismiss()}catch{issue="لم تُحفظ العادة: "+madarUserDetail(error)};busy=false}
-        }catch{issue="راجع الهدف وأيام الشهر؛ وقت البداية والنهاية يجب أن يختلفا.";busy=false}
+        }catch{issue="راجع العادة: "+madarUserDetail(error);busy=false}
     }
 }

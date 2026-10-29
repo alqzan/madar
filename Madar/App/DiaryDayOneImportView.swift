@@ -48,7 +48,9 @@ struct DiaryDayOneImportView: View {
             }
             .onChange(of: choice) { _, value in if let draft { preview = try? service.preview(draft, choice: value) } }
             .onChange(of: phase) { _, value in if value == .background, importing == nil, receipt == nil { reset() } }
-            .onDisappear { service.discard(draft) }
+            // Mid-import the folder is still being read: no swipe away, and nothing is discarded under it.
+            .interactiveDismissDisabled(importing != nil)
+            .onDisappear { if importing == nil { service.discard(draft) } }
             .sheet(isPresented: Binding(get: { openDay != nil }, set: { if !$0 { openDay = nil } })) { if let openDay { DiaryDayView(app: app, day: openDay).environment(\.roomTheme, theme).madarSheetErrorAlert(app) } }
         }
     }

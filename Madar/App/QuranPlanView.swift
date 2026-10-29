@@ -143,7 +143,7 @@ struct QuranPlanView: View {
                             Rectangle().fill(theme.color("hifz")).frame(height: 70 * day.extra / highest)
                             Rectangle().fill(theme.color("hifzTint")).frame(height: 70 * day.base / highest)
                         }.frame(height: 70).clipShape(.rect(topLeadingRadius: 5, topTrailingRadius: 5)).accessibilityHidden(true)
-                        MadarDateLabel(app.dateLabels(day.day, compact: true), primaryFont: quranFont(11), secondaryFont: quranFont(11))
+                        MadarDateLabel(app.dateLabels(day.day, first: .hijri, compact: true), primaryFont: quranFont(11), secondaryFont: quranFont(11))
                             .foregroundStyle(theme.secondaryInk).multilineTextAlignment(.center)
                     }.frame(maxWidth: .infinity).accessibilityElement(children: .combine)
                         .accessibilityIdentifier("quran-plan-miss-preview-" + day.id)

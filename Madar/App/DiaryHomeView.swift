@@ -164,7 +164,7 @@ struct DiaryHomeView: View {
                 if !worded {
                 VStack(spacing: 12) {
                     Image(systemName: past && missing > 0 ? "photo.on.rectangle.angled" : "book.closed").font(.system(size: 46, weight: .ultraLight))
-                    Text(past && missing > 0 ? (missing == 1 ? "صورة هذا اليوم لم تُنقل" : "صور هذا اليوم لم تُنقل") : past ? "من دفترك ذاك اليوم" : "صفحة تنتظر ما تعيشه").font(DiaryType.writing)
+                    Text(past && missing > 0 ? (missing == 1 ? "صورة هذا اليوم لم تُنقل" : missing == 2 ? "صورتا هذا اليوم لم تُنقلا" : "صور هذا اليوم لم تُنقل") : past ? "من دفترك ذاك اليوم" : "صفحة تنتظر ما تعيشه").font(DiaryType.writing)
                 }
                     .foregroundStyle(theme.color("ink3Text")).frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
@@ -249,7 +249,7 @@ struct DiaryHomeView: View {
                     Text(page.excerpt).font(.custom("thmanyahseriftext-Regular", size: 18, relativeTo: .body)).lineSpacing(6).lineLimit(3).multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)
                     if let place = page.place { Label(place, systemImage: "mappin").font(DiaryType.label).foregroundStyle(theme.color("ink3Text")) }
                     // Owner trial, 22 Oct: a photo the import did not carry is named, never invented.
-                    if image == nil, page.missingPhotos > 0 { Label(page.missingPhotos == 1 ? "صورة هذا اليوم لم تُنقل" : "صور هذا اليوم لم تُنقل", systemImage: "photo.on.rectangle.angled").font(DiaryType.label).foregroundStyle(theme.color("ink3Text")) }
+                    if image == nil, page.missingPhotos > 0 { Label(page.missingPhotos == 1 ? "صورة هذا اليوم لم تُنقل" : page.missingPhotos == 2 ? "صورتا هذا اليوم لم تُنقلا" : "صور هذا اليوم لم تُنقل", systemImage: "photo.on.rectangle.angled").font(DiaryType.label).foregroundStyle(theme.color("ink3Text")) }
                 }.frame(maxWidth: .infinity, alignment: .leading)
                 if let image, !typeSize.isAccessibilitySize { Image(uiImage: image).resizable().scaledToFill().frame(width: 76, height: 96).clipShape(.rect(cornerRadius: 14)).accessibilityHidden(true) }
             }.padding(16).frame(maxWidth: .infinity, alignment: .leading)

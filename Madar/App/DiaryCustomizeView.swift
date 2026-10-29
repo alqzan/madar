@@ -141,7 +141,7 @@ struct DiaryCustomizeView: View {
             VStack(alignment: .leading, spacing: 10) {
                 Label("معاينة حيّة", systemImage: "circle.fill").font(DiaryType.label).foregroundStyle(theme.accent)
                 Text("المذكرات كما ستظهر").font(DiaryType.heading)
-                previewLine("الأجزاء", app.digits(visibleOrder.count) + " ظاهرة").accessibilityElement(children: .combine).accessibilityIdentifier("diary-preview-parts")
+                previewLine("الأجزاء", visiblePartsText).accessibilityElement(children: .combine).accessibilityIdentifier("diary-preview-parts")
                 previewLine("شكل الرئيسية", label("notes.homeShape"))
                 previewLine("المطابقة", label("notes.match"))
                 previewLine("إذا لا ذكرى", label("notes.noMemory"))
@@ -168,9 +168,10 @@ struct DiaryCustomizeView: View {
         Button { dismiss() } label: { Text("افتح المذكرات").font(MadarTypography.caption()).padding(.horizontal, 13).frame(minHeight: 44).foregroundStyle(theme.background).background(theme.ink, in: .capsule) }.buttonStyle(.plain).accessibilityIdentifier("diary-customize-open")
         Button { confirmReset = true } label: { Text("أعِد الافتراضي").font(MadarTypography.caption()).padding(.horizontal, 10).frame(minHeight: 44).overlay { Capsule().stroke(theme.line) } }.buttonStyle(.plain).accessibilityIdentifier("diary-customize-reset")
     }
+    private var visiblePartsText: String { let n = visibleOrder.count; return n == 1 ? "جزء واحد ظاهر" : n == 2 ? "جزءان ظاهران" : app.digits(n) + ((3...10).contains(n % 100) ? " أجزاء ظاهرة" : " جزءًا ظاهرًا") }
     private func previewLine(_ title: String, _ value: String) -> some View { HStack { Text(title).foregroundStyle(theme.color("ink3Text")); Spacer(minLength: 5); Text(value) }.font(DiaryType.label) }
     private var homeCard: some View {
-        section("home", title: "الرئيسية", subtitle: label("notes.homeShape") + "، " + { let n = visibleOrder.count; return n == 1 ? "جزء واحد ظاهر" : n == 2 ? "جزءان ظاهران" : app.digits(n) + ((3...10).contains(n % 100) ? " أجزاء ظاهرة" : " جزءًا ظاهرًا") }(), symbol: "square.grid.2x2") {
+        section("home", title: "الرئيسية", subtitle: label("notes.homeShape") + "، " + visiblePartsText, symbol: "square.grid.2x2") {
             Text(shape == "window" ? "قدّم بطاقات السنين أو أيامك بما يناسبك. شريط صفحة اليوم ثابت في الأسفل." : shape == "margin" ? "الصفحة وشريط اليوم ثابتان. اختر ما يظهر حول الذكرى؛ ترتيب الهامش ثابت." : "الأصداء أولًا وشريط صفحة اليوم في الأسفل. يمكنك إظهار أيامك أو إخفاؤها.").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
             ForEach(activeOrder, id: \.self) { id in
                 Divider().overlay(theme.line)

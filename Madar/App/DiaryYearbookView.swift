@@ -16,6 +16,8 @@ struct DiaryYearbookView:View {
     @State private var photos=true
     @State private var includeIndex=true
     @State private var artifact:DiaryExportArtifact?
+    /// Bumped by every clear, so a file finished after the screen moved on is deleted, never kept.
+    @State private var generation = 0
     @State private var preview=false
     @State private var busy=false
     @State private var failure:String?
@@ -75,6 +77,6 @@ struct DiaryYearbookView:View {
         VStack(alignment:.leading,spacing:8){MadarDateLabel(page.title);ForEach(Array(page.lines.prefix(4))){line in Text(AppDiaryService.exportLabel(line.kind)+line.text).font(.custom("thmanyahseriftext-Regular",size:12,relativeTo:.caption)).foregroundStyle(line.kind=="margin" ? theme.color("pencil"):theme.ink).lineLimit(3)};if photos,let item=page.media.first(where:{$0.kind=="photo"}),let image=UIImage(data:item.data){Image(uiImage:image).resizable().scaledToFill().frame(height:50).clipped()};Spacer(minLength:0)}.frame(maxWidth:.infinity,alignment:.leading).frame(minHeight:155,alignment:.top).padding(10).background(theme.surface)
     }
     private func load(){clear();do{pages=try service.yearbookPages(year:selectedYear,margins:margins,sources:sources,photos:photos);failure=nil}catch{failure=madarUserMessage(error)}}
-    private func prepare(){busy=true;failure=nil;clear();Task{@MainActor in await Task.yield();defer{busy=false};do{artifact=try service.exportYearbook(pages:pages,year:selectedYear,index:includeIndex)}catch{failure=madarUserMessage(error)}}}
-    private func clear(){if let artifact {try? FileManager.default.removeItem(at:artifact.url.deletingLastPathComponent())};artifact=nil}
+    private func prepare(){busy=true;failure=nil;clear();let started=generation;Task{@MainActor in await Task.yield();defer{busy=false};do{let made=try service.exportYearbook(pages:pages,year:selectedYear,index:includeIndex);if started == generation {artifact=made}else{try? FileManager.default.removeItem(at:made.url.deletingLastPathComponent())}}catch{failure=madarUserMessage(error)}}}
+    private func clear(){generation += 1;if let artifact {try? FileManager.default.removeItem(at:artifact.url.deletingLastPathComponent())};artifact=nil}
 }

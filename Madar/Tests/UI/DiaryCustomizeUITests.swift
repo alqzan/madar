@@ -39,7 +39,7 @@ import XCTest
         app.launch()
         XCTAssertTrue(app.buttons["diary-customize"].waitForExistence(timeout: 25)); app.buttons["diary-customize"].tap()
         let parts = app.descendants(matching: .any)["diary-preview-parts"]
-        XCTAssertTrue(parts.waitForExistence(timeout: 10)); XCTAssertTrue(parts.label.contains("٣ ظاهرة"), parts.label)
+        XCTAssertTrue(parts.waitForExistence(timeout: 10)); XCTAssertTrue(parts.label.contains("٣ أجزاء ظاهرة"), parts.label)
         XCTAssertFalse(app.switches["diary-block-thatDay"].exists)
         XCTAssertFalse(app.switches["diary-block-sinceThatDay"].exists)
         capture(app, "OR-10-window-customize-L")
