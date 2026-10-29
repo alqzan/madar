@@ -461,6 +461,8 @@ struct MoneyReconcileView: View {
         typed = entries[id].map { plain($0.observedMinor) } ?? ""
     }
     private func plain(_ minor: Int) -> String {
+        // An overdrawn balance is shown as a sign and its size, so it can be read back as typed.
+        if minor < 0 { return "-" + plain(-minor) }
         var scale = 1; for _ in 0..<exponent { scale *= 10 }
         let whole = String(minor / scale), fraction = minor % scale
         return service.digits.string(minor / scale) == whole ? (fraction == 0 ? whole : whole + "." + String(format: "%0\(exponent)d", fraction))
@@ -474,7 +476,9 @@ struct MoneyReconcileView: View {
             return ch == "٫" || ch == "," ? "." : ch
         }).filter { $0 != "٬" && $0 != " " }
         if ascii.isEmpty { if note == Self.unreadable { note = nil }; if entries[r.id] != nil, typing { entries[r.id] = nil }; return }
-        guard let value = MoneyAmountInput.minor(ascii, exponent: exponent) else { note = Self.unreadable; return }
+        let negative = ascii.first == "-" || ascii.first == "\u{2212}"
+        guard let size = MoneyAmountInput.minor(negative ? String(ascii.dropFirst()) : ascii, exponent: exponent) else { note = Self.unreadable; return }
+        let value = negative ? -size : size
         if note == Self.unreadable { note = nil }
         if entries[r.id]?.observedMinor != value { set(r, value, at: nil) }
     }

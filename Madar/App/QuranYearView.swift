@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 import MadarDesign
 
 struct QuranYearView: View {
@@ -61,6 +62,8 @@ struct QuranYearView: View {
             }.padding(16).padding(.bottom, 20)
         }.foregroundStyle(theme.ink).background(theme.background.ignoresSafeArea()).tint(theme.color("review"))
             .task { load() }
+            // Left open past midnight, the log follows the day it is now.
+            .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged).receive(on: RunLoop.main)) { _ in load() }
             .sheet(item: $month) { item in
                 ScrollView { VStack(alignment: .leading, spacing: 14) {
                     Text(item.title).font(quranSerif(25))

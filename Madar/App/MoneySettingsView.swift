@@ -106,7 +106,7 @@ struct MoneySettingsView: View {
             }
             note("أي تغيير يبدأ غدًا؛ ما مضى من يومياتك والترحيل والخطط محفوظ.")
             MadarDateLabel(app.dateLabels((cycle?.today ?? today).adding(days: 1)), primaryFont: MadarTypography.caption(), secondaryFont: MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
-            saveButton("احفظ اليومية", id: "daily-save", enabled: visible && amountMinor != nil && percentBp != nil) {
+            saveButton("احفظ اليومية", id: "daily-save", enabled: visible && (mode == "fixed" ? amountMinor != nil : percentBp != nil)) {
                 app.setMany(["mal.dailyAllowance": .object(["mode": .string(mode), "amountMinor": mode == "fixed" ? .number(Double(amountMinor ?? 0)) : .null, "percentBp": mode == "percent" ? .number(Double(percentBp ?? 0)) : .null])])
             }
         }

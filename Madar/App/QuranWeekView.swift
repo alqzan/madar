@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 import MadarDesign
 
 struct QuranWeekView: View {
@@ -26,6 +27,8 @@ struct QuranWeekView: View {
             }.padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 24)
         }.foregroundStyle(theme.ink).background(theme.background.ignoresSafeArea()).tint(theme.color("review"))
             .task { load() }
+            // Left open past midnight, the log follows the day it is now.
+            .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged).receive(on: RunLoop.main)) { _ in load() }
             .sheet(item: $selected) { day in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {

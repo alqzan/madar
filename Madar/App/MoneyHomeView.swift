@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 import SwiftData
 import MadarCore
 import MadarData
@@ -180,7 +181,7 @@ struct MoneyHomeView: View {
         .sheet(isPresented: $basisOpen) { MoneyBasisView(app: app, revealed: $revealed) }
         .task {
             await app.seedMoneyDefaults()
-            do { try await app.executeMoneyCommand("money.accruePlans") } catch { }
+            do { try await app.executeMoneyCommand("money.accruePlans") } catch { app.errorMessage = "تعذّر تحديث الخطط اليوم: " + madarUserMessage(error) }
             load()
             if app.moneyOpensMessages { app.moneyOpensMessages = false; messagesOpen = true; return }
             // §7.5 «بعد غياب»: «منذ آخر زيارة» opens first; otherwise this visit is the new mark.
@@ -192,7 +193,9 @@ struct MoneyHomeView: View {
         .onChange(of: messagesOpen) { if !messagesOpen { load() } }
         .onChange(of: app.bool("core.hideMoneyUntilTouch")) { revealed = false }
         .onChange(of: app.selectedTab) { revealed = false }
-        .onChange(of: scenePhase) { if scenePhase != .active { revealed = false } }
+        .onChange(of: scenePhase) { if scenePhase != .active { revealed = false } else { load() } }
+        // Left open past midnight, «اليوم» and the cycle day follow the day it is now.
+        .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged).receive(on: RunLoop.main)) { _ in load() }
         .accessibilityIdentifier("money-home")
     }
     private var header: some View {

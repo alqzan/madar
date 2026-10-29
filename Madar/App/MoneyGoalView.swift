@@ -68,7 +68,7 @@ struct MoneyGoalView: View {
                 VStack(spacing: 8) {
                     GeometryReader { proxy in HStack(spacing: 2) { Rectangle().fill(theme.color("reserveText")).frame(width: proxy.size.width * (!visible || target == 0 ? 0 : min(1, Double(minor(upfront)) / Double(target)))); Rectangle().fill(theme.color("surplusText")) } }.frame(height: 9).clipShape(Capsule())
                     HStack { Text("من " + (source == "surplus" ? "الفائض " : "الاحتياطي ") + shown(minor(upfront))); Spacer(); Text("من يومك " + shown(rest)) }.font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                    HStack { Text("يومك"); Text(shown(reading.dailyMinor - minor(daily))).frame(maxWidth: .infinity); Text("+ " + shown(minor(daily))).foregroundStyle(theme.color("surplusText")) }.font(MadarTypography.body()).padding(8).overlay { Capsule().stroke(theme.color("reserveText").opacity(0.25)) }
+                    HStack { Text("يومك"); Text(shown(max(0, reading.dailyMinor - minor(daily)))).frame(maxWidth: .infinity); Text("+ " + shown(minor(daily))).foregroundStyle(theme.color("surplusText")) }.font(MadarTypography.body()).padding(8).overlay { Capsule().stroke(theme.color("reserveText").opacity(0.25)) }
                 }
                 Button("عدّل المبلغ والاقتطاع والمصدر") { edit = true }.font(MadarTypography.caption()).frame(minHeight: 44).accessibilityIdentifier("money-goal-adjust")
                 Button("خطة سنة من الاحتياطي ويومك") { yearPlan() }.font(MadarTypography.caption()).frame(minHeight: 44).disabled(!visible).accessibilityIdentifier("money-goal-year")
