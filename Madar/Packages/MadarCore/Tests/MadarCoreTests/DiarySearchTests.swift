@@ -41,6 +41,9 @@ struct DiarySearchTests {
         #expect(DiarySearchParser.contains("بالصبر والصلاة",words:"الصَّبر الصلاة"))
         #expect(DiarySearchParser.contains("أمي في مكـة ١٤٤٥",words:"امي مكه 1445"))
         #expect(!DiarySearchParser.contains("يوم في جدة",words:"معنى حياتي"))
+        // Hamza seats, wasla alef and Persian digits fold too.
+        #expect(DiarySearchParser.contains("مسؤولية كبيرة",words:"مسئوليه"))
+        #expect(DiarySearchParser.contains("ٱلحمد لله ۲۰۲۴",words:"الحمد 2024"))
         #expect(try parser().parse("ما معنى حياتي؟").map(\.rule)==[.words("ما معني حياتي")])
         #expect(try parser().parse("عنان").map(\.rule)==[.words("عنان")])
     }

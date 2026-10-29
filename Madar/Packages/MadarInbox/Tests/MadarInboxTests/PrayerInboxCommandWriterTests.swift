@@ -41,6 +41,13 @@ struct PrayerInboxCommandWriterTests {
         ]))
     }
 
+    @Test func aFolderNamedLikeARecordIsNeverClaimed() throws {
+        let inbox = fixture()
+        let folder = inbox.directory.appending(path: "pending/\(UUID().uuidString).jsonl", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        #expect(try inbox.claimBatch().isEmpty)
+    }
+
     @Test func test_M1F04_shortcutPrayerLogRejectsInvalidOrAmbiguousInput() throws {
         let inbox = fixture()
         let zone = try #require(TimeZone(identifier: "Asia/Riyadh"))

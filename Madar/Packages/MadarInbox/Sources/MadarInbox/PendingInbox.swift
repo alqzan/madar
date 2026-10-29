@@ -162,7 +162,8 @@ public struct PendingInbox: Sendable {
         let url = directory.appending(path: folder, directoryHint: .isDirectory)
         guard FileManager.default.fileExists(atPath: url.path) else { return [] }
         return try FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: [.isRegularFileKey])
-            .filter { $0.pathExtension == "jsonl" && deliveryID(for: $0) != nil }
+            // A directory or link with a record's name is never claimed, so it cannot stall the drain.
+            .filter { $0.pathExtension == "jsonl" && deliveryID(for: $0) != nil && (try? $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true }
             .sorted { $0.lastPathComponent < $1.lastPathComponent }
     }
     private func deliveryID(for file: URL) -> UUID? {

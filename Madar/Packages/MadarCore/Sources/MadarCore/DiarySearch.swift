@@ -30,11 +30,13 @@ public struct DiarySearchParser: Sendable {
     public let tags: [String]
     public init(today: GregorianDay, zone: TimeZone, weekStart: Int = 7, sightingOffset: Int = 0, places: [String] = [], projects: [String: UUID] = [:], tags: [String] = []) { self.today=today; self.zone=zone; self.weekStart=weekStart; self.sightingOffset=sightingOffset; self.places=places; self.projects=projects; self.tags=tags }
     public static func normalize(_ value: String) -> String {
-        let digits = Array("٠١٢٣٤٥٦٧٨٩"), western = Array("0123456789")
+        let digits = Array("٠١٢٣٤٥٦٧٨٩"), persian = Array("۰۱۲۳۴۵۶۷۸۹"), western = Array("0123456789")
         var result = value.lowercased()
         for (a,b) in zip(digits,western) { result=result.replacingOccurrences(of: String(a), with: String(b)) }
+        for (a,b) in zip(persian,western) { result=result.replacingOccurrences(of: String(a), with: String(b)) }
         return result.unicodeScalars.filter { !CharacterSet.nonBaseCharacters.contains($0) && $0.value != 0x0640 }.map(String.init).joined()
-            .replacingOccurrences(of: "[أإآ]", with: "ا", options: .regularExpression).replacingOccurrences(of: "ى", with: "ي").replacingOccurrences(of: "ة", with: "ه")
+            .replacingOccurrences(of: "[أإآٱ]", with: "ا", options: .regularExpression).replacingOccurrences(of: "ى", with: "ي")
+            .replacingOccurrences(of: "[ؤئ]", with: "ء", options: .regularExpression).replacingOccurrences(of: "ة", with: "ه")  // «مسئولية» finds «مسؤولية»
     }
     private func calendar(_ first: FirstCalendar) -> Calendar { var c=Calendar(identifier: first == .hijri ? .islamicUmmAlQura : .gregorian); c.timeZone=zone; return c }
     private func date(_ y: Int,_ m: Int,_ d: Int,_ first: FirstCalendar) -> GregorianDay? {
