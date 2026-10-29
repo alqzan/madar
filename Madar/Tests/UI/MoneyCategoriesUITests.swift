@@ -52,6 +52,31 @@ import XCTest
         app.terminate()
     }
 
+    func testPercentLimitDisplaysHundredths() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": "showcase",
+            "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-16T20:00:00+03:00"]
+        app.launch()
+        let tab = app.buttons["tab-customize"]; XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
+        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("المال")
+        let money = app.buttons["money-open"]; XCTAssertTrue(money.waitForExistence(timeout: 5)); money.tap()
+        let open = app.buttons["money-categories-open"]; XCTAssertTrue(open.waitForExistence(timeout: 10))
+        for _ in 0..<6 where !open.isHittable { app.swipeUp(velocity: .slow) }
+        for _ in 0..<4 where open.frame.maxY > app.frame.maxY - 140 { app.swipeUp(velocity: .slow) }
+        open.tap()
+        let shelf = app.buttons["money-shelf-بقالة"]; XCTAssertTrue(shelf.waitForExistence(timeout: 10), app.debugDescription)
+        shelf.tap()
+        let percentMode = app.buttons["money-limit-mode-percent"]
+        for _ in 0..<8 where !percentMode.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(percentMode.waitForExistence(timeout: 10), app.debugDescription); percentMode.tap()
+        let value = app.staticTexts["money-limit-value"]
+        XCTAssertTrue(value.waitForExistence(timeout: 10), app.debugDescription)
+        let normalizedValue = value.label.replacingOccurrences(of: "\u{2068}", with: "").replacingOccurrences(of: "\u{2069}", with: "")
+        XCTAssertEqual(normalizedValue, "٢٦٫٦٦٪")
+        shot(app, "AU-83-categories-percent-L")
+        app.terminate()
+    }
+
     func testLimit80AlertIsDeliveredWithPrivacySafeCopy() throws {
         continueAfterFailure = false
         let storeID = UUID().uuidString

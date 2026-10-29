@@ -147,7 +147,7 @@ struct MoneyCategoriesView: View {
             HStack {
                 step("minus") { if percentMode { draftBp = max(100, draftBp - 100) } else { draftMinor = max(0, draftMinor - 10_000) } }
                 Spacer()
-                Text(percentMode ? service.digits.string(draftBp / 100) + "٪" : amount(draftMinor)).font(.custom("thmanyahserifdisplay-Black", size: 52, relativeTo: .largeTitle))
+                Text(percentMode ? percentLabel(draftBp) : amount(draftMinor)).font(.custom("thmanyahserifdisplay-Black", size: 52, relativeTo: .largeTitle))
                     .lineLimit(1).minimumScaleFactor(0.5).accessibilityIdentifier("money-limit-value")
                 Spacer()
                 step("plus") { if percentMode { draftBp = min(10_000, draftBp + 100) } else { draftMinor += 10_000 } }
@@ -175,6 +175,11 @@ struct MoneyCategoriesView: View {
         Button(action: action) {
             Text(title).font(MadarTypography.caption()).foregroundStyle(on ? theme.background : theme.ink).padding(.horizontal, 16).frame(minHeight: 44).background(on ? theme.ink : Color.clear)
         }.buttonStyle(.plain).accessibilityAddTraits(on ? .isSelected : []).accessibilityIdentifier("money-limit-mode-" + id)
+    }
+    private func percentLabel(_ basisPoints: Int) -> String {
+        if basisPoints % 100 == 0 { return service.digits.percent(basisPoints / 100) }
+        if basisPoints % 10 == 0 { return service.digits.amount(minorUnits: Int64(basisPoints / 10), fractionDigits: 1, signed: false) + "٪" }
+        return service.digits.amount(minorUnits: Int64(basisPoints), fractionDigits: 2, signed: false) + "٪"
     }
     private func step(_ symbol: String, _ action: @escaping () -> Void) -> some View {
         Button(action: action) {
