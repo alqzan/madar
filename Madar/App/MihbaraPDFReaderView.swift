@@ -458,7 +458,12 @@ private struct MihbaraPDFSearchView: View {
             let reader = PDFBookTextReader(data: bytes, language: book.language)
             total = try await reader.pageCount()
             for index in pages.count..<total {
-                let page = try await reader.page(at: index)
+                let page: PDFBookPageText
+                do { page = try await reader.page(at: index) }
+                catch is CancellationError { throw CancellationError() }
+                catch PDFBookTextReader.Failure.unsupportedLanguage { throw PDFBookTextReader.Failure.unsupportedLanguage }
+                // One unreadable page is passed over (searched as empty) instead of stopping the whole scan.
+                catch { page = PDFBookPageText(index: index, text: "", source: .optical) }
                 try Task.checkCancellation()
                 guard jobID == id, app.lockController?.canPresent(.app) ?? app.protectedDataAuthorized else { return }
                 pages.append(page)

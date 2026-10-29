@@ -68,11 +68,13 @@ private struct PDFConversionLoadedCheckpoint {
         var state = State.running
         var summary: PDFBookEPUB.Summary?
         var started = Date()
+        /// Pages already read when this run began (a resumed checkpoint), so the pace counts only this run.
+        var startDone = 0
 
         /// Seconds left at the pace so far, once a few pages have been read.
         var secondsLeft: Int? {
-            guard state == .running, done >= 5, total > done else { return nil }
-            return Int((Date().timeIntervalSince(started) / Double(done) * Double(total - done)).rounded(.up))
+            guard state == .running, done - startDone >= 5, total > done else { return nil }
+            return Int((Date().timeIntervalSince(started) / Double(done - startDone) * Double(total - done)).rounded(.up))
         }
     }
 
@@ -201,7 +203,7 @@ private struct PDFConversionLoadedCheckpoint {
         var pages = checkpoint.pages
         var pictures = pages.filter { $0.image != nil }.count
         let checkpointDirectory = Self.checkpointFolder(book.id, app: app)
-        update(book.id) { $0.done = pages.count }
+        update(book.id) { [count = pages.count] in $0.done = count; $0.startDone = count; $0.started = Date() }
 #if DEBUG
         if !pages.isEmpty,
            UUID(uuidString: ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"] ?? "") != nil,

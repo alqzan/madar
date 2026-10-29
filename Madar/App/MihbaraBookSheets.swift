@@ -456,7 +456,7 @@ struct MihbaraBookCard: View {
         return chapters
     }
     private var shelfTitle: String {
-        switch book.shelf { case "want": "أبي أقرأها"; case "finished": "أنهيتها"; default: "أقرؤها الآن" }
+        switch book.shelf { case "want": "أبي أقرأها"; case "finished": "أنهيتها"; case "old": "قرأتها قديمًا"; default: "أقرؤها الآن" }
     }
     /// «أنهيته قبل ١٠ سنوات» for a book finished a year or more ago; plain «أنهيته» otherwise.
     private func finishedAgo(_ finished: Date) -> String {

@@ -47,7 +47,7 @@ struct MihbaraPaperIndexEditor: View {
     private var digits: MadarNumberFormatter { AppMihbaraService(app: app).digits }
     private var scanCanRun: Bool { VNDocumentScanAvailability.supported }
     private var shelfTitle: String {
-        switch shelf { case "want": "أبي أقرأه"; case "finished": "أنهيته"; default: "أقرؤه الآن" }
+        switch shelf { case "want": "أبي أقرأه"; case "finished": "أنهيته"; case "old": "قرأته قديمًا"; default: "أقرؤه الآن" }
     }
 
     init(app: AppSession, readingBooks: [MihbaraBook], onSaved: @escaping () -> Void, existingBook: MihbaraBook? = nil) {
@@ -193,7 +193,7 @@ struct MihbaraPaperIndexEditor: View {
         .confirmationDialog("اختر كتابًا يرجع إلى أبي أقرأها", isPresented: $choosingSlot, titleVisibility: .visible) {
             ForEach(readingBooks) { old in Button(old.title) { save(replacing: old.id) } }
         }
-        .alert("تعذر الفحص", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
+        .alert("تعذّر الإكمال", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
             Button("حسنًا", role: .cancel) { errorMessage = nil }
         } message: { Text(errorMessage ?? "") }
         .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تمّ") { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) } } }

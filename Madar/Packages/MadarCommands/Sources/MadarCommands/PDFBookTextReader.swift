@@ -14,7 +14,7 @@ public struct PDFBookPageText: Equatable, Sendable, Identifiable {
     public let normalizedText: String
     public var id: Int { index }
 
-    init(index: Int, text: String, source: Source) {
+    public init(index: Int, text: String, source: Source) {
         self.index = index; self.text = text; self.source = source
         normalizedText = Self.normalize(text)
     }
