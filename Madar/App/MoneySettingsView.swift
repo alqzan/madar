@@ -21,6 +21,7 @@ struct MoneySettingsView: View {
     @State private var cycle: MoneyCycleReading?
     @State private var mode = "fixed"
     @State private var rawAmount = ""
+    @State private var storedLocalSettings: [String: MadarData.JSONValue] = [:]
     @State private var rawPercent = "30"
     @State private var salaryDay = 0
     @State private var calendar = "gregorian"
@@ -79,7 +80,7 @@ struct MoneySettingsView: View {
                 }.padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 28).frame(maxWidth: 620).frame(maxWidth: .infinity)
             }.scrollDismissesKeyboard(.interactively).background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.plain).toolbar(.hidden, for: .navigationBar, .tabBar)
                 .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تمّ") { editing = false }.accessibilityIdentifier("money-settings-keyboard-done") } }
-                .task { load() }.onChange(of: app.prayerRevision) { refreshCycle() }.onChange(of: unit) { every = min(every, unit.maxEvery) }
+                .task { load() }.onChange(of: app.prayerRevision) { refreshAfterSettingsChange() }.onChange(of: unit) { every = min(every, unit.maxEvery) }
                 .accessibilityIdentifier("money-settings")
         }
     }
@@ -231,12 +232,40 @@ struct MoneySettingsView: View {
     private func stringBinding(_ key: String) -> Binding<String> { .init(get: { app.string(key) }, set: { app.set(.string($0), key: key) }) }
     private func tabValue(_ p: Page) -> String { switch p { case .daily: cycle.map { amount($0.headline.todayAllowanceMinor) } ?? "—"; case .cycle: salaryDay > 0 ? service.digits.string(salaryDay) : "الراتب"; case .deficit: service.digits.string(Int(app.number("mal.offsetCapDailies"))); case .travel: app.bool("mal.travelPausesDaily") ? "تتوقف" : "تستمر"; case .messages: "الاختصار"; case .room: "خصوصيتك"; case .reconciliation: service.digits.string(Int(app.number("mal.reconcileEveryDays"))) + " يوم" } }
     private var keys: [String] { switch page { case .daily: ["mal.dailyAllowance"]; case .cycle: ["mal.salaryDay", "mal.cycleCalendar", "mal.salarySchedule"]; case .deficit: ["mal.autoOffset", "mal.offsetCapDailies", "mal.salaryRemainder", "mal.cashWithdrawalAsSpend"]; case .messages: ["mal.alert80", "mal.sinceLastVisit", "mal.cardDue", "mal.zakatReminder"]; case .travel: ["mal.travelPausesDaily"]; case .room: ["core.hideMoneyOutside", "core.hideMoneyUntilTouch", "mal.figureStyle", "mal.hawlStyle", "mal.bigExpenseRule", "mal.bigExpenseDays", "mal.bigExpenseSalaryBp", "mal.bigExpenseMinor"]; case .reconciliation: ["mal.reconcileEveryDays"] } }
+    private var localSettingKeys: [String] { ["core.currency", "mal.dailyAllowance", "mal.salaryDay", "mal.cycleCalendar", "mal.salarySchedule", "mal.bigExpenseSalaryBp", "mal.bigExpenseMinor", "mal.reconcileEveryDays"] }
+    private func localSettingsSnapshot() -> [String: MadarData.JSONValue] {
+        Dictionary(uniqueKeysWithValues: localSettingKeys.map { ($0, app.values[$0] ?? .null) })
+    }
     private func refreshCycle() {
         cycle = try? MoneyRepository(context: ModelContext(app.container)).cycle(at: app.prayerNow())
     }
-    private func load() {
+    private func refreshAfterSettingsChange() {
         refreshCycle()
-        let value = app.values["mal.dailyAllowance"]?.object ?? [:]; mode = value["mode"]?.string ?? "fixed"
+        let current = localSettingsSnapshot()
+        guard !storedLocalSettings.isEmpty else { storedLocalSettings = current; return }
+        let changed = Set(localSettingKeys.filter { storedLocalSettings[$0] != current[$0] })
+        guard !changed.isEmpty else { return }
+        if changed.contains("mal.dailyAllowance") { loadDailyAllowance() }
+        if changed.contains("mal.salaryDay") { salaryDay = Int(app.number("mal.salaryDay")) }
+        if changed.contains("mal.cycleCalendar") { calendar = app.string("mal.cycleCalendar") }
+        if changed.contains("mal.salarySchedule") { loadSalarySchedule() }
+        if changed.contains("mal.bigExpenseMinor") { loadBigExpenseAmount() }
+        if changed.contains("mal.bigExpenseSalaryBp") { loadBigExpensePercent() }
+        if changed.contains("mal.reconcileEveryDays") { loadReconciliationSettings() }
+        if changed.contains("core.currency") {
+            let oldCurrency = storedLocalSettings["core.currency"]?.string ?? app.string("core.currency")
+            let oldExponent = CurrencyExponents.specified.exponent(oldCurrency) ?? 2
+            let newExponent = homeExponent
+            if oldExponent != newExponent {
+                if let amount = MoneyAmountInput.minor(rawAmount, exponent: oldExponent) { rawAmount = input(amount, exponent: newExponent) }
+                if let amount = MoneyAmountInput.minor(rawBigAmount, exponent: oldExponent) { rawBigAmount = input(amount, exponent: newExponent) }
+            }
+        }
+        storedLocalSettings = current
+    }
+    private func loadDailyAllowance() {
+        let value = app.values["mal.dailyAllowance"]?.object ?? [:]
+        mode = value["mode"]?.string ?? "fixed"
         if value["amountMinor"] == .null && value["percentBp"] == .null {
             mode = cycle?.input.policies.last.map { if case .percent = $0.mode { "percent" } else { "fixed" } } ?? "fixed"
         }
@@ -244,12 +273,32 @@ struct MoneySettingsView: View {
         rawAmount = value["amountMinor"] == .null && cycle == nil ? "" : input(n, exponent: homeExponent)
         let previousBp = cycle?.input.policies.last.flatMap { if case .percent(let bp, _) = $0.mode { bp } else { nil } }
         rawPercent = input(value["percentBp"]?.number.map(Int.init) ?? previousBp ?? 3000, exponent: 2)
-        rawBigAmount = input(Int(app.number("mal.bigExpenseMinor")), exponent: homeExponent)
-        rawBigPercent = input(Int(app.number("mal.bigExpenseSalaryBp")), exponent: 2)
-        rawReconcileDays = input(Int(app.number("mal.reconcileEveryDays")), exponent: 0)
+    }
+    private func load() {
+        refreshCycle()
+        loadDailyAllowance()
+        loadCycleSettings()
+        loadBigExpenseAmount()
+        loadBigExpensePercent()
+        loadReconciliationSettings()
+        storedLocalSettings = localSettingsSnapshot()
+    }
+    private func loadCycleSettings() {
         salaryDay = Int(app.number("mal.salaryDay")); calendar = app.string("mal.cycleCalendar")
+        loadSalarySchedule()
+    }
+    private func loadSalarySchedule() {
         let schedule = app.values["mal.salarySchedule"]?.object ?? [:]; flexible = schedule["enabled"] == .bool(true); every = schedule["every"]?.number.map(Int.init) ?? 1; unit = RecurrenceUnit(rawValue: schedule["unit"]?.string ?? "month") ?? .month
         first = schedule["firstDayKey"]?.string.flatMap { try? GregorianDay($0) }?.date(in: app.activePlace.timeZone) ?? cycle?.expectedEndDay.date(in: app.activePlace.timeZone) ?? app.prayerNow()
+    }
+    private func loadBigExpenseAmount() {
+        rawBigAmount = input(Int(app.number("mal.bigExpenseMinor")), exponent: homeExponent)
+    }
+    private func loadBigExpensePercent() {
+        rawBigPercent = input(Int(app.number("mal.bigExpenseSalaryBp")), exponent: 2)
+    }
+    private func loadReconciliationSettings() {
+        rawReconcileDays = input(Int(app.number("mal.reconcileEveryDays")), exponent: 0)
     }
 }
 private struct MoneyBookRosette: Shape {
