@@ -45,6 +45,13 @@ struct MihbaraPDFImportView: View {
     @State private var bookID = UUID()
     @State private var commandID = UUID()
     @State private var inspection: PDFBookInspection?
+    // AU-36: a dimmed add button names what it waits for.
+    private var waiting: String? {
+        if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "اكتب عنوان الكتاب لتضيفه" }
+        if title.count > 300 { return "العنوان أطول من ٣٠٠ حرف" }
+        if author.count > 300 { return "اسم المؤلف أطول من ٣٠٠ حرف" }
+        return nil
+    }
     @State private var recoveryBook: MihbaraBook?
     @State private var title = ""
     @State private var author = ""
@@ -122,6 +129,7 @@ struct MihbaraPDFImportView: View {
                     }.font(MadarTypography.body()).padding(14).background(theme.surface, in: .rect(cornerRadius: 16))
                         .overlay { RoundedRectangle(cornerRadius: 16).stroke(theme.line.opacity(0.7), lineWidth: 1) }
                         .disabled(saving || confirmedMetadata != nil)
+                    if !saving && recoveryBook == nil && confirmedMetadata == nil, let waiting { Text(waiting).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("mihbara-import-waiting") }
                     Button(saving ? (recoveryBook == nil ? "يُضاف…" : "يُعاد الملف…") : (recoveryBook == nil ? "أضفه إلى «أبي أقرأها»" : "أعد الملف إلى الكتاب")) { confirm() }
                         .buttonStyle(MadarPrimaryButton()).disabled(saving || (recoveryBook == nil && (title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || title.count > 300 || author.count > 300)))
                         .accessibilityIdentifier("mihbara-import-confirm")

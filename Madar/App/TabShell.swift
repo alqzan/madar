@@ -305,3 +305,12 @@ struct MadarRootView: View {
         return dynamicType
     }
 }
+
+extension View {
+    /// AU-36/37: the root alert cannot show over a sheet, so a sheet carries its own for `session.errorMessage`.
+    func madarSheetErrorAlert(_ session: AppSession) -> some View {
+        alert("لم تكتمل العملية", isPresented: Binding(get: { session.errorMessage != nil }, set: { if !$0 { session.errorMessage = nil } })) {
+            Button("حسنًا") { session.errorMessage = nil }
+        } message: { Text(session.errorMessage ?? "") }
+    }
+}

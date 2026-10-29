@@ -136,7 +136,7 @@ struct MihbaraHomeView: View {
                     case .motivation: MihbaraMotivationCard(cues: motivationCues, action: performMotivation)
                     }
                 }
-            }.environment(\.roomTheme, theme).presentationDragIndicator(.visible)
+            }.environment(\.roomTheme, theme).presentationDragIndicator(.visible).madarSheetErrorAlert(app)
         }
         // Owner, 21 Oct 2026: «اقدر اعدل اسم الكتاب». The spine keeps the short name the title is known by.
         .alert("اسم الكتاب", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
@@ -182,7 +182,7 @@ struct MihbaraHomeView: View {
                         pendingGoodreadsStage: $pendingGoodreadsStage
                     )
                 }
-                .environment(\.roomTheme, theme)
+                .environment(\.roomTheme, theme).madarSheetErrorAlert(app)
             } else {
                 // AU-18: never a blank full-screen cover with no way out.
                 Color.clear.onAppear { showingAddBook = false }
@@ -194,6 +194,10 @@ struct MihbaraHomeView: View {
         ForEach(MihbaraConversions.shared.jobs) { job in
             MihbaraConversionCard(app: app, job: job, digits: service.digits) { id in readerRoute = MihbaraReaderRoute(bookID: id) }
         }
+    }
+    // AU-36: «كتاب آخر / كتابان آخران / ٣ كتب أخرى», never «كتاب واحد أخرى».
+    private func moreBooks(_ count: Int) -> String {
+        count == 1 ? "كتاب آخر" : count == 2 ? "كتابان آخران" : MihbaraCopy.books(count, service.digits) + " " + (count % 100 >= 3 && count % 100 <= 10 ? "أخرى" : "آخر")
     }
     private func readableBook(_ id: UUID) -> MihbaraBook? {
         guard let book = reading?.book(id), book.isReadableEPUB || book.isReadablePDF else { return nil }
@@ -422,7 +426,7 @@ struct MihbaraHomeView: View {
                 MihbaraShelfPlank().padding(.top, -14)
             }
             if hidden > 0 {
-                Button { sheet = .library } label: { Text(MihbaraCopy.books(hidden, service.digits) + " أخرى في «كل كتبي» ‹").font(MadarTypography.caption()) }
+                Button { sheet = .library } label: { Text(moreBooks(hidden) + " في «كل كتبي» ‹").font(MadarTypography.caption()) }
                     .frame(maxWidth: .infinity, minHeight: 44).accessibilityIdentifier("mihbara-bookcase-more")
             }
         }
@@ -444,7 +448,7 @@ struct MihbaraHomeView: View {
                 MihbaraShelfPlank().padding(.top, -14)
             }
             if hidden > 0 {
-                Button { sheet = .library } label: { Text(MihbaraCopy.books(hidden, service.digits) + " أخرى في «كل كتبي» ‹").font(MadarTypography.caption()) }
+                Button { sheet = .library } label: { Text(moreBooks(hidden) + " في «كل كتبي» ‹").font(MadarTypography.caption()) }
                     .frame(maxWidth: .infinity, minHeight: 44)
             }
         }
@@ -1352,3 +1356,4 @@ struct MihbaraOpenBook: View {
         VStack(spacing: sunnah ? 8 : 12) { Text(header).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).lineLimit(2); Spacer(minLength: 0); Text(title).font(.custom(sunnah ? "Amiri-Regular" : "Amiri-Bold", size: sunnah ? 16 : 23, relativeTo: .title2)).multilineTextAlignment(.center); Text(text).font(.custom("Amiri-Regular", size: sunnah ? 18 : 21, relativeTo: .body)).multilineTextAlignment(.center).lineLimit(sunnah ? 5 : 4); Spacer(minLength: 0); Text(footer).font(.custom("Amiri-Regular", size: 14, relativeTo: .caption)) }.padding(.horizontal, 12).padding(.vertical, sunnah ? 10 : 16).frame(maxWidth: .infinity).frame(minHeight: sunnah ? 180 : 220).background(theme.surface).overlay(alignment: .leading) { LinearGradient(colors: [theme.ink.opacity(0.08), .clear], startPoint: .leading, endPoint: .trailing).frame(width: 15).allowsHitTesting(false) }
     }
 }
+

@@ -123,7 +123,8 @@ struct MihbaraEPUBImportView: View {
                     }
                 }
 
-                if let error {
+                // AU-36: once the book is read, a save error sits beside the add button instead.
+                if let error, inspection == nil {
                     Text(error).font(MadarTypography.body()).foregroundStyle(theme.ink).accessibilityIdentifier("mihbara-epub-import-error")
                 }
 
@@ -259,11 +260,25 @@ struct MihbaraEPUBImportView: View {
     }
 
     private var confirmButton: some View {
+        VStack(alignment: .leading, spacing: 8) {
+        if let error, inspection != nil {
+            Text(error).font(MadarTypography.body()).foregroundStyle(theme.ink).accessibilityIdentifier("mihbara-epub-import-error")
+        }
+        if !saving && scanDone && recoveryBook == nil, let waiting { Text(waiting).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("mihbara-import-waiting") }
         Button(saving ? (recoveryBook == nil ? "يُضاف…" : "يُعاد الملف…") : (recoveryBook == nil ? "أضفه إلى مكتبتي" : "أعد الملف إلى الكتاب")) { confirm() }
             .buttonStyle(MadarPrimaryButton())
             .disabled(saving || !scanDone || title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || title.count > 300 || author.count > 300)
             .accessibilityIdentifier("mihbara-epub-import-confirm")
+        }
     }
+    // AU-36: a dimmed add button names what it waits for.
+    private var waiting: String? {
+        if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "اكتب عنوان الكتاب لتضيفه" }
+        if title.count > 300 { return "العنوان أطول من ٣٠٠ حرف" }
+        if author.count > 300 { return "اسم المؤلف أطول من ٣٠٠ حرف" }
+        return nil
+    }
+
 
     private func row(_ title: String, detail: String, detected: Bool) -> some View {
         HStack(alignment: .top, spacing: 10) {
@@ -421,7 +436,7 @@ struct MihbaraEPUBImportView: View {
 
     private func confirm() {
         guard !saving, let inspection else { return }
-        saving = true
+        saving = true; error = nil
         Task { @MainActor in
             do {
                 try await service.confirmEPUB(inspection, bookID: bookID, commandID: commandID,

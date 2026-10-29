@@ -200,7 +200,7 @@ struct DiaryTextEditor: View {
         guard loaded, !saving else { return }
         draftTask?.cancel(); draftStatus = "تُحفظ المسودة…"
         draftTask = Task {
-            do { try await Task.sleep(for: .milliseconds(500)); try Task.checkCancellation(); try await persistDraft(); draftStatus = text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : "المسودة محفوظة" }
+            do { try await Task.sleep(for: .milliseconds(500)); try Task.checkCancellation(); try await persistDraft(); failure = nil; draftStatus = text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : "المسودة محفوظة" }
             catch is CancellationError {} catch { draftStatus = "لم تُحفظ المسودة"; failure = madarUserMessage(error) }
         }
     }
@@ -211,18 +211,19 @@ struct DiaryTextEditor: View {
         hasDraftRecord = true
     }
     private func close() async {
-        draftTask?.cancel(); saving = true
+        draftTask?.cancel(); saving = true; failure = nil
         do { await voice?.stop(); if loaded { try await persistDraft() }; dismiss() }
         catch { failure = madarUserMessage(error); saving = false }
     }
     private func add(_ data: Data, kind: String, type: String, caption: String = "", assetID: String? = nil) async throws {
         guard let writingDay else { throw CocoaError(.coderInvalidValue) }; importing = true
         defer { importing = false }
+        failure = nil // AU-36: a stale error never sits beside a success.
         _ = try await AppDiaryService(app: app).appendMedia(data: data, kind: kind, contentType: type, caption: caption, day: day, writingDay: writingDay, assetID: assetID)
         attachmentSaved = true; editorUndo = true; draftStatus = "حُفظ المرفق في الصفحة"
     }
     private func save() async {
-        guard !saving else { return }; saving = true; draftTask?.cancel()
+        guard !saving else { return }; saving = true; failure = nil; draftTask?.cancel()
         do {
             await voice?.stop()
             if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
