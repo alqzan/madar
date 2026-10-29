@@ -99,7 +99,7 @@
                   "many": {
                     "stringUnit": {
                       "state": "translated",
-                      "value": "%2$@ يومية"
+                      "value": "%2$@ يوميةً"
                     }
                   },
                   "other": {
@@ -213,7 +213,7 @@
                   "many": {
                     "stringUnit": {
                       "state": "translated",
-                      "value": "%2$@ مرة"
+                      "value": "%2$@ مرةً"
                     }
                   },
                   "other": {
