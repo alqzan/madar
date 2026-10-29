@@ -57,10 +57,11 @@ struct MoneyAccountSheet: View {
                     // An account that is not mine is outside zakat already (the caption above says so).
                     if draft.ownership == "mine" { Toggle("أدخله في حساب الزكاة", isOn: $draft.zakatInclude).accessibilityIdentifier("money-account-zakat") }
                     field("أسماء مرسلي رسائل البنك، اسم في كل سطر") { TextField("أسماء المرسل", text: $senders, axis: .vertical).lineLimit(2...5).focused($editing).accessibilityIdentifier("money-account-senders") }
+                    if !balanceReadable { Text("لم أفهم الرصيد؛ اكتب أرقامًا وفاصلة واحدة على الأكثر.").font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")) }
                     if let failure { Text(failure).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")) }
                     // AU-34: the reason sits beside the dimmed save, not only mid-form.
                     if !saving && !draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !draft.openingKnown && balance.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { Text("أدخل رصيد البنك لتحفظ الحساب").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-account-waiting") }
-                    Button(action: save) { Text(saving ? "جارٍ الحفظ…" : "احفظ الحساب").font(MadarTypography.cardTitle()).frame(maxWidth: .infinity, minHeight: 54).background(theme.ink).foregroundStyle(theme.background) }.disabled(saving || draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || (!draft.openingKnown && balance.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)).accessibilityIdentifier("money-account-save")
+                    Button(action: save) { Text(saving ? "جارٍ الحفظ…" : "احفظ الحساب").font(MadarTypography.cardTitle()).frame(maxWidth: .infinity, minHeight: 54).background(theme.ink).foregroundStyle(theme.background) }.disabled(saving || !balanceReadable || draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || (!draft.openingKnown && balance.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)).accessibilityIdentifier("money-account-save")
                     // Item 34: an account entered by mistake goes, while nothing refers to it; the toast offers undo.
                     if !original.isNew && original.removable {
                         Button(role: .destructive) { confirmingRemoval = true } label: {
@@ -88,6 +89,14 @@ struct MoneyAccountSheet: View {
             do { try await app.executeMoneyCommand("money.removeAccount", payload: ["id": .string(original.id.uuidString)]); dismiss() }
             catch { saving = false; failure = "لم يُحذف الحساب؛ ربما صار عليه حركة أو بطاقة. أعد فتح الحساب لترى حاله." }
         }
+    }
+    /// The typed balance reads as an amount (a leading «-» or «−» allowed); a blank field is judged by the opening rule.
+    private var balanceReadable: Bool {
+        let raw = balance.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !raw.isEmpty else { return true }
+        let negative = raw.hasPrefix("-") || raw.hasPrefix("−")
+        guard let exponent = CurrencyExponents.specified.exponent(draft.currency) else { return false }
+        return MoneyAmountInput.minor(negative ? String(raw.dropFirst()) : raw, exponent: exponent) != nil
     }
     private func save() {
         guard !saving else { return }; editing = false
