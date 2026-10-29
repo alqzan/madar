@@ -108,13 +108,13 @@ struct QuranHomeView: View {
                 if step.kind == .drill, step.available, state?.draft == nil {
                     Button("ابدأ التدريب") { detail = nil; run { active = try await service.start(kind: .drill, stepID: step.id, range: nil, rakaat: nil, spotID: nil) } }
                         .font(bodyFont(14, bold: true)).frame(maxWidth: .infinity, minHeight: 48).foregroundStyle(theme.onAccent).background(theme.color("accent"), in: Capsule())
-                        .accessibilityIdentifier("quran-drill-start")
+                        .disabled(busy).accessibilityIdentifier("quran-drill-start")
                     Button("تمّ") { detail = nil }.font(bodyFont(14, bold: true)).frame(maxWidth: .infinity, minHeight: 44).foregroundStyle(theme.ink)
                 } else if step.available, !step.completed, state?.draft == nil {
                     // Owner 20 Oct: the day's order is a suggestion, not a gate; any open step can start now.
                     Button(step.id == next?.id ? "ابدأ" : "ابدأ بها الآن") { detail = nil; run { active = try await service.start(kind: step.kind, stepID: step.id, range: step.range, rakaat: nil, spotID: nil) } }
                         .font(bodyFont(14, bold: true)).frame(maxWidth: .infinity, minHeight: 48).foregroundStyle(theme.onAccent).background(theme.color("accent"), in: Capsule())
-                        .accessibilityIdentifier("quran-step-start")
+                        .disabled(busy).accessibilityIdentifier("quran-step-start")
                     Button("تمّ") { detail = nil }.font(bodyFont(14, bold: true)).frame(maxWidth: .infinity, minHeight: 44).foregroundStyle(theme.ink)
                 } else {
                 Button("تمّ") { detail = nil }.font(bodyFont(14, bold: true)).frame(maxWidth: .infinity, minHeight: 48).foregroundStyle(theme.onAccent).background(theme.color("accent"), in: Capsule())

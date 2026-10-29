@@ -856,7 +856,8 @@ final class AppSession {
         let result = try await bus.execute(.init(commandID: id, name: name, payload: .object(payload), issuedAt: now), now: now)
         guard result.status == .applied || result.status == .duplicate else { throw DataError.invalidValue(result.reason ?? "money command") }
         if result.status == .applied {
-            try reload(); try publishSnapshot()
+            // The command is committed: a failed refresh must not read as a failed save, or a retry with a new ID records it twice.
+            do { try reload(); try publishSnapshot() } catch { errorMessage = "حُفظ التغيير، لكن تعذّر تحديث العرض. أغلق الصفحة وافتحها مرة أخرى." }
             // A confirmed spend can cross a category's 80% line (M5-V10); re-plan room reminders through the one arbiter.
             Task { await refreshPrayerNotifications() }
         }

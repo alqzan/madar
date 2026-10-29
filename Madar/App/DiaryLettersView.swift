@@ -178,6 +178,7 @@ struct DiaryLetterComposer: View {
     @State private var choices: [DiaryLetterChoice] = []
     @State private var choice: DiaryLetterChoice?
     @State private var date = Date().addingTimeInterval(30 * 86_400)
+    @State private var confirmDiscard = false
     @State private var failure: String?
     @State private var saving = false
     private var service: AppDiaryService { .init(app: app) }
@@ -217,7 +218,7 @@ struct DiaryLetterComposer: View {
             }.background(theme.background).foregroundStyle(theme.ink)
                 .navigationTitle("رسالة لنفسك").navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItem(placement: .cancellationAction) { Button("إلغاء") { dismiss() } }
+                    ToolbarItem(placement: .cancellationAction) { Button("إلغاء") { if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { dismiss() } else { confirmDiscard = true } }.accessibilityIdentifier("diary-letter-cancel") }
                     ToolbarItem(placement: .confirmationAction) {
                         Button("اختمها") {
                             guard !saving, let choice else { return }; saving = true
@@ -228,6 +229,12 @@ struct DiaryLetterComposer: View {
                     }
                 }.toolbarBackground(theme.background, for: .navigationBar).tint(theme.accent)
                 .task { do { choices = try service.letterChoices(); choice = choice ?? choices.first } catch { failure = madarUserMessage(error) } }
+                // A letter in progress is not lost to a stray swipe or cancel.
+                .interactiveDismissDisabled(!text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || saving)
+                .alert("تتجاهل رسالتك؟", isPresented: $confirmDiscard) {
+                    Button("تجاهل الرسالة", role: .destructive) { dismiss() }
+                    Button("أكمل الكتابة", role: .cancel) {}
+                }
         }
     }
 }

@@ -159,6 +159,10 @@ struct MihbaraTurathView: View {
         .environment(\.layoutDirection, .rightToLeft).toolbarVisibility(.hidden, for: .navigationBar).statusBarHidden(true)
         .task(id: catalogueAttempt) { await load() }
         .onChange(of: query) { _, value in results = TurathCatalogue.search(books, query: value) }
+        // Backing out of the review leaves no downloaded copy behind; an import has already copied it.
+        .onChange(of: reviewing) { _, open in
+            if !open, let file = downloaded { try? FileManager.default.removeItem(at: file); downloaded = nil }
+        }
         .navigationDestination(isPresented: $reviewing) {
             if let downloaded {
                 MihbaraEPUBImportView(app: app, source: downloaded, turathID: downloadedTurathID) {

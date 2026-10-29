@@ -146,7 +146,7 @@ import MadarPrayer
                 do {
                     try await command("quran.resolveMissedDay", ["dayKey": .string(day.description), "choice": .string(plan.missPolicy)])
                     return try await load()
-                } catch { missedDay = nil }
+                } catch { missedDay = nil; autoResolvedMissedDay = nil } // the next load tries again
             }
             if plan.missPolicy != "ask" { missedDay = nil }
         }

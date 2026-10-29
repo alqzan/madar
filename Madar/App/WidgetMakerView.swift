@@ -259,7 +259,7 @@ struct WidgetMakerView: View {
         if id.hasPrefix("day:"), let day = days.first(where: { "day:" + $0.id == id }) { return day.title }
         return ["prayerNext": "الصلاة القادمة", "habitsToday": "عادات اليوم", "moneyNow": "لك الآن", "ramadan": "رمضان", "year": "نسبة السنة", "upcoming": "أقرب يوم", "quranCoverage": "في صدرك", "quranReview": "من القرآن اليوم", "book": "الكتاب", "hadith": "حديث اليوم", "diaryLine": "سطر اليوم", "hijriClock": "الساعة والتاريخان"][id] ?? "عنصر غير متاح"
     }
-    private func applySelection(_ item: WidgetMakerDraft) { draft = item; baseline = saved.contains { $0.id == item.id } ? item : nil; status = ""; selectionRevision += 1 }
+    private func applySelection(_ item: WidgetMakerDraft) { draft = item; beforeReset = nil; baseline = saved.contains { $0.id == item.id } ? item : nil; status = ""; selectionRevision += 1 }
     private func select(_ item: WidgetMakerDraft) {
         if dirty { pendingSelection = item; discard = true } else { applySelection(item) }
     }

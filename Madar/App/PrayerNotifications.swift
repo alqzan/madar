@@ -383,10 +383,10 @@ final class PrayerNotificationCoordinator {
 
     private func reconcile(plan: NotificationPlan, candidates: [NotificationCandidate], current: [UNNotificationRequest], repository: PrayerRepository) async throws {
         let candidateByID = Dictionary(candidates.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        let requested = Dictionary(uniqueKeysWithValues: plan.scheduled.compactMap { item -> (String, NotificationCandidate)? in
+        let requested = Dictionary(plan.scheduled.compactMap { item -> (String, NotificationCandidate)? in
             guard Self.prayer(for: item.id) != nil else { return nil }
             return (item.id, item)
-        })
+        }, uniquingKeysWith: { first, _ in first })
         let currentByID = Dictionary(current.map { ($0.identifier, $0) }, uniquingKeysWith: { first, _ in first })
         let obsolete = current.filter { request in
             guard let target = requested[request.identifier] else { return true }

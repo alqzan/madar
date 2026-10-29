@@ -135,7 +135,8 @@ struct DiaryTextEditor: View {
         .onChange(of: day) { _, _ in scheduleDraft() }
         .onChange(of: photo) { _, item in Task {
             guard let item else { return }; importing = true
-            defer { importing = false }
+            // Cleared so the same photo can be chosen again.
+            defer { importing = false; photo = nil }
             do {
                 guard let data = try await item.loadTransferable(type: Data.self) else { failure = "تعذّر فتح الصورة. اخترها مرة أخرى."; return }
                 // A library photo is linked: its identifier and a small copy, never a second full image.
