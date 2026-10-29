@@ -119,6 +119,8 @@ struct DiaryTextEditor: View {
             writingDay = (try? AppDiaryService(app: app).currentDay()).map { initialDay == "yesterday" ? $0.adding(days: -1) : $0 }
             do { if let draft = try AppDiaryService(app: app).draft(margin: margin) { draftID = draft.id; hasDraftRecord = true; text = draft.text; day = draft.day; writingDay = draft.writingDay; draftStatus = draft.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : "مسودة مستعادة" } }
             catch { failure = madarUserMessage(error) }
+            // AU-38: let the restored text's onChange pass first, so «مسودة مستعادة» stays until the user types.
+            await Task.yield()
             loaded = true
             if voice == nil { voice = DiaryVoiceController(app: app); await voice?.recoverRecordings() }
             // A room-tab write link presents during the native sheet transition; an earlier

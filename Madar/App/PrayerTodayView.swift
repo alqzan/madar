@@ -1016,6 +1016,8 @@ private struct PrayerQadaListSheet: View {
     private var outstanding: [PrayerQada] {
         ((try? session.prayerSnapshot(at: session.prayerNow()))?.qada ?? []).filter { $0.madeUpAt == nil }
     }
+    // AU-38: a failed read never reads as «nothing owed».
+    private var readFailed: Bool { (try? session.prayerSnapshot(at: session.prayerNow())) == nil }
     private var digits: MadarNumberFormatter { MadarNumberFormatter(style: session.string("core.numerals") == "western" ? .western : .hindi) }
 
     var body: some View {
@@ -1026,7 +1028,7 @@ private struct PrayerQadaListSheet: View {
                 .accessibilityIdentifier("prayer-qada-title")
             HStack(alignment: .center, spacing: 12) {
                 if !items.isEmpty { Text(digits.string(items.count)).font(.custom("thmanyahserifdisplay-Bold", size: 64, relativeTo: .largeTitle)) }
-                Text(PrayerCopy.owed(items.count)).font(PrayerHomeType.lead).foregroundStyle(theme.secondaryInk)
+                Text(readFailed ? "تعذّرت قراءة الفوائت الآن؛ أغلق الورقة وافتحها من جديد." : PrayerCopy.owed(items.count)).font(PrayerHomeType.lead).foregroundStyle(theme.secondaryInk)
                 Spacer(minLength: 0)
             }
             .padding(.top, 14).accessibilityElement(children: .combine)
@@ -1173,6 +1175,8 @@ private struct PrayerTodayLogSheet: View {
         VStack(alignment: .leading, spacing: 0) {
             header
             if cell.isFriday { fridayKindRow.padding(.top, 16) }
+            // AU-38: the dimmed options say why.
+            if cell.isFriday && fridayKind == nil { Text("اختر «جمعة» أو «ظهر» لتسجّلها في جماعة أو فائتة.").font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk).padding(.top, 8).accessibilityIdentifier("prayer-friday-kind-hint") }
             optionRow.padding(.top, 20)
             if selected == .missed { missedPanel.padding(.top, 14) }
             if showsHeart { heartSection.padding(.top, 22) }
@@ -2019,6 +2023,7 @@ private struct PrayerDayEditSheet: View {
     let digits: MadarNumberFormatter
     let openLog: (PrayerCell) -> Void
     @Environment(\.roomTheme) private var theme
+    @Environment(\.dismiss) private var dismissDay
     @State private var contentHeight: CGFloat = 560
 
     private var summary: PrayerDaySummary? {
@@ -2036,6 +2041,10 @@ private struct PrayerDayEditSheet: View {
                 Rectangle().fill(theme.ink.opacity(0.1)).frame(height: 1)
                 Text("غير المسجّلة تبقى معلّقة حتى تختار حالها.").font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
                     .frame(maxWidth: .infinity).padding(.top, 14)
+            } else {
+                // AU-38: never a blank sheet with only its handle.
+                Text("تعذّر تحميل هذا اليوم.").font(PrayerHomeType.lead)
+                Button("أغلق") { dismissDay() }.font(PrayerHomeType.strong).frame(minHeight: 44).accessibilityIdentifier("prayer-day-close")
             }
         }
         .padding(.horizontal, 20).padding(.top, 26).padding(.bottom, 12)

@@ -478,6 +478,7 @@ struct MoneyReconcileView: View {
         typed = plain(entries[r.id]!.observedMinor)
     }
     private func set(_ r: MoneyReconcileRow, _ value: Int, at: Date?) {
+        note = nil // AU-38: an edited row is a new attempt; the old note no longer applies.
         var entry = entries[r.id] ?? .init(observedMinor: value, at: at, name: nil)
         entry.observedMinor = value; entry.at = at
         // A name that no longer fits the new difference is dropped, never silently turned into spending.
@@ -503,6 +504,7 @@ struct MoneyReconcileView: View {
     }
     private func save() {
         guard let reading else { return }
+        note = nil
         let formatter = ISO8601DateFormatter()
         let rows: [MadarCore.JSONValue] = reading.rows.compactMap { r in
             guard let entry = entries[r.id] else { return nil }

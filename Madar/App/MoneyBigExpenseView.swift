@@ -43,7 +43,7 @@ struct MoneyBigExpenseView: View {
                     if let r = reading {
                         heading(r)
                         HStack(spacing: 0) { ForEach(BigExpense.Mode.allCases, id: \.rawValue) { m in
-                            Button { mode = m; cycles = nil } label: { Text(title(m)).font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 44).background(m == mode ? theme.ink : .clear).foregroundStyle(m == mode ? theme.background : theme.ink) }.accessibilityIdentifier("money-big-mode-" + m.rawValue)
+                            Button { mode = m; cycles = nil; failure = nil } label: { Text(title(m)).font(MadarTypography.caption()).frame(maxWidth: .infinity, minHeight: 44).background(m == mode ? theme.ink : .clear).foregroundStyle(m == mode ? theme.background : theme.ink) }.accessibilityIdentifier("money-big-mode-" + m.rawValue)
                         } }.overlay { Rectangle().stroke(theme.color("reserveText"), lineWidth: 1) }
                         if !visible { Button("أظهر الأرقام") { revealed = true }.frame(minHeight: 44).accessibilityIdentifier("money-big-reveal") }
                         if let p = plan {

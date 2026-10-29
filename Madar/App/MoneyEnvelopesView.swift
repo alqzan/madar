@@ -213,6 +213,7 @@ struct MoneyReserveTargetView: View {
     private func fill() { if let current, numbersVisible, input.isEmpty { input = AppMoneyService(app: app).amount(current, full: true) } }
     private func save() {
         guard current == nil || numbersVisible else { return }
+        errorMessage = nil
         let raw = BankMessageParser.clean(input).replacingOccurrences(of: ",", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
         guard let exp = CurrencyExponents.specified.exponent(app.string("core.currency")), let value = MoneyAmountInput.minor(raw, exponent: exp), value > 0 else { errorMessage = "أدخل مبلغًا موجبًا للهدف."; return }
         working = true
