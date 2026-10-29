@@ -16,16 +16,18 @@ import MadarInbox
     }
 
     static func requestSystem(_ reserved: ReservedPrayerActivity, budget: NotificationBudgetStore, now: Date) async throws {
-        for old in Activity<PrayerCountdownAttributes>.activities {
-            await old.end(nil, dismissalPolicy: .immediate)
-            if let id = old.attributes.budgetRequestID { try budget.cancel(id: id, now: now) }
-        }
+        // The running countdown is replaced only after the new one is granted, so a refused request leaves it in place.
+        let previous = Activity<PrayerCountdownAttributes>.activities
         let names = ["fajr": "الفجر", "dhuhr": "الظهر", "asr": "العصر", "maghrib": "المغرب", "isha": "العشاء"]
         let attributes = PrayerCountdownAttributes(activityKey: "prayer.next", scheduledStartAt: reserved.reservation.scheduledAt,
                                                    budgetRequestID: reserved.reservation.id, numerals: reserved.numerals)
         let state = PrayerCountdownAttributes.ContentState(prayerName: names[reserved.prayer.rawValue] ?? "الصلاة القادمة", prayerAt: reserved.prayerAt)
         _ = try Activity.request(attributes: attributes, content: ActivityContent(state: state, staleDate: reserved.prayerAt, relevanceScore: 1),
             pushType: nil, style: .standard)
+        for old in previous {
+            await old.end(nil, dismissalPolicy: .immediate)
+            if let id = old.attributes.budgetRequestID { try budget.cancel(id: id, now: now) }
+        }
     }
 }
 

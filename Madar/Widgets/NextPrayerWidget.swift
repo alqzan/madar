@@ -105,12 +105,12 @@ struct NextPrayerView: View {
     private var circular:some View {
         VStack(spacing:3) {
             Image("MadarPrayer").renderingMode(.template).resizable().scaledToFit().frame(width:16,height:16)
-            if let state {Text(entry.snapshot?.countdown(minutes:state.minutes) ?? "").font(.system(size:15,weight:.semibold)).monospacedDigit().minimumScaleFactor(0.74).lineLimit(1);Text(state.item.name).font(.system(size:11)).lineLimit(1)}
+            if let state {Text(entry.snapshot?.countdown(minutes:state.minutes) ?? "").font(.system(size:15,weight:.semibold)).monospacedDigit().minimumScaleFactor(0.74).lineLimit(1);Text(nextName).font(.system(size:11)).lineLimit(1)}
             else{Text("افتح مدار").font(.system(size:11))}
         }.foregroundStyle(.primary).frame(maxWidth:.infinity,maxHeight:.infinity)
     }
     private var inline: some View {
-        Text(state.map { $0.item.name + " " + clock($0.item.at) } ?? "افتح مدار")
+        Text(state.map { nextName + " " + clock($0.item.at) } ?? "افتح مدار")
     }
     /// X2: «الصلاة», the countdown with the prayer it leads to, and the day's five prayers as dots by the clock.
     private var rectangular: some View {
@@ -122,7 +122,7 @@ struct NextPrayerView: View {
             if let state {
                 HStack(alignment: .firstTextBaseline, spacing: 5) {
                     Text(entry.snapshot?.countdown(minutes: state.minutes) ?? "").font(.system(size: 20, weight: .bold)).monospacedDigit()
-                    Text("على " + state.item.name + " " + shortClock(state.item.at)).font(.system(size: 12)).lineLimit(1).minimumScaleFactor(0.8)
+                    Text("على " + nextName + " " + shortClock(state.item.at)).font(.system(size: 12)).lineLimit(1).minimumScaleFactor(0.8)
                 }
                 if dayItems.count > 1 {
                     HStack(spacing: 4) {
@@ -136,6 +136,12 @@ struct NextPrayerView: View {
                 }
             } else { Text("افتح مدار").font(.headline) }
         }.frame(maxWidth: .infinity, alignment: .leading)
+    }
+    /// The headline names Friday's noon prayer like the arches do.
+    private var nextName: String {
+        guard let state else { return "" }
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = TimeZone(identifier: entry.tzID) ?? .current
+        return state.item.prayer == "dhuhr" && calendar.component(.weekday, from: state.item.at) == 6 ? "الجمعة" : state.item.name
     }
     /// The five prayers of the next prayer's day; on a Friday the noon prayer is named «الجمعة».
     private var dayItems: [PrayerNextSnapshot.Item] {
@@ -167,7 +173,7 @@ struct NextPrayerView: View {
                 header
                 Spacer(minLength: 4)
                 Text("القادمة").font(.custom("thmanyahsans-Regular", size: 12, relativeTo: .caption2)).foregroundStyle(.secondary)
-                Text(state?.item.name ?? "").font(.custom("thmanyahserifdisplay-Bold", size: 32, relativeTo: .title)).foregroundStyle(Salah.ink).lineLimit(1).minimumScaleFactor(0.7)
+                Text(nextName).font(.custom("thmanyahserifdisplay-Bold", size: 32, relativeTo: .title)).foregroundStyle(Salah.ink).lineLimit(1).minimumScaleFactor(0.7)
                 Text(countdown).font(.custom("thmanyahsans-Bold", size: 16, relativeTo: .headline)).monospacedDigit().foregroundStyle(Salah.accent).widgetAccentable()
                 Spacer(minLength: 4)
                 Text(state.map { "عند " + clock($0.item.at) } ?? "").font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(.secondary).lineLimit(1)
@@ -197,11 +203,11 @@ struct NextPrayerView: View {
         VStack(alignment: .leading, spacing: extraLargePortrait ? 18 : 4) {
             if extraLargePortrait { Text("الصلاة القادمة").font(.title2).foregroundStyle(.secondary) } else { header }
             if let state {
-                Text(entry.template == .countdown ? countdown : state.item.name).font(.system(size: extraLargePortrait ? 72 : family == .systemSmall ? 34 : 40, weight: .bold, design: .serif))
+                Text(entry.template == .countdown ? countdown : nextName).font(.system(size: extraLargePortrait ? 72 : family == .systemSmall ? 34 : 40, weight: .bold, design: .serif))
                     .minimumScaleFactor(0.6).lineLimit(1).foregroundStyle(Salah.ink)
                 Text(clock(state.item.at)).font(.system(size: extraLargePortrait ? 52 : 22, weight: .semibold, design: .rounded)).foregroundStyle(Salah.accent).widgetAccentable()
                 Spacer(minLength: 0)
-                Text(entry.template == .countdown ? state.item.name : countdown).font(.system(size: extraLargePortrait ? 32 : 16, weight: .regular)).monospacedDigit().foregroundStyle(.secondary)
+                Text(entry.template == .countdown ? nextName : countdown).font(.system(size: extraLargePortrait ? 32 : 16, weight: .regular)).monospacedDigit().foregroundStyle(.secondary)
             } else {
                 Spacer(minLength: 0)
                 Text("افتح مدار").font(.title3.weight(.semibold)).foregroundStyle(Salah.ink)
