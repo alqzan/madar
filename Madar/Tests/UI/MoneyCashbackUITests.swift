@@ -2,13 +2,29 @@ import XCTest
 
 @MainActor final class MoneyCashbackUITests: XCTestCase {
     private func shot(_ app: XCUIApplication, _ name: String) { let a = XCTAttachment(screenshot: app.screenshot()); a.name = name; a.lifetime = .keepAlways; add(a) }
-    private func openJar(fixture: String) -> XCUIApplication {
+    private func openJar(fixture: String, currency: String? = nil) -> XCUIApplication {
         let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": fixture, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-16T20:00:00+03:00"]
+        if let currency { app.launchEnvironment["MADAR_UI_MONEY_CURRENCY"] = currency }
         app.launch(); let tab = app.buttons["tab-customize"]; XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
         let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("المال")
         app.buttons["money-open"].tap()
         let open = app.buttons["money-cashback-open"]; XCTAssertTrue(open.waitForExistence(timeout: 10)); for _ in 0..<8 where !open.isHittable { app.swipeUp(velocity: .slow) }; open.tap()
         return app
+    }
+
+    func testHomeCurrencyUsesItsLocalizedNameInCashback() throws {
+        continueAfterFailure = false
+        let app = openJar(fixture: "cashback", currency: "USD")
+        let expected = try XCTUnwrap(Locale(identifier: "ar").localizedString(forCurrencyCode: "USD"))
+        let currency = app.staticTexts["money-cashback-currency"]
+        XCTAssertTrue(currency.waitForExistence(timeout: 10)); XCTAssertEqual(currency.label, expected)
+        let card = app.buttons["money-cashback-card-البطاقة الأساسية"]
+        for _ in 0..<8 where !card.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(card.waitForExistence(timeout: 8)); card.tap()
+        let preview = app.staticTexts["money-cashback-rate-preview"]
+        XCTAssertTrue(preview.waitForExistence(timeout: 5)); XCTAssertTrue(preview.label.contains(expected), preview.label)
+        XCTAssertFalse(preview.label.contains("ريال"), preview.label)
+        shot(app, "AU-81-cashback-usd-L")
     }
 
     func testJarMonthsSwitchAndRate() throws {

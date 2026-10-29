@@ -14,11 +14,21 @@ private struct UITestBankCorpusLine: Decodable {
 extension AppSession {
     /// Named synthetic stores only. Never reads or writes the owner's store.
     func prepareMoneyFixture(group: URL) throws {
-        guard let variant = ProcessInfo.processInfo.environment["MADAR_UI_MONEY_FIXTURE"], ["funding", "goal", "zakat", "zakatHidden", "travel", "travelMissing", "travelHidden", "travelMultiLeg", "travelMultiLegHidden", "accounts", "expense", "showcase", "empty", "hidden", "zero", "shortfall", "messages", "salarySourceFlow", "bankCorpus", "since", "rules", "salary", "budget", "cards", "cardsHidden", "analysis", "analysisHidden", "reconcile", "reconcileHidden", "cashback", "cashbackHidden", "subscriptions", "subscriptionsHidden"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
+        let environment = ProcessInfo.processInfo.environment
+        guard let variant = environment["MADAR_UI_MONEY_FIXTURE"], ["funding", "goal", "zakat", "zakatHidden", "travel", "travelMissing", "travelHidden", "travelMultiLeg", "travelMultiLegHidden", "accounts", "expense", "showcase", "empty", "hidden", "zero", "shortfall", "messages", "salarySourceFlow", "bankCorpus", "since", "rules", "salary", "budget", "cards", "cardsHidden", "analysis", "analysisHidden", "reconcile", "reconcileHidden", "cashback", "cashbackHidden", "subscriptions", "subscriptionsHidden"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         let c = ModelContext(container)
         guard !(try c.fetch(FetchDescriptor<DeviceSetting>())).contains(where: { $0.key == "sys.moneyFixture" }) else { return }
         for key in ["sys.moneyFixture", "sys.onboardingCompleted"] { let marker = DeviceSetting(); marker.key = key; marker.valueJSON = Data("true".utf8); c.insert(marker) }
-        _ = try SettingsStore(context: c).stage(["core.dayStart": .string("midnight"), "core.faceIDLock": .string("none"), "core.hideMoneyUntilTouch": .bool(["zakatHidden", "travelHidden", "travelMultiLegHidden", "hidden", "cardsHidden", "analysisHidden", "reconcileHidden", "cashbackHidden", "subscriptionsHidden"].contains(variant))])
+        let settings = try SettingsStore(context: c)
+        let homeCurrencyOverride = environment["MADAR_UI_MONEY_CURRENCY"] == "USD" && ["cashback", "showcase"].contains(variant) ? "USD" : nil
+        var seed: [String: MadarData.JSONValue] = ["core.dayStart": .string("midnight"), "core.faceIDLock": .string("none"), "core.hideMoneyUntilTouch": .bool(["zakatHidden", "travelHidden", "travelMultiLegHidden", "hidden", "cardsHidden", "analysisHidden", "reconcileHidden", "cashbackHidden", "subscriptionsHidden"].contains(variant))]
+        if let homeCurrencyOverride {
+            var home = try settings.value(for: "core.homeCity").object ?? [:]
+            home["currency"] = .string(homeCurrencyOverride)
+            seed["core.currency"] = .string(homeCurrencyOverride)
+            seed["core.homeCity"] = .object(home)
+        }
+        _ = try settings.stage(seed)
         if ProcessInfo.processInfo.environment["MADAR_UI_MONEY_BLOCK_SIZE"] == "4x4" {
             let store = try SettingsStore(context: c)
             var layout = try store.value(for: "bahw.layout").object ?? [:], sizes = layout["sizes"]?.object ?? [:]
@@ -299,6 +309,21 @@ extension AppSession {
         }
         if ProcessInfo.processInfo.environment["MADAR_UI_ALL_BALANCES_UNKNOWN"] == "1" {
             for row in try c.fetch(FetchDescriptor<Account>()) where row.ownership == "mine" && row.tracked { row.balanceAt = nil }
+            try c.save()
+        }
+        if let homeCurrencyOverride {
+            // USD and SAR both use two minor-unit digits. Keep this named synthetic fixture internally coherent
+            // so the money home can load without inventing an exchange rate for its accounts or obligations.
+            for account in try c.fetch(FetchDescriptor<Account>()) where account.ownership == "mine" && account.currency == "SAR" {
+                account.currency = homeCurrencyOverride
+            }
+            for movement in try c.fetch(FetchDescriptor<MoneyTransaction>()) {
+                if movement.currency == "SAR" { movement.currency = homeCurrencyOverride }
+                movement.homeCurrency = homeCurrencyOverride
+            }
+            for obligation in try c.fetch(FetchDescriptor<Obligation>()) where obligation.currency == "SAR" {
+                obligation.currency = homeCurrencyOverride
+            }
             try c.save()
         }
     }

@@ -24,6 +24,7 @@ struct MoneyCashbackView: View {
     @State private var grown = false
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
     private var service: AppMoneyService { .init(app: app) }
+    private var homeCurrencyName: String { app.string("core.currency") == "SAR" ? "ريال" : service.currencyName(app.string("core.currency")) }
     private var visible: Bool { revealed || !app.bool("core.hideMoneyUntilTouch") }
     private func amount(_ n: Int) -> String { visible ? service.amount(n) : "•••" }
     /// Shapes in the card's own colour (the miniature order of «البطاقات»); text under 24 pt uses the *Text variant.
@@ -85,7 +86,7 @@ struct MoneyCashbackView: View {
                 Text(whole(r.jar.headlineMinor)).font(.custom("thmanyahserifdisplay-Black", size: 76, relativeTo: .largeTitle)).lineLimit(1).minimumScaleFactor(0.45)
                     .contentTransition(.numericText()).accessibilityIdentifier("money-cashback-headline")
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(app.string("core.currency") == "SAR" ? "ريال" : app.string("core.currency")).font(MadarTypography.body())
+                    Text(homeCurrencyName).font(MadarTypography.body()).accessibilityIdentifier("money-cashback-currency")
                     if r.jar.accumulatingMinor > 0 { Text("تقريبًا").font(MadarTypography.fine()).accessibilityIdentifier("money-cashback-approx") }
                 }.foregroundStyle(theme.secondaryInk).fixedSize()
             }
@@ -503,6 +504,7 @@ struct MoneyCashbackRateSheet: View {
         _bp = State(initialValue: card.rateBp)
     }
     private var unit: Int { var scale = 1; for _ in 0..<(CurrencyExponents.specified.exponent(app.string("core.currency")) ?? 2) { scale *= 10 }; return scale }
+    private var homeCurrencyName: String { app.string("core.currency") == "SAR" ? "ريال" : service.currencyName(app.string("core.currency")) }
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -524,7 +526,7 @@ struct MoneyCashbackRateSheet: View {
                     }
                 }
                 let sample = 1_000 * unit
-                Text(bp.flatMap { CardPlanning.cashbackEstimate(purchaseMinor: sample, rateBp: $0) }.map { "كل " + service.amount(sample) + " ريال تشتري بها يرجع منها " + service.amount($0) + " تقريبًا." } ?? "اختر النسبة كما في شروط البطاقة.")
+                Text(bp.flatMap { CardPlanning.cashbackEstimate(purchaseMinor: sample, rateBp: $0) }.map { "كل " + service.amount(sample) + " " + homeCurrencyName + " تشتري بها يرجع منها " + service.amount($0) + " تقريبًا." } ?? "اختر النسبة كما في شروط البطاقة.")
                     .font(MadarTypography.body()).accessibilityIdentifier("money-cashback-rate-preview")
                 Text(card.source.explanation).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
                 if let message = card.source.message { Text(message).font(MadarTypography.fine()).padding(10).background(theme.surface, in: RoundedRectangle(cornerRadius: 10)) }

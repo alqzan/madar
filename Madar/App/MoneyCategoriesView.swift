@@ -24,6 +24,7 @@ struct MoneyCategoriesView: View {
     @State private var revealed = false
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
     private var service: AppMoneyService { .init(app: app) }
+    private var homeCurrencyName: String { app.string("core.currency") == "SAR" ? "ريال" : service.currencyName(app.string("core.currency")) }
     private var visible: Bool { revealed || !app.bool("core.hideMoneyUntilTouch") }
     private func amount(_ minor: Int) -> String { visible ? service.amount(minor) : "•••" }
     /// The shelf plank: dark wood under every category.
@@ -139,8 +140,8 @@ struct MoneyCategoriesView: View {
                 Text("حدّ " + s.name).font(.custom("thmanyahserifdisplay-Bold", size: 22, relativeTo: .title3))
                 Spacer()
                 HStack(spacing: 0) {
-                    modeButton("ريال", !percentMode) { percentMode = false; draftMinor = limit }
-                    if r.incomeMinor > 0 { modeButton("٪ راتب", percentMode) { percentMode = true; draftBase = "income"; draftBp = r.incomeMinor > 0 ? min(10_000, max(1, (draftMinor * 10_000) / r.incomeMinor)) : 0 } }
+                    modeButton(homeCurrencyName, !percentMode, id: "amount") { percentMode = false; draftMinor = limit }
+                    if r.incomeMinor > 0 { modeButton("٪ راتب", percentMode, id: "percent") { percentMode = true; draftBase = "income"; draftBp = r.incomeMinor > 0 ? min(10_000, max(1, (draftMinor * 10_000) / r.incomeMinor)) : 0 } }
                 }.overlay { Capsule().stroke(theme.color("reserve"), lineWidth: 1) }.clipShape(Capsule())
             }
             HStack {
@@ -170,10 +171,10 @@ struct MoneyCategoriesView: View {
             if let saveFailure { Text(saveFailure).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")).accessibilityIdentifier("money-limit-failure") }
         }.padding(.top, 6)
     }
-    private func modeButton(_ title: String, _ on: Bool, _ action: @escaping () -> Void) -> some View {
+    private func modeButton(_ title: String, _ on: Bool, id: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title).font(MadarTypography.caption()).foregroundStyle(on ? theme.background : theme.ink).padding(.horizontal, 16).frame(minHeight: 44).background(on ? theme.ink : Color.clear)
-        }.buttonStyle(.plain).accessibilityAddTraits(on ? .isSelected : [])
+        }.buttonStyle(.plain).accessibilityAddTraits(on ? .isSelected : []).accessibilityIdentifier("money-limit-mode-" + id)
     }
     private func step(_ symbol: String, _ action: @escaping () -> Void) -> some View {
         Button(action: action) {

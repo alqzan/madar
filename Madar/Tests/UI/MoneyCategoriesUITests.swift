@@ -30,6 +30,28 @@ import XCTest
         XCTAssertTrue(NSPredicate(format: "label CONTAINS %@", "٣٬١٠٠").evaluate(with: saved) || saved.label.contains("3,100") || saved.staticTexts.allElementsBoundByIndex.contains { $0.label.contains("٣٬١٠٠") }, saved.debugDescription)
     }
 
+    func testAmountLimitUsesItsLocalizedHomeCurrencyName() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": "showcase",
+            "MADAR_UI_MONEY_CURRENCY": "USD", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-16T20:00:00+03:00"]
+        app.launch()
+        let tab = app.buttons["tab-customize"]; XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
+        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("المال")
+        let money = app.buttons["money-open"]; XCTAssertTrue(money.waitForExistence(timeout: 5)); money.tap()
+        let open = app.buttons["money-categories-open"]; XCTAssertTrue(open.waitForExistence(timeout: 10))
+        for _ in 0..<6 where !open.isHittable { app.swipeUp(velocity: .slow) }
+        for _ in 0..<4 where open.frame.maxY > app.frame.maxY - 140 { app.swipeUp(velocity: .slow) }
+        open.tap()
+        let amountMode = app.buttons["money-limit-mode-amount"]
+        for _ in 0..<8 where !amountMode.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(amountMode.waitForExistence(timeout: 10), app.debugDescription)
+        let expected = try XCTUnwrap(Locale(identifier: "ar").localizedString(forCurrencyCode: "USD"))
+        XCTAssertTrue(amountMode.label.contains(expected), amountMode.label)
+        XCTAssertFalse(amountMode.label.contains("ريال"), amountMode.label)
+        shot(app, "AU-81-categories-usd-L")
+        app.terminate()
+    }
+
     func testLimit80AlertIsDeliveredWithPrivacySafeCopy() throws {
         continueAfterFailure = false
         let storeID = UUID().uuidString
