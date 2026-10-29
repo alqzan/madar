@@ -142,7 +142,7 @@ struct MihbaraHomeView: View {
         .alert("اسم الكتاب", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
             TextField("عنوان الكتاب", text: $renameTitle).accessibilityIdentifier("mihbara-rename-title")
             TextField("المؤلف", text: $renameAuthor).accessibilityIdentifier("mihbara-rename-author")
-            Button("احفظ") { rename() }.accessibilityIdentifier("mihbara-rename-save")
+            Button("احفظ") { rename() }.disabled(renameTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty).accessibilityIdentifier("mihbara-rename-save")
             Button("إلغاء", role: .cancel) { renaming = nil }
         } message: {
             Text("على الرف: «" + BookTitle.parts(renameTitle.isEmpty ? (renaming?.title ?? "") : renameTitle).short + "»")

@@ -93,7 +93,12 @@ struct MihbaraConversionCard: View {
         case ...1: return seconds < 60 ? "باقي أقل من دقيقة" : "باقي نحو دقيقة"
         case 2: return "باقي نحو دقيقتين"
         case 3...10: return "باقي نحو \(digits.string(minutes)) دقائق"
-        default: return "باقي نحو \(digits.string(minutes)) دقيقة"
+        case 11..<60: return "باقي نحو \(digits.string(minutes)) دقيقة"
+        case 75..<105: return "باقي نحو ساعة ونصف"
+        default:
+            // Long conversions read in hours, not «١٣٥ دقيقة».
+            let hours = (minutes + 30) / 60
+            return hours == 1 ? "باقي نحو ساعة" : hours == 2 ? "باقي نحو ساعتين" : "باقي نحو \(digits.string(hours)) " + ((3...10).contains(hours % 100) ? "ساعات" : "ساعة")
         }
     }
 

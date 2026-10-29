@@ -13,6 +13,7 @@ struct QuranIndexView: View {
     @State private var reader:Int?
     @State private var query=""
     @State private var error:String?
+    @State private var attempt=0
     var body: some View {
         ScrollView {
             VStack(alignment:.leading,spacing:16) {
@@ -33,11 +34,12 @@ struct QuranIndexView: View {
                         }
                     }
                 }
-                if let error {Text(error).font(quranFont(13))}
+                if unit == .ayah && !query.isEmpty && !items.isEmpty && filtered.isEmpty { Text("لا آية تطابق «\(query)»؛ جرّب كلمة أقصر").font(quranFont(13)).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("quran-index-no-results") }
+                if let error { VStack(alignment:.leading,spacing:6) { Text(error).font(quranFont(13)); Button("أعد المحاولة") { self.error=nil; attempt += 1 }.font(quranFont(13,bold:true)).frame(minHeight:44).accessibilityIdentifier("quran-index-retry") } }
                 QuranPaperCard { Text("المحفوظ مصمت، المراجَع بنقطة، المستحق بخط مائل، وورد اليوم بإطار. طول حبل السورة يتبع عدد آياتها.").font(quranFont(12)).foregroundStyle(theme.secondaryInk) }
             }.padding(16)
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.color("review"))
-            .task(id:unit) { do { let result=try await service.index(unit);try Task.checkCancellation();items=result } catch is CancellationError {} catch {self.error=quranUserMessage(error)} }
+            .task(id:"\(unit.id)-\(attempt)") { do { let result=try await service.index(unit);try Task.checkCancellation();items=result;self.error=nil } catch is CancellationError {} catch {self.error=quranUserMessage(error)} }
             .sheet(item:$selected) { item in VStack(alignment:.leading,spacing:15) {Text(item.title).font(quranSerif(28));Text(item.subtitle).font(quranFont(14));Text(status(item)).font(quranFont(14,bold:true));Button("افتح في المصحف") {selected=nil;reader=item.firstPage}.frame(minHeight:44);Button("تمّ") {selected=nil}.frame(minHeight:44)}.padding(24).frame(maxWidth:.infinity,alignment:.leading).background(theme.surface).foregroundStyle(theme.ink).presentationDetents([.height(310),.large]).environment(\.layoutDirection,.rightToLeft) }
             .fullScreenCover(isPresented:Binding(get:{reader != nil},set:{if !$0 {reader=nil}})) {QuranMushafView(service:service,initialPage:reader ?? 1,close:{reader=nil})}
     }

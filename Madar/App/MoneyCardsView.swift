@@ -219,6 +219,7 @@ struct MoneyCardsView: View {
     private func cashFlow(_ r: MoneyCardsReading) -> some View {
         VStack(alignment: .leading, spacing: 22) {
             Text("لو اشتريت اليوم، متى يخرج النقد").font(MadarTypography.cardTitle())
+            if !r.cards.contains(where: { $0.kind == "credit" }) { Text("بطاقات الخصم يخرج نقدها يوم الشراء. أضف بطاقة ائتمانية ليظهر هنا متى يخرج نقدها.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-cashflow-no-credit") }
             ForEach(r.cards.filter { $0.kind == "credit" }) { c in
                 VStack(alignment: .leading, spacing: 10) {
                     HStack { Text(c.name).font(MadarTypography.cardTitle()); Spacer(); if let grace = c.graceDays { Text(service.days(grace) + " تقريبًا").font(MadarTypography.caption()).foregroundStyle(theme.color("surplusText")) } }
@@ -284,7 +285,7 @@ struct MoneyCardsView: View {
                     Label(visible ? selected.cashAfterMinor >= 0 ? "يكفي من النقد الحالي" : "النقد الحالي لا يغطي المواعيد المعروفة" : "•••", systemImage: !visible ? "eye.slash" : selected.cashAfterMinor >= 0 ? "checkmark.circle" : "exclamationmark.triangle").font(MadarTypography.caption()).foregroundStyle(theme.color(visible && selected.cashAfterMinor < 0 ? "dueText" : "surplusText"))
                 }.padding(16).background(theme.surface, in: RoundedRectangle(cornerRadius: 16)).overlay { RoundedRectangle(cornerRadius: 16).stroke(theme.color("reserveText"), lineWidth: 1) }.accessibilityIdentifier("money-card-due-detail")
             } else { Text("لا مبالغ مستحقة معروفة بعد.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk) }
-            Text("المواعيد المعروفة").font(MadarTypography.cardTitle())
+            if !r.dues.isEmpty { Text("المواعيد المعروفة").font(MadarTypography.cardTitle()) }
             ForEach(r.dues) { due in
                 Button { selectedDue = due.id } label: { HStack { Text(due.name); Spacer(); dates(due.day); Text(figure: amount(due.amountMinor)) }.font(MadarTypography.caption()).padding(.vertical, 8).contentShape(.rect) }.buttonStyle(.plain)
             }

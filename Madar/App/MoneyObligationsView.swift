@@ -51,7 +51,7 @@ struct MoneyObligationsView: View {
                     if !visible { Button("أظهر الأرقام") { revealed = true }.font(MadarTypography.caption()).frame(minHeight: 44) }
                     thread(reading)
                     if let due = current(reading) { detail(due, reading) }
-                    ladder(reading)
+                    if reading.ladder.contains(where: { $0.total > 0 }) { ladder(reading) } else { Text("لا أقساط ولا فواتير في الأشهر القادمة؛ يظهر سلّمها هنا حين تضيف التزامًا.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-ladder-empty") }
                     ForEach(reading.subscriptionSuggestions) { suggestion in subscriptionSuggestion(suggestion) }
                     Button { obligationSheet = .new } label: {
                         Text("+ أضف التزامًا، وشاهد أثره على السلّم").font(.custom("thmanyahserifdisplay-Bold", size: 19, relativeTo: .headline)).foregroundStyle(theme.background)
