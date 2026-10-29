@@ -60,8 +60,8 @@ struct MoneyAccountSheet: View {
                     if !balanceReadable { Text("لم أفهم الرصيد؛ اكتب أرقامًا وفاصلة واحدة على الأكثر.").font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")) }
                     if let failure { Text(failure).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")) }
                     // AU-34: the reason sits beside the dimmed save, not only mid-form.
-                    if !saving && !draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !draft.openingKnown && balance.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { Text("أدخل رصيد البنك لتحفظ الحساب").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-account-waiting") }
-                    Button(action: save) { Text(saving ? "جارٍ الحفظ…" : "احفظ الحساب").font(MadarTypography.cardTitle()).frame(maxWidth: .infinity, minHeight: 54).background(theme.ink).foregroundStyle(theme.background) }.disabled(saving || !balanceReadable || draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || (!draft.openingKnown && balance.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)).accessibilityIdentifier("money-account-save")
+                    if !saving && !draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && balanceIsRequired && balanceIsEmpty { Text(draft.openingKnown ? "أدخل رصيد البداية لتحفظ الحساب" : "أدخل رصيد البنك لتحفظ الحساب").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-account-waiting") }
+                    Button(action: save) { Text(saving ? "جارٍ الحفظ…" : "احفظ الحساب").font(MadarTypography.cardTitle()).frame(maxWidth: .infinity, minHeight: 54).background(theme.ink).foregroundStyle(theme.background) }.disabled(saving || !balanceReadable || draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || (balanceIsRequired && balanceIsEmpty)).accessibilityIdentifier("money-account-save")
                     // Item 34: an account entered by mistake goes, while nothing refers to it; the toast offers undo.
                     if !original.isNew && original.removable {
                         Button(role: .destructive) { confirmingRemoval = true } label: {
@@ -91,6 +91,8 @@ struct MoneyAccountSheet: View {
         }
     }
     /// The typed balance reads as an amount (a leading «-» or «−» allowed); a blank field is judged by the opening rule.
+    private var balanceIsEmpty: Bool { balance.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    private var balanceIsRequired: Bool { !draft.fixedCheckpoint || !draft.openingKnown }
     private var balanceReadable: Bool {
         let raw = balance.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !raw.isEmpty else { return true }
@@ -101,10 +103,16 @@ struct MoneyAccountSheet: View {
     private func save() {
         guard !saving else { return }; editing = false
         let raw = balance.trimmingCharacters(in: .whitespacesAndNewlines), negative = raw.hasPrefix("-") || raw.hasPrefix("−")
-        guard let exponent = CurrencyExponents.specified.exponent(draft.currency), let minor = MoneyAmountInput.minor(negative ? String(raw.dropFirst()) : raw, exponent: exponent) else { failure = "راجع مبلغ رصيد البداية."; return }
+        let balanceMinor: Int
+        if draft.fixedCheckpoint && draft.openingKnown {
+            balanceMinor = original.openingMinor
+        } else {
+            guard let exponent = CurrencyExponents.specified.exponent(draft.currency), let minor = MoneyAmountInput.minor(negative ? String(raw.dropFirst()) : raw, exponent: exponent) else { failure = "راجع مبلغ رصيد البداية."; return }
+            balanceMinor = minor * (negative ? -1 : 1)
+        }
         let last4 = draft.last4.map { c in c.wholeNumberValue.map(String.init) ?? String(c) }.joined()
         let aliases = Array(Set(senders.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty })).sorted()
-        var payload: [String: MadarCore.JSONValue] = ["id": .string(draft.id.uuidString), "name": .string(draft.name.trimmingCharacters(in: .whitespacesAndNewlines)), "bank": .string(draft.bank.trimmingCharacters(in: .whitespacesAndNewlines)), "last4": .string(last4), "kind": .string(draft.kind), "ownership": .string(draft.ownership), "currency": .string(draft.currency), "balanceMinor": .string(String(draft.fixedCheckpoint && draft.openingKnown ? original.openingMinor : minor * (negative ? -1 : 1))), "balanceAt": .string(ISO8601DateFormatter().string(from: draft.openingAt)), "senderIDs": .array(aliases.map { .string($0) }), "tracked": .bool(draft.tracked), "zakatInclude": .bool(draft.zakatInclude)]
+        var payload: [String: MadarCore.JSONValue] = ["id": .string(draft.id.uuidString), "name": .string(draft.name.trimmingCharacters(in: .whitespacesAndNewlines)), "bank": .string(draft.bank.trimmingCharacters(in: .whitespacesAndNewlines)), "last4": .string(last4), "kind": .string(draft.kind), "ownership": .string(draft.ownership), "currency": .string(draft.currency), "balanceMinor": .string(String(balanceMinor)), "balanceAt": .string(ISO8601DateFormatter().string(from: draft.openingAt)), "senderIDs": .array(aliases.map { .string($0) }), "tracked": .bool(draft.tracked), "zakatInclude": .bool(draft.zakatInclude)]
         if !draft.openingKnown { payload["establishBalance"] = .bool(true) }
         saving = true
         Task { do { try await app.executeMoneyCommand("money.saveAccount", payload: payload); dismiss() } catch { saving = false; failure = "لم يُحفظ الحساب. راجع آخر أربعة أرقام واسم البنك؛ يجب أن يميّزا حسابًا واحدًا." } }

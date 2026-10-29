@@ -37,6 +37,28 @@ import XCTest
         let undo = app.buttons["تراجع"]; XCTAssertTrue(undo.waitForExistence(timeout: 5)); undo.tap()
         XCTAssertFalse(app.buttons["money-account-حساب الأسرة"].exists); XCTAssertEqual(net.label, before)
     }
+    func testKnownEditableOpeningBalanceCannotBeClearedAndSaved() {
+        continueAfterFailure = false
+        let app = open("accounts")
+        app.buttons["money-accounts-add"].tap()
+        let field = app.textFields["money-account-name"]; XCTAssertTrue(field.waitForExistence(timeout: 5)); field.tap(); field.typeText("حساب فارغ")
+        let bank = app.textFields["money-account-bank"]; bank.tap(); bank.typeText("مصرف الاختبار")
+        app.buttons["money-account-keyboard-done"].tap()
+        let save = app.buttons["money-account-save"]; for _ in 0..<5 where !save.isHittable { app.swipeUp(velocity: .slow) }; save.tap()
+        let row = app.buttons["money-account-حساب فارغ"]; XCTAssertTrue(row.waitForExistence(timeout: 10), app.debugDescription)
+        for _ in 0..<6 where !row.isHittable { app.swipeUp(velocity: .slow) }
+        row.tap()
+        let opening = app.textFields["money-account-opening"]
+        XCTAssertTrue(opening.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(opening.isEnabled, "A regular account's opening balance is editable")
+        opening.coordinate(withNormalizedOffset: CGVector(dx: 0.98, dy: 0.5)).tap()
+        opening.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 12))
+        app.buttons["money-account-keyboard-done"].tap()
+        for _ in 0..<5 where !save.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertFalse(save.isEnabled, "A known but editable opening balance cannot be saved empty")
+        XCTAssertTrue(app.staticTexts["money-account-waiting"].waitForExistence(timeout: 5), app.debugDescription)
+        shot(app, "M5-V19-empty-opening-L")
+    }
     /// Item 34: an account added by mistake is removed from its sheet after a confirmation, and the toast brings it back.
     func testUnusedAccountRemovesWithConfirmationAndUndo() {
         continueAfterFailure = false
