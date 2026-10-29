@@ -1,5 +1,32 @@
 import XCTest
 @MainActor final class QuranPlanSetupUITests:XCTestCase {
+    func testInitialPlanReadFailureCanRetryAndSaveWithoutLeaving() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
+            "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00", "MADAR_UI_QURAN_FIXTURE": "home",
+            "MADAR_UI_QURAN_PLAN_READ_FAILURE_ONCE": "1"]
+        app.launch()
+        let streak = app.buttons["quran-streak"]
+        XCTAssertTrue(streak.waitForExistence(timeout: 25)); streak.tap()
+        let edit = app.buttons["quran-plan-edit"]
+        XCTAssertTrue(edit.waitForExistence(timeout: 10))
+        expectation(for: NSPredicate(format: "isEnabled == true"), evaluatedWith: edit)
+        waitForExpectations(timeout: 15); edit.tap()
+        let retry = app.buttons["quran-setup-retry"]
+        XCTAssertTrue(retry.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(app.buttons["quran-setup-next"].exists)
+        capture(app, "AU-46-plan-read-error-L")
+        retry.tap()
+        XCTAssertTrue(app.buttons["quran-setup-continue"].waitForExistence(timeout: 10))
+        XCTAssertFalse(retry.exists)
+        capture(app, "AU-46-plan-read-recovered-L")
+        for _ in 0..<4 { app.buttons["quran-setup-next"].tap() }
+        XCTAssertEqual(app.buttons["quran-setup-next"].label, "احفظ الخطة")
+        app.buttons["quran-setup-next"].tap()
+        XCTAssertTrue(edit.waitForExistence(timeout: 15), app.debugDescription)
+    }
+
     func testCustomStartingAyahSurvivesSwitchingStartModes() {
         continueAfterFailure = false
         let app = XCUIApplication()

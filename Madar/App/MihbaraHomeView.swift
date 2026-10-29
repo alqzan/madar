@@ -156,7 +156,7 @@ struct MihbaraHomeView: View {
                             originalPDF: originalPDFID,
                             openOriginal: { id, page in readerRoute = MihbaraReaderRoute(bookID: id, page: page) }) { readerRoute = nil }
                     }
-                }.environment(\.roomTheme, theme)
+                }.environment(\.roomTheme, theme).madarSheetErrorAlert(app) // AU-46: a failed save while reading is said in the reader.
             } else {
                 VStack(spacing: 16) {
                     Text("ملف الكتاب غير متاح الآن").font(MadarTypography.body())
@@ -1130,14 +1130,21 @@ private struct MihbaraNotebookContent: View {
     @State private var notes: [Note] = []
     @State private var editor: Editor?
     @State private var failure: String?
+    #if DEBUG
+    @State private var injectedLoadFailure = false
+    #endif
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 HStack { Text("ملاحظاتك الخاصة").font(MadarTypography.title()); Spacer(); Button { editor = .init(id: UUID(), text: "") } label: { Label("ملاحظة جديدة", systemImage: "plus") }.accessibilityIdentifier("mihbara-note-add") }
                 Text("تبقى هنا في دفتر المحبرة.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                if let failure { Text(failure).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
-                if notes.isEmpty {
+                if let failure {
+                    Text(failure).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                        .accessibilityIdentifier("mihbara-notebook-read-error")
+                    Button("أعِد المحاولة") { load() }.font(MadarTypography.body()).frame(minHeight: 44)
+                        .accessibilityIdentifier("mihbara-notebook-retry")
+                } else if notes.isEmpty {
                     Text("ابدأ بملاحظة صغيرة؛ ستجدها هنا حين تعود.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk).frame(maxWidth: .infinity, minHeight: 110, alignment: .leading)
                 } else {
                     ForEach(notes) { note in
@@ -1173,6 +1180,14 @@ private struct MihbaraNotebookContent: View {
 
     private func load() {
         do {
+            #if DEBUG
+            let environment = ProcessInfo.processInfo.environment
+            if !injectedLoadFailure, UUID(uuidString: environment["MADAR_UI_STORE_ID"] ?? "") != nil,
+               environment["MADAR_UI_NOTE_READ_FAILURE_ONCE"] == "1" {
+                injectedLoadFailure = true
+                throw CocoaError(.fileReadUnknown)
+            }
+            #endif
             let context = ModelContext(app.container)
             let rows = try context.fetch(FetchDescriptor<NotebookNote>())
             let books = try context.fetch(FetchDescriptor<Book>())

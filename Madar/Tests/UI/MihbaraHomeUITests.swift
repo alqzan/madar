@@ -625,6 +625,23 @@ import UIKit
         shot(app, "UX-01-private-notebook-L")
         app.buttons["mihbara-notebook-close"].tap()
     }
+    func testNotebookReadFailureDoesNotPretendToBeEmptyAndCanRetry() {
+        continueAfterFailure = false
+        let app = app("home")
+        app.launchEnvironment["MADAR_UI_NOTE_READ_FAILURE_ONCE"] = "1"
+        app.launch(); open(app)
+        let notebook = app.buttons["mihbara-notebook"]; reach(app, notebook); notebook.tap()
+        let failure = app.staticTexts["mihbara-notebook-read-error"]
+        XCTAssertTrue(failure.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertFalse(app.staticTexts["ابدأ بملاحظة صغيرة؛ ستجدها هنا حين تعود."].exists)
+        shot(app, "AU-46-notebook-read-error-L")
+        app.buttons["mihbara-notebook-retry"].tap()
+        XCTAssertTrue(app.staticTexts["سر لا يظهر قبل المصادقة"].waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertFalse(failure.exists)
+        XCTAssertFalse(app.buttons["mihbara-notebook-retry"].exists)
+        shot(app, "AU-46-notebook-read-recovered-L")
+        app.buttons["mihbara-notebook-close"].tap()
+    }
     func testRahlOpeningChoiceResetUndoAndRelaunch() {
         continueAfterFailure = false; let app = app("home"); app.launch(); open(app)
         let preferences = app.buttons["mihbara-opening-preference"]; reach(app, preferences); preferences.tap()

@@ -107,6 +107,9 @@ struct QuranHifzCoachView: View {
                         Text(coach.pastDay ? "هذه جلسة من يوم سابق. احفظ ما تمّ بيومه أو تجاهل المسودة." : coach.review ? "المسودة محفوظة تلقائيًا. سجّل الأوجه التي قيّمتها، أو تجاهل الجلسة، أو تابع." : "المسودة محفوظة تلقائيًا. سجّل ما اجتاز التسميع المستور، أو تجاهل الجلسة، أو تابع.")
                             .font(font(14)).foregroundStyle(theme.secondaryInk)
                         sheetButton("أنهِ وسجّل ما تمّ", id: "quran-session-save-partial") { action(.commitPartial) }
+                        Text("«تجاهل الجلسة» لا يسجّل شيئًا مما أنجزته الآن.")
+                            .font(font(12)).foregroundStyle(theme.secondaryInk)
+                            .accessibilityIdentifier("quran-session-discard-explanation")
                         sheetButton("تجاهل الجلسة", id: "quran-session-discard") { action(.discard) }
                         if !coach.pastDay { sheetButton("تابع", id: "quran-session-continue") {} }
                     }

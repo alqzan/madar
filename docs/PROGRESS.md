@@ -130,6 +130,7 @@ Six read-only Sonnet audits compared canonical screens with the newest screensho
 | AU-43 | Settings and reconcile: say which field, say what a switch does (Claude, 29 Oct) | City editor: one specific sentence for the first wrong field (name, latitude «بين −٩٠ و٩٠، مثل ٢٤٫٧١», longitude, time zone, country, currency) instead of one sentence for all; Arabic-Indic digits and «٫» accepted; numeric keyboard; the error clears on edit; the city shortcuts say they save at once and set Saudi country, currency and zone. Settings captions for «القفل بالوجه», «تذكيرات هذا الجهاز» and «صمت بعد العشاء» (until midnight, per `isQuiet`). Reconcile: a refused save is said right above the pinned button. Not taken: a passcode fallback for the lock (owner: biometric only). 9 tests passed (au43: quiet hours, whole-app lock, city/numerals, DiaryLockPreference 3, MoneyReconcile 3). | matched — awaiting owner |
 | AU-44 | Hijri correction reads as a sentence (Claude, 29 Oct) | «تصحيح الهجري» showed a bare «٠» or a signed number; it now reads «بلا تصحيح», «يوم زيادة», «يومان نقصان». Build passed; test_M0T17 city/numerals passed (au44). No UI test reaches this stepper (shown only when «حساب الهجري» is «الرؤية»). | matched — awaiting owner |
 | AU-45 | Diary editor: one photo button (Claude, 29 Oct) | With the keyboard down, the editor showed «صورة» twice (the row under the text and the voice panel). The voice panel keeps an empty slot so the record button stays centred; the row button (`diary-editor-photo`) remains. DiaryEditorUITests and DiaryWindowUITests passed (au45). | matched — awaiting owner |
+| AU-46 | Quran and Mihbara: finish Claude’s uncommitted recovery routes (29 Oct) | Reader/sheet error alerts, PDF and plan initial-load retry, saving feedback and the active coach discard explanation. Notebook read failure no longer claims an empty notebook and can retry. Serial synthetic iOS 26.5: Quran plan 3/3 + coach 1/1 + reader settings 1/1 in baseline-r3; notebook recovery 1/1 in final-r4 (bundle had other failures and did not finish); final PDF failure/retry/OCR/position/reopen 1/1 in codex-au46-pdf-r5. PDF test first tapped a covered spine, then exposed inherited container identifiers; both corrected. Native app/widget built. Screens in codex-au46-au07-baseline-shots and codex-au46-pdf-shots; owner/device acceptance remains open. | matched — awaiting owner |
 
 OR-03 current source and proof are in the live row above. The earlier widgetScope, smartPresence and X3 behavior gaps were implemented and verified on 27 Oct; do not treat the old placeholder-control note as current. The actual OS gallery/action and iOS 27 runtime checks remain open.
 
@@ -415,6 +416,14 @@ M0-T06 (device acceptance paperwork), M0-T09 privacy matrix (encrypted backup un
 M0-M6 software is integrated; M5 has its bounded software gate. M7 remains open for every-screen visual/state trace and owner/device/system acceptance (owner/Claude), real-device Release performance, iOS 27 runtime, resource release evidence and signed distribution. PDF OCR/search is now local and cancelable; PDF-to-EPUB conversion remains the separate owner/Claude topic. Direct @als is optional/deferred; no provider key/endpoint is available. Store metadata/privacy text is prepared locally; public support/privacy URLs, real review contact and App Store Connect access are still required for publication. The static scanner remains conservative: its UI/font/colour/action references were not bulk-accepted or turned into a fake complete pass; frozen backup/privacy/a11y work remains frozen.
 
 # Handovers
+## Handover — استكمال كلود AU-46 — 2026-10-29 — Codex
+- **Works now:** إعادة محاولة PDF وخطة القرآن والدفتر؛ فشل قراءة الدفتر لا يبدو فراغًا؛ شرح تجاهل الجلسة في الورقة الفعلية؛ أخطاء القارئ داخل أوراقه.
+- **Verified:** `xcodebuild test/test-without-building … -parallel-testing-enabled NO` على 0638DFC9/iOS26.5: القرآن 4/4 وإعدادات القارئ 1/1 في `codex-au46-au07-baseline-r3`؛ الدفتر 1/1 بسجل `codex-au46-au07-final-r4`؛ PDF النهائي 1/1 في `codex-au46-pdf-r5`؛ `git diff --check`.
+- **Differences left:** قبول المالك والفروق السابقة؛ مقارنة R18-Setup وZ-R12-Home2 مولدة، والصور فُحصت مباشرة؛ مرجع المال يضع الاحتياطي والفائض في صفّين بالفعل، فملاحظة AU-04 قديمة.
+- **Not verified:** iPhone المالك؛ حزمة r3 فشلت بسبب اختبار PDF القديم؛ r4 فشلت في PDF واختباري المال وبقي جمع نتائجها عالقًا. لا نجاح كامل لأي منهما.
+- **Next:** AU-07: رقعة النصوص غير المتحققة `Artifacts/codex-au07-unverified.patch`؛ أُعيد ملفا المال إلى HEAD. اختبارات المال على الرقعة فشلت عند أزرار مغطاة بعد المحرر؛ شخّص وأصلح وصول الاختبار قبل اعتمادها. لا تغييرات مال مثبتة.
+- **Model/effort:** not exposed / not exposed؛ مساعدا Luna للبحث وتتبع المسارات فقط.
+- **Usage:** آخر قراءة 98% مستخدم من الخمس ساعات؛ توقف بدء العمل. حُذفت فقط Build وIndex.noindex غير المستخدمتين من Madar/DerivedData لتوفير المساحة؛ الأدلة وبيانات المالك محفوظة.
 ## Handover — استكمال تسليم كلود — 2026-10-28 — Codex
 - **Works now:** مسار تسجيل الصلاة بلا مواقيت واختيار «أمرّ» ثم السلاسل والسجل متحقق؛ الإصلاح في الاختبار فقط.
 - **Verified:** `xcodebuild test … -parallel-testing-enabled NO -only-testing:MadarUITests/PrayerFirstDayUITests`، نتيجتان ناجحتان في `codex-au10-polar-r4.xcresult`؛ صور L/light فُحصت؛ `git diff --check`.
@@ -432,11 +441,3 @@ M0-M6 software is integrated; M5 has its bounded software gate. M7 remains open 
 - **Disk:** حُذفت ستّ نسخ DerivedData قديمة في `Madar/Artifacts` (~15GB) لأن القرص امتلأ (198MB)؛ `owner-data` والمحاكيات لم تُمسّ.
 - **Next:** بقايا AU-07 في نفس الصف (تسمية «يومك/يومياتك/اليومية» في المال)؛ قرار المالك في فكرة سطر دفتر المحبرة على الودجات (Ideas)؛ ثم مراجعة المالك لصفوف AU-04…AU-21. لم تُغيَّر «أبي أقرأها» ولا «٤٠ دقيقة» عمدًا (المواصفة).
 - **Model/effort:** claude-opus-5-5، not exposed. Sonnet helpers للقراءة فقط.
-## Handover — استكمال الخصوصية بعد كلود — 2026-10-28 — Codex
-- **Works now:** قفل التطبيق يمسح لقطات الغرف قبل الحفظ ويمنع إعادة نشرها أثناء الانتقال؛ يحذف إشعارات الغرف القديمة والمسلّمة، ويُبقي تنبيهات الصلاة العامة.
-- **Verified:** اختبارات تكامل متسلسلة 4/4 (`codex-app-lock-redaction-20261028-r2.xcresult`)؛ `git diff --check`.
-- **Differences left:** لا تغيير بصري؛ قبول المالك لـOR-04 ما زال معلّقًا.
-- **Not verified:** التسليم الفعلي عبر مركز الإشعارات، iPhone المالك وiOS 27.
-- **Next:** تابع أول بطاقة `ready` في `docs/PROGRESS.md`؛ سؤال تاريخ إيقاف الرحلة/العادات ما زال ينتظر جواب المالك.
-- **Model/effort:** غير مكشوف / غير مكشوف؛ ثلاث مراجعات مستقلة للخصوصية، دون تشغيلها للاختبارات.
-- **Usage:** آخر قراءة 96٪ مستخدم من الخمس ساعات؛ توقفت عند الاحتياطي المطلوب.

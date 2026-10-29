@@ -466,7 +466,7 @@ struct MihbaraReaderView: View {
                 set: updateReaderSetting,
                 reset: { app.reset([settingsKey]) { readerUndoID = app.undoToken?.id } }
             )
-            .environment(\.layoutDirection, .rightToLeft)
+            .environment(\.layoutDirection, .rightToLeft).madarSheetErrorAlert(app)
         }
         .sheet(item: $noteDraft) { draft in
             MihbaraPageNoteSheet(draft: draft, palette: palette, pageText: draft.pageText) { text in
@@ -488,7 +488,7 @@ struct MihbaraReaderView: View {
         }
         .sheet(item: $quoteCard) { card in
             MihbaraQuoteCardSheet(app: app, card: card)
-                .environment(\.layoutDirection, .rightToLeft)
+                .environment(\.layoutDirection, .rightToLeft).madarSheetErrorAlert(app)
                 .presentationDetents([.large])
         }
         .alert("القارئ", isPresented: Binding(get: { readerAlert != nil }, set: { if !$0 { readerAlert = nil } })) {

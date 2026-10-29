@@ -30,6 +30,9 @@ struct MihbaraPDFReaderView: View {
     @State private var closing = false
     @State private var searching = false
     @State private var flowing = false
+    #if DEBUG
+    @State private var injectedOpenFailure = false
+    #endif
 
     private var saveCoordinator: MihbaraReadingSaveCoordinator { .forSession(app) }
     private var service: AppMihbaraService { .init(app: app) }
@@ -61,11 +64,13 @@ struct MihbaraPDFReaderView: View {
                         if let error {
                             Image(systemName: "doc.text.magnifyingglass").font(.largeTitle)
                             Text(error).font(MadarTypography.body()).multilineTextAlignment(.center)
+                                .accessibilityIdentifier("mihbara-pdf-error")
+                            // AU-46: a passing failure (locked data, busy file) can be retried without leaving.
+                            Button("أعد المحاولة") { self.error = nil; openPDF() }.font(MadarTypography.body()).frame(minHeight: 44).accessibilityIdentifier("mihbara-pdf-retry")
                             Button("العودة إلى المحبرة", action: close).buttonStyle(MadarPrimaryButton())
                         } else { ProgressView("يفتح ملف PDF من جهازك…") }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity).padding(28)
-                    .accessibilityIdentifier("mihbara-pdf-error")
                 }
                 footer
             }
@@ -91,11 +96,11 @@ struct MihbaraPDFReaderView: View {
                 pageChanged(index, true)
                 searching = false
             }
-            .environment(\.roomTheme, readerTheme)
+            .environment(\.roomTheme, readerTheme).madarSheetErrorAlert(app)
         }
         .sheet(isPresented: $flowing) {
             MihbaraPDFFlowView(app: app, book: book) { flowing = false }
-                .environment(\.roomTheme, readerTheme)
+                .environment(\.roomTheme, readerTheme).madarSheetErrorAlert(app)
         }
         .onDisappear { pause(at: Date()) }
         .toolbarVisibility(.hidden, for: .navigationBar)
@@ -174,6 +179,14 @@ struct MihbaraPDFReaderView: View {
     @MainActor private func openPDF() {
         guard document == nil, error == nil else { return }
         do {
+            #if DEBUG
+            let environment = ProcessInfo.processInfo.environment
+            if !injectedOpenFailure, UUID(uuidString: environment["MADAR_UI_STORE_ID"] ?? "") != nil,
+               environment["MADAR_UI_PDF_OPEN_FAILURE_ONCE"] == "1" {
+                injectedOpenFailure = true
+                throw PDFReaderError.unreadable
+            }
+            #endif
             let bytes = try service.pdfData(for: book)
             guard let opened = PDFDocument(data: bytes), !opened.isLocked, opened.pageCount > 0,
                   opened.page(at: 0) != nil else { throw PDFReaderError.unreadable }

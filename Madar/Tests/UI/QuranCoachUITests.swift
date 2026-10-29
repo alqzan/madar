@@ -34,6 +34,7 @@ import XCTest
         waitLabel(advance, contains: "سمّعتها")
         app.buttons["quran-session-close"].tap()
         XCTAssertTrue(app.buttons["quran-session-discard"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["quran-session-discard-explanation"].exists)
         attach(app, "M2-V02-exit-L")
         app.buttons["quran-session-discard"].tap()
         XCTAssertTrue(app.staticTexts["quran-coverage-title"].waitForExistence(timeout: 15))

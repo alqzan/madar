@@ -47,6 +47,14 @@ import UIKit
     }
 
     func testScannedPDFReaderSavesPositionAndResumes() {
+        scannedPDFReaderSavesPositionAndResumes(failFirstOpen: false)
+    }
+
+    func testPDFOpenFailureRetriesWithoutLeavingAndKeepsPosition() {
+        scannedPDFReaderSavesPositionAndResumes(failFirstOpen: true)
+    }
+
+    private func scannedPDFReaderSavesPositionAndResumes(failFirstOpen: Bool) {
         continueAfterFailure = false
         let app = XCUIApplication()
         let image = UIGraphicsImageRenderer(size: CGSize(width: 300, height: 400)).image { canvas in
@@ -61,6 +69,7 @@ import UIKit
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MIHBARA_FIXTURE": "empty",
             "MADAR_UI_NOW": "2026-10-18T12:00:00+03:00", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
             "MADAR_UI_MIHBARA_IMPORT_PDF": pdf.base64EncodedString()]
+        if failFirstOpen { app.launchEnvironment["MADAR_UI_PDF_OPEN_FAILURE_ONCE"] = "1" }
         app.launch()
         let customize = app.buttons["tab-customize"]; XCTAssertTrue(customize.waitForExistence(timeout: 20)); customize.tap()
         let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 8)); search.tap(); search.typeText("المحبرة")
@@ -87,8 +96,21 @@ import UIKit
         app.buttons["mihbara-add-back"].tap()
         app.buttons["mihbara-shelf-want"].tap()
         XCTAssertTrue(app.staticTexts["ملف اختبار مصوّر"].firstMatch.waitForExistence(timeout: 8))
-        let imported = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "ملف اختبار مصوّر")).firstMatch
+        let imported = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "mihbara-book-", "ملف اختبار مصوّر")).firstMatch
+        // Bring the actual spine clear of the pinned navigation and floating accessory before tapping.
+        for _ in 0..<8 {
+            if imported.frame.minY > 125 && imported.frame.maxY < app.frame.maxY - 220 { break }
+            if imported.frame.minY <= 125 { app.swipeDown(velocity: .slow) } else { app.swipeUp(velocity: .slow) }
+        }
+        XCTAssertTrue(imported.isHittable, app.debugDescription)
         imported.tap()
+        if failFirstOpen {
+            let retry = app.buttons["mihbara-pdf-retry"]
+            XCTAssertTrue(retry.waitForExistence(timeout: 12), app.debugDescription)
+            attach(app, "AU-46-PDF-open-error-L")
+            retry.tap()
+            XCTAssertFalse(retry.exists)
+        }
         XCTAssertTrue(app.buttons["mihbara-pdf-next"].waitForExistence(timeout: 12), app.debugDescription)
         XCTAssertTrue(app.descendants(matching: .any)["mihbara-pdf-page"].label.replacingOccurrences(of: "\u{2068}", with: "").replacingOccurrences(of: "\u{2069}", with: "").contains("١ من ٢"), app.debugDescription)
         attach(app, "M6-V18-PDF-L")
@@ -115,6 +137,11 @@ import UIKit
         XCTAssertEqual(XCTWaiter.wait(for: [importedReady], timeout: 12), .completed, app.debugDescription)
         imported.tap()
         XCTAssertTrue(app.buttons["mihbara-pdf-close"].waitForExistence(timeout: 12))
+        if failFirstOpen {
+            let retry = app.buttons["mihbara-pdf-retry"]
+            XCTAssertTrue(retry.waitForExistence(timeout: 8), app.debugDescription)
+            retry.tap()
+        }
         XCTAssertTrue(app.descendants(matching: .any)["mihbara-pdf-page"].label.replacingOccurrences(of: "\u{2068}", with: "").replacingOccurrences(of: "\u{2069}", with: "").contains("٢ من ٢"), app.debugDescription)
         app.buttons["mihbara-pdf-close"].tap()
     }

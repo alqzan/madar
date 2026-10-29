@@ -62,7 +62,7 @@ struct QuranHomeSessionFlow: View {
             Button("أنهِ وسجّل ما تمّ") { perform(.commitPartial) }
             Button("تجاهل الجلسة", role: .destructive) { perform(.discard) }
             Button("تابع", role: .cancel) {}
-        }
+        } message: { Text("«تجاهل الجلسة» لا يسجّل شيئًا مما أنجزته الآن.") } // AU-46
     }
     private var stageTitle: String {
         switch state.stage { case .repetition: "التكرار"; case .lineStarts: "أوائل الأسطر"; case .recall: "استرجاع بالتلقين"; case .covered: "تسميع مستور"; case .grading: "تقييمك"; default: "المراجعة" }

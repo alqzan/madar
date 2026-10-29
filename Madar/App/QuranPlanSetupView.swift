@@ -17,7 +17,28 @@ struct QuranPlanSetupView: View {
     @State private var forecastState: QuranUIForecastState?
     @State private var busy = false
     @State private var error: String?
+    #if DEBUG
+    @State private var injectedLoadFailure = false
+    #endif
     private let titles = ["من أين تبدأ؟", "كم وردك؟", "كيف تتعلّم؟", "يوم الراحة", "هذه خطّتك"]
+    private func loadPlan() {
+        error = nil
+        do {
+            #if DEBUG
+            let environment = ProcessInfo.processInfo.environment
+            if !injectedLoadFailure, UUID(uuidString: environment["MADAR_UI_STORE_ID"] ?? "") != nil,
+               environment["MADAR_UI_QURAN_PLAN_READ_FAILURE_ONCE"] == "1" {
+                injectedLoadFailure = true
+                throw CocoaError(.fileReadUnknown)
+            }
+            #endif
+            let p = try service.planInput()
+            let startPage = try QuranResources.catalog().ayah(id: p.startAyah)?.page ?? 1
+            input = p; initialStart = p.startAyah
+            customStartAyah = p.startAyah
+            page = startPage
+        } catch { self.error = quranUserMessage(error) }
+    }
     var body: some View {
         TimelineView(.periodic(from: .now, by: 60)) { _ in
             let evaluatedAt = service.currentTime()
@@ -33,6 +54,8 @@ struct QuranPlanSetupView: View {
                     Text(titles[step]).font(quranSerif(33)).accessibilityIdentifier("quran-setup-title")
                     if let input { content(input) }
                     if let error { Text(error).font(quranFont(13)).foregroundStyle(theme.color("dueText")) }
+                    // AU-46: a failed first read is not a dead end.
+                    if input == nil, error != nil { Button("حاول مرة أخرى") { self.error = nil; loadPlan() }.font(quranFont(15, bold: true)).frame(minHeight: 44).accessibilityIdentifier("quran-setup-retry") }
                 }.padding(16)
             }
             if let input {
@@ -47,20 +70,14 @@ struct QuranPlanSetupView: View {
                             Text("تقدير بافتراض إتمام أيام الحفظ بلا فوت أو تثبيت.").font(quranFont(11)).foregroundStyle(theme.secondaryInk)
                         }
                     }
-                    Button(step == 4 ? "احفظ الخطة" : "التالي") {
+                    Button(step == 4 ? (busy ? "نحفظ الخطة…" : "احفظ الخطة") : "التالي") {
                         if step < 4 { step += 1 }
                         else { busy = true; Task { defer { busy = false }; do { try await service.perform(.savePlan(input)); close() } catch { self.error = quranUserMessage(error) } } }
                     }.font(quranFont(16, bold: true)).frame(maxWidth: .infinity, minHeight: 52).foregroundStyle(theme.onAccent).background(theme.accent, in: Capsule()).accessibilityIdentifier("quran-setup-next")
                 }.padding(16)
             }
             }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.color("review")).disabled(busy)
-            .task {
-                do {
-                    let p = try service.planInput(); input = p; initialStart = p.startAyah
-                    customStartAyah = p.startAyah
-                    page = try QuranResources.catalog().ayah(id: p.startAyah)?.page ?? 1
-                } catch { self.error = quranUserMessage(error) }
-            }
+            .task { loadPlan() }
             .task(id: forecastKey) {
                 guard let input, let forecastKey else { forecastState = nil; return }
                 do {
