@@ -400,7 +400,7 @@ struct BackupSettingsView: View {
                     note("اختر مجلدًا في iCloud Drive لتبقى نسخة مشفّرة عند فقدان الجهاز. المجلد في «على الـ iPhone» يبقى على الجهاز نفسه.")
                     Button("اختر مجلدًا في الملفات") { filePurpose = .folder; choosingFile = true }.buttonStyle(MadarPrimaryButton()).accessibilityIdentifier("backup-folder-choose")
                 }
-                note("تُنسخ الملفات المشفّرة فقط، بعد إنشائها وعند فتح مدار. نحتفظ بآخر أربع نسخ تلقائية وكل اليدوية. تغيير المجلد أو إيقافه يبقي الملفات السابقة.")
+                note("تُنسخ الملفات المشفّرة فقط، بعد إنشائها وعند فتح مدار. تغيير المجلد أو إيقافه يبقي الملفات السابقة.")
                 if model.status?.canUndoFolderChange == true {
                     Button("تراجع عن تغيير المجلد", action: model.undoFolderChange).font(MadarTypography.caption()).frame(minHeight: 44).accessibilityIdentifier("backup-folder-undo")
                 }
@@ -429,6 +429,11 @@ struct BackupSettingsView: View {
                     .padding(12).background(theme.background, in: .rect(cornerRadius: 12)).accessibilityIdentifier("backup-password-confirmation")
                 note("احفظ كلمة المرور في مكان آمن. فقدانها يجعل النسخة غير قابلة للقراءة.")
                 if model.status?.keyConfigured == false { note("كلمة مرور أول نسخة تشفّر النسخ التلقائية أيضًا. لا تُحفظ كلمة المرور نفسها على الجهاز، فاحفظها عندك.").accessibilityIdentifier("backup-key-setup") }
+                // AU-35: the dimmed copy button says what it waits for once typing starts.
+                if !model.busy && !model.exportPassphrase.isEmpty && !model.canExport {
+                    Text(model.exportPassphrase.count < 10 ? "كلمة المرور عشرة أحرف على الأقل" : model.exportConfirmation.isEmpty ? "أعِد كتابة كلمة المرور للتأكيد" : "كلمتا المرور غير متطابقتين")
+                        .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("backup-export-waiting")
+                }
                 exportButton.buttonStyle(MadarPrimaryButton())
                 if model.exportedURL != nil {
                     Button(action: model.shareEncrypted) { Label("احفظ النسخة أو شاركها", systemImage: "square.and.arrow.up").frame(maxWidth: .infinity, minHeight: 44) }.disabled(model.busy).accessibilityIdentifier("backup-export")
@@ -447,6 +452,9 @@ struct BackupSettingsView: View {
                 if let file = model.selectedFile { Text(file.lastPathComponent).font(MadarTypography.caption()) }
                 SecureField("كلمة مرور النسخة", text: $model.restorePassphrase).textContentType(.password).focused($focusedPassword, equals: 3).submitLabel(.done).onSubmit { focusedPassword = nil }
                     .padding(12).background(theme.background, in: .rect(cornerRadius: 12)).accessibilityIdentifier("restore-password")
+                if !model.busy && !model.canInspect {
+                    Text(model.selectedFile == nil ? "اختر ملف النسخة ثم أدخل كلمة مرورها" : "أدخل كلمة مرور النسخة لتفحصها").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("restore-waiting")
+                }
                 Button("افحص وعاين", action: model.inspect).frame(minHeight: 44).disabled(!model.canInspect).accessibilityIdentifier("restore-inspect")
                 if let preview = model.preview { Divider().overlay(theme.line); previewRows(preview) }
             }
@@ -501,13 +509,22 @@ struct BackupSettingsView: View {
             + ";busy=" + String(model.busy)
     }
     #endif
+    private func changeLine(_ preview: BackupRestorePreview) -> String {
+        var parts: [String] = []
+        if preview.additions > 0 { parts.append("إضافة \(digits(preview.additions))") }
+        if preview.updates > 0 { parts.append("تحديث \(digits(preview.updates))") }
+        if model.restoreMode == .replace && preview.deletions > 0 { parts.append("حذف \(digits(preview.deletions))") }
+        if parts.isEmpty { return model.restoreMode == .replace ? "لا فرق بين النسخة وبياناتك" : "لا جديد في النسخة على بياناتك" }
+        return parts.joined(separator: "، ")
+    }
     @ViewBuilder private func previewRows(_ preview: BackupRestorePreview) -> some View {
         Text("معاينة \(preview.fileName)").font(MadarTypography.section())
         MadarDateLabel(dates(preview.createdAt))
-        ForEach(preview.counts) { row in
+        // AU-35: kinds absent from both sides are skipped, and the change line names only what happens.
+        ForEach(preview.counts.filter { $0.current > 0 || $0.saved > 0 }) { row in
             LabeledContent(row.title) { Text("حاليًا \(digits(row.current))، في النسخة \(digits(row.saved))") }
         }
-        Text("إضافة \(digits(preview.additions))، تحديث \(digits(preview.updates))، حذف عند الاستبدال \(digits(preview.deletions))")
+        Text(changeLine(preview)).accessibilityIdentifier("restore-preview-changes")
         if let first = preview.earliestDate, let last = preview.latestDate {
             let a = dates(first), b = dates(last)
             MadarDateLabel(.init(primary: "الفترة: " + a.primary + " — " + b.primary, secondary: a.secondary.isEmpty ? "" : a.secondary + " — " + b.secondary))

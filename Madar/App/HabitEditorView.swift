@@ -24,6 +24,8 @@ struct HabitEditorView:View {
     var body:some View {
         VStack(spacing:0) {
             HStack { Button("إلغاء"){dismiss()}.frame(minHeight:44);Spacer();Text(reading == nil ? "عادة جديدة" : "تعديل العادة").font(MadarTypography.cardTitle());Spacer();Button("احفظ"){save()}.font(MadarTypography.section()).frame(minHeight:44).disabled(busy || name.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty).accessibilityIdentifier("habit-save") }.padding(.horizontal,20).padding(.top,10)
+            // AU-35: the error sits under «احفظ», not below five sections, and editing clears it.
+            if let issue { Text(issue).font(MadarTypography.caption()).foregroundStyle(theme.accent).frame(maxWidth:.infinity,alignment:.leading).padding(.horizontal,20).padding(.top,6).accessibilityIdentifier("habit-editor-error") }
             ScrollView {
                 VStack(alignment:.leading,spacing:18) {
                     section("العادة") {
@@ -83,7 +85,6 @@ struct HabitEditorView:View {
                         Toggle("للبيت فقط، تتوقف في السفر",isOn:$homeOnly).frame(minHeight:44)
                         Text("أيام إجازة").font(MadarTypography.caption());dayButtons($rule.restWeekdays)
                     }
-                    if let issue { Text(issue).font(MadarTypography.caption()).foregroundStyle(theme.accent).accessibilityIdentifier("habit-editor-error") }
                     MadarDateLabel(session.dateLabels(AppBahwService(session:session).today)).foregroundStyle(theme.secondaryInk)
                 }.padding(20)
             }
@@ -94,6 +95,7 @@ struct HabitEditorView:View {
             let defaultReminder = session.string("bahw.reminder")
             reminder=reading?.reminder ?? (["dot", "push", "none"].contains(defaultReminder) ? defaultReminder : "dot")
         }
+        .onChange(of:name){issue=nil}.onChange(of:monthDays){issue=nil}.onChange(of:windowOn){issue=nil}
         .onChange(of:source){old,value in
             if reading == nil && value != "custom" && reminder == "push" { reminder = "dot" }
             if value == "custom",reading == nil {rule.measure = .once;rule.unit=nil;rule.target=1}

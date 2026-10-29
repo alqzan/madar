@@ -68,8 +68,8 @@ struct HabitDetailView:View {
             } label: { filled("افتح "+(reading.sourceTitle ?? "غرفتها")) }.buttonStyle(.plain).accessibilityIdentifier("habit-owner")
         } else if !reading.paused && current.target > 0 {
             let doneOnce = current.met && current.rule.measure == .once
-            // A «آخر مرة» habit done in its period needs no greyed «تمّت»: the ring and «منذ آخر مرة» already say it.
-            if !(doneOnce && keptBySince) { Button { perform("habit.complete",["id":.string(reading.id.uuidString),"delta":.number(current.rule.measure == .duration ? 15 : 1)]) } label: {
+            // A once-a-period habit done in its period needs no greyed «تمّت»: the ring and the state line already say it (AU-35).
+            if !doneOnce { Button { perform("habit.complete",["id":.string(reading.id.uuidString),"delta":.number(current.rule.measure == .duration ? 15 : 1)]) } label: {
                 filled(current.rule.measure == .duration ? "أضف "+digits.string(15)+" دقيقة" : current.rule.measure == .count ? "أضف "+habitOneMore(current.rule.unit) : doneOnce ? "تمّت" : "أتممتها").opacity(doneOnce ? 0.55 : 1)
             }.buttonStyle(.plain).disabled(busy || doneOnce).accessibilityIdentifier("habit-complete") }
             if current.rule.measure != .health, let start = reading.summary.periods.first?.start, start < AppBahwService(session:session).today { Button { pastDay = true } label: { outline(Label("فعلتها في يوم سابق",systemImage:"calendar.badge.clock")) }.buttonStyle(.plain).accessibilityIdentifier("habit-past-day") }
