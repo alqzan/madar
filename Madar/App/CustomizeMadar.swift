@@ -220,7 +220,12 @@ struct SettingControl: View {
             case "int":
                 Stepper(value: Binding(get: { Int(session.number(definition.key)) }, set: { session.set(.number(Double($0)), key: definition.key) }), in: integerRange) {
                     let n = Int(session.number(definition.key))
+                    // AU-44: the Hijri correction reads as a sentence, not a signed number.
+                    if definition.key == "core.hijriOffset" {
+                        Text(n == 0 ? "بلا تصحيح" : (abs(n) == 1 ? "يوم" : abs(n) == 2 ? "يومان" : session.digits(abs(n)) + " أيام") + (n > 0 ? " زيادة" : " نقصان"))
+                    } else {
                     Text(unitForms.map { arabicCount(n, $0, MadarNumberFormatter(style: session.string("core.numerals") == "western" ? .western : .hindi)) } ?? session.digits(n))
+                    }
                 }.accessibilityIdentifier("setting-\(definition.key)")
             case "map":
                 if definition.key == "salah.offsets" {
