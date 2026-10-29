@@ -739,13 +739,15 @@ private struct MihbaraGoodreadsImportView: View {
                     Text(stage.fileName).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).lineLimit(2)
                 }
                 if loading { ProgressView("أفحص الكتب…").tint(theme.ink).frame(maxWidth: .infinity, minHeight: 150) }
-                else if let failure {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("تعذّرت المعاينة").font(MadarTypography.cardTitle())
-                        Text(failure).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                        Button("العودة لاختيار الملف") { dismiss() }.buttonStyle(MadarPrimaryButton())
-                    }.padding(18).frame(maxWidth: .infinity, alignment: .leading).background(theme.surface, in: .rect(cornerRadius: 18))
-                } else if let preview {
+                else if let preview {
+                    if let failure {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("تعذّرت الإضافة").font(MadarTypography.cardTitle())
+                            Text(failure).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                                .accessibilityIdentifier("mihbara-goodreads-import-error")
+                        }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
+                            .background(theme.surface, in: .rect(cornerRadius: 18))
+                    }
                     Text("أراجع الملف قبل إضافته. الكتب المطابقة لا تُدمج إلا بعد اختيارك.")
                         .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                     HStack(spacing: 9) {
@@ -761,6 +763,12 @@ private struct MihbaraGoodreadsImportView: View {
                             ForEach(preview.rows, id: \.entry.rowKey) { row in goodreadsRow(row) }
                         }
                     }
+                } else if let failure {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("تعذّرت المعاينة").font(MadarTypography.cardTitle())
+                        Text(failure).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                        Button("العودة لاختيار الملف") { dismiss() }.buttonStyle(MadarPrimaryButton())
+                    }.padding(18).frame(maxWidth: .infinity, alignment: .leading).background(theme.surface, in: .rect(cornerRadius: 18))
                 }
             }.padding(18).frame(maxWidth: 680).frame(maxWidth: .infinity)
         }
@@ -768,7 +776,7 @@ private struct MihbaraGoodreadsImportView: View {
         .environment(\.layoutDirection, .rightToLeft)
         .toolbarVisibility(.hidden, for: .navigationBar)
         .safeAreaInset(edge: .bottom) {
-            if !loading && failure == nil {
+            if !loading && preview != nil {
                 Button(action: importBooks) {
                     HStack(spacing: 9) {
                         if saving { ProgressView().tint(theme.background) }
@@ -885,7 +893,7 @@ private struct MihbaraGoodreadsImportView: View {
     }
 
     private func shelfName(_ shelf: String) -> String {
-        switch shelf { case "reading": "أقرأها"; case "want": "لاحقًا"; case "finished": "أنهيتها"; default: "قديمًا" }
+        switch shelf { case "reading": "أقرأها"; case "want": "أبي أقرأها"; case "finished": "أنهيتها"; default: "قديمًا" }
     }
 
     private var importButtonTitle: String {
@@ -916,7 +924,7 @@ private struct MihbaraGoodreadsImportView: View {
 
     private func importBooks() {
         guard preview != nil, targetsAreUnique else { return }
-        saving = true
+        failure = nil; saving = true
         Task {
             do {
                 let selectedData = try JSONEncoder().encode(selectedMatches)

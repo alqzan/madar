@@ -77,6 +77,7 @@ final class AppSession {
     private(set) var prayerWriteInProgress = false
     #if DEBUG
     @ObservationIgnored private var failFirstNotebookSave = false
+    @ObservationIgnored private var failFirstGoodreadsImport = false
     #endif
     var settingsQuery = ""
     private let bus: CommandBus
@@ -129,6 +130,9 @@ final class AppSession {
         #if DEBUG
         let notebookTest = ProcessInfo.processInfo.environment
         failFirstNotebookSave = notebookTest["MADAR_UI_NOTE_FAIL_FIRST_SAVE"] == "1"
+            && notebookTest["MADAR_UI_STORE_ID"] == group.lastPathComponent
+            && group.deletingLastPathComponent().lastPathComponent == "UITestStores"
+        failFirstGoodreadsImport = notebookTest["MADAR_UI_MIHBARA_IMPORT_GOODREADS_FAIL_ONCE"] == "1"
             && notebookTest["MADAR_UI_STORE_ID"] == group.lastPathComponent
             && group.deletingLastPathComponent().lastPathComponent == "UITestStores"
         #endif
@@ -878,6 +882,10 @@ final class AppSession {
         if failFirstNotebookSave && name == "notebook.savePrivate" {
             failFirstNotebookSave = false
             throw DataError.invalidValue("notebook UI fixture write failure")
+        }
+        if failFirstGoodreadsImport && name == "book.importGoodreads" {
+            failFirstGoodreadsImport = false
+            throw DataError.invalidValue("تعذّرت إضافة كتب Goodreads إلى المحبرة. حاول مرة أخرى.")
         }
         #endif
         let now = prayerNow()

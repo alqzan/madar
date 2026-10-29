@@ -127,9 +127,11 @@ import UIKit
         continueAfterFailure = false
         let csv = "Book Id,Title,Author,Additional Authors,ISBN,ISBN13,My Rating,Exclusive Shelf,Date Read,Read Count,My Review,Private Notes,Number of Pages,Year Published,Date Added,Bookshelves\r\n"
             + "9001,رحلة Goodreads,أحمد,,,9780306406157,4,currently-reading,,1,\"مراجعة متعددة\r\nالسطور\",ملاحظة من Goodreads,120,2020,2020/02/01,favorites\r\n"
-            + "9002,كتاب مؤرخ,أحمد,,,,5,read,2020/02/01,1,,,,2020,2020/02/01,"
+            + "9002,كتاب مؤرخ,أحمد,,,,5,read,2020/02/01,1,,,,2020,2020/02/01,\r\n"
+            + "9003,كتاب ينتظرني,سارة,,,,0,to-read,,0,,,,2020,2020/02/01,"
         let app = app("empty")
         app.launchEnvironment["MADAR_UI_MIHBARA_IMPORT_GOODREADS"] = Data(csv.utf8).base64EncodedString()
+        app.launchEnvironment["MADAR_UI_MIHBARA_IMPORT_GOODREADS_FAIL_ONCE"] = "1"
         app.launch(); open(app)
         let addBook = app.buttons["mihbara-add-paper"]
         reach(app, addBook); addBook.tap()
@@ -142,7 +144,16 @@ import UIKit
         let cutoff = app.descendants(matching: .any)["mihbara-goodreads-cutoff-year"]
         XCTAssertTrue(cutoff.waitForExistence(timeout: 8), app.debugDescription)
         XCTAssertTrue(cutoff.label.contains("هـ") && cutoff.label.contains(" م"), cutoff.label)
+        XCTAssertTrue(app.staticTexts["أبي أقرأها"].exists, app.debugDescription)
         shot(app, "M6-V17-goodreads-preview-L")
+        importButton.tap()
+
+        let importFailure = app.staticTexts["mihbara-goodreads-import-error"]
+        XCTAssertTrue(importFailure.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertEqual(importFailure.label, "تعذّرت إضافة كتب Goodreads إلى المحبرة. حاول مرة أخرى.")
+        XCTAssertTrue(app.staticTexts["رحلة Goodreads"].exists, "A failed import must preserve the preview.")
+        XCTAssertTrue(importButton.isEnabled && importButton.isHittable, app.debugDescription)
+        shot(app, "AU-76-goodreads-import-retry-L")
         importButton.tap()
 
         XCTAssertTrue(app.buttons["mihbara-add-paper"].waitForExistence(timeout: 20), app.debugDescription)
