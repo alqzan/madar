@@ -164,11 +164,13 @@ public enum QuranPortionEngine {
             guard let last = catalog.ayahs(on: page).last?.id else { throw QuranCoverageError.invalidMap }
             return try QuranAyahRange(first: start, last: min(limit, last))
         }
-        let target = Double(first.page) + Double(first.lineStart - 1) / 15 + quantity
+        // Pages 1 and 2 have eight lines; every other page has fifteen.
+        func lines(_ page: Int) -> Double { page <= 2 ? 8 : 15 }
+        let target = Double(first.page) + Double(first.lineStart - 1) / lines(first.page) + quantity
         var best = start
         var distance = Double.infinity
         for ayah in catalog.ayahs where (start...limit).contains(ayah.id) {
-            let end = Double(ayah.page) + Double(ayah.lineEnd) / 15
+            let end = Double(ayah.page) + Double(ayah.lineEnd) / lines(ayah.page)
             let candidate = abs(end - target)
             // Equal distances retain the earlier ayah, independent of float noise.
             if candidate < distance - 1e-10 { best = ayah.id; distance = candidate }

@@ -99,6 +99,15 @@ import XCTest
         XCTAssertTrue(complete.isKhatm); XCTAssertEqual(complete.completedJuz.count, 30)
     }
 
+    func testHalfOfAnEightLinePageEndsNearItsMiddle() throws {
+        let c = try QuranResourceCatalog.bundled()
+        // Pages 1 and 2 have eight lines: half of page 1 from its first ayah ends near line 4, not line 7–8.
+        let half = try QuranPortionEngine.portion(from: 1, unit: .half, amount: 1, catalog: c)
+        let last = try XCTUnwrap(c.ayah(id: half.last))
+        XCTAssertEqual(last.page, 1)
+        XCTAssertTrue((3...5).contains(last.lineEnd), "line \(last.lineEnd) of 8")
+    }
+
     func testPortionsUseOfficialLinesAndRetainTheWholePageLegacyResult() throws {
         let c = try QuranResourceCatalog.bundled()
         // Official page 22: ayahs 149/150/151/152 end on lines 3/8/12/15.
