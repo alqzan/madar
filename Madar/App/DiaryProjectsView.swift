@@ -50,6 +50,8 @@ struct DiaryProjectEditor: View {
     @State private var failure: String?
     @State private var identity = UUID()
     @State private var saving = false
+    @State private var confirmDiscard = false
+    private var hasUnsavedInput: Bool { !name.isEmpty || !intention.isEmpty || !keyword.isEmpty }
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 14) {
@@ -62,7 +64,7 @@ struct DiaryProjectEditor: View {
             }.padding(18).background(theme.background).foregroundStyle(theme.ink)
                 .navigationTitle("مشروع جديد").navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItem(placement: .cancellationAction) { Button("إلغاء") { dismiss() }.disabled(saving) }
+                    ToolbarItem(placement: .cancellationAction) { Button("إلغاء") { if hasUnsavedInput { confirmDiscard = true } else { dismiss() } }.disabled(saving) }
                     ToolbarItem(placement: .confirmationAction) {
                         Button("احفظ") {
                             guard !saving else { return }; saving = true
@@ -74,6 +76,13 @@ struct DiaryProjectEditor: View {
                             .disabled(saving || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty).accessibilityIdentifier("diary-project-save")
                     }
                 }.toolbarBackground(theme.background, for: .navigationBar).tint(theme.accent)
+                .interactiveDismissDisabled(hasUnsavedInput)
+                .confirmationDialog("تجاهل كتابة المشروع؟", isPresented: $confirmDiscard, titleVisibility: .visible) {
+                    Button("تجاهل المسودة", role: .destructive) { dismiss() }.accessibilityIdentifier("diary-project-discard")
+                    Button("أكمل الكتابة") { }
+                } message: {
+                    Text("لم تحفظ المشروع بعد.")
+                }
         }
     }
     private func field(_ title: String, _ value: Binding<String>, id: String) -> some View {

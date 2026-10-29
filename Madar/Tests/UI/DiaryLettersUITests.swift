@@ -1,5 +1,49 @@
 import XCTest
 @MainActor final class DiaryLettersUITests:XCTestCase {
+    private func shot(_ app: XCUIApplication, _ name: String) {
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = name; attachment.lifetime = .keepAlways; add(attachment)
+    }
+    func testWelcomeRetriesAfterItsFirstReadFails() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": "welcome", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_DIARY_WELCOME_READ_FAILURE_ONCE": "1"]
+        app.launch()
+        let retry = app.buttons["diary-welcome-retry"]
+        XCTAssertTrue(retry.waitForExistence(timeout: 12), app.debugDescription)
+        let error = app.staticTexts["diary-welcome-error"]
+        XCTAssertEqual(error.label, "تعذّر فتح صفحة اليوميات. أعد المحاولة.")
+        shot(app, "AU-70-welcome-read-error-L")
+        retry.tap()
+        XCTAssertTrue(app.buttons["diary-welcome-next"].waitForExistence(timeout: 10), app.debugDescription)
+        shot(app, "AU-70-welcome-retried-L")
+    }
+    func testSwipeCannotDiscardAnUnsavedProjectDraft() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": "letters", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00"]
+        app.launch()
+        XCTAssertTrue(app.buttons["diary-days"].waitForExistence(timeout: 25)); app.buttons["diary-days"].tap()
+        XCTAssertTrue(app.buttons["diary-hub-projects"].waitForExistence(timeout: 10)); app.buttons["diary-hub-projects"].tap()
+        app.buttons["diary-project-new"].tap()
+        let name = app.textFields["diary-project-name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5)); name.tap(); name.typeText("مسودة محفوظة من السحب")
+        shot(app, "AU-70-project-draft-before-L")
+        app.swipeDown()
+        XCTAssertTrue(name.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertEqual(name.value as? String, "مسودة محفوظة من السحب")
+        app.buttons["إلغاء"].tap()
+        let discard = app.buttons["diary-project-discard"]
+        XCTAssertTrue(discard.waitForExistence(timeout: 5), app.debugDescription)
+        shot(app, "AU-70-project-discard-confirm-L")
+        app.buttons["أكمل الكتابة"].tap()
+        XCTAssertTrue(name.exists, app.debugDescription)
+        XCTAssertEqual(name.value as? String, "مسودة محفوظة من السحب")
+        shot(app, "AU-70-project-draft-kept-L")
+        app.buttons["إلغاء"].tap()
+        XCTAssertTrue(discard.firstMatch.waitForExistence(timeout: 5)); discard.firstMatch.tap()
+        XCTAssertTrue(name.waitForNonExistence(timeout: 8))
+    }
     func testProjectRapidSaveCreatesOneRowAndHijriComposerKeepsBothDates() throws {
         continueAfterFailure = false
         let app = XCUIApplication()

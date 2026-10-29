@@ -4,19 +4,41 @@ import MadarDesign
 
 struct DiaryLaunchView: View {
     @Bindable var app: AppSession
+    @Environment(\.roomTheme) private var theme
     @State private var writingDirectly = false
     @State private var welcomed: Bool?
     @State private var failure: String?
+    @State private var welcomeLookupAttempt = 0
+    @State private var welcomeChecking = false
+    @State private var injectedWelcomeFailure = false
     var body: some View {
         Group {
             if welcomed == true || writingDirectly { DiaryHomeView(app: app) }
             else if welcomed == false { DiaryWelcomeView(app: app) { welcomed = true } }
-            else if let failure { Text(failure).padding() }
-            else { ProgressView("تُفتح صفحتك…") }
+            else if welcomeChecking || failure == nil { ProgressView("تُفتح صفحتك…") }
+            else if let failure {
+                VStack(spacing: 14) {
+                    Text(failure).font(DiaryType.writing).multilineTextAlignment(.center).accessibilityIdentifier("diary-welcome-error")
+                    Button("أعد المحاولة") { welcomeLookupAttempt += 1 }
+                        .disabled(welcomeChecking).accessibilityIdentifier("diary-welcome-retry")
+                }.padding(28).frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
+            }
         }.onChange(of: app.diaryRoute, initial: true) { _, route in
             if route?.path.first == "write" { writingDirectly = true }
-        }.task {
-            do { welcomed = try AppDiaryService(app: app).hasWelcomed() } catch { failure = madarUserMessage(error) }
+        }.task(id: welcomeLookupAttempt) {
+            welcomeChecking = true
+            failure = nil
+            defer { welcomeChecking = false }
+            do {
+                #if DEBUG
+                if !injectedWelcomeFailure && ProcessInfo.processInfo.environment["MADAR_UI_DIARY_WELCOME_READ_FAILURE_ONCE"] == "1" {
+                    injectedWelcomeFailure = true
+                    throw CocoaError(.fileReadUnknown)
+                }
+                #endif
+                welcomed = try AppDiaryService(app: app).hasWelcomed()
+            } catch { failure = "تعذّر فتح صفحة اليوميات. أعد المحاولة." }
         }
         // The diary opens from the glass accessory, not a tab: hiding the bar during the welcome left no way to another room.
     }
