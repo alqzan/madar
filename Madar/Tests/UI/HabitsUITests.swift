@@ -313,6 +313,28 @@ import UIKit
             app.terminate()
         }
     }
+
+    func testSecondHabitDeepLinkUpdatesOpenHabitsRoom() throws {
+        continueAfterFailure = false
+        let app = app("showcase")
+        open(app)
+        let rows = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "habit-row-"))
+        let first = rows.element(boundBy: 0), second = rows.element(boundBy: 1)
+        XCTAssertTrue(first.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(second.waitForExistence(timeout: 5), app.debugDescription)
+        let prefix = "habit-row-"
+        let firstID = String(first.identifier.dropFirst(prefix.count))
+        let secondID = String(second.identifier.dropFirst(prefix.count))
+        let firstName = first.label.components(separatedBy: "،").first ?? first.label
+        let secondName = second.label.components(separatedBy: "،").first ?? second.label
+        XCTAssertNotEqual(firstName, secondName)
+
+        app.open(URL(string: "madar://bahw/habits/\(firstID)")!)
+        XCTAssertTrue(app.staticTexts[firstName].waitForExistence(timeout: 10), app.debugDescription)
+        app.open(URL(string: "madar://bahw/habits/\(secondID)")!)
+        XCTAssertTrue(app.staticTexts[secondName].waitForExistence(timeout: 10), app.debugDescription)
+    }
+
     func testOverdueYearlyHabitShowsTheGentleNudge() throws {
         continueAfterFailure = false
         let app = app("sinceOverdue"); open(app)

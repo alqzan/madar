@@ -16,3 +16,12 @@
 - **Disk:** حُذفت ستّ نسخ DerivedData قديمة في `Madar/Artifacts` (~15GB) لأن القرص امتلأ (198MB)؛ `owner-data` والمحاكيات لم تُمسّ.
 - **Next:** بقايا AU-07 في نفس الصف (تسمية «يومك/يومياتك/اليومية» في المال)؛ قرار المالك في فكرة سطر دفتر المحبرة على الودجات (Ideas)؛ ثم مراجعة المالك لصفوف AU-04…AU-21. لم تُغيَّر «أبي أقرأها» ولا «٤٠ دقيقة» عمدًا (المواصفة).
 - **Model/effort:** claude-opus-5-5، not exposed. Sonnet helpers للقراءة فقط.
+
+## Handover — استكمال تسليم كلود — 2026-10-28 — Codex
+- **Works now:** مسار تسجيل الصلاة بلا مواقيت واختيار «أمرّ» ثم السلاسل والسجل متحقق؛ الإصلاح في الاختبار فقط.
+- **Verified:** `xcodebuild test … -parallel-testing-enabled NO -only-testing:MadarUITests/PrayerFirstDayUITests`، نتيجتان ناجحتان في `codex-au10-polar-r4.xcresult`؛ صور L/light فُحصت؛ `git diff --check`.
+- **Differences left:** لا تغيير في الواجهة؛ تبقى موافقة المالك والفروق المسجلة في الصفوف.
+- **Not verified:** الجهاز والتوزيع وCloudKit وiOS 27؛ بيانات المالك ومحاكيه لم تُستخدم.
+- **Next:** بقايا AU-22 النحوية وAU-11 النصية ثم أعمدة الدين في AU-04.
+- **Model/effort:** not exposed / not exposed؛ Luna للبحث فقط.
+- **Usage:** آخر قراءة 10% مستخدم من الخمس ساعات، 32% أسبوعي؛ الجلسة مستمرة.

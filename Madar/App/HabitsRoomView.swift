@@ -93,6 +93,10 @@ struct HabitsRoomView: View {
         .background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.accent)
         .toolbarVisibility(.hidden,for:.navigationBar).environment(\.roomTheme,theme)
         .task(id:session.prayerRevision) { reload() }
+        .onChange(of: session.habitRouteID) { _, routeID in
+            guard routeID != nil else { return }
+            reload()
+        }
         .task { do {liveHealth=try await HabitHealthStore.refresh(session:session);reload()} catch {session.errorMessage="لم تتجدد قراءة الصحة؛ سجلك السابق محفوظ."} }
         .task {
             while !Task.isCancelled {
