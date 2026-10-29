@@ -1236,7 +1236,10 @@ import XCTest
             XCTAssertTrue(choice.waitForExistence(timeout: 10), target.debugDescription)
             choice.tap()
             let skipHeartQuestion = target.buttons["prayer-heart-skip"]
-            if skipHeartQuestion.waitForExistence(timeout: 3) { skipHeartQuestion.tap() }
+            if skipHeartQuestion.waitForExistence(timeout: 3) {
+                skipHeartQuestion.tap()
+                XCTAssertTrue(skipHeartQuestion.waitForNonExistence(timeout: 10), target.debugDescription)
+            }
         }
 
         openPrayer(app)
