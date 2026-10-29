@@ -35,6 +35,17 @@ struct MoneyGoalView: View {
     private var days: Int? { GoalPreparation.days(remainingMinor: rest, dailyMinor: minor(daily)) }
     private var finish: GregorianDay? { days.flatMap { reading?.today.adding(days: $0) } }
     private var valid: Bool { visible && name.count <= 80 && [amount, upfront, daily].allSatisfy { MoneyAmountInput.minor($0, exponent: CurrencyExponents.specified.exponent(app.string("core.currency")) ?? 2).map { $0 >= 0 } == true } && target > 0 && !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && minor(upfront) <= target && minor(upfront) <= max(0, source == "surplus" ? reading?.surplusMinor ?? 0 : reading?.reserveMinor ?? 0) && minor(daily) <= (reading?.dailyMinor ?? 0) && days != nil }
+    /// AU-40: the first reason «أنشئ المظروف» is dimmed, once an amount exists (the empty case has its own sentence).
+    private var blocked: String? {
+        guard !valid, target > 0, visible else { return nil }
+        if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "اكتب اسم ما تستعد له" }
+        if name.count > 80 { return "الاسم أطول من ٨٠ حرفًا" }
+        if minor(upfront) > target { return "ما تضعه الآن أكبر من المبلغ كله" }
+        if minor(upfront) > max(0, source == "surplus" ? reading?.surplusMinor ?? 0 : reading?.reserveMinor ?? 0) { return "ما تضعه الآن أكبر من المتاح في مصدره" }
+        if minor(daily) > (reading?.dailyMinor ?? 0) { return "الاقتطاع اليومي أكبر من يومك" }
+        if days == nil { return "اختر اقتطاعًا يوميًا ليُعرف متى يكتمل" }
+        return nil
+    }
     private func shown(_ n: Int) -> String { visible ? service.amount(n) : "•••" }
     var body: some View {
         ScrollView { VStack(spacing: 18) {
@@ -63,6 +74,7 @@ struct MoneyGoalView: View {
                 Button("خطة سنة من الاحتياطي واليومية") { yearPlan() }.font(MadarTypography.caption()).frame(minHeight: 44).disabled(!visible).accessibilityIdentifier("money-goal-year")
                 Button("دفعت منه شيء قبل؟ " + (paid.isEmpty ? "اختر من مصروفاتك" : shown(already))) { paidOpen = true }.font(MadarTypography.caption()).frame(minHeight: 44).disabled(!visible).accessibilityIdentifier("money-goal-paid")
                 if let failure { Text(failure).font(MadarTypography.caption()) }
+                if failure == nil, let blocked { Text(blocked).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-goal-blocked") }
                 Button { preview = true } label: { Text("أنشئ المظروف").font(MadarTypography.cardTitle()).frame(maxWidth: .infinity, minHeight: 54).background(theme.ink, in: Capsule()).foregroundStyle(theme.background) }.disabled(!valid).accessibilityIdentifier("money-goal-create")
             } else { ProgressView() }
         }.padding(20).frame(maxWidth: 620).frame(maxWidth: .infinity) }

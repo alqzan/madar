@@ -68,7 +68,7 @@ struct MihbaraPaperIndexEditor: View {
         _author = State(initialValue: existingBook?.author ?? "")
         _isbn13 = State(initialValue: existingBook?.isbn13 ?? "")
         _pages = State(initialValue: existingBook?.pages.map(digits.string) ?? "")
-        _positionPage = State(initialValue: existingBook?.page.map(digits.string) ?? digits.string(0))
+        _positionPage = State(initialValue: existingBook?.page.map(digits.string) ?? "") // AU-40: an unstarted book is empty, not «صفحة ٠».
         _firstPage = State(initialValue: drafts.first?.page ?? "")
         _chapters = State(initialValue: drafts.isEmpty ? [.init()] : drafts)
         _shelf = State(initialValue: existingBook?.shelf ?? "reading")
@@ -128,7 +128,7 @@ struct MihbaraPaperIndexEditor: View {
                 if existingBook != nil {
                     VStack(alignment: .trailing, spacing: 7) {
                         Text("وصلت إلى صفحة").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                        TextField("رقم الصفحة", text: $positionPage)
+                        TextField("لم أبدأ بعد", text: $positionPage)
                             .font(MadarTypography.body())
                             .multilineTextAlignment(.trailing)
                             .keyboardType(.numberPad)
@@ -340,7 +340,7 @@ struct MihbaraPaperIndexEditor: View {
         guard models.isEmpty || tocData != nil else { errorMessage = "الفهرس أطول من الحد المسموح."; return }
         let position: Int?
         if existingBook != nil {
-            guard let value = Self.integer(positionPage), (0...100_000).contains(value) else { errorMessage = "اكتب رقم صفحة صحيحًا"; return }
+            guard let value = positionPage.trimmingCharacters(in: .whitespaces).isEmpty ? 0 : Self.integer(positionPage), (0...100_000).contains(value) else { errorMessage = "اكتب رقم صفحة صحيحًا"; return }
             position = value
         } else {
             position = nil

@@ -16,6 +16,7 @@ struct MoneySalaryView: View {
     @State private var reading: MoneySalaryReading?
     @State private var failure: String?
     @State private var confirmFailed = false
+    @State private var adjustFailed = false
     @State private var selected: String?
     @State private var remainderTo: SalaryRemainder?
     @State private var revealed = false
@@ -350,6 +351,7 @@ struct MoneySalaryView: View {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 104), spacing: 10)], spacing: 10) {
                 ForEach(r.opening.envelopes) { envelopeCard($0) }
             }.environment(\.layoutDirection, .rightToLeft)
+            if adjustFailed { Text("لم يُحفظ التعديل؛ تحدّثت الأرقام، فعدّل من جديد.").font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")).accessibilityIdentifier("money-salary-adjust-failed") }
         }
     }
     private func envelopeCard(_ e: SalaryOpeningReading.EnvelopeLine) -> some View {
@@ -405,7 +407,11 @@ struct MoneySalaryView: View {
         }
     }
     private func run(_ name: String, _ payload: [String: MadarCore.JSONValue]) {
-        busy = true
-        Task { try? await app.executeMoneyCommand(name, payload: payload); busy = false; load() }
+        busy = true; adjustFailed = false
+        // AU-40: a refused ± says so; the numbers reload either way.
+        Task {
+            do { try await app.executeMoneyCommand(name, payload: payload) } catch { adjustFailed = true }
+            busy = false; load()
+        }
     }
 }
