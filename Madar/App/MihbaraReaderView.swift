@@ -1421,7 +1421,7 @@ struct MihbaraReaderView: View {
         let quote = card.isWord && card.quote.split(separator: " ").count > 1 ? card.quote : card.paragraphText
         var source = [book.title]
         if !book.author.trimmingCharacters(in: .whitespaces).isEmpty { source.append(book.author) }
-        if let label = card.pageLabel { source.append("ص " + digits.localized(label)) }
+        if let location = MihbaraQuoteCardContent.location(card.pageLabel, turathID: book.turathID, digits: digits) { source.append(location) }
         UIPasteboard.general.string = "«\(quote)»\n— " + source.joined(separator: "، ")
         let stamp = Date()
         copiedAt = stamp
@@ -2608,20 +2608,21 @@ struct MihbaraQuoteCardContent: Identifiable {
     let sourceURL: URL?
     let sourceName: String
 
+    /// «ج ٣، ص ٤٥» for a Turath volume/page label, «ص ٤٥» otherwise; the quote card and the copied citation share it.
+    static func location(_ pageLabel: String?, turathID: Int?, digits: MadarNumberFormatter) -> String? {
+        guard let pageLabel, !pageLabel.isEmpty else { return nil }
+        let parts = pageLabel.split(separator: "/", omittingEmptySubsequences: false)
+        if turathID != nil, parts.count == 2, !parts[0].isEmpty, !parts[1].isEmpty {
+            return "ج \(digits.localized(String(parts[0])))، ص \(digits.localized(String(parts[1])))"
+        }
+        return "ص \(digits.localized(pageLabel))"
+    }
+
     init(quote: String, bookTitle: String, author: String, pageLabel: String?, turathID: Int?, digits: MadarNumberFormatter) {
         self.quote = quote
         self.bookTitle = bookTitle
         self.author = author
-        if let pageLabel, !pageLabel.isEmpty {
-            let parts = pageLabel.split(separator: "/", omittingEmptySubsequences: false)
-            if turathID != nil, parts.count == 2, !parts[0].isEmpty, !parts[1].isEmpty {
-                location = "ج \(digits.localized(String(parts[0])))، ص \(digits.localized(String(parts[1])))"
-            } else {
-                location = "ص \(digits.localized(pageLabel))"
-            }
-        } else {
-            location = nil
-        }
+        location = Self.location(pageLabel, turathID: turathID, digits: digits)
         sourceURL = turathID.flatMap { URL(string: "https://shamela.ws/book/\($0)") }
         sourceName = sourceURL == nil ? "من مكتبتك" : "المكتبة الشاملة"
     }
@@ -3234,6 +3235,8 @@ private struct MihbaraPageNoteSheet: View {
         .tint(palette.accent)
         .background(palette.bg.ignoresSafeArea())
         .presentationDetents([.medium, .large])
+        // A swipe never throws away a written note; «إلغاء» stays the deliberate way out.
+        .interactiveDismissDisabled(!text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         .onAppear { focused = true }
     }
 }
