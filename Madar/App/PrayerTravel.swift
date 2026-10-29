@@ -194,9 +194,19 @@ struct PrayerTripSheet: View {
     private var legs: [(city: String, country: String, start: Date, end: Date?)] {
         (try? PrayerRepository(context: ModelContext(session.container)))?.journeyLegs(of: trip.id) ?? []
     }
+    private var hasRepeatedCityNames: Bool {
+        let cities = legs.map(\.city)
+        return Set(cities).count != cities.count
+    }
+    private func locationLabel(_ city: String, country: String, disambiguate: Bool) -> String {
+        guard disambiguate, !country.isEmpty else { return city }
+        let name = Locale(identifier: "ar").localizedString(forRegionCode: country) ?? country
+        return "\(city)، \(name)"
+    }
     /// The phone is in another city than this leg and far from it: offer to add it to the same journey.
     private var nextStop: TravelFix? {
-        guard let fix, fix.city != trip.city, TravelRule.distanceKm(from: trip.place, to: fix.place) > thresholdKm,
+        guard let fix, let currentLeg = legs.last,
+              (fix.city != currentLeg.city || fix.country != currentLeg.country), TravelRule.distanceKm(from: trip.place, to: fix.place) > thresholdKm,
               TravelRule.isAway(home: session.activePlace, current: fix.place, thresholdKm: thresholdKm) else { return nil }
         return fix
     }
@@ -209,18 +219,21 @@ struct PrayerTripSheet: View {
                     HStack(spacing: 6) {
                         ForEach(Array(legs.enumerated()), id: \.offset) { index, leg in
                             if index > 0 { Image(systemName: "arrow.left").font(.system(size: 12, weight: .semibold)).foregroundStyle(theme.secondaryInk) }
-                            Text(leg.city).font(PrayerHomeType.strong).foregroundStyle(leg.end == nil ? theme.color("accentText") : theme.ink)
+                            Text(locationLabel(leg.city, country: leg.country, disambiguate: hasRepeatedCityNames))
+                                .font(PrayerHomeType.strong).foregroundStyle(leg.end == nil ? theme.color("accentText") : theme.ink)
                         }
                     }
                     .accessibilityElement(children: .combine).accessibilityIdentifier("prayer-trip-legs")
                 }
                 if let stop = nextStop {
+                    let currentCountry = legs.last?.country ?? ""
+                    let stopName = locationLabel(stop.city, country: stop.country, disambiguate: stop.city == trip.city && stop.country != currentCountry)
                     PrayerPaperCard {
                         VStack(alignment: .leading, spacing: 10) {
-                            Text("أنت الآن في \(stop.city)").font(PrayerHomeType.strong)
+                            Text("أنت الآن في \(stopName)").font(PrayerHomeType.strong)
                             Text("أضفها محطةً في رحلتك نفسها: تُحسب المواقيت هنا، ويبقى القصر والجمع، وتجمع ميزانية الرحلة مصروف البلدين.")
                                 .font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk)
-                            TravelPrimaryButton(title: "أضف \(stop.city) إلى رحلتك", id: "prayer-trip-continue", busy: session.prayerWriteInProgress) {
+                            TravelPrimaryButton(title: "أضف \(stopName) إلى رحلتك", id: "prayer-trip-continue", busy: session.prayerWriteInProgress) {
                                 session.continuePrayerTrip(city: stop.city, country: stop.country, place: stop.place, homeKm: max(0, TravelRule.distanceKm(from: session.activePlace, to: stop.place) - TravelRule.homeRadiusKm)) { if $0 { finished() } }
                             }
                         }

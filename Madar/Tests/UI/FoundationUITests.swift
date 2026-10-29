@@ -201,6 +201,40 @@ import XCTest
         app.terminate()
     }
 
+    func test_OR09_TripContinuesWhenCityNameMatchesInAnotherCountry() throws {
+        continueAfterFailure = false
+        let store = UUID().uuidString, app = XCUIApplication()
+        func launch(_ fix: String) {
+            app.launchEnvironment = ["MADAR_UI_STORE_ID": store, "MADAR_UI_SIZE": "L", "MADAR_UI_NOW": "2026-10-07T16:00:00+03:00",
+                "MADAR_UI_TRACKING_START": "2026-10-01", "MADAR_UI_THEME": "light", "MADAR_UI_TRAVEL_FIX": fix]
+            app.launch()
+        }
+        launch("51.5074,-0.1278,لندن,GB,Europe/London"); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+        let pill = app.buttons["prayer-travel-pill"]
+        XCTAssertTrue(pill.waitForExistence(timeout: 10), app.debugDescription); pill.tap()
+        let yes = app.buttons["prayer-travel-yes"]
+        XCTAssertTrue(yes.waitForExistence(timeout: 8), app.debugDescription); yes.tap()
+        XCTAssertTrue(yes.waitForNonExistence(timeout: 8), app.debugDescription)
+        app.terminate()
+
+        launch("42.9849,-81.2453,لندن,CA,America/Toronto"); app.tabBars.buttons["الصلاة"].tap()
+        XCTAssertTrue(pill.waitForExistence(timeout: 10), app.debugDescription); pill.tap()
+        let add = app.buttons["prayer-trip-continue"]
+        XCTAssertTrue(add.waitForExistence(timeout: 8), app.debugDescription)
+        let canada = Locale(identifier: "ar").localizedString(forRegionCode: "CA") ?? "CA"
+        let unitedKingdom = Locale(identifier: "ar").localizedString(forRegionCode: "GB") ?? "GB"
+        XCTAssertTrue(add.label.contains(canada), add.label)
+        attachScreenshot(app, named: "OR-09-same-name-arrival-L")
+        add.tap()
+        XCTAssertTrue(add.waitForNonExistence(timeout: 8), app.debugDescription)
+        pill.tap()
+        let legs = app.descendants(matching: .any)["prayer-trip-legs"]
+        XCTAssertTrue(legs.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(legs.label.contains(unitedKingdom) && legs.label.contains(canada), legs.label)
+        attachScreenshot(app, named: "OR-09-same-name-legs-L")
+        app.terminate()
+    }
+
     /// M1-V10: «خصّص الصلاة», for comparison with screens/flex/06-K-Salah(-s1).jpg; order and hide change the home.
     func test_M1V10_CustomizePrayerReordersAndHidesHomeBlocks() throws {
         continueAfterFailure = false
