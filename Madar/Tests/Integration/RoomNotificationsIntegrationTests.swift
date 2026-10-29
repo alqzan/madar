@@ -270,7 +270,7 @@ import MadarCore
         let plan = NotificationArbiter.plan(candidates: [], prayerDays: [day], now: day.fajr, timeZone: ActivePlace.riyadh.timeZone, policy: .init(staleNudgeEnabled: false))
         let q = RoomNotificationContent.content(for: qada, plan: plan, session: app, habitNames: [:])
         let h = RoomNotificationContent.content(for: reminder, plan: plan, session: app, habitNames: [habit.uuidString: "المشي"])
-        XCTAssertFalse(q.body.contains("قضاء")); XCTAssertFalse(h.title.contains("المشي"))
+        XCTAssertFalse(q.body.contains("قضاء")); XCTAssertEqual(q.title, "مدار"); XCTAssertFalse(h.title.contains("المشي"))
         let digest = RoomNotificationContent.content(for: NotificationCandidate(id: "digest.2026-10-15", room: .habits, dueAt: day.asr, dayKey: "2026-10-15"), plan: plan, session: app, habitNames: [:])
         XCTAssertEqual(digest.title, "مدار"); XCTAssertTrue(digest.body.hasSuffix("في مدار"), digest.body)
         RoomNotificationContent.open(reminder.id, userInfo: h.userInfo, session: app)

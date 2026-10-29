@@ -222,7 +222,8 @@ import MadarPrayer
             content.body = "لديك " + reminderCount(members.count, digits) + (protected ? " في مدار" : kinds.isEmpty ? "" : ": " + kinds.joined(separator: "، "))
             content.userInfo = ["dayKey": candidate.dayKey, "room": "bahw"]
         } else if id.hasPrefix("qada.") {
-            content.title = "القضاء"
+            // AU-31: under the whole-app lock the title must not reveal missed prayers either.
+            content.title = protected ? "مدار" : "القضاء"
             content.body = protected ? "لديك تذكير في مدار" : qadaLine(candidate.dayKey)
             content.userInfo = ["dayKey": candidate.dayKey, "room": "salah"]
         } else if id.hasPrefix("habits.") {
