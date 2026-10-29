@@ -39,6 +39,8 @@ import XCTest
     }
 
     private func crawl(_ tab: String, _ extra: [String: String]) {
+        // About forty minutes for all rooms: run on purpose with TEST_RUNNER_MADAR_UI_CRAWL=1, never in a full suite.
+        guard ProcessInfo.processInfo.environment["MADAR_UI_CRAWL"] == "1" else { return }
         continueAfterFailure = true
         var env = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
         env.merge(extra) { $1 }

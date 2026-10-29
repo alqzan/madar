@@ -13,6 +13,7 @@ struct QuranHomeSessionFlow: View {
     /// AU-95: «أنهِ وسجّل» or «تجاهل» tapped while a reveal or grade is still saving runs once it lands, instead of
     /// closing the sheet and silently doing nothing.
     @State private var queuedFinish: QuranUISessionAction?
+    @State private var finishing = false
     @State private var autoAdvance: UUID?
     @State private var error: String?
     @State private var showDayClose = false
@@ -103,14 +104,15 @@ struct QuranHomeSessionFlow: View {
         if busy {
             switch action {
             case .reveal(let ayah, nil) where !queuedReveals.contains(ayah): queuedReveals.append(ayah)
-            case .commit, .commitPartial, .discard: queuedFinish = action
+            case .commit, .commitPartial, .discard where !finishing: queuedFinish = action
             default: break
             }
             return
         }
         busy = true
+        switch action { case .commit, .commitPartial, .discard: finishing = true; default: break }
         if case .reveal = action {} else { queuedReveals = [] }
-        Task { defer { busy = false; drainReveals() }; do { switch try await service.session(draftID: state.id, action: action) {
+        Task { defer { busy = false; finishing = false; drainReveals() }; do { switch try await service.session(draftID: state.id, action: action) {
         case .active(let next): state = next; autoStep(after: action, next)
         case .completed(_, let reachedKhatm):
             queuedReveals = []; autoAdvance = nil

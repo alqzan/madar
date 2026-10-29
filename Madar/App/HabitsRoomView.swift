@@ -49,6 +49,8 @@ struct HabitsRoomView: View {
     @State private var showAll = false
     @State private var selectedPeriod: HabitFrequency?
     @State private var pastDay: HabitReading?
+    /// AU-95: a once-habit is one tap; a quick second tap on its ring must not log it twice.
+    @State private var onceInFlight: Set<UUID> = []
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -357,7 +359,11 @@ struct HabitsRoomView: View {
     /// beside an empty tap circle read as two of the same). Count habits keep the ring as progress and a «+».
     @ViewBuilder private func leading(_ row:HabitReading,share:Double,met:Bool)->some View {
         if let p=row.summary.current, row.source == nil, !row.paused, p.target > 0, p.rule.measure == .once, !met {
-            Button { perform("habit.complete",["id":.string(row.id.uuidString),"delta":.number(1)]) } label: {
+            Button {
+                guard !onceInFlight.contains(row.id) else { return }
+                onceInFlight.insert(row.id)
+                perform("habit.complete",["id":.string(row.id.uuidString),"delta":.number(1)]) { onceInFlight.remove(row.id) }
+            } label: {
                 Circle().stroke(theme.accent,lineWidth:2).frame(width:32,height:32).frame(width:44,height:44).contentShape(.circle)
             }.buttonStyle(.madarPlain)
             .accessibilityLabel(quickLogLabel(row.name,.once))
@@ -398,7 +404,7 @@ struct HabitsRoomView: View {
             }
         } catch { session.errorMessage = madarUserMessage(error) }
     }
-    private func perform(_ name:String,_ payload:[String:MadarCore.JSONValue]) { Task { do {try await session.executeDiaryCommand(name,payload:payload);reload()}catch{session.errorMessage=madarUserMessage(error)} } }
+    private func perform(_ name:String,_ payload:[String:MadarCore.JSONValue],done:@escaping () -> Void = {}) { Task { defer{done()}; do {try await session.executeDiaryCommand(name,payload:payload);reload()}catch{session.errorMessage=madarUserMessage(error)} } }
 }
 
 private struct HabitPeriodSummaryCard: View {
