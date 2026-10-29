@@ -131,7 +131,7 @@ public struct HabitTime: Equatable, Sendable {
             let initialEpoch=epochs.first
             let epochCalendar=MadarCalendarDays(zone:calendar.zone,source:initialEpoch?.calendarSource.flatMap(HijriSource.init(rawValue:)) ?? calendar.source,offset:initialEpoch?.calendarOffset ?? calendar.offset)
             let calendarChanges=try epochs.map { HabitCalendarChange(day:try GregorianDay($0.dayKey),source:$0.calendarSource.flatMap(HijriSource.init(rawValue:)) ?? calendar.source,offset:$0.calendarOffset ?? calendar.offset) }
-            let weekChanges=epochs.isEmpty ? legacyWeekChanges : try epochs.map {HabitWeekChange(day:try GregorianDay($0.dayKey),start:$0.weekStart.flatMap(MadarWeekStart.init(rawValue:)) ?? .saturday)}
+            let weekChanges=epochs.isEmpty ? legacyWeekChanges : try epochs.map {HabitWeekChange(day:try GregorianDay($0.dayKey),start:$0.weekStart.flatMap(MadarWeekStart.init(rawValue:)) ?? MadarWeekStart(rawValue: initialWeek) ?? .saturday)}
             let epochWeek=initialEpoch?.weekStart ?? initialWeek
             let summary = try HabitEngine.evaluate(rules: rules, facts: facts, pauses: breaks, today: today, days: epochCalendar,
                 weekStart: MadarWeekStart(rawValue: epochWeek) ?? .saturday, weekChanges: weekChanges, calendarChanges:calendarChanges,
