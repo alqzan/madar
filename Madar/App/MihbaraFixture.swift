@@ -40,8 +40,16 @@ extension AppSession {
             let r = Book(); r.id = StableIdentity.uuid(for: "mihbara-fixture-book"); r.title = "رحلة القراءة"; r.author = "من مكتبتك"; r.pages = 250; r.currentPage = 147; r.locatorJSON = try JSONEncoder().encode(PaperBookPosition(page: 147)); r.shelf = "reading"; r.updatedAt = now; c.insert(r)
             let want = Book(); want.title = "كتاب ينتظر"; want.author = "من مكتبتك"; want.shelf = "want"; want.pages = 180; c.insert(want)
             if ProcessInfo.processInfo.environment["MADAR_UI_MIHBARA_FILE_ROW"] == "1" {
+                let nearEnd = ProcessInfo.processInfo.environment["MADAR_UI_MIHBARA_FILE_NEAR_END"] == "1"
                 let file = Book(); file.id = StableIdentity.uuid(for: "mihbara-fixture-editable-file")
-                file.title = "ملف قابل للتعديل"; file.author = "نص اختباري"; file.kind = "file"; file.format = "epub"; file.shelf = "reading"; file.pages = 90; file.updatedAt = now
+                file.title = "ملف قابل للتعديل"; file.author = "نص اختباري"; file.kind = "file"; file.format = "epub"; file.shelf = "reading"
+                file.pages = nearEnd ? 200 : 90
+                if nearEnd {
+                    file.mediaID = StableIdentity.uuid(for: "mihbara-fixture-near-end-media")
+                    file.fileHash = String(repeating: "a", count: 64)
+                    file.locatorJSON = try JSONSerialization.data(withJSONObject: ["locations": ["totalProgression": 0.995]])
+                }
+                file.updatedAt = now.addingTimeInterval(nearEnd ? 60 : 0)
                 c.insert(file)
             }
             let old = Book(); old.title = "قراءة قديمة"; old.author = "من مكتبتك"; old.shelf = "old"; old.finishedAt = ISO8601DateFormatter().date(from: "2016-10-01T12:00:00Z"); c.insert(old)

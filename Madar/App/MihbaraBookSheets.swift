@@ -41,10 +41,18 @@ enum MihbaraCopy {
         let left = total - read
         return pagesLeft(left, digits) + "، " + readingTime(pages: left, digits)
     }
-    /// How far into a file book the reader is, as pages: progress × the stored page count.
+    /// A whole-number percent can round to 100 while a page remains; hold that label at 99 until completion.
+    static func progressPercent(_ progress: Double?) -> Int? {
+        guard let progress, progress.isFinite else { return nil }
+        let bounded = min(1, max(0, progress))
+        guard bounded > 0 else { return nil }
+        return bounded >= 1 ? 100 : min(99, Int((bounded * 100).rounded()))
+    }
+    /// Whole pages reached, rounded down so an unfinished final page never vanishes.
     static func pagesRead(_ book: MihbaraBook) -> Int? {
-        guard let total = book.pages, total > 0, let progress = book.progress else { return nil }
-        return min(total, max(0, Int((progress * Double(total)).rounded())))
+        guard let total = book.pages, total > 0, let progress = book.progress, progress.isFinite else { return nil }
+        let bounded = min(1, max(0, progress))
+        return min(total, max(0, Int((bounded * Double(total)).rounded(.down))))
     }
 }
 

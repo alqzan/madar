@@ -111,15 +111,15 @@ struct MihbaraBookCover: View {
     }
 
     @ViewBuilder private func footer(ink: Color) -> some View {
-        if book.shelf == "reading", let p = book.progress, p > 0 {
+        if book.shelf == "reading", let p = book.progress, let percent = MihbaraCopy.progressPercent(p) {
             VStack(spacing: 3) {
                 GeometryReader { g in
                     ZStack(alignment: .trailing) {
                         Capsule().fill(ink.opacity(0.22))
-                        Capsule().fill(ink).frame(width: max(3, g.size.width * p))
+                        Capsule().fill(ink).frame(width: max(3, g.size.width * min(1, max(0, p))))
                     }
                 }.frame(height: 3)
-                Text(digits.string(Int((p * 100).rounded())) + "٪").font(MadarTypography.fine())
+                Text(digits.string(percent) + "٪").font(MadarTypography.fine())
             }
         } else if let size = MihbaraBookCovers.sizeWord(shape, digits) {
             Text(size).font(MadarTypography.fine()).lineLimit(1).opacity(0.9)
@@ -403,7 +403,7 @@ struct MihbaraBookSpine: View {
 
     private var footer: String {
         if let volume { return "ج " + digits.string(volume + 1) }
-        if book.shelf == "reading", let p = book.progress, p > 0 { return digits.string(Int((p * 100).rounded())) + "٪" }
+        if book.shelf == "reading", let p = MihbaraCopy.progressPercent(book.progress) { return digits.string(p) + "٪" }
         return ""
     }
 }

@@ -608,7 +608,7 @@ struct MihbaraHomeView: View {
         var parts = [b.title]
         if !b.author.isEmpty { parts.append(b.author) }
         if let size = MihbaraBookCovers.sizeWord(shapes[b.id], service.digits) { parts.append(size) }
-        if b.shelf == "reading", let p = b.progress, p > 0 { parts.append("قرأت " + service.digits.string(Int((p * 100).rounded())) + "٪") }
+        if b.shelf == "reading", let p = MihbaraCopy.progressPercent(b.progress) { parts.append("قرأت " + service.digits.string(p) + "٪") }
         if b.shelf == "old" { parts.append("قرأته قديمًا") } else if b.shelf == "finished", let year = pileYear(b) { parts.append("أنهيته في " + year.primary) }
         return parts.joined(separator: "، ")
     }
@@ -749,7 +749,7 @@ struct MihbaraHomeView: View {
     private func fileTableBook(_ b: MihbaraBook) -> some View {
         let digits = service.digits
         // AU-25: a book opened but not read yet is «لم تبدأه بعد», not «قرأت منه ٠٪».
-        let percent = b.progress.map { Int(($0 * 100).rounded()) }.flatMap { $0 > 0 ? $0 : nil }
+        let percent = MihbaraCopy.progressPercent(b.progress)
         let kind = b.format == "epub" ? "كتاب إلكتروني" : b.format == "pdfScanned" ? "ملف PDF مصوّر" : "ملف PDF"
         let total = b.pages.flatMap { $0 > 0 ? $0 : nil }
         let read = MihbaraCopy.pagesRead(b)
@@ -842,7 +842,7 @@ struct MihbaraHomeView: View {
     private func continueCard(_ b: MihbaraBook, leather: Int) -> some View {
         let digits = service.digits
         // AU-25: a book opened but not read yet is «لم تبدأه بعد», not «قرأت منه ٠٪».
-        let percent = b.progress.map { Int(($0 * 100).rounded()) }.flatMap { $0 > 0 ? $0 : nil }
+        let percent = MihbaraCopy.progressPercent(b.progress)
         let read = (b.isReadableEPUB || b.isReadablePDF) ? MihbaraCopy.pagesRead(b) : b.page
         let total = b.pages.flatMap { $0 > 0 ? $0 : nil }
         let where_: String = {
@@ -944,7 +944,7 @@ struct MihbaraHomeView: View {
                 Text(b.title).font(MadarTypography.fine()).lineLimit(2).multilineTextAlignment(.center)
                 HStack(spacing: 4) {
                     Text(libraryShelfName(b.shelf))
-                    if let p = b.progress, b.shelf != "finished", p > 0 { Text(service.digits.string(Int((p * 100).rounded())) + "٪") }
+                    if let p = MihbaraCopy.progressPercent(b.progress), b.shelf != "finished" { Text(service.digits.string(p) + "٪") }
                 }.font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                 Text(libraryDetail(b)).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).lineLimit(1)
                     .minimumScaleFactor(0.85)
@@ -966,7 +966,7 @@ struct MihbaraHomeView: View {
                             Spacer(minLength: 8)
                             VStack(alignment: .trailing, spacing: 3) {
                                 Text(libraryShelfName(b.shelf)).font(MadarTypography.fine())
-                                if let p = b.progress, b.shelf != "finished", p > 0 { Text(service.digits.string(Int((p * 100).rounded())) + "٪").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
+                                if let p = MihbaraCopy.progressPercent(b.progress), b.shelf != "finished" { Text(service.digits.string(p) + "٪").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk) }
                             }
                         }.padding(16).background(theme.surface, in: .rect(cornerRadius: 14))
                     }.buttonStyle(.plain).opacity(libraryMatches(b) ? 1 : 0.3)

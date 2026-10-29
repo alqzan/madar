@@ -315,12 +315,13 @@ import UIKit
         let keep = app.alerts.buttons["أبقه PDF"].firstMatch
         if keep.waitForExistence(timeout: 15) { keep.tap() }
     }
-    private func app(_ fixture: String, epub: Data? = nil, paperIndex: Bool = false, storeID: String? = nil, pdf: Data? = nil, fileRow: Bool = false) -> XCUIApplication {
+    private func app(_ fixture: String, epub: Data? = nil, paperIndex: Bool = false, storeID: String? = nil, pdf: Data? = nil, fileRow: Bool = false, fileNearEnd: Bool = false) -> XCUIApplication {
         let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID":storeID ?? UUID().uuidString,"MADAR_UI_MIHBARA_FIXTURE":fixture,"MADAR_UI_NOW":"2026-10-17T12:00:00+03:00","MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light"]
         if let epub { app.launchEnvironment["MADAR_UI_MIHBARA_EPUB_BASE64"] = epub.base64EncodedString() }
         if let pdf { app.launchEnvironment["MADAR_UI_MIHBARA_IMPORT_PDF"] = pdf.base64EncodedString() }
         if paperIndex { app.launchEnvironment["MADAR_UI_MIHBARA_PAPER_INDEX_FIXTURE"] = "1" }
-        if fileRow { app.launchEnvironment["MADAR_UI_MIHBARA_FILE_ROW"] = "1" }
+        if fileRow || fileNearEnd { app.launchEnvironment["MADAR_UI_MIHBARA_FILE_ROW"] = "1" }
+        if fileNearEnd { app.launchEnvironment["MADAR_UI_MIHBARA_FILE_NEAR_END"] = "1" }
         return app
     }
     private func open(_ app: XCUIApplication) {
@@ -484,6 +485,34 @@ import UIKit
         XCTAssertTrue(wantBook.waitForExistence(timeout: 8), app.debugDescription); wantBook.tap()
         XCTAssertTrue(app.textFields["mihbara-library-search"].waitForNonExistence(timeout: 8), "Dismiss the library before opening book details.")
         XCTAssertTrue(app.buttons["mihbara-paper-start"].waitForExistence(timeout: 8), app.debugDescription)
+    }
+    func testFileBookNearEndShowsOnePageRemainingUntilComplete() {
+        continueAfterFailure = false
+        let app = app("home", fileNearEnd: true); app.launch(); open(app)
+        let remaining = app.staticTexts["بقيت صفحة واحدة"]
+        XCTAssertTrue(remaining.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(app.staticTexts["أتممت قراءته"].exists, app.debugDescription)
+        let percentages = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "٪"))
+        XCTAssertTrue(percentages.firstMatch.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(percentages.allElementsBoundByIndex.contains { $0.label.contains("٩٩") }, app.debugDescription)
+        let continueBook = app.buttons.matching(NSPredicate(format: "identifier == %@ AND label CONTAINS %@", "mihbara-book-continue", "أكمل من صفحة ٢٠٠")).firstMatch
+        XCTAssertTrue(continueBook.waitForExistence(timeout: 8), app.debugDescription)
+        shot(app, "AU-87-file-near-end-L")
+        let library = app.buttons["mihbara-library"]
+        let bottomBar = app.tabBars.firstMatch
+        let clearOfBottomBar = bottomBar.frame.minY - 16
+        for _ in 0..<5 where library.frame.maxY > clearOfBottomBar { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(library.isHittable, app.debugDescription)
+        XCTAssertLessThan(library.frame.maxY, clearOfBottomBar, app.debugDescription)
+        library.tap()
+        XCTAssertTrue(app.textFields["mihbara-library-search"].waitForExistence(timeout: 8), app.debugDescription)
+        let file = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "mihbara-library-book-", "ملف قابل للتعديل")).firstMatch
+        XCTAssertTrue(file.waitForExistence(timeout: 8), app.debugDescription)
+        let fileLabel = file.label.unicodeScalars.filter { ![0x200E, 0x200F, 0x2066, 0x2067, 0x2068, 0x2069].contains($0.value) }.map(String.init).joined()
+        XCTAssertTrue(fileLabel.contains("٩٩٪"), fileLabel)
+        XCTAssertFalse(fileLabel.contains("١٠٠٪"), fileLabel)
+        shot(app, "AU-87-file-near-end-library-L")
+        app.terminate()
     }
     func testEmptyShelfPaperAddAndUndo() {
         continueAfterFailure = false; let app = app("empty"); app.launch(); open(app); shot(app,"M6-V01-empty-L")
