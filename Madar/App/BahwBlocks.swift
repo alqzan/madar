@@ -560,8 +560,13 @@ struct BahwBlockView: View {
             Circle().stroke(lobby.line, lineWidth: 5)
             Circle().trim(from: 0, to: service.upcomingCloseness(daysLeft: item.daysLeft)).stroke(lobby.color("clay"), style: .init(lineWidth: 5, lineCap: .round)).rotationEffect(.degrees(-90))
             VStack(spacing: 0) {
+                // AU-32: on the day itself the ring says «اليوم», not a «٠» that reads as nothing.
+                if item.elapsedDays == nil && item.daysLeft == 0 {
+                    Text("اليوم").font(.custom("thmanyahserifdisplay-Bold", size: diameter * 0.24, relativeTo: .title2)).minimumScaleFactor(0.51)
+                } else {
                 Text(digits.string(item.count)).font(.custom("thmanyahserifdisplay-Bold", size: diameter * 0.34, relativeTo: .title2)).minimumScaleFactor(0.51)
-                Text(item.elapsedDays.map(service.sinceCount) ?? (item.daysLeft == 0 ? "اليوم" : service.dayCount(item.daysLeft))).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(lobby.secondaryInk)
+                Text(item.elapsedDays.map(service.sinceCount) ?? service.dayCount(item.daysLeft)).font(.custom("thmanyahsans-Regular", size: 11, relativeTo: .caption2)).foregroundStyle(lobby.secondaryInk)
+                }
             }
         }.frame(width: diameter, height: diameter).accessibilityHidden(true)
     }

@@ -81,6 +81,13 @@ struct BahwLobbyView: View {
                     BahwGridLayout(placements: placements) {
                         ForEach(visible, id: \.self) { block in tile(block, size: layout.size(block)) }
                     }
+                    // AU-32: hiding every widget leaves a way back, not a blank lobby.
+                    if visible.isEmpty && !arranging {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("أخفيت كل الودجات").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
+                            Button("أظهر الودجات المخفية") { arranging = true; drawerOpen = true }.font(MadarTypography.body().bold()).frame(minHeight: 44).accessibilityIdentifier("bahw-show-hidden")
+                        }.frame(maxWidth: .infinity, alignment: .leading)
+                    }
                     if !arranging {
                         SavedLobbyWidgets(session: session)
                         BahwSuggestionsView(session: session)
