@@ -16,6 +16,8 @@ struct MoneyMessagesView: View {
     @State private var reading: MoneyMessagesReading?
     @State private var failure: String?
     @State private var note: String?
+    @State private var deleteFailureID: UUID?
+    @State private var injectedDeleteFailure = false
     @State private var categorizing: MoneyMessageDraft?
     @State private var rulesOpen = false
     @State private var guideOpen = false
@@ -256,6 +258,10 @@ struct MoneyMessagesView: View {
                         Image(systemName: "xmark").font(.body).foregroundStyle(theme.secondaryInk).frame(width: 44, height: 44).overlay { Circle().stroke(theme.line, lineWidth: 1.2) }
                     }.buttonStyle(.plain).accessibilityLabel("احذف " + d.title).accessibilityIdentifier("money-draft-delete")
                 }.environment(\.layoutDirection, .leftToRight)
+                if deleteFailureID == d.id {
+                    Text("تعذّر حذف الحركة.").font(MadarTypography.fine()).foregroundStyle(theme.color("dueText"))
+                        .accessibilityIdentifier("money-draft-delete-error")
+                }
             }
         }.padding(.horizontal, 12).padding(.vertical, 10).background(theme.surface).overlay { TicketEdge().stroke(theme.line, lineWidth: 1) }
             .accessibilityElement(children: .contain).accessibilityIdentifier("money-draft-" + d.title)
@@ -324,8 +330,28 @@ struct MoneyMessagesView: View {
     }
     private func run(_ name: String, _ payload: [String: MadarCore.JSONValue], successNote: String? = nil) {
         Task {
-            do { try await app.executeMoneyCommand(name, payload: payload); note = successNote }
-            catch { note = name == "money.applyStatement" ? "المبلغ يختلف عن كشف قريب لهذه البطاقة؛ راجع البطاقة أو تجاهل الرسالة" : "لم يُحفظ: الحركة تحتاج اختيارًا قبل اعتمادها" }
+            do {
+                #if DEBUG
+                let environment = ProcessInfo.processInfo.environment
+                if name == "money.deleteTransaction", !injectedDeleteFailure,
+                   environment["MADAR_UI_MONEY_DELETE_FAILURE_ONCE"] == "1",
+                   environment["MADAR_UI_MONEY_FIXTURE"] == "messages",
+                   environment["MADAR_UI_STORE_ID"] != nil {
+                    injectedDeleteFailure = true
+                    throw CocoaError(.fileReadUnknown)
+                }
+                #endif
+                try await app.executeMoneyCommand(name, payload: payload)
+                if name == "money.deleteTransaction" { deleteFailureID = nil }
+                note = successNote
+            } catch {
+                if name == "money.deleteTransaction" {
+                    if case .string(let rawID)? = payload["id"] { deleteFailureID = UUID(uuidString: rawID) }
+                    note = nil
+                }
+                else if name == "money.applyStatement" { note = "المبلغ يختلف عن كشف قريب لهذه البطاقة؛ راجع البطاقة أو تجاهل الرسالة" }
+                else { note = "لم يُحفظ: الحركة تحتاج اختيارًا قبل اعتمادها" }
+            }
             load()
         }
     }

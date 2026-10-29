@@ -74,6 +74,31 @@ import UIKit
         XCTAssertTrue(chip.label.contains("بقالة"), "The successful retry persists the category")
     }
 
+    func testDeleteFailureShowsDeleteMessageAndKeepsDraftForRetry() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": "messages",
+            "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-16T20:00:00+03:00",
+            "MADAR_UI_MONEY_DELETE_FAILURE_ONCE": "1"]
+        app.launch()
+        let tab = app.buttons["tab-customize"]; XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
+        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("المال")
+        let money = app.buttons["money-open"]; XCTAssertTrue(money.waitForExistence(timeout: 5)); money.tap()
+        let tray = app.descendants(matching: .any)["money-pending"]; XCTAssertTrue(tray.waitForExistence(timeout: 10)); tray.tap()
+        let draft = app.descendants(matching: .any)["money-draft-مخبز الحي"]
+        let delete = draft.buttons["money-draft-delete"]
+        XCTAssertTrue(delete.waitForExistence(timeout: 10), app.debugDescription)
+        delete.tap()
+        let note = app.staticTexts["money-draft-delete-error"]
+        XCTAssertTrue(note.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertEqual(note.label, "تعذّر حذف الحركة.")
+        XCTAssertTrue(note.isHittable, app.debugDescription)
+        XCTAssertTrue(draft.exists, "A failed delete must leave the draft available")
+        shot(app, "AU-73-draft-delete-failure-L")
+        draft.buttons["money-draft-delete"].tap()
+        XCTAssertTrue(draft.waitForNonExistence(timeout: 10), app.debugDescription)
+    }
+
     func testPasteOverFiveHundredMessagesIsRejectedWithoutPartialImport() throws {
         continueAfterFailure = false
         let sample = "شراء مدى\n*3333\n18.00 SAR\nلدى: Coffee\n2026-10-16 12:00"
