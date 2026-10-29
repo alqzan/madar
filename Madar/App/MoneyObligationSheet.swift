@@ -113,7 +113,7 @@ struct MoneyObligationSheet: View {
                     Text("فاتورة").tag("bill"); Text("اشتراك").tag("subscription"); Text("قرض").tag("loan"); Text("تقسيط").tag("installment")
                 }.pickerStyle(.segmented).accessibilityIdentifier("money-obligation-kind")
                 field("الاسم") {
-                    TextField(placeholder, text: $name).focused($field, equals: .name).accessibilityIdentifier("money-obligation-name")
+                    TextField(placeholder, text: $name).focused($field, equals: .name).accessibilityIdentifier("money-obligation-name").onChange(of: name) { errorMessage = nil }
                 }
                 if suggestion != nil && !numbersVisible {
                     VStack(alignment: .leading, spacing: 6) {
@@ -130,7 +130,7 @@ struct MoneyObligationSheet: View {
                     field(recurring ? "المبلغ في كل مرة" : "مبلغ القسط") {
                         TextField("٠", text: $rawAmount).keyboardType(.decimalPad).focused($field, equals: .amount)
                             .accessibilityIdentifier("money-obligation-amount")
-                            .onChange(of: rawAmount) { amountWasEdited = true }
+                            .onChange(of: rawAmount) { amountWasEdited = true; errorMessage = nil }
                     }
                 }
                 if !recurring {

@@ -37,7 +37,7 @@ struct QuranMushafView: View {
                         .accessibilityAction(named: "إظهار الأدوات") { tools = true }
                         .accessibilityScrollAction { edge in if edge == .leading { move(1) } else if edge == .trailing { move(-1) } }
                 } else if let error {
-                    VStack(spacing: 16) { Text(error); Button("حاول مرة أخرى") { Task { await load() } }; Button("رجوع", action: close) }.padding(24)
+                    VStack(spacing: 16) { Text(error); Button("حاول مرة أخرى") { self.error = nil; Task { await load() } }; Button("رجوع", action: close) }.padding(24)
                 } else { ProgressView() }
                 // AU-18: while the page loads there is no page to tap, so the close stays visible.
                 if tools || (page == nil && error == nil) { controls }
@@ -85,7 +85,7 @@ struct QuranMushafView: View {
         Button(action: action) { Image(systemName: symbol).font(.system(size: 17, weight: .medium)).frame(width: 44, height: 44) }
             .buttonStyle(.plain).accessibilityLabel(label).accessibilityIdentifier(id)
     }
-    private func move(_ delta: Int) { let next = min(604, max(1, number + delta)); if next != number { number = next; page = nil; zoom = 1; pan = .zero } }
+    private func move(_ delta: Int) { let next = min(604, max(1, number + delta)); if next != number { number = next; page = nil; error = nil; zoom = 1; pan = .zero } }
     private func load() async {
         let requested = number
         do { let loaded = try await service.page(requested); guard number == requested else { return }; page = loaded; error = nil }

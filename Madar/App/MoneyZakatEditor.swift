@@ -33,7 +33,13 @@ struct MoneyZakatEditor: View {
     private func money(_ raw: String) -> Int? { raw.isEmpty ? nil : MoneyAmountInput.minor(raw, exponent: exponent) }
     private var valid: Bool {
         basisChosen && (gold.isEmpty || money(gold).map { $0 > 0 } == true) && (silver.isEmpty || money(silver).map { $0 > 0 } == true)
-            && MoneyAmountInput.minor(goldWeight, exponent:3).map { $0 > 0 } == true && MoneyAmountInput.minor(silverWeight, exponent:3).map { $0 > 0 } == true && money(other) != nil
+            && MoneyAmountInput.minor(goldWeight, exponent:3).map { $0 > 0 } == true && MoneyAmountInput.minor(silverWeight, exponent:3).map { $0 > 0 } == true && (other.isEmpty || money(other) != nil)
+    }
+    private var waiting: String? {
+        if !basisChosen { return "اختر أساس النصاب لتحفظ" }
+        if !numbersVisible { return "أظهر الأرقام لتحفظ" }
+        if valid { return nil }
+        return "اكتب وزن النصاب بالغرام، وأرقامًا صحيحة في الأسعار"
     }
     var body: some View {
         NavigationStack { ScrollView { VStack(alignment:.leading,spacing:16) {
@@ -41,11 +47,11 @@ struct MoneyZakatEditor: View {
             Text("أساس النصاب").font(MadarTypography.section())
             HStack { Button("ذهب ٢٤ قيراطًا") { selectedBasis = .gold; basisChosen = true }.accessibilityIdentifier("money-zakat-editor-gold");Spacer();Button("فضة") { selectedBasis = .silver; basisChosen = true }.accessibilityIdentifier("money-zakat-editor-silver") }.font(MadarTypography.body())
             if basisChosen { Text(selectedBasis == .gold ? "اخترت الذهب عيار ٢٤" : "اخترت الفضة").font(MadarTypography.caption()).foregroundStyle(theme.color("reserveText")) }
-            if selectedBasis == .gold { field("سعر غرام الذهب عيار ٢٤، بعملة البيت", $gold, "gold-price"); field("وزن النصاب بالغرام", $goldWeight, "gold-weight") }
-            else { field("سعر غرام الفضة، بعملة البيت", $silver, "silver-price"); field("وزن النصاب بالغرام", $silverWeight, "silver-weight") }
+            if selectedBasis == .gold { field("سعر غرام الذهب عيار ٢٤، بعملة البيت", $gold, "gold-price"); field("وزن النصاب بالغرام", $goldWeight, "gold-weight", placeholder: "٨٥") }
+            else { field("سعر غرام الفضة، بعملة البيت", $silver, "silver-price"); field("وزن النصاب بالغرام", $silverWeight, "silver-weight", placeholder: "٥٩٥") }
             Button("أعد وزني النصاب إلى المتفق عليهما") { goldWeight=service.moneyInput(85000,exponent:3);silverWeight=service.moneyInput(595000,exponent:3) }.font(MadarTypography.caption()).frame(minHeight:44)
             Text("المظاريف داخل الحسابات أصلًا").font(MadarTypography.section())
-            if numbersVisible { field("أموال أخرى تُزكّى، بعملة البيت", $other, "other") }
+            if numbersVisible { field("أموال أخرى تُزكّى، بعملة البيت", $other, "other", placeholder: "٠") }
             else {
                 // The saved other-assets total stays hidden like every amount until the numbers are revealed.
                 Text("أموالك الأخرى المحفوظة مخفية حتى تُظهر الأرقام.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
@@ -60,13 +66,15 @@ struct MoneyZakatEditor: View {
             }
             Text("مدار لا يستنتج اكتمال الحول من الرصيد؛ هذا تاريخ تختاره للمحاسبة السنوية.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
             if let failure {Text(failure).font(MadarTypography.caption())}
+            // AU-34: a dimmed save names what it still waits for.
+            if !saving, let waiting {Text(waiting).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-zakat-waiting")}
             Button(action:save) {Text(saving ? "جارٍ الحفظ…" : "احفظ بيانات الحساب").font(MadarTypography.body()).frame(maxWidth:.infinity,minHeight:50).background(theme.ink).foregroundStyle(theme.background)}.disabled(saving || !valid || !numbersVisible).accessibilityIdentifier("money-zakat-save")
         }.padding(22) }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.plain).scrollDismissesKeyboard(.interactively)
             .toolbar {ToolbarItemGroup(placement:.keyboard){Spacer();Button("تمّ"){focused=false}.accessibilityIdentifier("money-zakat-keyboard-done")}}
             .task {let i=reading.input;selectedBasis=basis;basisChosen=chosen;selectedDebt=debt;gold=i.goldPricePerGramMinor.map{service.moneyInput($0)} ?? "";silver=i.silverPricePerGramMinor.map{service.moneyInput($0)} ?? "";goldWeight=service.moneyInput(i.nisabMg,exponent:3);silverWeight=service.moneyInput(i.nisabSilverMg,exponent:3);other=service.moneyInput(i.otherAssetsMinor);hasHawl = !(i.hawlStartHijri ?? "").isEmpty;date=MoneyHawl.read(i.hawlStartHijri ?? "",app:app)?.chosen.date(in:app.activePlace.timeZone) ?? app.prayerNow()}
         }
     }
-    private func field(_ title:String,_ binding:Binding<String>,_ id:String)->some View {VStack(alignment:.leading,spacing:5){Text(title).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk);TextField("اختياري",text:binding).font(MadarTypography.body()).keyboardType(.decimalPad).focused($focused).padding(10).background(theme.surface).accessibilityIdentifier("money-zakat-"+id)}}
+    private func field(_ title:String,_ binding:Binding<String>,_ id:String,placeholder:String="اختياري")->some View {VStack(alignment:.leading,spacing:5){Text(title).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk);TextField(placeholder,text:binding).font(MadarTypography.body()).keyboardType(.decimalPad).focused($focused).padding(10).background(theme.surface).accessibilityIdentifier("money-zakat-"+id)}}
     private func save(){
         guard valid, numbersVisible else{return};focused=false;saving=true
         let h=HijriCalendar.date(for:date,timeZone:app.activePlace.timeZone,source:HijriSource(rawValue:app.string("core.hijriSource")) ?? .ummAlQura,sightingOffset:Int(app.number("core.hijriOffset")))

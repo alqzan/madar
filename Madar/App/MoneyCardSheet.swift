@@ -31,6 +31,14 @@ struct MoneyCardSheet: View {
             && name.count <= 80 && bank.count <= 80 && digits.count == 4 && digits.allSatisfy(\.isASCII) && (kind == "credit" || accountID != nil)
     }
 
+    private var waiting: String? {
+        if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "اكتب اسم البطاقة لتحفظها" }
+        if bank.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "اكتب اسم البنك لتحفظها" }
+        if digits.count != 4 || !digits.allSatisfy(\.isASCII) { return "اكتب آخر أربعة أرقام من البطاقة" }
+        if kind != "credit" && accountID == nil && !accounts.isEmpty { return "اختر الحساب الذي تُخصم منه" }
+        return nil
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -47,7 +55,7 @@ struct MoneyCardSheet: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(kind == "credit" ? "تُسدَّد من حساب (اختياري)" : "تُخصم من حساب").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
                         if accounts.isEmpty {
-                            Text("لا حسابات بعد. أضف حسابك من «الحسابات» أولًا.").font(MadarTypography.body()).accessibilityIdentifier("money-card-no-accounts")
+                            Text(kind == "credit" ? "لا حسابات بعد؛ يمكنك حفظها بلا حساب سداد." : "لا حسابات بعد. أضف حسابك من «الحسابات» أولًا، أو اختر «ائتمانية» إن لم يكن لها حساب.").font(MadarTypography.body()).accessibilityIdentifier("money-card-no-accounts")
                         } else {
                             ForEach(accounts, id: \.id) { account in
                                 Button { accountID = accountID == account.id && kind == "credit" ? nil : account.id } label: {
@@ -65,6 +73,8 @@ struct MoneyCardSheet: View {
                     }
                     field("كيف يكتب البنك اسمها في الرسائل، اسم في كل سطر (اختياري)") { TextField("مثل: مدى ٣٣١٧", text: $senders, axis: .vertical).lineLimit(1...4).focused($editing).accessibilityIdentifier("money-card-aliases") }
                     if let failure { Text(failure).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")).accessibilityIdentifier("money-card-error") }
+                    // AU-34: a dimmed save names the first thing it still waits for.
+                    if !canSave && !saving, let waiting { Text(waiting).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-card-waiting") }
                     Button(action: save) { Text(saving ? "جارٍ الحفظ…" : "احفظ البطاقة").font(MadarTypography.cardTitle()).frame(maxWidth: .infinity, minHeight: 54).background(theme.ink.opacity(canSave ? 1 : 0.35)).foregroundStyle(theme.background) }
                         .disabled(!canSave).accessibilityIdentifier("money-card-save")
                 }.padding(20)

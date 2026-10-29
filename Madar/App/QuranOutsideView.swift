@@ -14,8 +14,13 @@ struct QuranOutsideView: View {
             VStack(alignment: .leading, spacing: 16) {
                 HStack { Button("رجوع", action: close).frame(minHeight: 44); Spacer(); Text("التذكير والودجات").font(MadarTypography.cardTitle()) }
                 if let value {
-                    if app.string("quran.wirdReminder") != "off" { reminder(QuranReminderCopy.title, detail: QuranReminderCopy.body, timing: reminderTitle) }
-                    if app.bool("quran.lateReminder") { reminder(QuranReminderCopy.lateTitle, detail: QuranReminderCopy.lateBody, timing: "بعد العصر") }
+                    // AU-34: the preview never promises a reminder this device will not send.
+                    if app.bool("notif.thisDeviceReminders") && app.notificationsAuthorized {
+                        if app.string("quran.wirdReminder") != "off" { reminder(QuranReminderCopy.title, detail: QuranReminderCopy.body, timing: reminderTitle) }
+                        if app.bool("quran.lateReminder") { reminder(QuranReminderCopy.lateTitle, detail: QuranReminderCopy.lateBody, timing: "بعد العصر") }
+                    } else if app.string("quran.wirdReminder") != "off" || app.bool("quran.lateReminder") {
+                        Text("التذكيرات متوقفة على هذا الجهاز؛ شغّلها من «التذكير» أدناه").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("quran-reminders-off")
+                    }
                     HStack(spacing: 14) { preview(value, .coverage, height: 170); preview(value, .path, height: 170) }
                     preview(value, .week, height: 150)
                 }

@@ -53,12 +53,12 @@ struct QuranFreeView: View {
                         QuranPageMap(pages: pages, selected: range) { page in
                             userSelectedRange = true
                             selectLastAfterIndex = false
-                            if pickingEnd { through = page; pickingEnd = false } else { from = page; through = page; pickingEnd = true }
+                            if pickingEnd { through = page; pickingEnd = false; if through < from { swap(&from, &through) } } else { from = page; through = page; pickingEnd = true }
                         }.disabled(busy)
                         Text("في صدرك: مصمت، راجعته: نقطة، المستحق: خط مائل، الاختيار: إطار").font(quranFont(11)).foregroundStyle(theme.secondaryInk)
-                        Stepper("من الوجه " + service.numerals.string(from), value: Binding(get: { from }, set: { from = $0; userSelectedRange = true; selectLastAfterIndex = false }), in: 1...604)
+                        Stepper("من الوجه " + service.numerals.string(from), value: Binding(get: { from }, set: { from = $0; through = max(through, $0); userSelectedRange = true; selectLastAfterIndex = false }), in: 1...604)
                             .disabled(busy).accessibilityIdentifier("quran-free-from")
-                        Stepper("إلى الوجه " + service.numerals.string(through), value: Binding(get: { through }, set: { through = $0; userSelectedRange = true; selectLastAfterIndex = false }), in: 1...604)
+                        Stepper("إلى الوجه " + service.numerals.string(through), value: Binding(get: { through }, set: { through = $0; from = min(from, $0); userSelectedRange = true; selectLastAfterIndex = false }), in: 1...604)
                             .disabled(busy).accessibilityIdentifier("quran-free-through")
                     }.font(quranFont(14))
                 }
@@ -105,8 +105,9 @@ struct QuranFreeView: View {
     }
     private var surahs: [(Int,String)] { guard let catalog = try? QuranResources.catalog() else { return [] }; return Dictionary(grouping:catalog.ayahs,by:\.surahID).sorted { $0.key < $1.key }.map { ($0.key,$0.value[0].surahNameArabic) } }
     private func selectLastPages(_ indexed: [QuranUIIndexItem]) {
-        let last = indexed.filter(\.memorized).map(\.firstPage).max() ?? 1
-        through = last; from = max(1, last - 4)
+        // AU-34: with nothing memorised the preset says why it cannot pick, instead of silently choosing page 1.
+        guard let last = indexed.filter(\.memorized).map(\.firstPage).max() else { error = "لا شيء في صدرك بعد؛ اختر سورة أو نطاقًا للقراءة"; return }
+        error = nil; through = last; from = max(1, last - 4)
     }
     private func selectSurah(_ id: Int) { guard let ayahs = try? QuranResources.catalog().ayahs.filter({ $0.surahID == id }),let first=ayahs.first,let last=ayahs.last else { return };from=first.page;through=last.page;userSelectedRange = true;selectLastAfterIndex = false }
     private func selectJuz(_ n: Int) { guard let ayahs = try? QuranResources.catalog().ayahs.filter({ $0.juz == n }),let first=ayahs.first,let last=ayahs.last else { return };from=first.page;through=last.page;userSelectedRange = true;selectLastAfterIndex = false }

@@ -33,6 +33,8 @@ struct MoneyTripRateSheet: View {
             if let at = reading.rateAt { VStack(alignment: .leading, spacing: 3) { Text("آخر سعر أدخلته").font(MadarTypography.caption()); MadarDateLabel(app.dateLabels(.containing(at, in: app.activePlace.timeZone)), primaryFont: MadarTypography.caption(), secondaryFont: MadarTypography.fine()); Text(service.time(at)).font(MadarTypography.fine()) }.foregroundStyle(theme.secondaryInk) }
             Text("السعر يدوي. يُحفظ مع كل حركة وقت تسجيلها؛ تغيير هذا السعر لا يغيّر مصروفاتك السابقة.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
             if let failure { Text(failure).font(MadarTypography.caption()) }
+            // AU-34: hidden numbers say why save waits.
+            if !visible { Text("أرقامك مخفية؛ أظهرها من صفحة الرحلة لتحفظ").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-trip-hidden-hint") }
             Button { save() } label: { Text(saving ? "جارٍ الحفظ…" : "احفظ السعر").frame(maxWidth: .infinity, minHeight: 50).background(theme.ink).foregroundStyle(theme.background) }.disabled(saving || rate == nil || !visible).accessibilityIdentifier("money-trip-rate-save")
             if reading.currency != app.string("core.currency"), reading.rate != nil {
                 Button("معاينة تطبيق السعر المحفوظ على حركات الرحلة") {
@@ -113,6 +115,8 @@ struct MoneyTripFundingSheet: View {
                 Text("هذا موعد للخطة فقط؛ عودتك الفعلية تُنهي حالة السفر لكل الغرف.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
             }
             if let failure { Text(failure).font(MadarTypography.caption()) }
+            // AU-34: hidden numbers say why save waits.
+            if !visible { Text("أرقامك مخفية؛ أظهرها من صفحة الرحلة لتحفظ").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-trip-hidden-hint") }
             Button { save() } label: { Text("انقل للمظروف").frame(maxWidth: .infinity, minHeight: 50).background(theme.ink).foregroundStyle(theme.background) }.disabled(saving || !visible || minor.map { $0 > 0 && $0 <= available } != true).accessibilityIdentifier("money-trip-fund-save")
         }.padding(22) }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.plain).scrollDismissesKeyboard(.interactively)
             .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تمّ") { focused = false }.accessibilityIdentifier("money-trip-keyboard-done") } }

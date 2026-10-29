@@ -58,6 +58,8 @@ struct MoneyAccountSheet: View {
                     if draft.ownership == "mine" { Toggle("أدخله في حساب الزكاة", isOn: $draft.zakatInclude).accessibilityIdentifier("money-account-zakat") }
                     field("أسماء مرسلي رسائل البنك، اسم في كل سطر") { TextField("أسماء المرسل", text: $senders, axis: .vertical).lineLimit(2...5).focused($editing).accessibilityIdentifier("money-account-senders") }
                     if let failure { Text(failure).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")) }
+                    // AU-34: the reason sits beside the dimmed save, not only mid-form.
+                    if !saving && !draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !draft.openingKnown && balance.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { Text("أدخل رصيد البنك لتحفظ الحساب").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-account-waiting") }
                     Button(action: save) { Text(saving ? "جارٍ الحفظ…" : "احفظ الحساب").font(MadarTypography.cardTitle()).frame(maxWidth: .infinity, minHeight: 54).background(theme.ink).foregroundStyle(theme.background) }.disabled(saving || draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || (!draft.openingKnown && balance.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)).accessibilityIdentifier("money-account-save")
                     // Item 34: an account entered by mistake goes, while nothing refers to it; the toast offers undo.
                     if !original.isNew && original.removable {
