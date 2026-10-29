@@ -41,4 +41,27 @@ import XCTest
         let hidden = open("hidden"); XCTAssertTrue(hidden.staticTexts["money-settings-preview"].label.contains("•••")); XCTAssertFalse(hidden.textFields["money-settings-allowance"].exists); shot(hidden, "M5-V20-hidden-L"); hidden.terminate()
         let empty = open("empty"); XCTAssertFalse(empty.buttons["money-settings-daily-save"].isEnabled); shot(empty, "M5-V20-unset-L")
     }
+    func testBigExpenseDraftSurvivesFigureStyleChange() throws {
+        continueAfterFailure = false
+        let app = open("expense")
+        let room = app.buttons["money-settings-page-5"]; reach(room, app: app, up: false); room.tap()
+        let rule = app.segmentedControls["money-settings-big-rule"]
+        XCTAssertTrue(rule.waitForExistence(timeout: 5)); rule.buttons["مبلغ"].tap()
+        let amount = app.textFields["money-settings-big-amount"]
+        XCTAssertTrue(amount.waitForExistence(timeout: 5)); amount.tap()
+        let count = (amount.value as? String)?.count ?? 7
+        amount.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: count) + "1200.50")
+        let done = app.buttons["money-settings-keyboard-done"]
+        XCTAssertTrue(done.waitForExistence(timeout: 5)); done.tap()
+        let draft = try XCTUnwrap(amount.value as? String)
+        let style = app.segmentedControls["money-settings-figure-style"]
+        XCTAssertTrue(style.waitForExistence(timeout: 5)); reach(style, app: app)
+        let modern = style.buttons["حديثة"]
+        modern.tap()
+        let selected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "selected == 1"), object: modern)
+        XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 10), .completed)
+        XCTAssertEqual(amount.value as? String, draft, "Changing a display-only setting must keep the unsaved threshold draft.")
+        shot(app, "AU-80-big-expense-draft-kept-L")
+        app.terminate()
+    }
 }

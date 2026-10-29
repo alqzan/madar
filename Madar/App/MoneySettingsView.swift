@@ -71,7 +71,7 @@ struct MoneySettingsView: View {
                             case .room: roomPage
                             case .reconciliation: reconciliationPage
                             }
-                            Button("أعد إعدادات هذا الباب إلى المتفق عليه") { editing = false; app.reset(keys) }.font(MadarTypography.caption()).frame(minHeight: 44).accessibilityIdentifier("money-settings-reset")
+                            Button("أعد إعدادات هذا الباب إلى المتفق عليه") { editing = false; app.reset(keys) { load() } }.font(MadarTypography.caption()).frame(minHeight: 44).accessibilityIdentifier("money-settings-reset")
                             Text("— " + service.digits.string(page.rawValue + 1) + " —").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk).frame(maxWidth: .infinity)
                         }.padding(20).frame(maxWidth: .infinity, alignment: .leading).background(theme.surface).overlay { RoundedRectangle(cornerRadius: 16).stroke(theme.color("reserveText"), lineWidth: 1) }
                     }
@@ -79,7 +79,7 @@ struct MoneySettingsView: View {
                 }.padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 28).frame(maxWidth: 620).frame(maxWidth: .infinity)
             }.scrollDismissesKeyboard(.interactively).background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.plain).toolbar(.hidden, for: .navigationBar, .tabBar)
                 .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("تمّ") { editing = false }.accessibilityIdentifier("money-settings-keyboard-done") } }
-                .task { load() }.onChange(of: app.prayerRevision) { load() }.onChange(of: unit) { every = min(every, unit.maxEvery) }
+                .task { load() }.onChange(of: app.prayerRevision) { refreshCycle() }.onChange(of: unit) { every = min(every, unit.maxEvery) }
                 .accessibilityIdentifier("money-settings")
         }
     }
@@ -231,8 +231,11 @@ struct MoneySettingsView: View {
     private func stringBinding(_ key: String) -> Binding<String> { .init(get: { app.string(key) }, set: { app.set(.string($0), key: key) }) }
     private func tabValue(_ p: Page) -> String { switch p { case .daily: cycle.map { amount($0.headline.todayAllowanceMinor) } ?? "—"; case .cycle: salaryDay > 0 ? service.digits.string(salaryDay) : "الراتب"; case .deficit: service.digits.string(Int(app.number("mal.offsetCapDailies"))); case .travel: app.bool("mal.travelPausesDaily") ? "تتوقف" : "تستمر"; case .messages: "الاختصار"; case .room: "خصوصيتك"; case .reconciliation: service.digits.string(Int(app.number("mal.reconcileEveryDays"))) + " يوم" } }
     private var keys: [String] { switch page { case .daily: ["mal.dailyAllowance"]; case .cycle: ["mal.salaryDay", "mal.cycleCalendar", "mal.salarySchedule"]; case .deficit: ["mal.autoOffset", "mal.offsetCapDailies", "mal.salaryRemainder", "mal.cashWithdrawalAsSpend"]; case .messages: ["mal.alert80", "mal.sinceLastVisit", "mal.cardDue", "mal.zakatReminder"]; case .travel: ["mal.travelPausesDaily"]; case .room: ["core.hideMoneyOutside", "core.hideMoneyUntilTouch", "mal.figureStyle", "mal.hawlStyle", "mal.bigExpenseRule", "mal.bigExpenseDays", "mal.bigExpenseSalaryBp", "mal.bigExpenseMinor"]; case .reconciliation: ["mal.reconcileEveryDays"] } }
-    private func load() {
+    private func refreshCycle() {
         cycle = try? MoneyRepository(context: ModelContext(app.container)).cycle(at: app.prayerNow())
+    }
+    private func load() {
+        refreshCycle()
         let value = app.values["mal.dailyAllowance"]?.object ?? [:]; mode = value["mode"]?.string ?? "fixed"
         if value["amountMinor"] == .null && value["percentBp"] == .null {
             mode = cycle?.input.policies.last.map { if case .percent = $0.mode { "percent" } else { "fixed" } } ?? "fixed"
