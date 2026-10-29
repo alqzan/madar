@@ -19,7 +19,7 @@ struct FirstRunView: View {
                     if step == 1 {
                         MadarCard {
                             VStack(alignment: .leading, spacing: 16) {
-                                Text(session.cityName).font(MadarTypography.section())
+                                Text(session.cityName.isEmpty ? "الرياض، حتى تختار مدينتك" : session.cityName).font(MadarTypography.section())
                                 Text("المواقيت بطريقة أم القرى").foregroundStyle(theme.secondaryInk)
                                 NavigationLink("اختر مدينة") { CityEditor(session: session) }
                                     .frame(minHeight: 44).accessibilityIdentifier("first-run-city")

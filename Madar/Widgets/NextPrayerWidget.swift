@@ -235,7 +235,8 @@ struct ConfiguredPrayerProvider:AppIntentTimelineProvider {
         let window=envelope?.payload.minuteWindow(from:now,validUntil:expiry)
         let dates=window?.dates ?? [now],refresh=window?.refreshAt ?? expiry
         var entries=dates.map{NextPrayerEntry(date:$0,snapshot:envelope?.payload,tzID:zone,template:configuration.template)}
-        entries.append(.init(date:refresh,snapshot:nil,tzID:zone,template:configuration.template))
+        // The empty «افتح مدار» entry only where the snapshot really expires, not at each eight-hour refresh.
+        if envelope == nil || refresh >= expiry { entries.append(.init(date:refresh,snapshot:nil,tzID:zone,template:configuration.template)) }
         return Timeline(entries:entries,policy:.after(refresh))
     }
     private func load(_ config:PrayerWidgetConfiguration)->NextPrayerEntry{

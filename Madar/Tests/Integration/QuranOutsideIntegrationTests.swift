@@ -55,7 +55,8 @@ import MadarSnapshots
         XCTAssertEqual(app.selectedTab, "quran"); XCTAssertEqual(app.quranRoute?.path, ["page", "285"])
         app.quranRoute = nil; app.errorMessage = nil
         app.open(URL(string: "madar://quran/fihris")!)
-        XCTAssertNil(app.quranRoute); XCTAssertNotNil(app.errorMessage)
+        // A valid link without its own screen opens its room instead of an error (29 Oct 2026).
+        XCTAssertNil(app.quranRoute); XCTAssertNil(app.errorMessage); XCTAssertEqual(app.selectedTab, "quran")
         XCTAssertEqual(try ModelContext(app.container).fetchCount(FetchDescriptor<HifzSession>()), 1)
     }
     func testQuranWidgetSnapshotIsRemovedUnderWholeAppLockAndReturnsAfterUnlock() async throws {

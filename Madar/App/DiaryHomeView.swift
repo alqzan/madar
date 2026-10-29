@@ -82,7 +82,12 @@ struct DiaryHomeView: View {
                         }
                     }
                     }
-                } else if let failure { Text(failure).font(DiaryType.writing) }
+                } else if let failure {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(failure).font(DiaryType.writing)
+                        Button("حاول مرة أخرى") { Task { await refresh() } }.frame(minHeight: 44).accessibilityIdentifier("diary-home-retry")
+                    }
+                }
                 else { ProgressView("تُفتح صفحتك…") }
             }.padding(.horizontal, 14).padding(.top, 8).padding(.bottom, 12)
             }

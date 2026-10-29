@@ -61,8 +61,9 @@ struct CompleteHabitIntent: AppIntent {
               let item = snapshot.items.first(where: { $0.id == habit.id }) else { throw CompleteHabitIntentError.notAvailable }
         if snapshot.periodsValidUntil <= now {
             try await continueInForeground("افتح مدار ليسجّلها في يومها الجديد.", alwaysConfirm: false)
-            await MadarIntentHandoff.shared.submit(.completeHabit(habitID: item.id, id: UUID()))
-            return .result(dialog: "سُجّلت.")
+            let applied = await MadarIntentHandoff.shared.submit(.completeHabit(habitID: item.id, id: UUID()))
+            // A held request (locked or still loading) is not yet recorded; the dialog never claims it is.
+            return .result(dialog: applied ? "سُجّلت." : "افتح مدار ليكتمل التسجيل.")
         }
         guard let group = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.alqzan.madar2") else {
             throw CompleteHabitIntentError.openMadar

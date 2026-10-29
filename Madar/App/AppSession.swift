@@ -617,6 +617,11 @@ final class AppSession {
             if route.room == .habits { habitRouteID=route.path.last.flatMap(UUID.init(uuidString:)) ?? route.parameters["habit"].flatMap(UUID.init(uuidString:)); selectedTab = "foundation"; habitsOpen = true; return }
             if route.room == .year, route.path == ["year"] { selectedTab = "foundation"; yearOpen = true; return }
             if route.room == .mihbara { selectedTab = "mihbara"; return }
+            // A valid link whose inner screen has no direct route yet opens its room, never «هذا الرابط غير متاح».
+            let roomTabs: [Room: String] = [.salah: "prayer", .quran: "quran", .notes: "notes", .mal: "money", .mihbara: "mihbara", .bahw: "foundation", .year: "foundation"]
+            if url.host == "capture" { selectedTab = "notes"; return }
+            if url.host == "search" { selectedTab = route.parameters["room"].flatMap(Room.init(rawValue:)).flatMap { roomTabs[$0] } ?? "foundation"; return }
+            if url.host != "settings", let tab = roomTabs[route.room] { selectedTab = tab; return }
             guard url.host == "settings", route.room == .core else { throw CoreError.unavailableFeature }
             settingsQuery = try schema.definition(for: route.path[1]).title
             selectedTab = "customize"

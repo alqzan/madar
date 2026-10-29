@@ -75,6 +75,7 @@ struct MihbaraTurathView: View {
     @State private var error: String?
     @State private var downloaded: URL?
     @State private var downloadedTurathID: Int?
+    @State private var downloadTask: Task<Void, Never>?
     @State private var reviewing = false
     @FocusState private var searching: Bool
     private var digits: MadarNumberFormatter { AppMihbaraService(app: app).digits }
@@ -158,6 +159,7 @@ struct MihbaraTurathView: View {
         .foregroundStyle(theme.ink).background(theme.background.ignoresSafeArea())
         .environment(\.layoutDirection, .rightToLeft).toolbarVisibility(.hidden, for: .navigationBar).statusBarHidden(true)
         .task(id: catalogueAttempt) { await load() }
+        .onDisappear { if !reviewing { downloadTask?.cancel() } }
         .onChange(of: query) { _, value in results = TurathCatalogue.search(books, query: value) }
         // Backing out of the review leaves no downloaded copy behind; an import has already copied it.
         .onChange(of: reviewing) { _, open in
@@ -258,16 +260,20 @@ struct MihbaraTurathView: View {
     private func download(_ book: TurathCatalogueBook) {
         guard downloading == nil else { return }
         downloading = book.id; error = nil; searching = false
-        Task { @MainActor in
+        downloadTask = Task { @MainActor in
             do {
                 let folder = app.bookStagingDirectory.deletingLastPathComponent().appendingPathComponent("TurathDownloads")
-                downloaded = try await MihbaraTurathSource.download(book, into: folder)
+                let file = try await MihbaraTurathSource.download(book, into: folder)
+                // Left the page while it downloaded: keep nothing behind and open nothing.
+                guard !Task.isCancelled else { try? FileManager.default.removeItem(at: file); downloading = nil; return }
+                downloaded = file
                 downloadedTurathID = book.id
                 downloading = nil; reviewing = true
             } catch TurathError.tooLarge {
                 downloading = nil; error = "هذا الكتاب أكبر من ١٥٠ م.ب؛ لا يُنزّل إلى الجهاز."
+            } catch is CancellationError { downloading = nil
             } catch {
-                downloading = nil; self.error = "تعذّر تنزيل «\(book.title)». تحقق من الاتصال وحاول مرة أخرى."
+                downloading = nil; if !Task.isCancelled { self.error = "تعذّر تنزيل «\(book.title)». تحقق من الاتصال وحاول مرة أخرى." }
             }
         }
     }

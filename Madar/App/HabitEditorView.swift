@@ -126,9 +126,13 @@ struct HabitEditorView:View {
             var saved=rule;saved.effectiveFrom=AppBahwService(session:session).today
             let english=monthDays.map { $0.wholeNumberValue.map(String.init) ?? String($0) }.joined()
             let parts=english.split(whereSeparator:{!$0.isNumber});let parsed=parts.compactMap{Int($0)}
-            guard parsed.count==parts.count,parsed.allSatisfy({(1...(saved.hijri ? 30 : 31)).contains($0)}) else{throw CoreError.invalidCommand}
+            guard parsed.count==parts.count,parsed.allSatisfy({(1...(saved.hijri ? 30 : 31)).contains($0)}) else{issue=saved.hijri ? "أيام الشهر الهجري من ١ إلى ٣٠، تفصلها فاصلة." : "أيام الشهر من ١ إلى ٣١، تفصلها فاصلة.";busy=false;return}
             saved.monthDays=Array(Set(parsed)).sorted();saved.minimum=minimumOn ? min(saved.target,saved.minimum ?? 1) : nil
             if !windowOn{saved.windowStart=nil;saved.windowEnd=nil;saved.windowAnchor=nil}else{saved.windowStart=saved.windowStart ?? 1020;saved.windowEnd=saved.windowEnd ?? 1200}
+            // Name the one thing to fix instead of one sentence for every refusal.
+            if saved.target <= 0 {issue="اجعل الهدف أكبر من صفر.";busy=false;return}
+            if let low=saved.minimum, low <= 0 || low > saved.target {issue="الحد الأدنى بين ١ والهدف.";busy=false;return}
+            if let a=saved.windowStart, let b=saved.windowEnd, a == b {issue="وقت البداية والنهاية يجب أن يختلفا.";busy=false;return}
             try saved.validate()
             let json=try JSONDecoder().decode(MadarCore.JSONValue.self,from:JSONEncoder().encode(saved))
             var p:[String:MadarCore.JSONValue]=["id":.string(id.uuidString),"name":.string(name),"rule":json,"homeOnly":.bool(homeOnly),"reminder":.string(reminder)]

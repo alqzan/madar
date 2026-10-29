@@ -1,12 +1,14 @@
 import SwiftUI
 import MadarDesign
 import MadarQuran
+import Combine
 
 /// R18 Home. RQ9 keeps one line per step and one start action; tools enter only with their screen cards.
 struct QuranHomeView: View {
     let service: AppQuranService
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicType
+    @Environment(\.scenePhase) private var scenePhase
     @State private var state: QuranRoomState?
     @State private var error: String?
     @State private var detail: HomeDetail?
@@ -82,6 +84,9 @@ struct QuranHomeView: View {
         .environment(\.roomTheme, theme)
         .accessibilityIdentifier("quran-home")
         .task { do { try await refresh() } catch { self.error = quranUserMessage(error) } }
+        // Back from the lock screen or past midnight, «مسار اليوم» and a missed day reflect the day it is now.
+        .onChange(of: scenePhase) { _, phase in if phase == .active, active == nil { run { try await refresh() } } }
+        .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged).receive(on: RunLoop.main)) { _ in if active == nil { run { try await refresh() } } }
         .onChange(of: service.app.quranRoute, initial: true) { _, route in
             guard let route else { return }; service.app.quranRoute = nil
             run {
