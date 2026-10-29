@@ -58,6 +58,29 @@ import XCTest
         XCTAssertFalse(app.buttons["quran-resume"].exists, "No draft survives a partial save")
         app.terminate()
     }
+    func testPartialExitWithOnlySlipKeepsDraftAndExplains() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-16T15:00:00+03:00", "MADAR_UI_QURAN_FIXTURE": "home"]
+        app.launch()
+        let begin = app.buttons["quran-begin"]; XCTAssertTrue(begin.waitForExistence(timeout: 20), app.debugDescription); begin.tap()
+        XCTAssertTrue(app.buttons["quran-session-advance"].waitForExistence(timeout: 15), app.debugDescription)
+        app.buttons["quran-session-full-page"].tap()
+        app.buttons["quran-session-show-tools"].tap()
+        let slip = app.buttons["quran-session-hint"]
+        XCTAssertEqual(slip.label, "تعثّرت"); slip.tap()
+        app.buttons["quran-session-close"].tap()
+        let partial = app.buttons["quran-session-save-partial"]
+        XCTAssertTrue(partial.waitForExistence(timeout: 5), app.debugDescription); partial.tap()
+        let alert = app.alerts["لم تكتمل العملية"]
+        XCTAssertTrue(alert.waitForExistence(timeout: 8), app.debugDescription)
+        let explanation = alert.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "سهواتك باقية في المسودة")).firstMatch
+        XCTAssertTrue(explanation.waitForExistence(timeout: 5), alert.debugDescription)
+        alert.buttons["تمّ"].tap()
+        app.terminate(); app.launch()
+        XCTAssertTrue(app.buttons["quran-resume"].waitForExistence(timeout: 20), app.debugDescription)
+        app.terminate()
+    }
     private func attach(_ app: XCUIApplication, _ name: String) {
         let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = name; shot.lifetime = .keepAlways; add(shot)
     }
