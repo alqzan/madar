@@ -15,7 +15,7 @@ extension AppSession {
     /// Named synthetic stores only. Never reads or writes the owner's store.
     func prepareMoneyFixture(group: URL) throws {
         let environment = ProcessInfo.processInfo.environment
-        guard let variant = environment["MADAR_UI_MONEY_FIXTURE"], ["funding", "goal", "zakat", "zakatHidden", "travel", "travelMissing", "travelHidden", "travelMultiLeg", "travelMultiLegHidden", "accounts", "expense", "showcase", "empty", "hidden", "zero", "shortfall", "messages", "salarySourceFlow", "bankCorpus", "since", "rules", "salary", "budget", "cards", "cardsHidden", "analysis", "analysisHidden", "reconcile", "reconcileHidden", "cashback", "cashbackHidden", "subscriptions", "subscriptionsHidden"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
+        guard let variant = environment["MADAR_UI_MONEY_FIXTURE"], ["funding", "goal", "zakat", "zakatHidden", "travel", "travelDupTRY", "travelDupSAR", "travelMissing", "travelHidden", "travelMultiLeg", "travelMultiLegHidden", "accounts", "expense", "showcase", "empty", "hidden", "zero", "shortfall", "messages", "salarySourceFlow", "bankCorpus", "since", "rules", "salary", "budget", "cards", "cardsHidden", "analysis", "analysisHidden", "reconcile", "reconcileHidden", "cashback", "cashbackHidden", "subscriptions", "subscriptionsHidden"].contains(variant), group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         let c = ModelContext(container)
         guard !(try c.fetch(FetchDescriptor<DeviceSetting>())).contains(where: { $0.key == "sys.moneyFixture" }) else { return }
         for key in ["sys.moneyFixture", "sys.onboardingCompleted"] { let marker = DeviceSetting(); marker.key = key; marker.valueJSON = Data("true".utf8); c.insert(marker) }
@@ -269,6 +269,15 @@ extension AppSession {
                     tx.dayKey = today.adding(days: -1).description
                     tx.eventAt = today.adding(days: -1).date(in: zone).addingTimeInterval(Double(3600 * (index + 12)))
                 }
+            }
+            if variant == "travelDupTRY" || variant == "travelDupSAR" {
+                let inTripCurrency = variant == "travelDupTRY"
+                let duplicate = MoneyTransaction(); duplicate.kind = "expense"; duplicate.source = "manual"; duplicate.reviewState = "ok"
+                duplicate.tripID = inTripCurrency ? trip.id : nil; duplicate.currency = inTripCurrency ? "TRY" : "SAR"; duplicate.homeCurrency = "SAR"
+                duplicate.amountMinor = 42_500; duplicate.homeAmountMinor = inTripCurrency ? 4_250 : 42_500
+                if inTripCurrency { duplicate.rateAtTime = "0.1"; duplicate.rateSource = "trip" }
+                duplicate.dayKey = today.description; duplicate.eventAt = now.addingTimeInterval(-300); duplicate.tzID = trip.tzID; duplicate.dayPolicy = "midnight@1"
+                duplicate.merchant = "TripTest"; duplicate.cardID = card.id; duplicate.method = "card"; duplicate.cycleID = cycle.id; c.insert(duplicate)
             }
             if multiLeg {
                 let next = Trip(); next.journeyID = trip.id; next.city = "باريس"; next.country = "فرنسا"

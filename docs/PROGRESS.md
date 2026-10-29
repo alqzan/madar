@@ -176,6 +176,7 @@ Six read-only Sonnet audits compared canonical screens with the newest screensho
 | AU-89 | إتاحة محطة الرحلة عند تكرار اسم المدينة في بلد آخر | شرط المحطة الجديدة صار يطابق المحرك: اختلاف المدينة أو البلد. عند تكرار المدينة يظهر اسم البلد بالعربية في بطاقة الوصول وخط المحطات لتمييز المكانين، وتبقى المدن الأخرى مختصرة. أُعيد إنتاج غياب الزر قبل الإصلاح (`au89-trip-same-name-r1`)، ثم اجتاز المسار العادي والمكرر 2/2 في `FoundationUITests` (`au89-trip-same-name-r4`) على `Madar M6 Work` / iOS 26.5؛ لقطات قبل/بعد L/light فُحصت؛ `git diff --check` نظيف. | fixed — awaiting owner |
 | AU-90 | منع حفظ الحساب المعروف بعد مسح رصيد بدايته | يعطّل حفظ الحساب المعروف القابل للتعديل عند فراغ رصيد البداية ويعرض «أدخل رصيد البداية لتحفظ الحساب»؛ نقطة المطابقة الثابتة تظل تستخدم رصيدها الأصلي. Verified: `MoneyAccountsUITests.testKnownEditableOpeningBalanceCannotBeClearedAndSaved` 1/1 على `Madar M6 Work` / iOS 26.5 (`au90-empty-account-opening-r5.xcresult`)؛ لقطة L/light `M5-V19-empty-opening-L` فُحصت؛ `git diff --check` نظيف. | fixed — awaiting owner |
 | AU-91 | فتح رابط عادة ثانية والغرفة مفتوحة | تستمع غرفة العادات لتغيّر `habitRouteID` غير الفارغ وتعيد القراءة، فيفتح الرابط العادة المطلوبة حتى والغرفة معروضة. Verified: `HabitsUITests.testSecondHabitDeepLinkUpdatesOpenHabitsRoom` 1/1 على `Madar M6 Work` / iOS 26.5 (`au91-habit-second-route-r2.xcresult`)؛ `git diff --check` نظيف. | fixed — awaiting owner |
+| AU-92 | تلميح التكرار يطابق عملة الرحلة | يقارن المصروف القريب بعملة الإدخال الحالية (ليرة الرحلة)، فلا يظهر التلميح بسبب حركة مساوية بعملة البيت. تحقق بعينتين اصطناعيتين: مطابقة TRY وإهمال SAR؛ `MoneyExpenseUITests.testTripCurrencyDuplicateHintMatchesStoredCurrency` و`testTripCurrencyDuplicateHintIgnoresHomeCurrencyMatch` 2/2 على `Madar M6 Work` / iOS 26.5 (`au92-trip-duplicate-r3.xcresult`)؛ لقطة التحذير L/light فُحصت؛ `git diff --check` نظيف. | fixed — awaiting owner |
 
 OR-03 current source and proof are in the live row above. The earlier widgetScope, smartPresence and X3 behavior gaps were implemented and verified on 27 Oct; do not treat the old placeholder-control note as current. The actual OS gallery/action and iOS 27 runtime checks remain open.
 
@@ -463,6 +464,14 @@ M0-T06 (device acceptance paperwork), M0-T09 privacy matrix (encrypted backup un
 M0-M6 software is integrated; M5 has its bounded software gate. M7 remains open for every-screen visual/state trace and owner/device/system acceptance (owner/Claude), real-device Release performance, iOS 27 runtime, resource release evidence and signed distribution. PDF OCR/search is now local and cancelable; PDF-to-EPUB conversion remains the separate owner/Claude topic. Direct @als is optional/deferred; no provider key/endpoint is available. Store metadata/privacy text is prepared locally; public support/privacy URLs, real review contact and App Store Connect access are still required for publication. The static scanner remains conservative: its UI/font/colour/action references were not bulk-accepted or turned into a fake complete pass; frozen backup/privacy/a11y work remains frozen.
 
 # Handovers
+## Handover — استكمال مدار بعد AU-91 — 2026-10-29 — Codex
+- **Works now:** AU-92 يطابق تلميح التكرار مع عملة الإدخال في الرحلة؛ AU-91 يفتح رابط العادة الثانية والغرفة قائمة؛ AU-90 يمنع حفظ الحساب المعروف برصيد بداية فارغ.
+- **Verified:** `xcodebuild -quiet test … -only-testing:MadarUITests/MoneyExpenseUITests/testTripCurrencyDuplicateHintMatchesStoredCurrency -only-testing:MadarUITests/MoneyExpenseUITests/testTripCurrencyDuplicateHintIgnoresHomeCurrencyMatch -parallel-testing-enabled NO` — 2/2 على `Madar M6 Work` / iOS 26.5، fixtures اصطناعية (`au92-trip-duplicate-r3.xcresult`)؛ لقطة التحذير L/light فُحصت؛ `git diff --check`.
+- **Differences left:** حالة التحذير لا تملك canonical مستقلًا؛ اللقطة البديلة فُحصت بصريًا.
+- **Not verified:** iPhone المالك؛ AU-93 وAU-94 لم يُنفّذا، ولا تغييرات على بيانات المالك.
+- **Next:** AU-93 يمنع حفظ مصروف بعملة الرحلة بتاريخ يسبق بدء الرحلة؛ AU-94 يضيف إعادة محاولة لفتح EPUB بعد الفشل.
+- **Model/effort:** غير مكشوف / غير مكشوف؛ مساعدين Luna للقراءة فقط.
+- **Usage:** ٨٤٪ مستخدم من الخمس ساعات و٧٤٪ أسبوعي؛ أُنهي العمل بطلب المالك قبل بلوغ احتياطي ٥٪.
 ## Handover — استكمال مدار بعد AU-90 — 2026-10-29 — Codex
 - **Works now:** AU-91 يعرض تفاصيل العادة المطلوبة عند وصول رابط آخر والغرفة مفتوحة؛ AU-90 يمنع حفظ الحساب المعروف برصيد بداية فارغ.
 - **Verified:** `xcodebuild test … -only-testing:MadarUITests/HabitsUITests/testSecondHabitDeepLinkUpdatesOpenHabitsRoom -parallel-testing-enabled NO` — 1/1 على Madar M6 Work / iOS 26.5 (`au91-habit-second-route-r2.xcresult`)؛ `git diff --check`.
@@ -483,11 +492,3 @@ M0-M6 software is integrated; M5 has its bounded software gate. M7 remains open 
 - **Next:** فكرة «صمت بعد العشاء حتى الفجر» في Ideas تنتظر المالك. ما تبقى من تقارير Haiku ولم يُبنَ (منخفض): رسالة خطأ أدق في محرر العادة، تحديث ورقة تفاصيل العادة كل دقيقة، إغلاق أداة الأدراج في البهو عند بقاء ودجة مخفية، مهلة ٢٠ ث لتحويل الصوت الطويل، `try?` في مسودة الخلفية، تحديث القرآن عند تغيّر اليوم والتطبيق مفتوح، إلغاء تنزيل تراث عند المغادرة. القاعدة الجديدة (OWNER-29): صيد الأخطاء بمساعدي Haiku دائمًا.
 - **Model/effort:** claude-opus-5-5، not exposed؛ Sonnet وHaiku للقراءة فقط.
 - **Usage:** ٨٢٪ من الخمس ساعات قبل تجددها، ٥٥٪ أسبوعي؛ لا تغييرات غير ملتزمة.
-## Handover — استكمال كلود AU-46 — 2026-10-29 — Codex
-- **Works now:** إعادة محاولة PDF وخطة القرآن والدفتر؛ فشل قراءة الدفتر لا يبدو فراغًا؛ شرح تجاهل الجلسة في الورقة الفعلية؛ أخطاء القارئ داخل أوراقه.
-- **Verified:** `xcodebuild test/test-without-building … -parallel-testing-enabled NO` على 0638DFC9/iOS26.5: القرآن 4/4 وإعدادات القارئ 1/1 في `codex-au46-au07-baseline-r3`؛ الدفتر 1/1 بسجل `codex-au46-au07-final-r4`؛ PDF النهائي 1/1 في `codex-au46-pdf-r5`؛ `git diff --check`.
-- **Differences left:** قبول المالك والفروق السابقة؛ مقارنة R18-Setup وZ-R12-Home2 مولدة، والصور فُحصت مباشرة؛ مرجع المال يضع الاحتياطي والفائض في صفّين بالفعل، فملاحظة AU-04 قديمة.
-- **Not verified:** iPhone المالك؛ حزمة r3 فشلت بسبب اختبار PDF القديم؛ r4 فشلت في PDF واختباري المال وبقي جمع نتائجها عالقًا. لا نجاح كامل لأي منهما.
-- **Next:** AU-07: رقعة النصوص غير المتحققة `Artifacts/codex-au07-unverified.patch`؛ أُعيد ملفا المال إلى HEAD. اختبارات المال على الرقعة فشلت عند أزرار مغطاة بعد المحرر؛ شخّص وأصلح وصول الاختبار قبل اعتمادها. لا تغييرات مال مثبتة.
-- **Model/effort:** not exposed / not exposed؛ مساعدا Luna للبحث وتتبع المسارات فقط.
-- **Usage:** آخر قراءة 98% مستخدم من الخمس ساعات؛ توقف بدء العمل. حُذفت فقط Build وIndex.noindex غير المستخدمتين من Madar/DerivedData لتوفير المساحة؛ الأدلة وبيانات المالك محفوظة.

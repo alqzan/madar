@@ -42,7 +42,7 @@ struct MoneyExpenseView: View {
         return ExpenseEntry.headlineAfter(elapsedDays: cycle.elapsedDays, cycle.input, dailySpentMinor: cycle.spent,
             expenseDay: MadarCalendarDays.distance(from: cycle.startDay, to: day) + 1, dailyChargeMinor: split.dailyMinor)
     }
-    private var duplicate: Bool { reading?.nearby.contains { $0.methodID == methodID && $0.currency == reading?.currency && $0.amountMinor == minor && abs($0.at.timeIntervalSince(date)) <= 600 && ($0.merchant ?? "").trimmingCharacters(in: .whitespacesAndNewlines) == merchant.trimmingCharacters(in: .whitespacesAndNewlines) } == true && minor > 0 }
+    private var duplicate: Bool { reading?.nearby.contains { $0.methodID == methodID && $0.currency == inputCurrency && $0.amountMinor == minor && abs($0.at.timeIntervalSince(date)) <= 600 && ($0.merchant ?? "").trimmingCharacters(in: .whitespacesAndNewlines) == merchant.trimmingCharacters(in: .whitespacesAndNewlines) } == true && minor > 0 }
     var body: some View {
         ScrollView {
             VStack(spacing: 12) {

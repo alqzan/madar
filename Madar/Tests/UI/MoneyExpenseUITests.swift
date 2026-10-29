@@ -6,7 +6,13 @@ import XCTest
         let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": fixture, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-17T12:00:00+03:00"]
         app.launch(); let tab = app.buttons["tab-customize"]; XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
         let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("المال"); app.buttons["money-open"].tap()
-        let door = app.buttons["money-expense-open"]; XCTAssertTrue(door.waitForExistence(timeout: 10)); for _ in 0..<8 where !door.isHittable { app.swipeUp(velocity: .slow) }; door.tap()
+        let tripExpense = app.buttons["money-travel-expense"]
+        if tripExpense.waitForExistence(timeout: 3) {
+            for _ in 0..<8 where !tripExpense.isHittable { app.swipeUp(velocity: .slow) }
+            XCTAssertTrue(tripExpense.isHittable, app.debugDescription); tripExpense.tap()
+        } else {
+            let door = app.buttons["money-expense-open"]; XCTAssertTrue(door.waitForExistence(timeout: 10)); for _ in 0..<8 where !door.isHittable { app.swipeUp(velocity: .slow) }; door.tap()
+        }
         XCTAssertTrue(app.buttons["money-expense-key-4"].waitForExistence(timeout: 10)); return app
     }
     func testCalculatorSplitSaveAndUndo() {
@@ -37,5 +43,31 @@ import XCTest
         XCTAssertTrue(app.staticTexts["أضف حسابًا أو بطاقة من رسائل البنك أولًا."].exists)
         app.buttons["money-expense-key-4"].tap(); XCTAssertFalse(app.buttons["money-expense-save"].isEnabled)
         shot(app, "M5-V17-empty-L")
+    }
+
+    private func enterTripDuplicate(_ app: XCUIApplication) {
+        for key in ["4", "2", "5"] { app.buttons["money-expense-key-" + key].tap() }
+        let merchant = app.buttons["money-expense-merchant-TripTest"]
+        XCTAssertTrue(merchant.waitForExistence(timeout: 5), app.debugDescription)
+        for _ in 0..<6 where !merchant.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(merchant.isHittable, app.debugDescription); merchant.tap()
+    }
+
+    func testTripCurrencyDuplicateHintMatchesStoredCurrency() {
+        continueAfterFailure = false
+        let app = openExpense("travelDupTRY")
+        enterTripDuplicate(app)
+        let hint = app.staticTexts["money-expense-duplicate"]
+        XCTAssertTrue(hint.waitForExistence(timeout: 5), app.debugDescription)
+        for _ in 0..<8 where !hint.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(hint.isHittable, app.debugDescription)
+        shot(app, "M5-V17-duplicate-trip-currency-L")
+    }
+
+    func testTripCurrencyDuplicateHintIgnoresHomeCurrencyMatch() {
+        continueAfterFailure = false
+        let app = openExpense("travelDupSAR")
+        enterTripDuplicate(app)
+        XCTAssertFalse(app.staticTexts["money-expense-duplicate"].exists, app.debugDescription)
     }
 }
