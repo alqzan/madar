@@ -102,7 +102,8 @@ import XCTest
         let double = app.buttons["quran-plan-miss-double"]
         for _ in 0..<5 where !double.isHittable { app.swipeDown() }
         double.tap()
-        reveal(bar("2026-10-19")); XCTAssertTrue(bar("2026-10-15").label.contains("وردان"))
+        XCTAssertTrue(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "selected == true"), object: double)], timeout: 10) == .completed, app.debugDescription)
+        reveal(bar("2026-10-19")); XCTAssertTrue(bar("2026-10-15").label.contains("وردان"), bar("2026-10-15").label)
         app.swipeUp(velocity: .slow)
         capture(app, "OR-21-missed-double-preview-L")
         app.terminate(); app.launch(); openPlan()
