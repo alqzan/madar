@@ -677,6 +677,33 @@
    }
   },
   {
+   "key": "notif.quietUntil",
+   "owner": "notif",
+   "section": "الإشعارات",
+   "title": "ينتهي الصمت",
+   "type": "choice",
+   "default": "fajr",
+   "scope": "sync",
+   "options": [
+    {
+     "value": "fajr",
+     "label": "عند الفجر"
+    },
+    {
+     "value": "sunrise",
+     "label": "عند الشروق"
+    },
+    {
+     "value": "midnight",
+     "label": "منتصف الليل"
+    }
+   ],
+   "note": "المالك، ٢٩ أكتوبر ٢٠٢٦: «ابي فيه الاعداد هذا انا اتحكم». كان الصمت ينتهي عند منتصف الليل؛ الافتراضي الآن حتى الفجر",
+   "storage": "Setting (synced)",
+   "preset": false,
+   "availability": "v1"
+  },
+  {
    "key": "notif.staleNudge",
    "owner": "notif",
    "section": "الإشعارات",

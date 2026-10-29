@@ -17,18 +17,24 @@ public struct NotificationPlan: Equatable, Sendable {
     /// Which requests each retained digest stands for, so its fixed text can name their kinds (§8 item 8).
     public var digestMembers: [String: [String]] = [:]
 }
+/// Where «صمت بعد العشاء» ends (`notif.quietUntil`; owner, 29 Oct 2026). Midnight was the only end before.
+public enum QuietEnd: String, Sendable {
+    case fajr, sunrise, midnight
+}
+
 public struct NotificationPolicy: Sendable {
     public let dailyBudget: Int
     public let priority: [Room]
     public let quietFromMinutes: Int?
+    public let quietUntil: QuietEnd
     public let digestEnabled: Bool
     public let thisDeviceRemindersEnabled: Bool
     public let staleNudgeEnabled: Bool
     public let notesDailyCap: Int
     public let dayBoundary: DayBoundary
-    public init(dailyBudget: Int = 4, priority: [Room] = [.salah, .quran, .mal, .notes, .habits, .mihbara], quietFromMinutes: Int? = nil, digestEnabled: Bool = true, thisDeviceRemindersEnabled: Bool = true, staleNudgeEnabled: Bool = true, notesDailyCap: Int = 2, dayBoundary: DayBoundary = .fajr) {
+    public init(dailyBudget: Int = 4, priority: [Room] = [.salah, .quran, .mal, .notes, .habits, .mihbara], quietFromMinutes: Int? = nil, quietUntil: QuietEnd = .midnight, digestEnabled: Bool = true, thisDeviceRemindersEnabled: Bool = true, staleNudgeEnabled: Bool = true, notesDailyCap: Int = 2, dayBoundary: DayBoundary = .fajr) {
         self.dailyBudget = min(10, max(1, dailyBudget)); self.priority = priority
-        self.quietFromMinutes = quietFromMinutes.map { min(1439, max(0, $0)) }; self.digestEnabled = digestEnabled
+        self.quietFromMinutes = quietFromMinutes.map { min(1439, max(0, $0)) }; self.quietUntil = quietUntil; self.digestEnabled = digestEnabled
         self.thisDeviceRemindersEnabled = thisDeviceRemindersEnabled; self.staleNudgeEnabled = staleNudgeEnabled
         self.notesDailyCap = min(2, max(0, notesDailyCap)); self.dayBoundary = dayBoundary
     }
@@ -64,7 +70,7 @@ public enum NotificationArbiter {
         let occurrences = prayerDays.flatMap { day in Prayer.allCases.map { (day.time(for: $0), $0) } }.sorted { $0.0 < $1.0 }
         guard policy.thisDeviceRemindersEnabled,
               SanctityGuard(prayerDays: prayerDays).clamp(instant) == instant,
-              !isQuiet(instant, timeZone: timeZone, policy: policy),
+              !isQuiet(instant, timeZone: timeZone, policy: policy, prayerDays: prayerDays),
               let next = occurrences.first(where: { $0.0 > instant }),
               next.1 != .fajr,
               next.0.timeIntervalSince(instant) <= 8 * 60 * 60,
@@ -88,7 +94,7 @@ public enum NotificationArbiter {
                                                    sanctityWindows: [SanctityWindow]? = nil) -> Bool {
         guard policy.thisDeviceRemindersEnabled,
               SanctityGuard(windows: sanctityWindows ?? prayerDays.flatMap(\.sanctityWindows)).clamp(instant) == instant,
-              !isQuiet(instant, timeZone: timeZone, policy: policy) else { return false }
+              !isQuiet(instant, timeZone: timeZone, policy: policy, prayerDays: prayerDays) else { return false }
         let occurrences = (suppliedOccurrences ?? prayerDays.flatMap { day in Prayer.allCases.map { (day.time(for: $0), $0) } }).sorted { $0.0 < $1.0 }
         guard let next = occurrences.first(where: { $0.0 > instant }) else { return false }
         guard next.1 != .fajr,
@@ -130,7 +136,7 @@ public enum NotificationArbiter {
             guard due <= horizon else { dropped.append(candidate.id); continue }
             let shifted = NotificationCandidate(id: candidate.id, room: candidate.room, kind: candidate.kind, dueAt: due, dayKey: candidate.dayKey, categoryCycleKey: candidate.categoryCycleKey)
             if candidate.kind == .prayerAsk { scheduled.append(shifted); continue }
-            guard !isQuiet(due, timeZone: timeZone, policy: policy) else { dropped.append(candidate.id); continue }
+            guard !isQuiet(due, timeZone: timeZone, policy: policy, prayerDays: prayerDays) else { dropped.append(candidate.id); continue }
             let key = madarKey(at: due, prayerDays: prayerDays, timeZone: timeZone, boundary: policy.dayBoundary)
             if let cycle = candidate.categoryCycleKey, cycles.contains(cycle) { dropped.append(candidate.id); continue }
             if candidate.room == .notes && notesCounts[key, default: 0] >= policy.notesDailyCap { dropped.append(candidate.id); continue }
@@ -140,7 +146,7 @@ public enum NotificationArbiter {
         }
         if policy.staleNudgeEnabled {
             let finalAt = sanctityGuard.clamp(ordinaryEnd)
-            if !isQuiet(finalAt, timeZone: timeZone, policy: policy) {
+            if !isQuiet(finalAt, timeZone: timeZone, policy: policy, prayerDays: prayerDays) {
                 let key = madarKey(at: finalAt, prayerDays: prayerDays, timeZone: timeZone, boundary: policy.dayBoundary)
                 rooms[key, default: []].append(.init(id: "nudge.\(key)", room: .core, kind: .openApp, dueAt: finalAt, dayKey: key))
             }
@@ -158,7 +164,7 @@ public enum NotificationArbiter {
                     proposed = min(proposed, cutoff)
                 }
                 proposed = sanctityGuard.clamp(proposed)
-                if proposed >= now && proposed <= ordinaryEnd && !isQuiet(proposed, timeZone: timeZone, policy: policy) { digestTime = proposed }
+                if proposed >= now && proposed <= ordinaryEnd && !isQuiet(proposed, timeZone: timeZone, policy: policy, prayerDays: prayerDays) { digestTime = proposed }
             }
             if let digestTime {
                 scheduled += entries.prefix(available - 1)
@@ -204,10 +210,22 @@ public enum NotificationArbiter {
     public static func deferOutsideWindows(_ instant: Date, windows: [SanctityWindow]) -> Date {
         SanctityGuard(windows: windows).clamp(instant)
     }
-    private static func isQuiet(_ date: Date, timeZone: TimeZone, policy: NotificationPolicy) -> Bool {
+    private static func isQuiet(_ date: Date, timeZone: TimeZone, policy: NotificationPolicy, prayerDays: [PrayerDay]) -> Bool {
         guard let from = policy.quietFromMinutes else { return false }
+        return quietWindowContains(date, timeZone: timeZone, fromMinutes: from, until: policy.quietUntil, prayerDays: prayerDays)
+    }
+    /// Quiet runs from `fromMinutes` on one evening until midnight, or on into the next morning's Fajr or sunrise.
+    /// After midnight, the end is that civil day's Fajr or sunrise; a day with no prayer times keeps the old midnight end.
+    public static func quietWindowContains(_ date: Date, timeZone: TimeZone, fromMinutes: Int, until: QuietEnd, prayerDays: [PrayerDay]) -> Bool {
         var calendar = Calendar(identifier: .gregorian); calendar.timeZone = timeZone
         let parts = calendar.dateComponents([.hour, .minute], from: date)
-        return parts.hour! * 60 + parts.minute! >= from
+        guard let hour = parts.hour, let minute = parts.minute else { return true }
+        let current = hour * 60 + minute
+        if current >= fromMinutes { return true }
+        let civil = GregorianDay.containing(date, in: timeZone)
+        guard until != .midnight, let day = prayerDays.first(where: { $0.day == civil }) else { return false }
+        let end = until == .fajr ? day.fajr : day.sunrise
+        // The morning part only: before this day's end, and only in the small hours before the evening start.
+        return date < end && end.timeIntervalSince(calendar.startOfDay(for: date)) < Double(fromMinutes) * 60
     }
 }

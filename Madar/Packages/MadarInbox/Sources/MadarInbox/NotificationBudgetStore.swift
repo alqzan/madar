@@ -10,18 +10,20 @@ public struct NotificationBudgetPolicy: Codable, Sendable {
     public let remindersEnabled: Bool
     public let dailyBudget: Int
     public let quietFromMinutes: Int?
+    /// `notif.quietUntil`; absent in snapshots written before 29 Oct 2026, which ended quiet at midnight.
+    public let quietUntil: String?
     public let dayBoundary: DayBoundary
     public let prayerDays: [PrayerDay]
     public let numerals: String
     public init(generatedAt: Date, validUntil: Date, activityEnabled: Bool, remindersEnabled: Bool,
-                dailyBudget: Int, quietFromMinutes: Int?, dayBoundary: DayBoundary, prayerDays: [PrayerDay], numerals: String = "hindi") {
+                dailyBudget: Int, quietFromMinutes: Int?, quietUntil: String? = nil, dayBoundary: DayBoundary, prayerDays: [PrayerDay], numerals: String = "hindi") {
         self.generatedAt = generatedAt; self.validUntil = validUntil; self.activityEnabled = activityEnabled
-        self.remindersEnabled = remindersEnabled; self.dailyBudget = dailyBudget; self.quietFromMinutes = quietFromMinutes
+        self.remindersEnabled = remindersEnabled; self.dailyBudget = dailyBudget; self.quietFromMinutes = quietFromMinutes; self.quietUntil = quietUntil
         self.dayBoundary = dayBoundary; self.prayerDays = prayerDays
         self.numerals = numerals
     }
     public var notificationPolicy: NotificationPolicy {
-        .init(dailyBudget: dailyBudget, quietFromMinutes: quietFromMinutes, thisDeviceRemindersEnabled: remindersEnabled, dayBoundary: dayBoundary)
+        .init(dailyBudget: dailyBudget, quietFromMinutes: quietFromMinutes, quietUntil: quietUntil.flatMap(QuietEnd.init(rawValue:)) ?? .midnight, thisDeviceRemindersEnabled: remindersEnabled, dayBoundary: dayBoundary)
     }
 }
 

@@ -227,7 +227,7 @@ final class PrayerNotificationCoordinator {
             prayerDays: planningDays,
             now: now,
             timeZone: repository.place(at: now).timeZone,
-            policy: .init(dailyBudget: Int(session.number("notif.dailyBudget")), priority: priority, quietFromMinutes: quietMinutes,
+            policy: .init(dailyBudget: Int(session.number("notif.dailyBudget")), priority: priority, quietFromMinutes: quietMinutes, quietUntil: quietEnd,
                 digestEnabled: session.bool("notif.digestOverflow"), thisDeviceRemindersEnabled: globalEnabled, staleNudgeEnabled: session.bool("notif.staleNudge"),
                 notesDailyCap: Int(session.number("notes.dailyCap")),
                 dayBoundary: DayBoundary(rawValue: session.string("core.dayStart")) ?? .fajr),
@@ -237,7 +237,7 @@ final class PrayerNotificationCoordinator {
         try await reconcile(plan: plan, candidates: candidates,
                             current: existing.filter { $0.identifier.hasPrefix(Self.requestPrefix) },
                             repository: repository)
-        try await reconcileRooms(plan: plan, candidates: candidates, current: existing.filter { RoomNotificationContent.isRoomRequest($0.identifier) }, timeZone: repository.place(at: now).timeZone, consumed: Set(consumed.map(\.requestID)), now: now)
+        try await reconcileRooms(plan: plan, candidates: candidates, current: existing.filter { RoomNotificationContent.isRoomRequest($0.identifier) }, timeZone: repository.place(at: now).timeZone, consumed: Set(consumed.map(\.requestID)), prayerDays: planningDays, now: now)
         try await reconcilePrayerActivity(prayerSlots: prayerSlots, sanctityWindows: sanctityWindows, repository: repository, now: now, session: session)
         try await reconcileContextActivities(prayerDays: days, prayerSlots: prayerSlots, sanctityWindows: sanctityWindows,
                                             repository: repository, now: now, session: session)
@@ -421,7 +421,7 @@ final class PrayerNotificationCoordinator {
     private static func manages(_ id: String) -> Bool { id.hasPrefix(requestPrefix) || RoomNotificationContent.isRoomRequest(id) }
     /// Every non-prayer request (Quran, qada, habits, digest, nudge) through one path: a kind turned off
     /// leaves nothing pending and is logged as cancelled; drops and digests are logged for every room.
-    private func reconcileRooms(plan: NotificationPlan, candidates: [NotificationCandidate], current: [UNNotificationRequest], timeZone: TimeZone, consumed: Set<String>, now: Date) async throws {
+    private func reconcileRooms(plan: NotificationPlan, candidates: [NotificationCandidate], current: [UNNotificationRequest], timeZone: TimeZone, consumed: Set<String>, prayerDays: [PrayerDay], now: Date) async throws {
         guard let session else { return }
         let targets = plan.scheduled.filter { $0.kind != .prayerAsk && !consumed.contains($0.id) }
         let ids = Set(targets.map(\.id)), obsolete = current.filter { !ids.contains($0.identifier) }.map(\.identifier)
@@ -458,7 +458,7 @@ final class PrayerNotificationCoordinator {
         for id in plan.digestedIDs where RoomNotificationContent.isRoomRequest(id) && !consumed.contains(id) { try updateLedger(requestID: id, state: "digested") }
         for id in plan.droppedIDs where RoomNotificationContent.isRoomRequest(id) && !consumed.contains(id) {
             guard let candidate = candidates.first(where: { $0.id == id }) else { continue }
-            let quiet = Self.isQuiet(candidate.dueAt, timeZone: timeZone, quietAfterIsha: session.bool("notif.quietAfterIsha"), quietFrom: session.string("notif.quietFrom"))
+            let quiet = Self.isQuiet(candidate.dueAt, timeZone: timeZone, quietAfterIsha: session.bool("notif.quietAfterIsha"), quietFrom: session.string("notif.quietFrom"), until: quietEnd, prayerDays: prayerDays)
             try updateLedger(requestID: id, dayKey: candidate.dayKey, dueAt: candidate.dueAt, state: "dropped", reason: quiet ? "quiet" : "budget", kind: RoomNotificationContent.ledgerKind(id))
         }
     }
@@ -546,7 +546,8 @@ final class PrayerNotificationCoordinator {
         let timeZone = repository.place(at: now).timeZone
         guard !Self.isQuiet(startAt, timeZone: timeZone,
                             quietAfterIsha: session.bool("notif.quietAfterIsha"),
-                            quietFrom: session.string("notif.quietFrom")) else {
+                            quietFrom: session.string("notif.quietFrom"), until: quietEnd,
+                            prayerDays: prayerDays(repository: repository, now: now)) else {
             for activity in active { try await endPrayerActivity(activity, now: now) }
             return
         }
@@ -646,7 +647,7 @@ final class PrayerNotificationCoordinator {
         let quietParts = session.string("notif.quietFrom").split(separator: ":").compactMap { Int($0) }
         let quietFrom = session.bool("notif.quietAfterIsha")
             ? (quietParts.count == 2 ? quietParts[0] * 60 + quietParts[1] : 0) : nil
-        let policy = NotificationPolicy(dailyBudget: Int(session.number("notif.dailyBudget")), quietFromMinutes: quietFrom,
+        let policy = NotificationPolicy(dailyBudget: Int(session.number("notif.dailyBudget")), quietFromMinutes: quietFrom, quietUntil: quietEnd,
                                         thisDeviceRemindersEnabled: session.bool("notif.thisDeviceReminders"),
                                         dayBoundary: DayBoundary(rawValue: session.string("core.dayStart")) ?? .fajr)
         guard session.bool("salah.liveActivity"),
@@ -751,16 +752,15 @@ final class PrayerNotificationCoordinator {
         return counts.mapValues(\.count)
     }
 
-    private static func isQuiet(_ date: Date, timeZone: TimeZone, quietAfterIsha: Bool, quietFrom: String) -> Bool {
+    /// «ينتهي الصمت» (`notif.quietUntil`, owner 29 Oct 2026): Fajr by default, sunrise, or midnight as before.
+    private var quietEnd: QuietEnd { QuietEnd(rawValue: session?.string("notif.quietUntil") ?? "") ?? .fajr }
+
+    private static func isQuiet(_ date: Date, timeZone: TimeZone, quietAfterIsha: Bool, quietFrom: String, until: QuietEnd, prayerDays: [PrayerDay]) -> Bool {
         guard quietAfterIsha else { return false }
         let parts = quietFrom.split(separator: ":", omittingEmptySubsequences: false)
         guard parts.count == 2, let hour = Int(parts[0]), let minute = Int(parts[1]),
               (0...23).contains(hour), (0...59).contains(minute) else { return true }
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = timeZone
-        let current = calendar.dateComponents([.hour, .minute], from: date)
-        guard let currentHour = current.hour, let currentMinute = current.minute else { return true }
-        return currentHour * 60 + currentMinute >= hour * 60 + minute
+        return NotificationArbiter.quietWindowContains(date, timeZone: timeZone, fromMinutes: hour * 60 + minute, until: until, prayerDays: prayerDays)
     }
 
     private func updateLedger(requestID: String, dayKey: String? = nil, prayer: Prayer? = nil, dueAt: Date? = nil,

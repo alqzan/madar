@@ -452,3 +452,32 @@ func tripMethodTimes(_ city: String, _ lat: Double, _ lon: Double, _ zoneID: Str
         #expect(difference <= 3, "\(city) \(date) \(prayer): got \(c.hour!):\(c.minute!), expected \(clock)")
     }
 }
+
+@Test("Owner 29 Oct: quiet after Isha ends at midnight, Fajr or sunrise as the owner chooses")
+func quietEndChoice() throws {
+    let day = try #require(PrayerTimesEngine.calculate(day: GregorianDay("2026-10-09"), place: .riyadh))
+    let from = 21 * 60 + 30
+    func quiet(_ at: Date, _ end: QuietEnd) -> Bool {
+        NotificationArbiter.quietWindowContains(at, timeZone: zone, fromMinutes: from, until: end, prayerDays: [day])
+    }
+    // Evening: quiet from 21:30 whatever the end.
+    for end in [QuietEnd.midnight, .fajr, .sunrise] {
+        #expect(quiet(try instant(hour: 22), end)); #expect(!quiet(try instant(hour: 20), end))
+    }
+    // Small hours: only the Fajr and sunrise ends keep the night quiet.
+    #expect(!quiet(try instant(hour: 1, minute: 30), .midnight))
+    #expect(quiet(try instant(hour: 1, minute: 30), .fajr))
+    #expect(quiet(try instant(hour: 1, minute: 30), .sunrise))
+    // Between Fajr and sunrise: quiet only until sunrise.
+    let between = day.fajr.addingTimeInterval(day.sunrise.timeIntervalSince(day.fajr) / 2)
+    #expect(!quiet(between, .fajr)); #expect(quiet(between, .sunrise))
+    // After sunrise the day is open again.
+    #expect(!quiet(day.sunrise.addingTimeInterval(60), .sunrise))
+    // The arbiter drops a 01:30 room reminder only when the night stays quiet.
+    let night = NotificationCandidate(id: "night", room: .habits, dueAt: try instant(hour: 1, minute: 30), dayKey: day.day.description)
+    let early = try instant(hour: 0)
+    #expect(NotificationArbiter.plan(candidates: [night], prayerDays: [day], now: early, timeZone: zone,
+        policy: .init(quietFromMinutes: from, quietUntil: .fajr)).droppedIDs.contains("night"))
+    #expect(!NotificationArbiter.plan(candidates: [night], prayerDays: [day], now: early, timeZone: zone,
+        policy: .init(quietFromMinutes: from, quietUntil: .midnight)).droppedIDs.contains("night"))
+}

@@ -807,6 +807,16 @@ import XCTest
             XCTAssertTrue(quietTime.waitForExistence(timeout: 10), app.debugDescription)
             scrollTo(quietTime, in: app)
             attachScreenshot(app, named: "M1-T04-quiet-hours-\(size)")
+            // Owner, 29 Oct 2026: the owner chooses where quiet ends.
+            search.tap()
+            search.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: (search.value as? String ?? "").count))
+            search.typeText("notif.quietUntil\n")
+            let quietEnd = app.buttons["option-notif.quietUntil-fajr"]
+            XCTAssertTrue(quietEnd.waitForExistence(timeout: 10), app.debugDescription)
+            XCTAssertTrue(quietEnd.isSelected, "Fajr is the agreed default end")
+            XCTAssertTrue(app.buttons["option-notif.quietUntil-sunrise"].exists && app.buttons["option-notif.quietUntil-midnight"].exists)
+            scrollTo(quietEnd, in: app)
+            attachScreenshot(app, named: "M1-T04-quiet-end-\(size)")
             app.terminate()
         }
     }

@@ -104,7 +104,7 @@ struct CustomizeMadar: View {
         session.schema.settings.filter { definition in
             guard AppSession.supportedKeys.contains(definition.key) else { return false }
             if definition.key == "core.hijriOffset" && session.string("core.hijriSource") != "sighting" { return false }
-            if definition.key == "notif.quietFrom" && !session.bool("notif.quietAfterIsha") { return false }
+            if ["notif.quietFrom", "notif.quietUntil"].contains(definition.key) && !session.bool("notif.quietAfterIsha") { return false }
             return query.isEmpty || normalized(definition.title + " " + sectionFor(definition.key) + " " + definition.key).contains(normalized(query))
         }
     }
@@ -140,7 +140,7 @@ func sectionFor(_ key: String) -> String {
     if ["salah.showMosqueStreak", "salah.askHeart"].contains(key) { return "الصلاة" }
     if key == "core.faceIDLock" { return "الخصوصية" }
     if key == "core.spotlightIndex" { return "البحث" }
-    if ["salah.askAfterAdhanMin", "salah.askReminder", "salah.liveActivity", "notif.thisDeviceReminders", "notif.quietAfterIsha", "notif.quietFrom"].contains(key) { return "الإشعارات" }
+    if ["salah.askAfterAdhanMin", "salah.askReminder", "salah.liveActivity", "notif.thisDeviceReminders", "notif.quietAfterIsha", "notif.quietFrom", "notif.quietUntil"].contains(key) { return "الإشعارات" }
     return "المظهر"
 }
 func normalized(_ text: String) -> String {
@@ -251,7 +251,7 @@ struct SettingControl: View {
             // AU-43: the switches that change what reaches the user say what they do.
             if let caption = ["core.faceIDLock": "مدار كله: يطلب Face ID عند فتح مدار، ويخفي تفاصيل الودجات والإشعارات. بلا: يُفتح مباشرة.",
                               "notif.thisDeviceReminders": "إيقافه يوقف كل تذكيرات مدار على هذا الجهاز، وتبقى مواعيدك وسجلّك كما هي.",
-                              "notif.quietAfterIsha": "لا تصلك التذكيرات من وقت الصمت حتى منتصف الليل."][definition.key] {
+                              "notif.quietAfterIsha": "لا تصلك تذكيرات الغرف من بدء الصمت حتى نهايته التي تختارها: الفجر أو الشروق أو منتصف الليل."][definition.key] {
                 Text(caption).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).fixedSize(horizontal: false, vertical: true)
             }
             if definition.key == "core.spotlightIndex" {

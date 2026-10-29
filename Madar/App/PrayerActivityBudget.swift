@@ -25,7 +25,7 @@ extension AppSession {
         let quiet = bool("notif.quietAfterIsha") ? (parts.count == 2 ? parts[0] * 60 + parts[1] : 0) : nil
         try notificationBudget.publish(.init(generatedAt: now, validUntil: now.addingTimeInterval(24 * 3600),
             activityEnabled: bool("salah.liveActivity"), remindersEnabled: bool("notif.thisDeviceReminders"),
-            dailyBudget: Int(number("notif.dailyBudget")), quietFromMinutes: quiet,
+            dailyBudget: Int(number("notif.dailyBudget")), quietFromMinutes: quiet, quietUntil: string("notif.quietUntil"),
             dayBoundary: DayBoundary(rawValue: string("core.dayStart")) ?? .fajr, prayerDays: days, numerals: string("core.numerals")), importing: seeds)
     }
 }
