@@ -160,12 +160,12 @@ struct PrayerTodayView: View {
                     },
                     answerHeart: { heart, done in session.answerPrayerHeart(cell.reference, heart: heart, completion: done) })
             case .makeUp(let item, let isFridayNoon, let dateLabel):
-                PrayerMakeUpSheet(item: item, isFridayNoon: isFridayNoon, dateLabel: dateLabel, isSaving: session.prayerWriteInProgress) { kind in
-                    session.makeUpPrayer(item.reference, fridayKind: kind)
+                PrayerMakeUpSheet(item: item, isFridayNoon: isFridayNoon, dateLabel: dateLabel, isSaving: session.prayerWriteInProgress) { kind, done in
+                    session.makeUpPrayer(item.reference, fridayKind: kind, completion: done)
                 }
             case .recovery(let references, let fridayReferences, let timeZone):
-                PrayerGapResolutionSheet(references: references, fridayReferences: fridayReferences, dateLabel: qadaDate, digits: digits) { resolutions in
-                    session.resolvePrayerGap(resolutions)
+                PrayerGapResolutionSheet(references: references, fridayReferences: fridayReferences, dateLabel: qadaDate, digits: digits) { resolutions, done in
+                    session.resolvePrayerGap(resolutions, completion: done)
                 }
             }
             }
@@ -1377,12 +1377,12 @@ private struct PrayerMakeUpSheet: View {
     let isFridayNoon: Bool
     let dateLabel: String
     let isSaving: Bool
-    let makeUp: (FridayPrayerKind?) -> Void
+    let makeUp: (FridayPrayerKind?, @escaping (Bool) -> Void) -> Void
     @Environment(\.dismiss) private var dismiss
     @Environment(\.roomTheme) private var theme
     @State private var fridayKind: FridayPrayerKind?
     @State private var contentHeight: CGFloat = 420
-    init(item: PrayerQada, isFridayNoon: Bool, dateLabel: String, isSaving: Bool, makeUp: @escaping (FridayPrayerKind?) -> Void) {
+    init(item: PrayerQada, isFridayNoon: Bool, dateLabel: String, isSaving: Bool, makeUp: @escaping (FridayPrayerKind?, @escaping (Bool) -> Void) -> Void) {
         self.item = item; self.isFridayNoon = isFridayNoon; self.dateLabel = dateLabel; self.isSaving = isSaving; self.makeUp = makeUp
         _fridayKind = State(initialValue: item.fridayKind)
     }
@@ -1421,7 +1421,7 @@ private struct PrayerMakeUpSheet: View {
                     Spacer(minLength: 0)
                 }
             }
-            Button { makeUp(isFridayNoon ? fridayKind : nil); dismiss() } label: {
+            Button { makeUp(isFridayNoon ? fridayKind : nil) { ok in if ok { dismiss() } } } label: { // AU-41: close only once the make-up is saved.
                 Text("قضيتُها الآن").font(PrayerHomeType.strong).foregroundStyle(theme.background)
                     .frame(maxWidth: .infinity, minHeight: 56).background(theme.ink, in: .rect(cornerRadius: 18))
             }
@@ -1448,7 +1448,7 @@ private struct PrayerGapResolutionSheet: View {
     let fridayReferences: Set<PrayerReference>
     let dateLabel: (GregorianDay) -> String
     let digits: MadarNumberFormatter
-    let resolve: ([PrayerGapResolution]) -> Void
+    let resolve: ([PrayerGapResolution], @escaping (Bool) -> Void) -> Void
     @Environment(\.dismiss) private var dismiss
     @Environment(\.roomTheme) private var theme
     @State private var choices: [PrayerReference: Choice] = [:]
@@ -1628,7 +1628,7 @@ private struct PrayerGapResolutionSheet: View {
             return .init(reference: ref, status: choice.status, fridayKind: choice.fridayKind)
         }
         guard !resolutions.isEmpty else { return }
-        resolve(resolutions); dismiss()
+        resolve(resolutions) { ok in if ok { dismiss() } } // AU-41: a failed save keeps the choices on screen.
     }
 
     private func title(_ choice: Choice, friday: Bool) -> String {

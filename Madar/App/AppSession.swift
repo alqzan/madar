@@ -377,8 +377,8 @@ final class AppSession {
         ])
         sendPrayerCommand(name: "prayer.makeUp", payload: payload, undoMessage: "قُضيت الصلاة", completion: completion)
     }
-    func resolvePrayerGap(_ resolutions: [PrayerGapResolution]) {
-        guard !resolutions.isEmpty else { return }
+    func resolvePrayerGap(_ resolutions: [PrayerGapResolution], completion: ((Bool) -> Void)? = nil) {
+        guard !resolutions.isEmpty else { completion?(false); return }
         let values = resolutions.map { item in
             MadarCore.JSONValue.object([
                 "dayKey": .string(item.reference.day.description),
@@ -388,7 +388,7 @@ final class AppSession {
             ])
         }
         sendPrayerCommand(name: "prayer.resolveGap", payload: .object(["resolutions": .array(values)]),
-            undoMessage: "حُلّت الفترة")
+            undoMessage: "حُلّت الفترة", completion: completion)
     }
     /// Capture's prayer report uses the same command, undo and refresh as a tap on the arch.
     @discardableResult
