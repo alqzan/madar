@@ -6,8 +6,13 @@ import XCTest
         app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00", "MADAR_UI_QURAN_FIXTURE": "home"]
         app.launch(); XCTAssertTrue(app.buttons["quran-streak"].waitForExistence(timeout: 25)); app.buttons["quran-streak"].tap()
         let level = app.buttons["quran-plan-quran.hifzLevel"]
-        XCTAssertTrue(level.waitForExistence(timeout: 10)); level.tap()
-        app.buttons["quran-plan-option-quran.hifzLevel-deep"].tap()
+        XCTAssertTrue(level.waitForExistence(timeout: 10))
+        let levelEnabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isEnabled == true"), object: level)
+        XCTAssertEqual(XCTWaiter.wait(for: [levelEnabled], timeout: 30), .completed, app.debugDescription)
+        level.tap()
+        let deep = app.buttons["quran-plan-option-quran.hifzLevel-deep"]
+        XCTAssertTrue(deep.waitForExistence(timeout: 10), app.debugDescription)
+        deep.tap()
         let amount = app.staticTexts["quran-plan-example-amount"]
         for _ in 0..<8 where !amount.isHittable { app.swipeUp() }
         XCTAssertTrue(amount.isHittable)
@@ -24,15 +29,22 @@ import XCTest
         XCTAssertTrue(forecast.waitForExistence(timeout: 10)); let before = forecast.label
         let maximum = app.buttons["quran-plan-preview-max"]
         for _ in 0..<5 where !maximum.isHittable { app.swipeUp() }
-        XCTAssertTrue(maximum.isHittable); maximum.tap()
-        XCTAssertTrue(maximum.isSelected)
+        XCTAssertTrue(maximum.isHittable)
+        let maximumEnabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isEnabled == true"), object: maximum)
+        XCTAssertEqual(XCTWaiter.wait(for: [maximumEnabled], timeout: 30), .completed, app.debugDescription)
+        maximum.tap()
+        let maximumSelected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isSelected == true"), object: maximum)
+        XCTAssertEqual(XCTWaiter.wait(for: [maximumSelected], timeout: 8), .completed, app.debugDescription)
         XCTAssertNotEqual(forecast.label, before)
         XCTAssertTrue(app.buttons["quran-plan-quran.hifzLevel"].label.contains("متوسط"))
         capture(app, "OR-21-forecast-preview-max-L")
         let simple = app.buttons["quran-plan-preview-simple"]
         // Drag the existing four-stop track from its last stop to its first stop.
-        maximum.press(forDuration: 0.1, thenDragTo: simple)
-        XCTAssertTrue(simple.isSelected)
+        let start = maximum.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        let end = simple.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        start.press(forDuration: 0.1, thenDragTo: end)
+        let simpleSelected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isSelected == true"), object: simple)
+        XCTAssertEqual(XCTWaiter.wait(for: [simpleSelected], timeout: 8), .completed, app.debugDescription)
         capture(app, "OR-21-forecast-preview-simple-L")
         app.terminate(); app.launch()
         XCTAssertTrue(app.buttons["quran-streak"].waitForExistence(timeout: 25)); app.buttons["quran-streak"].tap()

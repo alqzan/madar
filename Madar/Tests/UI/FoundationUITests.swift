@@ -130,16 +130,8 @@ import XCTest
         let trip = app.buttons["prayer-travel-pill"]
         XCTAssertTrue(trip.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(NSPredicate(format: "label CONTAINS 'مسافر' AND label CONTAINS 'لندن'").evaluate(with: trip), trip.label)
-        let fajr = app.descendants(matching: .any).matching(identifier: "prayer-arch-fajr").firstMatch
-        XCTAssertTrue(fajr.waitForExistence(timeout: 8), app.debugDescription)
-        let expectedClock = String(try XCTUnwrap(fajr.label.components(separatedBy: "، ").dropFirst().first))
-        fajr.tap()
-        let logClock = app.staticTexts["prayer-log-clock"]
-        XCTAssertTrue(logClock.waitForExistence(timeout: 8), app.debugDescription)
-        attachScreenshot(app, named: "M1-F02-trip-log-clock-L")
-        XCTAssertEqual(logClock.label, expectedClock, "The log sheet must use the same active-trip clock as the prayer arch")
-        app.buttons["prayer-status-alone"].tap()
         let dhuhr = app.descendants(matching: .any).matching(identifier: "prayer-arch-dhuhr").firstMatch
+        XCTAssertTrue(dhuhr.waitForExistence(timeout: 8), app.debugDescription)
         XCTAssertTrue(dhuhr.label.contains("قصر"), dhuhr.label)
         attachScreenshot(app, named: "M1-F02-trip-L")
         dhuhr.tap()
@@ -152,6 +144,27 @@ import XCTest
         attachScreenshot(app, named: "M1-F02-paired-L")
         XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "prayer-arch-dhuhr").firstMatch.label.contains("جماعة"), app.debugDescription)
         app.terminate()
+    }
+
+    func test_M1F02_TripLogClockMatchesTravelArch() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
+            "MADAR_UI_NOW": "2026-10-07T16:00:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01", "MADAR_UI_THEME": "light",
+            "MADAR_UI_TRAVEL_FIX": "51.5074,-0.1278,لندن,GB,Europe/London"]
+        app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+        let pill = app.buttons["prayer-travel-pill"]
+        XCTAssertTrue(pill.waitForExistence(timeout: 10), app.debugDescription); pill.tap()
+        let yes = app.buttons["prayer-travel-yes"]
+        XCTAssertTrue(yes.waitForExistence(timeout: 8), app.debugDescription); yes.tap()
+        let fajr = app.descendants(matching: .any).matching(identifier: "prayer-arch-fajr").firstMatch
+        XCTAssertTrue(fajr.waitForExistence(timeout: 8), app.debugDescription)
+        let expectedClock = try XCTUnwrap(fajr.label.components(separatedBy: "، ").dropFirst().first)
+        fajr.tap()
+        let logClock = app.staticTexts["prayer-log-clock"]
+        XCTAssertTrue(logClock.waitForExistence(timeout: 8), app.debugDescription)
+        attachScreenshot(app, named: "M1-F02-trip-log-clock-L")
+        XCTAssertEqual(logClock.label, expectedClock, "The log sheet must use the same active-trip clock as the prayer arch")
     }
 
     /// OR-09: London → Paris is one journey: the pill asks on arrival, the next leg joins the trip and the sheet lists both stops.
@@ -715,6 +728,9 @@ import XCTest
         let settings = app.buttons["tab-customize"]
         XCTAssertTrue(settings.waitForExistence(timeout: 10), app.debugDescription)
         settings.tap()
+        let notifications = app.buttons["الإشعارات"]
+        XCTAssertTrue(notifications.waitForExistence(timeout: 10), app.debugDescription)
+        scrollTo(notifications, in: app); notifications.tap()
         let request = app.buttons["prayer-notification-permission-request"]
         XCTAssertTrue(request.waitForExistence(timeout: 10), app.debugDescription)
         scrollTo(request, in: app)
@@ -1018,7 +1034,7 @@ import XCTest
         XCTAssertTrue(choose.isHittable, app.debugDescription)
         attachScreenshot(app, named: "B01-backup-folder-choice-L")
         choose.tap()
-        let cancel = app.buttons.matching(NSPredicate(format: "label IN %@", ["Cancel", "إلغاء"])).firstMatch
+        let cancel = app.descendants(matching: .any).matching(NSPredicate(format: "label IN %@", ["Cancel", "إلغاء"])).firstMatch
         XCTAssertTrue(cancel.waitForExistence(timeout: 10), app.debugDescription)
         cancel.tap()
         XCTAssertTrue(choose.waitForExistence(timeout: 10), app.debugDescription)
@@ -1210,7 +1226,7 @@ import XCTest
             XCTAssertTrue(target.staticTexts["الصلاة"].waitForExistence(timeout: 10), target.debugDescription)
         }
         func fajrArch(_ target: XCUIApplication) -> XCUIElement {
-            target.buttons.matching(NSPredicate(format: "label CONTAINS %@", "الفجر")).firstMatch
+            target.descendants(matching: .any).matching(identifier: "prayer-arch-fajr").firstMatch
         }
         func record(_ status: String, in target: XCUIApplication) {
             let arch = fajrArch(target)
@@ -1219,6 +1235,8 @@ import XCTest
             let choice = target.buttons["prayer-status-\(status)"]
             XCTAssertTrue(choice.waitForExistence(timeout: 10), target.debugDescription)
             choice.tap()
+            let skipHeartQuestion = target.buttons["prayer-heart-skip"]
+            if skipHeartQuestion.waitForExistence(timeout: 3) { skipHeartQuestion.tap() }
         }
 
         openPrayer(app)
