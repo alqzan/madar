@@ -45,8 +45,8 @@ struct DiaryProjectsPanel: View {
             handledRouteID = nil
             if !projects.isEmpty { openRoutedProject(initialProjectID) }
         }
-        .sheet(isPresented: $creating) { DiaryProjectEditor(app: app).environment(\.roomTheme, theme).presentationDetents([.medium, .large]) }
-        .sheet(item: $detail) { project in DiaryProjectDetail(app: app, project: project).environment(\.roomTheme, theme) }
+        .sheet(isPresented: $creating) { DiaryProjectEditor(app: app).environment(\.roomTheme, theme).presentationDetents([.medium, .large]).diaryRootDraftBlocking(app) }
+        .sheet(item: $detail) { project in DiaryProjectDetail(app: app, project: project).environment(\.roomTheme, theme).diaryRootDraftBlocking(app) }
     }
     private func loadProjects() {
         do {

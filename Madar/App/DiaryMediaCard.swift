@@ -52,7 +52,7 @@ struct DiaryMediaCard: View {
         }.padding(.vertical, 10).padding(.leading, 58).padding(.trailing, 18)
             .task { if voice == nil { voice = DiaryVoiceController(app: app) } }
             .sheet(item: $preview) { item in DiaryQuickLook(url: item.url).onDisappear { try? FileManager.default.removeItem(at: item.url.deletingLastPathComponent()) } }
-            .sheet(isPresented: $editingTranscript) { DiaryTranscriptEditor(app: app, media: media, original: transcript).environment(\.roomTheme, theme) }
+            .sheet(isPresented: $editingTranscript) { DiaryTranscriptEditor(app: app, media: media, original: transcript).environment(\.roomTheme, theme).diaryRootDraftBlocking(app) }
             .onDisappear { if playback.activeID == media.id { playback.stop() }; voice?.cancelConversion(); voice?.cancelDownload() }
     }
     /// «ثانية واحدة»، «ثانيتان»، «٥ ثوانٍ»، «٤٠ ثانيةً».
@@ -145,6 +145,7 @@ private struct DiaryTranscriptEditor: View {
         } message: { Text("التعديلات غير محفوظة.") }
         .task { text = original; loaded = true }
         .interactiveDismissDisabled(hasUnsavedText || saving)
+        .diaryRootDraftBlocking(app)
     }
 }
 

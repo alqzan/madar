@@ -26,6 +26,18 @@ private struct DiaryEditorTarget: Identifiable {
     let margin: GregorianDay?
     var day = "today"
 }
+private struct DiaryRootDraftBlocking: ViewModifier {
+    @Bindable var app: AppSession
+    @State private var blockerID = UUID()
+    func body(content: Content) -> some View {
+        content
+            .onAppear { app.setDiaryRootDraftBlocker(blockerID, active: true) }
+            .onDisappear { app.setDiaryRootDraftBlocker(blockerID, active: false) }
+    }
+}
+extension View {
+    func diaryRootDraftBlocking(_ app: AppSession) -> some View { modifier(DiaryRootDraftBlocking(app: app)) }
+}
 struct DiaryHomeView: View {
     @Bindable var app: AppSession
     @Environment(\.roomTheme) private var theme
@@ -37,6 +49,7 @@ struct DiaryHomeView: View {
     @State private var searchOpen = false
     @State private var editor: DiaryEditorTarget?
     @State private var reader: GregorianDay?
+    @State private var pendingDiaryRootRequestID: UUID?
     @State private var readerEntryID: UUID?
     @State private var routedHubTab: String?
     @State private var routedLetterID: UUID?
@@ -133,15 +146,15 @@ struct DiaryHomeView: View {
             }
         }
         .onChange(of: selected) { _, day in if let day { Task { try? await service.prepareClosedDay(day); await refresh() } } }
-        .fullScreenCover(isPresented: $searchOpen, onDismiss: { routedSearchQuery = nil; routedSearchRequestID = nil }) { DiarySearchView(app: app, initialQuery: routedSearchQuery, initialQueryRequestID: routedSearchRequestID).environment(\.roomTheme, theme) }
-        .fullScreenCover(isPresented: $archiveOpen, onDismiss: clearHubRoute) {
+        .fullScreenCover(isPresented: $searchOpen, onDismiss: { routedSearchQuery = nil; routedSearchRequestID = nil; applyPendingDiaryRootIfReady() }) { DiarySearchView(app: app, initialQuery: routedSearchQuery, initialQueryRequestID: routedSearchRequestID).environment(\.roomTheme, theme) }
+        .fullScreenCover(isPresented: $archiveOpen, onDismiss: { clearHubRoute(); applyPendingDiaryRootIfReady() }) {
             DiaryHubView(app: app, initialTab: routedHubTab, initialLetterID: routedLetterID, initialProjectID: routedProjectID,
                 initialLetterRequestID: routedLetterRequestID, initialProjectRequestID: routedProjectRequestID)
                 .environment(\.roomTheme, theme).madarSheetErrorAlert(app)
         }
-        .sheet(isPresented: $customizing, onDismiss: { selected = nil; Task { await refresh() } }) { DiaryCustomizeView(app: app).environment(\.roomTheme, theme).madarSheetErrorAlert(app) }
-        .sheet(item: $editor) { target in DiaryTextEditor(app: app, margin: target.margin, initialDay: target.day).environment(\.roomTheme, theme).madarSheetErrorAlert(app) }
-        .sheet(isPresented: Binding(get: { reader != nil }, set: { if !$0 { reader = nil; readerEntryID = nil; readerEntryRouteID = nil } })) {
+        .sheet(isPresented: $customizing, onDismiss: { selected = nil; Task { await refresh() }; applyPendingDiaryRootIfReady() }) { DiaryCustomizeView(app: app).environment(\.roomTheme, theme).madarSheetErrorAlert(app) }
+        .sheet(item: $editor, onDismiss: { applyPendingDiaryRootIfReady() }) { target in DiaryTextEditor(app: app, margin: target.margin, initialDay: target.day).environment(\.roomTheme, theme).madarSheetErrorAlert(app) }
+        .sheet(isPresented: Binding(get: { reader != nil }, set: { if !$0 { reader = nil; readerEntryID = nil; readerEntryRouteID = nil } }), onDismiss: { applyPendingDiaryRootIfReady() }) {
             if let reader { DiaryDayView(app: app, day: reader, initialEntryID: readerEntryID, initialEntryRouteID: readerEntryRouteID).environment(\.roomTheme, theme).madarSheetErrorAlert(app) }
         }
         .onChange(of: app.diaryRoute, initial: true) { _, route in
@@ -163,6 +176,12 @@ struct DiaryHomeView: View {
             }
             else if route.path.first == "today" { readerEntryID = nil; readerEntryRouteID = nil; reader = try? service.currentDay() }
         }
+        .onChange(of: app.diaryRootRequestID, initial: true) { _, requestID in
+            guard let requestID else { pendingDiaryRootRequestID = nil; return }
+            pendingDiaryRootRequestID = requestID
+            applyPendingDiaryRootIfReady()
+        }
+        .onChange(of: app.diaryRootDraftBlockers) { _, _ in applyPendingDiaryRootIfReady() }
         .onChange(of: app.searchRoute, initial: true) { _, route in
             guard let route, route.parameters["room"] == nil || route.parameters["room"] == "notes" else { return }
             app.searchRoute = nil
@@ -172,6 +191,22 @@ struct DiaryHomeView: View {
         }
     }
     private func clearHubRoute() { routedHubTab = nil; routedLetterID = nil; routedProjectID = nil; routedLetterRequestID = nil; routedProjectRequestID = nil }
+    private func applyPendingDiaryRootIfReady() {
+        guard let requestID = pendingDiaryRootRequestID,
+              app.diaryRootRequestID == requestID,
+              app.diaryRootDraftBlockers.isEmpty,
+              editor == nil else { return }
+        pendingDiaryRootRequestID = nil
+        app.diaryRootRequestID = nil
+        searchOpen = false
+        archiveOpen = false
+        customizing = false
+        reader = nil
+        readerEntryID = nil
+        readerEntryRouteID = nil
+        selected = nil
+        clearHubRoute()
+    }
     private var header: some View {
         HStack(alignment: .center, spacing: 10) {
             VStack(alignment: .leading, spacing: 3) {

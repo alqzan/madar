@@ -194,11 +194,11 @@ struct DiaryDayView: View {
                 .fullScreenCover(isPresented:$searchOpen){DiarySearchView(app:app).environment(\.roomTheme,theme)}
                 .fullScreenCover(isPresented:$archiveOpen){DiaryHubView(app:app).environment(\.roomTheme,theme).madarSheetErrorAlert(app)}
                 .sheet(item:$openingLetter,onDismiss:{retry+=1}){letter in DiaryLetterMoment(app:app,letter:letter).environment(\.roomTheme,theme)}
-                .sheet(item:$editing){edit in DiaryLineEditSheet(app:app,edit:edit){niyyaSaved=true}.environment(\.roomTheme,theme)}
+                .sheet(item:$editing){edit in DiaryLineEditSheet(app:app,edit:edit){niyyaSaved=true}.environment(\.roomTheme,theme).diaryRootDraftBlocking(app)}
                 .sheet(item:$original){first in DiaryOriginalSheet(text:first.text).environment(\.roomTheme,theme).presentationDetents([.medium,.large])}
                 .sheet(isPresented:$stampsOpen){DiaryStampsView(app:app).environment(\.roomTheme,theme)}
                 .sheet(isPresented:$weekOpen){DiaryWeekView(app:app,day:shownDay).environment(\.roomTheme,theme)}
-                .sheet(isPresented:$intentionsOpen){DiaryIntentionsView(app:app,day:shownDay,evening:service.intentionEvening(shownDay)).environment(\.roomTheme,theme).madarSheetErrorAlert(app)}
+                .sheet(isPresented:$intentionsOpen){DiaryIntentionsView(app:app,day:shownDay,evening:service.intentionEvening(shownDay)).environment(\.roomTheme,theme).madarSheetErrorAlert(app).diaryRootDraftBlocking(app)}
                 .sheet(isPresented: $writing) { DiaryTextEditor(app: app, margin: shownDay == today ? nil : shownDay).environment(\.roomTheme, theme).madarSheetErrorAlert(app) }
                 // N04: letters are checked when the diary is open and the app comes to the foreground.
                 .onChange(of:scenePhase){_,phase in if phase == .active {retry+=1}}

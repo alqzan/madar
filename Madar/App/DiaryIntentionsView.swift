@@ -54,7 +54,7 @@ struct DiaryIntentionsView:View {
                     Button("أكمل الكتابة"){}.accessibilityIdentifier("diary-niyya-continue")
                 } message:{Text("لم تحفظ التغييرات على النيّة.")}
                 .task(id:app.prayerRevision){load()}.disabled(busy)
-        }
+        }.diaryRootDraftBlocking(app)
     }
     private func load(){do{rows=try service.intentions(day);failure=nil}catch{failure=madarUserMessage(error)}}
     private func run(_ action:@escaping @MainActor () async throws -> Void){busy=true;Task{@MainActor in defer{busy=false};do{try await action();saved=true;load()}catch{failure=madarUserMessage(error)}}}

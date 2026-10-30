@@ -85,10 +85,10 @@ struct DiaryLettersPanel: View {
             handledRouteID = nil
             if !letters.isEmpty { openRoutedLetter(initialLetterID) }
         }
-        .sheet(isPresented: $composing) { DiaryLetterComposer(app: app).environment(\.roomTheme, theme) }
+        .sheet(isPresented: $composing) { DiaryLetterComposer(app: app).environment(\.roomTheme, theme).diaryRootDraftBlocking(app) }
         .sheet(item: $opening) { letter in DiaryLetterMoment(app: app, letter: letter).environment(\.roomTheme, theme) }
         .sheet(item: $reading) { letter in DiaryLetterReader(text: letter.text ?? "", written: service.bothDates(letter.writtenDay)).environment(\.roomTheme, theme).presentationDetents([.medium, .large]) }
-        .sheet(item: $rescheduling) { letter in DiaryLetterReschedule(app: app, letter: letter).environment(\.roomTheme, theme).presentationDetents([.medium]) }
+        .sheet(item: $rescheduling) { letter in DiaryLetterReschedule(app: app, letter: letter).environment(\.roomTheme, theme).presentationDetents([.medium]).diaryRootDraftBlocking(app) }
     }
     private func load() async {
         do {

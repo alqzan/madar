@@ -66,7 +66,15 @@ struct DiarySearchView: View {
                     }
                 }.padding(18)
             }.navigationBarTitleDisplayMode(.inline).scrollDismissesKeyboard(.interactively).background(theme.background).foregroundStyle(theme.ink)
-                .toolbar{ToolbarItem(placement:.topBarLeading){Button{dismiss()}label:{HStack(spacing:5){Image(systemName:"chevron.backward");Text("رجوع").font(DiaryType.label)}}.accessibilityIdentifier("diary-search-close")};ToolbarItem(placement:.principal){Text("في الكتابة والهوامش والتسجيلات").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))}}
+                .toolbar{
+                    ToolbarItem(placement:.topBarLeading){Button{dismiss()}label:{HStack(spacing:5){Image(systemName:"chevron.backward");Text("رجوع").font(DiaryType.label)}}.accessibilityIdentifier("diary-search-close")}
+                    ToolbarItem(placement:.principal){Text("في الكتابة والهوامش والتسجيلات").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))}
+#if DEBUG
+                    if ProcessInfo.processInfo.environment["MADAR_UI_DIARY_ROOT_ROUTE_HARNESS"] == "1" {
+                        ToolbarItem(placement:.topBarTrailing) { Button("اختبر الجذر") { app.open(URL(string:"madar://notes")!) }.accessibilityIdentifier("ui-test-open-diary-root") }
+                    }
+#endif
+                }
                 .toolbarBackground(theme.background,for:.navigationBar).tint(theme.accent)
                 .task(id: loadAttempt) { loadIndex() }
                 .onChange(of: initialQueryRequestID, initial: true) { _, _ in applyInitialQuery() }

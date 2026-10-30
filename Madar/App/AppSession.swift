@@ -19,6 +19,9 @@ final class AppSession {
     private static let bahwReturnStateKey = "sys.bahwReturnPlan"
     let diaryPlayback = DiaryPlayback()
     var diaryRoute: Route?
+    /// A diary root link waits for child editors that own an explicit save/discard path.
+    var diaryRootRequestID: UUID?
+    var diaryRootDraftBlockers: Set<UUID> = []
     var prayerRoute: Route?
     var prayerRootRequestID: UUID?
     var quranRoute: Route?
@@ -619,6 +622,10 @@ final class AppSession {
     func string(_ key: String) -> String { if case .string(let v) = values[key] { v } else { "" } }
     func bool(_ key: String) -> Bool { if case .bool(let v) = values[key] { v } else { false } }
     func number(_ key: String) -> Double { if case .number(let v) = values[key] { v } else { 0 } }
+    func setDiaryRootDraftBlocker(_ id: UUID, active: Bool) {
+        if active { diaryRootDraftBlockers.insert(id) }
+        else { diaryRootDraftBlockers.remove(id) }
+    }
     func open(_ url: URL) {
         let today = GregorianDay.containing(.now, in: activePlace.timeZone)
         let unavailableSettings = Set(schema.settings.map(\.key)).subtracting(Self.supportedKeys)
@@ -654,7 +661,16 @@ final class AppSession {
             if route.room == .quran {
                 quranRoute = route; selectedTab = "quran"; return
             }
-            if route.room == .notes { diaryRoute = route; selectedTab = "notes"; return }
+            if route.room == .notes {
+                if route.path.isEmpty {
+                    diaryRootRequestID = UUID()
+                    if selectedTab != "notes" { selectedTab = "notes" }
+                } else {
+                    diaryRoute = route
+                    selectedTab = "notes"
+                }
+                return
+            }
             if route.room == .habits { bahwRootRequestID = nil; habitRouteID=route.path.last.flatMap(UUID.init(uuidString:)) ?? route.parameters["habit"].flatMap(UUID.init(uuidString:)); yearOpen = false; selectedTab = "foundation"; habitsOpen = true; return }
             if route.room == .year {
                 yearDayID = route.path.count == 3 ? route.path.last.flatMap(UUID.init(uuidString:)) : nil

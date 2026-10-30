@@ -1,12 +1,39 @@
 import XCTest
 
 @MainActor final class DiaryWindowUITests: XCTestCase {
-    private func launch(_ variant: String) -> XCUIApplication {
+    private func launch(_ variant: String, rootRouteHarness: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": variant,
+        var environment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": variant,
             "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00"]
+        if rootRouteHarness { environment["MADAR_UI_DIARY_ROOT_ROUTE_HARNESS"] = "1" }
+        app.launchEnvironment = environment
         app.launch(); XCTAssertTrue(app.staticTexts["diary-home-title"].waitForExistence(timeout: 25), app.debugDescription)
         return app
+    }
+    func testDiaryRootRouteClosesSearchAndWaitsForTextDraft() throws {
+        continueAfterFailure = false
+        let app = launch("empty", rootRouteHarness: true)
+        app.buttons["diary-search"].tap()
+        XCTAssertTrue(app.textFields["diary-search-query"].waitForExistence(timeout: 10), app.debugDescription)
+        app.buttons["ui-test-open-diary-root"].tap()
+        XCTAssertTrue(app.staticTexts["diary-home-title"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(app.textFields["diary-search-query"].exists)
+
+        app.buttons["diary-write"].tap()
+        let editor = app.textViews["diary-editor-text"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 10), app.debugDescription)
+        editor.tap(); editor.typeText("مسودة تحفظ قبل الرجوع")
+        let rootLink = app.buttons["ui-test-open-diary-root"]
+        XCTAssertTrue(rootLink.label.contains("مع مسودة"), "The active editor must register as a diary-root blocker.")
+        rootLink.tap()
+        XCTAssertTrue(editor.waitForExistence(timeout: 5), "The root route must wait while a diary editor owns a draft.\n" + app.debugDescription)
+        app.buttons["diary-editor-save"].tap()
+        let write = app.buttons["diary-write"]
+        XCTAssertTrue(write.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(write.isHittable, app.debugDescription)
+        XCTAssertFalse(editor.exists)
+        app.buttons["diary-today"].tap()
+        XCTAssertTrue(app.staticTexts["مسودة تحفظ قبل الرجوع"].waitForExistence(timeout: 10), app.debugDescription)
     }
     func testWindowYearsMarginTodayAndRelaunch() throws {
         continueAfterFailure = false

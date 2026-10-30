@@ -42,7 +42,7 @@ struct DiaryLineEditSheet: View {
                     Button("تجاهل التعديل", role: .destructive) { dismiss() }
                     Button("أكمل التعديل", role: .cancel) {}
                 }
-        }
+        }.diaryRootDraftBlocking(app)
     }
 }
 

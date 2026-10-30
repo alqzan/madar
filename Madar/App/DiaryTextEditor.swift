@@ -109,7 +109,14 @@ struct DiaryTextEditor: View {
             .foregroundStyle(theme.ink).background(theme.background)
             .navigationTitle(margin == nil ? "صفحة اليوم" : "اكتب في هامشها").navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) { Button("إغلاق") { Task { await close() } }.disabled(saving || importing || voice?.savingAudio == true).accessibilityIdentifier("diary-editor-cancel") }
+                ToolbarItemGroup(placement: .topBarLeading) {
+                    Button("إغلاق") { Task { await close() } }.disabled(saving || importing || voice?.savingAudio == true).accessibilityIdentifier("diary-editor-cancel")
+#if DEBUG
+                    if ProcessInfo.processInfo.environment["MADAR_UI_DIARY_ROOT_ROUTE_HARNESS"] == "1" {
+                        Button(app.diaryRootDraftBlockers.isEmpty ? "اختبر الجذر" : "اختبر الجذر مع مسودة") { app.open(URL(string:"madar://notes")!) }.accessibilityIdentifier("ui-test-open-diary-root")
+                    }
+#endif
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(saving ? "يُحفظ…" : "تمّ") { Task { await save() } }.fontWeight(.bold)
                         .disabled(saving || importing || voice?.savingAudio == true || (!attachmentSaved && text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
@@ -158,6 +165,7 @@ struct DiaryTextEditor: View {
         .safeAreaInset(edge: .bottom) { if editorUndo, app.undoToastVisible { UndoToast(message: app.undoMessage, undo: app.undo, dismiss: app.hideUndoToast) } }
         .interactiveDismissDisabled(!text.isEmpty || saving || importing || voice?.recording == true || voice?.savingAudio == true)
         .onDisappear { draftTask?.cancel(); voice?.cancelConversion(); voice?.cancelDownload(); if let voice { Task { await voice.stop() } } }
+        .diaryRootDraftBlocking(app)
     }
     /// The selected range, or an empty range at the cursor (the end when nothing is focused yet).
     private var selectedOffsets: Range<Int> {
