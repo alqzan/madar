@@ -119,6 +119,18 @@ public struct HabitTime: Equatable, Sendable {
                         }
                     }
                     ownerStreak = QuranProgressEngine.streak(activities: snapshot.activities, through: today, restDay: snapshot.restDay).days
+                case "reading":
+                    // §7.6: a session under 60 active seconds keeps its place but never counts for the habit.
+                    // Both units are offered per day; the engine keeps the one the period's rule measures.
+                    var seconds: [String: Int] = [:], pages: [String: Int] = [:]
+                    for row in try context.fetch(FetchDescriptor<ReadingSession>()) where row.deletedAt == nil && row.mergedInto == nil && row.activeSeconds >= 60 && !row.dayKey.isEmpty {
+                        seconds[row.dayKey, default: 0] += row.activeSeconds; pages[row.dayKey, default: 0] += max(0, row.pagesCounted)
+                    }
+                    facts = try seconds.keys.sorted().flatMap { key -> [HabitFact] in
+                        let day = try GregorianDay(key)
+                        return [HabitFact(id: StableIdentity.uuid(for: "habit-reading:\(key):minutes"), day: day, periodKey: "", delta: seconds[key, default: 0] / 60, unit: "minutes"),
+                                HabitFact(id: StableIdentity.uuid(for: "habit-reading:\(key):pages"), day: day, periodKey: "", delta: pages[key, default: 0], unit: "pages")]
+                    }
                 case "diaryLine":
                     let entries = try context.fetch(FetchDescriptor<Entry>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.source != "autoPinned" && !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
                     let chains = DiaryRevisionChains(entries.map { .init(id: $0.id, replaces: $0.source == "revision" ? $0.sourceID.flatMap(UUID.init(uuidString:)) : nil) })

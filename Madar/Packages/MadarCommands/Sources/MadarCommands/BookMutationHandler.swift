@@ -209,6 +209,14 @@ private struct GoodreadsImportSummary: Codable {
             let row = try book(id), before = try row.record()
             row.deletedAt = now; row.deletionBarrierAt = now
             try touch(row, before: before)
+        case .restoreBook(let id):
+            // «سلة المحذوفات» (owner, 30 Oct): a tombstoned book comes back with its sessions, quotes and notes, which
+            // were never cascaded. A book that was being read returns to «أبي أقرأه» when the three reading places are full.
+            guard let row = books.filter({ $0.id == id && $0.mergedInto == nil && $0.deletedAt != nil }).max(by: { $0.updatedAt < $1.updatedAt }) else { throw DataError.invalidValue("الكتاب ليس في سلة المحذوفات") }
+            let before = try row.record(), barrier = row.deletionBarrierAt ?? row.deletedAt ?? .distantPast
+            row.restoredAt = max(now, barrier.addingTimeInterval(0.001)); row.deletedAt = nil
+            if row.shelf == "reading", books.filter({ $0.shelf == "reading" && $0.deletedAt == nil && $0.mergedInto == nil && $0.id != id }).count >= 3 { row.shelf = "want" }
+            try touch(row, before: before)
         case .removeBookFile(let id):
             let row = try book(id)
             guard row.kind == "file", ["epub", "pdf", "pdfScanned"].contains(row.format ?? ""),

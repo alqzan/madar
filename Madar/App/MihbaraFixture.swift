@@ -51,6 +51,21 @@ extension AppSession {
                 }
                 file.updatedAt = now.addingTimeInterval(nearEnd ? 60 : 0)
                 c.insert(file)
+                if ProcessInfo.processInfo.environment["MADAR_UI_MIHBARA_MARGIN_NOTE"] == "1" {
+                    let margin = NotebookNote(); margin.id = StableIdentity.uuid(for: "mihbara-fixture-margin-note"); margin.link = "page"; margin.isPrivate = false
+                    margin.targetID = file.id; margin.page = 12; margin.text = "فكرة تستحق أن أرجع لها."; margin.updatedAt = now
+                    margin.locatorJSON = try JSONSerialization.data(withJSONObject: ["href": "ch1.xhtml", "type": "application/xhtml+xml", "locations": ["progression": 0.2], "text": ["highlight": "العلم صيد والكتابة قيده، قيّد صيودك بالحبال الواثقة."]])
+                    c.insert(margin)
+                }
+            }
+            if ProcessInfo.processInfo.environment["MADAR_UI_MIHBARA_READING_DAYS"] == "1" {
+                // Reading goal (owner, 30 Oct): a week of evening sessions after Isha, today's still short of 15 minutes.
+                for (back, minutes, pages) in [(6, 22, 9), (5, 0, 0), (4, 18, 7), (3, 31, 12), (2, 9, 3), (1, 16, 6), (0, 8, 3)] where minutes > 0 {
+                    let day = try GregorianDay("2026-10-17").adding(days: -back), row = ReadingSession()
+                    row.bookID = r.id; row.dayKey = day.description; row.tzID = "Asia/Riyadh"; row.activeSeconds = minutes * 60; row.pagesCounted = pages
+                    row.start = day.date(in: TimeZone(identifier: "Asia/Riyadh")!).addingTimeInterval(back == 0 ? 10 * 3600 : 21 * 3600); row.end = row.start.addingTimeInterval(Double(minutes * 60))
+                    c.insert(row)
+                }
             }
             let old = Book(); old.title = "قراءة قديمة"; old.author = "من مكتبتك"; old.shelf = "old"; old.finishedAt = ISO8601DateFormatter().date(from: "2016-10-01T12:00:00Z"); c.insert(old)
             let note = NotebookNote(); note.id = StableIdentity.uuid(for: "mihbara-fixture-private-note"); note.text = "سر لا يظهر قبل المصادقة"; note.isPrivate = true; note.link = "general"; note.updatedAt = now; c.insert(note)

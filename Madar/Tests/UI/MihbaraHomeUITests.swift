@@ -2,6 +2,115 @@ import XCTest
 import UIKit
 
 @MainActor final class MihbaraHomeUITests: XCTestCase {
+    /// Owner, 30 Oct: the daily reading goal is the «القراءة» habit, read from the Mihbara's own sessions.
+    func testReadingGoalCreatesTheLinkedHabitAndShowsTheWeek() throws {
+        continueAfterFailure = false
+        let app = app("home")
+        app.launchEnvironment["MADAR_UI_MIHBARA_READING_DAYS"] = "1"
+        app.launch()
+        open(app)
+        let card = app.descendants(matching: .any)["mihbara-reading-goal"]
+        for _ in 0..<6 where !app.buttons["mihbara-goal-create"].isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(app.buttons["mihbara-goal-create"].waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(card.staticTexts["تقرأ غالبًا بعد العشاء"].exists, app.debugDescription)
+        shot(app, "MIH-GOAL-before-L")
+        app.buttons["mihbara-goal-column-2026-10-14"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["mihbara-goal-day"].waitForExistence(timeout: 4), app.debugDescription)
+        shot(app, "MIH-GOAL-day-L")
+        app.buttons["mihbara-goal-create"].tap()
+        let save = app.buttons["habit-save"]
+        XCTAssertTrue(save.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(app.descendants(matching: .any)["habit-reading-unit"].exists, app.debugDescription)
+        shot(app, "MIH-GOAL-editor-L")
+        save.tap()
+        let left = app.staticTexts["mihbara-goal-left"]
+        XCTAssertTrue(left.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertEqual(left.label, "بقي ٧ دقائق")
+        for _ in 0..<3 where !app.buttons["mihbara-goal-edit"].isHittable { app.swipeUp(velocity: .slow) }
+        shot(app, "MIH-GOAL-after-L")
+        app.terminate()
+    }
+
+    /// Owner, 30 Oct: «سلة المحذوفات» brings a deleted book back after the undo toast is gone.
+    func testDeletedBookComesBackFromTheTrash() throws {
+        continueAfterFailure = false
+        let app = app("home")
+        app.launch()
+        open(app)
+        app.buttons["mihbara-library"].tap()
+        let waiting = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'mihbara-library-book-' AND label CONTAINS 'كتاب ينتظر'")).firstMatch
+        XCTAssertTrue(waiting.waitForExistence(timeout: 8), app.debugDescription)
+        waiting.press(forDuration: 1.0)
+        let delete = app.buttons["mihbara-book-delete"]
+        XCTAssertTrue(delete.waitForExistence(timeout: 5), app.debugDescription); delete.tap()
+        let confirm = app.buttons["احذف من مكتبتي"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5), app.debugDescription); confirm.tap()
+        XCTAssertTrue(waiting.waitForNonExistence(timeout: 8), app.debugDescription)
+        // The delete confirmation belongs to the room, so the library closes behind it; open it again.
+        if !app.buttons["mihbara-library-trash"].exists { app.buttons["mihbara-library"].tap() }
+        let trash = app.buttons["mihbara-library-trash"]
+        XCTAssertTrue(trash.waitForExistence(timeout: 8), app.debugDescription)
+        for _ in 0..<6 where !trash.isHittable { app.swipeUp(velocity: .slow) }
+        trash.tap()
+        let restore = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'mihbara-trash-restore-'")).firstMatch
+        XCTAssertTrue(restore.waitForExistence(timeout: 8), app.debugDescription)
+        shot(app, "MIH-TRASH-list-L")
+        restore.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["mihbara-trash-empty"].waitForExistence(timeout: 8), app.debugDescription)
+        shot(app, "MIH-TRASH-empty-L")
+        app.navigationBars.buttons.firstMatch.tap()
+        for _ in 0..<6 where !waiting.exists { app.swipeDown(velocity: .slow) }
+        XCTAssertTrue(waiting.waitForExistence(timeout: 8), app.debugDescription)
+        app.terminate()
+    }
+
+    /// Owner, 30 Oct: a note written on a passage is listed on the book card and edits in a full page with the passage.
+    func testMarginNoteEditsInAFullPageWithItsPassage() throws {
+        continueAfterFailure = false
+        let app = app("home", fileRow: true)
+        app.launchEnvironment["MADAR_UI_MIHBARA_MARGIN_NOTE"] = "1"
+        app.launch()
+        open(app)
+        app.buttons["mihbara-library"].tap()
+        let book = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'mihbara-library-book-' AND label CONTAINS 'ملف قابل للتعديل'")).firstMatch
+        XCTAssertTrue(book.waitForExistence(timeout: 8), app.debugDescription); book.tap()
+        let note = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'mihbara-margin-note-'")).firstMatch
+        for _ in 0..<4 where !(note.exists && note.isHittable) { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(note.waitForExistence(timeout: 8), app.debugDescription)
+        shot(app, "MIH-MARGIN-card-L")
+        note.tap()
+        let editor = app.textViews["mihbara-margin-text"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 6), app.debugDescription)
+        XCTAssertTrue(app.descendants(matching: .any)["mihbara-margin-passage"].exists, app.debugDescription)
+        editor.typeText(" ومعها مثال.")
+        shot(app, "MIH-MARGIN-editor-L")
+        app.buttons["mihbara-margin-save"].tap()
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'mihbara-margin-note-' AND label CONTAINS 'ومعها مثال'")).firstMatch.waitForExistence(timeout: 8), app.debugDescription)
+        app.terminate()
+    }
+
+    /// Owner, 30 Oct: the library search also looks inside the text of the books and opens the reader at the match.
+    func testLibrarySearchFindsWordsInsideBooks() throws {
+        continueAfterFailure = false
+        let fixtureURL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "arabic-reader-poc", withExtension: "epub"))
+        let app = app("reader", epub: try Data(contentsOf: fixtureURL))
+        app.launch(); open(app)
+        app.buttons["mihbara-library"].tap()
+        let field = app.textFields["mihbara-library-search"]
+        XCTAssertTrue(field.waitForExistence(timeout: 8), app.debugDescription)
+        field.tap(); field.typeText("نافذة")
+        let search = app.buttons["mihbara-text-search"]
+        XCTAssertTrue(search.waitForExistence(timeout: 5), app.debugDescription); search.tap()
+        let hit = app.buttons["mihbara-text-hit"].firstMatch
+        XCTAssertTrue(hit.waitForExistence(timeout: 30), app.debugDescription)
+        XCTAssertTrue(hit.label.contains("نافذة"), hit.label)
+        shot(app, "MIH-SEARCH-hits-L")
+        hit.tap()
+        XCTAssertTrue(app.buttons["mihbara-reader-close"].waitForExistence(timeout: 20), app.debugDescription)
+        shot(app, "MIH-SEARCH-reader-L")
+        app.terminate()
+    }
+
     func testMihbaraRouteRetriesAfterFirstShelfReadFails() throws {
         continueAfterFailure = false
         let app = app("home")
@@ -421,7 +530,13 @@ import UIKit
         // xcodebuild can hang after the run and lose attachments; a shot folder keeps them on disk.
         if let dir = ProcessInfo.processInfo.environment["MADAR_SHOT_DIR"] { try? s.pngRepresentation.write(to: URL(fileURLWithPath: dir).appendingPathComponent(name + ".png")) }
     }
-    private func reach(_ app: XCUIApplication, _ button: XCUIElement) { for _ in 0..<7 where !button.isHittable { app.swipeUp(velocity:.slow) }; XCTAssertTrue(button.isHittable) }
+    /// Short drags, so a longer room never carries the button past the top between two checks.
+    private func reach(_ app: XCUIApplication, _ button: XCUIElement) {
+        for _ in 0..<14 where !button.isHittable {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.7)).press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45)))
+        }
+        XCTAssertTrue(button.isHittable)
+    }
     func testHomeWirdExplicitUnderstandingUndoAndRelaunch() {
         continueAfterFailure = false; let app = app("home"); app.launch(); open(app)
         XCTAssertFalse(app.buttons["tab-customize"].isHittable)

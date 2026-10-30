@@ -511,6 +511,7 @@ struct MihbaraBookCard: View {
                             MadarDateLabel(app.dateLabels(GregorianDay.containing(finished, in: app.activePlace.timeZone)))
                         }
                     }
+                    MihbaraMarginNotesSection(app: app, bookID: book.id)
                     if book.shelf != "reading" { Button("ضعه على الطاولة") { moveToReading() }.buttonStyle(MadarPrimaryButton()).disabled(saving).accessibilityIdentifier("mihbara-put-on-table") }
                     if fileUnavailable {
                         Label("ملف الكتاب غير موجود على هذا الجهاز.", systemImage: "doc.badge.ellipsis")

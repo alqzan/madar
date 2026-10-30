@@ -8,6 +8,7 @@ public enum BookCommand: Codable, Equatable, Sendable {
     case importEPUB(id: UUID, fileID: UUID, sha256: String, title: String, author: String, language: String, shelf: String, turathID: Int? = nil)
     case importGoodreads(id: UUID, fileID: UUID, sha256: String, fileName: String, cutoffYear: Int, missingDateShelf: String, selectedMatchesJSON: Data)
     case deleteBook(id: UUID)
+    case restoreBook(id: UUID)
     case removeBookFile(id: UUID)
     case restoreBookFile(id: UUID, fileID: UUID, sha256: String)
     case shelf(id: UUID, shelf: String, replacing: UUID?)
@@ -27,7 +28,7 @@ public enum BookCommand: Codable, Equatable, Sendable {
     /// «أضف إلى كلماتي»: one saved word with its source paragraph and reading position.
     case saveUserWord(id: UUID, word: String, language: String, bookID: UUID, bookTitle: String, locatorJSON: Data, context: String)
     public static let highlightColors: Set<String> = ["yellow", "green", "rose"]
-    public static let names: Set<String> = ["book.savePaper", "book.updatePaper", "book.importPDF", "book.importEPUB", "book.importGoodreads", "book.delete", "book.removeFile", "book.restoreFile", "book.moveShelf", "book.rename", "book.setPosition", "book.setLocator", "reading.saveSession", "hadith.mark", "notebook.savePrivate", "notebook.deletePrivate", "highlight.save", "highlight.delete", "notebook.savePage", "word.save"]
+    public static let names: Set<String> = ["book.savePaper", "book.updatePaper", "book.importPDF", "book.importEPUB", "book.importGoodreads", "book.delete", "book.restore", "book.removeFile", "book.restoreFile", "book.moveShelf", "book.rename", "book.setPosition", "book.setLocator", "reading.saveSession", "hadith.mark", "notebook.savePrivate", "notebook.deletePrivate", "highlight.save", "highlight.delete", "notebook.savePage", "word.save"]
     public var isUndoable: Bool {
         if case .readingSession = self { return false }
         if case .removeBookFile = self { return false }
@@ -140,6 +141,9 @@ public enum BookCommand: Codable, Equatable, Sendable {
         case "book.delete":
             guard Set(p.keys) == ["id"] else { return nil }
             return .deleteBook(id: id)
+        case "book.restore":
+            guard Set(p.keys) == ["id"] else { return nil }
+            return .restoreBook(id: id)
         case "book.removeFile":
             guard Set(p.keys) == ["id"] else { return nil }
             return .removeBookFile(id: id)

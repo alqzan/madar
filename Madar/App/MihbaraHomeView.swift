@@ -40,6 +40,8 @@ struct MihbaraHomeView: View {
     @State private var restoreFileAfterSheet = false
     @State private var offerConversion: MihbaraBook?
     @State private var shelfReadFailed = false
+    @State private var readingGoal: MihbaraReadingGoal?
+    @State private var goalEditor: MihbaraGoalEditor?
     @State private var shelfReadError: String?
     #if DEBUG
     @State private var injectedShelfReadFailure = false
@@ -131,6 +133,9 @@ struct MihbaraHomeView: View {
                 }
             }.environment(\.roomTheme, theme).presentationDragIndicator(.visible).madarSheetErrorAlert(app)
         }
+        .sheet(item: $goalEditor, onDismiss: { load() }) { target in
+            HabitEditorView(session: app, reading: target.reading, id: target.id, initialSource: "reading").madarSheetErrorAlert(app)
+        }
         // Owner, 21 Oct 2026: «اقدر اعدل اسم الكتاب». The spine keeps the short name the title is known by.
         .modifier(MihbaraRenameAlert(book: $renaming, title: $renameTitle, author: $renameAuthor, save: rename))
         .modifier(MihbaraReaderCover(
@@ -188,6 +193,11 @@ struct MihbaraHomeView: View {
                     conversionCards
                     shelfView(reading)
                     deskAndContinuation(reading)
+                    if let readingGoal {
+                        MihbaraReadingGoalCard(app: app, goal: readingGoal, digits: service.digits,
+                                               onCreate: { goalEditor = .init(reading: nil) },
+                                               onEdit: { goalEditor = .init(reading: $0) })
+                    }
                 }
             }
             .padding(.horizontal, 16).padding(.top, 10).padding(.bottom, 28)
@@ -254,6 +264,8 @@ struct MihbaraHomeView: View {
             #endif
             let loaded = try service.load()
             reading = loaded
+            // A failed read keeps the last card; a nil card would offer to create a habit that may already exist.
+            do { readingGoal = try service.readingGoal(today: loaded.day) } catch { app.errorMessage = madarUserMessage(error) }
             shelfReadFailed = false
             shelfReadError = nil
             let books = loaded.books
@@ -1043,6 +1055,10 @@ struct MihbaraHomeView: View {
                 }.frame(height: 125).padding(.horizontal, 65).accessibilityHidden(true)
                 TextField("ابحث في كتبك…", text: $libraryQuery).font(MadarTypography.body()).padding(15).background(theme.surface, in: .capsule).accessibilityIdentifier("mihbara-library-search")
                 Picker("رفّ الكتب", selection: $libraryShelf) { Text("كل الكتب").tag("all"); Text("أقرؤها الآن").tag("reading"); Text("أبي أقرأها").tag("want"); Text("أنهيتها").tag("finished"); Text("قديمًا").tag("old") }.pickerStyle(.menu)
+                MihbaraTextSearchSection(query: libraryQuery, books: r.books, service: service) { hit in
+                    sheet = nil
+                    readerRoute = MihbaraReaderRoute(bookID: hit.bookID, page: hit.pdfPage, locatorJSON: hit.locatorJSON)
+                }
                 libraryStatus(r)
                 // Owner, 21 Oct 2026: the «قديمًا» cabinet is a section here now, after the three shelves.
                 ForEach(Self.librarySections, id: \.shelf) { section in
@@ -1059,6 +1075,15 @@ struct MihbaraHomeView: View {
                         }
                     }
                 }
+                // Owner, 30 Oct 2026: «سلة المحذوفات» — what was deleted by mistake comes back after the undo is gone.
+                NavigationLink {
+                    MihbaraTrashView(app: app, onRestored: { load() }).environment(\.roomTheme, theme)
+                } label: {
+                    Label("سلة المحذوفات", systemImage: "trash").font(MadarTypography.body())
+                        .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading).padding(.horizontal, 16)
+                        .background(theme.surface, in: .rect(cornerRadius: 14))
+                }
+                .buttonStyle(.madarPlain).padding(.top, 8).accessibilityIdentifier("mihbara-library-trash")
             }.padding(20)
         }.background(theme.background).foregroundStyle(theme.ink)
     }
@@ -1163,6 +1188,9 @@ private enum MihbaraRemovalConfirmation { case book(MihbaraBook), file(MihbaraBo
 private enum MihbaraSheet: Identifiable { case library, book(UUID), hadith(Int), opening, notebook, motivation; var id: String { String(describing: self) } }
 private enum MihbaraLibraryAction { case rename(MihbaraBook), remove(MihbaraRemovalConfirmation), open(MihbaraBook, volume: Int?, locatorJSON: String?) }
 private enum MihbaraBookOpenResult { case opened, deferred, failed }
+private struct MihbaraGoalEditor: Identifiable { let reading: HabitReading?; var id: UUID { reading?.id ?? fresh }; private let fresh = UUID()
+    init(reading: HabitReading?) { self.reading = reading }
+}
 private struct MihbaraRenameAlert: ViewModifier {
     @Binding var book: MihbaraBook?
     @Binding var title: String

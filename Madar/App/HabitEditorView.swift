@@ -19,6 +19,8 @@ struct HabitEditorView:View {
     @Bindable var session:AppSession
     let reading:HabitReading?
     let id:UUID
+    /// A new habit opened from a room starts on that room's source (the Mihbara opens «القراءة»).
+    var initialSource="custom"
     @Environment(\.dismiss) private var dismiss
     @State private var name=""
     @State private var source="custom"
@@ -51,7 +53,7 @@ struct HabitEditorView:View {
                 VStack(alignment:.leading,spacing:18) {
                     section("العادة") {
                         TextField("اسم العادة",text:$name,prompt:Text("ورد قبل النوم")).font(MadarTypography.body()).frame(minHeight:44).accessibilityIdentifier("habit-name")
-                        if reading == nil { Picker("تسجيلها",selection:$source) { Text("أسجّلها هنا").tag("custom");Text("الجماعة من الصلاة").tag("jamaah");Text("المراجعة من القرآن").tag("review");Text("سطر اليوم من المذكرات").tag("diaryLine");if HabitHealthStore.available {Text("المشي من الصحة").tag("walking")} }.pickerStyle(.menu).frame(minHeight:44).accessibilityIdentifier("habit-source") }
+                        if reading == nil { Picker("تسجيلها",selection:$source) { Text("أسجّلها هنا").tag("custom");Text("الجماعة من الصلاة").tag("jamaah");Text("المراجعة من القرآن").tag("review");Text("القراءة من المحبرة").tag("reading");Text("سطر اليوم من المذكرات").tag("diaryLine");if HabitHealthStore.available {Text("المشي من الصحة").tag("walking")} }.pickerStyle(.menu).frame(minHeight:44).accessibilityIdentifier("habit-source") }
                         else if let title=reading?.sourceTitle { Text("تُقرأ من "+title).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
                     }
                     section("التكرار") {
@@ -69,6 +71,12 @@ struct HabitEditorView:View {
                         if source == "custom" {
                             Picker("الحساب",selection:$rule.measure){Text("مرة").tag(HabitMeasure.once);Text("بالعدد").tag(HabitMeasure.count);Text("بالوقت").tag(HabitMeasure.duration)}.pickerStyle(.menu).frame(minHeight:44).accessibilityIdentifier("habit-measure")
                             if rule.measure == .count { TextField("الوحدة، مثل كوب أو صفحة",text:Binding(get:{rule.unit ?? ""},set:{rule.unit=$0})).frame(minHeight:44).accessibilityIdentifier("habit-unit") }
+                        }
+                        if source == "reading" {
+                            Picker("تُقاس",selection:Binding(get:{rule.unit ?? "minutes"},set:{unit in
+                                rule.measure = unit == "pages" ? .count : .duration;rule.unit=unit;rule.target=unit == "pages" ? 10 : 15;rule.minimum=rule.minimum.map{min($0,rule.target)}
+                            })) {Text("بالدقائق").tag("minutes");Text("بالصفحات").tag("pages")}.pickerStyle(.segmented).disabled(reading != nil).accessibilityIdentifier("habit-reading-unit")
+                            Text("تُحسب من جلسات القراءة في المحبرة: الوقت وأنت تقرأ فعلًا، والصفحات الجديدة فقط. الجلسة الأقصر من دقيقة لا تُحسب.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                         }
                         if source == "walking" {
                             Picker("وحدة الصحة",selection:Binding(get:{rule.unit ?? "steps"},set:{rule.unit=$0;rule.target=$0 == "steps" ? 6000 : 30})) {Text("خطوات").tag("steps");Text("دقائق حركة").tag("exerciseMinutes")}.pickerStyle(.menu)
@@ -111,9 +119,10 @@ struct HabitEditorView:View {
             }
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.accent).environment(\.timeZone,session.activePlace.timeZone)
         .onAppear {
-            let initialName = reading?.name ?? ""
-            let initialSource = reading?.source ?? "custom"
+            let initialName = reading?.name ?? (initialSource == "reading" ? "القراءة" : "")
+            let initialSource = reading?.source ?? self.initialSource
             var initialRule = reading?.summary.current?.rule ?? HabitRule(effectiveFrom:AppBahwService(session:session).today)
+            if reading == nil && initialSource == "reading" { initialRule.measure = .duration;initialRule.unit="minutes";initialRule.target=15 }
             initialRule.effectiveFrom=AppBahwService(session:session).today
             let initialMonthDays = initialRule.monthDays.map{digits.string($0)}.joined(separator:"، ")
             let initialMinimumOn = initialRule.minimum != nil
@@ -128,15 +137,16 @@ struct HabitEditorView:View {
         .onChange(of:source){old,value in
             if reading == nil && value != "custom" && reminder == "push" { reminder = "dot" }
             if value == "custom",reading == nil {rule.measure = .once;rule.unit=nil;rule.target=1}
-            let defaults=["jamaah":"الجماعة","review":"المراجعة","diaryLine":"سطر اليوم","walking":"المشي"]
+            let defaults=["jamaah":"الجماعة","review":"المراجعة","reading":"القراءة","diaryLine":"سطر اليوم","walking":"المشي"]
             if let previous=defaults[old],name==previous {name=defaults[value] ?? ""}
-            if value != "custom" && reading == nil { rule.measure = value == "walking" ? .health : .count;rule.unit=["jamaah":"صلاة","review":"وجه","diaryLine":"سطر","walking":"steps"][value];rule.target=value == "walking" ? 6000 : value == "jamaah" ? 5 : 1; if name.isEmpty {name=["jamaah":"الجماعة","review":"المراجعة","diaryLine":"سطر اليوم","walking":"المشي"][value] ?? ""} }
+            if value != "custom" && reading == nil { rule.measure = value == "walking" ? .health : value == "reading" ? .duration : .count;rule.unit=["jamaah":"صلاة","review":"وجه","reading":"minutes","diaryLine":"سطر","walking":"steps"][value];rule.target=value == "walking" ? 6000 : value == "jamaah" ? 5 : value == "reading" ? 15 : 1; if name.isEmpty {name=["jamaah":"الجماعة","review":"المراجعة","reading":"القراءة","diaryLine":"سطر اليوم","walking":"المشي"][value] ?? ""} }
         }
         .onChange(of:rule.measure){old,value in measureChanged(from:old,to:value)}
         .interactiveDismissDisabled(hasUnsavedChanges || busy)
     }
     /// Switching back from minutes to a count drops the «minutes» unit, so a count habit never reads as time.
     private func measureChanged(from old:HabitMeasure,to value:HabitMeasure) {
+        if source == "reading" { return } // the minutes/pages picker sets measure, unit and target together
         if value == .duration {rule.unit="minutes";rule.target=15}
         else if value == .once {rule.target=1;rule.minimum=nil;minimumOn=false}
         else if value == .count, old == .duration {rule.unit=nil}

@@ -274,4 +274,28 @@ import MadarData
         #expect(try ModelContext(container).fetchCount(FetchDescriptor<HabitEvent>()) == 0)
         #expect(HabitCommand.parse("habit.complete",["id":.string(id.uuidString),"delta":.number(-1)]) == nil)
     }
+    /// §7.1 unit table + §7.6: «القراءة» reads active minutes (default 15) or pages from saved sessions; a session
+    /// under 60 active seconds and a deleted session never count, and the habit writes no event of its own.
+    @Test func readingHabitCountsSessionMinutesOrPages() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("HabitReading-\(UUID())"); defer { try? FileManager.default.removeItem(at:root) }
+        let container = try MadarContainerFactory.makeLocal(at:root), bus = CommandBus(adapter:DurableCommandAdapter(container:container,lockDirectory:root,transactionClock:{$0}))
+        let context = ModelContext(container)
+        for (seconds, pages, deleted) in [(600, 4, false), (330, 2, false), (45, 9, false), (900, 30, true)] {
+            let row = ReadingSession(); row.dayKey = "2026-10-15"; row.activeSeconds = seconds; row.pagesCounted = pages
+            if deleted { row.deletedAt = now }; context.insert(row)
+        }
+        let yesterday = ReadingSession(); yesterday.dayKey = "2026-10-14"; yesterday.activeSeconds = 1200; yesterday.pagesCounted = 12; context.insert(yesterday)
+        try context.save()
+        let minutes = UUID(); var m = HabitRule(effectiveFrom:try GregorianDay("2026-10-15")); m.measure = .duration; m.unit = "minutes"; m.target = 15
+        let pages = UUID(); var p = HabitRule(effectiveFrom:try GregorianDay("2026-10-15")); p.measure = .count; p.unit = "pages"; p.target = 10
+        #expect(try await bus.execute(.init(name:"habit.save",payload:.object(payload(minutes,m,source:"reading")),issuedAt:now),now:now).status == .applied)
+        #expect(try await bus.execute(.init(name:"habit.save",payload:.object(payload(pages,p,source:"reading")),issuedAt:now),now:now).status == .applied)
+        let readings = try HabitRepository(context:ModelContext(container)).readings(at:now)
+        let byMinutes = try #require(readings.first { $0.id == minutes }), byPages = try #require(readings.first { $0.id == pages })
+        #expect(byMinutes.summary.current?.value == 15 && byMinutes.summary.current?.met == true)
+        #expect(byPages.summary.current?.value == 6 && byPages.summary.current?.met == false)
+        #expect(try ModelContext(container).fetchCount(FetchDescriptor<HabitEvent>()) == 0)
+        var wrong = m; wrong.measure = .count; wrong.unit = "سطر"
+        #expect(HabitCommand.parse("habit.save", try payload(UUID(), wrong, source:"reading")) == nil)
+    }
 }

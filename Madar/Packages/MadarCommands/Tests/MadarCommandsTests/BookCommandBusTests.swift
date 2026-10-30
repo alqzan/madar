@@ -119,4 +119,23 @@ import MadarData
         let missingMedia = try #require(context.fetch(FetchDescriptor<Media>()).first { $0.id == mediaID })
         #expect(missingMedia.data == nil); #expect(missingMedia.state == "missing"); #expect(missingMedia.sha256 == hash); #expect(missingMedia.sizeBytes == bytes.count)
     }
+    /// «سلة المحذوفات» (owner, 30 Oct): a deleted book comes back after the undo window; a book that was being read
+    /// waits in «أبي أقرأه» when the three reading places were filled meanwhile; a live book is not «restored».
+    @Test func deletedBookRestoresFromTheTrash() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "BookTrash-\(UUID())"); defer { try? FileManager.default.removeItem(at: root) }
+        let container = try MadarContainerFactory.makeLocal(at: root)
+        let now = ISO8601DateFormatter().date(from: "2026-10-17T12:00:00+03:00")!, later = now.addingTimeInterval(3 * 86_400)
+        let bus = CommandBus(adapter: DurableCommandAdapter(container: container, lockDirectory: root, transactionClock: { $0 }))
+        func run(_ name: String, _ p: [String: MadarCore.JSONValue], at t: Date) async throws -> CommandOutcome { try await bus.execute(.init(name: name, payload: .object(p), issuedAt: t), now: t) }
+        let gone = UUID()
+        #expect(try await run("book.savePaper", ["id":.string(gone.uuidString),"title":.string("كتاب محذوف"),"author":.string(""),"pages":.number(200),"shelf":.string("reading")], at: now).status == .applied)
+        #expect(try await run("book.delete", ["id":.string(gone.uuidString)], at: now).status == .applied)
+        for n in 0..<3 { _ = try await run("book.savePaper", ["id":.string(UUID().uuidString),"title":.string("كتاب \(n)"),"author":.string(""),"pages":.number(100),"shelf":.string("reading")], at: now) }
+        #expect(BookCommand.parse("book.restore", ["id": .string(gone.uuidString)]) == .restoreBook(id: gone))
+        let restored = try await run("book.restore", ["id":.string(gone.uuidString)], at: later)
+        #expect(restored.status == .applied && restored.undoToken != nil)
+        let row = try #require(ModelContext(container).fetch(FetchDescriptor<Book>()).first { $0.id == gone })
+        #expect(row.deletedAt == nil && row.restoredAt != nil && row.shelf == "want")
+        #expect(try await run("book.restore", ["id":.string(gone.uuidString)], at: later).status != .applied)
+    }
 }
