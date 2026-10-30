@@ -26,6 +26,8 @@ struct HabitEditorView:View {
     @State private var source="custom"
     @State private var rule=HabitRule(effectiveFrom:GregorianDay.containing(.now,in:ActivePlace.riyadh.timeZone))
     @State private var monthDays=""
+    /// The target the reader typed for each unit, so switching minutes ↔ pages and back keeps it.
+    @State private var unitTargets:[String:Int]=[:]
     @State private var minimumOn=false
     @State private var windowOn=false
     @State private var homeOnly=false
@@ -74,12 +76,13 @@ struct HabitEditorView:View {
                         }
                         if source == "reading" {
                             Picker("تُقاس",selection:Binding(get:{rule.unit ?? "minutes"},set:{unit in
-                                rule.measure = unit == "pages" ? .count : .duration;rule.unit=unit;rule.target=unit == "pages" ? 10 : 15;rule.minimum=rule.minimum.map{min($0,rule.target)}
+                                unitTargets[rule.unit ?? "minutes"]=rule.target
+                                rule.measure = unit == "pages" ? .count : .duration;rule.unit=unit;rule.target=unitTargets[unit] ?? (unit == "pages" ? 10 : 15);rule.minimum=rule.minimum.map{min($0,rule.target)}
                             })) {Text("بالدقائق").tag("minutes");Text("بالصفحات").tag("pages")}.pickerStyle(.segmented).disabled(reading != nil).accessibilityIdentifier("habit-reading-unit")
                             Text("تُحسب من جلسات القراءة في المحبرة: الوقت وأنت تقرأ فعلًا، والصفحات الجديدة فقط. الجلسة الأقصر من دقيقة لا تُحسب.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                         }
                         if source == "walking" {
-                            Picker("وحدة الصحة",selection:Binding(get:{rule.unit ?? "steps"},set:{rule.unit=$0;rule.target=$0 == "steps" ? 6000 : 30})) {Text("خطوات").tag("steps");Text("دقائق حركة").tag("exerciseMinutes")}.pickerStyle(.menu)
+                            Picker("وحدة الصحة",selection:Binding(get:{rule.unit ?? "steps"},set:{unitTargets[rule.unit ?? "steps"]=rule.target;rule.unit=$0;rule.target=unitTargets[$0] ?? ($0 == "steps" ? 6000 : 30)})) {Text("خطوات").tag("steps");Text("دقائق حركة").tag("exerciseMinutes")}.pickerStyle(.menu)
                             Text("دقائق الحركة تشمل كل تمرين، وليست المشي وحده. السماح بالصحة باختيارك، ولا يكتب مدار فيها.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                         }
                         if rule.measure != .once {

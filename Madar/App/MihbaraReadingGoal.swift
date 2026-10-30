@@ -50,8 +50,14 @@ extension AppMihbaraService {
         }
         let prayer = try PrayerRepository(context: context), place = prayer.place(at: now), options = prayer.calculationOptions(at: now)
         let recent = sessions.filter { $0.start > now.addingTimeInterval(-30 * 86_400) && $0.start <= now }.map { (start: $0.start, seconds: $0.activeSeconds) }
+        // One prayer calculation per calendar day, not one per session: thirty days hold at most thirty.
+        var prayerDays: [String: PrayerDay?] = [:]
         let usual = MihbaraReadingGoal.usualStretch(recent) { date in
-            PrayerTimesEngine.calculate(day: GregorianDay.containing(date, in: place.timeZone), place: place, options: options)
+            let day = GregorianDay.containing(date, in: place.timeZone)
+            if let cached = prayerDays[day.description] { return cached }
+            let calculated = PrayerTimesEngine.calculate(day: day, place: place, options: options)
+            prayerDays[day.description] = .some(calculated)
+            return calculated
         }
         return .init(habit: habit, days: days, usual: usual)
     }

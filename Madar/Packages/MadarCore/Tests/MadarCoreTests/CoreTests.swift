@@ -194,6 +194,12 @@ func routes() throws {
         #expect(destination.path == [path])
     }
     #expect(try !RouteRegistry.parse(URL(string: "madar://notes/write?day=yesterday")!, context: context).requiresUnlock)
+    // «أكمل القراءة» (Siri): the Mihbara room picks the book, so the route carries none and takes no parameters.
+    let resume = try RouteRegistry.parse(URL(string: "madar://mihbara/continue")!, context: context)
+    #expect(resume.room == .mihbara && resume.path == ["continue"])
+    for input in ["madar://mihbara/continue?id=1", "madar://mihbara/continue/extra"] {
+        #expect(throws: (any Error).self) { try RouteRegistry.parse(URL(string: input)!, context: context) }
+    }
     let locked = RouteContext(trackingStart: context.trackingStart, today: context.today, settingsKeys: context.settingsKeys, unavailableSettings: context.unavailableSettings, lock: .app, availability: context.availability)
     #expect(try RouteRegistry.parse(URL(string: "madar://notes/write")!, context: locked).requiresUnlock)
     for input in ["madar://mal/add?amount=1.5", "madar://mal/add?amount=1&amount=2", "madar://notes/day/2026-02-30", "madar://quran/page/605", "madar://salah/log?prayer=sunrise", "madar://notes/write?save=true", "madar://capture?text=hello", "madar://settings/core/not-a-key"] {

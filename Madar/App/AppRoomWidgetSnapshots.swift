@@ -63,7 +63,7 @@ extension AppSession {
         do {
             let reading=try AppMihbaraService(app:self).load(at:now)
             let current=reading.books.first{$0.shelf=="reading"}
-            let book=current.map { MihbaraSnapshot.BookSummary(id:$0.id,title:$0.title,author:$0.author,currentPage:$0.page.flatMap{$0>0 ? $0 : nil},pages:$0.pages) }
+            let book=current.map { MihbaraSnapshot.BookSummary(id:$0.id,title:$0.title,author:$0.author,currentPage:(($0.isReadableEPUB || $0.isReadablePDF) ? MihbaraCopy.pagesRead($0) : $0.page).flatMap{$0>0 ? $0 : nil},pages:$0.pages) }
             let hadith=reading.todayHadiths.first.map { MihbaraSnapshot.HadithSummary(collectionID:reading.collection.collectionID,number:$0.number,title:$0.title) }
             let notes=try context.fetch(FetchDescriptor<NotebookNote>())
             // Owner, 30 Oct: notebook text reaches the widget only with the same opt-in as the diary's (`notes.widgetContent`, off by default).

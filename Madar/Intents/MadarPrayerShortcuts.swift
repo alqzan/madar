@@ -40,6 +40,12 @@ struct MadarPrayerShortcuts: AppShortcutsProvider {
             systemImageName: "door.left.hand.open"
         )
         AppShortcut(
+            intent: ContinueReadingIntent(),
+            phrases: ["أكمل القراءة في \(.applicationName)", "أكمل كتابي في \(.applicationName)"],
+            shortTitle: "أكمل القراءة",
+            systemImageName: "book.pages"
+        )
+        AppShortcut(
             intent: StartPrayerActivityIntent(),
             phrases: ["ابدأ عداد الصلاة في \(.applicationName)", "تابع الصلاة القادمة في \(.applicationName)"],
             shortTitle: "عدّاد الصلاة",

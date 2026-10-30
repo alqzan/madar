@@ -48,6 +48,13 @@ struct OpenRoomIntent: AppIntent {
     }
 }
 
+/// Owner, 30 Oct: «أكمل القراءة» opens the book on the stand at the saved place. The intent runs outside the store, so it asks the app for `madar://mihbara/continue` and the room picks the book.
+struct ContinueReadingIntent: AppIntent {
+    static let title: LocalizedStringResource = "أكمل القراءة"
+    static let supportedModes: IntentModes = .foreground
+    func perform() async throws -> some IntentResult & OpensIntent { .result(opensIntent: OpenURLIntent(URL(string: "madar://mihbara/continue")!)) }
+}
+
 struct OpenMoneyExpenseIntent: AppIntent {
     static let title: LocalizedStringResource = "سجّل مصروفًا"
     static let supportedModes: IntentModes = .foreground

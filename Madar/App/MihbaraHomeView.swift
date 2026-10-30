@@ -313,6 +313,21 @@ struct MihbaraHomeView: View {
         case "desk":
             app.mihbaraRoute = nil
             return
+        case "continue":
+            // Siri and Shortcuts cannot read the store, so «أكمل القراءة» names no book: the book on the stand is chosen here.
+            guard let book = reading.books.first(where: { $0.id == tableID }) ?? reading.books.first(where: { $0.shelf == "reading" }) else {
+                app.mihbaraRoute = nil
+                app.errorMessage = "ما على رفّ «أقرؤها» كتاب الآن؛ اختر كتابًا من مكتبتك لتكمله."
+                return
+            }
+            switch openBook(book, locatorJSON: nil) {
+            case .opened:
+                app.mihbaraRoute = nil
+                shelfReadFailed = false
+                shelfReadError = nil
+            case .deferred, .failed:
+                break
+            }
         case "book":
             guard route.path.count == 2, let rawID = route.path.last else { app.mihbaraRoute = nil; return }
             guard let id = UUID(uuidString: rawID), let book = reading.book(id) else {

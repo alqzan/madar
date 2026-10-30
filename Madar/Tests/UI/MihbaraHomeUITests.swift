@@ -22,10 +22,19 @@ import UIKit
         XCTAssertTrue(save.waitForExistence(timeout: 8), app.debugDescription)
         XCTAssertTrue(app.descendants(matching: .any)["habit-reading-unit"].exists, app.debugDescription)
         shot(app, "MIH-GOAL-editor-L")
+        // The target typed for minutes survives a look at pages and back (it used to reset to 15).
+        let unit = app.descendants(matching: .any)["habit-reading-unit"]
+        let target = app.descendants(matching: .any)["habit-target"]
+        XCTAssertTrue(target.waitForExistence(timeout: 4), app.debugDescription)
+        target.buttons.element(boundBy: 1).tap()   // «+» once: 15 → 16 minutes
+        unit.buttons["بالصفحات"].tap()
+        unit.buttons["بالدقائق"].tap()
+        XCTAssertTrue(target.label.contains("١٦"), target.label)
         save.tap()
         let left = app.staticTexts["mihbara-goal-left"]
         XCTAssertTrue(left.waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertEqual(left.label, "بقي ٧ دقائق")
+        // 8 minutes read that day against the 16-minute target kept above: 8 left (it was 7 left of the default 15).
+        XCTAssertEqual(left.label, "بقي ٨ دقائق")
         for _ in 0..<3 where !app.buttons["mihbara-goal-edit"].isHittable { app.swipeUp(velocity: .slow) }
         shot(app, "MIH-GOAL-after-L")
         app.terminate()
@@ -496,6 +505,18 @@ import UIKit
     }
     /// M6-PK (owner, 30 Oct 2026): a finger draws on a PDF page, the drawing is saved beside the book and is there
     /// again when the book reopens; «امسح» clears the page.
+    /// Siri's «أكمل القراءة» opens `madar://mihbara/continue`; the room opens the book on the stand without another tap.
+    func testContinueRouteOpensTheBookOnTheStand() {
+        continueAfterFailure = false
+        let app = app("missingFile", storeID: UUID().uuidString, pdf: fixturePDF())
+        app.launchEnvironment["MADAR_UI_MIHBARA_PDF_READY"] = "1"
+        app.launchEnvironment["MADAR_UI_MIHBARA_ROUTE"] = "madar://mihbara/continue"
+        app.launch()
+        app.tabBars.buttons["المحبرة"].tap()
+        XCTAssertTrue(app.buttons["mihbara-pdf-ink"].waitForExistence(timeout: 20), app.debugDescription)
+        shot(app, "M6-SIRI-continue-L")
+    }
+
     func testDrawingOnAPDFPageStaysWithTheBook() {
         continueAfterFailure = false
         let storeID = UUID().uuidString

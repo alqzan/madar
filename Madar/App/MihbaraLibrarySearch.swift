@@ -35,11 +35,11 @@ struct MihbaraTextHit: Identifiable {
     }
 
     private static func epub(_ needle: String, _ book: MihbaraBook, _ service: AppMihbaraService) async -> [MihbaraTextHit] {
-        guard let data = await service.readableBookData(for: book) else { return [] }
         let file = FileManager.default.temporaryDirectory.appendingPathComponent("MadarSearch-" + UUID().uuidString).appendingPathExtension("epub")
         defer { try? FileManager.default.removeItem(at: file) }
-        guard (try? data.write(to: file, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])) != nil,
-              let publication = try? await MihbaraEPUBLoader.open(at: file) else { return [] }
+        // The book's bytes live only inside this call, so the copy in memory is gone before the book is opened and searched.
+        guard await writeBook(book, to: file, service) else { return [] }
+        guard let publication = try? await MihbaraEPUBLoader.open(at: file) else { return [] }
         defer { publication.close() }
         guard case .success(let iterator) = await publication.search(query: needle, options: SearchOptions(caseSensitive: false, diacriticSensitive: false)) else { return [] }
         defer { iterator.close() }
@@ -52,6 +52,11 @@ struct MihbaraTextHit: Identifiable {
             if page.locators.isEmpty { break }
         }
         return hits
+    }
+
+    private static func writeBook(_ book: MihbaraBook, to file: URL, _ service: AppMihbaraService) async -> Bool {
+        guard let data = await service.readableBookData(for: book) else { return false }
+        return (try? data.write(to: file, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])) != nil
     }
 
     private static func pdf(_ needle: String, _ book: MihbaraBook, _ data: Data) async -> [MihbaraTextHit] {
