@@ -523,6 +523,10 @@ import UIKit
         XCTAssertTrue(undo.isEnabled, app.debugDescription)
         mark.press(forDuration: 0.05, thenDragTo: content.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.55)))
         shot(app, "M6-PK-drawing-L")
+        // A two-finger pinch while drawing zooms the page; the lines scale with it and the tools stay usable.
+        content.pinch(withScale: 1.6, velocity: 1)
+        shot(app, "M6-PK-zoomed-L")
+        XCTAssertTrue(app.buttons["mihbara-pdf-ink-clear"].isEnabled, app.debugDescription)
         app.buttons["mihbara-pdf-ink-done"].tap()
         XCTAssertTrue(app.buttons["mihbara-pdf-ink"].waitForExistence(timeout: 5))
         XCTAssertEqual(app.buttons["mihbara-pdf-ink"].value as? String, "١", app.debugDescription)
