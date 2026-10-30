@@ -2751,7 +2751,7 @@
    "key": "notes.widgetContent",
    "owner": "notes",
    "section": "خارج التطبيق",
-   "title": "محتوى المذكرات في الودجات",
+   "title": "محتوى المذكرات ودفتر المحبرة في الودجات",
    "type": "bool",
    "default": false,
    "scope": "device",

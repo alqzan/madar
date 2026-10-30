@@ -126,7 +126,11 @@ import MadarPrayer
         let privateNote=NotebookNote();privateNote.text="SECRET-PRIVATE-NOTE";privateNote.isPrivate=true;privateNote.link="general";privateNote.updatedAt=now.addingTimeInterval(2);context.insert(privateNote)
         let diaryNote=NotebookNote();diaryNote.text="SECRET-DIARY-LINE";diaryNote.isPrivate=false;diaryNote.link="fromDiary";diaryNote.targetID=UUID();diaryNote.updatedAt=now.addingTimeInterval(3);context.insert(diaryNote)
         let publicNote=NotebookNote();publicNote.text=String(repeating:"م",count:100);publicNote.isPrivate=false;publicNote.link="idea";publicNote.updatedAt=now.addingTimeInterval(4);context.insert(publicNote)
-        try context.save();try app.publishRoomWidgetSnapshots(at:now)
+        try context.save()
+        // Notebook text stays off the widget until the same opt-in as the diary's is on.
+        XCTAssertNil(app.mihbaraWidgetSnapshot(locked:false,at:now).lastNotebookLine)
+        try await app.applySettingsAndWait(["notes.widgetContent":.bool(true)])
+        try app.publishRoomWidgetSnapshots(at:now)
 
         let envelope=try XCTUnwrap(app.snapshotStore.read(BuiltRoomWidget.mihbara.rawValue,as:MihbaraSnapshot.self,now:now))
         XCTAssertEqual(envelope.payload.currentBook?.id,book.id);XCTAssertEqual(envelope.payload.currentBook?.currentPage,14);XCTAssertEqual(envelope.payload.currentBook?.pages,240)

@@ -66,7 +66,9 @@ extension AppSession {
             let book=current.map { MihbaraSnapshot.BookSummary(id:$0.id,title:$0.title,author:$0.author,currentPage:$0.page.flatMap{$0>0 ? $0 : nil},pages:$0.pages) }
             let hadith=reading.todayHadiths.first.map { MihbaraSnapshot.HadithSummary(collectionID:reading.collection.collectionID,number:$0.number,title:$0.title) }
             let notes=try context.fetch(FetchDescriptor<NotebookNote>())
-            let lastLine=notes.filter{$0.deletedAt==nil && $0.mergedInto==nil && !$0.isPrivate && $0.link != "fromDiary"}
+            // Owner, 30 Oct: notebook text reaches the widget only with the same opt-in as the diary's (`notes.widgetContent`, off by default).
+            let notebookShown=bool("notes.widgetContent")
+            let lastLine:String?=notes.filter{ notebookShown && $0.deletedAt==nil && $0.mergedInto==nil && !$0.isPrivate && $0.link != "fromDiary"}
                 .sorted{$0.updatedAt>$1.updatedAt}
                 .compactMap{$0.text.trimmingCharacters(in:.whitespacesAndNewlines)}
                 .first{$0.isEmpty == false}
