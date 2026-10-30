@@ -2,10 +2,11 @@ import XCTest
 import UIKit
 
 @MainActor final class HabitsUITests:XCTestCase {
-    private func app(_ fixture:String, appearance:String = "light", now:String = "2026-10-15T20:00:00+03:00", firstCalendar: String? = nil, habitWriteHoldMS: Int? = nil)->XCUIApplication {
+    private func app(_ fixture:String, appearance:String = "light", now:String = "2026-10-15T20:00:00+03:00", firstCalendar: String? = nil, habitWriteHoldMS: Int? = nil, rootRouteHarness: Bool = false)->XCUIApplication {
         let app=XCUIApplication();var environment=["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_HABIT_FIXTURE":fixture,"MADAR_UI_NOW":now,"MADAR_UI_SIZE":"L","MADAR_UI_THEME":appearance]
         if let firstCalendar { environment["MADAR_UI_FIRST_CALENDAR"] = firstCalendar }
         if let habitWriteHoldMS { environment["MADAR_UI_HABIT_WRITE_HOLD_MS"] = String(habitWriteHoldMS) }
+        if rootRouteHarness { environment["MADAR_UI_BAHW_ROOT_ROUTE_HARNESS"] = "1" }
         app.launchEnvironment=environment;app.launch();return app
     }
     private func open(_ app:XCUIApplication){let block=app.descendants(matching:.any).matching(identifier:"bahw-block-habits").firstMatch;XCTAssertTrue(block.waitForExistence(timeout:20));let header=app.buttons["bahw-habits-open"]; if header.exists { header.tap() } else { block.tap() };XCTAssertTrue(app.staticTexts["habits-title"].waitForExistence(timeout:10))}
@@ -390,11 +391,17 @@ import UIKit
 
     func testBahwRoutesReplaceOrCloseAnOpenSubroom() throws {
         continueAfterFailure = false
-        let app = app("showcase")
+        let app = app("showcase", rootRouteHarness: true)
         XCTAssertTrue(app.descendants(matching: .any)["bahw-greeting"].waitForExistence(timeout: 15), app.debugDescription)
-        app.open(URL(string: "madar://bahw/habits")!)
-        XCTAssertTrue(app.staticTexts["habits-title"].waitForExistence(timeout: 10), app.debugDescription)
-        app.open(URL(string: "madar://bahw")!)
+        open(app)
+        app.buttons["habit-add"].tap()
+        let name = app.textFields["habit-name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5), app.debugDescription)
+        name.tap(); name.typeText("عادة قيد الحفظ")
+        app.buttons["ui-test-open-bahw-root"].tap()
+        XCTAssertTrue(name.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertEqual(name.value as? String, "عادة قيد الحفظ", "A lobby-root link must not remove the unsaved habit editor.")
+        app.buttons["إلغاء"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["bahw-greeting"].waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertFalse(app.staticTexts["habits-title"].exists)
 
@@ -403,6 +410,22 @@ import UIKit
         app.open(URL(string: "madar://bahw/habits")!)
         XCTAssertTrue(app.staticTexts["habits-title"].waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertFalse(app.descendants(matching: .any)["bahw-year-hero"].exists)
+        app.terminate()
+    }
+
+    func testHabitEditorSwipeKeepsUnsavedDraftOpen() throws {
+        continueAfterFailure = false
+        let app = app("empty"); open(app); app.buttons["habit-first"].tap()
+        let name = app.textFields["habit-name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5), app.debugDescription)
+        name.tap(); name.typeText("عادة قيد الحفظ")
+        let sheetTop = max(8, name.frame.minY - 35)
+        let start = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: app.frame.midX, dy: sheetTop))
+        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.98))
+        start.press(forDuration: 0.05, thenDragTo: end)
+        XCTAssertTrue(name.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertEqual(name.value as? String, "عادة قيد الحفظ", "A swipe must not discard an edited habit.")
+        app.buttons["habit-cancel"].tap()
         app.terminate()
     }
 

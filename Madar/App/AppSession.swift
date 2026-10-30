@@ -39,6 +39,8 @@ final class AppSession {
     var moneyExpenseSeed: MoneyExpenseSeed?
     @ObservationIgnored private var queuedMoneyExpenseSeeds: [MoneyExpenseSeed] = []
     var habitsOpen = false
+    /// A lobby-root link waits for the habits editor to close so its local, unsaved fields stay visible.
+    var bahwRootRequestID: UUID?
     /// A capture named a prayer without its state; the prayer home opens that prayer's log sheet.
     var prayerLogRequest: Prayer?
     var habitRouteID:UUID?
@@ -642,16 +644,21 @@ final class AppSession {
                 else { prayerRoute = route; selectedTab = "prayer" }
                 return
             }
-            if route.room == .bahw, route.path.isEmpty { habitsOpen = false; yearOpen = false; selectedTab = "foundation"; return }
+            if route.room == .bahw, route.path.isEmpty {
+                yearOpen = false; selectedTab = "foundation"
+                if habitsOpen { bahwRootRequestID = UUID() }
+                else { habitsOpen = false }
+                return
+            }
             if route.room == .bahw, route.path == ["widget-maker"] { widgetMakerRoute = route; widgetMakerRouteID = UUID(); selectedTab = "customize"; return }
             if route.room == .quran {
                 quranRoute = route; selectedTab = "quran"; return
             }
             if route.room == .notes { diaryRoute = route; selectedTab = "notes"; return }
-            if route.room == .habits { habitRouteID=route.path.last.flatMap(UUID.init(uuidString:)) ?? route.parameters["habit"].flatMap(UUID.init(uuidString:)); yearOpen = false; selectedTab = "foundation"; habitsOpen = true; return }
+            if route.room == .habits { bahwRootRequestID = nil; habitRouteID=route.path.last.flatMap(UUID.init(uuidString:)) ?? route.parameters["habit"].flatMap(UUID.init(uuidString:)); yearOpen = false; selectedTab = "foundation"; habitsOpen = true; return }
             if route.room == .year {
                 yearDayID = route.path.count == 3 ? route.path.last.flatMap(UUID.init(uuidString:)) : nil
-                habitsOpen = false; selectedTab = "foundation"; yearOpen = true; return
+                bahwRootRequestID = nil; habitsOpen = false; selectedTab = "foundation"; yearOpen = true; return
             }
             if route.room == .mihbara { mihbaraRoute = route; selectedTab = "mihbara"; return }
             // A valid link whose inner screen has no direct route yet opens its room, never «هذا الرابط غير متاح».

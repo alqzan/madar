@@ -43,6 +43,7 @@ struct HabitsRoomView: View {
     @State private var liveHealth: [UUID:Int] = [:]
     @State private var detail: HabitReading?
     @State private var editor: HabitEditorIdentity?
+    @State private var pendingBahwRootRequestID: UUID?
     @State private var showArchived = false
     @State private var deletingArchived: HabitReading?
     @State private var pendingEditor: HabitEditorIdentity?
@@ -99,6 +100,15 @@ struct HabitsRoomView: View {
             guard routeID != nil else { return }
             reload()
         }
+        .onChange(of: session.bahwRootRequestID, initial: true) { _, requestID in
+            guard let requestID else { pendingBahwRootRequestID = nil; return }
+            if editor != nil {
+                pendingBahwRootRequestID = requestID
+            } else {
+                session.bahwRootRequestID = nil
+                session.habitsOpen = false
+            }
+        }
         .task { do {liveHealth=try await HabitHealthStore.refresh(session:session);reload()} catch {session.errorMessage="لم تتجدد قراءة الصحة؛ سجلك السابق محفوظ."} }
         .task {
             while !Task.isCancelled {
@@ -110,7 +120,12 @@ struct HabitsRoomView: View {
             Button("احذف نهائيًا",role:.destructive) {if let row=deletingArchived{perform("habit.deleteArchived",["id":.string(row.id.uuidString)])};deletingArchived=nil}
             Button("إلغاء",role:.cancel){deletingArchived=nil}
         } message:{Text("تختفي العادة وسياساتها وتسجيلاتها. يتاح التراجع لعشر دقائق.")}
-        .sheet(item:$editor) { value in HabitEditorView(session:session,reading:value.reading,id:value.id).madarSheetErrorAlert(session) }
+        .sheet(item:$editor, onDismiss: {
+            guard pendingBahwRootRequestID != nil else { return }
+            pendingBahwRootRequestID = nil
+            session.bahwRootRequestID = nil
+            session.habitsOpen = false
+        }) { value in HabitEditorView(session:session,reading:value.reading,id:value.id).madarSheetErrorAlert(session) }
         .sheet(item:$pastDay) { row in HabitPastDaySheet(session:session,reading:row) { reload() }.madarSheetErrorAlert(session) }
         .sheet(item:$detail,onDismiss:{if let pendingEditor {editor=pendingEditor;self.pendingEditor=nil}}) { row in HabitDetailView(session:session,reading:row) { pendingEditor = .init(id:row.id,reading:row); detail=nil }.madarSheetErrorAlert(session) }
     }

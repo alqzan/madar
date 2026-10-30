@@ -3,6 +3,17 @@ import MadarCore
 import MadarCommands
 import MadarDesign
 
+private struct HabitEditorSnapshot: Equatable {
+    let name: String
+    let source: String
+    let rule: HabitRule
+    let monthDays: String
+    let minimumOn: Bool
+    let windowOn: Bool
+    let homeOnly: Bool
+    let reminder: String
+}
+
 struct HabitEditorView:View {
     @Environment(\.colorScheme) private var colorScheme
     @Bindable var session:AppSession
@@ -19,11 +30,21 @@ struct HabitEditorView:View {
     @State private var reminder="dot"
     @State private var busy=false
     @State private var issue:String?
+    @State private var initialSnapshot: HabitEditorSnapshot?
     private var theme:RoomTheme{.init(room:"bahw",dark:colorScheme == .dark)}
     private var digits:MadarNumberFormatter{.init(style:session.string("core.numerals") == "western" ? .western : .hindi)}
     var body:some View {
         VStack(spacing:0) {
-            HStack { Button("إلغاء"){dismiss()}.frame(minHeight:44);Spacer();Text(reading == nil ? "عادة جديدة" : "تعديل العادة").font(MadarTypography.cardTitle());Spacer();Button("احفظ"){save()}.font(MadarTypography.section()).frame(minHeight:44).disabled(busy || name.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty).accessibilityIdentifier("habit-save") }.padding(.horizontal,20).padding(.top,10)
+            HStack {
+                Button("إلغاء"){dismiss()}.frame(minHeight:44).disabled(busy).accessibilityIdentifier("habit-cancel")
+#if DEBUG
+                if ProcessInfo.processInfo.environment["MADAR_UI_BAHW_ROOT_ROUTE_HARNESS"] == "1" {
+                    Button("اختبر رابط البهو") { session.open(URL(string: "madar://bahw")!) }
+                        .accessibilityIdentifier("ui-test-open-bahw-root")
+                }
+#endif
+                Spacer();Text(reading == nil ? "عادة جديدة" : "تعديل العادة").font(MadarTypography.cardTitle());Spacer();Button("احفظ"){save()}.font(MadarTypography.section()).frame(minHeight:44).disabled(busy || name.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty).accessibilityIdentifier("habit-save")
+            }.padding(.horizontal,20).padding(.top,10)
             // AU-35: the error sits under «احفظ», not below five sections, and editing clears it.
             if let issue { Text(issue).font(MadarTypography.caption()).foregroundStyle(theme.accent).frame(maxWidth:.infinity,alignment:.leading).padding(.horizontal,20).padding(.top,6).accessibilityIdentifier("habit-editor-error") }
             ScrollView {
@@ -90,10 +111,18 @@ struct HabitEditorView:View {
             }
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.accent).environment(\.timeZone,session.activePlace.timeZone)
         .onAppear {
-            name=reading?.name ?? "";source=reading?.source ?? "custom";rule=reading?.summary.current?.rule ?? HabitRule(effectiveFrom:AppBahwService(session:session).today)
-            rule.effectiveFrom=AppBahwService(session:session).today;monthDays=rule.monthDays.map{digits.string($0)}.joined(separator:"، ");minimumOn=rule.minimum != nil;windowOn=rule.windowStart != nil;homeOnly=reading?.homeOnly ?? false
+            let initialName = reading?.name ?? ""
+            let initialSource = reading?.source ?? "custom"
+            var initialRule = reading?.summary.current?.rule ?? HabitRule(effectiveFrom:AppBahwService(session:session).today)
+            initialRule.effectiveFrom=AppBahwService(session:session).today
+            let initialMonthDays = initialRule.monthDays.map{digits.string($0)}.joined(separator:"، ")
+            let initialMinimumOn = initialRule.minimum != nil
+            let initialWindowOn = initialRule.windowStart != nil
+            let initialHomeOnly = reading?.homeOnly ?? false
             let defaultReminder = session.string("bahw.reminder")
-            reminder=reading?.reminder ?? (["dot", "push", "none"].contains(defaultReminder) ? defaultReminder : "dot")
+            let initialReminder = reading?.reminder ?? (["dot", "push", "none"].contains(defaultReminder) ? defaultReminder : "dot")
+            name=initialName;source=initialSource;rule=initialRule;monthDays=initialMonthDays;minimumOn=initialMinimumOn;windowOn=initialWindowOn;homeOnly=initialHomeOnly;reminder=initialReminder
+            initialSnapshot = .init(name:initialName,source:initialSource,rule:initialRule,monthDays:initialMonthDays,minimumOn:initialMinimumOn,windowOn:initialWindowOn,homeOnly:initialHomeOnly,reminder:initialReminder)
         }
         .onChange(of:name){issue=nil}.onChange(of:monthDays){issue=nil}.onChange(of:windowOn){issue=nil}
         .onChange(of:source){old,value in
@@ -104,12 +133,17 @@ struct HabitEditorView:View {
             if value != "custom" && reading == nil { rule.measure = value == "walking" ? .health : .count;rule.unit=["jamaah":"صلاة","review":"وجه","diaryLine":"سطر","walking":"steps"][value];rule.target=value == "walking" ? 6000 : value == "jamaah" ? 5 : 1; if name.isEmpty {name=["jamaah":"الجماعة","review":"المراجعة","diaryLine":"سطر اليوم","walking":"المشي"][value] ?? ""} }
         }
         .onChange(of:rule.measure){old,value in measureChanged(from:old,to:value)}
+        .interactiveDismissDisabled(hasUnsavedChanges || busy)
     }
     /// Switching back from minutes to a count drops the «minutes» unit, so a count habit never reads as time.
     private func measureChanged(from old:HabitMeasure,to value:HabitMeasure) {
         if value == .duration {rule.unit="minutes";rule.target=15}
         else if value == .once {rule.target=1;rule.minimum=nil;minimumOn=false}
         else if value == .count, old == .duration {rule.unit=nil}
+    }
+    private var hasUnsavedChanges: Bool {
+        guard let initialSnapshot else { return false }
+        return initialSnapshot != .init(name:name,source:source,rule:rule,monthDays:monthDays,minimumOn:minimumOn,windowOn:windowOn,homeOnly:homeOnly,reminder:reminder)
     }
     private func dayButtons(_ selection:Binding<[Int]>)->some View { HStack(spacing:3) { ForEach(Array(["ح","ن","ث","ر","خ","ج","س"].enumerated()),id:\.offset){i,label in Button {let day=i+1;if selection.wrappedValue.contains(day){selection.wrappedValue.removeAll{$0==day}}else{selection.wrappedValue.append(day)}}label:{Text(label).font(MadarTypography.caption()).frame(maxWidth:.infinity,minHeight:44).background(selection.wrappedValue.contains(i+1) ? theme.accentFill : theme.background,in:.capsule).foregroundStyle(selection.wrappedValue.contains(i+1) ? theme.onAccent : theme.ink)}.buttonStyle(.madarPlain).accessibilityLabel(["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"][i]).accessibilityAddTraits(selection.wrappedValue.contains(i+1) ? .isSelected : []) } } }
     private func section<Content:View>(_ title:String,@ViewBuilder content:()->Content)->some View { VStack(alignment:.leading,spacing:12){Text(title).font(MadarTypography.section());content()}.padding(16).frame(maxWidth:.infinity,alignment:.leading).background(theme.surface,in:.rect(cornerRadius:22)) }
