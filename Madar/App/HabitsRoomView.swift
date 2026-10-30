@@ -44,6 +44,7 @@ struct HabitsRoomView: View {
     @State private var detail: HabitReading?
     @State private var editor: HabitEditorIdentity?
     @State private var pendingBahwRootRequestID: UUID?
+    @State private var detailPastDayDraftPresented = false
     @State private var showArchived = false
     @State private var deletingArchived: HabitReading?
     @State private var pendingEditor: HabitEditorIdentity?
@@ -102,13 +103,14 @@ struct HabitsRoomView: View {
         }
         .onChange(of: session.bahwRootRequestID, initial: true) { _, requestID in
             guard let requestID else { pendingBahwRootRequestID = nil; return }
-            if editor != nil {
+            if editor != nil || pastDay != nil || detailPastDayDraftPresented {
                 pendingBahwRootRequestID = requestID
             } else {
                 session.bahwRootRequestID = nil
                 session.habitsOpen = false
             }
         }
+        .onChange(of: detailPastDayDraftPresented) { _, _ in applyPendingBahwRootIfReady() }
         .task { do {liveHealth=try await HabitHealthStore.refresh(session:session);reload()} catch {session.errorMessage="لم تتجدد قراءة الصحة؛ سجلك السابق محفوظ."} }
         .task {
             while !Task.isCancelled {
@@ -120,14 +122,19 @@ struct HabitsRoomView: View {
             Button("احذف نهائيًا",role:.destructive) {if let row=deletingArchived{perform("habit.deleteArchived",["id":.string(row.id.uuidString)])};deletingArchived=nil}
             Button("إلغاء",role:.cancel){deletingArchived=nil}
         } message:{Text("تختفي العادة وسياساتها وتسجيلاتها. يتاح التراجع لعشر دقائق.")}
-        .sheet(item:$editor, onDismiss: {
-            guard pendingBahwRootRequestID != nil else { return }
-            pendingBahwRootRequestID = nil
-            session.bahwRootRequestID = nil
-            session.habitsOpen = false
-        }) { value in HabitEditorView(session:session,reading:value.reading,id:value.id).madarSheetErrorAlert(session) }
-        .sheet(item:$pastDay) { row in HabitPastDaySheet(session:session,reading:row) { reload() }.madarSheetErrorAlert(session) }
-        .sheet(item:$detail,onDismiss:{if let pendingEditor {editor=pendingEditor;self.pendingEditor=nil}}) { row in HabitDetailView(session:session,reading:row) { pendingEditor = .init(id:row.id,reading:row); detail=nil }.madarSheetErrorAlert(session) }
+        .sheet(item:$editor, onDismiss: { applyPendingBahwRootIfReady() }) { value in HabitEditorView(session:session,reading:value.reading,id:value.id).madarSheetErrorAlert(session) }
+        .sheet(item:$pastDay, onDismiss: { applyPendingBahwRootIfReady() }) { row in HabitPastDaySheet(session:session,reading:row) { reload() }.madarSheetErrorAlert(session) }
+        .sheet(item:$detail,onDismiss:{
+            detailPastDayDraftPresented = false
+            if let pendingEditor { editor=pendingEditor;self.pendingEditor=nil }
+            applyPendingBahwRootIfReady()
+        }) { row in HabitDetailView(session:session,reading:row,pastDayDraftPresented:$detailPastDayDraftPresented) { pendingEditor = .init(id:row.id,reading:row); detail=nil }.madarSheetErrorAlert(session) }
+    }
+    private func applyPendingBahwRootIfReady() {
+        guard pendingBahwRootRequestID != nil, editor == nil, pastDay == nil, !detailPastDayDraftPresented else { return }
+        pendingBahwRootRequestID = nil
+        session.bahwRootRequestID = nil
+        session.habitsOpen = false
     }
     private var empty: some View {
         VStack(spacing:16) { HabitRingGlyph(share:0.25,done:false,symbol:nil,lineWidth:5).frame(width:60,height:60); Text("القليل الذي تدوم عليه").font(MadarTypography.title()); Text("اختر عادة صغيرة تبدأ بها، أو اربطها بما تسجّله في غرف مدار.").font(MadarTypography.body()).multilineTextAlignment(.center).foregroundStyle(theme.secondaryInk); Button { editor = .init(id:UUID()) } label: { Text("أضف أول عادة").font(MadarTypography.section()).padding(.horizontal,22).frame(minHeight:48).background(theme.accentFill,in:.capsule).foregroundStyle(theme.onAccent) }.buttonStyle(.madarPlain).accessibilityIdentifier("habit-first") }.padding(28).frame(maxWidth:.infinity).background(theme.surface,in:.rect(cornerRadius:24)).padding(.top,25)

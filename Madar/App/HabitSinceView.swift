@@ -131,6 +131,7 @@ struct HabitPastDaySheet:View {
     private var theme:RoomTheme{.init(room:"bahw",dark:colorScheme == .dark)}
     private var today:GregorianDay { AppBahwService(session:session).today }
     private var first:GregorianDay { reading.summary.periods.first?.start ?? today }
+    private var defaultDay:GregorianDay { max(first,today.adding(days:-1)) }
     private var day:GregorianDay { GregorianDay.containing(date,in:.gmt) }
     private var selectedRule: HabitRule? { reading.summary.periods.last { $0.start <= day && day < $0.end }?.rule }
     private var delta: Int { selectedRule?.measure == .duration ? 15 : 1 }
@@ -142,7 +143,16 @@ struct HabitPastDaySheet:View {
     var body:some View {
         ScrollView {
             VStack(alignment:.leading,spacing:16) {
-                HStack { Text("فعلتها في يوم سابق").font(MadarTypography.title()); Spacer(); Button("إلغاء"){dismiss()}.frame(minHeight:44) }
+                HStack {
+                    Text("فعلتها في يوم سابق").font(MadarTypography.title())
+#if DEBUG
+                    if ProcessInfo.processInfo.environment["MADAR_UI_BAHW_ROOT_ROUTE_HARNESS"] == "1" {
+                        Button("اختبر رابط البهو") { session.open(URL(string: "madar://bahw")!) }
+                            .accessibilityIdentifier("ui-test-open-bahw-root")
+                    }
+#endif
+                    Spacer(); Button("إلغاء"){dismiss()}.frame(minHeight:44)
+                }
                 Text(reading.name).font(MadarTypography.section()).foregroundStyle(theme.secondaryInk)
                 if first < today {
                     DatePicker("اليوم",selection:$date,in:gmt(first)...gmt(today.adding(days:-1)),displayedComponents:.date)
@@ -171,7 +181,8 @@ struct HabitPastDaySheet:View {
             }.padding(22)
         }
         .background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.accent).environment(\.roomTheme,theme)
-        .onAppear { date = gmt(max(first,today.adding(days:-1))) }
+        .interactiveDismissDisabled(busy || entry != nil || day != defaultDay)
+        .onAppear { date = gmt(defaultDay) }
         .onChange(of:date) { entry = nil }
     }
     private var dayLines:[Entry] { ((try? HabitDiaryLines.heads(ModelContext(session.container))) ?? []).filter { $0.dayKey == day.description }.sorted { $0.createdAt < $1.createdAt } }

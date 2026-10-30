@@ -413,6 +413,45 @@ import UIKit
         app.terminate()
     }
 
+    func testBahwRootRoutePreservesPastDayDraftFromHabitDetail() throws {
+        continueAfterFailure = false
+        let app = app("since", rootRouteHarness: true)
+        open(app)
+        app.buttons["habits-view-all"].tap()
+        let gift = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "إهداء من تحب")).firstMatch
+        for _ in 0..<8 where !gift.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(gift.isHittable, app.debugDescription)
+        gift.tap()
+
+        let past = app.buttons["habit-past-day"]
+        for _ in 0..<6 where !past.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(past.isHittable, app.debugDescription)
+        past.tap()
+        XCTAssertTrue(app.buttons["habit-past-save"].waitForExistence(timeout: 5), app.debugDescription)
+        let day = app.datePickers["habit-past-date"].buttons.matching(NSPredicate(format: "label CONTAINS %@", "12")).firstMatch
+        XCTAssertTrue(day.waitForExistence(timeout: 5), app.debugDescription)
+        day.tap()
+        let line = app.buttons["habit-past-line"]
+        XCTAssertTrue(line.waitForExistence(timeout: 5), app.debugDescription)
+        line.tap()
+        XCTAssertTrue(line.isSelected)
+
+        let sheetTop = max(8, app.buttons["ui-test-open-bahw-root"].frame.minY - 20)
+        let start = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: app.frame.midX, dy: sheetTop))
+        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.98))
+        start.press(forDuration: 0.05, thenDragTo: end)
+        XCTAssertTrue(app.buttons["habit-past-save"].waitForExistence(timeout: 5), "A swipe must not discard a changed past-day selection.")
+        XCTAssertTrue(line.isSelected)
+
+        app.buttons["ui-test-open-bahw-root"].tap()
+        XCTAssertTrue(line.waitForExistence(timeout: 5), "The past-day sheet should remain open until the draft is handled.")
+        XCTAssertTrue(line.isSelected, "A root route must not discard the selected diary line.")
+        XCTAssertTrue(app.staticTexts["مشيت مع أخي بعد العصر."].exists, "The selected historical day must remain active.")
+        app.buttons["إلغاء"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["bahw-greeting"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(app.staticTexts["habits-title"].exists)
+    }
+
     func testHabitEditorSwipeKeepsUnsavedDraftOpen() throws {
         continueAfterFailure = false
         let app = app("empty"); open(app); app.buttons["habit-first"].tap()
