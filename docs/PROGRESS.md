@@ -485,8 +485,9 @@ M0-M6 software is integrated; M5 has its bounded software gate. M7 remains open 
 - **Open failure:** `QuranPlanUITests/testMissedDayChartReflectsPolicyAndRestDaysAfterRelaunch` يفشل في السطر ١٠٥ مرتين (بعد ضغط `quran-plan-miss-double` لا يظهر «وردان»). الأرجح أن `.madarPlain` في `QuranPlanView.swift:103` وسّع مساحة لمس خيارات اليوم الفائت؛ أول خطوة: أعده بـ`.plain` هناك وأعد الاختبار.
 - **Not verified:** الموجة الثانية لم تُشغَّل اختباراتها بعد (QuranHome/Review/Coach/Drill، DiaryEditor/Yearbook/Letters، BahwYear، MoneySettings، DiaryCustomize، QuranJourney، MihbaraImport، أي اختبار يضغط `undo-button`)، وفتح القوائم تحت `.madarPlain`، ولقطات شريط التراجع، والزاحف الكامل (`TEST_RUNNER_MADAR_UI_CRAWL=1`)، وiPhone المالك.
 - **Next:** إصلاح الفشل أعلاه، ثم تشغيل القائمة غير المتحقق منها. تُرك عمدًا: لافتة الخطأ بعد إعادة تحميل فاشلة في المذكرات (Hub/Home)، وورقة المزامنة (مجمّدة)، و«أمرُّ» يمسح جواب القلب لأن المواصفة تنص على nil.
+- **Later the same day (owner idea list from a reading app):** M6-G1 وِرد القراءة من العادات، M6-TR سلة المحذوفات، M6-MN الهوامش، M6-FS البحث داخل الكتب — committed a349c62 with tests (see rows). Next: M6-PK (Pencil on PDF) needs a schema version after V13 and its review pass; `testPrivateNoteFailedSaveKeepsDraftAndRetryPersistsIt` fails on main, `testRahlOpeningChoiceResetUndoAndRelaunch` is flaky on main.
 - **Model/effort:** claude-opus-5-5 / غير مكشوف؛ مساعدون Haiku للقراءة فقط.
-- **Usage:** غير مكشوف (أداة الاستهلاك لم تُرجع رقمًا)؛ أُوقف العمل بطلب المالك.
+- **Usage:** غير مكشوف (أداة الاستهلاك لم تُرجع رقمًا)؛ أُوقف العمل بطلب المالك؛ الجولة الثانية ١٨٪ من حد الساعات الخمس عند بدايتها.
 
 ## Handover — استكمال مدار بعد AU-91 — 2026-10-29 — Codex
 - **Works now:** AU-92 يطابق تلميح التكرار مع عملة الإدخال في الرحلة؛ AU-91 يفتح رابط العادة الثانية والغرفة قائمة؛ AU-90 يمنع حفظ الحساب المعروف برصيد بداية فارغ.
