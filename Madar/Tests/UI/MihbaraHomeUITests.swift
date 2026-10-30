@@ -2,6 +2,76 @@ import XCTest
 import UIKit
 
 @MainActor final class MihbaraHomeUITests: XCTestCase {
+    func testMihbaraRouteRetriesAfterFirstShelfReadFails() throws {
+        continueAfterFailure = false
+        let app = app("home")
+        app.launchEnvironment["MADAR_UI_MIHBARA_ROUTE"] = "madar://mihbara/hadith/today"
+        app.launchEnvironment["MADAR_UI_MIHBARA_HOME_READ_FAILURE_ONCE"] = "1"
+        app.launch()
+        app.tabBars.buttons["المحبرة"].tap()
+        let retry = app.buttons["mihbara-home-retry"]
+        XCTAssertTrue(retry.waitForExistence(timeout: 10), app.debugDescription)
+        shot(app, "M6-route-read-failure-L")
+        retry.tap()
+        XCTAssertTrue(app.textViews["mihbara-hadith-text"].waitForExistence(timeout: 10), app.debugDescription)
+        shot(app, "M6-route-read-recovered-L")
+        app.terminate()
+    }
+
+    func testMihbaraRouteRemainsPendingAfterItsFirstOpenFails() throws {
+        continueAfterFailure = false
+        let app = app("home")
+        app.launchEnvironment["MADAR_UI_MIHBARA_ROUTE"] = "madar://mihbara/hadith/today"
+        app.launchEnvironment["MADAR_UI_MIHBARA_ROUTE_OPEN_FAILURE_ONCE"] = "1"
+        app.launch()
+        app.tabBars.buttons["المحبرة"].tap()
+        let retry = app.buttons["mihbara-home-retry"]
+        XCTAssertTrue(retry.waitForExistence(timeout: 10), app.debugDescription)
+        shot(app, "M6-route-open-failure-L")
+        retry.tap()
+        XCTAssertTrue(app.textViews["mihbara-hadith-text"].waitForExistence(timeout: 10), app.debugDescription)
+        shot(app, "M6-route-open-recovered-L")
+        app.terminate()
+    }
+
+    func testMihbaraRootRouteClosesReaderAndReturnsToShelf() throws {
+        continueAfterFailure = false
+        let fixtureURL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "arabic-reader-poc", withExtension: "epub"))
+        let app = app("reader", epub: try Data(contentsOf: fixtureURL))
+        app.launch(); open(app)
+        let continueBook = app.buttons["mihbara-book-continue"]
+        XCTAssertTrue(continueBook.waitForExistence(timeout: 10), app.debugDescription)
+        reach(app, continueBook); continueBook.tap()
+        let closeReader = app.buttons["mihbara-reader-close"]
+        XCTAssertTrue(closeReader.waitForExistence(timeout: 20), app.debugDescription)
+        shot(app, "AU-95-mihbara-root-before-L")
+
+        app.open(URL(string: "madar://mihbara")!)
+
+        XCTAssertTrue(closeReader.waitForNonExistence(timeout: 10), app.debugDescription)
+        let returnedBook = app.buttons["mihbara-book-continue"]
+        XCTAssertTrue(returnedBook.waitForExistence(timeout: 10), app.debugDescription)
+        shot(app, "AU-95-mihbara-root-after-L")
+        app.terminate()
+    }
+
+    func testMihbaraRootRouteClosesLibraryAndReturnsToShelf() throws {
+        continueAfterFailure = false
+        let app = app("home")
+        app.launch(); open(app)
+        let library = app.buttons["mihbara-library"]
+        reach(app, library); library.tap()
+        let search = app.textFields["mihbara-library-search"]
+        XCTAssertTrue(search.waitForExistence(timeout: 10), app.debugDescription)
+
+        app.open(URL(string: "madar://mihbara")!)
+
+        XCTAssertTrue(search.waitForNonExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(library.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(library.isHittable, app.debugDescription)
+        app.terminate()
+    }
+
     /// Handwritten legacy Turath EPUB: one chapter, no noteref link, two complete note paragraphs.
     /// Its immutable content is enriched only in the reader DOM; no converter or owner file is used.
     func testLegacyTurathPageNotesOpenWithoutReimportingTheBook() throws {
@@ -543,6 +613,48 @@ import UIKit
         XCTAssertTrue(app.staticTexts["دفتر البدايات"].waitForExistence(timeout: 8))
         undo(app)
         XCTAssertTrue(app.staticTexts["أضف كتابك الأول"].waitForExistence(timeout: 8))
+    }
+    func testPaperIndexBackConfirmsBeforeDiscardingChanges() throws {
+        continueAfterFailure = false
+        let app = app("empty", paperIndex: true); app.launch(); open(app)
+        app.buttons["mihbara-add-paper"].tap()
+        app.descendants(matching: .any)["mihbara-add-source-paper"].tap()
+        let chapter = app.textFields["mihbara-paper-chapter-title-0"]
+        XCTAssertTrue(chapter.waitForExistence(timeout: 8), app.debugDescription)
+        let original = try XCTUnwrap(chapter.value as? String)
+        chapter.tap(); chapter.typeText(" تعديل مؤقت")
+        let changed = try XCTUnwrap(chapter.value as? String)
+        if app.toolbars.buttons["تمّ"].exists { app.toolbars.buttons["تمّ"].tap() }
+        let back = app.buttons["mihbara-paper-back"]
+        for _ in 0..<8 where !back.isHittable { app.swipeDown(velocity: .slow) }
+        XCTAssertTrue(back.isHittable, app.debugDescription); back.tap()
+        let keep = app.buttons["mihbara-paper-continue"].firstMatch
+        XCTAssertTrue(keep.waitForExistence(timeout: 8), app.debugDescription); keep.tap()
+        XCTAssertEqual(chapter.value as? String, changed, "Keeping the editor open preserves the draft.")
+        back.tap()
+        let discard = app.buttons["mihbara-paper-discard"].firstMatch
+        XCTAssertTrue(discard.waitForExistence(timeout: 8), app.debugDescription); discard.tap()
+        XCTAssertTrue(app.buttons["mihbara-add-source-paper"].waitForExistence(timeout: 8), app.debugDescription)
+
+        app.buttons["mihbara-add-source-paper"].tap()
+        let reopened = app.textFields["mihbara-paper-chapter-title-0"]
+        XCTAssertTrue(reopened.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertEqual(reopened.value as? String, original, "Discard leaves the book's saved index unchanged.")
+        let close = app.buttons["mihbara-paper-back"]
+        for _ in 0..<8 where !close.isHittable { app.swipeDown(velocity: .slow) }
+        close.tap()
+    }
+    func testBlankPaperIndexClosesWithoutDiscardPrompt() {
+        continueAfterFailure = false
+        let app = app("empty"); app.launch(); open(app)
+        app.buttons["mihbara-add-paper"].tap()
+        let source = app.descendants(matching: .any)["mihbara-add-source-paper"]
+        XCTAssertTrue(source.waitForExistence(timeout: 8), app.debugDescription); source.tap()
+        let back = app.buttons["mihbara-paper-back"]
+        XCTAssertTrue(back.waitForExistence(timeout: 8), app.debugDescription)
+        back.tap()
+        XCTAssertTrue(source.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertFalse(app.buttons["mihbara-paper-discard"].exists, "An untouched form should close directly.")
     }
     func testPaperBookCardOpensPrefilledIndexEditorAndUndoRestoresMissingIndex() {
         continueAfterFailure = false; let app = app("empty"); app.launch(); open(app)

@@ -355,10 +355,30 @@ import MadarPrayer
 
     /// Where a tap lands: the room the reminder speaks for.
     static func open(_ id: String, userInfo: [AnyHashable: Any], session: AppSession) {
-        if id.hasPrefix("quran.") { session.selectedTab = "quran" }
-        else if id.hasPrefix("qada.") { session.selectedTab = "prayer" }
-        else if id.hasPrefix("mal.alert80.") || id.hasPrefix("mal.card") || id.hasPrefix("mal.reconcile.") || id.hasPrefix("mal.zakat.") { session.selectedTab = "money" }
-        else if id.hasPrefix("notes.") { session.open(URL(string: id.hasSuffix(".onThisDay") ? "madar://notes" : "madar://notes/today")!) }
+        if id.hasPrefix("quran.") {
+            let sessionKind = id.hasSuffix(".late") ? "review" : "wird"
+            session.open(URL(string: "madar://quran/session/\(sessionKind)")!)
+        }
+        else if id.hasPrefix("qada.") { session.open(URL(string: "madar://salah/qada")!) }
+        else if id.hasPrefix("mal.cardDue.") || id.hasPrefix("mal.cardCash.") {
+            let components = id.split(separator: ".")
+            if components.count == 4, let cardID = UUID(uuidString: String(components[2])) {
+                let tab = id.hasPrefix("mal.cardCash.") ? "cash" : "calendar"
+                session.open(URL(string: "madar://mal/card/\(cardID.uuidString)?tab=\(tab)")!)
+            } else { session.selectedTab = "money" }
+        }
+        else if id.hasPrefix("mal.alert80.") { session.open(URL(string: "madar://mal/categories")!) }
+        else if id.hasPrefix("mal.reconcile.") { session.open(URL(string: "madar://mal/reconcile")!) }
+        else if id.hasPrefix("mal.zakat.") { session.open(URL(string: "madar://mal/zakat")!) }
+        else if id.hasPrefix("notes.") {
+            if id.hasSuffix(".letter") {
+                session.open(URL(string: "madar://notes/letters")!)
+            } else if let rawDay = userInfo["dayKey"] as? String, (try? GregorianDay(rawDay)) != nil {
+                session.open(URL(string: "madar://notes/day/\(rawDay)")!)
+            } else {
+                session.open(URL(string: "madar://notes/today")!)
+            }
+        }
         else if id.hasPrefix("habits.") {
             session.habitRouteID = (userInfo["habit"] as? String).flatMap(UUID.init(uuidString:))
             session.selectedTab = "foundation"; session.habitsOpen = true

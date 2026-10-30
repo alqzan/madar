@@ -30,6 +30,11 @@ public struct RoomWidgetSnapshot:Codable,Sendable,Equatable {
     public var periods:[Row]
     public var locked:Bool
     public init(datePrimary:String,dateSecondary:String,heading:String,emptyTitle:String,rows:[Row]=[],periods:[Row]=[],locked:Bool=false){self.datePrimary=datePrimary;self.dateSecondary=dateSecondary;self.heading=heading;self.emptyTitle=emptyTitle;self.rows=rows;self.periods=periods;self.locked=locked}
+    public func hasVisibleRows(for room:BuiltRoomWidget, template:String) -> Bool {
+        if room == .habits && template == "periods" { return !periods.isEmpty }
+        if room == .year && ["hijri", "gregorian"].contains(template) { return rows.contains { $0.id == template } }
+        return !rows.isEmpty
+    }
 }
 /// Mihbara's outside-room payload follows data-dictionary.json. It contains only facts owned by
 /// Mihbara; private notes and diary-linked notes are filtered by the app before the JSON is written.

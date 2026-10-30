@@ -12,6 +12,9 @@ struct QuranYearView: View {
     @State private var review = true
     @State private var month: QuranUIYearMonth?
     @State private var error: String?
+#if DEBUG
+    @State private var loadCount = 0
+#endif
     var body: some View {
         ScrollView {
             VStack(spacing: 12) {
@@ -58,10 +61,20 @@ struct QuranYearView: View {
                             monthBars(value.months, review: true)
                         }
                     }
-                } else if let error { Text(error); Button("حاول مرة أخرى", action: load) }
+                } else if let error { Text(error).accessibilityIdentifier("quran-year-error"); Button("حاول مرة أخرى", action: load).accessibilityIdentifier("quran-year-retry") }
             }.padding(16).padding(.bottom, 20)
         }.foregroundStyle(theme.ink).background(theme.background.ignoresSafeArea()).tint(theme.color("review"))
-            .task { load() }
+            .task {
+                load()
+                #if DEBUG
+                let environment = ProcessInfo.processInfo.environment
+                if environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil,
+                   environment["MADAR_UI_QURAN_YEAR_READ_FAILURE_AFTER_FIRST"] == "1" {
+                    await Task.yield()
+                    load()
+                }
+                #endif
+            }
             // Left open past midnight, the log follows the day it is now.
             .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged).receive(on: RunLoop.main)) { _ in load() }
             .sheet(item: $month) { item in
@@ -103,5 +116,18 @@ struct QuranYearView: View {
         let abbreviations = [("جمادى الأولى", "جم١"), ("جمادى الآخرة", "جم٢"), ("ربيع الأول", "رب١"), ("ربيع الآخر", "رب٢"), ("ذو القعدة", "قع"), ("ذو الحجة", "حج"), ("محرم", "مح"), ("صفر", "صف"), ("رجب", "رج"), ("شعبان", "شع"), ("رمضان", "رم"), ("شوال", "شو")]
         return abbreviations.first { title.hasPrefix($0.0) }?.1 ?? title
     }
-    private func load() { do { value = try service.yearLog() } catch { self.error = quranUserMessage(error) } }
+    private func load() {
+        do {
+            #if DEBUG
+            loadCount += 1
+            let environment = ProcessInfo.processInfo.environment
+            if loadCount == 2,
+               environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil,
+               environment["MADAR_UI_QURAN_YEAR_READ_FAILURE_AFTER_FIRST"] == "1" {
+                throw CocoaError(.fileReadUnknown)
+            }
+            #endif
+            value = try service.yearLog(); error = nil
+        } catch { value = nil; self.error = quranUserMessage(error) }
+    }
 }

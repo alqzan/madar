@@ -8,6 +8,10 @@ struct QuranOutsideView: View {
     @Environment(\.roomTheme) private var theme
     @State private var value: QuranWidgetSnapshot?
     @State private var error: String?
+    @State private var retryAttempt = 0
+    #if DEBUG
+    @State private var injectedReadFailure = false
+    #endif
     private var app: AppSession { service.app }
     var body: some View {
         ScrollView {
@@ -49,14 +53,33 @@ struct QuranOutsideView: View {
                 }
                 Text("أضف «القرآن» من معرض ودجات iOS، واختر قالب «في صدرك» أو «مسار اليوم» أو «الحفظ والمراجعة». يختار النظام حجمها. وزرّ «مؤقّت المراجعة» في مركز التحكم يفتح جلسة المراجعة مباشرة.")
                     .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                if let error { Text(error).font(MadarTypography.caption()) }
+                if let error {
+                    Text(error).font(MadarTypography.caption()).accessibilityIdentifier("quran-outside-read-error")
+                    Button("أعد المحاولة") { retryAttempt += 1 }
+                        .font(MadarTypography.body()).frame(minHeight: 44)
+                        .accessibilityIdentifier("quran-outside-retry")
+                }
             }.padding(16)
         }.foregroundStyle(theme.ink).background(theme.background.ignoresSafeArea()).tint(theme.color("review"))
             .safeAreaInset(edge: .bottom) { if app.undoToastVisible { UndoToast(message: app.undoMessage, undo: app.undo, dismiss: app.hideUndoToast).accessibilityIdentifier("quran-reminder-undo") } }
-            .task { do { value = try service.widgetSnapshot().payload } catch { self.error = quranUserMessage(error) } }
+            .task(id: retryAttempt) { load() }
             .alert("لم تكتمل العملية", isPresented: Binding(get: { app.errorMessage != nil }, set: { if !$0 { app.errorMessage = nil } })) { Button("تمّ") { app.errorMessage = nil } } message: { Text(app.errorMessage ?? "") }
     }
     private var reminderTitle: String { ["afterFajr": "بعد الفجر", "afterAsr": "بعد العصر", "afterIsha": "بعد العشاء", "off": "بلا"][app.string("quran.wirdReminder")] ?? "بعد الفجر" }
+    private func load() {
+        do {
+            #if DEBUG
+            let environment = ProcessInfo.processInfo.environment
+            if !injectedReadFailure, environment["MADAR_UI_QURAN_OUTSIDE_READ_FAILURE_ONCE"] == "1",
+               environment["MADAR_UI_QURAN_FIXTURE"] == "home", environment["MADAR_UI_STORE_ID"] != nil {
+                injectedReadFailure = true
+                throw CocoaError(.fileReadUnknown)
+            }
+            #endif
+            value = try service.widgetSnapshot().payload
+            error = nil
+        } catch let failure { error = quranUserMessage(failure) }
+    }
     private func reminder(_ title: String, detail: String, timing: String) -> some View {
         HStack(spacing: 12) {
             Text("م").font(.custom("Amiri-Bold", size: 28)).frame(width: 44, height: 44).foregroundStyle(theme.onAccent).background(theme.color("cover"), in: .rect(cornerRadius: 12))

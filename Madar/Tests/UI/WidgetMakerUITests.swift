@@ -19,6 +19,30 @@ import XCTest
         let maker = app.buttons["widget-maker-open"]; XCTAssertTrue(maker.waitForExistence(timeout: 10)); maker.tap()
         XCTAssertTrue(app.staticTexts["widget-maker-title"].waitForExistence(timeout: 10))
     }
+    func testWidgetMakerRouteUpdatesTemplateWhileTheSheetIsOpen() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
+            "MADAR_UI_NOW": "2026-10-15T20:00:00+03:00", "MADAR_UI_QURAN_FIXTURE": "home", "MADAR_UI_MONEY_FIXTURE": "showcase"]
+        app.launch()
+        app.open(URL(string: "madar://bahw/widget-maker?template=quran")!)
+        let quran = app.buttons["widget-item-quranCoverage"]
+        XCTAssertTrue(quran.waitForExistence(timeout: 20), app.debugDescription)
+        XCTAssertTrue(quran.isSelected)
+        XCTAssertFalse(app.staticTexts["اختر المحتوى الذي تحب أن تراه"].exists, "A routed Quran template must replace the empty preview prompt.")
+        capture(app, "AU-95-widget-route-quran-L")
+        XCUIDevice.shared.press(.home)
+        app.activate()
+        XCTAssertTrue(quran.waitForExistence(timeout: 12), app.debugDescription)
+        XCTAssertTrue(quran.isSelected, "Returning to the foreground must preserve the routed Quran template.")
+        XCTAssertFalse(app.staticTexts["اختر المحتوى الذي تحب أن تراه"].exists, app.debugDescription)
+        app.open(URL(string: "madar://bahw/widget-maker?template=mal")!)
+        let money = app.buttons["widget-item-moneyNow"]
+        XCTAssertTrue(money.waitForExistence(timeout: 12), app.debugDescription)
+        XCTAssertTrue(money.isSelected, app.debugDescription)
+        XCTAssertFalse(quran.isSelected, "A second maker link replaces the initial room template.")
+        capture(app, "AU-95-widget-route-money-L")
+        app.terminate()
+    }
     func testNamedWidgetContentStyleRelaunchDeleteAndUndo() throws {
         continueAfterFailure = false
         let app = XCUIApplication()

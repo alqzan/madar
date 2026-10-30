@@ -93,6 +93,26 @@ import XCTest
         mihbara.tap()
         XCTAssertTrue(app.buttons["mihbara-add-paper"].waitForExistence(timeout: 10), app.debugDescription)
     }
+    func testMoneySuggestionOpensBankMessages() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": "showcase", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light"]
+        app.launch(); finishOnboarding(app)
+        app.buttons["tab-customize"].tap()
+        let search = app.textFields["settings-search"]
+        XCTAssertTrue(search.waitForExistence(timeout: 10), app.debugDescription)
+        search.tap(); search.typeText("bahw.smartPresence\n")
+        let present = app.buttons["option-bahw.smartPresence-present"]
+        XCTAssertTrue(present.waitForExistence(timeout: 10), app.debugDescription); present.tap()
+        let selected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "selected == true"), object: present)
+        XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 10), .completed, app.debugDescription)
+        app.tabBars.buttons["البهو"].tap()
+        let suggestion = app.buttons["bahw-suggestion-money"]
+        for _ in 0..<8 where !suggestion.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(suggestion.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(suggestion.isHittable, app.debugDescription); suggestion.tap()
+        XCTAssertTrue(app.staticTexts["money-messages-title"].waitForExistence(timeout: 15), app.debugDescription)
+    }
     func testHabitWideAndSmallBlocksShowAtRisk() throws {
         continueAfterFailure = false
         let app = XCUIApplication()

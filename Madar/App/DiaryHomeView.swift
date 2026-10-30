@@ -37,7 +37,20 @@ struct DiaryHomeView: View {
     @State private var searchOpen = false
     @State private var editor: DiaryEditorTarget?
     @State private var reader: GregorianDay?
+    @State private var readerEntryID: UUID?
+    @State private var routedHubTab: String?
+    @State private var routedLetterID: UUID?
+    @State private var routedLetterRequestID: UUID?
+    @State private var routedProjectID: UUID?
+    @State private var routedProjectRequestID: UUID?
+    @State private var routedSearchQuery: String?
+    @State private var routedSearchRequestID: UUID?
+    @State private var readerEntryRouteID: UUID?
     @State private var failure: String?
+#if DEBUG
+    @State private var injectedReadFailure = false
+#endif
+    @State private var refreshGeneration = 0
     private var service: AppDiaryService { AppDiaryService(app: app) }
     private var memory: DiaryDisplayDay? {
         guard let snapshot else { return nil }
@@ -85,7 +98,7 @@ struct DiaryHomeView: View {
                 } else if let failure {
                     VStack(alignment: .leading, spacing: 10) {
                         Text(failure).font(DiaryType.writing)
-                        Button("حاول مرة أخرى") { Task { await refresh() } }.frame(minHeight: 44).accessibilityIdentifier("diary-home-retry")
+                        Button("حاول مرة أخرى") { Task { await refresh(retrying: true) } }.frame(minHeight: 44).accessibilityIdentifier("diary-home-retry")
                     }
                 }
                 else { ProgressView("تُفتح صفحتك…") }
@@ -100,7 +113,16 @@ struct DiaryHomeView: View {
             }
         }
         .toolbarVisibility(.hidden, for: .navigationBar)
-        .task(id: app.prayerRevision) { await refresh() }
+        .task(id: app.prayerRevision) {
+            await refresh()
+            #if DEBUG
+            let environment = ProcessInfo.processInfo.environment
+            if environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil,
+               environment["MADAR_UI_DIARY_HOME_READ_FAILURE_AFTER_FIRST"] == "1" {
+                await refresh()
+            }
+            #endif
+        }
         .task {
             while !Task.isCancelled {
                 do { try await Task.sleep(for: .seconds(30)) } catch { break }
@@ -111,20 +133,45 @@ struct DiaryHomeView: View {
             }
         }
         .onChange(of: selected) { _, day in if let day { Task { try? await service.prepareClosedDay(day); await refresh() } } }
-        .fullScreenCover(isPresented: $searchOpen) { DiarySearchView(app: app).environment(\.roomTheme, theme) }
-        .fullScreenCover(isPresented: $archiveOpen) { DiaryHubView(app: app).environment(\.roomTheme, theme).madarSheetErrorAlert(app) }
+        .fullScreenCover(isPresented: $searchOpen, onDismiss: { routedSearchQuery = nil; routedSearchRequestID = nil }) { DiarySearchView(app: app, initialQuery: routedSearchQuery, initialQueryRequestID: routedSearchRequestID).environment(\.roomTheme, theme) }
+        .fullScreenCover(isPresented: $archiveOpen, onDismiss: clearHubRoute) {
+            DiaryHubView(app: app, initialTab: routedHubTab, initialLetterID: routedLetterID, initialProjectID: routedProjectID,
+                initialLetterRequestID: routedLetterRequestID, initialProjectRequestID: routedProjectRequestID)
+                .environment(\.roomTheme, theme).madarSheetErrorAlert(app)
+        }
         .sheet(isPresented: $customizing, onDismiss: { selected = nil; Task { await refresh() } }) { DiaryCustomizeView(app: app).environment(\.roomTheme, theme).madarSheetErrorAlert(app) }
         .sheet(item: $editor) { target in DiaryTextEditor(app: app, margin: target.margin, initialDay: target.day).environment(\.roomTheme, theme).madarSheetErrorAlert(app) }
-        .sheet(isPresented: Binding(get: { reader != nil }, set: { if !$0 { reader = nil } })) {
-            if let reader { DiaryDayView(app: app, day: reader).environment(\.roomTheme, theme).madarSheetErrorAlert(app) }
+        .sheet(isPresented: Binding(get: { reader != nil }, set: { if !$0 { reader = nil; readerEntryID = nil; readerEntryRouteID = nil } })) {
+            if let reader { DiaryDayView(app: app, day: reader, initialEntryID: readerEntryID, initialEntryRouteID: readerEntryRouteID).environment(\.roomTheme, theme).madarSheetErrorAlert(app) }
         }
         .onChange(of: app.diaryRoute, initial: true) { _, route in
             guard let route else { return }; app.diaryRoute = nil
             if route.path.first == "write" { editor = .init(margin: nil, day: route.parameters["day"] ?? "today") }
-            else if route.path.first == "day", let key = route.path.last, let day = try? GregorianDay(key) { reader = day }
-            else if route.path.first == "today" { reader = try? service.currentDay() }
+            else if route.path.first == "day", let key = route.path.last, let day = try? GregorianDay(key) { readerEntryID = nil; readerEntryRouteID = nil; reader = day }
+            else if route.path.first == "entry", route.path.count == 2, let rawID = route.path.last, let id = UUID(uuidString: rawID) {
+                do {
+                    guard let day = try service.entryDay(id) else { app.errorMessage = "هذا السطر لم يعد موجودًا في مذكراتك."; return }
+                    readerEntryID = id; readerEntryRouteID = UUID(); reader = day
+                } catch { app.errorMessage = madarUserMessage(error) }
+            }
+            else if route.path.first == "letters" { routedHubTab = "letters"; archiveOpen = true }
+            else if route.path.first == "letter", route.path.count == 2, let rawID = route.path.last, let id = UUID(uuidString: rawID) {
+                routedHubTab = "letters"; routedLetterID = id; routedLetterRequestID = UUID(); archiveOpen = true
+            }
+            else if route.path.first == "project", route.path.count == 2, let rawID = route.path.last, let id = UUID(uuidString: rawID) {
+                routedHubTab = "projects"; routedProjectID = id; routedProjectRequestID = UUID(); archiveOpen = true
+            }
+            else if route.path.first == "today" { readerEntryID = nil; readerEntryRouteID = nil; reader = try? service.currentDay() }
+        }
+        .onChange(of: app.searchRoute, initial: true) { _, route in
+            guard let route, route.parameters["room"] == nil || route.parameters["room"] == "notes" else { return }
+            app.searchRoute = nil
+            routedSearchQuery = route.parameters["q"] ?? ""
+            routedSearchRequestID = UUID()
+            searchOpen = true
         }
     }
+    private func clearHubRoute() { routedHubTab = nil; routedLetterID = nil; routedProjectID = nil; routedLetterRequestID = nil; routedProjectRequestID = nil }
     private var header: some View {
         HStack(alignment: .center, spacing: 10) {
             VStack(alignment: .leading, spacing: 3) {
@@ -378,14 +425,42 @@ struct DiaryHomeView: View {
         return labels.primary.split(separator: " ").suffix(2).joined(separator: " ") + "، " + labels.secondary.split(separator: " ").suffix(2).joined(separator: " ")
     }
 
-    private func refresh() async {
+    private func refresh(retrying: Bool = false) async {
+#if DEBUG
+        let environment = ProcessInfo.processInfo.environment
+        let inject = environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil
+            && environment["MADAR_UI_DIARY_HOME_READ_FAILURE_AFTER_FIRST"] == "1"
+        if inject, injectedReadFailure, !retrying { return }
+#endif
+        guard !Task.isCancelled else { return }
+        refreshGeneration += 1
+        let generation = refreshGeneration
         do {
+#if DEBUG
+            if inject {
+                if injectedReadFailure {
+                    guard retrying else { return }
+                } else if snapshot != nil {
+                    injectedReadFailure = true
+                    throw CocoaError(.fileReadUnknown)
+                }
+            }
+#endif
             var value = try service.home()
             let shape = app.string("notes.homeShape")
             let displayed = shape == "echoes" ? value.echoes.compactMap(\.day) : shape == "margin" ? [selected ?? opening(value)].compactMap { $0 } : value.selection.days
-            for day in Set(displayed) { try await service.prepareClosedDay(day) }
+            for day in Set(displayed) {
+                guard generation == refreshGeneration, !Task.isCancelled else { return }
+                try await service.prepareClosedDay(day)
+            }
+            guard generation == refreshGeneration, !Task.isCancelled else { return }
             value = try service.home()
+            guard generation == refreshGeneration, !Task.isCancelled else { return }
             snapshot = value; failure = nil
-        } catch { failure = madarUserMessage(error) }
+        } catch {
+            guard generation == refreshGeneration, !Task.isCancelled else { return }
+            snapshot = nil
+            failure = madarUserMessage(error)
+        }
     }
 }

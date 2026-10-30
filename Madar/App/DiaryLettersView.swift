@@ -5,6 +5,8 @@ import MadarDesign
 /// §7.3 N04 «أرشيف الرسائل»: a mailbox. Sealed letters show an hourglass and when they open, never their text.
 struct DiaryLettersPanel: View {
     @Bindable var app: AppSession
+    var initialLetterID: UUID? = nil
+    var initialLetterRequestID: UUID? = nil
     @Environment(\.roomTheme) private var theme
     @State private var letters: [DiaryLetterCard] = []
     @State private var composing = false
@@ -12,6 +14,8 @@ struct DiaryLettersPanel: View {
     @State private var reading: DiaryLetterCard?
     @State private var rescheduling: DiaryLetterCard?
     @State private var failure: String?
+    @State private var routeMessage: String?
+    @State private var handledRouteID: UUID?
     private var service: AppDiaryService { .init(app: app) }
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -21,7 +25,14 @@ struct DiaryLettersPanel: View {
             }
             Button { composing = true } label: { Label("اكتب رسالة لنفسك", systemImage: "envelope").font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 50).foregroundStyle(theme.background).background(theme.dark ? theme.accent : theme.ink, in: .capsule) }
                 .buttonStyle(.madarPlain).accessibilityIdentifier("diary-letter-compose")
-            if let failure { Text(failure).font(MadarTypography.body()) }
+            if let failure {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(failure).font(MadarTypography.body())
+                    Button("أعِد المحاولة") { Task { await load() } }
+                        .font(DiaryType.label).frame(minHeight: 44).accessibilityIdentifier("diary-letters-retry")
+                }
+            }
+            if let routeMessage { Text(routeMessage).font(DiaryType.label).foregroundStyle(theme.color("ink3Text")).accessibilityIdentifier("diary-letter-route-status") }
             let waiting = letters.filter { $0.state == .eligible }, orphaned = letters.filter { $0.state == .orphaned }
             let sealed = letters.filter { $0.state == .sealed }, opened = letters.filter { $0.state == .opened }
             if letters.isEmpty && failure == nil { Text("لا رسائل بعد. اكتب لنفسك في موعد أو بعد حدث.").font(DiaryType.writing).foregroundStyle(theme.color("ink3Text")).padding(.vertical, 20) }
@@ -68,13 +79,38 @@ struct DiaryLettersPanel: View {
             }
         }
         .task(id: app.prayerRevision) { await load() }
+        .onChange(of: initialLetterID) { _, id in if let id, !letters.isEmpty { openRoutedLetter(id) } }
+        .onChange(of: initialLetterRequestID) { _, requestID in
+            guard requestID != nil, let initialLetterID else { return }
+            handledRouteID = nil
+            if !letters.isEmpty { openRoutedLetter(initialLetterID) }
+        }
         .sheet(isPresented: $composing) { DiaryLetterComposer(app: app).environment(\.roomTheme, theme) }
         .sheet(item: $opening) { letter in DiaryLetterMoment(app: app, letter: letter).environment(\.roomTheme, theme) }
         .sheet(item: $reading) { letter in DiaryLetterReader(text: letter.text ?? "", written: service.bothDates(letter.writtenDay)).environment(\.roomTheme, theme).presentationDetents([.medium, .large]) }
         .sheet(item: $rescheduling) { letter in DiaryLetterReschedule(app: app, letter: letter).environment(\.roomTheme, theme).presentationDetents([.medium]) }
     }
     private func load() async {
-        do { try await service.refreshLetters(); letters = try service.letters(); failure = nil } catch { failure = madarUserMessage(error) }
+        do {
+            try await service.refreshLetters()
+            letters = try service.letters()
+            failure = nil
+            if let initialLetterID { openRoutedLetter(initialLetterID) }
+        } catch { letters = []; failure = madarUserMessage(error) }
+    }
+    private func openRoutedLetter(_ id: UUID) {
+        guard handledRouteID != id else { return }
+        handledRouteID = id
+        routeMessage = nil
+        guard let letter = letters.first(where: { $0.id == id }) else {
+            routeMessage = "هذه الرسالة لم تعد موجودة في صندوق البريد."
+            return
+        }
+        switch letter.state {
+        case .opened: reading = letter
+        case .eligible, .orphaned: opening = letter
+        case .sealed: routeMessage = "هذه الرسالة ما زالت مختومة؛ سيبقى نصّها مخفيًا حتى يحين موعد فتحها."
+        }
     }
 }
 

@@ -9,10 +9,18 @@ import WidgetKit
 
 extension AppSession {
     /// Omits personal rows at construction time when whole-app protection is configured; a view mask is insufficient.
-    func roomWidgetPayloads(locked:Bool,at instant:Date?=nil)->[BuiltRoomWidget:RoomWidgetSnapshot] {
+    func roomWidgetPayloads(locked:Bool,at instant:Date?=nil,readHabitReadings:(() throws -> [HabitReading])?=nil)->[BuiltRoomWidget:RoomWidgetSnapshot] {
         let now=instant ?? prayerNow(),service=AppBahwService(session:self,evaluationDate:now),today=service.today,date=dateLabels(today),digits=service.digits
         var payloads:[BuiltRoomWidget:RoomWidgetSnapshot]=[:]
-        let readings=locked ? [] : ((try? HabitRepository(context:ModelContext(container)).readings(at:now)) ?? [])
+        var habitReadFailed=false
+        let readings:[HabitReading]
+        if locked { readings=[] }
+        else {
+            do {
+                if let readHabitReadings { readings=try readHabitReadings() }
+                else { readings=try HabitRepository(context:ModelContext(container)).readings(at:now) }
+            } catch { readings=[]; habitReadFailed=true }
+        }
         let eligible=readings.filter{$0.summary.current?.dueDays.contains(today)==true || $0.paused}
         let ordered=habitRowsForWidgetScope(eligible, at: now).enumerated().sorted { left,right in
             let a=left.element,b=right.element
@@ -30,7 +38,7 @@ extension AppSession {
             return .init(id:f.rawValue,title:f.arabic,value:WidgetCopy.periodProgress(met:met,total:group.count,digits:digits),detail:group.isEmpty ? "" : met==group.count ? "تمّ" : digits.string(group.count-met),share:Double(met)/Double(max(1,group.count)),route:BuiltRoomWidget.habits.route,completedCount:met,targetCount:group.count)
         }
         let dueToday=eligible.filter{!$0.paused && ($0.summary.current?.target ?? 0)>0}
-        payloads[.habits] = .init(datePrimary:date.primary,dateSecondary:date.secondary,heading:WidgetCopy.habitsHeading(met:dueToday.filter{$0.summary.current?.met==true}.count,total:dueToday.count,digits:digits),emptyTitle:readings.isEmpty ? "أضف أول عادة" : "لا عادات مستحقة اليوم",rows:rows,periods:periods,locked:locked)
+        payloads[.habits] = .init(datePrimary:date.primary,dateSecondary:date.secondary,heading:habitReadFailed ? "تعذّر تحديث العادات" : WidgetCopy.habitsHeading(met:dueToday.filter{$0.summary.current?.met==true}.count,total:dueToday.count,digits:digits),emptyTitle:habitReadFailed ? "افتح مدار لإعادة المحاولة" : readings.isEmpty ? "أضف أول عادة" : "لا عادات مستحقة اليوم",rows:habitReadFailed ? [] : rows,periods:habitReadFailed ? [] : periods,locked:locked)
         let year=service.year()
         var yearRows:[RoomWidgetSnapshot.Row]=[
             .init(id:"hijri",title:digits.string(year.hijriYear)+" هـ",value:digits.string(year.hijri.basisPoints/100)+"٪\u{061C}",detail:"بقي "+service.daysPhrase(year.hijri.remaining),share:Double(year.hijri.basisPoints)/10000,route:BuiltRoomWidget.year.route),

@@ -16,6 +16,9 @@ struct MoneyAccountsView: View {
     @State private var errorMessage: String?
     @State private var appeared = false
     @State private var reconcileOpen = false
+    #if DEBUG
+    @State private var injectedReadFailure = false
+    #endif
     private var service: AppMoneyService { .init(app: app) }
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
     private var visible: Bool { revealed || !app.bool("core.hideMoneyUntilTouch") }
@@ -27,6 +30,15 @@ struct MoneyAccountsView: View {
                     Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1) } }.accessibilityLabel("إغلاق").accessibilityIdentifier("money-accounts-close")
                     Text("الحسابات").font(.custom("thmanyahserifdisplay-Bold", size: 24, relativeTo: .title2)); Spacer()
                     Button(action: addAccount) { Image(systemName: "plus").frame(width: 44, height: 44) }.accessibilityLabel("أضف حسابًا").accessibilityIdentifier("money-accounts-add")
+                }
+                if let errorMessage, reading != nil {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(errorMessage).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                            .accessibilityIdentifier("money-accounts-read-error")
+                        Button("أعد المحاولة", action: load).frame(minHeight: 44)
+                            .accessibilityIdentifier("money-accounts-retry")
+                    }.frame(maxWidth: .infinity, alignment: .leading).padding(12)
+                        .background(theme.surface, in: .rect(cornerRadius: 12))
                 }
                 if let r = reading {
                     if !visible { Button("أظهر الأرقام") { revealed = true }.frame(minHeight: 44).accessibilityIdentifier("money-accounts-reveal") }
@@ -55,7 +67,10 @@ struct MoneyAccountsView: View {
                         Spacer(minLength: 0)
                         if r.shortcutCount > 0 { Text(service.counted(r.shortcutCount, ("وصلت رسالة واحدة", "وصلت رسالتان", "رسائل وصلت", "رسالةً وصلت"))).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk) }
                     }.padding(14).frame(maxWidth: .infinity).overlay { Capsule().stroke(theme.line, lineWidth: 1) }
-                } else if let errorMessage { Text(errorMessage); Button("أعِد المحاولة", action: load) }
+                } else if let errorMessage {
+                    Text(errorMessage).accessibilityIdentifier("money-accounts-read-error")
+                    Button("أعِد المحاولة", action: load).accessibilityIdentifier("money-accounts-retry")
+                }
                 else { ProgressView().frame(height: 250) }
             }.padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 24).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.madarPlain).toolbar(.hidden, for: .navigationBar, .tabBar)
@@ -146,7 +161,21 @@ struct MoneyAccountsView: View {
     }
     private func sourceTitle(_ source: AccountBalanceSource) -> String { switch source { case .entered: "رصيد بداية أدخلته"; case .reconciled: "من مطابقة اعتمدتها"; case .message: "رصيد رسالة يطابق الدفتر"; case .messageDiffers: "رصيد رسالة يختلف عن الدفتر" } }
     private func addAccount() { selected = .init(id: UUID(), isNew: true, name: "", bank: "", last4: "", kind: "current", ownership: "mine", currency: app.string("core.currency"), openingMinor: 0, openingAt: app.prayerNow(), senderIDs: [], tracked: true, zakatInclude: true, fixedCheckpoint: false) }
-    private func load() { do { reading = try service.loadAccounts(); errorMessage = nil } catch { errorMessage = "لم تكتمل قراءة الحسابات." } }
+    private func load() {
+        do {
+            #if DEBUG
+            let environment = ProcessInfo.processInfo.environment
+            if !injectedReadFailure, environment["MADAR_UI_MONEY_ACCOUNTS_READ_FAILURE_ONCE"] == "1",
+               environment["MADAR_UI_MONEY_FIXTURE"] == "accounts", environment["MADAR_UI_STORE_ID"] != nil {
+                injectedReadFailure = true
+                throw CocoaError(.fileReadUnknown)
+            }
+            #endif
+            reading = try service.loadAccounts(); errorMessage = nil
+        } catch {
+            errorMessage = reading == nil ? "لم تكتمل قراءة الحسابات. أعد المحاولة." : "تعذّر تحديث الحسابات؛ تعرض آخر قراءة ناجحة. أعد المحاولة."
+        }
+    }
 }
 
 private struct MoneyAccountCrown: Shape {

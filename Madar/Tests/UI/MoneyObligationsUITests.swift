@@ -3,6 +3,17 @@ import XCTest
 /// M5-V09: the obligations room opens from the money home, and repeat charges create reviewable drafts.
 @MainActor final class MoneyObligationsUITests: XCTestCase {
     func shot(_ app: XCUIApplication, _ name: String) { let a = XCTAttachment(screenshot: app.screenshot()); a.name = name; a.lifetime = .keepAlways; add(a) }
+    func testObligationsReadFailureOffersRetry() {
+        continueAfterFailure = false
+        let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": "showcase", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-16T20:00:00+03:00", "MADAR_UI_MONEY_OBLIGATIONS_READ_FAILURE_ONCE": "1"]
+        app.launch(); let tab = app.buttons["tab-customize"]; XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
+        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("المال"); app.buttons["money-open"].tap()
+        let open = app.buttons["money-obligations-open"]; XCTAssertTrue(open.waitForExistence(timeout: 10))
+        for _ in 0..<6 where !open.isHittable { app.swipeUp(velocity: .slow) }; open.tap()
+        XCTAssertTrue(app.staticTexts["money-obligations-read-error"].waitForExistence(timeout: 10), app.debugDescription)
+        app.buttons["money-obligations-retry"].tap()
+        XCTAssertTrue(app.staticTexts["money-obligations-total"].waitForExistence(timeout: 10), app.debugDescription)
+    }
     func testObligationsThreadLadderShelvesAndAdd() throws {
         continueAfterFailure = false
         let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": "showcase",

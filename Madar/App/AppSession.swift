@@ -19,15 +19,25 @@ final class AppSession {
     private static let bahwReturnStateKey = "sys.bahwReturnPlan"
     let diaryPlayback = DiaryPlayback()
     var diaryRoute: Route?
+    var prayerRoute: Route?
+    var prayerRootRequestID: UUID?
     var quranRoute: Route?
     /// M4-V03: «السنة وما يهمّك» pushed from the lobby (`madar://bahw/year`).
     var yearOpen = false
+    var yearDayID: UUID?
+    var widgetMakerRoute: Route?
+    var widgetMakerRouteID: UUID?
     var moneyOpen = false
     /// One-shot: the money room opens straight on the bank messages (after the old-Madar move left some for review).
     var moneyOpensMessages = false
+    var moneyRoute: Route?
     var mihbaraOpen = false
     var mihbaraBookToOpen: UUID?
+    var mihbaraRoute: Route?
+    var searchRoute: Route?
+    var settingsRoute: Route?
     var moneyExpenseSeed: MoneyExpenseSeed?
+    @ObservationIgnored private var queuedMoneyExpenseSeeds: [MoneyExpenseSeed] = []
     var habitsOpen = false
     /// A capture named a prayer without its state; the prayer home opens that prayer's log sheet.
     var prayerLogRequest: Prayer?
@@ -85,7 +95,7 @@ final class AppSession {
     private(set) var prayerRevision = 0
     private(set) var prayerWriteInProgress = false
     #if DEBUG
-    @ObservationIgnored private var failFirstNotebookSave = false
+    @ObservationIgnored var failFirstNotebookSave = false
     @ObservationIgnored private var failFirstGoodreadsImport = false
     #endif
     var settingsQuery = ""
@@ -121,7 +131,7 @@ final class AppSession {
     @ObservationIgnored private var spotlightReconciliationTask: Task<Void, Never>?
     @ObservationIgnored private let spotlightIndexOperation: AppSpotlightIndexOperation
 
-    static let supportedKeys = ["core.dayStart", "core.firstCalendar", "core.hijriSource", "core.hijriOffset", "core.weekStart", "core.theme", "core.numerals", "core.homeCity", "core.faceIDLock", "core.spotlightIndex", "salah.askAfterAdhanMin", "salah.askReminder", "salah.liveActivity", "salah.showMosqueStreak", "salah.askHeart", "salah.method", "salah.asr", "salah.highLatitudeRule", "salah.offsets", "notif.thisDeviceReminders", "notif.quietAfterIsha", "notif.quietFrom", "notif.quietUntil", "bahw.yearWhich", "bahw.upcomingCount", "bahw.streakBreakAfter", "bahw.reminder", "bahw.travelFreezesHome", "bahw.smartPresence", "bahw.widgetScope"]
+    static let supportedKeys = ["core.dayStart", "core.firstCalendar", "core.hijriSource", "core.hijriOffset", "core.weekStart", "core.theme", "core.numerals", "core.homeCity", "core.faceIDLock", "core.spotlightIndex", "salah.pool", "salah.fridayTallArch", "salah.pendingDays", "salah.tripMethod", "salah.travelShortenCombine", "salah.qadaReminder", "salah.askAfterAdhanMin", "salah.askReminder", "salah.liveActivity", "salah.showMosqueStreak", "salah.askHeart", "salah.method", "salah.asr", "salah.highLatitudeRule", "salah.offsets", "notif.thisDeviceReminders", "notif.quietAfterIsha", "notif.quietFrom", "notif.quietUntil", "bahw.yearWhich", "bahw.upcomingCount", "bahw.streakBreakAfter", "bahw.reminder", "bahw.travelFreezesHome", "bahw.smartPresence", "bahw.widgetScope"]
 
     init(
         container: ModelContainer,
@@ -609,36 +619,66 @@ final class AppSession {
     func number(_ key: String) -> Double { if case .number(let v) = values[key] { v } else { 0 } }
     func open(_ url: URL) {
         let today = GregorianDay.containing(.now, in: activePlace.timeZone)
-        let context = RouteContext(trackingStart: today.adding(days: -36500), today: today, settingsKeys: Set(Self.supportedKeys), availability: .init(builtRooms: [.core, .salah, .quran, .notes, .bahw, .year, .habits, .mal, .mihbara]))
+        let unavailableSettings = Set(schema.settings.map(\.key)).subtracting(Self.supportedKeys)
+        let context = RouteContext(trackingStart: today.adding(days: -36500), today: today, settingsKeys: Set(Self.supportedKeys), unavailableSettings: unavailableSettings, availability: .init(builtRooms: [.core, .salah, .quran, .notes, .bahw, .year, .habits, .mal, .mihbara]))
         do {
             var components=URLComponents(url:url,resolvingAgainstBaseURL:false)
             if components?.host == "prayer" {components?.host="salah"} // Existing placed widgets used this legacy alias.
             let route = try RouteRegistry.parse(components?.url ?? url, context: context)
+            if url.host == "settings" {
+                settingsRoute = route
+                settingsQuery = (try? schema.definition(for: route.path[1]).title) ?? ""
+                selectedTab = "customize"
+                return
+            }
             if route.room == .mal, route.path == ["add"] {
                 let raw = route.parameters["amount"].flatMap(Int.init).map { AppMoneyService(app: self).moneyInput($0) } ?? ""
-                moneyExpenseSeed = .init(amount: raw, merchant: String((route.parameters["merchant"] ?? "").prefix(80)), homeCurrency: true); return
+                presentMoneyExpenseSeed(.init(amount: raw, merchant: String((route.parameters["merchant"] ?? "").prefix(80)), method: route.parameters["method"], homeCurrency: true)); return
             }
             if route.room == .mal, route.path.isEmpty || route.path == ["now"] { selectedTab = "money"; return }
-            if route.room == .salah,route.path.isEmpty {selectedTab="prayer";return}
-            if route.room == .bahw,route.path.isEmpty {selectedTab="foundation";return}
-            if route.room == .quran, route.path.isEmpty || route.path.first == "session" || route.path.first == "page" {
+            if route.room == .mal { moneyRoute = route; selectedTab = "money"; return }
+            if route.room == .salah {
+                if route.path.isEmpty { prayerRootRequestID = UUID(); selectedTab = "prayer" }
+                else { prayerRoute = route; selectedTab = "prayer" }
+                return
+            }
+            if route.room == .bahw, route.path.isEmpty { habitsOpen = false; yearOpen = false; selectedTab = "foundation"; return }
+            if route.room == .bahw, route.path == ["widget-maker"] { widgetMakerRoute = route; widgetMakerRouteID = UUID(); selectedTab = "customize"; return }
+            if route.room == .quran {
                 quranRoute = route; selectedTab = "quran"; return
             }
-            if route.room == .notes, route.path.isEmpty || ["today", "day", "write"].contains(route.path.first ?? "") {
-                diaryRoute = route; selectedTab = "notes"; return
+            if route.room == .notes { diaryRoute = route; selectedTab = "notes"; return }
+            if route.room == .habits { habitRouteID=route.path.last.flatMap(UUID.init(uuidString:)) ?? route.parameters["habit"].flatMap(UUID.init(uuidString:)); yearOpen = false; selectedTab = "foundation"; habitsOpen = true; return }
+            if route.room == .year {
+                yearDayID = route.path.count == 3 ? route.path.last.flatMap(UUID.init(uuidString:)) : nil
+                habitsOpen = false; selectedTab = "foundation"; yearOpen = true; return
             }
-            if route.room == .habits { habitRouteID=route.path.last.flatMap(UUID.init(uuidString:)) ?? route.parameters["habit"].flatMap(UUID.init(uuidString:)); selectedTab = "foundation"; habitsOpen = true; return }
-            if route.room == .year, route.path == ["year"] { selectedTab = "foundation"; yearOpen = true; return }
-            if route.room == .mihbara { selectedTab = "mihbara"; return }
+            if route.room == .mihbara { mihbaraRoute = route; selectedTab = "mihbara"; return }
             // A valid link whose inner screen has no direct route yet opens its room, never «هذا الرابط غير متاح».
             let roomTabs: [Room: String] = [.salah: "prayer", .quran: "quran", .notes: "notes", .mal: "money", .mihbara: "mihbara", .bahw: "foundation", .year: "foundation"]
-            if url.host == "capture" { selectedTab = "notes"; return }
-            if url.host == "search" { selectedTab = route.parameters["room"].flatMap(Room.init(rawValue:)).flatMap { roomTabs[$0] } ?? "foundation"; return }
-            if url.host != "settings", let tab = roomTabs[route.room] { selectedTab = tab; return }
-            guard url.host == "settings", route.room == .core else { throw CoreError.unavailableFeature }
-            settingsQuery = try schema.definition(for: route.path[1]).title
-            selectedTab = "customize"
+            if url.host == "search" {
+                searchRoute = route
+                selectedTab = route.parameters["room"].flatMap(Room.init(rawValue:)).flatMap { roomTabs[$0] } ?? "notes"
+                return
+            }
+            if let tab = roomTabs[route.room] { selectedTab = tab; return }
+            throw CoreError.unavailableFeature
         } catch { errorMessage = "هذا الرابط غير متاح في إصدار مدار الحالي." }
+    }
+    /// Keep later Capture/deep-link requests until the current local-only expense draft is dismissed.
+    func presentMoneyExpenseSeed(_ seed: MoneyExpenseSeed) {
+        if moneyExpenseSeed?.id == seed.id || queuedMoneyExpenseSeeds.contains(where: { $0.id == seed.id }) { return }
+        if moneyExpenseSeed == nil && queuedMoneyExpenseSeeds.isEmpty {
+            moneyExpenseSeed = seed
+        } else {
+            queuedMoneyExpenseSeeds.append(seed)
+            if moneyExpenseSeed == nil { presentNextMoneyExpenseSeed() }
+        }
+    }
+    /// Called only after SwiftUI has finished dismissing the current expense cover.
+    func presentNextMoneyExpenseSeed() {
+        guard moneyExpenseSeed == nil, !queuedMoneyExpenseSeeds.isEmpty else { return }
+        moneyExpenseSeed = queuedMoneyExpenseSeeds.removeFirst()
     }
     func set(_ value: JSONValue, key: String, completion: (() -> Void)? = nil) {
         if key == "core.faceIDLock", case .string(let raw) = value, let scope = MadarLockScope(rawValue: raw), let lockController {
@@ -914,6 +954,14 @@ final class AppSession {
         guard !name.hasPrefix("diary.") || (lockController?.canPresent(.notes) ?? protectedDataAuthorized) else { throw DataError.invalidValue("المذكرات مقفلة") }
         guard beginWrite() else { throw BackupOperationError.busy }
         defer { pendingWrites -= 1 }
+#if DEBUG
+        if name == "habit.complete",
+           ProcessInfo.processInfo.environment["MADAR_UI_STORE_ID"] != nil,
+           let milliseconds = Int(ProcessInfo.processInfo.environment["MADAR_UI_HABIT_WRITE_HOLD_MS"] ?? ""),
+           (1...5000).contains(milliseconds) {
+            try await Task.sleep(for: .milliseconds(milliseconds))
+        }
+#endif
         let now = prayerNow()
         func run() async throws -> CommandOutcome {
             let result = try await bus.execute(CommandEnvelope(commandID: id, name: name, payload: .object(payload), issuedAt: now), now: now)

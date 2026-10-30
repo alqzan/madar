@@ -59,7 +59,11 @@ private struct MadarSceneContent: View {
             // A Shortcut ran in this process and queued a blind write: apply it now, not at the next launch.
             .onReceive(NotificationCenter.default.publisher(for: .madarInboxChanged)) { _ in
                 guard let session else { return }
-                Task { do { try await session.drainInbox() } catch { } }
+                Task {
+                    do { try await session.drainInbox() }
+                    catch BackupOperationError.busy { }
+                    catch { session.errorMessage = "لم يكتمل تحديث البيانات. \(madarUserMessage(error))" }
+                }
             }
             .onOpenURL { url in
                 if let session { session.open(url) }

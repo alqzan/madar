@@ -520,6 +520,40 @@ import XCTest
         app.buttons["undo-button"].tap()
     }
 
+    func testPrayerDeepLinkSurvivesReadFailureAndRetry() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
+            "MADAR_UI_NOW": "2026-10-07T16:20:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01",
+            "MADAR_UI_PRAYER_FIXTURE": "homeShowcase", "MADAR_UI_THEME": "light",
+            "MADAR_UI_PRAYER_READ_FAILURE_ONCE": "1", "MADAR_UI_PRAYER_ROUTE": "madar://salah/log?prayer=asr"]
+        app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+        let retry = app.alerts.buttons["أعد المحاولة"]
+        XCTAssertTrue(retry.waitForExistence(timeout: 10), app.debugDescription)
+        retry.tap()
+        let alone = app.buttons["prayer-status-alone"]
+        XCTAssertTrue(alone.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(alone.isSelected, "Retry opens the requested Asr log without dropping the route")
+        app.terminate()
+    }
+
+    func testPrayerQadaListReadFailureRetriesInPlace() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L",
+            "MADAR_UI_NOW": "2026-10-07T20:00:00+03:00", "MADAR_UI_TRACKING_START": "2026-10-01",
+            "MADAR_UI_PRAYER_FIXTURE": "ratio26of30", "MADAR_UI_THEME": "light",
+            "MADAR_UI_PRAYER_READ_FAILURE_ONCE": "1"]
+        app.launch(); finishOnboarding(app); app.tabBars.buttons["الصلاة"].tap()
+        let places = app.buttons["prayer-qada-places"]; scrollTo(places, in: app); places.tap()
+        let retry = app.buttons["prayer-qada-retry"]
+        XCTAssertTrue(retry.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["prayer-qada-read-error"].exists)
+        retry.tap()
+        XCTAssertTrue(app.buttons["prayer-qada-row-2026-10-06-isha"].waitForExistence(timeout: 10), app.debugDescription)
+        app.terminate()
+    }
+
     /// M1-V07: the qiyam sheet, for comparison with screens/salah/07-S6-Qiyam(-s1).jpg.
     func test_M1V07_QiyamSheetMatchesCanonical() throws {
         continueAfterFailure = false
@@ -1051,6 +1085,35 @@ import XCTest
         app.swipeUp(); app.swipeUp()
         // Native minimization has no stable public XCTest state; review these two images.
         attachScreenshot(app, named: "M0-native-bar-after-scroll")
+        app.terminate()
+    }
+
+    func testSettingsRouteScrollsToAndHighlightsExactSetting() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
+            "MADAR_UI_SETTINGS_ROUTE": "madar://settings/core/core.dayStart"]
+        app.launch(); finishOnboarding(app)
+        let customize = app.buttons["tab-customize"]
+        XCTAssertTrue(customize.waitForExistence(timeout: 15), app.debugDescription)
+        customize.tap()
+        let option = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "option-core.dayStart-")).firstMatch
+        XCTAssertTrue(option.waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertTrue(option.isHittable, "The deep link must scroll to its exact setting.")
+        XCTAssertEqual(app.textFields["settings-search"].value as? String, "يبدأ يومك من")
+        attachScreenshot(app, named: "AU-95-settings-route-core-dayStart-L")
+        app.terminate()
+    }
+
+    func testUnknownSettingsRouteShowsInSettingsMessage() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString,
+            "MADAR_UI_SETTINGS_ROUTE": "madar://settings/core/no.such.key"]
+        app.launch(); finishOnboarding(app)
+        let customize = app.buttons["tab-customize"]
+        XCTAssertTrue(customize.waitForExistence(timeout: 15), app.debugDescription)
+        customize.tap()
+        XCTAssertTrue(app.staticTexts["settings-route-missing"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(app.buttons["settings-clear-search"].exists, "A missing setting key must not remain as an active search.")
         app.terminate()
     }
     func testBackupFolderPickerCancellationKeepsLocalBackupSettings() throws {

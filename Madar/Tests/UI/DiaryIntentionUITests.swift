@@ -22,5 +22,13 @@ import XCTest
         let convert=app.buttons["اجعلها نيّة اليوم"];XCTAssertTrue(convert.waitForExistence(timeout:5));convert.tap()
         XCTAssertTrue(app.buttons["diary-day-niyya-undo"].waitForExistence(timeout:10));XCTAssertTrue(app.buttons["diary-niyya-open"].label.contains("صورة احتفظت بها اليوم"));capture(app,"M3-V13-sentence-L")
     }
+    func testUnsavedIntentionIsKeptWhenCloseIsCancelled() {
+        continueAfterFailure=false
+        let app=XCUIApplication();app.launchEnvironment=["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_DIARY_FIXTURE":"empty","MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light","MADAR_UI_NOW":"2026-10-15T07:00:00+03:00"]
+        app.launch();XCTAssertTrue(app.buttons["diary-today"].waitForExistence(timeout:25));app.buttons["diary-today"].tap();app.buttons["diary-niyya-open"].tap()
+        let text=app.textFields["diary-niyya-text"];XCTAssertTrue(text.waitForExistence(timeout:10));text.tap();text.typeText("أتمّ ما بدأت به")
+        app.buttons["diary-niyya-close"].tap();let keep=app.buttons.matching(identifier:"diary-niyya-continue").firstMatch;XCTAssertTrue(keep.waitForExistence(timeout:5));capture(app,"AU-95-diary-intention-discard-confirm-L");keep.tap()
+        XCTAssertEqual(text.value as? String,"أتمّ ما بدأت به");app.buttons["diary-niyya-save"].tap();XCTAssertTrue(app.buttons["diary-niyya-undo"].waitForExistence(timeout:10))
+    }
     private func capture(_ app:XCUIApplication,_ name:String){let a=XCTAttachment(screenshot:app.screenshot());a.name=name;a.lifetime = .keepAlways;add(a)}
 }

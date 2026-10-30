@@ -75,10 +75,10 @@ struct PrayerCustomizeView: View {
         let id: String, title: String, symbol: String, keys: [String]
     }
     private let groups: [CustomizeGroup] = [
-        .init(id: "riwaq", title: "الرواق والميزان", symbol: "paintpalette", keys: ["salah.showMosqueStreak"]),
-        .init(id: "log", title: "التسجيل", symbol: "checkmark", keys: ["salah.askHeart"]),
-        .init(id: "times", title: "المواقيت", symbol: "clock", keys: ["salah.method", "salah.asr", "salah.highLatitudeRule", "salah.offsets"]),
-        .init(id: "remind", title: "التذكير", symbol: "bell", keys: ["salah.askReminder", "salah.askAfterAdhanMin", "salah.liveActivity"]),
+        .init(id: "riwaq", title: "الرواق والميزان", symbol: "paintpalette", keys: ["salah.pool", "salah.fridayTallArch", "salah.showMosqueStreak"]),
+        .init(id: "log", title: "التسجيل", symbol: "checkmark", keys: ["salah.askHeart", "salah.pendingDays"]),
+        .init(id: "times", title: "المواقيت", symbol: "clock", keys: ["salah.method", "salah.tripMethod", "salah.asr", "salah.highLatitudeRule", "salah.offsets", "salah.travelShortenCombine"]),
+        .init(id: "remind", title: "التذكير", symbol: "bell", keys: ["salah.askReminder", "salah.askAfterAdhanMin", "salah.qadaReminder", "salah.liveActivity"]),
     ]
     private func definitions(_ group: CustomizeGroup) -> [SettingDefinition] {
         group.keys.compactMap { key in AppSession.supportedKeys.contains(key) ? session.schema.settings.first { $0.key == key } : nil }

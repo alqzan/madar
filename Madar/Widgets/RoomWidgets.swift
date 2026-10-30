@@ -78,7 +78,7 @@ struct FixedRoomEntry:TimelineEntry {
     var relevance:TimelineEntryRelevance?{
         let empty = room == .mihbara
             ? mihbara?.currentBook == nil && mihbara?.hadithToday == nil && mihbara?.lastNotebookLine == nil && (mihbara?.shelfCount ?? 0) == 0
-            : value == nil || value?.rows.isEmpty == true
+            : value == nil || value?.hasVisibleRows(for: room, template: template) == false
         return .init(score:empty || value?.locked == true || mihbaraLocked ? 0 : 1)
     }
 }

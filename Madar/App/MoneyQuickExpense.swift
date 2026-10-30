@@ -5,6 +5,7 @@ struct MoneyExpenseSeed: Identifiable {
     var id = UUID()
     var amount = ""
     var merchant = ""
+    var method: String?
     var homeCurrency = false
 }
 struct MoneyQuickExpense: View {

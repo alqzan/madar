@@ -2,14 +2,23 @@ import XCTest
 
 @MainActor final class MoneyAccountsUITests: XCTestCase {
     private func shot(_ app: XCUIApplication, _ name: String) { Thread.sleep(forTimeInterval: 0.6); let a = XCTAttachment(screenshot: app.screenshot()); a.name = name; a.lifetime = .keepAlways; add(a) }
-    private func open(_ fixture: String, unknownBalance: Bool = false, wrappedNames: Bool = false) -> XCUIApplication {
+    private func open(_ fixture: String, unknownBalance: Bool = false, wrappedNames: Bool = false, failReadOnce: Bool = false) -> XCUIApplication {
         let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": fixture, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-17T12:00:00+03:00"]
         if unknownBalance { app.launchEnvironment["MADAR_UI_UNKNOWN_BALANCE"] = "1" }
         if wrappedNames { app.launchEnvironment["MADAR_UI_WRAPPED_ACCOUNTS"] = "1" }
+        if failReadOnce { app.launchEnvironment["MADAR_UI_MONEY_ACCOUNTS_READ_FAILURE_ONCE"] = "1" }
         app.launch(); let tab = app.buttons["tab-customize"]; XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
         let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("المال"); app.buttons["money-open"].tap()
         let door = app.buttons["money-accounts-open"]; XCTAssertTrue(door.waitForExistence(timeout: 10)); for _ in 0..<8 where !door.isHittable { app.swipeUp(velocity: .slow) }; door.tap()
-        XCTAssertTrue(app.staticTexts["money-accounts-net"].waitForExistence(timeout: 10)); return app
+        if failReadOnce { XCTAssertTrue(app.staticTexts["money-accounts-read-error"].waitForExistence(timeout: 10)) }
+        else { XCTAssertTrue(app.staticTexts["money-accounts-net"].waitForExistence(timeout: 10)) }
+        return app
+    }
+    func testAccountsReadFailureOffersRetry() {
+        continueAfterFailure = false
+        let app = open("accounts", failReadOnce: true)
+        app.buttons["money-accounts-retry"].tap()
+        XCTAssertTrue(app.staticTexts["money-accounts-net"].waitForExistence(timeout: 10), app.debugDescription)
     }
     func testTreeSourcesProtectedCheckpointAndAddNotMineWithUndo() {
         continueAfterFailure = false

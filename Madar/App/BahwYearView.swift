@@ -123,6 +123,7 @@ struct BahwYearView: View {
         .environment(\.roomTheme, lobby)
         .toolbarVisibility(.hidden, for: .navigationBar).toolbarVisibility(.hidden, for: .tabBar).hidesRoomAccessory(session, id: "bahw-year")
         .sheet(item: $editing) { draft in BahwDaySheet(session: session, draft: draft).presentationDetents([.large]) }
+        .onChange(of: session.yearDayID, initial: true) { _, id in if let id { openRoutedDay(id) } }
     }
 
     private var topBar: some View {
@@ -283,6 +284,15 @@ struct BahwYearView: View {
                 }
             }.background(lobby.surface, in: .rect(cornerRadius: 26)).overlay { RoundedRectangle(cornerRadius: 26).stroke(lobby.line) }
         }
+    }
+
+    private func openRoutedDay(_ id: UUID) {
+        defer { session.yearDayID = nil }
+        guard let matter = service.matters().first(where: { $0.rowID == id }) else {
+            session.errorMessage = "هذا اليوم لم يعد موجودًا في الأيام القادمة."
+            return
+        }
+        editing = .init(service: service, matter: matter, id: id)
     }
     @ViewBuilder private func matterRow(_ item: BahwMatter) -> some View {
         let content = HStack(alignment: .center, spacing: 14) {

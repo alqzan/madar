@@ -94,6 +94,12 @@ import MadarCore
         XCTAssertNil(session.errorMessage)
         XCTAssertEqual(session.selectedTab, "customize")
         XCTAssertEqual(session.settingsQuery, "الوضع")
+        session.settingsRoute = nil
+        session.open(try XCTUnwrap(URL(string: "madar://settings/core/no.such.key")))
+        XCTAssertNil(session.errorMessage)
+        XCTAssertEqual(session.selectedTab, "customize")
+        XCTAssertEqual(session.settingsQuery, "")
+        XCTAssertEqual(session.settingsRoute?.path, ["core", "no.such.key"])
     }
     func testBackupUIAdapterRestoresSyncedDataAndPreservesDevicePreferences() async throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "MadarService-\(UUID())")

@@ -231,7 +231,7 @@ struct MadarRootView: View {
                 }
             }
         }
-        .fullScreenCover(item: $session.moneyExpenseSeed) { seed in MoneyQuickExpense(app: session, seed: seed) }
+        .fullScreenCover(item: $session.moneyExpenseSeed, onDismiss: { session.presentNextMoneyExpenseSeed() }) { seed in MoneyQuickExpense(app: session, seed: seed) }
         .font(MadarTypography.body())
         .environment(\.roomTheme, theme)
         .dynamicTypeSize(effectiveType)

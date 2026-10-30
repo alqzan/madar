@@ -21,10 +21,15 @@ import XCTest
         app.swipeDown(velocity: .fast)
         app.buttons["money-log-search-open"].tap()
         let field = app.textFields["money-log-search"]; XCTAssertTrue(field.waitForExistence(timeout: 5)); field.tap(); field.typeText("غيرموجود\n")
-        XCTAssertTrue(app.staticTexts["money-log-empty"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["money-log-search-empty"].waitForExistence(timeout: 5))
         app.buttons["مسح البحث"].tap(); XCTAssertTrue(app.otherElements["money-log-month-grid"].exists)
         app.buttons["money-log-filter-transfers"].tap()
         XCTAssertTrue(app.staticTexts["money-log-empty"].waitForExistence(timeout: 5))
+        app.buttons["money-log-search-open"].tap()
+        let filteredSearch = app.textFields["money-log-search"]
+        XCTAssertTrue(filteredSearch.waitForExistence(timeout: 5)); filteredSearch.tap(); filteredSearch.typeText("متجر الأدوات\n")
+        XCTAssertTrue(app.staticTexts["money-log-search-empty"].waitForExistence(timeout: 5), app.debugDescription)
+        app.buttons["مسح البحث"].tap()
         app.buttons["money-log-filter-all"].tap()
         let restored = app.buttons["money-log-row-مصروف"]
         for _ in 0..<6 where !restored.exists { app.swipeUp(velocity: .slow) }

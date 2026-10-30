@@ -4,6 +4,11 @@ import MadarDesign
 
 struct DiaryHubView: View {
     @Bindable var app: AppSession
+    var initialTab: String? = nil
+    var initialLetterID: UUID? = nil
+    var initialProjectID: UUID? = nil
+    var initialLetterRequestID: UUID? = nil
+    var initialProjectRequestID: UUID? = nil
     @Environment(\.dismiss) private var dismiss
     @Environment(\.roomTheme) private var theme
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -19,7 +24,12 @@ struct DiaryHubView: View {
     @State private var bookOpen = false
     @State private var failure: String?
     @State private var loadAttempt = 0
+    @State private var memoryReadFailurePending = false
+#if DEBUG
+    @State private var injectedMemoryReadFailure = false
+#endif
     @State private var injectedArchiveReadFailure = false
+    @State private var initialRouteApplied = false
     private var service: AppDiaryService { .init(app: app) }
     private var grid: DiaryCalendarGrid { service.diaryCalendar }
     private var selectedYear: Int { year ?? archive.map { grid.parts($0.today).year ?? $0.today.year } ?? grid.parts(GregorianDay.containing(.now, in: app.activePlace.timeZone)).year ?? Calendar.current.component(.year, from: .now) }
@@ -38,8 +48,8 @@ struct DiaryHubView: View {
                             case "photos": photos(archive)
                             case "memories": memories(archive)
                             case "index": index(archive)
-                            case "letters": DiaryLettersPanel(app: app)
-                            case "projects": DiaryProjectsPanel(app: app)
+                            case "letters": DiaryLettersPanel(app: app, initialLetterID: initialLetterID, initialLetterRequestID: initialLetterRequestID)
+                            case "projects": DiaryProjectsPanel(app: app, initialProjectID: initialProjectID, initialProjectRequestID: initialProjectRequestID)
                             default: timeline(archive.days)
                             }
                         } else if let failure {
@@ -58,7 +68,18 @@ struct DiaryHubView: View {
                 .scrollPosition($contentPosition)
                 .onChange(of: month) { contentPosition.scrollTo(edge: .top) }
                 .onChange(of: selectedYear) { contentPosition.scrollTo(edge: .top) }
-                .onChange(of: tab) { contentPosition.scrollTo(edge: .top) }
+                .onChange(of: tab) { _, value in
+                    contentPosition.scrollTo(edge: .top)
+#if DEBUG
+                    let environment = ProcessInfo.processInfo.environment
+                    if value == "memories", !injectedMemoryReadFailure,
+                       environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil,
+                       environment["MADAR_UI_DIARY_MEMORIES_READ_FAILURE_ONCE"] == "1" {
+                        injectedMemoryReadFailure = true
+                        memoryReadFailurePending = true
+                    }
+#endif
+                }
             }.background(theme.background).foregroundStyle(theme.ink)
                 .fullScreenCover(isPresented: $bookOpen) { DiaryYearbookView(app: app).environment(\.roomTheme, theme) }
                 .fullScreenCover(isPresented: $exportOpen) { DiaryExportView(app: app).environment(\.roomTheme, theme) }
@@ -66,6 +87,9 @@ struct DiaryHubView: View {
                 .toolbar { ToolbarItem(placement: .topBarTrailing) { Button { searchOpen = true } label: { Image(systemName: "magnifyingglass") }.accessibilityLabel("ابحث في مذكراتك") }; ToolbarItem(placement: .topBarLeading) { Button { dismiss() } label: { Label("المذكرات", systemImage: "chevron.backward") }.accessibilityIdentifier("diary-hub-close") } }
                 .toolbarBackground(theme.background, for: .navigationBar).tint(theme.accent)
                 .sheet(isPresented: Binding(get: { reader != nil }, set: { if !$0 { reader = nil } })) { if let reader { DiaryDayView(app: app, day: reader).environment(\.roomTheme, theme).madarSheetErrorAlert(app) } }
+                .onChange(of: initialTab) { _, target in
+                    if let target, tabs.contains(where: { $0.0 == target }) { tab = target; initialRouteApplied = true }
+                }
                 .task(id: "\(app.prayerRevision)-\(loadAttempt)") {
                     failure = nil
                     do {
@@ -82,7 +106,13 @@ struct DiaryHubView: View {
                         archive = try service.archive()
                         travelDays = (try? service.travelDays()) ?? []
                         failure = nil
+                        if !initialRouteApplied, let initialTab, tabs.contains(where: { $0.0 == initialTab }) {
+                            tab = initialTab
+                            initialRouteApplied = true
+                        }
                     } catch {
+                        archive = nil
+                        travelDays = []
                         failure = "تعذّر فتح سجل اليوميات."
                     }
                 }
@@ -206,12 +236,19 @@ struct DiaryHubView: View {
         }
     }
     private func memories(_ archive: DiaryArchiveSnapshot) -> some View {
-        let loaded = Result { try service.home() }, home = try? loaded.get()
+        let loaded: Result<DiaryHomeSnapshot, Error>
+        if memoryReadFailurePending { loaded = .failure(CocoaError(.fileReadUnknown)) }
+        else { loaded = Result { try service.home() } }
+        let home = try? loaded.get()
         return VStack(alignment: .leading, spacing: 14) {
             Text("رف الذكريات").font(DiaryType.heading)
             Text(home?.selection.match == .echo ? "أقرب صدى من كتابتك" : "من مثل هذا اليوم").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))
             // A read that failed says so; «لا ذكريات» is only for a day that truly has none.
-            if case .failure(let error) = loaded { Text(madarUserMessage(error)).font(DiaryType.writing) }
+            if case .failure(let error) = loaded {
+                Text(madarUserMessage(error)).font(DiaryType.writing).accessibilityIdentifier("diary-hub-memory-error")
+                Button("أعد المحاولة") { memoryReadFailurePending = false }
+                    .frame(minHeight: 44).accessibilityIdentifier("diary-hub-memories-retry")
+            }
             else { timeline(archive.days.filter { home?.selection.days.contains($0.day) == true }, empty: "لا ذكريات لهذا اليوم بعد.") }
         }
     }

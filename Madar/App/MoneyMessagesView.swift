@@ -356,7 +356,8 @@ struct MoneyMessagesView: View {
         }
     }
     private func load() {
-        do { reading = try service.loadMessages(); failure = nil } catch { failure = "تعذّرت قراءة الرسائل" }
+        do { reading = try service.loadMessages(); failure = nil }
+        catch { reading = nil; failure = "تعذّرت قراءة الرسائل. يمكنك إعادة المحاولة." }
     }
 }
 

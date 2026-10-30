@@ -107,6 +107,16 @@ import MadarPrayer
         let mihbara=app.mihbaraWidgetSnapshot(locked:true)
         XCTAssertNil(mihbara.currentBook);XCTAssertNil(mihbara.hadithToday);XCTAssertEqual(mihbara.shelfCount,0);XCTAssertNil(mihbara.lastNotebookLine)
     }
+    func testHabitReadFailureDoesNotPublishAnEmptyHabitState() throws {
+        let root=FileManager.default.temporaryDirectory.appending(path:"RoomWidgetHabitReadFailure-\(UUID())");defer{try? FileManager.default.removeItem(at:root)}
+        let container=try MadarContainerFactory.makeLocal(at:root),app=try AppSession(container:container,groupDirectory:root)
+        let payload=try XCTUnwrap(app.roomWidgetPayloads(locked:false,at:app.prayerNow(),readHabitReadings:{throw CocoaError(.fileReadUnknown)})[.habits])
+        XCTAssertEqual(payload.heading,"تعذّر تحديث العادات")
+        XCTAssertEqual(payload.emptyTitle,"افتح مدار لإعادة المحاولة")
+        XCTAssertTrue(payload.rows.isEmpty)
+        XCTAssertTrue(payload.periods.isEmpty)
+        XCTAssertFalse(payload.locked)
+    }
     func testMihbaraSnapshotUsesOnlyEligibleBooksAndNotebookLines() async throws {
         let root=FileManager.default.temporaryDirectory.appendingPathComponent("RoomWidgetMihbara-\(UUID())");defer{try? FileManager.default.removeItem(at:root)}
         let container=try MadarContainerFactory.makeLocal(at:root),app=try AppSession(container:container,groupDirectory:root),context=ModelContext(container),now=app.prayerNow()

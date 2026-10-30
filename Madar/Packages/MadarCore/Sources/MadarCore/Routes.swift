@@ -13,10 +13,11 @@ public struct RouteContext: Sendable {
     public let trackingStart: GregorianDay
     public let today: GregorianDay
     public let settingsKeys: Set<String>
+    public let unavailableSettings: Set<String>
     public let lock: RouteLock
     public let unlocked: Bool
     public let availability: FeatureAvailability
-    public init(trackingStart: GregorianDay, today: GregorianDay, settingsKeys: Set<String>, lock: RouteLock = .none, unlocked: Bool = false, availability: FeatureAvailability = .m0) { self.trackingStart = trackingStart; self.today = today; self.settingsKeys = settingsKeys; self.lock = lock; self.unlocked = unlocked; self.availability = availability }
+    public init(trackingStart: GregorianDay, today: GregorianDay, settingsKeys: Set<String>, unavailableSettings: Set<String> = [], lock: RouteLock = .none, unlocked: Bool = false, availability: FeatureAvailability = .m0) { self.trackingStart = trackingStart; self.today = today; self.settingsKeys = settingsKeys; self.unavailableSettings = unavailableSettings; self.lock = lock; self.unlocked = unlocked; self.availability = availability }
 }
 public enum RouteRegistry {
     public static func parse(_ url: URL, context: RouteContext) throws -> Route {
@@ -31,13 +32,15 @@ public enum RouteRegistry {
         func date(_ value: String) throws { let d = try GregorianDay(value); guard d >= context.trackingStart, d <= context.today.adding(days: 366) else { throw CoreError.invalidRoute } }
         func integer(_ value: String, range: ClosedRange<Int>) throws { guard value.utf8.allSatisfy({ (48...57).contains($0) }), let n = Int(value), range.contains(n) else { throw CoreError.invalidRoute } }
         if host == "settings" {
-            guard path.count == 2, let r = Room(rawValue: path[0]), context.settingsKeys.contains(path[1]) else { throw CoreError.invalidRoute }
+            let key = path.last ?? ""
+            guard path.count == 2, let r = Room(rawValue: path[0]),
+                  key.utf8.count <= 128,
+                  key.range(of: "^[A-Za-z0-9_]+(?:\\.[A-Za-z0-9_-]+)+$", options: .regularExpression) != nil,
+                  (context.settingsKeys.contains(key) || !context.unavailableSettings.contains(key)) else { throw CoreError.invalidRoute }
             room = r
         } else if host == "search" {
             guard path.isEmpty else { throw CoreError.invalidRoute }; room = .core; allowed = ["q", "room"]
             if let r = p["room"], Room(rawValue: r) == nil { throw CoreError.invalidRoute }
-        } else if host == "capture" {
-            guard path.isEmpty else { throw CoreError.invalidRoute }; room = .core; mode = .prefill; allowed = ["text"]
         } else {
             guard let r = Room(rawValue: host), r != .core, r != .habits, r != .year else { throw CoreError.invalidRoute }; room = r
             if path.isEmpty {} else {
@@ -48,7 +51,7 @@ public enum RouteRegistry {
                 case (.bahw, "year", 3): guard path[1] == "day" else { throw CoreError.invalidRoute }; room = .year; try uuid(path[2])
                 case (.bahw, "widget-maker", 1): allowed = ["template"]; if let t = p["template"], Room(rawValue: t) == nil { throw CoreError.invalidRoute }
                 case (.salah, "day", 2), (.salah, "qiyam", 2), (.notes, "day", 2): try date(path[1])
-                case (.salah, "hali", 1), (.salah, "qada", 1), (.notes, "today", 1), (.notes, "letters", 1), (.quran, "fihris", 1), (.mal, "now", 1), (.mal, "messages", 1), (.mihbara, "desk", 1): break
+                case (.salah, "hali", 1), (.salah, "qada", 1), (.notes, "today", 1), (.notes, "letters", 1), (.quran, "fihris", 1), (.mal, "now", 1), (.mal, "messages", 1), (.mal, "categories", 1), (.mal, "reconcile", 1), (.mal, "zakat", 1), (.mihbara, "desk", 1): break
                 case (.salah, "log", 1):
                     allowed = ["prayer", "day", "status", "heart"]; mode = .prefill
                     guard let value = p["prayer"], Prayer(rawValue: value) != nil else { throw CoreError.invalidRoute }

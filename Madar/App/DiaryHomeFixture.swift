@@ -10,7 +10,7 @@ import MadarDesign
 extension AppSession {
     func prepareDiaryHomeFixture(group: URL) throws {
         let env = ProcessInfo.processInfo.environment
-        guard let variant = env["MADAR_UI_DIARY_FIXTURE"], ["home", "empty", "echoes", "margin", "welcome", "restored", "today", "editor", "return", "travel", "travelClock", "letters"].contains(variant), let id = env["MADAR_UI_STORE_ID"],
+        guard let variant = env["MADAR_UI_DIARY_FIXTURE"], ["home", "empty", "echoes", "margin", "welcome", "restored", "today", "editor", "entryRoute", "return", "travel", "travelClock", "letters"].contains(variant), let id = env["MADAR_UI_STORE_ID"],
               group.lastPathComponent == id, group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         selectedTab = "notes"
         let context = ModelContext(container)
@@ -34,11 +34,22 @@ extension AppSession {
         if variant == "letters" {
             // N04: one letter due since yesterday, one sealed today, and a project whose keyword today's line mentions.
             let now=prayerUITestClock(.now),today=GregorianDay.containing(now,in:.riyadh)
-            let due=Letter();due.text="أرجو أن تكون أخفّ مما كنت يوم كتبتها.";due.triggerKind="date";due.triggerValue=today.adding(days:-1).description;due.openAt=today.adding(days:-1).date(in:.riyadh);due.createdAt=now.addingTimeInterval(-40*86400);context.insert(due)
-            let sealed=Letter();sealed.text="لا تُقرأ قبل وقتها";sealed.triggerKind="date";sealed.triggerValue=today.adding(days:60).description;sealed.createdAt=now.addingTimeInterval(-3600);context.insert(sealed)
-            let project=Project();project.name="ترتيب البيت";project.intention="بيت أهدأ قبل رمضان";project.keyword="البيت";context.insert(project)
+            let due=Letter();due.id=UUID(uuidString:"33333333-3333-4333-8333-333333333331")!;due.text="أرجو أن تكون أخفّ مما كنت يوم كتبتها.";due.triggerKind="date";due.triggerValue=today.adding(days:-1).description;due.openAt=today.adding(days:-1).date(in:.riyadh);due.createdAt=now.addingTimeInterval(-40*86400);context.insert(due)
+            let sealed=Letter();sealed.id=UUID(uuidString:"33333333-3333-4333-8333-333333333332")!;sealed.text="لا تُقرأ قبل وقتها";sealed.triggerKind="date";sealed.triggerValue=today.adding(days:60).description;sealed.createdAt=now.addingTimeInterval(-3600);context.insert(sealed)
+            let project=Project();project.id=UUID(uuidString:"44444444-4444-4444-8444-444444444441")!;project.name="ترتيب البيت";project.intention="بيت أهدأ قبل رمضان";project.keyword="البيت";context.insert(project)
             let row=Entry();row.dayKey=today.description;row.text="دهنّا غرفة البيت الصغيرة.";row.eventAt=now.addingTimeInterval(-2*3600);row.tzID="Asia/Riyadh";row.dayPolicy="midnight@1";context.insert(row)
             try context.save();return
+        }
+        if variant == "entryRoute" {
+            let today = GregorianDay.containing(prayerUITestClock(.now), in: .riyadh)
+            let row = Entry(); row.id = UUID(uuidString: "44444444-4444-4444-8444-444444440001")!
+            row.dayKey = today.description; row.text = "سطر اختبار رابط اليوميات"; row.eventAt = today.date(in: .riyadh).addingTimeInterval(12 * 3600)
+            row.tzID = "Asia/Riyadh"; row.dayPolicy = "midnight@1"; row.source = "native"
+            context.insert(row)
+            let second = Entry(); second.id = UUID(uuidString: "44444444-4444-4444-8444-444444440002")!
+            second.dayKey = today.description; second.text = "السطر الثاني في اليوم نفسه"; second.eventAt = today.date(in: .riyadh).addingTimeInterval(13 * 3600)
+            second.tzID = "Asia/Riyadh"; second.dayPolicy = "midnight@1"; second.source = "native"
+            context.insert(second); try context.save(); return
         }
         if variant == "travel" {
             // A shared Trip as Prayer's explicit arrival would store it: Istanbul since yesterday; no homeKm, so distance is derived.

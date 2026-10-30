@@ -8,6 +8,8 @@ import MadarCommands
 struct MoneyEnvelopesView: View {
     let app: AppSession
     @Binding var revealed: Bool
+    @Binding var initialEnvelopeID: UUID?
+    @Binding var initialRouteRequestID: UUID?
     @Environment(\.roomTheme) private var inheritedTheme
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dismiss) private var dismiss
@@ -18,6 +20,8 @@ struct MoneyEnvelopesView: View {
     @State private var failure: String?
     @State private var selectedEnvelope: UUID?
     @State private var goalOpen = false
+    @State private var appliedRouteRequestID: UUID?
+    @State private var initialEnvelopeUnavailable = false
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
     private var service: AppMoneyService { .init(app: app) }
     private var visible: Bool { revealed || !app.bool("core.hideMoneyUntilTouch") }
@@ -29,6 +33,10 @@ struct MoneyEnvelopesView: View {
                     Text("المظاريف").font(MadarTypography.title())
                     Spacer()
                     if let reading { Text(figure: amount(reading.totalMinor)).font(MadarTypography.cardTitle()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-envelope-total") }
+                }
+                if initialEnvelopeUnavailable {
+                    Text("المظروف المطلوب لم يعد موجودًا. المظاريف الحالية ظاهرة كما هي.")
+                        .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-envelope-route-unavailable")
                 }
                 if !visible { Button("أظهر الأرقام") { revealed = true }.frame(minHeight: 44).accessibilityIdentifier("money-envelopes-reveal") }
                 if let reading {
@@ -61,19 +69,21 @@ struct MoneyEnvelopesView: View {
                     // AU-95: a failed reserve change used to vanish, since `failure` showed only when nothing was read.
                     if let failure { Text(failure).font(MadarTypography.caption()).foregroundStyle(theme.color("dueText")).accessibilityIdentifier("money-envelopes-failure") }
                     ForEach(reading.home.envelopes) { envelope in
-                        Button { selectedEnvelope = envelope.id } label: { MoneyGoalOverview(envelope: envelope, app: app, visible: visible).contentShape(.rect) }.buttonStyle(.madarPlain).accessibilityIdentifier("money-envelope-" + envelope.name)
+                        Button { selectedEnvelope = envelope.id } label: { MoneyGoalOverview(envelope: envelope, app: app, visible: visible).contentShape(.rect) }
+                            .buttonStyle(.madarPlain).accessibilityAddTraits(selectedEnvelope == envelope.id ? .isSelected : [])
+                            .accessibilityIdentifier("money-envelope-" + envelope.name + "-" + envelope.id.uuidString)
                     }
                     Button { goalOpen = true } label: {
                         Label("جهّز لشيء قادم", systemImage: "plus").font(MadarTypography.body()).frame(maxWidth: .infinity, minHeight: 52)
                             .overlay { RoundedRectangle(cornerRadius: 6).stroke(theme.color("accent").opacity(0.6), style: .init(lineWidth: 1, dash: [4, 3])) }
                     }.buttonStyle(.madarPlain).padding(.top, 6).accessibilityIdentifier("money-envelopes-new-goal")
                 } else if let failure {
-                    Text(failure).font(MadarTypography.body()); Button("أعِد المحاولة", action: load).frame(minHeight: 44)
+                    Text(failure).font(MadarTypography.body()); Button("أعِد المحاولة") { load(routeRequestID: initialRouteRequestID) }.frame(minHeight: 44)
                 } else { ProgressView().frame(maxWidth: .infinity, minHeight: 200) }
             }.padding(.horizontal, 18).padding(.top, 0).padding(.bottom, 30).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }.clipped().background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
             .environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar)
-            .task { load() }.onChange(of: app.prayerRevision) { load() }
+            .task(id: initialRouteRequestID) { load(routeRequestID: initialRouteRequestID) }.onChange(of: app.prayerRevision) { load() }
             .sheet(isPresented: $targetOpen) { MoneyReserveTargetView(app: app, current: reading?.reserveTargetMinor, visible: visible, revealed: $revealed) { load() }.environment(\.roomTheme, theme) }
             .navigationDestination(isPresented: $goalOpen) { MoneyGoalView(app: app, revealed: $revealed).environment(\.roomTheme, theme) }
             .onChange(of: goalOpen) { if !goalOpen { load() } }
@@ -176,8 +186,20 @@ struct MoneyEnvelopesView: View {
     }
     private func previews(_ balance: Int) -> [Int] { [0] + Array(Set([max(0, balance) / 4, max(0, balance) / 2, max(0, balance) / 4 * 3].filter { $0 > 0 })).sorted() }
     private func amount(_ value: Int) -> String { visible ? service.amount(value) : "•••" }
-    private func load() {
-        do { reading = try service.loadEnvelopes(); previewMinor = min(previewMinor, max(0, reading?.home.reserveMinor ?? 0)); failure = nil }
+    private func load(routeRequestID: UUID? = nil) {
+        do {
+            let loaded = try service.loadEnvelopes()
+            reading = loaded
+            previewMinor = min(previewMinor, max(0, loaded.home.reserveMinor))
+            failure = nil
+            guard let routeRequestID, routeRequestID != appliedRouteRequestID else { return }
+            appliedRouteRequestID = routeRequestID
+            initialEnvelopeUnavailable = false
+            selectedEnvelope = nil
+            guard let initialEnvelopeID else { return }
+            if loaded.home.envelopes.contains(where: { $0.id == initialEnvelopeID }) { selectedEnvelope = initialEnvelopeID }
+            else { initialEnvelopeUnavailable = true }
+        }
         catch { reading = nil; failure = "لم تكتمل قراءة المظاريف. يمكنك إعادة المحاولة." }
     }
 }

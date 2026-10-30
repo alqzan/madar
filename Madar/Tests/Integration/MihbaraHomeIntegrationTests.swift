@@ -70,6 +70,34 @@ import CoreSpotlight
 }
 
 @MainActor final class MihbaraHomeIntegrationTests: XCTestCase {
+    func testRoutedPDFLocatorIsBoundToTheExactFile() {
+        let locator = #"{"fileHash":"file-a","pdfPageIndex":4}"#
+        XCTAssertEqual(MihbaraPDFLocator.pageIndex(locatorJSON: locator, fileHash: "file-a"), 4)
+        XCTAssertNil(MihbaraPDFLocator.pageIndex(locatorJSON: locator, fileHash: "file-b"))
+        XCTAssertNil(MihbaraPDFLocator.pageIndex(locatorJSON: #"{"fileHash":"file-a","pdfPageIndex":1.5}"#, fileHash: "file-a"))
+    }
+
+    func testTurathDownloadStopsAtTheActualByteLimit() async throws {
+        let withinLimit = AsyncThrowingStream<UInt8, Error>(bufferingPolicy: .unbounded) { continuation in
+            let bytes: [UInt8] = [1, 2, 3, 4]
+            for byte in bytes { continuation.yield(byte) }
+            continuation.finish()
+        }
+        let collected = try await MihbaraTurathSource.boundedData(withinLimit, maximumBytes: 4)
+        XCTAssertEqual(collected, Data([1, 2, 3, 4]))
+
+        let exceedsLimit = AsyncThrowingStream<UInt8, Error>(bufferingPolicy: .unbounded) { continuation in
+            let bytes: [UInt8] = [1, 2, 3, 4, 5]
+            for byte in bytes { continuation.yield(byte) }
+            continuation.finish()
+        }
+        do {
+            _ = try await MihbaraTurathSource.boundedData(exceedsLimit, maximumBytes: 4)
+            XCTFail("An actual response larger than the cap must stop during streaming.")
+        } catch let error as TurathError {
+            XCTAssertEqual(error, .tooLarge)
+        }
+    }
     func testPageFootnotesKeepContinuationLinesAndLongSourceText() throws {
         let note = try XCTUnwrap(MihbaraFootnote(html: "<aside><p>١ الحاشية الأولى.</p><p>سطر مكمل للحاشية.</p><a role=\"doc-backlink\" href=\"#page-ref\">عودة</a></aside>", referrer: "حواشي الصفحة"))
         XCTAssertEqual(note.number, "حواشي الصفحة")

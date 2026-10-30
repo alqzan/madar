@@ -14,8 +14,13 @@ struct DiaryIntentionsView:View {
     @State private var busy=false
     @State private var failure:String?
     @State private var saved=false
+    @State private var confirmDiscard=false
     @FocusState private var focused:Bool
     private var service:AppDiaryService{.init(app:app)}
+    private var hasUnsavedInput:Bool {
+        if let editing, let row=rows.first(where:{$0.id==editing}) { return text != row.text }
+        return !text.isEmpty
+    }
     var body:some View {
         NavigationStack {
             ScrollView {
@@ -42,7 +47,12 @@ struct DiaryIntentionsView:View {
                     if saved,app.undoToken != nil {Button("تراجع عن آخر تعديل"){app.undo();saved=false}.font(MadarTypography.body()).frame(minHeight:44).accessibilityIdentifier("diary-niyya-undo")}
                 }.padding(18)
             }.background(theme.background).foregroundStyle(theme.ink).scrollDismissesKeyboard(.interactively).navigationBarTitleDisplayMode(.inline)
-                .toolbar{ToolbarItem(placement:.topBarLeading){Button("الصفحة"){dismiss()}.disabled(busy).accessibilityIdentifier("diary-niyya-close")}}.tint(theme.accent).toolbarBackground(theme.background,for:.navigationBar)
+                .toolbar{ToolbarItem(placement:.topBarLeading){Button("الصفحة"){if hasUnsavedInput {focused=false;confirmDiscard=true} else {dismiss()}}.disabled(busy).accessibilityIdentifier("diary-niyya-close")}}.tint(theme.accent).toolbarBackground(theme.background,for:.navigationBar)
+                .interactiveDismissDisabled(hasUnsavedInput || busy)
+                .confirmationDialog("تتجاهل النيّة؟",isPresented:$confirmDiscard,titleVisibility:.visible){
+                    Button("تجاهل المسودة",role:.destructive){text="";editing=nil;dismiss()}.accessibilityIdentifier("diary-niyya-discard")
+                    Button("أكمل الكتابة"){}.accessibilityIdentifier("diary-niyya-continue")
+                } message:{Text("لم تحفظ التغييرات على النيّة.")}
                 .task(id:app.prayerRevision){load()}.disabled(busy)
         }
     }

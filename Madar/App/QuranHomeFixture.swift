@@ -9,7 +9,7 @@ import MadarQuran
 extension AppSession {
     func prepareQuranHomeFixture(group: URL) throws {
         let env = ProcessInfo.processInfo.environment
-        guard let variant = env["MADAR_UI_QURAN_FIXTURE"], ["home", "drill", "dayClose", "dayCloseStart", "khatmaStart", "widgetReview"].contains(variant), let id = env["MADAR_UI_STORE_ID"],
+        guard let variant = env["MADAR_UI_QURAN_FIXTURE"], ["home", "drill", "dayClose", "dayCloseStart", "khatmaStart", "widgetReview", "historyRoute"].contains(variant), let id = env["MADAR_UI_STORE_ID"],
               group.lastPathComponent == id, group.deletingLastPathComponent().lastPathComponent == "UITestStores" else { return }
         let context = ModelContext(container)
         selectedTab = "quran"
@@ -20,14 +20,21 @@ extension AppSession {
         _ = try settings.stage(["core.dayStart": .string("midnight"), "quran.restDay": .string("friday"), "quran.reviewSchedule": .string("spaced")], now: now)
         let plan = HifzPlan(); plan.startAyah = 1; plan.amount = 1; plan.activeFrom = now.addingTimeInterval(-100 * 86400); plan.createdAt = plan.activeFrom
         plan.missPolicy = "ask"; context.insert(plan)
-        @discardableResult func append(kind: String, first: Int, last: Int, pages: [Int], offset: Int) -> HifzSession {
-            let row = HifzSession(); row.planID = plan.id; row.kind = kind; row.fromAyah = first; row.toAyah = last; row.pages = pages
+        var historyRouteSessionID: UUID?
+        @discardableResult func append(kind: String, first: Int, last: Int, pages: [Int], offset: Int, id: UUID? = nil) -> HifzSession {
+            let row = HifzSession(); if let id { row.id = id }; row.planID = plan.id; row.kind = kind; row.fromAyah = first; row.toAyah = last; row.pages = pages
             row.dayKey = today.adding(days: offset).description; row.endedAt = today.adding(days: offset).date(in: .riyadhZone).addingTimeInterval(12 * 3600)
             row.tzID = "Asia/Riyadh"; row.dayPolicy = "midnight@1"; context.insert(row)
             for page in pages { let grade = PageGrade(); grade.sessionID = row.id; grade.page = page; grade.grade = "mastered"; context.insert(grade) }
             return row
         }
-        if variant == "dayCloseStart" {
+        if variant == "historyRoute" {
+            let row = append(kind: "review", first: 1, last: 7, pages: [1], offset: -1, id: UUID(uuidString: "11111111-1111-4111-8111-111111111111")!)
+            let mistake = MistakeEvent(); mistake.sessionID = row.id; mistake.ayahId = 2; mistake.wordIndex = 1; mistake.kind = "mistake"; mistake.at = row.endedAt; context.insert(mistake)
+            let next = append(kind: "hifz", first: 8, last: 14, pages: [2], offset: -2, id: UUID(uuidString: "22222222-2222-4222-8222-222222222222")!)
+            let nextMistake = MistakeEvent(); nextMistake.sessionID = next.id; nextMistake.ayahId = 10; nextMistake.wordIndex = 2; nextMistake.kind = "mistake"; nextMistake.at = next.endedAt; context.insert(nextMistake)
+            historyRouteSessionID = row.id
+        } else if variant == "dayCloseStart" {
             plan.unit = "ayah"; plan.amount = 7; plan.rhythm = "light"; plan.activeFrom = now
         } else if variant == "khatmaStart" {
             let finalAyah = catalog.ayahs(on: 604).last!.id
@@ -75,7 +82,8 @@ extension AppSession {
         }
         let done = DeviceSetting(); done.key = "sys.onboardingCompleted"; done.valueJSON = Data("true".utf8); context.insert(done)
         try context.save()
-        if let raw = env["MADAR_UI_QURAN_ROUTE"], let url = URL(string: raw) { open(url) }
+        if let historyRouteSessionID { open(URL(string: "madar://quran/history/\(historyRouteSessionID.uuidString)")!) }
+        else if let raw = env["MADAR_UI_QURAN_ROUTE"], let url = URL(string: raw) { open(url) }
     }
 }
 private extension TimeZone { static var riyadhZone: TimeZone { TimeZone(identifier: "Asia/Riyadh")! } }

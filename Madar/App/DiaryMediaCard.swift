@@ -122,19 +122,29 @@ private struct DiaryTranscriptEditor: View {
     @Environment(\.roomTheme) private var theme
     @State private var text = ""
     @State private var saving = false
+    @State private var loaded = false
+    @State private var confirmDiscard = false
     @State private var error: String?
+    @FocusState private var editing: Bool
+    private var hasUnsavedText: Bool { loaded && text != original }
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading) {
                 Text("الصوت هو الأصل، ويبقى محفوظًا مع هذا النص.").font(MadarTypography.caption()).padding()
-                TextEditor(text: $text).font(DiaryType.writing).scrollContentBackground(.hidden).padding().accessibilityIdentifier("diary-transcript-text")
+                TextEditor(text: $text).font(DiaryType.writing).scrollContentBackground(.hidden).padding().focused($editing).accessibilityIdentifier("diary-transcript-text")
                 if let error { Text(error).font(MadarTypography.caption()).padding() }
             }.background(theme.background).foregroundStyle(theme.ink).navigationTitle("نص التسجيل").navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItem(placement: .topBarLeading) { Button("إلغاء") { dismiss() } }
+                    ToolbarItem(placement: .topBarLeading) { Button("إلغاء") { if hasUnsavedText { editing = false; confirmDiscard = true } else { dismiss() } }.disabled(saving).accessibilityIdentifier("diary-transcript-close") }
                     ToolbarItem(placement: .topBarTrailing) { Button("احفظ") { Task { saving = true; do { try await app.executeDiaryCommand("diary.setTranscript", payload: ["entryID": .string(media.entryID), "text": .string(text)]); dismiss() } catch { self.error = madarUserMessage(error); saving = false } } }.disabled(saving).accessibilityIdentifier("diary-transcript-save") }
                 }
-        }.task { text = original }.interactiveDismissDisabled(text != original)
+        }
+        .confirmationDialog("تتجاهل تعديل النص؟", isPresented: $confirmDiscard, titleVisibility: .visible) {
+            Button("تجاهل التعديل", role: .destructive) { dismiss() }.accessibilityIdentifier("diary-transcript-discard")
+            Button("أكمل التعديل") { }.accessibilityIdentifier("diary-transcript-continue")
+        } message: { Text("التعديلات غير محفوظة.") }
+        .task { text = original; loaded = true }
+        .interactiveDismissDisabled(hasUnsavedText || saving)
     }
 }
 

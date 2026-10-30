@@ -6,6 +6,9 @@ import MadarMoney
 struct MoneyLogView: View {
     let app: AppSession
     @Binding var revealed: Bool
+    var initialTransactionID: UUID? = nil
+    var initialQuery: String? = nil
+    var initialRouteRequestID: UUID? = nil
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicType
@@ -20,6 +23,9 @@ struct MoneyLogView: View {
     @State private var source: MoneySourceDetail?
     @State private var messagesOpen = false
     @State private var failure: String?
+    @State private var initialRouteApplied = false
+    @State private var initialRouteMissing = false
+    @State private var appliedRouteRequestID: UUID?
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
     private var service: AppMoneyService { .init(app: app) }
     private var visible: Bool { revealed || !app.bool("core.hideMoneyUntilTouch") }
@@ -35,6 +41,10 @@ struct MoneyLogView: View {
                     Button { calendarMode.toggle() } label: { Image(systemName: calendarMode ? "book.pages" : "calendar").frame(width: 44, height: 44).background(calendarMode ? theme.ink : Color.clear, in: Circle()).foregroundStyle(calendarMode ? theme.background : theme.ink).overlay { Circle().stroke(theme.line, lineWidth: 1) } }.buttonStyle(.madarPlain).accessibilityLabel(calendarMode ? "رواق الأيام" : "الشهر أقواسًا").accessibilityIdentifier("money-log-mode")
                 }.padding(.top, 8)
                 if let reading {
+                    if initialRouteMissing {
+                        Text("هذه الحركة لم تعد موجودة في السجل.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                            .accessibilityIdentifier("money-log-route-unavailable")
+                    }
                     ScrollView(.horizontal) {
                         HStack(spacing: 8) {
                             ForEach(reading.monthStarts, id: \.description) { start in
@@ -58,16 +68,20 @@ struct MoneyLogView: View {
                         }.scrollIndicators(.hidden)
                     }
                     if !visible { Button("أظهر الأرقام") { revealed = true }.frame(minHeight: 44).accessibilityIdentifier("money-log-reveal") }
-                    if dynamicType.isAccessibilitySize { dayList(reading.days) }
-                    else if calendarMode { monthGrid(reading) }
-                    else { arcade(reading) }
-                    if let chosen { detail(chosen, reading: reading) }
+                    if query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        if dynamicType.isAccessibilitySize { dayList(reading.days) }
+                        else if calendarMode { monthGrid(reading) }
+                        else { arcade(reading) }
+                        if let chosen { detail(chosen, reading: reading) }
+                    } else {
+                        searchResults(reading)
+                    }
                     monthSummary(reading)
-                } else if let failure { Text(failure).font(MadarTypography.body()); Button("أعِد المحاولة", action: load).frame(minHeight: 44) }
+                } else if let failure { Text(failure).font(MadarTypography.body()); Button("أعِد المحاولة") { load(applyIncomingRoute: true) }.frame(minHeight: 44) }
                 else { ProgressView().frame(maxWidth: .infinity, minHeight: 220) }
             }.padding(.horizontal, 20).padding(.bottom, 30).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar)
-            .task { load() }.onChange(of: app.prayerRevision) { load() }
+            .task(id: initialRouteRequestID) { load(applyIncomingRoute: true) }.onChange(of: app.prayerRevision) { load() }
             .sheet(item: $source) { MoneySourceView(app: app, detail: $0, visible: visible).environment(\.roomTheme, theme) }
             .navigationDestination(isPresented: $messagesOpen) { MoneyMessagesView(app: app, revealed: $revealed) }.accessibilityIdentifier("money-log")
     }
@@ -155,9 +169,8 @@ struct MoneyLogView: View {
     private func detail(_ d: MoneyLogDay, reading r: MoneyLogReading) -> some View {
         let rows = r.movements.filter { row in
             guard row.day == d.day else { return false }
-            let matches = filter == "all" || filter == "cash" && row.cash || filter == "bnpl" && row.bnpl || filter == "transfers" && ["transfer", "cardPayment"].contains(row.kind) || row.cardID?.uuidString == filter
             func normalized(_ s: String) -> String { BankDedupe.normalize(s).folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "ar")).filter { $0.isLetter || $0.isNumber } }
-            return matches && (query.isEmpty || normalized(row.title + row.category + row.payment + (visible ? service.amount(row.amountMinor) : "")).contains(normalized(query)))
+            return matchesFilter(row) && (query.isEmpty || normalized(row.title + row.category + row.payment + (visible ? service.amount(row.amountMinor) : "")).contains(normalized(query)))
         }
         return VStack(alignment: .leading, spacing: 14) {
             DoubleRule().stroke(theme.color("reserveText"), lineWidth: 0.8).frame(height: 3)
@@ -222,8 +235,104 @@ struct MoneyLogView: View {
             metric("تحويلات محايدة", value: amount(r.neutralTransfersMinor), note: "لا تُخصم من اليومية", tint: theme.secondaryInk)
         }.padding(.top, 10)
     }
-    private func load() {
-        do { reading = try service.loadLog(month: month); if selected == nil { selected = reading?.days.last { $0.day <= reading!.today }?.day ?? reading?.days.first?.day }; failure = nil }
+    private func normalizedSearch(_ value: String) -> String {
+        BankDedupe.normalize(value).folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "ar"))
+            .filter { $0.isLetter || $0.isNumber }
+    }
+    private func matchesFilter(_ row: MoneyLogMovement) -> Bool {
+        filter == "all" || filter == "cash" && row.cash || filter == "bnpl" && row.bnpl
+            || filter == "transfers" && ["transfer", "cardPayment"].contains(row.kind)
+            || row.cardID?.uuidString == filter
+    }
+    private func matchingMovements(_ r: MoneyLogReading) -> [MoneyLogMovement] {
+        let needle = normalizedSearch(query)
+        guard !needle.isEmpty else { return [] }
+        return r.movements.filter { row in
+            let searchable = row.title + row.category + row.payment + (visible ? service.amount(row.amountMinor) : "")
+            return matchesFilter(row) && normalizedSearch(searchable).contains(needle)
+        }
+    }
+    @ViewBuilder private func searchResults(_ r: MoneyLogReading) -> some View {
+        let rows = matchingMovements(r)
+        if rows.isEmpty {
+            Text("لا حركة تطابق بحثك.").font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
+                .accessibilityIdentifier("money-log-search-empty")
+        } else {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("نتائج البحث: " + service.digits.string(rows.count)).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                ForEach(rows) { row in
+                    Button { source = row.detail } label: {
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(row.title).font(MadarTypography.body()).bold()
+                                MadarDateLabel(app.dateLabels(row.day, weekday: true)).font(MadarTypography.fine())
+                                Text(row.category + "، " + row.payment).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
+                            }
+                            Spacer(minLength: 4)
+                            Text(figure: amount(row.amountMinor)).font(MadarTypography.cardTitle()).lineLimit(1).minimumScaleFactor(0.7)
+                        }.padding(12).frame(maxWidth: .infinity, alignment: .leading).background(theme.surface)
+                            .overlay(alignment: .top) { Rectangle().fill(row.confirmed ? theme.color("surplusText") : theme.secondaryInk).frame(height: 3) }
+                    }.buttonStyle(.madarPlain).accessibilityIdentifier("money-log-search-result-" + row.id.uuidString)
+                }
+            }.accessibilityElement(children: .contain).accessibilityIdentifier("money-log-search-results")
+        }
+    }
+    private func load(applyIncomingRoute: Bool = false) {
+        do {
+            let requestID = applyIncomingRoute ? initialRouteRequestID : nil
+            let appliesNewRoute = requestID != nil && requestID != appliedRouteRequestID
+            if appliesNewRoute {
+                source = nil
+                initialRouteMissing = false
+                filter = "all"
+                query = ""
+                searching = false
+                month = nil
+                selected = nil
+            }
+            let loaded = try service.loadLog(month: appliesNewRoute ? nil : month)
+            if appliesNewRoute {
+                month = loaded.monthStart
+                selected = loaded.days.last { $0.day <= loaded.today }?.day ?? loaded.days.first?.day
+            }
+            let firstTransactionRoute = !initialRouteApplied && initialTransactionID != nil
+            if (appliesNewRoute || firstTransactionRoute), let initialTransactionID {
+                if let movement = loaded.movements.first(where: { $0.id == initialTransactionID }) {
+                    let targetMonth = service.logMonthStart(movement.day)
+                    let routed = targetMonth == loaded.monthStart ? loaded : try service.loadLog(month: targetMonth)
+                    month = targetMonth
+                    selected = movement.day
+                    filter = "all"
+                    query = ""
+                    searching = false
+                    reading = routed
+                    source = movement.detail
+                    initialRouteApplied = true
+                } else {
+                    reading = loaded
+                    initialRouteMissing = true
+                    initialRouteApplied = true
+                }
+                if appliesNewRoute { appliedRouteRequestID = requestID }
+            } else {
+                reading = loaded
+                if appliesNewRoute {
+                    query = initialQuery ?? ""
+                    searching = initialQuery != nil
+                    initialRouteMissing = false
+                    initialRouteApplied = true
+                    appliedRouteRequestID = requestID
+                } else if !initialRouteApplied {
+                    if let initialQuery {
+                        query = initialQuery
+                        searching = true
+                    }
+                    initialRouteApplied = true
+                }
+                if selected == nil { selected = loaded.days.last { $0.day <= loaded.today }?.day ?? loaded.days.first?.day }
+            }
+            failure = nil
+        }
         catch { reading = nil; failure = "لم تكتمل قراءة السجل. حاول مرة أخرى." }
     }
 }

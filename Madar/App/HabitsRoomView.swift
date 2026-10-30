@@ -28,8 +28,8 @@ extension HabitReading {
         if summary.atRisk { return missedPhrase(MadarNumberFormatter(style: .hindi)) + "؛ الحالية تحفظها" }
         switch summary.current?.outcome { case .complete: return "تمّت"; case .minimum: return "أقلّ القليل"; case .excluded: return "إجازتها اليوم"; case .missed: return "فترة بلا تسجيل"; default: return isNow ? "وقتها الآن" : "تنتظر" }
     }
-    var sourceTitle: String? { switch source { case "jamaah": "الصلاة"; case "review": "القرآن"; case "diaryLine": "المذكرات"; case "walking": "الصحة"; default: nil } }
-    var symbol: String { switch source { case "jamaah": "MadarPrayer"; case "review": "MadarQuran"; case "diaryLine": "MadarDiary"; case "walking": "figure.walk"; default: nameGlyph ?? "checkmark" } }
+    var sourceTitle: String? { switch source { case "jamaah": "الصلاة"; case "review": "القرآن"; case "diaryLine": "المذكرات"; case "reading", "hadith": "المحبرة"; case "walking": "الصحة"; default: nil } }
+    var symbol: String { switch source { case "jamaah": "MadarPrayer"; case "review": "MadarQuran"; case "diaryLine": "MadarDiary"; case "reading", "hadith": "books.vertical"; case "walking": "figure.walk"; default: nameGlyph ?? "checkmark" } }
     /// DA-05: a hand-made habit has no stored icon; its own words choose one for display only (nil when none fits).
     var nameGlyph: String? {
         HabitNameGlyph.symbol(for: name)
@@ -49,8 +49,8 @@ struct HabitsRoomView: View {
     @State private var showAll = false
     @State private var selectedPeriod: HabitFrequency?
     @State private var pastDay: HabitReading?
-    /// AU-95: a once-habit is one tap; a quick second tap on its ring must not log it twice.
-    @State private var onceInFlight: Set<UUID> = []
+    /// AU-95: repeated quick taps submit one command while a habit completion is still saving.
+    @State private var completionInFlight: Set<UUID> = []
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -187,15 +187,15 @@ struct HabitsRoomView: View {
             if let next = openToday.first {
                 Button {
                     if next.source == nil, let period = next.summary.current {
-                        perform("habit.complete", ["id": .string(next.id.uuidString),
-                                                  "delta": .number(period.rule.measure == .duration ? 15 : 1)])
+                        complete(next, delta: period.rule.measure == .duration ? 15 : 1)
                     } else { detail = next }
                 } label: {
                     Text(next.source == nil ? "سجّل" : "افتحها").font(MadarTypography.caption())
                         .padding(.horizontal, 14).frame(minHeight: 44)
                         .background(theme.accentFill, in: .capsule).foregroundStyle(theme.onAccent)
                 }
-                .buttonStyle(.madarPlain).accessibilityLabel(heroAction(next)).accessibilityIdentifier("habits-next")
+                .buttonStyle(.madarPlain).disabled(completionInFlight.contains(next.id))
+                .accessibilityLabel(heroAction(next)).accessibilityIdentifier("habits-next")
             }
         }
         .padding(12).frame(maxWidth: .infinity, alignment: .leading)
@@ -213,9 +213,9 @@ struct HabitsRoomView: View {
                 if let next = openToday.first {
                     // The next step is one tap from the top: it logs, as the row's own button does; a linked habit opens its sheet.
                     Button {
-                        if next.source == nil, let p = next.summary.current { perform("habit.complete",["id":.string(next.id.uuidString),"delta":.number(p.rule.measure == .duration ? 15 : 1)]) } else { detail = next }
+                        if next.source == nil, let p = next.summary.current { complete(next, delta: p.rule.measure == .duration ? 15 : 1) } else { detail = next }
                     } label: { Text(heroAction(next)).font(MadarTypography.caption()).lineLimit(1).minimumScaleFactor(0.8).padding(.horizontal,14).frame(minHeight:44).background(theme.accentFill,in:.capsule).foregroundStyle(theme.onAccent) }
-                        .buttonStyle(.madarPlain).padding(.top,4).accessibilityIdentifier("habits-next")
+                        .buttonStyle(.madarPlain).disabled(completionInFlight.contains(next.id)).padding(.top,4).accessibilityIdentifier("habits-next")
                 }
             }
             Spacer(minLength:0)
@@ -360,12 +360,10 @@ struct HabitsRoomView: View {
     @ViewBuilder private func leading(_ row:HabitReading,share:Double,met:Bool)->some View {
         if let p=row.summary.current, row.source == nil, !row.paused, p.target > 0, p.rule.measure == .once, !met {
             Button {
-                guard !onceInFlight.contains(row.id) else { return }
-                onceInFlight.insert(row.id)
-                perform("habit.complete",["id":.string(row.id.uuidString),"delta":.number(1)]) { onceInFlight.remove(row.id) }
+                complete(row, delta: 1)
             } label: {
                 Circle().stroke(theme.accent,lineWidth:2).frame(width:32,height:32).frame(width:44,height:44).contentShape(.circle)
-            }.buttonStyle(.madarPlain)
+            }.buttonStyle(.madarPlain).disabled(completionInFlight.contains(row.id))
             .accessibilityLabel(quickLogLabel(row.name,.once))
             .accessibilityIdentifier("habit-quick-"+row.id.uuidString)
         } else if !dynamicTypeSize.isAccessibilitySize {
@@ -375,10 +373,10 @@ struct HabitsRoomView: View {
     /// Count and duration habits log from a «+»; a once-habit logs from its ring.
     @ViewBuilder private func trailing(_ row:HabitReading)->some View {
         if row.source == nil, !row.paused, let p=row.summary.current, p.target > 0, p.rule.measure != .once {
-            Button { perform("habit.complete",["id":.string(row.id.uuidString),"delta":.number(p.rule.measure == .duration ? 15 : 1)]) } label: {
+            Button { complete(row, delta: p.rule.measure == .duration ? 15 : 1) } label: {
                 Image(systemName:"plus").font(.system(size:16,weight:.semibold)).foregroundStyle(p.met ? theme.accent : theme.onAccent).frame(width:38,height:38).background(p.met ? theme.accentFill.opacity(0.14) : theme.accentFill,in:.circle)
                     .frame(width:44,height:44).contentShape(.circle)
-            }.buttonStyle(.madarPlain)
+            }.buttonStyle(.madarPlain).disabled(completionInFlight.contains(row.id))
             .accessibilityLabel(quickLogLabel(row.name,p.rule.measure))
             .accessibilityIdentifier("habit-quick-"+row.id.uuidString)
         }
@@ -403,6 +401,13 @@ struct HabitsRoomView: View {
                 session.habitRouteID = nil
             }
         } catch { session.errorMessage = madarUserMessage(error) }
+    }
+    private func complete(_ row: HabitReading, delta: Int) {
+        guard !completionInFlight.contains(row.id) else { return }
+        completionInFlight.insert(row.id)
+        perform("habit.complete", ["id": .string(row.id.uuidString), "delta": .number(Double(delta))]) {
+            completionInFlight.remove(row.id)
+        }
     }
     private func perform(_ name:String,_ payload:[String:MadarCore.JSONValue],done:@escaping () -> Void = {}) { Task { defer{done()}; do {try await session.executeDiaryCommand(name,payload:payload);reload()}catch{session.errorMessage=madarUserMessage(error)} } }
 }

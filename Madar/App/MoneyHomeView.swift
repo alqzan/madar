@@ -37,6 +37,14 @@ struct MoneyHomeView: View {
     @State private var goalOpen = false
     @State private var guideOpen = false
     @State private var visitChecked = false
+    @State private var routedCardID: UUID?
+    @State private var routedCardTab: String?
+    @State private var routedCardRequestID: UUID?
+    @State private var routedEnvelopeID: UUID?
+    @State private var routedEnvelopeRequestID: UUID?
+    @State private var routedTransactionID: UUID?
+    @State private var routedLogQuery: String?
+    @State private var routedLogRequestID: UUID?
     private var service: AppMoneyService { .init(app: app) }
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
     private var amountsVisible: Bool { !app.bool("core.hideMoneyUntilTouch") || revealed }
@@ -54,7 +62,7 @@ struct MoneyHomeView: View {
             // Not lazy: eight drawers are cheap, and every door must exist before it scrolls into view.
             Grid(horizontalSpacing: 10, verticalSpacing: 10) {
                 GridRow {
-                    drawer("السجل", "book.pages", "money-log-open") { logOpen = true }
+                    drawer("السجل", "book.pages", "money-log-open", action: openLog)
                     drawer("التحليل", "chart.bar.xaxis", "money-analysis-open") { analysisOpen = true }
                 }
                 GridRow {
@@ -115,53 +123,18 @@ struct MoneyHomeView: View {
         }.buttonStyle(.madarPlain).accessibilityLabel(title).accessibilityValue(fact ?? "").accessibilityIdentifier(id)
     }
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 10) {
-                header
-                if let reading {
-                    let blocks = RoomHomeLayout(session: app, key: "mal.layout").visible
-                    ForEach(blocks, id: \.self) { id in
-                        switch id {
-                        case "curve":
-                            if let cycle = reading.cycle {
-                                if dynamicType.isAccessibilitySize { cycleSummary(cycle) }
-                                else { MoneyScrollChart(cycle: cycle, app: app, visible: amountsVisible, obligations: reading.obligations).frame(height: 224) }
-                            }
-                        case "now":
-                            if let cycle = reading.cycle { headline(reading, cycle: cycle) }
-                            else { firstPage(reading) }
-                            if reading.unknownBalanceCount > 0 {
-                                Text("بعض الحسابات لم يُعرف رصيدها بعد؛ لا تدخل في المجموع.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
-                                Button("المطابقة مع البنك") { reconcileOpen = true }.font(MadarTypography.body()).frame(minHeight: 44).accessibilityIdentifier("money-unknown-balance-reconcile")
-                            }
-                        case "envelopes": envelopeSection(reading)
-                        case "limits":
-                            if blocks.firstIndex(of: "obligations") == blocks.firstIndex(of: "limits").map({ $0 + 1 }) { lowerDesk(reading) }
-                            else { limits(reading) }
-                        case "obligations":
-                            if blocks.firstIndex(of: "obligations") != blocks.firstIndex(of: "limits").map({ $0 + 1 }) { obligations(reading) }
-                        default: EmptyView()
-                        }
-                    }
-                    doors
-                } else if let failure {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("لم تكتمل قراءة المال").font(MadarTypography.cardTitle())
-                        Text(failure).font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
-                        Button("أعِد المحاولة", action: load).frame(minHeight: 44)
-                        Button("الحسابات") { accountsOpen = true }.frame(minHeight: 44).accessibilityIdentifier("money-accounts-open")
-                    }.padding(20)
-                } else { ProgressView().frame(maxWidth: .infinity, minHeight: 300) }
-            }.padding(.horizontal, 16).padding(.top, 0).padding(.bottom, 30).frame(maxWidth: 620).frame(maxWidth: .infinity)
-        }
+        ScrollView { homeContent }
         .clipped().background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
         .environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar)
-        .navigationDestination(isPresented: $envelopesOpen) { MoneyEnvelopesView(app: app, revealed: $revealed) }
+        .navigationDestination(isPresented: $envelopesOpen) { MoneyEnvelopesView(app: app, revealed: $revealed, initialEnvelopeID: $routedEnvelopeID, initialRouteRequestID: $routedEnvelopeRequestID) }
+        .onChange(of: envelopesOpen) { _, isOpen in if !isOpen { routedEnvelopeID = nil; routedEnvelopeRequestID = nil } }
         .navigationDestination(isPresented: $messagesOpen) { MoneyMessagesView(app: app, revealed: $revealed) }
         .navigationDestination(isPresented: $obligationsOpen) { MoneyObligationsView(app: app) }
         .navigationDestination(isPresented: $categoriesOpen) { MoneyCategoriesView(app: app) }
-        .navigationDestination(isPresented: $cardsOpen) { MoneyCardsView(app: app, revealed: $revealed) }
-        .navigationDestination(isPresented: $logOpen) { MoneyLogView(app: app, revealed: $revealed) }
+        .navigationDestination(isPresented: $cardsOpen) { MoneyCardsView(app: app, revealed: $revealed, initialCardID: $routedCardID, initialTab: $routedCardTab, initialRouteRequestID: $routedCardRequestID) }
+        .onChange(of: cardsOpen) { _, isOpen in if !isOpen { routedCardID = nil; routedCardTab = nil; routedCardRequestID = nil } }
+        .navigationDestination(isPresented: $logOpen) { MoneyLogView(app: app, revealed: $revealed, initialTransactionID: routedTransactionID, initialQuery: routedLogQuery, initialRouteRequestID: routedLogRequestID) }
+        .onChange(of: logOpen) { _, isOpen in if !isOpen { routedTransactionID = nil; routedLogQuery = nil; routedLogRequestID = nil } }
         .navigationDestination(isPresented: $analysisOpen) { MoneyAnalysisView(app: app, revealed: $revealed) }
         .navigationDestination(isPresented: $reconcileOpen) { MoneyReconcileView(app: app, revealed: $revealed) }
         .onChange(of: reconcileOpen) { if !reconcileOpen { load() } }
@@ -190,6 +163,16 @@ struct MoneyHomeView: View {
             if service.sinceDue(today: reading.cycle?.today ?? GregorianDay.containing(app.prayerNow(), in: app.activePlace.timeZone)) { sinceOpen = true }
             else { try? await app.executeMoneyCommand("money.markVisit") }
         }.onChange(of: app.prayerRevision) { load() }
+        .onChange(of: app.moneyRoute, initial: true) { _, route in if let route { openMoneyRoute(route) } }
+        .onChange(of: app.searchRoute, initial: true) { _, route in
+            guard let route, route.parameters["room"] == "mal" else { return }
+            app.searchRoute = nil
+            visitChecked = true
+            routedTransactionID = nil
+            routedLogQuery = route.parameters["q"] ?? ""
+            routedLogRequestID = UUID()
+            logOpen = true
+        }
         .onChange(of: messagesOpen) { if !messagesOpen { load() } }
         .onChange(of: app.bool("core.hideMoneyUntilTouch")) { revealed = false }
         .onChange(of: app.selectedTab) { revealed = false }
@@ -197,6 +180,45 @@ struct MoneyHomeView: View {
         // Left open past midnight, «اليوم» and the cycle day follow the day it is now.
         .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged).receive(on: RunLoop.main)) { _ in load() }
         .accessibilityIdentifier("money-home")
+    }
+    private var homeContent: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            header
+            if let reading {
+                dashboard(reading)
+            } else if let failure {
+                readFailure(failure)
+            } else {
+                ProgressView().frame(maxWidth: .infinity, minHeight: 300)
+            }
+        }.padding(.horizontal, 16).padding(.top, 0).padding(.bottom, 30).frame(maxWidth: 620).frame(maxWidth: .infinity)
+    }
+    @ViewBuilder private func dashboard(_ reading: MoneyHomeReading) -> some View {
+        let blocks = RoomHomeLayout(session: app, key: "mal.layout").visible
+        ForEach(blocks, id: \.self) { id in
+            switch id {
+            case "curve":
+                if let cycle = reading.cycle {
+                    if dynamicType.isAccessibilitySize { cycleSummary(cycle) }
+                    else { MoneyScrollChart(cycle: cycle, app: app, visible: amountsVisible, obligations: reading.obligations).frame(height: 224) }
+                }
+            case "now":
+                if let cycle = reading.cycle { headline(reading, cycle: cycle) }
+                else { firstPage(reading) }
+                if reading.unknownBalanceCount > 0 {
+                    Text("بعض الحسابات لم يُعرف رصيدها بعد؛ لا تدخل في المجموع.").font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                    Button("المطابقة مع البنك") { reconcileOpen = true }.font(MadarTypography.body()).frame(minHeight: 44).accessibilityIdentifier("money-unknown-balance-reconcile")
+                }
+            case "envelopes": envelopeSection(reading)
+            case "limits":
+                if blocks.firstIndex(of: "obligations") == blocks.firstIndex(of: "limits").map({ $0 + 1 }) { lowerDesk(reading) }
+                else { limits(reading) }
+            case "obligations":
+                if blocks.firstIndex(of: "obligations") != blocks.firstIndex(of: "limits").map({ $0 + 1 }) { obligations(reading) }
+            default: EmptyView()
+            }
+        }
+        doors
     }
     private var header: some View {
         HStack(alignment: .firstTextBaseline, spacing: 12) {
@@ -404,9 +426,66 @@ struct MoneyHomeView: View {
         cardCount = ((try? context.fetch(FetchDescriptor<Card>())) ?? []).filter { $0.deletedAt == nil && $0.mergedInto == nil }.count
         hawlKey = ((try? context.fetch(FetchDescriptor<ZakatProfile>())) ?? []).filter { $0.deletedAt == nil && $0.mergedInto == nil }
             .sorted { $0.id.uuidString < $1.id.uuidString }.first?.hawlStartHijri
-        do { reading = try service.load(); failure = nil }
+        do {
+            reading = try service.load()
+            failure = nil
+            if let route = app.moneyRoute { openMoneyRoute(route) }
+        }
         catch MoneyCommandError.missingRate { failure = "يلزم سعر تحويل يدوي لجمع أرصدتك بعملة البيت."; reading = nil }
         catch { failure = "تعذّرت قراءة البيانات الآن. أعد المحاولة."; reading = nil }
+    }
+    private func openMoneyRoute(_ route: Route) {
+        guard route.room == .mal else { return }
+        switch route.path.first {
+        case "categories" where route.path.count == 1:
+            app.moneyRoute = nil
+            categoriesOpen = true
+        case "reconcile" where route.path.count == 1:
+            app.moneyRoute = nil
+            reconcileOpen = true
+        case "zakat" where route.path.count == 1:
+            app.moneyRoute = nil
+            zakatOpen = true
+        case "messages" where route.path.count == 1:
+            app.moneyRoute = nil
+            messagesOpen = true
+        case "card" where route.path.count == 2:
+            guard let rawID = route.path.last, let id = UUID(uuidString: rawID) else { app.moneyRoute = nil; return }
+            routedCardID = id
+            routedCardTab = ["overview": "نظرة", "cash": "متى يخرج النقد", "calendar": "تقويم السداد", "match": "المطابقة"][route.parameters["tab"] ?? "overview"]
+            routedCardRequestID = UUID()
+            app.moneyRoute = nil
+            cardsOpen = true
+        case "envelope" where route.path.count == 2:
+            guard let rawID = route.path.last, let id = UUID(uuidString: rawID) else { app.moneyRoute = nil; return }
+            routedEnvelopeID = id
+            routedEnvelopeRequestID = UUID()
+            app.moneyRoute = nil
+            envelopesOpen = true
+        case "tx" where route.path.count == 2:
+            guard let rawID = route.path.last, let id = UUID(uuidString: rawID) else { app.moneyRoute = nil; return }
+            routedTransactionID = id
+            routedLogQuery = nil
+            routedLogRequestID = UUID()
+            app.moneyRoute = nil
+            logOpen = true
+        default:
+            app.moneyRoute = nil
+        }
+    }
+    private func openLog() {
+        routedTransactionID = nil
+        routedLogQuery = nil
+        routedLogRequestID = UUID()
+        logOpen = true
+    }
+    private func readFailure(_ message: String) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("لم تكتمل قراءة المال").font(MadarTypography.cardTitle())
+            Text(message).font(MadarTypography.body()).foregroundStyle(theme.secondaryInk)
+            Button("أعِد المحاولة", action: load).frame(minHeight: 44)
+            Button("الحسابات") { accountsOpen = true }.frame(minHeight: 44).accessibilityIdentifier("money-accounts-open")
+        }.padding(20)
     }
 }
 

@@ -5,11 +5,15 @@ import MadarDesign
 struct DiaryDayView: View {
     @Bindable var app: AppSession
     let day: GregorianDay
+    var initialEntryID: UUID? = nil
+    var initialEntryRouteID: UUID? = nil
     @Environment(\.roomTheme) private var roomTheme
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var selected: GregorianDay?
     @State private var page: DiaryDisplayDay?
+    @State private var highlightedEntryID: UUID?
+    @State private var highlightGeneration = 0
     @State private var failure: String?
     @State private var writing = false
     @State private var retry = 0
@@ -104,11 +108,11 @@ struct DiaryDayView: View {
                         HStack(alignment:.firstTextBaseline,spacing:10){Text("النيّة").font(DiaryType.label).foregroundStyle(theme.accent);VStack(alignment:.leading,spacing:2){Text(intentions.first?.text ?? "أضف نيّتك لليوم").font(DiaryType.writing).lineLimit(2);if shownDay == today,!intentions.isEmpty {Text("أسألك عنها بعد العشاء").font(DiaryType.label).foregroundStyle(theme.color("ink3Text"))}}.frame(maxWidth:.infinity,alignment:.leading);Image(systemName:"chevron.backward").font(.caption)}.padding(.horizontal,18).frame(minHeight:54).contentShape(.rect)
                     }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-niyya-open")
                 }
-                GeometryReader { geometry in ScrollView {
+                GeometryReader { geometry in ScrollViewReader { proxy in ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
                         if let page {
                             ForEach(page.lines.filter{$0.kind != "intention"}) { line in
-                                lineRow(line, page: page)
+                                lineRow(line, page: page).id("diary-entry-" + line.id)
                                 let attached = page.media.filter { $0.entryID == line.id }
                                 ForEach(attached.filter { $0.kind != "missing" }) { media in DiaryMediaCard(app: app, media: media, transcript: line.text) }
                                 // Owner real-data trial, 24 Oct 2026: one line for the entry's missing files, not one per file.
@@ -144,8 +148,13 @@ struct DiaryDayView: View {
                         }
                     }
                 }.overlay(alignment:.topTrailing){if let travel,!typeSize.isAccessibilitySize {DiaryPassportStamp(city:travel.city,date:service.stampDate(travel.arrival)).padding(.top,40).padding(.trailing,4)}}.overlay(alignment:.topTrailing){if friday,!typeSize.isAccessibilitySize {HStack(alignment:.top,spacing:5){if fridayStyle == .ribbon {ribbon("يوم الجمعة",color:theme.accent,height:88)};if appearance?.weekAvailable == true {Button{weekOpen=true}label:{ribbon("صندوق الأسبوع",color:theme.color("ghad"),height:130).frame(width:44).contentShape(.rect)}.buttonStyle(.madarPlain).accessibilityIdentifier("diary-week-open")}}.padding(.trailing,12)}}
+                .onChange(of: page?.lines.map(\.id), initial: true) { _, _ in revealInitialEntry(using: proxy) }
+                .onChange(of: initialEntryID) { _, _ in revealInitialEntry(using: proxy) }
+                .onChange(of: initialEntryRouteID) { _, requestID in if requestID != nil { revealInitialEntry(using: proxy) } }
+                    }
                 }
-            }.background(theme.background).foregroundStyle(theme.ink).environment(\.roomTheme,theme)
+            }
+            .background(theme.background).foregroundStyle(theme.ink).environment(\.roomTheme,theme)
                 .safeAreaInset(edge: .bottom, spacing: 0) {
                     VStack(spacing: 8) {
                     if app.undoToastVisible {
@@ -268,7 +277,12 @@ struct DiaryDayView: View {
                     Text(MadarInlineText.joined(["هامش", page.marginDays[line.id].map { service.bothDates($0) } ?? "تاريخ الكتابة غير متاح"])).font(DiaryType.label)
                 }
             }.foregroundStyle(line.kind == "margin" ? secondInk : line.kind == "late" ? theme.color("late") : auto ? theme.color("autoInkText") : theme.ink)
-        }.contextMenu {
+        }.accessibilityElement(children: .contain).accessibilityIdentifier("diary-entry-" + line.id).overlay {
+            if highlightedEntryID?.uuidString == line.id {
+                RoundedRectangle(cornerRadius: 12).stroke(theme.accent, lineWidth: 2)
+            }
+        }.animation(.easeInOut(duration: 0.2), value: highlightedEntryID)
+        .contextMenu {
             if page.editable.contains(line.id) { Button("عدّل السطر", systemImage: "pencil") { editing = .init(id: line.id, text: line.text) } }
             if page.deletable.contains(line.id), let id = UUID(uuidString: line.id) {
                 Button(role: .destructive) { deleteConfirmation = id } label: { Label("احذف السطر", systemImage: "trash") }
@@ -278,5 +292,17 @@ struct DiaryDayView: View {
                 Button("اجعلها نيّة اليوم") { Task { do { try await service.saveIntention(line.text, day: shownDay); niyyaSaved = true } catch { failure = madarUserMessage(error) } } }
             }
         }.padding(.leading, 6).padding(.trailing, travel == nil || typeSize.isAccessibilitySize ? 18 : 92).padding(.vertical, 10).frame(minHeight: 34)
+    }
+    private func revealInitialEntry(using proxy: ScrollViewProxy) {
+        guard let initialEntryID,
+              page?.lines.contains(where: { $0.id == initialEntryID.uuidString }) == true else { return }
+        highlightGeneration += 1
+        let generation = highlightGeneration
+        highlightedEntryID = initialEntryID
+        proxy.scrollTo("diary-entry-" + initialEntryID.uuidString, anchor: .center)
+        Task { @MainActor in
+            do { try await Task.sleep(for: .seconds(2)) } catch { return }
+            if highlightGeneration == generation, highlightedEntryID == initialEntryID { highlightedEntryID = nil }
+        }
     }
 }

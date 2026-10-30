@@ -55,7 +55,7 @@ extension AppSession {
             }
         }
         for (index, title, balance, target) in [(0, "الإيجار", -90_000, 180_000), (1, "رحلة الشتاء", -40_000, 200_000), (2, "الطوارئ", 120_000, 180_000), (3, "هدية", 46_000, 60_000)] {
-            let e = Envelope(); e.name = title; e.role = "goal"; e.targetMinor = target; e.due = end.adding(days: index * 10).date(in: zone); e.createdAt = now.addingTimeInterval(Double(index)); c.insert(e); allocation(balance, "envelope", id: e.id)
+            let e = Envelope(); if variant == "showcase", let id = UUID(uuidString: ["66666666-6666-4666-8666-666666666661", "66666666-6666-4666-8666-666666666662", "66666666-6666-4666-8666-666666666663", "66666666-6666-4666-8666-666666666664"][index]) { e.id = id }; e.name = title; e.role = "goal"; e.targetMinor = target; e.due = end.adding(days: index * 10).date(in: zone); e.createdAt = now.addingTimeInterval(Double(index)); c.insert(e); allocation(balance, "envelope", id: e.id)
         }
         let planEnvelope = try c.fetch(FetchDescriptor<Envelope>()).first { $0.name == "رحلة الشتاء" }!
         let plan = EnvelopePlan(); plan.envelopeID = planEnvelope.id; plan.source = "daily"; plan.period = "perDay"; plan.perPaycheckMinor = variant == "zero" ? 0 : 1300; plan.startDayKey = start.description; c.insert(plan)
@@ -86,7 +86,7 @@ extension AppSession {
             }
         }
         let debit = Card(); debit.name = "بطاقة مدى"; debit.kind = "debit"; debit.bank = "بنك الاختبار"; debit.last4 = "3317"; debit.accountID = account.id; c.insert(debit)
-        let card = Card(); card.name = "بطاقة المشتريات"; card.kind = "credit"; card.bank = "بنك الاختبار"; card.last4 = "8844"; card.accountID = account.id; c.insert(card)
+        let card = Card(); if variant == "cards", let id = UUID(uuidString: "55555555-5555-4555-8555-555555555551") { card.id = id }; card.name = "بطاقة المشتريات"; card.kind = "credit"; card.bank = "بنك الاختبار"; card.last4 = "8844"; card.accountID = account.id; c.insert(card)
         let statement = Statement(); statement.cardID = card.id; statement.statementMinor = 680000; statement.closeDate = start.date(in: zone).addingTimeInterval(-86400); statement.dueDate = today.adding(days: 4).date(in: zone); statement.closeDateSource = "estimated"; c.insert(statement)
         let unbilled = MoneyTransaction(); unbilled.cardID = card.id; unbilled.method = "card"; unbilled.amountMinor = 180000; unbilled.homeAmountMinor = 180000; unbilled.dayKey = today.description; unbilled.eventAt = now; unbilled.ignoredFromBudget = true; c.insert(unbilled)
         let bnpl = Obligation(); bnpl.name = "أقساط الشراء"; bnpl.provider = "Tamara"; bnpl.kind = "installment"; bnpl.totalMinor = 120000; c.insert(bnpl)
@@ -105,7 +105,7 @@ extension AppSession {
                 row.eventAt = old.closeDate.addingTimeInterval(-Double((index + 1) * 86400)); row.dayKey = GregorianDay.containing(row.eventAt, in: zone).description; row.tzID = zone.identifier; row.dayPolicy = "midnight@1"; c.insert(row)
             }
             unbilled.merchant = "متجر الأجهزة"
-            let second = Card(); second.name = "بطاقة السفر"; second.bank = "بنك الاختبار"; second.last4 = "7722"; second.kind = "credit"; second.accountID = account.id; second.limitMinor = 1_000_000; second.cashbackBp = 150; second.network = "Mastercard"
+            let second = Card(); if variant == "cards", let id = UUID(uuidString: "55555555-5555-4555-8555-555555555552") { second.id = id }; second.name = "بطاقة السفر"; second.bank = "بنك الاختبار"; second.last4 = "7722"; second.kind = "credit"; second.accountID = account.id; second.limitMinor = 1_000_000; second.cashbackBp = 150; second.network = "Mastercard"
             second.fieldSourcesJSON = try JSONSerialization.data(withJSONObject: ["limitMinor": "entered", "cashbackBp": "entered"]); c.insert(second)
             for offset in [-1, 0] {
                 let s = Statement(); s.cardID = second.id; s.closeDate = calendar.date(byAdding: .month, value: offset, to: today.adding(days: -2).date(in: zone))!; s.periodStart = calendar.date(byAdding: .month, value: -1, to: s.closeDate); s.dueDate = calendar.date(byAdding: .month, value: offset, to: today.adding(days: 16).date(in: zone)); s.statementMinor = 180_000; s.minimumDueMinor = 9_000; s.closeDateSource = "message"; c.insert(s)

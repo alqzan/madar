@@ -4,7 +4,7 @@ import VisionKit
 import MadarCore
 import MadarDesign
 
-private struct PaperChapterDraft: Identifiable {
+private struct PaperChapterDraft: Identifiable, Equatable {
     var id = UUID()
     var title = ""
     var page = ""
@@ -17,6 +17,17 @@ private struct PaperChapterDraft: Identifiable {
         let pageSource: PaperBookPageSource = page.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .unknown : source
         return PaperBookChapter(id: id, title: cleanTitle, page: pageNumber, pageSource: pageSource)
     }
+}
+
+private struct PaperIndexDraftSnapshot: Equatable {
+    let title: String
+    let author: String
+    let isbn13: String
+    let pages: String
+    let positionPage: String
+    let firstPage: String
+    let chapters: [PaperChapterDraft]
+    let shelf: String
 }
 
 struct MihbaraPaperIndexEditor: View {
@@ -43,9 +54,16 @@ struct MihbaraPaperIndexEditor: View {
     @State private var hasReadIndexPage = false
     @State private var status = ""
     @State private var errorMessage: String?
+    @State private var originalSnapshot: PaperIndexDraftSnapshot
+    @State private var confirmDiscard = false
 
     private var digits: MadarNumberFormatter { AppMihbaraService(app: app).digits }
     private var scanCanRun: Bool { VNDocumentScanAvailability.supported }
+    private var draftSnapshot: PaperIndexDraftSnapshot {
+        .init(title: title, author: author, isbn13: isbn13, pages: pages, positionPage: positionPage,
+              firstPage: firstPage, chapters: chapters, shelf: shelf)
+    }
+    private var hasUnsavedChanges: Bool { draftSnapshot != originalSnapshot }
     private var shelfTitle: String {
         switch shelf { case "want": "أبي أقرأه"; case "finished": "أنهيته"; case "old": "قرأته قديمًا"; default: "أقرؤه الآن" }
     }
@@ -64,14 +82,24 @@ struct MihbaraPaperIndexEditor: View {
         let drafts = decodedChapters.map {
             PaperChapterDraft(id: $0.id, title: $0.title, page: $0.page.map(digits.string) ?? "", source: $0.pageSource)
         }
-        _title = State(initialValue: existingBook?.title ?? "")
-        _author = State(initialValue: existingBook?.author ?? "")
-        _isbn13 = State(initialValue: existingBook?.isbn13 ?? "")
-        _pages = State(initialValue: existingBook?.pages.map(digits.string) ?? "")
-        _positionPage = State(initialValue: existingBook?.page.map(digits.string) ?? "") // AU-40: an unstarted book is empty, not «صفحة ٠».
-        _firstPage = State(initialValue: drafts.first?.page ?? "")
-        _chapters = State(initialValue: drafts.isEmpty ? [.init()] : drafts)
-        _shelf = State(initialValue: existingBook?.shelf ?? "reading")
+        let initialTitle = existingBook?.title ?? ""
+        let initialAuthor = existingBook?.author ?? ""
+        let initialISBN13 = existingBook?.isbn13 ?? ""
+        let initialPages = existingBook?.pages.map(digits.string) ?? ""
+        let initialPosition = existingBook?.page.map(digits.string) ?? "" // AU-40: an unstarted book is empty, not «صفحة ٠».
+        let initialFirstPage = drafts.first?.page ?? ""
+        let initialShelf = existingBook?.shelf ?? "reading"
+        let initialChapters: [PaperChapterDraft] = drafts.isEmpty ? [.init()] : drafts
+        _originalSnapshot = State(initialValue: .init(title: initialTitle, author: initialAuthor, isbn13: initialISBN13,
+            pages: initialPages, positionPage: initialPosition, firstPage: initialFirstPage, chapters: initialChapters, shelf: initialShelf))
+        _title = State(initialValue: initialTitle)
+        _author = State(initialValue: initialAuthor)
+        _isbn13 = State(initialValue: initialISBN13)
+        _pages = State(initialValue: initialPages)
+        _positionPage = State(initialValue: initialPosition)
+        _firstPage = State(initialValue: initialFirstPage)
+        _chapters = State(initialValue: initialChapters)
+        _shelf = State(initialValue: initialShelf)
         _identity = State(initialValue: existingBook?.id ?? UUID())
     }
 
@@ -79,12 +107,12 @@ struct MihbaraPaperIndexEditor: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 HStack {
-                    Button { dismiss() } label: {
+                    Button { if hasUnsavedChanges { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil); confirmDiscard = true } else { dismiss() } } label: {
                         Label("رجوع", systemImage: "chevron.right")
                             .font(MadarTypography.caption())
                             .frame(minHeight: 44)
                     }
-                    .accessibilityIdentifier("mihbara-paper-back")
+                    .disabled(saving).accessibilityIdentifier("mihbara-paper-back")
                     Spacer()
                     Text("كتاب ورقي").font(.custom("thmanyahserifdisplay-Bold", size: 24, relativeTo: .title2))
                     Spacer().frame(width: 48)
@@ -193,6 +221,11 @@ struct MihbaraPaperIndexEditor: View {
         .confirmationDialog("اختر كتابًا يرجع إلى أبي أقرأها", isPresented: $choosingSlot, titleVisibility: .visible) {
             ForEach(readingBooks) { old in Button(old.title) { save(replacing: old.id) } }
         }
+        .confirmationDialog("تتجاهل تعديلات الفهرس؟", isPresented: $confirmDiscard, titleVisibility: .visible) {
+            Button("تجاهل التعديلات", role: .destructive) { dismiss() }.accessibilityIdentifier("mihbara-paper-discard")
+            Button("أكمل الكتابة") { }.accessibilityIdentifier("mihbara-paper-continue")
+        } message: { Text("الفهرس غير محفوظ.") }
+        .interactiveDismissDisabled(hasUnsavedChanges || saving)
         .alert("تعذّر الإكمال", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
             Button("حسنًا", role: .cancel) { errorMessage = nil }
         } message: { Text(errorMessage ?? "") }
@@ -410,6 +443,7 @@ struct MihbaraPaperIndexEditor: View {
         ]
         firstPage = chapters[0].page
         hasReadIndexPage = true
+        originalSnapshot = draftSnapshot
         #endif
     }
 

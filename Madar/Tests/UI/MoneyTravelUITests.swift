@@ -11,11 +11,32 @@ import XCTest
         }
         XCTAssertTrue(button.isHittable)
     }
-    private func open(_ fixture: String, store: String = UUID().uuidString) -> XCUIApplication {
+    private func open(_ fixture: String, store: String = UUID().uuidString, failTravelReadOnce: Bool = false) -> XCUIApplication {
         let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID": store, "MADAR_UI_MONEY_FIXTURE": fixture, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-17T12:00:00+03:00"]
+        if failTravelReadOnce { app.launchEnvironment["MADAR_UI_MONEY_TRAVEL_READ_FAILURE_ONCE"] = "1" }
         app.launch(); let tab = app.buttons["tab-customize"]; XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
         let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("المال"); app.buttons["money-open"].tap()
-        XCTAssertTrue(app.staticTexts["money-travel-remaining"].waitForExistence(timeout: 10)); return app
+        if failTravelReadOnce { XCTAssertTrue(app.staticTexts["money-travel-read-error"].waitForExistence(timeout: 10)) }
+        else { XCTAssertTrue(app.staticTexts["money-travel-remaining"].waitForExistence(timeout: 10)) }
+        return app
+    }
+    func testTripDetectionFailureDoesNotPretendThereIsNoTrip() {
+        continueAfterFailure = false
+        let app = XCUIApplication(); app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_MONEY_FIXTURE": "travel", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-17T12:00:00+03:00", "MADAR_UI_MONEY_TRIP_DETECTION_FAILURE_ONCE": "1"]
+        app.launch(); let tab = app.buttons["tab-customize"]; XCTAssertTrue(tab.waitForExistence(timeout: 20)); tab.tap()
+        let search = app.textFields["settings-search"]; XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("المال"); app.buttons["money-open"].tap()
+        let failure = app.staticTexts["money-trip-detection-error"]
+        XCTAssertTrue(failure.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(app.staticTexts["money-title"].exists)
+        app.buttons["money-trip-detection-retry"].tap()
+        XCTAssertTrue(app.staticTexts["money-travel-remaining"].waitForExistence(timeout: 10), app.debugDescription)
+    }
+    func testTripReadFailureOffersRetry() {
+        continueAfterFailure = false
+        let app = open("travel", failTravelReadOnce: true)
+        XCTAssertTrue(app.staticTexts["money-travel-read-error"].waitForExistence(timeout: 10), app.debugDescription)
+        app.buttons["money-travel-retry"].tap()
+        XCTAssertTrue(app.staticTexts["money-travel-remaining"].waitForExistence(timeout: 10), app.debugDescription)
     }
     func testTicketRateSaveUndoExpenseAndReport() {
         continueAfterFailure = false

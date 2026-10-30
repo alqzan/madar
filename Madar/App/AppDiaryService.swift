@@ -195,6 +195,16 @@ struct DiaryHomeSnapshot {
         return String(labels.primary.dropLast(suffix.count))
     }
 
+    /// Resolves a live, visible entry through its stored day key. A stale revision
+    /// or tombstone never redirects to a different page.
+    func entryDay(_ id: UUID) throws -> GregorianDay? {
+        try authorizeRead()
+        let context = ModelContext(app.container)
+        let entries = try context.fetch(FetchDescriptor<Entry>(predicate: #Predicate { $0.deletedAt == nil && $0.mergedInto == nil }))
+        guard let entry = Self.visible(entries).first(where: { $0.id == id }) else { return nil }
+        return try GregorianDay(entry.dayKey)
+    }
+
     func prepareClosedDay(_ day: GregorianDay) async throws {
         try authorizeRead()
         guard day < (try currentDay()) else { return }

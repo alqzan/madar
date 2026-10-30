@@ -25,6 +25,10 @@ struct MoneyObligationsView: View {
     @Environment(\.dynamicTypeSize) private var dynamicType
     @State private var reading: MoneyObligationsReading?
     @State private var failure: String?
+    @State private var retryAttempt = 0
+    #if DEBUG
+    @State private var injectedReadFailure = false
+    #endif
     @State private var selected: String?
     @State private var obligationSheet: ObligationSheetRoute?
     @State private var revealed = false
@@ -46,6 +50,15 @@ struct MoneyObligationsView: View {
                     Text("الالتزامات").font(.custom("thmanyahserifdisplay-Bold", size: 28, relativeTo: .title)).accessibilityAddTraits(.isHeader)
                     Spacer()
                 }.padding(.top, 8)
+                if let failure, reading != nil {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(failure).font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+                            .accessibilityIdentifier("money-obligations-read-error")
+                        Button("أعد المحاولة") { retryAttempt += 1 }.frame(minHeight: 44)
+                            .accessibilityIdentifier("money-obligations-retry")
+                    }.frame(maxWidth: .infinity, alignment: .leading).padding(12)
+                        .background(theme.surface, in: .rect(cornerRadius: 12))
+                }
                 if let reading {
                     summary(reading)
                     if !visible { Button("أظهر الأرقام") { revealed = true }.font(MadarTypography.caption()).frame(minHeight: 44) }
@@ -58,12 +71,18 @@ struct MoneyObligationsView: View {
                             .frame(maxWidth: .infinity, minHeight: 60).background(theme.ink).shadow(color: theme.ink.opacity(0.18), radius: 8, y: 4)
                     }.buttonStyle(.madarPlain).accessibilityIdentifier("money-obligations-add")
                     shelves(reading)
-                } else if let failure { Text(failure).font(MadarTypography.body()) }
+                } else if let failure {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(failure).font(MadarTypography.body()).accessibilityIdentifier("money-obligations-read-error")
+                        Button("أعد المحاولة") { retryAttempt += 1 }.frame(minHeight: 44)
+                            .accessibilityIdentifier("money-obligations-retry")
+                    }
+                }
                 else { ProgressView().frame(maxWidth: .infinity, minHeight: 240) }
             }.padding(.horizontal, 16).padding(.bottom, 30).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }.clipped().background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
             .environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar)
-            .task { load() }.onChange(of: app.prayerRevision) { load() }
+            .task(id: "\(app.prayerRevision)-\(retryAttempt)") { load() }
             .sheet(item: $obligationSheet) { route in
                 if let reading {
                     MoneyObligationSheet(app: app, ladder: reading.ladder, visible: visible, revealed: $revealed, suggestion: route.suggestion)
@@ -394,7 +413,19 @@ struct MoneyObligationsView: View {
     }
 
     private func load() {
-        do { reading = try service.loadObligations(); failure = nil } catch { failure = "تعذّرت قراءة الالتزامات الآن." }
+        do {
+            #if DEBUG
+            let environment = ProcessInfo.processInfo.environment
+            if !injectedReadFailure, environment["MADAR_UI_MONEY_OBLIGATIONS_READ_FAILURE_ONCE"] == "1",
+               ["showcase", "subscriptions"].contains(environment["MADAR_UI_MONEY_FIXTURE"] ?? ""), environment["MADAR_UI_STORE_ID"] != nil {
+                injectedReadFailure = true
+                throw CocoaError(.fileReadUnknown)
+            }
+            #endif
+            reading = try service.loadObligations(); failure = nil
+        } catch {
+            failure = reading == nil ? "تعذّرت قراءة الالتزامات الآن. أعد المحاولة." : "تعذّر تحديث الالتزامات؛ تعرض آخر قراءة ناجحة. أعد المحاولة."
+        }
     }
 }
 

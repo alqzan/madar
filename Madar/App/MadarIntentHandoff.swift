@@ -22,6 +22,7 @@ enum MadarIntentRequest: Equatable, Sendable {
     private var pending: [MadarIntentRequest] = []
     private var handler: ((MadarIntentRequest) async -> Bool)?
     private var flushing = false
+    private var flushWaiters: [CheckedContinuation<Void, Never>] = []
     /// Requests that ran and failed, with the app's own message, so the Siri dialog never says «سُجّلت» for them.
     private var failures: [(MadarIntentRequest, String)] = []
     func fail(_ request: MadarIntentRequest, _ message: String) { failures.append((request, message)); failures = Array(failures.suffix(20)) }
@@ -45,8 +46,18 @@ enum MadarIntentRequest: Equatable, Sendable {
     }
     /// Runs on attach, on every return to the foreground and when a lock opens.
     func flush() async {
-        guard let handler, !flushing else { return }
-        flushing = true; defer { flushing = false }
+        guard let handler else { return }
+        if flushing {
+            await withCheckedContinuation { flushWaiters.append($0) }
+            return
+        }
+        flushing = true
+        defer {
+            flushing = false
+            let waiters = flushWaiters
+            flushWaiters.removeAll()
+            waiters.forEach { $0.resume() }
+        }
         var held: [MadarIntentRequest] = []
         while !pending.isEmpty {
             let request = pending.removeFirst()
@@ -84,7 +95,7 @@ extension AppSession {
             switch CaptureRouter.route(text) {
             case .moneyExpense(let amount, let merchant):
                 guard let exp = CurrencyExponents.specified.exponent(string("core.currency")), let n = MoneyAmountInput.minor(amount, exponent: exp), n > 0 else { errorMessage = "راجع مبلغ المصروف وعملته."; return true }
-                moneyExpenseSeed = .init(id: id, amount: amount, merchant: merchant, homeCurrency: true); return true
+                presentMoneyExpenseSeed(.init(id: id, amount: amount, merchant: merchant, homeCurrency: true)); return true
             case .empty: errorMessage = "لم يصل نص لالتقاطه."; return true
             case .tooLong: errorMessage = "النص أطول من سطر واحد في صفحة اليوم (٢٠٠٠ حرف)."; return true
             case .diaryLine(let line, let kind):
@@ -100,8 +111,13 @@ extension AppSession {
     }
 
     private func addDiaryLineFromIntent(text: String, day: String, id: UUID) async -> Bool {
-        // Today's page shows the new line; while the diary is locked its gate shows instead and the line waits.
-        open(URL(string: "madar://notes/today")!)
+        // Land on the same day the command will write; while the diary is locked its gate shows instead and the line waits.
+        if day == "yesterday",
+           let today = try? DiaryLineRenderer.today(context: ModelContext(container), now: prayerNow()) {
+            open(URL(string: "madar://notes/day/\(today.adding(days: -1).description)")!)
+        } else {
+            open(URL(string: "madar://notes/today")!)
+        }
         guard lockController?.canPresent(.notes) ?? protectedDataAuthorized else { return false }
         do {
             try await executeDiaryCommand("diary.appendLine", payload: ["text": .string(text), "day": .string(day)], id: id)
@@ -120,9 +136,10 @@ extension AppSession {
             try await executeBookCommand("notebook.savePrivate", payload:["id":.string(id.uuidString),"text":.string(text)], id:id)
             clearRecoveredMaintenanceError()
             return true
-        } catch {
+        } catch BackupOperationError.busy { return false }
+        catch {
             errorMessage = "لم تُحفظ الفكرة في دفتر المحبرة. أعد المحاولة."
-            return false
+            return true
         }
     }
 

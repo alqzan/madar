@@ -44,7 +44,12 @@ struct DiaryDayOneImportView: View {
             .toolbar { ToolbarItem(placement: .topBarLeading) { Button { close() } label: { HStack(spacing: 6) { Image(systemName: "chevron.backward"); Text("رجوع").font(MadarTypography.body()) } }.disabled(importing != nil).accessibilityIdentifier("dayone-close") } }
             .tint(theme.accent).toolbarBackground(theme.background, for: .navigationBar)
             .fileImporter(isPresented: $choosing, allowedContentTypes: [.zip]) { result in
-                switch result { case .success(let url): read(url); case .failure: failure = "لم يُفتح الملف. جرّب اختياره مرة أخرى." }
+                switch result {
+                case .success(let url): read(url)
+                case .failure(let error):
+                    if DiaryDayOnePickerFailure.isCancellation(error) { failure = nil }
+                    else { failure = "لم يُفتح الملف. جرّب اختياره مرة أخرى." }
+                }
             }
             .onChange(of: choice) { _, value in if let draft { preview = try? service.preview(draft, choice: value) } }
             .onChange(of: phase) { _, value in if value == .background, importing == nil, receipt == nil { reset() } }
@@ -278,4 +283,12 @@ struct DiaryDayOneImportView: View {
     }
     private func reset() { service.discard(draft); draft = nil; preview = nil; choice = .automatic }
     private func close() { if importing == nil { reset(); dismiss() } }
+}
+
+enum DiaryDayOnePickerFailure {
+    static func isCancellation(_ error: Error) -> Bool {
+        let value = error as NSError
+        return (value.domain == NSCocoaErrorDomain && value.code == CocoaError.userCancelled.rawValue)
+            || (value.domain == NSURLErrorDomain && value.code == NSURLErrorCancelled)
+    }
 }

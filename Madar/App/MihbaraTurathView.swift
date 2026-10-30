@@ -6,7 +6,7 @@ import MadarDesign
 /// M6-T01: search the Turath catalogue (the Shamela corpus), download a book, and hand a local EPUB
 /// to the existing import review. Search and download need the internet; the book then reads offline.
 @MainActor enum MihbaraTurathSource {
-    static let maximumBytes = 150 * 1024 * 1024
+    nonisolated static let maximumBytes = 150 * 1024 * 1024
     private static var cacheURL: URL {
         FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("turath-catalogue-v3.json")
     }
@@ -52,9 +52,23 @@ import MadarDesign
         return file
     }
 
-    private static func fetch(_ book: TurathCatalogueBook) async throws -> Data {
-        let (data, response) = try await URLSession.shared.data(from: TurathCatalogue.bookURL(book.id))
-        guard (response as? HTTPURLResponse)?.statusCode == 200, data.count <= maximumBytes else { throw TurathError.unreadable }
+    nonisolated static func fetch(_ book: TurathCatalogueBook, session: URLSession = .shared, maximumBytes: Int = maximumBytes) async throws -> Data {
+        guard book.sizeBytes <= maximumBytes else { throw TurathError.tooLarge }
+        let (bytes, response) = try await session.bytes(from: TurathCatalogue.bookURL(book.id))
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw TurathError.unreadable }
+        let expected = response.expectedContentLength
+        guard expected <= 0 || expected <= Int64(maximumBytes) else { throw TurathError.tooLarge }
+        return try await boundedData(bytes, maximumBytes: maximumBytes, expectedCount: expected)
+    }
+
+    nonisolated static func boundedData<Bytes: AsyncSequence & Sendable>(_ bytes: Bytes, maximumBytes: Int, expectedCount: Int64 = -1) async throws -> Data where Bytes.Element == UInt8 {
+        var data = Data()
+        if expectedCount > 0 { data.reserveCapacity(min(maximumBytes, Int(expectedCount))) }
+        for try await byte in bytes {
+            guard data.count < maximumBytes else { throw TurathError.tooLarge }
+            if data.count & 0x3fff == 0 { try Task.checkCancellation() }
+            data.append(byte)
+        }
         return data
     }
 }

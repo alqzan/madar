@@ -15,6 +15,20 @@ import XCTest
         }
         XCTAssertTrue(app.buttons["money-expense-key-4"].waitForExistence(timeout: 10)); return app
     }
+    func testClosePromptsBeforeDiscardingExpenseDraft() {
+        continueAfterFailure = false
+        let app = openExpense()
+        app.buttons["money-expense-key-4"].tap(); app.buttons["money-expense-key-2"].tap()
+        let amount = app.staticTexts["money-expense-amount"].label
+        app.buttons["money-expense-close"].tap()
+        let keep = app.buttons["money-expense-continue"].firstMatch
+        XCTAssertTrue(keep.waitForExistence(timeout: 8), app.debugDescription); shot(app, "AU-95-expense-discard-prompt-L"); keep.tap()
+        XCTAssertEqual(app.staticTexts["money-expense-amount"].label, amount, "Continuing keeps the amount entered in the calculator.")
+        app.buttons["money-expense-close"].tap()
+        let discard = app.buttons["money-expense-discard"].firstMatch
+        XCTAssertTrue(discard.waitForExistence(timeout: 8), app.debugDescription); discard.tap()
+        XCTAssertTrue(app.buttons["money-expense-open"].waitForExistence(timeout: 10), app.debugDescription)
+    }
     func testCalculatorSplitSaveAndUndo() {
         continueAfterFailure = false
         let app = openExpense()

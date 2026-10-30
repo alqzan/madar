@@ -35,16 +35,58 @@ import MadarCore
         XCTAssertTrue(content.body.contains("بعد ثلاثة أيام"), "the card reminder says when, in words")
         RoomNotificationContent.open(candidate.id, userInfo: content.userInfo, session: app)
         XCTAssertEqual(app.selectedTab, "money"); XCTAssertFalse(app.moneyOpen)
+        XCTAssertEqual(app.moneyRoute?.path, ["card", card.id.uuidString])
+        XCTAssertEqual(app.moneyRoute?.parameters["tab"], "calendar")
         statement.dueDate = day.day.date(in: day.place.timeZone); try c.save()
         let cash = try XCTUnwrap(RoomNotificationContent.cardCandidates(session: app, prayerDays: [day], now: now).first)
         XCTAssertTrue(cash.id.hasPrefix("mal.cardCash."))
         XCTAssertTrue(try RoomNotificationContent.stillRelevant(cash.id, session: app, now: now))
+        RoomNotificationContent.open(cash.id, userInfo: ["dayKey": cash.dayKey], session: app)
+        XCTAssertEqual(app.moneyRoute?.path, ["card", card.id.uuidString])
+        XCTAssertEqual(app.moneyRoute?.parameters["tab"], "cash")
         let payment = MoneyTransaction(); payment.kind = "cardPayment"; payment.cardID = card.id; payment.fromAccountID = account.id; payment.eventAt = now; payment.dayKey = day.day.description; payment.amountMinor = 50_000; payment.homeAmountMinor = 50_000; c.insert(payment); try c.save()
         XCTAssertFalse(try RoomNotificationContent.stillRelevant(cash.id, session: app, now: now))
         XCTAssertTrue(RoomNotificationContent.cardCandidates(session: app, prayerDays: [day], now: now).isEmpty)
         _ = try SettingsStore(context: c).stage(["mal.cardDue": .string("off"), "core.faceIDLock": .string("app")]); try c.save(); try app.reload()
         XCTAssertTrue(RoomNotificationContent.cardCandidates(session: app, prayerDays: [day], now: now).isEmpty)
         XCTAssertEqual(RoomNotificationContent.content(for: candidate, plan: plan, session: app, habitNames: [:]).body, "لديك تنبيه في مدار")
+    }
+
+    func testPrayerAndDiaryNotificationBodiesOpenTheirSpecificDestinations() throws {
+        let (app, _, _, prayerDay) = try fixture(["core.faceIDLock": .string("none"), "core.dayStart": .string("midnight")])
+        let day = prayerDay.day.description
+
+        RoomNotificationContent.open("quran.\(day).late", userInfo: ["dayKey": day], session: app)
+        XCTAssertEqual(app.quranRoute?.path, ["session", "review"])
+
+        RoomNotificationContent.open("qada.\(day)", userInfo: ["dayKey": day], session: app)
+        XCTAssertEqual(app.prayerRoute?.path, ["qada"])
+        XCTAssertEqual(app.selectedTab, "prayer")
+
+        app.prayerRoute = nil
+        RoomNotificationContent.open("notes.\(day).niyya", userInfo: ["dayKey": day, "room": "notes"], session: app)
+        XCTAssertEqual(app.diaryRoute?.path, ["day", day])
+        XCTAssertEqual(app.selectedTab, "notes")
+
+        app.diaryRoute = nil
+        RoomNotificationContent.open("notes.\(day).onThisDay", userInfo: ["dayKey": day, "room": "notes"], session: app)
+        XCTAssertEqual(app.diaryRoute?.path, ["day", day])
+
+        app.diaryRoute = nil
+        RoomNotificationContent.open("notes.\(day).letter", userInfo: ["dayKey": day, "room": "notes"], session: app)
+        XCTAssertEqual(app.diaryRoute?.path, ["letters"])
+    }
+
+    func testMoneyNotificationsOpenTheDestinationNamedByTheReminder() throws {
+        let (app, _, _, day) = try fixture(["core.faceIDLock": .string("none"), "core.dayStart": .string("midnight")])
+        RoomNotificationContent.open("mal.alert80.\(UUID().uuidString)", userInfo: ["dayKey": day.day.description], session: app)
+        XCTAssertEqual(app.moneyRoute?.path, ["categories"])
+        app.moneyRoute = nil
+        RoomNotificationContent.open("mal.reconcile.\(day.day.description)", userInfo: ["dayKey": day.day.description], session: app)
+        XCTAssertEqual(app.moneyRoute?.path, ["reconcile"])
+        app.moneyRoute = nil
+        RoomNotificationContent.open("mal.zakat.\(day.day.description)", userInfo: ["dayKey": day.day.description], session: app)
+        XCTAssertEqual(app.moneyRoute?.path, ["zakat"])
     }
 
     func testLimitAlertStaysAmountFreeWhenMoneyIsVisibleInsideTheApp() throws {

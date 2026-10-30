@@ -12,14 +12,41 @@ struct MoneyRoomView: View {
     @State private var trip = false
     @State private var loaded = false
     @State private var revealed = false
+    @State private var failure: String?
+    @State private var retryAttempt = 0
+    #if DEBUG
+    @State private var injectedReadFailure = false
+    #endif
     var body: some View {
         Group {
             if !loaded { ProgressView() }
+            else if let failure {
+                VStack(spacing: 12) {
+                    Text(failure).font(MadarTypography.body())
+                        .accessibilityIdentifier("money-trip-detection-error")
+                    Button("أعد المحاولة") { retryAttempt += 1 }.frame(minHeight: 44)
+                        .accessibilityIdentifier("money-trip-detection-retry")
+                }.padding(24)
+            }
             else if trip { MoneyTravelView(app: app, revealed: $revealed, isTabRoot: isTabRoot) }
             else { MoneyHomeView(app: app, isTabRoot: isTabRoot) }
-        }.task { load() }.onChange(of: app.prayerRevision) { load() }
+        }.task(id: "\(app.prayerRevision)-\(retryAttempt)") { load() }
     }
-    private func load() { trip = (try? MoneyRepository(context: ModelContext(app.container)).trip(at: app.prayerNow())) != nil; loaded = true }
+    private func load() {
+        do {
+            #if DEBUG
+            let environment = ProcessInfo.processInfo.environment
+            if !injectedReadFailure, environment["MADAR_UI_MONEY_TRIP_DETECTION_FAILURE_ONCE"] == "1",
+               environment["MADAR_UI_MONEY_FIXTURE"] == "travel", environment["MADAR_UI_STORE_ID"] != nil {
+                injectedReadFailure = true
+                throw CocoaError(.fileReadUnknown)
+            }
+            #endif
+            trip = try MoneyRepository(context: ModelContext(app.container)).trip(at: app.prayerNow()) != nil
+            failure = nil
+        } catch { failure = "تعذّرت معرفة حالة رحلة المال. أعد المحاولة." }
+        loaded = true
+    }
 }
 
 struct MoneyTravelView: View {
@@ -41,6 +68,10 @@ struct MoneyTravelView: View {
     @State private var regular = false
     @State private var entered = false
     @State private var failure: String?
+    @State private var retryAttempt = 0
+    #if DEBUG
+    @State private var injectedReadFailure = false
+    #endif
     private var theme: RoomTheme { .init(room: "mal.travel", dark: colorScheme == .dark) }
     private var service: AppMoneyService { .init(app: app) }
     private var visible: Bool { revealed || !app.bool("core.hideMoneyUntilTouch") }
@@ -78,11 +109,19 @@ struct MoneyTravelView: View {
                     }
                     Button { report = true } label: { Text("تقرير الرحلة").font(MadarTypography.cardTitle()).frame(maxWidth: .infinity, minHeight: 56).foregroundStyle(theme.color("onButton")).background(theme.color("button"), in: .capsule) }.accessibilityIdentifier("money-travel-report")
                     HStack { Button("سجّل مصروفًا") { expense = true }.accessibilityIdentifier("money-travel-expense"); Spacer(); Button("ارجع لمالي") { regular = true }.accessibilityIdentifier("money-travel-ledger") }.font(MadarTypography.caption()).frame(minHeight: 44)
-                    if let failure { Text(failure).font(MadarTypography.caption()) }
-                } else { Text(failure ?? "لا توجد رحلة جارية. تبدأ الرحلة من حالة السفر المشتركة في الصلاة.").font(MadarTypography.body()).padding(24) }
+                    if let failure {
+                        Text(failure).font(MadarTypography.caption()).accessibilityIdentifier("money-travel-read-error")
+                        Button("أعد المحاولة", action: load).frame(minHeight: 44).accessibilityIdentifier("money-travel-retry")
+                    }
+                } else if let failure {
+                    VStack(spacing: 10) {
+                        Text(failure).font(MadarTypography.body()).accessibilityIdentifier("money-travel-read-error")
+                        Button("أعد المحاولة", action: load).frame(minHeight: 44).accessibilityIdentifier("money-travel-retry")
+                    }.padding(24)
+                } else { Text("لا توجد رحلة جارية. تبدأ الرحلة من حالة السفر المشتركة في الصلاة.").font(MadarTypography.body()).padding(24) }
             }.padding(.horizontal, 18).padding(.top, 6).padding(.bottom, 24).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }.clipped().background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).buttonStyle(.madarPlain).environment(\.roomTheme, theme)
-            .toolbar(.hidden, for: .navigationBar, .tabBar).task { load(); entered = true }.onChange(of: app.prayerRevision) { load() }
+            .toolbar(.hidden, for: .navigationBar, .tabBar).task(id: "\(app.prayerRevision)-\(retryAttempt)") { load(); entered = true }
             .onChange(of: scenePhase) { if scenePhase != .active { revealed = false } }
             .accessibilityIdentifier("money-travel")
             .sheet(isPresented: $editor) { if let r = reading { MoneyTripRateSheet(app: app, reading: r, visible: visible) } }
@@ -178,7 +217,19 @@ struct MoneyTravelView: View {
         return app.string("core.firstCalendar") == "gregorian" ? .init(primary: g, secondary: h) : .init(primary: h, secondary: g)
     }
     private func shortCurrency(_ code: String) -> String { let name = service.currencyName(code); return name.split(separator: " ").first.map(String.init) ?? code }
-    private func load() { do { reading = try service.loadTravel(); failure = nil } catch { failure = "لم تكتمل قراءة الرحلة. حاول مرة أخرى." } }
+    private func load() {
+        do {
+            #if DEBUG
+            let environment = ProcessInfo.processInfo.environment
+            if !injectedReadFailure, environment["MADAR_UI_MONEY_TRAVEL_READ_FAILURE_ONCE"] == "1",
+               environment["MADAR_UI_MONEY_FIXTURE"] == "travel", environment["MADAR_UI_STORE_ID"] != nil {
+                injectedReadFailure = true
+                throw CocoaError(.fileReadUnknown)
+            }
+            #endif
+            reading = try service.loadTravel(); failure = nil
+        } catch { failure = "لم تكتمل قراءة الرحلة. حاول مرة أخرى." }
+    }
 }
 private struct MoneyAirmailBorder: Shape { func path(in r: CGRect) -> Path { Path(r) } }
 /// OR-09: a generic journey ornament (no city's skyline): a horizon, two soft hills and a dotted flight arc

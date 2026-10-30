@@ -43,6 +43,98 @@ import XCTest
             basis(after: page)
         }
     }
+    func testTransactionRouteSeedDoesNotLeakIntoTheNextOrdinaryLog() throws {
+        let app = app("showcase"); open(app)
+        app.open(URL(string: "madar://mal/tx/11111111-1111-4111-8111-111111111111")!)
+        XCTAssertTrue(app.staticTexts["money-log-route-unavailable"].waitForExistence(timeout: 15), app.debugDescription)
+        app.buttons["money-log-close"].tap()
+        let ordinaryLog = app.buttons["money-log-open"]
+        for _ in 0..<8 where !ordinaryLog.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(ordinaryLog.isHittable, app.debugDescription); ordinaryLog.tap()
+        XCTAssertTrue(app.otherElements["money-log-arcade"].waitForExistence(timeout: 12), app.debugDescription)
+        XCTAssertFalse(app.staticTexts["money-log-route-unavailable"].exists)
+        app.terminate()
+    }
+    func testMoneyRoutesOpenCategoriesReconcileAndZakat() throws {
+        let app = app("showcase"); open(app)
+        app.open(URL(string: "madar://mal/categories")!)
+        XCTAssertTrue(app.descendants(matching: .any)["money-categories"].waitForExistence(timeout: 15), app.debugDescription)
+        app.buttons["money-categories-close"].tap()
+        app.open(URL(string: "madar://mal/reconcile")!)
+        XCTAssertTrue(app.descendants(matching: .any)["money-reconcile"].waitForExistence(timeout: 15), app.debugDescription)
+        app.buttons["money-reconcile-close"].tap()
+        app.open(URL(string: "madar://mal/zakat")!)
+        XCTAssertTrue(app.descendants(matching: .any)["money-zakat"].waitForExistence(timeout: 15), app.debugDescription)
+        app.buttons["money-zakat-close"].tap()
+    }
+    func testRepeatedMoneyRoutesUpdateTheOpenLogAndClearItsFilter() throws {
+        let app = app("cards"); open(app)
+        let log = app.buttons["money-log-open"]
+        for _ in 0..<8 where !log.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(log.isHittable, app.debugDescription); log.tap()
+        let transfers = app.buttons["money-log-filter-transfers"]
+        XCTAssertTrue(transfers.waitForExistence(timeout: 10), app.debugDescription); transfers.tap()
+
+        func openSearch(_ query: String) {
+            var url = URLComponents(); url.scheme = "madar"; url.host = "search"
+            url.queryItems = [.init(name: "q", value: query), .init(name: "room", value: "mal")]
+            app.open(url.url!)
+        }
+        openSearch("مطعم الحي")
+        let firstResult = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "money-log-search-result-")).firstMatch
+        XCTAssertTrue(firstResult.waitForExistence(timeout: 12), app.debugDescription)
+        let firstID = String(firstResult.identifier.dropFirst("money-log-search-result-".count))
+        openSearch("متجر الكتب")
+        let secondResult = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "money-log-search-result-")).firstMatch
+        XCTAssertTrue(secondResult.waitForExistence(timeout: 12), app.debugDescription)
+        let secondID = String(secondResult.identifier.dropFirst("money-log-search-result-".count))
+        XCTAssertNotEqual(firstID, secondID)
+        XCTAssertEqual(app.textFields["money-log-search"].value as? String, "متجر الكتب")
+
+        app.open(URL(string: "madar://mal/tx/\(firstID)")!)
+        XCTAssertTrue(app.staticTexts["مطعم الحي"].waitForExistence(timeout: 12), app.debugDescription)
+        app.open(URL(string: "madar://mal/tx/\(secondID)")!)
+        XCTAssertTrue(app.staticTexts["متجر الكتب"].waitForExistence(timeout: 12), app.debugDescription)
+        app.terminate()
+    }
+    func testRepeatedCardRoutesUpdateTheOpenCardAndTab() throws {
+        let app = app("cards"); open(app)
+        let cards = app.buttons["money-cards-open"]
+        for _ in 0..<8 where !cards.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(cards.isHittable, app.debugDescription); cards.tap()
+
+        let primaryID = "55555555-5555-4555-8555-555555555551"
+        let travelID = "55555555-5555-4555-8555-555555555552"
+        let primary = app.buttons.matching(NSPredicate(format: "identifier ENDSWITH %@", primaryID.uppercased())).firstMatch
+        let travel = app.buttons.matching(NSPredicate(format: "identifier ENDSWITH %@", travelID.uppercased())).firstMatch
+        XCTAssertTrue(primary.waitForExistence(timeout: 12), app.debugDescription)
+        XCTAssertTrue(travel.exists)
+
+        app.open(URL(string: "madar://mal/card/\(primaryID)?tab=overview")!)
+        let primarySelected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "selected == true"), object: primary)
+        XCTAssertEqual(XCTWaiter.wait(for: [primarySelected], timeout: 10), .completed)
+        app.open(URL(string: "madar://mal/card/\(travelID)?tab=calendar")!)
+        let travelSelected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "selected == true"), object: travel)
+        XCTAssertEqual(XCTWaiter.wait(for: [travelSelected], timeout: 10), .completed)
+        XCTAssertTrue(app.buttons["money-cards-tab-تقويم السداد"].isSelected)
+        XCTAssertFalse(primary.isSelected)
+        app.terminate()
+    }
+    func testRepeatedEnvelopeRoutesReplaceTheOpenDetail() throws {
+        let app = app("showcase"); open(app)
+        let envelopes = app.buttons["money-envelopes-open"]
+        for _ in 0..<8 where !envelopes.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(envelopes.isHittable, app.debugDescription); envelopes.tap()
+        let rent = app.buttons.matching(NSPredicate(format: "identifier ENDSWITH %@", "66666666-6666-4666-8666-666666666661")).firstMatch
+        XCTAssertTrue(rent.waitForExistence(timeout: 12), app.debugDescription)
+
+        app.open(URL(string: "madar://mal/envelope/66666666-6666-4666-8666-666666666661")!)
+        XCTAssertTrue(app.staticTexts["الإيجار"].waitForExistence(timeout: 12), app.debugDescription)
+        app.open(URL(string: "madar://mal/envelope/66666666-6666-4666-8666-666666666662")!)
+        XCTAssertTrue(app.staticTexts["رحلة الشتاء"].waitForExistence(timeout: 12), app.debugDescription)
+        XCTAssertFalse(app.staticTexts["الإيجار"].exists)
+        app.terminate()
+    }
     func shot(_ app: XCUIApplication, _ name: String) { let a = XCTAttachment(screenshot: app.screenshot()); a.name = name; a.lifetime = .keepAlways; add(a) }
     private func assertChartDates(_ chart: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
         let dateRange = chart.label.components(separatedBy: "؛").first ?? chart.label

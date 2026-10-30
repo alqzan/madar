@@ -47,6 +47,100 @@ import XCTest
         XCTAssertTrue(app.staticTexts["سطر محفوظ من اليوم"].waitForExistence(timeout: 10))
         capture(app, "M3-V01-today-L")
     }
+    func testHomeReadFailureAfterFirstSnapshotShowsRetryInsteadOfStalePage() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": "home",
+            "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00",
+            "MADAR_UI_DIARY_HOME_READ_FAILURE_AFTER_FIRST": "1"]
+        app.launch()
+        XCTAssertTrue(app.staticTexts["diary-home-title"].waitForExistence(timeout: 25), app.debugDescription)
+        let retry = app.buttons["diary-home-retry"]
+        XCTAssertTrue(retry.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(app.buttons["diary-today"].exists, "A stale page must not remain available after its refresh fails.")
+        capture(app, "AU-95-diary-home-read-failure-L")
+        retry.tap()
+        XCTAssertTrue(app.buttons["diary-today"].waitForExistence(timeout: 10), app.debugDescription)
+        capture(app, "AU-95-diary-home-read-recovered-L")
+        app.terminate()
+    }
+    func testEntryRouteScrollsToAndBrieflyHighlightsItsLine() throws {
+        let app = launch("entryRoute")
+        let id = "44444444-4444-4444-8444-444444440001"
+        app.open(URL(string: "madar://notes/entry/\(id)")!)
+        let target = app.descendants(matching: .any)["diary-entry-\(id)"]
+        XCTAssertTrue(target.waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertTrue(target.isHittable, "The diary entry link must land on its exact line.")
+        capture(app, "AU-95-diary-entry-route-highlight-L")
+        app.terminate()
+    }
+    func testRepeatedEntryRouteTargetsAnotherLineInTheSameOpenDay() throws {
+        let app = launch("entryRoute")
+        let first = "44444444-4444-4444-8444-444444440001"
+        let second = "44444444-4444-4444-8444-444444440002"
+        app.open(URL(string: "madar://notes/entry/\(first)")!)
+        XCTAssertTrue(app.descendants(matching: .any)["diary-entry-\(first)"].waitForExistence(timeout: 15), app.debugDescription)
+        app.open(URL(string: "madar://notes/entry/\(second)")!)
+        let target = app.descendants(matching: .any)["diary-entry-\(second)"]
+        XCTAssertTrue(target.waitForExistence(timeout: 12), app.debugDescription)
+        XCTAssertTrue(target.isHittable, "A second entry route must retarget the already-open day sheet.")
+        capture(app, "AU-95-diary-entry-route-repeat-L")
+        app.terminate()
+    }
+    func testDiarySearchRouteUpdatesTheAlreadyOpenSearch() throws {
+        let app = launch("home")
+        func openSearch(_ query: String) {
+            var url = URLComponents(); url.scheme = "madar"; url.host = "search"
+            url.queryItems = [.init(name: "q", value: query), .init(name: "room", value: "notes")]
+            app.open(url.url!)
+        }
+        openSearch("عشاء")
+        let first = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "diary-search-result-")).firstMatch
+        XCTAssertTrue(first.waitForExistence(timeout: 20), app.debugDescription)
+        openSearch("اتصلت")
+        let second = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "diary-search-result-")).firstMatch
+        XCTAssertTrue(second.waitForExistence(timeout: 12), app.debugDescription)
+        XCTAssertTrue(second.label.contains("اتصلت"), second.label)
+        XCTAssertEqual(app.textFields["diary-search-query"].value as? String, "اتصلت")
+        app.terminate()
+    }
+    func testSameLetterAndProjectRoutesReopenTheirDetails() throws {
+        let app = launch("letters")
+        let letterURL = URL(string: "madar://notes/letter/33333333-3333-4333-8333-333333333331")!
+        app.open(letterURL)
+        let letterOpen = app.buttons["diary-letter-open"]
+        XCTAssertTrue(letterOpen.waitForExistence(timeout: 15), app.debugDescription)
+        app.buttons["diary-letter-done"].tap()
+        XCTAssertTrue(letterOpen.waitForNonExistence(timeout: 8), app.debugDescription)
+        app.open(letterURL)
+        XCTAssertTrue(app.buttons["diary-letter-open"].waitForExistence(timeout: 12), app.debugDescription)
+        app.buttons["diary-letter-done"].tap()
+
+        let projectURL = URL(string: "madar://notes/project/44444444-4444-4444-8444-444444444441")!
+        app.open(projectURL)
+        let projectTitle = app.navigationBars["ترتيب البيت"]
+        XCTAssertTrue(projectTitle.waitForExistence(timeout: 12), app.debugDescription)
+        app.buttons["تمّ"].tap()
+        XCTAssertTrue(projectTitle.waitForNonExistence(timeout: 8), app.debugDescription)
+        app.open(projectURL)
+        XCTAssertTrue(app.navigationBars["ترتيب البيت"].waitForExistence(timeout: 12), app.debugDescription)
+        app.terminate()
+    }
+    func testMemoriesReadFailureCanRetryInTheArchive() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": "letters",
+            "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00",
+            "MADAR_UI_DIARY_MEMORIES_READ_FAILURE_ONCE": "1"]
+        app.launch(); XCTAssertTrue(app.staticTexts["diary-home-title"].waitForExistence(timeout: 25), app.debugDescription)
+        app.open(URL(string: "madar://notes/letters")!)
+        let memories = app.buttons["diary-hub-memories"]
+        XCTAssertTrue(memories.waitForExistence(timeout: 15), app.debugDescription)
+        memories.tap()
+        XCTAssertTrue(app.staticTexts["diary-hub-memory-error"].waitForExistence(timeout: 10), app.debugDescription)
+        app.buttons["diary-hub-memories-retry"].tap()
+        XCTAssertTrue(app.staticTexts["diary-hub-memory-error"].waitForNonExistence(timeout: 10), app.debugDescription)
+        app.terminate()
+    }
     /// OR-13: a heading and bold written with the editor's tools show formatted on the page, never as raw marks.
     func testEditorHeadingAndBoldShowFormatted() throws {
         continueAfterFailure = false

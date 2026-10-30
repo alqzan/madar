@@ -156,6 +156,8 @@ struct MihbaraReaderView: View {
     let book: MihbaraBook
     /// The volume of a set whose spine was tapped (0-based); nil opens the saved place.
     var volume: Int? = nil
+    /// A validated, URL-encoded Readium locator from a Mihbara deep link; it takes priority over the saved place.
+    var initialLocatorJSON: String? = nil
     /// Owner, 25 Oct 2026: «خل دائما فيه خيار لعرضه PDF». For a book converted on this device, finds the
     /// original PDF on the shelf from the EPUB's identifier (`urn:madar:pdf:<file hash>`).
     var originalPDF: ((String) -> UUID?)? = nil
@@ -739,10 +741,12 @@ struct MihbaraReaderView: View {
             }
 
             let saved = readiumLocator(book.locatorJSON)
+            let routed = initialLocatorJSON.flatMap { readiumLocator(Data($0.utf8)) }
+            if initialLocatorJSON != nil && routed == nil { message = "موضع القراءة في الرابط غير صالح؛ فُتح الكتاب عند موضعك المحفوظ." }
             let now = Date()
             let (readyPublication, firstLocator, readyPages, readyPositionCount, volumeStarts) = await prepareReader(from: opened)
             printPages = readyPages
-            var startLocator = saved ?? firstLocator
+            var startLocator = routed ?? saved ?? firstLocator
             // Owner, 21 Oct 2026: a tapped volume opens at its first page, unless the saved place is already inside it.
             if let volume {
                 let labels = readyPages.map(\.label)

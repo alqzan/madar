@@ -64,7 +64,14 @@ struct HabitDetailView:View {
             if HabitHealthStore.available { Button {Task{do{try await HabitHealthStore.authorize(unit:reading.summary.current?.rule.unit ?? "steps");_ = try await HabitHealthStore.refresh(session:session);dismiss()}catch{session.errorMessage=madarUserMessage(error)}}} label: { filled("حدّث من الصحة") }.buttonStyle(.madarPlain) } else {Text("بيانات الصحة غير متاحة على هذا الجهاز").font(MadarTypography.caption())}
         } else if let source=reading.source {
             Button {
-                if source == "jamaah"{session.selectedTab="prayer"}else if source == "review"{session.selectedTab="quran"}else{session.selectedTab="notes"};dismiss()
+                switch source {
+                case "jamaah": session.selectedTab = "prayer"
+                case "review": session.selectedTab = "quran"
+                case "diaryLine": session.selectedTab = "notes"
+                case "reading", "hadith": session.selectedTab = "mihbara"
+                default: session.errorMessage = "لا توجد غرفة مرتبطة بهذا المصدر."
+                }
+                dismiss()
             } label: { filled("افتح "+(reading.sourceTitle ?? "غرفتها")) }.buttonStyle(.madarPlain).accessibilityIdentifier("habit-owner")
         } else if !reading.paused && current.target > 0 {
             let doneOnce = current.met && current.rule.measure == .once

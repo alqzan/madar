@@ -23,6 +23,7 @@ struct MoneyExpenseView: View {
     @State private var details = false
     @State private var date = Date()
     @State private var saving = false
+    @State private var confirmDiscard = false
     @State private var failure: String?
     @FocusState private var editing: Bool
     @State private var commandID = UUID()
@@ -33,6 +34,9 @@ struct MoneyExpenseView: View {
     private var inputCurrency: String { foreign ? reading?.tripCurrency ?? reading?.currency ?? "SAR" : reading?.currency ?? "SAR" }
     private var homeMinor: Int { guard let r = reading else { return minor }; return (try? FX.homeAmount(amountMinor: minor, currency: inputCurrency, rate: r.tripRate ?? "1", home: r.currency)) ?? 0 }
     private var method: MoneyPaymentChoice? { reading?.methods.first { $0.id == methodID } }
+    private var hasUnsavedInput: Bool {
+        !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !merchant.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
     private var visible: Bool { revealed || !app.bool("core.hideMoneyUntilTouch") }
     private func amount(_ value: Int) -> String { visible ? service.amount(value) : "•••" }
     private var split: ExpenseEntry.Split { ExpenseEntry.split(chargeMinor: method?.kind == .cash && reading?.cashCountedAtWithdrawal == true ? 0 : homeMinor, share: share) }
@@ -47,8 +51,8 @@ struct MoneyExpenseView: View {
         ScrollView {
             VStack(spacing: 12) {
                 HStack {
-                    Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1) } }
-                        .accessibilityLabel("إغلاق").accessibilityIdentifier("money-expense-close")
+                    Button { if hasUnsavedInput { editing = false; confirmDiscard = true } else { dismiss() } } label: { Image(systemName: "xmark").frame(width: 44, height: 44).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1) } }
+                        .disabled(saving).accessibilityLabel("إغلاق").accessibilityIdentifier("money-expense-close")
                     Text("سجّل مصروفًا").font(.custom("thmanyahserifdisplay-Bold", size: 24, relativeTo: .title2)); Spacer()
                     Button { details.toggle() } label: { Image(systemName: "slider.horizontal.3").frame(width: 44, height: 44) }.accessibilityLabel("تفاصيل المصروف").accessibilityIdentifier("money-expense-details")
                 }
@@ -95,6 +99,11 @@ struct MoneyExpenseView: View {
             .fullScreenCover(item: $bigRoute) { route in
                 MoneyBigExpenseView(app: app, route: route, revealed: $revealed) { bigRoute = nil; dismiss() }
             }
+            .confirmationDialog("تتجاهل المصروف؟", isPresented: $confirmDiscard, titleVisibility: .visible) {
+                Button("تجاهل المصروف", role: .destructive) { dismiss() }.accessibilityIdentifier("money-expense-discard")
+                Button("أكمل التسجيل") { }.accessibilityIdentifier("money-expense-continue")
+            } message: { Text("المبلغ أو اسم المتجر غير محفوظ.") }
+            .interactiveDismissDisabled(hasUnsavedInput || saving)
     }
     private func amountHeading(_ r: MoneyExpenseReading) -> some View {
         VStack(spacing: 0) {
@@ -233,7 +242,14 @@ struct MoneyExpenseView: View {
         }.padding(12).background(theme.surface)
     }
     private func load() {
-        do { let r = try service.loadExpense(); reading = r; methodID = r.defaultMethodID ?? ""; date = app.prayerNow(); failure = nil; if let id = r.tripEnvelopeID { envelopeID = id; share = .envelope } }
+        do {
+            let r = try service.loadExpense()
+            reading = r
+            let requestedMethod = seed?.method.flatMap { requested in r.methods.contains(where: { $0.id == requested }) ? requested : nil }
+            methodID = requestedMethod ?? r.defaultMethodID ?? ""
+            date = app.prayerNow(); failure = nil
+            if let id = r.tripEnvelopeID { envelopeID = id; share = .envelope }
+        }
         catch { failure = "لم تكتمل قراءة مصادر الدفع. حاول مرة أخرى." }
     }
     private func save() {

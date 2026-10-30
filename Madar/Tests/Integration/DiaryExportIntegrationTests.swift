@@ -7,6 +7,12 @@ import MadarData
 import MadarCommands
 @testable import Madar
 @MainActor final class DiaryExportIntegrationTests:XCTestCase {
+    func testDayOnePickerCancellationIsDistinctFromFileReadFailure() {
+        XCTAssertTrue(DiaryDayOnePickerFailure.isCancellation(CocoaError(.userCancelled)))
+        XCTAssertTrue(DiaryDayOnePickerFailure.isCancellation(URLError(.cancelled)))
+        XCTAssertFalse(DiaryDayOnePickerFailure.isCancellation(CocoaError(.fileReadUnknown)))
+    }
+
     func testBatchKeepsRevisionsMarginsOpenedLettersAndEmptyFrozenDays() throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "DiaryExportBatch-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }

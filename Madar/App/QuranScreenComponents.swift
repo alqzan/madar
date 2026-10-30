@@ -40,13 +40,18 @@ struct QuranLogTabs: View {
 struct QuranLogView: View {
     let service: AppQuranService
     let close: () -> Void
-    @State private var selection = QuranLogTab.week
+    let initialSessionID: UUID?
+    @State private var selection: QuranLogTab
+    init(service: AppQuranService, close: @escaping () -> Void, initialTab: QuranLogTab = .week, initialSessionID: UUID? = nil) {
+        self.service = service; self.close = close; self.initialSessionID = initialSessionID
+        _selection = State(initialValue: initialTab)
+    }
     var body: some View {
         switch selection {
         case .week: QuranWeekView(service: service, close: close, selection: $selection)
         case .year: QuranYearView(service: service, close: close, selection: $selection)
         case .all: QuranJourneyView(service: service, close: close, selection: $selection)
-        case .sessions: QuranSessionLogView(service: service, close: close, selection: $selection)
+        case .sessions: QuranSessionLogView(service: service, close: close, selection: $selection, initialSessionID: initialSessionID)
         }
     }
 }

@@ -9,9 +9,14 @@ struct CustomizeMadar: View {
     @State private var confirmReset = false
     @State private var widgetGallery = false
     @State private var widgetMaker = false
+    @State private var missingSettingsRoute = false
+    @State private var highlightedSettingKey: String?
+    @State private var routedSettingsQuery: String?
+    @State private var routedSettingKey: String?
     @Environment(\.roomTheme) private var theme
     @Environment(\.dynamicTypeSize) private var dynamicType
     var body: some View {
+        ScrollViewReader { proxy in
         CustomizationTemplate(title: "خصّص مدار", subtitle: "كل تعديل يُحفظ وحده") {
             // M4-V04: the live model is the lobby itself (05-W4-Takhsis).
             // While searching, results come first; the model returns when the search is cleared.
@@ -20,15 +25,21 @@ struct CustomizeMadar: View {
             VStack(spacing: 16) {
                 HStack {
                     Image(systemName: "magnifyingglass").foregroundStyle(theme.secondaryInk)
-                    TextField("ابحث في إعدادات مدار…", text: $session.settingsQuery).accessibilityIdentifier("settings-search")
+                    TextField("ابحث في إعدادات مدار…", text: Binding(get: { session.settingsQuery }, set: updateSettingsQuery)).accessibilityIdentifier("settings-search")
                         .submitLabel(.search).padding(.trailing, query.isEmpty ? 0 : 34)
                         .overlay(alignment: .trailing) {
                             if !query.isEmpty {
-                                Button { session.settingsQuery = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(theme.secondaryInk).frame(width: 44, height: 44) }
+                                Button { updateSettingsQuery("") } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(theme.secondaryInk).frame(width: 44, height: 44) }
                                     .buttonStyle(.madarPlain).accessibilityLabel("امسح البحث").accessibilityIdentifier("settings-clear-search")
                             }
                         }
                 }.padding(16).background(theme.surface, in: .capsule)
+                if missingSettingsRoute {
+                    MadarCard {
+                        Text("الإعداد غير موجود").font(MadarTypography.section())
+                            .accessibilityIdentifier("settings-route-missing")
+                    }
+                }
                 if query.isEmpty || normalized("المحبرة").contains(normalized(query)) {
                     Button { session.mihbaraOpen = true } label: {
                         HStack { Text("افتح المحبرة").font(MadarTypography.section()); Spacer(); Image(systemName: "chevron.left") }.padding(16).background(theme.surface, in: .rect(cornerRadius: 20))
@@ -53,7 +64,7 @@ struct CustomizeMadar: View {
                     ContentUnavailableView.search(text: query)
                 } else {
                     ForEach(sections, id: \.self) { section in
-                        SettingsSection(title: section, symbol: symbols[section] ?? "slider.horizontal.3", definitions: filtered.filter { sectionFor($0.key) == section }, session: session, searching: !query.isEmpty)
+                        SettingsSection(title: section, symbol: symbols[section] ?? "slider.horizontal.3", definitions: filtered.filter { sectionFor($0.key) == section }, session: session, searching: !query.isEmpty, highlightedSettingKey: highlightedSettingKey)
                     }
                     if sections.contains("الإشعارات") && session.bool("salah.askReminder") && !session.notificationsAuthorized {
                         MadarCard {
@@ -92,19 +103,73 @@ struct CustomizeMadar: View {
         }
         .fullScreenCover(isPresented: $session.mihbaraOpen) { MihbaraHomeView(app: session) }
         .navigationDestination(isPresented: $session.moneyOpen) { MoneyRoomView(app: session) }
-        .sheet(isPresented: $widgetMaker) { WidgetMakerView(session: session).presentationDetents([.large]).madarSheetErrorAlert(session) }
+        .sheet(isPresented: $widgetMaker, onDismiss: { session.widgetMakerRoute = nil; session.widgetMakerRouteID = nil }) {
+            WidgetMakerView(session: session)
+                .presentationDetents([.large]).madarSheetErrorAlert(session)
+        }
         .sheet(isPresented:$widgetGallery){NavigationStack{RoomWidgetsGallery(session:session)}.madarSheetErrorAlert(session)}
         .toolbarVisibility(.hidden, for: .navigationBar)
+        .onChange(of: session.widgetMakerRouteID, initial: true) { _, requestID in if requestID != nil { widgetMaker = true } }
         .confirmationDialog("أعِد الإعدادات المتفق عليها؟", isPresented: $confirmReset, titleVisibility: .visible) {
             Button("أعِد الافتراضي", role: .destructive) { session.reset(AppSession.supportedKeys + ["bahw.layout"] + RoomHomeLayout.rooms.map { $0.0 + ".layout" }) }
         } message: { Text("يعود الشكل والترتيب والإعدادات. البيانات لا تُمسّ.") }
+        .onChange(of: session.settingsRoute, initial: true) { _, route in showSettingsRoute(route, using: proxy) }
+        .task(id: highlightedSettingKey) {
+            guard highlightedSettingKey != nil else { return }
+            do { try await Task.sleep(for: .seconds(2)) } catch { return }
+            highlightedSettingKey = nil
+        }
+        .task {
+#if DEBUG
+            let environment = ProcessInfo.processInfo.environment
+            if environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil,
+               let raw = environment["MADAR_UI_SETTINGS_ROUTE"], let url = URL(string: raw) {
+                session.open(url)
+            }
+#endif
+        }
+        }
+    }
+    private func updateSettingsQuery(_ value: String) {
+        session.settingsQuery = value
+        if value != routedSettingsQuery {
+            routedSettingsQuery = nil
+            routedSettingKey = nil
+            missingSettingsRoute = false
+            highlightedSettingKey = nil
+        }
+    }
+    private func showSettingsRoute(_ route: Route?, using proxy: ScrollViewProxy) {
+        guard let route else { return }
+        session.settingsRoute = nil
+        guard let key = route.path.last, AppSession.supportedKeys.contains(key),
+              let definition = try? session.schema.definition(for: key) else {
+            session.settingsQuery = ""
+            routedSettingsQuery = ""
+            routedSettingKey = nil
+            highlightedSettingKey = nil
+            missingSettingsRoute = true
+            return
+        }
+        session.settingsQuery = definition.title
+        routedSettingsQuery = definition.title
+        routedSettingKey = key
+        missingSettingsRoute = false
+        highlightedSettingKey = key
+        Task { @MainActor in
+            await Task.yield()
+            guard highlightedSettingKey == key else { return }
+            withAnimation(.easeInOut(duration: 0.25)) {
+                proxy.scrollTo("settings-route-\(key)", anchor: .center)
+            }
+        }
     }
     private var showsRoomLayouts: Bool { query.isEmpty || normalized("ما يعرضه كل باب ترتيب الغرف").contains(normalized(query)) }
     private var filtered: [SettingDefinition] {
         session.schema.settings.filter { definition in
             guard AppSession.supportedKeys.contains(definition.key) else { return false }
-            if definition.key == "core.hijriOffset" && session.string("core.hijriSource") != "sighting" { return false }
-            if ["notif.quietFrom", "notif.quietUntil"].contains(definition.key) && !session.bool("notif.quietAfterIsha") { return false }
+            if definition.key == "core.hijriOffset" && session.string("core.hijriSource") != "sighting" && definition.key != routedSettingKey { return false }
+            if ["notif.quietFrom", "notif.quietUntil"].contains(definition.key) && !session.bool("notif.quietAfterIsha") && definition.key != routedSettingKey { return false }
             return query.isEmpty || normalized(definition.title + " " + sectionFor(definition.key) + " " + definition.key).contains(normalized(query))
         }
     }
@@ -155,6 +220,7 @@ struct SettingsSection: View {
     let definitions: [SettingDefinition]
     @Bindable var session: AppSession
     let searching: Bool
+    let highlightedSettingKey: String?
     @State private var expanded = false
     @Environment(\.roomTheme) private var theme
     /// The current choices, read from the values (05-W4-Takhsis-s1: «هجري أولًا، يبدأ اليوم من الفجر»).
@@ -172,7 +238,8 @@ struct SettingsSection: View {
                 VStack(alignment: .leading, spacing: 16) {
                     ForEach(definitions, id: \.key) { definition in
                         Divider().overlay(theme.line)
-                        SettingControl(definition: definition, session: session)
+                        SettingControl(definition: definition, session: session, highlighted: highlightedSettingKey == definition.key)
+                            .id("settings-route-\(definition.key)")
                     }
                 }.padding(.top, 12)
             } label: {
@@ -191,6 +258,7 @@ struct SettingsSection: View {
 struct SettingControl: View {
     let definition: SettingDefinition
     @Bindable var session: AppSession
+    var highlighted = false
     @Environment(\.roomTheme) private var theme
     @Environment(\.dynamicTypeSize) private var dynamicType
     /// AU-95: quick taps on +/− each stepped from the stored value, which only refreshes after the write lands, so
@@ -282,6 +350,10 @@ struct SettingControl: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+        .overlay {
+            if highlighted { RoundedRectangle(cornerRadius: 16).stroke(theme.accent, lineWidth: 2) }
+        }
+        .animation(.easeInOut(duration: 0.2), value: highlighted)
     }
     private var offsetRange: ClosedRange<Int> {
         let limits = definition.contract?["range"]?.array?.compactMap(\.number) ?? [-60, 60]

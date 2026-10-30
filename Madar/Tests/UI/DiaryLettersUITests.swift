@@ -33,6 +33,35 @@ import XCTest
         XCTAssertTrue(app.staticTexts["diary-hub-year"].waitForExistence(timeout: 10), app.debugDescription)
         shot(app, "AU-74-hub-retried-L")
     }
+    func testProjectListDoesNotClaimEmptyWhenReadFailsAndCanRetry() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": "letters", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00", "MADAR_UI_DIARY_PROJECTS_READ_FAILURE_ONCE": "1"]
+        app.launch()
+        XCTAssertTrue(app.buttons["diary-days"].waitForExistence(timeout: 25)); app.buttons["diary-days"].tap()
+        XCTAssertTrue(app.buttons["diary-hub-projects"].waitForExistence(timeout: 10)); app.buttons["diary-hub-projects"].tap()
+        XCTAssertTrue(app.staticTexts["diary-project-read-error"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "لا مشاريع بعد")).firstMatch.exists)
+        app.buttons["diary-project-retry"].tap()
+        XCTAssertTrue(app.buttons["diary-project-row"].waitForExistence(timeout: 10), app.debugDescription)
+    }
+    func testUnsavedProjectReflectionIsKeptWhenCloseIsCancelled() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_DIARY_FIXTURE": "letters", "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00"]
+        app.launch()
+        XCTAssertTrue(app.buttons["diary-days"].waitForExistence(timeout: 25)); app.buttons["diary-days"].tap()
+        XCTAssertTrue(app.buttons["diary-hub-projects"].waitForExistence(timeout: 10)); app.buttons["diary-hub-projects"].tap()
+        let project = app.buttons["diary-project-row"]; XCTAssertTrue(project.waitForExistence(timeout: 10)); project.tap()
+        app.buttons["diary-project-finish"].tap()
+        let reflection = app.textFields["diary-project-reflection"]; XCTAssertTrue(reflection.waitForExistence(timeout: 5)); reflection.tap(); reflection.typeText("سطر أخير أحفظه")
+        app.buttons["diary-project-detail-close"].tap()
+        let keep = app.buttons.matching(identifier: "diary-project-reflection-continue").firstMatch; XCTAssertTrue(keep.waitForExistence(timeout: 5)); shot(app, "AU-95-diary-project-reflection-confirm-L"); keep.tap()
+        XCTAssertEqual(reflection.value as? String, "سطر أخير أحفظه")
+        app.buttons["diary-project-detail-close"].tap()
+        let discard = app.buttons.matching(identifier: "diary-project-reflection-discard").firstMatch; XCTAssertTrue(discard.waitForExistence(timeout: 5)); discard.tap()
+        XCTAssertTrue(app.buttons["diary-project-row"].waitForExistence(timeout: 10))
+    }
     func testSwipeCannotDiscardAnUnsavedProjectDraft() {
         continueAfterFailure = false
         let app = XCUIApplication()

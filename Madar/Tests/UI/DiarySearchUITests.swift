@@ -1,5 +1,13 @@
 import XCTest
 @MainActor final class DiarySearchUITests:XCTestCase {
+    func testSearchIndexReadFailureCanRetry() throws {
+        continueAfterFailure=false
+        let app=XCUIApplication();app.launchEnvironment=["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_DIARY_FIXTURE":"editor","MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light","MADAR_UI_NOW":"2026-10-15T15:00:00+03:00","MADAR_UI_DIARY_SEARCH_READ_FAILURE_ONCE":"1"]
+        app.launch();XCTAssertTrue(app.buttons["diary-search"].waitForExistence(timeout:25));app.buttons["diary-search"].tap()
+        XCTAssertTrue(app.staticTexts["diary-search-read-error"].waitForExistence(timeout:10),app.debugDescription)
+        app.buttons["diary-search-retry"].tap()
+        XCTAssertTrue(app.staticTexts["فهرس الكتاب"].waitForExistence(timeout:10),app.debugDescription)
+    }
     func testChipsOpenSourceEditRemoveAndNoResults() throws {
         continueAfterFailure=false
         let app=XCUIApplication();app.launchEnvironment=["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_DIARY_FIXTURE":"editor","MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light","MADAR_UI_NOW":"2026-10-15T15:00:00+03:00"]

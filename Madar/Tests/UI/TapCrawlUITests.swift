@@ -46,7 +46,12 @@ import XCTest
         env.merge(extra) { $1 }
         let app = XCUIApplication()
         app.launchEnvironment = env
-        open(app, tab: tab, page: 0)
+        guard open(app, tab: tab, page: 0) else {
+            print("CRAWL|\(tab)|INCOMPLETE|NO-TAB")
+            print(app.debugDescription)
+            app.terminate()
+            return
+        }
         var tested = Set<String>()
         var page = 0
         while page < 10 {
@@ -57,7 +62,11 @@ import XCTest
                 Thread.sleep(forTimeInterval: 1.2)
                 if app.state != .runningForeground {
                     report(tab, "CRASH", key)
-                    open(app, tab: tab, page: page)
+                    guard open(app, tab: tab, page: page) else {
+                        print("CRAWL|\(tab)|INCOMPLETE|NO-TAB")
+                        app.terminate()
+                        return
+                    }
                     continue
                 }
                 if signature(app) == before {
@@ -67,7 +76,11 @@ import XCTest
                 }
                 if !restore(app, to: before) {
                     app.terminate()
-                    open(app, tab: tab, page: page)
+                    guard open(app, tab: tab, page: page) else {
+                        print("CRAWL|\(tab)|INCOMPLETE|NO-TAB")
+                        app.terminate()
+                        return
+                    }
                 }
             }
             let before = signature(app)
@@ -80,15 +93,28 @@ import XCTest
         app.terminate()
     }
 
-    private func open(_ app: XCUIApplication, tab: String, page: Int) {
+    private func open(_ app: XCUIApplication, tab: String, page: Int) -> Bool {
         app.launch()
         if app.buttons["first-run-skip"].waitForExistence(timeout: 3) { app.buttons["first-run-skip"].tap() }
         let start = app.buttons["first-run-continue"]
         for _ in 0..<4 where start.waitForExistence(timeout: 2) && start.isHittable { start.tap(); Thread.sleep(forTimeInterval: 0.8) }
-        let tabButton = app.buttons["tab-\(tab)"].firstMatch
-        if tabButton.waitForExistence(timeout: 10) { tabButton.tap() } else { report(tab, "NO-TAB", tab) }
+        let rootIdentifier = tab == "customize" ? "settings-tab" : "\(tab)-tab"
+        if app.descendants(matching: .any).matching(identifier: rootIdentifier).firstMatch.waitForExistence(timeout: 5) {
+            return true
+        }
+        let tabTitles = ["foundation": "البهو", "prayer": "الصلاة", "quran": "القرآن", "money": "المال", "mihbara": "المحبرة", "notes": "المذكرات", "customize": "خصّص"]
+        let nativeTab = tabTitles[tab].map { app.tabBars.buttons[$0].firstMatch }
+        let shortcut = app.buttons["tab-\(tab)"].firstMatch
+        if let nativeTab, nativeTab.waitForExistence(timeout: 10) {
+            nativeTab.tap()
+        } else if shortcut.waitForExistence(timeout: 10) {
+            shortcut.tap()
+        } else {
+            return false
+        }
         Thread.sleep(forTimeInterval: 2)
         for _ in 0..<page { app.swipeUp(); Thread.sleep(forTimeInterval: 0.5) }
+        return true
     }
 
     /// The first hittable button above the floating accessory that has not been tapped yet.

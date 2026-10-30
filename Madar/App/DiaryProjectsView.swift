@@ -5,29 +5,73 @@ import MadarDesign
 /// §7.3 N04 projects: open projects with their linked lines; finished ones go to «الفصول».
 struct DiaryProjectsPanel: View {
     @Bindable var app: AppSession
+    var initialProjectID: UUID? = nil
+    var initialProjectRequestID: UUID? = nil
     @Environment(\.roomTheme) private var theme
     @State private var projects: [DiaryProjectCard] = []
     @State private var creating = false
     @State private var detail: DiaryProjectCard?
     @State private var failure: String?
+    @State private var routeMessage: String?
+    @State private var handledRouteID: UUID?
+    @State private var loadAttempt = 0
+    #if DEBUG
+    @State private var injectedReadFailure = false
+    #endif
     private var service: AppDiaryService { .init(app: app) }
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 4) { Text("المشاريع").font(DiaryType.heading); Text("ما تبنيه على مهل، وسطورك عنه").font(DiaryType.label).foregroundStyle(theme.color("ink3Text")) }
             Button { creating = true } label: { Label("مشروع جديد", systemImage: "plus").font(DiaryType.label).frame(maxWidth: .infinity, minHeight: 46).overlay { Capsule().stroke(theme.line) } }
                 .buttonStyle(.madarPlain).accessibilityIdentifier("diary-project-new")
-            if let failure { Text(failure).font(MadarTypography.body()) }
+            if let failure {
+                Text(failure).font(MadarTypography.body()).accessibilityIdentifier("diary-project-read-error")
+                Button("أعد المحاولة") { loadAttempt += 1 }
+                    .frame(minHeight: 44).accessibilityIdentifier("diary-project-retry")
+            }
+            if let routeMessage { Text(routeMessage).font(DiaryType.label).foregroundStyle(theme.color("ink3Text")).accessibilityIdentifier("diary-project-route-status") }
             let open = projects.filter { $0.finishedAt == nil }, chapters = projects.filter { $0.finishedAt != nil }
-            if projects.isEmpty { Text("لا مشاريع بعد. اضغط «مشروع جديد» واكتب كلمة تدلّ عليه، ويقترح مدار ربط سطورك به.").font(DiaryType.writing).foregroundStyle(theme.color("ink3Text")).padding(.vertical, 16) }
+            if failure == nil && projects.isEmpty { Text("لا مشاريع بعد. اضغط «مشروع جديد» واكتب كلمة تدلّ عليه، ويقترح مدار ربط سطورك به.").font(DiaryType.writing).foregroundStyle(theme.color("ink3Text")).padding(.vertical, 16) }
             ForEach(open) { project in row(project) }
             if !chapters.isEmpty {
                 Text("الفصول").font(DiaryType.heading).padding(.top, 8)
                 ForEach(chapters) { project in row(project) }
             }
         }
-        .task(id: app.prayerRevision) { do { projects = try service.projects(); failure = nil } catch { failure = madarUserMessage(error) } }
+        .task(id: "\(app.prayerRevision)-\(loadAttempt)") { loadProjects() }
+        .onChange(of: initialProjectID) { _, id in if let id, !projects.isEmpty { openRoutedProject(id) } }
+        .onChange(of: initialProjectRequestID) { _, requestID in
+            guard requestID != nil, let initialProjectID else { return }
+            handledRouteID = nil
+            if !projects.isEmpty { openRoutedProject(initialProjectID) }
+        }
         .sheet(isPresented: $creating) { DiaryProjectEditor(app: app).environment(\.roomTheme, theme).presentationDetents([.medium, .large]) }
         .sheet(item: $detail) { project in DiaryProjectDetail(app: app, project: project).environment(\.roomTheme, theme) }
+    }
+    private func loadProjects() {
+        do {
+            #if DEBUG
+            let environment = ProcessInfo.processInfo.environment
+            if !injectedReadFailure, environment["MADAR_UI_DIARY_PROJECTS_READ_FAILURE_ONCE"] == "1",
+               environment["MADAR_UI_DIARY_FIXTURE"] == "letters", environment["MADAR_UI_STORE_ID"] != nil {
+                injectedReadFailure = true
+                throw CocoaError(.fileReadUnknown)
+            }
+            #endif
+            projects = try service.projects()
+            failure = nil
+            if let initialProjectID { openRoutedProject(initialProjectID) }
+        } catch { projects = []; failure = "تعذّر فتح المشاريع المحفوظة. أعد المحاولة." }
+    }
+    private func openRoutedProject(_ id: UUID) {
+        guard handledRouteID != id else { return }
+        handledRouteID = id
+        routeMessage = nil
+        guard let project = projects.first(where: { $0.id == id }) else {
+            routeMessage = "هذا المشروع لم يعد موجودًا في مذكراتك."
+            return
+        }
+        detail = project
     }
     private func row(_ project: DiaryProjectCard) -> some View {
         Button { detail = project } label: {
@@ -100,10 +144,13 @@ struct DiaryProjectDetail: View {
     @Environment(\.roomTheme) private var theme
     @Environment(\.dismiss) private var dismiss
     @State private var reflection = ""
+    @FocusState private var reflectionFocused: Bool
     @State private var finishing = false
+    @State private var confirmDiscardReflection = false
     @State private var confirmDelete = false
     @State private var failure: String?
     private var service: AppDiaryService { .init(app: app) }
+    private var hasUnsavedReflection: Bool { finishing && !reflection.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -119,7 +166,7 @@ struct DiaryProjectDetail: View {
                     }
                     if project.finishedAt == nil {
                         if finishing {
-                            TextField("كلمة تختم بها المشروع", text: $reflection, axis: .vertical).font(DiaryType.writing).padding(12).background(theme.surface, in: .rect(cornerRadius: 12)).accessibilityIdentifier("diary-project-reflection")
+                            TextField("كلمة تختم بها المشروع", text: $reflection, axis: .vertical).font(DiaryType.writing).focused($reflectionFocused).padding(12).background(theme.surface, in: .rect(cornerRadius: 12)).accessibilityIdentifier("diary-project-reflection")
                             Button { Task { do { try await service.finishProject(project.id, reflection: reflection); dismiss() } catch { failure = madarUserMessage(error) } } } label: {
                                 Text("أنهِ المشروع").font(MadarTypography.section()).frame(maxWidth: .infinity, minHeight: 50).foregroundStyle(theme.background).background(theme.ink, in: .capsule)
                             }.buttonStyle(.madarPlain).accessibilityIdentifier("diary-project-finish-confirm")
@@ -132,8 +179,13 @@ struct DiaryProjectDetail: View {
                 }.padding(18)
             }.background(theme.background).foregroundStyle(theme.ink)
                 .navigationTitle(project.name).navigationBarTitleDisplayMode(.inline)
-                .toolbar { ToolbarItem(placement: .topBarLeading) { Button("تمّ") { dismiss() } } }
+                .toolbar { ToolbarItem(placement: .topBarLeading) { Button("تمّ") { if hasUnsavedReflection { reflectionFocused = false; confirmDiscardReflection = true } else { dismiss() } }.accessibilityIdentifier("diary-project-detail-close") } }
                 .toolbarBackground(theme.background, for: .navigationBar).tint(theme.accent)
+                .interactiveDismissDisabled(hasUnsavedReflection)
+                .confirmationDialog("تتجاهل خاتمة المشروع؟", isPresented: $confirmDiscardReflection, titleVisibility: .visible) {
+                    Button("تجاهل الخاتمة", role: .destructive) { reflection = ""; finishing = false; dismiss() }.accessibilityIdentifier("diary-project-reflection-discard")
+                    Button("أكمل الكتابة") {}.accessibilityIdentifier("diary-project-reflection-continue")
+                } message: { Text("لم تُحفظ الخاتمة. يمكنك إكمالها أو إنهاء المشروع بها.") }
                 .confirmationDialog("تبقى السطور بنصّها، ويختفي ربطها. يمكنك التراجع.", isPresented: $confirmDelete, titleVisibility: .visible) {
                     Button("احذف المشروع", role: .destructive) { Task { do { try await service.deleteProject(project.id); dismiss() } catch { failure = madarUserMessage(error) } } }
                 }

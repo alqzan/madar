@@ -166,7 +166,10 @@ struct BahwLobbyView: View {
     }
     private func tileContent(_ block: BahwBlock, size: BahwBlockSize) -> some View {
         Group {
-            if block == .habits { BahwBlockView(service: service, block: block, size: size, interactive: !arranging).contentShape(.rect(cornerRadius:22)).onTapGesture { open(block) } }
+            // Larger habits cards contain real quick-log buttons, so their header opens the room.
+            // The icon has no quick actions and remains a single room-entry button.
+            if block == .habits && size == .icon { Button { open(block) } label: { BahwBlockView(service: service, block: block, size: size, interactive: !arranging).contentShape(.rect(cornerRadius:22)) } }
+            else if block == .habits { BahwBlockView(service: service, block: block, size: size, interactive: !arranging).contentShape(.rect(cornerRadius:22)) }
             else { Button { open(block) } label: { BahwBlockView(service: service, block: block, size: size, interactive: !arranging).contentShape(.rect(cornerRadius:22)) } }
         }.buttonStyle(.madarPlain)
             .rotationEffect(.degrees(wiggle ? 0.7 : 0)).animation(wiggle ? .easeInOut(duration: 0.14).repeatForever(autoreverses: true) : .default, value: wiggle)
@@ -350,7 +353,7 @@ private struct BahwSuggestionsView: View {
         case .quran: session.selectedTab = "quran"
         case .diary:
             if let url = URL(string: "madar://notes/write") { session.open(url) }
-        case .money: session.selectedTab = "money"
+        case .money: session.open(URL(string: "madar://mal/messages")!)
         case .mihbara: session.selectedTab = "mihbara"
         }
     }

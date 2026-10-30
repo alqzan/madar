@@ -16,3 +16,19 @@ struct WidgetCatalogTests {
         #expect(config.visibleRows(at: morning, capacity: 0, smart: true).isEmpty)
     }
 }
+
+struct RoomWidgetSnapshotTests {
+    private func row(_ id: String) -> RoomWidgetSnapshot.Row {
+        .init(id: id, title: id, value: "١", route: "madar://bahw")
+    }
+
+    @Test func visibleRowsFollowTheSelectedWidgetTemplate() {
+        let habits = RoomWidgetSnapshot(datePrimary: "اليوم", dateSecondary: "", heading: "", emptyTitle: "", periods: [row("weekly")])
+        #expect(habits.hasVisibleRows(for: .habits, template: "periods"))
+        #expect(!habits.hasVisibleRows(for: .habits, template: "summary"))
+
+        let year = RoomWidgetSnapshot(datePrimary: "السنة", dateSecondary: "", heading: "", emptyTitle: "", rows: [row("hijri")])
+        #expect(year.hasVisibleRows(for: .year, template: "hijri"))
+        #expect(!year.hasVisibleRows(for: .year, template: "gregorian"))
+    }
+}

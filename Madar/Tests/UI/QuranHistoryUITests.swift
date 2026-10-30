@@ -1,5 +1,42 @@
 import XCTest
 @MainActor final class QuranHistoryUITests: XCTestCase {
+    func testHistoryDeepLinkOpensExactSessionWithGradeAndMistake() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00", "MADAR_UI_QURAN_FIXTURE": "historyRoute"]
+        app.launch()
+        XCTAssertTrue(app.staticTexts["quran-history-coverage"].waitForExistence(timeout: 25))
+        let firstTarget = app.descendants(matching: .any)["quran-history-route-target-11111111-1111-4111-8111-111111111111"]
+        XCTAssertTrue(firstTarget.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["quran-history-grade-mastered"].waitForExistence(timeout: 5))
+        let mistake = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "quran-history-mistake-")).firstMatch
+        for _ in 0..<5 where !mistake.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(mistake.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(mistake.isHittable, app.debugDescription)
+        app.open(URL(string: "madar://quran/history/22222222-2222-4222-8222-222222222222")!)
+        XCTAssertTrue(app.descendants(matching: .any)["quran-history-route-target-22222222-2222-4222-8222-222222222222"].waitForExistence(timeout: 12), app.debugDescription)
+        app.buttons["quran-screen-close"].tap()
+        let week = app.buttons["quran-week-open"]
+        for _ in 0..<6 where !week.isHittable { app.swipeUp() }
+        XCTAssertTrue(week.isHittable, app.debugDescription); week.tap()
+        let weekTab = app.buttons["quran-log-week"]
+        XCTAssertTrue(weekTab.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(weekTab.isSelected, "A later ordinary «الأسبوع» open must not reuse the routed session tab.")
+    }
+
+    func testHistoryRouteReadFailureCanRetry() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light",
+            "MADAR_UI_NOW": "2026-10-15T15:00:00+03:00", "MADAR_UI_QURAN_FIXTURE": "historyRoute",
+            "MADAR_UI_QURAN_SESSION_LOG_READ_FAILURE_ONCE": "1"]
+        app.launch()
+        let retry = app.buttons["quran-history-retry"]
+        XCTAssertTrue(retry.waitForExistence(timeout: 25), app.debugDescription)
+        retry.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["quran-history-route-target-11111111-1111-4111-8111-111111111111"].waitForExistence(timeout: 15), app.debugDescription)
+        app.terminate()
+    }
+
     func testEditGradeDeleteAndUndoKeepSession() throws {
         continueAfterFailure = false
         let app=XCUIApplication(); app.launchEnvironment=["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_SIZE":"L","MADAR_UI_THEME":"light","MADAR_UI_NOW":"2026-10-15T15:00:00+03:00","MADAR_UI_QURAN_FIXTURE":"home"]

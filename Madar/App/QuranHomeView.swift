@@ -1,4 +1,5 @@
 import SwiftUI
+import MadarCore
 import MadarDesign
 import MadarQuran
 import Combine
@@ -19,12 +20,27 @@ struct QuranHomeView: View {
     @State private var mushaf: QuranMushafRequest?
     @State private var showOutside = false
     @State private var showWeek = false
+    @State private var logInitialTab: QuranLogTab = .week
+    @State private var logInitialSessionID: UUID?
+    @State private var logRouteRequestID: UUID?
     @State private var showPlan = false
     @State private var showSetup = false
     @State private var showFree = false
     @State private var showIndex = false
+    @State private var indexInitialUnit: QuranUIIndexUnit = .surah
+    @State private var indexInitialItemID: String?
+    @State private var indexRouteRequestID: UUID?
     @State private var showStrength = false
     @State private var showQiyam = false
+    @State private var pendingQuranRoute: Route?
+    @State private var pendingQuranRouteRequestID: UUID?
+    @State private var failedQuranRouteRequestID: UUID?
+#if DEBUG
+    @State private var injectedRunHold = false
+#endif
+    #if DEBUG
+    @State private var injectedRouteReadFailure = false
+    #endif
     @ViewBuilder private func planContent(_ state: QuranRoomState) -> some View {
                     if let draft = state.draft {
                         Button(draft.isPastDay ? "راجع ما تمّ في جلستك السابقة" : "تابع جلستك") {
@@ -59,6 +75,21 @@ struct QuranHomeView: View {
     private var next: QuranUIStep? { state?.steps.first { !$0.completed && $0.available } }
     var body: some View {
         ScrollView {
+            if let error {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(error).font(bodyFont(14)).fixedSize(horizontal: false, vertical: true)
+                    Button("حاول مرة أخرى") {
+                        if pendingQuranRoute != nil {
+                            retryPendingRoute()
+                        } else { run { try await refresh() } }
+                    }
+                    .font(bodyFont(14, bold: true))
+                    .accessibilityIdentifier("quran-home-retry")
+                }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .foregroundStyle(theme.ink)
+            }
             if let state {
                 VStack(alignment: .leading, spacing: 24) {
                     header(state)
@@ -72,10 +103,7 @@ struct QuranHomeView: View {
                         }
                     }
                 }.padding(.horizontal, 16).padding(.top, 20).padding(.bottom, 36)
-            } else if let error {
-                VStack(spacing: 16) { Text(error); Button("حاول مرة أخرى") { run { try await refresh() } } }
-                    .padding(24).foregroundStyle(theme.ink)
-            } else { ProgressView().frame(maxWidth: .infinity).padding(60) }
+            } else if error == nil { ProgressView().frame(maxWidth: .infinity).padding(60) }
         }
         .clipped()
         .background(theme.background.ignoresSafeArea())
@@ -88,16 +116,25 @@ struct QuranHomeView: View {
         .onChange(of: scenePhase) { _, phase in if phase == .active, active == nil { run { try await refresh() } } }
         .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged).receive(on: RunLoop.main)) { _ in if active == nil { run { try await refresh() } } }
         .onChange(of: service.app.quranRoute, initial: true) { _, route in
-            guard let route else { return }; service.app.quranRoute = nil
+            guard let route else { return }
+            service.app.quranRoute = nil
+            error = nil
+            pendingQuranRoute = route
+            let requestID = UUID()
+            pendingQuranRouteRequestID = requestID
+            failedQuranRouteRequestID = nil
             run {
-                if state == nil { try await refresh() }
-                if route.path.first == "page", let number = Int(route.path.last ?? "") { mushaf = .init(page: number) }
-                else if route.path.first == "session" {
-                    if route.path.last == "qiyam" { showQiyam = true }
-                    else if let draft = state?.draft { active = try await service.resume(draftID: draft.id) }
-                    else if let kind = QuranUIKind(rawValue: route.path.last == "wird" ? "hifz" : route.path.last ?? "") { active = try await service.start(kind: kind, stepID: nil, range: nil, rakaat: nil, spotID: nil) }
+                do {
+                    try await consume(route)
+                    if pendingQuranRouteRequestID == requestID { pendingQuranRoute = nil; pendingQuranRouteRequestID = nil; failedQuranRouteRequestID = nil }
+                } catch {
+                    if pendingQuranRouteRequestID == requestID { failedQuranRouteRequestID = requestID }
+                    throw error
                 }
             }
+        }
+        .onChange(of: busy) { _, isBusy in
+            if !isBusy, pendingQuranRouteRequestID != nil, pendingQuranRouteRequestID != failedQuranRouteRequestID { retryPendingRoute() }
         }
         .sheet(item: $detail) { item in
             switch item {
@@ -144,12 +181,27 @@ struct QuranHomeView: View {
         .fullScreenCover(isPresented: $showOutside) { QuranOutsideView(service: service, close: { showOutside = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
         .fullScreenCover(isPresented: $showQiyam, onDismiss: { run { try await refresh() } }) { QuranQiyamView(service: service, close: { showQiyam = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
         .fullScreenCover(isPresented: $showStrength, onDismiss: { run { try await refresh() } }) { QuranStrengthView(service: service, close: { showStrength = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
-        .fullScreenCover(isPresented: $showIndex) { QuranIndexView(service: service, close: { showIndex = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
+        .fullScreenCover(isPresented: $showIndex, onDismiss: clearIndexRoute) {
+            QuranIndexView(service: service, initialUnit: indexInitialUnit, initialItemID: indexInitialItemID) {
+                showIndex = false
+                clearIndexRoute()
+            }.environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft).id(indexRouteRequestID)
+        }
         .fullScreenCover(isPresented: $showFree, onDismiss: { run { try await refresh() } }) { QuranFreeView(service: service, close: { showFree = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
         .fullScreenCover(isPresented: $showSetup, onDismiss: { run { try await refresh() } }) { QuranPlanSetupView(service: service, close: { showSetup = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
         .fullScreenCover(isPresented: $showPlan, onDismiss: { run { try await refresh() } }) { QuranPlanView(service: service, close: { showPlan = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
-        .fullScreenCover(isPresented: $showWeek) { QuranLogView(service: service, close: { showWeek = false }).environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft) }
-        .alert("تعذّر إتمام العملية", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) { Button("تمّ") { error = nil } } message: { Text(error ?? "") }
+        .fullScreenCover(isPresented: $showWeek, onDismiss: clearLogRoute) {
+            QuranLogView(service: service, close: { showWeek = false }, initialTab: logInitialTab, initialSessionID: logInitialSessionID)
+                .environment(\.roomTheme, theme).environment(\.layoutDirection, .rightToLeft).id(logRouteRequestID)
+        }
+        .alert("تعذّر إتمام العملية", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
+            if pendingQuranRoute != nil {
+                Button("حاول مرة أخرى") {
+                    retryPendingRoute()
+                }
+            }
+            Button("تمّ") { error = nil }
+        } message: { Text(error ?? "") }
     }
     /// «الوجه ٥»، «الوجهان ٥ و٦»، «الأوجه ٥ إلى ٩»: a one- or two-page step is not «الأوجه».
     private func pagesRange(_ from: Int, _ to: Int) -> String {
@@ -374,9 +426,75 @@ struct QuranHomeView: View {
         Button(action: action) { VStack(spacing: 8) { Image(systemName: icon).font(.system(size: 18)); Text(title).font(bodyFont(11, bold: true)).multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true) }.frame(maxWidth: .infinity, minHeight: 74, alignment: .top).contentShape(Rectangle()) }.buttonStyle(.madarPlain).accessibilityIdentifier("quran-tool-" + id)
     }
     private func refresh() async throws { state = try await service.load() }
+    private func clearIndexRoute() { indexInitialUnit = .surah; indexInitialItemID = nil; indexRouteRequestID = nil }
+    private func clearLogRoute() { logInitialTab = .week; logInitialSessionID = nil; logRouteRequestID = nil }
+    private func consume(_ route: Route) async throws {
+        #if DEBUG
+        let environment = ProcessInfo.processInfo.environment
+        if !injectedRouteReadFailure,
+           environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil,
+           environment["MADAR_UI_QURAN_ROUTE_READ_FAILURE_ONCE"] == "1" {
+            injectedRouteReadFailure = true
+            throw CocoaError(.fileReadUnknown)
+        }
+        #endif
+        if state == nil { try await refresh() }
+        if route.path.first == "page", let number = Int(route.path.last ?? "") { mushaf = .init(page: number) }
+        else if route.path.first == "fihris" { indexInitialUnit = .surah; indexInitialItemID = nil; indexRouteRequestID = UUID(); showIndex = true }
+        else if route.path.first == "juz", let number = route.path.last {
+            indexInitialUnit = .juz
+            indexInitialItemID = number
+            indexRouteRequestID = UUID()
+            showIndex = true
+        }
+        else if route.path.first == "history", let rawID = route.path.last, let id = UUID(uuidString: rawID) {
+            logInitialTab = .sessions
+            logInitialSessionID = id
+            logRouteRequestID = UUID()
+            showWeek = true
+        }
+        else if route.path.first == "session" {
+            if route.path.last == "qiyam" { showQiyam = true }
+            else if let draft = state?.draft { active = try await service.resume(draftID: draft.id) }
+            else if let kind = QuranUIKind(rawValue: route.path.last == "wird" ? "hifz" : route.path.last ?? "") { active = try await service.start(kind: kind, stepID: nil, range: nil, rakaat: nil, spotID: nil) }
+        }
+        error = nil
+    }
     private func run(_ operation: @escaping @MainActor () async throws -> Void) {
         guard !busy else { return }; busy = true
-        Task { defer { busy = false }; do { try await operation() } catch { self.error = quranUserMessage(error) } }
+#if DEBUG
+        let environment = ProcessInfo.processInfo.environment
+        let runHold: Int
+        if !injectedRunHold,
+           environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil,
+           let raw = environment["MADAR_UI_QURAN_RUN_HOLD_MS"], let milliseconds = Int(raw), (1...5000).contains(milliseconds) {
+            injectedRunHold = true
+            runHold = milliseconds
+        } else { runHold = 0 }
+#else
+        let runHold = 0
+#endif
+        Task {
+            error = nil
+            defer { busy = false }
+            do {
+                if runHold > 0 { try await Task.sleep(for: .milliseconds(Int64(runHold))) }
+                try await operation()
+            } catch { self.error = quranUserMessage(error) }
+        }
+    }
+    private func retryPendingRoute() {
+        guard let route = pendingQuranRoute, let requestID = pendingQuranRouteRequestID else { return }
+        failedQuranRouteRequestID = nil
+        run {
+            do {
+                try await consume(route)
+                if pendingQuranRouteRequestID == requestID { pendingQuranRoute = nil; pendingQuranRouteRequestID = nil; failedQuranRouteRequestID = nil }
+            } catch {
+                if pendingQuranRouteRequestID == requestID { failedQuranRouteRequestID = requestID }
+                throw error
+            }
+        }
     }
 }
 

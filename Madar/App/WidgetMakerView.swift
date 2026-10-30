@@ -25,7 +25,10 @@ struct WidgetMakerView: View {
     @State private var discard = false
     @State private var pendingSelection: WidgetMakerDraft?
     @State private var selectionRevision = 0
+    @State private var makerDataReady = false
     @State private var beforeReset: (WidgetMakerStyle, String)?
+    /// A route creates an unsaved template draft, while `baseline` normally describes a saved preset.
+    @State private var baselineIsPersisted = false
     private var theme: RoomTheme { .init(room: "bahw", dark: colorScheme == .dark) }
     private var dirty: Bool { baseline.map { draft != $0 } ?? (!draft.name.isEmpty || !draft.items.isEmpty || draft.style != WidgetMakerStyle()) }
     private var family: WidgetFamily {
@@ -93,7 +96,10 @@ struct WidgetMakerView: View {
                 }
             }.padding(16)
         }
-        .onChange(of: selectionRevision) { proxy.scrollTo("widget-maker-controls", anchor: .top) }
+        .onChange(of: selectionRevision) {
+            let target = draft.items.first.map { "widget-item-" + $0 } ?? "widget-maker-controls"
+            proxy.scrollTo(target, anchor: .center)
+        }
         }
         .background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.accentFill)
         .environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar)
@@ -111,7 +117,17 @@ struct WidgetMakerView: View {
         } message: { Text("يبقى محتوى غرفك كما هو، ويتاح التراجع. يظل موضع ودجة النظام تحت تحكم iOS.") }
         // AU-28: «حُفظت …» stops claiming the widget is saved once it is edited again.
         .onChange(of: draft) { if dirty, !status.isEmpty { status = "" } }
-        .task { reload(); habits = (try? HabitRepository(context: ModelContext(session.container)).readings(at: session.prayerNow())) ?? []; days = AppBahwService(session: session).upcoming(limit: Int.max).filter { UUID(uuidString: $0.id) != nil } }
+        .task {
+            reload()
+            habits = (try? HabitRepository(context: ModelContext(session.container)).readings(at: session.prayerNow())) ?? []
+            days = AppBahwService(session: session).upcoming(limit: Int.max).filter { UUID(uuidString: $0.id) != nil }
+            makerDataReady = true
+            applyInitialRoom(session.widgetMakerRoute?.parameters["template"])
+        }
+        .onChange(of: session.widgetMakerRouteID) { _, requestID in
+            guard makerDataReady, requestID != nil, let room = session.widgetMakerRoute?.parameters["template"] else { return }
+            applyInitialRoom(room)
+        }
         .task(id: draft.items.joined(separator: "|") + "-\(draft.style.iftarCountdown)-\(draft.style.surface)-\(session.prayerRevision)") {
             try? await Task.sleep(for: .milliseconds(150)); guard !Task.isCancelled else { return }
             rows = session.widgetMakerRows(draft, at: session.prayerNow(), outside: draft.style.surface != "lobby")
@@ -156,7 +172,7 @@ struct WidgetMakerView: View {
                         HStack { Text(title(id)).font(MadarTypography.caption()); Spacer(minLength: 3); if let n = draft.items.firstIndex(of: id) { Text(session.digits(n + 1)).font(MadarTypography.fine()).padding(5).background(theme.accentFill, in: .circle).foregroundStyle(theme.onAccent) } }
                             .padding(10).frame(maxWidth: .infinity, minHeight: 48).background(theme.surface, in: .rect(cornerRadius: 16))
                             .overlay { RoundedRectangle(cornerRadius: 16).stroke(draft.items.contains(id) ? theme.accentFill : theme.line) }
-                    }.buttonStyle(.madarPlain).accessibilityAddTraits(draft.items.contains(id) ? .isSelected : []).accessibilityIdentifier("widget-item-" + id)
+                    }.buttonStyle(.madarPlain).accessibilityAddTraits(draft.items.contains(id) ? .isSelected : []).accessibilityIdentifier("widget-item-" + id).id("widget-item-" + id)
                 }
             }
             if !habits.isEmpty { Menu("عادة بعينها") { ForEach(habits) { habit in Button(habit.name) { toggle("habit:" + habit.id.uuidString) } } }.frame(minHeight: 44).accessibilityIdentifier("widget-pick-habit") }
@@ -259,25 +275,51 @@ struct WidgetMakerView: View {
         if id.hasPrefix("day:"), let day = days.first(where: { "day:" + $0.id == id }) { return day.title }
         return ["prayerNext": "الصلاة القادمة", "habitsToday": "عادات اليوم", "moneyNow": "لك الآن", "ramadan": "رمضان", "year": "نسبة السنة", "upcoming": "أقرب يوم", "quranCoverage": "في صدرك", "quranReview": "من القرآن اليوم", "book": "الكتاب", "hadith": "حديث اليوم", "diaryLine": "سطر اليوم", "hijriClock": "الساعة والتاريخان"][id] ?? "عنصر غير متاح"
     }
-    private func applySelection(_ item: WidgetMakerDraft) { draft = item; beforeReset = nil; baseline = saved.contains { $0.id == item.id } ? item : nil; status = ""; selectionRevision += 1 }
+    private func applySelection(_ item: WidgetMakerDraft) {
+        draft = item
+        beforeReset = nil
+        baselineIsPersisted = saved.contains { $0.id == item.id }
+        baseline = baselineIsPersisted ? item : nil
+        status = ""
+        selectionRevision += 1
+    }
     private func select(_ item: WidgetMakerDraft) {
         if dirty { pendingSelection = item; discard = true } else { applySelection(item) }
     }
     private func reload() {
         do {
             saved = try session.widgetMakerDrafts()
-            if baseline != nil && !dirty {
+            if baselineIsPersisted, baseline != nil, !dirty {
                 if let current = saved.first(where: { $0.id == draft.id }) { draft = current; baseline = current }
-                else { draft = .init(); baseline = nil; status = "" }
+                else { draft = .init(); baseline = nil; baselineIsPersisted = false; status = "" }
             }
         } catch { session.errorMessage = madarUserMessage(error) }
     }
+    private func applyInitialRoom(_ room: String?) {
+        guard let room else { return }
+        let item: String? = switch room {
+        case "salah": "prayerNext"
+        case "habits": "habitsToday"
+        case "quran": "quranCoverage"
+        case "notes": "diaryLine"
+        case "mal": "moneyNow"
+        case "mihbara": "book"
+        case "year": "year"
+        case "bahw": "upcoming"
+        default: nil
+        }
+        guard let item, WidgetMakerStyle.itemIDs.contains(item) else { return }
+        var routed = draft
+        routed.items = [item]
+        if dirty { select(routed) }
+        else { draft = routed; baseline = routed; baselineIsPersisted = false; beforeReset = nil; status = ""; selectionRevision += 1 }
+    }
     private func save() {
         busy = true; let value = draft
-        Task { defer { busy = false }; do { try await session.saveWidget(value); baseline = value; status = "حُفظت «" + value.name + "»"; reload() } catch { session.errorMessage = madarUserMessage(error) } }
+        Task { defer { busy = false }; do { try await session.saveWidget(value); baseline = value; baselineIsPersisted = true; status = "حُفظت «" + value.name + "»"; reload() } catch { session.errorMessage = madarUserMessage(error) } }
     }
     private func remove(_ item: WidgetMakerDraft) {
         deleting = nil
-        Task { do { try await session.executeDiaryCommand("widget.delete", payload: ["id": .string(item.id.uuidString)]); if draft.id == item.id { draft = .init(); baseline = nil }; reload() } catch { session.errorMessage = madarUserMessage(error) } }
+        Task { do { try await session.executeDiaryCommand("widget.delete", payload: ["id": .string(item.id.uuidString)]); if draft.id == item.id { draft = .init(); baseline = nil; baselineIsPersisted = false }; reload() } catch { session.errorMessage = madarUserMessage(error) } }
     }
 }

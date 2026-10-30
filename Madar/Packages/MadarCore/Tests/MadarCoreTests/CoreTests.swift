@@ -188,12 +188,20 @@ func routes() throws {
     let context = RouteContext(trackingStart: try GregorianDay("2026-01-01"), today: try GregorianDay("2026-10-09"), settingsKeys: ["core.dayStart"], availability: .init(builtRooms: Set(Room.allCases)))
     let route = try RouteRegistry.parse(URL(string: "madar://mal/add?amount=1234&merchant=test")!, context: context)
     #expect(route.mode == .prefill)
+    for path in ["categories", "reconcile", "zakat"] {
+        let destination = try RouteRegistry.parse(URL(string: "madar://mal/\(path)")!, context: context)
+        #expect(destination.room == .mal)
+        #expect(destination.path == [path])
+    }
     #expect(try !RouteRegistry.parse(URL(string: "madar://notes/write?day=yesterday")!, context: context).requiresUnlock)
-    let locked = RouteContext(trackingStart: context.trackingStart, today: context.today, settingsKeys: context.settingsKeys, lock: .app, availability: context.availability)
+    let locked = RouteContext(trackingStart: context.trackingStart, today: context.today, settingsKeys: context.settingsKeys, unavailableSettings: context.unavailableSettings, lock: .app, availability: context.availability)
     #expect(try RouteRegistry.parse(URL(string: "madar://notes/write")!, context: locked).requiresUnlock)
-    for input in ["madar://mal/add?amount=1.5", "madar://mal/add?amount=1&amount=2", "madar://notes/day/2026-02-30", "madar://quran/page/605", "madar://salah/log?prayer=sunrise", "madar://notes/write?save=true", "madar://settings/core/no.such.key"] {
+    for input in ["madar://mal/add?amount=1.5", "madar://mal/add?amount=1&amount=2", "madar://notes/day/2026-02-30", "madar://quran/page/605", "madar://salah/log?prayer=sunrise", "madar://notes/write?save=true", "madar://capture?text=hello", "madar://settings/core/not-a-key"] {
         #expect(throws: (any Error).self) { try RouteRegistry.parse(URL(string: input)!, context: context) }
     }
+    let missingSetting = try RouteRegistry.parse(URL(string: "madar://settings/core/no.such.key")!, context: context)
+    #expect(missingSetting.room == .core)
+    #expect(missingSetting.path == ["core", "no.such.key"])
     let m0 = RouteContext(trackingStart: context.trackingStart, today: context.today, settingsKeys: context.settingsKeys)
     #expect(throws: CoreError.unavailableFeature) { try RouteRegistry.parse(URL(string: "madar://salah")!, context: m0) }
     #expect(FeatureAvailability.m0.builtRooms == [.core])

@@ -16,6 +16,7 @@ struct BahwBlockView: View {
     @State private var mihbaraSnapshot: MihbaraSnapshot?
     @State private var mihbaraLocked = true
     @State private var habitPeriod: HabitFrequency?
+    @State private var completionInFlight: Set<UUID> = []
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.roomTheme) private var lobby
@@ -137,9 +138,20 @@ struct BahwBlockView: View {
     }
     private func activateHabit(_ row: HabitReading) {
         if row.source == "walking" { service.session.habitsOpen = true }
-        else if let source = row.source { service.session.selectedTab = source == "jamaah" ? "prayer" : source == "review" ? "quran" : "notes" }
+        else if let source = row.source {
+            switch source {
+            case "jamaah": service.session.selectedTab = "prayer"
+            case "review": service.session.selectedTab = "quran"
+            case "diaryLine": service.session.selectedTab = "notes"
+            case "reading", "hadith": service.session.selectedTab = "mihbara"
+            default: service.session.errorMessage = "لا توجد غرفة مرتبطة بهذا المصدر."
+            }
+        }
         else {
+            guard !completionInFlight.contains(row.id) else { return }
+            completionInFlight.insert(row.id)
             Task {
+                defer { completionInFlight.remove(row.id) }
                 do {
                     try await service.session.executeDiaryCommand("habit.complete", payload: [
                         "id": .string(row.id.uuidString),
@@ -187,7 +199,7 @@ struct BahwBlockView: View {
             .contentShape(.rect(cornerRadius: 12))
         }
         .buttonStyle(.madarPlain)
-        .disabled(!interactive || row.paused)
+        .disabled(!interactive || row.paused || completionInFlight.contains(row.id))
         .accessibilityLabel(row.name + "، " + progress + (row.statusTitle == progress ? "" : "، " + row.statusTitle))
         .accessibilityHint(row.source == nil ? "المس لتسجيل العادة" : "المس لفتح الغرفة المرتبطة")
         .accessibilityIdentifier("bahw-habit-ring-" + row.id.uuidString)
@@ -230,7 +242,7 @@ struct BahwBlockView: View {
             .contentShape(.rect(cornerRadius: 12))
         }
         .buttonStyle(.madarPlain)
-        .disabled(!interactive || row.paused)
+        .disabled(!interactive || row.paused || completionInFlight.contains(row.id))
         .accessibilityLabel(row.name + "، " + progress + (row.statusTitle == progress ? "" : "، " + row.statusTitle))
         .accessibilityHint(row.source == nil ? "المس لتسجيل العادة" : "المس لفتح الغرفة المرتبطة")
         .accessibilityIdentifier("bahw-habit-ring-" + row.id.uuidString)
@@ -253,7 +265,7 @@ struct BahwBlockView: View {
             .contentShape(.rect)
         }
         .buttonStyle(.madarPlain)
-        .disabled(!interactive || row.paused)
+        .disabled(!interactive || row.paused || completionInFlight.contains(row.id))
         .accessibilityLabel(row.name + "، " + progress + (row.statusTitle == progress ? "" : "، " + row.statusTitle))
         .accessibilityHint(row.source == nil ? "المس لتسجيل العادة" : "المس لفتح الغرفة المرتبطة")
         .accessibilityIdentifier("bahw-habit-item-" + row.id.uuidString)
@@ -271,7 +283,7 @@ struct BahwBlockView: View {
         let met = daily.filter { $0.summary.current?.met == true }.count
         if size == .icon {
             // A 1×1 cell has no room for the full card header or the next-habit details.
-            // The whole tile already opens the room; keep its count and ring inside the grid cell.
+            // The lobby makes this whole indicator a room-entry button.
             VStack(spacing: 4) {
                 ZStack {
                     HabitMiniRing(share: Double(met) / Double(max(1, daily.count)), theme: room)

@@ -1,6 +1,36 @@
 import XCTest
 
 @MainActor final class PrayerFirstDayUITests: XCTestCase {
+    func testPrayerRootLinkClosesHistorySheetAndReturnsToToday() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["MADAR_UI_STORE_ID": UUID().uuidString, "MADAR_UI_PRAYER_FIXTURE": "homeShowcase",
+            "MADAR_UI_SIZE": "L", "MADAR_UI_THEME": "light", "MADAR_UI_NOW": "2026-10-07T16:20:00+03:00",
+            "MADAR_UI_TRACKING_START": "2026-10-01"]
+        app.launch()
+        if app.buttons["first-run-skip"].waitForExistence(timeout: 2) { app.buttons["first-run-skip"].tap() }
+        let start = app.buttons["first-run-continue"]
+        if start.waitForExistence(timeout: 2) { start.tap(); if start.exists && start.isHittable { start.tap() } }
+        app.tabBars.buttons["الصلاة"].tap()
+
+        let streaks = app.buttons["prayer-streaks"]
+        reveal(streaks, in: app); streaks.tap()
+        let history = app.buttons["prayer-history"]
+        XCTAssertTrue(history.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(history.isHittable, app.debugDescription)
+        history.tap()
+        let month = app.staticTexts["prayer-history-month"]
+        XCTAssertTrue(month.waitForExistence(timeout: 10), app.debugDescription)
+        attachScreenshot(app, named: "AU-95-prayer-root-before-L")
+
+        app.open(URL(string: "madar://prayer")!)
+
+        XCTAssertTrue(month.waitForNonExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["prayer-today-summary"].waitForExistence(timeout: 10), app.debugDescription)
+        attachScreenshot(app, named: "AU-95-prayer-root-after-L")
+        app.terminate()
+    }
+
     func testPolarDayLetsMeRecordAPrayerManually() throws {
         continueAfterFailure = false
         let app = XCUIApplication()

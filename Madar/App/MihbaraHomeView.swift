@@ -22,6 +22,7 @@ struct MihbaraHomeView: View {
     @State private var showingAddBook = false
     @State private var sunnahDrawerOpen = false
     @State private var readerRoute: MihbaraReaderRoute?
+    @State private var notebookRouteID: UUID?
     @State private var renaming: MihbaraBook?
     @State private var pendingRemoval: MihbaraRemovalConfirmation?
     @State private var renameTitle = ""
@@ -38,43 +39,42 @@ struct MihbaraHomeView: View {
     @State private var pendingLibraryAction: MihbaraLibraryAction?
     @State private var restoreFileAfterSheet = false
     @State private var offerConversion: MihbaraBook?
+    @State private var shelfReadFailed = false
+    @State private var shelfReadError: String?
+    #if DEBUG
+    @State private var injectedShelfReadFailure = false
+    @State private var injectedRouteOpenFailure = false
+    @State private var injectedRouteForUITest = false
+    #endif
     private var theme: RoomTheme { .init(room: "mihbara", dark: colorScheme == .dark) }
     private var service: AppMihbaraService { .init(app: app) }
     private var tableBook: MihbaraBook? { reading?.books.first { $0.id == tableID } ?? reading?.books.first { $0.shelf == "reading" } }
-    var body: some View {
-        TimelineView(.periodic(from: Date(timeIntervalSince1970: 0), by: 60)) { tick in
-            ScrollViewReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    HStack {
-                        if isTabRoot { Color.clear.frame(width: 44, height: 44) }
-                        else { Button { dismiss() } label: { Label("رجوع", systemImage: "chevron.right") }.accessibilityIdentifier("mihbara-back") }
-                        Spacer(minLength: 8)
-                        Text("المحبرة").font(MadarTypography.title())
-                        Spacer(minLength: 8)
-                        Image(systemName: "books.vertical").font(.title2).frame(width: 44, height: 44)
-                    }
-                    if let r = reading {
-                        MadarDateLabel(app.dateLabels(r.day)).foregroundStyle(theme.secondaryInk)
-                        conversionCards
-                        shelfView(r)
-                        VStack(spacing: 0) {
-                            desk(r)
-                            if let b = lastReadBook(r) {
-                                continueCard(b, leather: MihbaraBookCovers.leatherIndices(for: r.books)[b.id] ?? 0)
-                                    .padding(.horizontal, 8).padding(.bottom, 12)
-                            }
-                        }.background(theme.color("wood"), in: .rect(topLeadingRadius: 26, bottomLeadingRadius: 12, bottomTrailingRadius: 12, topTrailingRadius: 26))
-                    }
-                }.padding(.horizontal, 16).padding(.top, 10).padding(.bottom, 28).frame(maxWidth: 650).frame(maxWidth: .infinity)
-            }.clipped().onChange(of: tick.date) { load() }
-            .onChange(of: scrollTarget) { _, target in
-                guard let target else { return }
-                withAnimation(reduceMotion ? nil : .smooth) { proxy.scrollTo("shelf-" + target, anchor: .top) }
-                scrollTarget = nil
-            }
+    private var shelfReadFailurePanel: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(shelfReadError ?? "تعذّرت قراءة بيانات المحبرة الآن.")
+                .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk)
+            Button("أعِد المحاولة") { load(retryingAfterFailure: true) }
+                .font(MadarTypography.section()).frame(minHeight: 44)
+                .foregroundStyle(theme.accent)
+                .accessibilityIdentifier("mihbara-home-retry")
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(theme.surface, in: .rect(cornerRadius: 18))
+    }
+    @ViewBuilder private func deskAndContinuation(_ reading: MihbaraHomeReading) -> some View {
+        VStack(spacing: 0) {
+            desk(reading)
+            if let book = lastReadBook(reading) {
+                let index = MihbaraBookCovers.leatherIndices(for: reading.books)[book.id] ?? 0
+                continueCard(book, leather: index)
+                    .padding(.horizontal, 8).padding(.bottom, 12)
             }
         }
+        .background(theme.color("wood"), in: .rect(topLeadingRadius: 26, bottomLeadingRadius: 12, bottomTrailingRadius: 12, topTrailingRadius: 26))
+    }
+    var body: some View {
+        timelineContent
         .background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink)
         .environment(\.roomTheme, theme).toolbarVisibility(.hidden, for: .navigationBar)
         .safeAreaInset(edge: .bottom) {
@@ -83,31 +83,23 @@ struct MihbaraHomeView: View {
                     .accessibilityIdentifier("mihbara-undo")
             }
         }
-        .task { load(); openSpotlightBookIfNeeded(); MihbaraConversions.shared.onFinished = { load() } }
+        .task {
+            injectRouteForUITestIfNeeded()
+            load()
+            MihbaraConversions.shared.onFinished = { load() }
+        }
         .modifier(MihbaraConversionOffer(app: app, book: $offerConversion))
         .onChange(of: app.mihbaraBookToOpen) { _, _ in openSpotlightBookIfNeeded() }
+        .onChange(of: app.mihbaraRoute, initial: true) { _, route in if let route { openRoute(route) } }
         .onChange(of: app.undoToken?.id) { load() }
-        .confirmationDialog("اختر كتابًا يرجع إلى أبي أقرأها", isPresented: Binding(get: { slotBook != nil }, set: { if !$0 { slotBook = nil } }), titleVisibility: .visible, presenting: slotBook) { incoming in
-            ForEach((reading?.books ?? []).filter { $0.shelf == "reading" && $0.id != incoming.id }) { old in
-                Button(old.title) { moveBook(incoming, to: "reading", replacing: old.id) }
-            }
-        }
-        .confirmationDialog(removalTitle, isPresented: Binding(get: { pendingRemoval != nil }, set: { if !$0 { pendingRemoval = nil } }), titleVisibility: .visible) {
-            if let pendingRemoval {
-                switch pendingRemoval {
-                case .book(let book): Button("احذف من مكتبتي", role: .destructive) { deleteBook(book) }
-                case .file(let book): Button("احذف ملف الكتاب", role: .destructive) { removeBookFile(book) }
-                }
-            }
-            Button("إلغاء", role: .cancel) { pendingRemoval = nil }
-        } message: {
-            if case .book? = pendingRemoval {
-                Text("يبقى عنوانه وسجل جلسات القراءة وتظليلاته وملفه محفوظة؛ يختفي الكتاب من رفوف المحبرة فقط.")
-            } else if case .file? = pendingRemoval {
-                Text("يُزال محتوى الملف من مدار، ويبقى عنوان الكتاب وموضعه وجلسات القراءة والتظليلات. لا يمكن التراجع؛ أعد الملف باختيار النسخة نفسها من «من ملف».")
-            }
-        }
         .onChange(of: app.prayerRevision) { load() }.onChange(of: reading?.day) { folded = false; manuallyOpen = false }
+        .modifier(MihbaraHomeConfirmations(
+            slotBook: $slotBook, pendingRemoval: $pendingRemoval,
+            replacementBooks: { replacementBooks(for: $0) },
+            removalTitle: removalTitle,
+            moveToReading: { incoming, oldID in moveBook(incoming, to: "reading", replacing: oldID) },
+            deleteBook: deleteBook, removeBookFile: removeBookFile
+        ))
         .sheet(item: $sheet, onDismiss: sheetDismissed) { target in
             NavigationStack {
                 if let r = reading {
@@ -131,41 +123,23 @@ struct MihbaraHomeView: View {
                             )
                         }
                     }
-                    case .hadith(let n): if let h = r.collection.hadiths.first(where: { $0.number == n }) { MihbaraHadithView(app: app, hadith: h, collection: r.collection, day: r.day) }
+                    case .hadith(let n): hadithRouteView(n, reading: r)
                     case .opening: MihbaraRahlOpeningView(app: app).presentationDetents([.large])
-                    case .notebook: MihbaraNotebookContent(app: app)
+                    case .notebook: MihbaraNotebookContent(app: app, initialNoteID: notebookRouteID)
                     case .motivation: MihbaraMotivationCard(cues: motivationCues, action: performMotivation)
                     }
                 }
             }.environment(\.roomTheme, theme).presentationDragIndicator(.visible).madarSheetErrorAlert(app)
         }
         // Owner, 21 Oct 2026: «اقدر اعدل اسم الكتاب». The spine keeps the short name the title is known by.
-        .alert("اسم الكتاب", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
-            TextField("عنوان الكتاب", text: $renameTitle).accessibilityIdentifier("mihbara-rename-title")
-            TextField("المؤلف", text: $renameAuthor).accessibilityIdentifier("mihbara-rename-author")
-            Button("احفظ") { rename() }.disabled(renameTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty).accessibilityIdentifier("mihbara-rename-save")
-            Button("إلغاء", role: .cancel) { renaming = nil }
-        } message: {
-            Text("على الرف: «" + BookTitle.parts(renameTitle.isEmpty ? (renaming?.title ?? "") : renameTitle).short + "»")
-        }
-        .fullScreenCover(item: $readerRoute, onDismiss: load) { route in
-            if let book = readableBook(route.bookID) {
-                Group {
-                    if book.isReadablePDF { MihbaraPDFReaderView(app: app, book: book, startPage: route.page) { readerRoute = nil } }
-                    else {
-                        MihbaraReaderView(app: app, book: book, volume: route.volume,
-                            originalPDF: originalPDFID,
-                            openOriginal: { id, page in readerRoute = MihbaraReaderRoute(bookID: id, page: page) }) { readerRoute = nil }
-                    }
-                }.environment(\.roomTheme, theme).madarSheetErrorAlert(app) // AU-46: a failed save while reading is said in the reader.
-            } else {
-                VStack(spacing: 16) {
-                    Text("ملف الكتاب غير متاح الآن").font(MadarTypography.body())
-                    Button("تفاصيل الكتاب واستعادة ملفه") { readerRoute = nil; sheet = .book(route.bookID) }.buttonStyle(MadarPrimaryButton())
-                    Button("العودة إلى المحبرة") { readerRoute = nil }.buttonStyle(MadarPrimaryButton())
-                }.frame(maxWidth: .infinity, maxHeight: .infinity).background(theme.background).foregroundStyle(theme.ink)
-            }
-        }
+        .modifier(MihbaraRenameAlert(book: $renaming, title: $renameTitle, author: $renameAuthor, save: rename))
+        .modifier(MihbaraReaderCover(
+            app: app, route: $readerRoute, theme: theme,
+            bookForRoute: { readableBook($0) },
+            originalPDFID: { originalPDFID($0) },
+            onDismiss: { load() },
+            onBookDetails: { id in sheet = .book(id) }
+        ))
         .fullScreenCover(isPresented: $showingAddBook, onDismiss: discardPendingGoodreads) {
             if let reading {
                 NavigationStack {
@@ -190,6 +164,39 @@ struct MihbaraHomeView: View {
             }
         }
     }
+    private var timelineContent: some View {
+        TimelineView(.periodic(from: Date(timeIntervalSince1970: 0), by: 60)) { tick in
+            ScrollViewReader { proxy in
+                shelfScrollView(at: tick.date, proxy: proxy)
+            }
+        }
+    }
+    private func shelfScrollView(at date: Date, proxy: ScrollViewProxy) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                HStack {
+                    if isTabRoot { Color.clear.frame(width: 44, height: 44) }
+                    else { Button { dismiss() } label: { Label("رجوع", systemImage: "chevron.right") }.accessibilityIdentifier("mihbara-back") }
+                    Spacer(minLength: 8)
+                    Text("المحبرة").font(MadarTypography.title())
+                    Spacer(minLength: 8)
+                    Image(systemName: "books.vertical").font(.title2).frame(width: 44, height: 44)
+                }
+                if shelfReadFailed { shelfReadFailurePanel }
+                if let reading {
+                    MadarDateLabel(app.dateLabels(reading.day)).foregroundStyle(theme.secondaryInk)
+                    conversionCards
+                    shelfView(reading)
+                    deskAndContinuation(reading)
+                }
+            }
+            .padding(.horizontal, 16).padding(.top, 10).padding(.bottom, 28)
+            .frame(maxWidth: 650).frame(maxWidth: .infinity)
+        }
+        .clipped()
+        .onChange(of: date) { if !shelfReadFailed { load() } }
+        .onChange(of: scrollTarget) { _, target in handleScrollTargetChange(target, proxy: proxy) }
+    }
     /// PDFs converting in the background, and those just finished («افتحه»).
     private var conversionCards: some View {
         ForEach(MihbaraConversions.shared.jobs) { job in
@@ -200,10 +207,24 @@ struct MihbaraHomeView: View {
     private func moreBooks(_ count: Int) -> String {
         count == 1 ? "كتاب آخر" : count == 2 ? "كتابان آخران" : MihbaraCopy.books(count, service.digits) + " " + (count % 100 >= 3 && count % 100 <= 10 ? "أخرى" : "آخر")
     }
+    private func replacementBooks(for incoming: MihbaraBook) -> [MihbaraBook] {
+        let books = reading?.books ?? []
+        return books.filter { $0.shelf == "reading" && $0.id != incoming.id }
+    }
     private func readableBook(_ id: UUID) -> MihbaraBook? {
         guard let book = reading?.book(id), book.isReadableEPUB || book.isReadablePDF else { return nil }
         guard service.hasLocalFile(for: book) else { return nil }
         return book
+    }
+    private func handleScrollTargetChange(_ target: String?, proxy: ScrollViewProxy) {
+        guard let target else { return }
+        withAnimation(reduceMotion ? nil : .smooth) { proxy.scrollTo("shelf-" + target, anchor: .top) }
+        scrollTarget = nil
+    }
+    @ViewBuilder private func hadithRouteView(_ number: Int, reading: MihbaraHomeReading) -> some View {
+        if let hadith = reading.collection.hadiths.first(where: { $0.number == number }) {
+            MihbaraHadithView(app: app, hadith: hadith, collection: reading.collection, day: reading.day)
+        }
     }
     private func discardPendingGoodreads() {
         if let stage = pendingGoodreadsStage { GoodreadsCSVFiles.discard(id: stage.id, root: app.bookStagingDirectory) }
@@ -219,23 +240,124 @@ struct MihbaraHomeView: View {
         let all: [MihbaraBook] = (reading?.originals ?? []) + (reading?.books ?? [])
         return all.first { $0.isReadablePDF && $0.fileHash == hash }?.id
     }
-    private func load() {
+    private func load(retryingAfterFailure: Bool = false) {
+        guard !shelfReadFailed || retryingAfterFailure else { return }
         do {
-            reading = try service.load()
-            let books = reading?.books ?? []
+            #if DEBUG
+            let environment = ProcessInfo.processInfo.environment
+            if !injectedShelfReadFailure,
+               environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil,
+               environment["MADAR_UI_MIHBARA_HOME_READ_FAILURE_ONCE"] == "1" {
+                injectedShelfReadFailure = true
+                throw CocoaError(.fileReadUnknown)
+            }
+            #endif
+            let loaded = try service.load()
+            reading = loaded
+            shelfReadFailed = false
+            shelfReadError = nil
+            let books = loaded.books
             MihbaraConversions.shared.resume(books, app: app)
             Task { shapes = await service.bookShapes(books) }
-        } catch { app.errorMessage = madarUserMessage(error) }
+            if let route = app.mihbaraRoute { openRoute(route, using: loaded) }
+            else { openSpotlightBookIfNeeded(using: loaded) }
+        } catch {
+            shelfReadFailed = true
+            shelfReadError = "تعذّرت قراءة المحبرة الآن. كتبك محفوظة في مكانها؛ حاول مرة أخرى."
+        }
     }
-    private func openSpotlightBookIfNeeded() {
+    #if DEBUG
+    private func injectRouteForUITestIfNeeded() {
+        let environment = ProcessInfo.processInfo.environment
+        guard !injectedRouteForUITest,
+              environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil,
+              let rawURL = environment["MADAR_UI_MIHBARA_ROUTE"], let url = URL(string: rawURL) else { return }
+        injectedRouteForUITest = true
+        app.open(url)
+    }
+    #endif
+    private func openRoute(_ route: Route, using loadedReading: MihbaraHomeReading? = nil) {
+        guard !shelfReadFailed else { return }
+        guard !route.path.isEmpty else {
+            readerRoute = nil
+            if case .library? = sheet { sheet = nil }
+            app.mihbaraRoute = nil
+            return
+        }
+        guard let reading = loadedReading ?? self.reading else { return }
+        #if DEBUG
+        let environment = ProcessInfo.processInfo.environment
+        if !injectedRouteOpenFailure,
+           environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil,
+           environment["MADAR_UI_MIHBARA_ROUTE_OPEN_FAILURE_ONCE"] == "1" {
+            injectedRouteOpenFailure = true
+            shelfReadFailed = true
+            shelfReadError = "تعذّر فتح الوجهة الآن. حاول مرة أخرى."
+            return
+        }
+        #endif
+        guard let routeName = route.path.first else { app.mihbaraRoute = nil; return }
+        switch routeName {
+        case "desk":
+            app.mihbaraRoute = nil
+            return
+        case "book":
+            guard route.path.count == 2, let rawID = route.path.last else { app.mihbaraRoute = nil; return }
+            guard let id = UUID(uuidString: rawID), let book = reading.book(id) else {
+                app.mihbaraRoute = nil
+                app.errorMessage = "الكتاب لم يعد موجودًا في المحبرة."
+                return
+            }
+            switch openBook(book, locatorJSON: route.parameters["loc"]) {
+            case .opened:
+                app.mihbaraRoute = nil
+                shelfReadFailed = false
+                shelfReadError = nil
+            case .deferred, .failed:
+                break
+            }
+        case "hadith" where route.path.count == 2 && route.path.last == "today":
+            guard let hadith = reading.todayHadiths.first else {
+                app.mihbaraRoute = nil
+                app.errorMessage = "لا حديث لورد اليوم الآن."
+                return
+            }
+            sheet = .hadith(hadith.number)
+            app.mihbaraRoute = nil
+        case "hadith" where route.path.count == 3:
+            let collection = route.path[1], rawNumber = route.path[2]
+            guard collection == reading.collection.collectionID,
+                  let number = Int(rawNumber), reading.collection.hadiths.contains(where: { $0.number == number }) else {
+                app.mihbaraRoute = nil
+                app.errorMessage = "هذا الحديث لم يعد موجودًا في المحبرة."
+                return
+            }
+            sheet = .hadith(number)
+            app.mihbaraRoute = nil
+        case "notebook":
+            guard route.path.count == 2, let rawID = route.path.last else { app.mihbaraRoute = nil; return }
+            guard let id = UUID(uuidString: rawID) else {
+                app.mihbaraRoute = nil
+                app.errorMessage = "فكرة الدفتر لم تعد موجودة."
+                return
+            }
+            notebookRouteID = id
+            sheet = .notebook
+            app.mihbaraRoute = nil
+        default:
+            app.mihbaraRoute = nil
+            return
+        }
+    }
+    private func openSpotlightBookIfNeeded(using loadedReading: MihbaraHomeReading? = nil) {
         guard let id = app.mihbaraBookToOpen else { return }
-        if reading == nil { load() }
-        defer { app.mihbaraBookToOpen = nil }
-        guard let book = reading?.books.first(where: { $0.id == id }) else {
+        guard let reading = loadedReading ?? self.reading else { load(); return }
+        guard let book = reading.book(id) else {
+            app.mihbaraBookToOpen = nil
             app.errorMessage = "الكتاب لم يعد موجودًا في المحبرة."
             return
         }
-        openBook(book)
+        if case .opened = openBook(book) { app.mihbaraBookToOpen = nil }
     }
     private func showMotivation() {
         guard let reading else { return }
@@ -260,6 +382,7 @@ struct MihbaraHomeView: View {
         }
         openPendingMotivationBook()
         if let book = pendingSlotBook { pendingSlotBook = nil; slotBook = book }
+        notebookRouteID = nil
     }
     private func scheduleLibraryAction(_ action: MihbaraLibraryAction) {
         if case .library? = sheet {
@@ -277,9 +400,17 @@ struct MihbaraHomeView: View {
             renaming = book
         case .remove(let target):
             pendingRemoval = target
-        case .open(let book, let volume):
-            openBook(book, volume: volume)
+        case .open(let book, let volume, let locatorJSON):
+            if case .opened = openBook(book, volume: volume, locatorJSON: locatorJSON) {
+                clearPendingBookOpen(for: book.id)
+            }
         }
+    }
+    private func clearPendingBookOpen(for id: UUID) {
+        if app.mihbaraBookToOpen == id { app.mihbaraBookToOpen = nil }
+        guard let route = app.mihbaraRoute, route.path.count == 2, route.path.first == "book",
+              UUID(uuidString: route.path[1]) == id else { return }
+        app.mihbaraRoute = nil
     }
     /// A book can change shelf from where it sits: long-press its spine or its library row. The table holds three at most.
     @ViewBuilder private func bookMenu(_ b: MihbaraBook) -> some View {
@@ -631,7 +762,7 @@ struct MihbaraHomeView: View {
         VStack(spacing: 14) {
             HStack(alignment: .top) {
                 if !RoomHomeLayout(session: app, key: "mihbara.layout").hidden.contains("notebook") {
-                Button { sheet = .notebook } label: {
+                Button { notebookRouteID = nil; sheet = .notebook } label: {
                     // The notebook stays yellow in dark, so its label keeps the light room's ink.
                     Text("دفتر").font(.custom("ArefRuqaa-Regular", size: 18, relativeTo: .headline))
                         .foregroundStyle(RoomTheme(room: "mihbara", dark: false).ink).frame(width: 58, height: 70)
@@ -1004,28 +1135,120 @@ struct MihbaraHomeView: View {
         }
     }
 
-    private func openBook(_ book: MihbaraBook, volume: Int? = nil) {
+    @discardableResult private func openBook(_ book: MihbaraBook, volume: Int? = nil, locatorJSON: String? = nil) -> MihbaraBookOpenResult {
         if case .library? = sheet {
-            scheduleLibraryAction(.open(book, volume: volume))
-            return
+            scheduleLibraryAction(.open(book, volume: volume, locatorJSON: locatorJSON))
+            return .deferred
         }
-        guard book.isReadableEPUB || book.isReadablePDF else { sheet = .book(book.id); return }
-        guard service.hasLocalFile(for: book) else { sheet = .book(book.id); return }
+        guard book.isReadableEPUB || book.isReadablePDF else { sheet = .book(book.id); return .opened }
+        guard service.hasLocalFile(for: book) else { sheet = .book(book.id); return .opened }
         do {
             // A reader can close while its last locator is being committed. Refresh
             // the managed generation before constructing the next reader route.
             try app.reload()
             reading = try service.load()
-            readerRoute = MihbaraReaderRoute(bookID: book.id, volume: volume)
+            let pdfPage = book.isReadablePDF ? MihbaraPDFLocator.pageIndex(locatorJSON: locatorJSON, fileHash: book.fileHash) : nil
+            readerRoute = MihbaraReaderRoute(bookID: book.id, volume: volume, page: pdfPage, locatorJSON: locatorJSON)
+            return .opened
         } catch {
             app.errorMessage = madarUserMessage(error)
+            shelfReadFailed = true
+            shelfReadError = "تعذّر فتح الكتاب الآن. كتبك محفوظة في مكانها؛ حاول مرة أخرى."
+            return .failed
         }
     }
 
 }
 private enum MihbaraRemovalConfirmation { case book(MihbaraBook), file(MihbaraBook) }
 private enum MihbaraSheet: Identifiable { case library, book(UUID), hadith(Int), opening, notebook, motivation; var id: String { String(describing: self) } }
-private enum MihbaraLibraryAction { case rename(MihbaraBook), remove(MihbaraRemovalConfirmation), open(MihbaraBook, volume: Int?) }
+private enum MihbaraLibraryAction { case rename(MihbaraBook), remove(MihbaraRemovalConfirmation), open(MihbaraBook, volume: Int?, locatorJSON: String?) }
+private enum MihbaraBookOpenResult { case opened, deferred, failed }
+private struct MihbaraRenameAlert: ViewModifier {
+    @Binding var book: MihbaraBook?
+    @Binding var title: String
+    @Binding var author: String
+    let save: () -> Void
+
+    func body(content: Content) -> some View {
+        content.alert("اسم الكتاب", isPresented: Binding(get: { book != nil }, set: { if !$0 { book = nil } })) {
+            TextField("عنوان الكتاب", text: $title).accessibilityIdentifier("mihbara-rename-title")
+            TextField("المؤلف", text: $author).accessibilityIdentifier("mihbara-rename-author")
+            Button("احفظ", action: save).disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty).accessibilityIdentifier("mihbara-rename-save")
+            Button("إلغاء", role: .cancel) { book = nil }
+        } message: {
+            let sourceTitle = title.isEmpty ? (book?.title ?? "") : title
+            Text("على الرف: «" + BookTitle.parts(sourceTitle).short + "»")
+        }
+    }
+}
+private struct MihbaraHomeConfirmations: ViewModifier {
+    @Binding var slotBook: MihbaraBook?
+    @Binding var pendingRemoval: MihbaraRemovalConfirmation?
+    let replacementBooks: (MihbaraBook) -> [MihbaraBook]
+    let removalTitle: String
+    let moveToReading: (MihbaraBook, UUID) -> Void
+    let deleteBook: (MihbaraBook) -> Void
+    let removeBookFile: (MihbaraBook) -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .confirmationDialog("اختر كتابًا يرجع إلى أبي أقرأها", isPresented: Binding(get: { slotBook != nil }, set: { if !$0 { slotBook = nil } }), titleVisibility: .visible, presenting: slotBook) { incoming in
+                ForEach(replacementBooks(incoming)) { old in
+                    Button(old.title) { moveToReading(incoming, old.id) }
+                }
+            }
+            .confirmationDialog(removalTitle, isPresented: Binding(get: { pendingRemoval != nil }, set: { if !$0 { pendingRemoval = nil } }), titleVisibility: .visible) {
+                if let pendingRemoval {
+                    switch pendingRemoval {
+                    case .book(let book): Button("احذف من مكتبتي", role: .destructive) { deleteBook(book) }
+                    case .file(let book): Button("احذف ملف الكتاب", role: .destructive) { removeBookFile(book) }
+                    }
+                }
+                Button("إلغاء", role: .cancel) { pendingRemoval = nil }
+            } message: {
+                if case .book? = pendingRemoval {
+                    Text("يبقى عنوانه وسجل جلسات القراءة وتظليلاته وملفه محفوظة؛ يختفي الكتاب من رفوف المحبرة فقط.")
+                } else if case .file? = pendingRemoval {
+                    Text("يُزال محتوى الملف من مدار، ويبقى عنوان الكتاب وموضعه وجلسات القراءة والتظليلات. لا يمكن التراجع؛ أعد الملف باختيار النسخة نفسها من «من ملف».")
+                }
+            }
+    }
+}
+private struct MihbaraReaderCover: ViewModifier {
+    let app: AppSession
+    @Binding var route: MihbaraReaderRoute?
+    let theme: RoomTheme
+    let bookForRoute: (UUID) -> MihbaraBook?
+    let originalPDFID: (String) -> UUID?
+    let onDismiss: () -> Void
+    let onBookDetails: (UUID) -> Void
+
+    func body(content: Content) -> some View {
+        content.fullScreenCover(item: $route, onDismiss: onDismiss) { destination in
+            if let book = bookForRoute(destination.bookID) {
+                Group {
+                    if book.isReadablePDF {
+                        MihbaraPDFReaderView(app: app, book: book, startPage: destination.page) { route = nil }
+                    } else {
+                        MihbaraReaderView(app: app, book: book, volume: destination.volume,
+                            initialLocatorJSON: destination.locatorJSON,
+                            originalPDF: originalPDFID,
+                            openOriginal: { id, page in route = MihbaraReaderRoute(bookID: id, page: page) }) { route = nil }
+                    }
+                }
+                .environment(\.roomTheme, theme).madarSheetErrorAlert(app)
+            } else {
+                VStack(spacing: 16) {
+                    Text("ملف الكتاب غير متاح الآن").font(MadarTypography.body())
+                    Button("تفاصيل الكتاب واستعادة ملفه") { route = nil; onBookDetails(destination.bookID) }.buttonStyle(MadarPrimaryButton())
+                    Button("العودة إلى المحبرة") { route = nil }.buttonStyle(MadarPrimaryButton())
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(theme.background).foregroundStyle(theme.ink)
+            }
+        }
+    }
+}
 /// Owner, 25 Oct 2026: «اول ما احمل بي دي اف يقولي ترا بحوله لك ولي انا الخيار».
 private struct MihbaraConversionOffer: ViewModifier {
     let app: AppSession
@@ -1041,7 +1264,19 @@ private struct MihbaraConversionOffer: ViewModifier {
     }
 }
 
-private struct MihbaraReaderRoute: Identifiable { let bookID: UUID; var volume: Int? = nil; var page: Int? = nil; var id: String { bookID.uuidString + "-\(volume ?? -1)-\(page ?? -1)" } }
+private struct MihbaraReaderRoute: Identifiable { let bookID: UUID; var volume: Int? = nil; var page: Int? = nil; var locatorJSON: String? = nil; var id: String { bookID.uuidString + "-\(volume ?? -1)-\(page ?? -1)-" + (locatorJSON ?? "") } }
+
+enum MihbaraPDFLocator {
+    static func pageIndex(locatorJSON: String?, fileHash: String?) -> Int? {
+        guard let locatorJSON, let fileHash,
+              let data = locatorJSON.data(using: .utf8),
+              case .object(let object)? = try? JSONDecoder().decode(MadarCore.JSONValue.self, from: data),
+              case .string(let routedHash)? = object["fileHash"], routedHash == fileHash,
+              case .number(let number)? = object["pdfPageIndex"], number.isFinite,
+              number >= 0, number < Double(Int.max), number.rounded(.down) == number else { return nil }
+        return Int(number)
+    }
+}
 
 private struct MihbaraMotivationCard: View {
     let cues: [MihbaraMotivationCue]
@@ -1156,14 +1391,21 @@ private struct MihbaraNotebookContent: View {
     struct Note: Identifiable { let id: UUID; let text: String; let updatedAt: Date; let bookTitle: String?; let isBookNote: Bool }
     struct Editor: Identifiable { let id: UUID; let text: String }
     let app: AppSession
+    let initialNoteID: UUID?
     @Environment(\.roomTheme) private var theme
     @Environment(\.dismiss) private var dismiss
     @State private var notes: [Note] = []
     @State private var editor: Editor?
     @State private var failure: String?
+    @State private var initialNoteHandled = false
     #if DEBUG
     @State private var injectedLoadFailure = false
     #endif
+
+    init(app: AppSession, initialNoteID: UUID? = nil) {
+        self.app = app
+        self.initialNoteID = initialNoteID
+    }
 
     var body: some View {
         ScrollView {
@@ -1225,7 +1467,7 @@ private struct MihbaraNotebookContent: View {
             let titles = books.reduce(into: [UUID: String]()) { result, book in
                 if book.deletedAt == nil && book.mergedInto == nil { result[book.id] = book.title }
             }
-            notes = rows.filter {
+            let loadedNotes = rows.filter {
                 $0.isPrivate && $0.deletedAt == nil && $0.mergedInto == nil
                     && $0.link == "general"
                     && ($0.targetID == nil || $0.targetID.map { titles[$0] != nil } == true)
@@ -1234,7 +1476,18 @@ private struct MihbaraNotebookContent: View {
                      bookTitle: $0.targetID.flatMap { titles[$0] },
                      isBookNote: $0.targetID.map { titles[$0] != nil } == true)
             }.sorted { $0.updatedAt > $1.updatedAt }
+            notes = loadedNotes
             failure = nil
+            if !initialNoteHandled {
+                initialNoteHandled = true
+                if let initialNoteID {
+                    guard let note = loadedNotes.first(where: { $0.id == initialNoteID }) else {
+                        failure = "فكرة الدفتر لم تعد موجودة."
+                        return
+                    }
+                    editor = .init(id: note.id, text: note.text)
+                }
+            }
         } catch { notes.removeAll(); failure = "تعذّر فتح الملاحظات المحفوظة." }
     }
 

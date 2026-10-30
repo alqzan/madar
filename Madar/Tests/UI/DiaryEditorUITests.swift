@@ -92,6 +92,39 @@ import XCTest
         app.buttons["diary-editor-save"].tap(); app.buttons["diary-today"].tap()
         XCTAssertTrue(app.staticTexts["مسودة من الصفحة"].waitForExistence(timeout: 10))
     }
+    func testUnsavedTranscriptRequiresExplicitDiscard() throws {
+        continueAfterFailure = false
+        let app = launch("editor"); app.buttons["diary-today"].tap()
+        let play = app.buttons["diary-play-33333333-3333-4333-8333-333333330002"]
+        for _ in 0..<5 where !play.isHittable { app.swipeUp() }
+        XCTAssertTrue(play.isHittable, app.debugDescription); play.tap()
+        let disclosure = app.buttons["التسجيل والنص"]
+        XCTAssertTrue(disclosure.waitForExistence(timeout: 5), app.debugDescription); disclosure.tap()
+        let edit = app.buttons["diary-transcript-edit-33333333-3333-4333-8333-333333330002"]
+        let write = app.buttons["diary-day-write"]
+        for _ in 0..<5 where !edit.isHittable || (write.exists && edit.frame.maxY > write.frame.minY) { app.swipeUp() }
+        XCTAssertTrue(edit.isHittable, app.debugDescription); edit.tap()
+        let text = app.textViews["diary-transcript-text"]
+        XCTAssertTrue(text.waitForExistence(timeout: 10), app.debugDescription)
+        let original = try XCTUnwrap(text.value as? String)
+        text.tap(); text.typeText(" أضفت تصحيحًا مؤقتًا.")
+        let changed = try XCTUnwrap(text.value as? String)
+        XCTAssertNotEqual(changed, original)
+
+        app.buttons["diary-transcript-close"].tap()
+        let keep = app.buttons["diary-transcript-continue"].firstMatch
+        XCTAssertTrue(keep.waitForExistence(timeout: 8), app.debugDescription); keep.tap()
+        XCTAssertEqual(text.value as? String, changed, "Choosing to continue editing keeps the local draft.")
+
+        app.buttons["diary-transcript-close"].tap()
+        let discard = app.buttons["diary-transcript-discard"].firstMatch
+        XCTAssertTrue(discard.waitForExistence(timeout: 8), app.debugDescription); discard.tap()
+        XCTAssertTrue(edit.waitForExistence(timeout: 10), app.debugDescription); edit.tap()
+        let reopened = app.textViews["diary-transcript-text"]
+        XCTAssertTrue(reopened.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertEqual(reopened.value as? String, original, "Discard closes the editor without changing the saved transcript.")
+        app.buttons["diary-transcript-close"].tap()
+    }
     func testSavedMediaPlaybackTranscriptCorrectionAndFilePreview() throws {
         continueAfterFailure = false
         let app = launch("editor"); app.buttons["diary-today"].tap()

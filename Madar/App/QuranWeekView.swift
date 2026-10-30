@@ -11,6 +11,9 @@ struct QuranWeekView: View {
     @State private var week: QuranUIWeek?
     @State private var selected: QuranUIWeekDay?
     @State private var error: String?
+#if DEBUG
+    @State private var loadCount = 0
+#endif
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
@@ -22,11 +25,21 @@ struct QuranWeekView: View {
                 if let week {
                     if service.app.string("quran.weekLogView") != "summary" { rings(week) }
                     summary(week)
-                } else if let error { Text(error); Button("حاول مرة أخرى", action: load).frame(minHeight: 44) }
+                } else if let error { Text(error).accessibilityIdentifier("quran-week-error"); Button("حاول مرة أخرى", action: load).frame(minHeight: 44).accessibilityIdentifier("quran-week-retry") }
                 else { ProgressView().frame(maxWidth: .infinity).padding(50) }
             }.padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 24)
         }.foregroundStyle(theme.ink).background(theme.background.ignoresSafeArea()).tint(theme.color("review"))
-            .task { load() }
+            .task {
+                load()
+                #if DEBUG
+                let environment = ProcessInfo.processInfo.environment
+                if environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil,
+                   environment["MADAR_UI_QURAN_WEEK_READ_FAILURE_AFTER_FIRST"] == "1" {
+                    await Task.yield()
+                    load()
+                }
+                #endif
+            }
             // Left open past midnight, the log follows the day it is now.
             .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged).receive(on: RunLoop.main)) { _ in load() }
             .sheet(item: $selected) { day in
@@ -112,5 +125,18 @@ struct QuranWeekView: View {
     private func faces(_ value: Int) -> String { QuranDayCloseCopy.faces(value, digits: service.numerals) }
     private func font(_ size: CGFloat, bold: Bool = false) -> Font { .custom(bold ? "thmanyahsans-Bold" : "thmanyahsans-Regular", size: size, relativeTo: .body) }
     private func serif(_ size: CGFloat) -> Font { .custom("Amiri-Bold", size: size, relativeTo: .title2) }
-    private func load() { do { week = try service.weeklyLog(); error = nil } catch { self.error = quranUserMessage(error) } }
+    private func load() {
+        do {
+            #if DEBUG
+            loadCount += 1
+            let environment = ProcessInfo.processInfo.environment
+            if loadCount == 2,
+               environment["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil,
+               environment["MADAR_UI_QURAN_WEEK_READ_FAILURE_AFTER_FIRST"] == "1" {
+                throw CocoaError(.fileReadUnknown)
+            }
+            #endif
+            week = try service.weeklyLog(); error = nil
+        } catch { week = nil; self.error = quranUserMessage(error) }
+    }
 }

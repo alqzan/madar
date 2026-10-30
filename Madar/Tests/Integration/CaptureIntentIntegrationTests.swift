@@ -63,6 +63,45 @@ import MadarMoney
         XCTAssertEqual(try ModelContext(container).fetch(FetchDescriptor<PrayerLog>()).filter { $0.prayer == "fajr" && $0.status == "jamaah" }.count, 1)
     }
 
+    func testFailedMihbaraIdeaCaptureIsReportedAsFinalFailure() async throws {
+        let (app, _) = try session()
+        app.authorizeProtectedData()
+        app.failFirstNotebookSave = true
+        let request = MadarIntentRequest.capture(text: "فكرة: حديقة صغيرة", id: UUID())
+        let completed = await app.handleIntentRequest(request)
+        XCTAssertTrue(completed, "A permanent command failure is reported; it is not retained as a locked request.")
+        XCTAssertEqual(MadarIntentHandoff.shared.takeFailure(request), "لم تُحفظ الفكرة في دفتر المحبرة. أعد المحاولة.")
+    }
+    func testConcurrentIntentSubmissionWaitsUntilItsRequestIsHandled() async throws {
+        let handoff = MadarIntentHandoff()
+        let first = MadarIntentRequest.capture(text: "مصروف أول", id: UUID())
+        let second = MadarIntentRequest.diaryLine(text: "سطر ثان", day: "today", id: UUID())
+        var handled: [MadarIntentRequest] = []
+        await handoff.attach { request in
+            if request == first { try? await Task.sleep(for: .milliseconds(100)) }
+            handled.append(request)
+            return true
+        }
+        let firstSubmission = Task { await handoff.submit(first) }
+        try await Task.sleep(for: .milliseconds(10))
+        let secondApplied = await handoff.submit(second)
+        let firstApplied = await firstSubmission.value
+        XCTAssertTrue(firstApplied)
+        XCTAssertTrue(secondApplied, "A request handled by the active flush must not be reported as merely queued.")
+        XCTAssertEqual(handled, [first, second])
+    }
+    func testYesterdayDiaryIntentOpensThePageItWrites() async throws {
+        let (app, container) = try session()
+        app.authorizeProtectedData()
+        let today = try DiaryLineRenderer.today(context: ModelContext(container), now: app.prayerNow())
+        let yesterday = today.adding(days: -1)
+        let applied = await app.handleIntentRequest(.diaryLine(text: "سطر عن الأمس", day: "yesterday", id: UUID()))
+        XCTAssertTrue(applied)
+        XCTAssertEqual(app.diaryRoute?.path, ["day", yesterday.description])
+        let saved = try ModelContext(container).fetch(FetchDescriptor<Entry>()).first { $0.text == "سطر عن الأمس" }
+        XCTAssertEqual(saved?.dayKey, yesterday.description)
+    }
+
     func testMihbaraIdeaCaptureWritesOnePrivateNoteAndOpensItsRoom() async throws {
         let (app,container)=try session(),id=UUID()
         app.authorizeProtectedData()
@@ -78,14 +117,27 @@ import MadarMoney
     }
 
     func testMoneyCaptureOpensConfirmationWithoutWritingOrRequiringDiaryUnlock() async throws {
-        let (app, container) = try session(), id = UUID()
+        let (app, container) = try session(), id = UUID(), secondID = UUID()
         let applied = await app.handleIntentRequest(.capture(text: "قهوة ١٨", id: id)); XCTAssertTrue(applied)
         XCTAssertEqual(app.moneyExpenseSeed?.amount, "١٨"); XCTAssertEqual(app.moneyExpenseSeed?.merchant, "قهوة"); XCTAssertEqual(app.moneyExpenseSeed?.id, id)
         XCTAssertEqual(try ModelContext(container).fetchCount(FetchDescriptor<MoneyTransaction>()), 0)
         XCTAssertEqual(try ModelContext(container).fetchCount(FetchDescriptor<Entry>()), 0)
+        let secondApplied = await app.handleIntentRequest(.capture(text: "مصروف: شاي ٧", id: secondID))
+        XCTAssertTrue(secondApplied)
+        let secondReplay = await app.handleIntentRequest(.capture(text: "مصروف: شاي ٧", id: secondID))
+        XCTAssertTrue(secondReplay, "A replayed request with the same id is handled without duplicating the queued expense.")
+        XCTAssertEqual(app.moneyExpenseSeed?.id, id, "A later Capture request must not replace the open expense draft.")
+        let requestedMethod = "card:" + UUID().uuidString
+        app.open(URL(string: "madar://mal/add?amount=1800&merchant=coffee&method=" + requestedMethod)!)
+        XCTAssertEqual(app.moneyExpenseSeed?.id, id, "A later add link must not replace the open expense draft.")
         app.moneyExpenseSeed = nil
-        app.open(URL(string: "madar://mal/add?amount=1800&merchant=coffee")!)
+        app.presentNextMoneyExpenseSeed()
+        XCTAssertEqual(app.moneyExpenseSeed?.id, secondID, "Queued Capture requests are presented first in FIFO order.")
+        XCTAssertEqual(app.moneyExpenseSeed?.amount, "٧"); XCTAssertEqual(app.moneyExpenseSeed?.merchant, "شاي")
+        app.moneyExpenseSeed = nil
+        app.presentNextMoneyExpenseSeed()
         XCTAssertEqual(MoneyAmountInput.minor(app.moneyExpenseSeed?.amount ?? "", exponent: 2), 1800)
+        XCTAssertEqual(app.moneyExpenseSeed?.method, requestedMethod)
         XCTAssertEqual(try ModelContext(container).fetchCount(FetchDescriptor<MoneyTransaction>()), 0, "A public link can prefill but never write")
     }
     func testPrayerReportLogsAndAMissingStateOpensTheLogSheet() async throws {

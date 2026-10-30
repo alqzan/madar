@@ -13,9 +13,12 @@ struct PrayerTodayView: View {
     @State private var selectedSheet: PrayerTodaySheet?
     @State private var locator = TravelLocator()
     @State private var requestReadFailed = false
+    @State private var pendingPrayerRoute: Route?
+    @State private var pendingPrayerRootRequestID: UUID?
     #if DEBUG
     @State private var injectedReadFailure = false
     @State private var injectedRequest = false
+    @State private var injectedRoute = false
     #endif
     @Environment(\.scenePhase) private var scenePhase
 
@@ -96,6 +99,11 @@ struct PrayerTodayView: View {
                 injectedRequest = true
                 session.prayerLogRequest = prayer
             }
+            if !injectedRoute, env["MADAR_UI_STORE_ID"].flatMap(UUID.init(uuidString:)) != nil,
+               let raw = env["MADAR_UI_PRAYER_ROUTE"], let url = URL(string: raw) {
+                injectedRoute = true
+                session.open(url)
+            }
             #endif
         }
         .onChange(of: selectedSheet == nil) { _, _ in refreshTrip() }
@@ -104,9 +112,25 @@ struct PrayerTodayView: View {
             guard let prayer else { return }
             openPrayerRequest(prayer)
         }
+        .onChange(of: session.prayerRoute, initial: true) { _, route in
+            guard let route else { return }
+            session.prayerRoute = nil
+            pendingPrayerRoute = route
+            openPrayerRoute(route)
+        }
+        .onChange(of: session.prayerRootRequestID) { _, requestID in
+            guard let requestID else { return }
+            pendingPrayerRootRequestID = requestID
+            closeForPrayerRootIfSafe()
+        }
+        .onChange(of: session.prayerWriteInProgress) { _, isWriting in
+            if !isWriting { closeForPrayerRootIfSafe() }
+        }
         .alert("تعذّر فتح تسجيل الصلاة", isPresented: $requestReadFailed) {
-            Button("أعد المحاولة") { if let prayer = session.prayerLogRequest { openPrayerRequest(prayer) } }
-            Button("إلغاء", role: .cancel) { session.prayerLogRequest = nil }
+            Button("أعد المحاولة") {
+                retryPrayerRead()
+            }
+            Button("إلغاء", role: .cancel) { session.prayerLogRequest = nil; pendingPrayerRoute = nil }
         } message: { Text("تعذّرت قراءة بيانات الصلاة. يمكنك المحاولة مرة أخرى.") }
         .onChange(of: scenePhase) { _, phase in if phase == .active { detectTravel() } }
         .sheet(item: $selectedSheet) { route in
@@ -126,6 +150,10 @@ struct PrayerTodayView: View {
                 PrayerSnapshotSheet(revision: session.prayerRevision, load: sheetSnapshot, close: { selectedSheet = nil }) { snapshot in
                     PrayerNightLoggingSheet(session: session, snapshot: snapshot, finished: { selectedSheet = nil })
                 }
+            case .qiyamNight(let night):
+                PrayerSnapshotSheet(revision: session.prayerRevision, load: sheetSnapshot, close: { selectedSheet = nil }) { snapshot in
+                    PrayerNightLoggingSheet(session: session, snapshot: snapshot, initialNight: night, finished: { selectedSheet = nil })
+                }
             case .heart(let cell):
                 PrayerHeartAnswerSheet(session: session, cell: cell, finished: { selectedSheet = nil })
             case .streaks:
@@ -139,14 +167,38 @@ struct PrayerTodayView: View {
                         PrayerStatisticsView(session: session, snapshot: snapshot) { choose($0) }
                     }
                 }
+            case .day(let day):
+                NavigationStack {
+                    PrayerSnapshotSheet(revision: session.prayerRevision, load: sheetSnapshot, close: { selectedSheet = nil }) { snapshot in
+                        PrayerStatisticsView(session: session, snapshot: snapshot, initialDay: day) { choose($0) }
+                    }
+                }
             case .qadaList:
-                PrayerQadaListSheet(session: session, dateLabel: qadaDate,
+                PrayerQadaListSheet(session: session, dateLabel: qadaDate, loadSnapshot: sheetSnapshot,
                     makeUp: { item in selectedSheet = .makeUp(item, isFridayNoon: item.isFriday, dateLabel: qadaDate(item.reference.day)) },
                     addOld: { selectedSheet = .oldMissed })
             case .log(let cell, let timeZone):
                 PrayerTodayLogSheet(cell: cell,
                     clock: (cell.prayerTime ?? cell.time).map { clock($0, timeZone: timeZone) } ?? "",
                     askHeart: session.bool("salah.askHeart"), isSaving: session.prayerWriteInProgress,
+                    prefillStatus: nil, prefillHeart: nil,
+                    save: { status, fridayKind, makeUpNow, done in
+                        if status == .qada {
+                            session.makeUpPrayer(cell.reference, fridayKind: fridayKind, completion: done)
+                        } else if status == .missed && makeUpNow {
+                            session.recordPrayer(cell.reference, status: .missed, fridayKind: fridayKind) { succeeded in
+                                if succeeded { session.makeUpPrayer(cell.reference, fridayKind: fridayKind, completion: done) } else { done(false) }
+                            }
+                        } else {
+                            session.recordPrayer(cell.reference, status: status, fridayKind: fridayKind, completion: done)
+                        }
+                    },
+                    answerHeart: { heart, done in session.answerPrayerHeart(cell.reference, heart: heart, completion: done) })
+            case .prefilledLog(let cell, let timeZone, let status, let heart):
+                PrayerTodayLogSheet(cell: cell,
+                    clock: (cell.prayerTime ?? cell.time).map { clock($0, timeZone: timeZone) } ?? "",
+                    askHeart: session.bool("salah.askHeart"), isSaving: session.prayerWriteInProgress,
+                    prefillStatus: status, prefillHeart: heart,
                     save: { status, fridayKind, makeUpNow, done in
                         if status == .qada {
                             session.makeUpPrayer(cell.reference, fridayKind: fridayKind, completion: done)
@@ -198,6 +250,97 @@ struct PrayerTodayView: View {
             requestReadFailed = false
             choose(cell)
         } catch { requestReadFailed = true }
+    }
+
+    private func retryPrayerRead() {
+        let route = pendingPrayerRoute
+        let prayer = session.prayerLogRequest
+        requestReadFailed = false
+        Task { @MainActor in
+            // Let SwiftUI dismiss the alert before a repeated failure asks to present it again.
+            await Task.yield()
+            if let route { openPrayerRoute(route) }
+            else if let prayer { openPrayerRequest(prayer) }
+        }
+    }
+
+    private func closeForPrayerRootIfSafe() {
+        guard pendingPrayerRootRequestID != nil, !session.prayerWriteInProgress else { return }
+        session.prayerLogRequest = nil
+        pendingPrayerRoute = nil
+        requestReadFailed = false
+        selectedSheet = nil
+        pendingPrayerRootRequestID = nil
+    }
+
+    private func openPrayerRoute(_ route: Route) {
+        pendingPrayerRoute = nil
+        guard let routeName = route.path.first else { session.errorMessage = "هذا المسار لا يفتح شاشة صلاة معروفة."; return }
+        switch routeName {
+        case "day" where route.path.count == 2:
+            let rawDay = route.path[1]
+            guard let day = try? GregorianDay(rawDay) else { session.errorMessage = "تعذّر فتح يوم الصلاة المطلوب."; return }
+            selectedSheet = .day(day)
+        case "qiyam" where route.path.count == 2:
+            let rawNight = route.path[1]
+            guard let night = try? GregorianDay(rawNight) else { session.errorMessage = "تعذّر فتح ليلة القيام المطلوبة."; return }
+            selectedSheet = .qiyamNight(night)
+        case "hali" where route.path.count == 1:
+            selectedSheet = .statistics
+        case "qada" where route.path.count == 1:
+            selectedSheet = .qadaList
+        case "qada" where route.path.count == 2:
+            let rawID = route.path[1]
+            guard let id = UUID(uuidString: rawID) else {
+                session.errorMessage = "لم تعد هذه الفائتة موجودة في سجل الصلاة."
+                pendingPrayerRoute = nil
+                return
+            }
+            do {
+                guard let item = try sheetSnapshot().qada.first(where: { $0.id == id && $0.madeUpAt == nil }) else {
+                    session.errorMessage = "لم تعد هذه الفائتة موجودة في سجل الصلاة."
+                    pendingPrayerRoute = nil
+                    return
+                }
+                pendingPrayerRoute = nil
+                requestReadFailed = false
+                selectedSheet = .makeUp(item, isFridayNoon: item.isFriday, dateLabel: qadaDate(item.reference.day))
+            } catch {
+                pendingPrayerRoute = route
+                requestReadFailed = true
+            }
+        case "log" where route.path.count == 1:
+            guard let prayer = route.parameters["prayer"].flatMap(Prayer.init(rawValue:)) else {
+                session.errorMessage = "تعذّر فتح تسجيل الصلاة المطلوب."
+                return
+            }
+            do {
+                let current = try sheetSnapshot()
+                let targetSnapshot: PrayerSnapshot
+                if let rawDay = route.parameters["day"] {
+                    let day = try GregorianDay(rawDay)
+                    let zone = current.activeTrip?.place.timeZone ?? session.activePlace.timeZone
+                    targetSnapshot = try session.prayerSnapshot(at: day.date(in: zone).addingTimeInterval(12 * 60 * 60))
+                } else { targetSnapshot = current }
+                guard let cell = targetSnapshot.today.cells.first(where: { $0.reference.prayer == prayer }) else {
+                    session.errorMessage = "تعذّر فتح تسجيل الصلاة المطلوبة في هذا اليوم."
+                    return
+                }
+                let zone = targetSnapshot.activeTrip?.place.timeZone ?? session.activePlace.timeZone
+                let status = route.parameters["status"].flatMap(PrayerStoredStatus.init(rawValue:))
+                let heart = route.parameters["heart"].flatMap(PrayerHeart.init(rawValue:))
+                selectedSheet = status == nil && heart == nil
+                    ? .log(cell, zone)
+                    : .prefilledLog(cell, zone, status, heart)
+                pendingPrayerRoute = nil
+                requestReadFailed = false
+            } catch {
+                pendingPrayerRoute = route
+                requestReadFailed = true
+            }
+        default:
+            session.errorMessage = "هذا المسار لا يفتح شاشة صلاة معروفة."
+        }
     }
 
     private func header(day prayerDay: GregorianDay?) -> some View {
@@ -1007,28 +1150,26 @@ private struct PrayerNightFootprint: View {
 private struct PrayerQadaListSheet: View {
     let session: AppSession
     let dateLabel: (GregorianDay) -> String
+    let loadSnapshot: () throws -> PrayerSnapshot
     let makeUp: (PrayerQada) -> Void
     let addOld: () -> Void
     @Environment(\.roomTheme) private var theme
     @State private var chosen: UUID?
     @State private var contentHeight: CGFloat = 640
-
-    private var outstanding: [PrayerQada] {
-        ((try? session.prayerSnapshot(at: session.prayerNow()))?.qada ?? []).filter { $0.madeUpAt == nil }
-    }
-    // AU-38: a failed read never reads as «nothing owed».
-    private var readFailed: Bool { (try? session.prayerSnapshot(at: session.prayerNow())) == nil }
+    @State private var items: [PrayerQada] = []
+    @State private var didLoad = false
+    @State private var readFailed = false
     private var digits: MadarNumberFormatter { MadarNumberFormatter(style: session.string("core.numerals") == "western" ? .western : .hindi) }
 
     var body: some View {
-        let items = outstanding
         let selected = items.first { $0.id == chosen } ?? items.first
         VStack(alignment: .leading, spacing: 0) {
             Text("الفوائت والقضاء").font(.custom("thmanyahserifdisplay-Bold", size: 30, relativeTo: .title)).accessibilityAddTraits(.isHeader)
                 .accessibilityIdentifier("prayer-qada-title")
             HStack(alignment: .center, spacing: 12) {
-                if !items.isEmpty { Text(digits.string(items.count)).font(.custom("thmanyahserifdisplay-Bold", size: 64, relativeTo: .largeTitle)) }
-                Text(readFailed ? "تعذّرت قراءة الفوائت الآن؛ أغلق الورقة وافتحها من جديد." : PrayerCopy.owed(items.count)).font(PrayerHomeType.lead).foregroundStyle(theme.secondaryInk)
+                if didLoad && !readFailed && !items.isEmpty { Text(digits.string(items.count)).font(.custom("thmanyahserifdisplay-Bold", size: 64, relativeTo: .largeTitle)) }
+                Text(!didLoad ? "جارٍ قراءة الفوائت…" : readFailed ? "تعذّرت قراءة الفوائت الآن." : PrayerCopy.owed(items.count))
+                    .font(PrayerHomeType.lead).foregroundStyle(theme.secondaryInk)
                 Spacer(minLength: 0)
             }
             .padding(.top, 14).accessibilityElement(children: .combine)
@@ -1038,19 +1179,35 @@ private struct PrayerQadaListSheet: View {
             }
             .fixedSize(horizontal: false, vertical: true).padding(.top, 8)
             ScrollView {
-                VStack(spacing: 0) {
-                    // Prayers missed on the same day share one date: it is written once, on the
-                    // group's first row, and the group has no divider inside it.
-                    ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                        let opensDay = index == 0 || items[index - 1].reference.day != item.reference.day
-                        if opensDay { Rectangle().fill(theme.ink.opacity(0.1)).frame(height: 1) }
-                        row(item, on: item.id == selected?.id, showsDate: opensDay)
+                if !didLoad {
+                    ProgressView().frame(maxWidth: .infinity, minHeight: 72)
+                } else if readFailed {
+                    VStack(spacing: 10) {
+                        Text("تعذّرت قراءة سجل الصلاة. أعد المحاولة لعرض الفوائت.")
+                            .font(PrayerHomeType.body).multilineTextAlignment(.center)
+                            .accessibilityIdentifier("prayer-qada-read-error")
+                        Button("أعد المحاولة", action: load)
+                            .font(PrayerHomeType.strong).frame(minHeight: 44)
+                            .accessibilityIdentifier("prayer-qada-retry")
                     }
-                    Rectangle().fill(theme.ink.opacity(0.1)).frame(height: 1)
+                    .frame(maxWidth: .infinity, minHeight: 120)
+                } else {
+                    VStack(spacing: 0) {
+                        // Prayers missed on the same day share one date: it is written once, on the
+                        // group's first row, and the group has no divider inside it.
+                        ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                            let opensDay = index == 0 || items[index - 1].reference.day != item.reference.day
+                            if opensDay { Rectangle().fill(theme.ink.opacity(0.1)).frame(height: 1) }
+                            row(item, on: item.id == selected?.id, showsDate: opensDay)
+                        }
+                        Rectangle().fill(theme.ink.opacity(0.1)).frame(height: 1)
+                    }
                 }
             }
-            .scrollBounceBehavior(.basedOnSize).frame(height: min(CGFloat(items.count) * 61 + 1, 280)).padding(.top, 16)
-            actions(selected)
+            .scrollBounceBehavior(.basedOnSize)
+            .frame(height: readFailed || !didLoad ? 120 : min(CGFloat(items.count) * 61 + 1, 280))
+            .padding(.top, 16)
+            actions(readFailed || !didLoad ? nil : selected, canAddOld: didLoad && !readFailed)
         }
         .padding(.horizontal, 20).padding(.top, 26).padding(.bottom, 14)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1061,6 +1218,17 @@ private struct PrayerQadaListSheet: View {
         .presentationBackground(theme.background)
         .presentationDragIndicator(.visible)
         .presentationCornerRadius(34)
+        .task { load() }
+    }
+
+    private func load() {
+        do {
+            items = try loadSnapshot().qada.filter { $0.madeUpAt == nil }
+            readFailed = false
+        } catch {
+            readFailed = true
+        }
+        didLoad = true
     }
 
     private func row(_ item: PrayerQada, on: Bool, showsDate: Bool) -> some View {
@@ -1082,7 +1250,7 @@ private struct PrayerQadaListSheet: View {
         .accessibilityIdentifier("prayer-qada-row-\(item.reference.day)-\(item.reference.prayer.rawValue)")
     }
 
-    private func actions(_ selected: PrayerQada?) -> some View {
+    private func actions(_ selected: PrayerQada?, canAddOld: Bool) -> some View {
         HStack(spacing: 12) {
             Button { if let selected { makeUp(selected) } } label: {
                 Text("اقضِ واحدة").font(PrayerHomeType.strong).foregroundStyle(theme.background)
@@ -1095,7 +1263,8 @@ private struct PrayerQadaListSheet: View {
                     .overlay { RoundedRectangle(cornerRadius: 18).stroke(theme.ink.opacity(0.14), lineWidth: 1) }
                     .contentShape(.rect(cornerRadius: 18))
             }
-            .buttonStyle(.madarPlain).accessibilityIdentifier("prayer-old-missed")
+            .buttonStyle(.madarPlain).disabled(!canAddOld).opacity(canAddOld ? 1 : 0.4)
+            .accessibilityIdentifier("prayer-old-missed")
         }
         .padding(.top, 16)
     }
@@ -1106,10 +1275,13 @@ private enum PrayerTodaySheet: Identifiable {
     case trip(PrayerTrip)
     case pair(GregorianDay, PrayerPair, PrayerCell, TimeZone)
     case log(PrayerCell, TimeZone)
+    case prefilledLog(PrayerCell, TimeZone, PrayerStoredStatus?, PrayerHeart?)
     case statistics
+    case day(GregorianDay)
     case streaks
     case heart(PrayerCell)
     case qiyam
+    case qiyamNight(GregorianDay)
     case oldMissed
     case qadaList
     case makeUp(PrayerQada, isFridayNoon: Bool, dateLabel: String)
@@ -1122,10 +1294,13 @@ private enum PrayerTodaySheet: Identifiable {
         case .oldMissed: "old-missed"
         case .qadaList: "qada-list"
         case .qiyam: "qiyam"
+        case .qiyamNight(let night): "qiyam-" + night.description
         case .statistics: "statistics"
+        case .day(let day): "day-" + day.description
         case .streaks: "streaks"
         case .heart(let cell): "heart-\(cell.reference.naturalKey)"
         case .log(let cell, _): "log-\(cell.reference.naturalKey)"
+        case .prefilledLog(let cell, _, _, _): "prefilled-log-\(cell.reference.naturalKey)"
         case .makeUp(let item, _, _): "makeup-\(item.id.uuidString)"
         case .recovery(let references, _, _): "recovery-\(references.first?.naturalKey ?? "empty")"
         }
@@ -1142,6 +1317,7 @@ private struct PrayerTodayLogSheet: View {
     let clock: String
     let askHeart: Bool
     let isSaving: Bool
+    let routePrefilled: Bool
     let save: (PrayerStoredStatus, FridayPrayerKind?, Bool, @escaping (Bool) -> Void) -> Void
     let answerHeart: (PrayerHeart?, @escaping (Bool) -> Void) -> Void
     @Environment(\.dismiss) private var dismiss
@@ -1153,19 +1329,21 @@ private struct PrayerTodayLogSheet: View {
     @State private var contentHeight: CGFloat = 430
 
     init(cell: PrayerCell, clock: String, askHeart: Bool, isSaving: Bool,
+         prefillStatus: PrayerStoredStatus?, prefillHeart: PrayerHeart?,
          save: @escaping (PrayerStoredStatus, FridayPrayerKind?, Bool, @escaping (Bool) -> Void) -> Void,
          answerHeart: @escaping (PrayerHeart?, @escaping (Bool) -> Void) -> Void) {
         self.cell = cell; self.clock = clock; self.askHeart = askHeart; self.isSaving = isSaving
+        self.routePrefilled = prefillStatus != nil || prefillHeart != nil
         self.save = save; self.answerHeart = answerHeart
         let initial: PrayerStoredStatus? = switch cell.status { case .jamaah: .jamaah; case .alone: .alone; case .qada: .qada; case .missed: .missed; default: nil }
-        _selected = State(initialValue: initial)
-        _recorded = State(initialValue: initial != nil)
-        _heart = State(initialValue: cell.heart)
+        _selected = State(initialValue: prefillStatus ?? initial)
+        _recorded = State(initialValue: prefillStatus == nil && initial != nil)
+        _heart = State(initialValue: prefillHeart ?? cell.heart)
         _fridayKind = State(initialValue: cell.fridayKind)
     }
 
     private var options: [PrayerStoredStatus] {
-        [.jamaah, .alone] + (cell.canMakeUp || cell.status == .qada ? [.qada] : []) + (cell.canMarkMissed || cell.status == .missed ? [.missed] : [])
+        [.jamaah, .alone] + (cell.canMakeUp || cell.status == .qada || selected == .qada ? [.qada] : []) + (cell.canMarkMissed || cell.status == .missed || selected == .missed ? [.missed] : [])
     }
     /// Friday noon: everything but «وحدي» (always the noon prayer) waits for the kind.
     private func needsKind(_ option: PrayerStoredStatus) -> Bool { cell.isFriday && option != .alone && fridayKind == nil }
@@ -1178,6 +1356,12 @@ private struct PrayerTodayLogSheet: View {
             // AU-38: the dimmed options say why.
             if cell.isFriday && fridayKind == nil { Text("اختر «جمعة» أو «ظهر» لتسجّلها في جماعة أو فائتة.").font(PrayerHomeType.small).foregroundStyle(theme.secondaryInk).padding(.top, 8).accessibilityIdentifier("prayer-friday-kind-hint") }
             optionRow.padding(.top, 20)
+            if routePrefilled, !recorded, let selected, selected != .missed {
+                Button("احفظ التسجيل") { record(selected, kind: cell.isFriday ? (selected == .alone ? .dhuhr : fridayKind) : nil) }
+                    .buttonStyle(.madarPlain).frame(maxWidth: .infinity, minHeight: 48)
+                    .overlay { Capsule().stroke(theme.accent, lineWidth: 1) }
+                    .padding(.top, 10).accessibilityIdentifier("prayer-log-prefill-save")
+            }
             if selected == .missed { missedPanel.padding(.top, 14) }
             if showsHeart { heartSection.padding(.top, 22) }
         }
@@ -1669,8 +1853,9 @@ private struct PrayerStatisticsView: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var editing: PrayerDayRoute?
 
-    init(session: AppSession, snapshot: PrayerSnapshot, select: @escaping (PrayerCell) -> Void) {
+    init(session: AppSession, snapshot: PrayerSnapshot, initialDay: GregorianDay? = nil, select: @escaping (PrayerCell) -> Void) {
         self.session = session; self.fallback = snapshot; self.select = select
+        _editing = State(initialValue: initialDay.map { PrayerDayRoute(day: $0) })
     }
     /// Read afresh so an edit in the day sheet shows here at once.
     private var snapshot: PrayerSnapshot { (try? session.prayerSnapshot(at: session.prayerNow())) ?? fallback }
@@ -2377,14 +2562,18 @@ private struct PrayerNightLoggingSheet: View {
     @State private var wird: (line: String, logged: Bool)?
     @Environment(\.roomTheme) private var theme
     @Environment(\.dynamicTypeSize) private var typeSize
-    init(session: AppSession, snapshot: PrayerSnapshot, finished: @escaping () -> Void) {
+    init(session: AppSession, snapshot: PrayerSnapshot, initialNight: GregorianDay? = nil, finished: @escaping () -> Void) {
         self.session = session; self.snapshot = snapshot; self.finished = finished
-        _selectedNight = State(initialValue: snapshot.nightDefault)
-        let previous = snapshot.nights.first { $0.night == snapshot.nightDefault }
+        let selectedNight = initialNight ?? snapshot.nightDefault
+        _selectedNight = State(initialValue: selectedNight)
+        let previous = snapshot.nights.first { $0.night == selectedNight }
         _rakaat = State(initialValue: previous?.rakaat ?? 0); _witr = State(initialValue: previous?.witr ?? false)
     }
     private var formatter: MadarNumberFormatter { .init(style: session.string("core.numerals") == "western" ? .western : .hindi) }
-    private var eligibleNights: [GregorianDay] { (0..<7).map { snapshot.nightDefault.adding(days: -$0) } }
+    private var eligibleNights: [GregorianDay] {
+        let recent = (0..<7).map { snapshot.nightDefault.adding(days: -$0) }
+        return recent.contains(selectedNight) ? recent : [selectedNight] + recent
+    }
     private var footprint: [GregorianDay] { (0..<30).reversed().map { snapshot.nightDefault.adding(days: -$0) } }
     private var restoreNeeded: Bool { (try? session.qiyamRequiresRestore(selectedNight)) ?? true }
     private var logged: Bool { hasRecord(selectedNight) }

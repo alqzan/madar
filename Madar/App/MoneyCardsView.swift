@@ -6,6 +6,9 @@ import MadarMoney
 struct MoneyCardsView: View {
     let app: AppSession
     @Binding var revealed: Bool
+    @Binding var initialCardID: UUID?
+    @Binding var initialTab: String?
+    @Binding var initialRouteRequestID: UUID?
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicType
@@ -19,12 +22,17 @@ struct MoneyCardsView: View {
     @State private var failure: String?
     @State private var jarOpen = false
     @State private var adding = false
+    @State private var appliedRouteRequestID: UUID?
+    @State private var routeTargetUnavailable = false
     private let tabs = ["نظرة", "متى يخرج النقد", "تقويم السداد", "المطابقة"]
     private var service: AppMoneyService { .init(app: app) }
     private var theme: RoomTheme { .init(room: "mal", dark: colorScheme == .dark) }
     private var visible: Bool { revealed || !app.bool("core.hideMoneyUntilTouch") }
     private func amount(_ minor: Int) -> String { visible ? service.amount(minor) : "•••" }
-    private var card: MoneyCardReading? { reading?.cards.first { $0.id == selected } ?? reading?.cards.first }
+    private var card: MoneyCardReading? {
+        guard !routeTargetUnavailable else { return nil }
+        return reading?.cards.first { $0.id == selected } ?? reading?.cards.first
+    }
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
@@ -36,6 +44,10 @@ struct MoneyCardsView: View {
                     Button { adding = true } label: { Image(systemName: "plus").frame(width: 44, height: 44).overlay { Circle().stroke(theme.color("reserveText"), lineWidth: 1) } }
                         .buttonStyle(.madarPlain).accessibilityLabel("أضف بطاقة").accessibilityIdentifier("money-cards-add")
                 }.padding(.top, 8)
+                if routeTargetUnavailable {
+                    Text("البطاقة المطلوبة لم تعد موجودة. اختر بطاقة أخرى من القائمة إن رغبت.")
+                        .font(MadarTypography.caption()).foregroundStyle(theme.secondaryInk).accessibilityIdentifier("money-card-route-unavailable")
+                }
                 if let reading {
                     if reading.cards.isEmpty {
                         Text("لا بطاقات بعد").font(MadarTypography.cardTitle())
@@ -60,15 +72,15 @@ struct MoneyCardsView: View {
                             }
                         }
                     }
-                } else if let failure { Text(failure).font(MadarTypography.body()); Button("أعِد المحاولة", action: load).frame(minHeight: 44) }
+                } else if let failure { Text(failure).font(MadarTypography.body()); Button("أعِد المحاولة") { load(routeRequestID: initialRouteRequestID) }.frame(minHeight: 44) }
                 else { ProgressView().frame(maxWidth: .infinity, minHeight: 250) }
             }.padding(.horizontal, 20).padding(.bottom, 30).frame(maxWidth: 620).frame(maxWidth: .infinity)
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).environment(\.roomTheme, theme)
             .toolbarVisibility(.hidden, for: .navigationBar).accessibilityIdentifier("money-cards")
-            .task { load() }.onChange(of: app.prayerRevision) { load() }
+            .task(id: initialRouteRequestID) { load(routeRequestID: initialRouteRequestID) }.onChange(of: app.prayerRevision) { load() }
             .sheet(item: $source) { MoneySourceView(app: app, detail: $0, visible: visible).environment(\.roomTheme, theme) }
             .navigationDestination(isPresented: $jarOpen) { MoneyCashbackView(app: app, revealed: $revealed) }
-            .sheet(isPresented: $adding, onDismiss: load) { MoneyCardSheet(app: app) }
+            .sheet(isPresented: $adding, onDismiss: { load() }) { MoneyCardSheet(app: app) }
     }
     private var tabStrip: some View {
         HStack(spacing: 0) {
@@ -82,7 +94,7 @@ struct MoneyCardsView: View {
     }
     private func miniature(_ c: MoneyCardReading) -> some View {
         let active = card?.id == c.id
-        return Button { selected = c.id; minimum = false } label: {
+        return Button { selected = c.id; minimum = false; routeTargetUnavailable = false } label: {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .top) {
                     Text(c.name).font(.custom("thmanyahserifdisplay-Bold", size: 16, relativeTo: .subheadline)).lineLimit(2).fixedSize(horizontal: false, vertical: true)
@@ -107,7 +119,8 @@ struct MoneyCardsView: View {
                 .overlay { RoundedRectangle(cornerRadius: 9).stroke(theme.background.opacity(0.35), lineWidth: 0.6).padding(5) }
                 .shadow(color: theme.ink.opacity(0.14), radius: 5, y: 4)
         }.buttonStyle(.madarPlain).accessibilityLabel(c.name + (c.kind == "credit" ? "، عليك " + amount(c.owedMinor) : "، ليست دينًا ائتمانيًا"))
-            .accessibilityIdentifier("money-card-" + c.name)
+            .accessibilityAddTraits(active ? .isSelected : [])
+            .accessibilityIdentifier("money-card-" + c.name + "-" + c.id.uuidString)
     }
     private func isPrimary(_ c: MoneyCardReading) -> Bool { c.kind == "credit" && c.id == reading?.cards.first(where: { $0.kind == "credit" })?.id }
     /// Gold-edged dark card for the main credit card, navy for the others, olive-gold for debit and prepaid (canonical 16-Z-R19-cards-1).
@@ -380,8 +393,20 @@ struct MoneyCardsView: View {
             Text(labels.secondary).font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
         }.frame(width: width).multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
     }
-    private func load() {
-        do { reading = try service.loadCards(); failure = nil } catch { reading = nil; failure = "لم تكتمل قراءة البطاقات. حاول مرة أخرى." }
+    private func load(routeRequestID: UUID? = nil) {
+        do {
+            let loaded = try service.loadCards()
+            reading = loaded
+            failure = nil
+            guard let routeRequestID, routeRequestID != appliedRouteRequestID else { return }
+            appliedRouteRequestID = routeRequestID
+            routeTargetUnavailable = false
+            selectedDue = nil
+            tab = tabs.contains(initialTab ?? "") ? (initialTab ?? "نظرة") : "نظرة"
+            guard let initialCardID else { return }
+            if loaded.cards.contains(where: { $0.id == initialCardID }) { selected = initialCardID }
+            else { routeTargetUnavailable = true }
+        } catch { reading = nil; failure = "لم تكتمل قراءة البطاقات. حاول مرة أخرى." }
     }
 }
 

@@ -2,9 +2,10 @@ import XCTest
 import UIKit
 
 @MainActor final class HabitsUITests:XCTestCase {
-    private func app(_ fixture:String, appearance:String = "light", now:String = "2026-10-15T20:00:00+03:00", firstCalendar: String? = nil)->XCUIApplication {
+    private func app(_ fixture:String, appearance:String = "light", now:String = "2026-10-15T20:00:00+03:00", firstCalendar: String? = nil, habitWriteHoldMS: Int? = nil)->XCUIApplication {
         let app=XCUIApplication();var environment=["MADAR_UI_STORE_ID":UUID().uuidString,"MADAR_UI_HABIT_FIXTURE":fixture,"MADAR_UI_NOW":now,"MADAR_UI_SIZE":"L","MADAR_UI_THEME":appearance]
         if let firstCalendar { environment["MADAR_UI_FIRST_CALENDAR"] = firstCalendar }
+        if let habitWriteHoldMS { environment["MADAR_UI_HABIT_WRITE_HOLD_MS"] = String(habitWriteHoldMS) }
         app.launchEnvironment=environment;app.launch();return app
     }
     private func open(_ app:XCUIApplication){let block=app.descendants(matching:.any).matching(identifier:"bahw-block-habits").firstMatch;XCTAssertTrue(block.waitForExistence(timeout:20));let header=app.buttons["bahw-habits-open"]; if header.exists { header.tap() } else { block.tap() };XCTAssertTrue(app.staticTexts["habits-title"].waitForExistence(timeout:10))}
@@ -103,6 +104,58 @@ import UIKit
         XCTAssertTrue(row.waitForExistence(timeout: 5), app.debugDescription)
         shot(app, "M4-same-day-trip-home-only-L")
         XCTAssertTrue(row.label.contains("مجمّدة"), row.label)
+    }
+    func testRapidCountHabitTapsDoNotDoubleLogWhileSaving() throws {
+        continueAfterFailure = false
+        let app = app("partialDuration", habitWriteHoldMS: 1200); open(app)
+        app.buttons["habits-view-all"].tap()
+        let quick = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "habit-quick-")).firstMatch
+        XCTAssertTrue(quick.waitForExistence(timeout: 5), app.debugDescription)
+        quick.tap()
+        XCTAssertFalse(quick.isEnabled, "A count/duration completion stays locked until its write finishes.")
+        if quick.isHittable { quick.tap() }
+
+        let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isEnabled == true"), object: quick)
+        XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: 10), .completed)
+        let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "habit-row-")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 5)); row.tap()
+        let progress = app.staticTexts["habit-progress"]
+        XCTAssertTrue(progress.waitForExistence(timeout: 5))
+        XCTAssertTrue(progress.label.contains("١٥ من ٣٠"), progress.label)
+        app.buttons["تمّ"].tap()
+
+        XCTAssertTrue(quick.isEnabled); quick.tap()
+        XCTAssertFalse(quick.isEnabled, "A new intentional tap is accepted after the previous save.")
+        let enabledAgain = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isEnabled == true"), object: quick)
+        XCTAssertEqual(XCTWaiter.wait(for: [enabledAgain], timeout: 10), .completed)
+        row.tap()
+        XCTAssertTrue(progress.waitForExistence(timeout: 5))
+        XCTAssertTrue(progress.label.contains("٣٠ من ٣٠"), progress.label)
+    }
+    func testRapidLobbyHabitTapsDoNotDoubleLogWhileSaving() throws {
+        continueAfterFailure = false
+        let app = app("lobbySix", habitWriteHoldMS: 1200)
+        let ring = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "bahw-habit-ring-")).firstMatch
+        XCTAssertTrue(ring.waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertTrue(ring.label.contains("الماء"), ring.label)
+        for _ in 0..<6 where !ring.isHittable { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(ring.isHittable)
+
+        ring.tap()
+        XCTAssertFalse(app.staticTexts["habits-title"].exists, "A quick-log tap should keep the lobby visible; only the header opens the room.")
+        XCTAssertFalse(ring.isEnabled, "The lobby disables this habit's other entry points until its write finishes.")
+        if ring.isHittable { ring.tap() }
+        let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isEnabled == true"), object: ring)
+        XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: 10), .completed)
+        let first = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", "١ من ٨"), object: ring)
+        XCTAssertEqual(XCTWaiter.wait(for: [first], timeout: 5), .completed, ring.label)
+
+        ring.tap()
+        XCTAssertFalse(ring.isEnabled)
+        let enabledAgain = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isEnabled == true"), object: ring)
+        XCTAssertEqual(XCTWaiter.wait(for: [enabledAgain], timeout: 10), .completed)
+        let second = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", "٢ من ٨"), object: ring)
+        XCTAssertEqual(XCTWaiter.wait(for: [second], timeout: 5), .completed, ring.label)
     }
     func testPartialDurationIsNotACompleteDayAndPastSaveNamesItsAmount() throws {
         continueAfterFailure = false
@@ -333,6 +386,24 @@ import UIKit
         XCTAssertTrue(app.staticTexts[firstName].waitForExistence(timeout: 10), app.debugDescription)
         app.open(URL(string: "madar://bahw/habits/\(secondID)")!)
         XCTAssertTrue(app.staticTexts[secondName].waitForExistence(timeout: 10), app.debugDescription)
+    }
+
+    func testBahwRoutesReplaceOrCloseAnOpenSubroom() throws {
+        continueAfterFailure = false
+        let app = app("showcase")
+        XCTAssertTrue(app.descendants(matching: .any)["bahw-greeting"].waitForExistence(timeout: 15), app.debugDescription)
+        app.open(URL(string: "madar://bahw/habits")!)
+        XCTAssertTrue(app.staticTexts["habits-title"].waitForExistence(timeout: 10), app.debugDescription)
+        app.open(URL(string: "madar://bahw")!)
+        XCTAssertTrue(app.descendants(matching: .any)["bahw-greeting"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(app.staticTexts["habits-title"].exists)
+
+        app.open(URL(string: "madar://bahw/year")!)
+        XCTAssertTrue(app.descendants(matching: .any)["bahw-year-hero"].waitForExistence(timeout: 10), app.debugDescription)
+        app.open(URL(string: "madar://bahw/habits")!)
+        XCTAssertTrue(app.staticTexts["habits-title"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(app.descendants(matching: .any)["bahw-year-hero"].exists)
+        app.terminate()
     }
 
     func testOverdueYearlyHabitShowsTheGentleNudge() throws {
