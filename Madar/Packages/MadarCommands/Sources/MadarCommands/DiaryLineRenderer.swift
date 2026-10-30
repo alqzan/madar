@@ -98,7 +98,7 @@ public struct DiaryAutoLine: Identifiable, Codable, Equatable, Sendable {
             let name = habit.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "عادتك" : habit.name.trimmingCharacters(in: .whitespacesAndNewlines)
             let unit = (latest.unit ?? "").trimmingCharacters(in: .whitespaces)
             let forms: [String: [String]] = ["minutes": ["دقيقة واحدة", "دقيقتين", "دقائق", "دقيقة"], "دقيقة": ["دقيقة واحدة", "دقيقتين", "دقائق", "دقيقة"],
-                "steps": ["خطوة واحدة", "خطوتين", "خطوات", "خطوة"], "pages": ["صفحة واحدة", "صفحتين", "صفحات", "صفحة"], "صفحة": ["صفحة واحدة", "صفحتين", "صفحات", "صفحة"],
+                "steps": ["خطوة واحدة", "خطوتين", "خطوات", "خطوة"], "pages": ["صفحة واحدة", "صفحتين", "صفحات", "صفحة"], "chapters": ["فصلًا واحدًا", "فصلين", "فصول", "فصلًا"], "صفحة": ["صفحة واحدة", "صفحتين", "صفحات", "صفحة"],
                 "كوب": ["كوبًا واحدًا", "كوبين", "أكواب", "كوبًا"], "مرة": ["مرة واحدة", "مرتين", "مرات", "مرة"]]
             let amount = rows.contains { ($0.unit ?? "").isEmpty } && total == 1 ? nil : unit.isEmpty ? (total > 1 ? counted(total, forms["مرة"]!) : nil) : forms[unit].map { counted(total, $0) } ?? digits.string(total) + " " + unit
             let text = MadarInlineText.joined([name, amount].compactMap { $0 })

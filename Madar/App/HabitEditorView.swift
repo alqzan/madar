@@ -28,6 +28,14 @@ struct HabitEditorView:View {
     @State private var monthDays=""
     /// The target the reader typed for each unit, so switching minutes ↔ pages and back keeps it.
     @State private var unitTargets:[String:Int]=[:]
+    /// The reader's pace, read once when a «القراءة» goal is edited, so the editor can say what the goal costs in minutes or pages.
+    @State private var paceGoal:MihbaraReadingGoal?
+    private var readingHint:String? {
+        let unit=rule.unit ?? "minutes",digits=MadarNumberFormatter(style: session.string("core.numerals") == "western" ? .western : .hindi)
+        if unit == "chapters",paceGoal != nil,paceGoal?.pagesPerChapter == nil { return "الفصول تُحسب للكتب التي لها فهرس: الورقي بعد إضافة فهرسه، وملفات PDF التي فيها فهرس." }
+        guard let estimate=paceGoal?.estimate(left:rule.target,unit:unit) else { return "كلما قرأت أكثر عرفتُ كم يأخذ هدفك من وقتك." }
+        return "نحو "+habitUnitCount(estimate.amount,estimate.unit,digits,genitive:true)+" في اليوم بحسب وتيرتك الأخيرة."
+    }
     @State private var minimumOn=false
     @State private var windowOn=false
     @State private var homeOnly=false
@@ -77,8 +85,9 @@ struct HabitEditorView:View {
                         if source == "reading" {
                             Picker("تُقاس",selection:Binding(get:{rule.unit ?? "minutes"},set:{unit in
                                 unitTargets[rule.unit ?? "minutes"]=rule.target
-                                rule.measure = unit == "pages" ? .count : .duration;rule.unit=unit;rule.target=unitTargets[unit] ?? (unit == "pages" ? 10 : 15);rule.minimum=rule.minimum.map{min($0,rule.target)}
-                            })) {Text("بالدقائق").tag("minutes");Text("بالصفحات").tag("pages")}.pickerStyle(.segmented).disabled(reading != nil).accessibilityIdentifier("habit-reading-unit")
+                                rule.measure = unit == "minutes" ? .duration : .count;rule.unit=unit;rule.target=unitTargets[unit] ?? (unit == "pages" ? 10 : unit == "chapters" ? 1 : 15);rule.minimum=rule.minimum.map{min($0,rule.target)}
+                            })) {Text("بالدقائق").tag("minutes");Text("بالصفحات").tag("pages");Text("بالفصول").tag("chapters")}.pickerStyle(.segmented).accessibilityIdentifier("habit-reading-unit")
+                            if let hint=readingHint { Text(hint).font(MadarTypography.caption()).foregroundStyle(theme.accent).accessibilityIdentifier("habit-reading-hint") }
                             Text("تُحسب من جلسات القراءة في المحبرة: الوقت وأنت تقرأ فعلًا، والصفحات الجديدة فقط. الجلسة الأقصر من دقيقة لا تُحسب.").font(MadarTypography.fine()).foregroundStyle(theme.secondaryInk)
                         }
                         if source == "walking" {
@@ -121,6 +130,11 @@ struct HabitEditorView:View {
                 }.padding(20)
             }
         }.background(theme.background.ignoresSafeArea()).foregroundStyle(theme.ink).tint(theme.accent).environment(\.timeZone,session.activePlace.timeZone)
+        .task(id:source) {
+            guard source == "reading" else { return }
+            let service=AppMihbaraService(app:session)
+            if let loaded=try? service.load() { paceGoal=try? service.readingGoal(today:loaded.day,book:loaded.books.first{$0.shelf == "reading"}) }
+        }
         .onAppear {
             let initialName = reading?.name ?? (initialSource == "reading" ? "القراءة" : "")
             let initialSource = reading?.source ?? self.initialSource

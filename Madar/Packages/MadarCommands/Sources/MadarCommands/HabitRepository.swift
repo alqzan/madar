@@ -122,14 +122,18 @@ public struct HabitTime: Equatable, Sendable {
                 case "reading":
                     // §7.6: a session under 60 active seconds keeps its place but never counts for the habit.
                     // Both units are offered per day; the engine keeps the one the period's rule measures.
-                    var seconds: [String: Int] = [:], pages: [String: Int] = [:]
+                    // Owner, 30 Oct: «فصول» is the third unit, counted from the pages read and the book's outline (a book with no outline adds none).
+                    var seconds: [String: Int] = [:], pages: [String: Int] = [:], chapters: [String: Double] = [:]
+                    let outlines = Dictionary(try context.fetch(FetchDescriptor<Book>()).filter { $0.deletedAt == nil && $0.mergedInto == nil }.map { ($0.id, ($0.pages, ReadingChapters.chapterCount(tocJSON: $0.tocJSON))) }, uniquingKeysWith: { first, _ in first })
                     for row in try context.fetch(FetchDescriptor<ReadingSession>()) where row.deletedAt == nil && row.mergedInto == nil && row.activeSeconds >= 60 && !row.dayKey.isEmpty {
                         seconds[row.dayKey, default: 0] += row.activeSeconds; pages[row.dayKey, default: 0] += max(0, row.pagesCounted)
+                        if let id = row.bookID, let outline = outlines[id], let share = ReadingChapters.chapters(pagesRead: row.pagesCounted, bookPages: outline.0, chapterCount: outline.1) { chapters[row.dayKey, default: 0] += share }
                     }
                     facts = try seconds.keys.sorted().flatMap { key -> [HabitFact] in
                         let day = try GregorianDay(key)
                         return [HabitFact(id: StableIdentity.uuid(for: "habit-reading:\(key):minutes"), day: day, periodKey: "", delta: seconds[key, default: 0] / 60, unit: "minutes"),
-                                HabitFact(id: StableIdentity.uuid(for: "habit-reading:\(key):pages"), day: day, periodKey: "", delta: pages[key, default: 0], unit: "pages")]
+                                HabitFact(id: StableIdentity.uuid(for: "habit-reading:\(key):pages"), day: day, periodKey: "", delta: pages[key, default: 0], unit: "pages"),
+                                HabitFact(id: StableIdentity.uuid(for: "habit-reading:\(key):chapters"), day: day, periodKey: "", delta: Int(chapters[key, default: 0].rounded(.down)), unit: "chapters")]
                     }
                 case "diaryLine":
                     let entries = try context.fetch(FetchDescriptor<Entry>()).filter { $0.deletedAt == nil && $0.mergedInto == nil && $0.source != "autoPinned" && !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }

@@ -265,7 +265,7 @@ struct MihbaraHomeView: View {
             let loaded = try service.load()
             reading = loaded
             // A failed read keeps the last card; a nil card would offer to create a habit that may already exist.
-            do { readingGoal = try service.readingGoal(today: loaded.day) } catch { app.errorMessage = madarUserMessage(error) }
+            do { readingGoal = try service.readingGoal(today: loaded.day, book: loaded.books.first { $0.shelf == "reading" }) } catch { app.errorMessage = madarUserMessage(error) }
             shelfReadFailed = false
             shelfReadError = nil
             let books = loaded.books

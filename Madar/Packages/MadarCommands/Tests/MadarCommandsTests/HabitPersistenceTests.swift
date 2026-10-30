@@ -298,4 +298,21 @@ import MadarData
         var wrong = m; wrong.measure = .count; wrong.unit = "سطر"
         #expect(HabitCommand.parse("habit.save", try payload(UUID(), wrong, source:"reading")) == nil)
     }
+    /// Owner, 30 Oct: «فصول» is counted from pages read and the book's outline: 45 pages of a 240-page, 12-chapter book is
+    /// 45 × 12 / 240 = 2.25 chapters, so 2 whole chapters; a book with no outline and a session under 60 seconds add nothing.
+    @Test func readingHabitCountsChaptersFromTheOutline() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("HabitChapters-\(UUID())"); defer { try? FileManager.default.removeItem(at:root) }
+        let container = try MadarContainerFactory.makeLocal(at:root), bus = CommandBus(adapter:DurableCommandAdapter(container:container,lockDirectory:root,transactionClock:{$0}))
+        let context = ModelContext(container)
+        let outlined = Book(); outlined.pages = 240; outlined.tocJSON = try JSONSerialization.data(withJSONObject: (0..<12).map { ["title":"فصل \($0)","page":1 + $0 * 20] as [String:Any] }); context.insert(outlined)
+        let plain = Book(); plain.pages = 240; context.insert(plain)
+        for (book, seconds, pages) in [(outlined.id, 1200, 30), (outlined.id, 600, 15), (outlined.id, 45, 20), (plain.id, 1200, 40)] {
+            let row = ReadingSession(); row.bookID = book; row.dayKey = "2026-10-15"; row.activeSeconds = seconds; row.pagesCounted = pages; context.insert(row)
+        }
+        try context.save()
+        let id = UUID(); var rule = HabitRule(effectiveFrom:try GregorianDay("2026-10-15")); rule.measure = .count; rule.unit = "chapters"; rule.target = 3
+        #expect(try await bus.execute(.init(name:"habit.save",payload:.object(payload(id,rule,source:"reading")),issuedAt:now),now:now).status == .applied)
+        let reading = try #require(HabitRepository(context:ModelContext(container)).readings(at:now).first { $0.id == id })
+        #expect(reading.summary.current?.value == 2 && reading.summary.current?.met == false)
+    }
 }

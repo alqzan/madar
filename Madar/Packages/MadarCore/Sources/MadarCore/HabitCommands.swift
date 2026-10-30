@@ -20,7 +20,7 @@ public enum HabitCommand: Codable, Equatable, Sendable {
             if source == "jamaah", rule.target > 5 { return nil }
             if source == "walking" { guard rule.measure == .health, ["steps","exerciseMinutes"].contains(rule.unit ?? "") else {return nil} }
             // §7.1 unit table: reading counts active minutes (default) or pages from the Mihbara's saved sessions.
-            else if source == "reading" { guard rule.measure == .duration && rule.unit == "minutes" || rule.measure == .count && rule.unit == "pages" else { return nil } }
+            else if source == "reading" { guard rule.measure == .duration && rule.unit == "minutes" || rule.measure == .count && (rule.unit == "pages" || rule.unit == "chapters") else { return nil } }
             else if let source {
                 guard rule.measure == .count, rule.unit == ["jamaah":"صلاة","review":"وجه","diaryLine":"سطر"][source] else { return nil }
             }

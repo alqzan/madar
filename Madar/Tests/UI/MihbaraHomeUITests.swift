@@ -41,6 +41,55 @@ import UIKit
     }
 
     /// Owner, 30 Oct: «سلة المحذوفات» brings a deleted book back after the undo toast is gone.
+    /// Owner, 30 Oct: the goal can be minutes, pages or chapters, says what it costs in the other unit from the reader's own pace,
+    /// predicts when the book ends, and can be read past. Values worked by hand from the fixture's six sessions (104 minutes, 40 pages):
+    /// 156 s a page; 10 pages = 26 minutes; 7 pages left = 18.2, so 19 minutes; 40 pages / 14 days, 103 pages left = 36.05, so 37 days.
+    func testFlexibleReadingGoalIsSmartAndCanBeExceeded() throws {
+        continueAfterFailure = false
+        let app = app("home")
+        app.launchEnvironment["MADAR_UI_MIHBARA_READING_DAYS"] = "1"
+        app.launch()
+        open(app)
+        for _ in 0..<6 where !app.buttons["mihbara-goal-create"].isHittable { app.swipeUp(velocity: .slow) }
+        let finish = app.descendants(matching: .any).matching(identifier: "mihbara-goal-finish").firstMatch
+        XCTAssertTrue(finish.waitForExistence(timeout: 8), app.debugDescription)
+        XCTAssertTrue(finish.label.contains("٣٧"), finish.label)
+        app.buttons["mihbara-goal-create"].tap()
+        let save = app.buttons["habit-save"]
+        XCTAssertTrue(save.waitForExistence(timeout: 8), app.debugDescription)
+        let unit = app.descendants(matching: .any)["habit-reading-unit"]
+        unit.buttons["بالصفحات"].tap()
+        let hint = app.descendants(matching: .any).matching(identifier: "habit-reading-hint").firstMatch
+        XCTAssertTrue(hint.waitForExistence(timeout: 4), app.debugDescription)
+        XCTAssertTrue(hint.label.contains("٢٦"), hint.label)
+        shot(app, "MIH-GOAL-pages-hint-L")
+        unit.buttons["بالفصول"].tap()
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "habit-reading-hint").firstMatch.label.contains("دقيقة"), app.debugDescription)
+        unit.buttons["بالصفحات"].tap()
+        save.tap()
+        let left = app.staticTexts["mihbara-goal-left"]
+        XCTAssertTrue(left.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertEqual(left.label, "بقي ٧ صفحات")
+        let estimate = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "بحسب وتيرتك")).firstMatch
+        XCTAssertTrue(estimate.waitForExistence(timeout: 4), "no estimate line")
+        XCTAssertTrue(estimate.label.contains("١٩"), "estimate says: " + estimate.label)
+        for _ in 0..<3 where !app.buttons["mihbara-goal-edit"].isHittable { app.swipeUp(velocity: .slow) }
+        shot(app, "MIH-GOAL-pages-L")
+        // The unit of a goal already made can change, and reading past a small goal is said.
+        app.buttons["mihbara-goal-edit"].tap()
+        XCTAssertTrue(save.waitForExistence(timeout: 8), app.debugDescription)
+        app.descendants(matching: .any)["habit-reading-unit"].buttons["بالدقائق"].tap()
+        let target = app.descendants(matching: .any)["habit-target"]
+        for _ in 0..<10 { target.buttons.element(boundBy: 0).tap() }
+        save.tap()
+        let over = app.staticTexts["mihbara-goal-left"]
+        XCTAssertTrue(over.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertEqual(over.label, "تجاوزت وِرد اليوم بـ ٣ دقائق")
+        for _ in 0..<3 where !app.buttons["mihbara-goal-edit"].isHittable { app.swipeUp(velocity: .slow) }
+        shot(app, "MIH-GOAL-exceeded-L")
+        app.terminate()
+    }
+
     func testDeletedBookComesBackFromTheTrash() throws {
         continueAfterFailure = false
         let app = app("home")

@@ -62,6 +62,8 @@ extension AppSession {
             }
             if ProcessInfo.processInfo.environment["MADAR_UI_MIHBARA_READING_DAYS"] == "1" {
                 // Reading goal (owner, 30 Oct): a week of evening sessions after Isha, today's still short of 15 minutes.
+                // The book has a twelve-chapter outline, so a «فصول» goal can be measured.
+                r.tocJSON = try JSONSerialization.data(withJSONObject: (0..<12).map { ["title": "الفصل \($0 + 1)", "page": 1 + $0 * 21] as [String: Any] })
                 for (back, minutes, pages) in [(6, 22, 9), (5, 0, 0), (4, 18, 7), (3, 31, 12), (2, 9, 3), (1, 16, 6), (0, 8, 3)] where minutes > 0 {
                     let day = try GregorianDay("2026-10-17").adding(days: -back), row = ReadingSession()
                     row.bookID = r.id; row.dayKey = day.description; row.tzID = "Asia/Riyadh"; row.activeSeconds = minutes * 60; row.pagesCounted = pages
