@@ -185,19 +185,27 @@ struct MihbaraMotivationCue: Identifiable {
     }
 
     func epubData(for book: MihbaraBook) throws -> Data {
-        try verifiedBookData(for: book, allowedFormats: ["epub"])
+        try Self.verifiedBookData(container: app.container, for: book, allowedFormats: ["epub"])
     }
 
     func pdfData(for book: MihbaraBook) throws -> Data {
-        try verifiedBookData(for: book, allowedFormats: ["pdf", "pdfScanned"])
+        try Self.verifiedBookData(container: app.container, for: book, allowedFormats: ["pdf", "pdfScanned"])
     }
 
-    private func verifiedBookData(for book: MihbaraBook, allowedFormats: Set<String>) throws -> Data {
+    /// The same checked read off the main actor, for a search that walks every book: reading and hashing a large file must not freeze the screen.
+    func readableBookData(for book: MihbaraBook) async -> Data? {
+        let container = app.container, isEPUB = book.isReadableEPUB
+        return await Task.detached(priority: .userInitiated) {
+            try? Self.verifiedBookData(container: container, for: book, allowedFormats: isEPUB ? ["epub"] : ["pdf", "pdfScanned"])
+        }.value
+    }
+
+    nonisolated private static func verifiedBookData(container: ModelContainer, for book: MihbaraBook, allowedFormats: Set<String>) throws -> Data {
         guard book.kind == "file", allowedFormats.contains(book.format ?? ""),
               let mediaID = book.mediaID, let expectedHash = book.fileHash, expectedHash.count == 64 else {
             throw DataError.invalidValue("هذا الكتاب لا يملك ملفًا صالحًا للقراءة")
         }
-        let context = ModelContext(app.container)
+        let context = ModelContext(container)
         let books = try context.fetch(FetchDescriptor<Book>())
         guard let currentBook = books.first(where: { $0.id == book.id && $0.deletedAt == nil && $0.mergedInto == nil }),
               currentBook.kind == "file", allowedFormats.contains(currentBook.format ?? ""),

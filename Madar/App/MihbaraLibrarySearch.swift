@@ -29,13 +29,13 @@ struct MihbaraTextHit: Identifiable {
             if Task.isCancelled || hits.count >= total { break }
             progress(index + 1)
             if book.isReadableEPUB { hits += await epub(needle, book, service) }
-            else if let data = try? service.pdfData(for: book) { hits += await pdf(needle, book, data) }
+            else if let data = await service.readableBookData(for: book) { hits += await pdf(needle, book, data) }
         }
         return Array(hits.prefix(total))
     }
 
     private static func epub(_ needle: String, _ book: MihbaraBook, _ service: AppMihbaraService) async -> [MihbaraTextHit] {
-        guard let data = try? service.epubData(for: book) else { return [] }
+        guard let data = await service.readableBookData(for: book) else { return [] }
         let file = FileManager.default.temporaryDirectory.appendingPathComponent("MadarSearch-" + UUID().uuidString).appendingPathExtension("epub")
         defer { try? FileManager.default.removeItem(at: file) }
         guard (try? data.write(to: file, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])) != nil,
