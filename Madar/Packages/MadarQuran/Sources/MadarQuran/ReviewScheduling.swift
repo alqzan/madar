@@ -174,6 +174,8 @@ public enum QuranReviewEngine {
     public static let neverReviewedRisk = 2.5
     public static let consistencyWindowDays = 14
     public static let halfWirdFactor = 2.0
+    public static let goodGrowthFactor = 1.3
+    public static let goodGrowthOnTimeFraction = 0.8
 
     private static let easeMultipliers: [QuranReviewRating: Double] = [
         .needsMastery: 0.82,
@@ -203,7 +205,11 @@ public enum QuranReviewEngine {
         case .needsMastery:
             return max(1, preset.needsDays)
         case .good:
-            return max(1, (Double(preset.goodDays) * ease).roundedInt)
+            let base = max(1, (Double(preset.goodDays) * ease).roundedInt)
+            // Owner, 30 Oct: a portion that stays «جيد» on time spaces out ×1.3 each time, up to the ladder's first rung
+            // (past that only «متقن» climbs, and a portion already beyond it keeps the plain «جيد» gap). A review before the last gap was reached does not stretch it.
+            guard previousDays > 0, let cap = preset.ladder.first, previousDays <= cap, Double(max(0, elapsedDays)) >= Double(previousDays) * goodGrowthOnTimeFraction else { return base }
+            return max(base, min((Double(previousDays) * goodGrowthFactor).roundedInt, max(cap, base)))
         case .mastered:
             let baseline = previousDays > 0 ? Double(previousDays) / ease : 0
             if previousDays <= 0 || baseline < Double(preset.goodDays) * 0.75 {

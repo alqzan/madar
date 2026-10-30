@@ -31,6 +31,22 @@ final class ReviewSchedulingTests: XCTestCase {
         XCTAssertEqual(QuranReviewEngine.nextInterval(previousDays: 60, rating: .needsMastery), 1)
     }
 
+    /// Owner, 30 Oct: «جيد» on time stretches the gap ×1.3 up to the first rung (7 days, balanced); expected values worked by hand.
+    func testRepeatedGoodSpacesOutUpToTheFirstRung() {
+        func good(_ previous: Int, elapsed: Int) -> Int { QuranReviewEngine.nextInterval(previousDays: previous, rating: .good, elapsedDays: elapsed) }
+        XCTAssertEqual(good(3, elapsed: 3), 4)    // 3 × 1.3 = 3.9
+        XCTAssertEqual(good(4, elapsed: 4), 5)    // 5.2
+        XCTAssertEqual(good(5, elapsed: 5), 7)    // 6.5, up to the 7-day rung
+        XCTAssertEqual(good(6, elapsed: 6), 7)    // 7.8, capped at 7
+        XCTAssertEqual(good(7, elapsed: 7), 7)    // already at the rung
+        // On time means at least 80٪ of the last gap: 4 of 5 days counts, 3 of 5 does not.
+        XCTAssertEqual(good(5, elapsed: 4), 7)
+        XCTAssertEqual(good(5, elapsed: 3), 3)
+        // Beyond the rung only «متقن» climbs; «جيد» keeps the plain gap. A first «جيد» is unchanged.
+        XCTAssertEqual(good(14, elapsed: 14), 3)
+        XCTAssertEqual(good(0, elapsed: 0), 3)
+    }
+
     func testEaseAndLateMasteryUseTheApprovedBoundsAndRounding() {
         XCTAssertEqual(QuranReviewEngine.nextEase(1, rating: .needsMastery), 0.82, accuracy: 0.0001)
         XCTAssertEqual(QuranReviewEngine.nextEase(1, rating: .good), 0.95, accuracy: 0.0001)
